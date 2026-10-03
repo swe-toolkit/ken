@@ -162,9 +162,18 @@ it. Five items, delivered in the two increments below:
      falsifiers are mutations at the fate sites, never at refusals R cannot
      reach; a fate site no corpus row reaches is recorded as unexercised.
 
-     The compiler forces a `Residual` arm at every exhaustive `match` on
-     `LoweringOperand`; the census row set is the criterion population at
-     the exact SHA. No boolean helper groups R with K.
+     Population = refutable probes (if-let/while-let/let-else/matches!)
+     plus `LoweringOperand` catch-all arms (rustc-typed via
+     `wildcard_enum_match_arm`), at the exact SHA. No `LoweringOperand`
+     catch-all remains in production lowering; exhaustive matches with an
+     explicit `Residual` arm are compiler-forced and need no row (Architect
+     `evt_52c5f8gxxhp99`). Each catch-all becomes explicit `Carried`,
+     `Residual` and `Specialized` arms (an inner `_` only inside
+     `Specialized` over `Lowered`), with the R arm's disposition stated.
+     Every catch-all in the syntax scan appears in the clippy set or carries
+     a one-line reason. The `px8-ds-test-support` arm at `units.rs:4279` is
+     excluded like the cfg(test) rows while no shipped manifest enables the
+     feature. No boolean helper groups R with K.
 3. **The ABI slot kind.** The planner issues a residual slot kind for any
    capture or frame slot that must carry R across a generated-context or
    declared-call boundary. Any other boundary carries the decoded Child.
@@ -286,6 +295,12 @@ The ruling carries the code and is authoritative where this summary differs.
 
 - **AC-0 (done).** The fan-in tables above, and the cut confirmed.
 - **AC-1 (I-0).**
+  - Catch-all ban (`evt_52c5f8gxxhp99`): the clippy-filtered
+    `wildcard_enum_match_arm` run at the exact SHA, with the census feature
+    union, reports 0 `LoweringOperand` catch-alls outside the listed
+    exclusions. Deleting the `Residual` arm at `units.rs:9396` is a compile
+    error (E0004). A rewrite that turns a passing `rt_parity_native` row
+    into a refusal is a stop to the Architect.
   - `generated_entry_capsule_outer_carried` passes 1/1 with the typed
     identity-41 trap.
   - The exits are enforced by module privacy. `CarriedResidualWord`'s word
@@ -377,6 +392,11 @@ The ruling carries the code and is authoritative where this summary differs.
    `evt_65eqjan51qtgp`). The rewalk obligation is keyed on
    `recursive_residual_for_specialization` (`evt_34wv6tryq2v64`); that much
    is retained.
+
+4. R is absorbed by `_` or binding catch-all arms on `LoweringOperand`.
+   Keyed on "matches none of the named variants" (`evt_52c5f8gxxhp99`,
+   §1a 4, advancing). Under the shared predicate below: the catch-all ban is
+   the consumer half of declaring representation per slot.
 
 **Shared predicate (Architect `evt_65eqjan51qtgp`):** the R/K representation
 of a position (an operand, a field or a slot member) is read off a nearby
