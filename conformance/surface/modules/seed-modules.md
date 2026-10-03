@@ -260,19 +260,18 @@ rules**, and the `Σ`/`trusted_base()` identity against the **landed** kernel.
   scope. A resolver that over-applies the new clash rule into lexical binders
   rejects and fails this case.
 
-### surface/modules/prelude-clash-rejected-rename-local-resolves
-- spec: `33 §3.3`/`§4` (prelude is an unshadowable primitive floor)
+### surface/modules/protected-name-binding-rejected-renamed-local-resolves
+- spec: `33 §3.3` (no source binding may introduce a name in B)
 - given: paired clients: (a) declare `def Bool = Nat`; (b) instead declare
   `def LocalBool = Bool`, leaving the registered prelude `Bool`
   untouched
-- expect: (a) rejects at the surface with **`AmbiguousReference`** for `Bool`,
-  identifying the local and prelude sources; (b) accepts, with `LocalBool` and
-  the prelude `Bool` resolving to distinct `GlobalId`s. There is no prelude
-  exclusion input or positive opt-out arm.
-- why: N3 AC2. Renaming only the local changes reject to accept while the
-  prelude environment is fixed. A warn-and-allow policy, silent local win, or
-  resolver that aliases `LocalBool` to prelude `Bool` fails. **RED UNTIL N3 LANE
-  B.**
+- expect: (a) a hard surface error at the introduction of the protected name
+  `Bool`; the diagnostic kind is not further specified here. (b) accepts, with
+  `LocalBool` and the prelude `Bool` resolving to distinct `GlobalId`s. There is
+  no prelude exclusion input or positive opt-out arm.
+- why: N3 AC2. Renaming only the new binding outside B changes the protected-name
+  error to acceptance while the prelude environment is fixed. This is not an
+  ordinary non-B ambiguity check. **RED UNTIL N3 LANE B.**
 
 ### surface/modules/per-name-rename-parses-hiding-is-syntax-error
 - spec: `32` import EBNF, `33 §3.2` (selection item rename; no `hiding` form)
@@ -704,45 +703,38 @@ is historical evidence, not a sentinel retained beside the current contract.
   The combined arm makes both meanings visible at the same spelling; a parser
   or resolver must not choose the module path by order.
 
-### surface/modules/prelude-floor-clash-and-lookalike-matrix
+### surface/modules/prelude-protected-name-bindings-and-lookalike-matrix
 
-- promise class: **durable invariant** — the immutable floor fails closed on
-  every non-canonical same-spelling origin
-- spec: `33 §3.3` (top-level local × prelude clash), `39 §2.0`
+- promise class: **durable invariant** — no source binding introduces a name in
+  the protected built-in set B
+- spec: `33 §3.3` (protected-name introduction ban), `39 §2.0`
 - given: use a fresh strict-roots environment per row. For each of the eight
-  inductive parents in the table above:
-
-  1. keep only the parent spelling canonical while renaming all constructors;
-  2. in separate entries, keep only one constructor spelling canonical while
-     renaming the parent and all sibling constructors;
-  3. as the reaching positive, rename the parent and every constructor while
-     preserving the same declaration shape.
-
-  For constructor-free `Char`, pair `def Char = Int` with the same-production
-  positive `def LocalChar = Int`. For transparent `Pair` and its three companion
-  bindings, run the independent four-row collision matrix in
-  `seed-pair-strict-boundary.md`; pair every same-spelling reject with an
-  all-renamed transparent positive.
-- expect: every same-spelling row raises `AmbiguousReference` naming the one
-  retained floor spelling before any declaration or `GlobalId` is allocated.
-  Every all-renamed positive accepts. Each renamed inductive former and
-  constructor has an id distinct from every floor id, and each constructor's
-  parent is its renamed local former; `LocalChar` is likewise a distinct checked
-  transparent id. The Pair-family rows likewise reject before allocation, while
-  every renamed transparent lookalike receives a fresh id. Every row preserves
-  `trusted_base()`.
+  inductive parent names in the table above, attempt a same-shaped declaration
+  retaining only the protected parent spelling, then a reaching positive with
+  that parent and every constructor renamed. For the bare constructor families
+  in B (`Auth`, `Bool`, `List`, `Nat`, `Option`, `Result`, and `Utf8Error`),
+  repeat the one-name-at-a-time negative and all-renamed positive; do not treat
+  `ResourceKind`'s scoped constructors as bare B names. For constructor-free
+  `Char`, pair `def Char = Int` with the positive `def LocalChar = Int`. For
+  transparent `Pair` and its three companion bindings, run the independent
+  protected-name matrix in `seed-pair-strict-boundary.md`.
+- expect: every attempted B-name introduction is a hard surface error at the
+  binding site; the diagnostic kind is not further specified here. All-renamed
+  positives accept, with distinct identities and correct constructor parentage;
+  `LocalChar` is a distinct checked transparent identity. The `Pair`-family
+  negatives are likewise protected-name errors, and renamed lookalikes accept.
+  Successful positive rows preserve `trusted_base()`.
 - why: a generic `expect_err`, or one all-names-collide fixture, can pass at the
-  parser, positivity checker, or the wrong collision. One-axis rows plus
-  same-production positives establish reachability and exact error phase for
-  every binding. The companion matrix prevents a type-only floor check from
-  leaving helper replacement open. The renamed lookalikes prove structural
-  equality is not canonical identity.
-- **MEASURED:** all-renamed same-shape families elaborate under distinct ids;
-  current root loading still admits and shadows a same-spelling floor
-  declaration. **CLAIMED:** every floor name is immutable and rejects before
-  allocation. **THE GAP:** add the fail-closed collision at the fresh root-unit
-  scope; accepting a lookalike is the present implementation defect this case
-  must redden on.
+  parser, positivity checker, or the wrong binding. One-name-at-a-time negatives
+  plus same-production positives isolate the protected-name guard. The
+  `ResourceKind` exclusion keeps the population aligned with B's scoped
+  constructor rule; the renamed lookalikes distinguish source identity from
+  structural equality.
+- **MEASURED (prior root-loading probe):** all-renamed same-shape families
+  elaborate under distinct ids; the probed root loader admits a same-spelling
+  floor declaration. **CLAIMED:** each attempted B-name binding is a hard
+  surface error at introduction. **THE GAP:** the producer must enforce
+  `33 §3.3` at each binding site. This claim does not pin allocator movement.
 
 ### surface/modules/ord-nat-class-owner-and-reexport-use-one-dictionary
 
@@ -1430,7 +1422,7 @@ monotone-downward and revocation management actions remain runner/host-internal
 - **Exact prelude floor and `Ord Nat` provenance** (`30 §4`, `33 §3.3`/
   `§4.3`/`§5.3`, `39 §2.0`/`§6.1`, `51 §7`):
   `prelude-floor-reuses-exact-types-and-constructors`,
-  `prelude-floor-clash-and-lookalike-matrix`,
+  `prelude-protected-name-bindings-and-lookalike-matrix`,
   `ord-nat-class-owner-and-reexport-use-one-dictionary`, and
   `prelude-head-does-not-transfer-orphan-ownership`.
 - **N3** (module clash error + explicit resolution, lexical boundary, prelude
@@ -1438,7 +1430,7 @@ monotone-downward and revocation management actions remain runner/host-internal
   `import-de-selection-leaves-local-sole-binding`,
   `per-name-rename-resolves-distinct-targets`,
   `lexical-binder-still-shadows-imported`,
-  `prelude-clash-rejected-rename-local-resolves`,
+  `protected-name-binding-rejected-renamed-local-resolves`,
   `per-name-rename-parses-hiding-is-syntax-error`, and the renamed arm of
   `import-spellings-resolve-to-one-binding`.
 - **N4** (source-world admission boundary):

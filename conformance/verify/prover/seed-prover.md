@@ -60,22 +60,23 @@ against `23` + `trusted_base()`.
 
 ### verify/prover/discharged-goal-cert-kernel-accepts
 - spec: `23 §1.2`/§1.3; `18 §4.5`
-- given: a decidable obligation `⟨id, Γ ⊢ 5 > 0, prov⟩`; the prover produces a
-  certificate `p` with `Γ ⊢ p : 5 > 0`
-- expect: `check(env, Γ, p, 5 > 0)` **accepts** (`Ok`); verdict **proved**; no
-  postulate carrying `5 > 0` in `trusted_base()` (the honesty guard, §1.3).
+- given: a decidable obligation `⟨id, Γ ⊢ IsTrue (5 > 0), prov⟩`; the prover
+  produces a certificate `p` with `Γ ⊢ p : IsTrue (5 > 0)`
+- expect: `check(env, Γ, p, IsTrue (5 > 0))` **accepts** (`Ok`); verdict
+  **proved**; no postulate carrying `IsTrue (5 > 0)` in `trusted_base()` (the
+  honesty guard, §1.3).
 - why: §1.2 — `proved` is the cert verdict, believed because the kernel
   re-checks `p`. The accept half of the de Bruijn criterion; paired with the
   corrupted-cert flip below.
 
 ### verify/prover/corrupted-cert-kernel-rejects-unknown (soundness)
 - spec: `23 §1.5`; `18 §4.5`/§4.4
-- given: the **same** obligation `Γ ⊢ 5 > 0`, but the emitted certificate is
-  **deliberately corrupted / mis-translated** — a term `p'` whose type is
-  **not** `5 > 0`
-- expect: `check(env, Γ, p', 5 > 0)` **rejects** (`TypeMismatch`); the verdict
-  is **not** `proved` — it is **unknown** (the honest typed hole; no
-  countermodel was found), so `5 > 0` **appears** in `trusted_base()`.
+- given: the **same** obligation `Γ ⊢ IsTrue (5 > 0)`, but the emitted
+  certificate is **deliberately corrupted / mis-translated** — a term `p'` whose
+  type is **not** `IsTrue (5 > 0)`
+- expect: `check(env, Γ, p', IsTrue (5 > 0))` **rejects** (`TypeMismatch`); the
+  verdict is **not** `proved` — it is **unknown** (the honest typed hole; no
+  countermodel was found), so `IsTrue (5 > 0)` **appears** in `trusted_base()`.
 - why: §1.5 — the de Bruijn criterion **exercised, not assumed**.
   **Verdict-flip:** correct cert → `proved`; corrupted cert → `unknown`
   (opposite verdicts, on cert integrity alone). A prover bug can never forge
@@ -109,10 +110,11 @@ against `23` + `trusted_base()`.
 
 ### verify/prover/classify-routes-each-shape-D-FO-HO
 - spec: `23 §2`/§2.1
-- given: three obligations — (D) a decidable atom `2 + 2 == 4`; (FO) a
-  first-order intuitionistic formula over decidable atoms (e.g.
-  `∀x. P x ∨ ¬ P x` is *not* assumed, so an FO goal like `(∀x. P x) ⇒ P a` with
-  abstract `P`); (HO) an inductive goal `∀ xs : List Nat. length xs ≥ 0`
+- given: three obligations — (D) a decidable atom
+  `IsTrue (2 + 2 == 4)`; (FO) a first-order intuitionistic formula over
+  decidable atoms (e.g. `∀x. P x ∨ ¬ P x` is *not* assumed, so an FO goal
+  like `(∀x. P x) ⇒ P a` with abstract `P`); (HO) an inductive goal
+  `∀ xs : List Nat. IsTrue (length xs ≥ 0)`
 - expect: `classify` routes them **D → direct/reflective decision (§3)**, **FO →
   Kripke embedding (§4)**, **HO → tactics (§5)**, respectively — each obligation
   receives **exactly one** route keyed by `shape(φ)`.
@@ -149,14 +151,14 @@ against `23` + `trusted_base()`.
 
 ### verify/prover/reflective-decision-computes-cert-D
 - spec: `23 §3.1`; `16 §1.3` (derived `Decidable`), `16 §9` (canonicity)
-- given: a **closed** decidable goal `2 + 2 == 4` with a kernel-verified
-  decision procedure `dec : (x : A) → Decidable (φ x)`,
-  `Decidable P = P + (P → Empty)`
+- given: a **closed** decidable goal `IsTrue (2 + 2 == 4)` with a
+  kernel-verified decision procedure
+  `dec : (x : A) → Decidable (φ x)`, `Decidable P = P + (P → Empty)`
 - expect: the certificate is **by computation** — the kernel evaluates `dec a`
-  (canonicity, `16 §9`) to `inl proof`; that `proof : (2 + 2 == 4)` `check`s →
-  **proved**, with **no external solver in the trusted path**. The companion
-  **false** decidable goal `2 + 2 == 5` evaluates to `inr refutation` →
-  **disproved**.
+  (canonicity, `16 §9`) to `inl proof`; that `proof : IsTrue (2 + 2 == 4)`
+  `check`s → **proved**, with **no external solver in the trusted path**. The
+  companion **false** decidable goal `IsTrue (2 + 2 == 5)` evaluates to
+  `inr refutation` → **disproved**.
 - why: §3.1 — the computing kernel discharges the decidable fragment directly.
   **Verdict-flip on the atom's truth:** true → `inl proof` → `proved`; false →
   `inr refutation` → `disproved`. **Structural output:** the cert is the
@@ -234,19 +236,22 @@ against `23` + `trusted_base()`.
   (`p ∨ ¬ p`) → **unknown** — pinning the §1.2 invalid-vs-refuted boundary.
   **Internal-consistency:** matches **A3** (same class — classically valid,
   `¬φ` unprovable → `unknown`); `disproved` is reserved for genuinely-refutable
-  goals where `¬φ` is provable (C1's `2 + 2 == 5`, E1's `n > 0` on `n ≤ 0`). A
-  build coding `disproved` here would report an `unknown` as a refutation —
+  goals where `¬φ` is provable (C1's `IsTrue (2 + 2 == 5)`, E1's
+  `IsTrue (n > 0)` on `n ≤ 0`). A build coding `disproved` here would report
+  an `unknown` as a refutation —
   "fix the code" when the honest message is "supply more facts" (`24 §1`).
 
 ### verify/prover/induction-descent-with-ih-and-localized-partiality (soundness)
 - spec: `23 §5` (sub-obligation descent + certificate composition); `14 §3`
   (eliminator); `22 §4` (the V2 extraction analog)
-- given: an HO goal needing induction, `∀ xs : List Nat. length xs ≥ 0`; the
-  induction tactic decomposes it — **(a)** with every sub-certificate supplied;
-  **(b)** the **same** with the `cons`-branch sub-certificate **removed**
+- given: an HO goal needing induction,
+  `∀ xs : List Nat. IsTrue (length xs ≥ 0)`; the induction tactic decomposes it
+  — **(a)** with every sub-certificate supplied; **(b)** the **same** with the
+  `cons`-branch sub-certificate **removed**
 - expect: the tactic emits **one subgoal per constructor** — `nil`:
-  `length nil ≥ 0` (`0 ≥ 0`); `cons y ys`: `length (cons y ys) ≥ 0` **with the
-  induction hypothesis** `M ys = (length ys ≥ 0)` in `Γ`; the composed
+  `IsTrue (length nil ≥ 0)` (`IsTrue (0 ≥ 0)`); `cons y ys`:
+  `IsTrue (length (cons y ys) ≥ 0)` **with the induction hypothesis**
+  `M ys = IsTrue (length ys ≥ 0)` in `Γ`; the composed
   certificate is the eliminator application `elim_List M methods… xs`, `check`ed
   **once** at the top goal (`18 §4.5`). **(a)** all sub-certs → **proved**.
   **(b)** the `cons` sub-certificate removed → a **single, precisely-located
@@ -273,11 +278,12 @@ against `23` + `trusted_base()`.
 ### verify/prover/disproved-carries-countermodel
 - spec: `23 §1.2`; `24 §1` (countermodel shape — `(oracle)` where unlanded)
 - given: a **false** obligation —
-  `view f (n : Int) : Int ensures result > 0 = n` (false for `n ≤ 0`); its
-  postcondition goal `Γ ⊢ n > 0`
+  `fn f (n : Int) : Int ensures IsTrue (result > 0) = n` (false for
+  `n ≤ 0`); its postcondition goal `Γ ⊢ IsTrue (n > 0)`
 - expect: verdict **disproved**, evidence = a **countermodel** naming the
   failing input class (`n ≤ 0`); where the backend yields a proof of `¬φ`, the
-  cert `q : ¬φ` is `check`ed too (`check(env, Γ, q, ¬(n > 0))`).
+  cert `q : Not (IsTrue (n > 0))` is `check`ed too
+  (`check(env, Γ, q, Not (IsTrue (n > 0)))`).
 - why: §1.2 — a genuine counterexample is reported with the false-vs-unknown
   distinction (a refuted claim is **fixed**, not shipped — `21 §5.3`; it is
   **not** exported as an epistemic status, §1.4). **Verdict-flip:** a
@@ -313,7 +319,7 @@ against `23` + `trusted_base()`.
 - spec: `23 §1.1`; `22 §8` (empty obligation set); `21 §6.2`
 - given: a **non-spec** program — no
   `requires`/`ensures`/refinement/`prove`/`law`, no partial primitive (e.g.
-  `view id (A : Type) (x : A) : A = x`), so V2 emits the **empty** obligation
+  `fn id (A : Type) (x : A) : A = x`), so V2 emits the **empty** obligation
   set
 - expect: V3 produces **no** verdicts (the per-obligation function is never
   invoked); the V1/V0 elaboration **and** pure evaluation are **unchanged**.

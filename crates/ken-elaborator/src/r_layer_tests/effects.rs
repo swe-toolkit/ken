@@ -487,7 +487,7 @@ fn handler_multishot_rejected() {
 // EFF5 — pure/impure boundary hook for L7 FFI
 // ============================================================
 
-/// `surface/effects/pure-view-usable-in-pure-context` (oracle)
+/// `surface/effects/pure-fn-usable-in-pure-context` (oracle)
 ///
 /// `double` has inferred row ∅; it is usable where a pure function is
 /// required (empty row is the certificate). The collapse `ITree 𝟘 R ≅ R` is

@@ -199,7 +199,7 @@ the flow invariant, not the surface token.
 
 ### security/ifc/related-pair-proved
 - spec: `61 §5.1`/`§5.3` (low-equivalence, the product reduction)
-- given: a bespoke NI claim for a well-labeled `view` at observer `ζ`;
+- given: a bespoke NI claim for a well-labeled `fn` at observer `ζ`;
   `product(c, ζ)` emits `lowEq_ζ(in¹,in²) ⇒ lowEq_ζ(out¹,out²) ∧
   coterminates_ζ` and it is **provable**
 - expect: **proved** — discharged; the certificate is kernel-re-checked
@@ -209,7 +209,7 @@ the flow invariant, not the surface token.
 
 ### security/ifc/distinguishing-pair-disproved-with-witness
 - spec: `61 §5.3` (verdict mapping), `23 §1.2`
-- given: a leaking `view` for which a **distinguishing pair** exists — two
+- given: a leaking `fn` for which a **distinguishing pair** exists — two
   `ζ`-low-equivalent inputs whose `ζ`-observable outputs differ
 - expect: **disproved(countermodel)** — the distinguishing pair **is** the
   leak-witness
@@ -233,7 +233,7 @@ the flow invariant, not the surface token.
 
 ### security/ifc/progress-sensitive-divergence-is-a-leak
 - spec: `61 §5.2` (P4) / `§5.3` (the `coterminates_ζ` conjunct), `21 §5`
-- given: a `view` non-interfering on *values* but where one run of a
+- given: an `fn` non-interfering on *values* but where one run of a
   `ζ`-equal-input pair **diverges/crashes** while the other terminates
 - expect: **disproved** by default (the `coterminates_ζ` conjunct fails — a
   crash/non-termination is itself a `ζ`-observable event); under the

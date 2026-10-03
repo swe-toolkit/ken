@@ -4,8 +4,7 @@ Format: `../../README.md`. These pin the **Map-container deliverable**
 (`docs/program/wp/Map-container.md`, `spec/50-stdlib/52-map.md`; VAL2 #8 /
 OQ-A): a **proved, pure, `Ord k`-keyed** associative map shipped as ordinary
 **package Ken — out of `trusted_base()`, not a kernel builtin**. Its carrier is
-an ordinary inductive (`data Tree k v = Leaf | Node …`), its operations are
-kernel-re-checked `view` defs, and **every correctness law is a real kernel
+an ordinary inductive (`data Tree k v = Leaf | Node …`), its operations use kernel-re-checked pure `const`/`fn` definitions, and **every correctness law is a real kernel
 proof, not a postulate** (`52 §1`, `21 §3`). This closes `letter-frequency`'s
 gap — `Map` was a bare opaque primitive with **zero operations** — and
 **retires** that opaque primitive (net-negative TCB).
@@ -101,7 +100,7 @@ structurally forces the retirement of the constructor-less opaque primitive.
   kernel environment.
 - expect: `Tree k v` is admitted by **`declare_inductive`** (two constructors
   `Leaf`/`Node`, kernel-rechecked, an induction principle exists); `insert`/
-  `lookup`/`member`/`toList`/`fromList`/`fold` are **`declare_def`** `view`s;
+  `lookup`/`member`/`toList`/`fromList`/`fold` are **`declare_def`** pure functions;
   the `Ordered` invariant + the `§5` laws are **`declare_def`** `Ω`-props /
   proof terms. **`declare_primitive` and `declare_postulate` are ABSENT** for
   `Map`/`Tree`/`Set` and every op and law. Assert the admission **kind** of each
@@ -406,7 +405,7 @@ territory).
 ### stdlib/map/ordered-invariant-derived-not-opaque (soundness)
 - spec: `52 §5.1`/`§9`, `37 §6` (`isSorted`-style `Ω` recursion), `16 §1.3`
 - given: the `Ordered` invariant and its helper `allKeys` as admitted on `main`
-  (`a592f0b`, `map.ken` — `view` defs, constant `Prop` motive → `infer_match`).
+  (`a592f0b`, `map.ken` — `fn` defs, constant `Prop` motive → `infer_match`).
 - expect: `Ordered`/`allKeys` are **`declare_def` `Ω`-valued structural
   recursions** the prover **unfolds** (built from the
   `IsTrue b := Equal Bool b True` bridge + the derived `Ω`-conjunction `∧`),

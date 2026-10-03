@@ -116,26 +116,26 @@ now and remain evidence for the unchanged kernel behavior.
   so conversion success cannot stand in for provenance.
 - why: transparent conversion operates on terms, not declaration ownership.
 
-### surface/modules/pair-floor-binding-collisions-reject-before-allocation
+### surface/modules/pair-floor-protected-name-bindings-reject
 
-- promise class: **durable invariant** — every floor binding is immutable and
-  unshadowable at top level
+- promise class: **durable invariant** — source cannot introduce a binding in B
 - stage: **RED-UNTIL floor realization for the four Pair-family rows**
 - spec: `33 §3.3`; `39 §2.0`
-- given: in independent Strict roots, locally declare a top-level binding named
-  `Pair`, `mk_pair`, `pair_fst`, or `pair_snd`, with a well-typed body or family.
-  Snapshot declarations, allocator position, and trust before each attempt.
-  Reuse `seed-modules.md`'s exhaustive type/constructor collision matrix for the
-  other nine type-floor members and their exact constructors.
-- expect: every same-spelling Pair-family row rejects as a top-level clash before
-  source declaration admission. No floor identity is replaced and no snapshot
-  moves. An ordinary local `data Pair a b = MkPair a b` is included in the
-  `Pair` row and cannot become the transparent floor family.
-- controls: rename all four local declarations. They admit with fresh ids and
-  remain distinct from the floor declarations. A narrower lexical binder named
-  `pair_fst` retains ordinary lexical shadowing and is not a top-level clash.
-- why: an immutable floor asserted only for types could leave companion
-  replacement open. The four independent rows reach every new binding class.
+- given: in independent Strict roots, attempt a top-level binding named `Pair`,
+  `mk_pair`, `pair_fst`, or `pair_snd`, with a well-typed body or family. Also
+  try `fn use_pair (pair_fst : Int) : Int = pair_fst`, paired with the same
+  function using the non-B binder `local_pair_fst`. Reuse `seed-modules.md`'s
+  protected-name matrix for the other floor types and bare constructors.
+- expect: each Pair-family top-level attempt and the `pair_fst` binder are hard
+  surface errors at binding introduction; the diagnostic kind is not further
+  specified here. The `local_pair_fst` control accepts. No local binding
+  replaces a floor identity. An ordinary local `data Pair a b = MkPair a b` is
+  included in the `Pair` row and cannot become the transparent floor family.
+- controls: rename all four local declarations; they admit with fresh ids and
+  remain distinct from the floor declarations. The non-B binder accepts; the
+  separate `seed-modules.md` case covers ordinary lexical shadowing.
+- why: the prohibition covers declarations and binders in the floor type and
+  its companion-binding inventory; no binder can introduce a protected name.
 
 ### surface/modules/pair-reexport-is-identity-preserving-republication
 

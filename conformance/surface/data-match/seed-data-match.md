@@ -43,15 +43,15 @@ prototype's stubbed sums and missing exhaustiveness.
 
 ## surface/data-match/construct-then-eliminate (AC1)
 - spec: `spec/30-surface/34-data-match.md §1`, `10-kernel/14 §3`
-- given: `data Option a = None | Some a`; `match (Some 3) { Some x => x; None =>
-  0 }`
-- expect: **reduces-to** `3` (the emitted `elim_Option` ι-reduces on the `Some`
-  constructor, `14 §3`) — a real constructor **and** a real, computing
-  eliminator.
+- given: `data MaybeValue a = MissingValue | PresentValue a`;
+  `match (PresentValue 3) { PresentValue x => x; MissingValue => 0 }`
+- expect: **reduces-to** `3` (the emitted `elim_MaybeValue` ι-reduces on the
+  `PresentValue` constructor, `14 §3`) — a real constructor **and** a real,
+  computing eliminator.
 - why: sum types are finished, not lowered to an opaque base with no eliminator.
-  **Flip:** the prototype's stub (opaque base, no `elim`) is **stuck** — it does
-  **not** reduce to `3`. Structural: assert the reduct is the literal `3`, not
-  merely "compiles".
+  **Flip:** the stub (opaque base, no `elim`) is **stuck** — it does **not**
+  reduce to `3`. Structural: assert the reduct is the literal `3`, not merely
+  "compiles".
 
 ## surface/data-match/match-elaborates-to-elim (AC2)
 - spec: `spec/30-surface/34-data-match.md §3`, `39 §2.6`
@@ -377,7 +377,7 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 ## surface/data-match/indexed-impossible-pair (AC5) (soundness) — TR5a + TR5b
 - spec: `spec/30-surface/34-data-match.md §2`, `§4.3`
 - given: `data Vec a : Nat → Type { VNil : Vec a 0 ; VCons : {n} → a → Vec a n →
-  Vec a (n+1) }`; (a) `view head {n} (v : Vec a (n+1)) : a = match v { VCons x _
+  Vec a (n+1) }`; (a) `fn head {n} (v : Vec a (n+1)) : a = match v { VCons x _
   => x }` — **omitting** the `VNil` arm; (b) applying `head` to `VNil`
 - expect — **the non-degenerate pair on one rule**:
   - (a) **accepts** — `VNil` is **index-impossible** at `n+1` (`0 ≢ n+1`); the
@@ -604,22 +604,23 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 
 ## surface/data-match/refinement-obligation (AC7) (soundness) — TR7
 - spec: `spec/30-surface/34-data-match.md §5`, `21 §2`, `22 §2.1`
-- given: `def NonNeg = { n : Int | n ≥ 0 }`; (a) passing a plain `Int` `e`
-  where `NonNeg` is expected (introduction); (b) passing a `NonNeg` where an
-  `Int` is expected (forgetful)
+- given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; (a) passing a plain
+  `Int` `e` where `NonNeg` is expected (introduction); (b) passing a `NonNeg`
+  where an `Int` is expected (forgetful)
 - expect:
-  - (a) the obligation `e ≥ 0` is **emitted** at that point (`22 §2.1`),
-    discharged or left a visible hole — **never** a silent coercion past `φ`;
-    the core image of the value is the **carrier `Int`** (no kernel `Σ`).
-    **(soundness)**
-  - (b) **no** obligation — `{n:Int|n≥0} ≤ Int` is **free** (the identity on the
-    carrier, `22 §2.1`/§2.5).
+  - (a) the obligation `IsTrue (leq_int 0 e)` is **emitted** at that point
+    (`22 §2.1`), discharged or left a visible hole — **never** a silent
+    coercion past `φ`; the core image of the value is the **carrier `Int`** (no
+    kernel `Σ`). **(soundness)**
+  - (b) **no** obligation — `{n:Int | IsTrue (leq_int 0 n)} ≤ Int` is **free**
+    (the identity on the carrier, `22 §2.1`/§2.5).
 - why: refinements enforce; using `A` as `{x:A|φ}` costs a proof, the reverse is
   free. **Flip:** a missed obligation on (a) reads `proved` with **zero** proof
   (the `22 §intro` linchpin — completeness is backstopped by nothing
-  downstream), so observe the **emitted VC** structurally (obligation `n ≥ 0`
-  is in the set), not just the final verdict. A spurious obligation on (b) (the
-  forgetful direction) is the dual bug — assert the set is **empty** there. The
+  downstream), so observe the **emitted VC** structurally (obligation
+  `IsTrue (leq_int 0 e)` is in the set), not just the final verdict. A spurious
+  obligation on (b), the forgetful direction, is the dual bug — assert the set
+  is **empty** there. The
   pair (emit-on-intro / silent-on-forget) flips on the direction.
 
 ## Coverage map

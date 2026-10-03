@@ -24,7 +24,7 @@ by-proof relational path + its `[rel-deferred]` product-program reducer);
 gate TC5); `24 §2` (a typed hole is a postulate); `64 §4` (over-claim refusal).
 **Landed code pinned against:** the export emitter
 (`crates/ken-elaborator/src/export.rs`); `CapParam { name, effect }` + `cap_set`
-(`effects/algebra.rs`), no-ambient inertness of a no-`Cap` `view`;
+(`effects/algebra.rs`), no-ambient inertness of a no-`Cap` `fn`;
 `trusted_base` membership (`ken-kernel`); the single `Vis` trace site
 (`ken-interp`); the `Temporal` inductive via the L2 `data` machinery.
 **Named-deferred (carried, not driven):** the `OQ-relational` 2-run
@@ -125,7 +125,7 @@ concept, spelling deferred.
 
 ### agentic/agent-holds-propose-invariant-proved-for-all (AC2)
 - spec: `74 §3`/`§7 AC2`, `62 §1`/`§2`, `36 §2.5`, `22 §2`
-- given: an agent `view` with **no `Cap E` parameter** (inert by no-ambient
+- given: an agent `fn` with **no `Cap E` parameter** (inert by no-ambient
   authority, `62 §1` — it computes a proposal *value* and nothing else); the
   verified `act_on` above holds `act` and performs the world-effect **only**
   behind `requires safe a`; the system invariant `I` discharged as an

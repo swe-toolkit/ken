@@ -89,9 +89,9 @@ normative.
 the
 audit trail; independent-checker catches, not silently resolved).
 
-1. **`const` keyword ↔ def-name collision — RESOLVED (renamed `konst`).** The V0
-   K combinator `view const (A) (B) (x) (y) : A = x` (`32-grammar`) is renamed
-   **`konst`** by spec-author (`32 §8`, `33 §1`: "'const' is now a keyword"),
+1. **`const` keyword ↔ def-name collision — RESOLVED (renamed `konst`).** The
+   current K combinator is `fn konst (A) (B) (x) (y) : A = x`; this replaces the
+   former `view const` spelling (`32 §8`, `33 §1`: `const` is now a keyword),
    and
    the spec asserts "no `.ken` in the corpus names a def `const`/`fn`/`proc`."
    PK6 keeps the grep guard (no `const`-named def survives migration).
@@ -109,8 +109,9 @@ audit trail; independent-checker catches, not silently resolved).
    hard-error covers PK2b — the `§1.6.2` carve-out makes the over-declared case
    honest (see PK2b for the reconciled reading).
 
-**Citations.** `33-declarations.md §1` (`view`/`let` → Π/λ; generic implicit
-params; `let` = nullary view), `§6` (operators = ordinary defs, symbolic names);
+**Citations.** `33-declarations.md §1` (`const`/`fn`/`proc` → Π/λ; generic
+implicit params; `const` replaces the former nullary value definition; local
+`let` remains an expression), `§6` (operators = ordinary defs, symbolic names);
 `36-effects.md §1.1` (row lattice, latent arrow `A →[ρ] B`, pure row `∅`),
 `§1.2` (transitive `infer_row`: `perform_E → {E}`, `g → row(g)`), `§1.4`
 (declared-row `⊆` check, escape error + witness; "no `visits` ⇒ `ρ_decl = ∅`"),
@@ -124,7 +125,8 @@ levels), frame §2 (fixed classification rule), §4 (acceptance), §5 (bounded
 enclave sub-decisions).
 
 Companion: this seed is **additive** over `../effects/seed-effects.md` (which
-pins the keyword-**agnostic** row inference/escape under `view`) — SURF-1 layers
+pins row inference/escape independently of the prior single-keyword definition
+form) — SURF-1 layers
 the **keyword↔(arity, purity)** contract on top.
 
 ---
@@ -340,24 +342,26 @@ The keyword thus determines the verification treatment.
 - spec: `36 §2.4` (pure collapse), `§6` (row-`∅` def = mathematical function,
   value-level `ensures`), `33 §1`, frame AC4
 - given: a pure `fn` with a value-level postcondition:
-  `fn succ (n : Int) : Int ensures result == n + 1 = n + 1`.
+  `fn succ (n : Int) : Int ensures Equal Int result (n + 1) = n + 1`.
 - expect: **accepts and the `ensures` discharges** — `succ` has row `∅`,
   collapses to the plain term (`ITree 𝟘 Int ≅ Int`, `§2.4`); the obligation
-  `result == n + 1` is a **value** equation, discharged by computation/`refl`
+  `Equal Int result (n + 1)` is a **value** equation, discharged by
+  computation/`refl`
   (`16 §2`), **no world-state**. The verification layer sees a mathematical
   function.
 - why: AC4's **pure half** — the `∅`-row + collapse is the certificate the
-  verification core rests on (mirrors EFF5 `pure-view-usable-in-pure-context`,
+  verification core rests on (mirrors EFF5 `pure-fn-usable-in-pure-context`,
   re-keyed on the new `fn` keyword). Pairs with PK4b for the flip.
 
 ### surface/declarations/fn-no-old-in-ensures (oracle)
 - spec: `36 §4.3` (`old(e)` = `e` in the **pre-state**; well-defined only when
   the denotation *names* a pre-state), `§6`, frame AC4
 - given: the **same** `old(n)`-style postcondition under two keywords:
-  (a) `proc inc () : Unit visits [Counter]` with `ensures n == old(n) + 1` and
-      body `n becomes n + 1` (inside `space Counter`);
-  (b) `fn bump (n : Int) : Int` with `ensures result == old(n) + 1` and body
-      `n + 1`.
+  (a) `proc inc () : Unit visits [Counter]` with
+      `ensures Equal Int n (old(n) + 1)` and body `n becomes n + 1` (inside
+      `space Counter`);
+  (b) `fn bump (n : Int) : Int` with
+      `ensures Equal Int result (old(n) + 1)` and body `n + 1`.
 - expect: (a) **accepts and discharges** — `old(n)` names the pre-state of the
   `space` op's `State S` transformer, obligation computes to `refl` (EFF4
   `space-old-scoped-to-ensures`, `36 §4.3`). (b) **rejects** — a pure `fn` has
@@ -376,14 +380,14 @@ The keyword thus determines the verification treatment.
 
 ### surface/declarations/keywords-kernel-untouched (property)
 - spec: `36 §2` (effects/rows are outer-ring; the kernel has no effect notion),
-  `33 §1` (`view`/`const`/`fn`/`proc` all elaborate to Π/λ defs), frame AC5/§2.6
+  `33 §1` (`const`/`fn`/`proc` all elaborate to Π/λ defs), frame AC5/§2.6
 - given: the delivered `const`/`fn`/`proc` grammar + the bidirectional purity
   checker.
 - expect: **`git diff origin/main -- crates/ken-kernel/` stays empty** and
   `trusted_base()` is **byte-unchanged** — **no new `Term`/`Decl` variant**, no
   new `declare_primitive`/`declare_postulate`. The split is entirely **surface
   parse + elaborator + effect-checker**; a `const`/`fn`/`proc` def elaborates to
-  the **same** Π/λ core term its `view` predecessor did (the keyword is erased
+  the **same** Π/λ core term the prior definition spelling did (the keyword is erased
   before the kernel), and a pure def still collapses to the plain term
   (`36 §2.4`). The purity **check** is an elaboration-time diagnostic
   (`36 §7.3`), never a kernel rule.

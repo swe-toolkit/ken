@@ -504,10 +504,9 @@ reachability measurement below; B3's
 drives every currently parseable embedded orientation without a hand-built
 `FormattableSource`.
 
-The `record Pair` declarations in the formatting cases below are intentional
-local text fixtures, not references to the canonical floor declaration. If
-elaborated as top-level source after Pair floor realization, their same spelling
-would clash rather than replace or alias the floor identity. These cases assert
+The `record ExamplePair` declarations below are local formatting fixtures. The
+name is outside the protected built-in set, keeping this formatting case
+independent of the canonical `Pair` floor identity. These cases assert
 formatting only.
 
 ### surface/formatting/blank-runs-normalize-in-both-orientations (property)
@@ -525,7 +524,7 @@ formatting only.
 
   const two : Nat = 2
 
-  record Pair {
+  record ExamplePair {
     left : Nat;
 
 
@@ -539,7 +538,7 @@ formatting only.
 
   const two : Nat = 2
 
-  record Pair {
+  record ExamplePair {
     left : Nat;
     right : Nat
   }
@@ -726,19 +725,19 @@ formatting only.
   below. Its exact non-canonical spelling is:
 
   ```ken
-  record Pair { left:Nat ; right : Nat ; }
-  fn swap (p:Pair):Pair=match p {{left ,right}|->{left=right ,right=left}}
+  record ExamplePair { left:Nat ; right : Nat ; }
+  fn swap (p:ExamplePair):ExamplePair=match p {{left ,right}|->{left=right ,right=left}}
   data Wrapped = Wrap { value:Nat ,valid :Bool }
   ```
 - expect: both format byte-for-byte to:
 
   ```ken
-  record Pair {
+  record ExamplePair {
     left : Nat;
     right : Nat
   }
 
-  fn swap (p : Pair) : Pair =
+  fn swap (p : ExamplePair) : ExamplePair =
     match p {
       { left, right } ↦
         { left = right, right = left }

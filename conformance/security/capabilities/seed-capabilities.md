@@ -20,7 +20,7 @@ capability-passing
 translation: `Cap E` is a value parameter via ordinary Π, minted by a handler;
 the cross-workstream contract "capability `Cap E` → a value parameter (Π) → read
 by Sec2 authority/attenuation `62`"); `36 §1.4` (the EFFECT-ESCAPE check — a no-
-row `view` is inert); `34 §5`/`21 §2` (refinement = carrier + emitted obligation
+row `fn` is inert); `34 §5`/`21 §2` (refinement = carrier + emitted obligation
 — the attenuation encoding); `16 §1`/`61 §2.1` (the `Ω`-valued `⊑` order the
 `Authority` lattice rides); `61 §3.1` (`L-SINK`, the flow half of AC6); `61 §4`
 (declassify is capability-gated/audited); `25 §3`/`63` (`trusted_base_delta`).
@@ -115,25 +115,25 @@ not a capability-producing surface spelling; deferred runtime mechanisms remain
 
 ### security/capabilities/world-action-without-capability-rejected
 - spec: `62 §1`, `36 §2.5`/`§7.3`
-- given: a world-action (`write_at p d`, a `visits [FS]` op) in a `view` that
-  declares **no** `Cap_FS` parameter (and/or no `FS` row)
+- given: a world-action (`write_at p d`, a `visits [FS]` op) in a `proc` with
+  `visits [FS]` but **no** `Cap_FS` parameter
 - expect: **rejects** — the `perform_FS` denotes to an unbound `Cap_FS`
   reference; a missing-capability error (kernel-ill-typed; the elaborator
   surfaces the source-located diagnostic, `36 §7.3` class 2)
 - why: (soundness) AC1, no ambient authority. **Kernel-backed flip:** the *same*
   body with the `Cap_FS` parameter present **accepts** — right=accept (cap +
   row) / wrong=reject (no cap), on the real Π-binding discriminator, not a
-  synthetic gate. A no-row/no-cap `view` is provably inert (`ITree 𝟘 ≅ B`,
+  synthetic gate. A no-row/no-cap `fn` is provably inert (`ITree 𝟘 ≅ B`,
   `36 §2.4`).
 
-### security/capabilities/no-row-view-is-inert
+### security/capabilities/no-row-fn-is-inert
 - spec: `62 §1`, `36 §1.4`/`§2.4`
-- given: a `view classify (x) : Tag` with **no** effect row, whose body attempts
+- given: a `fn classify (x) : Tag` with **no** effect row, whose body attempts
   any effect
 - expect: **rejects** — EFFECT-ESCAPE (`ρ_inf ⊄ ρ_decl = ∅`), naming the
   escaping effect + a witness perform/call
 - why: (soundness) inert-by-type precondition every authority claim rests on.
-  Flip: declaring the row (and holding the cap) accepts; the bare `view` cannot
+  Flip: declaring the row (and holding the cap) accepts; the bare `fn` cannot
   perform. (Distinct from A1: here the **row** is absent, not just the cap — the
   two halves of "no ambient".)
 
@@ -141,8 +141,8 @@ not a capability-producing surface spelling; deferred runtime mechanisms remain
 
 ### security/capabilities/uses-unpassed-capability-rejected
 - spec: `62 §2`, `36 §2.5` (`cap_params`)
-- given: a `view` whose body uses a `Cap_Net` it was **not** passed (no
-  `Cap_Net` in `cap_params`, no enclosing handler providing it)
+- given: a `proc` with `visits [Net]` whose body uses a `Cap_Net` it was **not**
+  passed (no `Cap_Net` in `cap_params`, no enclosing handler providing it)
 - expect: **rejects** — default authority is `∅`; the capability is an unbound
   reference
 - why: (soundness) AC2, least by default (PoLA). Flip: passing `Cap_Net` (adding
@@ -517,7 +517,7 @@ against a naive path-string implementation is not an acceptable substitute.
 ## Coverage map (AC → cases)
 
 - **AC1** no ambient → A1 (`world-action-without-capability-rejected`),
-  A2 (`no-row-view-is-inert`).
+  A2 (`no-row-fn-is-inert`).
 - **AC2** least by default → B1 (`uses-unpassed-capability-rejected`).
 - **AC3** attenuation monotone-downward (THE headline) → **C1↔C2** (the order-
   dual non-degenerate pair), C3
@@ -548,7 +548,7 @@ against a naive path-string implementation is not an acceptable substitute.
 
 - **No-ambient / least class {A1, A2, B1}** — agree: every world-action needs an
   explicit `Cap E` **and** a declared row; default authority is `∅`; a no-cap or
-  no-row `view` is inert. Each a clean verdict flip (cap/row present → accept;
+  a no-row `fn` is inert. Each a clean verdict flip (cap/row present → accept;
   absent → reject), kernel-backed (real Π binding), none green-vs-green.
 - **Order-dual orientation {C1, C2}** — the load-bearing pair: the **same**
   attenuated cap **accepts** at a weak sink **while** it **rejects** at a sink
