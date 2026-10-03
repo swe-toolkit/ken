@@ -209,16 +209,27 @@ not depend on the spelling.
 ## §3.1 — `Int` division by zero is an obligation, not a trap
 
 ### surface/numbers/int-div-by-zero-emits-obligation
-- spec: `35 §3.1`, `22 §2.4`, `34 §5`
-- given: `a / b : Int` with possibly-zero `b : Int`
-- expect: V2 **emits** a non-zero side-condition obligation `b ≠ 0` at the
-  operation site (`22 §2.4`); a raw `/` on a possibly-zero divisor is a marked
-  partial point, **not** a silent trap. Supplying `b : {d : Int | d ≠ 0}`
-  **discharges** it (refinement coercion `{x:A|φ} ≤ A`, `34 §5`) ⇒ `div` total.
-- why: `Int` is total for `+`/`-`/`*` (arbitrary precision), and division/modulo
-  by zero is its **one** partial point — surfaced as an obligation, parallel to
-  the fixed-width overflow mechanism. Mechanism-consistency with AC3 (same
-  obligation triple, same typed-hole/postulate degrade).
+- spec: `35 §3.1`, `22 §2.4`, `34 §5`, `18a §5.2`
+- given: two isolated bodies on `a b : Int`, one `a / b` and one `a % b`,
+  each with possibly-zero `b`. Pair each with the corresponding body where
+  `b : {d : Int | d ≠ 0}`.
+- expect: each unrefined operator site emits exactly one `PartialPrim`
+  non-zero side-condition obligation for `NonZeroDivisor b` (`b ≠ 0`) at the
+  operation site. The corresponding refined divisor discharges it, leaving no
+  residual check. Neither operator silently traps.
+- why: raw `/` and `%` share the partial-primitive contract, but each gets its
+  own fixture so a missing modulo obligation cannot pass by relying on division
+  coverage. Refinement coercion discharges each obligation (`34 §5`).
+
+### surface/numbers/int-div-mod-truncates-negative-remainder (soundness)
+- spec: `18a §5.2` (NATIVE div-mod semantics), `35 §3.1`
+- given: evaluate raw `a / b` and `a % b` with the non-zero obligation
+  discharged, at numerator `a = -7` and divisor `b = 3`.
+- expect: the quotient is `-2`, the remainder is `-1`, and
+  `-7 = (-2) * 3 + (-1)`. A floored remainder of `2` is wrong.
+- why: the negative-dividend case distinguishes truncation from floor-mod
+  (`18a §5.2`). The `-1` remainder is specified independently of the
+  interpreter's implementation path.
 
 ## §6 — kernel-primitive / prelude-law boundary (no kernel enlargement)
 
@@ -312,7 +323,9 @@ not depend on the spelling.
   `no-implicit-cross-type-coercion`, `explicit-conversion-is-partial-option`
 - **AC6** (`Decimal` exact, `Float` honest) —
   `decimal-exact-while-float-honest`
-- **§3.1** (`Int` div-by-zero obligation) — `int-div-by-zero-emits-obligation`
+- **§3.1** (`Int` div/mod obligation and truncated remainder) —
+  `int-div-by-zero-emits-obligation`,
+  `int-div-mod-truncates-negative-remainder`
 - **§6.1/§6.2** (primitive reduction vs prelude law) —
   `primitive-op-runtime-value-k3-conversion-deferred`,
   `algebraic-law-is-proposition-not-reduction`
@@ -332,10 +345,13 @@ not depend on the spelling.
   `Float + Int`, `Decimal + Float`, …); the only cross-type path is a named
   conversion function. No case accepts a mixed-type op.
 - **Obligation-mechanism consistency.** The overflow obligation (AC3), the
-  division obligation (§3.1), and the discharged/undischarged degrade share one
-  shape: the triple `⟨id, Γ ⊢ φ, provenance⟩`, a typed hole `?id : φ`
+  `/` and `%` obligations (§3.1), and the discharged/undischarged degrade share
+  one shape: the triple `⟨id, Γ ⊢ φ, provenance⟩`, a typed hole `?id : φ`
   (`22 §1`, `24 §2`), discharged by proof or degraded to a listed postulate
   (`43 §2`). No case encodes a one-off "checked mode" distinct from this.
+- **Int division/remainder boundaries agree.** Separate `/` and `%` fixtures
+  each emit the divisor obligation; the negative-dividend case fixes `%` to the
+  truncated remainder `-1`, not the floored result `2`.
 - **`Float`-honesty consistency.** `Float` is never the integer-literal default
   (AC2) and never asserted exact (AC6); no case treats `Float ==` as reliable or
   `Float` as the universal carrier.

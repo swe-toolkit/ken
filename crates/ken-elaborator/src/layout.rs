@@ -1821,7 +1821,7 @@ fn binop_precedence(op: BinOp) -> u8 {
     match op {
         BinOp::EqEq => 3,
         BinOp::Add | BinOp::WrappingAdd | BinOp::Sub => 4,
-        BinOp::Mul => 5,
+        BinOp::Mul | BinOp::Div | BinOp::Mod => 5,
     }
 }
 

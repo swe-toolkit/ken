@@ -321,7 +321,7 @@ expr ::=
   | application_atom
 operator_prefix ::= operator_name application_atom+
 binop ::= operator_name | fixed_binop
-fixed_binop ::= "+" | "-" | "*" | "+%" | "-%" | "*%" | "=="
+fixed_binop ::= "+" | "-" | "*" | "/" | "%" | "+%" | "-%" | "*%" | "=="
 application_atom ::= primary ("." ident | ".1" | ".2")*  -- postfix projection chain
 primary ::=
     literal | ident | ConId | qualified_global_ref
@@ -603,7 +603,7 @@ c)` and `a - b - c` as `(a - b) - c`:
 
 | Level | Operators | Assoc | Notes |
 |---|---|---|---|
-| `7` | `*` (and any future `/`) | `infixl` | multiplicative — binds **tighter** |
+| `7` | `*`, `/`, `%` | `infixl` | multiplicative — binds **tighter** |
 | `6` | `+`, `-` | `infixl` | additive |
 
 The wrapping variants (`+%`/`-%`/`*%`, `35 §3`) share their base operator's

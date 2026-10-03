@@ -534,7 +534,7 @@ const literal : String = "<= /\\ \\/ /= >="
 
 #[test]
 fn generic_and_fixed_operator_paths_remain_distinct() {
-    for operator in ["<", ">", "/", "%"] {
+    for operator in ["<", ">"] {
         common_fixture(operator, operator);
     }
 
@@ -548,6 +548,8 @@ fn generic_and_fixed_operator_paths_remain_distinct() {
     for (source, expected) in [
         ("in", Token::KwIn),
         ("=", Token::Eq),
+        ("/", Token::Slash),
+        ("%", Token::Percent),
         (":", Token::Colon),
         ("::", Token::DoubleColon),
         (".", Token::Dot),

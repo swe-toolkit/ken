@@ -605,6 +605,10 @@ pub enum BinOp {
     Sub,
     /// `*` — type-directed multiplication.
     Mul,
+    /// `/` — type-directed Int division with a nonzero-divisor obligation.
+    Div,
+    /// `%` — type-directed Int remainder with a nonzero-divisor obligation.
+    Mod,
     /// `==` — structural equality.
     EqEq,
 }

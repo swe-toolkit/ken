@@ -172,6 +172,9 @@ pub(crate) enum RDeclKind {
     View {
         keyword: DefKeyword,
         is_space_op: bool,
+        /// The parameters written on the declaration, not lambdas in its body
+        /// or Pi binders that belong to its result type.
+        param_count: usize,
         constraints: Vec<RInstanceConstraint>,
         visits: Option<EffectRowSyntax>,
     },
@@ -1278,6 +1281,7 @@ pub(crate) fn resolve_decl_in_unit(
                 kind: RDeclKind::View {
                     keyword: *keyword,
                     is_space_op: *is_space_op,
+                    param_count: params.iter().map(|binder| binder.names.len()).sum(),
                     constraints: resolved_constraints,
                     visits: visits.clone(),
                 },
