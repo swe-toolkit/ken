@@ -77,7 +77,11 @@ stop and report the mismatch.
    - A `ken-interp` unit pin evaluates `Eq (Nat / R) [Zero] [Suc Zero]` and
      asserts `Neutral`, not Top. Deleting the arm reddens it with `Unknown`.
    - Spec 42 §3.1's residue list and §3.6's `Eq`-by-type canonicity bullet
-     gain the interim C8 exception, gated on P0.
+     gain the interim C8 exception, gated on P0. So does §1's statement
+     that closed ground programs never reach a neutral (spec-author
+     `evt_3rtr85bqjts6e`). In `seed-evaluation.md`, the CAN1 intro and
+     `can-no-stuck-closed-ground` are scoped to exclude it; the row's
+     fixtures keep their verdicts.
    - No `cast_reduce` or `eq_type_eq` change.
    - Not this WP: `eq_reduce` also returns `Unknown` for other closed
      C2-C4 cases (multi-field constructor, Π, Ω, scalar). That is a

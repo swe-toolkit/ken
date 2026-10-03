@@ -57,8 +57,9 @@ stop and report the mismatch.
    accept and the `quotient-respect-schema-dependent-motive` accept half
    are restored.
 5. X1's interim quotient arm in `eq_reduce` (from the interim WP) reduces
-   to `R a b` again. The spec 42 §3.1/§3.6 interim exceptions and the
-   interim `ken-interp` pin flip with it.
+   to `R a b` again. The spec 42 §1/§3.1/§3.6 interim exceptions, the
+   CAN1 scoping in `seed-evaluation.md` and the interim `ken-interp` pin
+   flip with it.
 
 ## Acceptance
 
