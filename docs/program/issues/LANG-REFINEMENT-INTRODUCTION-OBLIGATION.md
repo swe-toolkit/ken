@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-INTRODUCTION-OBLIGATION
 title: "A value introduced at a def-named refinement (Char, PosInt) emits no obligation, so const c : Char = 55296 elaborates with isScalar 55296 untracked; spec 34 section 5 requires every introduction at a refinement, literal or named, to emit phi a. Record the named predicate by GlobalId and emit at the one expected-type check"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
@@ -145,3 +145,10 @@ base, stop and report the mismatch.
    merges, then resumes with AC-1 and AC-2 unchanged. WIP parked at
    `f4edc461c` on `wp/LANG-REFINEMENT-INTRODUCTION-OBLIGATION` (base
    `c4f1812f4`).
+   - Resumed on `61fde2caf`. `KERNEL-LEQ-INT-LITERAL-REDUCTION` merged
+     `2df33a695`, and `LANG-SIBLING-GOAL-REFINEMENT` merged `61fde2caf`.
+     Replay the park onto `61fde2caf`. `elab.rs` has moved a long way
+     since `c4f1812f4`, so re-measure every settled-input anchor before
+     building on it. `SPEC-REFINED-PARAM-REQUIRES-DESUGAR` (`80afb1b10`)
+     makes a refined parameter a `requires`, which is
+     `LANG-REFINED-PARAM-REQUIRES-DESUGAR`, not this WP.

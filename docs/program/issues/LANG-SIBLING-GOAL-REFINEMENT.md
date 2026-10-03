@@ -1,7 +1,7 @@
 ---
 id: LANG-SIBLING-GOAL-REFINEMENT
 title: "A goal that mentions an indexed sibling binder refined by a match on a different scrutinee fails (BadEliminator, 'could not classify the branch goal'); record each failing leaf's proof, its inferred type and its installing match before any fix"
-status: active
+status: merged
 owner: language
 size: L
 tier: T1
@@ -190,8 +190,18 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
     admission (`ds5b` row).
   - Architect residual, diagnostic only: a no-op with nonempty leaves still
     builds the expanded view.
-- Open: increment 2 (Class A), released on `db19a8d0c`. The WP stays open
-  until it lands.
+- Increment 2 (Class A, one `MatchFrame` record): merged `61fde2caf` from
+  exact `9271ca05d` (FULL CI green, run `37157647421`); the main tree equals
+  the routed merge tree, 11 paths. Gates: Language QA `evt_4cx2pfr1mszt4`,
+  Architect `evt_7qw90rdx7jdbv`, Decision `dec_4cz90js83gfsy`.
+  - Its parent `b1d80c184` (QA `evt_4c51vk80g75j8`, Architect
+    `evt_5gwnxz1xyx6gm`) was red at M5 (run `37137801218`): the recursive
+    `check_match_dependent_mode` frame grew by about 5 KB and default-stack
+    tests overflowed. `9271ca05d` outlines motive preparation, arm-frame
+    opening and the premise frame, and is back under the base budget with
+    no stack override.
+  - `lookup_zip_with` checks without axioms, which unblocks
+    `CAT-VECTOR-DEFERRED-LAWS`.
 
 ## Residual (carried, not closed)
 
