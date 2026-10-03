@@ -2319,7 +2319,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     .iter()
                                     .enumerate()
                                     .find(|(_, case)| case.constructor == *constructor),
-                                _ => None,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
+                                LoweringOperand::Residual(_) => None,
                             };
                             let (case_index, case) = if let Some(selected) = selected {
                                 self.record_source_machine_computational_match_selection(

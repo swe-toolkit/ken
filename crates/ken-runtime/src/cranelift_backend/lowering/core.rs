@@ -6439,7 +6439,11 @@ impl<'a> Lowering<'a> {
                     eliminators,
                 )
             }
-            _ => Err(unsupported(
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => Err(unsupported(
+                "ComputationalMatch",
+                "tree producer callee is not a closure",
+            )),
+            LoweringOperand::Residual(_) => Err(unsupported(
                 "ComputationalMatch",
                 "tree producer callee is not a closure",
             )),
@@ -10534,7 +10538,17 @@ impl<'a> Lowering<'a> {
                 body,
                 ..
             }) => (captures, *body, params.len()),
-            _ => {
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
+                return Err(unsupported(
+                    "ContinuationSpecialization",
+                    format!(
+                        "the ruled recursive field at position {recursive_position} is not a retained \
+                         closure, so this continuation's selected worker has no capture run to \
+                         assemble from"
+                    ),
+                ));
+            }
+            LoweringOperand::Residual(_) => {
                 return Err(unsupported(
                     "ContinuationSpecialization",
                     format!(
@@ -16286,7 +16300,9 @@ impl<'a> Lowering<'a> {
                     LoweringOperand::Residual(residual) => Ok(LoweringOperand::Carried(
                         self.decode_residual_child(builder, *residual)?,
                     )),
-                    operand => Ok(operand.clone()),
+                    operand @ (LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)) => {
+                        Ok(operand.clone())
+                    }
                 }
             }
             RuntimeExpr::PrimitiveCall { primitive, args } => {
@@ -17332,7 +17348,12 @@ impl<'a> Lowering<'a> {
                         self.leave_oriented_semantic_region(installed.checked);
                         result
                     }
-                    _ => Err(unsupported("Call", "callee is not a closure")),
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
+                        Err(unsupported("Call", "callee is not a closure"))
+                    }
+                    LoweringOperand::Residual(_) => {
+                        Err(unsupported("Call", "callee is not a closure"))
+                    }
                 }
             }
             RuntimeExpr::Trap(trap) => Ok(LoweringOperand::Specialized(Lowered::Trap(trap.clone()))),

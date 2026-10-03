@@ -9397,7 +9397,7 @@ fn define_unit_body<M: Module>(
                 LoweringOperand::Residual(residual) => LoweringOperand::Carried(
                     compiler.decode_residual_child(&mut builder, residual)?,
                 ),
-                other => other,
+                other @ (LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)) => other,
             };
             match lowered {
                 LoweringOperand::Carried(word) if !compiler.process_object => (
