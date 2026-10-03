@@ -435,6 +435,75 @@ fn requires_body_and_ensures_obligations_are_all_reported_in_order() {
 }
 
 #[test]
+fn ensures_expression_operation_precedes_its_generated_ensures_hole() {
+    for spelling in ["/", "%"] {
+        let mut env = ElabEnv::new().unwrap();
+        let before = env.env.trusted_base();
+        let source =
+            format!("fn f (n : Int) (d : Int) : Int ensures Equal Int result (n {spelling} d) = n");
+        let result = env
+            .elaborate_decl_v1(&source)
+            .expect("an operation in the ensures expression must elaborate");
+        let [operation, ensures] = result.obligations.as_slice() else {
+            panic!("{spelling}: ensures-expression operation plus generated ensures hole")
+        };
+        assert!(matches!(operation.kind, ObligationKind::PartialPrim));
+        assert!(matches!(ensures.kind, ObligationKind::Ensures));
+        assert_eq!((operation.id, ensures.id), (0, 1));
+        assert!(env.is_open_hole(operation.hole_id));
+        assert!(env.is_open_hole(ensures.hole_id));
+        let added = env
+            .env
+            .trusted_base()
+            .into_iter()
+            .filter(|id| !before.contains(id))
+            .collect::<Vec<_>>();
+        assert_eq!(added.len(), 2);
+        assert!(added.contains(&operation.hole_id));
+        assert!(added.contains(&ensures.hole_id));
+        let extracted = v2_extract(&result);
+        assert!(matches!(
+            extracted.obligations[0].provenance.kind,
+            ProvKind::PartialPrim
+        ));
+        assert!(matches!(
+            extracted.obligations[1].provenance.kind,
+            ProvKind::Ensures { index: 1 }
+        ));
+        let body = env
+            .env
+            .transparent_body(result.def_id)
+            .expect("f is checked")
+            .1;
+        assert_eq!(
+            peel_function_body(&body),
+            &Term::var(1),
+            "{spelling}: the operation is in the ensures proposition, not the body"
+        );
+        let int = Term::const_(env.globals["Int"], vec![]);
+        let Term::Pi(n, rest) = &operation.goal_closed else {
+            panic!("operation goal: n binder")
+        };
+        let Term::Pi(d, rest) = rest.as_ref() else {
+            panic!("operation goal: d binder")
+        };
+        let Term::Pi(result_ty, goal) = rest.as_ref() else {
+            panic!("operation goal: ensures-local result binder")
+        };
+        assert_eq!(
+            (n.as_ref(), d.as_ref(), result_ty.as_ref()),
+            (&int, &int, &int)
+        );
+        let nonzero = env.numeric_env.classify_div(&int).unwrap().nonzero_id;
+        assert_eq!(
+            goal.as_ref(),
+            &Term::app(Term::const_(nonzero, vec![]), Term::var(1)),
+            "{spelling}: the ensures-local goal must depend on d"
+        );
+    }
+}
+
+#[test]
 fn requires_and_ensures_still_accept_propositions_and_reject_bool() {
     for (clause, prop, expected_obligations) in [
         ("requires", "Equal Int n n", 0),
