@@ -44,11 +44,23 @@ stop and report the mismatch.
 1. Kernel: Eq at quotient classes is neutral; Cast refuses unequal levels.
 2. Spec 16: §2.2's quotient rule and §5's Equality bullet state the interim
    (neutral until Quot-Form carries an equivalence proof); §8.4 and §9's C8
-   row follow. No change to §3.1.
+   row follow. No change to §3.1. §5.1's Type target gains the interim
+   paragraph ruled in `evt_59v6y2svdkx63`. The schema is kept and checked
+   where the transport collapses by regularity (`M [x] ≡ M [y]`, including
+   every constant motive). A Type-target elimination whose respect needs a
+   class equality is refused until P0: a dependent motive, or a motive into
+   a quotient. The Ω-target rule is unchanged. §9's C15 row splits:
+   constant-motive accept and refuse are unchanged; the dependent-motive
+   accept is deferred to P0 with interim verdict refused; `r_bad` stays
+   refused.
 3. Conformance: the `quotient-eq` rows (`seed-kernel.md`,
    `seed-observational.md`, `seed-conversion.md`
    `quotient-eq-through-conv`) state the interim verdict; a row pins the
    `0 = 1` probe refused and one pins the cross-level cast refused.
+   `quotient-respect-schema-dependent-motive` restates `given` without the
+   reduction-derived `h'`, pins refused for both `r_ok` and `r_bad`, and
+   marks the accept half as restored by P0. The constant-motive
+   `quotient-respect-schema-{rejects,accepts}-…` rows are unchanged.
 4. Test consumers of the reduction are migrated (check 3: grep
    `crates/*/tests`, `conformance/`, `examples/`, `catalog/` for quotient
    equality uses, not only `eq_at_quot`).
@@ -69,7 +81,9 @@ stop and report the mismatch.
 
 ## Stop conditions
 
-- A non-test path depends on quotient equality reducing (for example the
-  §5.1 respect schema's quotient-Eq transport): stop to the Architect with
-  the site.
+- A non-test path depends on quotient equality reducing: stop to the
+  Architect with the site. §5.1 is ruled (`evt_59v6y2svdkx63`):
+  `infer_quot_elim` (`check.rs:909-941`) forms no `h'`, so no kernel code
+  changes for it. The spec prose is the only consumer, handled in
+  deliverable 2.
 - A catalog or `examples/` program stops checking.

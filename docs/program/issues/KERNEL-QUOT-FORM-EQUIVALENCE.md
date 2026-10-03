@@ -50,6 +50,12 @@ stop and report the mismatch.
 2. Kernel, checked core, elaborator and interpreter carry `e`; the surface
    quotient form requires it.
 3. `eq_at_quot` reduces at class pairs again.
+4. `infer_quot_elim`'s Type-target respect schema forms the transport proof
+   as `sym (cong M h')`, with `h'` derived from `h` through the restored
+   reduction, replacing `Refl(M [y])` (Architect `evt_59v6y2svdkx63`). Spec
+   16 §5.1's interim paragraph is removed, and the C15 dependent-motive
+   accept and the `quotient-respect-schema-dependent-motive` accept half
+   are restored.
 
 ## Acceptance
 
@@ -58,7 +64,8 @@ stop and report the mismatch.
   real equivalence reduces `Eq (A/R) [a] [b]` to `R a b`. A relation at
   `Ω_{l+1}` over `A : Type l` is refused, and so is S2's `R : Bool → Nat →
   Ω_0` over `Bool`. `trusted_base()` delta is the
-  formation side condition only.
+  formation side condition only. An executed kernel admission test (not a
+  `whnf` test) accepts C15's dependent-motive `r_ok` and refuses `r_bad`.
 - **AC-2 (falsifiers).** M1: skip the `IsEquiv` check; a pin forming the
   `0 = 1` quotient reddens. M2: accept `Ω(_)` without the level equation;
   the level pin reddens.
