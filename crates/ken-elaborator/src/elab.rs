@@ -18493,6 +18493,8 @@ fn build_ctor_buckets(
             let split_span = split_span.ok_or_else(|| {
                 ElabError::Internal("nested bucket has no split span".into())
             })?;
+            let saved_len = cx.ctx.len();
+            let saved_hidden = cx.hidden_positions.len();
             let hidden = cx.hidden_positions.pop();
             debug_assert_eq!(hidden, Some(cx.ctx.len() - 1));
             let binder = cx.ctx.pop().expect("nested split binder remains installed");
@@ -18508,6 +18510,9 @@ fn build_ctor_buckets(
             );
             cx.ctx.push(binder);
             cx.hidden_positions.push(cx.ctx.len() - 1);
+            debug_assert_eq!(cx.ctx.len(), saved_len);
+            debug_assert_eq!(cx.hidden_positions.len(), saved_hidden);
+            debug_assert_eq!(cx.hidden_positions.last(), Some(&(saved_len - 1)));
             if ret_ty_slot.is_some() {
                 nested_motive = Some(calculated?.0);
             } else {
