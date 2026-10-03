@@ -42,13 +42,6 @@ impl CarriedResidualWord {
         self.slot
     }
 
-    /// I-0 only: an explicitly counted crossing of an untyped ABI seat.
-    /// I-1 deletes this method when every such seat has a planner-issued kind.
-    pub(super) fn residual_across_untyped_abi_transitional(self) -> CarriedBoundaryWord {
-        #[cfg(any(test, feature = "px8-ds-test-support"))]
-        super::record_residual_transitional_escape();
-        CarriedBoundaryWord { word: self.word }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

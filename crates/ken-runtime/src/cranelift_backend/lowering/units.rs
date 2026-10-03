@@ -4505,10 +4505,12 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             };
             let returned = match returned_operand {
                 LoweringOperand::Carried(word) => word,
-                // The pending-Vis response-owner Result frame remains untyped
-                // until I-1; this is an explicit, counted I-0 ABI crossing.
-                LoweringOperand::Residual(residual) => residual
-                    .residual_across_untyped_abi_transitional(),
+                // The pending-Vis response-owner Result frame carries K.
+                LoweringOperand::Residual(residual) => {
+                    #[cfg(any(test, feature = "px8-ds-test-support"))]
+                    record_residual_abi_decode();
+                    compiler.decode_residual_child(&mut builder, residual)?
+                },
                 LoweringOperand::Specialized(_) => {
                     return Err(backend_module(
                         "a response K context returned a specialized template instead of its Trap-checked runtime Result"
@@ -5276,9 +5278,12 @@ pub(super) fn define_continuation_bodies<M: Module>(
             // The Result slot is WRITTEN here and never read.
             let word = match lowered {
                 LoweringOperand::Carried(carried) => carried.word,
-                // Continuation Result frame slot: counted I-0 ABI crossing.
-                LoweringOperand::Residual(residual) => residual
-                    .residual_across_untyped_abi_transitional().word,
+                // The continuation Result frame slot carries K.
+                LoweringOperand::Residual(residual) => {
+                    #[cfg(any(test, feature = "px8-ds-test-support"))]
+                    record_residual_abi_decode();
+                    compiler.decode_residual_child(&mut builder, residual)?.word
+                },
                 LoweringOperand::Specialized(value) => {
                     compiler.emit_result(&mut builder, value)?.0
                 }
@@ -5925,9 +5930,12 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
                         )?
                         .word,
                 ),
-                // Generated-context Result frame slot: counted I-0 ABI copy.
-                LoweringOperand::Residual(residual) => Some(residual
-                    .residual_across_untyped_abi_transitional().word),
+                // The generated-context Result frame slot carries K.
+                LoweringOperand::Residual(residual) => {
+                    #[cfg(any(test, feature = "px8-ds-test-support"))]
+                    record_residual_abi_decode();
+                    Some(compiler.decode_residual_child(&mut builder, residual)?.word)
+                },
             };
             if let Some(word) = word {
                 builder.ins().store(
@@ -6575,9 +6583,12 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
                         )?
                         .word,
                 ),
-                // Fused-unit Result frame slot: counted I-0 ABI copy.
-                LoweringOperand::Residual(residual) => Some(residual
-                    .residual_across_untyped_abi_transitional().word),
+                // The fused-unit Result frame slot carries K.
+                LoweringOperand::Residual(residual) => {
+                    #[cfg(any(test, feature = "px8-ds-test-support"))]
+                    record_residual_abi_decode();
+                    Some(compiler.decode_residual_child(&mut builder, residual)?.word)
+                },
             };
             if let Some(word) = word {
                 builder.ins().store(
@@ -9565,9 +9576,12 @@ fn define_unit_body<M: Module>(
                         )?
                         .word,
                 ),
-                // Ordinary-unit Result frame slot: counted I-0 ABI copy.
-                LoweringOperand::Residual(residual) => Some(residual
-                    .residual_across_untyped_abi_transitional().word),
+                // The ordinary-unit Result frame slot carries K.
+                LoweringOperand::Residual(residual) => {
+                    #[cfg(any(test, feature = "px8-ds-test-support"))]
+                    record_residual_abi_decode();
+                    Some(compiler.decode_residual_child(&mut builder, residual)?.word)
+                },
             };
             (word, None)
         };
