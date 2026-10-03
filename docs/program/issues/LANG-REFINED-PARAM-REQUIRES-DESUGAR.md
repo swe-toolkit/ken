@@ -6,7 +6,7 @@ owner: language
 size: M
 tier: T1
 gate: architect
-depends_on: [SPEC-REFINED-PARAM-REQUIRES-DESUGAR, KERNEL-INT-DIV-MOD-NATIVE]
+depends_on: [SPEC-REFINED-PARAM-REQUIRES-DESUGAR, KERNEL-INT-DIV-MOD-NATIVE, VERIFY-CONTRACT-LOWERING-MULTI-REQUIRES]
 blocks: []
 github: null
 origin: "Operator 2026-10-03: 'approve 3(a) as a desugar to requires' (evt_2903kfxhh96c). Spec contract SPEC-REFINED-PARAM-REQUIRES-DESUGAR. Steward-filed per COORDINATION section 2."
