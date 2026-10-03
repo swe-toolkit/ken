@@ -146,9 +146,12 @@ This follows from `cast`-refl (`16` par. 3.2): when `e = refl a`,
 
 Because `J` is built from `cast`, when its equality argument is a
 *non-`refl`* but otherwise canonical proof -- e.g. one produced by
-`subst`, by a constructor's congruence, or by a quotient relation -- `J`
-**reduces** by the corresponding `cast` computation (`16` par. 3.2) rather
-than getting stuck.
+`subst` or a constructor's congruence -- `J` **reduces** by the
+corresponding `cast` computation (`16` par. 3.2) rather than getting
+stuck. A proof `h : R a b` from a quotient relation does **not** supply
+`Eq (A/R) [a] [b]` by conversion in the interim: class equality is
+neutral (`16 §2.2`/§5). That example becomes available only after P0
+checks Quot-Form's equivalence proof and restores relation-as-equality.
 
 Concretely:
 
