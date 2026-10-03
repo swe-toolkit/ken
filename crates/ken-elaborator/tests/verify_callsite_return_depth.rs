@@ -186,6 +186,53 @@ fn function_return_ensures_use_parameter_depth_and_ascribed_result() {
     assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
 }
 
+/// AR7. MEASURED: both the alias and direct-arrow declarations produce one
+/// Ensures hole, and the alias goal ascribes the body at `IntFn`. CLAIMED:
+/// whether B is a function result is determined by its checked whnf. THE GAP:
+/// `IntFn` is a Const surface term whose transparent body is a Pi.
+#[test]
+fn function_return_alias_uses_whnf_for_ensures_ascription() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let results = env
+        .elaborate_file_v1(
+            "def IntFn = Int -> Int\n\
+             fn aliased (n : Int) : IntFn \
+             ensures Equal Int (result 0) n = \\m. n\n\
+             fn direct (n : Int) : Int -> Int \
+             ensures Equal Int (result 0) n = \\m. n",
+        )
+        .expect("an aliased function-valued return admits its Ensures goal");
+    let [_, aliased, direct] = results.as_slice() else {
+        panic!("expected the alias declaration and two functions")
+    };
+    let [alias_ensures] = aliased.obligations.as_slice() else {
+        panic!("the alias declaration has exactly one Ensures obligation")
+    };
+    let [direct_ensures] = direct.obligations.as_slice() else {
+        panic!("the direct-arrow twin has exactly one Ensures obligation")
+    };
+    assert!(matches!(alias_ensures.kind, ObligationKind::Ensures));
+    assert!(matches!(direct_ensures.kind, ObligationKind::Ensures));
+
+    let int = Term::const_(env.globals["Int"], vec![]);
+    let int_fn = Term::const_(env.globals["IntFn"], vec![]);
+    let result_function = Term::Ascript(
+        Box::new(Term::lam(int.clone(), Term::var(1))),
+        Box::new(int_fn),
+    );
+    assert_eq!(
+        alias_ensures.goal_closed,
+        Term::pi(
+            int.clone(),
+            equal_int(
+                &env,
+                Term::app(result_function, Term::IntLit(0.into())),
+                Term::var(0),
+            ),
+        )
+    );
+}
+
 /// AR4. MEASURED: a return refinement below the declared result's own arrow
 /// is refused with the ruled diagnostic. CLAIMED: only a refinement at the
 /// `param_count` depth becomes an implicit ensures. THE GAP: this type has

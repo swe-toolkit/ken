@@ -4567,7 +4567,15 @@ fn infer_preconditioned_application(
     span: &Span,
 ) -> Result<Option<(Term, Term)>, ElabError> {
     let (head, arguments) = call_application_spine(expr);
-    if !matches!(head, RExpr::RCon(_, _) | RExpr::RCheckedGlobal { .. }) {
+    let resolvable_global = match head {
+        RExpr::RCheckedGlobal { .. } => true,
+        RExpr::RCon(name, _) => cx.globals.contains_key(name),
+        _ => false,
+    };
+    if !resolvable_global {
+        // Surface eliminators such as `J` can be unresolved RCons until their
+        // dedicated application arm sees the complete arity. Do not infer an
+        // arbitrary head while probing for call-site metadata.
         return Ok(None);
     }
     let (head_core, mut ty) = infer(cx, head)?;
@@ -4600,7 +4608,12 @@ fn append_saturated_preconditions(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let (head, arguments) = call_application_spine(expr);
-    if !matches!(head, RExpr::RCon(_, _) | RExpr::RCheckedGlobal { .. }) {
+    let resolvable_global = match head {
+        RExpr::RCheckedGlobal { .. } => true,
+        RExpr::RCon(name, _) => cx.globals.contains_key(name),
+        _ => false,
+    };
+    if !resolvable_global {
         return Ok(call);
     }
     let (head_core, _) = infer(cx, head)?;
@@ -15916,12 +15929,17 @@ fn elaborate_view_with_spec(
             absorb_obligations(&mut decl_obligations, psi_obligations);
             // `psi_core` is in params + requires + result context. Substitute
             // the body at its result type under the requires binders.
-            let result_term = match &result_ty_under_requires {
-                Term::Pi(..) => Term::Ascript(
+            let result_is_function = matches!(
+                whnf(env, &ens_goal_ctx, &result_ty_under_requires),
+                Term::Pi(..)
+            );
+            let result_term = if result_is_function {
+                Term::Ascript(
                     Box::new(body_inner.clone()),
                     Box::new(result_ty_under_requires.clone()),
-                ),
-                _ => body_inner.clone(),
+                )
+            } else {
+                body_inner.clone()
             };
             let goal_open = subst0(&psi_core, &result_term);
             let closed = close_goal(&ens_goal_ctx, &[], goal_open);
