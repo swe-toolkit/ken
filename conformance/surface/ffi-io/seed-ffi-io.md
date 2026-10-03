@@ -84,8 +84,8 @@ touches — `38 §3.4`). `(oracle)` = the literal `foreign`/`symbol`/`library`/
 ### ffi-io/relied-on-foreign-listed-in-P (AC2)
 - spec: `spec/30-surface/38-ffi-io.md §3.1`, `25 §3`, `18 §5`,
   `spec/70-behavioral/71-assumption-boundary.md §3.1` (I2)
-- given: a verified `view useFFI ... = ... os_write ...` that **calls**
-  `os_write`, run through the **real** B1 export
+- given: a verified `proc` named `useFFI`, with `visits [FS]`, that **calls**
+  `os_write`; run it through the **real** B1 export
 - expect: `os_write`'s postulate is in `useFFI`'s `trusted_base_delta` (`25 §3`)
   and projects into the export's **`P`** (assumptions, concept; literal key
   `(oracle)`) tagged `tested` under the **FFI boundary-label** case (`71 §2.1`)
@@ -98,8 +98,8 @@ touches — `38 §3.4`). `(oracle)` = the literal `foreign`/`symbol`/`library`/
 ### ffi-io/not-relied-on-foreign-absent-from-P (AC2, soundness)
 - spec: `spec/30-surface/38-ffi-io.md §3.1`, `25 §3`,
   `spec/70-behavioral/71-assumption-boundary.md §3.1` (I2), `§3.3`
-- given: the **same** module with `os_write` in scope, but a verified `view
-  noFFI (x : Int) : Int = x + 1` that does **not** call it, run through the
+- given: the **same** module with `os_write` in scope, but a verified
+  `fn noFFI (x : Int) : Int = x + 1` that does **not** call it, run through the
   emitter
 - expect: `os_write` is **absent** from `noFFI`'s `trusted_base_delta` and from
   its export `P` (and a relied-on vs not export differ in **hash**, `71 §3.3`) —
@@ -117,12 +117,16 @@ touches — `38 §3.4`). `(oracle)` = the literal `foreign`/`symbol`/`library`/
 ### ffi-io/pure-foreign-assumption-rides-P-not-Q (AC3, soundness)
 - spec: `spec/30-surface/38-ffi-io.md §3.2`, `21 §5.4`,
   `spec/70-behavioral/71-assumption-boundary.md §3.1` (I1)
-- given: an artifact calling `foreign c_sqrt : Float → Float = symbol "sqrt"
-  library "m" pure`, **and** a co-located `view wrap (x : Float) : Float ensures
-  result == c_sqrt x = c_sqrt x` whose Ken-side `ensures` is provable by `refl`
-  (it relates the wrapper to the foreign's *result*, **not** sqrt's C
-  semantics), so its obligation **discharges** (verdict `proved`); run through
-  the emitter
+- given: an artifact with the pure foreign `c_sqrt : Float → Float`, and this
+  co-located wrapper, run through the emitter:
+
+  ```ken
+  fn wrap (x : Float) : Float
+    ensures Equal Float result (c_sqrt x) = c_sqrt x
+  ```
+
+  The `ensures` is provable by `refl`: it relates the wrapper to the foreign's
+  *result*, **not** sqrt's C semantics, so the obligation **discharges**.
 - expect: `c_sqrt`'s assumed `pure`/type guarantee lands in **`P`** (`tested`,
   the trusted boundary) and is **absent from `Q`**; **while** `wrap`'s
   discharged postcondition lands in **`Q`** (`proved`) — the field tracks
@@ -170,8 +174,8 @@ touches — `38 §3.4`). `(oracle)` = the literal `foreign`/`symbol`/`library`/
 ### ffi-io/world-foreign-without-row-rejected (AC5)
 - spec: `spec/30-surface/38-ffi-io.md §3.4`, `36 §1.4`, `38 §1.3`
 - given: `foreign os_write : Int32 → Bytes → Int visits [FS] = symbol "write"`
-  called from a `view send_it ...` whose declared row is **∅** (no `visits`) —
-  and a second `view send_ok ... visits [FS]` declaring `[FS]`
+  called by two callers with the same explicit `Bytes` parameter and body:
+  pure `fn send_it` with no row, and `proc send_ok` with `visits [FS]`
 - expect: `send_it` is an **EFFECT-ESCAPE** static error (`36 §1.4`: `ρ_inf ⊄
   ρ_decl` — the `[FS]` from `os_write` escapes the empty declared row);
   `send_ok` **accepts** — a **verdict flip** through the **real** `36 §1.4`

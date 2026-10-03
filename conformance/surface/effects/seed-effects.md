@@ -104,37 +104,49 @@ collapse `ITree 𝟘 R ≅ R`), `§2.5` (capability-passing, `Cap E` as Π param
 
 ## EFF1 — effect row: transitive inference + static check (frame AC1)
 
-A `view` is **pure by default**; an effectful one carries a static **effect
-row** (`visits ρ`) **inferred transitively** from its body (`infer_row`, `§1.2`)
-and **checked** `ρ_inf ⊆ ρ_decl` (`§1.4`) — performing an effect outside the
-declared bound is the **single soundness-relevant gate** (`§1.4`, frame AC1).
+A `const` or `fn` is **pure by declaration**; an effectful computation uses a
+`proc` with a static **effect row** (`visits ρ`) **inferred transitively** from
+its body (`infer_row`, `§1.2`) and **checked** `ρ_inf ⊆ ρ_decl` (`§1.4`) —
+performing an effect outside the declared bound is the
+**single soundness-relevant gate** (`§1.4`, frame AC1).
 
 ### surface/effects/eff-row-inferred-transitively (oracle)
 - spec: `36 §1.2`, `§1.1`
 - given: leaf prims `read_config (p:String):Config visits [FS]` and
-  `now ():Instant visits [Clock]`; a `view setup () : Config = read_config "/x"`
-  with **no declared row**.
+  `now ():Instant visits [Clock]`; then:
+
+  ```ken
+  proc setup () : Config visits [FS, Clock] = read_config "/x"
+  ```
+
+  The declared row reserves unused `Clock` as headroom.
 - expect: `infer_row` assigns `setup` the row **`[FS]`** — `read_config`'s
   latent row released at the call (`§1.2`, `f a` clause). Accepts; the inferred
   row is **exactly `[FS]`** (not `[]`, not `[FS, Clock]`).
 - why: pins transitive inference as a **structural output** asserted
-  verdict-independently. A bug that fails to release `read_config`'s latent
-  `[FS]` infers `[]` (wrong) while the program still "accepts" — caught only by
-  asserting the row, not the accept. (the V0/K2c structural-output carry.)
+  verdict-independently. Copying the declared `[FS, Clock]` row gives the wrong
+  extra `Clock`; failing to release `read_config`'s latent `[FS]` gives `[]`.
+  Either error may still accept, so the inferred row itself is load-bearing
+  (the V0/K2c structural-output carry).
 
 ### surface/effects/eff-row-union-two-effects (oracle)
 - spec: `36 §1.2` (`let` / sequencing clause), `§1.1` (join `∪`)
-- given: `view boot () = { read_config "/x" ; now () }` — calls both leaves; no
-  declared row.
+- given: a procedure that calls both leaves and declares unused `Net` as
+  headroom:
+
+  ```ken
+  proc boot () visits [FS, Clock, Net] = { read_config "/x" ; now () }
+  ```
 - expect: inferred row = the **join `[FS, Clock]`** (lattice `∪`, `§1.1`; set
   normalization `(oracle)`). Accepts.
 - why: ≥2 distinct effects — the row is the **join** over the body's calls. A
-  bug taking only the first/last call's effect infers `[FS]` or `[Clock]`; the
-  asserted join flips the structural check. (≥2-effects guardrail.)
+  bug taking only the first/last call's effect infers `[FS]` or `[Clock]`; a bug
+  copying the declared superset also differs from the asserted join. (≥2-effects
+  guardrail.)
 
 ### surface/effects/eff-undeclared-escapes-rejected (oracle)
 - spec: `36 §1.4` (`ρ_inf ⊄ ρ_decl` ⇒ EFFECT-ESCAPE), §6 acceptance 1
-- given: `view logged () : Unit visits [Console] = { greet "hi" ; now () }` —
+- given: `proc logged () : Unit visits [Console] = { greet "hi" ; now () }` —
   declares `[Console]`; `infer_row` = `{Console, Clock}` (`greet` + `now`), so
   `Clock ∉ ρ_decl`.
 - expect: **static error** `EffectEscapes` (kind `(oracle)`) that **names each
@@ -174,13 +186,13 @@ declared bound is the **single soundness-relevant gate** (`§1.4`, frame AC1).
 
 ### surface/effects/eff-pure-default-is-effect-free (oracle)
 - spec: `36 §1.4` ("no `visits` ⇒ `ρ_decl = ∅`"), `§2.4` (pure collapse)
-- given: `view double (n:Int):Int = n + n` — no effectful call, no row.
+- given: `fn double (n:Int):Int = n + n` — no effectful call, no row.
 - expect: `infer_row = ∅`; accepts; denotes to `ITree 𝟘 ⟦Int⟧ ≅ ⟦Int⟧`, which
   the elaborator **collapses** to the plain term (`§2.4`) — usable where a pure
   function is required.
 - why: the pure-default base case and the **EFF5 hinge**. A bug that infers a
   spurious effect for pure code (or breaks "no row ⇒ pure") is caught by the
-  asserted empty row. Pairs with `pure-view-usable-in-pure-context`.
+  asserted empty row. Pairs with `pure-fn-usable-in-pure-context`.
 
 ---
 
@@ -194,7 +206,7 @@ machinery** (`§2.1`, `§7.1`).
 ### surface/effects/eff-denotes-to-interaction-tree (oracle)
 - spec: `36 §2.1` (`Ret`/`Vis`), `§2.2` (`perform`), `§2.4` (`⟦let⟧ = bind`),
   `§7.5.2`
-- given: `view two_ops () visits [Console] = { greet "a" ; greet "b" }`, where
+- given: `proc two_ops () visits [Console] = { greet "a" ; greet "b" }`, where
   `greet s ⤳ perform (Write s)` (`Console.Op = { Write String }`, `§2.1`).
 - expect: the denotation is the **pure** `ITree` term
   `Vis (Write "a") (λ_. Vis (Write "b") (λ_. Ret unit))` — **two** `Vis` nodes
@@ -272,7 +284,7 @@ denial path on each. (L5 pins **presence**-gating; subsumption/attenuation is
 ### surface/effects/cap-op-without-token-rejected (oracle)
 - spec: `36 §2.5` (`perform_E` well-formed only if `Cap E` in scope), `§7.3.2`
 - given: `write_file` declared `using fs : FsCap`; a
-  `view dump () : Unit visits [FS] = write_file "/x" data` with **no** `Cap FS`
+  `proc dump () : Unit visits [FS] = write_file "/x" data` with **no** `Cap FS`
   in scope (no capability parameter, no enclosing handler provides it).
 - expect: **static error** — `MissingCapability(FsCap)` (kind `(oracle)`,
   `§7.3.2`): the `perform` is gated on the `Cap E` value's presence, unprovided.
@@ -291,7 +303,7 @@ denial path on each. (L5 pins **presence**-gating; subsumption/attenuation is
 
 ### surface/effects/cap-two-distinct-caps-each-gated (oracle)
 - spec: `36 §2.5` (one `Cap E` parameter per un-handled effect)
-- given: `view exfil () visits [FS, Net] = { write_file "/x" d ; send sock d }`
+- given: `proc exfil () visits [FS, Net] = { write_file "/x" d ; send sock d }`
   — `write_file using fs:FsCap`, `send using net:NetCap`. Three variants: (a)
   both caps in scope; (b) only `fs`; (c) only `net`.
 - expect: (a) **accepts**; (b) **rejects** `MissingCapability(NetCap)`; (c)
@@ -318,8 +330,8 @@ tail-resumptive fold (`§4.2`). Handlers are `elim_ITree` folds,
   ```
   space Counter {
     mut n : Int = 0
-    view inc () : Unit visits [Counter] = n becomes n + 1
-    view get () : Int  visits [Counter] = n
+    proc inc () : Unit visits [Counter] = n becomes n + 1
+    proc get () : Int  visits [Counter] = n
   }
   ```
 
@@ -335,7 +347,7 @@ tail-resumptive fold (`§4.2`). Handlers are `elim_ITree` folds,
 
 ### surface/effects/space-old-scoped-to-ensures (oracle)
 - spec: `36 §4.3` (`old(e)` = `e` in the pre-state; worked `inc` example)
-- given: `view inc() visits [Counter] ensures n == old(n) + 1 = n becomes n+1`;
+- given: `proc inc() visits [Counter] ensures n == old(n) + 1 = n becomes n+1`;
   and a variant asserting `n == old(n) + 2`.
 - expect: the **`+1`** `ensures` **discharges** — `inc` denotes to the
   transformer `λ s. (tt, s with .n := s.n+1)`, and the obligation computes
@@ -415,7 +427,7 @@ tail-resumptive fold (`§4.2`). Handlers are `elim_ITree` folds,
 L5 fixes the interface (the `Effect` signature + every foreign op is a `Vis`
 node); **L7 supplies the interpreters** (`§7.2`).
 
-### surface/effects/pure-view-usable-in-pure-context (oracle)
+### surface/effects/pure-fn-usable-in-pure-context (oracle)
 - spec: `36 §1.4`/`§7.2` (`pure ≡ ρ = ∅`), `§2.4` (collapse)
 - given: `double` (row `∅`, from `eff-pure-default-is-effect-free`) used where a
   pure function is required — inside a `requires`/`ensures` predicate or a total
@@ -431,7 +443,8 @@ node); **L7 supplies the interpreters** (`§7.2`).
   node)
 - given: a `foreign` op with a **non-empty** declared row (e.g.
   `foreign read_clock () : Instant visits [Clock]`) — its operation is a `Vis`
-  node at the world frontier; and a `view` calling it.
+  node at the world frontier; and a `proc` calling it with the corresponding
+  effect row.
 - expect: the impure marker is the **non-empty row** (`impure ≡ ρ ≠ ∅`, `§7.2`),
   **visible in the type**; a caller **inherits** `Clock` in its inferred row
   (`§1.2`, propagates transitively like any effect). L5 exposes the `Effect`
@@ -444,12 +457,12 @@ node); **L7 supplies the interpreters** (`§7.2`).
 
 ### surface/effects/impure-masquerading-as-pure-rejected (oracle)
 - spec: `36 §1.4` (escape), `§7.2` (`impure ≡ non-empty row`)
-- given: a pure-typed `view safe () : Int = read_clock ()` where `read_clock` is
+- given: a pure-typed `const safe : Int = read_clock ()` where `read_clock` is
   impure (`visits [Clock]`), but `safe` declares **no row** (`ρ_decl = ∅`,
   claims purity).
 - expect: **static error** — `EffectEscapes(Clock)` (kind `(oracle)`):
-  `ρ_inf = {Clock} ⊄ ∅`, so an impure op cannot be called from a pure-typed
-  (empty-row) view without surfacing the effect (`§1.4`).
+  `ρ_inf = {Clock} ⊄ ∅`, so an impure op cannot be called from an empty-row
+  `const` without surfacing the effect (`§1.4`).
 - why: the boundary's **integrity** — impure cannot silently masquerade as pure,
   the property the "no row ⇒ pure" certificate (and all of verification, IFC, CT
   downstream) depends on. Verdict **flips**: declaring `visits [Clock]` accepts,
@@ -641,7 +654,8 @@ and space doors **agree on the fold's shape**.
 - given: the on-`main` surface/elaboration invariants and the V0
   `lex → parse → resolve → elaborate → kernel-check` seeds.
 - expect: **unchanged** — L5 **extends** surface conformance with effects; it
-  must not regress pure-elaboration or the V0 pipeline. A pure `view` (row `∅`)
+  must not regress pure-elaboration or the V0 pipeline. A pure `fn` or `const`
+  (row `∅`)
   denotes to `ITree 𝟘 R`, which **collapses to the identical core term** the V0
   elaborator emits (`§2.4`) — effects are additive: no row ⇒ the V0 path is
   untouched.

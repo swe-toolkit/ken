@@ -222,10 +222,11 @@ gate (this case does not re-pin the gate — see the subsume note).
 ### surface/bytes-io/read-bytes-untracked-is-type-error
 - spec: `38 §1.3`, `36 §1.4` (gate home: `../effects/seed-effects.md`
   `eff-undeclared-escapes-rejected`)
-- given: the real landed `read_bytes … visits [FS]` called from (a) a `view`
-  declaring **no** row (`ρ_decl = ∅`, pure by default); (b) a `view` declaring
-  `visits [FS]`. Derive its row from `ElabEnv.effect_rows`, populated from the
-  actual declaration; do not hand-feed an `FS` literal.
+- given: the real landed `read_bytes … visits [FS]` called from (a) an `fn`
+  with an explicit argument and **no** row (`ρ_decl = ∅`, pure by declaration);
+  (b) a `proc` with the same argument and `visits [FS]`. Derive its row from
+  `ElabEnv.effect_rows`, populated from the actual declaration; do not hand-feed
+  an `FS` literal.
 - expect: (a) **static error** EFFECT-ESCAPE (`EffectEscapes(FS)`, kind
   `(oracle)`) — `read_bytes`'s latent `[FS]` is in the inferred row, `[FS] ⊄ ∅`;
   (b) **accepts** — `[FS] ⊆ [FS]`. A **verdict flip** keyed on whether the I/O
@@ -243,8 +244,9 @@ gate (this case does not re-pin the gate — see the subsume note).
 ### surface/bytes-io/print-line-untracked-is-type-error
 - spec: `36 §1.4` (gate home as above), CP0 fixture-re-anchor disposition
 - given: the real landed
-  `print_line : String → IO Unit visits [Console]` called from (a) a `view`
-  with **no** row; (b) a `view` declaring `visits [Console]`. Derive the callee
+  `print_line : String → IO Unit visits [Console]` called from (a) an `fn`
+  with an explicit argument and **no** row; (b) a `proc` with the same argument
+  and `visits [Console]`. Derive the callee
   row from `ElabEnv.effect_rows`, populated by the actual prelude declaration;
   do not hand-feed a synthetic effect declaration.
 - expect: (a) **static error** EFFECT-ESCAPE (`EffectEscapes(Console)`) —

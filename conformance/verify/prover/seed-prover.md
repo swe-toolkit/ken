@@ -273,7 +273,7 @@ against `23` + `trusted_base()`.
 ### verify/prover/disproved-carries-countermodel
 - spec: `23 §1.2`; `24 §1` (countermodel shape — `(oracle)` where unlanded)
 - given: a **false** obligation —
-  `view f (n : Int) : Int ensures result > 0 = n` (false for `n ≤ 0`); its
+  `fn f (n : Int) : Int ensures result > 0 = n` (false for `n ≤ 0`); its
   postcondition goal `Γ ⊢ n > 0`
 - expect: verdict **disproved**, evidence = a **countermodel** naming the
   failing input class (`n ≤ 0`); where the backend yields a proof of `¬φ`, the
@@ -313,7 +313,7 @@ against `23` + `trusted_base()`.
 - spec: `23 §1.1`; `22 §8` (empty obligation set); `21 §6.2`
 - given: a **non-spec** program — no
   `requires`/`ensures`/refinement/`prove`/`law`, no partial primitive (e.g.
-  `view id (A : Type) (x : A) : A = x`), so V2 emits the **empty** obligation
+  `fn id (A : Type) (x : A) : A = x`), so V2 emits the **empty** obligation
   set
 - expect: V3 produces **no** verdicts (the per-obligation function is never
   invoked); the V1/V0 elaboration **and** pure evaluation are **unchanged**.

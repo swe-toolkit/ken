@@ -92,7 +92,7 @@ not depend on the spelling.
 
 ### surface/numbers/expected-type-overrides-default
 - spec: `35 §4.1` (expected-type override)
-- given: `view f (x : Int64) = x + 1` — the literal `1` in an `Int64`-typed
+- given: `fn f (x : Int64) = x + 1` — the literal `1` in an `Int64`-typed
   position
 - expect: `1` elaborates at the **expected type `Int64`**; the default table
   does **not** fire (no `Int`-default, no ambiguity error). The default applies

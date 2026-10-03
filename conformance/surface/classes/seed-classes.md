@@ -188,7 +188,7 @@ that enforcement.
 ### classes/explicit-named-instance-used-implicit-selects-canonical (AC5)
 - spec: `33 §5.5`, `39 §6.5`, `39 §6.2`
 - given: a **non-canonical** `byLength : Ord String` (an ordinary record-typed
-  `let`/`view` value, distinct from the canonical `Ord String`); one call
+  `let`/`const` value, distinct from the canonical `Ord String`); one call
   passing it **explicitly** (`f {d = byLength} x` / positional dictionary
   application), and one call at the **same type** using the **implicit**
   `where Ord String`

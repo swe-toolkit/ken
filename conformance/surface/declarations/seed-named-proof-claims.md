@@ -43,7 +43,7 @@ attached-proof references.
   lemma kw_theorem_refl (x : Bool) : Equal Bool x x = Refl
   ```
 - expect-negative: rejects with span `0..5` and exactly
-  `expected 'view', 'const', 'fn', 'proc', 'let', 'prove', 'prop', 'theorem',
+  `expected 'const', 'fn', 'proc', 'let', 'prove', 'prop', 'theorem',
   'proof', 'law', 'data', 'def', 'foreign', 'temporal', 'record', 'class',
   'instance', 'derive', 'module', 'import', 'export', 'pub', 'program',
   'package', or 'space proc', found Ident("lemma")`.

@@ -43,15 +43,15 @@ prototype's stubbed sums and missing exhaustiveness.
 
 ## surface/data-match/construct-then-eliminate (AC1)
 - spec: `spec/30-surface/34-data-match.md §1`, `10-kernel/14 §3`
-- given: `data Option a = None | Some a`; `match (Some 3) { Some x => x; None =>
-  0 }`
-- expect: **reduces-to** `3` (the emitted `elim_Option` ι-reduces on the `Some`
-  constructor, `14 §3`) — a real constructor **and** a real, computing
-  eliminator.
+- given: `data MaybeValue a = MissingValue | PresentValue a`;
+  `match (PresentValue 3) { PresentValue x => x; MissingValue => 0 }`
+- expect: **reduces-to** `3` (the emitted `elim_MaybeValue` ι-reduces on the
+  `PresentValue` constructor, `14 §3`) — a real constructor **and** a real,
+  computing eliminator.
 - why: sum types are finished, not lowered to an opaque base with no eliminator.
-  **Flip:** the prototype's stub (opaque base, no `elim`) is **stuck** — it does
-  **not** reduce to `3`. Structural: assert the reduct is the literal `3`, not
-  merely "compiles".
+  **Flip:** the stub (opaque base, no `elim`) is **stuck** — it does **not**
+  reduce to `3`. Structural: assert the reduct is the literal `3`, not merely
+  "compiles".
 
 ## surface/data-match/match-elaborates-to-elim (AC2)
 - spec: `spec/30-surface/34-data-match.md §3`, `39 §2.6`
@@ -377,7 +377,7 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 ## surface/data-match/indexed-impossible-pair (AC5) (soundness) — TR5a + TR5b
 - spec: `spec/30-surface/34-data-match.md §2`, `§4.3`
 - given: `data Vec a : Nat → Type { VNil : Vec a 0 ; VCons : {n} → a → Vec a n →
-  Vec a (n+1) }`; (a) `view head {n} (v : Vec a (n+1)) : a = match v { VCons x _
+  Vec a (n+1) }`; (a) `fn head {n} (v : Vec a (n+1)) : a = match v { VCons x _
   => x }` — **omitting** the `VNil` arm; (b) applying `head` to `VNil`
 - expect — **the non-degenerate pair on one rule**:
   - (a) **accepts** — `VNil` is **index-impossible** at `n+1` (`0 ≢ n+1`); the

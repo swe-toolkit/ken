@@ -270,7 +270,7 @@ are private (`41 §2`).
 ## AC3 — combinators have laws as propositions
 
 `map` and `filter` are imported package functions from
-`Data.Collections.Derived`, not prelude `view`s (`37 §4`). This seed makes no
+`Data.Collections.Derived`, not prelude `fn`s (`37 §4`). This seed makes no
 placement claim about `fold`/`reduce` or `zip`. The laws are
 `≡`-propositions discharged by the prover, adding **no kernel rule**.
 
@@ -434,7 +434,7 @@ elaboration **emits the conjoined obligation**.
 
 ### surface/collections/sort-emits-issorted-and-perm (soundness)
 - spec: `37 §6`, `34 §5` (refinement obligation), `22 §2.1`
-- given: `view sort {a} (leq : a → a → Bool) (xs : List a) : R = …`, where the
+- given: `fn sort {a} (leq : a → a → Bool) (xs : List a) : R = …`, where the
   refinement `R = { ys : List a | isSorted leq ys ∧ Perm ys xs }` (`34 §5`) —
   the **explicit-comparator** surface (ES2-remainder pin; no `where Ord a`).
 - expect: the result-introduction **emits the conjoined refinement obligation**

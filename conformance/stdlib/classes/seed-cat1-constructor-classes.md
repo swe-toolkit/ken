@@ -59,7 +59,7 @@ genuinely inductive) is a Monoid-first phenomenon.
 - `33 §5.2`/`§5.3` — a class is a **record** (`13 §3` Σ+η); an instance is a
   record value of ops **+ law proofs**. **No new kernel former** (AC1).
 - `catalog/packages/Data/Collections/Derived.ken.md` — the landed `list_append`
-  (`view list_append (a) (xs ys : List a) : List a`), recursing on its **first**
+  (`fn list_append (a) (xs ys : List a) : List a`), recursing on its **first**
   argument: `list_append a Nil ys => ys`, `list_append a (Cons x xs2) ys =>
   Cons a x (list_append a xs2 ys)`. This recursion structure is the ground for
   the left/right-unit proof asymmetry below (re-derived from first principles,

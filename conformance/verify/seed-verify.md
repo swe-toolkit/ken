@@ -5,7 +5,7 @@ soundness backbone (the prover is untrusted; the kernel re-checks).
 
 ## verify/proved-postcondition (G2)
 - spec: `spec/20-verification/21-spec-syntax.md §1`, `23-prover.md`
-- given: `view abs (n : Int) : Int ensures result ≥ 0 = if n < 0 then -n else n`
+- given: `fn abs (n : Int) : Int ensures result ≥ 0 = if n < 0 then -n else n`
   with a correct proof
 - expect: **proved**; `trusted_base_delta` empty
 - why: a correct postcondition proof is accepted.
@@ -19,7 +19,7 @@ soundness backbone (the prover is untrusted; the kernel re-checks).
 
 ## verify/disproved-with-countermodel (G4)
 - spec: `spec/20-verification/24-diagnostics.md §1`
-- given: `view f (n : Int) : Int ensures result > 0 = n` (false for `n ≤ 0`)
+- given: `fn f (n : Int) : Int ensures result > 0 = n` (false for `n ≤ 0`)
 - expect: **disproved**; diagnostic `kind=countermodel`, `verdict=false`, naming
   the failing input class (`n ≤ 0`)
 - why: a genuine counterexample is reported with the false-vs-unknown verdict.

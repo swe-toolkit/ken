@@ -381,10 +381,10 @@ claim with no conformance case is a claim no one can rely on
 - `stdlib/map/seed-map.md` — Map-container proved `Map k v` over `Ord k`
   (`50-stdlib/52`, VAL2 #8 / OQ-A): a **proved, pure, `Ord k`-keyed**
   associative map shipped as **package Ken out of `trusted_base()`** — a bare
-  unbalanced BST (`data Tree k v = Leaf | Node …`) whose operations are `view`
-  defs and whose every correctness law is a **real kernel proof, not a
-  postulate**; it **retires** the opaque `Map`/`Set` primitive (net-negative
-  TCB). AC1 (inductive-not-primitive + `trusted_base()` shrinks), AC2
+  unbalanced BST (`data Tree k v = Leaf | Node …`) whose operations use pure
+  `const`/`fn` definitions and whose every correctness law is a **real kernel
+  proof, not a postulate**; it **retires** the opaque `Map`/`Set` primitive
+  (net-negative TCB). AC1 (inductive-not-primitive + `trusted_base()` shrinks), AC2
   (real-interpreter `insert`/`lookup` round-trips, ordered `toList`, the
   `letter-frequency` shape — value-flips, `Char`/`Bool` keys), AC3
   (**proved-not-stubbed** via the real `trusted_base_delta` cone walk — a
@@ -402,7 +402,7 @@ claim with no conformance case is a claim no one can rely on
   axis orientation pair, the sealed `LeakSink` set, declassify ends the span,
   the CT-in-parameter `Q` promise).
 - `security/capabilities/seed-capabilities.md` — Sec2 authority discipline
-  (`62`): no ambient authority (a no-cap/no-row `view` is inert), least by
+  (`62`): no ambient authority (a no-cap/no-row `fn` is inert), least by
   default, **monotone-downward attenuation** (the order-dual non-degenerate pair
   — weaker-accepts/stronger-rejects — over a trusted-Rust + conformance-netted
   refinement bound; plus the enumerated absence of any amplifying operation),

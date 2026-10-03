@@ -67,7 +67,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/postcondition-emits-substituted-goal
 - spec: `22 §2.2`; `21 §6.3`
-- given: `view inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1` —
+- given: `fn inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1` —
   a **straight-line** body
 - expect: emits **one** obligation
   `⟨id, Γ,(n:Int) ⊢ Equal Int (n + 1) (n + 1), prov⟩` — `ψ[b/result]` with
@@ -88,9 +88,9 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/precondition-obligation-at-call-not-in-body (soundness)
 - spec: `22 §2.3`, `§2.5.2`
-- given: `view safe_div (n:Int) (d:Int) : Int` with
+- given: `fn safe_div (n:Int) (d:Int) : Int` with
   `requires Not (Equal Int d 0) = n / d`, and a caller
-  `view use (x:Int) : Int = safe_div x 2`
+  `fn use (x:Int) : Int = safe_div x 2`
 - expect: the precondition `Not (Equal Int d 0)` yields an obligation **at the
   call** in `use` — `⟨id, Γ_call ⊢ Not (Equal Int 2 0), prov(call)⟩` (the caller
   meets it); **inside** `safe_div`'s body it yields **no** obligation — the
@@ -142,7 +142,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/refined-param-desugars-to-requires (soundness)
 - spec: `21 §6.3`; `22 §2.3`, `§2.5.1`, `§3`
-- given: `view head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …`
+- given: `fn head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …`
   — a refined **parameter**
 - expect: the refined parameter desugars to the carrier binder plus a generated
   `requires` proof argument. It emits **no** definition-site obligation; the
@@ -205,9 +205,9 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/trivial-clause-still-emits-obligation (soundness)
 - spec: `22 §2.5` (the completeness counter-rule); acceptance `§8` / frame `§1`
-- given: (a) `view f (n : Int) : Int ensures Equal Int result result = n` (a
+- given: (a) `fn f (n : Int) : Int ensures Equal Int result result = n` (a
   **trivially-true** postcondition); (b)
-  `view g (n : Int) : Int ensures IsTrue (leq_int 0 result) = n * n` (a
+  `fn g (n : Int) : Int ensures IsTrue (leq_int 0 result) = n * n` (a
   **real-burden** postcondition) — both **straight-line** bodies (one obligation
   each, isolating the trivial-vs-real axis from path-sensitivity)
 - expect: **both** emit a postcondition obligation — (a)
@@ -258,7 +258,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/match-branch-gamma-carries-scrutinee-equation (soundness)
 - spec: `22 §3` (match constructor equation), `§4`; `39 §2.6` (match→elim_D)
-- given: `view f (xs : List Int) : Int ensures P result = …` whose body is
+- given: `fn f (xs : List Int) : Int ensures P result = …` whose body is
   `match xs { nil → e0 ; cons y ys → e1 }` where the `cons`-branch goal
   discharges only by knowing the scrutinee shape
 - expect: in the `cons y ys` branch, the obligation's `Γ` carries the
@@ -286,7 +286,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/conditional-branch-adds-boolean-equation
 - spec: `22 §3` (conditional)
-- given: `view f (n : Int) : Int` with
+- given: `fn f (n : Int) : Int` with
   `ensures IsTrue (leq_int 0 result) = if leq_int 0 n then n else 0`
 - expect: the `then`-branch obligation's `Γ` carries
   `(_ : Equal Bool (leq_int 0 n) true)`; the `else` branch carries
@@ -320,7 +320,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 ### verify/obligations/recursive-fn-per-ctor-obligation-with-ih (soundness)
 - spec: `22 §4`; `14 §3` (eliminator); `39 §2.6`
 - given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; a recursive
-  `view sum (xs : List NonNeg) : Int` with
+  `fn sum (xs : List NonNeg) : Int` with
   `ensures IsTrue (leq_int 0 result) = …` and body
   `match xs { nil → 0 ; cons y ys → y + sum ys }`
 - expect: the extractor emits **per-constructor** obligations from the `elim_D`
@@ -341,7 +341,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 ### verify/obligations/nonrecursive-degenerate-no-induction-hypothesis
 - spec: `22 §4` (degenerate motive)
 - given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; a non-recursive
-  `view double (n : NonNeg) : Int ensures IsTrue (leq_int n result) = n + n`
+  `fn double (n : NonNeg) : Int ensures IsTrue (leq_int n result) = n + n`
 - expect: the obligation `IsTrue (leq_int n (n + n))` is emitted with **no**
   induction hypothesis in `Γ` (the degenerate motive — no recursive fields).
 - why: §4 — non-recursive functions are the degenerate motive (no recursive
@@ -406,7 +406,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 ### verify/obligations/non-spec-program-empty-obligation-set (soundness)
 - spec: `22 §8` (regression), `§6`; `21 §6.2`
 - given: a non-spec program — no `requires`/`ensures`/refinement/`prove`/`law`,
-  no partial primitive — e.g. `view id (A : Type) (x : A) : A = x`
+  no partial primitive — e.g. `fn id (A : Type) (x : A) : A = x`
 - expect: the **empty** obligation set; V1/V0 elaboration of the program is
   **unchanged**.
 - why: §8 — a program with no proof burden yields no obligations; V2 adds

@@ -75,7 +75,8 @@ netted **solely** by conformance (the kernel is blind to the export bytes).
 ### export/proved-postcondition-projects-to-Q (AC2)
 - spec: `spec/70-behavioral/71-assumption-boundary.md §2.1`, `21 §5.3/§5.4`,
   `25 §3`
-- given: a checked `view` with `ensures result > 0` whose obligation
+- given: a checked `fn` with an input parameter and `ensures result > 0`
+  whose obligation
   **discharges** (verdict `proved`; certificate `check`s; goal **absent** from
   `trusted_base()`), run through the export emitter
 - expect: the postcondition projects into **`Q`** (concept `guarantees`; literal

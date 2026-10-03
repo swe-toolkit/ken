@@ -64,8 +64,8 @@ rests on (`21 §5.4`) and must never regress.
 ## A. Syntax, AST, and elaboration to core (`21 §6.1`–§6.3)
 
 ### verify/spec-syntax/requires-elaborates-to-pi-proof-arg
-- spec: `21 §6.3` (elabView), `§6.1`/§6.2 (grammar/AST); `16 §1.1` (`sort_pi`)
-- given: `view divide (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n / d`
+- spec: `21 §6.3` (elabFn), `§6.1`/§6.2 (grammar/AST); `16 §1.1` (`sort_pi`)
+- given: `fn divide (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n / d`
 - expect: **accepts**; **(a — emitted type)** the emitted core type is
   `(n:Int) → (d:Int) → (_ : Not (Equal Int d 0)) → Int` — the precondition is
   a **Π proof-argument** and the function type stays at **`Type`** (not Ω);
@@ -116,10 +116,10 @@ rests on (`21 §5.4`) and must never regress.
 The fixture declarations are:
 
 ```ken
-view refined_fn (d : {x:Int | Not (Equal Int x 0)}) : Int = d
-view requires_fn (d : Int) : Int requires Not (Equal Int d 0) = d
-view plain_slot (f : (d : Int) → Int) : Int = f 1
-view refined_slot
+fn refined_fn (d : {x:Int | Not (Equal Int x 0)}) : Int = d
+fn requires_fn (d : Int) : Int requires Not (Equal Int d 0) = d
+fn plain_slot (f : (d : Int) → Int) : Int = f 1
+fn refined_slot
   (f : (d : {x:Int | Not (Equal Int x 0)}) → Int)
   (n : Int) : Int = f n
 ```
@@ -156,7 +156,7 @@ The four listed applications above are the negative and positive controls;
 ### verify/spec-syntax/ensures-emits-obligation-not-sigma
 - spec: `21 §6.3` (postcondition → obligation), `§2` (carrier-plus-obligation),
   `§6.5`
-- given: `view abs (n : Int) : Int` with
+- given: `fn abs (n : Int) : Int` with
   `ensures IsTrue (leq_int 0 result) = if n < 0 then -n else n`
 - expect: **accepts**; the emitted core **body** has type **`Int`** — the bare
   carrier, **not** `(r:Int) × IsTrue (leq_int 0 r)`; a **single** obligation
@@ -189,14 +189,14 @@ The four listed applications above are the negative and positive controls;
 ### verify/spec-syntax/non-omega-predicate-surface-error
 - spec: `21 §4` (every spec prop `: Ω`), `§6.3` (check at Ω before any
   obligation)
-- given: `view f (n : Int) : Int requires (n + 1) = n` — the clause body
+- given: `fn f (n : Int) : Int requires (n + 1) = n` — the clause body
   `n + 1 : Int`, **not** a proposition
 - expect: **rejected** as a **surface type error** at elaboration
   (`TypeMismatch`: expected `Ω`, found `Int`), **before** any obligation is
   formed; **not** a verification failure, **not** silently admitted.
 - why: §6.3 `check`s every clause body at Ω; a non-Ω body is rejected at
   elaboration (`§4`, "a load-bearing guard"). **Absence-assertion gate** — guard
-  named: the explicit `check(Γ, φ, Ω)` in `elabView`/`elabType`. **Disconfirming
+  named: the explicit `check(Γ, φ, Ω)` in `elabFn`/`elabType`. **Disconfirming
   check:** would a non-Ω `requires` also reject under the bug this targets
   (omitting the Ω-check)? **No** — that bug would *accept* it and form an
   obligation over a non-proposition. **Verdict-flips:**
@@ -205,8 +205,8 @@ The four listed applications above are the negative and positive controls;
 
 ### verify/spec-syntax/result-scope
 - spec: `21 §4` (`result` only in `ensures`), `§6.3`
-- given: (a) `view g (n:Int) : Int ensures IsTrue (leq_int 0 result) = …`; (b)
-  `view h (n:Int) : Int requires IsTrue (leq_int 0 result) = …`
+- given: (a) `fn g (n:Int) : Int ensures IsTrue (leq_int 0 result) = …`; (b)
+  `fn h (n:Int) : Int requires IsTrue (leq_int 0 result) = …`
 - expect: (a) **accepts** — `result` resolves to the return value (`: Int`) in
   the `ensures` scope; (b) **rejected** — `result` in a `requires` is an
   **unbound-name / scope error** (`result` not in scope outside `ensures`).
@@ -239,7 +239,7 @@ The four listed applications above are the negative and positive controls;
 ### verify/spec-syntax/old-out-of-scope-rejects (soundness)
 - spec: `21 §6.4` (scope guard), `§4`, `36 §7.3`
 - given: a **pure**
-  `view k (x : Int) : Int ensures Equal Int result (old(x) + 1) = x + 1`
+  `fn k (x : Int) : Int ensures Equal Int result (old(x) + 1) = x + 1`
 - expect (landed): **rejected** as `UnboundName("old")` at scope resolution.
   With the same `old(…)` syntax in a block-space operation postcondition, the
   operation **accepts** and resolves `old` to its pre-state cell projection.
@@ -286,7 +286,7 @@ The four listed applications above are the negative and positive controls;
 ### verify/spec-syntax/unknown-hole-distinct-from-proved (soundness)
 - spec: `21 §5.4` (the honesty guard), `§5.1` (`unknown` = postulate); `18 §5`;
   `24 §2`
-- given: a `view` with an `ensures φ` left **undischarged** — admitted with a
+- given: an `fn` with an `ensures φ` left **undischarged** — admitted with a
   typed hole `?h : φ`; the program type-checks and runs
 - expect: the goal `φ` **appears** in `GlobalEnv::trusted_base()` (the hole
   **is** a postulate of `φ`), whereas a `proved` claim's goal does **not**. So
@@ -309,7 +309,7 @@ The four listed applications above are the negative and positive controls;
 ### verify/spec-syntax/disproved-distinct-from-unknown
 - spec: `21 §5.1` (`disproved` = verification error), `§5.3` (projection),
   `24 §3`
-- given: `view f (n : Int) : Int ensures IsTrue (leq_int 1 result) = n` —
+- given: `fn f (n : Int) : Int ensures IsTrue (leq_int 1 result) = n` —
   false for `n ≤ 0`, with a **given** countermodel at that world (the prover is
   V3 — the countermodel is supplied here, as the certificate is in the
   `proved`/bogus-cert cases)
@@ -353,7 +353,7 @@ The four listed applications above are the negative and positive controls;
 
 ### verify/spec-syntax/obligation-hole-set-exposed-to-v2
 - spec: `21 §7` (the interface), `§6.5` (obligation-hole encoding)
-- given: `view f (n : Int) (m : {k:Int|Not (Equal Int k 0)}) : Int` with
+- given: `fn f (n : Int) (m : {k:Int|Not (Equal Int k 0)}) : Int` with
   `requires IsTrue (leq_int 1 n)`, postconditions
   `ensures IsTrue (leq_int n result)` and `ensures IsTrue (leq_int 0 result)`,
   and body `n + m`
@@ -390,7 +390,8 @@ The four listed applications above are the negative and positive controls;
   discharge** by a certificate `p` with `Γ ⊢ p : φ` that `check`s — the
   postulate is **retired**, `add_comm ↦ p`, status `proved`, `φ` **leaves**
   `trusted_base()`.
-- why: §6.3/§5.4 — `prove` is the degenerate (no-`view`) obligation; proving is
+- why: §6.3/§5.4 — `prove` is the degenerate (no function-body) obligation;
+  proving is
   hole-filling, and the honesty guard applies identically (a goal is a visible
   postulate until its certificate checks). Verdict/structural flip on
   **`trusted_base()` membership** across discharge.
@@ -418,7 +419,7 @@ The four listed applications above are the negative and positive controls;
 
 ### verify/spec-syntax/v0-unchanged-for-non-spec-programs (soundness)
 - spec: `21 §6.2` (no regression), `§9` acceptance #5; `39 §5` (V0)
-- given: a non-spec program, e.g. `view id (A : Type) (x : A) : A = x` — no
+- given: a non-spec program, e.g. `fn id (A : Type) (x : A) : A = x` — no
   `requires`/`ensures`/refinement/`prove`/`law`
 - expect: parses to **exactly** the V0 AST (the `ViewDecl`'s
   `requires`/`ensures` lists empty, no `TRefine`/`ProveDecl`/`LawDecl`),

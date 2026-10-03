@@ -56,7 +56,7 @@ through `lex → parse → resolve → elaborate → kernel-check`, and get `Ok`
 
 ### surface/elaboration/id-elaborates-checks (oracle)
 - spec: `39 §5.1`, `§5.4`, `§5.5`; `13 §1`; `18 §3,§4`; `12 §1,§2`
-- given: `view id (A : Type) (x : A) : A = x`
+- given: `fn id (A : Type) (x : A) : A = x`
 - expect: parses → elaborates → kernel-check **Ok**. Emitted core (de Bruijn):
   `Lam(Univ 0, Lam(Var 0, Var 0))` at declared type
   `Pi(Univ 0, Pi(Var 0, Var 1))`. Default level `0` (typical ambiguity,
@@ -66,9 +66,9 @@ through `lex → parse → resolve → elaborate → kernel-check`, and get `Ok`
   binder); `id`'s declared Π re-checks against the emitted λ. Pins the exact
   core shape and the two Π levels (`12 §2`).
 
-### surface/elaboration/const-elaborates-checks (oracle)
+### surface/elaboration/konst-elaborates-checks (oracle)
 - spec: `39 §5.3`, `§5.4`; `11-syntax §2`; `13 §1`
-- given: `view const (A B : Type) (x : A) (y : B) : A = x`
+- given: `fn konst (A B : Type) (x : A) (y : B) : A = x`
 - expect: **Ok**. Body `x` is **`Var 1`**, not `Var 0` — the scope stack
   (innermost-first) is `[y, x, B, A]`, so `x` sits at index 1. Returns type `A`.
 - why: a de Bruijn index that is **not** `0`. A resolver that always emitted the
@@ -79,7 +79,7 @@ through `lex → parse → resolve → elaborate → kernel-check`, and get `Ok`
 ### surface/elaboration/apply-elaborates-checks (oracle)
 - spec: `39 §5.4`; `13 §1`; `18 §3` (application: infer `f ⇒ (x:A)→B`, check
   `u ⇐ A`)
-- given: `view apply (A B : Type) (f : (x : A) -> B) (x : A) : B = f x`
+- given: `fn apply (A B : Type) (f : (x : A) -> B) (x : A) : B = f x`
 - expect: **Ok**. Core body `App(Var 1, Var 0)` (`f` at index 1, the argument
   `x` at index 0 under stack `[x, f, B, A]`); `f : (x:A)->B` applied to `x : A`
   yields `B`.
@@ -118,7 +118,7 @@ elaborates, and checks (frame Acceptance 2; `39 §5.1`).
 
 ### surface/elaboration/base-type-app (oracle)
 - spec: `39 §5.4` (`Con` → environment lookup); `13 §1`; `18 §3`
-- given: `view idNat (x : Nat) : Nat = x`, in a base environment providing
+- given: `fn idNat (x : Nat) : Nat = x`, in a base environment providing
   `Nat : Type 0`
 - expect: **Ok**. Core `Lam(Con "Nat", Var 0)` at type `Pi(Con "Nat", Con "Nat")
   : Univ 0`.
@@ -138,7 +138,7 @@ surfaced, never swallowed (frame Acceptance 3; `39 §3` well-typed-output, `§4`
 
 ### surface/elaboration/type-mismatch-rejected
 - spec: `39 §5.6`; `18 §3` (the `(Conv)` switch); `12 §3` (non-cumulative)
-- given: `view bad (x : Nat) : Bool = x`
+- given: `fn bad (x : Nat) : Bool = x`
 - expect: elaborates to `Lam(Con "Nat", Var 0)` at declared type
   `Pi(Con "Nat", Con "Bool")`; kernel **rejects** — body `x : Nat` checked
   against `Bool`, and `Nat ≢ Bool`. The error surfaces with the source span of
@@ -148,7 +148,7 @@ surfaced, never swallowed (frame Acceptance 3; `39 §3` well-typed-output, `§4`
 
 ### surface/elaboration/wrong-return-app-rejected
 - spec: `39 §5.4`, `§5.6`; `18 §3`
-- given: `view badApp (f : (x : Nat) -> Bool) (x : Nat) : Nat = f x`
+- given: `fn badApp (f : (x : Nat) -> Bool) (x : Nat) : Nat = f x`
 - expect: elaborates `App(Var 1, Var 0)`; kernel **rejects** — `f x : Bool`
   checked against the return type `Nat`, `Bool ≢ Nat`.
 - why: rejection through an application result, not just a bare variable — the
@@ -157,7 +157,7 @@ surfaced, never swallowed (frame Acceptance 3; `39 §3` well-typed-output, `§4`
 ### surface/elaboration/wrong-arity-rejected
 - spec: `39 §5.4` (`check (RLam, notPi) → error`), `§5.6`
   (`LambdaVsNonFunction`); `13 §1`
-- given: `view badLam (x : Nat) : (y : Nat) -> Nat = \y . \z . x`
+- given: `fn badLam (x : Nat) : (y : Nat) -> Nat = \y . \z . x`
 - expect: **rejected** — after binding `y : Nat`, the inner `\z . x` is checked
   against `Nat`, which is not a Π. V0 raises `LambdaVsNonFunction`
   **structurally** (`39 §5.6`), surfaced in the type-mismatch class with the λ's
@@ -191,7 +191,7 @@ backed by a **structural** assertion on the resolved de Bruijn index that holds
 ### surface/elaboration/shadow-outer-not-captured  ← discriminating
 - spec: `39 §5.3` (first/innermost-match resolution); `11-syntax §2`; `18 §3`;
   `13 §1` (non-dependent `→` codomain)
-- given: `view f (A : Type) (x : A) : Type -> A = \B . x`
+- given: `fn f (A : Type) (x : A) : Type -> A = \B . x`
   (full term `λ A. λ x. λ B. x`; the body `x` must resolve **past** the
   intervening `\B` binder to the outer `x`)
 - expect: kernel **accepts** under correct resolution; a capture bug
@@ -216,7 +216,7 @@ backed by a **structural** assertion on the resolved de Bruijn index that holds
 
 ### surface/elaboration/shadow-resolver-emits-outer-index (oracle)
 - spec: `39 §5.3` (`indexOf` = first/innermost match); `11-syntax §2`
-- given: the same `view f (A : Type) (x : A) : Type -> A = \B . x`
+- given: the same `fn f (A : Type) (x : A) : Type -> A = \B . x`
 - expect: name resolution emits the body `x` as **`Var 1`** (the outer `x`
   parameter), **not** `Var 0` (the intervening `\B`). A direct,
   **verdict-independent** assertion on the resolver output.
@@ -230,7 +230,7 @@ backed by a **structural** assertion on the resolved de Bruijn index that holds
 
 ### surface/elaboration/nested-app-each-binder (oracle)
 - spec: `39 §5.3`, `§5.4`; `11-syntax §2`; `13 §1`
-- given: `view nested (A : Type) (f : (x : A) -> A) (x : A) : A = f (f x)`
+- given: `fn nested (A : Type) (f : (x : A) -> A) (x : A) : A = f (f x)`
 - expect: **Ok**. Stack `[x, f, A]`: `f` is `Var 1`, `x` is `Var 0`; core body
   `App(Var 1, App(Var 1, Var 0))`. Each `f` and `x` resolves to its correct
   binder; `f (f x) : A`.
@@ -240,7 +240,7 @@ backed by a **structural** assertion on the resolved de Bruijn index that holds
 ### surface/elaboration/unbound-name-rejected-at-resolution
 - spec: `39 §5.3` (unbound ⇒ surface error), `§5.6`; `39 §4` (L1 surface error,
   distinct from a kernel error)
-- given: `view unbound (x : Nat) : Nat = y`
+- given: `fn unbound (x : Nat) : Nat = y`
 - expect: **rejected at name resolution** — *before* any core term is emitted —
   with `error(unbound-name)` naming `y` and its source span. The kernel is
   **never** invoked (no core image exists).
@@ -261,7 +261,7 @@ mode is surfaced at its originating stage, not swallowed (frame Acceptance 3;
 ### surface/elaboration/pipeline-emits-explicit-core (property)(oracle)
 - spec: `39 §3` (well-typed-output), `§5.4` (levels explicit in output), `§5.5`;
   `12 §4`; `18 §3`
-- given: every program AC1–AC2 **accepts** (e.g. `id`, `const`, `apply`,
+- given: every program AC1–AC2 **accepts** (e.g. `id`, `konst`, `apply`,
   `idNat`)
 - expect: each emitted core `Term` is **metavariable-free** and carries
   **fully-explicit** `Univ` levels (no unsolved level metavariables); the
@@ -274,9 +274,9 @@ mode is surfaced at its originating stage, not swallowed (frame Acceptance 3;
 ### surface/elaboration/pipeline-errors-at-correct-stage
 - spec: `39 §5.5`, `§5.6`; `39 §4`
 - given: three inputs, one per stage —
-  (a) `view id (A : Type) (x : A) : A =` (missing body);
-  (b) `view u (x : Nat) : Nat = y` (free `y`);
-  (c) `view bad (x : Nat) : Bool = x` (ill-typed)
+  (a) `fn id (A : Type) (x : A) : A =` (missing body);
+  (b) `fn u (x : Nat) : Nat = y` (free `y`);
+  (c) `fn bad (x : Nat) : Bool = x` (ill-typed)
 - expect: (a) **parse error** with span — never reaches resolution; (b)
   **name-resolution error** naming `y` with span — never reaches the kernel; (c)
   **kernel rejection** surfaced as a surface error quoting the kernel's reason
@@ -296,7 +296,7 @@ decidable level equality (`12 §1,§2,§4`; `17 §3.6`).
 ### surface/elaboration/id-pi-level-max (oracle)
 - spec: `12 §1` (`Univ ℓ : Univ (suc ℓ)`), `§2` (Π-Form `max`); `13 §1`;
   `17 §3.6`
-- given: `view id (A : Type) (x : A) : A = x`, default `A : Type 0`
+- given: `fn id (A : Type) (x : A) : A = x`, default `A : Type 0`
 - expect: the inner Π `(x : A) -> A` has level `max(0, 0) = 0` (`A : Univ 0`,
   codomain `A : Univ 0`); the full type `(A : Type 0) -> (x:A) -> A` has level
   `max(suc 0, 0) = max(1, 0) = 1`. Both levels appear **explicitly** in the
@@ -307,7 +307,7 @@ decidable level equality (`12 §1,§2,§4`; `17 §3.6`).
 
 ### surface/elaboration/two-distinct-levels (oracle)
 - spec: `12 §1,§2,§4`; `17 §3.6`
-- given: `view poly (A : Type 1) (B : Type 2) (x : A) : A = x`
+- given: `fn poly (A : Type 1) (B : Type 2) (x : A) : A = x`
 - expect: **Ok**. Two **distinct** explicit annotations `Type 1` and `Type 2`
   coexist in the core term; the inner Π `(x : A) -> A` (with `A : Univ 1`) has
   level `max(1, 1) = 1`. `Type 1` and `Type 2` are **not** interchangeable
