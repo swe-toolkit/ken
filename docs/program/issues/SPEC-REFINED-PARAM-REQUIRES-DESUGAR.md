@@ -53,7 +53,12 @@ premise as a proposition.
    spec-leader's residual, `evt_2czwycgn39psm`): every Bool-valued operator in a premise,
    postcondition or refinement position becomes a proposition (`Not (Equal
    Int d 0)` for `d ≠ 0`, `Equal`, the ordering propositions).
-4. Conformance: `seed-obligations.md` (`:138` and the refined-parameter
+4. Retired surface in the same five files (CV via spec-leader
+   `evt_69gwr5whd0n39`): no example defines a protected built-in name (34
+   §5's `def Nat` is renamed, 33 §3.3), and the retired `view` definition
+   keyword (33 §1) is replaced by the current one in examples and in 21
+   §6.1's grammar; the elaboration pseudocode follows. No other chapter.
+5. Conformance: `seed-obligations.md` (`:138` and the refined-parameter
    rows) and `seed-spec-syntax.md:305` follow, with a row pinning that a
    function with a refined parameter is refused where a plain `A → B` is
    expected.
