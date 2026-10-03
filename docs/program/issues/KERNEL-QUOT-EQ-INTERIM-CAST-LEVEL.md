@@ -63,13 +63,25 @@ stop and report the mismatch.
    marks the accept half as restored by P0. The constant-motive
    `quotient-respect-schema-{rejects,accepts}-…` rows are unchanged.
    `seed-evaluation.md`'s `can-eq-by-type-computes` and
-   `agree-observational-corpus` drop the quotient-class reduction claim
-   (kernel-implementer `evt_47tab4rs3fm50`). They mark the quotient-class
-   `Eq` case deferred to P0 and pin no X1 verdict (kernel QA
-   `evt_79844c7p7041x`). X1's `eq_reduce` returns `Unknown` there, not a
-   neutral value; it never computed the old reduct either. Do not claim
-   cross-engine agreement, and do not substitute `unknown` (spec 42 §4
-   reserves it for holes).
+   `agree-observational-corpus` state that quotient-class `Eq` stays
+   neutral in both engines and does not reduce to `R a b`
+   (kernel-implementer `evt_47tab4rs3fm50`).
+5. X1 (Architect `evt_4ztchp312c4wn` on kernel QA `evt_79844c7p7041x`).
+   - Today X1 is safe only by accident: a quotient class reaches
+     `eq_reduce`'s inductive same-constructor placeholder and returns
+     `Unknown`. A lawful completion of that placeholder would compare
+     representatives, giving Bottom for `R := λ _ _. Top`.
+   - `eq_reduce` gets an explicit arm keyed on the checked id
+     `QUOT_CLASS_TYPE_ID`, before the inductive `Ctor` arm, that returns
+     `EvalVal::Neutral`.
+   - A `ken-interp` unit pin evaluates `Eq (Nat / R) [Zero] [Suc Zero]` and
+     asserts `Neutral`, not Top. Deleting the arm reddens it with `Unknown`.
+   - Spec 42 §3.1's residue list and §3.6's `Eq`-by-type canonicity bullet
+     gain the interim C8 exception, gated on P0.
+   - No `cast_reduce` or `eq_type_eq` change.
+   - Not this WP: `eq_reduce` also returns `Unknown` for other closed
+     C2-C4 cases (multi-field constructor, Π, Ω, scalar). That is a
+     pre-existing drift from 42 §3.6.
 4. Test consumers of the reduction are migrated (check 3: grep
    `crates/*/tests`, `conformance/`, `examples/`, `catalog/` for quotient
    equality uses, not only `eq_at_quot`).
