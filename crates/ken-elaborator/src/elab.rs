@@ -15121,9 +15121,11 @@ fn elaborate_view_with_spec(
             )
         };
 
-        // Build the param context from the Pi-chain of the carrier type.
-        let param_types = unwrap_pi_chain(&carrier_ty_raw);
-        let carrier_b = innermost_codomain(&carrier_ty_raw);
+        // Split only the explicit parameters. The declared return may itself
+        // be function-valued and remains in the result position.
+        let (param_types, carrier_b) = split_params(&carrier_ty_raw, param_count).ok_or_else(|| {
+            ElabError::Internal("declaration type has fewer Pi binders than its parameters".into())
+        })?;
         let mut param_ctx = Context::new();
         for pt in &param_types {
             param_ctx.push(pt.clone());
@@ -15143,14 +15145,24 @@ fn elaborate_view_with_spec(
         let mut ens_ctx = param_ctx.clone();
         ens_ctx.push(carrier_b.clone());
 
-        // body_inner = the inner body term (past all param lambdas)
-        let body_inner = unwrap_lam(&body_raw, param_types.len());
+        // Strip only the explicit parameter lambdas; a return-function lambda
+        // remains part of the declared result.
+        let body_inner = strip_param_lams(&body_raw, param_count).ok_or_else(|| {
+            ElabError::Internal("declaration body has fewer lambdas than its parameters".into())
+        })?;
 
         // Collect ensures: explicit clauses + implicit from return-type refinement (`22 §2.1`).
         // A `{ x : A | φ }` return type is a refinement introduction at the body site;
         // its predicate φ is an implicit ensures with the same ψ[body/result] structure.
         let mut all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
         if let Some(phi) = rdecl.ty.as_ref().and_then(|ty| innermost_refine_pred(ty)) {
+            if rdecl.ty.as_ref().and_then(refine_return_depth) != Some(param_count) {
+                return Err(ElabError::TypeMismatch {
+                    span: rdecl.span.clone(),
+                    reason: "a refinement under a function-valued return type is not supported yet"
+                        .into(),
+                });
+            }
             all_ensures.push(phi);
         }
 
@@ -15175,7 +15187,14 @@ fn elaborate_view_with_spec(
             // result is Var(0) in ens_ctx. After substitution, the body
             // remains under the requirement binders, so shift it past them.
             let psi_under_requires = shift(&psi_core, req_cores.len() as i64, 1);
-            let body_under_requires = weaken(&body_inner, req_cores.len() as i64);
+            let result_term = match &carrier_b {
+                Term::Pi(..) => Term::Ascript(
+                    Box::new(body_inner.clone()),
+                    Box::new(carrier_b.clone()),
+                ),
+                _ => body_inner.clone(),
+            };
+            let body_under_requires = weaken(&result_term, req_cores.len() as i64);
             let goal_open = subst0(&psi_under_requires, &body_under_requires);
             let closed = close_goal(&ens_goal_ctx, &[], goal_open);
             let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
@@ -15827,6 +15846,46 @@ fn elab_in_ctx_at_omega(
     Ok((core, std::mem::take(&mut cx.obligations)))
 }
 
+/// Split a declaration type after exactly `n` parameter binders: the
+/// parameter domains and the declared return type, which may itself be a Pi.
+fn split_params(ty: &Term, n: usize) -> Option<(Vec<Term>, Term)> {
+    let mut domains = Vec::with_capacity(n);
+    let mut current = ty;
+    for _ in 0..n {
+        let Term::Pi(domain, codomain) = current else {
+            return None;
+        };
+        domains.push((**domain).clone());
+        current = codomain;
+    }
+    Some((domains, current.clone()))
+}
+
+/// Strip exactly `n` parameter lambdas; `None` when the body has fewer.
+fn strip_param_lams(term: &Term, n: usize) -> Option<Term> {
+    let mut current = term;
+    for _ in 0..n {
+        let Term::Lam(_, body) = current else {
+            return None;
+        };
+        current = body;
+    }
+    Some(current.clone())
+}
+
+/// Number of arrows `innermost_refine_pred` crosses to reach its refinement.
+fn refine_return_depth(ty: &RType) -> Option<usize> {
+    match ty {
+        RType::RPi(_, _, codomain, _)
+        | RType::RArr(_, codomain, _)
+        | RType::REffectArr(_, _, codomain, _) => {
+            refine_return_depth(codomain).map(|depth| depth + 1)
+        }
+        RType::RRefine(..) => Some(0),
+        _ => None,
+    }
+}
+
 /// Unwrap the outermost `n` Pi binders, collecting domain types.
 ///
 /// `Pi(A, Pi(B, C))` with n=2 → `[A, B]` (A = outermost, B = innermost param).
@@ -15843,29 +15902,6 @@ fn unwrap_pi_chain(ty: &Term) -> Vec<Term> {
         }
     }
     result
-}
-
-/// Return the innermost codomain of a Pi-chain.
-fn innermost_codomain(ty: &Term) -> Term {
-    let mut cur = ty;
-    loop {
-        match cur {
-            Term::Pi(_, cod) => cur = cod,
-            other => return other.clone(),
-        }
-    }
-}
-
-/// Unwrap the outermost `n` Lam binders, returning the inner body.
-fn unwrap_lam(term: &Term, n: usize) -> Term {
-    let mut cur = term;
-    for _ in 0..n {
-        match cur {
-            Term::Lam(_, body) => cur = body,
-            _ => break,
-        }
-    }
-    cur.clone()
 }
 
 // ----- match elaboration -----
