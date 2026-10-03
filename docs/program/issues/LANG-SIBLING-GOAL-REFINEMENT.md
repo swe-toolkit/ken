@@ -3,7 +3,7 @@ id: LANG-SIBLING-GOAL-REFINEMENT
 title: "A goal that mentions an indexed sibling binder refined by a match on a different scrutinee fails (BadEliminator, 'could not classify the branch goal'); record each failing leaf's proof, its inferred type and its installing match before any fix"
 status: active
 owner: language
-size: M
+size: L
 tier: T1
 gate: architect
 depends_on: [LANG-INFER-MATCH-INDEX-COVERAGE]
@@ -61,17 +61,43 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
    - Measured on `f8bc5d4e1` (`evt_11byqak8y2p2v`): the five Class A rows
      pass. `lookup_zip_with` (CAT-VECTOR law 5) fails at the convoy guard
      `elab.rs:3535`, in the FZero arm at the inner `match ys`.
-   - **Repair (Architect `evt_1b4t346jcdrkr`).** The entry that trips the
-     guard is the index equation the enclosing `xs` arm generated. The
-     arm's `match_field_regions` range, pushed at `elab.rs:6206` as
-     `outer_scope_depth..ctx.len()`, covers only the constructor fields,
-     so the re-bound convoy entry and the generated equation are classified
-     ambient by position. When an equation-convoy arm pushes its re-bound
-     convoy entries and generated index-equation premises, extend that
-     arm's own range to cover them, and pop it unchanged with the arm.
-     `compute_context_convoy`, the `:3535` refusal and the scrutinee
-     self-skip stay as they are. The measurement commit `a64abf8ae` rides
-     first in the candidate.
+   - The region-extension repair (`evt_1b4t346jcdrkr`) moved the first
+     failure to the FSuc arm (`InferredMatchResultEscapesPattern {
+     tail_ys }`, `elab.rs:18107`; stop 3, `evt_6gsvxjqx8wqm2`).
+   - **Recut (Architect `evt_4yzxxbzka2z3c` on Research
+     `evt_20w8wrae0fye3`): one frame record replaces per-consumer
+     reconstruction.**
+     1. A `MatchFrame`, pushed and popped by each dependent-match arm
+        wherever `match_field_regions` is pushed today (`elab.rs:6206` and
+        siblings), carries: (i) the origin of every binder the arm pushes,
+        written at the push (Field, IH, Scrutinee, ConvoyRebound{original},
+        GeneralizedDependent{original}, GeneratedEquation), keyed by de
+        Bruijn level, never by index or type shape; origin is total, and a
+        binder under an active frame with none is `Internal` at the
+        consumer; (ii) the arm's refined target, so a nested match with a
+        known expected type elaborates in check mode, and the
+        inferred-matrix path (`:18107`) is the no-expected-type fallback
+        only; (iii) the map from the arm's telescope to the enclosing one,
+        absorbing increment 1's generalized-binder redirect.
+     2. Consumers read the record and their local reconstructions are
+        deleted: `compute_context_convoy`'s scrutinee self-skip and
+        field-region skip, increment 1's premise-sentinel redirect, the
+        nested method binder-source lookup (entry 1), and the route that
+        sends a nested match to inferred-matrix projection (entry 3).
+     3. Unchanged: increment 1's behaviour (`aa0c46bc1`), the Class A
+        fixes, LEAF-PARITY's `lower_binders`, and the `:3535` guard and
+        `lower_by` escape refusal, which stay as fail-closed backstops.
+        `a64abf8ae` rides first.
+   - **D0 (design only, Architect gate, non-advancing).** (a) Every site
+     that pushes a binder under an active match frame, with its origin,
+     counted at a named base, including the convoy re-bind and
+     equation-premise pushes in `check_generalized_branch_goal`. (b) Every
+     reader of `match_field_regions`, of the scrutinee `Term::Var`
+     spelling, of `derived_depth` and of the increment-1 redirect, each
+     migrate or out with a reason. (c) The entry-3 routing trace on the
+     disposable first patch: `infer` or `check` for the FSuc inner `match
+     ys`; at `:18107`, `derived_depth`, context length, `tail_ys`'s level
+     and the frame ranges. The owed f6 trace rides D0 if cheap.
 
 ## Acceptance
 
@@ -107,15 +133,19 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
   - A committed row consumes a generalized premise through a generated
     proof (f6's shape).
 
-  Increment 2 (Architect `evt_1b4t346jcdrkr`):
-  - (a) `lookup_zip_with`, both arms including the FSuc recursive call,
-    checks as a pinned fixture.
-  - (b) The five Class A rows and `zip_with_map_pointwise` stay green.
-  - (c) A genuine-ambient control keeps its verdict before and after: a
-    user binder inside the `xs` arm whose type mentions the field index
-    (`VCons _ x tail_xs ↦ let t = tail_xs in match ys {…}`) is pinned at
-    its current verdict. Recorded provenance must not exempt user binders.
-  - (d) Falsifier: drop the region extension, and (a) reddens at `:3535`.
+  Increment 2 (the recut, Architect `evt_4yzxxbzka2z3c`):
+  - `lookup_zip_with`, both arms including the FSuc recursive call,
+    checks as a pinned fixture, and L3 consumes it.
+  - The 10 Class B rows, the 5 Class A rows, `zip_with_map_pointwise`,
+    the controls below and the exactly-once restoration control are
+    unchanged. The genuine-ambient control (a user `let t = tail_xs`
+    inside the `xs` arm, typed at the field index) keeps its verdict.
+  - Falsifiers: F1, drop one origin write, and the totality `Internal`
+    fires (not a downstream symptom); F2, force the FSuc inner match to
+    inference, and `InferredMatchResultEscapesPattern { tail_ys }`
+    returns; F3, classify by the fields-only region, and `:3535` returns
+    on the FZero arm.
+  - f5 and f6 stay out of scope and are re-measured on the recut.
 - **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A
   committed exactly-once control counts one leaf-keyed whole-Π restoration
   on the emitted term, and a duplicate-restoration mutation reddens it. A's
@@ -167,21 +197,23 @@ it joins scope.
    convoy sibling of its own redirected scrutinee — keyed on scrutinee
    identity across the redirect (sentinel spelling vs pushed Var).
 
-Candidate shared predicate (Architect `evt_1b4t346jcdrkr`): binder
-provenance (generalized vs original, scrutinee vs sibling,
-enclosing-generated vs ambient) is reconstructed at the consumer, by
-spelling or by position, instead of being recorded where the binder is
-pushed. Increment 2's convoy repair is its third consumer and not item 2:
-there the scrutinee is a plain `Var` and is skipped correctly. If a next
-stop lands, the §1b answer is this predicate, and the recut is one
-provenance record for every binder match elaboration pushes.
+3. Inner `match ys` in the FSuc arm infers its result over its own
+   pattern binder `tail_ys` (`InferredMatchResultEscapesPattern`,
+   `elab.rs:18107`) despite an expected goal, keyed on the inferred-matrix
+   path's `derived_depth` (`evt_6gsvxjqx8wqm2`).
+
+§1a count: 3 (`evt_5y97zdd2prmsg`). §1b: one predicate (Architect
+`evt_4yzxxbzka2z3c`): a nested match frame does not receive the state its
+enclosing frame holds (binder provenance, the refined goal, the map to the
+enclosing telescope), and each consumer reconstructs it by spelling, by
+position or by falling back to inference. The recut above is its closure.
+The next research re-trigger is the 6th stop.
 
 ## Stop conditions
 
-- Increment 2: after the region extension, `lookup_zip_with` fails at a
-  new site. Stop with that site: it would be advancing stop 3, a research
-  hold under §1a.
-
+- Increment 2: a binder push under an active frame that D0 cannot give an
+  origin, or a consumer that cannot read the record without a kernel or
+  trust change: stop to the Architect.
 - Any kernel conversion change, trust change, or change to `zip_with`.
 - g1 fails at parse (`expected a type, found Lambda`). That is the
   surface-grammar gap (`evt_7aem5zqk3dqm8`) and out of scope.
