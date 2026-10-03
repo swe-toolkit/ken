@@ -52,7 +52,8 @@ stop and report the mismatch.
    a quotient. The Ω-target rule is unchanged. §9's C15 row splits:
    constant-motive accept and refuse are unchanged; the dependent-motive
    accept is deferred to P0 with interim verdict refused; `r_bad` stays
-   refused.
+   refused. §9's numbered item 4 ("relation-as-equality") states neutral
+   class Eq until P0 (spec-author `evt_1tkny60qttp4r`).
 3. Conformance: the `quotient-eq` rows (`seed-kernel.md`,
    `seed-observational.md`, `seed-conversion.md`
    `quotient-eq-through-conv`) state the interim verdict; a row pins the
@@ -61,6 +62,9 @@ stop and report the mismatch.
    reduction-derived `h'`, pins refused for both `r_ok` and `r_bad`, and
    marks the accept half as restored by P0. The constant-motive
    `quotient-respect-schema-{rejects,accepts}-…` rows are unchanged.
+   `seed-evaluation.md`'s `can-eq-by-type-computes` and
+   `agree-observational-corpus` state the interim verdict too
+   (kernel-implementer `evt_47tab4rs3fm50`).
 4. Test consumers of the reduction are migrated (check 3: grep
    `crates/*/tests`, `conformance/`, `examples/`, `catalog/` for quotient
    equality uses, not only `eq_at_quot`).
