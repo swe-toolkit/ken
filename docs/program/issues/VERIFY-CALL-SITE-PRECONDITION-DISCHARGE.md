@@ -46,6 +46,25 @@ stop and report the mismatch.
 
 ## Deliverable (the Architect's shape)
 
+0. **First, separate commit: `param_count` is the only split point**
+   (Adversary `evt_pcxxnva6rss4`, Architect `evt_enahv9vv0f5r`, measured on
+   `958121efa`). With a function-valued return, the requires and ensures
+   clauses are resolved at `param_count`, but `unwrap_pi_chain` /
+   `innermost_codomain` / `unwrap_lam` run to the end of the carrier's
+   Π-chain, so each premise and ensures binds one variable too deep.
+   MULTI-REQUIRES made the two-clause case (H4) admit instead of fail.
+   - Add `split_params`, `strip_param_lams` and `refine_return_depth`
+     beside `unwrap_pi_chain`. Δ is the first `param_count` domains, B is
+     the declared return at that depth (possibly a Π), `body_inner` strips
+     exactly `param_count` lambdas, and `ens_ctx` is Δ then `result : B`.
+   - When B is a Π, `result` is substituted by `body : B` (an ascription).
+   - A return refinement is an implicit ensures only at depth
+     `param_count`; one under the return's own arrows is refused with "a
+     refinement under a function-valued return type is not supported yet".
+   - The Architect's ruling carries the probe-verified patch; build from
+     it. Item 1's staged type uses the same `split_params(…, param_count)`.
+   - If this WP hard-stops or is recut before landing, this commit lands
+     alone; H4 is not left on main behind a held WP.
 1. **Staging.** Build the declaration's full `Π(Δ). Π(φ̄). B` before
    `stage_placeholders`, using MULTI-REQUIRES's Phase 4 construction. Stage
    and admit against that term, and delete the `:15204` assumption.
@@ -74,6 +93,19 @@ stop and report the mismatch.
 
 ## Acceptance
 
+- **AR (item 0; Architect `evt_enahv9vv0f5r`).**
+  - AR1: H1 (`fn f (n : Int) : Int -> Int requires Not (Equal Int n 0) =
+    \m . m / n`) is `Π n. Π (Not (Equal Int @0 0)). Π m. Int`; H4 is `Π n.
+    Π d. Π (d≠0 @0). Π (n≠0 @2). Π m. Int`.
+  - AR2: `f 0 k` is never admitted with 0 obligations: refused before
+    item 4, one Requires obligation `Not (Equal Int 0 0)` after it.
+  - AR3: at a function return, `ensures Equal Int n 5` names n; `ensures
+    Equal Int (result 0) n` is admitted with goal `∀n. (λm. n : Int→Int) 0
+    = n`; `ensures Equal Int result n` is refused.
+  - AR4: a nested return refinement is refused with the new reason.
+  - AR5: reverting `split_params` to `unwrap_pi_chain` reddens AR1.
+  - AR6: after item 4, point-free `… requires Not (Equal Int n 0) = q n`
+    is admitted with 0 obligations, its premise passed to `q`.
 - **AC-1.** P1 elaborates with 1 open Requires obligation in `g`. P2
   elaborates with 0.
 - **AC-2.** `fn r (n:Nat):Nat requires Equal Nat n n = match n { Zero ↦
@@ -99,3 +131,9 @@ stop and report the mismatch.
   the body. Check this with a fixture whose admission fails after a
   self-call hole is declared.
 - A kernel change or a fresh-env `trusted_base()` change.
+
+## Not this WP
+
+- The implicit refinement ensures under a function-valued return
+  (`∀Δ.∀φ̄.∀ē. φ[(body ē)/x]`) stays refused until framed separately
+  (Architect `evt_enahv9vv0f5r`).
