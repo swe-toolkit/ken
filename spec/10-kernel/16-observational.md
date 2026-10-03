@@ -438,6 +438,13 @@ Type equality is **structural** (par. 3), not univalent. The reduction is:
 - `Eq Type l A B` where `A` and `B` have **different heads** (e.g. Pi vs
   Sigma) ⇝ `Bottom`
 - `Eq Type l A A` (same neutral head) is neutral
+- When `A` and `B` are both `Type` universe heads, or both `Ω` universe
+  heads, a successful level-equivalence comparison gives `Top`, even for
+  open levels. Otherwise, give `Bottom` **only when both are closed**:
+  neither expression contains a level variable, including under `suc` or
+  `max`. If either level is open, equality stays neutral even when the
+  comparison did not identify the levels. The different-rigid-head rule
+  above is unchanged.
 
 This is defined structurally; the algorithmic rules for structural
 type-equality are given in par. 3 (they are the same as the `cast`-by-type
