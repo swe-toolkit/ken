@@ -785,498 +785,9 @@ impl<'a> Lowering<'a> {
         let mut state = SourceMachineState::Eval { expr, env, control };
         loop {
             state = match state {
-                SourceMachineState::Eval {
-                    expr:
-                        OwnedSourceOccurrence {
-                            expr,
-                            static_origin,
-                        },
-                    env,
-                    mut control,
-                } => match {
-                    // The owned source machine is the third traversal route for
-                    // these joins. Record the source occurrence here; later
-                    // continuation helpers may only reborrow its token.
-                    self.enter_source_occurrence_plan(static_origin)?;
-                    expr
-                } {
-                    RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
-                        self.enter_checked_subcontinuation_frame(builder, frame_id)?;
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *body)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::CheckedRecursiveInvocation {
-                        call_template_id,
-                        body,
-                        ..
-                    } => {
-                        let instance =
-                            self.enter_checked_recursive_invocation(call_template_id, &body)?;
-                        control.continuation =
-                            SourceContinuation::CheckedRecursiveInvocationReturn {
-                                instance,
-                                next: Box::new(control.continuation),
-                            };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *body)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::CheckedComputationalIHSlots { body, .. } => {
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *body)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::CheckedComputationalIHInvocation {
-                        call_template_id,
-                        kind,
-                        binder_morphism,
-                        body,
-                        ..
-                    } => {
-                        // `D8f` — the machine's own child derivation, taken
-                        // BEFORE the marker is entered so the same occurrence is
-                        // recorded and evaluated.
-                        let body = self.owned_child_occurrence(static_origin, 0, *body)?;
-                        self.enter_checked_computational_ih_invocation(
-                            call_template_id,
-                            kind,
-                            binder_morphism,
-                            &body.expr,
-                            static_origin,
-                            body.static_origin,
-                        )?;
-                        control.continuation =
-                            SourceContinuation::CheckedComputationalIHInvocationReturn {
-                                call_template_id,
-                                next: Box::new(control.continuation),
-                            };
-                        SourceMachineState::Eval {
-                            expr: body,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Value(value) => SourceMachineState::Value {
-                        value: RoutedAnswer::direct(LoweringOperand::Specialized(
-                            self.lower_value(builder, &value)?,
-                        )),
-                        control,
-                    },
-                    // Same value-producing rule as the direct descent's `Var`:
-                    // only `Value` yields a machine value, and a static worker
-                    // binding fails closed here rather than entering one.
-                    RuntimeExpr::Var(index) => {
-                        let binding = env.get(index as usize).ok_or_else(|| {
-                            unsupported("Var", format!("no runtime binding for index {index}"))
-                        })?;
-                        // Capsule mutants are injected on the real forwarding
-                        // path, before this `value_at` and before dispatch. The
-                        // generated call key is capsule-independent.
-                        #[cfg(feature = "px8-ds-test-support")]
-                        let mutated_binding = if let (Some(_), Some(pending)) = (
-                            self.function_local.checked_ih_generated_entry_access.as_ref(),
-                            self.pending_computational_ih_call,
-                        ) {
-                            let callee_origin = self.static_transition_plan.child_static_origin(
-                                pending.application_origin,
-                                0,
-                            )?;
-                            if callee_origin == static_origin {
-                                let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(
-                                    || {
-                                        unsupported(
-                                            "CheckedIhGeneratedEntryAccess",
-                                            "a generated-entry invocation has no oriented call plan",
-                                        )
-                                    },
-                                )?;
-                                let call = plan
-                                    .computational_ih_call(pending.call_template_id)
-                                    .ok_or_else(|| {
-                                        unsupported(
-                                            "CheckedIhGeneratedEntryAccess",
-                                            "a generated-entry invocation has no exact call template",
-                                        )
-                                    })?;
-                                Some(mutate_checked_ih_generated_entry_capsule_binding(
-                                    binding, pending, call,
-                                ))
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-                        #[cfg(feature = "px8-ds-test-support")]
-                        let binding = mutated_binding.as_ref().unwrap_or(binding);
-                        #[cfg(test)]
-                        crate::cranelift_backend::lowering::record_d2k_owner_event(
-                            crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller {
-                                site: "core.rs source-machine Var",
-                            },
-                        );
-                        SourceMachineState::Value {
-                            value: binding.routed_at("a source-machine Var")?,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Let { value, body } => {
-                        control.continuation = SourceContinuation::LetBody {
-                            body: self.owned_child_occurrence(static_origin, 1, *body)?,
-                            env: env.clone(),
-                            next: Box::new(control.continuation),
-                        };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *value)?,
-                            env: env.clone(),
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Construct {
-                        constructor,
-                        mut args,
-                    } => {
-                        // `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` -- ask the same
-                        // classifier as direct descent before the source
-                        // machine lowers any field. D1 established that every
-                        // eligible state arrives with the complete argument
-                        // run and no pending constructor continuation, so the
-                        // existing template can open its conservation ledger
-                        // without restructuring partial machine state.
-                        let recognized =
-                            Self::recognized_constructor_worker_fields(&args, &env);
-                        if recognized.iter().any(Option::is_some) {
-                            SourceMachineState::Value {
-                                value: RoutedAnswer::direct(
-                                    LoweringOperand::Specialized(
-                                        self.static_worker_constructor_template(
-                                            builder,
-                                            static_origin,
-                                            &constructor,
-                                            &args,
-                                            &recognized,
-                                            &env,
-                                        )?,
-                                    ),
-                                ),
-                                control,
-                            }
-                        } else if args.is_empty() {
-                            SourceMachineState::Value {
-                                value: RoutedAnswer::direct(LoweringOperand::Specialized(
-                                    self.finish_source_constructor(
-                                        builder,
-                                        constructor,
-                                        static_origin,
-                                        vec![],
-                                    )?,
-                                )),
-                                control,
-                            }
-                        } else {
-                            // Argument *i* is child *i*; the suffix keeps each
-                            // pending term paired with its own origin, so the
-                            // machine's positions cannot drift as it consumes them.
-                            let first = args.remove(0);
-                            let remaining = args
-                                .into_iter()
-                                .enumerate()
-                                .map(|(offset, arg)| {
-                                    self.owned_child_occurrence(static_origin, 1 + offset, arg)
-                                })
-                                .collect::<Result<Vec<_>, _>>()?;
-                            control.continuation = SourceContinuation::ConstructArgument {
-                                constructor,
-                                static_origin,
-                                remaining,
-                                lowered: Vec::new(),
-                                env: env.clone(),
-                                next: Box::new(control.continuation),
-                            };
-                            SourceMachineState::Eval {
-                                expr: self.owned_child_occurrence(static_origin, 0, first)?,
-                                env,
-                                control,
-                            }
-                        }
-                    }
-                    RuntimeExpr::Match {
-                        scrutinee,
-                        cases,
-                        default,
-                    } => {
-                        control.continuation = SourceContinuation::MatchScrutinee {
-                            cases,
-                            default,
-                            env: env.clone(),
-                            static_origin,
-                            next: Box::new(control.continuation),
-                        };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Call { callee, args } => {
-                        let args = args
-                            .into_iter()
-                            .enumerate()
-                            .map(|(position, arg)| {
-                                self.owned_child_occurrence(static_origin, 1 + position, arg)
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        // **`RT-CONTSRC-PRODUCER-LOCAL` `D8e` — THE SOLE
-                        // SOURCE-MACHINE CONSUMER of a `D8d` binding.**
-                        //
-                        // ⛔ It sits **ahead of the callee's own evaluation**,
-                        // and that placement is the mechanism, not a
-                        // convenience. Evaluating a `Var` callee first routes it
-                        // through the machine's value arm, which calls
-                        // `value_at` and fails closed on a static worker by
-                        // design. So the binding is either consumed here or
-                        // refused everywhere — there is no third outcome, and a
-                        // `Var` resolving to `Value` falls through to the
-                        // pre-existing route untouched.
-                        //
-                        // ⭐ Deliberately the same shape as the direct descent's
-                        // sole consumer: an exact `Var`, read out of the
-                        // environment by index, no shape inference and no
-                        // planner query. The environment already holds the
-                        // answer because `D8d` put it there; asking the planner
-                        // again here would be the consumer-side target lookup
-                        // this checkpoint excludes, and a second authority for
-                        // one binding.
-                        let static_worker = match callee.as_ref() {
-                            RuntimeExpr::Var(index) => match env.get(*index as usize) {
-                                Some(LoweringEnvironmentBinding::StaticWorker(worker)) => {
-                                    Some((u64::from(*index), worker.clone()))
-                                }
-                                _ => None,
-                            },
-                            _ => None,
-                        };
-                        if let Some((binder_index, worker)) = static_worker {
-                            // `D2k-1b-i` — the source machine's terminal
-                            // disposition, counted into the same conservation
-                            // ledger as the direct descent's.
-                            self.static_worker_fields
-                            .note_consuming_call(worker.transport, static_origin, self.defining_function_id)?;
-                            #[cfg(test)]
-                            d8e_record_consumption();
-                            // `D8l2` — which facet this consumption carried,
-                            // recorded beside the count so "three consumptions"
-                            // can be attributed rather than merely counted.
-                            #[cfg(test)]
-                            crate::cranelift_backend::lowering::record_d8l2_consumed_facet(
-                                matches!(
-                                    worker.discharge,
-                                    ContinuationDischarge::ComposedSourceContinuation(_)
-                                ),
-                            );
-                            // Arguments are evaluated under the machine's own
-                            // control and phase, exactly as for a value callee;
-                            // only the completion differs.
-                            let mut remaining = args;
-                            if remaining.is_empty() {
-                                // **`D8p` — THE CHECKED-APPLICATION SEAM, on the
-                                // source machine's call edge.**
-                                //
-                                // The direct descent has consulted it since
-                                // `D5a`; this edge did not, so a checked-IH
-                                // marker entered in a body whose application the
-                                // SOURCE MACHINE lowers could never be consumed
-                                // and failed closed at the marker's close. The
-                                // seam is the same function, on the same exact
-                                // occurrence and binder ordinal -- no second
-                                // authority, no target lookup, and no new
-                                // identity.
-                                //
-                                // ⛔ Immediately BEFORE the call is written, so
-                                // consumption still precedes the instruction it
-                                // discharges, and after the arguments are in
-                                // hand so an ordinary selected-argument call
-                                // reaches the seat first and leaves the marker
-                                // for the occurrence that owns it.
-                                let pending = self.pending_computational_ih_call;
-                                let disposition = self
-                                    .consume_checked_ih_marker_at_static_worker_call(
-                                        binder_index,
-                                        0,
-                                        static_origin,
-                                    )?;
-                                let materialized = match pending {
-                                    Some(pending) => self
-                                        .materialize_checked_ih_static_worker_application(
-                                            builder,
-                                            pending,
-                                            disposition,
-                                            &worker,
-                                        )?,
-                                    None => None,
-                                };
-                                if let Some(environment) = materialized {
-                                    SourceMachineState::Value {
-                                        value: RoutedAnswer::direct(environment.into_operand()),
-                                        control,
-                                    }
-                                } else {
-                                let before = self.live_source_continuations;
-                                let (called, emission) = self.call_static_worker_with_inputs(
-                                    builder,
-                                    &worker,
-                                    Vec::new(),
-                                    static_origin,
-                                    None,
-                                )?
-                                .into_emitted()?;
-                                // `D8p` — the TARGET side, under the same key,
-                                // written only now that the call instruction
-                                // exists and carrying the run it actually took.
-                                #[cfg(test)]
-                                if disposition == CheckedApplicationDisposition::ConsumedHere {
-                                    crate::cranelift_backend::lowering::record_d8p_emitted_target(
-                                        crate::cranelift_backend::lowering::D8pEmittedTarget {
-                                            function: self.defining_function_id,
-                                            application_origin: static_origin,
-                                            target_body_origin: worker.body_origin,
-                                            declared_arity: worker.declared_arity,
-                                            captures: worker.captures.len(),
-                                            supplied_operands: emission.supplied_operands,
-                                        },
-                                    );
-                                }
-                                // `D8f` — the disposition, recorded AFTER the
-                                // call instruction exists. A record here is
-                                // therefore "this exact call was emitted, with
-                                // this disposition", which is what an omission
-                                // control needs: emitted, and not consumed.
-                                #[cfg(test)]
-                                crate::cranelift_backend::lowering::record_d8f_disposition(
-                                    self.defining_function_id,
-                                    static_origin,
-                                    disposition,
-                                );
-                                // `D8j` — the call is emitted and its result is
-                                // in hand under the SAME `control` this arm was
-                                // entered with. Only now may a composed
-                                // obligation be claimed.
-                                // **`D8f` — THE CLAIM DISPOSITION, three cases,
-                                // matched exhaustively.**
-                                match disposition {
-                                    // The `D8j` population: an ordinary composed
-                                    // call, untouched by this seam, claims its
-                                    // causal identity exactly as before.
-                                    CheckedApplicationDisposition::NoPendingApplication
-                                    // The checked application itself, claiming
-                                    // the planner-issued identity once.
-                                    | CheckedApplicationDisposition::ConsumedHere => {
-                                        self.claim_composed_discharge(
-                                            &worker, emission, &called, before,
-                                        )?;
-                                    }
-                                    // ⛔ The declined call. It is emitted
-                                    // unchanged and it claims NOTHING: the
-                                    // identity belongs to the checked
-                                    // application the planner issued it for, and
-                                    // an ordinary selected-argument call
-                                    // answering for it is a second discharge of
-                                    // one obligation. The binding is not
-                                    // reclassified and no identity is minted --
-                                    // this call simply does not answer.
-                                    CheckedApplicationDisposition::PendingAtAnotherOccurrence => {
-                                        #[cfg(test)]
-                                        if d8f_declined_call_claims() {
-                                            self.claim_composed_discharge(
-                                                &worker, emission, &called, before,
-                                            )?;
-                                        }
-                                    }
-                                }
-                                SourceMachineState::Value {
-                                    value: RoutedAnswer::direct(called),
-                                    control,
-                                }
-                                }
-                            } else {
-                                let first = remaining.remove(0);
-                                control.continuation = SourceContinuation::CallArgument {
-                                    callee: SourceCallee::StaticWorker {
-                                        worker,
-                                        static_origin,
-                                        binder_index,
-                                    },
-                                    remaining,
-                                    lowered: Vec::new(),
-                                    env: env.clone(),
-                                    next: Box::new(control.continuation),
-                                };
-                                SourceMachineState::Eval {
-                                    expr: first,
-                                    env,
-                                    control,
-                                }
-                            }
-                        } else {
-                            control.continuation = SourceContinuation::CallCallee {
-                                args,
-                                env: env.clone(),
-                                next: Box::new(control.continuation),
-                            };
-                            SourceMachineState::Eval {
-                                expr: self.owned_child_occurrence(static_origin, 0, *callee)?,
-                                env,
-                                control,
-                            }
-                        }
-                    }
-                    RuntimeExpr::ComputationalMatch {
-                        scrutinee,
-                        cases,
-                        default,
-                    } => {
-                        let checked_frame_id =
-                            self.consume_checked_subcontinuation_frame(builder, &cases, &default)?;
-                        control.continuation = SourceContinuation::ComputationalMatchScrutinee {
-                            cases,
-                            default,
-                            env: env.clone(),
-                            static_origin,
-                            provenance: self.mint_recursor_frame_provenance(),
-                            checked_frame_id,
-                            answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
-                            next: Box::new(control.continuation),
-                        };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
-                            env,
-                            control,
-                        }
-                    }
-                    // ⭐ The delegation point. Every form this dispatcher does not
-                    // handle — closures included — goes to `lower_expr` here, and
-                    // it now goes **as the same occurrence**: same term, same
-                    // origin. This arm is why a "machine-only" subset could never
-                    // have been threaded soundly.
-                    other => SourceMachineState::Value {
-                        value: RoutedAnswer::direct(self.lower_expr(
-                            builder,
-                            SourceOccurrence {
-                                expr: &other,
-                                static_origin,
-                            },
-                            &env,
-                        )?),
-                        control,
-                    },
-                },
+                SourceMachineState::Eval { expr, env, control } => {
+                    self.step_source_machine_eval(builder, expr, env, control)?
+                }
                 SourceMachineState::Value { value, mut control } => {
                     // ⭐⭐ `D6a` upstream half -- SPLIT THE PAIR ONCE, HERE.
                     //
@@ -2797,6 +2308,503 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 }
             };
         }
+    }
+
+    /// Keep an Eval transition outside the retained continuation loop frame.
+    /// Recursive source matches re-enter the Value transition while lowering
+    /// their leaves; Eval-only temporaries must not occupy each retained frame.
+    #[inline(never)]
+    fn step_source_machine_eval<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        expr: OwnedSourceOccurrence,
+        env: Vec<LoweringEnvironmentBinding>,
+        mut control: SourceControl<'b>,
+    ) -> Result<SourceMachineState<'b>, CraneliftBackendError> {
+        let OwnedSourceOccurrence {
+            expr,
+            static_origin,
+        } = expr;
+        // Record this occurrence before dispatch, including delegated forms.
+        self.enter_source_occurrence_plan(static_origin)?;
+        Ok(match expr {
+            RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
+                self.enter_checked_subcontinuation_frame(builder, frame_id)?;
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *body)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::CheckedRecursiveInvocation {
+                call_template_id,
+                body,
+                ..
+            } => {
+                let instance =
+                    self.enter_checked_recursive_invocation(call_template_id, &body)?;
+                control.continuation =
+                    SourceContinuation::CheckedRecursiveInvocationReturn {
+                        instance,
+                        next: Box::new(control.continuation),
+                    };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *body)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::CheckedComputationalIHSlots { body, .. } => {
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *body)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::CheckedComputationalIHInvocation {
+                call_template_id,
+                kind,
+                binder_morphism,
+                body,
+                ..
+            } => {
+                // `D8f` — the machine's own child derivation, taken
+                // BEFORE the marker is entered so the same occurrence is
+                // recorded and evaluated.
+                let body = self.owned_child_occurrence(static_origin, 0, *body)?;
+                self.enter_checked_computational_ih_invocation(
+                    call_template_id,
+                    kind,
+                    binder_morphism,
+                    &body.expr,
+                    static_origin,
+                    body.static_origin,
+                )?;
+                control.continuation =
+                    SourceContinuation::CheckedComputationalIHInvocationReturn {
+                        call_template_id,
+                        next: Box::new(control.continuation),
+                    };
+                SourceMachineState::Eval {
+                    expr: body,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::Value(value) => SourceMachineState::Value {
+                value: RoutedAnswer::direct(LoweringOperand::Specialized(
+                    self.lower_value(builder, &value)?,
+                )),
+                control,
+            },
+            // Same value-producing rule as the direct descent's `Var`:
+            // only `Value` yields a machine value, and a static worker
+            // binding fails closed here rather than entering one.
+            RuntimeExpr::Var(index) => {
+                let binding = env.get(index as usize).ok_or_else(|| {
+                    unsupported("Var", format!("no runtime binding for index {index}"))
+                })?;
+                // Capsule mutants are injected on the real forwarding
+                // path, before this `value_at` and before dispatch. The
+                // generated call key is capsule-independent.
+                #[cfg(feature = "px8-ds-test-support")]
+                let mutated_binding = if let (Some(_), Some(pending)) = (
+                    self.function_local.checked_ih_generated_entry_access.as_ref(),
+                    self.pending_computational_ih_call,
+                ) {
+                    let callee_origin = self.static_transition_plan.child_static_origin(
+                        pending.application_origin,
+                        0,
+                    )?;
+                    if callee_origin == static_origin {
+                        let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(
+                            || {
+                                unsupported(
+                                    "CheckedIhGeneratedEntryAccess",
+                                    "a generated-entry invocation has no oriented call plan",
+                                )
+                            },
+                        )?;
+                        let call = plan
+                            .computational_ih_call(pending.call_template_id)
+                            .ok_or_else(|| {
+                                unsupported(
+                                    "CheckedIhGeneratedEntryAccess",
+                                    "a generated-entry invocation has no exact call template",
+                                )
+                            })?;
+                        Some(mutate_checked_ih_generated_entry_capsule_binding(
+                            binding, pending, call,
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                #[cfg(feature = "px8-ds-test-support")]
+                let binding = mutated_binding.as_ref().unwrap_or(binding);
+                #[cfg(test)]
+                crate::cranelift_backend::lowering::record_d2k_owner_event(
+                    crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller {
+                        site: "core.rs source-machine Var",
+                    },
+                );
+                SourceMachineState::Value {
+                    value: binding.routed_at("a source-machine Var")?,
+                    control,
+                }
+            }
+            RuntimeExpr::Let { value, body } => {
+                control.continuation = SourceContinuation::LetBody {
+                    body: self.owned_child_occurrence(static_origin, 1, *body)?,
+                    env: env.clone(),
+                    next: Box::new(control.continuation),
+                };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *value)?,
+                    env: env.clone(),
+                    control,
+                }
+            }
+            RuntimeExpr::Construct {
+                constructor,
+                mut args,
+            } => {
+                // `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` -- ask the same
+                // classifier as direct descent before the source
+                // machine lowers any field. D1 established that every
+                // eligible state arrives with the complete argument
+                // run and no pending constructor continuation, so the
+                // existing template can open its conservation ledger
+                // without restructuring partial machine state.
+                let recognized =
+                    Self::recognized_constructor_worker_fields(&args, &env);
+                if recognized.iter().any(Option::is_some) {
+                    SourceMachineState::Value {
+                        value: RoutedAnswer::direct(
+                            LoweringOperand::Specialized(
+                                self.static_worker_constructor_template(
+                                    builder,
+                                    static_origin,
+                                    &constructor,
+                                    &args,
+                                    &recognized,
+                                    &env,
+                                )?,
+                            ),
+                        ),
+                        control,
+                    }
+                } else if args.is_empty() {
+                    SourceMachineState::Value {
+                        value: RoutedAnswer::direct(LoweringOperand::Specialized(
+                            self.finish_source_constructor(
+                                builder,
+                                constructor,
+                                static_origin,
+                                vec![],
+                            )?,
+                        )),
+                        control,
+                    }
+                } else {
+                    // Argument *i* is child *i*; the suffix keeps each
+                    // pending term paired with its own origin, so the
+                    // machine's positions cannot drift as it consumes them.
+                    let first = args.remove(0);
+                    let remaining = args
+                        .into_iter()
+                        .enumerate()
+                        .map(|(offset, arg)| {
+                            self.owned_child_occurrence(static_origin, 1 + offset, arg)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    control.continuation = SourceContinuation::ConstructArgument {
+                        constructor,
+                        static_origin,
+                        remaining,
+                        lowered: Vec::new(),
+                        env: env.clone(),
+                        next: Box::new(control.continuation),
+                    };
+                    SourceMachineState::Eval {
+                        expr: self.owned_child_occurrence(static_origin, 0, first)?,
+                        env,
+                        control,
+                    }
+                }
+            }
+            RuntimeExpr::Match {
+                scrutinee,
+                cases,
+                default,
+            } => {
+                control.continuation = SourceContinuation::MatchScrutinee {
+                    cases,
+                    default,
+                    env: env.clone(),
+                    static_origin,
+                    next: Box::new(control.continuation),
+                };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::Call { callee, args } => {
+                let args = args
+                    .into_iter()
+                    .enumerate()
+                    .map(|(position, arg)| {
+                        self.owned_child_occurrence(static_origin, 1 + position, arg)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                // **`RT-CONTSRC-PRODUCER-LOCAL` `D8e` — THE SOLE
+                // SOURCE-MACHINE CONSUMER of a `D8d` binding.**
+                //
+                // ⛔ It sits **ahead of the callee's own evaluation**,
+                // and that placement is the mechanism, not a
+                // convenience. Evaluating a `Var` callee first routes it
+                // through the machine's value arm, which calls
+                // `value_at` and fails closed on a static worker by
+                // design. So the binding is either consumed here or
+                // refused everywhere — there is no third outcome, and a
+                // `Var` resolving to `Value` falls through to the
+                // pre-existing route untouched.
+                //
+                // ⭐ Deliberately the same shape as the direct descent's
+                // sole consumer: an exact `Var`, read out of the
+                // environment by index, no shape inference and no
+                // planner query. The environment already holds the
+                // answer because `D8d` put it there; asking the planner
+                // again here would be the consumer-side target lookup
+                // this checkpoint excludes, and a second authority for
+                // one binding.
+                let static_worker = match callee.as_ref() {
+                    RuntimeExpr::Var(index) => match env.get(*index as usize) {
+                        Some(LoweringEnvironmentBinding::StaticWorker(worker)) => {
+                            Some((u64::from(*index), worker.clone()))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some((binder_index, worker)) = static_worker {
+                    // `D2k-1b-i` — the source machine's terminal
+                    // disposition, counted into the same conservation
+                    // ledger as the direct descent's.
+                    self.static_worker_fields
+                    .note_consuming_call(worker.transport, static_origin, self.defining_function_id)?;
+                    #[cfg(test)]
+                    d8e_record_consumption();
+                    // `D8l2` — which facet this consumption carried,
+                    // recorded beside the count so "three consumptions"
+                    // can be attributed rather than merely counted.
+                    #[cfg(test)]
+                    crate::cranelift_backend::lowering::record_d8l2_consumed_facet(
+                        matches!(
+                            worker.discharge,
+                            ContinuationDischarge::ComposedSourceContinuation(_)
+                        ),
+                    );
+                    // Arguments are evaluated under the machine's own
+                    // control and phase, exactly as for a value callee;
+                    // only the completion differs.
+                    let mut remaining = args;
+                    if remaining.is_empty() {
+                        // **`D8p` — THE CHECKED-APPLICATION SEAM, on the
+                        // source machine's call edge.**
+                        //
+                        // The direct descent has consulted it since
+                        // `D5a`; this edge did not, so a checked-IH
+                        // marker entered in a body whose application the
+                        // SOURCE MACHINE lowers could never be consumed
+                        // and failed closed at the marker's close. The
+                        // seam is the same function, on the same exact
+                        // occurrence and binder ordinal -- no second
+                        // authority, no target lookup, and no new
+                        // identity.
+                        //
+                        // ⛔ Immediately BEFORE the call is written, so
+                        // consumption still precedes the instruction it
+                        // discharges, and after the arguments are in
+                        // hand so an ordinary selected-argument call
+                        // reaches the seat first and leaves the marker
+                        // for the occurrence that owns it.
+                        let pending = self.pending_computational_ih_call;
+                        let disposition = self
+                            .consume_checked_ih_marker_at_static_worker_call(
+                                binder_index,
+                                0,
+                                static_origin,
+                            )?;
+                        let materialized = match pending {
+                            Some(pending) => self
+                                .materialize_checked_ih_static_worker_application(
+                                    builder,
+                                    pending,
+                                    disposition,
+                                    &worker,
+                                )?,
+                            None => None,
+                        };
+                        if let Some(environment) = materialized {
+                            SourceMachineState::Value {
+                                value: RoutedAnswer::direct(environment.into_operand()),
+                                control,
+                            }
+                        } else {
+                        let before = self.live_source_continuations;
+                        let (called, emission) = self.call_static_worker_with_inputs(
+                            builder,
+                            &worker,
+                            Vec::new(),
+                            static_origin,
+                            None,
+                        )?
+                        .into_emitted()?;
+                        // `D8p` — the TARGET side, under the same key,
+                        // written only now that the call instruction
+                        // exists and carrying the run it actually took.
+                        #[cfg(test)]
+                        if disposition == CheckedApplicationDisposition::ConsumedHere {
+                            crate::cranelift_backend::lowering::record_d8p_emitted_target(
+                                crate::cranelift_backend::lowering::D8pEmittedTarget {
+                                    function: self.defining_function_id,
+                                    application_origin: static_origin,
+                                    target_body_origin: worker.body_origin,
+                                    declared_arity: worker.declared_arity,
+                                    captures: worker.captures.len(),
+                                    supplied_operands: emission.supplied_operands,
+                                },
+                            );
+                        }
+                        // `D8f` — the disposition, recorded AFTER the
+                        // call instruction exists. A record here is
+                        // therefore "this exact call was emitted, with
+                        // this disposition", which is what an omission
+                        // control needs: emitted, and not consumed.
+                        #[cfg(test)]
+                        crate::cranelift_backend::lowering::record_d8f_disposition(
+                            self.defining_function_id,
+                            static_origin,
+                            disposition,
+                        );
+                        // `D8j` — the call is emitted and its result is
+                        // in hand under the SAME `control` this arm was
+                        // entered with. Only now may a composed
+                        // obligation be claimed.
+                        // **`D8f` — THE CLAIM DISPOSITION, three cases,
+                        // matched exhaustively.**
+                        match disposition {
+                            // The `D8j` population: an ordinary composed
+                            // call, untouched by this seam, claims its
+                            // causal identity exactly as before.
+                            CheckedApplicationDisposition::NoPendingApplication
+                            // The checked application itself, claiming
+                            // the planner-issued identity once.
+                            | CheckedApplicationDisposition::ConsumedHere => {
+                                self.claim_composed_discharge(
+                                    &worker, emission, &called, before,
+                                )?;
+                            }
+                            // ⛔ The declined call. It is emitted
+                            // unchanged and it claims NOTHING: the
+                            // identity belongs to the checked
+                            // application the planner issued it for, and
+                            // an ordinary selected-argument call
+                            // answering for it is a second discharge of
+                            // one obligation. The binding is not
+                            // reclassified and no identity is minted --
+                            // this call simply does not answer.
+                            CheckedApplicationDisposition::PendingAtAnotherOccurrence => {
+                                #[cfg(test)]
+                                if d8f_declined_call_claims() {
+                                    self.claim_composed_discharge(
+                                        &worker, emission, &called, before,
+                                    )?;
+                                }
+                            }
+                        }
+                        SourceMachineState::Value {
+                            value: RoutedAnswer::direct(called),
+                            control,
+                        }
+                        }
+                    } else {
+                        let first = remaining.remove(0);
+                        control.continuation = SourceContinuation::CallArgument {
+                            callee: SourceCallee::StaticWorker {
+                                worker,
+                                static_origin,
+                                binder_index,
+                            },
+                            remaining,
+                            lowered: Vec::new(),
+                            env: env.clone(),
+                            next: Box::new(control.continuation),
+                        };
+                        SourceMachineState::Eval {
+                            expr: first,
+                            env,
+                            control,
+                        }
+                    }
+                } else {
+                    control.continuation = SourceContinuation::CallCallee {
+                        args,
+                        env: env.clone(),
+                        next: Box::new(control.continuation),
+                    };
+                    SourceMachineState::Eval {
+                        expr: self.owned_child_occurrence(static_origin, 0, *callee)?,
+                        env,
+                        control,
+                    }
+                }
+            }
+            RuntimeExpr::ComputationalMatch {
+                scrutinee,
+                cases,
+                default,
+            } => {
+                let checked_frame_id =
+                    self.consume_checked_subcontinuation_frame(builder, &cases, &default)?;
+                control.continuation = SourceContinuation::ComputationalMatchScrutinee {
+                    cases,
+                    default,
+                    env: env.clone(),
+                    static_origin,
+                    provenance: self.mint_recursor_frame_provenance(),
+                    checked_frame_id,
+                    answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
+                    next: Box::new(control.continuation),
+                };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
+                    env,
+                    control,
+                }
+            }
+            // ⭐ The delegation point. Every form this dispatcher does not
+            // handle — closures included — goes to `lower_expr` here, and
+            // it now goes **as the same occurrence**: same term, same
+            // origin. This arm is why a "machine-only" subset could never
+            // have been threaded soundly.
+            other => SourceMachineState::Value {
+                value: RoutedAnswer::direct(self.lower_expr(
+                    builder,
+                    SourceOccurrence {
+                        expr: &other,
+                        static_origin,
+                    },
+                    &env,
+                )?),
+                control,
+            },
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
