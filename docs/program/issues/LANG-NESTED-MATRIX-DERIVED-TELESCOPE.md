@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-MATRIX-DERIVED-TELESCOPE
 title: "The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or discovered first"
-status: active
+status: merged
 owner: language
 size: L
 tier: T1
@@ -315,3 +315,14 @@ Check-mode result seed (a separate count, §1a 1, `evt_6jqa2y7rft3tr`):
 - The repair needs a kernel or spec change.
 - Seeding leaves an entry `None` in check mode: stop and name it.
 - A retired mechanism has a consumer outside the matrix: stop and name it.
+
+## Closeout
+
+Increment 2, the last, merged as `db19a8d0c` from exact `f8973947e`.
+Gates: Language QA `evt_559xm7c51j7qj` (after the block
+`evt_618a6n1qhq0gr`, cured by the same-span literal ordinal pin), Architect
+`evt_74aest76n4k07`, Decision `dec_3ya6k3maacem4`. All five routed blobs
+match main. The nested matrix elaborates in one derived context of real
+`cx.ctx` pushes; the woven binders and alias sentinels are gone. Follow-ons
+`LANG-FORWARD-REFERENCE-ACROSS-DATA-EXPORT` and
+`LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE` stay on the lane.
