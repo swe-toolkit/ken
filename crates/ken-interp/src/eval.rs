@@ -1194,6 +1194,16 @@ fn eq_reduce(a_ty: EvalVal, lhs: EvalVal, rhs: EvalVal, globals: &GlobalEnv) -> 
         return EvalVal::Unknown;
     }
 
+    // C8 interim (16 §5.1): quotient-class equality is neutral, as in the
+    // kernel. It must not reach the inductive same-constructor rule below,
+    // which would compare representatives. Relation-as-equality is gated on
+    // KERNEL-QUOT-FORM-EQUIVALENCE.
+    if matches!(&lhs, EvalVal::Ctor { id, .. } if *id == GlobalId(QUOT_CLASS_TYPE_ID))
+        || matches!(&rhs, EvalVal::Ctor { id, .. } if *id == GlobalId(QUOT_CLASS_TYPE_ID))
+    {
+        return EvalVal::Neutral;
+    }
+
     // C4: Eq at an inductive type, same constructor (0-field → Top), diff → Bottom.
     // Both are represented as opaque IndFormerVal pointing to the prelude constants.
     if let (
