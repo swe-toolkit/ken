@@ -98,6 +98,27 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
      disposable first patch: `infer` or `check` for the FSuc inner `match
      ys`; at `:18107`, `derived_depth`, context length, `tail_ys`'s level
      and the frame ranges. The owed f6 trace rides D0 if cheap.
+   - **D0 gated (Architect `evt_3v5en59224w18` on `evt_6qs6wc9m6mef7`):
+     36 push sites, 21 under an active frame, 15 fresh contexts; 28
+     consumer dispositions. Entry 3 is the dropped goal:
+     `check_large_convoy_recursive_arm` calls `infer(cx, &arm.body)` at
+     `elab.rs:5564` though `expected_here` is computed. The build follows
+     three rulings:**
+     - **R1.** The origin set adds `UserLocal` for every binder user source
+       or term/type formation introduces under a frame (`let`, lambda, Π/Σ/J
+       motive locals, inferred let, literal/tuple/record binders).
+       `UserLocal` is ambient by definition. Each of the 21 active-frame
+       sites pushes through one API that takes the origin as an argument,
+       with no default; never derived from position or type.
+     - **R2.** Every arm producer pushes its `MatchFrame` before its own
+       constructor fields, so each field is written as Field into its own
+       frame: `check_dependent_branch_body`,
+       `check_large_convoy_recursive_arm`, the lifted and structured methods,
+       and the indexed-matrix leaves (`:18352`). D0's arm-producer census is
+       the population.
+     - **R3.** At `:5564`, `check(cx, &arm.body, &expected_here)` replaces
+       `infer`. A later use of the inferred type reads the expected type or
+       the checked term's kernel type, never a re-inference.
 
 ## Acceptance
 
@@ -144,7 +165,11 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
     fires (not a downstream symptom); F2, force the FSuc inner match to
     inference, and `InferredMatchResultEscapesPattern { tail_ys }`
     returns; F3, classify by the fields-only region, and `:3535` returns
-    on the FZero arm.
+    on the FZero arm; F4, remove the frame push from
+    `check_large_convoy_recursive_arm`, and the FSuc fields land in the
+    enclosing frame and the classification test reddens. F1 may instead
+    fail to compile. The ambient control is classified `UserLocal` and
+    still refused at `:3535`.
   - f5 and f6 stay out of scope and are re-measured on the recut.
 - **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A
   committed exactly-once control counts one leaf-keyed whole-Π restoration
@@ -211,9 +236,10 @@ The next research re-trigger is the 6th stop.
 
 ## Stop conditions
 
-- Increment 2: a binder push under an active frame that D0 cannot give an
-  origin, or a consumer that cannot read the record without a kernel or
-  trust change: stop to the Architect.
+- Increment 2 build: R3's check-mode change exposes a new site (advancing
+  stop 4, ruled inside the recut), or an arm producer cannot open its frame
+  before its fields without reordering kernel-visible binders: stop to the
+  Architect with the site.
 - Any kernel conversion change, trust change, or change to `zip_with`.
 - g1 fails at parse (`expected a type, found Lambda`). That is the
   surface-grammar gap (`evt_7aem5zqk3dqm8`) and out of scope.
