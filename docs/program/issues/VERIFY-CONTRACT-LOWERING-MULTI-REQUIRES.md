@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CONTRACT-LOWERING-MULTI-REQUIRES
 title: "A declaration with two requires clauses is rejected by the kernel, because the body's proof lambdas are not shifted under the earlier ones, and an ensures goal is closed without the requires premises. Lower contracts as spec 21 elabView states: λ(Δ). λ(p̄). b, with ensures checked under the requires"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -102,3 +102,12 @@ stop and report the mismatch.
   that now sits under its requires is the intended decrease.
 - An existing pin changes verdict outside the multi-clause and ensures
   population: stop with the row.
+
+## Closeout
+
+Merged `958121efa` from exact `d32935726` (FULL CI green, run
+`37121725445`). `elab.rs` is a three-way merge with LEAF-PARITY; the main
+tree equals the routed merge tree, and the test file's blob matches.
+Gates: Verify QA `evt_7ekazehv14sts`, Architect `evt_6xsth0x21cr9d`,
+Decision `dec_72m6ps4nhezhc`. VERIFY-CALL-SITE-PRECONDITION-DISCHARGE
+builds on it.
