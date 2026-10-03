@@ -1,7 +1,7 @@
 ---
 id: KERNEL-LEVEL-CLOSURE-CHECK
 title: "The kernel proves Bottom with no postulate, because no admission checks a declaration's free level variables against its level parameters, so a definition's own u escapes instantiation. Check level closure and distinct parameters at every admission, and emit Bottom for unequal universes only over closed levels"
-status: draft
+status: ready
 owner: kernel
 size: S
 tier: T1
@@ -9,7 +9,7 @@ gate: architect
 depends_on: [KERNEL-QUOT-EQ-INTERIM-CAST-LEVEL]
 blocks: []
 github: null
-origin: "Research sweep evt_7daqm6ydmbnsr S1 (operator item (v), evt_6d6fzbqt2sa8r). Architect ruling evt_24070d0c9zgmw item 1. Kernel change: draft until operator approval. Steward-filed per COORDINATION section 2."
+origin: "Research sweep evt_7daqm6ydmbnsr S1 (operator item (v), evt_6d6fzbqt2sa8r). Architect ruling evt_24070d0c9zgmw item 1. Kernel change; operator 2026-10-03: 'approve A and B'. Steward-filed per COORDINATION section 2."
 ---
 
 # Level variables are closed at admission
