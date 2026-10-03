@@ -154,8 +154,17 @@ it. Five items, delivered in the two increments below:
      - D: R is decoded with `decode_residual_child`;
      - E: an ABI copy, through the counted escape.
 
-     The compiler forces a `Residual` arm at the 58 `match` arms. No boolean
-     helper groups R with K.
+     A row is dispositioned where R's fate is decided (Architect
+     `evt_cp8vaq46mbtc`). A probe R cannot reach cites its fate site: `D
+     (upstream)` when an exhaustive match decodes R and returns first, or `->
+     <fate site>` when R falls through with no intervening consumer of the
+     scrutinee, and the fate site gets its own row per eliminator arm. The
+     falsifiers are mutations at the fate sites, never at refusals R cannot
+     reach; a fate site no corpus row reaches is recorded as unexercised.
+
+     The compiler forces a `Residual` arm at every exhaustive `match` on
+     `LoweringOperand`; the census row set is the criterion population at
+     the exact SHA. No boolean helper groups R with K.
 3. **The ABI slot kind.** The planner issues a residual slot kind for any
    capture or frame slot that must carry R across a generated-context or
    declared-call boundary. Any other boundary carries the decoded Child.
