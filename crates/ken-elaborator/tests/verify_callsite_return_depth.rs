@@ -95,22 +95,38 @@ fn multiple_requires_split_before_a_function_valued_return() {
     assert_eq!(result, int);
 }
 
-/// AR2 before item 4. MEASURED: `f 0 k` is rejected while its contracted
-/// function result still exposes the requires Pi. CLAIMED: the call is never
-/// admitted as though it had zero obligations. THE GAP: item 4 may later turn
-/// this refusal into one call-site Requires obligation.
+/// AR2 after item 4. MEASURED: `f 0 k` creates one Requires hole for
+/// `Not (Equal Int 0 0)`. CLAIMED: the call is admitted only with its caller
+/// burden. THE GAP: the exact obligation kind and goal distinguish discharge
+/// from either a silent zero-hole accept or an unrelated failure.
 #[test]
-fn function_valued_call_is_not_admitted_without_a_requires_argument() {
+fn function_valued_call_creates_requires_obligation() {
     let mut env = ElabEnv::new().expect("numeric prelude");
-    let before = env.env.trusted_base();
-    let error = env
+    let results = env
         .elaborate_file_v1(
             "fn f (n : Int) : Int -> Int requires Not (Equal Int n 0) = \\m. m\n\
              fn h (k : Int) : Int = f 0 k",
         )
-        .expect_err("the caller supplies Int where f still requires a proof");
-    assert!(format!("{error:?}").contains("TypeMismatch"), "{error:?}");
-    assert_eq!(env.env.trusted_base(), before);
+        .expect("the caller receives a Requires obligation");
+    let [f, h] = results.as_slice() else {
+        panic!("expected the callee and its caller")
+    };
+    assert!(f.obligations.is_empty());
+    let [requires] = h.obligations.as_slice() else {
+        panic!("the caller has exactly one Requires obligation")
+    };
+    assert!(matches!(requires.kind, ObligationKind::Requires));
+    let int = Term::const_(env.globals["Int"], vec![]);
+    assert_eq!(
+        requires.goal_closed,
+        Term::pi(
+            int,
+            not(
+                &env,
+                equal_int(&env, Term::IntLit(0.into()), Term::IntLit(0.into()))
+            ),
+        )
+    );
 }
 
 /// AR3. MEASURED: ensures at the declared return depth closes over n; an
