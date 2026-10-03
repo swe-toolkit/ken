@@ -30,6 +30,13 @@ fn not_eq_int(env: &ElabEnv, variable: usize, value: i64) -> Term {
     Term::app(Term::const_(env.globals["Not"], vec![]), eq)
 }
 
+/// Spec 21 §1/§6.3; promise class: durable invariant.
+/// MEASURED: M1-M4 kernel-check, M1's second domain names n under h1, and
+/// the twin's remaining PartialPrim goal names d under both requirements.
+/// CLAIMED: each requires proof lambda and direct divisor premise retain their
+/// meaning at the intended binder depth.
+/// THE GAP: typed term equality is paired with kernel admission; the fixtures
+/// reach `declare_def` and vary clause order, body shape, and duplication.
 #[test]
 fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
     let cases = [
@@ -94,6 +101,21 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
         }
     }
 
+    // A third clause reaches another binder depth. The exact domain check is
+    // needed because n and d share a type, so kernel admission alone cannot
+    // distinguish the correct variable from its neighbour.
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let result = env
+        .elaborate_decl_v1(
+            "fn many (n : Int) (d : Int) : Int \
+             requires Equal Int n 1 requires Equal Int d 2 \
+             requires Not (Equal Int n 0) = n",
+        )
+        .expect("three requires clauses");
+    let (_, ty) = env.env.const_type(result.def_id).expect("many type");
+    let (domains, _) = pi_domains(&ty, 5);
+    assert_eq!(domains[4], &not_eq_int(&env, 3, 0));
+
     // The twin does not establish d's nonzero premise. Its single remaining
     // divisor obligation is closed under both explicit proof arguments.
     let mut env = ElabEnv::new().expect("numeric prelude");
@@ -110,7 +132,18 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
     let int = Term::const_(env.globals["Int"], vec![]);
     let nonzero_id = env.numeric_env.classify_div(&int).unwrap().nonzero_id;
     let (domains, goal) = pi_domains(&obligation.goal_closed, 4);
-    assert_eq!(domains.len(), 4);
+    assert_eq!(domains[2], &not_eq_int(&env, 1, 0));
+    assert_eq!(
+        domains[3],
+        &Term::app(
+            Term::app(
+                Term::app(Term::const_(env.globals["Equal"], vec![]), int.clone()),
+                Term::var(1),
+            ),
+            Term::var(1),
+        ),
+        "the second twin binder remains Equal Int d d under h1"
+    );
     assert_eq!(
         goal,
         &Term::app(Term::const_(nonzero_id, vec![]), Term::var(2)),
@@ -118,8 +151,13 @@ fn multiple_requires_domains_shift_and_divisor_controls_stay_exact() {
     );
 }
 
-/// Spec 21 §1, durable invariant: the requires premise is available while
-/// elaborating ensures, and the reported holes exactly explain trust growth.
+/// Spec 21 §1; promise class: durable invariant.
+/// MEASURED: T1 minus T0 is the reported Ensures hole, and its typed goal is
+/// closed under h after result substitution; no PartialPrim hole is reported.
+/// CLAIMED: obligations and trust growth are exactly accounted for under the
+/// requires premise.
+/// THE GAP: this entailment needs independent hole membership and kind checks,
+/// not just matching counts; compare the actual T1-T0 ID set with reported IDs.
 #[test]
 fn ensures_goal_and_obligation_holes_are_closed_under_requires() {
     let mut env = ElabEnv::new().expect("numeric prelude");
@@ -180,4 +218,55 @@ fn ensures_goal_and_obligation_holes_are_closed_under_requires() {
         added, reported,
         "every trusted-base addition is exactly a reported obligation hole"
     );
+}
+
+/// Spec 21 §1, durable invariant for multi-clause ensures.
+/// MEASURED: the declaration reports only its Ensures hole, whose goal closes
+/// under both proof binders; the later divisor premise discharges `/` in the
+/// ensures expression as well as in the body.
+/// CLAIMED: every requires premise is available to ensure-side elaboration.
+/// THE GAP: result substitution and premise use are separate; this fixture
+/// reaches the ensure expression's production division path and checks the
+/// closed goal's complete two-premise telescope.
+#[test]
+fn ensures_expression_uses_later_requires_premise() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let result = env
+        .elaborate_decl_v1(
+            "fn f (n : Int) (d : Int) : Int \
+             requires Not (Equal Int n 0) \
+             requires Not (Equal Int d 0) \
+             ensures Equal Int (result + n / d) n = n / d",
+        )
+        .expect("later requires premise discharges ensures division");
+    let [obligation] = result.obligations.as_slice() else {
+        panic!("the ensure-side division must not add a PartialPrim hole")
+    };
+    assert!(matches!(obligation.kind, ObligationKind::Ensures));
+
+    let (domains, goal) = pi_domains(&obligation.goal_closed, 4);
+    assert_eq!(domains[2], &not_eq_int(&env, 1, 0));
+    assert_eq!(domains[3], &not_eq_int(&env, 1, 0));
+    let n = Term::var(3);
+    let d = Term::var(2);
+    let quotient = Term::app(
+        Term::app(Term::const_(env.globals["div_int"], vec![]), n.clone()),
+        d.clone(),
+    );
+    let sum = Term::app(
+        Term::app(
+            Term::const_(env.globals["add_int"], vec![]),
+            quotient.clone(),
+        ),
+        quotient,
+    );
+    let int = Term::const_(env.globals["Int"], vec![]);
+    let expected_goal = Term::app(
+        Term::app(
+            Term::app(Term::const_(env.globals["Equal"], vec![]), int),
+            sum,
+        ),
+        n,
+    );
+    assert_eq!(goal, &expected_goal);
 }
