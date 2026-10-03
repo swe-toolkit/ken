@@ -70,9 +70,14 @@ stop and report the mismatch.
     under `(n, d, h1)`.
   - The twin `requires Not (Equal Int n 0) requires Equal Int d d = n / d`
     still raises exactly one divisor obligation at `d`.
-- **AC-2.** Spec 21 §1's `n / d` example raises no ensures-side PartialPrim
-  obligation. Its Ensures goal is `Π n d (h : Not (Eq Int d 0)). …`.
-  `trusted_base()` has no delta.
+- **AC-2 (Architect `evt_4nz89dqvempe1`).** On spec 21 §1's `divide`
+  example, take T0 as `trusted_base()` just before `elaborate_file` and T1
+  just after.
+  - `T1 \ T0` is exactly the set of reported obligation `hole_id`s.
+  - That set is one `Ensures` hole with goal `Π n d (h : Not (Eq Int d
+    0)). …`, and no `PartialPrim` hole.
+  - Assert membership and kinds, not a count. A fresh `ElabEnv`'s base is
+    unchanged (the `lang_prelude_collections` pin stays green).
 - **AC-3 (falsifiers; each must redden).**
   - F1: revert the Phase 4 shift; M1-M4 are KernelRejected.
   - F2: drop the premises from the ensures context; the AC-2 example raises
@@ -83,6 +88,9 @@ stop and report the mismatch.
 ## Stop conditions
 
 - The repair needs a kernel change, or `trusted_base()` moves: stop to the
-  Architect.
+  Architect. Moving means the fresh-env base changes, or a postulate
+  outside the reported obligation holes appears, or the hole set changes
+  outside this population. A PartialPrim hole leaving an ensures goal
+  that now sits under its requires is the intended decrease.
 - An existing pin changes verdict outside the multi-clause and ensures
   population: stop with the row.
