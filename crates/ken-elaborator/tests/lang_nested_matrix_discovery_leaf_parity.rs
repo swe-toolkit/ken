@@ -424,13 +424,31 @@ fn sigr_tree_checked_sigma_result_control() {
     sigr_tree(true);
 }
 
+fn architect_binary_tree(checked: bool) {
+    // MEASURED: the Architect's binary Tree source selects x=2 while its
+    // two recursive fields supply IHs, once with inferred R and once with
+    // a directly checked match. CLAIMED: ordinary non-indexed splitting
+    // survives both modes. THE GAP: neither mode has a dependent index.
+    let matched = "match t { Node l x rt ↦ x; Leaf ↦ Zero }";
+    let body = format!(
+        "fn f (t : Tree) : Nat = {}\n\
+         const observed : Nat = f (Node Leaf (Suc (Suc Zero)) Leaf)",
+        infer_or_check(matched, checked)
+    );
+    observe_with_families(
+        if checked { "TREE-check" } else { "TREE-infer" },
+        &format!("{FAMILIES}\n{BINARY_TREE}"),
+        &body,
+        2,
+    );
+}
+
 #[test]
 fn architect_binary_tree_control() {
-    // MEASURED: the Architect's binary Tree source selects x=2 while its
-    // fields contribute two IHs. CLAIMED: ordinary non-indexed splitting
-    // remains unchanged. THE GAP: its fields have no dependent index.
-    let body = "fn f (t : Tree) : Nat = let r = match t { \
-      Node l x rt ↦ x; Leaf ↦ Zero } in r\n\
-      const observed : Nat = f (Node Leaf (Suc (Suc Zero)) Leaf)";
-    observe_with_families("TREE", &format!("{FAMILIES}\n{BINARY_TREE}"), body, 2);
+    architect_binary_tree(false);
+}
+
+#[test]
+fn architect_binary_tree_checked_control() {
+    architect_binary_tree(true);
 }
