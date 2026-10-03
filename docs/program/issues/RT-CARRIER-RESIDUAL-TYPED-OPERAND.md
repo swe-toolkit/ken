@@ -291,6 +291,15 @@ The ruling carries the code and is authoritative where this summary differs.
   (`calls.rs:912-942`) and the planned source join (`joins.rs:353-445`)
   declare one, with R decoded or K→R refused.
 
+## Increments landed
+
+- I-0: merged `2edc10ac9` from exact `8f73d8785` (FULL CI green, run
+  `37124959753`); the main tree equals the routed merge tree, 32 blobs
+  match. Gates: runtime QA `evt_1z4wpnh1yy0qe`, Architect
+  `evt_7wzam0ee4b3y5`, Decision `dec_3vvjwp3f8fzez`, on the `a04a6e2ff`
+  and `6439ba77d` gate sets. It carries ENV-CARRIAGE I-2. Open: I-1.
+  Architect carry: bound the nested source-machine frame depth.
+
 ## Acceptance
 
 - **AC-0 (done).** The fan-in tables above, and the cut confirmed.
