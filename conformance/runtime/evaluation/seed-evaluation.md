@@ -5,7 +5,8 @@ delivers (`docs/program/wp/X1-interpreter.md`,
 `spec/40-runtime/42-evaluation.md`): evaluate **core terms** (`10-kernel/11`,
 the elaborator's output) to **values** (`41`, the runtime value model),
 realizing exactly the kernel's reductions (`17 §1`), **deterministically**, with
-**canonicity** for closed ground computations, and `unknown` propagation.
+**canonicity** for closed ground computations, with the interim neutral C8
+quotient-class `Eq` exception, and `unknown` propagation.
 **Pure-core (G1) scope** — effects are deferred (below). They extend — and must
 not regress — the two on-`main` evaluation anchors in `../seed-runtime.md`
 (`runtime/evaluation/canonicity`, `runtime/evaluation/unknown-propagates`).
@@ -17,11 +18,13 @@ against the interpreter (★★, a notch below the kernel). So correctness is by
 **agreement with the kernel's own reductions** (`17 §1`, `42 §1`) — the **CAN5
 kernel-agreement** cases are the load-bearing oracle anchor — plus the
 canonicity/determinism corpus, not a separate trust argument. **`(soundness)`**
-tags the **canonicity** cases: a closed well-typed ground term *getting stuck*
-would break the kernel's canonicity commitment (`16 §9`, `42 §3.6`) that X1 must
-realize; those must never regress. (X1 cannot make the *kernel* unsound — it
-runs post-check — but a stuck or divergent X1 fails the metatheoretic guarantee
-end-to-end, so the cases carry the tag and the never-regress bar.)
+tags the **canonicity** cases. For the no-stuck cases, an unexpected neutral on
+a closed, well-typed ground input in their stated population would break the
+kernel's canonicity commitment (`16 §9`, `42 §3.6`) that X1 must realize. Closed
+quotient-class `Eq` is excluded from that population and pinned separately as
+the interim C8 neutral exception. These outcomes must never regress. A stuck or
+divergent X1 on a listed reducing fixture fails the end-to-end guarantee, so
+those cases carry the tag and the never-regress bar.
 
 **Tags.** `(oracle)` — confirmed at build time against Ken's interpreter (safe:
 X1 not in the type-soundness TCB): **interpreter-internal** observations (the
@@ -37,13 +40,14 @@ not a single trace.
 **out-of-scope stuck forms** — a `perform`/effect node and a `space` cell op are
 deliberately **not reduced**, to be wired by the **L5 follow-on** (their
 denotation rides `36`'s `ITree`, K1.5-gated, `36 §7.0`). **No effect-evaluation
-case is authored here.** So CAN1's "no stuck closed ground term" is scoped to
-the **pure fragment**: an effect node legitimately sticks (the deferred seam),
-not a canonicity violation. Two deferred strengthenings are flagged at their
-cases: branch-laziness becomes *value-observable* only once an effect (L5)
-**or** an opaque-non-total divergent branch (`42 §3.3` escape hatch) can sit in
-the untaken arm; and the `Lazy a` thunk's force/memo lands only if `41`/`42` pin
-it (`42 §2`).
+case is authored here.** So CAN1's no-stuck claim is scoped to the listed pure
+reducing population, excluding the closed quotient-class `Eq` case (the interim
+C8 neutral exception). An effect node also legitimately sticks (the deferred
+seam) and is not a canonicity violation. Two deferred strengthenings are
+flagged at their cases: branch-laziness becomes *value-observable* only once an
+effect (L5) **or** an opaque-non-total divergent branch (`42 §3.3` escape
+hatch) can sit in the untaken arm; and the `Lazy a` thunk's force/memo lands
+only if `41`/`42` pin it (`42 §2`).
 
 **Reconcile note (content-verified against landed `42` §1–§7, `ef7d55d`).**
 Authored in parallel with spec-author, then reconciled against the *bodies* (not
@@ -81,14 +85,17 @@ computations, C2–C6/C9/C10), `16 §9.1` (the `(oracle)` cast/transport edges),
 
 ---
 
-## CAN1 — canonicity: closed ground terms compute, none get stuck (frame AC1)
+## CAN1 — canonicity: reducing ground cases, C8 exception (frame AC1)
 
-A closed, well-typed, **ground** term evaluates to a **value**, never a stuck
-neutral (`42 §3.6`): an inductive → a **constructor form** (data goes to
-**full** normal form, recursively, `42 §3.5`); the closed observational
-computations compute. These realize the kernel's canonicity commitment, so
-`(soundness)`. (Scoped to the **pure fragment** — effect nodes are the intended
-deferred stuck forms, `42 §6`.)
+A closed, well-typed, **ground** term in the computed fragment below evaluates
+to a canonical **value**, never a stuck neutral, except for `Eq` at a
+quotient-classified carrier (C8 interim; `42 §3.6`). The listed no-stuck cases
+exclude this closed quotient-class equality; `can-eq-by-type-computes` pins it
+as neutral in both engines. Relation-as-equality awaits P0
+(`KERNEL-QUOT-FORM-EQUIVALENCE`). The listed inductive cases reach constructor
+form, and data is fully evaluated (`42 §3.5`); the listed closed observational
+cases follow their K2-locked outcomes. These realize the kernel's canonicity
+commitment, so `(soundness)`. Effect nodes remain out of scope (`42 §6`).
 
 ### runtime/evaluation/can-closed-inductive-to-constructor (soundness)
 - spec: `42 §3.6`, `§1` (ι, δ, β, prim table); `14 §5` (prim)
@@ -114,15 +121,17 @@ deferred stuck forms, `42 §6`.)
   regularity leaves `cast A A refl a` stuck/neutral — flips vs `a`. (soundness.)
 
 ### runtime/evaluation/can-eq-by-type-computes (soundness)
-- spec: `42 §3.3` (C2–C4, C9), `16 §2.2`/`§5`; anchors `seed-observational`
-  `eq-inductive-same-ctor`, `quotient-eq`
+- spec: `42 §3.3` (C2–C4, C9), `42 §3.1`/`§3.6` (C8 interim),
+  `16 §2.2`/`§5`; anchors `seed-observational` `eq-inductive-same-ctor`,
+  `quotient-eq`
 - given: closed `Eq`-by-type observations: (a) `Eq Bool true true`; (b)
   `Eq (Nat / R) [0] [1]` with `R := λ _ _. Top` and no equivalence proof.
 - expect: (a) **reduces-to** the kernel value for same-constructor `Eq` (the
   conjunction of field equalities, here trivial — exact form `(oracle)`,
   anchored to the locked `eq-inductive-same-ctor`; `Eq` lands in `Ω`,
-  proof-irrelevant at the value layer, `42 §3.3`); (b) **stays neutral** and
-  does not reduce to `R 0 1` (`Top`). Relation-as-equality is
+  proof-irrelevant at the value layer, `42 §3.3`); (b) the closed C8
+  quotient-class `Eq` **stays neutral in both engines** and does not reduce to
+  `R 0 1` (`Top`). Relation-as-equality is
   `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
 - why: X1 agrees with the kernel's locked outcomes for both the reducing and
   neutral cases. An evaluator reducing quotient-class `Eq` to the relation
@@ -139,15 +148,19 @@ deferred stuck forms, `42 §6`.)
   eliminator stuck on `[a]` flips vs `f a`. (soundness; AC1.)
 
 ### runtime/evaluation/can-no-stuck-closed-ground (soundness, property)
-- spec: `42 §3.6` ("a closed well-typed ground term evaluates to a value, never
-  a stuck neutral"); `42 §6` (effect nodes excepted)
+- spec: `42 §3.6` (computed fragment; C8 quotient-class `Eq` exception),
+  `42 §6` (effect nodes out of scope)
 - given: a corpus of closed **pure** ground terms mixing β, Σ-projection, ι, δ,
-  and a prim (e.g. `fst (pair (add 1 1) true)`, `(\x. x) ((\y. y) 0)`).
-- expect: **each reduces-to a value** (constructor form / immediate); **no**
-  sub-term remains neutral/stuck. The **only** marked non-value outcomes are
-  `unknown` (open hole, CAN4) and an opt-in opaque-non-total divergence
-  (`42 §3.3`) — both listed; an **effect node** is the deferred out-of-scope
-  stuck form (`42 §6`), not a canonicity failure.
+  and a prim, e.g. `fst (pair (add 1 1) true)` and
+  `(\x. x) ((\y. y) 0)`. The corpus excludes closed quotient-class `Eq` (C8),
+  pinned above.
+- expect: **each listed fixture reduces to a value** (constructor form /
+  immediate); **no** sub-term remains neutral/stuck. Across CAN1, marked
+  non-value outcomes include `unknown` (open hole, CAN4), closed quotient-class
+  `Eq` (neutral under C8; relation-as-equality is
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`), and opt-in opaque-non-total
+  divergence (`42 §3.3`); an **effect node** is deferred and out of scope
+  (`42 §6`), not a canonicity failure.
 - why: the canonicity *property* over the reduction forms, not one
   representative (COORDINATION §7). A bug stuck on any one reduction (a missing
   δ-unfold, an un-projected Σ) is caught by the corpus member that exercises it.
@@ -412,16 +425,17 @@ closed-term corpus its value **matches the kernel's own reduction** — on
   value away from the kernel's. (property; AC5.)
 
 ### runtime/evaluation/agree-observational-corpus (soundness, property)
-- spec: `16 §2.2`/`§3.2`/`§5`/`§6` (C2–C6, C8 interim, C9, C10); anchors
-  `seed-observational` `cast-refl`,
+- spec: `42 §1`/`§3.1`/`§3.6` (C8 interim); `16 §2.2`/`§3.2`/`§5`/`§6`
+  (C2–C6, C8, C9, C10); anchors `seed-observational` `cast-refl`,
   `cast-computes-pi`/`-sigma`/`-inductive`/`-quotient`, `quotient-eq`,
   `quotient-elim`, `eq-inductive-same-ctor`/`-diff-ctor`
 - given: the **closed observational** terms whose kernel reductions K2 locked,
   including `Eq (Nat / R) [0] [1]` for `R := λ _ _. Top`.
 - expect: X1 evaluates **each** to the **same value** the K2 seed locked (e.g.
-  `cast A A refl a → a` C5; for `R := λ _ _. Top`, `Eq (Nat / R) [0] [1]`
-  stays neutral under C8 and does not reduce to `Top`; `cast`-by-type at an
-  inductive → the constructor form with recursive casts C6). Relation-as-equality is
+  `cast A A refl a → a` C5; for `R := λ _ _. Top`, closed C8
+  `Eq (Nat / R) [0] [1]` stays neutral in both engines and does not reduce to
+  `Top`; `cast`-by-type at an inductive → the constructor form with recursive
+  casts C6). Relation-as-equality is
   `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`. **Exception — `(oracle)`:** the
   `cast Type Type` non-`refl` reduction and certain quotient-transport edges
   (`16 §9.1`, `42 §3.3`) are **not locked** — X1 inherits the tag and realizes
