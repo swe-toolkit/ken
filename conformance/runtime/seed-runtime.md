@@ -30,11 +30,11 @@ runtime representation, and the runtime-local opaque callable boundary.
 
 ## runtime/evaluation/canonicity
 - spec: `spec/40-runtime/42-evaluation.md §1`, `§3.6` (C8 exception)
-- given: a closed inductive computation, or a closed reducing `Eq`/`cast`
-  computation from `42 §3.6`, excluding quotient-class `Eq` at C8
+- given: a closed computation of an inductive (or a closed `Eq`/`cast` op),
+  excluding `Eq (A/R) [a] [b]` on closed classes (C8)
 - expect: **reduces** to a constructor form (resp. computes); no closed,
-  well-typed ground input in this computed population gets stuck. Closed
-  quotient-class `Eq` is excluded and stays neutral under the C8 interim rule.
+  well-typed ground input in this population gets stuck. The excluded C8 case
+  stays neutral under the interim rule.
 - why: canonicity (a soundness commitment).
 
 ## runtime/evaluation/unknown-propagates
