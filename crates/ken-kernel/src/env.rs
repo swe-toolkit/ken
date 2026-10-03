@@ -235,6 +235,14 @@ pub enum Decl {
     },
 }
 
+/// Kernel-recorded admission route for an opaque declaration. A barrier fold
+/// has no entry, even though it appears in `trusted_base()` on the view.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OpaqueUpgradeOrigin {
+    StagedPlaceholder,
+    PostulateAssumption,
+}
+
 impl Decl {
     pub fn id(&self) -> GlobalId {
         match self {
@@ -293,6 +301,10 @@ pub struct GlobalEnv {
     instance: EnvInstance,
     decls: Vec<Decl>,
     by_id: HashMap<GlobalId, usize>,
+    /// Only staged placeholders and checked postulate assumptions may receive
+    /// a body. Recorded by identity at creation, never inferred from a name,
+    /// `Decl::Opaque`, or the derived trusted-base inventory.
+    opaque_upgrade_origins: HashMap<GlobalId, OpaqueUpgradeOrigin>,
     /// Transparent constants on cycles of the current transparent-body graph.
     /// Derived from bodies, never from the admission route or declaration name.
     recursive_transparent: BTreeSet<GlobalId>,
@@ -363,6 +375,7 @@ impl PartialEq for GlobalEnv {
             instance: _,
             decls,
             by_id,
+            opaque_upgrade_origins,
             recursive_transparent,
             sct_decreasing,
             referrers,
@@ -384,6 +397,7 @@ impl PartialEq for GlobalEnv {
         } = self;
         decls == &other.decls
             && by_id == &other.by_id
+            && opaque_upgrade_origins == &other.opaque_upgrade_origins
             && recursive_transparent == &other.recursive_transparent
             && sct_decreasing == &other.sct_decreasing
             && referrers == &other.referrers
@@ -462,6 +476,8 @@ impl GlobalEnv {
                 ty: ty.clone(),
             };
             view.decls[idx] = folded;
+            // A folded checked body is never a fresh admission hole.
+            view.opaque_upgrade_origins.remove(&id);
             for target in view.body_refs.remove(&id).expect("transparent body index") {
                 if let Some(sources) = view.referrers.get_mut(&target) {
                     sources.remove(&id);
@@ -574,6 +590,28 @@ impl GlobalEnv {
         id
     }
 
+    fn record_opaque_upgrade_origin(&mut self, id: GlobalId, origin: OpaqueUpgradeOrigin) {
+        assert!(
+            matches!(self.lookup(id), Some(Decl::Opaque { .. }))
+                && !self.opaque_upgrade_origins.contains_key(&id),
+            "only a fresh opaque declaration may acquire upgrade eligibility"
+        );
+        self.opaque_upgrade_origins.insert(id, origin);
+    }
+
+    pub(crate) fn record_staged_placeholder(&mut self, id: GlobalId) {
+        self.record_opaque_upgrade_origin(id, OpaqueUpgradeOrigin::StagedPlaceholder);
+    }
+
+    pub(crate) fn record_postulate_assumption(&mut self, id: GlobalId) {
+        self.record_opaque_upgrade_origin(id, OpaqueUpgradeOrigin::PostulateAssumption);
+    }
+
+    pub(crate) fn is_upgradable_opaque(&self, id: GlobalId) -> bool {
+        self.opaque_upgrade_origins.contains_key(&id)
+            && matches!(self.lookup(id), Some(Decl::Opaque { .. }))
+    }
+
     /// Read-only declaration sequence in publication order.
     pub fn declarations(&self) -> &[Decl] {
         &self.decls
@@ -647,6 +685,7 @@ impl GlobalEnv {
     pub(crate) fn remove_last(&mut self) -> Option<Decl> {
         let decl = self.decls.pop()?;
         self.by_id.remove(&decl.id());
+        self.opaque_upgrade_origins.remove(&decl.id());
         if let Decl::Inductive(ind) = &decl {
             for c in &ind.constructors {
                 self.ctor_index.remove(&c.id);
@@ -903,6 +942,7 @@ impl GlobalEnv {
                 ty,
                 body,
             };
+            self.opaque_upgrade_origins.remove(&id);
             self.mark_new_transparent_cycles(id);
             true
         } else {
@@ -1234,6 +1274,30 @@ mod literal_rollback_tests {
         assert!(
             env.checked_literal(wrong_carrier).is_none(),
             "convertible is not the exact String carrier"
+        );
+    }
+}
+
+#[cfg(test)]
+mod upgrade_origin_tests {
+    use super::*;
+    use crate::check::declare_postulate;
+
+    #[test]
+    fn env_value_equality_observes_opaque_upgrade_origin() {
+        let mut env = GlobalEnv::new();
+        let hole = declare_postulate(&mut env, "hole".into(), vec![], Term::Omega(Level::zero()))
+            .expect("checked assumption");
+        let mut missing_origin = env.clone();
+        assert_eq!(
+            missing_origin.opaque_upgrade_origins.remove(&hole),
+            Some(OpaqueUpgradeOrigin::PostulateAssumption)
+        );
+        assert_eq!(env.declarations(), missing_origin.declarations());
+        assert_eq!(env.trusted_base(), missing_origin.trusted_base());
+        assert_ne!(
+            env, missing_origin,
+            "declaration equality must not hide provenance changes"
         );
     }
 }
