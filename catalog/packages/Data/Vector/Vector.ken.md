@@ -35,7 +35,7 @@ constructor of `Fin` targets `Fin Zero`. The map laws use checked `idf` and
 ```ken
 import Core.Function.Combinators (comp, idf)
 
-import Core.Logic.Transport (cong)
+import Core.Logic.Transport (cong, sym, trans)
 
 data Vec (a : Type) : Nat → Type where {
   VNil : Vec a Zero;
@@ -183,6 +183,57 @@ theorem lookup_map
         VCons _ x tail_xs ↦ lookup_map a b m f tail_xs rest
       }
   }
+
+theorem zip_with_map
+      (a : Type)
+      (a2 : Type)
+      (b : Type)
+      (b2 : Type)
+      (c : Type)
+      (n : Nat)
+      (g : a → b)
+      (h : a2 → b2)
+      (f : b → b2 → c)
+      (k : a → a2 → c)
+      (hk : (u : a) → (v : a2) → Equal c (k u v) (f (g u) (h v)))
+      (xs : Vec a n)
+      (ys : Vec a2 n)
+    : Equal
+        (Vec c n)
+        (zip_with b b2 c n f (map a b n g xs) (map a2 b2 n h ys))
+        (zip_with a a2 c n k xs ys) =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      match ys {
+        VCons _ y tail_ys ↦
+          let
+            mapped_tail = zip_with b b2 c m f (map a b m g tail_xs) (map a2 b2 m h tail_ys);
+            original_tail = zip_with a a2 c m k tail_xs tail_ys;
+            head_alignment = sym c (k x y) (f (g x) (h y)) (hk x y);
+            tail_alignment = zip_with_map a a2 b b2 c m g h f k hk tail_xs tail_ys
+          in
+            trans
+              (Vec c (Suc m))
+              (VCons c m (f (g x) (h y)) mapped_tail)
+              (VCons c m (k x y) mapped_tail)
+              (VCons c m (k x y) original_tail)
+              (cong
+                c
+                (Vec c (Suc m))
+                (f (g x) (h y))
+                (k x y)
+                (λz. VCons c m z mapped_tail)
+                head_alignment)
+              (cong
+                (Vec c m)
+                (Vec c (Suc m))
+                mapped_tail
+                original_tail
+                (VCons c m (k x y))
+                tail_alignment)
+      }
+  }
 ```
 
 ## Using it
@@ -227,6 +278,12 @@ collapse; in each successor case, `cong` lifts the recursive equality under
 `VCons`. Looking up an element after mapping is the same as mapping the
 original lookup result: matching `Fin n`, then its vector, follows the index
 into the successor tail. These laws are private checked proofs, not exports.
+
+Pointwise alignment of `k` with the mapped binary function makes mapping
+before `zip_with` equivalent to zipping with `k`. In the successor case,
+`sym` orients the head alignment toward `k`, while `cong` lifts that equality
+and the recursive tail equality under `VCons`; `trans` joins the two changes.
+This checked private theorem works at arbitrary element types and lengths.
 
 The checked examples first use all five backfilled private laws at their
 generic propositions, then illustrate the operations at concrete indices.
@@ -340,12 +397,12 @@ zip-with operation.
 
 The implementation recurses structurally. `zip_with` and `lookup` refine a
 sibling indexed value through nested matches. Generic cons computation for
-`zip_with` checks by `Refl`; lookup after `zip_with` and `zip_with`/map
-naturality remain outside the proved laws because their indexed sibling tails
-do not refine in the required generic goals. Writing the naturality equation
-with an inline lambda inside its proposition type is also not supported by
-the current type grammar. Concrete checked examples illustrate the operations
-but do not stand in for those general laws.
+`zip_with` checks by `Refl`. Lookup after `zip_with` remains outside the
+proved laws because its indexed sibling tails do not yet refine in the
+required generic goal. `zip_with`/map naturality instead states a pointwise
+premise on the combining function; this states the general law without an
+inline lambda in a proposition type. Concrete checked examples illustrate
+the operations but do not stand in for those general laws.
 
 ## References
 
@@ -363,12 +420,14 @@ but do not stand in for those general laws.
 This entry realizes the length-indexed vector contract in
 `spec/50-stdlib/60-length-indexed-vectors.md` using the ordinary `Nat`, indexed
 `data`, structural recursion, dependent `match`, `Equal`, `Refl`, and `Proved`
-surfaces. The private map laws reuse `Core.Function.Combinators.comp`/`idf`
-and `Core.Logic.Transport.cong`.
+surfaces. The private map and naturality laws reuse
+`Core.Function.Combinators.comp`/`idf` and
+`Core.Logic.Transport.cong`/`sym`/`trans`.
 
 The public API is `Vec`, `VNil`, `VCons`, `Fin`, `FZero`, `FSuc`, `head`,
 `tail`, `map`, `zip_with`, and `lookup`. Eight computation theorems, map
-composition, and lookup after map are private checked laws.
+composition, lookup after map, and pointwise `zip_with`/map naturality are
+private checked laws.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
