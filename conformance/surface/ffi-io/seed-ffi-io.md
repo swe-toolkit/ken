@@ -225,10 +225,13 @@ touches — `38 §3.4`). `(oracle)` = the literal `foreign`/`symbol`/`library`/
 
 ### ffi-io/verified-component-with-foreign-call-and-roundtrip-proof (G6)
 - spec: `spec/30-surface/38-ffi-io.md §6` (G6), `§1.5`, `§3.1`
-- given: a verified component that makes **≥1** `foreign` call (e.g. reads bytes
-  via a `foreign`), carries the provable round-trip law
-  `IsTrue (decode (encode s) == Ok s)` (`38 §1.5`, one-directional), and is
-  run through the export emitter
+- given: a verified component that makes **≥1** `foreign` call (e.g. reads
+  bytes via a `foreign`) and carries the provable round-trip law:
+  ```text
+  (s : String) → Equal (Result Utf8Error String)
+    (bytes_decode (bytes_encode s)) (Ok Utf8Error String s)
+  ```
+  (`38 §1.5`, one-directional), and is run through the export emitter
 - expect: the round-trip obligation is **provable** (verdict `proved` → its
   claim in `Q`); the `foreign` call's postulate appears in the component's
   `trusted_base_delta` → `P` (the trust base **shows exactly what is assumed**);

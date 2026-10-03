@@ -202,8 +202,12 @@ claim with no conformance case is a claim no one can rely on
   effect-tracked I/O
   (`read_bytes`/`send` carry their `[FS]`/`[Net]` rows — the L5 `36 §1.4` gate,
   referenced not duplicated), explicit `encode`/`decode` (no hidden charset),
-  and the one-directional round-trip law (`decode (encode s) == Ok s` provable;
-  the reverse is **not** a law).
+  and the one-directional round-trip law:
+  ```text
+  ∀ (s : String). Equal (Result Utf8Error String)
+    (bytes_decode (bytes_encode s)) (Ok Utf8Error String s)
+  ```
+  is provable; the reverse is **not** a law.
 - `surface/bytes-structural-view/seed-bytes-structural-view.md` — SUB-1's
   bounded `Bytes ↔ List UInt8` view (`37 §2.6`): both runtime inverse
   directions, the exact four-name `trusted_base()` delta, the registered-
