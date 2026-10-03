@@ -2,12 +2,14 @@
 //! Promise class: durable type-directed dispatch and proof-obligation invariants
 //! (35 §3.1, 18a §5.2); lexer spellings/fixity are compatibility vectors.
 
+use std::collections::HashSet;
+
 use ken_elaborator::extract::{v2_extract, ProvKind};
 use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::parser::{parse_decls, parse_expr};
 use ken_elaborator::{BinOp, ElabEnv, ElabError, Expr, ObligationKind};
 use ken_kernel::env::Context;
-use ken_kernel::{convert_type, whnf, KernelError, Term};
+use ken_kernel::{convert_type, whnf, Term};
 
 fn peel_function_body(body: &Term) -> &Term {
     let Term::Lam(_, inner) = body else {
@@ -278,28 +280,34 @@ fn refined_divisor_caller_can_pass_zero_but_the_callee_keeps_its_hole() {
 }
 
 #[test]
-fn requires_proof_premise_refuses_the_same_zero_divisor_caller() {
+fn requires_call_site_emits_one_hole_without_reopening_body_division() {
     for spelling in ["/", "%"] {
         let mut env = ElabEnv::new().unwrap();
-        let before = env.env.trusted_base();
+        let before = env.env.trusted_base().into_iter().collect::<HashSet<_>>();
         let f = env
             .elaborate_decl_v1(&format!(
                 "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n {spelling} d"
             ))
-            .expect("direct requires supplies the callee's proof premise");
+            .expect("the callee body uses its requires binder");
         assert!(f.obligations.is_empty());
-        assert_eq!(env.env.trusted_base(), before);
-        assert!(
-            matches!(
-                env.elaborate_decl_v1("fn g (u : Int) : Int = f 1 0"),
-                Err(ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch { .. },
-                    ..
-                })
-            ),
-            "{spelling}: missing the required proof must be rejected by the kernel"
+        assert_eq!(
+            env.env.trusted_base().into_iter().collect::<HashSet<_>>(),
+            before
         );
-        assert_eq!(env.env.trusted_base(), before);
+
+        let g = env
+            .elaborate_decl_v1("fn g (u : Int) : Int = f 1 0")
+            .expect("the caller is admitted with an open call-site proof");
+        let [obligation] = g.obligations.as_slice() else {
+            panic!("the call emits exactly one Requires obligation")
+        };
+        assert!(matches!(obligation.kind, ObligationKind::Requires));
+        let after = env.env.trusted_base().into_iter().collect::<HashSet<_>>();
+        assert_eq!(
+            after.difference(&before).copied().collect::<HashSet<_>>(),
+            [obligation.hole_id].into_iter().collect(),
+            "the call-site hole is the only trusted-base addition"
+        );
     }
 }
 

@@ -50,6 +50,8 @@ pub enum ObligationKind {
     LawField(String),
     /// From a bare fixed-width arithmetic op (`35 §3`, `43 §2`).
     PartialPrim,
+    /// A callee's `requires` premise that is absent in the caller (`22 §2.3`).
+    Requires,
     /// A `foreign` boundary contract that is statically unprovable → lowered
     /// to a runtime-checked assertion (`21 §5.2`, `38 §3.3`).
     FfiRuntimeCheck,
@@ -315,9 +317,8 @@ fn level_from_nat(n: u32) -> Level {
 
 // ----- elaboration context -----
 
-/// A proposition available at a binder depth, but not inserted into the
-/// kernel's context while elaborating a declaration body. Recognition uses
-/// kernel conversion; goal closure inserts each proposition into the telescope.
+/// A proposition whose proof binder is present at `depth` in `ctx`.
+/// Recognition uses kernel conversion against the binder's proposition.
 #[derive(Clone)]
 struct Assumption {
     prop: Term,
@@ -395,6 +396,8 @@ struct ElabCtx<'e> {
     assumptions: Vec<Assumption>,
     metas: MetaCtx,
     globals: &'e HashMap<String, GlobalId>,
+    /// Contract premise arities, selected only by checked global identity.
+    preconditions: HashMap<GlobalId, (usize, usize)>,
     num_values: &'e mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &'e NumericEnv,
     obligations: Vec<Obligation>,
@@ -625,6 +628,7 @@ impl<'e> ElabCtx<'e> {
             assumptions: Vec::new(),
             metas: MetaCtx::default(),
             globals,
+            preconditions: HashMap::new(),
             num_values,
             numeric_env,
             obligations: Vec::new(),
@@ -750,6 +754,11 @@ impl<'e> ElabCtx<'e> {
 
     fn with_local_dicts(mut self, local_dicts: &HashMap<String, (Term, Term, usize)>) -> Self {
         self.local_dicts = local_dicts.clone();
+        self
+    }
+
+    fn with_preconditions(mut self, preconditions: &HashMap<GlobalId, (usize, usize)>) -> Self {
+        self.preconditions.clone_from(preconditions);
         self
     }
 
@@ -1851,10 +1860,23 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             let exp_wh = whnf(cx.env, &cx.ctx, expected);
             match exp_wh {
                 Term::Pi(dom, cod) => {
-                    cx.push_match_binder(*dom.clone(), MatchBinderOrigin::UserLocal);
-                    let body_core = check(cx, body, &cod, lam_span)?;
+let domain = *dom;
+                    let position = cx.ctx.len();
+                    let is_proposition = kernel_infer_current(cx, &domain)
+                        .ok()
+                        .is_some_and(|sort| matches!(whnf(cx.env, &cx.ctx, &sort), Term::Omega(_)));
+                    let assumption_base = cx.assumptions.len();
+                    if is_proposition {
+                        cx.assumptions.push(Assumption {
+                            prop: domain.clone(),
+                            depth: position,
+                        });
+                    }
+                    cx.push_match_binder(domain.clone(), MatchBinderOrigin::UserLocal);
+                    let body_result = check(cx, body, &cod, lam_span);
                     cx.ctx.pop();
-                    Ok(Term::lam(*dom, body_core))
+                    cx.assumptions.truncate(assumption_base);
+                    body_result.map(|body_core| Term::lam(domain, body_core))
                 }
                 _ => Err(ElabError::LambdaVsNonFunction {
                     span: lam_span.clone(),
@@ -4450,6 +4472,148 @@ fn transport_recursive_group_call_result(
     } else {
         Ok(None)
     }
+}
+
+fn call_application_spine(expr: &RExpr) -> (&RExpr, Vec<&RExpr>) {
+    let mut head = expr;
+    let mut arguments = Vec::new();
+    while let RExpr::RApp(function, argument, _) = head {
+        arguments.push(argument.as_ref());
+        head = function.as_ref();
+    }
+    arguments.reverse();
+    (head, arguments)
+}
+
+fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
+    if let Some(proof) = cx.assumptions.iter().rev().find_map(|assumption| {
+        let later_binders = cx.ctx.len().checked_sub(assumption.depth)?;
+        if assumption.depth >= cx.ctx.len() {
+            return None;
+        }
+        let proposition = weaken(&assumption.prop, later_binders as i64);
+        convert_type(cx.env, &cx.ctx, &proposition, goal)
+            .then(|| Term::var(cx.ctx.len() - 1 - assumption.depth))
+    }) {
+        return Some(proof);
+    }
+    (0..cx.ctx.len()).rev().find_map(|position| {
+        let proposition = weaken(&cx.ctx.types[position], (cx.ctx.len() - position) as i64);
+        convert_type(cx.env, &cx.ctx, &proposition, goal)
+            .then(|| Term::var(cx.ctx.len() - 1 - position))
+    })
+}
+
+fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
+    let closed = close_goal(&cx.ctx, &[], goal);
+    let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
+        .map_err(|error| ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        })?;
+    let obligation_id = cx.obl_counter;
+    cx.obl_counter += 1;
+    cx.obligations.push(Obligation {
+        id: obligation_id,
+        hole_id,
+        goal_closed: closed,
+        span: span.clone(),
+        kind: ObligationKind::Requires,
+    });
+    Ok((0..cx.ctx.len())
+        .rev()
+        .fold(Term::const_(hole_id, vec![]), |proof, index| {
+            Term::app(proof, Term::var(index))
+        }))
+}
+
+fn append_precondition_proofs(
+    cx: &mut ElabCtx<'_>,
+    mut call: Term,
+    mut ty: Term,
+    requires_arity: usize,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    for _ in 0..requires_arity {
+        let Term::Pi(domain, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+            return Err(ElabError::NotAFunction { span: span.clone() });
+        };
+        let proof = match premise_proof_in_scope(cx, &domain) {
+            Some(proof) => proof,
+            None => precondition_proof(cx, *domain.clone(), span)?,
+        };
+        ty = subst0(&codomain, &proof);
+        call = Term::app(call, proof);
+    }
+    Ok((call, ty))
+}
+
+fn apply_zero_arity_preconditions(
+    cx: &mut ElabCtx<'_>,
+    id: GlobalId,
+    call: Term,
+    ty: Term,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    match cx.preconditions.get(&id).copied() {
+        Some((0, requires_arity)) => append_precondition_proofs(cx, call, ty, requires_arity, span),
+        _ => Ok((call, ty)),
+    }
+}
+
+fn infer_preconditioned_application(
+    cx: &mut ElabCtx<'_>,
+    expr: &RExpr,
+    span: &Span,
+) -> Result<Option<(Term, Term)>, ElabError> {
+    let (head, arguments) = call_application_spine(expr);
+    if !matches!(head, RExpr::RCon(_, _) | RExpr::RCheckedGlobal { .. }) {
+        return Ok(None);
+    }
+    let (head_core, mut ty) = infer(cx, head)?;
+    let Term::Const { id, .. } = head_core else {
+        return Ok(None);
+    };
+    let Some((parameter_arity, requires_arity)) = cx.preconditions.get(&id).copied() else {
+        return Ok(None);
+    };
+    if arguments.len() != parameter_arity {
+        return Ok(None);
+    }
+
+    let mut call = head_core;
+    for argument in arguments {
+        let Term::Pi(domain, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+            return Err(ElabError::NotAFunction { span: span.clone() });
+        };
+        let argument_core = check(cx, argument, &domain, span)?;
+        ty = subst0(&codomain, &argument_core);
+        call = Term::app(call, argument_core);
+    }
+    append_precondition_proofs(cx, call, ty, requires_arity, span).map(Some)
+}
+
+fn append_saturated_preconditions(
+    cx: &mut ElabCtx<'_>,
+    expr: &RExpr,
+    call: (Term, Term),
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (head, arguments) = call_application_spine(expr);
+    if !matches!(head, RExpr::RCon(_, _) | RExpr::RCheckedGlobal { .. }) {
+        return Ok(call);
+    }
+    let (head_core, _) = infer(cx, head)?;
+    let Term::Const { id, .. } = head_core else {
+        return Ok(call);
+    };
+    let Some((parameter_arity, requires_arity)) = cx.preconditions.get(&id).copied() else {
+        return Ok(call);
+    };
+    if arguments.len() != parameter_arity {
+        return Ok(call);
+    }
+    append_precondition_proofs(cx, call.0, call.1, requires_arity, span)
 }
 
 #[inline(never)]
@@ -9336,7 +9500,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             span: span.clone(),
         }),
 
-        RExpr::RCheckedGlobal { name, id, .. } => {
+        RExpr::RCheckedGlobal { name, id, span } => {
             let id = *id;
             if let Some((ind, k)) = cx.env.constructor(id) {
                 let ty = ind.constructors[k].type_.clone();
@@ -9348,9 +9512,16 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
                 ElabError::Internal(format!("no checked type for imported global '{name}' {id:?}"))
             })?;
-            Ok((Term::const_(id, vec![]), ty.clone()))
+            let (core, ty) = (Term::const_(id, vec![]), ty.clone());
+            apply_zero_arity_preconditions(cx, id, core, ty, span)
         }
-        RExpr::RCon(name, span) => infer_spelling_global(cx, name, span),
+        RExpr::RCon(name, span) => {
+            let (core, ty) = infer_spelling_global(cx, name, span)?;
+            let Term::Const { id, .. } = core else {
+                return Ok((core, ty));
+            };
+            apply_zero_arity_preconditions(cx, id, core, ty, span)
+        }
 
         RExpr::RUniv(None, _) => {
             let l = cx.metas.fresh();
@@ -9419,6 +9590,9 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             // On the overwhelmingly-common decline path that frame (including
             // its argument vector) is gone before generic application recurses.
             if let Some(call) = infer_reflexive_recursive_self_call(cx, expr, span)? {
+                return append_saturated_preconditions(cx, expr, call, span);
+            }
+            if let Some(call) = infer_preconditioned_application(cx, expr, span)? {
                 return Ok(call);
             }
             let (f_core, f_ty) = infer(cx, f)?;
@@ -10392,17 +10566,9 @@ fn elab_binop(
             // Recognition is by kernel conversion of a DIRECT assumption,
             // never by spelling or by reasoning from a stronger proposition.
             let goal = Term::app(Term::const_(entry.nonzero_id, vec![]), rhs_core);
-            let known = cx.assumptions.iter().rev().any(|assumption| {
-                assumption.depth <= cx.ctx.len()
-                    && convert_type(
-                        cx.env,
-                        &cx.ctx,
-                        &weaken(&assumption.prop, (cx.ctx.len() - assumption.depth) as i64),
-                        &goal,
-                    )
-            });
+            let known = premise_proof_in_scope(cx, &goal).is_some();
             if !known {
-                let closed = close_goal(&cx.ctx, &cx.assumptions, goal);
+                let closed = close_goal(&cx.ctx, &[], goal);
                 let hole_id =
                     declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
                         .map_err(|error| ElabError::KernelRejected {
@@ -10535,8 +10701,86 @@ mod omega_clause_gate_tests {
     }
 }
 
+fn build_contract_type(
+    carrier_ty: &Term,
+    param_count: usize,
+    requires: &[Term],
+) -> Result<(Vec<Term>, Term, Term), ElabError> {
+    let (param_types, carrier_result) = split_params(carrier_ty, param_count).ok_or_else(|| {
+        ElabError::Internal("declaration parameter telescope is shorter than its source arity".into())
+    })?;
+    let mut full_ty = weaken(&carrier_result, requires.len() as i64);
+    for requirement in requires.iter().rev() {
+        full_ty = Term::pi(requirement.clone(), full_ty);
+    }
+    for parameter in param_types.iter().rev() {
+        full_ty = Term::pi(parameter.clone(), full_ty);
+    }
+    Ok((param_types, carrier_result, full_ty))
+}
+
+fn check_contract_body(
+    cx: &mut ElabCtx<'_>,
+    body: &RExpr,
+    carrier_ty: &Term,
+    param_count: usize,
+    requires: &[Term],
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (param_types, carrier_result) = split_params(carrier_ty, param_count).ok_or_else(|| {
+        ElabError::Internal("declaration parameter telescope is shorter than its source arity".into())
+    })?;
+    let start_depth = cx.ctx.len();
+    let hidden_base = cx.hidden_positions.len();
+    let assumption_base = cx.assumptions.len();
+    let result = (|| {
+        let mut current = body;
+        for domain in &param_types {
+            let RExpr::RLam(_, inner, _) = current else {
+                return Err(ElabError::TypeMismatch {
+                    span: current.span().clone(),
+                    reason: "a declared parameter is missing its body lambda".into(),
+                });
+            };
+            let position = cx.ctx.len();
+            let is_proposition = kernel_infer_current(cx, domain)
+                .ok()
+                .is_some_and(|sort| matches!(whnf(cx.env, &cx.ctx, &sort), Term::Omega(_)));
+            if is_proposition {
+                cx.assumptions.push(Assumption {
+                    prop: domain.clone(),
+                    depth: position,
+                });
+            }
+            cx.ctx.push(domain.clone());
+            current = inner;
+        }
+        for requirement in requires {
+            let position = cx.ctx.len();
+            cx.ctx.push(requirement.clone());
+            cx.hidden_positions.push(position);
+        }
+        let body_ty = weaken(&carrier_result, requires.len() as i64);
+        let body_inner = check(cx, current, &body_ty, span)?;
+        let mut full_body = body_inner.clone();
+        for requirement in requires.iter().rev() {
+            full_body = Term::lam(requirement.clone(), full_body);
+        }
+        for parameter in param_types.iter().rev() {
+            full_body = Term::lam(parameter.clone(), full_body);
+        }
+        Ok((full_body, body_inner))
+    })();
+    while cx.ctx.len() > start_depth {
+        cx.ctx.pop();
+    }
+    cx.hidden_positions.truncate(hidden_base);
+    cx.assumptions.truncate(assumption_base);
+    result
+}
+
 /// A spec'd declaration's `requires` are checked before its body and become
-/// elaborator-only assumptions at parameter depth. They are not hole sites.
+/// proof binders at their telescope positions. They are not hole sites.
 fn install_requires_assumptions(
     cx: &mut ElabCtx<'_>,
     carrier_ty: &Term,
@@ -10544,27 +10788,35 @@ fn install_requires_assumptions(
     requires: &[RExpr],
 ) -> Result<Vec<Term>, ElabError> {
     let start_depth = cx.ctx.len();
-    let param_types = unwrap_pi_chain(carrier_ty);
-    if param_types.len() < param_count {
-        return Err(ElabError::Internal("requires parameter telescope is too short".into()));
-    }
-    for ty in param_types.into_iter().take(param_count) {
+    let hidden_base = cx.hidden_positions.len();
+    let assumption_base = cx.assumptions.len();
+    let (param_types, _) = split_params(carrier_ty, param_count).ok_or_else(|| {
+        ElabError::Internal("requires parameter telescope is shorter than its source arity".into())
+    })?;
+    for ty in param_types {
         cx.ctx.push(ty);
     }
     let result = (|| {
         let mut cores = Vec::with_capacity(requires.len());
         for req in requires {
             let prop = elab_prop_at_omega(cx, req, req.span())?;
+            let depth = cx.ctx.len();
             cx.assumptions.push(Assumption {
                 prop: prop.clone(),
-                depth: cx.ctx.len(),
+                depth,
             });
+            cx.ctx.push(prop.clone());
+            cx.hidden_positions.push(depth);
             cores.push(prop);
         }
         Ok(cores)
     })();
     while cx.ctx.len() > start_depth {
         cx.ctx.pop();
+    }
+    cx.hidden_positions.truncate(hidden_base);
+    if result.is_err() {
+        cx.assumptions.truncate(assumption_base);
     }
     result
 }
@@ -10938,6 +11190,7 @@ fn confirm_instance_dictionary_carrier(
 fn resolve_instance_dictionary(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -10955,7 +11208,8 @@ fn resolve_instance_dictionary(
             ty: rtype_head_name(requested),
             span: span.clone(),
         })?;
-    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
+    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label)
+        .with_preconditions(preconditions);
     for ty in &ctx.types {
         cx.ctx.push(ty.clone());
     }
@@ -10967,6 +11221,7 @@ fn resolve_instance_dictionary(
     resolve_instance_dictionary_inner(
         env,
         globals,
+        preconditions,
         num_values,
         numeric_env,
         class_env,
@@ -11018,6 +11273,7 @@ fn standard_operator_class_id(
 fn resolve_instance_dictionary_by_head_id(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -11062,6 +11318,7 @@ fn resolve_instance_dictionary_by_head_id(
     resolve_instance_dictionary_inner(
         env,
         globals,
+        preconditions,
         num_values,
         numeric_env,
         class_env,
@@ -11084,6 +11341,7 @@ fn resolve_instance_dictionary_by_head_id(
 fn resolve_instance_dictionary_inner(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -11176,7 +11434,8 @@ fn resolve_instance_dictionary_inner(
                         span: span.clone(),
                     })?;
                 let core_args = {
-                    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
+                    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label)
+        .with_preconditions(preconditions);
                     for ty in &ctx.types {
                         cx.ctx.push(ty.clone());
                     }
@@ -11255,6 +11514,7 @@ fn resolve_instance_dictionary_inner(
             resolve_instance_dictionary_inner(
                 env,
                 globals,
+                preconditions,
                 num_values,
                 numeric_env,
                 class_env,
@@ -11290,6 +11550,7 @@ fn resolve_instance_dictionary_inner(
             resolve_instance_dictionary_by_head_id(
                 env,
                 globals,
+                preconditions,
                 num_values,
                 numeric_env,
                 class_env,
@@ -12167,6 +12428,7 @@ fn elab_standard_operator(
             // `x ≤ y` reject a mismatched pair at the occurrence rather than
             // inside the binding.
             let rhs_core = check(cx, rhs, &carrier, span)?;
+            let preconditions = cx.preconditions.clone();
 
             let (dictionary, _) = {
                 // Destructured so the resolver's `&mut` arguments are disjoint
@@ -12206,6 +12468,7 @@ fn elab_standard_operator(
                 resolve_instance_dictionary_by_head_id(
                     env,
                     globals,
+                    &preconditions,
                     num_values,
                     numeric_env,
                     class_env,
@@ -12250,6 +12513,7 @@ fn elab_standard_operator(
                 });
             };
 
+            let preconditions = cx.preconditions.clone();
             let (dictionary, _) = {
                 let ElabCtx {
                     env,
@@ -12285,6 +12549,7 @@ fn elab_standard_operator(
                 resolve_instance_dictionary_by_head_id(
                     env,
                     globals,
+                    &preconditions,
                     num_values,
                     numeric_env,
                     class_env,
@@ -12935,9 +13200,11 @@ pub(crate) fn elaborate_rdecl_v1(
     let mut ctor_decl_spans = HashMap::new();
     let no_names = HashMap::new();
     let no_checked_ids = HashMap::new();
+    let mut preconditions = HashMap::new();
     elaborate_rdecl_v1_with_effect_rows(
         env,
         globals,
+        &mut preconditions,
         num_values,
         numeric_env,
         class_env,
@@ -12958,6 +13225,7 @@ pub(crate) fn elaborate_rdecl_v1(
 fn declaration_param_context(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -12971,7 +13239,8 @@ fn declaration_param_context(
     // the class env for the same reason they do: the name-to-index lookup
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-        .with_classes(class_env, provenance, standard_operators);
+        .with_classes(class_env, provenance, standard_operators)
+        .with_preconditions(preconditions);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
         let domain_core = elab_type(&mut cx, domain)?;
@@ -12984,6 +13253,7 @@ fn declaration_param_context(
 pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &mut HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
@@ -13003,6 +13273,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
         return elaborate_associated_rdecl(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13021,6 +13292,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     elaborate_associated_rdecl(
         env,
         globals,
+        preconditions,
         num_values,
         numeric_env,
         class_env,
@@ -13039,6 +13311,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
 fn elaborate_associated_rdecl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &mut HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
@@ -13068,7 +13341,8 @@ fn elaborate_associated_rdecl(
             // name-to-index lookup has no field list and a well-formed binding
             // is refused by a sort pre-check.
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_classes(&*class_env, provenance, standard_operators);
+                .with_classes(&*class_env, provenance, standard_operators)
+                .with_preconditions(preconditions);
             let ty = elab_type(&mut cx, ty)?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
@@ -13080,6 +13354,7 @@ fn elaborate_associated_rdecl(
             let dictionary_ctx = declaration_param_context(
                 env,
                 globals,
+                preconditions,
                 num_values,
                 numeric_env,
                 class_env,
@@ -13096,6 +13371,7 @@ fn elaborate_associated_rdecl(
                 let dictionary = resolve_instance_dictionary(
                     env,
                     globals,
+                    preconditions,
                     num_values,
                     numeric_env,
                     class_env,
@@ -13123,6 +13399,7 @@ fn elaborate_associated_rdecl(
             let mut result = elaborate_view_or_let(
                 env,
                 globals,
+                preconditions,
                 num_values,
                 numeric_env,
                 class_env,
@@ -13142,6 +13419,7 @@ fn elaborate_associated_rdecl(
         RDeclKind::Let => elaborate_view_or_let(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13153,10 +13431,13 @@ fn elaborate_associated_rdecl(
             fixity_spans,
             declared_fixity.clone(),
         ),
-        RDeclKind::Prove => elaborate_prove(env, globals, num_values, numeric_env, rdecl),
+        RDeclKind::Prove => {
+            elaborate_prove(env, globals, preconditions, num_values, numeric_env, rdecl)
+        }
         RDeclKind::Prop { intros } => elaborate_prop_decl(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13168,6 +13449,7 @@ fn elaborate_associated_rdecl(
         RDeclKind::Theorem => elaborate_checked_theorem(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13179,6 +13461,7 @@ fn elaborate_associated_rdecl(
         RDeclKind::AttachedProof { subject, .. } => elaborate_checked_theorem(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13190,6 +13473,7 @@ fn elaborate_associated_rdecl(
         RDeclKind::Law { param, fields } => elaborate_law(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             rdecl,
@@ -13245,8 +13529,8 @@ fn elaborate_associated_rdecl(
             // A definition `def T = A` declares T as a transparent definition
             // of type `Type 0` whose body is A (`34 §2`).
             let (alias_body, alias_id) = {
-                let mut cx =
-                    ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+                let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                    .with_preconditions(preconditions);
                 let body = elab_type(&mut cx, ty)?;
                 let body_z = cx.metas.zonk_term(&body);
                 (body_z, ())
@@ -13277,6 +13561,7 @@ fn elaborate_associated_rdecl(
         } => elaborate_foreign_decl(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             rdecl,
@@ -13291,6 +13576,7 @@ fn elaborate_associated_rdecl(
         RDeclKind::RecordDecl { fields } => elab_record_decl(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13304,6 +13590,7 @@ fn elaborate_associated_rdecl(
         } => elab_class_decl(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13321,6 +13608,7 @@ fn elaborate_associated_rdecl(
         } => elab_instance_decl(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -13412,6 +13700,7 @@ fn build_pair_chain(field_vals: &[Term], record_nil_val_id: GlobalId) -> Term {
 fn elab_record_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
@@ -13419,7 +13708,8 @@ fn elab_record_decl(
     fields: &[RRecordField],
 ) -> Result<ElabResult, ElabError> {
     let field_types = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+            .with_preconditions(preconditions);
         let mut types = Vec::new();
         for field in fields {
             let ty = elab_type(&mut cx, &field.ty)?;
@@ -13498,6 +13788,7 @@ fn head_type_name(ty: &RType) -> String {
 fn elab_class_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
@@ -13510,7 +13801,8 @@ fn elab_class_decl(
     let has_param = param.is_some();
     let param_kind_core = if has_param {
         if let Some(kind) = param_kind {
-            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                .with_preconditions(preconditions);
             let kind_core = elab_type(&mut cx, kind)?;
             cx.metas.zonk_term(&kind_core)
         } else {
@@ -13527,7 +13819,8 @@ fn elab_class_decl(
     // before elaborating the next, so `resolve.rs`'s bound `RVarTy`
     // reference for that field name lines up with the real kernel depth.
     let field_types: Vec<Term> = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+            .with_preconditions(preconditions);
         if has_param {
             cx.ctx.push(param_kind_core.clone());
         }
@@ -13847,6 +14140,7 @@ fn instance_head_key(ty: &RType, core: &Term) -> InstanceHeadKey {
 fn elab_instance_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
@@ -13890,7 +14184,8 @@ fn elab_instance_decl(
             num_values,
             numeric_env,
             format!("{class_name}.{head_name}"),
-        );
+        )
+        .with_preconditions(preconditions);
         push_type0_params(&mut cx, head_params.len());
         let h = elab_type(&mut cx, head_type)?;
         cx.metas.zonk_term(&h)
@@ -13924,7 +14219,8 @@ fn elab_instance_decl(
             num_values,
             numeric_env,
             format!("{class_name}.{head_name}"),
-        );
+        )
+        .with_preconditions(preconditions);
         push_type0_params(&mut cx, head_params.len());
         constraints
             .iter()
@@ -14002,7 +14298,8 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env, provenance, standard_operators);
+            .with_classes(&*class_env, provenance, standard_operators)
+            .with_preconditions(preconditions);
             push_type0_params(&mut cx, head_params.len());
             for (index, constraint_ty) in constraint_core_types.iter().enumerate() {
                 cx.ctx.push(weaken(constraint_ty, index as i64));
@@ -14044,7 +14341,8 @@ fn elab_instance_decl(
                 numeric_env,
                 format!("{class_name}.{head_name}"),
             )
-            .with_classes(&*class_env, provenance, standard_operators);
+            .with_classes(&*class_env, provenance, standard_operators)
+            .with_preconditions(preconditions);
             push_type0_params(&mut cx, head_params.len());
             compute_ordered_field_values(
                 &mut cx,
@@ -14214,6 +14512,7 @@ fn elab_derive(
 fn elaborate_foreign_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     rdecl: &RDecl,
@@ -14225,7 +14524,8 @@ fn elaborate_foreign_decl(
     use crate::foreign::elaborate_foreign;
 
     let ty_core = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+            .with_preconditions(preconditions);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("foreign decl must have a type annotation".into())
         })?;
@@ -14283,6 +14583,7 @@ fn elaborate_foreign_decl(
 fn elaborate_view_or_let(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &mut HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -14305,6 +14606,7 @@ fn elaborate_view_or_let(
         return elaborate_v0(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -14321,6 +14623,7 @@ fn elaborate_view_or_let(
     elaborate_view_with_spec(
         env,
         globals,
+        preconditions,
         num_values,
         numeric_env,
         class_env,
@@ -14439,7 +14742,8 @@ pub(crate) fn elaborate_space_decl(
             &mut elab.num_values,
             &elab.numeric_env,
             format!("{}.initial", space.name),
-        );
+        )
+        .with_preconditions(&elab.preconditions);
         let cell_type = elab_type(&mut cx, &cell.ty)?;
         let cell_value = check(&mut cx, &cell.init, &cell_type, &cell.span)?;
         cell_types.push(cx.metas.zonk_term(&cell_type));
@@ -14547,7 +14851,8 @@ pub(crate) fn elaborate_space_decl(
             &elab.class_env,
             &mut elab.resolution_provenance,
             &elab.standard_operators,
-        );
+        )
+        .with_preconditions(&elab.preconditions);
         let mut parameter_domains = Vec::with_capacity(operation.params.len());
         for (_, parameter_type) in &operation.params {
             let domain = elab_type(&mut cx, parameter_type)?;
@@ -14782,6 +15087,7 @@ pub(crate) fn innermost_refine_pred(ty: &RType) -> Option<&RExpr> {
 fn elaborate_v0(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &mut HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -14801,6 +15107,7 @@ fn elaborate_v0(
         return elaborate_recursive_view(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             class_env,
@@ -14815,7 +15122,8 @@ fn elaborate_v0(
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
-            .with_local_dicts(local_dicts);
+            .with_local_dicts(local_dicts)
+            .with_preconditions(preconditions);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
@@ -14919,6 +15227,7 @@ fn rollback_elab_admission(
 fn elaborate_recursive_view(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -14932,7 +15241,8 @@ fn elaborate_recursive_view(
     // 1. Elaborate the declared type (recursive views are annotated).
     let (ty_core, type_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators);
+            .with_classes(class_env, provenance, standard_operators)
+            .with_preconditions(preconditions);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("recursive declaration requires a type annotation".into())
         })?;
@@ -14974,7 +15284,8 @@ fn elaborate_recursive_view(
     let associated = associated.as_deref().unwrap_or(rdecl);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators);
+            .with_classes(class_env, provenance, standard_operators)
+            .with_preconditions(preconditions);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
@@ -15036,6 +15347,7 @@ fn elaborate_recursive_view(
 pub(crate) fn elaborate_mutual_group(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -15050,7 +15362,8 @@ pub(crate) fn elaborate_mutual_group(
     // pre-pass) — none of these need a sibling's id, only their own params.
     let mut ty_cores: Vec<Term> = Vec::with_capacity(members.len());
     for rdecl in members {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+            .with_preconditions(preconditions);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!(
                 "mutually-recursive '{}' requires a type annotation",
@@ -15171,6 +15484,7 @@ pub(crate) fn elaborate_mutual_group(
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
+                .with_preconditions(preconditions)
                 .with_recursive_group(&recursive_group);
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
@@ -15342,6 +15656,7 @@ pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
 fn elaborate_view_with_spec(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &mut HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -15351,112 +15666,218 @@ fn elaborate_view_with_spec(
     local_dicts: &HashMap<String, (Term, Term, usize)>,
 ) -> Result<ElabResult, ElabError> {
     let mut pending: Option<ken_kernel::PendingAdmission> = None;
+    let mut precondition_entry = None;
     let result = (|| -> Result<ElabResult, ElabError> {
-        // Phase 1: elaborate requires before the body. Refined parameters
-        // lower to carriers: their predicates cannot be assumed until the
-        // parameter encoding carries a proof even through higher-order calls.
-        // Stage a recursive name only after its type and requires; keep one cx
-        // for the non-recursive type and body so level metas unify together.
         let is_recursive = rexpr_mentions_name(&rdecl.body, &rdecl.name);
+        // Annotated contracts stage before checking their body so recursive
+        // calls see the full type and all body holes share the admission rollback.
         let param_count = view_param_count(rdecl);
         let mut decl_obligations = Vec::new();
-        let (body_raw, carrier_ty_raw, pre_admit_id, req_cores) = if is_recursive {
+        let (
+            full_body,
+            _body_inner,
+            param_types,
+            result_ty_under_requires,
+            full_ty,
+            pre_admit_id,
+            req_cores,
+        ) = if is_recursive || rdecl.ty.is_some() {
             let (carrier_ty, assumptions, req_cores) = {
-                let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                    .with_classes(class_env, provenance, standard_operators)
-                    .with_local_dicts(local_dicts);
+                let mut cx =
+                    ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                        .with_classes(class_env, provenance, standard_operators)
+                        .with_local_dicts(local_dicts)
+                        .with_preconditions(preconditions);
                 let ty = rdecl.ty.as_ref().ok_or_else(|| {
                     ElabError::Internal(
-                        "recursive const with spec clauses requires a type annotation".into(),
+                        "recursive declaration with spec clauses requires a type annotation".into(),
                     )
                 })?;
-                let ty_c = elab_type(&mut cx, ty)?;
-                let req_cores =
-                    install_requires_assumptions(&mut cx, &ty_c, param_count, &rdecl.requires)?;
+                let carrier_ty = elab_type(&mut cx, ty)?;
+                let req_cores = install_requires_assumptions(
+                    &mut cx,
+                    &carrier_ty,
+                    param_count,
+                    &rdecl.requires,
+                )?;
+                let carrier_ty = cx.metas.zonk_term(&carrier_ty);
+                let req_cores = req_cores
+                    .iter()
+                    .map(|requirement| cx.metas.zonk_term(requirement))
+                    .collect::<Vec<_>>();
+                let assumptions = cx
+                    .assumptions
+                    .iter()
+                    .map(|assumption| Assumption {
+                        prop: cx.metas.zonk_term(&assumption.prop),
+                        depth: assumption.depth,
+                    })
+                    .collect::<Vec<_>>();
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
-                (
-                    cx.metas.zonk_term(&ty_c),
-                    std::mem::take(&mut cx.assumptions),
-                    req_cores,
-                )
+                (carrier_ty, assumptions, req_cores)
             };
+            let (param_types, carrier_result, full_ty) =
+                build_contract_type(&carrier_ty, param_count, &req_cores)?;
+            let result_ty_under_requires = weaken(&carrier_result, req_cores.len() as i64);
             let staged = ken_kernel::stage_placeholders(
                 env,
-                vec![(rdecl.name.clone(), vec![], carrier_ty.clone())],
+                vec![(rdecl.name.clone(), vec![], full_ty.clone())],
             )
             .map_err(|error| ElabError::KernelRejected {
                 error,
                 span: rdecl.span.clone(),
             })?;
             let id = staged.ids()[0];
+            if !req_cores.is_empty() {
+                preconditions.insert(id, (param_count, req_cores.len()));
+                precondition_entry = Some(id);
+            }
             pending = Some(staged);
             globals.insert(rdecl.name.clone(), id);
-            let body = {
-                let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                    .with_classes(class_env, provenance, standard_operators)
-                    .with_local_dicts(local_dicts);
+            let (full_body, body_inner) = {
+                let mut cx =
+                    ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+                        .with_classes(class_env, provenance, standard_operators)
+                        .with_local_dicts(local_dicts)
+                        .with_preconditions(preconditions);
                 cx.assumptions = assumptions;
-                let body_c = check(&mut cx, &rdecl.body, &carrier_ty, &rdecl.span)?;
+                let (full_body, body_inner) = check_contract_body(
+                    &mut cx,
+                    &rdecl.body,
+                    &carrier_ty,
+                    param_count,
+                    &req_cores,
+                    &rdecl.span,
+                )?;
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
-                cx.metas.zonk_term(&body_c)
+                (
+                    cx.metas.zonk_term(&full_body),
+                    cx.metas.zonk_term(&body_inner),
+                )
             };
-            (body, carrier_ty, Some(id), req_cores)
+            (
+                full_body,
+                body_inner,
+                param_types,
+                result_ty_under_requires,
+                full_ty,
+                Some(id),
+                req_cores,
+            )
         } else {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
-                .with_local_dicts(local_dicts);
-            let (body_c, ty_c, req_cores) = if let Some(ty) = &rdecl.ty {
-                let ty_c = elab_type(&mut cx, ty)?;
-                let req_cores =
-                    install_requires_assumptions(&mut cx, &ty_c, param_count, &rdecl.requires)?;
-                let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
-                (body_c, ty_c, req_cores)
-            } else {
-                // An unannotated const has no parameter telescope. Its
-                // requires can still be checked before inferring the body.
-                let req_cores = install_requires_assumptions(
-                    &mut cx, &Term::ty(Level::Zero), 0, &rdecl.requires,
-                )?;
-                let (body_c, ty_c) = infer(&mut cx, &rdecl.body)?;
-                (body_c, ty_c, req_cores)
-            };
+                .with_local_dicts(local_dicts)
+                .with_preconditions(preconditions);
+            let (full_body, body_inner, param_types, result_ty_under_requires, full_ty, req_cores) =
+                if let Some(ty) = &rdecl.ty {
+                    let carrier_ty = elab_type(&mut cx, ty)?;
+                    let req_cores = install_requires_assumptions(
+                        &mut cx,
+                        &carrier_ty,
+                        param_count,
+                        &rdecl.requires,
+                    )?;
+                    let (param_types, carrier_result, full_ty) =
+                        build_contract_type(&carrier_ty, param_count, &req_cores)?;
+                    let result_ty_under_requires = weaken(&carrier_result, req_cores.len() as i64);
+                    let (full_body, body_inner) = check_contract_body(
+                        &mut cx,
+                        &rdecl.body,
+                        &carrier_ty,
+                        param_count,
+                        &req_cores,
+                        &rdecl.span,
+                    )?;
+                    (
+                        full_body,
+                        body_inner,
+                        param_types,
+                        result_ty_under_requires,
+                        full_ty,
+                        req_cores,
+                    )
+                } else {
+                    let req_cores = install_requires_assumptions(
+                        &mut cx,
+                        &Term::ty(Level::Zero),
+                        0,
+                        &rdecl.requires,
+                    )?;
+                    let context_base = cx.ctx.len();
+                    let hidden_base = cx.hidden_positions.len();
+                    for requirement in &req_cores {
+                        let position = cx.ctx.len();
+                        cx.ctx.push(requirement.clone());
+                        cx.hidden_positions.push(position);
+                    }
+                    let inferred = infer(&mut cx, &rdecl.body);
+                    let (body_inner, result_ty_under_requires) = match inferred {
+                        Ok((body, result_ty)) => {
+                            (cx.metas.zonk_term(&body), cx.metas.zonk_term(&result_ty))
+                        }
+                        Err(error) => {
+                            while cx.ctx.len() > context_base {
+                                cx.ctx.pop();
+                            }
+                            cx.hidden_positions.truncate(hidden_base);
+                            return Err(error);
+                        }
+                    };
+                    while cx.ctx.len() > context_base {
+                        cx.ctx.pop();
+                    }
+                    cx.hidden_positions.truncate(hidden_base);
+                    let mut full_body = body_inner.clone();
+                    let mut full_ty = result_ty_under_requires.clone();
+                    for requirement in req_cores.iter().rev() {
+                        full_body = Term::lam(requirement.clone(), full_body);
+                        full_ty = Term::pi(requirement.clone(), full_ty);
+                    }
+                    (
+                        full_body,
+                        body_inner,
+                        Vec::new(),
+                        result_ty_under_requires,
+                        full_ty,
+                        req_cores,
+                    )
+                };
             absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
             (
-                cx.metas.zonk_term(&body_c),
-                cx.metas.zonk_term(&ty_c),
+                cx.metas.zonk_term(&full_body),
+                cx.metas.zonk_term(&body_inner),
+                param_types,
+                cx.metas.zonk_term(&result_ty_under_requires),
+                cx.metas.zonk_term(&full_ty),
                 None,
-                req_cores,
+                req_cores
+                    .iter()
+                    .map(|requirement| cx.metas.zonk_term(requirement))
+                    .collect(),
             )
         };
 
-        // Split only the explicit parameters. The declared return may itself
-        // be function-valued and remains in the result position.
-        let (param_types, carrier_b) = split_params(&carrier_ty_raw, param_count).ok_or_else(|| {
-            ElabError::Internal("declaration type has fewer Pi binders than its parameters".into())
-        })?;
         let mut param_ctx = Context::new();
-        for pt in &param_types {
-            param_ctx.push(pt.clone());
+        for parameter in &param_types {
+            param_ctx.push(parameter.clone());
         }
-
-        // Phase 2: process `ensures` clauses under the same preconditions
-        // that are explicit proof binders in the completed declaration.
-        // Requirement domains are authored at parameter depth, so shift each
-        // under the earlier requirement binders before extending the context.
         let mut ens_goal_ctx = param_ctx.clone();
-        for (i, req) in req_cores.iter().enumerate() {
-            ens_goal_ctx.push(weaken(req, i as i64));
+        for requirement in &req_cores {
+            ens_goal_ctx.push(requirement.clone());
         }
-        // Resolved ensures expressions index parameters and result in the
-        // original surface context; their requires are supplied as scoped
-        // assumptions and inserted only when the goal is closed.
-        let mut ens_ctx = param_ctx.clone();
-        ens_ctx.push(carrier_b.clone());
+        let mut ens_ctx = ens_goal_ctx.clone();
+        ens_ctx.push(result_ty_under_requires.clone());
+        // Phase 2 elaborates ensures in the same kernel context as the body:
+        // parameters, requires binders, then the result binder.
 
-        // Strip only the explicit parameter lambdas; a return-function lambda
-        // remains part of the declared result.
-        let body_inner = strip_param_lams(&body_raw, param_count).ok_or_else(|| {
+        // Recover the body under parameter and requires binders from the full
+        // telescope, splitting first at the explicit parameter arity.
+        let body_after_params = strip_param_lams(&full_body, param_count).ok_or_else(|| {
             ElabError::Internal("declaration body has fewer lambdas than its parameters".into())
+        })?;
+        let body_inner = strip_param_lams(&body_after_params, req_cores.len()).ok_or_else(|| {
+            ElabError::Internal("declaration body has fewer lambdas than its requires".into())
         })?;
 
         // Collect ensures: explicit clauses + implicit from return-type refinement (`22 §2.1`).
@@ -15483,6 +15904,7 @@ fn elaborate_view_with_spec(
                 class_env,
                 provenance,
                 standard_operators,
+                preconditions,
                 local_dicts,
                 &ens_ctx,
                 &req_cores,
@@ -15492,18 +15914,16 @@ fn elaborate_view_with_spec(
                 &rdecl.name,
             )?;
             absorb_obligations(&mut decl_obligations, psi_obligations);
-            // result is Var(0) in ens_ctx. After substitution, the body
-            // remains under the requirement binders, so shift it past them.
-            let psi_under_requires = shift(&psi_core, req_cores.len() as i64, 1);
-            let result_term = match &carrier_b {
+            // `psi_core` is in params + requires + result context. Substitute
+            // the body at its result type under the requires binders.
+            let result_term = match &result_ty_under_requires {
                 Term::Pi(..) => Term::Ascript(
                     Box::new(body_inner.clone()),
-                    Box::new(carrier_b.clone()),
+                    Box::new(result_ty_under_requires.clone()),
                 ),
                 _ => body_inner.clone(),
             };
-            let body_under_requires = weaken(&result_term, req_cores.len() as i64);
-            let goal_open = subst0(&psi_under_requires, &body_under_requires);
+            let goal_open = subst0(&psi_core, &result_term);
             let closed = close_goal(&ens_goal_ctx, &[], goal_open);
             let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
                 .map_err(|e| ElabError::KernelRejected {
@@ -15519,34 +15939,10 @@ fn elaborate_view_with_spec(
             });
         }
 
-        // Phase 4: build the full type and body.
-        // full_ty = Pi(params..., Pi(req..., carrier_b))
-        let mut full_ty = carrier_b.clone();
-        for req in req_cores.iter().rev() {
-            full_ty = Term::pi(req.clone(), weaken(&full_ty, 1));
-        }
-        for pt in param_types.iter().rev() {
-            full_ty = Term::pi(pt.clone(), full_ty);
-        }
-        // full_body = Lam(params..., Lam(req..., body_inner))
-        // body_inner has free variables indexed relative to param_ctx (depth n_params).
-        // The req lambdas are inserted BETWEEN the param lambdas and the body, so each
-        // param variable in body_inner shifts up by req_cores.len() to skip the req binders.
-        let mut full_body = weaken(&body_inner, req_cores.len() as i64);
-        for (i, req) in req_cores.iter().enumerate().rev() {
-            full_body = Term::lam(weaken(req, i as i64), full_body);
-        }
-        for pt in param_types.iter().rev() {
-            full_body = Term::lam(pt.clone(), full_body);
-        }
-
+        // Phase 4's full contract type and body were built before staging.
         let id = if let Some(pre_id) = pre_admit_id {
-            // Recursive: the opaque was pre-admitted with the carrier Pi-chain. For
-            // L3a's recursive views (no `requires`), `full_ty` == the carrier
-            // Pi-chain, so the opaque's type is already `full_ty`. The kernel
-            // checks and upgrades the singleton group. (A recursive fn WITH
-            // `requires` — `full_ty` ≠ carrier — is a tracked follow-on; see
-            // `elaborate_recursive_view`'s K2c note.)
+            // The opaque was staged at the complete contract type, so recursive
+            // calls and final admission see the same premise telescope.
             let staged = pending
                 .take()
                 .expect("recursive view staged its placeholder");
@@ -15554,6 +15950,8 @@ fn elaborate_view_with_spec(
                 Ok(_) => pre_id,
                 Err((error, removed)) => {
                     forget_rolled_back_decls(removed, globals, num_values);
+                    preconditions.remove(&pre_id);
+                    precondition_entry = None;
                     return Err(ElabError::KernelRejected {
                         error,
                         span: rdecl.span.clone(),
@@ -15568,6 +15966,9 @@ fn elaborate_view_with_spec(
                 }
             })?;
             globals.insert(rdecl.name.clone(), id);
+            if !req_cores.is_empty() {
+                preconditions.insert(id, (param_count, req_cores.len()));
+            }
             id
         };
         Ok(ElabResult {
@@ -15583,6 +15984,9 @@ fn elaborate_view_with_spec(
         if let Some(staged) = pending {
             rollback_elab_admission(env, staged, globals, num_values)?;
         }
+        if let Some(id) = precondition_entry {
+            preconditions.remove(&id);
+        }
     }
     result
 }
@@ -15593,17 +15997,22 @@ fn elaborate_view_with_spec(
 fn elaborate_prove(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
-    let phi_core = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone());
+    let (phi_core, mut obligations) = {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
+            .with_preconditions(preconditions);
         let omega = Term::omega(Level::Zero);
         let (phi_raw, phi_ty_raw) = infer(&mut cx, &rdecl.body)?;
         // Check φ is Ω-typed
         unify_types(&mut cx.metas, &omega, &phi_ty_raw);
-        cx.metas.zonk_term(&phi_raw)
+        (
+            cx.metas.zonk_term(&phi_raw),
+            std::mem::take(&mut cx.obligations),
+        )
     };
     // Declare as postulate (the hole)
     let hole_id =
@@ -15614,17 +16023,17 @@ fn elaborate_prove(
             }
         })?;
     globals.insert(rdecl.name.clone(), hole_id);
-    let obl = Obligation {
-        id: 0,
+    obligations.push(Obligation {
+        id: obligations.len() as u32,
         hole_id,
         goal_closed: phi_core,
         span: rdecl.span.clone(),
         kind: ObligationKind::Prove,
-    };
+    });
     Ok(ElabResult {
         name: rdecl.name.clone(),
         def_id: hole_id,
-        obligations: vec![obl],
+        obligations,
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
@@ -15634,6 +16043,7 @@ fn elaborate_prove(
 fn elaborate_prop_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -15655,7 +16065,8 @@ fn elaborate_prop_decl(
         // does: a `prop`'s telescope may be typed by a projection, and the
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators);
+            .with_classes(class_env, provenance, standard_operators)
+            .with_preconditions(preconditions);
         let ty = elab_type(&mut cx, prop_ty)?;
         let ty = cx.metas.zonk_term(&ty);
         let body = top_body_for_prop_type(env, &ty, &rdecl.span)?;
@@ -15695,6 +16106,7 @@ fn elaborate_prop_decl(
         let helper = elaborate_checked_theorem(
             env,
             globals,
+            preconditions,
             num_values,
             numeric_env,
             &ClassEnv::sentinel(),
@@ -15717,6 +16129,7 @@ fn elaborate_prop_decl(
 fn elaborate_checked_theorem(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &ClassEnv,
@@ -15734,7 +16147,8 @@ fn elaborate_checked_theorem(
 
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_classes(class_env, provenance, standard_operators);
+            .with_classes(class_env, provenance, standard_operators)
+            .with_preconditions(preconditions);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
         })?;
@@ -16037,6 +16451,7 @@ fn elaborate_temporal(
 fn elaborate_law(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     rdecl: &RDecl,
@@ -16048,25 +16463,30 @@ fn elaborate_law(
 
     // The param is pre-declared by the resolver; for each field φ, check at Ω
     // and emit an obligation hole.
-    for (i, (field_name, field_phi)) in fields.iter().enumerate() {
-        let phi_core = {
+    for (field_name, field_phi) in fields {
+        let (phi_core, callsite_obligations) = {
             let mut cx = ElabCtx::new(
                 env,
                 globals,
                 num_values,
                 numeric_env,
                 format!("{}.{}", rdecl.name, field_name),
-            );
+            )
+            .with_preconditions(preconditions);
             // param is the law's `param` argument — it's in scope (resolver pushed it)
             // For elaboration, we need the param in scope. Since the resolver resolved
             // field_phi with param in scope at Var(0), we replicate that:
             // Note: we DON'T have a declared type for the param here. For V1, the param
             // is just a term variable whose type must be inferrable from the field props.
             // For test cases, params will always be globally declared.
-            let (phi_raw, phi_ty_raw) = infer(&mut cx, field_phi)?;
+            let (phi_raw, phi_ty_raw) = infer(&mut cx, &field_phi)?;
             unify_types(&mut cx.metas, &omega, &phi_ty_raw);
-            cx.metas.zonk_term(&phi_raw)
+            (
+                cx.metas.zonk_term(&phi_raw),
+                std::mem::take(&mut cx.obligations),
+            )
         };
+        absorb_obligations(&mut obligations, callsite_obligations);
         let hole_id = declare_postulate(
             env,
             format!("{}.{}", rdecl.name, field_name),
@@ -16080,7 +16500,7 @@ fn elaborate_law(
         let law_field_name = format!("{}_{}", rdecl.name, field_name);
         globals.insert(law_field_name, hole_id);
         obligations.push(Obligation {
-            id: i as u32,
+            id: obligations.len() as u32,
             hole_id,
             goal_closed: phi_core,
             span: rdecl.span.clone(),
@@ -16123,6 +16543,7 @@ fn elab_in_ctx_at_omega(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     ctx: &Context,
     requires: &[Term],
@@ -16139,15 +16560,19 @@ fn elab_in_ctx_at_omega(
         owner_label.to_string(),
     )
     .with_classes(class_env, provenance, standard_operators)
-    .with_local_dicts(local_dicts);
-    // Populate cx.ctx from the snapshot
+    .with_local_dicts(local_dicts)
+    .with_preconditions(preconditions);
+    // Populate cx.ctx from the snapshot. The requires binders are real entries
+    // in this context; only their source-level visibility is hidden.
     for ty in &ctx.types {
         cx.ctx.push(ty.clone());
     }
-    for prop in requires {
+    for (index, prop) in requires.iter().enumerate() {
+        let depth = parameter_depth + index;
+        cx.hidden_positions.push(depth);
         cx.assumptions.push(Assumption {
             prop: prop.clone(),
-            depth: parameter_depth,
+            depth,
         });
     }
     let core = elab_prop_at_omega(&mut cx, expr, span)?;
@@ -20439,13 +20864,15 @@ fn recover_escaping_pattern_binder(
 pub(crate) fn elaborate_rexpr(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     owner_label: impl Into<String>,
     rexpr: &RExpr,
 ) -> Result<(Term, Term), ElabError> {
     let (core, ty, expr_span) = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label);
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label)
+            .with_preconditions(preconditions);
         let (core_raw, ty_raw) = infer(&mut cx, rexpr)?;
         let c = cx.metas.zonk_term(&core_raw);
         let t = cx.metas.zonk_term(&ty_raw);
