@@ -1,0 +1,23 @@
+# f5 reconstructed, diagnostic only: Refl explicitly checked against source goal.
+
+```ken
+data Vec (a : Type) : Nat → Type where {
+  VNil : Vec a Zero;
+  VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)
+}
+
+data Fin : Nat → Type where {
+  FZero : (n : Nat) → Fin (Suc n);
+  FSuc : (n : Nat) → Fin n → Fin (Suc n)
+}
+
+theorem t5_reconstructed (a : Type) (b : Type) (n : Nat)
+  (xs : Vec a n) (ys : Vec b n) (i : Fin n)
+  : Equal (Fin n) i i =
+  match i {
+    FZero m ↦ match xs { VCons _ x tail_xs ↦ match ys {
+      VCons _ y tail_ys ↦ (Refl : Equal (Fin n) i i) } };
+    FSuc m rest ↦ match xs { VCons _ x tail_xs ↦ match ys {
+      VCons _ y tail_ys ↦ (Refl : Equal (Fin n) i i) } }
+  }
+```
