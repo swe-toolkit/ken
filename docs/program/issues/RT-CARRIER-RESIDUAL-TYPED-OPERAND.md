@@ -141,8 +141,13 @@ it. Five items, delivered in the two increments below:
      the open sibling, and decodes residual captures before allocation.
    - Site B (`source.rs:4906-4913`). `RoutedAnswer::checked` carries the R
      typed, and G355 decodes it before the edge.
-   - Each of the 95 refutable patterns on `LoweringOperand` in production
-     lowering, measured at `d9b8d81a8`, gets one disposition:
+   - Each refutable pattern on `LoweringOperand` in production lowering
+     gets one disposition. The closure basis is the exact candidate's own
+     tree, not `d9b8d81a8`: the WIP was rebased, and `d9b8d81a8` is not an
+     ancestor of the candidate. The census reruns the same criterion at the
+     candidate; a row unchanged from the `d9b8d81a8` table keeps its
+     disposition, and every added or changed row gets one (Steward, on
+     runtime QA's block `evt_1jb96xz3mdcff`). The dispositions:
      - F: R falls into a branch that already fails closed; cite the error;
      - W: R is a runtime word there, and the site becomes an exhaustive
        `match` with a `Residual` arm;
@@ -182,10 +187,13 @@ then I-1, each a separate exact-SHA review with the Architect as single gate.
   `checked_ih_captured_environment_from_case_environment`
   (`source.rs:4906-4913`). A W/C consumer that gets `Synthesized` is a K→R
   refusal, never a coercion.
-- **The Tail result** is `TailAnswer::{PassThrough(CarriedResidualWord),
-  Routed(CarriedBoundaryWord)}`. The Child request after the Tail
-  (`core.rs:9531-9580`) is legal only on `PassThrough`, by type. A `Routed`
-  arm that reaches a Child or W/C request gets the compile-time
+- **The Tail result** is the representation-typed `LoweringOperand`
+  (Architect `evt_7qzpmd32e0cvg` withdraws the `TailAnswer` sum; the dead
+  enum and `into_operand` at `lowering/mod.rs:4141-4150` are deleted). The
+  Child request after the Tail is enforced by `checked_ih_transport_child`'s
+  exhaustive match against the planner's `wrapped()`. Tail consumers stay
+  exhaustive or use `RoutedAnswer::checked`; a routed answer reaching a
+  Child or W/C request gets the compile-time
   `CraneliftBackendError::ResidualRepresentationRequired { site }`.
 
 **I-0: typed operand, producers and consumers, and the proven route.** No

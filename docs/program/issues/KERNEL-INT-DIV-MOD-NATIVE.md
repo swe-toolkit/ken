@@ -78,9 +78,16 @@ stop and report the mismatch.
      unconditional push closed over `cx.ctx` is unprovable under `requires`.
      - `ElabCtx` gains elaborator-only `assumptions` (prop, depth); they
        never enter a kernel term. `elaborate_view_with_spec` elaborates each
-       `requires` before the body and pushes it at the parameter depth. Each
-       refined parameter pushes its φ at its binder depth, on both the V0
-       and V1 paths. Params and `requires` only.
+       `requires` before the body and pushes it at the parameter depth.
+       `requires` only.
+     - **Refined parameters are not assumptions** (Architect audit
+       `evt_27wngyard37xa` withdraws that half of `evt_5ma7hzg4a0e6`).
+       `{x:A|φ}` lowers to its carrier and no call site establishes φ, so
+       using φ as an assumption would remove the only check: measured, `f
+       (d : {z : Int | Not (Equal Int z 0)}) = n / d` then `g = f 1 0` gave
+       0 obligations and 0 new trust. Refined φ enters neither recognition
+       nor the goal telescope. `install_refined_param_assumptions` and its
+       call sites go.
      - At the `/` or `%` site, a direct assumption that the kernel's
        conversion finds `≡ NonZeroDivisor rhs` gives no hole, no obligation
        and no counter bump. No spelling match and no search beyond a direct
@@ -97,8 +104,9 @@ stop and report the mismatch.
        renumbering ids on absorption; ensures ids follow from the sequence
        length. Anything reading an `Obligation.id` before absorption is a
        stop to the Architect, never a second counter.
-     - A refined parameter's φ is now elaborated, and must check at Ω
-       (21 §6.3).
+     - The Ω acceptance predicate for `requires` and `ensures` keeps the
+       disjunction it had: accept an Ω-shaped type, or else a prop that
+       kernel-checks at Ω (`evt_27wngyard37xa` R2).
    - Declaring `fn /` or `fn %` is refused with the diagnostic class
      `fn +` gets. Measure that diagnostic first.
    - **Spec piece**, on the same branch and Decision (COORDINATION §14 (4)):
@@ -135,10 +143,6 @@ stop and report the mismatch.
   `NonZeroDivisor` in those names before any edit. `≠` is Bool (33 §6.1),
   so the direct proposition is `Not (Equal Int d 0)`, which reaches
   `NonZeroDivisor d` by δβ (`evt_5ma7hzg4a0e6`).
-  - Census every refined-parameter position over `catalog/`,
-    `crates/*/tests`, r_layer, `examples/` and `conformance/` (known:
-    `Derived.ken.md:1712`, `v2_acceptance.rs:266`), with each φ under the
-    new elaboration.
 - **AC-1 (behavior).**
   - `7 / 2 = 3`, `(-7) / 2 = -3`, `7 % 3 = 1` and `(-7) % 3 = -1`.
   - The div-mod identity holds on operands across 2¹²⁷ and on every sign
@@ -150,10 +154,13 @@ stop and report the mismatch.
     At `Nat` it gives `TypeMismatch` naming `/`, not `UnboundName`.
   - Obligations, for both `/` and `%` on one body: a possibly-zero divisor
     gives exactly 1 `NonZeroDivisor` obligation; `(d : {z : Int | Not
-    (Equal Int z 0)})` gives 0; `requires Not (Equal Int d 0)` gives 0;
+    (Equal Int z 0)})` gives 1, whose goal telescope has no φ; `requires
+    Not (Equal Int d 0)` gives 0;
     `requires Equal Int d 5` gives 1, whose closed goal's leading Π
     telescope holds `Eq Int d 5` at param depth; `requires Not (Equal Int
     e 0)` with divisor `d` gives 1.
+  - Caller pair: `f` with the refined divisor carries 1 open hole (pinned),
+    and `g = f 1 0` adds no obligation.
   - Consumer sweep: run every suite that elaborates a `requires` (about 82
     lines in `crates/*/tests`; the catalog has none). Each changed
     obligation count is a census row with its cause, not a silent pin edit.
@@ -166,9 +173,11 @@ stop and report the mismatch.
   - Restoring `/` to the generic path reddens the reservation pair.
 - **AC-2 (falsifiers).**
   - Removing the obligation emission reddens the row.
-  - Restoring the unconditional push reddens both zero rows. Dropping the
-    assumptions from the closure reddens the `Equal Int d 5` goal-shape pin.
-    Recognizing any assumption of shape `_ ≠ 0` reddens the `e ≠ 0` row.
+  - Restoring the unconditional push reddens the `requires Not (Equal Int
+    d 0)` zero row. Dropping the assumptions from the closure reddens the
+    `Equal Int d 5` goal-shape pin. Recognizing any assumption of shape `_ ≠
+    0` reddens the `e` row. Installing a refined φ as an assumption reddens
+    the caller-pair hole pin.
   - Replacing the zero-divisor fault with `0` reddens AC-1.
   - Swapping truncated `mod` for floored `mod` reddens `(-7) % 3`.
 - **AC-3.**
@@ -186,8 +195,8 @@ stop and report the mismatch.
 
 - The `Not (Equal Int d 0)` rows do not give 0 once obligations are
   absorbed: stop to the Architect; do not add a spelling match.
-- A census φ fails at Ω, or a changed obligation count has no explained
-  cause: stop to the Architect, never a skip.
+- A changed obligation count has no explained cause: stop to the
+  Architect, never a skip.
 
 - A third trusted entry, such as an opaque `NonZeroDivisor` postulate or a
   conversion rule for either Op: an operator question.
@@ -199,4 +208,9 @@ stop and report the mismatch.
   Architect.
 - Not this WP (Architect carries): the fixed-width `+`/`-`/`*` obligation's
   Γ; the other declaration aggregators that return `obligations: vec![]`;
-  the spec 21 examples and seeds that write a Bool `≠` in an Ω position.
+  the spec 21 examples and seeds that write a Bool `≠` in an Ω position;
+  ensures goals closing without the `requires` premises; the refined-argument
+  introduction obligation (an AC row in
+  `LANG-REFINEMENT-INTRODUCTION-OBLIGATION`, `evt_1ytv0fc4j1c1j`). Refined
+  recognition in the callee needs a proof-carrying parameter encoding, a
+  spec-lane decision.

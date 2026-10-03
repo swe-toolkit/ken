@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-RANGE-NTH-LAW
 title: "Derived proves only the length of range, so nothing states that range n holds 0..n-1 in order. Prove range_from_nth and range_nth beside range_length"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -66,3 +66,11 @@ stop and report the mismatch.
 - The theorems need an import, a new lemma outside Derived, or a postulate:
   stop to the Architect.
 - M1's first rejection is the length law, not `range_from_nth`.
+
+## Closeout
+
+Merged as `89a4e6782` from exact `a41234c9f`. Gates: Foundation QA
+`evt_3w96xwch0tjfz`, Architect `evt_3q0yraatv2688`, Decision
+`dec_14488ztxejsqa`. Both routed blobs match main. Derived now proves range
+contents (`range_from_nth`, `range_nth`) beside range length, with no trust
+change.

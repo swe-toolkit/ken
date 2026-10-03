@@ -79,6 +79,13 @@ base, stop and report the mismatch.
   - `55296` at Char leaves `isScalar 55296` undischarged, and `55295` leaves
     none.
   - `toC`'s body emits `isScalar n` with `n` free.
+  - An argument at a literal refined parameter (Architect
+    `evt_1ytv0fc4j1c1j`): given `fn f (n : Int) (d : {z : Int | Not (Equal
+    Int z 0)}) : Int = n / d`, `fn g (u : Int) : Int = f 1 0` carries 1 open
+    refinement obligation, `Not (Equal Int 0 0)`. `f` keeps its own
+    `PartialPrim` hole. This does not license refined-parameter recognition
+    in the callee: a higher-order use through the carrier Pi bypasses every
+    introduction.
 - **AC-2 (consumers and controls).**
   - The prelude's `intToChar` discharges its `Some Char n` from the arm's
     `inRangeBool n = True`.

@@ -178,10 +178,24 @@ alone.
      - Migration: every sentinel constant, finalizer, guard and
        `PatternVariableAcrossDependentSplit` goes in the same commit that
        deletes the producer arm, never earlier.
-   - Representation (input g, `evt_71d3p2fwxtqj1`): locally nameless. Matrix
-     binders are elaborator-only fresh free variables, refused at the kernel
-     boundary, so the kernel `Term` is unchanged. One `abstract` function
-     does the index arithmetic, once, at closing.
+   - Representation (input g, amended Architect `evt_216r68j77vfdx`):
+     single coordinate system. Every binder the matrix emits is a `cx.ctx`
+     push, hidden when it carries no surface name. Each row occurrence is
+     shifted by ordinary `weaken` exactly once per push. Surface names
+     resolve by position identity (`surface_binding_target`).
+     `check_nested_index_variables` refuses any reorder of bound entries.
+     There are no elaborator-only free variables and no `abstract`. The
+     kernel `Term` is unchanged.
+     - C1: `weaken_woven`, `under_woven_binder` and
+       `enter_woven_real_binder` are deleted in the same commit, and the
+       comments they falsify are corrected.
+     - C2: mutations M-A (the `Ih` arm keeps its push, drops
+       `under_core_binder`) and M-B (the split arm drops its push) each
+       redden a named test; a wrong value reddens a discriminating value pin.
+       A green mutation is a stop to the Architect.
+     - C3: census every nested-matrix site that abstracts or re-binds an
+       entry already in `cx.ctx`. Expected none; any one is a stop to the
+       Architect.
 
 ## Acceptance
 
