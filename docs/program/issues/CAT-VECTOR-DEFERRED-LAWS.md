@@ -61,10 +61,9 @@ stop and report the mismatch; do not build around it.
 - `79a6e5ac7`: `zip_with_vcons`, admitted by
   `LANG-GENERATED-J-PROOF-ASCRIPTION` (`b40f28977`). Inventory item 1 is
   closed.
-- Open, released now: the pointwise `zip_with_map` (item 3). It checks on
-  `f8bc5d4e1` as a scratch proof: VNil `Proved`, VCons `sym hk`, `cong` on
-  head and tail, `trans`, with `sym`/`trans` from `Core.Logic.Transport`
-  (language-implementer `evt_1hpn2yffh1jax`).
+- `d0ba7efc3` (exact `09a3b9eda`): the pointwise `zip_with_map` (item 3),
+  with Transport's `sym`/`trans`/`cong`. Foundation QA `evt_6ebxcc9ftsh84`,
+  Architect `evt_678xkzzx27868`, Decision `dec_70vey7m6wysdt`.
 - Open, waiting: `lookup_zip_with` (item 2). It fails at `elab.rs:3535`
   `Internal("index-equation convoy unexpectedly overlaps an ambient
   context convoy")`, which is `LANG-SIBLING-GOAL-REFINEMENT` increment 2's
