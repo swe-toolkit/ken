@@ -27,6 +27,11 @@ the carrier's level `l`, and `Eq (A/R) [a] [b]` reduces to `R a b` again.
 - `Term::Quot` gains the third field `e`. Conversion compares `A` and `R`
   and skips `e` (Ω proof irrelevance). `check_quotient_rel` requires
   `whnf(cod2) = Ω_l` with `l ≡ synth_type(A)`.
+- `check_quotient_rel` never checks R's second domain (`check.rs:832-839`;
+  Research `evt_7daqm6ydmbnsr` S2: `R : Bool → Nat → Ω_0` forms `Bool/R` and
+  reaches Bottom through a constructor field). P0 checks both domains
+  against `A` directly; building `IsEquiv A R` and checking `e` against it
+  is not enough unless that type is itself formation-checked.
 - Consumers (grep of `Term::Quot(` and the `"quot"` tag, perishable):
   checked_core encode/decode `:2501`, `:4096`, `:4514`, `:4604`; elab.rs
   `:213`, `:2065`, `:2157`, `:2681`, `:2828`, `:7873`, `:7992`, `:15795`;
@@ -51,7 +56,8 @@ stop and report the mismatch.
 - **AC-1.** The interim's `0 = 1` probe stays refused, now at formation
   (the relation `λx y. Eq Nat 0 1` has no `IsEquiv` proof); a quotient by a
   real equivalence reduces `Eq (A/R) [a] [b]` to `R a b`. A relation at
-  `Ω_{l+1}` over `A : Type l` is refused. `trusted_base()` delta is the
+  `Ω_{l+1}` over `A : Type l` is refused, and so is S2's `R : Bool → Nat →
+  Ω_0` over `Bool`. `trusted_base()` delta is the
   formation side condition only.
 - **AC-2 (falsifiers).** M1: skip the `IsEquiv` check; a pin forming the
   `0 = 1` quotient reddens. M2: accept `Ω(_)` without the level equation;

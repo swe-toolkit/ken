@@ -56,7 +56,12 @@ stop and report the mismatch.
 ## Acceptance
 
 - **AC-1.** The `0 = 1` probe is refused, and `cast A B e t` at equal levels
-  checks unchanged. `trusted_base()` has no delta.
+  checks unchanged. Research's constructor-field route (`evt_7daqm6ydmbnsr`
+  S2: `R : Bool → Nat → Ω_0`, `data Bx = bx (Bool/R)`, `refl (bx [true]) :
+  Bottom`; and the non-reflexive `R x y := Eq Bool x false` twin) is refused.
+  `eq_at_inductive` passes raw constructor arguments into the conjunct, so
+  a direct `refl [a]` probe alone does not reach the arm. `trusted_base()`
+  has no delta.
 - **AC-2 (falsifiers; each must redden).** M1: restore the `QuotClass` pair
   arm in `eq_at_quot`; the `0 = 1` pin reddens. M2: delete the level
   comparison; the cross-level pin reddens and the equal-level pin stays
