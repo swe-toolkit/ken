@@ -300,7 +300,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 - spec: `21 §1` (requires premise); `22 §2.4` (PartialPrim); `22 §3`
   (body context); `35 §3.1` (Int `/` and `%`).
 - given: for each of `/` and `%`, a declaration without a caller:
-  `view f (n : Int) (d : Int) : Int requires Equal Int d 5 = n / d`, and
+  `fn f (n : Int) (d : Int) : Int requires Equal Int d 5 = n / d`, and
   the same declaration with `%` in place of `/`.
 - expect: one operation-site `PartialPrim` obligation per operator. Its
   `goal_closed` has the telescope
