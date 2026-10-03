@@ -62,7 +62,8 @@ stop and report the mismatch.
    root-frame ownership and rerun path are unchanged.
 2. Committed value pins, infer mode plus check forms, for every row of the
    ruling's table (E1, D1, D3, D7c, THREE, SIGR, SIGRtree, TREE control)
-   and the Adversary's D2, D5 and D8 sources.
+   and up to three reconstructed `(CVec, Vec)` variants labelled as such
+   (the Adversary's D2, D5 and D8 sources were never posted).
 
 ## Acceptance
 
