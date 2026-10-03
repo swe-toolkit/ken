@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CALL-SITE-PRECONDITION-DISCHARGE
 title: "No caller of a function with requires can be elaborated, because nothing supplies the premise proofs at a call site (spec 22 §2.3). Insert the proofs at each call, recognised from the caller's premises or raised as call-site obligations, and stage a spec'd declaration at its full type so self-calls see it"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
