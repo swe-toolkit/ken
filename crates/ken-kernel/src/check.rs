@@ -125,6 +125,69 @@ fn raw_wf(ctx: &Context, t: &Term, offset: usize) -> KernelResult<()> {
     }
 }
 
+/// Check that a declaration's level variables are bound by distinct level
+/// parameters. This is separate from term-variable raw well-formedness: levels
+/// also occur in universe formers and in explicit global/eliminator arguments.
+fn check_level_closure<'a>(
+    level_params: &[LevelVar],
+    terms: impl IntoIterator<Item = &'a Term>,
+) -> KernelResult<()> {
+    let allowed: HashSet<_> = level_params.iter().copied().collect();
+    if allowed.len() != level_params.len() {
+        return Err(KernelError::IllFormedDecl(
+            "duplicate level parameter".into(),
+        ));
+    }
+
+    let mut pending: Vec<&Term> = terms.into_iter().collect();
+    while let Some(term) = pending.pop() {
+        let levels: &[Level] = match term {
+            Term::Type(level) | Term::Omega(level) => std::slice::from_ref(level),
+            Term::Const { level_args, .. }
+            | Term::IndFormer { level_args, .. }
+            | Term::Constructor { level_args, .. }
+            | Term::Elim { level_args, .. } => level_args,
+            _ => &[],
+        };
+        for level in levels {
+            let mut level_nodes = vec![level];
+            while let Some(node) = level_nodes.pop() {
+                match node {
+                    Level::Zero => {}
+                    Level::Var(var) if allowed.contains(var) => {}
+                    Level::Var(var) => {
+                        return Err(KernelError::IllFormedDecl(format!(
+                            "undeclared level variable {var:?}"
+                        )));
+                    }
+                    Level::Suc(inner) => level_nodes.push(inner),
+                    Level::Max(left, right) => {
+                        level_nodes.push(left);
+                        level_nodes.push(right);
+                    }
+                }
+            }
+        }
+        pending.extend(term.children());
+    }
+    Ok(())
+}
+
+/// Inductive declarations also carry a standalone family level and generated
+/// former/constructor types, in addition to their source telescopes.
+fn check_inductive_level_closure(ind: &InductiveDecl) -> KernelResult<()> {
+    let family_level = Term::Type(ind.level.clone());
+    let mut terms = vec![&family_level, &ind.former_type];
+    terms.extend(ind.params.iter());
+    terms.extend(ind.indices.iter());
+    for constructor in &ind.constructors {
+        terms.extend(constructor.args.iter());
+        terms.extend(constructor.target_indices.iter());
+        terms.push(&constructor.type_);
+    }
+    check_level_closure(&ind.level_params, terms)
+}
+
 /// Raw well-formedness check (public, for the elaborator precondition).
 pub fn raw_well_formed(ctx: &Context, t: &Term) -> KernelResult<()> {
     raw_wf(ctx, t, 0)
@@ -1052,6 +1115,10 @@ where
     // Generate former + constructor types (`Π Δ_p. Π Δ_i. Type ℓ`, etc.).
     ind.build_types();
     ind.parameter_polarities = crate::inductive::derive_parameter_polarities(env, &ind);
+    if let Err(error) = check_inductive_level_closure(&ind) {
+        env.release_unused_id(d_id);
+        return Err(error);
+    }
 
     // Provisionally admit so every admission clause can roll back both the
     // declaration and its allocated ids on failure.
@@ -1084,23 +1151,21 @@ where
                 .iter()
                 .map(|_| env.fresh_id())
                 .collect::<Vec<_>>();
-            let support = match build_all_support_decl(
-                env,
-                &ind,
-                parameter,
-                sort,
-                family,
-                &constructor_ids,
-            ) {
-                Ok(support) => support,
-                Err(error) => {
-                    for _ in 0..published_supports {
+            let support =
+                match build_all_support_decl(env, &ind, parameter, sort, family, &constructor_ids)
+                    .and_then(|support| {
+                        check_inductive_level_closure(&support)?;
+                        Ok(support)
+                    }) {
+                    Ok(support) => support,
+                    Err(error) => {
+                        for _ in 0..published_supports {
+                            env.remove_last();
+                        }
                         env.remove_last();
+                        return Err(error);
                     }
-                    env.remove_last();
-                    return Err(error);
-                }
-            };
+                };
             env.add_decl(Decl::Inductive(support.clone()));
             if let Err(error) = validate_inductive_decl_inner(env, &support, true) {
                 env.remove_last();
@@ -1231,7 +1296,8 @@ pub fn stage_placeholders(
         ));
     }
     let empty = Context::new();
-    for (_, _, ty) in &specs {
+    for (_, level_params, ty) in &specs {
+        check_level_closure(level_params, [ty])?;
         classify(env, &empty, ty)?;
     }
     let mark_len = env.declarations().len();
@@ -1338,11 +1404,15 @@ pub fn admit_bodies(env: &mut GlobalEnv, group: &[(GlobalId, Term)]) -> KernelRe
     }
     let empty = Context::new();
     for (id, body) in group {
-        let Some(Decl::Opaque { ty, .. }) = env.lookup(*id) else {
+        let Some(Decl::Opaque {
+            level_params, ty, ..
+        }) = env.lookup(*id)
+        else {
             return Err(KernelError::IllFormedDecl(
                 "checked upgrade requires a present opaque member".into(),
             ));
         };
+        check_level_closure(level_params, [body])?;
         check(env, &empty, body, ty)?;
     }
     let decreasing = crate::sct::sct_check(env, group)?;
@@ -1449,6 +1519,7 @@ pub fn declare_postulate(
     level_params: Vec<LevelVar>,
     ty: Term,
 ) -> KernelResult<GlobalId> {
+    check_level_closure(&level_params, [&ty])?;
     let empty = Context::new();
     classify(env, &empty, &ty)?;
     let id = env.fresh_id();
@@ -1470,6 +1541,7 @@ pub fn declare_primitive(
     ty: Term,
     reduction: crate::env::PrimReduction,
 ) -> KernelResult<GlobalId> {
+    check_level_closure(&level_params, [&ty])?;
     let empty = Context::new();
     classify(env, &empty, &ty)?;
     let id = env.fresh_id();
@@ -1731,6 +1803,56 @@ mod tests {
     use super::*;
     use crate::env::GlobalEnv;
     use crate::term::Level;
+
+    #[test]
+    fn level_closure_reaches_every_explicit_level_slot_and_nested_child() {
+        let u = LevelVar(0);
+        let v = LevelVar(1);
+        let escaped = Level::Var(u).max(Level::Var(v).suc());
+        let id = GlobalId(17);
+        let terms = [
+            Term::Type(escaped.clone()),
+            Term::Omega(escaped.clone()),
+            Term::Const {
+                id,
+                level_args: vec![escaped.clone()],
+            },
+            Term::IndFormer {
+                id,
+                level_args: vec![escaped.clone()],
+            },
+            Term::Constructor {
+                id,
+                level_args: vec![escaped.clone()],
+            },
+            Term::Elim {
+                fam: id,
+                level_args: vec![escaped.clone()],
+                params: vec![],
+                motive: Box::new(Term::ty(Level::zero())),
+                methods: vec![],
+                indices: vec![],
+                scrut: Box::new(Term::var(0)),
+            },
+            Term::pi(Term::ty(Level::zero()), Term::Type(escaped)),
+        ];
+        for term in &terms {
+            assert_eq!(
+                check_level_closure(&[u], [term]),
+                Err(KernelError::IllFormedDecl(format!(
+                    "undeclared level variable {v:?}"
+                ))),
+                "missed explicit or nested level slot in {term:?}"
+            );
+            assert_eq!(check_level_closure(&[u, v], [term]), Ok(()));
+        }
+        assert_eq!(
+            check_level_closure(&[u, u], [&Term::ty(Level::zero())]),
+            Err(KernelError::IllFormedDecl(
+                "duplicate level parameter".into()
+            ))
+        );
+    }
 
     struct BoolNat {
         bool_: GlobalId,
