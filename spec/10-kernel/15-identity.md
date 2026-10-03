@@ -38,12 +38,14 @@ proofs are definitionally equal (no coherence baggage; `16` par. 1.2).
 
 **Reflexivity.** `refl a : Eq A a a`.
 
-**Computation.** `Eq A a b` reduces *by recursion on `A`*
+**Computation.** `Eq A a b` dispatches on the structure of `A`
 (`16` par. 2.2): pointwise at a Pi-type (so **funext is definitional**),
-componentwise at a Sigma-type, structurally at an inductive, to the user
-relation at a quotient, to mutual implication at Omega (**propext**), and
-to literal equality at a primitive. On a neutral `A` it is a neutral
-proposition.
+componentwise at a Sigma-type, structurally at an inductive, to mutual
+implication at Omega (**propext**), and to literal equality at a primitive.
+At a quotient `A/R` it remains **neutral** in the interim, even for two
+classes; reduction to the user relation awaits P0's checked Quot-Form
+equivalence proof (`KERNEL-QUOT-FORM-EQUIVALENCE`, `16 §2.2`/§5). On a
+neutral `A` it is also a neutral proposition.
 
 `Eq` has **no primitive reduction rules of its own** -- it delegates
 entirely to the type-directed computation defined in `16` par. 2.2. The
