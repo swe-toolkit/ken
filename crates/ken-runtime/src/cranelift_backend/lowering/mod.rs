@@ -16,6 +16,9 @@
 //! escape `crate::cranelift_backend`.
 
 pub(in crate::cranelift_backend) mod core;
+mod residual;
+use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
+    RecursiveCarrierSlotKey, Representation};
 mod frame_validation;
 use frame_validation::{FrameEventKind, FrameEvents, FrameTerminalKind};
 
@@ -207,6 +210,169 @@ pub(in crate::cranelift_backend) use cranelift_module::{FuncId, Linkage, Module}
 
 pub(in crate::cranelift_backend) use safe_byte_span::SafeByteSpan;
 
+/// Test-support only: inspect the class-helper calls in emitted Cranelift IR
+/// at each ordinary constructor binder, independently of the planner's S
+/// predicate. Both mutations preserve compilation and perturb the emitter.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RecursiveResidualMatchGuardMutation {
+    Exact,
+    GuardEveryBinder,
+    GuardNoBinder,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug)]
+pub struct RecursiveResidualMatchGuardObservation {
+    pub constructor_identity: u64,
+    pub position: usize,
+    pub planned_in_s: bool,
+    pub emitted_class_calls: usize,
+    pub reader: &'static str,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+std::thread_local! {
+    static RECURSIVE_RESIDUAL_GUARD_MUTATION: std::cell::Cell<RecursiveResidualMatchGuardMutation> =
+        const { std::cell::Cell::new(RecursiveResidualMatchGuardMutation::Exact) };
+    static RECURSIVE_RESIDUAL_GUARD_OBSERVATIONS: std::cell::RefCell<Vec<RecursiveResidualMatchGuardObservation>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_recursive_residual_match_guard_observations<T>(
+    mutation: RecursiveResidualMatchGuardMutation,
+    body: impl FnOnce() -> T,
+) -> (T, Vec<RecursiveResidualMatchGuardObservation>) {
+    let old = RECURSIVE_RESIDUAL_GUARD_MUTATION.with(|cell| cell.replace(mutation));
+    RECURSIVE_RESIDUAL_GUARD_OBSERVATIONS.with(|cell| cell.borrow_mut().clear());
+    let result = body();
+    let rows = RECURSIVE_RESIDUAL_GUARD_OBSERVATIONS.with(|cell| std::mem::take(&mut *cell.borrow_mut()));
+    RECURSIVE_RESIDUAL_GUARD_MUTATION.with(|cell| cell.set(old));
+    (result, rows)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn recursive_residual_guard_enabled(expected: bool) -> bool {
+    RECURSIVE_RESIDUAL_GUARD_MUTATION.with(|cell| match cell.get() {
+        RecursiveResidualMatchGuardMutation::Exact => expected,
+        RecursiveResidualMatchGuardMutation::GuardEveryBinder => true,
+        RecursiveResidualMatchGuardMutation::GuardNoBinder => false,
+    })
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn recursive_residual_class_calls(func: &Function, target: FuncRef) -> usize {
+    func.layout.blocks().flat_map(|block| func.layout.block_insts(block))
+        .filter(|inst| matches!(func.dfg.insts[*inst],
+            cranelift_codegen::ir::InstructionData::Call { func_ref, .. } if func_ref == target))
+        .count()
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PrivateResidualReaderSite {
+    HostWireRoot,
+    HostWireChild,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy)]
+struct PrivateResidualReaderProbe {
+    site: PrivateResidualReaderSite,
+    delete_guard: bool,
+}
+
+#[cfg(test)]
+std::thread_local! {
+    static PRIVATE_RESIDUAL_READER_PROBE: std::cell::Cell<Option<PrivateResidualReaderProbe>> =
+        const { std::cell::Cell::new(None) };
+    static PRIVATE_RESIDUAL_READER_GUARDS: std::cell::RefCell<Vec<usize>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(test)]
+fn with_private_reader_probe<T>(
+    site: PrivateResidualReaderSite,
+    delete_guard: bool,
+    body: impl FnOnce() -> T,
+) -> (T, Vec<usize>) {
+    let old = PRIVATE_RESIDUAL_READER_PROBE.with(|cell| cell.replace(Some(
+        PrivateResidualReaderProbe { site, delete_guard }
+    )));
+    PRIVATE_RESIDUAL_READER_GUARDS.with(|cell| cell.borrow_mut().clear());
+    let result = body();
+    let guards = PRIVATE_RESIDUAL_READER_GUARDS.with(|cell| {
+        std::mem::take(&mut *cell.borrow_mut())
+    });
+    PRIVATE_RESIDUAL_READER_PROBE.with(|cell| cell.set(old));
+    (result, guards)
+}
+
+#[cfg(test)]
+fn private_reader_guard_deleted(site: PrivateResidualReaderSite) -> bool {
+    PRIVATE_RESIDUAL_READER_PROBE.with(|cell| {
+        cell.get().is_some_and(|probe| probe.site == site && probe.delete_guard)
+    })
+}
+
+#[cfg(test)]
+fn record_private_reader_guard(
+    site: PrivateResidualReaderSite,
+    before: usize,
+    func: &Function,
+    class: FuncRef,
+) {
+    if PRIVATE_RESIDUAL_READER_PROBE.with(|cell| cell.get().is_some_and(|p| p.site == site)) {
+        let after = recursive_residual_class_calls(func, class);
+        PRIVATE_RESIDUAL_READER_GUARDS.with(|cell| cell.borrow_mut().push(after - before));
+    }
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+std::thread_local! {
+    static PLAIN_NATIVE_UNIT_IR_OBSERVATIONS: std::cell::RefCell<Vec<String>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_plain_native_unit_ir_observations<T>(body: impl FnOnce() -> T) -> (T, String) {
+    PLAIN_NATIVE_UNIT_IR_OBSERVATIONS.with(|cell| cell.borrow_mut().clear());
+    let result = body();
+    let ir = PLAIN_NATIVE_UNIT_IR_OBSERVATIONS.with(|cell| {
+        std::mem::take(&mut *cell.borrow_mut()).concat()
+    });
+    (result, ir)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_plain_native_unit_ir(id: FuncId, func: &Function) {
+    PLAIN_NATIVE_UNIT_IR_OBSERVATIONS.with(|cell| cell.borrow_mut().push(
+        format!("=== {id:?}\n{func}\n")
+    ));
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_recursive_residual_match_guard(
+    reader: &'static str,
+    identity: ConstructorIdentity,
+    position: usize,
+    planned_in_s: bool,
+    emitted_class_calls: usize,
+) -> Result<(), CraneliftBackendError> {
+    let constructor_identity = identity.tag_abi_word()?;
+    RECURSIVE_RESIDUAL_GUARD_OBSERVATIONS.with(|cell| cell.borrow_mut().push(
+        RecursiveResidualMatchGuardObservation {
+            constructor_identity,
+            position,
+            planned_in_s,
+            emitted_class_calls,
+            reader,
+        }
+    ));
+    Ok(())
+}
+
 // --- crate root ------------------------------------------------------------
 pub(in crate::cranelift_backend) use crate::{
     RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeGroundValue, RuntimePartiality,
@@ -259,6 +425,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     // eliminator checks its assembled run against it. ⛔ Ungated here and in
     // `planning.rs`, because a `cfg(test)` re-export of an item production reads
     // is an unresolved import the test profile cannot see.
+    CaptureRun, MaterializationKind, PerEmitterCaptureClaim,
     BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
     CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
     CheckedIhForwardRetPlanProof,
@@ -282,6 +449,10 @@ pub(in crate::cranelift_backend) use super::planning::{
     host_effect_seat_contract_of, EffectSeatConstructorPath, EffectSeatNeed,
     EffectSeatOperation, EffectSeatPhase, EffectSeatSlot, PlannedEffectSeat,
     AggregateOccurrenceId, PlannedAggregateAllocation, PlannedAggregateShape,
+    RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
+    RecursiveCarrierBoxedStore, RecursiveCarrierMemberSchema, RecursiveCarrierStore,
+    RecursiveCarrierStoreKind,
+    RecursiveCarrierSlot, RecursiveCarrierVariant, RecursiveResidualChildKind,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
@@ -503,6 +674,8 @@ enum Px8jProducerPath {
 enum Px8jResidualPhase {
     /// The carried phase, together with the exact boundary word held.
     Carried(cranelift_codegen::ir::Value),
+    /// The issued residual carries a slot key, not an ordinary K word.
+    Residual(RecursiveCarrierSlotKey),
     /// The specialized phase. ⛔ Recorded as a phase only: `§2g-i`'s clause
     /// constrains the **carried** arm, and a specialized residual is a
     /// different route entirely.
@@ -744,6 +917,7 @@ fn px8j_record_recursor_carrier(path: Px8jProducerPath, value: &LoweringOperand)
     // silent hole in exactly the edge this field exists to expose.
     let residual = match residual.as_ref() {
         LoweringOperand::Carried(word) => Px8jResidualPhase::Carried(word.word),
+        LoweringOperand::Residual(residual) => Px8jResidualPhase::Residual(residual.slot()),
         LoweringOperand::Specialized(_) => Px8jResidualPhase::Specialized,
     };
     px8j_record_source_event(Px8jSourceTraceEvent::Carrier {
@@ -985,7 +1159,6 @@ impl ArtifactHelpers<'_> {
             #[cfg(test)]
             defining_abi_slot_kinds: Vec::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             continuation_calls: BTreeMap::new(),
             continuation_emissions: BTreeMap::new(),
@@ -1052,57 +1225,6 @@ enum TrapExitAuthority {
     },
 }
 
-/// **`RT-DECL-CLOSURE-PORT` `D5a`** -- the continuation-input operands one
-/// enclosing specialization passes across a retargeted worker call.
-/// **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- the generated context's own frame,
-/// CONSTRUCTED at the creation site from the producer's live environment.**
-///
-/// The closure conversion the Architect ruled (`evt_7vh5nccb9gcqy`). A carried
-/// recursive-position invocation retargeted onto a generated context must
-/// supply that context's whole declared frame, and two of its runs cannot be
-/// gathered where the retarget happens:
-///
-/// - the **worker-capture tail of the `Parameter` run** -- the carried
-///   invocation supplies only the raw body's declared arguments, so the
-///   selected closure's captures are simply absent there;
-/// - the **`Capture` run** -- the enclosing specialization's continuation
-///   inputs, whose producer-local members live in the producer's semantic
-///   environment and are **not ABI operands at all**, so
-///   `function_local.defining_abi_operands` structurally cannot hold them.
-///
-/// Both runs ARE in hand at `assemble_continuation_call_operands`, which runs
-/// in the enclosing function's body with `producer_env` live and resolves every
-/// member through the planner's own projections. This carries them from there
-/// to the retarget, so the frame is **materialized where its free variables are
-/// live** rather than re-derived where they are not.
-///
-/// **This supplies members; it relaxes no check.** The operands are presented
-/// in the context's declared order and the consumer re-verifies both
-/// cardinalities against the context's own frame header before using them, so a
-/// mis-ordered or mis-counted frame still refuses. `verify_entry_frame`'s
-/// membership and slot re-derivation guard is untouched: the context body still
-/// walks its own declared run.
-///
-/// Keyed by the **complete planner-issued coordinate triple**, never by body
-/// origin alone. One function can reach two retargets over one body, and a
-/// frame consumed at the wrong one would be an arity-correct call carrying
-/// another occurrence's values -- the exact silent shape `D6a` and
-/// `generated_context_captures` both guard against by retaining their key.
-struct ConstructedContextFrame {
-    /// The eliminator occurrence whose recursive position this frame serves.
-    continuation_origin: StaticOriginId,
-    /// That position, as the planner issued it.
-    recursive_position: u32,
-    /// The selected worker body the context executes.
-    worker_body_origin: StaticOriginId,
-    /// The selected closure's captures, in **capture-ordinal** order -- the
-    /// tail of the context's `Parameter` run, after the declared arguments the
-    /// carried invocation itself supplies.
-    worker_captures: Vec<LoweringOperand>,
-    /// The enclosing specialization's continuation inputs, in ordinal order --
-    /// the context's own `Capture` run.
-    context_captures: Vec<LoweringOperand>,
-}
 
 struct GeneratedContextCaptures {
     /// The exact worker body origin whose call carries this suffix.
@@ -1342,12 +1464,6 @@ struct FunctionLocalRefs {
     /// implicit: a suffix appended to the wrong worker call would be a silent
     /// arity error at a frame that happened to be big enough.
     generated_context_captures: Option<GeneratedContextCaptures>,
-    /// **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2`** -- see
-    /// [`ConstructedContextFrame`]. Written at the creation site, consumed at
-    /// the carried-invocation retarget, and per-function for the same reason
-    /// `generated_context_captures` is: the operands are `ir::Value`s of this
-    /// Function.
-    constructed_context_frame: Option<ConstructedContextFrame>,
     /// Sanitized planner authority installed only while defining one generated
     /// context function. Source identities, retarget callers, transports, and
     /// derivation ancestry are absent from its type.
@@ -1928,6 +2044,9 @@ pub(in crate::cranelift_backend) fn d4a_describe_binding(
         Some(LoweringEnvironmentBinding::StaticWorker(..)) => "worker".to_string(),
         Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(word))) => {
             format!("carried({:?})", word.word)
+        }
+        Some(LoweringEnvironmentBinding::Value(LoweringOperand::Residual(residual))) => {
+            format!("residual({:?})", residual.slot())
         }
         Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(lowered))) => {
             match lowered {
@@ -3887,6 +4006,105 @@ struct CarriedBoundaryWord {
     word: cranelift_codegen::ir::Value,
 }
 
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ResidualLoweringCounters {
+    pub site_a_none_arrivals: usize,
+    /// Counted while emitting the labelled arm, not when native execution selects it.
+    pub boxed_decode_arms_emitted: usize,
+    pub boxed_member_compile_refusals: usize,
+    pub transitional_escapes: usize,
+    pub synthesized_checked_ih_capture_escapes: usize,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static RESIDUAL_LOWERING_COUNTERS: std::cell::Cell<ResidualLoweringCounters> =
+        const { std::cell::Cell::new(ResidualLoweringCounters {
+            site_a_none_arrivals: 0,
+            boxed_decode_arms_emitted: 0,
+            boxed_member_compile_refusals: 0,
+            transitional_escapes: 0,
+            synthesized_checked_ih_capture_escapes: 0,
+        }) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+pub fn with_residual_lowering_counters<T>(body: impl FnOnce() -> T) -> (T, ResidualLoweringCounters) {
+    let old = RESIDUAL_LOWERING_COUNTERS.with(|counter| counter.replace(ResidualLoweringCounters::default()));
+    let result = body();
+    let measured = RESIDUAL_LOWERING_COUNTERS.with(|counter| counter.replace(old));
+    (result, measured)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_residual_counter_event(site: &'static str) {
+    // The optional diagnostic file collects counts across the parity suite's
+    // separate test processes. The thread-local counter is the CI subject;
+    // this file is only exact-run review evidence, never a test oracle.
+    if let Some(path) = std::env::var_os("KEN_RT_RESIDUAL_COUNT_LOG") {
+        use std::io::Write;
+        writeln!(
+            std::fs::OpenOptions::new().create(true).append(true).open(path)
+                .expect("residual diagnostic log is writable"),
+            "{} {site}", std::thread::current().name().unwrap_or("unnamed")
+        ).expect("residual diagnostic event is written");
+    }
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_site_a_residual_none_arrival() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.site_a_none_arrivals += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("site_a_none");
+}
+
+// Site A is counted during lowering. Keep the Boxed-arm counter in the
+// same measurement plane: emission of an arm is not evidence it was selected
+// at runtime. A targeted execution mutation must prove that separately.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_boxed_decode_arm_emitted() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.boxed_decode_arms_emitted += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("boxed_decode_arm_emitted");
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_boxed_member_compile_refusal() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.boxed_member_compile_refusals += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("boxed_member_compile_refusal");
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_residual_transitional_escape() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.transitional_escapes += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("transitional_escape");
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_synthesized_checked_ih_capture_escape() {
+    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
+        let mut measured = counter.get();
+        measured.synthesized_checked_ih_capture_escapes += 1;
+        counter.set(measured);
+    });
+    record_residual_counter_event("synthesized_checked_ih_capture_escape");
+}
+
 /// The capture-only runtime aggregate produced for a checked-IH application.
 ///
 /// This private role type deliberately has no conversion to
@@ -3894,13 +4112,28 @@ struct CarriedBoundaryWord {
 /// only the Direct application emitter may turn the captured fields into a
 /// result by issuing the planner-selected continuation call.
 #[derive(Clone, Copy, Debug)]
+enum CheckedIhEnvironmentOperand {
+    Residual(CarriedResidualWord),
+    Synthesized(CarriedBoundaryWord),
+}
+
+impl CheckedIhEnvironmentOperand {
+    fn into_operand(self) -> LoweringOperand {
+        match self {
+            Self::Residual(residual) => LoweringOperand::Residual(residual),
+            Self::Synthesized(word) => LoweringOperand::Carried(word),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 struct CheckedIhCapturedEnvironment {
-    word: CarriedBoundaryWord,
+    word: CheckedIhEnvironmentOperand,
 }
 
 impl CheckedIhCapturedEnvironment {
     fn into_operand(self) -> LoweringOperand {
-        LoweringOperand::Carried(self.word)
+        self.word.into_operand()
     }
 }
 
@@ -3918,6 +4151,11 @@ impl CheckedIhApplicationResult {
     fn from_declared_call(result: LoweringOperand) -> Result<Self, CraneliftBackendError> {
         match result {
             LoweringOperand::Carried(word) => Ok(Self { word }),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a fresh checked-IH declared-call answer",
+                },
+            ),
             LoweringOperand::Specialized(_) => Err(unsupported(
                 "CheckedIhApplicationResult",
                 "a governed checked-IH continuation call returned a specialized template instead of its Trap-checked runtime Result",
@@ -4199,8 +4437,10 @@ enum LoweringOperand {
     /// before this node. ⛔ Kept as an **explicit** arm, never a fallback:
     /// a fallback arm is a wildcard with better manners.
     Specialized(Lowered),
-    /// A runtime boundary word, eliminated only by emitted helpers.
+    /// An ordinary runtime boundary value; never a private residual record.
     Carried(CarriedBoundaryWord),
+    /// An issued recursive-position record with its producer's slot key.
+    Residual(CarriedResidualWord),
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -4218,6 +4458,7 @@ fn record_returned_vis_lexical_captures(
         let capture_origin = plan.child_static_origin(closure_origin, 1 + capture_position)?;
         let (variant, disposition, forbidden) = match capture {
             LoweringOperand::Carried(_) => ("Carried".to_owned(), None, false),
+            LoweringOperand::Residual(_) => ("Residual".to_owned(), None, false),
             LoweringOperand::Specialized(value) => {
                 let variant = value.variant();
                 let disposition = variant.boundary_disposition();
@@ -4253,8 +4494,8 @@ fn record_returned_vis_lexical_captures(
 /// de-Bruijn side map. Either would create a second binding authority, and then
 /// the question *"what is bound here"* would have two answers.
 ///
-/// This sum is compiler-only. It is **not** a [`Lowered`] variant, not a third
-/// [`LoweringOperand`] arm, and it never becomes a runtime value.
+/// This sum is compiler-only. The residual plane is an explicit
+/// [`LoweringOperand`] arm inside `Value`, not a parallel binding authority.
 #[derive(Clone)]
 enum LoweringEnvironmentBinding {
     /// An ordinary bound value. Every binder that existed before this node
@@ -4858,6 +5099,8 @@ impl LoweringOperand {
         match self {
             LoweringOperand::Specialized(_) => EffectSeatPhase::SpecializedTemplate,
             LoweringOperand::Carried(_) => EffectSeatPhase::CarriedWord,
+            // Phase does not assert the value-vs-residual representation.
+            LoweringOperand::Residual(_) => EffectSeatPhase::CarriedWord,
         }
     }
 
@@ -4872,6 +5115,9 @@ impl LoweringOperand {
                      emitted helper call"
                 ),
             )),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired { site: edge },
+            ),
         }
     }
 
@@ -4889,6 +5135,9 @@ impl LoweringOperand {
                      emitted helper call"
                 ),
             )),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired { site: edge },
+            ),
         }
     }
 }
@@ -6312,6 +6561,7 @@ pub(in crate::cranelift_backend) fn d9_role_key(
 pub(in crate::cranelift_backend) enum D9OperandPhase {
     Specialized,
     Carried,
+    Residual,
 }
 
 /// **The exact, comparison-only identity of one lowering operand.**
@@ -6341,7 +6591,8 @@ pub(in crate::cranelift_backend) struct D9OperandIdentity {
     /// word gains **no** [`LoweredVariant`], so asking for one would be the
     /// inverse conversion the phase sum exists to forbid.
     pub(in crate::cranelift_backend) variant: Option<LoweredVariant>,
-    /// Every SSA word the operand holds, in structural order.
+    /// SSA words visible outside the private residual module, in structural order.
+    /// An R is represented by its phase alone; its word remains private.
     pub(in crate::cranelift_backend) words: Vec<cranelift_codegen::ir::Value>,
     /// Every planner-issued static origin it names, in structural order.
     pub(in crate::cranelift_backend) origins: Vec<StaticOriginId>,
@@ -6358,6 +6609,7 @@ pub(in crate::cranelift_backend) fn d9_operand_identity(
             words.push(word.word);
             (D9OperandPhase::Carried, None)
         }
+        LoweringOperand::Residual(_) => (D9OperandPhase::Residual, None),
         LoweringOperand::Specialized(lowered) => {
             d9_collect(lowered, &mut words, &mut origins);
             (D9OperandPhase::Specialized, Some(lowered.variant()))
@@ -7432,6 +7684,7 @@ impl<'a> Lowering<'a> {
             let Some(observations) = window.as_mut() else { return };
             let (variant, disposition) = match input {
                 LoweringOperand::Carried(_) => ("Carried".to_owned(), None),
+                LoweringOperand::Residual(_) => ("Residual".to_owned(), None),
                 LoweringOperand::Specialized(value) => {
                     let variant = value.variant();
                     (format!("{variant:?}"), Some(format!("{:?}", variant.boundary_disposition())))
@@ -7468,18 +7721,18 @@ impl<'a> Lowering<'a> {
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
         #[cfg(not(feature = "px8-ds-test-support"))]
         let _ = (member, closure, position);
-        if let LoweringOperand::Specialized(value) = &input {
-            let admission = value.boundary_transfer_admissibility();
-            #[cfg(feature = "px8-ds-test-support")]
-            self.record_pending_vis_capture_observation(
-                member, closure, origin, position, &input, admission.is_ok(),
-            );
+        let admission = match &input {
+            LoweringOperand::Specialized(value) => Some(value.boundary_transfer_admissibility()),
+            LoweringOperand::Residual(_) => None,
+            LoweringOperand::Carried(_) => None,
+        };
+        #[cfg(feature = "px8-ds-test-support")]
+        self.record_pending_vis_capture_observation(
+            member, closure, origin, position, &input,
+            admission.as_ref().map_or(true, Result::is_ok),
+        );
+        if let Some(admission) = admission {
             admission?;
-        } else {
-            #[cfg(feature = "px8-ds-test-support")]
-            self.record_pending_vis_capture_observation(
-                member, closure, origin, position, &input, true,
-            );
         }
         match self.carry_call_input(
             builder, origin, input,
@@ -7489,6 +7742,9 @@ impl<'a> Lowering<'a> {
             GeneratedUnitCallInputCallee::Entry(origin),
         )? {
             LoweringOperand::Carried(word) => Ok(word),
+            // Pending-Vis capture frame: counted I-0 untyped ABI copy.
+            LoweringOperand::Residual(residual) => Ok(residual
+                .residual_across_untyped_abi_transitional()),
             LoweringOperand::Specialized(_) => Err(backend_module(
                 "a pending-Vis capture did not become a carried word".to_string(),
             )),
@@ -7642,6 +7898,8 @@ impl<'a> Lowering<'a> {
         );
         match input {
             LoweringOperand::Carried(word) => Ok(LoweringOperand::Carried(word)),
+            // Retain R until the actual declared-call frame-copy seat.
+            LoweringOperand::Residual(residual) => Ok(LoweringOperand::Residual(residual)),
             deferred @ LoweringOperand::Specialized(Lowered::StaticResponseDeferred { .. }) => {
                 // Keep the source site until the declared target and its slot
                 // are known. This crossing must never mint a carried zero.
@@ -8433,6 +8691,23 @@ impl<'a> Lowering<'a> {
         Ok(builder.ins().stack_load(types::I64, slot, 0))
     }
 
+    /// Issued residual labels are ImmediateInt words, not arena nodes. Read
+    /// their tag and signed ordinal from the word, never through node accessors.
+    fn emit_carrier_label_ordinal(
+        builder: &mut FunctionBuilder<'_>,
+        label: CarriedBoundaryWord,
+    ) -> cranelift_codegen::ir::Value {
+        let tag = builder.ins().band_imm(
+            label.word,
+            crate::boundary_value::BOUNDARY_TAG_MASK as i64,
+        );
+        Self::require_i64(builder, tag, BoundaryTag::ImmediateInt as i64);
+        builder.ins().sshr_imm(
+            label.word,
+            i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
+        )
+    }
+
     fn emit_carrier_host_success(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -8606,6 +8881,191 @@ impl<'a> Lowering<'a> {
     }
 
 
+
+    /// Test-only corruption at a real reader input. The synthetic tag-1 Record
+    /// copies the original word's positional children, so a later arity check
+    /// cannot be mistaken for this reader's class/tag refusal.
+    #[cfg(test)]
+    fn test_private_word_at_reader(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        original: CarriedBoundaryWord,
+        site: PrivateResidualReaderSite,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        if !PRIVATE_RESIDUAL_READER_PROBE.with(|cell| cell.get().is_some_and(|p| p.site == site)) {
+            return Ok(original);
+        }
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        let pointer = builder.func.dfg.value_type(arena);
+        let count = self.emit_carrier_field_count(builder, original)?;
+        let (record_slot, out) = Self::carrier_out_slot(builder, pointer);
+        let tag = builder.ins().iconst(types::I64, BoundaryTag::InvocationAggregate as i64);
+        let class = builder.ins().iconst(types::I64, BoundaryClass::Record as i64);
+        let alloc = builder.ins().call(refs.alloc, &[arena, tag, class, count, out]);
+        Self::require_i64(builder, builder.inst_results(alloc)[0], BOUNDARY_OK);
+        let record = CarriedBoundaryWord {
+            word: builder.ins().stack_load(types::I64, record_slot, 0),
+        };
+        self.emit_carrier_store_tag_id(builder, record, 1)?;
+
+        let head = builder.create_block();
+        builder.append_block_param(head, types::I64);
+        let copy = builder.create_block();
+        let done = builder.create_block();
+        let zero = builder.ins().iconst(types::I64, 0);
+        builder.ins().jump(head, &[zero.into()]);
+        builder.switch_to_block(head);
+        let index = builder.block_params(head)[0];
+        let remaining = builder.ins().icmp(
+            cranelift_codegen::ir::condcodes::IntCC::UnsignedLessThan, index, count,
+        );
+        builder.ins().brif(remaining, copy, &[], done, &[]);
+        builder.switch_to_block(copy);
+        let (child_slot, child_out) = Self::carrier_out_slot(builder, pointer);
+        let read = builder.ins().call(refs.field, &[arena, original.word, index, child_out]);
+        Self::require_i64(builder, builder.inst_results(read)[0], BOUNDARY_OK);
+        let child = builder.ins().stack_load(types::I64, child_slot, 0);
+        let write = builder.ins().call(refs.store_field, &[arena, record.word, index, child]);
+        Self::require_i64(builder, builder.inst_results(write)[0], BOUNDARY_OK);
+        let next = builder.ins().iadd_imm(index, 1);
+        builder.ins().jump(head, &[next.into()]);
+        builder.seal_block(head);
+        builder.switch_to_block(done);
+        Ok(record)
+    }
+
+    /// A test-only continuation poison, emitted immediately AFTER the reader's
+    /// guard. A private record may never reach it. Removing that one guard
+    /// returns 47 instead of the guard's -1, even if a later unrelated tag or
+    /// arity check would also have refused the record before a host call.
+    #[cfg(test)]
+    fn test_private_reader_fallthrough_poison(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        site: PrivateResidualReaderSite,
+    ) {
+        if !PRIVATE_RESIDUAL_READER_PROBE.with(|cell| cell.get().is_some_and(|p| p.site == site)) {
+            return;
+        }
+        let poison = builder.create_block();
+        let continue_lowering = builder.create_block();
+        let one = builder.ins().iconst(types::I64, 1);
+        let reached = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal, one, 1,
+        );
+        builder.ins().brif(reached, poison, &[], continue_lowering, &[]);
+        builder.switch_to_block(poison);
+        let marker = builder.ins().iconst(types::I64, 47);
+        builder.ins().return_(&[marker]);
+        builder.switch_to_block(continue_lowering);
+    }
+
+    /// A compiler-private recursive-position record must never be mistaken
+    /// for a source Record, positional environment or plain constructor child.
+    /// The class check precedes the tag read: tag 1 can also be an issued
+    /// constructor identity, so comparing only its tag is not discriminating.
+    fn refuse_private_recursive_residual(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+    ) -> Result<(), CraneliftBackendError> {
+        let class = self.emit_carrier_class(builder, word)?;
+        let is_record = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal,
+            class,
+            BoundaryClass::Record as i64,
+        );
+        let inspect = builder.create_block();
+        let done = builder.create_block();
+        builder.ins().brif(is_record, inspect, &[], done, &[]);
+        builder.switch_to_block(inspect);
+        let tag = self.emit_carrier_tag(builder, word)?;
+        let not_private = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::NotEqual, tag, 1,
+        );
+        let refused = builder.create_block();
+        builder.ins().brif(not_private, done, &[], refused, &[]);
+        builder.switch_to_block(refused);
+        let failure = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[failure]);
+        builder.switch_to_block(done);
+        Ok(())
+    }
+
+    /// Read a carried recursive field using its construction-time Child.
+    /// The transport identifies the reader; only the construct store issues
+    /// the residual and its Child schema. A call answer is not a slot writer.
+    fn checked_ih_transport_child(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        operand: LoweringOperand,
+        transport: &CheckedIhEnvironmentTransport,
+    ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
+        let source = transport.source_specialization();
+        let Some(disposition) = self.static_transition_plan
+            .recursive_residual_for_specialization(source)?
+            .filter(|disposition| disposition.wrapped()).cloned() else {
+            return match operand {
+                LoweringOperand::Carried(word) => {
+                    self.refuse_private_recursive_residual(builder, word)?;
+                    Ok(word)
+                }
+                LoweringOperand::Residual(_) => Err(unsupported(
+                    "RecursiveResidual", "an unwrapped transport received a private residual",
+                )),
+                LoweringOperand::Specialized(_) => Err(unsupported(
+                    "RecursiveResidual", "a transport Child reader has no carried word",
+                )),
+            };
+        };
+        let residual = match operand {
+            LoweringOperand::Residual(residual) => residual,
+            LoweringOperand::Carried(_) => return Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a wrapped checked-IH transport Child reader",
+                },
+            ),
+            LoweringOperand::Specialized(_) => return Err(unsupported(
+                "RecursiveResidual", "a wrapped transport Child reader has no residual",
+            )),
+        };
+        let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+            "RecursiveResidual", "a transport Child reader has no emission owner",
+        ))?;
+        if owner != transport.destination_owner()
+            || self.static_transition_plan.checked_ih_environment_transport_at(
+                owner, transport.destination_construct_origin(),
+            )? != Some(transport) {
+            return Err(unsupported("RecursiveResidual", "the transport Child reader has no exact planned transport"));
+        }
+        let slot = self.static_transition_plan
+            .recursive_carrier_for_specialization(source)?
+            .ok_or_else(|| unsupported("RecursiveResidual", "the transport Child has no planner slot"))?;
+        if residual.slot() != RecursiveCarrierSlotKey::of(slot) {
+            return Err(unsupported("RecursiveResidual", "the transport Child has a foreign issued slot"));
+        }
+        let unit = self.static_transition_plan.continuation_units()?.into_iter()
+            .find(|unit| unit.id() == source)
+            .ok_or_else(|| unsupported("RecursiveResidual", "the transport Child has no interned constructor"))?;
+        let edge = slot.edge(source, RecursiveCarrierStoreKind::ConstructEmission,
+            unit.producer_construct_origin(), unit.emission_owner())?;
+        let RecursiveCarrierChild::ConstructChild { origin, record } = edge.child else {
+            return Err(unsupported("RecursiveResidual", "the construct Child has an unexpected minting record"));
+        };
+        if origin != unit.worker_closure_origin() {
+            return Err(unsupported("RecursiveResidual", "the transport Child differs from its construct seat"));
+        }
+        let child_schema = self.static_transition_plan.aggregate_record_view(record)?;
+        if child_schema.shape() != PlannedAggregateShape::Constructor
+            || child_schema.declared_children().map(|children| children.len())
+                != Some(disposition.worker_captures as usize)
+        {
+            return Err(unsupported("RecursiveResidual", "the construct Child schema disagrees with its W roles"));
+        }
+        slot.variant(source)?;
+        self.decode_residual_child(builder, residual)
+    }
 
     fn checked_post_call_consumer_frame(
         &self,
@@ -9122,6 +9582,11 @@ impl<'a> ClaimedEffectSeats<'a> {
                     record.slot, record.operation, record.need
                 ),
             )),
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a specialized host-effect seat",
+                },
+            ),
         }
     }
 }
@@ -9484,6 +9949,44 @@ struct OrdinaryEliminatorFrame<'a> {
     retained_scrutinee_index: Option<usize>,
     deferred_constructor_case: Option<&'a DeferredConstructorCaseEnvironment<'a>>,
 }
+/// A recursive unit can be fixed by a literal producer or selected from the
+/// interned specialization set by the label on a carried residual. Neither
+/// variant admits a runtime-created code identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RecursiveUnitBodySelection {
+    /// The original literal-producer body; no residual disposition was selected.
+    Exact(StaticOriginId),
+    /// The planner-issued singleton residual. Keep the selection-time K with
+    /// the value so a later force checks the same continuation, not its own.
+    ResidualExact {
+        body: StaticOriginId,
+        pending_outer_frames: usize,
+    },
+    Labelled {
+        eliminator: StaticOriginId,
+        constructor: ConstructorIdentity,
+        position: u32,
+        pending_outer_frames: usize,
+    },
+}
+
+impl RecursiveUnitBodySelection {
+    fn require_trivial_residual_continuation(self) -> Result<(), CraneliftBackendError> {
+        let pending_outer_frames = match self {
+            Self::Exact(_) => return Ok(()),
+            Self::ResidualExact { pending_outer_frames, .. }
+            | Self::Labelled { pending_outer_frames, .. } => pending_outer_frames,
+        };
+        if pending_outer_frames > 0 {
+            return Err(unsupported(
+                "RecursiveResidual",
+                "a residual cannot replace a descent under a pending outer continuation",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy)]
 struct PendingLetContinuationFrame<'a> {
     /// ⭐ The same phase-bearing edge as
@@ -9497,7 +10000,7 @@ struct PendingLetContinuationFrame<'a> {
     /// `child(call_origin, 1 + i)`.
     call_origin: StaticOriginId,
     env: &'a [LoweringEnvironmentBinding],
-    recursive_unit_body: Option<StaticOriginId>,
+    recursive_unit_body: Option<RecursiveUnitBodySelection>,
 }
 #[derive(Clone, Copy)]
 struct ActiveContinuationFrame<'a> {
@@ -9551,7 +10054,7 @@ struct RecursorInvocationSegment {
     ///
     /// `None` is the ordinary structural-data IH: it resumes the eliminator
     /// over its carried value and accepts no source arguments.
-    recursive_unit_body: Option<StaticOriginId>,
+    recursive_unit_body: Option<RecursiveUnitBodySelection>,
     /// Inert handles into `Lowering::dynamic_splice_edges`. Cloning a lowered
     /// recursor can copy a handle, but only one clone can consume the unique
     /// compiler-owned edge; every replay rejects before CFG.
@@ -9782,6 +10285,7 @@ fn decompose_computational_recursor(
         // set stays visibly closed.
         LoweringOperand::Specialized(value) => (LoweringOperand::Specialized(value), None),
         LoweringOperand::Carried(word) => (LoweringOperand::Carried(word), None),
+        LoweringOperand::Residual(residual) => (LoweringOperand::Residual(residual), None),
     }
 }
 /// **`RT-LEXICAL-R3-FUSION-EMITTER` — the checked sequence a dynamic invocation
@@ -11201,6 +11705,9 @@ struct ContinuationCallOperands {
     /// from, including any test perturbation, rather than re-projecting it.
     envelope: Vec<ContinuationOrdinaryEnvelopeRole>,
     ordinary: Vec<LoweringOperand>,
+    /// Recorded at the validated WorkerCapture role, not reconstructed from
+    /// the ordinary prefix length or the producer's physical environment.
+    worker_captures: Vec<(u32, LoweringOperand)>,
     continuation_inputs: Vec<LoweringOperand>,
 }
 
@@ -12988,7 +13495,7 @@ impl<'a> Lowering<'a> {
             &SourceSelectedContinuation<'_>,
             &[SourceSelectedContinuation<'_>],
         )>,
-        recursive_unit_body: Option<StaticOriginId>,
+        recursive_unit_body: Option<RecursiveUnitBodySelection>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         // ---- `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — THE CONSUMPTION POINT.
         //
@@ -13003,8 +13510,11 @@ impl<'a> Lowering<'a> {
         // downstream cannot leave the capability outstanding and silently
         // re-spendable by a later edge.
         let recursive_unit_body = recursive_unit_body.or_else(|| match &recursive {
-            LoweringOperand::Specialized(Lowered::Closure { body, .. }) => Some(*body),
-            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
+            LoweringOperand::Specialized(Lowered::Closure { body, .. }) => {
+                Some(RecursiveUnitBodySelection::Exact(*body))
+            },
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_)
+            | LoweringOperand::Residual(_) => None,
         });
         let (residual, payload) = decompose_computational_recursor(recursive);
         let active_instance = self.active_recursive_invocations.last().copied();

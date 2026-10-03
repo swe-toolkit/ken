@@ -290,6 +290,12 @@ impl<'a> Lowering<'a> {
                     // checked disagreement is the defunctionalization seam,
                     // not permission to weaken the worker's arity gate.
                     if call.arity == 0 && worker.declared_arity == 1 {
+                        if let Some(seat) = self.defining_emission_owner.and_then(|owner|
+                            self.static_transition_plan.recursive_ih_force_site_seat(
+                                owner, pending.invocation_origin,
+                            )) {
+                            debug_assert_eq!(worker.closure_origin, seat);
+                        }
                         self.emit_checked_ih_captured_environment(builder, worker)
                             .map(Some)
                     } else {
@@ -807,6 +813,18 @@ impl<'a> Lowering<'a> {
                             ));
                         }
                     }
+                    LoweringOperand::Residual(_) => {
+                        if slot.storage_owner != AbiStorageOwner::ActivationFrame {
+                            return Err(unsupported(
+                                "RetainedCallableCaptureContract",
+                                format!(
+                                    "capture {position} of the retained callable at \
+                                     {closure_origin:?} arrived as R, but its slot storage belongs to {:?}",
+                                    slot.storage_owner,
+                                ),
+                            ));
+                        }
+                    }
                 }
                 let expected = expected_capture_slot(provenance, ordinal);
                 if **slot != expected {
@@ -825,12 +843,145 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        /// Select only from the gate's closed interned specialization set.
+        /// Arguments are prepared inside the selected arm, so an unselected
+        /// body never claims a call or transfers its operands.
+        pub(super) fn call_selected_recursive_position_unit<F>(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            selection: RecursiveUnitBodySelection,
+            coordinates: Option<CarriedInvocationCoordinates>,
+            carried_base: Option<CarriedResidualWord>,
+            mut build_inputs: F,
+        ) -> Result<LoweringOperand, CraneliftBackendError>
+        where
+            F: FnMut(&mut Self, &mut FunctionBuilder<'_>, StaticOriginId)
+                -> Result<Vec<LoweringOperand>, CraneliftBackendError>,
+        {
+            self.select_recursive_position_unit(builder, selection, coordinates, carried_base,
+                |this, builder, body, base| {
+                    let inputs = build_inputs(this, builder, body)?;
+                    this.call_declared_recursive_position_unit(
+                        builder, body, &inputs, coordinates, base,
+                    )
+                })
+        }
+
+        /// The sole label switch. The arm receives the *exact* worker body;
+        /// callers may take its governed force route or an ordinary unit call.
+        /// The switch itself issues no transport/materialization edge.
+        pub(super) fn select_recursive_position_unit<F>(
+            &mut self,
+            builder: &mut FunctionBuilder<'_>,
+            selection: RecursiveUnitBodySelection,
+            coordinates: Option<CarriedInvocationCoordinates>,
+            carried_base: Option<CarriedResidualWord>,
+            mut arm: F,
+        ) -> Result<LoweringOperand, CraneliftBackendError>
+        where
+            F: FnMut(&mut Self, &mut FunctionBuilder<'_>, StaticOriginId,
+                     Option<CarriedResidualWord>) -> Result<LoweringOperand, CraneliftBackendError>,
+        {
+            // Every caller of this shared selector, including source-machine
+            // forces and direct/composed call routes, must check the K observed
+            // when the residual was selected before invoking any arm.
+            selection.require_trivial_residual_continuation()?;
+            let RecursiveUnitBodySelection::Labelled {
+                eliminator, constructor, position, ..
+            } = selection else {
+                let body = match selection {
+                    RecursiveUnitBodySelection::Exact(body)
+                    | RecursiveUnitBodySelection::ResidualExact { body, .. } => body,
+                    RecursiveUnitBodySelection::Labelled { .. } => unreachable!(),
+                };
+                return arm(self, builder, body, carried_base);
+            };
+            if coordinates.is_none() {
+                return Err(unsupported("RecursiveResidual", "a labelled pending-Let invocation has no coordinates for its retarget"));
+            }
+            let word = carried_base.ok_or_else(|| unsupported(
+                "RecursiveResidual", "a labelled recursive invocation has no carried residual base",
+            ))?;
+            let slot = self.static_transition_plan.recursive_carrier_slot(
+                eliminator, constructor, position,
+            )?.ok_or_else(|| unsupported("RecursiveResidual", "a labelled invocation has no planner slot"))?.clone();
+            let candidates = slot.flow.clone();
+            let ordinal = self.residual_label_ordinal(builder, word, &slot)?;
+            let join = builder.create_block();
+            let CarriedBlockParam::Value(joined) = append_carried_block_param(
+                builder, join, Representation::Value,
+            ) else { unreachable!("labelled answer joins in the value plane") };
+            for (index, candidate) in candidates.iter().enumerate() {
+                let variant = slot.variant(*candidate)?.clone();
+                let label = u32::try_from(index).map_err(|_| unsupported(
+                    "RecursiveResidual", "a candidate label exceeds the carrier ABI",
+                ))?;
+                if variant.label != Some(label) {
+                    return Err(unsupported("RecursiveResidual", "a labelled candidate changed its issued label"));
+                }
+                let disposition = match variant.schema {
+                    RecursiveCarrierMemberSchema::Residual => Some(self.static_transition_plan
+                        .recursive_residual_for_specialization(*candidate)?
+                        .filter(|entry| entry.wrapped() && entry.label == Some(label))
+                        .cloned().ok_or_else(|| unsupported(
+                            "RecursiveResidual", "a residual candidate has no matching capture disposition",
+                        ))?),
+                    RecursiveCarrierMemberSchema::Boxed => {
+                        if self.static_transition_plan.recursive_residual_for_specialization(*candidate)?
+                            .is_some() {
+                            return Err(unsupported("RecursiveResidual", "a boxed candidate gained a residual disposition"));
+                        }
+                        None
+                    }
+                };
+                let body = self.static_transition_plan.continuation_units()?.into_iter()
+                    .find(|unit| unit.id() == *candidate)
+                    .ok_or_else(|| unsupported("RecursiveResidual", "a labelled candidate has no worker unit"))?
+                    .worker_body_origin();
+                let selected = builder.create_block();
+                let next = builder.create_block();
+                let matched = builder.ins().icmp_imm(
+                    cranelift_codegen::ir::condcodes::IntCC::Equal, ordinal,
+                    i64::try_from(index).map_err(|_| unsupported(
+                        "RecursiveResidual", "a candidate label exceeds the carrier ABI",
+                    ))?,
+                );
+                builder.ins().brif(matched, selected, &[], next, &[]);
+                builder.switch_to_block(selected);
+                if let Some(disposition) = disposition.as_ref() {
+                    let _ = self.assert_recursive_carrier_variant(builder, word, disposition)?;
+                } else {
+                    if word.slot() != RecursiveCarrierSlotKey::of(&slot) {
+                        return Err(unsupported("RecursiveResidual", "a boxed candidate has a foreign slot key"));
+                    }
+                    let _ = self.decode_residual_child(builder, word)?;
+                }
+                let returned = arm(self, builder, body, Some(word))?;
+                let answer = match returned {
+                    LoweringOperand::Carried(k) => k,
+                    // A Tail pass-through contributes its Child K, not the R.
+                    LoweringOperand::Residual(residual) =>
+                        self.decode_residual_child(builder, residual)?,
+                    LoweringOperand::Specialized(_) => return Err(unsupported(
+                        "RecursiveResidual", "a labelled unit returned a specialized value across its ABI",
+                    )),
+                };
+                builder.ins().jump(join, &[answer.word.into()]);
+                builder.switch_to_block(next);
+            }
+            let refused = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[refused]);
+            builder.switch_to_block(join);
+            Ok(LoweringOperand::Carried(joined))
+        }
+
         pub(super) fn call_declared_recursive_position_unit(
             &mut self,
             builder: &mut FunctionBuilder<'_>,
             body_origin: StaticOriginId,
             inputs: &[LoweringOperand],
             coordinates: Option<CarriedInvocationCoordinates>,
+            carried_base: Option<CarriedResidualWord>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             // `RT-DECL-CLOSURE-PORT` `D5a` checkpoint 4 step 1 — THE CARRIED
             // INVOCATION BINDING.
@@ -926,7 +1077,7 @@ impl<'a> Lowering<'a> {
                     context,
                     body_origin,
                     inputs,
-                    coordinates,
+                    carried_base,
                 )?,
                 None => self.call_declared_unit(
                     builder,
@@ -956,11 +1107,7 @@ impl<'a> Lowering<'a> {
             context: ContinuationContextId,
             body_origin: StaticOriginId,
             inputs: &[LoweringOperand],
-            // `RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- the planner-issued
-            // coordinates this retarget was resolved by, carried through so the
-            // constructed frame is matched on the same complete key the binding
-            // itself was, never on the body origin alone.
-            coordinates: Option<CarriedInvocationCoordinates>,
+            carried_base: Option<CarriedResidualWord>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             let target = self
                 .function_local
@@ -1002,145 +1149,48 @@ impl<'a> Lowering<'a> {
                 )
             })?;
             let mut inputs = inputs.to_vec();
-            // **`RT-CAPTURE-CONTEXT-FRAME-EMIT` `D2` -- CONSUME THE FRAME
-            // CONSTRUCTED AT THE CREATION SITE, when this retarget is the one it
-            // was built for.**
-            //
-            // **Matched on the COMPLETE planner-issued key** -- continuation
-            // origin, recursive position, and worker body -- exactly the key the
-            // binding above was resolved by. One function can hold two retargets
-            // over one body origin, and a frame consumed at the wrong one is an
-            // arity-correct call carrying another occurrence's values: the silent
-            // shape, not a loud one. A frame that does not match is not used, and
-            // this falls through to the gather below unchanged.
-            //
-            // **Two runs, because the retarget can supply neither.** The
-            // carried invocation carries the raw body's DECLARED ARGUMENTS only,
-            // so the selected closure's captures -- the tail of the context's
-            // `Parameter` run -- are appended here; the context's own `Capture`
-            // run follows, in the planner's ordinal order. Both were assembled at
-            // the creation site from the producer's live environment through the
-            // planner's own projections.
-            //
-            // **The declared frame header is re-checked here, and it is what
-            // makes this supply-not-relax.** The two cardinalities are verified
-            // against the context's OWN header before a single operand is used,
-            // so a short, long, or mis-ordered frame refuses at this call rather
-            // than filling a frame that happened to be big enough to absorb it.
-            // The context body still walks its declared run through the unchanged
-            // membership and slot re-derivation guard.
-            //
-            // **TAKEN ONLY WHERE THE GATHER BELOW STRUCTURALLY CANNOT SERVE.**
-            // This is not an optimization; it is what makes the route an
-            // ADDITION rather than a substitution.
-            //
-            // The gather appends the context's `Capture` run to the operands the
-            // retarget already carries, and that is a COMPLETE call exactly when
-            // the selected worker has no captures -- so the declared arguments
-            // already fill the `Parameter` run -- and every claim is resolvable
-            // where the gather reads. Wherever that holds, the gather has been
-            // emitting the right call all along, and the two routes would source
-            // the same values through DIFFERENT environments: the creation
-            // site's `producer_env` here, this frame's ABI operand run there.
-            // Preferring this route there would silently re-source operands on
-            // paths that are already correct, and any disagreement between the
-            // two environments would surface as changed behaviour instead of as
-            // a refusal.
-            //
-            // So the condition names the two ways the gather falls short and
-            // nothing else: a `Parameter` run the retarget cannot fill, and a
-            // claim with no context-capture availability for the gather to read.
+            // The planner binding was resolved above, before inspecting a
+            // residual. The carried base is separate from ordinary `inputs`:
+            // HostResult inputs are independently allocated words, not this
+            // recursive-position value. Only the bound context's issued schema
+            // can decode it; no call-scoped side slot can identify W2 vs W7.
             let claims = view.captures()?;
             let header = view.header();
-            let gather_cannot_serve = |worker_captures: &[LoweringOperand]| {
-                !worker_captures.is_empty()
-                    || claims
-                        .iter()
-                        .any(|claim| claim.availability.context_capture.is_none())
-            };
-            let constructed = self
-                .function_local
-                .constructed_context_frame
-                .as_ref()
-                .filter(|frame| {
-                    coordinates.is_some_and(|coordinates| {
-                        frame.continuation_origin == coordinates.continuation_origin
-                            && frame.recursive_position == coordinates.recursive_position
-                    }) && frame.worker_body_origin == body_origin
-                        && gather_cannot_serve(&frame.worker_captures)
-                })
-                .map(|frame| (frame.worker_captures.clone(), frame.context_captures.clone()));
-            if let Some((worker_captures, context_captures)) = constructed {
-                // `claims` above is claimed even though this route does not READ
-                // it for operands. `captures()` is where the projection is
-                // checked against its validated ABI input authority, and that
-                // check is about the PLAN, not about which route consumes it.
-                // Reaching it on only one route would make the other the one
-                // path on which a plan that disagrees with itself is never
-                // noticed.
-                // Both authorities, not one. `header` is the declared frame
-                // and `claims` is the ordered projection; checking the
-                // constructed run against each separately is what makes a
-                // disagreement BETWEEN them visible here rather than absorbed.
-                if claims.len() != context_captures.len() {
-                    return Err(unsupported(
-                        "ContinuationSpecialization",
-                        format!(
-                            "a constructed context frame supplies {} captures, but the context \
-                             bound to body {body_origin:?} projects {} continuation inputs",
-                            context_captures.len(),
-                            claims.len()
-                        ),
-                    ));
-                }
-                let declared_arguments = inputs.len();
-                let parameters = declared_arguments
-                    .checked_add(worker_captures.len())
-                    .ok_or_else(|| {
-                        unsupported(
-                            "ContinuationSpecialization",
-                            "a constructed context frame's parameter run exceeded addressable width",
-                        )
-                    })?;
-                if u32::try_from(parameters).ok() != Some(header.parameters) {
-                    return Err(unsupported(
-                        "ContinuationSpecialization",
-                        format!(
-                            "a constructed context frame supplies {declared_arguments} declared \
-                             arguments and {} worker captures, but the context bound to body \
-                             {body_origin:?} declares a {}-slot Parameter run; a call assembled \
-                             from a run of the wrong length fills declared parameters with values \
-                             that are not theirs",
-                            worker_captures.len(),
-                            header.parameters
-                        ),
-                    ));
-                }
-                if u32::try_from(context_captures.len()).ok() != Some(header.captures) {
-                    return Err(unsupported(
-                        "ContinuationSpecialization",
-                        format!(
-                            "a constructed context frame supplies {} captures, but the context \
-                             bound to body {body_origin:?} declares a {}-slot Capture run",
-                            context_captures.len(),
-                            header.captures
-                        ),
-                    ));
-                }
-                inputs.extend(worker_captures);
-                inputs.extend(context_captures);
-                return self
-                    .call_declared_unit_target(
-                        builder,
-                        target,
-                        &inputs,
-                        None,
-                        #[cfg(test)]
-                        None,
-                    )
-                    .map(|(operand, _inst)| operand);
+            let disposition = self.static_transition_plan
+                .recursive_residual_for_bound_context(context)?.cloned();
+            let gather_cannot_serve = inputs.len() != header.parameters as usize
+                || claims.iter().any(|claim| claim.availability.context_capture.is_none());
+            if gather_cannot_serve != disposition.as_ref().is_some_and(|entry| entry.wrapped()) {
+                return Err(unsupported(
+                    "RecursiveResidual",
+                    "the bound context needs a residual capture suffix but has no matching issued disposition",
+                ));
             }
-            for capture in view.captures()? {
+            let mut carried_context = None;
+            if let Some(disposition) = disposition.filter(|entry| entry.wrapped()) {
+                let base = carried_base.ok_or_else(|| unsupported(
+                    "RecursiveResidual",
+                    "a bound generated context needs its carried recursive-position residual",
+                ))?;
+                let (_forwarded, worker, context) =
+                    self.decode_recursive_residual(builder, base, &disposition)?;
+                // Both complete runs have independent cardinalities. A wrapped
+                // value reads every Capture from the word, never from a frame.
+                if worker.len() != disposition.worker_captures as usize
+                    || context.len() != disposition.context_captures as usize
+                    || claims.len() != context.len()
+                    || header.captures as usize != claims.len()
+                    || inputs.len().checked_add(worker.len()) != Some(header.parameters as usize)
+                {
+                    return Err(unsupported(
+                        "RecursiveResidual",
+                        "the bound context's worker Parameter and Capture runs disagree with the residual schema",
+                    ));
+                }
+                inputs.extend(worker);
+                carried_context = Some(context);
+            }
+            for (capture_index, capture) in claims.into_iter().enumerate() {
                 // `RT-CONTSRC-PRODUCER-LOCAL` `D1` — present a producer-local
                 // coordinate to this seam, so its refusal is measured rather than
                 // merely written. ⛔ Applied BEFORE the domain match, because the
@@ -1167,32 +1217,28 @@ impl<'a> Lowering<'a> {
                 // nothing here to index and is refused rather than read as an ABI
                 // position. The generated-context capture arm IS resolvable here,
                 // because a capture slot is a position in exactly this run.
-                let immediate_slot = self.resolve_context_capture_claim(
-                    capture.coordinate,
-                    capture.availability,
-                    defining_owner,
-                )?;
-                // `RT-CONTSRC-PRODUCER-LOCAL` `D2b` — the availability domain, matched
-                // exhaustively with no wildcard exactly as the coordinate domain is
-                // above. `D3` teaches this seam the two producer-local arms; until
-                // then it must not index `defining_abi_operands` — an ABI operand run
-                // — with a lexical environment index.
-                let operand = self
-                    .function_local
-                    .defining_abi_operands
-                    .get(immediate_slot as usize)
-                    .ok_or_else(|| {
-                        unsupported(
+                let operand = if let Some(context) = &carried_context {
+                    if capture.ordinal as usize != capture_index {
+                        return Err(unsupported("RecursiveResidual", "a residual Capture ordinal is out of declared order"));
+                    }
+                    context.get(capture_index).ok_or_else(|| unsupported(
+                        "RecursiveResidual", "a residual lacks a declared Capture",
+                    ))?.clone()
+                } else {
+                    let immediate_slot = self.resolve_context_capture_claim(
+                        capture.coordinate,
+                        capture.availability,
+                        defining_owner,
+                    )?;
+                    // This seam holds an entry ABI run, not the producer's
+                    // lexical environment. Keep the existing claim membership
+                    // and slot checks for every planner-recoverable member.
+                    self.function_local.defining_abi_operands.get(immediate_slot as usize)
+                        .ok_or_else(|| unsupported(
                             "ContinuationSpecialization",
-                            format!(
-                                "a generated context capture names immediate slot {} outside the                              emitting function's {} ABI operands; note this is the IMMEDIATE                              slot, whose meaning is fixed by the availability domain {:?}",
-                                immediate_slot,
-                                self.function_local.defining_abi_operands.len(),
-                                capture.availability,
-                            ),
-                        )
-                    })?
-                    .clone();
+                            format!("a generated context capture names immediate slot {immediate_slot} outside the emitting function's {} ABI operands", self.function_local.defining_abi_operands.len()),
+                        ))?.clone()
+                };
                 #[cfg(test)]
                 if let (ContinuationSourceCoordinate::EntryAbi { source_owner, .. },
                     LoweringOperand::Carried(word)) = (capture.coordinate, &operand) {
@@ -1204,6 +1250,9 @@ impl<'a> Lowering<'a> {
                     }));
                 }
                 inputs.push(operand);
+            }
+            if inputs.len() != (header.parameters as usize + header.captures as usize) {
+                return Err(unsupported("RecursiveResidual", "the context call did not consume its exact declared Capture run"));
             }
             self.call_declared_unit_target(
                 builder,
@@ -2115,6 +2164,9 @@ impl<'a> Lowering<'a> {
                         })?;
                         let word = match value {
                             LoweringOperand::Carried(word) => word.word,
+                            // I-0 transitional declared-call Parameter/Capture ABI.
+                            LoweringOperand::Residual(residual) => residual
+                                .residual_across_untyped_abi_transitional().word,
                             LoweringOperand::Specialized(Lowered::StaticResponseDeferred { site }) => {
                                 let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
                                     backend_module("a deferred host response reached a call outside a defined function scope".to_string())
@@ -2526,6 +2578,7 @@ impl<'a> Lowering<'a> {
             let word = builder.ins().stack_load(types::I64, payload, result_offset);
             if let Some(environment) = boundary_closure {
                 let environment_word = CarriedBoundaryWord { word };
+                self.refuse_private_recursive_residual(builder, environment_word)?;
                 let captures = (0..environment.capture_origins().len())
                     .map(|position| {
                         self.emit_carrier_field(builder, environment_word, position)

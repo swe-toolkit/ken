@@ -176,6 +176,7 @@ pub enum NativeFidelity {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CraneliftBackendError {
     Unsupported(UnsupportedLowering),
+    ResidualRepresentationRequired { site: &'static str },
     Backend(BackendFailure),
     CapacityExhausted(ken_host::CapacityExhaustedV1),
     SelectedCallIntegrity(ken_host::SelectedCallIntegrityFaultV1),
@@ -226,6 +227,9 @@ impl fmt::Display for CraneliftBackendError {
         match self {
             CraneliftBackendError::Unsupported(err) => {
                 write!(f, "unsupported runtime-IR lowering: {err}")
+            }
+            CraneliftBackendError::ResidualRepresentationRequired { site } => {
+                write!(f, "residual representation required at {site}: K cannot be coerced to R")
             }
             CraneliftBackendError::Backend(err) => write!(f, "Cranelift backend failure: {err}"),
             CraneliftBackendError::CapacityExhausted(fault) => {

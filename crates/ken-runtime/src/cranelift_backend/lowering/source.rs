@@ -352,6 +352,9 @@ fn rt_continuation_kinds(continuation: &SourceContinuation<'_>) -> Vec<&'static 
 fn rt_operand_desc(operand: &LoweringOperand) -> String {
     match operand {
         LoweringOperand::Carried(_) => "phase=Carried kind=<carried word>".to_string(),
+        LoweringOperand::Residual(residual) => {
+            format!("phase=Residual slot={:?}", residual.slot())
+        }
         LoweringOperand::Specialized(lowered) => {
             format!("phase=Specialized kind={}", lowered_value_kind(lowered))
         }
@@ -552,11 +555,16 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
         | Mutation::RetainedAccessWrongLocatorDomain
         | Mutation::RetainedAccessWrongLocatorIndex => {}
         Mutation::OuterCarried => {
-            if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-                Lowered::ComputationalRecursorClosure { residual, .. },
-            )) = &binding
-            {
-                binding = LoweringEnvironmentBinding::Value(residual.as_ref().clone());
+            if let LoweringEnvironmentBinding::Value(value) = &binding {
+                match value {
+                    LoweringOperand::Specialized(Lowered::ComputationalRecursorClosure {
+                        residual, ..
+                    }) => {
+                        binding = LoweringEnvironmentBinding::Value(residual.as_ref().clone());
+                    }
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
+                }
             }
         }
         Mutation::SpecializedSibling => {
@@ -582,15 +590,11 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
         }
         Mutation::WrongFrame | Mutation::WrongSlot | Mutation::WrongInvocation
         | Mutation::NonCarriedResidual => {
-            if let LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(
-                Lowered::ComputationalRecursorClosure {
-                    residual,
-                    invocation,
-                    ..
-                },
-            )) = &mut binding
-            {
-                match mutation {
+            if let LoweringEnvironmentBinding::Value(value) = &mut binding {
+                match value {
+                    LoweringOperand::Specialized(Lowered::ComputationalRecursorClosure {
+                        residual, invocation, ..
+                    }) => match mutation {
                     Mutation::WrongFrame => {
                         invocation.selection.checked_frame_id =
                             Some(call.parent_frame_template_id.unwrap_or(0).wrapping_add(1));
@@ -608,6 +612,9 @@ fn mutate_checked_ih_generated_entry_capsule_binding(
                         ));
                     }
                     _ => unreachable!(),
+                    },
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
             }
         }
@@ -778,498 +785,9 @@ impl<'a> Lowering<'a> {
         let mut state = SourceMachineState::Eval { expr, env, control };
         loop {
             state = match state {
-                SourceMachineState::Eval {
-                    expr:
-                        OwnedSourceOccurrence {
-                            expr,
-                            static_origin,
-                        },
-                    env,
-                    mut control,
-                } => match {
-                    // The owned source machine is the third traversal route for
-                    // these joins. Record the source occurrence here; later
-                    // continuation helpers may only reborrow its token.
-                    self.enter_source_occurrence_plan(static_origin)?;
-                    expr
-                } {
-                    RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
-                        self.enter_checked_subcontinuation_frame(builder, frame_id)?;
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *body)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::CheckedRecursiveInvocation {
-                        call_template_id,
-                        body,
-                        ..
-                    } => {
-                        let instance =
-                            self.enter_checked_recursive_invocation(call_template_id, &body)?;
-                        control.continuation =
-                            SourceContinuation::CheckedRecursiveInvocationReturn {
-                                instance,
-                                next: Box::new(control.continuation),
-                            };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *body)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::CheckedComputationalIHSlots { body, .. } => {
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *body)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::CheckedComputationalIHInvocation {
-                        call_template_id,
-                        kind,
-                        binder_morphism,
-                        body,
-                        ..
-                    } => {
-                        // `D8f` — the machine's own child derivation, taken
-                        // BEFORE the marker is entered so the same occurrence is
-                        // recorded and evaluated.
-                        let body = self.owned_child_occurrence(static_origin, 0, *body)?;
-                        self.enter_checked_computational_ih_invocation(
-                            call_template_id,
-                            kind,
-                            binder_morphism,
-                            &body.expr,
-                            static_origin,
-                            body.static_origin,
-                        )?;
-                        control.continuation =
-                            SourceContinuation::CheckedComputationalIHInvocationReturn {
-                                call_template_id,
-                                next: Box::new(control.continuation),
-                            };
-                        SourceMachineState::Eval {
-                            expr: body,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Value(value) => SourceMachineState::Value {
-                        value: RoutedAnswer::direct(LoweringOperand::Specialized(
-                            self.lower_value(builder, &value)?,
-                        )),
-                        control,
-                    },
-                    // Same value-producing rule as the direct descent's `Var`:
-                    // only `Value` yields a machine value, and a static worker
-                    // binding fails closed here rather than entering one.
-                    RuntimeExpr::Var(index) => {
-                        let binding = env.get(index as usize).ok_or_else(|| {
-                            unsupported("Var", format!("no runtime binding for index {index}"))
-                        })?;
-                        // Capsule mutants are injected on the real forwarding
-                        // path, before this `value_at` and before dispatch. The
-                        // generated call key is capsule-independent.
-                        #[cfg(feature = "px8-ds-test-support")]
-                        let mutated_binding = if let (Some(_), Some(pending)) = (
-                            self.function_local.checked_ih_generated_entry_access.as_ref(),
-                            self.pending_computational_ih_call,
-                        ) {
-                            let callee_origin = self.static_transition_plan.child_static_origin(
-                                pending.application_origin,
-                                0,
-                            )?;
-                            if callee_origin == static_origin {
-                                let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(
-                                    || {
-                                        unsupported(
-                                            "CheckedIhGeneratedEntryAccess",
-                                            "a generated-entry invocation has no oriented call plan",
-                                        )
-                                    },
-                                )?;
-                                let call = plan
-                                    .computational_ih_call(pending.call_template_id)
-                                    .ok_or_else(|| {
-                                        unsupported(
-                                            "CheckedIhGeneratedEntryAccess",
-                                            "a generated-entry invocation has no exact call template",
-                                        )
-                                    })?;
-                                Some(mutate_checked_ih_generated_entry_capsule_binding(
-                                    binding, pending, call,
-                                ))
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        };
-                        #[cfg(feature = "px8-ds-test-support")]
-                        let binding = mutated_binding.as_ref().unwrap_or(binding);
-                        #[cfg(test)]
-                        crate::cranelift_backend::lowering::record_d2k_owner_event(
-                            crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller {
-                                site: "core.rs source-machine Var",
-                            },
-                        );
-                        SourceMachineState::Value {
-                            value: binding.routed_at("a source-machine Var")?,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Let { value, body } => {
-                        control.continuation = SourceContinuation::LetBody {
-                            body: self.owned_child_occurrence(static_origin, 1, *body)?,
-                            env: env.clone(),
-                            next: Box::new(control.continuation),
-                        };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *value)?,
-                            env: env.clone(),
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Construct {
-                        constructor,
-                        mut args,
-                    } => {
-                        // `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` -- ask the same
-                        // classifier as direct descent before the source
-                        // machine lowers any field. D1 established that every
-                        // eligible state arrives with the complete argument
-                        // run and no pending constructor continuation, so the
-                        // existing template can open its conservation ledger
-                        // without restructuring partial machine state.
-                        let recognized =
-                            Self::recognized_constructor_worker_fields(&args, &env);
-                        if recognized.iter().any(Option::is_some) {
-                            SourceMachineState::Value {
-                                value: RoutedAnswer::direct(
-                                    LoweringOperand::Specialized(
-                                        self.static_worker_constructor_template(
-                                            builder,
-                                            static_origin,
-                                            &constructor,
-                                            &args,
-                                            &recognized,
-                                            &env,
-                                        )?,
-                                    ),
-                                ),
-                                control,
-                            }
-                        } else if args.is_empty() {
-                            SourceMachineState::Value {
-                                value: RoutedAnswer::direct(LoweringOperand::Specialized(
-                                    self.finish_source_constructor(
-                                        builder,
-                                        constructor,
-                                        static_origin,
-                                        vec![],
-                                    )?,
-                                )),
-                                control,
-                            }
-                        } else {
-                            // Argument *i* is child *i*; the suffix keeps each
-                            // pending term paired with its own origin, so the
-                            // machine's positions cannot drift as it consumes them.
-                            let first = args.remove(0);
-                            let remaining = args
-                                .into_iter()
-                                .enumerate()
-                                .map(|(offset, arg)| {
-                                    self.owned_child_occurrence(static_origin, 1 + offset, arg)
-                                })
-                                .collect::<Result<Vec<_>, _>>()?;
-                            control.continuation = SourceContinuation::ConstructArgument {
-                                constructor,
-                                static_origin,
-                                remaining,
-                                lowered: Vec::new(),
-                                env: env.clone(),
-                                next: Box::new(control.continuation),
-                            };
-                            SourceMachineState::Eval {
-                                expr: self.owned_child_occurrence(static_origin, 0, first)?,
-                                env,
-                                control,
-                            }
-                        }
-                    }
-                    RuntimeExpr::Match {
-                        scrutinee,
-                        cases,
-                        default,
-                    } => {
-                        control.continuation = SourceContinuation::MatchScrutinee {
-                            cases,
-                            default,
-                            env: env.clone(),
-                            static_origin,
-                            next: Box::new(control.continuation),
-                        };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
-                            env,
-                            control,
-                        }
-                    }
-                    RuntimeExpr::Call { callee, args } => {
-                        let args = args
-                            .into_iter()
-                            .enumerate()
-                            .map(|(position, arg)| {
-                                self.owned_child_occurrence(static_origin, 1 + position, arg)
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        // **`RT-CONTSRC-PRODUCER-LOCAL` `D8e` — THE SOLE
-                        // SOURCE-MACHINE CONSUMER of a `D8d` binding.**
-                        //
-                        // ⛔ It sits **ahead of the callee's own evaluation**,
-                        // and that placement is the mechanism, not a
-                        // convenience. Evaluating a `Var` callee first routes it
-                        // through the machine's value arm, which calls
-                        // `value_at` and fails closed on a static worker by
-                        // design. So the binding is either consumed here or
-                        // refused everywhere — there is no third outcome, and a
-                        // `Var` resolving to `Value` falls through to the
-                        // pre-existing route untouched.
-                        //
-                        // ⭐ Deliberately the same shape as the direct descent's
-                        // sole consumer: an exact `Var`, read out of the
-                        // environment by index, no shape inference and no
-                        // planner query. The environment already holds the
-                        // answer because `D8d` put it there; asking the planner
-                        // again here would be the consumer-side target lookup
-                        // this checkpoint excludes, and a second authority for
-                        // one binding.
-                        let static_worker = match callee.as_ref() {
-                            RuntimeExpr::Var(index) => match env.get(*index as usize) {
-                                Some(LoweringEnvironmentBinding::StaticWorker(worker)) => {
-                                    Some((u64::from(*index), worker.clone()))
-                                }
-                                _ => None,
-                            },
-                            _ => None,
-                        };
-                        if let Some((binder_index, worker)) = static_worker {
-                            // `D2k-1b-i` — the source machine's terminal
-                            // disposition, counted into the same conservation
-                            // ledger as the direct descent's.
-                            self.static_worker_fields
-                            .note_consuming_call(worker.transport, static_origin, self.defining_function_id)?;
-                            #[cfg(test)]
-                            d8e_record_consumption();
-                            // `D8l2` — which facet this consumption carried,
-                            // recorded beside the count so "three consumptions"
-                            // can be attributed rather than merely counted.
-                            #[cfg(test)]
-                            crate::cranelift_backend::lowering::record_d8l2_consumed_facet(
-                                matches!(
-                                    worker.discharge,
-                                    ContinuationDischarge::ComposedSourceContinuation(_)
-                                ),
-                            );
-                            // Arguments are evaluated under the machine's own
-                            // control and phase, exactly as for a value callee;
-                            // only the completion differs.
-                            let mut remaining = args;
-                            if remaining.is_empty() {
-                                // **`D8p` — THE CHECKED-APPLICATION SEAM, on the
-                                // source machine's call edge.**
-                                //
-                                // The direct descent has consulted it since
-                                // `D5a`; this edge did not, so a checked-IH
-                                // marker entered in a body whose application the
-                                // SOURCE MACHINE lowers could never be consumed
-                                // and failed closed at the marker's close. The
-                                // seam is the same function, on the same exact
-                                // occurrence and binder ordinal -- no second
-                                // authority, no target lookup, and no new
-                                // identity.
-                                //
-                                // ⛔ Immediately BEFORE the call is written, so
-                                // consumption still precedes the instruction it
-                                // discharges, and after the arguments are in
-                                // hand so an ordinary selected-argument call
-                                // reaches the seat first and leaves the marker
-                                // for the occurrence that owns it.
-                                let pending = self.pending_computational_ih_call;
-                                let disposition = self
-                                    .consume_checked_ih_marker_at_static_worker_call(
-                                        binder_index,
-                                        0,
-                                        static_origin,
-                                    )?;
-                                let materialized = match pending {
-                                    Some(pending) => self
-                                        .materialize_checked_ih_static_worker_application(
-                                            builder,
-                                            pending,
-                                            disposition,
-                                            &worker,
-                                        )?,
-                                    None => None,
-                                };
-                                if let Some(environment) = materialized {
-                                    SourceMachineState::Value {
-                                        value: RoutedAnswer::direct(environment.into_operand()),
-                                        control,
-                                    }
-                                } else {
-                                let before = self.live_source_continuations;
-                                let (called, emission) = self.call_static_worker_with_inputs(
-                                    builder,
-                                    &worker,
-                                    Vec::new(),
-                                    static_origin,
-                                    None,
-                                )?
-                                .into_emitted()?;
-                                // `D8p` — the TARGET side, under the same key,
-                                // written only now that the call instruction
-                                // exists and carrying the run it actually took.
-                                #[cfg(test)]
-                                if disposition == CheckedApplicationDisposition::ConsumedHere {
-                                    crate::cranelift_backend::lowering::record_d8p_emitted_target(
-                                        crate::cranelift_backend::lowering::D8pEmittedTarget {
-                                            function: self.defining_function_id,
-                                            application_origin: static_origin,
-                                            target_body_origin: worker.body_origin,
-                                            declared_arity: worker.declared_arity,
-                                            captures: worker.captures.len(),
-                                            supplied_operands: emission.supplied_operands,
-                                        },
-                                    );
-                                }
-                                // `D8f` — the disposition, recorded AFTER the
-                                // call instruction exists. A record here is
-                                // therefore "this exact call was emitted, with
-                                // this disposition", which is what an omission
-                                // control needs: emitted, and not consumed.
-                                #[cfg(test)]
-                                crate::cranelift_backend::lowering::record_d8f_disposition(
-                                    self.defining_function_id,
-                                    static_origin,
-                                    disposition,
-                                );
-                                // `D8j` — the call is emitted and its result is
-                                // in hand under the SAME `control` this arm was
-                                // entered with. Only now may a composed
-                                // obligation be claimed.
-                                // **`D8f` — THE CLAIM DISPOSITION, three cases,
-                                // matched exhaustively.**
-                                match disposition {
-                                    // The `D8j` population: an ordinary composed
-                                    // call, untouched by this seam, claims its
-                                    // causal identity exactly as before.
-                                    CheckedApplicationDisposition::NoPendingApplication
-                                    // The checked application itself, claiming
-                                    // the planner-issued identity once.
-                                    | CheckedApplicationDisposition::ConsumedHere => {
-                                        self.claim_composed_discharge(
-                                            &worker, emission, &called, before,
-                                        )?;
-                                    }
-                                    // ⛔ The declined call. It is emitted
-                                    // unchanged and it claims NOTHING: the
-                                    // identity belongs to the checked
-                                    // application the planner issued it for, and
-                                    // an ordinary selected-argument call
-                                    // answering for it is a second discharge of
-                                    // one obligation. The binding is not
-                                    // reclassified and no identity is minted --
-                                    // this call simply does not answer.
-                                    CheckedApplicationDisposition::PendingAtAnotherOccurrence => {
-                                        #[cfg(test)]
-                                        if d8f_declined_call_claims() {
-                                            self.claim_composed_discharge(
-                                                &worker, emission, &called, before,
-                                            )?;
-                                        }
-                                    }
-                                }
-                                SourceMachineState::Value {
-                                    value: RoutedAnswer::direct(called),
-                                    control,
-                                }
-                                }
-                            } else {
-                                let first = remaining.remove(0);
-                                control.continuation = SourceContinuation::CallArgument {
-                                    callee: SourceCallee::StaticWorker {
-                                        worker,
-                                        static_origin,
-                                        binder_index,
-                                    },
-                                    remaining,
-                                    lowered: Vec::new(),
-                                    env: env.clone(),
-                                    next: Box::new(control.continuation),
-                                };
-                                SourceMachineState::Eval {
-                                    expr: first,
-                                    env,
-                                    control,
-                                }
-                            }
-                        } else {
-                            control.continuation = SourceContinuation::CallCallee {
-                                args,
-                                env: env.clone(),
-                                next: Box::new(control.continuation),
-                            };
-                            SourceMachineState::Eval {
-                                expr: self.owned_child_occurrence(static_origin, 0, *callee)?,
-                                env,
-                                control,
-                            }
-                        }
-                    }
-                    RuntimeExpr::ComputationalMatch {
-                        scrutinee,
-                        cases,
-                        default,
-                    } => {
-                        let checked_frame_id =
-                            self.consume_checked_subcontinuation_frame(builder, &cases, &default)?;
-                        control.continuation = SourceContinuation::ComputationalMatchScrutinee {
-                            cases,
-                            default,
-                            env: env.clone(),
-                            static_origin,
-                            provenance: self.mint_recursor_frame_provenance(),
-                            checked_frame_id,
-                            answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
-                            next: Box::new(control.continuation),
-                        };
-                        SourceMachineState::Eval {
-                            expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
-                            env,
-                            control,
-                        }
-                    }
-                    // ⭐ The delegation point. Every form this dispatcher does not
-                    // handle — closures included — goes to `lower_expr` here, and
-                    // it now goes **as the same occurrence**: same term, same
-                    // origin. This arm is why a "machine-only" subset could never
-                    // have been threaded soundly.
-                    other => SourceMachineState::Value {
-                        value: RoutedAnswer::direct(self.lower_expr(
-                            builder,
-                            SourceOccurrence {
-                                expr: &other,
-                                static_origin,
-                            },
-                            &env,
-                        )?),
-                        control,
-                    },
-                },
+                SourceMachineState::Eval { expr, env, control } => {
+                    self.step_source_machine_eval(builder, expr, env, control)?
+                }
                 SourceMachineState::Value { value, mut control } => {
                     // ⭐⭐ `D6a` upstream half -- SPLIT THE PAIR ONCE, HERE.
                     //
@@ -1285,7 +803,12 @@ impl<'a> Lowering<'a> {
                         route: incoming_route,
                         role: incoming_role,
                     } = value;
-                    if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                    let discards_prefix = match &value {
+                        LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                        LoweringOperand::Residual(_) => false,
+                        LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                    };
+                    if discards_prefix {
                         control.continuation = Self::discard_source_prefix(control.continuation);
                     }
                     match control.continuation {
@@ -1311,7 +834,11 @@ impl<'a> Lowering<'a> {
                                     "producer-hole terminal cursor mismatch",
                                 ));
                             }
-                            if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 return Ok(value);
                             }
                             source_active_cursor(
@@ -1354,7 +881,11 @@ impl<'a> Lowering<'a> {
                                 ));
                             }
                             self.restore_root_terminal_authority(root_authority, expected)?;
-                            if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 return Ok(value);
                             }
                             return self.resume_active_continuation(builder, value, *active);
@@ -1362,7 +893,11 @@ impl<'a> Lowering<'a> {
                         SourceContinuation::Terminal(SourceContinuationTerminal::JumpToJoin(
                             edge,
                         )) => {
-                            if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 let failure = builder.ins().iconst(types::I64, -4);
                                 builder.ins().return_(&[failure]);
                                 self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
@@ -1433,7 +968,11 @@ impl<'a> Lowering<'a> {
                                     LoweringOperand::Specialized(Lowered::RecursiveBackedge)
                                 ),
                             );
-                            if matches!(value, LoweringOperand::Specialized(Lowered::RecursiveBackedge)) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 // ⭐⭐ `RT-LEXICAL-RECURSOR-CONSUMERS` `D2b` — THE
                                 // ABANDONED LET BODY IS DISPOSITIONED, NOT
                                 // CONSUMED.
@@ -1485,7 +1024,11 @@ impl<'a> Lowering<'a> {
                                     body.static_origin,
                                 )?;
                                 SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
-                            } else if matches!(value, LoweringOperand::Specialized(Lowered::Trap(_))) {
+                            } else if match &value {
+                                LoweringOperand::Specialized(Lowered::Trap(_)) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 SourceMachineState::Value { value: RoutedAnswer { value, route: incoming_route, role: incoming_role }, control }
                             } else {
                                 let body_env = env_with_operands([value], &env);
@@ -1649,10 +1192,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             env,
                             next,
                         } => {
-                            if matches!(
-                                &value,
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                            ) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 control.continuation = *next;
                                 SourceMachineState::Value {
                                     value: RoutedAnswer {
@@ -1706,14 +1250,17 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 self.record_pending_vis_construct(
                                     builder, static_origin, &constructor, &lowered,
                                 )?;
-                                let constructed = if lowered.iter().any(|field| {
-                                    matches!(field, LoweringOperand::Carried(_))
+                                let constructed = if lowered.iter().any(|field| match field {
+                                    LoweringOperand::Carried(_) => true,
+                                    LoweringOperand::Residual(_) => true,
+                                    LoweringOperand::Specialized(_) => false,
                                 }) {
                                     LoweringOperand::Carried(self.transfer_constructor_operands(
                                         builder,
                                         static_origin,
                                         &constructor,
                                         &lowered,
+                                        Some(&env),
                                     )?)
                                 } else {
                                     LoweringOperand::Specialized(self.finish_source_constructor(
@@ -1760,10 +1307,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             // forwards it without entering the Match occurrence or selecting a
                             // case. Preserve the exact predecessor route and role: resetting
                             // either would silently turn propagation into a new value.
-                            if matches!(
-                                &value,
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                            ) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 let forwarded = RoutedAnswer::forward(
                                     value,
                                     incoming_route,
@@ -1812,6 +1360,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                                 lowered_value_kind(value)
                                             }
                                             LoweringOperand::Carried(_) => "Carried",
+                                            LoweringOperand::Residual(_) => "Residual",
                                         },
                                     },
                             );
@@ -1824,6 +1373,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             let refusal_operand_kind = match &value {
                                 LoweringOperand::Specialized(value) => lowered_value_kind(value),
                                 LoweringOperand::Carried(_) => "Carried",
+                                LoweringOperand::Residual(_) => "Residual",
                             };
                             match value {
                                 LoweringOperand::Specialized(Lowered::BoundedNat(nat)) => {
@@ -2013,6 +1563,13 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 // `LoweringOperand` and a third variant is a
                                 // compile error here rather than a silent
                                 // refusal.
+                                LoweringOperand::Residual(residual) => {
+                                    let child = self.decode_residual_child(builder, residual)?;
+                                    return self.lower_source_carried_match(
+                                        builder, child, &cases, &default, static_origin,
+                                        &env, control,
+                                    );
+                                }
                                 LoweringOperand::Carried(word) => {
                                     // Family 5 control seam. The operand is
                                     // already classified `Carried` here, so a
@@ -2093,10 +1650,11 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                             // selection below and is still refused; only the
                             // marker, which was never a scrutinee value, is
                             // routed past it.
-                            if matches!(
-                                &value,
-                                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                            ) {
+                            if match &value {
+                                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                                LoweringOperand::Residual(_) => false,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+                            } {
                                 #[cfg(test)]
                                 LRC_D2A_BACKEDGE_ARRIVALS.with(|count| {
                                     count.set(count.get().saturating_add(1))
@@ -2263,16 +1821,17 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     constructor,
                                     ..
                                 }) => Some(constructor.clone()),
-                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
-                                    None
-                                }
+                                LoweringOperand::Specialized(_)
+                                | LoweringOperand::Carried(_)
+                                | LoweringOperand::Residual(_) => None,
                             };
                             let selected = match &value {
                                 LoweringOperand::Specialized(Lowered::Constructor { constructor, .. }) => cases
                                     .iter()
                                     .enumerate()
                                     .find(|(_, case)| case.constructor == *constructor),
-                                _ => None,
+                                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => None,
+                                LoweringOperand::Residual(_) => None,
                             };
                             let (case_index, case) = if let Some(selected) = selected {
                                 self.record_source_machine_computational_match_selection(
@@ -2751,6 +2310,503 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         }
     }
 
+    /// Keep an Eval transition outside the retained continuation loop frame.
+    /// Recursive source matches re-enter the Value transition while lowering
+    /// their leaves; Eval-only temporaries must not occupy each retained frame.
+    #[inline(never)]
+    fn step_source_machine_eval<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        expr: OwnedSourceOccurrence,
+        env: Vec<LoweringEnvironmentBinding>,
+        mut control: SourceControl<'b>,
+    ) -> Result<SourceMachineState<'b>, CraneliftBackendError> {
+        let OwnedSourceOccurrence {
+            expr,
+            static_origin,
+        } = expr;
+        // Record this occurrence before dispatch, including delegated forms.
+        self.enter_source_occurrence_plan(static_origin)?;
+        Ok(match expr {
+            RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
+                self.enter_checked_subcontinuation_frame(builder, frame_id)?;
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *body)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::CheckedRecursiveInvocation {
+                call_template_id,
+                body,
+                ..
+            } => {
+                let instance =
+                    self.enter_checked_recursive_invocation(call_template_id, &body)?;
+                control.continuation =
+                    SourceContinuation::CheckedRecursiveInvocationReturn {
+                        instance,
+                        next: Box::new(control.continuation),
+                    };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *body)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::CheckedComputationalIHSlots { body, .. } => {
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *body)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::CheckedComputationalIHInvocation {
+                call_template_id,
+                kind,
+                binder_morphism,
+                body,
+                ..
+            } => {
+                // `D8f` — the machine's own child derivation, taken
+                // BEFORE the marker is entered so the same occurrence is
+                // recorded and evaluated.
+                let body = self.owned_child_occurrence(static_origin, 0, *body)?;
+                self.enter_checked_computational_ih_invocation(
+                    call_template_id,
+                    kind,
+                    binder_morphism,
+                    &body.expr,
+                    static_origin,
+                    body.static_origin,
+                )?;
+                control.continuation =
+                    SourceContinuation::CheckedComputationalIHInvocationReturn {
+                        call_template_id,
+                        next: Box::new(control.continuation),
+                    };
+                SourceMachineState::Eval {
+                    expr: body,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::Value(value) => SourceMachineState::Value {
+                value: RoutedAnswer::direct(LoweringOperand::Specialized(
+                    self.lower_value(builder, &value)?,
+                )),
+                control,
+            },
+            // Same value-producing rule as the direct descent's `Var`:
+            // only `Value` yields a machine value, and a static worker
+            // binding fails closed here rather than entering one.
+            RuntimeExpr::Var(index) => {
+                let binding = env.get(index as usize).ok_or_else(|| {
+                    unsupported("Var", format!("no runtime binding for index {index}"))
+                })?;
+                // Capsule mutants are injected on the real forwarding
+                // path, before this `value_at` and before dispatch. The
+                // generated call key is capsule-independent.
+                #[cfg(feature = "px8-ds-test-support")]
+                let mutated_binding = if let (Some(_), Some(pending)) = (
+                    self.function_local.checked_ih_generated_entry_access.as_ref(),
+                    self.pending_computational_ih_call,
+                ) {
+                    let callee_origin = self.static_transition_plan.child_static_origin(
+                        pending.application_origin,
+                        0,
+                    )?;
+                    if callee_origin == static_origin {
+                        let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(
+                            || {
+                                unsupported(
+                                    "CheckedIhGeneratedEntryAccess",
+                                    "a generated-entry invocation has no oriented call plan",
+                                )
+                            },
+                        )?;
+                        let call = plan
+                            .computational_ih_call(pending.call_template_id)
+                            .ok_or_else(|| {
+                                unsupported(
+                                    "CheckedIhGeneratedEntryAccess",
+                                    "a generated-entry invocation has no exact call template",
+                                )
+                            })?;
+                        Some(mutate_checked_ih_generated_entry_capsule_binding(
+                            binding, pending, call,
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                #[cfg(feature = "px8-ds-test-support")]
+                let binding = mutated_binding.as_ref().unwrap_or(binding);
+                #[cfg(test)]
+                crate::cranelift_backend::lowering::record_d2k_owner_event(
+                    crate::cranelift_backend::lowering::D2kOwnerEvent::ValueAtCaller {
+                        site: "core.rs source-machine Var",
+                    },
+                );
+                SourceMachineState::Value {
+                    value: binding.routed_at("a source-machine Var")?,
+                    control,
+                }
+            }
+            RuntimeExpr::Let { value, body } => {
+                control.continuation = SourceContinuation::LetBody {
+                    body: self.owned_child_occurrence(static_origin, 1, *body)?,
+                    env: env.clone(),
+                    next: Box::new(control.continuation),
+                };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *value)?,
+                    env: env.clone(),
+                    control,
+                }
+            }
+            RuntimeExpr::Construct {
+                constructor,
+                mut args,
+            } => {
+                // `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` -- ask the same
+                // classifier as direct descent before the source
+                // machine lowers any field. D1 established that every
+                // eligible state arrives with the complete argument
+                // run and no pending constructor continuation, so the
+                // existing template can open its conservation ledger
+                // without restructuring partial machine state.
+                let recognized =
+                    Self::recognized_constructor_worker_fields(&args, &env);
+                if recognized.iter().any(Option::is_some) {
+                    SourceMachineState::Value {
+                        value: RoutedAnswer::direct(
+                            LoweringOperand::Specialized(
+                                self.static_worker_constructor_template(
+                                    builder,
+                                    static_origin,
+                                    &constructor,
+                                    &args,
+                                    &recognized,
+                                    &env,
+                                )?,
+                            ),
+                        ),
+                        control,
+                    }
+                } else if args.is_empty() {
+                    SourceMachineState::Value {
+                        value: RoutedAnswer::direct(LoweringOperand::Specialized(
+                            self.finish_source_constructor(
+                                builder,
+                                constructor,
+                                static_origin,
+                                vec![],
+                            )?,
+                        )),
+                        control,
+                    }
+                } else {
+                    // Argument *i* is child *i*; the suffix keeps each
+                    // pending term paired with its own origin, so the
+                    // machine's positions cannot drift as it consumes them.
+                    let first = args.remove(0);
+                    let remaining = args
+                        .into_iter()
+                        .enumerate()
+                        .map(|(offset, arg)| {
+                            self.owned_child_occurrence(static_origin, 1 + offset, arg)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    control.continuation = SourceContinuation::ConstructArgument {
+                        constructor,
+                        static_origin,
+                        remaining,
+                        lowered: Vec::new(),
+                        env: env.clone(),
+                        next: Box::new(control.continuation),
+                    };
+                    SourceMachineState::Eval {
+                        expr: self.owned_child_occurrence(static_origin, 0, first)?,
+                        env,
+                        control,
+                    }
+                }
+            }
+            RuntimeExpr::Match {
+                scrutinee,
+                cases,
+                default,
+            } => {
+                control.continuation = SourceContinuation::MatchScrutinee {
+                    cases,
+                    default,
+                    env: env.clone(),
+                    static_origin,
+                    next: Box::new(control.continuation),
+                };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
+                    env,
+                    control,
+                }
+            }
+            RuntimeExpr::Call { callee, args } => {
+                let args = args
+                    .into_iter()
+                    .enumerate()
+                    .map(|(position, arg)| {
+                        self.owned_child_occurrence(static_origin, 1 + position, arg)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                // **`RT-CONTSRC-PRODUCER-LOCAL` `D8e` — THE SOLE
+                // SOURCE-MACHINE CONSUMER of a `D8d` binding.**
+                //
+                // ⛔ It sits **ahead of the callee's own evaluation**,
+                // and that placement is the mechanism, not a
+                // convenience. Evaluating a `Var` callee first routes it
+                // through the machine's value arm, which calls
+                // `value_at` and fails closed on a static worker by
+                // design. So the binding is either consumed here or
+                // refused everywhere — there is no third outcome, and a
+                // `Var` resolving to `Value` falls through to the
+                // pre-existing route untouched.
+                //
+                // ⭐ Deliberately the same shape as the direct descent's
+                // sole consumer: an exact `Var`, read out of the
+                // environment by index, no shape inference and no
+                // planner query. The environment already holds the
+                // answer because `D8d` put it there; asking the planner
+                // again here would be the consumer-side target lookup
+                // this checkpoint excludes, and a second authority for
+                // one binding.
+                let static_worker = match callee.as_ref() {
+                    RuntimeExpr::Var(index) => match env.get(*index as usize) {
+                        Some(LoweringEnvironmentBinding::StaticWorker(worker)) => {
+                            Some((u64::from(*index), worker.clone()))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some((binder_index, worker)) = static_worker {
+                    // `D2k-1b-i` — the source machine's terminal
+                    // disposition, counted into the same conservation
+                    // ledger as the direct descent's.
+                    self.static_worker_fields
+                    .note_consuming_call(worker.transport, static_origin, self.defining_function_id)?;
+                    #[cfg(test)]
+                    d8e_record_consumption();
+                    // `D8l2` — which facet this consumption carried,
+                    // recorded beside the count so "three consumptions"
+                    // can be attributed rather than merely counted.
+                    #[cfg(test)]
+                    crate::cranelift_backend::lowering::record_d8l2_consumed_facet(
+                        matches!(
+                            worker.discharge,
+                            ContinuationDischarge::ComposedSourceContinuation(_)
+                        ),
+                    );
+                    // Arguments are evaluated under the machine's own
+                    // control and phase, exactly as for a value callee;
+                    // only the completion differs.
+                    let mut remaining = args;
+                    if remaining.is_empty() {
+                        // **`D8p` — THE CHECKED-APPLICATION SEAM, on the
+                        // source machine's call edge.**
+                        //
+                        // The direct descent has consulted it since
+                        // `D5a`; this edge did not, so a checked-IH
+                        // marker entered in a body whose application the
+                        // SOURCE MACHINE lowers could never be consumed
+                        // and failed closed at the marker's close. The
+                        // seam is the same function, on the same exact
+                        // occurrence and binder ordinal -- no second
+                        // authority, no target lookup, and no new
+                        // identity.
+                        //
+                        // ⛔ Immediately BEFORE the call is written, so
+                        // consumption still precedes the instruction it
+                        // discharges, and after the arguments are in
+                        // hand so an ordinary selected-argument call
+                        // reaches the seat first and leaves the marker
+                        // for the occurrence that owns it.
+                        let pending = self.pending_computational_ih_call;
+                        let disposition = self
+                            .consume_checked_ih_marker_at_static_worker_call(
+                                binder_index,
+                                0,
+                                static_origin,
+                            )?;
+                        let materialized = match pending {
+                            Some(pending) => self
+                                .materialize_checked_ih_static_worker_application(
+                                    builder,
+                                    pending,
+                                    disposition,
+                                    &worker,
+                                )?,
+                            None => None,
+                        };
+                        if let Some(environment) = materialized {
+                            SourceMachineState::Value {
+                                value: RoutedAnswer::direct(environment.into_operand()),
+                                control,
+                            }
+                        } else {
+                        let before = self.live_source_continuations;
+                        let (called, emission) = self.call_static_worker_with_inputs(
+                            builder,
+                            &worker,
+                            Vec::new(),
+                            static_origin,
+                            None,
+                        )?
+                        .into_emitted()?;
+                        // `D8p` — the TARGET side, under the same key,
+                        // written only now that the call instruction
+                        // exists and carrying the run it actually took.
+                        #[cfg(test)]
+                        if disposition == CheckedApplicationDisposition::ConsumedHere {
+                            crate::cranelift_backend::lowering::record_d8p_emitted_target(
+                                crate::cranelift_backend::lowering::D8pEmittedTarget {
+                                    function: self.defining_function_id,
+                                    application_origin: static_origin,
+                                    target_body_origin: worker.body_origin,
+                                    declared_arity: worker.declared_arity,
+                                    captures: worker.captures.len(),
+                                    supplied_operands: emission.supplied_operands,
+                                },
+                            );
+                        }
+                        // `D8f` — the disposition, recorded AFTER the
+                        // call instruction exists. A record here is
+                        // therefore "this exact call was emitted, with
+                        // this disposition", which is what an omission
+                        // control needs: emitted, and not consumed.
+                        #[cfg(test)]
+                        crate::cranelift_backend::lowering::record_d8f_disposition(
+                            self.defining_function_id,
+                            static_origin,
+                            disposition,
+                        );
+                        // `D8j` — the call is emitted and its result is
+                        // in hand under the SAME `control` this arm was
+                        // entered with. Only now may a composed
+                        // obligation be claimed.
+                        // **`D8f` — THE CLAIM DISPOSITION, three cases,
+                        // matched exhaustively.**
+                        match disposition {
+                            // The `D8j` population: an ordinary composed
+                            // call, untouched by this seam, claims its
+                            // causal identity exactly as before.
+                            CheckedApplicationDisposition::NoPendingApplication
+                            // The checked application itself, claiming
+                            // the planner-issued identity once.
+                            | CheckedApplicationDisposition::ConsumedHere => {
+                                self.claim_composed_discharge(
+                                    &worker, emission, &called, before,
+                                )?;
+                            }
+                            // ⛔ The declined call. It is emitted
+                            // unchanged and it claims NOTHING: the
+                            // identity belongs to the checked
+                            // application the planner issued it for, and
+                            // an ordinary selected-argument call
+                            // answering for it is a second discharge of
+                            // one obligation. The binding is not
+                            // reclassified and no identity is minted --
+                            // this call simply does not answer.
+                            CheckedApplicationDisposition::PendingAtAnotherOccurrence => {
+                                #[cfg(test)]
+                                if d8f_declined_call_claims() {
+                                    self.claim_composed_discharge(
+                                        &worker, emission, &called, before,
+                                    )?;
+                                }
+                            }
+                        }
+                        SourceMachineState::Value {
+                            value: RoutedAnswer::direct(called),
+                            control,
+                        }
+                        }
+                    } else {
+                        let first = remaining.remove(0);
+                        control.continuation = SourceContinuation::CallArgument {
+                            callee: SourceCallee::StaticWorker {
+                                worker,
+                                static_origin,
+                                binder_index,
+                            },
+                            remaining,
+                            lowered: Vec::new(),
+                            env: env.clone(),
+                            next: Box::new(control.continuation),
+                        };
+                        SourceMachineState::Eval {
+                            expr: first,
+                            env,
+                            control,
+                        }
+                    }
+                } else {
+                    control.continuation = SourceContinuation::CallCallee {
+                        args,
+                        env: env.clone(),
+                        next: Box::new(control.continuation),
+                    };
+                    SourceMachineState::Eval {
+                        expr: self.owned_child_occurrence(static_origin, 0, *callee)?,
+                        env,
+                        control,
+                    }
+                }
+            }
+            RuntimeExpr::ComputationalMatch {
+                scrutinee,
+                cases,
+                default,
+            } => {
+                let checked_frame_id =
+                    self.consume_checked_subcontinuation_frame(builder, &cases, &default)?;
+                control.continuation = SourceContinuation::ComputationalMatchScrutinee {
+                    cases,
+                    default,
+                    env: env.clone(),
+                    static_origin,
+                    provenance: self.mint_recursor_frame_provenance(),
+                    checked_frame_id,
+                    answer_route: SourceComputationalAnswerRoute::DirectScrutinee,
+                    next: Box::new(control.continuation),
+                };
+                SourceMachineState::Eval {
+                    expr: self.owned_child_occurrence(static_origin, 0, *scrutinee)?,
+                    env,
+                    control,
+                }
+            }
+            // ⭐ The delegation point. Every form this dispatcher does not
+            // handle — closures included — goes to `lower_expr` here, and
+            // it now goes **as the same occurrence**: same term, same
+            // origin. This arm is why a "machine-only" subset could never
+            // have been threaded soundly.
+            other => SourceMachineState::Value {
+                value: RoutedAnswer::direct(self.lower_expr(
+                    builder,
+                    SourceOccurrence {
+                        expr: &other,
+                        static_origin,
+                    },
+                    &env,
+                )?),
+                control,
+            },
+        })
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn lower_source_bounded_nat_match<'b>(
         &mut self,
@@ -2872,10 +2928,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 let detail = match &lowered {
                     LoweringOperand::Specialized(Lowered::Trap(trap)) => {
                         format!("Trap({}: {:?})", trap.message, trap.code)
@@ -2884,6 +2941,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     // ⛔ No wildcard: a carried operand reaching a join
                     // diagnostic must name itself, not fall into `other`.
                     LoweringOperand::Carried(_) => "BoundaryCarrier".to_string(),
+                    LoweringOperand::Residual(_) => "RecursiveResidual".to_string(),
                 };
                 return Err(unsupported(
                     "NativeJoinPlanV1",
@@ -3030,10 +3088,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     format!(
@@ -3171,10 +3230,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             };
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     format!(
@@ -3304,10 +3364,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             // A trap terminates this mutually exclusive predecessor.
             return Ok(());
         }
-        if !matches!(
-            lowered,
-            LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-        ) {
+        if !match &lowered {
+            LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+            LoweringOperand::Residual(_) => false,
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+        } {
             return Err(unsupported(
                 "NativeJoinPlanV1",
                 format!("carried-match leaf {index} did not seal its distinct affine join edge"),
@@ -3667,8 +3728,26 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             // case header and a boundary value belongs.
             Self::require_i64(builder, field_count, binders);
             let mut projected = Vec::with_capacity(cases[index].binders);
+            let constructor_identity = self.static_transition_plan
+                .case_constructor_identity(static_origin, index)?;
             for position in 0..cases[index].binders {
                 let child = self.emit_carrier_field(builder, scrutinee, position)?;
+                let expected = self.static_transition_plan
+                    .recursive_residual_binder_affected(constructor_identity, position);
+                #[cfg(feature = "px8-ds-test-support")]
+                let before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+                #[cfg(feature = "px8-ds-test-support")]
+                let emit = recursive_residual_guard_enabled(expected);
+                #[cfg(not(feature = "px8-ds-test-support"))]
+                let emit = expected;
+                if emit {
+                    self.refuse_private_recursive_residual(builder, child)?;
+                }
+                #[cfg(feature = "px8-ds-test-support")]
+                record_recursive_residual_match_guard(
+                    "source", constructor_identity, position, expected,
+                    recursive_residual_class_calls(builder.func, self.carrier_refs()?.class) - before,
+                )?;
                 projected.push(child.word.into());
             }
             builder.ins().jump(leaf, &projected);
@@ -3777,10 +3856,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             default_control,
         )?;
         if !self.seal_source_trap_branch(builder, &lowered)?
-            && !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            )
+            && !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            }
         {
             return Err(unsupported(
                 "NativeJoinPlanV1",
@@ -3924,10 +4004,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     "nested dynamic constructor predecessor did not seal its edge",
@@ -4036,10 +4117,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             )?;
             if self.seal_source_trap_branch(builder, &lowered)? {
                 // A trap terminates this mutually exclusive predecessor.
-            } else if !matches!(
-                lowered,
-                LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-            ) {
+            } else if !match &lowered {
+                LoweringOperand::Specialized(Lowered::RecursiveBackedge) => true,
+                LoweringOperand::Residual(_) => false,
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
+            } {
                 return Err(unsupported(
                     "NativeJoinPlanV1",
                     format!(
@@ -4200,9 +4282,16 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 "the governed callee Var disagrees with the immediate K locator index",
             ));
         }
+        let residual_phase_valid = match residual.as_ref() {
+            // The issued record remains R in the checked recursor capsule.
+            LoweringOperand::Residual(_) => true,
+            // Unwrapped source positions still have an ordinary carried K.
+            LoweringOperand::Carried(_) => true,
+            LoweringOperand::Specialized(_) => false,
+        };
         if invocation.selection.checked_frame_id != call.parent_frame_template_id
             || invocation.computational_ih_slot_template_id != Some(call.slot_template_id)
-            || !matches!(residual.as_ref(), LoweringOperand::Carried(_))
+            || !residual_phase_valid
         {
             return Err(unsupported(
                 "CheckedIhGeneratedEntryAccess",
@@ -4493,6 +4582,191 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             None
                         } else {
                             let body = invocation.recursive_unit_body;
+                            if let Some(selection) = body {
+                                // A checked transport can return before the
+                                // shared unit selector, so guard its retained
+                                // selection at this source-machine consumer.
+                                selection.require_trivial_residual_continuation()?;
+                            }
+                            if let Some(selection @ RecursiveUnitBodySelection::Labelled { .. }) = body {
+                                // The sole switch is in calls.rs. Its callback
+                                // receives an exact body in each arm, so an S4
+                                // arrival cannot borrow S3's unique transport.
+                                let coordinates = CarriedInvocationCoordinates::of(invocation)?;
+                                let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+                                    "CheckedIhEnvironmentTransport", "a labelled force has no destination owner",
+                                ))?;
+                                let projection = current_checked_ih_projection.clone();
+                                // As on the ordinary exact-body force path,
+                                // install the invocation segment before the
+                                // returned word resumes source control. Without
+                                // this, R itself is tested as a Result.
+                                let checked_ih_invocation =
+                                    self.mint_checked_computational_ih_instance(&mut recursor)?;
+                                if let Some(CheckedRecursiveInvocationInstance {
+                                    source: InvocationTemplateRef::ComputationalIHCall(call_template_id), ..
+                                }) = checked_ih_invocation {
+                                    let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(||
+                                        unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation has no oriented plan"))?;
+                                    let call = plan.computational_ih_call(call_template_id).ok_or_else(||
+                                        unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation has no call template"))?;
+                                    let open = control.selected.selected_scope.as_ref().ok_or_else(||
+                                        unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation has no selected parent occurrence"))?;
+                                    self.validate_source_dynamic_splice_parent(
+                                        checked_ih_invocation.expect("matched checked IH invocation"), open,
+                                    )?;
+                                    if call.parent_frame_template_id != open.frame.checked_frame_id
+                                        || call.parent_segment_site_id != open.frame.checked_frame_id
+                                            .and_then(|frame_id| plan.frame(frame_id)
+                                                .map(|frame| frame.segment_site_id)) {
+                                        return Err(unsupported("OrientedSubcontinuationPlanV1",
+                                            "a labelled IH invocation's parent differs from the active open occurrence"));
+                                    }
+                                }
+                                let (base, boundary) = decompose_computational_recursor(
+                                    LoweringOperand::Specialized(recursor),
+                                );
+                                let (activation, invocation) = boundary.ok_or_else(|| unsupported(
+                                    "RecursiveResidual", "a labelled force lost its invocation segment",
+                                ))?;
+                                let word = match base {
+                                    LoweringOperand::Residual(word) => word,
+                                    LoweringOperand::Carried(_) | LoweringOperand::Specialized(_) => {
+                                        return Err(unsupported("RecursiveResidual", "a labelled force has no issued R slot word"));
+                                    }
+                                };
+                                if source_active_cursor(&control.selected, &control.selected_lineage,
+                                    invocation.resume_cursor).is_none()
+                                    && !recursor_invocation_is_checked(&invocation) {
+                                    return Err(unsupported("ComputationalRecursor",
+                                        "a labelled invocation cursor is not live in source control"));
+                                }
+                                let mut suspended = control;
+                                if source_active_cursor(&suspended.selected, &suspended.selected_lineage,
+                                    invocation.resume_cursor).is_none()
+                                    && !recursor_invocation_is_checked(&invocation) {
+                                    return Err(unsupported("ComputationalRecursor",
+                                        "a labelled armed endpoint changed selected cursor"));
+                                }
+                                suspended.continuation = self.install_recursor_invocation(
+                                    suspended.continuation, activation, invocation,
+                                    checked_ih_invocation,
+                                )?;
+                                let value = self.select_recursive_position_unit(
+                                    builder, selection, Some(coordinates), Some(word),
+                                    |this, builder, body, carried_base| {
+                                        let transport = this.static_transition_plan
+                                            .checked_ih_environment_transport_for_invocation(
+                                                owner, Some(body),
+                                                coordinates.continuation_origin,
+                                                coordinates.recursive_position,
+                                            )?.cloned();
+                                        if let Some(transport) = transport {
+                                            let word = carried_base.ok_or_else(|| unsupported(
+                                                "RecursiveResidual", "the force arm lost its selected R word",
+                                            ))?;
+                                            // The selected S3 arm validates R15's
+                                            // Child against its independent K7
+                                            // source record before taking its route.
+                                            let _ = this.checked_ih_transport_child(
+                                                builder, LoweringOperand::Residual(word), &transport,
+                                            )?;
+                                            let authority = match this.function_local
+                                                .checked_ih_generated_entry_access.as_ref() {
+                                                Some(access) => this.composed_return_forward_ret_authority(
+                                                    access, &transport,
+                                                )?,
+                                                None => ComposedReturnForwardRetAuthorityOutcome::NonApplicable,
+                                            };
+                                            match authority {
+                                                #[cfg(feature = "px8-ds-test-support")]
+                                                ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
+                                                    return Err(unsupported("ComposedReturnForwardRetAuthority",
+                                                        "a validated Tail producer-to-Ret route has no exact post-selection authority"));
+                                                }
+                                                #[cfg(feature = "px8-ds-test-support")]
+                                                ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => {
+                                                    return Err(unsupported("ComposedReturnForwardRetAuthority",
+                                                        "a validated Tail producer-to-Ret route formed more than one post-selection authority"));
+                                                }
+                                                ComposedReturnForwardRetAuthorityOutcome::NonApplicable
+                                                | ComposedReturnForwardRetAuthorityOutcome::Formed(_) => {}
+                                                #[cfg(feature = "px8-ds-test-support")]
+                                                ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
+                                            }
+                                            if let Some((projection, pending, callee_origin)) = &projection {
+                                                match projection.fresh_result_route() {
+                                                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                                                        return Ok(this.call_direct_checked_ih_transport_from_case_environment(
+                                                            builder, &transport, projection, *pending, *callee_origin,
+                                                            &env,
+                                                        )?.into_routed_answer().value);
+                                                    }
+                                                    CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                                                        // A labelled arm returns a value;
+                                                        // no forward-Ret collapse inside the switch.
+                                                        return this.call_tail_checked_ih_transport_from_case_environment(
+                                                            builder, &transport, &env,
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            this.call_tail_checked_ih_transport_from_case_environment(
+                                                builder, &transport, &env,
+                                            )
+                                        } else {
+                                            // S4 has no transport; None is the
+                                            // ordinary exact-body path, not refusal.
+                                            let mut inputs = this.carry_source_call_inputs(
+                                                builder, body, args.clone(),
+                                            )?;
+                                            if !inputs.is_empty() {
+                                                return Err(unsupported("RecursiveResidual",
+                                                    "an exact labelled force has unexpected explicit ordinary arguments"));
+                                            }
+                                            let units = this.static_transition_plan.continuation_units()?;
+                                            let mut matching = units.iter().filter(|unit|
+                                                unit.worker_body_origin() == body
+                                                    && unit.continuation_origin() == coordinates.continuation_origin
+                                                    && unit.recursive_position() == coordinates.recursive_position);
+                                            let unit = matching.next().ok_or_else(|| unsupported(
+                                                "RecursiveResidual", "an exact labelled force has no selected unit envelope",
+                                            ))?;
+                                            if matching.next().is_some() {
+                                                return Err(unsupported("RecursiveResidual",
+                                                    "an exact labelled force has ambiguous selected unit envelopes"));
+                                            }
+                                            let field_start = unit.recursive_positions().len();
+                                            for role in unit.ordinary_envelope()? {
+                                                if let ContinuationOrdinaryEnvelopeRole::NonrecursiveConstructorField {
+                                                    source_position,
+                                                } = role {
+                                                    let index = field_start.checked_add(source_position as usize)
+                                                        .ok_or_else(|| unsupported("RecursiveResidual",
+                                                            "an exact force's ordinary source field exceeds the case environment"))?;
+                                                    inputs.push(env.get(index).ok_or_else(|| unsupported(
+                                                        "RecursiveResidual", "an exact force is missing its planned nonrecursive field",
+                                                    ))?.value_at("an exact labelled force ordinary field")?.clone());
+                                                }
+                                            }
+                                            this.call_declared_recursive_position_unit(
+                                                builder, body, &inputs, Some(coordinates), carried_base,
+                                            )
+                                        }
+                                    },
+                                )?;
+                                return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
+                                    value: RoutedAnswer::direct(value), control: suspended,
+                                }));
+                            }
+                            let body = body.and_then(|selected| match selected {
+                                RecursiveUnitBodySelection::Exact(body)
+                                | RecursiveUnitBodySelection::ResidualExact { body, .. } => Some(body),
+                                RecursiveUnitBodySelection::Labelled { .. } => None,
+                            });
                             let coordinates = CarriedInvocationCoordinates::of(invocation)?;
                             let destination_owner = self.defining_emission_owner.ok_or_else(|| {
                                 unsupported(
@@ -4972,7 +5246,14 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 // invocation segment" is literal: the refusal below runs
                 // **before** `install_recursor_invocation`, which is exactly the
                 // ordering control 5 measures.
-                if let LoweringOperand::Carried(word) = base {
+                let runtime_base = match &base {
+                    LoweringOperand::Carried(word) => Some((LoweringOperand::Carried(*word), None)),
+                    LoweringOperand::Residual(residual) => {
+                        Some((LoweringOperand::Residual(*residual), Some(*residual)))
+                    }
+                    LoweringOperand::Specialized(_) => None,
+                };
+                if let Some((runtime_value, residual_base)) = runtime_base {
                     let mut suspended = armed.suspended;
                     suspended.continuation = self.install_recursor_invocation(
                         suspended.continuation,
@@ -4992,12 +5273,11 @@ recursive_position={:?} body={:?} installed=ok top={:?}",
                     ));
                     if let Some(body) = recursive_unit_body {
                         let coordinates = carried_coordinates;
-                        let args = self.carry_source_call_inputs(builder, body, args)?;
-                        let value = self.call_declared_recursive_position_unit(
-                            builder,
-                            body,
-                            &args,
-                            Some(coordinates),
+                        let value = self.call_selected_recursive_position_unit(
+                            builder, body, Some(coordinates), residual_base,
+                            |this, builder, body| {
+                                this.carry_source_call_inputs(builder, body, args.clone())
+                            },
                         )?;
                         #[cfg(test)]
                         d5a_trace(format!(
@@ -5020,7 +5300,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                     }
                     Self::reject_carried_residual_arguments(args.len())?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
-                        value: RoutedAnswer::direct(LoweringOperand::Carried(word)),
+                        value: RoutedAnswer::direct(runtime_value),
                         control: suspended,
                     }));
                 }
@@ -5092,6 +5372,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         body,
                         &call_inputs,
                         Some(coordinates),
+                        None,
                     )?;
                     return Ok(SourceCallOutcome::Continue(SourceMachineState::Value {
                         // A declared recursive-position unit call is not a

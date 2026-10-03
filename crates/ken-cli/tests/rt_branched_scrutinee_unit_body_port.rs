@@ -216,13 +216,22 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
             )
         })
     });
-    assert_eq!(rows.len(), 1, "the resolver entry remains observable");
+    // The suppressed build's row count is not this control's subject. Before
+    // RT-NATIVE-CONTINUATION-ENV-CARRIAGE I-2 the suppressed build aborted at
+    // the first resolver entry, so one row was recorded. From I-2 the residual
+    // route compiles the whole program and records the later
+    // continuation-context entries too: the same three entries the unsuppressed
+    // run records. Select by the recorded property, as the sibling test does,
+    // and do not freeze the total.
+    assert!(!rows.is_empty(), "the resolver entry remains observable");
     assert!(
-        !rows[0].route1,
-        "the old route-1 observation remains satisfied"
+        rows.iter().all(|row| !row.route1),
+        "the old route-1 observation remains satisfied: {rows:?}"
     );
     assert!(
-        !rows[0].match_branch_entered,
-        "the pre-recorder suppression is a positive control for branch-entry recording"
+        rows.iter()
+            .all(|row| !row.match_branch_entered && row.match_arms_walked == 0),
+        "the pre-recorder suppression is a positive control for branch-entry \
+         recording: {rows:?}"
     );
 }

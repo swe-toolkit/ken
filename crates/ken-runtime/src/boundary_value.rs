@@ -2386,6 +2386,14 @@ impl BoundaryValueStore {
             .node_field(index, NODE_CLASS)
             .ok_or(BOUNDARY_ERR_BOUNDS)?;
         let class = BoundaryClass::from_bits(bits).ok_or(BOUNDARY_ERR_CLASS)?;
+        // A compiler-private recursive-position residual is never a user
+        // Record. Refuse on admission, before visiting any child or minting a
+        // canonical byte, slot, hash or provenance for this graph.
+        if class == BoundaryClass::Record
+            && self.image.0.node_field(index, NODE_TAG_ID).ok_or(BOUNDARY_ERR_BOUNDS)? == 1
+        {
+            return Err(BOUNDARY_ERR_ESCAPE);
+        }
         if Self::class_is_persistable(class) {
             Ok(())
         } else {
@@ -3460,6 +3468,12 @@ impl InvocationAggregateNode {
             | BoundaryClass::Closure
             | BoundaryClass::BorrowedOpaque => return Err(BOUNDARY_ERR_CLASS),
         }
+        // Tag 1 belongs to the compiler's residual schema, not to
+        // RuntimeGroundValue::Record. Check before names or child fields are
+        // read on the invocation-aggregate decode path as well.
+        if class == BoundaryClass::Record && field(NODE_TAG_ID)? == 1 {
+            return Err(BOUNDARY_ERR_ESCAPE);
+        }
         let field_count = field(NODE_FIELD_COUNT)?;
         let fields_at = field(NODE_FIELDS_AT)?;
         // The spans, checked before anything reads through them. `checked_add`
@@ -3714,6 +3728,57 @@ mod invocation_aggregate_decode_tests {
                     ("value".to_string(), RuntimeGroundValue::Int(7.into())),
                 ],
             }
+        );
+    }
+
+    /// Promise class: durable invariant. A private tag-1 Record is neither an
+    /// externally materializable invocation value nor a canonical persistent
+    /// value. A tag-0 Record of identical shape is a legal user value.
+    #[test]
+    fn private_recursive_record_refuses_before_ground_or_canonical_publication() {
+        let mut store = store();
+        let mut invocation = BoundaryArenaV1::default();
+        let private = push(
+            &mut invocation,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Record,
+            NULL_SLOT,
+            1,
+            &[int_word(7)],
+            &[VALUE_ID],
+        );
+        assert_eq!(
+            decode_invocation_ground(&invocation, &mut store, private),
+            Err(BOUNDARY_ERR_ESCAPE),
+            "tag-9 private Record refuses before reading a positional child",
+        );
+        let public = push(
+            &mut invocation,
+            BoundaryTag::InvocationAggregate,
+            BoundaryClass::Record,
+            NULL_SLOT,
+            0,
+            &[int_word(7)],
+            &[VALUE_ID],
+        );
+        assert_eq!(
+            decode_invocation_ground(&invocation, &mut store, public),
+            Ok(RuntimeGroundValue::Record {
+                fields: vec![("value".to_string(), RuntimeGroundValue::Int(7.into()))],
+            }),
+        );
+
+        let persistent = store.image.0.push_node(
+            BoundaryTag::PersistentGround, BoundaryClass::Record,
+            NULL_SLOT, 1, 0, 0, &[int_word(7)], &[VALUE_ID], &[],
+        );
+        store.image.0.seal();
+        assert_eq!(store.adopt(persistent), Err(BOUNDARY_ERR_ESCAPE));
+        assert!(store.placement.is_empty(), "no private canonical slot is minted");
+        assert_eq!(
+            store.image.0.node_field(persistent.payload(), NODE_SLOT),
+            Some(NULL_SLOT as u64),
+            "the rejected private node still has no store-minted slot",
         );
     }
 

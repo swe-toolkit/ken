@@ -729,6 +729,7 @@ impl SynthesizedArgument {
             Self::WorkerCaptureOperand { value, .. } => match value {
                 LoweringOperand::Specialized(value) => lowered_value_kind(value),
                 LoweringOperand::Carried(_) => "carried boundary word",
+                LoweringOperand::Residual(_) => "private recursive residual",
             },
         }
     }
@@ -991,6 +992,7 @@ impl<'a> Lowering<'a> {
                                     .iter()
                                     .map(|capture| match capture {
                                         LoweringOperand::Carried(_) => "Carried",
+                                        LoweringOperand::Residual(_) => "Residual",
                                         LoweringOperand::Specialized(_) => {
                                             "Specialized"
                                         }
@@ -1003,7 +1005,12 @@ impl<'a> Lowering<'a> {
                         );
                     }
                     for capture in captures {
-                        if let LoweringOperand::Specialized(value) = capture {
+                        let specialized = match capture {
+                            LoweringOperand::Specialized(value) => Some(value),
+                            LoweringOperand::Residual(_) => None,
+                            LoweringOperand::Carried(_) => None,
+                        };
+                        if let Some(value) = specialized {
                             self.represented_boundary_admissibility(value)?;
                             self.source_aggregate_preflight(value)?;
                         }
@@ -1087,7 +1094,12 @@ impl<'a> Lowering<'a> {
                     }
                     self.represented_boundary_admissibility(value)?;
                     for capture in captures {
-                        if let LoweringOperand::Specialized(value) = capture {
+                        let specialized = match capture {
+                            LoweringOperand::Specialized(value) => Some(value),
+                            LoweringOperand::Residual(_) => None,
+                            LoweringOperand::Carried(_) => None,
+                        };
+                        if let Some(value) = specialized {
                             self.bind_continuation_boundary_admissibility(value)?;
                         }
                     }
@@ -1852,8 +1864,20 @@ impl<'a> Lowering<'a> {
                                     schema_origin
                                 ))
                             })?,
+                    };
+                    // This transfer has no selected-case environment from
+                    // which to fill a residual suffix. A source-identity
+                    // slot allocation must use the creation-site builder;
+                    // never store its bare K child as though it were R.
+                    for position in 0..args.len() {
+                        if self.static_transition_plan.slot_store_obligation(
+                            self.defining_emission_owner, occurrence, identity, position as u32,
+                        )?.is_some() {
+                            return Err(unsupported("RecursiveResidual",
+                                "a source slot constructor reached generic transfer without its creation-site suffix"));
+                        }
                     }
-                    .tag_abi_word()?;
+                    let identity = identity.tag_abi_word()?;
                     // The fields are read BEFORE the allocation, deliberately. This
                     // arm materializes the constructor, so a field read placed
                     // inside the store loop below would refuse only after
@@ -3173,6 +3197,18 @@ impl<'a> Lowering<'a> {
                         ));
                     }
                 };
+                // An alternative retains its own Source occurrence when it
+                // materializes a source Construct. A synthesized alternative
+                // has no source identity and is outside the slot population.
+                for position in 0..alternative.fields.len() {
+                    if self.static_transition_plan.slot_store_obligation(
+                        self.defining_emission_owner, occurrence, alternative.identity,
+                        position as u32,
+                    )?.is_some() {
+                        return Err(unsupported("RecursiveResidual",
+                            "a source slot alternative reached generic transfer without its creation-site suffix"));
+                    }
+                }
                 let word = self.emit_checked_aggregate_alloc(
                     builder,
                     GovernedAllocationSite::DynamicAlternative,
@@ -3309,6 +3345,11 @@ impl<'a> Lowering<'a> {
             let (record, operand) = seats.operand(EffectSeatSlot::Argument(index))?;
             let (mut value, source) = match operand {
                 LoweringOperand::Specialized(value) => (value.clone(), SiteOperandSource::Specialized),
+                LoweringOperand::Residual(_) => return Err(
+                    CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "a host-effect site operand",
+                    },
+                ),
                 LoweringOperand::Carried(word) => {
                     // **`RT-FSREADAT-REPLY-BUFFER-GATE-REMOVAL` `D1` -- the
                     // carried branch is NEED-DIRECTED.**
@@ -3857,7 +3898,8 @@ impl<'a> Lowering<'a> {
                                     })?,
                                 SynthesizedAggregateRoot::HostResultError
                                 | SynthesizedAggregateRoot::HostResultOk
-                                | SynthesizedAggregateRoot::UnitBoundaryEnvironment => {
+                                | SynthesizedAggregateRoot::UnitBoundaryEnvironment
+                                | SynthesizedAggregateRoot::RecursivePositionResidual => {
                                     return Err(unsupported(
                                         "BoundaryClosureEnvironment",
                                         "a positional closure capture was reconciled under a non-capture aggregate root",
@@ -3980,7 +4022,12 @@ impl<'a> Lowering<'a> {
                 let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
                     unreachable!("this emitter constructs only worker-capture arguments")
                 };
-                if let LoweringOperand::Specialized(value) = value {
+                let specialized = match value {
+                    LoweringOperand::Specialized(value) => Some(value),
+                    LoweringOperand::Residual(_) => None,
+                    LoweringOperand::Carried(_) => None,
+                };
+                if let Some(value) = specialized {
                     value.boundary_transfer_admissibility()?;
                     self.source_aggregate_preflight(value)?;
                 }
@@ -3999,6 +4046,8 @@ impl<'a> Lowering<'a> {
                 &template,
                 PlannedAggregateShape::Constructor,
             )?;
+            // A planner-synthesized checked-IH positional environment has no
+            // source Construct identity; R2's source-store predicate excludes it.
             let word = self.emit_checked_aggregate_alloc(
                 builder,
                 GovernedAllocationSite::SourceConstructor,
@@ -4013,13 +4062,23 @@ impl<'a> Lowering<'a> {
                 };
                 let child = match value {
                     LoweringOperand::Carried(word) => word,
+                    // Synthesized checked-IH capture fields have positional
+                    // identities but no R/K kind until I-1. Count this
+                    // distinct transitional crossing; do not infer K here.
+                    LoweringOperand::Residual(residual) => {
+                        #[cfg(any(test, feature = "px8-ds-test-support"))]
+                        record_synthesized_checked_ih_capture_escape();
+                        residual.residual_across_untyped_abi_transitional()
+                    },
                     LoweringOperand::Specialized(value) => {
                         self.transfer_into_carrier(builder, origin, &value)?
                     }
                 };
                 self.emit_carrier_store_field(builder, word, position, child)?;
             }
-            Ok(CheckedIhCapturedEnvironment { word })
+            Ok(CheckedIhCapturedEnvironment {
+                word: CheckedIhEnvironmentOperand::Synthesized(word),
+            })
         }
 
         /// Materialize only the positional environment of one statically
@@ -4110,7 +4169,12 @@ impl<'a> Lowering<'a> {
                 let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
                     unreachable!("this emitter constructs only positional capture arguments")
                 };
-                if let LoweringOperand::Specialized(value) = value {
+                let specialized = match value {
+                    LoweringOperand::Specialized(value) => Some(value),
+                    LoweringOperand::Residual(_) => None,
+                    LoweringOperand::Carried(_) => None,
+                };
+                if let Some(value) = specialized {
                     value.boundary_transfer_admissibility()?;
                     self.source_aggregate_preflight(value)?;
                 }
@@ -4127,6 +4191,19 @@ impl<'a> Lowering<'a> {
                 &template,
                 PlannedAggregateShape::Constructor,
             )?;
+            // A boundary closure's positional captures have no issued R
+            // slot. Decode R at this K destination before parent allocation.
+            let mut decoded = vec![None; arguments.len()];
+            for (position, argument) in arguments.iter().enumerate() {
+                let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
+                    unreachable!("this emitter constructs only positional capture arguments")
+                };
+                if let LoweringOperand::Residual(residual) = value {
+                    decoded[position] = Some(self.decode_residual_child(builder, *residual)?);
+                }
+            }
+            // A planner-synthesized closure positional environment has no
+            // source Construct identity; R2's source-store predicate excludes it.
             let word = self.emit_checked_aggregate_alloc(
                 builder,
                 GovernedAllocationSite::SourceConstructor,
@@ -4141,6 +4218,8 @@ impl<'a> Lowering<'a> {
                 };
                 let child = match value {
                     LoweringOperand::Carried(word) => word,
+                    LoweringOperand::Residual(_) => decoded[position]
+                        .expect("boundary closure residual was decoded before allocation"),
                     LoweringOperand::Specialized(value) => {
                         self.transfer_into_carrier(builder, origin, &value)?
                     }

@@ -263,7 +263,6 @@ fn run_dynamic_constructor_dispatch_fixture(
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -2218,7 +2217,6 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -2818,6 +2816,48 @@ pub(super) fn c2_run_edge_with_arg(
     let function: extern "C" fn(*const u64, i64) -> i64 =
         unsafe { std::mem::transmute(code) };
     function(arena, argument)
+}
+
+/// Promise class: durable invariant. The exact private Record discriminator
+/// refuses the carried tag-1 record but not a tag-0 user Record or a legitimate
+/// Constructor whose checked identity is also 1. The synthetic words enter the
+/// emitted ABI reader, not a Rust-only duplicate predicate.
+#[test]
+fn private_record_reader_checks_class_and_tag_without_refusing_public_values() {
+    use crate::boundary_value::{
+        BoundaryArenaBuilder, BoundaryClass, BoundaryTag, NODE_TAG_ID,
+    };
+    let source = RuntimeExpr::Value(RuntimeValue::Int(1.into()));
+    let (plan, _) = planned_root_occurrence(&source);
+    let seed = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let (_module, code) = c2_compile_edge_with_arg(
+        "private_record_reader_class_and_tag", &seed, plan,
+        |compiler, builder, argument| {
+            compiler.refuse_private_recursive_residual(
+                builder, CarriedBoundaryWord { word: argument },
+            )?;
+            Ok(builder.ins().iconst(types::I64, 42))
+        },
+    );
+    let mut values = BoundaryArenaBuilder::new();
+    let private = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Record, 0, &[],
+    );
+    let public = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Record, 0, &[],
+    );
+    let constructor = values.push_node(
+        BoundaryTag::InvocationAggregate, BoundaryClass::Constructor, 0, &[],
+    );
+    let mut arena = values.finish();
+    arena.0.poke_node_field(private.payload(), NODE_TAG_ID, 1);
+    arena.0.poke_node_field(constructor.payload(), NODE_TAG_ID, 1);
+    let pointer = arena.publish();
+    assert_eq!(c2_run_edge_with_arg(code, pointer, private.0 as i64), -1);
+    assert_eq!(c2_run_edge_with_arg(code, pointer, public.0 as i64), 42);
+    assert_eq!(c2_run_edge_with_arg(code, pointer, constructor.0 as i64), 42);
 }
 
 /// The expected semantic environment for one declared source parameter, four
@@ -6800,6 +6840,9 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
                 &[EliminatorFrame::InvocationReturn],
             )? {
                 LoweringOperand::Carried(word) => Ok(word.word),
+                LoweringOperand::Residual(_) => Err(unsupported(
+                    "InvocationReturn", "a transport-free ordinary return cannot carry an R",
+                )),
                 LoweringOperand::Specialized(other) => Err(unsupported(
                     "InvocationReturn",
                     format!(
@@ -6860,6 +6903,90 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
         "the same owner's distinct ordinary producer must reach the production \
          decision as transport-free: {decisions:?}"
     );
+}
+
+/// The source plan admits a Boxed member, but its labelled selector lacks
+/// graph-issued call authority for that member. Full compilation must refuse
+/// before emitting any unit, rather than run an untested native ABI path.
+///
+/// MEASURED / GAP (Architect evt_75s5cr96knfde):
+/// On merge-base 10daa9242 the synthetic mixed source (the checked-IH mixed
+/// fixture with Node body `Call(Var(0), MkUnit)` and root
+/// `Call(source, Bool(false))`) compiles and returns `Returned(Option::None)`.
+/// The native word is 1541, a PersistentGround handle to image node 6; the
+/// label is the constructor stored in that node. No binder reading of the
+/// source produces that value, because the Leaf body's outer match is total
+/// into Exit. The RuntimeIr evaluator refuses computational IH, so no oracle
+/// exists. On the candidate the source is refused before lowering by the
+/// Boxed choke (refusals 1, Boxed arms 0). The parity population is unchanged:
+/// 186/186, 0 mixed slots in 299 plans, 0 choke firings.
+///
+/// CLAIMED: this Boxed member is refused before native lowering. A future
+/// graph-authorized source must execute Boxed and red both the arity and bare-K
+/// mutations before this refusal can be lifted. The base's wrong value is not
+/// a no-regression claim for the refused shape.
+///
+/// Promise class: transition sentinel, retired by that executed witness.
+#[test]
+fn mixed_recursive_carrier_boxed_member_is_refused_before_lowering() {
+    let mut source = checked_transport_mixed_invocation_return_fixture();
+    let RuntimeExpr::LexicalClosure { body, .. } = &mut source else {
+        panic!("mixed source has its lexical root")
+    };
+    let RuntimeExpr::ComputationalMatch { cases, .. } = body.as_mut() else {
+        panic!("mixed source has its recursive eliminator")
+    };
+    let node = cases.iter_mut().find(|case| case.constructor.ends_with("::Contspec::Node"))
+        .expect("mixed source has its Node case");
+    node.body = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::Var(0)),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::Unit::MkUnit".to_string(), args: Vec::new(),
+        }],
+    };
+    let call = RuntimeExpr::Call {
+        callee: Box::new(source),
+        args: vec![RuntimeExpr::Value(RuntimeValue::Bool(false))],
+    };
+    let plan = plan_static_transition_graph_with_symbols(
+        &call, &BTreeMap::new(), &crate::NativeProcessSymbols::legacy_prelude(),
+        AbiRootIngress::Process, true,
+    ).expect("live fixture plans");
+    let mixed = plan.recursive_carrier_slots().iter().filter(|slot|
+        slot.variants.iter().any(|variant| variant.schema == RecursiveCarrierMemberSchema::Residual)
+            && slot.variants.iter().any(|variant| variant.schema == RecursiveCarrierMemberSchema::Boxed)
+    ).count();
+    let boxed_stores = plan.recursive_carrier_slots().iter().map(|slot|
+        slot.edges.iter().filter(|edge|
+            edge.kind == RecursiveCarrierStoreKind::ConstructEmission
+                && slot.variant(edge.specialization).is_ok_and(|variant|
+                    variant.schema == RecursiveCarrierMemberSchema::Boxed)
+        ).count()
+    ).sum::<usize>();
+    let boxed_force = plan.recursive_carrier_slots().iter().map(|slot|
+        slot.edges.iter().filter(|edge|
+            edge.kind == RecursiveCarrierStoreKind::CheckedIhForce
+                && slot.variant(edge.specialization).is_ok_and(|variant|
+                    variant.schema == RecursiveCarrierMemberSchema::Boxed)
+        ).count()
+    ).sum::<usize>();
+    assert!(mixed >= 1, "the fixture must plan an issued mixed slot");
+    assert!(boxed_stores >= 1, "the fixture must plan a boxed construct store");
+    assert_eq!(boxed_force, 0, "Boxed members cannot mint checked-IH force stores");
+
+    let env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let (result, counters) = with_residual_lowering_counters(|| compile_expr(&call, &env));
+    match result {
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "RecursiveResidual", reason,
+        })) => assert_eq!(reason, "a Boxed carrier member has no executed consumer"),
+        Err(error) => panic!("the Boxed member reached another refusal: {error:?}"),
+        Ok(_) => panic!("the Boxed member compiled without an executed consumer"),
+    }
+    assert_eq!(counters.boxed_member_compile_refusals, 1,
+        "this compile must reach the pre-lowering Boxed choke exactly once");
+    assert_eq!(counters.boxed_decode_arms_emitted, 0,
+        "a Boxed decoder arm must not be emitted before the refusal");
 }
 
 // ─── RT-WORKER-BIND `D2` — the construction route's pre-installation facts ───
@@ -7344,7 +7471,7 @@ fn static_worker_as_aggregate_field_is_transported_and_non_materializable() {
         StaticWorkerTestRoute::Direct,
     ) {
         Ok(LoweringOperand::Specialized(lowered)) => lowered,
-        Ok(LoweringOperand::Carried(_)) => {
+        Ok(LoweringOperand::Carried(_) | LoweringOperand::Residual(_)) => {
             panic!("a template transporting a static worker must not reach the carrier")
         }
         Err(error) => panic!("the worker is transported rather than refused here: {error:?}"),
@@ -7440,7 +7567,7 @@ fn source_machine_recognized_worker_enters_the_constructor_template() {
         StaticWorkerTestRoute::SourceMachine,
     ) {
         Ok(LoweringOperand::Specialized(lowered)) => lowered,
-        Ok(LoweringOperand::Carried(_)) => {
+        Ok(LoweringOperand::Carried(_) | LoweringOperand::Residual(_)) => {
             panic!("the source-machine worker template must not enter the carrier")
         }
         Err(error) => panic!(

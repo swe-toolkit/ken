@@ -118,7 +118,6 @@ fn run_checked_bounded_nat_fixture(
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -5064,6 +5063,49 @@ fn carried_constructor_dispatch_traps_wrong_positional_child_before_fs_open() {
             .unwrap_or_else(|error| panic!("{name}: the guarded route compiles: {error}"));
         assert_eq!(status, -1, "{name}: must take the deterministic trap");
         assert_eq!(probe.calls, 0, "{name}: must perform zero host calls");
+    }
+}
+
+/// Promise class: durable invariant. A private tag-1 Record that preserves
+/// the root's or positional child's complete field layout refuses before the
+/// host request. The unmodified fixture above is the legitimate constructor
+/// control; each guard-deletion mutation must independently turn this red.
+#[test]
+fn a_private_record_at_either_host_wire_reader_refuses_before_fs_open() {
+    let mode = RuntimeExpr::Construct {
+        constructor: "ctor:prelude::ResourceOpenMode::ResourceWriteCreate".to_string(),
+        args: vec![RuntimeExpr::Construct {
+            constructor: "ctor:prelude::CreatePolicy::CreateOrTruncate".to_string(),
+            args: Vec::new(),
+        }],
+    };
+    for site in [PrivateResidualReaderSite::HostWireRoot,
+        PrivateResidualReaderSite::HostWireChild] {
+        let (result, guards) = with_private_reader_probe(site, false, || {
+            run_fs_open_fixture(&fs_open_carried_mode_fixture(mode.clone()))
+        });
+        let (status, probe) = result.expect("the private reader fixture compiles");
+        assert_eq!(status, -1, "{site:?}: private Record refuses at the reader");
+        assert_eq!(probe.calls, 0, "{site:?}: must not dispatch an FsOpen request");
+        assert!(!guards.is_empty(), "{site:?}: the injected reader must emit");
+        assert!(guards.iter().all(|&calls| calls == 1),
+            "{site:?}: one emitted class check per injected reader: {guards:?}");
+        let (unprotected, removed) = with_private_reader_probe(site, true, || {
+            run_fs_open_fixture(&fs_open_carried_mode_fixture(mode.clone()))
+        });
+        let (status_without_guard, without_guard) = unprotected.expect("guard-deletion fixture compiles");
+        assert_eq!(status_without_guard, 47,
+            "{site:?}: deleting its guard must reach the immediate fallthrough poison");
+        assert_eq!(without_guard.calls, 0,
+            "the poison is before host dispatch, not a stand-in host request");
+        assert!(!removed.is_empty() && removed.iter().all(|&calls| calls == 0),
+            "{site:?}: deleting this one reader's guard removes exactly its class call");
+        // MEASURED: synthetic private Record refuses at -1 before either a
+        // host call or a test-only fallthrough marker. Deleting just this
+        // guard reaches 47 with the same injected record. CLAIMED: the guard
+        // is the first refusal on this reader. THE GAP: a later tag check
+        // would also refuse on these checked identities, so the poison is
+        // placed before that check instead of inferring ordering from -1.
     }
 }
 

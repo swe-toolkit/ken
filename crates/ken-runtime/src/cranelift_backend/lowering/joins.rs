@@ -264,6 +264,11 @@ impl<'a> Lowering<'a> {
                     D8_CARRIED_JOIN_UNCHANGED.with(|count| count.set(count.get() + 1));
                     Ok(word)
                 }
+                LoweringOperand::Residual(_) => Err(
+                    CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "a source join without a declared residual result plane",
+                    },
+                ),
                 // ── ⛔ DEFERRED, said plainly ──────────────────────────────────
                 //
                 // ⚠ A deferral is honest; a deferral that reads as delivery is not.
@@ -1142,11 +1147,10 @@ impl<'a> Lowering<'a> {
                 // origin and the case's ordinal. ⚠ `case.constructor`, the
                 // **string**, is deliberately not the key: keying on the spelling
                 // would be the second derivation `D2` forbids.
-                let identity = self
+                let constructor_identity = self
                     .static_transition_plan
-                    .case_constructor_identity(static_origin, index)?
-                    .tag_abi_word()?;
-                let identity = Self::carrier_identity_immediate(builder, identity);
+                    .case_constructor_identity(static_origin, index)?;
+                let identity = Self::carrier_identity_immediate(builder, constructor_identity.tag_abi_word()?);
                 let selected = builder.create_block();
                 let next = builder.create_block();
                 let matched = builder.ins().icmp(
@@ -1178,9 +1182,24 @@ impl<'a> Lowering<'a> {
                 // phase** — which is the exact clause `§2h`'s control demands.
                 let mut bindings = Vec::with_capacity(case.binders);
                 for position in 0..case.binders {
-                    bindings.push(LoweringOperand::Carried(
-                        self.emit_carrier_field(builder, scrutinee, position)?,
-                    ));
+                    let child = self.emit_carrier_field(builder, scrutinee, position)?;
+                    let expected = self.static_transition_plan
+                        .recursive_residual_binder_affected(constructor_identity, position);
+                    #[cfg(feature = "px8-ds-test-support")]
+                    let before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+                    #[cfg(feature = "px8-ds-test-support")]
+                    let emit = recursive_residual_guard_enabled(expected);
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    let emit = expected;
+                    if emit {
+                        self.refuse_private_recursive_residual(builder, child)?;
+                    }
+                    #[cfg(feature = "px8-ds-test-support")]
+                    record_recursive_residual_match_guard(
+                        "joins", constructor_identity, position, expected,
+                        recursive_residual_class_calls(builder.func, self.carrier_refs()?.class) - before,
+                    )?;
+                    bindings.push(LoweringOperand::Carried(child));
                 }
                 let case_env = env_with_operands(bindings, env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
@@ -1446,8 +1465,12 @@ impl<'a> Lowering<'a> {
                 let arm_env = env_with(fields, env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 let lowered = self.lower_expr(builder, body, &arm_env)?;
-                if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                    terminal_trap.get_or_insert_with(|| trap.clone());
+                match &lowered {
+                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    }
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
                 if self.seal_source_trap_branch(builder, &lowered)? {
                     continue;
@@ -1677,8 +1700,12 @@ impl<'a> Lowering<'a> {
                 arm_env.extend_from_slice(env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
                 let lowered = self.lower_expr(builder, body, &arm_env)?;
-                if let LoweringOperand::Specialized(Lowered::Trap(trap)) = &lowered {
-                    terminal_trap.get_or_insert_with(|| trap.clone());
+                match &lowered {
+                    LoweringOperand::Specialized(Lowered::Trap(trap)) => {
+                        terminal_trap.get_or_insert_with(|| trap.clone());
+                    }
+                    LoweringOperand::Residual(_) => {}
+                    LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {}
                 }
                 if self.seal_source_trap_branch(builder, &lowered)? {
                     continue;
@@ -2733,6 +2760,11 @@ impl LoweringOperand {
                          cannot cross it until that join carries the phase"
                     ),
                 )),
+                LoweringOperand::Residual(_) => Err(
+                    CraneliftBackendError::ResidualRepresentationRequired {
+                        site: "a native scalar join",
+                    },
+                ),
             }
         }
 }
@@ -2749,8 +2781,10 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             lowered: &LoweringOperand,
         ) -> Result<bool, CraneliftBackendError> {
-            let LoweringOperand::Specialized(Lowered::Trap(trap)) = lowered else {
-                return Ok(false);
+            let trap = match lowered {
+                LoweringOperand::Specialized(Lowered::Trap(trap)) => trap,
+                LoweringOperand::Residual(_) => return Ok(false),
+                LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => return Ok(false),
             };
             let status = self.emit_current_trap(builder, trap)?;
             builder.ins().return_(&[status]);

@@ -1,0 +1,13 @@
+program capabilities FS AFull
+proc main (input : ProcessInput) (_caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match input {
+    MkProcessInput arguments _environment _cwd |-> match arguments {
+      Nil |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        ExitCode Success;
+      Cons _argv0 _rest |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        ExitCode (Failure 7)
+    }
+  }

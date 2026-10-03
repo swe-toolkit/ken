@@ -94,6 +94,10 @@ pub use lowering::units::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use lowering::{
+    with_residual_lowering_counters, ResidualLoweringCounters,
+    with_recursive_residual_match_guard_observations,
+    with_plain_native_unit_ir_observations,
+    RecursiveResidualMatchGuardMutation, RecursiveResidualMatchGuardObservation,
     checked_ih_direct_application_mutation_is_exact,
     composed_return_ret_sink_mutation_is_exact,
     with_checked_ih_direct_application_mutation,
@@ -126,6 +130,8 @@ pub use lowering::source::{
 // `RT-CAPTURE-PROJECTION-GROW` `D1` — the worker-prefix deferral ledger.
 #[cfg(feature = "px8-ds-test-support")]
 pub use planning::{
+    with_recursive_residual_disposition_census, RecursiveResidualDispositionCensus,
+    with_recursive_residual_disposition_mutation, RecursiveResidualDispositionMutation,
     checked_ih_continuation_inheritance_mutation_is_exact,
     checked_ih_generated_entry_admission_mutation_is_exact,
     checked_ih_generated_entry_arrival_mutation_is_exact,

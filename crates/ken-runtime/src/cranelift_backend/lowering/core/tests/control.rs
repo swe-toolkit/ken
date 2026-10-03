@@ -112,7 +112,6 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -299,7 +298,6 @@ fn run_px8j_malformed_recursor_consumer(
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -2359,7 +2357,6 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             driven_deferred_response_effect: None,
             worker_templates: BTreeMap::new(),
             generated_context_captures: None,
-            constructed_context_frame: None,
             checked_ih_generated_entry_access: None,
             seed_material: crate::cranelift_backend::lowering::seed_material::SeedMaterialRefs::none_for_tests(),
             host_dispatch: None,
@@ -3593,7 +3590,7 @@ fn the_branch_local_partition_mints_a_declared_body_for_a_capture_free_recursive
     lowering.static_transition_plan = plan;
 
     let minted = lowering
-        .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string())
+        .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string(), 0)
         .expect("the fixture is plannable and the resolver must not error");
 
     // ⭐ The MINTING path, not merely a lifted veto. Before the partition this
@@ -3622,7 +3619,7 @@ fn the_branch_local_partition_mints_a_declared_body_for_a_capture_free_recursive
         .child_static_origin(closure, 0)
         .expect("the closure's body has a planned origin");
     assert_eq!(
-        minted, closure_body,
+        minted, RecursiveUnitBodySelection::Exact(closure_body),
         "the minted unit must be the in-bucket closure's own body"
     );
 }
@@ -3639,7 +3636,7 @@ fn the_partition_still_refuses_a_capture_bearing_recursive_position() {
     lowering.static_transition_plan = plan;
 
     let minted = lowering
-        .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string())
+        .recursive_position_unit_body(root, 1, &"ctor:fixture::ITree::Vis".to_string(), 0)
         .expect("the fixture is plannable and the resolver must not error");
 
     assert!(
@@ -3647,4 +3644,35 @@ fn the_partition_still_refuses_a_capture_bearing_recursive_position() {
         "a capture-bearing LexicalClosure must still refuse — the partition is a \
          bucket cut, never a relaxation of the capture condition"
     );
+}
+
+#[test]
+fn residual_consumers_refuse_a_nontrivial_selection_continuation() {
+    let fixture = d1_ret_vis_producer(Vec::new());
+    let (plan, root) = planned_root_occurrence(&fixture);
+    let constructor = plan.case_constructor_identity(root, 0)
+        .expect("the selected case has a checked constructor identity");
+    let body = plan.child_static_origin(root, 0)
+        .expect("the eliminator has a checked scrutinee origin");
+    let exact = RecursiveUnitBodySelection::Exact(body);
+    let singleton = |pending_outer_frames| RecursiveUnitBodySelection::ResidualExact {
+        body,
+        pending_outer_frames,
+    };
+    let labelled = |pending_outer_frames| RecursiveUnitBodySelection::Labelled {
+        eliminator: root,
+        constructor,
+        position: 1,
+        pending_outer_frames,
+    };
+    assert!(exact.require_trivial_residual_continuation().is_ok());
+    assert!(singleton(0).require_trivial_residual_continuation().is_ok());
+    assert!(labelled(0).require_trivial_residual_continuation().is_ok());
+    for selection in [singleton(1), labelled(1)] {
+        let error = selection.require_trivial_residual_continuation()
+            .expect_err("a residual cannot consume a pending outer continuation");
+        assert!(format!("{error:?}").contains(
+            "a residual cannot replace a descent under a pending outer continuation"
+        ));
+    }
 }

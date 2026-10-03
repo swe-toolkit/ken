@@ -1305,6 +1305,11 @@ impl<'a> Lowering<'a> {
                     refusal: Some((invalid, resource_code)),
                 })
             }
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a host-effect bytes seat",
+                },
+            ),
         }
     }
     fn wire_bytes(
@@ -1647,6 +1652,11 @@ impl<'a> Lowering<'a> {
                 let word = *word;
                 self.narrow_carried_int_u64(builder, word)
             }
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a host-effect positioned Int seat",
+                },
+            ),
         }
     }
 
@@ -2208,6 +2218,22 @@ impl<'a> Lowering<'a> {
                 "a carried constructor seat has no artifact-static dispatch path",
             ));
         }
+        #[cfg(test)]
+        let word = self.test_private_word_at_reader(builder, word, PrivateResidualReaderSite::HostWireRoot)?;
+        #[cfg(test)]
+        let guard_before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+        #[cfg(test)]
+        let guard_enabled = !private_reader_guard_deleted(PrivateResidualReaderSite::HostWireRoot);
+        #[cfg(not(test))]
+        let guard_enabled = true;
+        if guard_enabled {
+            self.refuse_private_recursive_residual(builder, word)?;
+        }
+        #[cfg(test)]
+        record_private_reader_guard(PrivateResidualReaderSite::HostWireRoot, guard_before,
+            builder.func, self.carrier_refs()?.class);
+        #[cfg(test)]
+        self.test_private_reader_fallthrough_poison(builder, PrivateResidualReaderSite::HostWireRoot);
         let root_tag = self.emit_carrier_tag(builder, word)?;
         let root_field_count = self.emit_carrier_field_count(builder, word)?;
         let done = builder.create_block();
@@ -2256,6 +2282,24 @@ impl<'a> Lowering<'a> {
                         )
                     })?;
                     let child = self.emit_carrier_field(builder, word, child_position)?;
+                    #[cfg(test)]
+                    let child = self.test_private_word_at_reader(builder, child,
+                        PrivateResidualReaderSite::HostWireChild)?;
+                    #[cfg(test)]
+                    let guard_before = recursive_residual_class_calls(builder.func, self.carrier_refs()?.class);
+                    #[cfg(test)]
+                    let guard_enabled = !private_reader_guard_deleted(PrivateResidualReaderSite::HostWireChild);
+                    #[cfg(not(test))]
+                    let guard_enabled = true;
+                    if guard_enabled {
+                        self.refuse_private_recursive_residual(builder, child)?;
+                    }
+                    #[cfg(test)]
+                    record_private_reader_guard(PrivateResidualReaderSite::HostWireChild, guard_before,
+                        builder.func, self.carrier_refs()?.class);
+                    #[cfg(test)]
+                    self.test_private_reader_fallthrough_poison(builder,
+                        PrivateResidualReaderSite::HostWireChild);
                     let child_tag = self.emit_carrier_tag(builder, child)?;
                     let child_fields = self.emit_carrier_field_count(builder, child)?;
                     Self::require_i64(builder, child_fields, i64::from(*child_field_count));
@@ -2316,6 +2360,11 @@ impl<'a> Lowering<'a> {
                     })?;
                 self.emit_carried_constructor_dispatch(builder, *word, &paths)
             }
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a host-effect constructor tag seat",
+                },
+            ),
         }
     }
 
@@ -2354,6 +2403,11 @@ impl<'a> Lowering<'a> {
                 Self::require_i64(builder, class, BoundaryClass::BorrowedOpaque as i64);
                 self.emit_carrier_scalar(builder, *word)
             }
+            LoweringOperand::Residual(_) => Err(
+                CraneliftBackendError::ResidualRepresentationRequired {
+                    site: "a host-effect resource token seat",
+                },
+            ),
         }
     }
     /// Decode ABI-A3's provisional whole-directory payload into the checked
@@ -3194,6 +3248,11 @@ impl<'a> Lowering<'a> {
                 let token = match capability_operand {
                     LoweringOperand::Specialized(Lowered::CapabilityToken { value }) => *value,
                     LoweringOperand::Carried(word) => self.emit_carrier_scalar(builder, *word)?,
+                    LoweringOperand::Residual(_) => return Err(
+                        CraneliftBackendError::ResidualRepresentationRequired {
+                            site: "a directory operation capability seat",
+                        },
+                    ),
                     LoweringOperand::Specialized(other) => {
                         return Err(unsupported(
                             "Effect",
@@ -3257,15 +3316,15 @@ impl<'a> Lowering<'a> {
                 // claim group's window contains no operand lowering.
                 let (capability_record, capability_operand) =
                     seats.operand(EffectSeatSlot::Capability)?;
-                // ⛔ Exhaustive over both phases with no wildcard. The capability
-                // is an either-phase seat: a specialized `CapabilityToken`
-                // template is read directly, a carried word through the emitted
-                // scalar read. A specialized template that is neither is the
-                // third case, and it names the seat rather than falling into a
-                // catch-all.
+                // The exact site type is checked before any capability read.
                 let token = match capability_operand {
                     LoweringOperand::Specialized(Lowered::CapabilityToken { value }) => *value,
                     LoweringOperand::Carried(word) => self.emit_carrier_scalar(builder, *word)?,
+                    LoweringOperand::Residual(_) => return Err(
+                        CraneliftBackendError::ResidualRepresentationRequired {
+                            site: "a file operation capability seat",
+                        },
+                    ),
                     LoweringOperand::Specialized(other) => {
                         return Err(unsupported(
                             "Effect",
@@ -3463,6 +3522,11 @@ impl<'a> Lowering<'a> {
                             Self::record_capacity_phase_dispatch(true);
                             self.narrow_carried_int_u64(builder, word)?
                         }
+                        LoweringOperand::Residual(_) => return Err(
+                            CraneliftBackendError::ResidualRepresentationRequired {
+                                site: "BufferAllocate capacity",
+                            },
+                        ),
                     }
                 };
                 let invalid = builder.ins().icmp_imm(
@@ -3530,6 +3594,11 @@ impl<'a> Lowering<'a> {
                     LoweringOperand::Carried(word) => {
                         self.narrow_carried_int_u64(builder, *word)?
                     }
+                    LoweringOperand::Residual(_) => return Err(
+                        CraneliftBackendError::ResidualRepresentationRequired {
+                            site: "MappingAllocate length",
+                        },
+                    ),
                 };
                 let invalid = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
