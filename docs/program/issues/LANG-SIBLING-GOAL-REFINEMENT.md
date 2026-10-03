@@ -58,6 +58,20 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
    first: a row still red names its first rejecting site before any
    repair. A B row that involves a reducer-synthesized
    reduct moves here too.
+   - Measured on `f8bc5d4e1` (`evt_11byqak8y2p2v`): the five Class A rows
+     pass. `lookup_zip_with` (CAT-VECTOR law 5) fails at the convoy guard
+     `elab.rs:3535`, in the FZero arm at the inner `match ys`.
+   - **Repair (Architect `evt_1b4t346jcdrkr`).** The entry that trips the
+     guard is the index equation the enclosing `xs` arm generated. The
+     arm's `match_field_regions` range, pushed at `elab.rs:6206` as
+     `outer_scope_depth..ctx.len()`, covers only the constructor fields,
+     so the re-bound convoy entry and the generated equation are classified
+     ambient by position. When an equation-convoy arm pushes its re-bound
+     convoy entries and generated index-equation premises, extend that
+     arm's own range to cover them, and pop it unchanged with the arm.
+     `compute_context_convoy`, the `:3535` refusal and the scrutinee
+     self-skip stay as they are. The measurement commit `a64abf8ae` rides
+     first in the candidate.
 
 ## Acceptance
 
@@ -93,8 +107,15 @@ ruling `evt_bw82kr4k5pm5`; Steward resize):
   - A committed row consumes a generalized premise through a generated
     proof (f6's shape).
 
-  Increment 2: f7 and f4 check. `lookup_zip_with` checks unchanged,
-  together with `LANG-INFER-MATCH-INDEX-COVERAGE`.
+  Increment 2 (Architect `evt_1b4t346jcdrkr`):
+  - (a) `lookup_zip_with`, both arms including the FSuc recursive call,
+    checks as a pinned fixture.
+  - (b) The five Class A rows and `zip_with_map_pointwise` stay green.
+  - (c) A genuine-ambient control keeps its verdict before and after: a
+    user binder inside the `xs` arm whose type mentions the field index
+    (`VCons _ x tail_xs ↦ let t = tail_xs in match ys {…}`) is pinned at
+    its current verdict. Recorded provenance must not exempt user binders.
+  - (d) Falsifier: drop the region extension, and (a) reddens at `:3535`.
 - **AC-2.** The controls e2, e3, e6, f1-f3 and f8 are unchanged. A
   committed exactly-once control counts one leaf-keyed whole-Π restoration
   on the emitted term, and a duplicate-restoration mutation reddens it. A's
@@ -127,9 +148,13 @@ producers, with no measured failure. Each needs a measured failure before
 it joins scope.
 
 - B residual: surface `Refl` vs an observationally reduced `Eq` goal (f5,
-  f6; Architect `evt_enxtkpcwcad3`). The next increment first measures
-  whether each goal is reflexive up to conversion, before anyone touches
-  the `Refl` sugar.
+  f6; Architect `evt_enxtkpcwcad3`). Measured on `f8bc5d4e1`: both goals
+  are kernel-reflexive. f5 stops at the elaborator's Refl gate; f6 is a
+  kernel `TypeMismatch` between `Eq Nat (Suc @9) (Suc @9)` and `Eq Nat
+  (Suc @14) (Suc @14)`. Neither reaches `:3535`, so neither is increment
+  2. The next f6 measurement, outside increment 2: name binders @9 and
+  @14 and the producer of the `found` term and its build depth
+  (`evt_1b4t346jcdrkr`).
 
 ## Hard-stop inventory (§1b)
 
@@ -142,11 +167,20 @@ it joins scope.
    convoy sibling of its own redirected scrutinee — keyed on scrutinee
    identity across the redirect (sentinel spelling vs pushed Var).
 
-Candidate shared predicate: the generalized binder has two spellings across
-the generalization boundary, and each consumer that compares by spelling
-breaks.
+Candidate shared predicate (Architect `evt_1b4t346jcdrkr`): binder
+provenance (generalized vs original, scrutinee vs sibling,
+enclosing-generated vs ambient) is reconstructed at the consumer, by
+spelling or by position, instead of being recorded where the binder is
+pushed. Increment 2's convoy repair is its third consumer and not item 2:
+there the scrutinee is a plain `Var` and is skipped correctly. If a next
+stop lands, the §1b answer is this predicate, and the recut is one
+provenance record for every binder match elaboration pushes.
 
 ## Stop conditions
+
+- Increment 2: after the region extension, `lookup_zip_with` fails at a
+  new site. Stop with that site: it would be advancing stop 3, a research
+  hold under §1a.
 
 - Any kernel conversion change, trust change, or change to `zip_with`.
 - g1 fails at parse (`expected a type, found Lambda`). That is the
