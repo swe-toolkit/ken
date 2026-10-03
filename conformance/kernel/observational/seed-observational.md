@@ -67,6 +67,27 @@ build time by the Spec enclave.
 - why: Eq at Omega is mutual implication -- propext is definitional.
   Test with neutral `P`/`Q` and with known Omega propositions.
 
+### observational/eq-open-universe-levels-stay-neutral (soundness)
+- spec: `spec/10-kernel/16-observational.md` §2.2;
+  `spec/10-kernel/12-universes.md` §4
+- given: raw level variables `u` and `v`; let `U(l)` be either `Type l`
+  or `Omega_l`. For each former, query `whnf` directly on
+  `Eq (Type (max (suc u) (suc v))) (U u) (U v)`, and on the same
+  carrier with endpoint levels `(0, u)` and `(max (suc u) v, suc u)`.
+  This is a raw reducer query; do not run `infer` or `check` or claim
+  these open `Eq` terms satisfy `Eq-Form`. For each former, also query
+  `Eq (Type 1) (U 0) (U 1)` and
+  `Eq (Type (suc u)) (U u) (U u)` directly with `whnf`.
+- expect: each failed level-equivalence comparison with an open side
+  leaves the exact `Eq` term neutral. The closed unequal control reduces
+  to `Bottom`; the identical open-level control reduces to `Top`.
+- why: the old universe arm returned `Bottom` for every failed
+  comparison, including open levels that may become equal on instantiation.
+  The exact raw input distinguishes the new neutral result from that old
+  reduct; the controls preserve closed inequality and open equality. This
+  supplements `conversion/level-distinct-not-convertible`, which tests
+  level conversion rather than the Eq reduction arm.
+
 ### observational/eq-inductive-same-ctor
 - spec: `spec/10-kernel/16-observational.md` par. 2.2
 - given: `data Nat : Type 0 where { zero : Nat ; suc : Nat -> Nat }`;

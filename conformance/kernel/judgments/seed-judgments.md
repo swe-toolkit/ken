@@ -298,6 +298,75 @@ it**.
 
 ---
 
+### A6 — Level closure at every declaration admission (cite `12 §4`)
+
+`12 §4` applies to each declaration's distinct level parameters and every
+level-bearing term in its type and body. The cases below drive the public
+admission APIs; the raw universe-reduction boundary is in the observational
+seed.
+
+### kernel/judgments/declare-def-refuses-unabstracted-level (soundness)
+- spec: `12 §4`; `18 §4.2` (`declare_def`)
+- given: in a fresh `env`, attempt
+  `declare_def(env, [], Type (suc u), Type u)`. Then try to build the
+  regression's `g {0}` witness using `f`. As a control, admit the same `f`
+  with `[u]` and check its explicit use at `0`.
+- expect: the empty-parameter admission returns `Err(IllFormedDecl)` and
+  installs no `f` id, so the bad `g {0}` witness cannot be formed. The
+  `[u]` control is admitted, and `f {0}` checks at `Type 1`.
+- why: an unabstracted level cannot escape into a later instantiation; a
+  declared parameter remains instantiable.
+
+### kernel/judgments/declare-def-refuses-body-only-level (soundness)
+- spec: `12 §4`; `18 §4.2` (`declare_def` body upgrade)
+- given: in a fresh `env`, call `declare_def(env, [], Top, body)` with a
+  closed signature and `body` equal to `tt` ascribed to
+  `Eq (Type (suc u)) (Type u) (Type u)`.
+- expect: `Err(IllFormedDecl)` for the unlisted `u`; the failed declaration
+  leaves the environment unchanged and installs no transparent definition.
+- why: the signature is closed, so only checking the staged body against
+  its recorded level parameters can refuse this input before the upgrade.
+
+### kernel/judgments/recursive-group-level-closure (soundness)
+- spec: `12 §4`; `18 §4.2` (recursive-group staging and body upgrade)
+- given: in separate fresh environments, try a one-member
+  `declare_recursive_group` with empty level parameters, signature
+  `Type (suc u)`, and body `Type u`; then try a group with closed
+  signature `Top` and a body `tt` ascribed to
+  `Eq (Type (suc u)) (Type u) (Type u)`.
+- expect: both calls return `Err(IllFormedDecl)` and leave their
+  environments unchanged; the signature failure installs no placeholder,
+  and the body failure removes all staged members.
+- why: recursive-group signatures are checked before staging, and each
+  body is checked against its recorded parameters before upgrade.
+
+### kernel/judgments/level-parameters-must-be-distinct (soundness)
+- spec: `12 §4` (pairwise-distinct `level_params`)
+- given: call `declare_postulate(env, [u, u], Omega u)`; as a control,
+  call `declare_postulate(env, [u, v], Omega (max u v))` for distinct
+  parameters.
+- expect: the repeated-parameter call returns `Err(IllFormedDecl)`; the
+  distinct-parameter control is admitted.
+- why: a duplicate binder makes explicit level instantiation ambiguous;
+  the gate rejects duplication without forbidding genuine polymorphism.
+
+### kernel/judgments/level-closure-covers-declarator-kinds (soundness)
+- spec: `12 §4` (postulates, primitives, inductives, and explicit level args)
+- given: in one fresh `env`, admit `A` with
+  `declare_postulate(env, [u], Type u)`, then try
+  `declare_postulate(env, [], A {v})`. In separate fresh environments,
+  try a `declare_primitive` with type `Type v` and no level parameters;
+  a `declare_inductive` with family level `v`, no level parameters, and
+  no constructors; and an inductive with level parameters `[u]`, family
+  level `u`, and a constructor field of type `Type v`.
+- expect: the setup `A` is admitted; each following attempt returns
+  `Err(IllFormedDecl)` for undeclared `v`, without changing its pre-call
+  environment.
+- why: closure is enforced through each declarator, including an explicit
+  level argument nested in a declaration type, not only at `declare_def`.
+
+---
+
 ## B. The (Conv) mode switch — conversion integration (`18 §2`, `§3.2`)
 
 (Conv) is the **single** place conversion (`17`) is called during checking — the

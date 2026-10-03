@@ -92,6 +92,24 @@ instantiates them.
 c {ℓ₁ … ℓₙ}                          -- a use, with explicit level arguments
 ```
 
+**Admission closure.** Before admitting a declaration, the kernel checks
+that its `level_params` are pairwise distinct and that **every** level
+variable in its level-bearing terms is one of those parameters. This checks
+nested `suc`/`max` levels in `Type` and `Ω`, explicit level arguments on
+constants, inductive formers, constructors, and eliminators, and all nested
+terms of a declaration's type and body. For an inductive it also checks the
+family level, parameter and index telescopes, generated former type, and
+each constructor's argument types, target indices, and generated type.
+Postulates, primitives, and generated support inductives obey the same rule.
+A recursive group's signatures are checked before staging; its bodies are
+checked against their recorded level parameters before upgrading the staged
+declarations. An undeclared level variable or a repeated parameter refuses
+admission as `IllFormedDecl` rather than escaping into a later instantiation.
+For example, `level_params = []` cannot admit
+`f : Type (suc u) := Type u`, and `[u, u]` is refused even if `u` is
+otherwise well-typed. Internal prelude entries are closed; the recursion
+barrier inherits an already checked type rather than admitting new terms.
+
 - Level abstraction is **only** at the level of top-level declarations, not a
   first-class `Π` over `𝕃evel`. Levels are not terms; you cannot pattern-match
   on a level or store one in a data structure. This keeps the term language and
