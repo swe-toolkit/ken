@@ -54,6 +54,16 @@ stop and report the mismatch; do not build around it.
    equates `zip_with f (map g xs) (map h ys)` with `zip_with k xs ys`. The
    lambda instance is recovered at the use site. It stays deferred until
    `LANG-REFINED-SIBLING-MATCH-TAIL` lands.
+4. The whole-package loader exceeds the 2 MiB libtest worker once the
+   i→xs→ys proof is in `Vector.ken.md`; keyed on how deep elaboration nests
+   within one declaration (Architect `evt_2xpqwxn09fkah`; §1a 1 to 2). No
+   stack change and no `RUST_MIN_STACK`, and the theorem stays as stated.
+   - D0 measures the peak stack and the overflowing cycle.
+   - P1 moves the vector peeling into private helper theorems, so
+     `lookup_zip_with` matches only `i`. It lands if the cycle is the
+     nested-match chain and P1 passes `ken check` at a stated 1536 KiB.
+   - Otherwise item 5 is blocked on a Language per-level frame-reduction
+     WP, which the Steward frames, and the WIP `4e2ab6520` is kept as is.
 
 ## Increments landed
 
