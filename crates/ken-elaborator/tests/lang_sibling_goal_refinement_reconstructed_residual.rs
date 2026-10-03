@@ -47,11 +47,12 @@ fn source_verdict(source: &str) -> (Result<(), ElabError>, ElabEnv, bool) {
 }
 
 #[test]
-fn f5_reconstructed_goal_is_reflexive_even_when_bare_refl_loses_eq_origin() {
+fn f5_reconstructed_goal_is_reflexive_despite_bare_refl_shape_refusal() {
     // Promise: diagnostic measurement, not a durable refusal. The bare
     // source follows the described Fin goal through i→xs→ys; the ascribed
     // peer checks Refl at that source equality, exposing the kernel goal
-    // at the later boundary if the un-ascribed route loses Eq provenance.
+    // at a later boundary. This does not diagnose why the bare route's
+    // Eq-shaped-goal gate refused.
     let (bare, _, trusted) = source_verdict(F5_RECONSTRUCTED);
     assert!(trusted, "measurement must not add trusted declarations");
     match bare {
@@ -59,7 +60,7 @@ fn f5_reconstructed_goal_is_reflexive_even_when_bare_refl_loses_eq_origin() {
         Err(ElabError::TypeMismatch { reason, span })
             if reason == "Refl expects an `Eq`-shaped goal" =>
         {
-            println!("f5 reconstructed bare: Eq-origin loss at {span:?}");
+            println!("f5 reconstructed bare: Eq-shaped-goal gate refused at {span:?}");
         }
         Err(error) => panic!("f5 reconstructed: different first rejecting site: {error:?}"),
     }
