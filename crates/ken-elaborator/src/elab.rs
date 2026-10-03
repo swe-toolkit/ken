@@ -351,6 +351,21 @@ struct MatchFrame {
     scrutinee_level: Option<usize>,
 }
 
+#[inline(never)]
+fn boxed_match_frame(
+    start_level: usize,
+    sentinel_region: usize,
+    refined_target: Option<Term>,
+    scrutinee_level: Option<usize>,
+) -> Box<MatchFrame> {
+    Box::new(MatchFrame::new(
+        start_level,
+        sentinel_region,
+        refined_target,
+        scrutinee_level,
+    ))
+}
+
 impl MatchFrame {
     fn new(start_level: usize, sentinel_region: usize, refined_target: Option<Term>, scrutinee_level: Option<usize>) -> Self {
         Self {
@@ -6114,7 +6129,16 @@ fn build_large_convoy_recursive_method(
     sentinel_region: usize,
     premise_domains: &[Term],
 ) -> Result<Term, ElabError> {
-    let goal_j = check_large_convoy_recursive_arm(
+    let premise_base = cx.active_index_premise_frames.len();
+    if !premise_domains.is_empty() {
+        cx.active_index_premise_frames
+            .push(ActiveIndexPremiseFrame {
+                sentinel_region,
+                premise_domains: premise_domains.to_vec(),
+                install_depth: cx.ctx.len(),
+            });
+    }
+    let goal_result = check_large_convoy_recursive_arm(
         cx,
         arm,
         ind,
@@ -6124,8 +6148,9 @@ fn build_large_convoy_recursive_method(
         field_count,
         expected_here,
         sentinel_region,
-    )?
-    .ok_or_else(|| {
+    );
+    cx.active_index_premise_frames.truncate(premise_base);
+    let goal_j = goal_result?.ok_or_else(|| {
         ElabError::Internal(
             "large index convoy could not construct its recursive goal transport".into(),
         )
@@ -6562,6 +6587,178 @@ fn infer_dependent_match_scrutinee(
     Ok((Box::new(core), Box::new(inferred)))
 }
 
+// Context-telescope convoy (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE):
+// captured bindings follow the constructor's index into the motive codomain.
+// Each binder type and the goal may mention earlier convoy entries at different
+// depths; finalize the shared telescope once, rather than independently
+// substituting a depth-fixed sentinel into each nested binder type. This work
+// precedes recursive arm bodies so its temporaries do not grow their frames.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn wrap_dependent_motive_convoy(
+    context_convoy: &[ConvoyEntry],
+    embedded_method_convoy: &[EmbeddedMethodConvoy],
+    scrut_indices: &[Term],
+    scrut_core: &Term,
+    motive_local_indices: &[Term],
+    motive_base_depth: usize,
+    sentinel_region: usize,
+    equation_convoy: bool,
+    mut motive_user_body: Term,
+) -> Term {
+    let convoy_count = context_convoy.len();
+    if equation_convoy && convoy_count > 0 {
+        debug_assert!(embedded_method_convoy.is_empty());
+    } else if convoy_count > 0 || !embedded_method_convoy.is_empty() {
+        let (cv_types_inner_first, sentinels) = convoy_binder_types(
+            context_convoy,
+            scrut_indices,
+            scrut_core,
+            motive_local_indices,
+            &Term::var(0),
+            motive_base_depth,
+            0,
+            sentinel_region,
+        );
+        motive_user_body = redirect_convoy_body(
+            context_convoy,
+            motive_base_depth,
+            &sentinels,
+            motive_user_body,
+        );
+        let mut convoy_premises = Vec::with_capacity(convoy_count + embedded_method_convoy.len());
+        for i in (0..convoy_count).rev() {
+            convoy_premises.push(cv_types_inner_first[i].clone());
+        }
+        for entry in embedded_method_convoy {
+            convoy_premises.push(redirect_convoy_body(
+                context_convoy,
+                motive_base_depth,
+                &sentinels,
+                entry.motive_ty.clone(),
+            ));
+        }
+        motive_user_body =
+            wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region);
+    }
+    motive_user_body
+}
+
+// Motive construction has no recursive arm body. Outlining its temporary
+// context, equality, and convoy terms keeps them off each arm descent.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn finish_checked_dependent_motive<const MAY_REFINE_GROUP_RESULT: bool>(
+    cx: &ElabCtx,
+    ind: &InductiveDecl,
+    family: GlobalId,
+    params: &[Term],
+    scrut_indices: &[Term],
+    scrut_core: &Term,
+    scrut_ty: &Term,
+    motive_base_depth: usize,
+    motive_local_indices: &[Term],
+    sentinel_region: usize,
+    equation: Option<&str>,
+    span: &Span,
+    plan: &mut CoherentFrameMotivePlan,
+) -> Result<(Box<Term>, bool), ElabError> {
+    let mut motive_user_body =
+        std::mem::replace(&mut plan.motive_user_body, Term::Type(Level::Zero));
+    let zonked_ctx = Context {
+        types: cx
+            .ctx
+            .types
+            .iter()
+            .map(|term| cx.metas.zonk_term(term))
+            .collect(),
+    };
+    let motive_ctx = motive_context(&zonked_ctx, ind, params);
+    // The context convoy and embedded methods share one finalized telescope.
+    motive_user_body = wrap_dependent_motive_convoy(
+        &plan.context_convoy,
+        &plan.embedded_method_convoy,
+        scrut_indices,
+        scrut_core,
+        motive_local_indices,
+        motive_base_depth,
+        sentinel_region,
+        plan.equation_convoy,
+        motive_user_body,
+    );
+    // A hidden whole-scrutinee result equality is lawful only for an index
+    // domain of the result family and a non-recursive match. A recursive
+    // family would also change each IH into an unusable parent equality.
+    let hidden_group_result_refinement = MAY_REFINE_GROUP_RESULT
+        && ind.indices.is_empty()
+        && term_mentions_family_indexed_by(cx.env, &cx.ctx, &plan.expected, scrut_ty)
+        && ind.constructors.iter().all(|ctor| {
+            recursive_shapes(cx.env, ctor, family, ind.params.len())
+                .is_ok_and(|shapes| shapes.is_empty())
+        });
+    if equation.is_some() {
+        // The author-visible `eqn:` premise is discharged by Refl after Elim.
+        let eq_dom = Term::Eq(
+            Box::new(weaken(scrut_ty, 1)),
+            Box::new(weaken(scrut_core, 1)),
+            Box::new(Term::var(0)),
+        );
+        motive_user_body = Term::pi(eq_dom, weaken(&motive_user_body, 1));
+    } else if hidden_group_result_refinement {
+        let eq_dom = Term::Eq(
+            Box::new(weaken(scrut_ty, motive_base_depth as i64)),
+            Box::new(Term::var(0)),
+            Box::new(weaken(scrut_core, motive_base_depth as i64)),
+        );
+        motive_user_body = Term::pi(eq_dom, weaken(&motive_user_body, 1));
+    }
+    let motive = build_checked_dependent_motive(
+        cx,
+        &motive_ctx,
+        ind,
+        family,
+        params,
+        scrut_indices,
+        motive_user_body,
+        plan.equation_convoy,
+        plan.recursive_field_index_path,
+        span,
+    )?;
+    Ok((motive, hidden_group_result_refinement))
+}
+
+// Keep arm-field introduction off the recursive dependent-match stack frame.
+// In particular, ownership must be checked before any fallible arm work can
+// consume these fields; the caller restores both context and frame on error.
+#[inline(never)]
+fn open_checked_constructor_arm_frame(
+    cx: &mut ElabCtx,
+    ctor: &ConstructorDecl,
+    params: &[Term],
+    level_args: &[Level],
+    ind: &InductiveDecl,
+    sentinel_region: usize,
+    target: &Term,
+    scrutinee_level: Option<usize>,
+) -> Result<(), ElabError> {
+    let start_level = cx.ctx.len();
+    cx.match_frames.push(MatchFrame::new(
+        start_level,
+        sentinel_region,
+        Some(target.clone()),
+        scrutinee_level,
+    ));
+    for (j, domain) in ctor.args.iter().enumerate() {
+        let raw_ty = subst_levels(
+            &subst_outer(domain, ind.params.len(), params, j),
+            &ind.level_params,
+            level_args,
+        );
+        cx.push_match_binder(raw_ty, MatchBinderOrigin::Field);
+    }
+    cx.require_constructor_field_ownership(start_level, ctor.args.len())
+}
+
 /// Check `match scrut { C₁ p… => e₁ ; … }` against a KNOWN `expected` goal
 /// that may reference the scrutinee (a per-branch-varying `Ω`- or `Type`-
 /// motive) — the K4/AC4 dependent-elimination path. Only FLAT constructor
@@ -6644,8 +6841,11 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         Term::Var(index) => cx.ctx.len().checked_sub(index + 1),
         _ => None,
     };
-    let frame = MatchFrame::new(
-        cx.ctx.len(), sentinel_region, Some(original_expected.clone()), scrutinee_level,
+    let frame = boxed_match_frame(
+        cx.ctx.len(),
+        sentinel_region,
+        Some(original_expected.clone()),
+        scrutinee_level,
     );
     let recursive_field_index_path = recursive_field_index_path(
         cx,
@@ -6708,134 +6908,28 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         span,
         &frame,
     )?;
-    let mut motive_user_body =
-        std::mem::replace(&mut motive_plan.motive_user_body, Term::Type(Level::Zero));
+    let (motive, hidden_group_result_refinement) =
+        finish_checked_dependent_motive::<MAY_REFINE_GROUP_RESULT>(
+            cx,
+            &ind,
+            d_id,
+            &params_terms,
+            &scrut_indices,
+            &scrut_core,
+            &scrut_ty,
+            motive_base_depth,
+            &motive_local_indices,
+            sentinel_region,
+            equation,
+            span,
+            &mut motive_plan,
+        )?;
     let expected = &motive_plan.expected;
     let context_convoy = motive_plan.context_convoy.as_slice();
     let embedded_method_convoy = motive_plan.embedded_method_convoy.as_slice();
     let embedded_method_repairs = motive_plan.embedded_method_repairs.as_slice();
     let equation_convoy = motive_plan.equation_convoy;
     let recursive_field_index_path = motive_plan.recursive_field_index_path;
-    let zonked_ctx = Context {
-        types: cx
-            .ctx
-            .types
-            .iter()
-            .map(|term| cx.metas.zonk_term(term))
-            .collect(),
-    };
-    let motive_ctx = motive_context(&zonked_ctx, &ind, &params_terms);
-    // Context-telescope convoy (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE):
-    // the ordered forward-dependency closure of ambient bindings whose type the
-    // index refinement changes (`context_convoy`, computed above) travels WITH the
-    // scrutinee as a motive-codomain telescope, so a captured `xs : Env n` follows
-    // the constructor's index in every method and is reconstructed at the actual
-    // indices after the Elim. This REPLACES capability 2 (the sibling-outer-binding
-    // scan) of install_index_refinements. Empty when nothing captures the index
-    // (uncoupled Vec `map`, whose scrutinee IS the env) — then the old
-    // scrutinee-only shape.
-    // Generalize the convoy into the motive codomain as one telescope, ambient
-    // order preserved (`xs'` outer, `h' : P xs'` inner). Each binder type is
-    // rebased by the root pairs (scrutinee index -> LOCAL index at the base motive
-    // frame, scrutinee -> the scrutinee binder) and threads every OTHER convoy
-    // binder through its sentinel; the goal's ambient reference becomes its
-    // binder's sentinel. `wrap_premise_pis_finalized` relocates every sentinel to
-    // its real de Bruijn position in both the goal (codomain) and each binder type
-    // (a transitive `h : Wit n xs` naming the outer `xs`), and shifts each type's
-    // free references by its telescope position. A single depth-fixed
-    // `subst_term_generalize` per binder would misplace an ambient reference that
-    // an earlier-built binder type nests at a different depth. Only the Elim
-    // itself, kernel-validated, certifies the assembled shape.
-    let convoy_count = context_convoy.len();
-    let context_convoy_embedded_in_large_selector = equation_convoy && convoy_count > 0;
-    if context_convoy_embedded_in_large_selector {
-        debug_assert!(embedded_method_convoy.is_empty());
-    } else if convoy_count > 0 || !embedded_method_convoy.is_empty() {
-        // Same ONE plan as the methods/IH: local indices `Var(n_i - j)` and the
-        // scrutinee binder `Var(0)` are this frame's targets. Embedded methods
-        // are appended after the ambient convoy, so their sentinels and types
-        // share the same finalized telescope rather than being wrapped by an
-        // independent pass.
-        let (cv_types_inner_first, sentinels) = convoy_binder_types(
-            &context_convoy,
-            &scrut_indices,
-            &scrut_core,
-            &motive_local_indices,
-            &Term::var(0),
-            motive_base_depth,
-            0,
-            sentinel_region,
-        );
-        motive_user_body = redirect_convoy_body(
-            &context_convoy,
-            motive_base_depth,
-            &sentinels,
-            motive_user_body,
-        );
-        let mut convoy_premises: Vec<Term> =
-            Vec::with_capacity(convoy_count + embedded_method_convoy.len());
-        for i in (0..convoy_count).rev() {
-            convoy_premises.push(cv_types_inner_first[i].clone());
-        }
-        for entry in embedded_method_convoy {
-            convoy_premises.push(redirect_convoy_body(
-                &context_convoy,
-                motive_base_depth,
-                &sentinels,
-                entry.motive_ty.clone(),
-            ));
-        }
-        motive_user_body = wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region);
-    }
-    let hidden_group_result_refinement = MAY_REFINE_GROUP_RESULT
-        && ind.indices.is_empty()
-        // The matched carrier must itself be an index domain of the result
-        // family. This excludes unrelated control matches (for example Bool
-        // guards around a FokSequent-indexed derivation), preserving their
-        // original definitional computation and SCT presentation.
-        && term_mentions_family_indexed_by(cx.env, &cx.ctx, expected, &scrut_ty)
-        // A whole-scrutinee equation is a lawful hidden result refinement only
-        // for non-recursive matches. On a recursive family it would also alter
-        // each IH from `M child` to `child = parent -> M child`, an unusable and
-        // false premise. Recursive IH slots retain their existing index-only
-        // refinement machinery.
-        && ind.constructors.iter().all(|ctor| {
-            recursive_shapes(cx.env, ctor, d_id, m).is_ok_and(|shapes| shapes.is_empty())
-        });
-    if equation.is_some() {
-        // The eliminator returns a function over the branch equation.  Its
-        // methods can therefore bind the surface `eqn:` name, while applying
-        // the completed eliminator to `Refl` recovers the author's goal.
-        let eq_dom = Term::Eq(
-            Box::new(weaken(&scrut_ty, 1)),
-            Box::new(weaken(&scrut_core, 1)),
-            Box::new(Term::var(0)),
-        );
-        motive_user_body = Term::pi(eq_dom, weaken(&motive_user_body, 1));
-    } else if hidden_group_result_refinement {
-        // Keep the matched scrutinee's propositional refinement internal. The
-        // method receives `concrete = outer`; recursive-group calls may use its
-        // symmetric direction to transport a concrete indexed result back to
-        // the outer refined index. The completed eliminator supplies `Refl`.
-        let eq_dom = Term::Eq(
-            Box::new(weaken(&scrut_ty, motive_base_depth as i64)),
-            Box::new(Term::var(0)),
-            Box::new(weaken(&scrut_core, motive_base_depth as i64)),
-        );
-        motive_user_body = Term::pi(eq_dom, weaken(&motive_user_body, 1));
-    }
-    let motive = build_checked_dependent_motive(
-        cx,
-        &motive_ctx,
-        &ind,
-        d_id,
-        &params_terms,
-        &scrut_indices,
-        motive_user_body,
-        equation_convoy,
-        recursive_field_index_path,
-        span,
-    )?;
 
     let mut methods = Box::new(vec![None; ind.constructors.len()]);
     let mut arm_used = Box::new(vec![false; arms.len()]);
@@ -6900,9 +6994,6 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             continue;
         }
         let constructor_scope_depth = cx.ctx.len();
-        cx.match_frames.push(MatchFrame::new(
-            constructor_scope_depth, sentinel_region, Some(expected.clone()), frame.scrutinee_level,
-        ));
         // Expand restoration at each fallible site without adding a call frame
         // to recursive dependent-match checking.
         macro_rules! frame_try {
@@ -6917,15 +7008,16 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 }
             };
         }
-        for j in 0..n {
-            let raw_ty = subst_levels(
-                &subst_outer(&ctor.args[j], m, &params_terms, j),
-                &ind.level_params,
-                &family_level_args,
-            );
-            cx.push_match_binder(raw_ty, MatchBinderOrigin::Field);
-        }
-        frame_try!(cx.require_constructor_field_ownership(constructor_scope_depth, n));
+        frame_try!(open_checked_constructor_arm_frame(
+            cx,
+            ctor,
+            &params_terms,
+            &family_level_args,
+            &ind,
+            sentinel_region,
+            expected,
+            frame.scrutinee_level,
+        ));
         let constructor_frame = frame_try!(build_dependent_constructor_frame(
             cx,
             &ind,
@@ -6966,15 +7058,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     level_args: Vec::new(),
                 }
             } else if equation_convoy && expression_mentions_recursive_group(cx, &arm.body) {
-                let premise_base = cx.active_index_premise_frames.len();
-                if !premise_domains.is_empty() {
-                    cx.active_index_premise_frames.push(ActiveIndexPremiseFrame {
-                        sentinel_region,
-                        premise_domains: premise_domains.to_vec(),
-                        install_depth: cx.ctx.len(),
-                    });
-                }
-                let result = build_large_convoy_recursive_method(
+                frame_try!(build_large_convoy_recursive_method(
                     cx,
                     arm,
                     &ind,
@@ -6985,9 +7069,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     &expected_here,
                     sentinel_region,
                     &premise_domains,
-                );
-                cx.active_index_premise_frames.truncate(premise_base);
-                frame_try!(result)
+                ))
             } else if equation.is_some() {
                 let eq_dom = Term::Eq(
                     Box::new(weaken(&scrut_ty, n as i64)),
@@ -20351,6 +20433,7 @@ mod omega_index_refinement_tests {
         build_index_omega_transport, check_variable_with_index_views,
         classify_branch_goal_restoration, install_hidden_result_variable_refinements,
         install_index_refinements, subst_term_generalize, try_reindex_cast, weaken, ElabCtx,
+        MatchFrame,
     };
 
     #[test]
@@ -20578,6 +20661,10 @@ mod omega_index_refinement_tests {
             Box::new(Term::var(0)),
             Box::new(Term::var(0)),
         ));
+        // These ambient binders precede the checked constructor arm. The
+        // production seam now requires that arm's explicit owning frame.
+        cx.match_frames
+            .push(MatchFrame::new(cx.ctx.len(), 0, None, None));
 
         let installed =
             install_hidden_result_variable_refinements(&mut cx, &nat, &zero, &Term::var(1), 0, 2)
@@ -20664,6 +20751,8 @@ mod omega_index_refinement_tests {
             "omega-convoy-index-control",
         );
         cx.ctx.push(Term::ty(Level::Zero));
+        cx.match_frames
+            .push(MatchFrame::new(cx.ctx.len(), 0, None, None));
 
         let error =
             install_index_refinements(&mut cx, &fake_family, &[], &[proved], &[Term::var(0)], 0, 1)
