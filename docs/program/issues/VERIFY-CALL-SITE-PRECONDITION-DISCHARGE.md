@@ -63,8 +63,13 @@ stop and report the mismatch.
      refinement under a function-valued return type is not supported yet".
    - The Architect's ruling carries the probe-verified patch; build from
      it. Item 1's staged type uses the same `split_params(…, param_count)`.
-   - If this WP hard-stops or is recut before landing, this commit lands
-     alone; H4 is not left on main behind a held WP.
+   - **Merged `fc2b10f5c`** (exact `d66d297c5`).
+   - **Remaining on item 0** (Adversary `evt_5rwbf7c13q2gq`, measured on
+     `fc2b10f5c`). The ascription at `elab.rs:15190` keys on a syntactic
+     `Term::Pi`, so a return written through a `def` alias (`def IntFn = Int
+     -> Int`, `fn f (n : Int) : IntFn ensures Equal Int (result 0) n = \m. n`)
+     leaves `(λm. n) 0` unascribed and the kernel refuses the goal. Decide "B
+     is a Π" on the checked type (B's whnf), not on how B is written.
 1. **Staging.** Build the declaration's full `Π(Δ). Π(φ̄). B` before
    `stage_placeholders`, using MULTI-REQUIRES's Phase 4 construction. Stage
    and admit against that term, and delete the `:15204` assumption.
@@ -106,6 +111,9 @@ stop and report the mismatch.
   - AR5: reverting `split_params` to `unwrap_pi_chain` reddens AR1.
   - AR6: after item 4, point-free `… requires Not (Equal Int n 0) = q n`
     is admitted with 0 obligations, its premise passed to `q`.
+  - AR7: the `IntFn` alias row above is admitted with one Ensures
+    obligation, the same as its `Int -> Int` twin. Reverting to the syntactic
+    match reddens it.
 - **AC-1.** P1 elaborates with 1 open Requires obligation in `g`. P2
   elaborates with 0.
 - **AC-2.** `fn r (n:Nat):Nat requires Equal Nat n n = match n { Zero ↦
