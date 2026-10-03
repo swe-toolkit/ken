@@ -58,8 +58,8 @@ stop and report the mismatch.
    are restored.
 5. X1's interim quotient arm in `eq_reduce` (from the interim WP) reduces
    to `R a b` again. The spec 42 §1/§3.1/§3.6 interim exceptions, the
-   CAN1 scoping in `seed-evaluation.md` and the interim `ken-interp` pin
-   flip with it.
+   conformance scoping of the closed-ground no-stuck claim and the interim
+   `ken-interp` pin flip with it.
 
 ## Acceptance
 

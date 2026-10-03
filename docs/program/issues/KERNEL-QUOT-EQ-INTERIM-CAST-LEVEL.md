@@ -79,9 +79,12 @@ stop and report the mismatch.
    - Spec 42 §3.1's residue list and §3.6's `Eq`-by-type canonicity bullet
      gain the interim C8 exception, gated on P0. So does §1's statement
      that closed ground programs never reach a neutral (spec-author
-     `evt_3rtr85bqjts6e`). In `seed-evaluation.md`, the CAN1 intro and
-     `can-no-stuck-closed-ground` are scoped to exclude it; the row's
-     fixtures keep their verdicts.
+     `evt_3rtr85bqjts6e`). Every conformance statement of the same
+     closed-ground no-stuck claim is scoped to exclude it, and its fixtures
+     keep their verdicts. Measured (CV `evt_4vhaycdtr09mz`):
+     `seed-evaluation.md`'s CAN1 intro, `can-no-stuck-closed-ground`, Trust
+     posture and effects-scope paragraph, and `seed-runtime.md`'s
+     `runtime/evaluation/canonicity`.
    - No `cast_reduce` or `eq_type_eq` change.
    - Not this WP: `eq_reduce` also returns `Unknown` for other closed
      C2-C4 cases (multi-field constructor, Π, Ω, scalar). That is a
