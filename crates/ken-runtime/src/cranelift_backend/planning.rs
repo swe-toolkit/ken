@@ -145,7 +145,8 @@ pub(super) use static_transition::{
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
     RecursiveResidualDisposition, RecursiveCarrierBoxedStore, RecursiveCarrierChild,
     RecursiveCarrierMemberSchema, RecursiveCarrierRole, RecursiveCarrierStore,
-    RecursiveCarrierStoreKind, RecursiveCarrierSlot, RecursiveCarrierVariant,
+    RecursiveCarrierStoreKind, RecursiveCarrierSlot, RecursiveCarrierSlotKey,
+    RecursiveCarrierVariant,
     RecursiveResidualChildKind, PlannedReferentLifetime, SynthesizedAggregateNode, SynthesizedAggregatePath,
     SynthesizedAggregateRoot,
 };

@@ -231,7 +231,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     PlannedAggregateAllocation, PlannedAggregateOwnership, RecursiveResidualDisposition,
     PlannedAggregateShape, RecursiveCarrierBoxedStore, RecursiveCarrierChild, RecursiveCarrierEdge,
     RecursiveCarrierMemberSchema, RecursiveCarrierRole, RecursiveCarrierSlot,
-    RecursiveCarrierStore, RecursiveCarrierStoreKind,
+    RecursiveCarrierSlotKey, RecursiveCarrierStore, RecursiveCarrierStoreKind,
     RecursiveResidualChildKind,
     RecursiveCarrierVariant,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRole,

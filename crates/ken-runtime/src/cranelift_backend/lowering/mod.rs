@@ -18,7 +18,7 @@
 pub(in crate::cranelift_backend) mod core;
 mod residual;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
-    RecursiveCarrierSlotKey, Representation};
+    Representation};
 mod frame_validation;
 use frame_validation::{FrameEventKind, FrameEvents, FrameTerminalKind};
 
@@ -452,7 +452,8 @@ pub(in crate::cranelift_backend) use super::planning::{
     RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
     RecursiveCarrierBoxedStore, RecursiveCarrierMemberSchema, RecursiveCarrierStore,
     RecursiveCarrierStoreKind,
-    RecursiveCarrierSlot, RecursiveCarrierVariant, RecursiveResidualChildKind,
+    RecursiveCarrierSlot, RecursiveCarrierSlotKey, RecursiveCarrierVariant,
+    RecursiveResidualChildKind,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,
     JoinResultRepresentation, PredeclaredFunctionId, StaticOriginId,
@@ -4013,8 +4014,8 @@ pub struct ResidualLoweringCounters {
     /// Counted while emitting the labelled arm, not when native execution selects it.
     pub boxed_decode_arms_emitted: usize,
     pub boxed_member_compile_refusals: usize,
-    pub transitional_escapes: usize,
-    pub synthesized_checked_ih_capture_escapes: usize,
+    /// R→K conversions at ABI and capture-field boundaries, counted at lowering.
+    pub residual_abi_decodes: usize,
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]
@@ -4024,8 +4025,7 @@ thread_local! {
             site_a_none_arrivals: 0,
             boxed_decode_arms_emitted: 0,
             boxed_member_compile_refusals: 0,
-            transitional_escapes: 0,
-            synthesized_checked_ih_capture_escapes: 0,
+            residual_abi_decodes: 0,
         }) };
 }
 
@@ -4086,23 +4086,13 @@ fn record_boxed_member_compile_refusal() {
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]
-fn record_residual_transitional_escape() {
+fn record_residual_abi_decode() {
     RESIDUAL_LOWERING_COUNTERS.with(|counter| {
         let mut measured = counter.get();
-        measured.transitional_escapes += 1;
+        measured.residual_abi_decodes += 1;
         counter.set(measured);
     });
-    record_residual_counter_event("transitional_escape");
-}
-
-#[cfg(any(test, feature = "px8-ds-test-support"))]
-fn record_synthesized_checked_ih_capture_escape() {
-    RESIDUAL_LOWERING_COUNTERS.with(|counter| {
-        let mut measured = counter.get();
-        measured.synthesized_checked_ih_capture_escapes += 1;
-        counter.set(measured);
-    });
-    record_residual_counter_event("synthesized_checked_ih_capture_escape");
+    record_residual_counter_event("abi_r_to_k_decode");
 }
 
 /// The capture-only runtime aggregate produced for a checked-IH application.
@@ -7742,9 +7732,12 @@ impl<'a> Lowering<'a> {
             GeneratedUnitCallInputCallee::Entry(origin),
         )? {
             LoweringOperand::Carried(word) => Ok(word),
-            // Pending-Vis capture frame: counted I-0 untyped ABI copy.
-            LoweringOperand::Residual(residual) => Ok(residual
-                .residual_across_untyped_abi_transitional()),
+            // Pending-Vis captures are ordinary K; decode before their store.
+            LoweringOperand::Residual(residual) => {
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                record_residual_abi_decode();
+                self.decode_residual_child(builder, residual)
+            },
             LoweringOperand::Specialized(_) => Err(backend_module(
                 "a pending-Vis capture did not become a carried word".to_string(),
             )),

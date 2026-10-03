@@ -4018,13 +4018,19 @@ impl<'a> Lowering<'a> {
 
             // Screen the whole environment before allocating its parent. A
             // refusal on capture i must not leave fields 0..i-1 published.
-            for argument in &arguments {
+            for argument in &mut arguments {
                 let SynthesizedArgument::WorkerCaptureOperand { value, .. } = argument else {
                     unreachable!("this emitter constructs only worker-capture arguments")
                 };
+                if let LoweringOperand::Residual(residual) = value {
+                    let child = self.decode_residual_child(builder, *residual)?;
+                    #[cfg(any(test, feature = "px8-ds-test-support"))]
+                    record_residual_abi_decode();
+                    *value = LoweringOperand::Carried(child);
+                }
                 let specialized = match value {
                     LoweringOperand::Specialized(value) => Some(value),
-                    LoweringOperand::Residual(_) => None,
+                    LoweringOperand::Residual(_) => unreachable!("R was decoded in preflight"),
                     LoweringOperand::Carried(_) => None,
                 };
                 if let Some(value) = specialized {
@@ -4062,14 +4068,8 @@ impl<'a> Lowering<'a> {
                 };
                 let child = match value {
                     LoweringOperand::Carried(word) => word,
-                    // Synthesized checked-IH capture fields have positional
-                    // identities but no R/K kind until I-1. Count this
-                    // distinct transitional crossing; do not infer K here.
-                    LoweringOperand::Residual(residual) => {
-                        #[cfg(any(test, feature = "px8-ds-test-support"))]
-                        record_synthesized_checked_ih_capture_escape();
-                        residual.residual_across_untyped_abi_transitional()
-                    },
+                    // The pre-allocation screen decoded every R into Child K.
+                    LoweringOperand::Residual(_) => unreachable!("R was decoded in preflight"),
                     LoweringOperand::Specialized(value) => {
                         self.transfer_into_carrier(builder, origin, &value)?
                     }

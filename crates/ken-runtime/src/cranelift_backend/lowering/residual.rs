@@ -3,28 +3,6 @@
 
 use super::*;
 
-/// The slot, not a dynamically selected member of its closed flow.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct RecursiveCarrierSlotKey {
-    eliminator: StaticOriginId,
-    constructor: ConstructorIdentity,
-    position: u32,
-}
-
-impl RecursiveCarrierSlotKey {
-    pub(super) fn new(
-        eliminator: StaticOriginId,
-        constructor: ConstructorIdentity,
-        position: u32,
-    ) -> Self {
-        Self { eliminator, constructor, position }
-    }
-
-    pub(super) fn of(slot: &RecursiveCarrierSlot) -> Self {
-        Self::new(slot.eliminator, slot.constructor, slot.position)
-    }
-}
-
 /// An R record and its planner-issued source slot. The key exists only in
 /// lowering; the emitted word contains no variant or static provenance.
 #[derive(Clone, Copy, Debug)]
@@ -42,13 +20,6 @@ impl CarriedResidualWord {
         self.slot
     }
 
-    /// I-0 only: an explicitly counted crossing of an untyped ABI seat.
-    /// I-1 deletes this method when every such seat has a planner-issued kind.
-    pub(super) fn residual_across_untyped_abi_transitional(self) -> CarriedBoundaryWord {
-        #[cfg(any(test, feature = "px8-ds-test-support"))]
-        super::record_residual_transitional_escape();
-        CarriedBoundaryWord { word: self.word }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -196,9 +167,9 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         residual: CarriedResidualWord,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
-        let key = residual.slot();
+        let (eliminator, constructor, position) = residual.slot().coordinates();
         let slot = self.static_transition_plan.recursive_carrier_slot(
-            key.eliminator, key.constructor, key.position,
+            eliminator, constructor, position,
         )?.ok_or_else(|| unsupported("RecursiveResidual", "residual names no issued slot"))?.clone();
         let wrapped = CarriedBoundaryWord { word: residual.word };
         let class = self.emit_carrier_class(builder, wrapped)?;

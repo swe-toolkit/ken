@@ -2164,9 +2164,13 @@ impl<'a> Lowering<'a> {
                         })?;
                         let word = match value {
                             LoweringOperand::Carried(word) => word.word,
-                            // I-0 transitional declared-call Parameter/Capture ABI.
-                            LoweringOperand::Residual(residual) => residual
-                                .residual_across_untyped_abi_transitional().word,
+                            // Every declared-call Parameter/Capture slot is K:
+                            // decode R before storing into the callee frame.
+                            LoweringOperand::Residual(residual) => {
+                                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                                record_residual_abi_decode();
+                                self.decode_residual_child(builder, *residual)?.word
+                            },
                             LoweringOperand::Specialized(Lowered::StaticResponseDeferred { site }) => {
                                 let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
                                     backend_module("a deferred host response reached a call outside a defined function scope".to_string())
