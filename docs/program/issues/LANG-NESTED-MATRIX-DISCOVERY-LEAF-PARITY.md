@@ -33,35 +33,52 @@ Adversary's set.
   D4 (sibling field after the IH) were refused on the parent and are
   `Internal` now in infer mode, correct in check mode. E2, E3 and D6
   (non-indexed) stay correct.
-- Mechanism: in D1 the leaf context differs at the `tl` field before the
-  skipped IH: discovery holds `CVec Nat @2`, the rerun `CVec Nat @1` (the
-  correct one). Two discovery-side sources: tail columns passed unshifted
-  past the never-pushed IH (`elab.rs:18058-18068`; shifting them repairs D3
-  and D4 only) and field domains read under the domain-only motive
-  (`elab.rs:18505-18519`).
-- The frame's R contract (Architect `evt_9s1tts2m0xjk`, input g
-  `evt_216r68j77vfdx`) makes the mismatch an internal invariant. The
-  Architect rules the fix shape before the implementation turn.
+- Mechanism and shape (Architect ruling `evt_3zjpbz03wm5b9`, measured with
+  env-gated fixes; it corrects the Adversary's second source). Three
+  defects, each a hand-written second derivation of a coordinate change:
+  - (a) E1, D1, D7: discovery takes the `motive.is_none()` fallback, which
+    builds fields with `weaken(ty, 1)` and shifts the earlier field `m`
+    too (`@2` against `method_type`'s `@1`).
+  - (b) D3, D4: the discovery IH branch (`:18058-18068`) does not push the
+    IH but passes the telescope `col_types[1..]` on unlowered.
+  - (c) `lower_by_inner` is not total (catch-all arm): THREE still fails
+    after (a)+(b), and the R projection (`:17922`) rejects an inferred Σ
+    result mentioning an outer variable (SIGR, and SIGRtree, which the
+    parent also refused: pre-existing, fail-closed, ruled into scope
+    because (b) needs the total primitive).
+- The shape is the ruling's §3: item 1, a `tail_under_split` bucket always
+  takes fields, IHs and tail from `method_type` (domain-only motive while R
+  is unknown), the `weaken` fallback arm and `dependent_tail` go, and the
+  impossible case is a typed `Internal`; item 2, one `lower_binders` built
+  on the kernel's total `shift` replaces `lower_by`/`lower_by_inner`; item
+  3, the IH skip lowers the tail through it.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
 
 ## Deliverable
 
-1. Discovery builds the first leaf's context in the rerun's coordinate
-   system, on the Architect's shape.
-2. Committed pins for E1, D1, D2, D3, D4, D5, D7 and D8 in infer mode (and
-   D7's check form), asserting values, plus the E2, E3 and D6 controls.
+1. Items 1-3 of the ruling, one increment. The replay guard, literal memo,
+   root-frame ownership and rerun path are unchanged.
+2. Committed value pins, infer mode plus check forms, for every row of the
+   ruling's table (E1, D1, D3, D7c, THREE, SIGR, SIGRtree, TREE control)
+   and the Adversary's D2, D5 and D8 sources.
 
 ## Acceptance
 
-- **AC-1.** Each regressed row gives its parent value; D3 and D4 give
-  their check-mode values. The controls and the TELESCOPE suites are
-  unchanged; catalog `ken check` outcomes are unchanged.
-- **AC-2 (falsifier).** Reverting the discovery-side change reddens E1 with
-  the `Internal` replay error.
+- **AC-1.** Each row gives the ruling's A+B+C value; trust unchanged on
+  every Ok row. The TELESCOPE suites (`lang_nested_matrix_*`,
+  `lang_nested_split_field_dependence`) and catalog `ken check` outcomes are
+  unchanged. DEP stays refused (out of scope).
+- **AC-2 (falsifiers; each gives its named red).** Restore the `weaken`
+  route: E1 `Internal` replay. Pass `col_types[1..]` unlowered: D3 the same
+  `Internal`. Old traversal at the IH skip: THREE `Internal`. Old traversal
+  at `:17922`: SIGRtree `KernelRejected TypeMismatch`.
 
 ## Stop conditions
 
 - The repair needs the replay guard weakened or removed: stop to the
   Architect.
+- A committed `InferredMatchResultEscapesPattern` binder-name pin changes
+  (the escaping index is now the smallest mentioned): stop and report; do
+  not re-pin.
