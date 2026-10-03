@@ -126,7 +126,10 @@ pub fn eq_reduce(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term) 
         Term::Omega(_) => Some(eq_at_omega(a, b)),
         Term::Type(_) => eq_at_type(env, ctx, a, b),
         Term::Trunc(_) => Some(top_term(env)),
-        Term::Quot(_, r) => eq_at_quot(r, a, b),
+        // Until Quot-Form checks an equivalence witness, a relation need not
+        // be reflexive. Reducing class equality to R a b would let refl [a]
+        // prove an arbitrary proposition, including Bottom.
+        Term::Quot(_, _) => None,
         Term::App(_, _) | Term::IndFormer { .. } => eq_at_inductive(env, ctx, ty, a, b),
         // A primitive type with a registered decidable-equality certificate
         // (ADR 0013 Layer 2) decides `Eq` between two checked literals by
@@ -342,18 +345,6 @@ fn eq_at_omega(p: &Term, q: &Term) -> Term {
     let p_to_q = Term::pi(p.clone(), q.clone()); // (x:P) → Q
     let q_to_p = Term::pi(q.clone(), p.clone()); // (x:Q) → P
     Term::sigma(p_to_q, q_to_p) // (P→Q) and (Q→P)
-}
-
-/// `Eq (A/R) [a] [b] ⇝ R a b` — quotient equality is the relation (`16 §2.2`,
-/// §5). `a`,`b` are class representatives `[a']`,`[b']`; a neutral representative
-/// leaves `Eq` neutral.
-fn eq_at_quot(r: &Term, a: &Term, b: &Term) -> Option<Term> {
-    match (a, b) {
-        (Term::QuotClass(a0), Term::QuotClass(b0)) => {
-            Some(apply_args(r.clone(), &[(**a0).clone(), (**b0).clone()]))
-        }
-        _ => None,
-    }
 }
 
 /// Only a rigid type former can establish disjointness from another rigid

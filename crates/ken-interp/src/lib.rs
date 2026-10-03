@@ -346,6 +346,45 @@ mod tests {
         assert_ne!(r_tt, r_tf, "same-ctor and diff-ctor Eq must differ");
     }
 
+    /// Transition sentinel (C8, 16 §2.2/§5): quotient-class Eq is neutral
+    /// until KERNEL-QUOT-FORM-EQUIVALENCE. A relation equating every pair
+    /// cannot license X1 to compare the two representatives as constructors.
+    #[test]
+    fn quotient_class_eq_is_neutral_even_for_distinct_nat_representatives() {
+        let (env, std) = std_env();
+        let mut store = mk_store();
+        let Std { nat, zero, suc, .. } = std;
+        let nat_ty = Term::indformer(nat, vec![]);
+        let top = Term::const_(env.top_id(), vec![]);
+        let total_relation = Term::Ascript(
+            Box::new(Term::lam(nat_ty.clone(), Term::lam(nat_ty.clone(), top))),
+            Box::new(Term::pi(
+                nat_ty.clone(),
+                Term::pi(nat_ty.clone(), Term::Omega(Level::zero())),
+            )),
+        );
+        let quotient = Term::Quot(Box::new(nat_ty), Box::new(total_relation));
+        let zero_class = Term::QuotClass(Box::new(nat_term(0, zero, suc)));
+        let one_class = Term::QuotClass(Box::new(nat_term(1, zero, suc)));
+        let equality = Term::Eq(
+            Box::new(quotient),
+            Box::new(zero_class),
+            Box::new(one_class),
+        );
+        assert_eq!(
+            ken_kernel::infer(&env, &ken_kernel::env::Context::new(), &equality),
+            Ok(Term::Omega(Level::zero())),
+            "the equality input must be a checked proposition"
+        );
+        let result = eval(&[], &equality, &env, &mut store);
+        assert_eq!(result, EvalVal::Neutral, "class Eq must remain stuck");
+        assert_ne!(
+            result,
+            EvalVal::IndFormerVal { id: env.top_id() },
+            "the total relation does not make class Eq reduce to Top"
+        );
+    }
+
     /// `runtime/evaluation/can-quotient-elim-computes` (soundness)
     ///
     /// `elim_/ M f r [true] → f true = false`.

@@ -361,13 +361,15 @@ conversion must consume the obs WHNF rules and decide.
   **exact** level, per the K2 retro). ≥2 distinct levels, open `f`,`g`,
   dependent `B x`.
 
-### conversion/quotient-eq-through-conv (soundness)
-- spec: `17 §3.2` (whnf: quotient equality); `16 §5`
-- given: `A : Type 0`, `R : A -> A -> Omega_0`; open `a b : A`;
-  `convert(Omega_0, Eq (A / R) [a] [b], R a b)`
-- expect: **convertible (true)** — quotient equality **is** the relation
-- why: `Eq (A/R) [a] [b]` whnf-reduces to `R a b`; conversion uses the reduct.
-  Definitional, no setoid boilerplate. Open `a`,`b`,`R`.
+### conversion/quotient-eq-through-conv (soundness, C8 interim)
+- spec: `17 §3.2`; `16 §2.2`, `§5` (interim quotient equality)
+- given: `R := λ _ _. Top` on `Nat`, canonical classes `[0]`, `[1]`;
+  query `convert(Omega_0, Eq (Nat / R) [0] [1], R 0 1)`.
+- expect: **not convertible (false)** — `Eq (Nat/R) [0] [1]` stays neutral
+  and does not reduce to `R 0 1` (`Top`). The relation-as-equality reduct is
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
+- why: the D2 neutral verdict flips against the old rule, which would reduce
+  both sides to `Top`. `Quot-Form` has not supplied a checked equivalence proof.
 
 ---
 
@@ -628,35 +630,24 @@ discriminating cases live here.
 - spec: `16 §5.1` (transport-direction note), `§5` (Quot-Elim), `§3.1` (`cast`
   convention)
 - given: an **open** context — `R := λ _ _. Top` on `Bool`, reps `x := true`,
-  `y := false`, class equality `h' : Eq (Bool/R) [true] [false]` (inhabited
-  because `Eq (Bool/R) [x] [y] ⇝ R x y = Top`, `§2.2`); an **abstract** motive
-  `M : (z : Bool / R) → Type 0` (a context variable, so `M [true]` and `M
-  [false]` are **distinct neutral types** — `M [true] ≢ M [false]`, equal only
-  propositionally via `cong M h'`); `f : (b : Bool) → M [b]`. Form the respect
-  obligation and `elim_/ M f r [true]`
-- expect: the **correct-direction** proof `r_ok : … Eq (M [x]) (f x) (cast (M
-  [y]) (M [x]) (sym (cong M h')) (f y))` is **accepted** (admission fires; `⇝ f
-  true`); the **reversed** proof `r_bad : … (cast (M [x]) (M [y]) (cong M h') (f
-  y))` is **rejected** — **ill-typed** (it feeds `f y : M [y]` to a `cast` whose
-  **source** is `M [x]`, and lands in `M [y]` where the enclosing `Eq (M [x]) …`
-  requires `M [x]`)
-- why: this is the discriminating case the constant-motive probes
-  **structurally cannot be**. At a constant motive `M [x] ≡ M [y]`, so `cast B B
-  refl _` (`§3.2` regularity) collapses **regardless of source/target order** —
-  the direction is invisible. Here `M` is abstract over the **distinct** reps
-  `[true]`, `[false]`, so `M [true] ≢ M [false]` and the `cast` does **not**
-  collapse; the source/target order is load-bearing. **Verdict-flips on the
-  cast direction itself:** a kernel forming the **corrected** schema (`cast (M
-  [y]) (M [x]) (sym (cong M h'))`) accepts `r_ok` and rejects `r_bad`; a kernel
-  with the **pre-erratum reversed** schema (`cast (M [x]) (M [y]) (cong M h')`)
-  does the opposite — green↔red precisely on the direction bug. **Guard
-  named:** the schema `check` against the **correct-direction** expected type.
-  **Disconfirming check:** would `r_ok` also be accepted by the reversed-schema
-  kernel? **No** — it would be *rejected* there, so the verdict pins the
-  **direction**, not merely "some respect check fires." Pairs with the
-  constant-motive `quotient-respect-schema-{rejects,accepts}` (which pin the
-  check fires + the respect-validity flip); this pins the **direction** they
-  hold fixed.
+  `y := false`, and `h : R x y`; no class equality `h'` is supplied or derived
+  from `h` in the interim. An **abstract** motive
+  `M : (z : Bool / R) → Type 0` makes `M [true]` and `M [false]` distinct
+  neutral types. `f : (b : Bool) → M [b]`; attempt the correct-direction
+  `r_ok` and reversed-direction `r_bad` Type-target respect forms for
+  `elim_/ M f r [true]` without the reduction-derived `h'`.
+- expect: both `r_ok` and `r_bad` are **refused** in the interim; `h : R x y`
+  cannot supply `h' : Eq (Bool/R) [x] [y]` by conversion, so the dependent
+  `cong`/`cast` respect schema cannot be formed. The `r_ok` acceptance half is
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`; after P0, correct-direction `r_ok`
+  is accepted and reversed-direction `r_bad` is rejected.
+- why: unlike the unchanged constant-motive controls, `M [true]` and
+  `M [false]` are distinct, so a quotient class equality is needed to form the
+  transport. The interim supplies no `h'`; both candidate directions are
+  refused. P0 restores the correct-direction `cast (M [y]) (M [x])
+  (sym (cong M h'))` admission and leaves the reversed direction rejected.
+  The positive `r_ok` arm is gated; the constant-motive accept/refuse rows
+  remain the live checks until P0.
 
 ---
 

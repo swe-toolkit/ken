@@ -245,6 +245,21 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 - why: cast at quotient preserves the class structure, transporting
   the representative.
 
+### observational/cast-rejects-unequal-levels (soundness)
+- spec: `spec/10-kernel/16-observational.md` §3.1–§3.2
+- given: a one-constructor `D : Type 1` with `c : Bool → D`; let
+  `Large := (x : Bool) × Eq D (c x) (c x)` and
+  `Small := (x : Bool) × Eq Bool x x`, which infer at `Type 1` and `Type 0`.
+  For `v : Large`, query `convert(Type 1, Large, Small)` and try
+  `cast Large Small (refl Large) v`; compare with
+  `cast Large Large (refl Large) v`.
+- expect: `convert(Type 1, Large, Small)` is **true**. The cross-level cast is
+  **rejected** at formation; the equal-level control **accepts** and reduces
+  to `v`. `trusted_base()` is unchanged.
+- why: §3.1 requires both endpoints to inhabit the same `Type l`. A cast that
+  drops the level comparison would accept the first arm while the control stays
+  green.
+
 ---
 
 ## Acceptance criterion: J on non-refl (frame par. 2 item 4, README #13)
@@ -271,12 +286,15 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ## Acceptance criterion: Quotients (frame par. 2 item 7, README #14)
 
-### observational/quotient-eq (soundness)
-- spec: `spec/10-kernel/16-observational.md` par. 5
-- given: `R : A -> A -> Omega`, `a b : A`; `Eq (A / R) [a] [b]`
-- expect: **reduces-to** `R a b`
-- why: quotient equality IS the user relation. Definitional, no setoid
-  boilerplate.
+### observational/quotient-eq (soundness, C8 interim)
+- spec: `spec/10-kernel/16-observational.md` §2.2, §5
+- given: `R : A → A → Omega`, `a b : A`; `Eq (A / R) [a] [b]`, including
+  canonical classes.
+- expect: **stays neutral** for every pair of endpoints; it does not reduce to
+  `R a b`. Relation-as-equality is
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
+- why: Quot-Form has not supplied a checked equivalence proof for `R`; reducing
+  to an arbitrary relation is deferred until P0.
 
 ### observational/quotient-elim (soundness)
 - spec: `spec/10-kernel/16-observational.md` par. 5

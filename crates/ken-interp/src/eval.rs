@@ -20,8 +20,8 @@
 //!   equality is limited to canonical values admitted by C5.
 //! - `CtorPending` — accumulates positional args before the constructor saturates.
 //! - `Unknown` — open-hole residue (propagates strictly through all positions).
-//! - `Neutral` — stuck on an unsupported form or open variable (closed ground
-//!   programs never reach this per canonicity).
+//! - `Neutral` — stuck on an unsupported form or open variable; interim C8
+//!   also leaves checked closed quotient-class `Eq` neutral until P0 (`42 §3.6`).
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{self, IsTerminal, Read, Write};
@@ -302,8 +302,9 @@ pub enum EvalVal {
     /// An open verification hole (`hole h`) or opaque postulate — the "unknown"
     /// truth value from `41 §6`.
     Unknown,
-    /// A neutral head applied to values — only possible for open terms; closed
-    /// ground programs never produce this per canonicity (`42 §3.6`).
+    /// A neutral head or unsupported form. Interim C8 also leaves checked
+    /// closed quotient-class `Eq` neutral until Quot-Form requires an
+    /// equivalence proof (`KERNEL-QUOT-FORM-EQUIVALENCE`, `42 §3.1`/§3.6).
     Neutral,
 }
 
@@ -1192,6 +1193,16 @@ fn eq_reduce(a_ty: EvalVal, lhs: EvalVal, rhs: EvalVal, globals: &GlobalEnv) -> 
         || matches!(rhs, EvalVal::Unknown)
     {
         return EvalVal::Unknown;
+    }
+
+    // C8 interim (16 §5.1): quotient-class equality is neutral, as in the
+    // kernel. It must not reach the inductive same-constructor rule below,
+    // which would compare representatives. Relation-as-equality is gated on
+    // KERNEL-QUOT-FORM-EQUIVALENCE.
+    if matches!(&lhs, EvalVal::Ctor { id, .. } if *id == GlobalId(QUOT_CLASS_TYPE_ID))
+        || matches!(&rhs, EvalVal::Ctor { id, .. } if *id == GlobalId(QUOT_CLASS_TYPE_ID))
+    {
+        return EvalVal::Neutral;
     }
 
     // C4: Eq at an inductive type, same constructor (0-field → Top), diff → Bottom.
