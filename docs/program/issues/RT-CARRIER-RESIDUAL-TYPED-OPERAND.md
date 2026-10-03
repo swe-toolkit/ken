@@ -187,10 +187,13 @@ then I-1, each a separate exact-SHA review with the Architect as single gate.
   `checked_ih_captured_environment_from_case_environment`
   (`source.rs:4906-4913`). A W/C consumer that gets `Synthesized` is a K→R
   refusal, never a coercion.
-- **The Tail result** is `TailAnswer::{PassThrough(CarriedResidualWord),
-  Routed(CarriedBoundaryWord)}`. The Child request after the Tail
-  (`core.rs:9531-9580`) is legal only on `PassThrough`, by type. A `Routed`
-  arm that reaches a Child or W/C request gets the compile-time
+- **The Tail result** is the representation-typed `LoweringOperand`
+  (Architect `evt_7qzpmd32e0cvg` withdraws the `TailAnswer` sum; the dead
+  enum and `into_operand` at `lowering/mod.rs:4141-4150` are deleted). The
+  Child request after the Tail is enforced by `checked_ih_transport_child`'s
+  exhaustive match against the planner's `wrapped()`. Tail consumers stay
+  exhaustive or use `RoutedAnswer::checked`; a routed answer reaching a
+  Child or W/C request gets the compile-time
   `CraneliftBackendError::ResidualRepresentationRequired { site }`.
 
 **I-0: typed operand, producers and consumers, and the proven route.** No
