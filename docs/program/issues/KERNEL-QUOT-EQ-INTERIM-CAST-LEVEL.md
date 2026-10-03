@@ -1,7 +1,7 @@
 ---
 id: KERNEL-QUOT-EQ-INTERIM-CAST-LEVEL
 title: "The kernel proves Eq Nat 0 1, because Quot-Form takes any relation and Eq at quotient classes reduces to it, and it admits a cross-level cast, because Cast never compares the two levels. Make Eq at quotient classes neutral until Quot-Form carries an equivalence proof, and refuse a cast whose types sit at different levels"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
