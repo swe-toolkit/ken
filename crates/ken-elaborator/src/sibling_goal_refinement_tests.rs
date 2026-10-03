@@ -32,6 +32,60 @@ fn dummy_arm(body: RExpr) -> RMatchArm {
 }
 
 #[test]
+fn innermost_match_frame_owns_fields_even_with_stale_parent_level() {
+    // Promise class: durable invariant. MEASURED: a constructor field pushed
+    // after opening its own frame has Field provenance in that frame; a raw
+    // push at the same reused level is refused, not attributed to an earlier
+    // user binder in the enclosing frame. CLAIMED: level ownership is total
+    // even under binder pop/reuse. THE GAP: the checked law fixture pins the
+    // real large-convoy producer; this probes the private ownership rule.
+    let mut env = ElabEnv::new().expect("prelude");
+    let mut cx = ElabCtx::new(
+        &mut env.env,
+        &env.globals,
+        &mut env.num_values,
+        &env.numeric_env,
+        "match-field-owner-control",
+    );
+    cx.match_frames.push(MatchFrame::new(0, 0, None, None));
+    cx.push_match_binder(Term::Type(Level::Zero), MatchBinderOrigin::UserLocal);
+    cx.push_match_binder(Term::Type(Level::Zero), MatchBinderOrigin::UserLocal);
+    cx.ctx.pop(); // Leave a stale parent entry at the soon-to-be field level.
+    let field_start = cx.ctx.len();
+    cx.match_frames
+        .push(MatchFrame::new(field_start, 1, None, None));
+    cx.push_match_binder(Term::Type(Level::Zero), MatchBinderOrigin::Field);
+    assert_eq!(
+        cx.match_binder_origin(field_start).expect("owned field"),
+        Some(MatchBinderOrigin::Field)
+    );
+    cx.require_constructor_field_ownership(field_start, 1)
+        .expect("field belongs to its arm's frame");
+    cx.ctx.pop();
+    cx.match_frames.pop();
+    cx.match_frames
+        .push(MatchFrame::new(field_start, 1, None, None));
+    cx.ctx.push(Term::Type(Level::Zero)); // Deliberately simulate a missing origin write.
+    assert!(
+        matches!(
+            cx.match_binder_origin(field_start),
+            Err(ElabError::Internal(_))
+        ),
+        "a stale outer binder cannot fill the inner arm's missing field origin"
+    );
+    cx.ctx.pop();
+    cx.match_frames.pop();
+    cx.push_match_binder(Term::Type(Level::Zero), MatchBinderOrigin::Field);
+    assert!(
+        matches!(
+            cx.require_constructor_field_ownership(field_start, 1),
+            Err(ElabError::Internal(_))
+        ),
+        "a field tagged Field in the enclosing frame is not owned by this arm"
+    );
+}
+
+#[test]
 fn whole_pi_restores_existing_alias_once_at_original_goal() {
     // Promise class: durable invariant. This is the in-crate constructed
     // context authorized by the Architect: no natural source on ba2 has both
@@ -84,7 +138,8 @@ fn whole_pi_restores_existing_alias_once_at_original_goal() {
     cx.var_refinements
         .insert(5, (h0_alias.clone(), alias_ty.clone(), cx.ctx.len()));
     let goal = eq(alias_ty, h0_alias.clone(), h0_alias.clone());
-    cx.match_field_regions.push(0..cx.ctx.len());
+    cx.match_frames
+        .push(MatchFrame::new(cx.ctx.len(), 0, Some(goal.clone()), None));
     cx.active_index_premise_frames
         .push(ActiveIndexPremiseFrame {
             sentinel_region: 0,
@@ -129,7 +184,10 @@ fn whole_pi_restores_existing_alias_once_at_original_goal() {
         .expect("restore the checked body to its unrefined goal");
     kernel_check_current(&cx, &body, &goal).expect("emitted method checks at G(d,s)");
     assert_eq!(cx.ctx.len(), 6, "the temporary telescope was popped");
-    assert!(cx.scoped_premise_aliases.is_empty());
+    assert!(cx
+        .scoped_match_premises()
+        .expect("scoped premises")
+        .is_empty());
 }
 
 #[test]
@@ -164,17 +222,32 @@ fn scoped_premise_redirects_consumed_proof_and_restores_on_failure() {
     let sentinel = index_refinement_sentinel(7, 0);
     let proof_at_refined = Term::Ascript(Box::new(sentinel.clone()), Box::new(refined.clone()));
     assert!(kernel_infer_current(&cx, &proof_at_refined).is_err());
-    cx.ctx.push(refined.clone());
+    cx.match_frames.push(MatchFrame::new(
+        cx.ctx.len(),
+        7,
+        Some(refined.clone()),
+        None,
+    ));
+    cx.push_match_binder(refined.clone(), MatchBinderOrigin::GeneratedEquation);
     cx.hidden_positions.push(2);
-    cx.scoped_premise_aliases.insert((7, 0), 2);
+    cx.match_frames
+        .last_mut()
+        .expect("owned frame")
+        .premise_bindings
+        .insert((7, 0), 2);
     let at_binder = eq(nat_ty.clone(), Term::var(1), Term::var(1));
     let proof = Term::Ascript(Box::new(weaken(&sentinel, 1)), Box::new(at_binder.clone()));
     kernel_check_current(&cx, &proof, &at_binder)
         .expect("generated premise proof consumed at the generalized type");
-    cx.scoped_premise_aliases.clear();
+    cx.match_frames
+        .last_mut()
+        .expect("owned frame")
+        .premise_bindings
+        .clear();
     assert!(kernel_check_current(&cx, &proof, &at_binder).is_err());
     cx.ctx.pop();
     cx.hidden_positions.pop();
+    cx.match_frames.pop();
 }
 
 #[test]
@@ -213,9 +286,15 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
     let (before, before_ty) = infer(&mut cx, &expr).expect("original premise inference");
     assert_eq!(before, premise);
     assert_eq!(before_ty, old_ty);
-    cx.ctx.push(new_ty.clone());
+    cx.match_frames
+        .push(MatchFrame::new(cx.ctx.len(), 4, Some(new_ty.clone()), None));
+    cx.push_match_binder(new_ty.clone(), MatchBinderOrigin::GeneratedEquation);
     cx.hidden_positions.push(3);
-    cx.scoped_premise_aliases.insert((4, 0), 3);
+    cx.match_frames
+        .last_mut()
+        .expect("owned frame")
+        .premise_bindings
+        .insert((4, 0), 3);
     let (inside, inside_ty) = infer(&mut cx, &expr).expect("generalized premise inference");
     let generalized_ty = weaken(&new_ty, 1);
     assert_eq!(
@@ -237,9 +316,14 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
     let checked = check_variable_with_index_views(&mut cx, 0, &inside_ty)
         .expect("checking shares inference's binder identity");
     assert_eq!(checked, inside);
-    cx.scoped_premise_aliases.clear();
+    cx.match_frames
+        .last_mut()
+        .expect("owned frame")
+        .premise_bindings
+        .clear();
     cx.ctx.pop();
     cx.hidden_positions.pop();
+    cx.match_frames.pop();
     let (after, after_ty) = infer(&mut cx, &expr).expect("original premise restored");
     assert_eq!((after, after_ty), (premise, old_ty));
 }
@@ -275,33 +359,32 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
         "real-sibling-convoy-control",
     );
     cx.ctx.push(nat_ty.clone()); // n
-    cx.ctx.push(nat_ty.clone()); // m, inside an enclosing field region
-    let without_sibling = Context {
-        types: vec![nat_ty.clone(), nat_ty.clone(), vec_ty(Term::var(0))],
-    };
+    cx.match_frames
+        .push(MatchFrame::new(cx.ctx.len(), 0, None, None));
+    cx.push_match_binder(nat_ty.clone(), MatchBinderOrigin::Field); // m
+    cx.push_match_binder(vec_ty(Term::var(0)), MatchBinderOrigin::UserLocal); // y
+    let without_sibling = MatchFrame::new(cx.ctx.len(), 1, None, Some(cx.ctx.len() - 1));
     assert!(
-        compute_context_convoy(&without_sibling, &Term::var(0), &[Term::var(1)], &[1..2],)
+        compute_context_convoy(&cx, &without_sibling, &[Term::var(1)])
+            .expect("scrutinee classification")
             .is_empty(),
         "a dependent scrutinee is not its own ambient sibling"
     );
-    cx.ctx.push(vec_ty(Term::var(0))); // independent x : ConvoyVec Nat m
-    cx.ctx.push(vec_ty(Term::var(1))); // scrutinee y : ConvoyVec Nat m
-    cx.match_field_regions.push(1..2);
+    cx.ctx.pop();
+    cx.push_match_binder(vec_ty(Term::var(0)), MatchBinderOrigin::UserLocal); // x
+    cx.push_match_binder(vec_ty(Term::var(1)), MatchBinderOrigin::UserLocal); // y
     let index = Term::var(2);
     let scrutinee = Term::var(0);
-    let convoy = compute_context_convoy(
-        &cx.ctx,
-        &scrutinee,
-        std::slice::from_ref(&index),
-        &cx.match_field_regions,
-    );
+    let goal = eq(nat_ty.clone(), index.clone(), index.clone());
+    let frame = MatchFrame::new(cx.ctx.len(), 1, Some(goal.clone()), Some(cx.ctx.len() - 1));
+    let convoy = compute_context_convoy(&cx, &frame, std::slice::from_ref(&index))
+        .expect("sibling provenance");
     assert_eq!(
         convoy.len(),
         1,
         "real dependent sibling is not self-skipped"
     );
     assert_eq!(convoy[0].var, 1, "x, not the scrutinee y");
-    let goal = eq(nat_ty.clone(), index.clone(), index.clone());
     let error = plan_coherent_frame_motive(
         &cx,
         &family,
@@ -315,6 +398,7 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
         1,
         false,
         &Span { start: 0, end: 0 },
+        &frame,
     )
     .err()
     .expect("real sibling must be refused");
@@ -356,6 +440,8 @@ fn generalized_premise_generated_proof_is_consumed_by_body() {
         });
     cx.var_refinements
         .insert(2, (p.clone(), new.clone(), cx.ctx.len()));
+    cx.match_frames
+        .push(MatchFrame::new(cx.ctx.len(), 0, Some(old.clone()), None));
     let source_type = Term::pi(new.clone(), weaken(&new, 1));
     let restoration = || BranchGoalRestoration::Generalized {
         whole: Box::new(BranchGoalRestoration::OmegaJ {
@@ -383,7 +469,10 @@ fn generalized_premise_generated_proof_is_consumed_by_body() {
             .expect("generated proof consumed through body at generalized binder");
     kernel_check_current(&cx, &body, &old).expect("original method goal");
     assert_eq!(cx.ctx.len(), 3);
-    assert!(cx.scoped_premise_aliases.is_empty());
+    assert!(cx
+        .scoped_match_premises()
+        .expect("scoped premises")
+        .is_empty());
     assert!(matches!(cx.var_refinements.get(&2), Some((term, _, _)) if *term == p));
     let rejected = dummy_arm(RExpr::RCon(
         "not_a_constructor".into(),
@@ -400,7 +489,9 @@ fn generalized_premise_generated_proof_is_consumed_by_body() {
     .expect_err("a failed body must not leak its generalized scope");
     assert_eq!(cx.ctx.len(), 3, "error popped the generalized binder");
     assert!(
-        cx.scoped_premise_aliases.is_empty(),
+        cx.scoped_match_premises()
+            .expect("scoped premises")
+            .is_empty(),
         "error restored sentinel ownership"
     );
     assert!(matches!(cx.var_refinements.get(&2), Some((term, _, _)) if *term == p));
