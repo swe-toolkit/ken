@@ -114,8 +114,8 @@ the build design.
 ## 1. Sum types (real, not stubbed)
 
 ```
-data Option a = None | Some a
-data Result e a = Err e | Ok a
+data MaybeValue a = MissingValue | PresentValue a
+data Outcome e a = Failure e | Success a
 data Color = Red | Green | Blue
 data Tree a = Leaf | Node (Tree a) a (Tree a)
 data Expr = Lit Int | Add Expr Expr | Neg Expr
@@ -164,7 +164,8 @@ A `data` declaration elaborates to an **inductive family** (`../10-kernel/14
 introduction forms), and the **generated dependent eliminator** `elim_D` (`14
 §3`) — the *only* primitive way to consume a value of `D`. Constructors are real
 intro forms and `elim_D` is a real eliminator **with computation**: `elim_D …
-(Some x) ≡` the `Some` method applied to `x` (`14 §3` ι-reduction). Values can
+(PresentValue x) ≡` the `PresentValue` method applied to `x` (`14 §3`
+ι-reduction). Values can
 be built **and** taken apart, and the eliminator reduces.
 
 - **Constructor arguments** are positional or named-record style (`32 §1`); the
@@ -363,7 +364,7 @@ discharges, never a hole in the eliminator.
 ## 3. Pattern matching → `elim_D`
 
 ```
-view area (s : Shape) : Decimal = match s {
+fn area (s : Shape) : Decimal = match s {
   Circle r       => 3.14159d * r * r
   Rect   w h     => w * h
   Tri    b h     => 0.5d * b * h
@@ -747,7 +748,7 @@ here — transport discharges through the `J`/`cast`
 implies **no `../10-kernel` conversion-completeness note**.
 
 The five everyday combinators built on `J` — `subst`, `cong`, `cast`, `sym`,
-`trans` — are ordinary non-recursive library `view`s, **not** formers; they are
+`trans` — are ordinary non-recursive library `fn`s, **not** formers; they are
 listed in `../50-stdlib/53-transport.md`.
 
 ### 3.5 Proof-returning dependent motives
@@ -1013,9 +1014,9 @@ holds (the comprehension subobject, `../20-verification/21 §2`; the predicate's
 universe `Ω` is `../10-kernel/12 §5`, `16 §1`). At the surface:
 
 ```
-def Nat        = { n : Int | IsTrue (leq_int 0 n) }
-def NonEmpty a = { xs : List a | Not (Equal (List a) xs (Nil a)) }
-view head {a} (xs : NonEmpty a) : a = match xs { Cons x _ => x }
+def NonNegativeInt = { n : Int | IsTrue (leq_int 0 n) }
+def NonEmpty a    = { xs : List a | Not (Equal (List a) xs (Nil a)) }
+fn head {a} (xs : NonEmpty a) : a = match xs { Cons x _ => x }
 ```
 
 **The encoding — carrier plus obligation (normative, `21 §2`).** A refinement
@@ -1047,7 +1048,7 @@ verification.
 ## 6. Smart constructors & views (optional sugar)
 
 Pattern synonyms / view patterns (matching through an abstraction) and smart
-constructors (a `view` that enforces an invariant and returns a refined type,
+constructors (an `fn` that enforces an invariant and returns a refined type,
 `§5`) are ergonomic sugar over `§1`–`§5`; whether to include them is
 **OQ-syntax**. The semantic core — constructors + `elim_D` + exhaustiveness +
 refinements — does not depend on them.

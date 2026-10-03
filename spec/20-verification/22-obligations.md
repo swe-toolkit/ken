@@ -229,7 +229,7 @@ that site.
 
 ## 4. Body-as-motive (verifying recursive and dependent functions)
 
-For a function whose correctness is *inductive* — a recursive `view`, or one
+For a function whose correctness is *inductive* — a recursive `fn`, or one
 whose result type depends on a recursed argument — the obligation structure
 follows the **body as the motive**, recovered from the elaborator's `match →
 elim_D` compilation (`39 §2.6`); V2 does not synthesize an induction principle,
@@ -278,8 +278,8 @@ extract(Γ, term, expectedTy) → ObligationSet:        -- Γ: hypotheses; term:
         obls ∪= ⟨fresh(), Γ ⊢ φ[term/x], prov(term)⟩            -- emit, even if trivial (§2.5)
         obls ∪= extract(Γ, term, A)                              -- recurse at the carrier
 
-  -- (§2.2) a contracted function definition (V1's elabView output)
-  ViewDef(Δp, requires φ̄, ensures ψ̄, body, B):                -- Δp has interleaved generated proofs
+  -- (§2.2) a contracted function definition (V1's elabFn output)
+  FnDef(Δp, requires φ̄, ensures ψ̄, body, B):                -- Δp has interleaved generated proofs
         Γ' := Γ ⊕ Δp ⊕ { (_ : φᵢ) | φᵢ ∈ φ̄ }                    -- §3: written proofs follow, each once
         resultTy := refine(B, ψ̄)                                  -- {r : B | ψ₁ ∧ … ∧ ψₙ}: the postcondition AS the result-type motive (§4)
         obls ∪= extract(Γ', body, resultTy)                       -- §2.2: push it through the body — straight-line ⇒ one ψ[b/result]; branchy ⇒ per-path/per-ctor (the Elim/If clauses below, §3/§4). NO separate over-the-body obligation.

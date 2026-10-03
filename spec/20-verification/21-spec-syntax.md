@@ -46,7 +46,7 @@ grammar. The *prover* (`23`), *obligation extraction* (`22`), and *diagnostics*
 The everyday form: pre- and post-conditions on a function.
 
 ```
-view divide (n : Int) (d : Int) : Int
+fn divide (n : Int) (d : Int) : Int
   requires  Not (Equal Int d 0)
   ensures   Equal Int (result * d + (n % d)) n
 = n / d
@@ -63,7 +63,7 @@ view divide (n : Int) (d : Int) : Int
 - Contracts are **erasable**: they generate obligations (`22`) and assumptions
   but no runtime code by default (runtime-checked contracts are an opt-in, §5).
 
-The clause grammar (the `view`-declaration addendum; the full grammar is §6.1):
+The clause grammar (the `fn`-declaration addendum; the full grammar is §6.1):
 
 ```
 contract ::= requires-clause* ensures-clause*
@@ -96,7 +96,7 @@ A **refinement type** is the comprehension subobject (`../10-kernel/12 §5`,
 
 ```
 def Pos = { n : Int | IsTrue (leq_int 1 n) }
-view head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …
+fn head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …
   -- non-empty by type
 ```
 
@@ -209,7 +209,7 @@ proof-decl ::= "proof" ident "for" path binder* ":" type "=" expr
   `requires` or a refinement predicate is a scope error.
 - **`old(e)`** (referring to a pre-state value in a postcondition) is meaningful
   only for **`space` operations** (`../30-surface/36-effects.md §4.3`); for pure
-  `view`s the pre/post states coincide. **`OQ-Space` DECIDED:** `old(e)` is
+  `fn`s the pre/post states coincide. **`OQ-Space` DECIDED:** `old(e)` is
   admitted, **scoped to a `space` operation's `ensures`** (a cell's pre-call
   value), well-defined because a space's denotation is a state-transformer
   `S → R × S` that *names* the pre-state (§6.4). There is **no global
@@ -393,7 +393,7 @@ reserved.
 declarations and types:
 
 ```
-view-decl ::= "view" ident binder+ (":" type)? contract? "=" expr
+fn-decl ::= "fn" ident binder+ (":" type)? contract? "=" expr
 contract  ::= requires-clause* ensures-clause*
 requires-clause ::= "requires" prop
 ensures-clause  ::= "ensures"  prop
@@ -443,9 +443,10 @@ Prop  ::= Expr                         -- a proposition is an expression (checke
 
 The `requires`/`ensures` lists hang on `ViewDecl` (the existing
 function-declaration node gains two `Expr list` fields); the refinement gains a
-`Type` variant; `prove`/`law` are new top-level `Decl`s. Nothing changes in the
-V0 term-only nodes — non-spec programs parse to exactly the V0 AST (acceptance
-§5, no regression).
+`Type` variant; `prove`/`law` are new top-level `Decl`s. `ViewDecl` is the
+retained internal AST variant name, not the retired source keyword: the surface
+spelling is `fn` (§6.1). Nothing changes in the V0 term-only nodes — non-spec
+programs parse to exactly the V0 AST (acceptance §5, no regression).
 
 ### 6.3 Elaboration to core (the algorithm)
 
@@ -455,13 +456,13 @@ pseudocode is **defensive** — every position that *must* be a proposition is
 explicitly `check`ed at Ω (a non-Ω body is a surface error, never silently
 admitted), and every obligation site explicitly emits a typed hole.
 
-**Function contract** — `requires`/`ensures` on a `view`. First normalize any
+**Function contract** — `requires`/`ensures` on an `fn`. First normalize any
 refined parameter to a carrier parameter and a generated `requires` (§2,
 below). Preconditions become Π proof-arguments (assumed in the body, discharged
 at call sites); the postcondition becomes an obligation over `result`:
 
 ```
-elabView(Σ, ⟨ view f (Δ) : B requires φ̄ ensures ψ̄ = body ⟩) → (coreDef, obls):
+elabFn(Σ, ⟨ fn f (Δ) : B requires φ̄ ensures ψ̄ = body ⟩) → (coreDef, obls):
   Δp := desugarRefinedParams(Δ)                -- for each (x : {y:A|φ}), check φ[x/y] at Ω
                                                -- in its binder prefix; insert (x : A), (_ : φ[x/y])
   Γ := extendTelescope(·, Δp)                  -- carrier and proof binders, in order
@@ -528,7 +529,7 @@ proof-argument immediately after the domain it protects. This normalization
 happens **before** ordinary `elabType` erases a refinement to its carrier; it
 applies at every written function-type domain, including types in higher-order
 positions. In a multi-domain function type, each generated proof-argument
-follows its own carrier domain, just as in `elabView`. In particular, its core
+follows its own carrier domain, just as in `elabFn`. In particular, its core
 type is **not** the plain `A → B`: substituting a function requiring `φ` for a
 value of plain `A → B` must be rejected by function-type checking. An
 application through a higher-order variable still supplies the proof argument
@@ -577,12 +578,12 @@ elabSpaceEnsures(Γ, f, ψ):                       -- f : a space op, ⟦f⟧ : 
 
 **The scope guard (discriminating, not coincidental).** `old(e)` is admitted
 **only** when the enclosing declaration is a `space` operation — the one place a
-distinct pre-state `s_pre` exists. In a pure `view`'s `ensures` there is no
+distinct pre-state `s_pre` exists. In a pure `fn`'s `ensures` there is no
 `State` effect, `s_pre ≡ s_post`, and there is no pre-state to bind: `old(e)` is
 a **scope error**, rejected at elaboration before the kernel (`36 §7.3`). The
 guard is the *kind of the enclosing declaration*, asserted explicitly — so the
 conformance verdict flips on it (`old(c)` in a `space`-op `ensures` resolves to
-`proj_i(s_pre)`; `old(x)` in a pure-`view` `ensures` is rejected), never passing
+`proj_i(s_pre)`; `old(x)` in a pure-`fn` `ensures` is rejected), never passing
 vacuously. Worked example (`36 §4.3`): `inc`'s
 `ensures Equal Int n (old(n) + 1)` denotes the obligation
 `Equal Int ((s_pre with .n := s_pre.n + 1).n) (s_pre.n + 1)`, which computes

@@ -165,7 +165,7 @@ one merely to preserve an old oracle.
   **one** place its label (`FS`/`Console`) enters the inferred row. A call to an
   I/O operation from a context whose declared row does **not** contain that label is
   an **EFFECT-ESCAPE static error** (`ρ_inf ⊄ ρ_decl`). Pure-by-default ⇒ a
-  `view` with **no** `visits` has `ρ_decl = ∅`, so **any** I/O call escapes ⇒
+  `fn` with **no** `visits` has `ρ_decl = ∅`, so **any** I/O call escapes ⇒
   **untracked I/O is a compile error** (AC2/AC3). The accepting case carries the
   effect in its row; the rejecting case drops it — a **verdict flip**, exercised
   with the **≥2 distinct effects** `FS` and `Console` (`36 §1.4`).
@@ -1005,7 +1005,7 @@ principle made structural.
 - **Resolve the silence — "relies on" is by *use*, not *declaration*.** A
   `foreign` decl in scope is **not** itself a reliance; what lists `os_write` in
   an artifact's delta is a verified definition that **calls** `os_write`. A
-  `view` that calls it has `os_write` in its delta; a `view` that does not is
+  `proc` that calls it has `os_write` in its delta; a `proc` that does not is
   **absent** from it — even with the `foreign` decl visible in the same module.
   The honesty property ranges over **the foreign functions the verified content
   reaches**, exactly as `18 §5` reads `trusted_base()` ("the assumptions a given
@@ -1048,7 +1048,7 @@ it is part of the trusted boundary, and is the AC3 mechanism.
 - **Discriminating, not green-vs-green.** *Nothing* about a foreign is ever in
   `Q`, so "the foreign is absent from `Q`" alone is vacuous. The net is the
   **pair on the same artifact**: a genuinely kernel-proved Ken-side
-  postcondition (a `view` wrapping the foreign, whose `ensures` over the
+  postcondition (an `fn` wrapping the foreign, whose `ensures` over the
   *marshalling* — not the C body — discharges) projects to **`Q`** **while** the
   foreign's assumed `pure`/type claim projects to **`P`** — the field tracks
   **kernel-provedness**, not the `pure` keyword. The bug (trust the `pure`
@@ -1085,7 +1085,7 @@ The AC5 mechanism: a catchable flip plus the single named gap (the honest limit,
   effect row (§2.1). A caller that performs the foreign's effect **without**
   declaring the matching row in its own signature is an **EFFECT-ESCAPE** static
   error (`36 §1.4`: `ρ_inf ⊄ ρ_decl`) — the **same** escape check L6 I/O rides
-  (`§1.3`), **not** a new gate. A `view` calling `os_write` (`visits [FS]`)
+  (`§1.3`), **not** a new gate. A `proc` calling `os_write` (`visits [FS]`)
   without `[FS]` in its declared row is **rejected**; with `[FS]`, it
   **accepts** — a **verdict flip** on a **real** foreign through the **real**
   escape check.
