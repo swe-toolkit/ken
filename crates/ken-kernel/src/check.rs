@@ -331,7 +331,13 @@ pub fn infer(env: &GlobalEnv, ctx: &Context, t: &Term) -> KernelResult<Term> {
         Term::Cast(a_ty, b_ty, e, t) => {
             // `cast A B e a : B`, `e : Eq Type A B` (`16 §3.1`).
             let l_a = synth_type(env, ctx, a_ty)?;
-            let _l_b = synth_type(env, ctx, b_ty)?;
+            let l_b = synth_type(env, ctx, b_ty)?;
+            if !level_eq(&l_a, &l_b) {
+                return Err(KernelError::TypeMismatch {
+                    expected: Box::new(Term::Type(l_a)),
+                    found: Box::new(Term::Type(l_b)),
+                });
+            }
             let eq_ty = Term::Eq(
                 Box::new(Term::Type(l_a)),
                 Box::new((**a_ty).clone()),

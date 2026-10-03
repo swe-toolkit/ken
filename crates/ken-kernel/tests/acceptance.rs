@@ -1521,8 +1521,9 @@ fn k2_j_on_refl_is_base() {
 // --- C8: quotient equality (`16 §5`) ---------------------------------------
 
 #[test]
-fn k2_quotient_eq_is_relation() {
-    // `Eq (A/R) [a] [b] ⇝ R a b`, with `A:Type 0`, `R:A→A→Ω`, `a b : A` open.
+fn k2_quotient_eq_stays_neutral_until_relation_is_equivalence() {
+    // Interim `16 §2.2`: `Eq (A/R) [a] [b]` stays neutral even when both
+    // endpoints are classes. `A:Type 0`, `R:A→A→Ω`, `a b : A` remain open.
     let (env, _s) = std_env();
     let mut ctx = Context::new();
     ctx.push(Term::Type(Level::zero())); // A  (A=0)
@@ -1534,14 +1535,15 @@ fn k2_quotient_eq_is_relation() {
     ctx.push(Term::var(1)); // a : A  (a=0, R=1, A=2)
     ctx.push(Term::var(2)); // b : A  (b=0, a=1, R=2, A=3)
                             // Now A=var3, R=var2, a=var1, b=var0.
-    let eq = Term::Eq(
-        Box::new(Term::Quot(Box::new(Term::var(3)), Box::new(Term::var(2)))),
-        Box::new(Term::QuotClass(Box::new(Term::var(1)))),
-        Box::new(Term::QuotClass(Box::new(Term::var(0)))),
-    );
-    // R a b = App(App(R, a), b).
-    let expected = Term::app(Term::app(Term::var(2), Term::var(1)), Term::var(0));
-    assert_eq!(whnf(&env, &ctx, &eq), expected);
+    for representative in [Term::var(1), Term::var(0)] {
+        let eq = Term::Eq(
+            Box::new(Term::Quot(Box::new(Term::var(3)), Box::new(Term::var(2)))),
+            Box::new(Term::QuotClass(Box::new(Term::var(1)))),
+            Box::new(Term::QuotClass(Box::new(representative))),
+        );
+        assert_eq!(infer(&env, &ctx, &eq), Ok(Term::Omega(Level::zero())));
+        assert_eq!(whnf(&env, &ctx, &eq), eq);
+    }
 }
 
 // --- C9: quotient eliminator i-reduction (`16 §5`) -------------------------
