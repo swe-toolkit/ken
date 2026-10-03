@@ -116,16 +116,17 @@ deferred stuck forms, `42 §6`.)
 ### runtime/evaluation/can-eq-by-type-computes (soundness)
 - spec: `42 §3.3` (C2–C4, C9), `16 §2.2`/`§5`; anchors `seed-observational`
   `eq-inductive-same-ctor`, `quotient-eq`
-- given: closed `Eq`-by-type computations: (a) `Eq Bool true true`; (b)
-  `Eq (A/R) [a] [b]` for a quotient `A/R`.
+- given: closed `Eq`-by-type observations: (a) `Eq Bool true true`; (b)
+  `Eq (Nat / R) [0] [1]` with `R := λ _ _. Top` and no equivalence proof.
 - expect: (a) **reduces-to** the kernel value for same-constructor `Eq` (the
   conjunction of field equalities, here trivial — exact form `(oracle)`,
   anchored to the locked `eq-inductive-same-ctor`; `Eq` lands in `Ω`,
-  proof-irrelevant at the value layer, `42 §3.3`); (b) **reduces-to** `R a b`
-  (`quotient-eq`: quotient equality *is* the user relation).
-- why: `Eq`-by-type computes on closed terms (no setoid boilerplate) — X1 agrees
-  with the kernel's locked values. A bug that leaves `Eq …` neutral flips
-  value-vs-stuck. (soundness; AC1 "`Eq`-by-type → its computed value".)
+  proof-irrelevant at the value layer, `42 §3.3`); (b) **stays neutral** and
+  does not reduce to `R 0 1` (`Top`). Relation-as-equality is
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
+- why: X1 agrees with the kernel's locked outcomes for both the reducing and
+  neutral cases. An evaluator reducing quotient-class `Eq` to the relation
+  would disagree with C8; relation-as-equality is gated to P0.
 
 ### runtime/evaluation/can-quotient-elim-computes (soundness)
 - spec: `42 §3.3` (C9), `16 §5`; anchor `seed-observational` `quotient-elim`
@@ -411,18 +412,21 @@ closed-term corpus its value **matches the kernel's own reduction** — on
   value away from the kernel's. (property; AC5.)
 
 ### runtime/evaluation/agree-observational-corpus (soundness, property)
-- spec: `16 §2.2`/`§3.2`/`§5`/`§6` (C2–C6, C9, C10); anchors
+- spec: `16 §2.2`/`§3.2`/`§5`/`§6` (C2–C6, C8 interim, C9, C10); anchors
   `seed-observational` `cast-refl`,
   `cast-computes-pi`/`-sigma`/`-inductive`/`-quotient`, `quotient-eq`,
   `quotient-elim`, `eq-inductive-same-ctor`/`-diff-ctor`
-- given: the **closed observational** terms whose kernel reductions K2 locked.
+- given: the **closed observational** terms whose kernel reductions K2 locked,
+  including `Eq (Nat / R) [0] [1]` for `R := λ _ _. Top`.
 - expect: X1 evaluates **each** to the **same value** the K2 seed locked (e.g.
-  `cast A A refl a → a` C5; `Eq (A/R) [a] [b] → R a b`; `cast`-by-type at an
-  inductive → the constructor form with recursive casts C6). **Exception —
-  `(oracle)`:** the `cast Type Type` non-`refl` reduction and certain
-  quotient-transport edges (`16 §9.1`, `42 §3.3`) are **not locked** — X1
-  inherits the tag and realizes whatever `16` settles, grounded from `16` + the
-  build-time oracle (yon not mounted).
+  `cast A A refl a → a` C5; for `R := λ _ _. Top`, `Eq (Nat / R) [0] [1]`
+  stays neutral under C8 and does not reduce to `Top`; `cast`-by-type at an
+  inductive → the constructor form with recursive casts C6). Relation-as-equality is
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`. **Exception — `(oracle)`:** the
+  `cast Type Type` non-`refl` reduction and certain quotient-transport edges
+  (`16 §9.1`, `42 §3.3`) are **not locked** — X1 inherits the tag and realizes
+  whatever `16` settles, grounded from `16` + the build-time oracle (yon not
+  mounted).
 - why: the load-bearing **kernel-agreement on the `(soundness)` observational
   reductions** — X1 reuses the kernel's locked values, never a divergent one. A
   bug evaluating any observational form differently from the kernel is a silent

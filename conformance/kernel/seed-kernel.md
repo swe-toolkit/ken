@@ -63,11 +63,26 @@ are acceptance criteria for later WPs. The K1 subset is extracted separately in
 - why: observational `Eq` at a Π-type *is* pointwise equality.
 
 ## kernel/observational/quotient-eq [K2]
-- spec: `spec/10-kernel/16-observational.md §5`
-- given: `Eq (A / R) [a] [b]`
-- expect: **reduces-to** `R a b`
-- why: quotient equality is the user relation; quotient soundness is
-  definitional.
+- spec: `16 §2.2`, `§5` (interim quotient equality)
+- given: `Eq (A / R) [a] [b]` for any quotient relation `R` and endpoints.
+- expect: **stays neutral** for every pair, including canonical classes; it
+  does not reduce to `R a b`. Relation-as-equality is
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
+- why: Quot-Form has no checked equivalence proof yet, so reducing to `R` could
+  identify classes under a non-reflexive relation.
+
+## kernel/observational/quotient-eq-cannot-prove-zero-one (soundness)
+- spec: `16 §2.2`, `§5` (interim quotient equality)
+- given: `R` constantly `Eq Nat 0 1`, `Q := Nat / R`, and a one-constructor
+  `Bx` with a `Q` field. Let `v := bx [0]`, `p := refl v : Eq Bx v v`, and
+  check `p` against `Eq Nat 0 1`.
+- expect: the check **rejects**. `Eq Nat 0 1` reduces to `Bottom`, while
+  `Eq Q [0] [0]` stays neutral; `p` does not prove `Bottom`. `trusted_base()`
+  is unchanged.
+- why: pins the closed 0 = 1 exploit path: without the quotient-Eq reduct, the
+  outer constructor reflexivity proof cannot reach the false relation. P0 will
+  refuse this non-equivalence `R` at Quot formation
+  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
 
 ## kernel/inductive/elim-computes
 - spec: `spec/10-kernel/14-inductive.md §3`
