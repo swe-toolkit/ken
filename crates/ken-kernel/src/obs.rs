@@ -18,7 +18,7 @@ use crate::conv::{convert_type, convert_type_deferred_operands, whnf};
 use crate::env::{Context, GlobalEnv};
 use crate::inductive::peel_app;
 use crate::subst::{apply_args, shift, subst0, subst_levels, subst_outer, subst_tel, weaken};
-use crate::term::Term;
+use crate::term::{Level, Term};
 
 // --- prelude proposition terms (`16 §1.3`) ---
 
@@ -384,6 +384,25 @@ fn rigid_type_former(ty: &Term) -> Option<RigidTypeFormer> {
     }
 }
 
+/// An open level is not known distinct merely because normalization cannot
+/// prove equality. Structural universe inequality is decidable only when both
+/// sides are closed, so the open case must remain neutral.
+fn closed_level(level: &Level) -> bool {
+    let mut pending = vec![level];
+    while let Some(node) = pending.pop() {
+        match node {
+            Level::Zero => {}
+            Level::Var(_) => return false,
+            Level::Suc(inner) => pending.push(inner),
+            Level::Max(left, right) => {
+                pending.push(left);
+                pending.push(right);
+            }
+        }
+    }
+    true
+}
+
 /// Structural type equality `Eq Type A B` (`16 §2.2`, §3). Unknown heads
 /// and unsupported same-former pairs remain neutral; distinct rigid heads
 /// reduce to `Bottom`, not an unproved equality.
@@ -392,11 +411,13 @@ fn eq_at_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term
     let b_w = whnf(env, ctx, b);
     match (&a_w, &b_w) {
         (Term::Type(l1), Term::Type(l2)) | (Term::Omega(l1), Term::Omega(l2)) => {
-            Some(if l1.equiv(l2) {
-                top_term(env)
+            if l1.equiv(l2) {
+                Some(top_term(env))
+            } else if closed_level(l1) && closed_level(l2) {
+                Some(bottom_term(env))
             } else {
-                bottom_term(env)
-            })
+                None
+            }
         }
         (Term::Pi(a1, b1), Term::Pi(a2, b2)) => {
             let level = type_level(env, ctx, a1)?;
