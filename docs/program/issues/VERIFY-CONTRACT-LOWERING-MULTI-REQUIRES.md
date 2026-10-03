@@ -16,9 +16,16 @@ origin: "Adversary evt_433905phzqcxw (hunt of a9e16c3a1), fail-closed; the ensur
 
 ## Objective
 
-A declaration with any number of `requires` clauses elaborates and
-kernel-checks. Each `ensures` goal and each obligation raised while
-elaborating an `ensures` is closed under the `requires` premises.
+A non-recursive declaration with any number of `requires` clauses
+elaborates and kernel-checks. Each `ensures` goal and each obligation
+raised while elaborating an `ensures` is closed under the `requires`
+premises.
+
+Not this WP: a recursive declaration with `requires`
+(`fn recurse (n : Int) : Int requires Equal Int n n = recurse n` gives
+`NotAFunction`, Verify QA `evt_25tbd7ab2ytxt`). The name is staged at
+`carrier_ty`, and a recursive call's requires burden is a design question
+for the successor. That failure predates this WP and fails closed.
 
 ## Settled inputs (Adversary `evt_433905phzqcxw`, read on `775d721c3`)
 
