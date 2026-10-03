@@ -282,6 +282,23 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   `elim_Bool`). Structural flip: the `then` obligation `n ≥ 0` is provable from
   the branch equation in `Γ`; without it, a false unknown.
 
+### verify/obligations/non-direct-requires-carries-into-partialprim-telescope
+- spec: `21 §1` (requires premise); `22 §2.4` (PartialPrim); `22 §3`
+  (body context); `35 §3.1` (Int `/` and `%`).
+- given: for each of `/` and `%`, a declaration without a caller:
+  `view f (n : Int) (d : Int) : Int requires Equal Int d 5 = n / d`, and
+  the same declaration with `%` in place of `/`.
+- expect: one operation-site `PartialPrim` obligation per operator. Its
+  `goal_closed` has the telescope
+  `Π (n : Int). Π (d : Int). Π (_ : Eq Int d 5). NonZeroDivisor d`.
+  The `Eq Int d 5` binder follows both parameter binders and appears at
+  parameter depth; `NonZeroDivisor d` remains the goal under that binder.
+- why: `Equal Int d 5` is an Ω-valued, non-direct `requires` premise. It enters
+  the body context but does not convert to `NonZeroDivisor d`, so each
+  operation site emits one obligation. **Structural flip:** correct closure
+  contains the `Eq Int d 5` binder; dropping `requires` from `close_goal`
+  leaves it out.
+
 ---
 
 ## D. Body-as-motive — induction surfaced from `elim_D` (`22 §4`)
@@ -399,7 +416,8 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 - **#2 Ω + context correctness** —
   `match-branch-gamma-carries-scrutinee-equation`,
   `let-binding-adds-equation-to-gamma`,
-  `conditional-branch-adds-boolean-equation`, + body-as-motive
+  `conditional-branch-adds-boolean-equation`,
+  `non-direct-requires-carries-into-partialprim-telescope`, + body-as-motive
   (`recursive-fn-per-ctor-obligation-with-ih`,
   `nonrecursive-degenerate-no-induction-hypothesis`).
 - **#3 decoupled from Σ-sort** — `decoupled-from-sigma-sort`.
