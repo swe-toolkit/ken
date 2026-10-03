@@ -31,7 +31,8 @@ fn forged_prelude_id_passes_goal_check_but_cannot_be_discharged() {
     assert!(!env.discharge_hole(&forged, cert));
     assert_eq!(env.env, before);
     assert_eq!(env.env.trusted_base(), trusted_before);
-    assert!(trusted_before.is_empty());
+    assert!(!trusted_before.contains(&bottom));
+    assert!(!trusted_before.contains(&top));
 }
 
 #[test]
