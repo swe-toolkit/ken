@@ -31,6 +31,22 @@ fn load(module: &str) -> (ElabEnv, Vec<GlobalId>) {
     (env, owned)
 }
 
+fn with_private_names() -> ElabEnv {
+    let (mut env, _) = load(VECTOR);
+    let prefix = format!("{VECTOR}.");
+    let aliases: Vec<_> = env
+        .globals
+        .iter()
+        .filter_map(|(qualified, id)| {
+            qualified
+                .strip_prefix(&prefix)
+                .map(|local| (local.to_owned(), *id))
+        })
+        .collect();
+    env.globals.extend(aliases);
+    env
+}
+
 fn expected_owned_names() -> BTreeSet<String> {
     [
         "FSuc",
@@ -53,6 +69,7 @@ fn expected_owned_names() -> BTreeSet<String> {
         "vec_map_compose",
         "vec_map_identity",
         "zip_with",
+        "zip_with_map",
         "zip_with_vcons",
         "zip_with_vnil",
     ]
@@ -177,7 +194,7 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 /// Promise class: transition sentinel for the owned declarations in this
 /// proof-only increment. Retire or rebaseline at the next separately authorized
 /// Vector declaration extension; this inventory is not a permanent API promise.
-/// MEASURED: ordinary isolated roots loading installs these twenty-two checked
+/// MEASURED: ordinary isolated roots loading installs these twenty-three checked
 /// Vector identities, returns only identities from that population, and
 /// executes every checked fence, then retains the same qualified name and ID
 /// populations. Provider-closure trust is unchanged by Vector. CLAIMED: the
@@ -245,8 +262,8 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
 /// Promise class: transition sentinel for this proof-only dependency edge;
 /// retire or rebaseline at the next separately authorized Vector import change.
 /// MEASURED: checked Vector references exactly the compiler floor, including
-/// `Top` in the new inductive proof goals, plus the canonical imported
-/// `comp`/`idf`/`cong` identities; parsed imports list exactly those two
+/// `Top` in the inductive proof goals, plus the canonical imported
+/// `comp`/`idf`/`cong`/`sym`/`trans` identities; parsed imports list exactly those two
 /// providers, with no public declaration or re-export. CLAIMED:
 /// the private laws use the two authorized providers and Vector publishes no
 /// catalog surface. THE GAP: `Type` and `Refl` elaborate without separate
@@ -273,6 +290,8 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
         "Core.Function.Combinators.comp",
         "Core.Function.Combinators.idf",
         "Core.Logic.Transport.cong",
+        "Core.Logic.Transport.sym",
+        "Core.Logic.Transport.trans",
     ] {
         expected_external.insert(via_vector.globals[name]);
     }
@@ -315,6 +334,8 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
             ("Core.Function.Combinators".to_owned(), "comp".to_owned()),
             ("Core.Function.Combinators".to_owned(), "idf".to_owned()),
             ("Core.Logic.Transport".to_owned(), "cong".to_owned()),
+            ("Core.Logic.Transport".to_owned(), "sym".to_owned()),
+            ("Core.Logic.Transport".to_owned(), "trans".to_owned()),
         ]
         .into_iter()
         .collect(),
@@ -362,6 +383,110 @@ fn vector_loader_visible_inventory_is_empty() {
             Ok(_) => panic!("Vector unexpectedly published {surface}"),
         }
     }
+}
+
+/// Promise class: durable invariant for the checked pointwise naturality law.
+/// MEASURED: a fresh roots-loaded Vector has a transparent `zip_with_map` with
+/// exactly the independently elaborated thirteen-binder raw Π proposition;
+/// a client type-checks the unmodified proof against that proposition.
+/// CLAIMED: the proof relates mapped zip to zip with `k` for arbitrary element
+/// types, lengths, vectors and the pointwise head witness, not a reflexive
+/// filler or an equality with swapped maps. THE GAP: the test-owned signature
+/// is an independent spelling of the law; the kernel checks the application,
+/// while raw type equality catches any binder or endpoint change.
+#[test]
+fn zip_with_map_has_exact_checked_pointwise_proposition() {
+    let mut env = with_private_names();
+    let name = format!("{VECTOR}.zip_with_map");
+    let id = env.globals[&name];
+    let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("law must roots-load") else {
+        panic!("{name} must be a checked transparent theorem, not an assumption");
+    };
+    let actual = ty.clone();
+    env.elaborate_file(
+        "theorem pointwise_vector_naturality_contract
+           (a : Type) (a2 : Type) (b : Type) (b2 : Type) (c : Type) (n : Nat)
+           (g : a → b) (h : a2 → b2) (f : b → b2 → c)
+           (k : a → a2 → c)
+           (hk : (u : a) → (v : a2) → Equal c (k u v) (f (g u) (h v)))
+           (xs : Vec a n) (ys : Vec a2 n)
+         : Equal (Vec c n)
+             (zip_with b b2 c n f (map a b n g xs) (map a2 b2 n h ys))
+             (zip_with a a2 c n k xs ys) =
+           zip_with_map a a2 b b2 c n g h f k hk xs ys",
+    )
+    .expect("the stated proposition must be inhabited by the Vector law");
+    let witness_id = env.globals["pointwise_vector_naturality_contract"];
+    let Decl::Transparent { ty: expected, .. } = env
+        .env
+        .lookup(witness_id)
+        .expect("contract witness must kernel-check")
+    else {
+        panic!("the consumer's contract witness must be transparent");
+    };
+    assert_eq!(
+        &actual, expected,
+        "zip_with_map's raw checked pointwise proposition changed"
+    );
+}
+
+/// Promise class: durable invariant for an unswapped positive and swapped
+/// negative use of the pointwise law.
+/// MEASURED: both mapped inputs are Bool, with `g True = True` and
+/// `h True = False`; the unswapped law is inhabited, while the swapped
+/// concrete claim is kernel-rejected. CLAIMED: `g` and `h` are not
+/// interchangeable in the pointwise law. THE GAP: this one-vector witness
+/// discriminates the two orders, not every possible function pair.
+#[test]
+fn swapped_maps_reject_on_distinct_boolean_functions() {
+    let mut env = with_private_names();
+    env.elaborate_file(
+        "fn pointwise_g (x : Bool) : Bool = x
+         fn pointwise_h (x : Bool) : Bool =
+           match x { True ↦ False; False ↦ True }
+         fn pointwise_f (x : Bool) (y : Bool) : Bool = y
+         fn pointwise_k (x : Bool) (y : Bool) : Bool =
+           pointwise_f (pointwise_g x) (pointwise_h y)
+         theorem pointwise_hk (u : Bool) (v : Bool)
+           : Equal Bool (pointwise_k u v)
+               (pointwise_f (pointwise_g u) (pointwise_h v)) = Refl
+         theorem mapped_g_true : Equal Bool (pointwise_g True) True = Proved
+         theorem mapped_h_true : Equal Bool (pointwise_h True) False = Proved
+         theorem unswapped_concrete :
+           Equal (Vec Bool (Suc Zero))
+             (zip_with Bool Bool Bool (Suc Zero) pointwise_f
+               (map Bool Bool (Suc Zero) pointwise_g (VCons Bool Zero True (VNil Bool)))
+               (map Bool Bool (Suc Zero) pointwise_h (VCons Bool Zero True (VNil Bool))))
+             (zip_with Bool Bool Bool (Suc Zero) pointwise_k
+               (VCons Bool Zero True (VNil Bool))
+               (VCons Bool Zero True (VNil Bool))) =
+           zip_with_map Bool Bool Bool Bool Bool (Suc Zero)
+             pointwise_g pointwise_h pointwise_f pointwise_k pointwise_hk
+             (VCons Bool Zero True (VNil Bool))
+             (VCons Bool Zero True (VNil Bool))",
+    )
+    .expect("the original order and distinguishing functions must check");
+    let bad = "theorem swapped_concrete :
+           Equal (Vec Bool (Suc Zero))
+             (zip_with Bool Bool Bool (Suc Zero) pointwise_f
+               (map Bool Bool (Suc Zero) pointwise_h (VCons Bool Zero True (VNil Bool)))
+               (map Bool Bool (Suc Zero) pointwise_g (VCons Bool Zero True (VNil Bool))))
+             (zip_with Bool Bool Bool (Suc Zero) pointwise_k
+               (VCons Bool Zero True (VNil Bool))
+               (VCons Bool Zero True (VNil Bool))) = Proved";
+    let error = env
+        .elaborate_file(bad)
+        .expect_err("swapped maps must not prove the same proposition");
+    assert!(
+        matches!(
+            error,
+            ElabError::KernelRejected {
+                error: ken_kernel::KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "swapped map statement must fail by kernel type mismatch: {error:?}"
+    );
 }
 
 /// Promise class: durable invariant for the exact private proof obligation.
