@@ -10206,15 +10206,15 @@ fn close_goal(ctx: &Context, assumptions: &[Assumption], goal: Term) -> Term {
     result
 }
 
-/// Type-check a proposition in the current context. Unlike a refinement's
-/// carrier-only lowering, its φ is checked at Ω before it becomes evidence.
+/// Check a requires or ensures proposition in the current context before it
+/// becomes an elaborator-only hypothesis or an obligation.
 fn elab_prop_at_omega(cx: &mut ElabCtx<'_>, expr: &RExpr, span: &Span) -> Result<Term, ElabError> {
     let (raw, inferred) = infer(cx, expr)?;
     let prop = cx.metas.zonk_term(&raw);
     let ty = cx.metas.zonk_term(&inferred);
     let omega = Term::omega(Level::Zero);
     if !matches!(ty, Term::Omega(_))
-        || kernel_check_raw(cx.env, &cx.ctx, &prop, &omega).is_err()
+        && kernel_check_raw(cx.env, &cx.ctx, &prop, &omega).is_err()
     {
         return Err(ElabError::TypeMismatch {
             span: span.clone(),
@@ -10224,42 +10224,61 @@ fn elab_prop_at_omega(cx: &mut ElabCtx<'_>, expr: &RExpr, span: &Span) -> Result
     Ok(prop)
 }
 
-/// Read the declaration's leading parameter telescope from its annotated
-/// type. A refinement domain has already lowered to its carrier; elaborate
-/// its predicate with that parameter bound, at its actual binder depth.
-fn install_refined_param_assumptions(
-    cx: &mut ElabCtx<'_>,
-    source_ty: &RType,
-    carrier_ty: &Term,
-    param_count: usize,
-) -> Result<(), ElabError> {
-    let start_depth = cx.ctx.len();
-    let mut source = source_ty;
-    let mut carrier = carrier_ty;
-    let result = (|| {
-        for _ in 0..param_count {
-            let (RType::RPi(_, domain, codomain, _), Term::Pi(carrier_domain, carrier_codomain)) =
-                (source, carrier)
-            else {
-                return Err(ElabError::Internal("parameter telescope shape changed".into()));
+#[cfg(test)]
+mod omega_clause_gate_tests {
+    use super::*;
+
+    #[test]
+    fn nonzero_omega_level_uses_the_omega_shaped_arm_for_requires_and_ensures() {
+        for clause in ["requires", "ensures"] {
+            let mut env = crate::ElabEnv::new().expect("numeric prelude");
+            // The gate sees a well-formed Ω₂ proposition. Full declaration
+            // admission has other level restrictions, so test the shared
+            // requires/ensures predicate itself rather than hiding those gates.
+            let source = format!("fn f (n : Int) : Int {clause} Eq (Type 1) Type Type = n");
+            let parsed = crate::parser::parse_decls(&source).expect("clause syntax");
+            let rdecl = crate::resolve::resolve_decl(&parsed[0]).expect("resolved clause");
+            let expr = if clause == "requires" {
+                &rdecl.requires[0]
+            } else {
+                &rdecl.ensures[0]
             };
-            cx.ctx.push(*carrier_domain.clone());
-            if let RType::RRefine(_, _, predicate, span) = domain.as_ref() {
-                let prop = elab_prop_at_omega(cx, predicate, span)?;
-                cx.assumptions.push(Assumption {
-                    prop,
-                    depth: cx.ctx.len(),
-                });
-            }
-            source = codomain;
-            carrier = carrier_codomain;
+            let mut cx = ElabCtx::new(
+                &mut env.env,
+                &env.globals,
+                &mut env.num_values,
+                &env.numeric_env,
+                "omega-clause-gate",
+            );
+            let prop = elab_prop_at_omega(&mut cx, expr, expr.span())
+                .unwrap_or_else(|error| panic!("higher-Ω {clause} gate: {error:?}"));
+            let inferred = kernel_infer_raw(cx.env, &cx.ctx, &prop).expect("formed proposition");
+            assert!(
+                matches!(inferred, Term::Omega(ref level) if level != &Level::Zero),
+                "{clause}: control must be Ω at a nonzero level, not Ω₀"
+            );
+            assert!(
+                kernel_check_raw(cx.env, &cx.ctx, &prop, &Term::omega(Level::Zero)).is_err(),
+                "{clause}: the kernel-at-Ω₀ fallback cannot make this row pass"
+            );
+
+            let bad_source = format!("fn bad (n : Int) : Int {clause} True = n");
+            let bad_parsed = crate::parser::parse_decls(&bad_source).expect("Bool syntax");
+            let bad = crate::resolve::resolve_decl(&bad_parsed[0]).expect("Bool clause");
+            let bad_expr = if clause == "requires" {
+                &bad.requires[0]
+            } else {
+                &bad.ensures[0]
+            };
+            assert!(
+                matches!(
+                    elab_prop_at_omega(&mut cx, bad_expr, bad_expr.span()),
+                    Err(ElabError::TypeMismatch { .. })
+                ),
+                "{clause}: Bool still fails both proposition-gate arms"
+            );
         }
-        Ok(())
-    })();
-    while cx.ctx.len() > start_depth {
-        cx.ctx.pop();
     }
-    result
 }
 
 /// A spec'd declaration's `requires` are checked before its body and become
@@ -14545,12 +14564,6 @@ fn elaborate_v0(
             .with_local_dicts(local_dicts);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
-            install_refined_param_assumptions(
-                &mut cx,
-                ty,
-                &ty_c,
-                view_param_count(rdecl),
-            )?;
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
             (body_c, ty_c)
         } else {
@@ -14663,24 +14676,14 @@ fn elaborate_recursive_view(
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     // 1. Elaborate the declared type (recursive views are annotated).
-    let (ty_core, param_assumptions, type_obligations) = {
+    let (ty_core, type_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("recursive declaration requires a type annotation".into())
         })?;
         let ty_c = elab_type(&mut cx, ty)?;
-        install_refined_param_assumptions(
-            &mut cx,
-            ty,
-            &ty_c,
-            view_param_count(rdecl),
-        )?;
-        (
-            cx.metas.zonk_term(&ty_c),
-            std::mem::take(&mut cx.assumptions),
-            std::mem::take(&mut cx.obligations),
-        )
+        (cx.metas.zonk_term(&ty_c), std::mem::take(&mut cx.obligations))
     };
 
     // 2. Stage a checked opaque placeholder so the body can self-reference.
@@ -14718,7 +14721,6 @@ fn elaborate_recursive_view(
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators);
-        cx.assumptions = param_assumptions;
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
@@ -14916,14 +14918,6 @@ pub(crate) fn elaborate_mutual_group(
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
                 .with_recursive_group(&recursive_group);
-            if let Some(source_ty) = &rdecl.ty {
-                install_refined_param_assumptions(
-                    &mut cx,
-                    source_ty,
-                    ty_core,
-                    view_param_count(rdecl),
-                )?;
-            }
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
             bodies.push(cx.metas.zonk_term(&body_c));
@@ -15104,10 +15098,11 @@ fn elaborate_view_with_spec(
 ) -> Result<ElabResult, ElabError> {
     let mut pending: Option<ken_kernel::PendingAdmission> = None;
     let result = (|| -> Result<ElabResult, ElabError> {
-        // Phase 1: elaborate parameter refinements and requires before the body.
-        // A recursive name is staged only after the annotated type and these
-        // param-only propositions have been elaborated. Keep one cx for the
-        // non-recursive type + body so level metas continue to unify together.
+        // Phase 1: elaborate requires before the body. Refined parameters
+        // lower to carriers: their predicates cannot be assumed until the
+        // parameter encoding carries a proof even through higher-order calls.
+        // Stage a recursive name only after its type and requires; keep one cx
+        // for the non-recursive type and body so level metas unify together.
         let is_recursive = rexpr_mentions_name(&rdecl.body, &rdecl.name);
         let param_count = view_param_count(rdecl);
         let mut decl_obligations = Vec::new();
@@ -15122,7 +15117,6 @@ fn elaborate_view_with_spec(
                     )
                 })?;
                 let ty_c = elab_type(&mut cx, ty)?;
-                install_refined_param_assumptions(&mut cx, ty, &ty_c, param_count)?;
                 let req_cores =
                     install_requires_assumptions(&mut cx, &ty_c, param_count, &rdecl.requires)?;
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
@@ -15159,7 +15153,6 @@ fn elaborate_view_with_spec(
                 .with_local_dicts(local_dicts);
             let (body_c, ty_c, req_cores) = if let Some(ty) = &rdecl.ty {
                 let ty_c = elab_type(&mut cx, ty)?;
-                install_refined_param_assumptions(&mut cx, ty, &ty_c, param_count)?;
                 let req_cores =
                     install_requires_assumptions(&mut cx, &ty_c, param_count, &rdecl.requires)?;
                 let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;

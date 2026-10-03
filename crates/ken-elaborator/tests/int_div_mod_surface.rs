@@ -7,7 +7,7 @@ use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::parser::{parse_decls, parse_expr};
 use ken_elaborator::{BinOp, ElabEnv, ElabError, Expr, ObligationKind};
 use ken_kernel::env::Context;
-use ken_kernel::{convert_type, whnf, Term};
+use ken_kernel::{convert_type, whnf, KernelError, Term};
 
 fn peel_function_body(body: &Term) -> &Term {
     let Term::Lam(_, inner) = body else {
@@ -143,16 +143,163 @@ fn assert_operation_obligations(spelling: &str, case: &str, source: &str, expect
 }
 
 #[test]
-fn refined_divisor_needs_no_new_operation_obligation_or_hole() {
+fn refined_divisor_keeps_the_open_operation_hole_without_an_unchecked_hypothesis() {
     for spelling in ["/", "%"] {
-        assert_operation_obligations(
-            spelling,
-            "refined divisor",
-            &format!(
-                "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = n {spelling} d"
-            ),
-            0,
+        let mut env = ElabEnv::new().unwrap();
+        let before = env.env.trusted_base();
+        let source = format!(
+            "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = n {spelling} d"
         );
+        let result = env
+            .elaborate_decl_v1(&source)
+            .expect("refined-domain function");
+        let [obligation] = result.obligations.as_slice() else {
+            panic!("{spelling}: carrier-only refinement must not discharge division")
+        };
+        assert!(matches!(obligation.kind, ObligationKind::PartialPrim));
+        assert!(env.is_open_hole(obligation.hole_id));
+        let added = env
+            .env
+            .trusted_base()
+            .into_iter()
+            .filter(|id| !before.contains(id))
+            .collect::<Vec<_>>();
+        assert_eq!(added, [obligation.hole_id]);
+        let int = Term::const_(env.globals["Int"], vec![]);
+        let Term::Pi(n, rest) = &obligation.goal_closed else {
+            panic!("{spelling}: n binder missing")
+        };
+        let Term::Pi(d, goal) = rest.as_ref() else {
+            panic!("{spelling}: d binder missing")
+        };
+        assert_eq!((n.as_ref(), d.as_ref()), (&int, &int));
+        let nonzero = env.numeric_env.classify_div(&int).unwrap().nonzero_id;
+        assert_eq!(
+            goal.as_ref(),
+            &Term::app(Term::const_(nonzero, vec![]), Term::var(0)),
+            "{spelling}: an unestablished refinement must not appear as a Pi hypothesis"
+        );
+    }
+}
+
+#[test]
+fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
+    for spelling in ["/", "%"] {
+        let mut env = ElabEnv::new().unwrap();
+        let before = env.env.trusted_base();
+        let result = env
+            .elaborate_decl_v1(&format!(
+                "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int \
+                 requires Equal Int n 5 = n {spelling} d"
+            ))
+            .expect("refined argument with a non-direct requires");
+        let [obligation] = result.obligations.as_slice() else {
+            panic!("{spelling}: an unrelated proof premise must not discharge the divisor")
+        };
+        assert!(matches!(obligation.kind, ObligationKind::PartialPrim));
+        assert_eq!(
+            env.env
+                .trusted_base()
+                .into_iter()
+                .filter(|id| !before.contains(id))
+                .collect::<Vec<_>>(),
+            [obligation.hole_id]
+        );
+        let int = Term::const_(env.globals["Int"], vec![]);
+        let Term::Pi(n, rest) = &obligation.goal_closed else {
+            panic!("n binder")
+        };
+        let Term::Pi(d, rest) = rest.as_ref() else {
+            panic!("d carrier binder")
+        };
+        assert_eq!((n.as_ref(), d.as_ref()), (&int, &int));
+        let Term::Pi(real_req, goal) = rest.as_ref() else {
+            panic!("the actual requires premise must be present")
+        };
+        let mut ctx = Context::new();
+        ctx.push(int.clone());
+        ctx.push(int.clone());
+        assert!(convert_type(
+            &env.env,
+            &ctx,
+            real_req,
+            &Term::Eq(
+                Box::new(int.clone()),
+                Box::new(Term::var(1)),
+                Box::new(Term::IntLit(5.into()))
+            )
+        ));
+        let nonzero = env.numeric_env.classify_div(&int).unwrap().nonzero_id;
+        assert_eq!(
+            goal.as_ref(),
+            &Term::app(Term::const_(nonzero, vec![]), Term::var(1)),
+            "{spelling}: only the proved requires may extend the goal telescope"
+        );
+    }
+}
+
+#[test]
+fn refined_divisor_caller_can_pass_zero_but_the_callee_keeps_its_hole() {
+    for spelling in ["/", "%"] {
+        let mut env = ElabEnv::new().unwrap();
+        let before = env.env.trusted_base();
+        let f = env
+            .elaborate_decl_v1(&format!(
+                "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = n {spelling} d"
+            ))
+            .expect("callee with erased refined domain");
+        let [hole] = f.obligations.as_slice() else {
+            panic!("{spelling}: f must retain its operation-site side condition")
+        };
+        assert!(matches!(hole.kind, ObligationKind::PartialPrim));
+        assert!(env.is_open_hole(hole.hole_id));
+        let after_f = env.env.trusted_base();
+        assert_eq!(
+            after_f
+                .iter()
+                .filter(|id| !before.contains(id))
+                .copied()
+                .collect::<Vec<_>>(),
+            [hole.hole_id]
+        );
+        let g = env
+            .elaborate_decl_v1("fn g (u : Int) : Int = f 1 0")
+            .expect("current carrier encoding accepts the zero argument");
+        assert!(
+            g.obligations.is_empty(),
+            "a caller does not currently establish the erased refinement"
+        );
+        assert_eq!(
+            env.env.trusted_base(),
+            after_f,
+            "no unreported argument-introduction hole can justify callee recognition"
+        );
+    }
+}
+
+#[test]
+fn requires_proof_premise_refuses_the_same_zero_divisor_caller() {
+    for spelling in ["/", "%"] {
+        let mut env = ElabEnv::new().unwrap();
+        let before = env.env.trusted_base();
+        let f = env
+            .elaborate_decl_v1(&format!(
+                "fn f (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n {spelling} d"
+            ))
+            .expect("direct requires supplies the callee's proof premise");
+        assert!(f.obligations.is_empty());
+        assert_eq!(env.env.trusted_base(), before);
+        assert!(
+            matches!(
+                env.elaborate_decl_v1("fn g (u : Int) : Int = f 1 0"),
+                Err(ElabError::KernelRejected {
+                    error: KernelError::TypeMismatch { .. },
+                    ..
+                })
+            ),
+            "{spelling}: missing the required proof must be rejected by the kernel"
+        );
+        assert_eq!(env.env.trusted_base(), before);
     }
 }
 
@@ -246,73 +393,6 @@ fn non_direct_requires_stays_in_closed_divisor_goal_at_its_binder_depth() {
 }
 
 #[test]
-fn assumptions_at_distinct_parameter_depths_keep_dependent_indices() {
-    for spelling in ["/", "%"] {
-        let mut env = ElabEnv::new().unwrap();
-        let source = format!(
-            "fn f (n : {{x : Int | Equal Int x 5}}) \
-             (d : {{z : Int | Equal Int z n}}) : Int \
-             requires Equal Int d 5 = n {spelling} d"
-        );
-        let result = env
-            .elaborate_decl_v1(&source)
-            .expect("dependent assumptions");
-        let [obligation] = result.obligations.as_slice() else {
-            panic!("{spelling}: still owes exactly one nonzero side condition")
-        };
-        let int = Term::const_(env.globals["Int"], vec![]);
-        let Term::Pi(n, after_n) = &obligation.goal_closed else {
-            panic!("n binder")
-        };
-        assert_eq!(n.as_ref(), &int);
-        let Term::Pi(n_refine, after_n_refine) = after_n.as_ref() else {
-            panic!("refined n hypothesis at depth 1")
-        };
-        let mut ctx = Context::new();
-        ctx.push(int.clone());
-        let eq_n_five = Term::Eq(
-            Box::new(int.clone()),
-            Box::new(Term::var(0)),
-            Box::new(Term::IntLit(5.into())),
-        );
-        assert!(convert_type(&env.env, &ctx, n_refine, &eq_n_five));
-        ctx.push(*n_refine.clone());
-        let Term::Pi(d, after_d) = after_n_refine.as_ref() else {
-            panic!("d binder after the first hypothesis")
-        };
-        assert_eq!(d.as_ref(), &int);
-        ctx.push(int.clone());
-        let Term::Pi(d_refine, after_d_refine) = after_d.as_ref() else {
-            panic!("d refinement at depth 2")
-        };
-        let eq_d_n = Term::Eq(
-            Box::new(int.clone()),
-            Box::new(Term::var(0)),
-            Box::new(Term::var(2)),
-        );
-        assert!(
-            convert_type(&env.env, &ctx, d_refine, &eq_d_n),
-            "{spelling}: introducing n's hypothesis must shift the n in d's refinement"
-        );
-        ctx.push(*d_refine.clone());
-        let Term::Pi(req, goal) = after_d_refine.as_ref() else {
-            panic!("requires at parameter depth 2")
-        };
-        let eq_d_five = Term::Eq(
-            Box::new(int.clone()),
-            Box::new(Term::var(1)),
-            Box::new(Term::IntLit(5.into())),
-        );
-        assert!(convert_type(&env.env, &ctx, req, &eq_d_five));
-        let nonzero = env.numeric_env.classify_div(&int).unwrap().nonzero_id;
-        assert_eq!(
-            goal.as_ref(),
-            &Term::app(Term::const_(nonzero, vec![]), Term::var(2))
-        );
-    }
-}
-
-#[test]
 fn requires_body_and_ensures_obligations_are_all_reported_in_order() {
     let mut env = ElabEnv::new().unwrap();
     let before = env.env.trusted_base();
@@ -355,53 +435,27 @@ fn requires_body_and_ensures_obligations_are_all_reported_in_order() {
 }
 
 #[test]
-fn result_lambda_is_not_a_declared_refined_parameter() {
-    let mut env = ElabEnv::new().unwrap();
-    let result = env
-        .elaborate_decl_v1("fn f (n : {z : Int | Equal Int z 5}) : Int -> Int = \\x. n / x")
-        .expect("a return-value lambda must not extend the declaration's parameter list");
-    let [obligation] = result.obligations.as_slice() else {
-        panic!("division in the returned lambda still owes one side condition")
-    };
-    let int = Term::const_(env.globals["Int"], vec![]);
-    let Term::Pi(n, rest) = &obligation.goal_closed else {
-        panic!("the declared n parameter must be outermost")
-    };
-    assert_eq!(n.as_ref(), &int);
-    let Term::Pi(n_refine, rest) = rest.as_ref() else {
-        panic!("n's refinement must precede the returned lambda's x binder")
-    };
-    let mut ctx = Context::new();
-    ctx.push(int.clone());
-    assert!(convert_type(
-        &env.env,
-        &ctx,
-        n_refine,
-        &Term::Eq(
-            Box::new(int.clone()),
-            Box::new(Term::var(0)),
-            Box::new(Term::IntLit(5.into()))
-        )
-    ));
-    let Term::Pi(x, _) = rest.as_ref() else {
-        panic!("the returned lambda's argument is still in the goal context")
-    };
-    assert_eq!(x.as_ref(), &int);
-}
-
-#[test]
-fn refined_parameter_predicate_must_be_a_checked_proposition() {
-    let mut env = ElabEnv::new().unwrap();
-    let valid = env.elaborate_decl_v1("fn valid (d : {z : Int | Equal Int z 0}) : Int = d");
-    assert!(
-        valid.is_ok(),
-        "Omega-valued refinement must remain legal: {valid:?}"
-    );
-    let invalid = env.elaborate_decl_v1("fn invalid (d : {z : Int | z == 0}) : Int = d");
-    assert!(
-        matches!(invalid, Err(ElabError::TypeMismatch { .. })),
-        "Bool-valued refinement must fail its Omega check: {invalid:?}"
-    );
+fn requires_and_ensures_still_accept_propositions_and_reject_bool() {
+    for (clause, prop, expected_obligations) in [
+        ("requires", "Equal Int n n", 0),
+        ("ensures", "Equal Int result n", 1),
+    ] {
+        let mut env = ElabEnv::new().unwrap();
+        let valid = format!("fn f (n : Int) : Int {clause} {prop} = n");
+        let result = env
+            .elaborate_decl_v1(&valid)
+            .unwrap_or_else(|error| panic!("Ω₀ {clause} must elaborate: {error:?}"));
+        assert_eq!(result.obligations.len(), expected_obligations);
+        let invalid = format!("fn bad (n : Int) : Int {clause} True = n");
+        assert!(
+            matches!(
+                env.elaborate_decl_v1(&invalid),
+                Err(ElabError::TypeMismatch { reason, .. })
+                    if reason == "spec proposition must have type Ω, found non-proposition"
+            ),
+            "{clause}: the Bool constructor must fail the proposition gate"
+        );
+    }
 }
 
 #[test]
