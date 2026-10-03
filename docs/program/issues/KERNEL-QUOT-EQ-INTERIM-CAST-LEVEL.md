@@ -63,8 +63,13 @@ stop and report the mismatch.
    marks the accept half as restored by P0. The constant-motive
    `quotient-respect-schema-{rejects,accepts}-…` rows are unchanged.
    `seed-evaluation.md`'s `can-eq-by-type-computes` and
-   `agree-observational-corpus` state the interim verdict too
-   (kernel-implementer `evt_47tab4rs3fm50`).
+   `agree-observational-corpus` drop the quotient-class reduction claim
+   (kernel-implementer `evt_47tab4rs3fm50`). They mark the quotient-class
+   `Eq` case deferred to P0 and pin no X1 verdict (kernel QA
+   `evt_79844c7p7041x`). X1's `eq_reduce` returns `Unknown` there, not a
+   neutral value; it never computed the old reduct either. Do not claim
+   cross-engine agreement, and do not substitute `unknown` (spec 42 §4
+   reserves it for holes).
 4. Test consumers of the reduction are migrated (check 3: grep
    `crates/*/tests`, `conformance/`, `examples/`, `catalog/` for quotient
    equality uses, not only `eq_at_quot`).

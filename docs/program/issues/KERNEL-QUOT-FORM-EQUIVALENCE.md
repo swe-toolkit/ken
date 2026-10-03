@@ -56,6 +56,11 @@ stop and report the mismatch.
    16 §5.1's interim paragraph is removed, and the C15 dependent-motive
    accept and the `quotient-respect-schema-dependent-motive` accept half
    are restored.
+5. X1 gives `Eq (A/R) [a] [b]` the result the restored reduction implies.
+   Today `eq_reduce` returns `Unknown` for equal constructor heads with
+   fields, which spec 42 §4 reserves for holes. The deferred
+   `seed-evaluation.md` quotient rows are restored with an executed X1 pin
+   (kernel QA `evt_79844c7p7041x`).
 
 ## Acceptance
 
