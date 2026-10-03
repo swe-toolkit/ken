@@ -2,13 +2,13 @@
 
 Format: `../../README.md`. These pin **WS-V V2** — the verification-condition
 extractor: turning a V1-spec'd program into the **obligation set** (each a
-triple
-`⟨id, Γ ⊢ φ, provenance⟩`). Grounded in the **landed** `22-obligations.md`
-(`wp/V2`), V1's `21 §6`/§7 (the carrier-plus-obligation form V2 consumes), the
-`18 §4`/§5 cert API, the kernel eliminator (`14 §3`) and `match → elim_D`
-(`39 §2.6`), and first principles. The prototype is not mounted; none of these
-required it. (Partial-primitive grounding `35 §3`/`43 §2` confirmed landed —
-not a forward reference.)
+triple `⟨id, Γ ⊢ φ, provenance⟩`). Grounded in the amended `21`/`22`
+contract at parent `5183c0437be3a14672c40acf5f0c969906031884` (including
+refined-parameter normalization), the `18 §4`/§5 cert API, the kernel
+eliminator (`14 §3`) and
+`match → elim_D` (`39 §2.6`), and first principles. The prototype is not
+mounted; none of these required it. (Partial-primitive grounding `35 §3`/`43
+§2` is not a forward reference.)
 
 **The layer is ★★ (untrusted) — but read the backstop precisely (Architect).** A
 V2 bug never breaks **kernel** soundness: the kernel re-checks every *supplied*
@@ -53,24 +53,26 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/refinement-introduction-emits-phi
 - spec: `22 §2.1`; `21 §2` (carrier encoding)
-- given: `def Pos = { n : Int | n > 0 }`; the introduction `(5 : Pos)` (a value
-  `5 : Int` used where `Pos` is expected)
-- expect: emits **one** obligation `⟨id, Γ ⊢ 5 > 0, prov⟩` — the goal is
-  `φ[a/x] = (n > 0)[5/n] = 5 > 0`, at Ω; provenance points to the introduction
+- given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }`; the introduction
+  `(5 : Pos)` (a value `5 : Int` used where `Pos` is expected)
+- expect: emits **one** obligation
+  `⟨id, Γ ⊢ IsTrue (leq_int 1 5), prov⟩` — the goal is
+  `φ[a/x] = IsTrue (leq_int 1 5)`, at Ω; provenance points to the introduction
   site.
 - why: §2.1 — the introduction direction `A ≤ {x:A|φ}` emits `φ[a/x]`.
-  Structural: the goal is the **substituted** `5 > 0` (not the un-substituted
-  `n > 0`, not nothing). A bug emitting `n > 0` (no subst), or none, flips the
-  structure. The reverse forgetful direction emits nothing
-  (`forgetful-coercion-emits-nothing`).
+  Structural: the goal is the **substituted** proposition (not the
+  un-substituted `IsTrue (leq_int 1 n)`, not nothing). A bug emitting the free
+  `n`-goal or none flips the structure. The reverse forgetful direction emits
+  nothing (`forgetful-coercion-emits-nothing`).
 
 ### verify/obligations/postcondition-emits-substituted-goal
 - spec: `22 §2.2`; `21 §6.3`
-- given: `view inc (n : Int) : Int ensures result > n = n + 1` — a
-  **straight-line** body
-- expect: emits **one** obligation `⟨id, Γ,(n:Int) ⊢ (n + 1) > n, prov⟩` —
-  `ψ[b/result]` with `result` replaced by the straight-line body `b = n + 1`; at
-  Ω; `Γ` carries the parameter telescope.
+- given: `view inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1` —
+  a **straight-line** body
+- expect: emits **one** obligation
+  `⟨id, Γ,(n:Int) ⊢ Equal Int (n + 1) (n + 1), prov⟩` — `ψ[b/result]` with
+  `result` replaced by the straight-line body `b = n + 1`; at Ω; `Γ` carries
+  the parameter telescope.
 - why: §2.2 — for a **straight-line** body the postcondition is the single
   substituted goal `ψ[b/result]` (the refined-result-type motive degenerates to
   one). Structural: the goal mentions the **body** (`result` substituted), not a
@@ -86,30 +88,34 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/precondition-obligation-at-call-not-in-body (soundness)
 - spec: `22 §2.3`, `§2.5.2`
-- given: `view safe_div (n : Int) (d : Int) : Int requires d ≠ 0 = n / d`, and a
-  caller `view use (x : Int) : Int = safe_div x 2`
-- expect: the precondition `d ≠ 0` yields an obligation **at the call** in `use`
-  — `⟨id, Γ_call ⊢ 2 ≠ 0, prov(call)⟩` (the caller meets it); **inside**
-  `safe_div`'s body it yields **no** obligation — `d ≠ 0` is an **assumption**
-  in `Γ`.
+- given: `view safe_div (n:Int) (d:Int) : Int` with
+  `requires Not (Equal Int d 0) = n / d`, and a caller
+  `view use (x:Int) : Int = safe_div x 2`
+- expect: the precondition `Not (Equal Int d 0)` yields an obligation **at the
+  call** in `use` — `⟨id, Γ_call ⊢ Not (Equal Int 2 0), prov(call)⟩` (the caller
+  meets it); **inside** `safe_div`'s body it yields **no** obligation — the
+  proposition is an **assumption** in `Γ`.
 - why: §2.3 — the precondition is the **caller's** burden, discharged at the
   call; the callee assumes it. **Verdict/structural flip on placement:** the
-  obligation appears at the call (`2 ≠ 0`) and is **absent** (present as a
-  Γ-assumption) in the body. **Absence-assertion (no body obligation)** — guard:
+  obligation appears at the call (`Not (Equal Int 2 0)`) and is **absent**
+  (present as a Γ-assumption) in the body.
+  **Absence-assertion (no body obligation)** — guard:
   a precondition enters `Γ` at the body top (§3), never the function's own goal.
-  **Disconfirming:** would the body also carry no `d ≠ 0` obligation under the
-  bug that re-obligates the precondition? **No** — that bug emits a **spurious**
+  **Disconfirming:** would the body also carry no
+  `Not (Equal Int d 0)` obligation under the bug that re-obligates the
+  precondition? **No** — that bug emits a **spurious**
   body goal the callee cannot discharge (it has no proof its own argument is
   nonzero). The asymmetry **is** the contract.
 
 ### verify/obligations/partial-primitive-emits-nonzero-obligation
 - spec: `22 §2.4`; `35 §3` (Int div/mod by zero = obligation); `43 §2`
 - given: an unrefined division `n / d` on `Int` with a **possibly-zero** `d` (no
-  `{d|d≠0}` refinement, no `d ≠ 0` in scope)
+  `requires Not (Equal Int d 0)` and no such proposition in scope)
 - expect: emits a **non-zero** side-condition obligation
-  `⟨id, Γ ⊢ d ≠ 0, prov(op)⟩` at the operation site; a divisor **already**
-  refined `{d|d≠0}` (or with `d ≠ 0 ∈ Γ`) emits **no** new obligation
-  (discharged by the refinement / assumption).
+  `⟨id, Γ ⊢ Not (Equal Int d 0), prov(op)⟩` at the operation site; a divisor
+  whose refined parameter has desugared to `requires Not (Equal Int d 0)` (or
+  with that proposition in `Γ`) emits **no** new obligation (discharged by the
+  generated proof argument / assumption).
 - why: §2.4 — a partial primitive (`/`, `%` on `Int`) emits its side condition
   (`35 §3`: "possibly-zero is an obligation, not a silent trap";
   cross-referenced from `43 §2`). **Verdict-flips:** possibly-zero divisor →
@@ -120,9 +126,10 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/prove-and-law-emit-one-obligation-per-goal
 - spec: `22 §2.4` (degenerate `prove`/`law`); `21 §3`
-- given: (a) `prove add_comm : (a b : Int) → a + b == b + a`; (b)
+- given: (a) `prove add_comm : (a b : Int) → Equal Int (a + b) (b + a)`; (b)
   `law Monoid (M) { assoc : … ; unit_l : … ; unit_r : … }`
-- expect: (a) **one** obligation `⟨id, Γ_binders ⊢ a + b == b + a, prov⟩` (no
+- expect: (a) **one** obligation
+  `⟨id, Γ_binders ⊢ Equal Int (a + b) (b + a), prov⟩` (no
   body — the degenerate case); (b) **one obligation per field** (3 here).
 - why: §2.4 — `prove` is the degenerate (bodyless) obligation; `law` emits one
   per field. Structural: the obligation **count** (1 / 3) + each prop. A bug
@@ -133,33 +140,36 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ## B. The absent-clause scan — guarded no-emit + the counter-rule (`22 §2.5`)
 
-### verify/obligations/refined-param-is-hypothesis-not-obligation (soundness)
-- spec: `22 §2.5.1`, `§3`
-- given: `view head (xs : { l : List A | l ≠ nil }) : A = …` — a refined
-  **parameter**
-- expect: the refined parameter emits **no** definition-site obligation; it
-  contributes `(_ : xs ≠ nil)` to `Γ` (a hypothesis the body may use); the
-  obligation to establish `xs ≠ nil` is the **caller's** at each call (§2.3).
-- why: §2.5.1 — a refined parameter is a **binder**, not a use/introduction.
-  **Absence-assertion gate** — guard: the position is a binder (→ Γ-hypothesis),
-  not an introduction. **Disconfirming:** would `head` carry no `xs ≠ nil`
-  obligation under the bug that treats the binder as an introduction? **No** —
-  that bug emits a **spurious** obligation `head` cannot discharge (it has no
-  proof its own argument is non-nil). Structural flip: correct → `xs ≠ nil ∈ Γ`,
-  no def-site obligation; bug → spurious def-site obligation. (The V1→V2
-  distinction; `../spec-syntax/seed-spec-syntax.md`
-  `obligation-hole-set-exposed-to-v2` pins the same on the V1 side.)
+### verify/obligations/refined-param-desugars-to-requires (soundness)
+- spec: `21 §6.3`; `22 §2.3`, `§2.5.1`, `§3`
+- given: `view head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …`
+  — a refined **parameter**
+- expect: the refined parameter desugars to the carrier binder plus a generated
+  `requires` proof argument. It emits **no** definition-site obligation; the
+  generated proposition enters the body telescope as a Π assumption. The
+  caller owes the obligation to establish
+  `Not (Equal (List A) xs (Nil A))` at each call (§2.3). There is no additional
+  refinement-specific `Γ` entry or binder beyond the generated Π proof argument.
+- why: `21 §6.3` and `22 §2.5.1` — the predicate is supplied only through the
+  generated `requires` Π proof argument. **Absence-assertion gate** — the
+  parameter binder is not a value introduction, so it emits no
+  refinement-introduction obligation. **Disconfirming:** treating the binder as
+  an introduction emits a spurious definition-site obligation; erasing the
+  refinement without adding the proof argument loses the body assumption and
+  makes the generated caller obligation disappear. Correct: no definition-site
+  obligation, with the generated proof assumption and caller-side obligation.
 
 ### verify/obligations/body-requires-assumed-not-reobligated
 - spec: `22 §2.5.2`, `§3`
-- given: inside `safe_div`'s body (above), the precondition `requires d ≠ 0`
-- expect: `d ≠ 0` is **assumed** — it enters `Γ` at the top of the body — and is
-  **not** re-emitted as an obligation of `safe_div`.
+- given: inside `safe_div`'s body (above), the precondition
+  `requires Not (Equal Int d 0)`
+- expect: `Not (Equal Int d 0)` is **assumed** through its Π proof argument at
+  the top of the body and is **not** re-emitted as an obligation of `safe_div`.
 - why: §2.5.2 — a precondition, once inside the body, is an assumption (the
   caller owes it, §2.3). **Absence-assertion** — guard: a precondition enters
   `Γ` at the body top, never the function's own goal. **Disconfirming:** would
-  the body lack a `d ≠ 0` obligation under the bug that re-obligates it? **No**
-  — that bug emits a spurious unprovable body goal. Pairs with
+  the body lack this obligation under the bug that re-obligates it? **No** —
+  that bug emits a spurious unprovable body goal. Pairs with
   `precondition-obligation-at-call-not-in-body` (the two halves of one
   asymmetry).
 
@@ -182,7 +192,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/forgetful-coercion-emits-nothing
 - spec: `22 §2.5.4`, `§2.1`
-- given: a value `p : Pos` (`= {n:Int|n>0}`) used where plain `Int` is expected
+- given: a value `p : Pos` (`= {n:Int|IsTrue (leq_int 1 n)}`) used where plain `Int` is expected
   — the forgetful direction `{x:A|φ} ≤ A`
 - expect: **no** obligation — the coercion forgets the proof and is the
   **identity** on the carrier `Int` (V1's encoding).
@@ -195,14 +205,15 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/trivial-clause-still-emits-obligation (soundness)
 - spec: `22 §2.5` (the completeness counter-rule); acceptance `§8` / frame `§1`
-- given: (a) `view f (n : Int) : Int ensures result == result = n` (a
+- given: (a) `view f (n : Int) : Int ensures Equal Int result result = n` (a
   **trivially-true** postcondition); (b)
-  `view g (n : Int) : Int ensures result ≥ 0 = n * n` (a **real-burden**
-  postcondition) — both **straight-line** bodies (one obligation each, isolating
-  the trivial-vs-real axis from path-sensitivity)
+  `view g (n : Int) : Int ensures IsTrue (leq_int 0 result) = n * n` (a
+  **real-burden** postcondition) — both **straight-line** bodies (one obligation
+  each, isolating the trivial-vs-real axis from path-sensitivity)
 - expect: **both** emit a postcondition obligation — (a)
-  `⟨id, Γ ⊢ b_f == b_f, prov⟩` (provable, discharged trivially by `refl`); (b)
-  `⟨id, Γ ⊢ b_g ≥ 0, prov⟩` (a real burden). **Neither** yields *no* obligation.
+  `⟨id, Γ ⊢ Equal Int b_f b_f, prov⟩` (provable, discharged trivially by
+  `refl`); (b) `⟨id, Γ ⊢ IsTrue (leq_int 0 (n * n)), prov⟩` (a real burden).
+  **Neither** yields *no* obligation.
 - why: §2.5 counter-rule — emission is keyed on the **clause's presence**, never
   a triviality heuristic; a trivially-true clause yields its **provable**
   obligation, not no obligation. **The absent-clause discriminating property:**
@@ -264,23 +275,26 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 ### verify/obligations/let-binding-adds-equation-to-gamma
 - spec: `22 §3` (let-equation)
 - given: a body `let m := n + 1 in …` with a downstream obligation that
-  discharges only via `m == n + 1`
+  discharges only via `Equal Int m (n + 1)`
 - expect: the obligation's `Γ` carries `(m : Int)` and the equation
-  `(_ : Eq Int m (n + 1))`.
+  `(_ : Equal Int m (n + 1))`.
 - why: §3 — `let x := e` adds `x` and (where informative) the equation
-  `Eq A x e`, so later obligations may rewrite by the binding. Structural flip:
-  the obligation needing `m == n + 1` is provable with the let-equation in `Γ`,
+  `Equal A x e`, so later obligations may rewrite by the binding. Structural
+  flip: the obligation needing `Equal Int m (n + 1)` is provable with the
+  let-equation in `Γ`,
   unprovable without it (too-weak `Γ` → false unknown).
 
 ### verify/obligations/conditional-branch-adds-boolean-equation
 - spec: `22 §3` (conditional)
-- given: `view f (n : Int) : Int ensures result ≥ 0 = if n ≥ 0 then n else 0`
+- given: `view f (n : Int) : Int` with
+  `ensures IsTrue (leq_int 0 result) = if leq_int 0 n then n else 0`
 - expect: the `then`-branch obligation's `Γ` carries
-  `(_ : Eq Bool (n ≥ 0) true)`; the `else` branch carries
-  `(_ : Eq Bool (n ≥ 0) false)`.
-- why: §3 — `if c` adds `Eq Bool c true` / `false` per branch (elaborated
-  `elim_Bool`). Structural flip: the `then` obligation `n ≥ 0` is provable from
-  the branch equation in `Γ`; without it, a false unknown.
+  `(_ : Equal Bool (leq_int 0 n) true)`; the `else` branch carries
+  `(_ : Equal Bool (leq_int 0 n) false)`.
+- why: §3 — `if c` adds `Equal Bool c true` / `false` per branch (elaborated
+  `elim_Bool`). Structural flip: the `then` obligation
+  `IsTrue (leq_int 0 n)` is provable from the branch equation in `Γ`; without
+  it, a false unknown.
 
 ### verify/obligations/non-direct-requires-carries-into-partialprim-telescope
 - spec: `21 §1` (requires premise); `22 §2.4` (PartialPrim); `22 §3`
@@ -305,30 +319,34 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/recursive-fn-per-ctor-obligation-with-ih (soundness)
 - spec: `22 §4`; `14 §3` (eliminator); `39 §2.6`
-- given: a recursive `view sum (xs : List Nat) : Nat ensures result ≥ 0 = …`
-  with body `match xs { nil → 0 ; cons y ys → y + sum ys }`
+- given: `def Nat = { n : Int | IsTrue (leq_int 0 n) }`; a recursive
+  `view sum (xs : List Nat) : Int` with
+  `ensures IsTrue (leq_int 0 result) = …` and body
+  `match xs { nil → 0 ; cons y ys → y + sum ys }`
 - expect: the extractor emits **per-constructor** obligations from the `elim_D`
-  motive `M z = { r : Nat | r ≥ 0 }` — the `nil` branch obligation `0 ≥ 0`; the
-  `cons y ys` branch obligation `(y + sum ys) ≥ 0` **with the induction
-  hypothesis** `(_ : M ys) = (_ : sum ys ≥ 0)` in `Γ`.
+  motive `M z = { r : Int | IsTrue (leq_int 0 r) }` — the `nil` branch
+  obligation `IsTrue (leq_int 0 0)`; the `cons y ys` branch obligation
+  `IsTrue (leq_int 0 (y + sum ys))` **with the induction hypothesis**
+  `(_ : M ys) = (_ : IsTrue (leq_int 0 (sum ys)))` in `Γ`.
 - why: §4 — the dependent eliminator gives each constructor method the IH for
   its recursive fields (`M zᵢ`); V2 **reads** these from the elaborator's
   `match → elim_D` compilation and adds them to `Γ` (it does not synthesize an
-  induction principle). **Structural/verdict flip:** the `cons` step is provable
-  **with** `sum ys ≥ 0` in `Γ` (structural induction), unprovable **without**
+  induction principle). **Structural/verdict flip:** the `cons` step is
+  provable **with** `IsTrue (leq_int 0 (sum ys))` in `Γ` (structural
+  induction), unprovable **without**
   it. **Disconfirming:** would the inductive step discharge under a bug that
   drops the IH? **No** — without `M ys` the step is a false `unknown`.
   Structural induction, surfaced automatically.
 
 ### verify/obligations/nonrecursive-degenerate-no-induction-hypothesis
 - spec: `22 §4` (degenerate motive)
-- given: a non-recursive
-  `view double (n : Nat) : Nat ensures result ≥ n = n + n`
-- expect: the obligation `(n + n) ≥ n` is emitted with **no** induction
-  hypothesis in `Γ` (the degenerate motive — no recursive fields).
+- given: `def Nat = { n : Int | IsTrue (leq_int 0 n) }`; a non-recursive
+  `view double (n : Nat) : Int ensures IsTrue (leq_int n result) = n + n`
+- expect: the obligation `IsTrue (leq_int n (n + n))` is emitted with **no**
+  induction hypothesis in `Γ` (the degenerate motive — no recursive fields).
 - why: §4 — non-recursive functions are the degenerate motive (no recursive
   fields ⇒ no IH); the same machinery covers both, no special-casing.
-  **Internal- consistency tie:** with `recursive-fn-…-with-IH`, this pins that
+  **Internal-consistency tie:** with `recursive-fn-…-with-IH`, this pins that
   an IH appears **iff** there is a recursive field — a bug adding a spurious IH
   here (or dropping the real one there) flips one of the pair.
 
@@ -345,7 +363,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   kernel (`18 §4.5`); the definition is **fully verified** (empty open set;
   nothing from it in `trusted_base()`). (b) with the `cons` proof removed — a
   **single, precisely-located** open hole at the `cons`-branch obligation
-  `(y + sum ys) ≥ 0` (status `unknown`); its goal **appears** in
+  `IsTrue (leq_int 0 (y + sum ys))` (status `unknown`); its goal **appears** in
   `trusted_base()`; the other obligations stay `proved`.
 - why: §8 — the flagship end-to-end. **Structural/verdict flip:** all-proofs →
   fully verified; one-proof-removed → exactly **one** localized hole (its
@@ -406,7 +424,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   `precondition-obligation-at-call-not-in-body`,
   `partial-primitive-emits-nonzero-obligation`,
   `prove-and-law-emit-one-obligation-per-goal`; the **absent-clause scan**
-  (`refined-param-is-hypothesis-not-obligation`,
+  (`refined-param-desugars-to-requires`,
   `body-requires-assumed-not-reobligated`,
   `present-cert-yields-zero-new-obligations`,
   `forgetful-coercion-emits-nothing`) + the counter-rule
