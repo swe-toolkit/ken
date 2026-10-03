@@ -324,6 +324,48 @@ struct Assumption {
     depth: usize,
 }
 
+/// Provenance is written when a binder enters the elaborator context. The
+/// stable key is its bottom-relative de Bruijn level, not its current index.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MatchBinderOrigin {
+    Field,
+    Ih,
+    Scrutinee,
+    ConvoyRebound { original: usize },
+    GeneralizedDependent { original: usize },
+    GeneratedEquation,
+    UserLocal,
+}
+
+/// One checked arm's provenance, target and embedding into its enclosing
+/// telescope. An absent enclosing level means this binder is new to the arm;
+/// it is not permission to reconstruct identity from its type or position.
+struct MatchFrame {
+    start_level: usize,
+    sentinel_region: usize,
+    origins: HashMap<usize, MatchBinderOrigin>,
+    enclosing_telescope: HashMap<usize, Option<usize>>,
+    premise_bindings: HashMap<(usize, usize), usize>,
+    convoy_originals: HashSet<usize>,
+    refined_target: Option<Term>,
+    scrutinee_level: Option<usize>,
+}
+
+impl MatchFrame {
+    fn new(start_level: usize, sentinel_region: usize, refined_target: Option<Term>, scrutinee_level: Option<usize>) -> Self {
+        Self {
+            start_level,
+            sentinel_region,
+            origins: HashMap::new(),
+            enclosing_telescope: HashMap::new(),
+            premise_bindings: HashMap::new(),
+            convoy_originals: HashSet::new(),
+            refined_target,
+            scrutinee_level,
+        }
+    }
+}
+
 struct ElabCtx<'e> {
     env: &'e mut GlobalEnv,
     /// Required semantic-owner label for every checking-mode `Axiom` minted
@@ -397,7 +439,6 @@ struct ElabCtx<'e> {
     /// During a generalized branch-goal check, a premise sentinel resolves to
     /// the temporary Pi binder rather than its original method premise. The
     /// bottom-relative position is stable across deeper local binders.
-    scoped_premise_aliases: HashMap<(usize, usize), usize>,
     /// Generated equality leaves for each active indexed-match branch. The
     /// leaves are stored at `install_depth`; a fresh local binder rebases their
     /// endpoints by later context growth before refining its recorded type.
@@ -413,7 +454,8 @@ struct ElabCtx<'e> {
     /// PROVENANCE`). Provenance, not position — a floor keyed on depth alone
     /// would misclassify a genuine outer binder pushed after the enclosing
     /// match's fields (e.g. a `let` between the outer arm and a nested match).
-    match_field_regions: Vec<std::ops::Range<usize>>,
+    match_frames: Vec<MatchFrame>,
+    next_aux_sentinel_region: usize,
     /// Elaborator-internal method binders are absent from resolved surface
     /// de Bruijn indices. Positions are stable bottom-relative context slots;
     /// `surface_var` skips them when translating an `RVar`.
@@ -461,6 +503,98 @@ enum SurfaceBindingTarget {
 }
 
 impl<'e> ElabCtx<'e> {
+    fn fresh_aux_sentinel_region(&mut self) -> Result<usize, ElabError> {
+        // Method/arm regions are stack-depth keyed for existing motive replay;
+        // auxiliary source-field premises live in a disjoint checked namespace.
+        if self.match_frames.len() >= AUX_SENTINEL_REGION_BASE
+            || self.next_aux_sentinel_region >= AUX_SENTINEL_REGION_END
+        {
+            return Err(ElabError::Internal("match sentinel-region namespace exhausted".into()));
+        }
+        let region = self.next_aux_sentinel_region;
+        self.next_aux_sentinel_region += 1;
+        checked_index_refinement_sentinel(region, 0)?;
+        Ok(region)
+    }
+
+    fn push_match_binder(&mut self, ty: Term, origin: MatchBinderOrigin) {
+        let level = self.ctx.len();
+        self.ctx.push(ty);
+        if let Some(frame) = self.match_frames.last_mut() {
+            let outer = match origin {
+                MatchBinderOrigin::ConvoyRebound { original }
+                | MatchBinderOrigin::GeneralizedDependent { original } => Some(original),
+                MatchBinderOrigin::Field
+                | MatchBinderOrigin::Ih
+                | MatchBinderOrigin::Scrutinee
+                | MatchBinderOrigin::GeneratedEquation
+                | MatchBinderOrigin::UserLocal => None,
+            };
+            frame.origins.insert(level, origin);
+            frame.enclosing_telescope.insert(level, outer);
+        }
+    }
+
+    fn require_constructor_field_ownership(
+        &self,
+        start_level: usize,
+        field_count: usize,
+    ) -> Result<(), ElabError> {
+        let frame = self.match_frames.last().ok_or_else(|| {
+            ElabError::Internal("constructor fields have no owning match frame".into())
+        })?;
+        if frame.start_level != start_level
+            || self.ctx.len().checked_sub(start_level) != Some(field_count)
+            || (start_level..self.ctx.len()).any(|level| {
+                frame.origins.get(&level) != Some(&MatchBinderOrigin::Field)
+                    || frame.enclosing_telescope.get(&level) != Some(&None)
+            })
+        {
+            return Err(ElabError::Internal(
+                "constructor fields have no owning match frame".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn scoped_match_premises(&self) -> Result<HashMap<(usize, usize), usize>, ElabError> {
+        let mut aliases = HashMap::new();
+        for frame in &self.match_frames {
+            for (&key, &level) in &frame.premise_bindings {
+                if frame.origins.get(&level) != Some(&MatchBinderOrigin::GeneratedEquation)
+                    || !frame.enclosing_telescope.contains_key(&level)
+                {
+                    return Err(ElabError::Internal(
+                        "generalized premise has no recorded equation origin".into(),
+                    ));
+                }
+                aliases.insert(key, level);
+            }
+        }
+        Ok(aliases)
+    }
+
+    fn match_binder_origin(&self, level: usize) -> Result<Option<MatchBinderOrigin>, ElabError> {
+        // The innermost frame whose start precedes this level owns the binder.
+        // A popped local can leave an old entry at the same level in a parent;
+        // never use it to fill a missing entry in the actual owner.
+        for frame in self.match_frames.iter().rev() {
+            if level < frame.start_level {
+                continue;
+            }
+            let origin = *frame.origins.get(&level).ok_or_else(|| {
+                ElabError::Internal(format!("match binder level {level} has no recorded origin"))
+            })?;
+            if !frame.enclosing_telescope.contains_key(&level) {
+                return Err(ElabError::Internal(format!(
+                    "match binder level {level} lost its enclosing telescope map"
+                )));
+            }
+            return Ok(Some(origin));
+        }
+        Ok(None)
+    }
+
     fn new(
         env: &'e mut GlobalEnv,
         globals: &'e HashMap<String, GlobalId>,
@@ -485,9 +619,9 @@ impl<'e> ElabCtx<'e> {
             provenance: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
-            scoped_premise_aliases: HashMap::new(),
             active_index_refinements: Vec::new(),
-            match_field_regions: Vec::new(),
+            match_frames: Vec::new(),
+            next_aux_sentinel_region: AUX_SENTINEL_REGION_BASE,
             hidden_positions: Vec::new(),
             matrix_virtual_surface_positions: Vec::new(),
             lift_bindings: HashMap::new(),
@@ -973,7 +1107,7 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
 
         RType::RPi(_, a, b, _) => {
             let a_core = elab_type(cx, a)?;
-            cx.ctx.push(a_core.clone());
+            cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
             let b_core = elab_type(cx, b)?;
             cx.ctx.pop();
             Ok(Term::pi(a_core, b_core))
@@ -981,7 +1115,7 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
 
         RType::RSigma(_, a, b, _) => {
             let a_core = elab_type(cx, a)?;
-            cx.ctx.push(a_core.clone());
+            cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
             let b_core = elab_type(cx, b)?;
             cx.ctx.pop();
             Ok(Term::sigma(a_core, b_core))
@@ -1087,7 +1221,7 @@ fn check_let(
 ) -> Result<Term, ElabError> {
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
-    cx.ctx.push(rhs_ty.clone());
+    cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
     let body_result = check(cx, body, &weaken(expected, 1), span);
     cx.ctx.pop();
     let body_core = body_result?;
@@ -1484,7 +1618,7 @@ fn scoped_premise_binding(
     let Term::Var(index) = term else {
         return Ok(None);
     };
-    for ((region, slot), position) in &cx.scoped_premise_aliases {
+    for ((region, slot), position) in cx.scoped_match_premises()?.iter() {
         let frame = cx
             .active_index_premise_frames
             .iter()
@@ -1702,7 +1836,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             let exp_wh = whnf(cx.env, &cx.ctx, expected);
             match exp_wh {
                 Term::Pi(dom, cod) => {
-                    cx.ctx.push(*dom.clone());
+                    cx.push_match_binder(*dom.clone(), MatchBinderOrigin::UserLocal);
                     let body_core = check(cx, body, &cod, lam_span)?;
                     cx.ctx.pop();
                     Ok(Term::lam(*dom, body_core))
@@ -3352,13 +3486,13 @@ fn recursive_field_index_path(
     level_args: &[Level],
     scrut_core: &Term,
     scrut_indices: &[Term],
+    frame: &MatchFrame,
 ) -> Result<RecursiveFieldIndexPath, ElabError> {
     if ind.indices.len() != 1
         || scrut_indices.len() != 1
         || !matches!(scrut_core, Term::Var(_))
         || !matches!(scrut_indices[0], Term::Var(_))
-        || !compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions)
-        .is_empty()
+        || !compute_context_convoy(cx, frame, scrut_indices)?.is_empty()
     {
         return Ok(RecursiveFieldIndexPath::CoupledRefinement);
     }
@@ -3440,9 +3574,9 @@ fn ordinary_coherent_frame_plan(
     motive_base_depth: usize,
     motive_local_indices: &[Term],
     recursive_field_index_path: RecursiveFieldIndexPath,
-) -> Box<CoherentFrameMotivePlan> {
-    let context_convoy =
-        compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions);
+    frame: &MatchFrame,
+) -> Result<Box<CoherentFrameMotivePlan>, ElabError> {
+    let context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
     let motive_rebase = dependent_rebase_subs(
         scrut_core,
         scrut_indices,
@@ -3455,7 +3589,7 @@ fn ordinary_coherent_frame_plan(
                 .iter()
                 .any(|entry| scrut_occurs(original_expected, &Term::var(entry.var))),
     );
-    Box::new(CoherentFrameMotivePlan {
+    Ok(Box::new(CoherentFrameMotivePlan {
         expected: original_expected.clone(),
         context_convoy,
         embedded_method_convoy: Vec::new(),
@@ -3466,7 +3600,7 @@ fn ordinary_coherent_frame_plan(
         ),
         equation_convoy: false,
         recursive_field_index_path,
-    })
+    }))
 }
 
 #[inline(never)]
@@ -3488,6 +3622,7 @@ fn plan_coherent_frame_motive(
     sentinel_region: usize,
     defer_coupled_expansion: bool,
     span: &Span,
+    frame: &MatchFrame,
 ) -> Result<Box<CoherentFrameMotivePlan>, ElabError> {
     let zonked_ctx = Context {
         types: cx
@@ -3501,7 +3636,7 @@ fn plan_coherent_frame_motive(
     if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
         || !has_nat_shaped_index(cx.env, &zonked_ctx, ind, params_terms)
     {
-        return Ok(ordinary_coherent_frame_plan(
+        return ordinary_coherent_frame_plan(
             cx,
             scrut_core,
             scrut_indices,
@@ -3509,13 +3644,13 @@ fn plan_coherent_frame_motive(
             motive_base_depth,
             motive_local_indices,
             recursive_field_index_path,
-        ));
+            frame,
+        );
     }
     let expanded_expected = boxed_simplify_branch_goal(cx.env, &zonked_ctx, original_expected);
     let has_nontrivial_coupled_sides = matches!(original_expected, Term::Eq(_, _, _))
         || matches!(expanded_expected.as_ref(), Term::Eq(_, _, _));
-    let probe_context_convoy =
-        compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions);
+    let probe_context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
 
     // A nested covering is already inside a constructor-refined outer frame.
     // Its motive convoys the generated index equation and transports the inner
@@ -3527,7 +3662,7 @@ fn plan_coherent_frame_motive(
         && scrut_indices
             .iter()
             .any(|index| !matches!(index, Term::Var(_)));
-    let equation_convoy = (!cx.match_field_regions.is_empty() && has_nontrivial_coupled_sides)
+    let equation_convoy = (!cx.match_frames.is_empty() && has_nontrivial_coupled_sides)
         || forced_telescope_convoy;
     if equation_convoy {
         if !probe_context_convoy.is_empty() && !forced_telescope_convoy {
@@ -3604,7 +3739,7 @@ fn plan_coherent_frame_motive(
     };
     let context_convoy = if embedded_method_convoy.is_empty() && embedded_method_repairs.is_empty()
     {
-        compute_context_convoy(&cx.ctx, scrut_core, scrut_indices, &cx.match_field_regions)
+        compute_context_convoy(cx, frame, scrut_indices)?
     } else {
         probe_context_convoy
     };
@@ -3648,16 +3783,15 @@ fn plan_coherent_frame_motive(
 /// transitive forward-dependency closure of genuine ambient bindings whose type
 /// the root substitution (or an already-included convoy binder) changes.
 /// Returned innermost-first (ascending de Bruijn `var`); the motive telescope
-/// wraps them outermost-first. `scrut_core` and the scrutinee's own binder are
-/// excluded (the motive already abstracts the scrutinee). Bindings inside an
-/// enclosing match's field region are excluded (they are that match's fields,
-/// not outer captured binders).
+/// wraps them outermost-first. The scrutinee's own binder is excluded (the
+/// motive already abstracts it). Binders with a recorded generated/arm origin
+/// are excluded; user-local binders remain ambient even within an arm.
 fn compute_context_convoy(
-    ctx: &Context,
-    scrut_core: &Term,
+    cx: &ElabCtx,
+    frame: &MatchFrame,
     scrut_indices: &[Term],
-    match_field_regions: &[std::ops::Range<usize>],
-) -> Vec<ConvoyEntry> {
+) -> Result<Vec<ConvoyEntry>, ElabError> {
+    let ctx = &cx.ctx;
     let depth = ctx.len();
     // The dependency seed: the free variables occurring in the scrutinee's
     // actual indices, as de Bruijn indices at the ambient depth. A binding is
@@ -3670,10 +3804,6 @@ fn compute_context_convoy(
             }
         }
     }
-    let scrut_var = match scrut_core {
-        Term::Var(v) => Some(*v),
-        _ => None,
-    };
     let mut convoy: Vec<ConvoyEntry> = Vec::new();
     // Walk bindings OUTERMOST (highest var) to innermost. A binding's type can
     // only mention OUTER bindings (higher var, bound earlier), so processing
@@ -3685,15 +3815,20 @@ fn compute_context_convoy(
     // and drop it. Collected outermost-first here, then reversed to the
     // innermost-first representation the motive/method telescope consumes.
     for var in (0..depth).rev() {
-        // Skip the scrutinee itself — the motive abstracts it directly.
-        if scrut_var == Some(var) {
+        // Skip the scrutinee recorded once at match introduction; the motive
+        // abstracts it directly even as later binders move its de Bruijn index.
+        if frame.scrutinee_level == Some(depth - 1 - var) {
             continue;
         }
-        // Skip an enclosing match's field: a bottom-relative position in a
-        // recorded field region is not a genuine outer captured binder.
+        // A user-local binder remains genuinely ambient, even when pushed
+        // between an enclosing arm and this match. Every other origin is
+        // owned by its arm; missing provenance inside an active frame is an
+        // error, never a positional guess.
         let bottom_pos = depth - 1 - var;
-        if match_field_regions.iter().any(|r| r.contains(&bottom_pos)) {
-            continue;
+        if let Some(origin) = cx.match_binder_origin(bottom_pos)? {
+            if origin != MatchBinderOrigin::UserLocal {
+                continue;
+            }
         }
         // The binding's stored type, weakened to be valid at the ambient depth.
         let raw_ty = match ctx.lookup(var) {
@@ -3714,7 +3849,7 @@ fn compute_context_convoy(
     // itself a topological order, so this single reversed pass — no fixpoint —
     // yields dependency-consistent innermost-first entries.
     convoy.reverse();
-    convoy
+    Ok(convoy)
 }
 
 /// Reduce transparent branch goals enough to expose constructor-local matches
@@ -4543,10 +4678,16 @@ fn check_match_with_lift(
             });
         }
         let base = cx.ctx.len();
+        cx.match_frames.push(MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None));
         let mut domains = Vec::with_capacity(raw_domains.len());
         for (position, raw_domain) in raw_domains.iter().enumerate() {
             let domain = whnf(cx.env, &cx.ctx, raw_domain);
-            cx.ctx.push(domain.clone());
+            let origin = if position < host_ctor.args.len() {
+                MatchBinderOrigin::Field
+            } else {
+                MatchBinderOrigin::Ih
+            };
+            cx.push_match_binder(domain.clone(), origin);
             domains.push(domain);
             if position >= host_ctor.args.len() {
                 cx.hidden_positions.push(base + position);
@@ -4651,7 +4792,8 @@ fn check_match_with_lift(
                 &concrete,
             ),
         );
-        let mut method = check(cx, &arm.body, &expected_here, &arm.span)?;
+        cx.match_frames.last_mut().expect("lifted arm frame").refined_target = Some(expected_here.clone());
+        let checked = check(cx, &arm.body, &expected_here, &arm.span);
 
         for source_field in evidence_positions {
             cx.lift_bindings.remove(&(base + source_field));
@@ -4660,6 +4802,8 @@ fn check_match_with_lift(
         for _ in 0..total {
             cx.ctx.pop();
         }
+        cx.match_frames.pop();
+        let mut method = checked?;
         for domain in domains.iter().rev() {
             method = Term::lam(domain.clone(), method);
         }
@@ -4752,10 +4896,16 @@ fn check_structured_constructor_method(
         });
     }
     let base = cx.ctx.len();
+    cx.match_frames.push(MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None));
     let mut domains = Vec::with_capacity(raw_domains.len());
     for (position, raw_domain) in raw_domains.iter().enumerate() {
         let domain = whnf(cx.env, &cx.ctx, raw_domain);
-        cx.ctx.push(domain.clone());
+        let origin = if position < field_count {
+            MatchBinderOrigin::Field
+        } else {
+            MatchBinderOrigin::Ih
+        };
+        cx.push_match_binder(domain.clone(), origin);
         domains.push(domain);
         if position >= field_count {
             cx.hidden_positions.push(base + position);
@@ -4805,6 +4955,7 @@ fn check_structured_constructor_method(
             &concrete,
         ),
     );
+    cx.match_frames.last_mut().expect("structured arm frame").refined_target = Some(expected_here.clone());
     let checked = check(cx, &arm.body, &expected_here, &arm.span);
 
     for shape in shapes {
@@ -4814,6 +4965,7 @@ fn check_structured_constructor_method(
     for _ in 0..total {
         cx.ctx.pop();
     }
+    cx.match_frames.pop();
     let mut method = checked?;
     for domain in domains.iter().rev() {
         method = Term::lam(domain.clone(), method);
@@ -4938,7 +5090,13 @@ fn check_generalized_branch_goal(
     let original_depth = cx.ctx.len();
     let original_hidden = cx.hidden_positions.len();
     let saved_refinements = cx.var_refinements.clone();
-    let saved_premises = cx.scoped_premise_aliases.clone();
+    let (saved_premises, saved_origins, saved_telescope) = {
+        let frame = cx.match_frames.last().ok_or_else(|| {
+            ElabError::Internal("generalized branch has no owning match frame".into())
+        })?;
+        (frame.premise_bindings.clone(), frame.origins.clone(),
+         frame.enclosing_telescope.clone())
+    };
     let attempt = (|| {
         let mut inner_goal = goal_refined;
         let mut domains = Vec::new();
@@ -4956,7 +5114,19 @@ fn check_generalized_branch_goal(
                     ));
                 };
                 let domain = *domain;
-                cx.ctx.push(domain.clone());
+                let origin = match binder.source {
+                    GeneralizedGoalSource::Original(original) => {
+                        if cx.match_frames.last().is_some_and(|frame| {
+                            frame.convoy_originals.contains(&original)
+                        }) {
+                            MatchBinderOrigin::ConvoyRebound { original }
+                        } else {
+                            MatchBinderOrigin::GeneralizedDependent { original }
+                        }
+                    }
+                    GeneralizedGoalSource::Premise { .. } => MatchBinderOrigin::GeneratedEquation,
+                };
+                cx.push_match_binder(domain.clone(), origin);
                 let position = cx.ctx.len() - 1;
                 cx.hidden_positions.push(position);
                 match binder.source {
@@ -4967,7 +5137,8 @@ fn check_generalized_branch_goal(
                         );
                     }
                     GeneralizedGoalSource::Premise { region, slot } => {
-                        cx.scoped_premise_aliases.insert((region, slot), position);
+                        cx.match_frames.last_mut().expect("owning generalized arm").premise_bindings
+                            .insert((region, slot), position);
                         premise_binders.push((region, slot, position));
                     }
                 }
@@ -5018,7 +5189,12 @@ fn check_generalized_branch_goal(
     cx.ctx.types.truncate(original_depth);
     cx.hidden_positions.truncate(original_hidden);
     cx.var_refinements = saved_refinements;
-    cx.scoped_premise_aliases = saved_premises;
+    let frame = cx.match_frames.last_mut().ok_or_else(|| {
+        ElabError::Internal("generalized branch lost its owning match frame".into())
+    })?;
+    frame.premise_bindings = saved_premises;
+    frame.origins = saved_origins;
+    frame.enclosing_telescope = saved_telescope;
     let mut body = attempt?;
     for restoration in restorations.into_iter().rev() {
         body = restoration.apply(body);
@@ -5535,6 +5711,7 @@ fn check_large_convoy_recursive_arm(
         return Ok(None);
     }
 
+    let source_region = cx.fresh_aux_sentinel_region()?;
     let mut base_substitutions = vec![
         (leaf.target.clone(), leaf.scrutinee.clone()),
         (
@@ -5551,30 +5728,41 @@ fn check_large_convoy_recursive_arm(
     for (slot, (_, _, field_term, _, source_ty)) in moving_fields.iter().enumerate() {
         base_substitutions.push((
             field_term.clone(),
-            index_refinement_sentinel(sentinel_region, slot),
+            index_refinement_sentinel(source_region, slot),
         ));
         source_domains.push(source_ty.clone());
     }
     let base_goal = subst_term_generalize_many(expected_here, &base_substitutions);
+    cx.match_frames.last_mut().ok_or_else(|| {
+        ElabError::Internal("large convoy arm has no owning match frame".into())
+    })?.refined_target = Some(base_goal.clone());
 
     let refinement_snapshot = cx.var_refinements.clone();
     for (slot, (position, _, _, _, source_ty)) in moving_fields.iter().enumerate() {
         cx.var_refinements.insert(
             *position,
             (
-                index_refinement_sentinel(sentinel_region, slot),
+                index_refinement_sentinel(source_region, slot),
                 source_ty.clone(),
                 cx.ctx.len(),
             ),
         );
     }
+    let premise_frame_base = cx.active_index_premise_frames.len();
+    cx.active_index_premise_frames.push(ActiveIndexPremiseFrame {
+        sentinel_region: source_region,
+        premise_domains: source_domains.clone(),
+        install_depth: cx.ctx.len(),
+    });
     let checked_base = (|| {
-        let (core, inferred) = infer(cx, &arm.body)?;
-        unify_types(&mut cx.metas, &base_goal, &inferred);
-        let base = wrap_premise_lams_finalized(core, &source_domains, sentinel_region);
-        let base_ty = wrap_premise_pis_finalized(base_goal.clone(), &source_domains, sentinel_region);
+        let refined_target = cx.match_frames.last().and_then(|frame| frame.refined_target.clone())
+            .ok_or_else(|| ElabError::Internal("large convoy arm lost its refined target".into()))?;
+        let core = check(cx, &arm.body, &refined_target, &arm.span)?;
+        let base = wrap_premise_lams_finalized(core, &source_domains, source_region);
+        let base_ty = wrap_premise_pis_finalized(base_goal.clone(), &source_domains, source_region);
         validate_large_convoy_base(cx, &base, &base_ty, &arm.span)
     })();
+    cx.active_index_premise_frames.truncate(premise_frame_base);
     cx.var_refinements = refinement_snapshot;
     let base = checked_base?;
 
@@ -5607,7 +5795,7 @@ fn check_large_convoy_recursive_arm(
     for (slot, (_, _, field_term, field_ty, _)) in moving_fields.iter().enumerate() {
         motive_substitutions.push((
             weaken(field_term, 2),
-            index_refinement_sentinel(sentinel_region, slot),
+            index_refinement_sentinel(source_region, slot),
         ));
         motive_domains.push(subst_term_generalize(
             &weaken(field_ty, 2),
@@ -5616,7 +5804,7 @@ fn check_large_convoy_recursive_arm(
         ));
     }
     let motive_goal = subst_term_generalize_many(&weaken(expected_here, 2), &motive_substitutions);
-    let motive_result = wrap_premise_pis_finalized(motive_goal, &motive_domains, sentinel_region);
+    let motive_result = wrap_premise_pis_finalized(motive_goal, &motive_domains, source_region);
 
     let Term::Eq(goal_carrier, _, _) = whnf(cx.env, &cx.ctx, expected_here) else {
         return Ok(None);
@@ -6148,15 +6336,15 @@ fn install_plain_declared_index_aliases(
             .insert(position, (target, index_ty, cx.ctx.len()));
     }
 
-    let Term::Var(scrut_index) = scrut_core else {
+    let scrut_position = cx.match_frames.last().and_then(|frame| frame.scrutinee_level)
+        .ok_or_else(|| ElabError::Internal(
+            "plain declared-index path lost its recorded scrutinee".into(),
+        ))?;
+    if scrut_position >= cx.ctx.len().saturating_sub(field_count) {
         return Err(ElabError::Internal(
-            "plain declared-index path received a non-variable scrutinee".into(),
+            "plain declared-index scrutinee escaped its constructor context".into(),
         ));
-    };
-    let scrut_index = scrut_index + field_count;
-    let scrut_position = cx.ctx.len().checked_sub(1 + scrut_index).ok_or_else(|| {
-        ElabError::Internal("plain declared-index scrutinee escaped its constructor context".into())
-        })?;
+    }
     let concrete = cx.metas.zonk_term(concrete);
     let concrete_ty = kernel_infer_in_zonked_current(cx, &zonked_ctx, &concrete).map_err(
         |error| match error {
@@ -6203,7 +6391,7 @@ fn check_dependent_branch_body(
     let active_index_refinement_base = cx.active_index_refinements.len();
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
-    cx.match_field_regions.push(outer_scope_depth..cx.ctx.len());
+    debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
 
     let outcome = (|| {
         if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
@@ -6254,6 +6442,9 @@ fn check_dependent_branch_body(
             } else {
                 simplify_branch_goal(cx.env, &cx.ctx, expected_here)
             };
+        cx.match_frames.last_mut().ok_or_else(|| {
+            ElabError::Internal("dependent arm has no owning match frame".into())
+        })?.refined_target = Some(expected_unrefined.clone());
         if let Some(premise_slot) = hidden_result_premise_slot {
             if premise_slot >= premise_domains.len() {
                 return Err(ElabError::Internal(format!(
@@ -6330,7 +6521,6 @@ fn check_dependent_branch_body(
     cx.active_index_refinements
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
-    cx.match_field_regions.pop();
     outcome
 }
 
@@ -6449,6 +6639,14 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     }
     let mut params_terms = Box::new(scrut_args);
     let scrut_indices = Box::new(params_terms.split_off(m));
+    let sentinel_region = cx.match_frames.len();
+    let scrutinee_level = match scrut_core.as_ref() {
+        Term::Var(index) => cx.ctx.len().checked_sub(index + 1),
+        _ => None,
+    };
+    let frame = MatchFrame::new(
+        cx.ctx.len(), sentinel_region, Some(original_expected.clone()), scrutinee_level,
+    );
     let recursive_field_index_path = recursive_field_index_path(
         cx,
         &ind,
@@ -6456,6 +6654,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         &family_level_args,
         &scrut_core,
         &scrut_indices,
+        &frame,
     )?;
 
     // A source field paired with residual generated `All` evidence is
@@ -6463,22 +6662,20 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // host constructor and support constructor aligned without exposing the
     // generated family at the surface.
     if equation.is_none() {
-        if let Term::Var(index) = scrut_core.as_ref() {
-            if let Some(position) = cx.ctx.len().checked_sub(1 + *index) {
-                if let Some(binding) = cx.lift_bindings.get(&position).copied() {
-                    if binding.support.is_some() {
-                        return check_match_with_lift(
-                            cx,
-                            arms,
-                            expected,
-                            span,
-                            &Term::var(*index),
-                            &ind,
-                            &family_level_args,
-                            &params_terms,
-                            binding,
-                        );
-                    }
+        if let Some(position) = frame.scrutinee_level {
+            if let Some(binding) = cx.lift_bindings.get(&position).copied() {
+                if binding.support.is_some() {
+                    return check_match_with_lift(
+                        cx,
+                        arms,
+                        expected,
+                        span,
+                        &Term::var(cx.ctx.len() - 1 - position),
+                        &ind,
+                        &family_level_args,
+                        &params_terms,
+                        binding,
+                    );
                 }
             }
         }
@@ -6492,7 +6689,6 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     // shifting recursive field instead takes the plain eliminator path: its
     // motive abstracts the index directly and carries no equality telescope.
     let motive_base_depth = n_i + 1;
-    let sentinel_region = cx.match_field_regions.len();
     let motive_local_indices: Vec<Term> = (0..n_i).map(|j| Term::var(n_i - j)).collect();
     let mut motive_plan = plan_coherent_frame_motive(
         cx,
@@ -6510,6 +6706,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 .iter()
                 .any(|arm| matches!(arm.body, RExpr::RMatch { .. })),
         span,
+        &frame,
     )?;
     let mut motive_user_body =
         std::mem::replace(&mut motive_plan.motive_user_body, Term::Type(Level::Zero));
@@ -6703,6 +6900,9 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             continue;
         }
         let constructor_scope_depth = cx.ctx.len();
+        cx.match_frames.push(MatchFrame::new(
+            constructor_scope_depth, sentinel_region, Some(expected.clone()), frame.scrutinee_level,
+        ));
         // Expand restoration at each fallible site without adding a call frame
         // to recursive dependent-match checking.
         macro_rules! frame_try {
@@ -6711,6 +6911,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     Ok(value) => value,
                     Err(error) => {
                         cx.ctx.types.truncate(constructor_scope_depth);
+                        cx.match_frames.pop();
                         return Err(error);
                     }
                 }
@@ -6722,8 +6923,9 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 &ind.level_params,
                 &family_level_args,
             );
-            cx.ctx.push(raw_ty);
+            cx.push_match_binder(raw_ty, MatchBinderOrigin::Field);
         }
+        frame_try!(cx.require_constructor_field_ownership(constructor_scope_depth, n));
         let constructor_frame = frame_try!(build_dependent_constructor_frame(
             cx,
             &ind,
@@ -6745,6 +6947,12 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             recursive_field_index_path,
             span,
         ));
+        let frame = cx.match_frames.last_mut().ok_or_else(|| {
+            ElabError::Internal("constructor frame lost its owning match arm".into())
+        })?;
+        frame.convoy_originals.extend(
+            constructor_frame.convoy_refinements.iter().map(|(position, _, _)| *position),
+        );
         let concrete = constructor_frame.concrete.as_ref();
         let target_indices = constructor_frame.target_indices.as_slice();
         let premise_domains = constructor_frame.premise_domains.as_slice();
@@ -6758,7 +6966,15 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     level_args: Vec::new(),
                 }
             } else if equation_convoy && expression_mentions_recursive_group(cx, &arm.body) {
-                frame_try!(build_large_convoy_recursive_method(
+                let premise_base = cx.active_index_premise_frames.len();
+                if !premise_domains.is_empty() {
+                    cx.active_index_premise_frames.push(ActiveIndexPremiseFrame {
+                        sentinel_region,
+                        premise_domains: premise_domains.to_vec(),
+                        install_depth: cx.ctx.len(),
+                    });
+                }
+                let result = build_large_convoy_recursive_method(
                     cx,
                     arm,
                     &ind,
@@ -6769,14 +6985,16 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     &expected_here,
                     sentinel_region,
                     &premise_domains,
-                ))
+                );
+                cx.active_index_premise_frames.truncate(premise_base);
+                frame_try!(result)
             } else if equation.is_some() {
                 let eq_dom = Term::Eq(
                     Box::new(weaken(&scrut_ty, n as i64)),
                     Box::new(weaken(&scrut_core, n as i64)),
                     Box::new(concrete.clone()),
                 );
-                cx.ctx.push(eq_dom.clone());
+                cx.push_match_binder(eq_dom.clone(), MatchBinderOrigin::GeneratedEquation);
                 let body = frame_try!(check(cx, &arm.body, &weaken(&expected_here, 1), &arm.span,));
                 cx.ctx.pop();
                 Term::lam(eq_dom, body)
@@ -6818,6 +7036,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         for _ in 0..n {
             cx.ctx.pop();
         }
+        cx.match_frames.pop();
         debug_assert_eq!(
             cx.ctx.len(),
             constructor_scope_depth,
@@ -7400,7 +7619,9 @@ fn refine_branch_goal(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
-    let sentinel_region = cx.match_field_regions.len().saturating_sub(1);
+    let sentinel_region = cx.match_frames.last().ok_or_else(|| {
+        ElabError::Internal("goal refinement has no owning match frame".into())
+    })?.sentinel_region;
     // Complete every evidence walk before refining the goal. An unsupported
     // child therefore rejects the whole plan, even when an earlier declared
     // index or Sigma child had usable Eq leaves.
@@ -7542,7 +7763,9 @@ fn install_hidden_result_variable_refinements(
         }
     }
 
-    let sentinel_region = cx.match_field_regions.len().saturating_sub(1);
+    let sentinel_region = cx.match_frames.last().ok_or_else(|| {
+        ElabError::Internal("result refinement has no owning match frame".into())
+    })?.sentinel_region;
     let raw_eq = Term::Eq(
         Box::new(index_ty),
         Box::new(concrete_index),
@@ -7590,12 +7813,9 @@ fn install_hidden_result_variable_refinements(
 
     let mut installed = Vec::new();
     for position in 0..outer_scope_depth {
-        if cx
-            .match_field_regions
-            .iter()
-            .any(|region| region.contains(&position))
-            || cx.var_refinements.contains_key(&position)
-        {
+        if cx.match_binder_origin(position)?.is_some_and(|origin| {
+            origin != MatchBinderOrigin::UserLocal
+        }) || cx.var_refinements.contains_key(&position) {
             continue;
         }
         let index = cx.ctx.len() - 1 - position;
@@ -7676,7 +7896,9 @@ fn install_index_refinements(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
-    let sentinel_region = cx.match_field_regions.len().saturating_sub(1);
+    let sentinel_region = cx.match_frames.last().ok_or_else(|| {
+        ElabError::Internal("index refinement has no owning match frame".into())
+    })?.sentinel_region;
 
     // Build the complete leaf plan before mutating `var_refinements`. This is
     // atomic across every declared-index premise: an unsupported child cannot
@@ -7777,6 +7999,10 @@ fn install_index_refinements(
 /// reach, so it can never collide with a genuine `Var`.
 const INDEX_REFINEMENT_SENTINEL_BASE: usize = 1 << 40;
 const INDEX_REFINEMENT_SENTINEL_STRIDE: usize = 1 << 20;
+// Auxiliary proof-view source fields must never alias a depth-keyed method
+// premise. Exhaustion refuses rather than permitting a wrapped sentinel.
+const AUX_SENTINEL_REGION_BASE: usize = 1 << 30;
+const AUX_SENTINEL_REGION_END: usize = 1 << 31;
 
 fn index_refinement_sentinel(region: usize, slot: usize) -> Term {
     Term::var(INDEX_REFINEMENT_SENTINEL_BASE + region * INDEX_REFINEMENT_SENTINEL_STRIDE + slot)
@@ -8326,7 +8552,7 @@ fn active_premise_kernel_view_for_context(
         expanded_sources,
         premise_to_expanded,
         premise_install_depth,
-        scoped_premise_aliases: cx.scoped_premise_aliases.clone(),
+        scoped_premise_aliases: cx.scoped_match_premises()?,
     };
     let mut context = Context::new();
     for source in &embedding.expanded_sources {
@@ -9138,7 +9364,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RLet(_x, ty_opt, rhs, body, span) => {
             let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
-            cx.ctx.push(rhs_ty.clone());
+            cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
             let body_result = infer(cx, body);
             cx.ctx.pop();
             let (body_core, body_ty) = body_result?;
@@ -9304,7 +9530,7 @@ fn infer_pi(
 ) -> Result<(Term, Term), ElabError> {
     let a_core = elab_type(cx, a)?;
     let a_core = cx.metas.zonk_term(&a_core);
-    cx.ctx.push(a_core.clone());
+    cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
     let b_result = infer(cx, b);
     cx.ctx.pop();
     let (b_core, _b_ty) = b_result?;
@@ -9594,8 +9820,8 @@ fn infer_j(
         Box::new(weaken(&a, 1)),
         Box::new(Term::var(0)),
     );
-    cx.ctx.push(a_ty.clone());
-    cx.ctx.push(eq_dom_ty.clone());
+    cx.push_match_binder(a_ty.clone(), MatchBinderOrigin::UserLocal);
+    cx.push_match_binder(eq_dom_ty.clone(), MatchBinderOrigin::UserLocal);
     let body_result = infer(cx, motive_body_expr);
     cx.ctx.pop();
     cx.ctx.pop();
@@ -16049,6 +16275,7 @@ struct MatrixOccurrence {
     term: Term,
     live: bool,
     source_binding: bool,
+    origin: MatchBinderOrigin,
     /// Whether an emitted core binder occupies a surface de Bruijn position.
     /// Record projection columns are continuation binders, not lexical ones.
     surface_binder: bool,
@@ -16060,15 +16287,17 @@ impl MatrixOccurrence {
             term,
             live: true,
             source_binding: true,
+            origin: MatchBinderOrigin::Scrutinee,
             surface_binder: true,
         }
     }
 
-    fn pending_field(source_binding: bool, surface_binder: bool) -> Self {
+    fn pending_field(source_binding: bool, surface_binder: bool, origin: MatchBinderOrigin) -> Self {
         Self {
             term: Term::var(0),
             live: false,
             source_binding,
+            origin,
             surface_binder,
         }
     }
@@ -16201,7 +16430,9 @@ impl RowState {
     ) -> Self {
         let surface_binder = self.real_occurrences[0].surface_binder;
         let source_bindings = vec![replacement_source_bindings; replacement_pats.len()];
-        self.specialize_current_columns(replacement_pats, source_bindings, surface_binder)
+        self.specialize_current_columns(
+            replacement_pats, source_bindings, surface_binder, MatchBinderOrigin::Field,
+        )
     }
 
     fn specialize_projected_record_column(
@@ -16209,7 +16440,9 @@ impl RowState {
         replacement_pats: Vec<RPattern>,
         replacement_source_bindings: Vec<bool>,
     ) -> Self {
-        self.specialize_current_columns(replacement_pats, replacement_source_bindings, false)
+        self.specialize_current_columns(
+            replacement_pats, replacement_source_bindings, false, MatchBinderOrigin::UserLocal,
+        )
     }
 
     fn specialize_current_columns(
@@ -16217,6 +16450,7 @@ impl RowState {
         replacement_pats: Vec<RPattern>,
         replacement_source_bindings: Vec<bool>,
         replacement_surface_binder: bool,
+        origin: MatchBinderOrigin,
     ) -> Self {
         self.assert_occurrence_alignment();
         debug_assert_eq!(replacement_pats.len(), replacement_source_bindings.len());
@@ -16230,7 +16464,7 @@ impl RowState {
         let mut real_occurrences = replacement_source_bindings
             .into_iter()
             .map(|source_binding| {
-                MatrixOccurrence::pending_field(source_binding, replacement_surface_binder)
+                MatrixOccurrence::pending_field(source_binding, replacement_surface_binder, origin)
             })
             .collect::<Vec<_>>();
         real_occurrences.append(&mut self.real_occurrences);
@@ -17368,7 +17602,7 @@ fn compile_literal_column(
     }
     let rows = entered_rows;
 
-    cx.ctx.push(col_types[0].clone());
+    cx.push_match_binder(col_types[0].clone(), MatchBinderOrigin::UserLocal);
     if !surface_binder {
         cx.hidden_positions.push(cx.ctx.len() - 1);
     }
@@ -17531,7 +17765,7 @@ fn compile_tuple_column(
         .iter()
         .all(|row| row.real_occurrences[0].live == current_is_live));
     if !current_is_live {
-        cx.ctx.push(col_types[0].clone());
+        cx.push_match_binder(col_types[0].clone(), MatchBinderOrigin::UserLocal);
         cx.hidden_positions.push(cx.ctx.len() - 1);
         rows = rows
             .into_iter()
@@ -17771,7 +18005,7 @@ fn compile_record_column(
         .iter()
         .all(|row| row.real_occurrences[0].live == current_is_live));
     if !current_is_live {
-        cx.ctx.push(col_types[0].clone());
+        cx.push_match_binder(col_types[0].clone(), MatchBinderOrigin::UserLocal);
         cx.hidden_positions.push(cx.ctx.len() - 1);
         rows = rows
             .into_iter()
@@ -18099,8 +18333,7 @@ fn compile_match_leaf(
     }
     if ret_ty_slot.is_none() {
         let zonked = cx.metas.zonk_term(&body_ty_ctx);
-        let derived_depth = cx.ctx.len().checked_sub(cx.matrix_entries[owner].outer_ctx_len)
-            .ok_or_else(|| ElabError::Internal("matrix leaf escaped its entry context".into()))?;
+        let derived_depth = matrix_telescope_depth(cx, cx.matrix_entries[owner].outer_ctx_len)?;
         let lowered = lower_by(&zonked, derived_depth).map_err(|index| {
             ElabError::InferredMatchResultEscapesPattern {
                 match_span: top_span.clone(),
@@ -18133,6 +18366,20 @@ fn compile_match_leaf(
     Ok(body_core)
 }
 
+/// Count only the live telescope of this matrix entry. Every binder introduced
+/// while a match frame is active must have its origin and enclosing map at its
+/// stable level; an absent entry is not repaired by guessing from the depth.
+fn matrix_telescope_depth(cx: &ElabCtx<'_>, outer_len: usize) -> Result<usize, ElabError> {
+    let end = cx.ctx.len();
+    if outer_len > end {
+        return Err(ElabError::Internal("matrix telescope escaped its entry context".into()));
+    }
+    for level in outer_len..end {
+        cx.match_binder_origin(level)?;
+    }
+    Ok(end - outer_len)
+}
+
 /// Determine a nested eliminator's motive before opening its constructor
 /// buckets. Its codomain is the pending continuation in the split binder's
 /// context; `method_type` then provides every bucket's exact domains.
@@ -18152,9 +18399,7 @@ fn nested_matrix_motive(
     let entry = cx.matrix_entries.last().ok_or_else(|| {
         ElabError::Internal("nested motive has no owning matrix entry".into())
     })?;
-    let derived_depth = cx.ctx.len().checked_sub(entry.outer_ctx_len).ok_or_else(|| {
-        ElabError::Internal("nested motive escaped its entry context".into())
-    })?;
+    let derived_depth = matrix_telescope_depth(cx, entry.outer_ctx_len)?;
     let codomain = tail_codomain(
         cx, &col_types[1..], &col_kinds[1..], result, derived_depth + 1,
     )?;
@@ -18272,7 +18517,7 @@ fn compile_match_matrix(
                     entry.skipped_ih.push(cx.ctx.len());
                 }
             }
-            cx.ctx.push(ih_ty.clone());
+            cx.push_match_binder(ih_ty.clone(), MatchBinderOrigin::Ih);
             cx.hidden_positions.push(cx.ctx.len() - 1);
             let rows = rows.into_iter().map(RowState::under_core_binder).collect();
             let inner = compile_match_matrix(
@@ -18371,7 +18616,13 @@ fn compile_match_matrix(
                 debug_assert!(rows
                     .iter()
                     .all(|row| row.real_occurrences[0].surface_binder == surface_binder));
-                cx.ctx.push(col_types[0].clone());
+                let origin = rows[0].real_occurrences[0].origin;
+                if rows.iter().any(|row| row.real_occurrences[0].origin != origin) {
+                    return Err(ElabError::Internal(
+                        "matrix flat column has inconsistent binder origins".into(),
+                    ));
+                }
+                cx.push_match_binder(col_types[0].clone(), origin);
                 if !surface_binder {
                     cx.hidden_positions.push(cx.ctx.len() - 1);
                 }
@@ -18474,7 +18725,7 @@ fn compile_match_matrix(
             // The split variable is a real, hidden context binder throughout
             // each derived method. Aborting discovery unwinds it before the
             // owning match decides whether to rerun.
-            cx.ctx.push(col_types[0].clone());
+            cx.push_match_binder(col_types[0].clone(), MatchBinderOrigin::Scrutinee);
             cx.hidden_positions.push(cx.ctx.len() - 1);
             let raw_methods_result = build_ctor_buckets(
                 cx, arms, &ind0, d_id0, m0, &params0, rows,
@@ -18696,7 +18947,7 @@ fn build_ctor_buckets(
                 &kinds, ret_ty_slot.as_ref().unwrap_or(&domain_result),
                 split_span, top_span,
             );
-            cx.ctx.push(binder);
+            cx.push_match_binder(binder, MatchBinderOrigin::Scrutinee);
             cx.hidden_positions.push(cx.ctx.len() - 1);
             debug_assert_eq!(cx.ctx.len(), saved_len);
             debug_assert_eq!(cx.hidden_positions.len(), saved_hidden);
@@ -18770,7 +19021,11 @@ fn build_ctor_buckets(
         new_col_kinds.extend(std::iter::repeat(ColKind::Ih).take(p_ihs0));
         new_col_kinds.extend_from_slice(tail_col_kinds);
 
-        let inner = compile_match_matrix(
+        let base = cx.ctx.len();
+        cx.match_frames.push(MatchFrame::new(
+            base, cx.match_frames.len(), ret_ty_slot.clone(), None,
+        ));
+        let result = compile_match_matrix(
             cx,
             arms,
             &new_col_types,
@@ -18782,7 +19037,9 @@ fn build_ctor_buckets(
             ret_ty_slot,
             arm_used,
             subsumed_by,
-        )?;
+        );
+        cx.match_frames.pop();
+        let inner = result?;
         methods[k0] = Some(inner);
     }
 
@@ -18978,7 +19235,7 @@ fn finish_inferred_indexed_match(
     scrut_core: Term,
     span: &Span,
 ) -> Result<Term, ElabError> {
-    let sentinel_region = cx.match_field_regions.len();
+    let sentinel_region = cx.match_frames.len();
     let motive = cx
         .indexed_match_roots
         .last()
@@ -19016,8 +19273,16 @@ fn finish_inferred_indexed_match(
             continue;
         }
         let old_depth = cx.ctx.len();
-        for domain in &domains {
-            cx.ctx.push(domain.clone());
+        cx.match_frames.push(MatchFrame::new(
+            old_depth, sentinel_region, Some(result_ty.clone()), None,
+        ));
+        for (position, domain) in domains.iter().enumerate() {
+            let origin = if position < field_count {
+                MatchBinderOrigin::Field
+            } else {
+                MatchBinderOrigin::Ih
+            };
+            cx.push_match_binder(domain.clone(), origin);
         }
         let premises_under_ih: Vec<_> = premises
             .iter()
@@ -19032,6 +19297,7 @@ fn finish_inferred_indexed_match(
             span,
         );
         cx.ctx.types.truncate(old_depth);
+        cx.match_frames.pop();
         let mut omitted = omitted?;
         for domain in domains.iter().rev() {
             omitted = Term::lam(domain.clone(), omitted);
@@ -19087,7 +19353,7 @@ fn compile_matrix_entry<T>(
         cx.pattern_alias_type_frames.len(),
         cx.active_pattern_aliases.len(),
         cx.indexed_match_roots.len(),
-        cx.match_field_regions.len(),
+        cx.match_frames.len(),
         cx.active_index_premise_frames.len(),
     );
     let result = loop {
@@ -19103,7 +19369,7 @@ fn compile_matrix_entry<T>(
                     cx.pattern_alias_type_frames.len(),
                         cx.active_pattern_aliases.len(),
                     cx.indexed_match_roots.len(),
-                    cx.match_field_regions.len(),
+                    cx.match_frames.len(),
                     cx.active_index_premise_frames.len(),
                 );
                 if !balanced {
@@ -22037,7 +22303,8 @@ mod nested_method_alias_frame_tests {
 #[cfg(test)]
 mod match_matrix_occurrence_tests {
     use super::{
-        begin_match_occurrence_trace, take_match_occurrence_trace, MatrixOccurrence, RowState,
+        begin_match_occurrence_trace, take_match_occurrence_trace, MatchBinderOrigin,
+        MatrixOccurrence, RowState,
     };
     use crate::{
         error::Span,
@@ -22210,7 +22477,7 @@ mod match_matrix_occurrence_tests {
             ],
             real_occurrences: vec![
                 MatrixOccurrence::live(Term::var(2)),
-                MatrixOccurrence::pending_field(true, true),
+                MatrixOccurrence::pending_field(true, true, MatchBinderOrigin::Field),
             ],
             binding_occurrences: vec![Some(Term::var(1))],
             virtual_surface_positions: Vec::new(),
