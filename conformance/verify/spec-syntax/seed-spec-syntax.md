@@ -86,29 +86,46 @@ rests on (`21 §5.4`) and must never regress.
   `refined_slot requires_fn`.
 - expect: **negative pair:** `plain_slot refined_fn` and
   `plain_slot requires_fn` are both refused because each argument type has the
-  extra precondition Π argument. **Positive pair:** `refined_slot refined_fn`
-  and `refined_slot requires_fn` are both accepted; `refined_slot`'s written
-  domain desugars to `(d : Int) → (_ : Not (Equal Int d 0)) → Int`, the same
-  carrier-plus-proof telescope as both functions.
-- why: `21 §6.3` requires refined parameters and written refined domains to
-  retain the generated proof binder in higher-order types; the explicit-
-  `requires` twin is the semantic control. A refinement-erasure bug that
-  accepts `refined_fn` in the plain slot but rejects `requires_fn` changes the
-  negative pair's verdict parity. Erasing the written refined domain also makes
-  the positive pair fail. Promise class: durable invariant. The asserted
-  behavior is type compatibility, not source spelling.
+  extra precondition Π argument. **Positive type-compatibility pair:**
+  `refined_slot refined_fn` and `refined_slot requires_fn` are both accepted
+  as `f` arguments, leaving the same residual `(n : Int) → Int` type. The
+  written domain desugars to the same carrier-plus-proof telescope as both
+  functions. The body application `f n` yields exactly one call-site
+  obligation with provenance at `f n`:
 
-The tested declarations are:
+  ```text
+  Γ = (f : (d : Int) → (_ : Not (Equal Int d 0)) → Int), (n : Int)
+  φ = Not (Equal Int n 0)
+  ```
+
+  There is no such premise in `Γ`; the plain `f 1` call in `plain_slot` emits
+  no precondition obligation.
+- why: `21 §6.3` requires refined parameters and written refined domains to
+  retain the generated proof binder in higher-order types; `22 §2.3` makes the
+  caller establish its premise. The explicit-`requires` twin controls type
+  compatibility. A refinement-erasure bug changes the negative pair's verdict
+  parity or rejects the positive pair; a call-path bug omits the obligation.
+  **Measured:** V2 emits `φ` with provenance at `f n` and emits no
+  precondition obligation at `plain_slot`'s `f 1`. **Claimed:** applying a
+  higher-order variable with a refined domain retains the caller's burden.
+  **The gap:** `f` is a variable, not a known declaration, and `n` is plain
+  `Int` with no premise in scope; the plain slot is the no-precondition control.
+  Promise class: durable invariant. The asserted
+  behavior is type compatibility and call-site obligation, not source spelling.
+
+The fixture declarations are:
 
 ```ken
 view refined_fn (d : {x:Int | Not (Equal Int x 0)}) : Int = d
 view requires_fn (d : Int) : Int requires Not (Equal Int d 0) = d
 view plain_slot (f : (d : Int) → Int) : Int = f 1
 view refined_slot
-  (f : (d : {x:Int | Not (Equal Int x 0)}) → Int) : Int = 0
+  (f : (d : {x:Int | Not (Equal Int x 0)}) → Int)
+  (n : Int) : Int = f n
 ```
 
-The four listed applications above are the negative and positive controls.
+The four listed applications above are the negative and positive controls;
+`f n` in `refined_slot` is the caller-obligation site.
 
 ### verify/spec-syntax/requires-on-first-param-of-two
 - spec: `21 §6.3` (preconditions become proof parameters), `39 §5.3`

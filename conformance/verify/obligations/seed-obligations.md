@@ -319,8 +319,8 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/recursive-fn-per-ctor-obligation-with-ih (soundness)
 - spec: `22 §4`; `14 §3` (eliminator); `39 §2.6`
-- given: `def Nat = { n : Int | IsTrue (leq_int 0 n) }`; a recursive
-  `view sum (xs : List Nat) : Int` with
+- given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; a recursive
+  `view sum (xs : List NonNeg) : Int` with
   `ensures IsTrue (leq_int 0 result) = …` and body
   `match xs { nil → 0 ; cons y ys → y + sum ys }`
 - expect: the extractor emits **per-constructor** obligations from the `elim_D`
@@ -340,8 +340,8 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/nonrecursive-degenerate-no-induction-hypothesis
 - spec: `22 §4` (degenerate motive)
-- given: `def Nat = { n : Int | IsTrue (leq_int 0 n) }`; a non-recursive
-  `view double (n : Nat) : Int ensures IsTrue (leq_int n result) = n + n`
+- given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; a non-recursive
+  `view double (n : NonNeg) : Int ensures IsTrue (leq_int n result) = n + n`
 - expect: the obligation `IsTrue (leq_int n (n + n))` is emitted with **no**
   induction hypothesis in `Γ` (the degenerate motive — no recursive fields).
 - why: §4 — non-recursive functions are the degenerate motive (no recursive

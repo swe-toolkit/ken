@@ -604,22 +604,23 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 
 ## surface/data-match/refinement-obligation (AC7) (soundness) — TR7
 - spec: `spec/30-surface/34-data-match.md §5`, `21 §2`, `22 §2.1`
-- given: `def NonNeg = { n : Int | n ≥ 0 }`; (a) passing a plain `Int` `e`
-  where `NonNeg` is expected (introduction); (b) passing a `NonNeg` where an
-  `Int` is expected (forgetful)
+- given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; (a) passing a plain
+  `Int` `e` where `NonNeg` is expected (introduction); (b) passing a `NonNeg`
+  where an `Int` is expected (forgetful)
 - expect:
-  - (a) the obligation `e ≥ 0` is **emitted** at that point (`22 §2.1`),
-    discharged or left a visible hole — **never** a silent coercion past `φ`;
-    the core image of the value is the **carrier `Int`** (no kernel `Σ`).
-    **(soundness)**
-  - (b) **no** obligation — `{n:Int|n≥0} ≤ Int` is **free** (the identity on the
-    carrier, `22 §2.1`/§2.5).
+  - (a) the obligation `IsTrue (leq_int 0 e)` is **emitted** at that point
+    (`22 §2.1`), discharged or left a visible hole — **never** a silent
+    coercion past `φ`; the core image of the value is the **carrier `Int`** (no
+    kernel `Σ`). **(soundness)**
+  - (b) **no** obligation — `{n:Int | IsTrue (leq_int 0 n)} ≤ Int` is **free**
+    (the identity on the carrier, `22 §2.1`/§2.5).
 - why: refinements enforce; using `A` as `{x:A|φ}` costs a proof, the reverse is
   free. **Flip:** a missed obligation on (a) reads `proved` with **zero** proof
   (the `22 §intro` linchpin — completeness is backstopped by nothing
-  downstream), so observe the **emitted VC** structurally (obligation `n ≥ 0`
-  is in the set), not just the final verdict. A spurious obligation on (b) (the
-  forgetful direction) is the dual bug — assert the set is **empty** there. The
+  downstream), so observe the **emitted VC** structurally (obligation
+  `IsTrue (leq_int 0 e)` is in the set), not just the final verdict. A spurious
+  obligation on (b), the forgetful direction, is the dual bug — assert the set
+  is **empty** there. The
   pair (emit-on-intro / silent-on-forget) flips on the direction.
 
 ## Coverage map
