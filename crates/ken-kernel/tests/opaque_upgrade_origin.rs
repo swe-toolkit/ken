@@ -45,6 +45,23 @@ fn p1_p2_prelude_constants_cannot_be_given_opposite_bodies() {
 }
 
 #[test]
+fn postulate_named_like_prelude_is_eligible_only_at_its_own_id() {
+    let mut env = GlobalEnv::new();
+    let bottom = env.bottom_id();
+    let top = env.top_id();
+    let tt = env.tt_id();
+    let named_bottom = declare_postulate(&mut env, "Bottom".into(), vec![], constant(top))
+        .expect("independently checked assumption");
+    assert_ne!(named_bottom, bottom);
+    ineligible(admit_bodies(&mut env, &[(bottom, constant(top))]).unwrap_err());
+    admit_bodies(&mut env, &[(named_bottom, constant(tt))])
+        .expect("only this postulate identity is eligible");
+    assert!(matches!(env.lookup(bottom), Some(Decl::Opaque { .. })));
+    assert!(!env.trusted_base().contains(&named_bottom));
+    assert!(env.trusted_base().is_empty());
+}
+
+#[test]
 fn ineligible_later_group_member_is_refused_before_first_body_is_checked() {
     let mut env = GlobalEnv::new();
     let top = env.top_id();
