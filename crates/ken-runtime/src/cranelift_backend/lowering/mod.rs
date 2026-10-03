@@ -4137,21 +4137,6 @@ impl CheckedIhCapturedEnvironment {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum TailAnswer {
-    PassThrough(CarriedResidualWord),
-    Routed(CarriedBoundaryWord),
-}
-
-impl TailAnswer {
-    fn into_operand(self) -> LoweringOperand {
-        match self {
-            Self::PassThrough(residual) => LoweringOperand::Residual(residual),
-            Self::Routed(word) => LoweringOperand::Carried(word),
-        }
-    }
-}
-
 /// The Trap-checked result of one governed checked-IH continuation call.
 ///
 /// Construction is confined to the declared-call consumer. In particular,
