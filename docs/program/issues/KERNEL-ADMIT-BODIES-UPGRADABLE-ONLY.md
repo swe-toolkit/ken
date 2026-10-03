@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ADMIT-BODIES-UPGRADABLE-ONLY
 title: "The kernel proves Bottom with an empty trusted base, because admit_bodies upgrades any Opaque declaration: it will give the prelude Bottom the body Top, or re-upgrade a recursion-barrier fold that earlier declarations were checked against. Upgrade only a hole the kernel staged or recorded as an assumption"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
