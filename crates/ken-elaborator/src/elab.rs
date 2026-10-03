@@ -2919,7 +2919,7 @@ fn build_index_equation_convoy_body(
     motive_base_depth: usize,
     context_convoy: &[ConvoyEntry],
     sentinel_region: usize,
-    split_span: &Span,
+    _split_span: &Span,
 ) -> Result<Option<Term>, ElabError> {
     let env: &GlobalEnv = &*cx.env;
     if ind.indices.len() != 1 || scrut_indices.len() != 1 {
@@ -6169,7 +6169,7 @@ fn install_plain_declared_index_aliases(
 fn check_dependent_branch_body(
     cx: &mut ElabCtx,
     arm: &RMatchArm,
-    match_span: &Span,
+    _match_span: &Span,
     ind: &InductiveDecl,
     params: &[Term],
     level_args: &[Level],
@@ -16278,7 +16278,7 @@ fn enter_pattern_alias_leaf(
     cx: &mut ElabCtx,
     arm_idx: usize,
     binding_occurrences: &[Option<Term>],
-    real_depth: usize,
+    _real_depth: usize,
     virtual_surface_positions: &[usize],
     virtual_aliases: &[MatrixVirtualAlias],
     row_hidden_surface_positions: &[usize],
@@ -18305,7 +18305,7 @@ fn compile_match_matrix(
             let Term::IndFormer { level_args, .. } = head else {
                 unreachable!("nested split has an inductive scrutinee")
             };
-            let (motive, needs_reverting) = nested_matrix_motive(
+            let (motive, _needs_reverting) = nested_matrix_motive(
                 cx, &ind0, d_id0, &level_args, &params0,
                 col_types, col_kinds, ret_ty_base,
                 &split_span, top_span,
@@ -18590,8 +18590,8 @@ fn build_ctor_buckets(
             let mut real_tail_binders = 0;
             for (ty, kind) in tail_col_types.iter().zip(tail_col_kinds) {
                 if matches!(kind, ColKind::Ih) {
-                    // IH slots are woven later, not part of the raw tail
-                    // type's real telescope.
+                    // IH domains come from `method_type`, not the pending
+                    // tail's Real-column specialization.
                     new_col_types.push(ty.clone());
                     continue;
                 }
@@ -18762,7 +18762,7 @@ fn close_inferred_index_method(
     field_count: usize,
     ih_count: usize,
     sentinel_region: usize,
-    split_span: &Span,
+    _split_span: &Span,
 ) -> Result<(Option<Term>, Vec<Term>), ElabError> {
     let mut domains = Vec::with_capacity(field_count + ih_count);
     let mut tail_ty = method_ty;
@@ -19898,11 +19898,10 @@ fn recover_escaping_pattern_binder(
     if binding_names.len() != occurrences.len() {
         return None;
     }
-    // `occurrences` live in the emitted method telescope (including IHs
-    // and split binders). The escaping index instead lives in `cx.ctx`,
-    // which has only real field pushes. Compare their binder *order*, not
-    // their raw de Bruijn indices: a synthetic IH below `m` changes its
-    // emitted index without changing the context position of `m`.
+    // Both occurrences and the escaping index live in `cx.ctx`, including
+    // hidden IH and split entries. `real_depth_so_far` counts only flat Real
+    // source binders; compare their order, not raw de Bruijn indices. A
+    // hidden IH below `m` changes its index without adding a source binder.
     let mut binders = binding_names
         .into_iter()
         .zip(occurrences)

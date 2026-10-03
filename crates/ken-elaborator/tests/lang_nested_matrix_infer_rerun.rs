@@ -3,7 +3,7 @@
 //! Spec: spec/30-surface/34-data-match.md §3.1–3.2, §4.4.
 //! Promise class: durable value and single-elaboration invariants.
 
-use ken_elaborator::{ElabEnv, NumericLitVal};
+use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{env::PrimReduction, normalize, Context, Decl, Term};
 
@@ -11,9 +11,19 @@ const VEC: &str = "data Vec (a : Type) : Nat → Type where { \
     VNil : Vec a Zero; VCons : (n : Nat) → a → Vec a n → Vec a (Suc n) }";
 
 fn literal_declarations(env: &ElabEnv) -> usize {
-    env.env.declarations().iter().filter(|decl| {
-        matches!(decl, Decl::Primitive { reduction: PrimReduction::Literal, .. })
-    }).count()
+    env.env
+        .declarations()
+        .iter()
+        .filter(|decl| {
+            matches!(
+                decl,
+                Decl::Primitive {
+                    reduction: PrimReduction::Literal,
+                    ..
+                }
+            )
+        })
+        .count()
 }
 
 fn normal(env: &ElabEnv, name: &str) -> Term {
@@ -25,8 +35,13 @@ fn normal(env: &ElabEnv, name: &str) -> Term {
 fn check_literal_result(source: &str, label: &str) -> (ElabEnv, ken_kernel::GlobalId) {
     let mut env = ElabEnv::new().expect("prelude");
     let trusted = env.env.trusted_base();
-    env.elaborate_file(source).unwrap_or_else(|e| panic!("{label}: {e:?}"));
-    assert_eq!(env.env.trusted_base(), trusted, "{label}: literal changed trust");
+    env.elaborate_file(source)
+        .unwrap_or_else(|e| panic!("{label}: {e:?}"));
+    assert_eq!(
+        env.env.trusted_base(),
+        trusted,
+        "{label}: literal changed trust"
+    );
     let Term::Const { id, .. } = normal(&env, "observed") else {
         panic!("{label}: the match did not reduce to its literal leaf")
     };
@@ -56,8 +71,11 @@ fn vcons_first_infers_string_and_decimal_once_before_ih() {
         );
         let (indexed_env, indexed_id) = check_literal_result(&indexed, "VCons-first");
         let (flat_env, flat_id) = check_literal_result(&flat, "non-IH Box");
-        assert_eq!(literal_declarations(&indexed_env), literal_declarations(&flat_env),
-            "{result_ty}: replay must not mint a second RHS literal");
+        assert_eq!(
+            literal_declarations(&indexed_env),
+            literal_declarations(&flat_env),
+            "{result_ty}: replay must not mint a second RHS literal"
+        );
         for (label, env, id) in [
             ("VCons-first", &indexed_env, indexed_id),
             ("non-IH Box", &flat_env, flat_id),
@@ -72,6 +90,33 @@ fn vcons_first_infers_string_and_decimal_once_before_ih() {
     }
 }
 
+#[test]
+fn inferred_nested_result_cannot_escape_a_constructor_field() {
+    // MEASURED: a nested leaf result `Vec Nat n` gives a typed escape
+    // diagnostic at its match span. CLAIMED: discovery must not treat the
+    // derived field telescope as ambient. THE GAP: nested projection does
+    // not recover the field name, so this pins the variant and location;
+    // the String/Decimal peers pin successful constant-R inference.
+    let mut env = ElabEnv::new().expect("prelude");
+    let source = format!(
+        "{VEC}\ndata Dep : Type where {{ MkDep : (n : Nat) → Vec Nat n → Dep }}\n\
+         data Wrapper : Type where {{ MkWrap : Dep → Wrapper }}\n\
+         fn result (w : Wrapper) : Nat = let r = match w {{ \
+           MkWrap (MkDep n v) ↦ v \
+         }} in Zero"
+    );
+    let error = env
+        .elaborate_file(&source)
+        .expect_err("a constructor-local result index must not escape");
+    assert!(
+        matches!(error,
+        ElabError::InferredMatchResultEscapesPattern { ref match_span, .. }
+            if match_span.start == source.find("match w").expect("fixture match")),
+        "{error:?}"
+    );
+    assert!(error.to_string().contains("annotate"), "{error}");
+}
+
 fn eval_nat(env: &ElabEnv, name: &str) -> usize {
     let mut store = EvalStore::new();
     store.list_char_ids = Some(ListCharIds {
@@ -83,11 +128,9 @@ fn eval_nat(env: &ElabEnv, name: &str) -> usize {
             NumericLitVal::Int(value) => EvalVal::from(value.clone()),
             NumericLitVal::Float(value) => EvalVal::Float(*value),
             NumericLitVal::Float32(value) => EvalVal::Float32(*value),
-            NumericLitVal::Decimal { coeff, exp } => ken_interp::decimal_value(
-                env.prelude_env.mkdecimalpair_id,
-                coeff.clone(),
-                *exp,
-            ),
+            NumericLitVal::Decimal { coeff, exp } => {
+                ken_interp::decimal_value(env.prelude_env.mkdecimalpair_id, coeff.clone(), *exp)
+            }
             NumericLitVal::Str(value) => EvalVal::Str(value.clone()),
             NumericLitVal::Bytes(value) => EvalVal::Bytes(value.clone()),
         };
@@ -104,7 +147,11 @@ fn eval_nat(env: &ElabEnv, name: &str) -> usize {
             other => panic!("expected Nat result, got {other:?}"),
         }
     }
-    count(eval(&[], &body, &env.env, &mut store), env.globals["Zero"], env.globals["Suc"])
+    count(
+        eval(&[], &body, &env.env, &mut store),
+        env.globals["Zero"],
+        env.globals["Suc"],
+    )
 }
 
 #[test]
@@ -140,13 +187,18 @@ fn vcons_first_string_pattern_reuses_descent_comparator_plan() {
            const expected_no : Nat = Zero"
     );
     let mut indexed_env = ElabEnv::new().expect("prelude");
-    indexed_env.elaborate_file(&indexed).expect("indexed comparator");
+    indexed_env
+        .elaborate_file(&indexed)
+        .expect("indexed comparator");
     let mut flat_env = ElabEnv::new().expect("prelude");
     flat_env.elaborate_file(&flat).expect("non-IH comparator");
     for (label, env) in [("indexed", &indexed_env), ("non-IH", &flat_env)] {
         assert_eq!(eval_nat(env, "yes"), 3, "{label} yes");
         assert_eq!(eval_nat(env, "no"), 0, "{label} no");
     }
-    assert_eq!(literal_declarations(&indexed_env), literal_declarations(&flat_env),
-        "the pattern comparator must be minted once before IH replay");
+    assert_eq!(
+        literal_declarations(&indexed_env),
+        literal_declarations(&flat_env),
+        "the pattern comparator must be minted once before IH replay"
+    );
 }
