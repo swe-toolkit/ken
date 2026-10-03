@@ -202,3 +202,61 @@ fn vcons_first_string_pattern_reuses_descent_comparator_plan() {
         "the pattern comparator must be minted once before IH replay"
     );
 }
+
+#[test]
+fn earlier_or_split_reuses_each_same_span_literal_request() {
+    // Promise class: durable value and declaration-count invariant.
+    // MEASURED: the earlier Or split requests the same String-pattern span
+    // twice; indexed and non-IH programs mint equal literal declarations
+    // and select both positive and negative values. CLAIMED: replay uses
+    // `(span, ordinal)`, not span alone. THE GAP: values alone would pass
+    // with an ordinal-free cache; the declaration relation must redden it.
+    let indexed = format!(
+        "{VEC}\nconst tail_value : String = \"tail\"\n\
+         fn select (n : Nat) (xs : Vec String (Suc n)) : Nat = \
+           let r = match xs {{ \
+             VCons (Zero | Suc Zero) \"a\" tl ↦ Suc (Suc (Suc Zero)); \
+             VCons m _ tl ↦ Zero \
+           }} in r\n\
+         const yes_zero : Nat = select Zero \
+           (VCons String Zero \"a\" (VNil String))\n\
+         const yes_one : Nat = select (Suc Zero) \
+           (VCons String (Suc Zero) \"a\" \
+             (VCons String Zero tail_value (VNil String)))\n\
+         const no_one : Nat = select (Suc Zero) \
+           (VCons String (Suc Zero) \"b\" \
+             (VCons String Zero tail_value (VNil String)))"
+    );
+    let non_ih = format!(
+        "{VEC}\nconst tail_value : String = \"tail\"\n\
+         data BoxString : Type where {{ MkBoxString : Nat → String → BoxString }}\n\
+         fn select (b : BoxString) : Nat = \
+           let r = match b {{ \
+             MkBoxString (Zero | Suc Zero) \"a\" ↦ Suc (Suc (Suc Zero)); \
+             MkBoxString m _ ↦ Zero \
+           }} in r\n\
+         const yes_zero : Nat = select (MkBoxString Zero \"a\")\n\
+         const yes_one : Nat = select (MkBoxString (Suc Zero) \"a\")\n\
+         const no_one : Nat = select (MkBoxString (Suc Zero) \"b\")"
+    );
+    let mut indexed_env = ElabEnv::new().expect("prelude");
+    let trust = indexed_env.env.trusted_base();
+    indexed_env
+        .elaborate_file(&indexed)
+        .expect("indexed Or and literal");
+    let mut non_ih_env = ElabEnv::new().expect("prelude");
+    non_ih_env
+        .elaborate_file(&non_ih)
+        .expect("non-IH Or and literal");
+    for (label, env) in [("indexed", &indexed_env), ("non-IH", &non_ih_env)] {
+        assert_eq!(eval_nat(env, "yes_zero"), 3, "{label} Zero");
+        assert_eq!(eval_nat(env, "yes_one"), 3, "{label} Suc Zero");
+        assert_eq!(eval_nat(env, "no_one"), 0, "{label} nonmatching literal");
+        assert_eq!(env.env.trusted_base(), trust, "{label} changed trust");
+    }
+    assert_eq!(
+        literal_declarations(&indexed_env),
+        literal_declarations(&non_ih_env),
+        "one plan per same-span request"
+    );
+}
