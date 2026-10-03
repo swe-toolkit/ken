@@ -292,7 +292,7 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 /// brackets exactly the two prelude `List` combinator `elaborate_decl` calls in
 /// `prelude.rs`, following the established `conversions.rs:303/364` idiom,
 /// and asserts their contribution to the trusted base is empty.
-/// 107 entries: large enough to be a finding about the shape of the
+/// 109 entries: large enough to be a finding about the shape of the
 /// trusted base in its own right (per D5b, that finding is reported rather
 /// than a reason to fall back to the per-name check AC-5 already is) --
 /// nearly all of it is the numeric-tower floor (`numbers.rs`/
@@ -320,7 +320,7 @@ fn trusted_base_labels(env: &ElabEnv) -> Vec<String> {
 /// block delta above are not redundant, and neither retires the other: the
 /// block delta is `GlobalId`-keyed and covers only zip's contribution,
 /// while this enumeration is label-keyed and covers the
-/// *whole* 107-entry trusted base, carrying census value the block delta
+/// *whole* 109-entry trusted base, carrying census value the block delta
 /// does not (the shape-of-the-trusted-base finding two paragraphs up is a
 /// property of this list specifically). Seeing an id-keyed delta land next
 /// to this label-keyed census is not a reason to retire the census.
