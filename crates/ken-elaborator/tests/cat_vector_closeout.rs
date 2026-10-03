@@ -1,7 +1,7 @@
 //! CAT-MIGRATE-TIER-C-DATA-VALUE Vector closeout controls.
 //!
 //! Vector owns checked indexed families, operations, computation theorems,
-//! and private map identity, fusion, and lookup-after-map laws. Its only
+//! and private map identity, fusion, and lookup-after-map/zip laws. Its only
 //! catalog dependencies are Combinators and Transport. It publishes no
 //! catalog surface and adds no trust beyond those providers.
 //! `cat_vec_acceptance` retains the family-index, computation, and
@@ -61,6 +61,7 @@ fn expected_owned_names() -> BTreeSet<String> {
         "lookup_fzero",
         "lookup_fsuc",
         "lookup_map",
+        "lookup_zip_with",
         "map",
         "map_vcons",
         "map_vnil",
@@ -194,7 +195,7 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 /// Promise class: transition sentinel for the owned declarations in this
 /// proof-only increment. Retire or rebaseline at the next separately authorized
 /// Vector declaration extension; this inventory is not a permanent API promise.
-/// MEASURED: ordinary isolated roots loading installs these twenty-three checked
+/// MEASURED: ordinary isolated roots loading installs these twenty-four checked
 /// Vector identities, returns only identities from that population, and
 /// executes every checked fence, then retains the same qualified name and ID
 /// populations. Provider-closure trust is unchanged by Vector. CLAIMED: the
@@ -383,6 +384,48 @@ fn vector_loader_visible_inventory_is_empty() {
             Ok(_) => panic!("Vector unexpectedly published {surface}"),
         }
     }
+}
+
+/// Promise class: durable invariant for the generic bounded-lookup law.
+/// MEASURED: roots loading installs a transparent `lookup_zip_with`; a fresh
+/// client independently spells its full generic Π proposition and applies the
+/// checked law at that type. The client's raw checked type must equal the
+/// provider's raw type. CLAIMED: lookup after zipping with `f` at the same
+/// `Fin n` equals `f` of *both* input lookups, at arbitrary element types,
+/// lengths, functions and vectors. THE GAP: the client pins the proposition
+/// and transparent proof, not its particular proof structure. An intact
+/// statement with a broken operation is separately tested by kernel check.
+#[test]
+fn lookup_zip_with_has_exact_checked_generic_proposition() {
+    let mut env = with_private_names();
+    let id = env.globals[&format!("{VECTOR}.lookup_zip_with")];
+    let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("lookup law must roots-load")
+    else {
+        panic!("lookup_zip_with must be a checked transparent theorem");
+    };
+    let actual = ty.clone();
+    env.elaborate_file(
+        "theorem checked_lookup_zip_with_contract
+           (a : Type) (b : Type) (c : Type) (n : Nat)
+           (f : a → b → c) (xs : Vec a n) (ys : Vec b n) (i : Fin n)
+         : Equal c
+             (lookup c n (zip_with a b c n f xs ys) i)
+             (f (lookup a n xs i) (lookup b n ys i)) =
+           lookup_zip_with a b c n f xs ys i",
+    )
+    .expect("the generic consumer must type-check against the lookup law");
+    let witness_id = env.globals["checked_lookup_zip_with_contract"];
+    let Decl::Transparent { ty: expected, .. } = env
+        .env
+        .lookup(witness_id)
+        .expect("checked client must load")
+    else {
+        panic!("lookup client must carry a checked proof");
+    };
+    assert_eq!(
+        &actual, expected,
+        "lookup_zip_with's raw proposition changed"
+    );
 }
 
 /// Promise class: durable invariant for the checked pointwise naturality law.
