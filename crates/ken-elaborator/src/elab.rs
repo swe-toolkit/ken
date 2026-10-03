@@ -15129,8 +15129,17 @@ fn elaborate_view_with_spec(
             param_ctx.push(pt.clone());
         }
 
-        // Phase 2: process `ensures` clauses.
-        // ensures context = param_ctx + [result : carrier_b]
+        // Phase 2: process `ensures` clauses under the same preconditions
+        // that are explicit proof binders in the completed declaration.
+        // Requirement domains are authored at parameter depth, so shift each
+        // under the earlier requirement binders before extending the context.
+        let mut ens_goal_ctx = param_ctx.clone();
+        for (i, req) in req_cores.iter().enumerate() {
+            ens_goal_ctx.push(weaken(req, i as i64));
+        }
+        // Resolved ensures expressions index parameters and result in the
+        // original surface context; their requires are supplied as scoped
+        // assumptions and inserted only when the goal is closed.
         let mut ens_ctx = param_ctx.clone();
         ens_ctx.push(carrier_b.clone());
 
@@ -15156,14 +15165,19 @@ fn elaborate_view_with_spec(
                 standard_operators,
                 local_dicts,
                 &ens_ctx,
+                &req_cores,
+                param_ctx.len(),
                 ens,
                 &rdecl.span,
                 &rdecl.name,
             )?;
             absorb_obligations(&mut decl_obligations, psi_obligations);
-            // goal = ψ[body_inner/result]: result = Var(0) in ens_ctx, substitute body
-            let goal_open = subst0(&psi_core, &body_inner);
-            let closed = close_goal(&param_ctx, &[], goal_open);
+            // result is Var(0) in ens_ctx. After substitution, the body
+            // remains under the requirement binders, so shift it past them.
+            let psi_under_requires = shift(&psi_core, req_cores.len() as i64, 1);
+            let body_under_requires = weaken(&body_inner, req_cores.len() as i64);
+            let goal_open = subst0(&psi_under_requires, &body_under_requires);
+            let closed = close_goal(&ens_goal_ctx, &[], goal_open);
             let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
                 .map_err(|e| ElabError::KernelRejected {
                     error: e,
@@ -15192,8 +15206,8 @@ fn elaborate_view_with_spec(
         // The req lambdas are inserted BETWEEN the param lambdas and the body, so each
         // param variable in body_inner shifts up by req_cores.len() to skip the req binders.
         let mut full_body = weaken(&body_inner, req_cores.len() as i64);
-        for req in req_cores.iter().rev() {
-            full_body = Term::lam(req.clone(), full_body);
+        for (i, req) in req_cores.iter().enumerate().rev() {
+            full_body = Term::lam(weaken(req, i as i64), full_body);
         }
         for pt in param_types.iter().rev() {
             full_body = Term::lam(pt.clone(), full_body);
@@ -15784,6 +15798,8 @@ fn elab_in_ctx_at_omega(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
     ctx: &Context,
+    requires: &[Term],
+    parameter_depth: usize,
     expr: &RExpr,
     span: &Span,
     owner_label: &str,
@@ -15800,6 +15816,12 @@ fn elab_in_ctx_at_omega(
     // Populate cx.ctx from the snapshot
     for ty in &ctx.types {
         cx.ctx.push(ty.clone());
+    }
+    for prop in requires {
+        cx.assumptions.push(Assumption {
+            prop: prop.clone(),
+            depth: parameter_depth,
+        });
     }
     let core = elab_prop_at_omega(&mut cx, expr, span)?;
     Ok((core, std::mem::take(&mut cx.obligations)))
