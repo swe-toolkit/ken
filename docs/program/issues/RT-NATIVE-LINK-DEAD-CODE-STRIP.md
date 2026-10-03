@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-LINK-DEAD-CODE-STRIP
 title: "Every native executable is about 20.7 MB (11.3 MB stripped) whatever it does, because the link step keeps the whole runtime archive, Cranelift backend and JIT included, though no run-time path calls them. Link with section garbage collection and strip, so an executable carries only the code it reaches"
-status: ready
+status: active
 owner: runtime
 size: S
 tier: T2
