@@ -65,6 +65,16 @@ premise as a proposition.
    propositions in Ω form too, including `conformance/README.md`'s bytes
    round-trip law in 38 §1.5's `Equal` form (spec-leader
    `evt_6rhcyc8n3r8de`).
+6. A test that claims a heading this WP renames follows the rename. Only
+   the claim comment changes, never an assertion. M5 red on `ecfb85936`:
+   `crates/ken-elaborator/tests/v2_acceptance.rs:254` claims
+   `refined-param-is-hypothesis-not-obligation`, renamed
+   `refined-param-desugars-to-requires`. The same sweep finds two more:
+   `src/r_layer_tests/effects.rs:490` (`pure-view-usable-in-pure-context`,
+   now `pure-fn-…`) and `src/r_layer_tests/acceptance.rs:66`
+   (`const-elaborates-checks`, now `konst-…`). Re-run the sweep at the
+   respin tip: every heading removed under `conformance/` against every
+   claim in `crates/`, `scripts/` and `.github/`.
 
 ## Acceptance
 
