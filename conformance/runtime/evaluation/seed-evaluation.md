@@ -22,9 +22,11 @@ tags the **canonicity** cases. For the no-stuck cases, an unexpected neutral on
 a closed, well-typed ground input in their stated population would break the
 kernel's canonicity commitment (`16 §9`, `42 §3.6`) that X1 must realize. Closed
 quotient-class `Eq` is excluded from that population and pinned separately as
-the interim C8 neutral exception. These outcomes must never regress. A stuck or
-divergent X1 on a listed reducing fixture fails the end-to-end guarantee, so
-those cases carry the tag and the never-regress bar.
+the interim C8 neutral exception. The listed reducing outcomes must never
+regress; the neutral exception is current until P0
+(`KERNEL-QUOT-FORM-EQUIVALENCE`). A stuck or divergent X1 on
+a listed reducing fixture fails the end-to-end guarantee, so those cases carry
+the tag and the never-regress bar.
 
 **Tags.** `(oracle)` — confirmed at build time against Ken's interpreter (safe:
 X1 not in the type-soundness TCB): **interpreter-internal** observations (the

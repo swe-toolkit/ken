@@ -374,7 +374,7 @@ modeled on V2's `verify/obligations/exhaustive-traversal-no-silent-skip`.
   (`𝟘.Op = Empty`), the elaborator collapses it to the plain term, and §3
   evaluates it **unchanged** to the value `3`. The program **never** reaches the
   driver; determinism and canonicity for this fixture hold unchanged. Closed
-  quotient-class `Eq` remains the neutral C8 exception (`42 §3.6`).
+  quotient-class `Eq` is the current neutral C8 exception (`42 §3.6`).
 - why: effect evaluation **wraps** the driver *around* the pure core; it does
   **not** alter pure reduction (`42 §6.8`, **no regression**, acceptance 5). A
   bug that routes pure programs through the driver (or otherwise perturbs §3)
