@@ -147,7 +147,30 @@ fn check_level_closure<'a>(
             | Term::IndFormer { level_args, .. }
             | Term::Constructor { level_args, .. }
             | Term::Elim { level_args, .. } => level_args,
-            _ => &[],
+            // Name every variant with no direct Level field. A new Term
+            // carrying levels must be reviewed here; `children()` alone
+            // cannot expose a level or a level-argument list.
+            Term::Var(_)
+            | Term::IntLit(_)
+            | Term::Pi(..)
+            | Term::Lam(..)
+            | Term::App(..)
+            | Term::Sigma(..)
+            | Term::Pair(..)
+            | Term::Proj1(_)
+            | Term::Proj2(_)
+            | Term::Let { .. }
+            | Term::Ascript(..)
+            | Term::Eq(..)
+            | Term::Refl(_)
+            | Term::Cast(..)
+            | Term::J(..)
+            | Term::Quot(..)
+            | Term::QuotClass(_)
+            | Term::QuotElim { .. }
+            | Term::Trunc(_)
+            | Term::TruncProj(_)
+            | Term::Absurd(..) => &[],
         };
         for level in levels {
             let mut level_nodes = vec![level];
