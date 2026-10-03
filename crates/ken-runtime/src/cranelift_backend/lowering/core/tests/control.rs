@@ -23,6 +23,64 @@ use crate::cranelift_backend::lowering::units::{
 };
 
 
+#[test]
+fn carrier_word_join_refuses_residual_predecessor_without_a_residual_plane() {
+    // RT-CARRIER AC-2; durable invariant. MEASURED: the production join helper
+    // refuses an issued R on a declared K plan, while the same plan accepts K.
+    // CLAIMED: a planned source join cannot silently carry R as an ordinary K.
+    // THE GAP: this direct control pins the helper, not how many runtime rows
+    // reach that helper with R; the parity census measures arrivals separately.
+    let source = RuntimeExpr::Construct {
+        constructor: "ctor:fixture::JoinControl::Value".to_string(),
+        args: Vec::new(),
+    };
+    let (plan, origin) = planned_root_occurrence(&source);
+    let constructor = plan.constructor_symbol_identity(origin).expect("issued constructor");
+    let slot = RecursiveCarrierSlotKey::new(origin, constructor, 0);
+    let join_plan = JoinPlanToken::test_only_carrier_word(origin);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    lowering.static_transition_plan = plan;
+    let mut func = Function::new();
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut func, &mut context);
+    let entry = builder.create_block();
+    let join = builder.create_block();
+    lowering.append_planned_join_params(&mut builder, join, &join_plan);
+    builder.switch_to_block(entry);
+    let word = builder.ins().iconst(types::I64, 17);
+    let residual = CarriedResidualWord::issue(word, slot);
+    let mut merge_kind = None;
+    let refusal = lowering.jump_planned_join_arm(
+        &mut builder,
+        join,
+        &join_plan,
+        origin,
+        LoweringOperand::Residual(residual),
+        &mut merge_kind,
+        "RT-CARRIER AC-2",
+    );
+    assert!(matches!(
+        refusal,
+        Err(CraneliftBackendError::ResidualRepresentationRequired {
+            site: "a source join without a declared residual result plane",
+        }),
+    ), "the K join must reject an R predecessor: {refusal:?}");
+    // The K neighbour proves the fixture reaches a usable join, not another
+    // refusal upstream of the residual-representation guard.
+    lowering.jump_planned_join_arm(
+        &mut builder,
+        join,
+        &join_plan,
+        origin,
+        LoweringOperand::Carried(CarriedBoundaryWord { word }),
+        &mut merge_kind,
+        "RT-CARRIER AC-2",
+    ).expect("the same declared K join accepts K");
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
     Delete,

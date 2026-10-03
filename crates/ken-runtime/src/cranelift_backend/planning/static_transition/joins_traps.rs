@@ -69,6 +69,9 @@ pub(in crate::cranelift_backend) fn dead_arm_effect_trap(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum JoinResultRepresentation {
     NativeScalarPair,
+    /// A boundary value (K), not a recursive-position residual (R).
+    /// A planned source join refuses R rather than decoding it without
+    /// planner evidence about the result's subsequent consumers.
     CarrierWord,
 }
 
@@ -82,6 +85,19 @@ pub(in crate::cranelift_backend) struct JoinPlanToken {
     pub(in crate::cranelift_backend) origin: StaticOriginId,
     pub(in crate::cranelift_backend) representation: JoinResultRepresentation,
     pub(in crate::cranelift_backend) has_continuing_predecessor: bool,
+}
+
+/// A test-only declared K join: the planner owns token construction even for
+/// controls that deliberately supply an R predecessor after planning.
+#[cfg(test)]
+impl JoinPlanToken {
+    pub(in crate::cranelift_backend) fn test_only_carrier_word(origin: StaticOriginId) -> Self {
+        Self {
+            origin,
+            representation: JoinResultRepresentation::CarrierWord,
+            has_continuing_predecessor: true,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

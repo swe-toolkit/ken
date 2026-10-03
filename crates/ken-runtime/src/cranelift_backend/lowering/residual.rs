@@ -3,6 +3,28 @@
 
 use super::*;
 
+/// The slot, not a dynamically selected member of its closed flow.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct RecursiveCarrierSlotKey {
+    eliminator: StaticOriginId,
+    constructor: ConstructorIdentity,
+    position: u32,
+}
+
+impl RecursiveCarrierSlotKey {
+    pub(super) fn new(
+        eliminator: StaticOriginId,
+        constructor: ConstructorIdentity,
+        position: u32,
+    ) -> Self {
+        Self { eliminator, constructor, position }
+    }
+
+    pub(super) fn of(slot: &RecursiveCarrierSlot) -> Self {
+        Self::new(slot.eliminator, slot.constructor, slot.position)
+    }
+}
+
 /// An R record and its planner-issued source slot. The key exists only in
 /// lowering; the emitted word contains no variant or static provenance.
 #[derive(Clone, Copy, Debug)]
@@ -167,9 +189,9 @@ impl<'a> Lowering<'a> {
         builder: &mut FunctionBuilder<'_>,
         residual: CarriedResidualWord,
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
-        let (eliminator, constructor, position) = residual.slot().coordinates();
+        let key = residual.slot();
         let slot = self.static_transition_plan.recursive_carrier_slot(
-            eliminator, constructor, position,
+            key.eliminator, key.constructor, key.position,
         )?.ok_or_else(|| unsupported("RecursiveResidual", "residual names no issued slot"))?.clone();
         let wrapped = CarriedBoundaryWord { word: residual.word };
         let class = self.emit_carrier_class(builder, wrapped)?;

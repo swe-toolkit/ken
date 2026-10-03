@@ -18,7 +18,7 @@
 pub(in crate::cranelift_backend) mod core;
 mod residual;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
-    Representation};
+    RecursiveCarrierSlotKey, Representation};
 mod frame_validation;
 use frame_validation::{FrameEventKind, FrameEvents, FrameTerminalKind};
 
@@ -452,7 +452,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     RecursiveResidualDisposition, RecursiveCarrierChild, RecursiveCarrierRole,
     RecursiveCarrierBoxedStore, RecursiveCarrierMemberSchema, RecursiveCarrierStore,
     RecursiveCarrierStoreKind,
-    RecursiveCarrierSlot, RecursiveCarrierSlotKey, RecursiveCarrierVariant,
+    RecursiveCarrierSlot, RecursiveCarrierVariant,
     RecursiveResidualChildKind,
     SynthesizedAggregateNode, SynthesizedAggregatePath, SynthesizedAggregateRoot, PlannedAggregateOwnership,
     dead_arm_effect_trap, malformed_dynamic_constructor_trap,

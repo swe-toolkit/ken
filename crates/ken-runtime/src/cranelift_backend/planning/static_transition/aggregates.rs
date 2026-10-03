@@ -277,30 +277,6 @@ pub(in crate::cranelift_backend) struct RecursiveCarrierEdge {
     pub(in crate::cranelift_backend) child: RecursiveCarrierChild,
 }
 
-/// The slot, not a dynamically selected member of its closed flow.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(in crate::cranelift_backend) struct RecursiveCarrierSlotKey {
-    eliminator: StaticOriginId,
-    constructor: super::ConstructorIdentity,
-    position: u32,
-}
-
-impl RecursiveCarrierSlotKey {
-    pub(in crate::cranelift_backend) fn of(slot: &RecursiveCarrierSlot) -> Self {
-        Self {
-            eliminator: slot.eliminator,
-            constructor: slot.constructor,
-            position: slot.position,
-        }
-    }
-
-    pub(in crate::cranelift_backend) fn coordinates(
-        self,
-    ) -> (StaticOriginId, super::ConstructorIdentity, u32) {
-        (self.eliminator, self.constructor, self.position)
-    }
-}
-
 /// One closed flow set and one sum schema per recursive constructor slot.
 /// The label is omitted exactly when the flow has one member. Only the
 /// recorded edges may insert a Child into this slot's R representation.
