@@ -1,7 +1,7 @@
 ---
 id: SPEC-REFINED-PARAM-REQUIRES-DESUGAR
 title: "Spec 21 and 22 assume a refined parameter's predicate in the body while the parameter lowers to its bare carrier, so a higher-order caller passes an unproved value and the body relies on it. Make a refined parameter a desugar to the carrier parameter plus requires, and state contract examples as propositions, not Bool expressions"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -90,3 +90,13 @@ premise as a proposition.
 - The desugar needs a kernel change, or a refinement position other than a
   parameter or a written function domain needs the same treatment: stop to
   the Architect.
+
+## Closeout
+
+Merged `80afb1b10` from exact `b41dd8847` (FULL CI green, run
+`37118271593`); the main tree equals the routed merge tree. Gates:
+Architect `evt_5mfyzfy8jbnfw` and `evt_mwgrccpy7thm` (D6), CV
+`evt_23p1t5tv91t1w`, Decision `dec_4efznr0k3pf6`.
+`LANG-REFINED-PARAM-REQUIRES-DESUGAR` now waits only on the two Verify
+repairs. Architect carry: the spec 21
+`:504` `recordRefinement` comment goes to the next spec 21 touch.
