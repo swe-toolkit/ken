@@ -59,11 +59,12 @@ any order / in parallel (the prover and the agent-team both exploit this, §6).
 
 V1 (`21 §7`) hands V2 a four-part interface: (1) the **kernel-checkable core
 term** with V1's contract encodings — precondition Π proof-args, **carrier**
-result and refined-parameter types, the bare body; (2) the **obligation-hole
-set** — one hole `?id : φ` per `ensures`/refinement-introduction/`prove`/
+result and carrier parameters with all generated and written preconditions
+explicit as Π proof-args, the bare body; (2) the **obligation-hole set** — one
+hole `?id : φ` per `ensures`/refinement-introduction/`prove`/
 `law`-field site, admitted as a postulate; (3) each hole's **at-introduction
-`Γ`** — the preconditions and refined-parameter predicates in scope where the
-obligation arose; (4) **provenance** per hole.
+`Γ`** — the written and generated preconditions in scope where the obligation
+arose; (4) **provenance** per hole.
 
 V2 reads this **bare-carrier-plus-obligation** form — never a proof-carrying
 `Σ(B,ψ)` value (V1 does not emit one, `21 §2`/§6.3) — so V2 is **decoupled from
@@ -118,8 +119,12 @@ obligation; the postcondition is the result-type motive, realized per path.
 
 ### 2.3 Precondition discharge at call sites
 
-Calling `f` whose parameter `requires φ` (or whose parameter type is a
-refinement `{x:A|φ}`) emits, **at the call**,
+Calling a function value whose type carries `requires φ` emits, **at the
+call**, the proof-argument obligation below. This includes a refined parameter
+`(x : {y:A|φ})` normalized to `(x : A)` plus `requires φ[x/y]` (`21 §6.3`),
+and a higher-order variable whose written function type has a refined domain.
+The premise is visible in the function type's Π proof-argument, not inferred
+from the callee's declaration name or a hidden refinement annotation:
 
 ```
   Γ_call ⊢ φ[ā/params]                    (the caller meets the precondition)
@@ -159,12 +164,13 @@ gap, not a silent drop" concrete: because completeness is backstopped by nothing
 but this scan (the intro), a *new* burden-bearing construct cannot be silently
 no-emitted — it has no guarded-skip rule, so it fails loudly until one is added.
 
-1. **A refined *parameter*** `(x : {y:A|φ})` is a **Γ-hypothesis, not a
-   definition-site obligation.** It contributes `φ[x]` to `Γ` (§3); its proof is
-   the **caller's** obligation at the call (§2.3). *Guard:* the position is a
-   **binder**, not a use/introduction. (A bug treating it as an introduction
-   would emit a spurious obligation the callee cannot discharge — it has no
-   proof that its own argument satisfies `φ`.)
+1. **A refined *parameter*** `(x : {y:A|φ})` is desugared by V1 to the carrier
+   binder `(x : A)` plus `requires φ[x/y]` (`21 §6.3`). Its proof is the
+   **caller's** obligation at the call (§2.3); the body receives it through the
+   precondition proof-argument (§3). *Guard:* a binder is not a value introduced
+   at a refinement, so the definition site emits no refinement-introduction
+   obligation. No separate refined-parameter Γ entry or core binder survives
+   the desugar.
 2. **A body `requires φ`** (a precondition, once inside the body) is **assumed,
    not re-obligated.** *Guard:* a precondition enters `Γ` at the top of the body
    (§3) and is never emitted as the function's own goal. (The caller already
@@ -198,9 +204,12 @@ elaborated body, by these rules — each a precise `Γ`-extension, stated
 defensively so a dropped hypothesis (a too-weak `Γ`, → a false `unknown`) is the
 visible failure, never a too-strong `Γ` (which could mask a real burden):
 
-- **Preconditions.** `requires φ` adds `(_ : φ)` to `Γ` at the top of the body
-  (the assumption of §2.3/§2.5).
-- **Refined parameters.** `(x : {y:A|φ})` adds `(_ : φ[x])` to `Γ` (§2.5.1).
+- **Preconditions.** Each `requires φ`, written or generated from a refined
+  parameter (`21 §6.3`), adds its Π proof-argument `(_ : φ)` to `Γ` in binder
+  order before the body (the assumption of §2.3/§2.5). A refined domain in a
+  written function type yields the same proof binder; an application through
+  a higher-order variable still owes it (§2.3). A refined parameter supplies
+  no second, independent hypothesis.
 - **`let x := e`** (with `e : A`) adds `(x : A)` and, where `A` is informative,
   the equation `(_ : Eq A x e)` — a propositional hypothesis in Ω — so later
   obligations may rewrite by the binding.
@@ -270,14 +279,14 @@ extract(Γ, term, expectedTy) → ObligationSet:        -- Γ: hypotheses; term:
         obls ∪= extract(Γ, term, A)                              -- recurse at the carrier
 
   -- (§2.2) a contracted function definition (V1's elabView output)
-  ViewDef(Δ, requires φ̄, ensures ψ̄, body, B):
-        Γ' := Γ ⊕ Δ ⊕ { (_ : φᵢ) | φᵢ ∈ φ̄ } ⊕ refinedParamHyps(Δ)  -- §3: precond + refined-param assumed
+  ViewDef(Δp, requires φ̄, ensures ψ̄, body, B):                -- Δp has interleaved generated proofs
+        Γ' := Γ ⊕ Δp ⊕ { (_ : φᵢ) | φᵢ ∈ φ̄ }                    -- §3: written proofs follow, each once
         resultTy := refine(B, ψ̄)                                  -- {r : B | ψ₁ ∧ … ∧ ψₙ}: the postcondition AS the result-type motive (§4)
         obls ∪= extract(Γ', body, resultTy)                       -- §2.2: push it through the body — straight-line ⇒ one ψ[b/result]; branchy ⇒ per-path/per-ctor (the Elim/If clauses below, §3/§4). NO separate over-the-body obligation.
 
   -- (§2.3) a call of a contracted function: the CALLER's burden
-  App(f, ā)  when hasPreconds(f):
-        for φᵢ ∈ preconds(f):
+  App(f, ā)  when hasPreconds(typeOf(f)):                         -- named OR higher-order callee
+        for φᵢ ∈ preconds(typeOf(f)):
            obls ∪= ⟨fresh(), Γ ⊢ φᵢ[ā/params], prov(call)⟩      -- §2.3 at the call site
         obls ∪= extractArgs(Γ, ā)                                -- recurse into arguments
 
@@ -301,8 +310,7 @@ extract(Γ, term, expectedTy) → ObligationSet:        -- Γ: hypotheses; term:
         obls ∪= extract(Γ ⊕ (_ : Eq Bool c false), els, expectedTy)
 
   -- (§2.5) GUARDED no-emit positions — recurse structurally, emit nothing here
-  RefinedParamBinder(x, A, φ):  skip            -- a binder ⇒ Γ-hypothesis (done above), not an obligation
-  Forget(refined → carrier):    skip            -- {x:A|φ} ≤ A is free
+  Forget(refined → carrier):    skip            -- {x:A|φ} ≤ A is free; no refined binder remains
   Var | Const | Lam | Pair | Proj | Type | …:   -- the known burden-free structural formers
         recurse into immediate subterms with the same Γ
 
@@ -401,7 +409,8 @@ Acceptance ties to **G2**: for a recursive function with an inductive
 postcondition, the obligations + supplied proofs `check` in the kernel,
 and removing a needed proof leaves a **precisely-located open hole** (an
 `unknown`, visible in `trusted_base()`); a trivially-true clause yields its
-provable obligation, not *no* obligation (§2.5); a refined parameter yields a
-`Γ`-hypothesis, not a spurious obligation (§2.5); and non-spec programs yield
+provable obligation, not *no* obligation (§2.5); a refined parameter yields
+its generated precondition proof-argument and a `Γ`-hypothesis, not a spurious
+definition-site obligation (§2.5); and non-spec programs yield
 the **empty** obligation set with V1/V0 elaboration unchanged. Conformance:
 `../../conformance/verify/obligations/`.

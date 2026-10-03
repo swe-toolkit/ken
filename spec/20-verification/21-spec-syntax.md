@@ -47,8 +47,8 @@ The everyday form: pre- and post-conditions on a function.
 
 ```
 view divide (n : Int) (d : Int) : Int
-  requires  d ≠ 0
-  ensures   result * d + (n % d) == n
+  requires  Not (Equal Int d 0)
+  ensures   Equal Int (result * d + (n % d)) n
 = n / d
 ```
 
@@ -76,7 +76,8 @@ Semantically, a contract **denotes** a **refined function type**
 (`../30-surface/39-elaboration.md`): `divide` above denotes the dependent type
 
 ```
-(n : Int) (d : Int) → { d ≠ 0 } → (r : Int) × (r * d + (n % d) == n)
+(n : Int) (d : Int) → { Not (Equal Int d 0) }
+  → (r : Int) × (Equal Int (r * d + (n % d)) n)
 ```
 
 i.e. preconditions are extra (proof) arguments and the postcondition pairs the
@@ -94,8 +95,9 @@ A **refinement type** is the comprehension subobject (`../10-kernel/12 §5`,
 `../30-surface/34-data-match.md`): the type of `x : A` *for which `φ x` holds*.
 
 ```
-def Pos = { n : Int | n > 0 }
-view head (xs : { l : List A | l ≠ nil }) : A = …      -- non-empty by type
+def Pos = { n : Int | IsTrue (leq_int 1 n) }
+view head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …
+  -- non-empty by type
 ```
 
 - `{ x : A | φ x }` requires `φ x : Ω`. Its inhabitants are, by the
@@ -125,8 +127,9 @@ used in V1, for two reasons:
    formation sort was keyed on the codomain only, `check.rs sort_pi_sigma`,
    sound for Π-into-prop but over-admitting a Σ with a *relevant* first
    component). A refinement reified that way is collapsed by Ω-proof-irrelevance
-   (`16 §1.2`): `(3, p) ≡ (5, q) : {n:Int|n>0}` definitionally — the carrier is
-   lost, and via a transport motive it closes to a proof of `Empty`. The
+   (`16 §1.2`): `(3, p) ≡ (5, q) : {n:Int|IsTrue (leq_int 1 n)}`
+   definitionally — the carrier is lost, and via a transport motive it closes
+   to a proof of `Empty`. The
    Architect **confirmed** this as a reachable trust-root over-equating hole; a
    priority kernel erratum splits the rule (`sort_sigma → Ω` iff *both*
    components are Ω; Π stays codomain-keyed), with the matching spec erratum in
@@ -147,7 +150,7 @@ A **goal** is a standalone proposition to be discharged — a lemma, an invarian
 or an algebraic law — not attached to a single function's body.
 
 ```
-prove  add_comm : (a b : Int) → a + b == b + a
+prove  add_comm : (a b : Int) → Equal Int (a + b) (b + a)
 law    Monoid (M) { assoc : … ; unit_l : … ; unit_r : … }   -- a property bundle
 ```
 
@@ -195,6 +198,9 @@ proof-decl ::= "proof" ident "for" path binder* ":" type "=" expr
   **surface type error** (caught at elaboration, §6.3), not a verification
   failure. This is a load-bearing guard: the elaborator `check`s each clause
   body at Ω and rejects a non-Ω body *before* any obligation is formed.
+  Bool-valued comparisons such as `==` and `≠` (`33 §6.1`) do not become
+  propositions implicitly: use `Equal`, `Not (Equal …)`, or `IsTrue` of a
+  Bool comparison in a proposition position.
 - A `prop` family result, standalone `theorem`, or attached `proof` theorem also
   MUST type-check at `Ω` in its scope. The attached form is still just a proof
   term; its canonical export name is `subject::proof_name`, and there is no
@@ -449,17 +455,20 @@ pseudocode is **defensive** — every position that *must* be a proposition is
 explicitly `check`ed at Ω (a non-Ω body is a surface error, never silently
 admitted), and every obligation site explicitly emits a typed hole.
 
-**Function contract** — `requires`/`ensures` on a `view`. Preconditions become
-Π proof-arguments (assumed in the body, discharged at call sites); the
-postcondition becomes an obligation over `result`:
+**Function contract** — `requires`/`ensures` on a `view`. First normalize any
+refined parameter to a carrier parameter and a generated `requires` (§2,
+below). Preconditions become Π proof-arguments (assumed in the body, discharged
+at call sites); the postcondition becomes an obligation over `result`:
 
 ```
 elabView(Σ, ⟨ view f (Δ) : B requires φ̄ ensures ψ̄ = body ⟩) → (coreDef, obls):
-  Γ := extendTelescope(·, Δ)                  -- params in scope (39 §5.4)
-  -- preconditions → Π proof-args, assumed in the body (22 §3)
+  Δp := desugarRefinedParams(Δ)                -- for each (x : {y:A|φ}), check φ[x/y] at Ω
+                                               -- in its binder prefix; insert (x : A), (_ : φ[x/y])
+  Γ := extendTelescope(·, Δp)                  -- carrier and proof binders, in order
+  -- written requires follow all parameters and generated proof-args (22 §3)
   for φᵢ in φ̄:
     φᵢ' := check(Γ, φᵢ, Ω)                     -- MUST check at Ω (12 §5); else SURFACE ERROR
-    Γ   := extend(Γ, φᵢ')                       -- pᵢ : φᵢ now an assumption
+    Γ   := extend(Γ, φᵢ')                      -- pᵢ : φᵢ now an assumption
   B'  := elabType(Γ, B)                         -- the carrier result type (a Type)
   b   := check(Γ, body, B')                     -- the body at the carrier
   -- postconditions → obligations over result := b (NOT paired into b)
@@ -470,15 +479,16 @@ elabView(Σ, ⟨ view f (Δ) : B requires φ̄ ensures ψ̄ = body ⟩) → (cor
     hⱼ  := freshHole()
     emit ⟨hⱼ, Γ ⊢ goal, prov(ψⱼ)⟩              -- a typed hole = postulate (24 §2, §6.5)
     obls := obls ∪ {hⱼ}
-  coreTy := Π(Δ). Π(φ̄). B'                      -- (Δ) → (φ̄) → B   (refined type, denotational)
-  coreTm := λ(Δ). λ(p̄). b                       -- λΔ. λp̄. body
+  coreTy := Π(Δp). Π(φ̄'). B'                  -- generated proofs interleaved, written ones last
+  coreTm := λ(Δp). λ(p̄). b                     -- same binders, same order
   return (declare_def-checked coreTm : coreTy, obls)
 ```
 
-- The precondition `Π(φ̄)` is **sound**: `Π(p : φ : Ω). Rest` keys its formation
-  sort on the **codomain** `Rest` (`16 §1.1`, the landed `sort_pi_sigma`), so an
-  Ω domain does **not** collapse the function type — it stays a `Type`. Proof
-  args are at Ω (erased at runtime; discharged at the call as `φ[args]`,
+- Each precondition `Π` proof-argument is **sound**: `Π(p : φ : Ω). Rest`
+  keys its formation sort on the **codomain** `Rest` (`16 §1.1`, the landed
+  `sort_pi_sigma`), so an Ω domain does **not** collapse the function type —
+  it stays a `Type`. Proof args are at Ω (erased at runtime; discharged at the
+  call as `φ[args]`,
   `22 §2.3`).
 - The postcondition proof is **not** paired into `b` (no `Σ(B,ψ)` value, §2);
   it is the obligation `hⱼ`. `b` remains the bare carrier value, so contracts
@@ -499,8 +509,32 @@ check(Γ, a, {x:A|φ}):                            -- introduction: a : A used w
   return a'                                       -- {x:A|φ} ≤ A is free (here, identity)
 ```
 
-A **refined parameter** `(x : {y:A|φ})` lowers its type to `A` and contributes
-`φ[x]` as an assumption in `Γ` for downstream obligations (`22 §3`).
+A **refined parameter** `(x : {y:A|φ})` is syntactic sugar for the carrier
+parameter `(x : A)` plus `requires φ[x/y]` (capture-avoiding substitution). The
+predicate is checked at Ω and gives the callee a proof assumption **only**
+through the generated precondition's Π proof-argument; the caller must provide
+that proof at application (`22 §2.3`). For multiple refined parameters, each
+generated proof-argument immediately follows its carrier binder, in
+left-to-right binder order; these generated `requires` precede the written
+`requires` clauses, which retain their source order, and all precede
+`ensures`. Thus a multi-parameter declaration and a written multi-domain
+function type have the same interleaved Π telescope, not a separate Γ-only
+refinement path. The free forgetful conversion of a *value* `{x:A|φ} ≤ A`
+(§2) is unchanged.
+
+A **refined domain in a written function type** must take the same route:
+`(x : {y:A|φ}) → B` denotes `(x : A) → (_ : φ[x/y]) → B`, with the
+proof-argument immediately after the domain it protects. This normalization
+happens **before** ordinary `elabType` erases a refinement to its carrier; it
+applies at every written function-type domain, including types in higher-order
+positions. In a multi-domain function type, each generated proof-argument
+follows its own carrier domain, just as in `elabView`. In particular, its core
+type is **not** the plain `A → B`: substituting a function requiring `φ` for a
+value of plain `A → B` must be rejected by function-type checking. An
+application through a higher-order variable still supplies the proof argument
+and discharges the same `requires`
+premise; neither a known declaration name nor a body-local hypothesis can
+bypass that obligation (`22 §2.3`).
 
 **Goals** — `prove`/`law` lower to standalone obligations:
 
@@ -549,10 +583,11 @@ a **scope error**, rejected at elaboration before the kernel (`36 §7.3`). The
 guard is the *kind of the enclosing declaration*, asserted explicitly — so the
 conformance verdict flips on it (`old(c)` in a `space`-op `ensures` resolves to
 `proj_i(s_pre)`; `old(x)` in a pure-`view` `ensures` is rejected), never passing
-vacuously. Worked example (`36 §4.3`): `inc`'s `ensures n == old(n) + 1` denotes
-to the obligation `(s_pre with .n := s_pre.n + 1).n == s_pre.n + 1`, which
-computes by record-β/η (`13 §3`) to `s_pre.n + 1 == s_pre.n + 1`, discharged by
-`refl` (`16 §2`).
+vacuously. Worked example (`36 §4.3`): `inc`'s
+`ensures Equal Int n (old(n) + 1)` denotes the obligation
+`Equal Int ((s_pre with .n := s_pre.n + 1).n) (s_pre.n + 1)`, which computes
+by record-β/η (`13 §3`) to `Equal Int (s_pre.n + 1) (s_pre.n + 1)`, discharged
+by `refl` (`16 §2`).
 
 ### 6.5 The obligation-hole encoding (the `22` input)
 
@@ -582,15 +617,15 @@ V1 produces, per definition, exactly what obligation generation (`22`, V2)
 consumes. The interface is four things:
 
 1. **The elaborated core term** — kernel-checkable, with the contract encodings
-   of §6.3: precondition `Π` proof-arguments, carrier result and refined-
-   parameter types, and the bare body. V0 re-checks it (`18 §4`); a spec program
-   with a type error has no core image and is rejected (`39 §3`).
+   of §6.3: carrier result and parameters, written and generated precondition
+   `Π` proof-arguments, and the bare body. V0 re-checks it (`18 §4`); a
+   spec program with a type error has no core image and is rejected (`39 §3`).
 2. **The obligation-hole set** — the ordered set of `⟨id, Γ ⊢ φ, provenance⟩`
    (§6.5), one per `ensures`/refinement-introduction/`prove`/`theorem`/`proof`/
    `law`-field site, each a typed hole `?id : φ` admitted as a postulate.
 3. **The at-introduction hypotheses** — each hole's `Γ` already carries the
-   facts in scope where the obligation *arose*: preconditions and refined-
-   parameter predicates (`22 §3`). V2 **extends** each `Γ` with path-sensitive
+   facts in scope where the obligation *arose*: written and generated
+   preconditions (`22 §3`). V2 **extends** each `Γ` with path-sensitive
    facts (let-equations, case-split constructor equations, body-as-motive
    induction hypotheses — `22 §3`/`§4`); V1 provides the seed context, V2 the
    accumulation.
