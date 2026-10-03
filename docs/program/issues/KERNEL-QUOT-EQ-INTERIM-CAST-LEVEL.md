@@ -1,7 +1,7 @@
 ---
 id: KERNEL-QUOT-EQ-INTERIM-CAST-LEVEL
 title: "The kernel proves Eq Nat 0 1, because Quot-Form takes any relation and Eq at quotient classes reduces to it, and it admits a cross-level cast, because Cast never compares the two levels. Make Eq at quotient classes neutral until Quot-Form carries an equivalence proof, and refuse a cast whose types sit at different levels"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -52,7 +52,14 @@ stop and report the mismatch.
    a quotient. The Ω-target rule is unchanged. §9's C15 row splits:
    constant-motive accept and refuse are unchanged; the dependent-motive
    accept is deferred to P0 with interim verdict refused; `r_bad` stays
-   refused.
+   refused. §9's numbered item 4 ("relation-as-equality") states neutral
+   class Eq until P0 (spec-author `evt_1tkny60qttp4r`).
+   Every other `spec/` statement that gives quotient-class `Eq` reducing
+   to `R a b` as current behavior, or that depends on it, states the
+   interim too. Measured (CV via kernel-leader `evt_5mrvncv2ejy82`;
+   spec-author `evt_7d5b91ebqwn8w`): `17-conversion.md` `:471-473` and
+   `:811-813`, `spec/10-kernel/README.md` `:76`, `:160` and commitment 16,
+   and `15-identity.md` §4.3.
 3. Conformance: the `quotient-eq` rows (`seed-kernel.md`,
    `seed-observational.md`, `seed-conversion.md`
    `quotient-eq-through-conv`) state the interim verdict; a row pins the
@@ -61,6 +68,33 @@ stop and report the mismatch.
    reduction-derived `h'`, pins refused for both `r_ok` and `r_bad`, and
    marks the accept half as restored by P0. The constant-motive
    `quotient-respect-schema-{rejects,accepts}-…` rows are unchanged.
+   `seed-evaluation.md`'s `can-eq-by-type-computes` and
+   `agree-observational-corpus` state that quotient-class `Eq` stays
+   neutral in both engines and does not reduce to `R a b`
+   (kernel-implementer `evt_47tab4rs3fm50`).
+5. X1 (Architect `evt_4ztchp312c4wn` on kernel QA `evt_79844c7p7041x`).
+   - Today X1 is safe only by accident: a quotient class reaches
+     `eq_reduce`'s inductive same-constructor placeholder and returns
+     `Unknown`. A lawful completion of that placeholder would compare
+     representatives, giving Bottom for `R := λ _ _. Top`.
+   - `eq_reduce` gets an explicit arm keyed on the checked id
+     `QUOT_CLASS_TYPE_ID`, before the inductive `Ctor` arm, that returns
+     `EvalVal::Neutral`.
+   - A `ken-interp` unit pin evaluates `Eq (Nat / R) [Zero] [Suc Zero]` and
+     asserts `Neutral`, not Top. Deleting the arm reddens it with `Unknown`.
+   - Spec 42 §3.1's residue list and §3.6's `Eq`-by-type canonicity bullet
+     gain the interim C8 exception, gated on P0. So does §1's statement
+     that closed ground programs never reach a neutral (spec-author
+     `evt_3rtr85bqjts6e`). Every conformance statement of the same
+     closed-ground no-stuck claim is scoped to exclude it, and its fixtures
+     keep their verdicts. Measured (CV `evt_4vhaycdtr09mz`):
+     `seed-evaluation.md`'s CAN1 intro, `can-no-stuck-closed-ground`, Trust
+     posture and effects-scope paragraph, and `seed-runtime.md`'s
+     `runtime/evaluation/canonicity`.
+   - No `cast_reduce` or `eq_type_eq` change.
+   - Not this WP: `eq_reduce` also returns `Unknown` for other closed
+     C2-C4 cases (multi-field constructor, Π, Ω, scalar). That is a
+     pre-existing drift from 42 §3.6.
 4. Test consumers of the reduction are migrated (check 3: grep
    `crates/*/tests`, `conformance/`, `examples/`, `catalog/` for quotient
    equality uses, not only `eq_at_quot`).
@@ -87,3 +121,14 @@ stop and report the mismatch.
   changes for it. The spec prose is the only consumer, handled in
   deliverable 2.
 - A catalog or `examples/` program stops checking.
+
+## Closeout
+
+Merged `66d72ceb8` from exact `e70979026` (FULL CI green, run
+`37131808322`); the main tree equals the routed merge tree, and all 18
+blobs match. Gates: Kernel QA `evt_4ek2n27qgx2sv`, Architect
+`evt_5swbqc99ge95m`, CV `evt_283yt5v45jvnn`, Decision `dec_7rpfw1a7b0ehs`.
+Quotient-class `Eq` is neutral in the kernel and the interpreter, cast
+refuses unequal levels, and every spec and conformance statement of the
+old reduction carries the P0-gated interim. KERNEL-QUOT-FORM-EQUIVALENCE
+(P0) restores the reduction and flips them back (its D5).

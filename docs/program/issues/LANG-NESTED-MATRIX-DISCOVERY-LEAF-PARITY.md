@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-MATRIX-DISCOVERY-LEAF-PARITY
 title: "An inferred nested match whose first leaf sits under an indexed family's IH now fails with Internal, replayed leaf changed a non-IH context entry, because the discovery pass builds that leaf's context differently from the check-mode rerun. Make discovery and rerun build the same leaf context, so the programs db19a8d0c^ accepted elaborate again"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -83,3 +83,12 @@ stop and report the mismatch.
 - A committed `InferredMatchResultEscapesPattern` binder-name pin changes
   (the escaping index is now the smallest mentioned): stop and report; do
   not re-pin.
+
+## Closeout
+
+Merged as `f8bc5d4e1` from exact `d2074b8a5`. Gates: Language QA
+`evt_4c476q8bxc9b8`, Architect `evt_vhtc47ts41q5`, Decision
+`dec_1caqep43v39mq`. Both routed blobs match main, and main's tree equals
+the checked merge tree. The inferred nested matrix now replays its leaves
+in the derived telescope; the `weaken` fallback and partial lowering are
+gone.

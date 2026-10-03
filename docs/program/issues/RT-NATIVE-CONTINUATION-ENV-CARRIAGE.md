@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-CONTINUATION-ENV-CARRIAGE
 title: "A native function-typed recursive position whose closure escapes through a word-only call result gets its captures from a compile-time side slot, so two constructions of the same continuation cannot be told apart. Carry the suffix as fields of the residual word, in defunctionalized form"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
@@ -466,3 +466,10 @@ order itself.
 - Any kernel, `trusted_base()` or spec change: an operator question.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Both increments are on main. I-1 merged `e893ecb7a`. I-2, held at
+`d9b8d81a8`, landed inside RT-CARRIER-RESIDUAL-TYPED-OPERAND I-0
+(`2edc10ac9`, exact `8f73d8785`), whose AC-1 holds every I-2 acceptance
+row. RT-NATIVE-SEQUENTIAL-BRACKETS is its first consumer.

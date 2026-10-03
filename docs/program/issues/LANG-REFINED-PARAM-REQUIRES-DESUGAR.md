@@ -6,7 +6,7 @@ owner: language
 size: M
 tier: T1
 gate: architect
-depends_on: [SPEC-REFINED-PARAM-REQUIRES-DESUGAR, KERNEL-INT-DIV-MOD-NATIVE]
+depends_on: [SPEC-REFINED-PARAM-REQUIRES-DESUGAR, KERNEL-INT-DIV-MOD-NATIVE, VERIFY-CONTRACT-LOWERING-MULTI-REQUIRES, VERIFY-CALL-SITE-PRECONDITION-DISCHARGE]
 blocks: []
 github: null
 origin: "Operator 2026-10-03: 'approve 3(a) as a desugar to requires' (evt_2903kfxhh96c). Spec contract SPEC-REFINED-PARAM-REQUIRES-DESUGAR. Steward-filed per COORDINATION section 2."
@@ -25,9 +25,13 @@ from the premise, callers owe it, and `f` is refused where a plain
 ## Settled inputs
 
 - The contract is the landed `SPEC-REFINED-PARAM-REQUIRES-DESUGAR` (spec 21
-  §6.3, 22 §3). The `requires` path is landed: KERNEL-INT-DIV-MOD-NATIVE's
-  assumption recognition discharges a direct `requires` premise by
-  conversion, so the desugar needs no new recognition code.
+  §6.3, 22 §3). Inside the callee body the `requires` path is landed:
+  KERNEL-INT-DIV-MOD-NATIVE's assumption recognition discharges a direct
+  premise by conversion.
+- Callers need the two Verify repairs. Before them, a caller of a function
+  with `requires` is kernel-rejected (Architect `evt_4qb4fh6bbnyhg` P1), so
+  deliverable 2's caller pair builds only on
+  VERIFY-CALL-SITE-PRECONDITION-DISCHARGE.
 - As built, the refined divisor gives 1 obligation (KERNEL-INT-DIV-MOD-NATIVE
   AC-1b). That row flips to 0 here.
 - Consumers (check 3, perishable): `Derived.ken.md:1924`
@@ -55,4 +59,6 @@ from the premise, callers owe it, and `f` is refused where a plain
 ## Stop conditions
 
 - `true_refinement_project`'s instance field, or any other consumer, needs
-  more than its type to follow the desugar: stop to the Architect.
+  more than its type to follow the desugar: stop to the Architect. Expect
+  it at `Derived.ken.md:1927`. An instance field is a higher-order
+  position, so the field gains a premise there (`evt_4qb4fh6bbnyhg`).

@@ -1,7 +1,7 @@
 ---
 id: SPEC-REFINED-PARAM-REQUIRES-DESUGAR
 title: "Spec 21 and 22 assume a refined parameter's predicate in the body while the parameter lowers to its bare carrier, so a higher-order caller passes an unproved value and the body relies on it. Make a refined parameter a desugar to the carrier parameter plus requires, and state contract examples as propositions, not Bool expressions"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -61,7 +61,20 @@ premise as a proposition.
 5. Conformance: `seed-obligations.md` (`:138` and the refined-parameter
    rows) and `seed-spec-syntax.md:305` follow, with a row pinning that a
    function with a refined parameter is refused where a plain `A → B` is
-   expected.
+   expected. A conformance path this WP already changes states its
+   propositions in Ω form too, including `conformance/README.md`'s bytes
+   round-trip law in 38 §1.5's `Equal` form (spec-leader
+   `evt_6rhcyc8n3r8de`).
+6. A test that claims a heading this WP renames follows the rename. Only
+   the claim comment changes, never an assertion. M5 red on `ecfb85936`:
+   `crates/ken-elaborator/tests/v2_acceptance.rs:254` claims
+   `refined-param-is-hypothesis-not-obligation`, renamed
+   `refined-param-desugars-to-requires`. The same sweep finds two more:
+   `src/r_layer_tests/effects.rs:490` (`pure-view-usable-in-pure-context`,
+   now `pure-fn-…`) and `src/r_layer_tests/acceptance.rs:66`
+   (`const-elaborates-checks`, now `konst-…`). Re-run the sweep at the
+   respin tip: every heading removed under `conformance/` against every
+   claim in `crates/`, `scripts/` and `.github/`.
 
 ## Acceptance
 
@@ -77,3 +90,13 @@ premise as a proposition.
 - The desugar needs a kernel change, or a refinement position other than a
   parameter or a written function domain needs the same treatment: stop to
   the Architect.
+
+## Closeout
+
+Merged `80afb1b10` from exact `b41dd8847` (FULL CI green, run
+`37118271593`); the main tree equals the routed merge tree. Gates:
+Architect `evt_5mfyzfy8jbnfw` and `evt_mwgrccpy7thm` (D6), CV
+`evt_23p1t5tv91t1w`, Decision `dec_4efznr0k3pf6`.
+`LANG-REFINED-PARAM-REQUIRES-DESUGAR` now waits only on the two Verify
+repairs. Architect carry: the spec 21
+`:504` `recordRefinement` comment goes to the next spec 21 touch.

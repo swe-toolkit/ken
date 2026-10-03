@@ -56,6 +56,11 @@ stop and report the mismatch.
    16 §5.1's interim paragraph is removed, and the C15 dependent-motive
    accept and the `quotient-respect-schema-dependent-motive` accept half
    are restored.
+5. X1's interim quotient arm in `eq_reduce` (from the interim WP) reduces
+   to `R a b` again. The spec 16, 17 and kernel README interim
+   statements, the spec 42 §1/§3.1/§3.6 interim exceptions, the
+   conformance scoping of the closed-ground no-stuck claim and the interim
+   `ken-interp` pin flip with it.
 
 ## Acceptance
 

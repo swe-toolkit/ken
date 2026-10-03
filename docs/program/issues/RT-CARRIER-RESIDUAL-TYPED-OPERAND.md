@@ -291,6 +291,26 @@ The ruling carries the code and is authoritative where this summary differs.
   (`calls.rs:912-942`) and the planned source join (`joins.rs:353-445`)
   declare one, with R decoded or K→R refused.
 
+## Increments landed
+
+- I-0: merged `2edc10ac9` from exact `8f73d8785` (FULL CI green, run
+  `37124959753`); the main tree equals the routed merge tree, 32 blobs
+  match. Gates: runtime QA `evt_1z4wpnh1yy0qe`, Architect
+  `evt_7wzam0ee4b3y5`, Decision `dec_3vvjwp3f8fzez`, on the `a04a6e2ff`
+  and `6439ba77d` gate sets. It carries ENV-CARRIAGE I-2. Open: I-1.
+  Architect carry: bound the nested source-machine frame depth.
+- I-1 as ruled (Architect `evt_76hxk5r1hk26d`, measured on `2edc10ac9`):
+  no R-declared boundary exists (`Representation::Residual` is constructed
+  nowhere; both `append_carried_block_param` callers pass `Value`). So:
+  the eight ABI escapes are decoded and the escape is deleted; joins keep
+  their behaviour. The planned source joins (`source.rs:2859`,
+  `core.rs:3959`) are K, and an R predecessor stays refused at
+  `carried_join_arm` with no decode added. The labelled invocation merge
+  (`calls.rs:911-943`) is K with R decoded before the edge.
+  `JoinResultRepresentation` gains no R variant; `CarrierWord`'s doc
+  comment says it means K. The dead `Representation::Residual` arm stays,
+  carried to a K→R coercion design.
+
 ## Acceptance
 
 - **AC-0 (done).** The fan-in tables above, and the cut confirmed.
@@ -374,7 +394,11 @@ The ruling carries the code and is authoritative where this summary differs.
   - Review evidence in the handoff: no raw `append_block_param` on a
     carried value outside the helper. Each scalar, control or pointer site
     among the 54 is listed as excluded, with its reason.
-  - A K→R refusal control fixture.
+  - The R-at-undeclared-join refusal control (K→R is unrepresentable on
+    this base): a `cfg(test)` call of `jump_planned_join_arm` with a
+    `CarrierWord` plan and a `LoweringOperand::Residual` predecessor
+    returns `ResidualRepresentationRequired` with that site, and replacing
+    the refusal with a raw pass-through reddens it.
   - Full parity is unchanged, and the handoff gives the fan-in table: each
     site, its operand type and the increment that changed it.
 
@@ -397,6 +421,11 @@ The ruling carries the code and is authoritative where this summary differs.
    Keyed on "matches none of the named variants" (`evt_52c5f8gxxhp99`,
    §1a 4, advancing). Under the shared predicate below: the catch-all ban is
    the consumer half of declaring representation per slot.
+5. A join's R/K was to be read off its downstream result consumer, which
+   the join helper cannot see. Keyed on the downstream consumer
+   (`evt_3rc5r5rmqkmzn`, §1a 5, advancing). Under the shared predicate:
+   closed by each join declaring its own representation
+   (`evt_76hxk5r1hk26d`).
 
 **Shared predicate (Architect `evt_65eqjan51qtgp`):** the R/K representation
 of a position (an operand, a field or a slot member) is read off a nearby
@@ -412,4 +441,4 @@ representation per slot (`evt_1ns21bwepgvqv`). The next re-trigger is the
 - Any change to the kernel, the spec or a verdict outside the runtime rows
   named here. A currently passing `rt_parity_native` row that is newly
   refused, including through an F disposition, is a stop to the Architect.
-- §1a is at 3. The 6th advancing stop is a hold plus research.
+- §1a is at 5. The 6th advancing stop is a hold plus research.
