@@ -108,7 +108,11 @@ not depend on the spelling.
 - spec: `35 §3.2`, `22 §1`, `§2.4`, `43 §2`
 - given: a bare `a + b : Int32` on **unconstrained** `a b : Int32`
 - expect: V2 **emits** the obligation triple `⟨id, Γ ⊢ φ_no_ovf, provenance⟩`
-  with goal `φ_no_ovf ≡ −2147483648 ≤ (a +_ℤ b) ∧ (a +_ℤ b) ≤ 2147483647`
+  with goal:
+  ```text
+  φ_no_ovf ≡ And (IsTrue (−2147483648 ≤ (a +_ℤ b)))
+    (IsTrue ((a +_ℤ b) ≤ 2147483647))
+  ```
   (the no-overflow predicate in the ℤ domain, `Int32` bounds). Unprovable from
   `Γ` ⇒ an **open typed hole** `?id : φ_no_ovf` (`22 §1`, `24 §2`) — a **marked
   partial point** that degrades to a runtime check (panic / `unknown`, `43 §2`).
@@ -122,8 +126,8 @@ not depend on the spelling.
 
 ### surface/numbers/in-range-overflow-obligation-discharged
 - spec: `35 §3.2`, `22 §2.4`, `34 §5` (refinement coercion discharges the goal)
-- given: the **same** bare `a + b : Int32` with `a b : {x : Int32 | 0 ≤ x ∧
-  x ≤ 1000}`
+- given: the **same** bare `a + b : Int32` with `a b :`
+  `{x : Int32 | And (IsTrue (0 ≤ x)) (IsTrue (x ≤ 1000))}`
 - expect: `φ_no_ovf` is the **same emitted goal**, now **dischargeable** from
   `Γ` (`a +_ℤ b ≤ 2000 ≤ 2³¹−1` and `≥ 0 ≥ −2³¹`) — the operation is **total and
   safe**, no residual runtime check.
@@ -140,7 +144,8 @@ not depend on the spelling.
 - given: `(100 : Int8) + (100 : Int8)` — sums to 200 in ℤ, out of `Int8` range
   (`Int8` max 127)
 - expect: does **NOT** silently produce the wrapped value `-56` (= 200 − 256).
-  The bare `+` emits `φ_no_ovf ≡ −128 ≤ 200 ≤ 127` — **unsatisfiable** here — so
+  The bare `+` emits `φ_no_ovf` with
+  `And (IsTrue (−128 ≤ 200)) (IsTrue (200 ≤ 127))` — **unsatisfiable** here — so
   the use is a marked partial point that obligation-checks / **panics**, never a
   silent wrap.
 - why: the load-bearing non-reproduction (silent wrap is a correctness hazard in
@@ -212,9 +217,10 @@ not depend on the spelling.
 - spec: `35 §3.1`, `22 §2.4`, `34 §5`, `18a §5.2`
 - given: two isolated bodies on `a b : Int`, one `a / b` and one `a % b`,
   each with possibly-zero `b`. Pair each with the corresponding body where
-  `b : {d : Int | d ≠ 0}`.
+  `b : {d : Int | Not (Equal Int d 0)}`.
 - expect: each unrefined operator site emits exactly one `PartialPrim`
-  non-zero side-condition obligation for `NonZeroDivisor b` (`b ≠ 0`) at the
+  non-zero side-condition obligation for `NonZeroDivisor b`
+  (`Not (Equal Int b 0)`) at the
   operation site. The corresponding refined divisor discharges it, leaving no
   residual check. Neither operator silently traps.
 - why: raw `/` and `%` share the partial-primitive contract, but each gets its
@@ -258,7 +264,7 @@ not depend on the spelling.
 ### surface/numbers/algebraic-law-is-proposition-not-reduction  (soundness)
 - spec: `35 §6.2`, `14 §5`
 - given: abstract `a b : Int`; the conversion query `a + b ≟ b + a` and the
-  prelude law `add_comm : (a b : Int) → a + b == b + a`
+  prelude law `add_comm : (a b : Int) → Equal Int (a + b) (b + a)`
 - expect: `a + b` and `b + a` are **NOT definitionally equal** — `a + b` is a
   **neutral** term on abstract operands (no reduction fires), so kernel
   conversion **rejects** `a + b ≡ b + a`. Commutativity holds only as the

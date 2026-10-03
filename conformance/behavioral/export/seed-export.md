@@ -75,7 +75,8 @@ netted **solely** by conformance (the kernel is blind to the export bytes).
 ### export/proved-postcondition-projects-to-Q (AC2)
 - spec: `spec/70-behavioral/71-assumption-boundary.md §2.1`, `21 §5.3/§5.4`,
   `25 §3`
-- given: a checked `fn` with an input parameter and `ensures result > 0`
+- given: a checked `fn` with an input parameter and
+  `ensures IsTrue (result > 0)`
   whose obligation
   **discharges** (verdict `proved`; certificate `check`s; goal **absent** from
   `trusted_base()`), run through the export emitter
@@ -88,8 +89,8 @@ netted **solely** by conformance (the kernel is blind to the export bytes).
 
 ### export/open-hole-postcondition-rides-P-as-unknown (AC2, soundness)
 - spec: `spec/70-behavioral/71-assumption-boundary.md §2.1`, `21 §5.4`, `24 §2`
-- given: the **same** `ensures result > 0`, but the proof is left an **open
-  typed hole** (verdict `unknown`; the hole is a postulate of the goal, so the
+- given: the **same** `ensures IsTrue (result > 0)`, but the proof is left an
+  **open typed hole** (verdict `unknown`; the hole is a postulate of the goal, so the
   goal **appears** in this target's `trusted_base_delta` / `trusted_base()`),
   run through the emitter
 - expect: the postcondition projects into **`P`** (concept `assumptions`) tagged

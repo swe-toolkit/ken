@@ -5,21 +5,23 @@ soundness backbone (the prover is untrusted; the kernel re-checks).
 
 ## verify/proved-postcondition (G2)
 - spec: `spec/20-verification/21-spec-syntax.md §1`, `23-prover.md`
-- given: `fn abs (n : Int) : Int ensures result ≥ 0 = if n < 0 then -n else n`
-  with a correct proof
+- given: a function with a correct proof:
+  `fn abs (n : Int) : Int ensures IsTrue (result ≥ 0) = if n < 0 then -n else n`
 - expect: **proved**; `trusted_base_delta` empty
 - why: a correct postcondition proof is accepted.
 
 ## verify/wrong-proof-rejected (G2, soundness)
 - spec: `spec/20-verification/23-prover.md §1`, `18 §4`
-- given: the same function with a **wrong** proof certificate for `result ≥ 0`
+- given: the same function with a **wrong** proof certificate for
+  `IsTrue (result ≥ 0)`
 - expect: **rejected** by the kernel re-check (not accepted on the prover's
   word)
 - why: the de Bruijn criterion — a bad certificate cannot pass.
 
 ## verify/disproved-with-countermodel (G4)
 - spec: `spec/20-verification/24-diagnostics.md §1`
-- given: `fn f (n : Int) : Int ensures result > 0 = n` (false for `n ≤ 0`)
+- given: a false-for-`n ≤ 0` function:
+  `fn f (n : Int) : Int ensures IsTrue (result > 0) = n`
 - expect: **disproved**; diagnostic `kind=countermodel`, `verdict=false`, naming
   the failing input class (`n ≤ 0`)
 - why: a genuine counterexample is reported with the false-vs-unknown verdict.
@@ -35,7 +37,8 @@ soundness backbone (the prover is untrusted; the kernel re-checks).
 
 ## verify/decidable-via-reflection (G3)
 - spec: `spec/20-verification/23-prover.md §3`
-- given: a decidable arithmetic goal over `Int` (e.g. `2 + 2 == 4`)
+- given: a decidable arithmetic goal over `Int` (e.g.
+  `IsTrue (2 + 2 == 4)`)
 - expect: **proved** by reflective decision (the kernel computes the decision
   procedure), no external solver in the trusted path
 - why: the computing kernel discharges the decidable fragment directly.

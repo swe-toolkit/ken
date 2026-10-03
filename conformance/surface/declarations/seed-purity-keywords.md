@@ -342,10 +342,11 @@ The keyword thus determines the verification treatment.
 - spec: `36 §2.4` (pure collapse), `§6` (row-`∅` def = mathematical function,
   value-level `ensures`), `33 §1`, frame AC4
 - given: a pure `fn` with a value-level postcondition:
-  `fn succ (n : Int) : Int ensures result == n + 1 = n + 1`.
+  `fn succ (n : Int) : Int ensures Equal Int result (n + 1) = n + 1`.
 - expect: **accepts and the `ensures` discharges** — `succ` has row `∅`,
   collapses to the plain term (`ITree 𝟘 Int ≅ Int`, `§2.4`); the obligation
-  `result == n + 1` is a **value** equation, discharged by computation/`refl`
+  `Equal Int result (n + 1)` is a **value** equation, discharged by
+  computation/`refl`
   (`16 §2`), **no world-state**. The verification layer sees a mathematical
   function.
 - why: AC4's **pure half** — the `∅`-row + collapse is the certificate the
@@ -356,10 +357,11 @@ The keyword thus determines the verification treatment.
 - spec: `36 §4.3` (`old(e)` = `e` in the **pre-state**; well-defined only when
   the denotation *names* a pre-state), `§6`, frame AC4
 - given: the **same** `old(n)`-style postcondition under two keywords:
-  (a) `proc inc () : Unit visits [Counter]` with `ensures n == old(n) + 1` and
-      body `n becomes n + 1` (inside `space Counter`);
-  (b) `fn bump (n : Int) : Int` with `ensures result == old(n) + 1` and body
-      `n + 1`.
+  (a) `proc inc () : Unit visits [Counter]` with
+      `ensures Equal Int n (old(n) + 1)` and body `n becomes n + 1` (inside
+      `space Counter`);
+  (b) `fn bump (n : Int) : Int` with
+      `ensures Equal Int result (old(n) + 1)` and body `n + 1`.
 - expect: (a) **accepts and discharges** — `old(n)` names the pre-state of the
   `space` op's `State S` transformer, obligation computes to `refl` (EFF4
   `space-old-scoped-to-ensures`, `36 §4.3`). (b) **rejects** — a pure `fn` has

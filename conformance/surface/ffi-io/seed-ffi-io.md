@@ -157,7 +157,8 @@ touches — `38 §3.4`). `(oracle)` = the literal `foreign`/`symbol`/`library`/
 ### ffi-io/unprovable-foreign-ensures-emits-runtime-check (AC4)
 - spec: `spec/30-surface/38-ffi-io.md §3.3`, `21 §5.2`
 - given: `foreign c_sqrt : Float → Float ... pure` with a **statically
-  unprovable** `ensures result ≥ 0.0` (no body for the kernel to reason about)
+  unprovable** `ensures IsTrue (result ≥ 0.0)` (no body for the kernel to
+  reason about)
 - expect: the contract lowers to the **`tested`** status (`21 §5.2`): a
   **runtime-checked, fail-fast assertion** emitted at the call boundary **and**
   a `P`/`tested` entry in the assumption boundary — observe the **emitted
@@ -225,8 +226,9 @@ touches — `38 §3.4`). `(oracle)` = the literal `foreign`/`symbol`/`library`/
 ### ffi-io/verified-component-with-foreign-call-and-roundtrip-proof (G6)
 - spec: `spec/30-surface/38-ffi-io.md §6` (G6), `§1.5`, `§3.1`
 - given: a verified component that makes **≥1** `foreign` call (e.g. reads bytes
-  via a `foreign`), carries the provable round-trip law `decode (encode s) == Ok
-  s` (`38 §1.5`, one-directional), and is run through the export emitter
+  via a `foreign`), carries the provable round-trip law
+  `IsTrue (decode (encode s) == Ok s)` (`38 §1.5`, one-directional), and is
+  run through the export emitter
 - expect: the round-trip obligation is **provable** (verdict `proved` → its
   claim in `Q`); the `foreign` call's postulate appears in the component's
   `trusted_base_delta` → `P` (the trust base **shows exactly what is assumed**);

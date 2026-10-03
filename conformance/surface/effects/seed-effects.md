@@ -347,12 +347,14 @@ tail-resumptive fold (`§4.2`). Handlers are `elim_ITree` folds,
 
 ### surface/effects/space-old-scoped-to-ensures (oracle)
 - spec: `36 §4.3` (`old(e)` = `e` in the pre-state; worked `inc` example)
-- given: `proc inc() visits [Counter] ensures n == old(n) + 1 = n becomes n+1`;
-  and a variant asserting `n == old(n) + 2`.
+- given: `proc inc() visits [Counter]` in `space Counter` with
+  `ensures Equal Int n (old(n) + 1)` and body `n becomes n+1`; the `+2` variant
+  uses `ensures Equal Int n (old(n) + 2)`.
 - expect: the **`+1`** `ensures` **discharges** — `inc` denotes to the
   transformer `λ s. (tt, s with .n := s.n+1)`, and the obligation computes
-  (record-β/η, `13 §3`) to `s.n+1 == s.n+1`, closed by `refl` (`§4.3`, `16 §2`).
-  The **`+2`** variant is **disproved** (obligation `s.n+1 == s.n+2`, no model).
+  (record-β/η, `13 §3`) to `Equal Int (s.n + 1) (s.n + 1)`, closed by
+  `refl` (`§4.3`, `16 §2`). The **`+2`** variant is **disproved** (obligation
+  `Equal Int (s.n + 1) (s.n + 2)`, no model).
 - why: pins `old` as the pre-state value **scoped to the op's `ensures`** (not a
   global `\old`), grounded in the state-transformer denotation (`§4.3`). Verdict
   **flips**: the correct postcondition proves, the wrong one disproves.
