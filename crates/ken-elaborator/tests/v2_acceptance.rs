@@ -251,7 +251,7 @@ fn prove_and_law_emit_one_obligation_per_goal() {
 // B.1 — Refined parameter is a Γ-hypothesis, not a definition-site obligation
 // ======================================================================
 
-/// verify/obligations/refined-param-is-hypothesis-not-obligation  (soundness)
+/// verify/obligations/refined-param-desugars-to-requires  (soundness)
 ///
 /// A refined parameter `(n : { k : Nat | IsNonNeg k })` emits **no**
 /// definition-site obligation — it lowers to the carrier and contributes

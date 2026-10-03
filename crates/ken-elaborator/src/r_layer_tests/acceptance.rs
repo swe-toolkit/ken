@@ -63,7 +63,7 @@ fn id_elaborates_checks() {
     assert_eq!(ty, expected_ty, "id type mismatch");
 }
 
-/// `surface/elaboration/const-elaborates-checks` (oracle) — body is Var 1
+/// `surface/elaboration/konst-elaborates-checks` (oracle) — body is Var 1
 #[test]
 fn const_elaborates_checks() {
     let mut env = mk_env();
