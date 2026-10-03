@@ -61,7 +61,10 @@ premise as a proposition.
 5. Conformance: `seed-obligations.md` (`:138` and the refined-parameter
    rows) and `seed-spec-syntax.md:305` follow, with a row pinning that a
    function with a refined parameter is refused where a plain `A → B` is
-   expected.
+   expected. A conformance path this WP already changes states its
+   propositions in Ω form too, including `conformance/README.md`'s bytes
+   round-trip law in 38 §1.5's `Equal` form (spec-leader
+   `evt_6rhcyc8n3r8de`).
 
 ## Acceptance
 
