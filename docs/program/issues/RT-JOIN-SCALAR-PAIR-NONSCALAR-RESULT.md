@@ -1,12 +1,12 @@
 ---
 id: RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT
 title: "A dynamic source Match whose specialized result is a constructor with fields is planned NativeScalarPair, because the planner chooses the join representation from phase alone, so object emission refuses with 'Match: dynamic arms must produce scalar Int or Bool values'. Plan such a join from its result shape as well"
-status: active
+status: ready
 owner: runtime
 size: M
 gate: architect
 tier: T1
-depends_on: []
+depends_on: [RT-CHECKED-JOIN-SITE-MATCH-POPULATION]
 blocks: []
 github: null
 origin: "Architect evt_2dt20kx3h81pt, the RT-JOIN-PHASE-CASE-BINDER-CARRIED AC-0 result: that WP's witness is gone from main, and the nat row's first refusal is now this shape gap. Also the first refusal of rt_escape ESCAPE_FILE_THEN_READAT (:660), which the Steward placed in L1 (RT-NATIVE-SEQUENTIAL-BRACKETS). Size is provisional and is re-set at AC-0. Steward-filed per COORDINATION section 2."
@@ -45,6 +45,23 @@ result has fields.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch; do not build around it.
+
+## Parked behind `RT-CHECKED-JOIN-SITE-MATCH-POPULATION`
+
+AC-0 and D1 ran (evidence `/workspaces/ken/local/rt-scalar-d1/`). The frame's
+new-plane stop fired: 0 of 268 Ok scalar merges sit under a
+`CheckedJoinSite`, and the checked answer kinds do not reach the planner.
+Architect `evt_4mp5dtzn0f5rb` rules the repair as two links: (a) every
+scalar-result Match is wrapped, which is the prerequisite; and (b) the answer
+kinds are threaded into `StaticTransitionPlan` along `core.rs:2263`, `:2305`,
+`static_transition.rs:949`, `construction.rs:1439` and `joins_traps.rs:614`,
+which stays in this WP. After the prerequisite lands, rebase onto main and add
+(b). Then `joins_traps.rs:533` plans `NativeScalarPair` for
+`SpecializedOnly` only when the origin's checked answer kind is `Int` or
+`Bool`, and `CarrierWord` otherwise. Acceptance: all 268 D1 merges stay Ok,
+1289 plans `CarrierWord` and passes the 256 MiB Nat test, and parity is
+186/186. Mutation: dropping the answer-kind guard makes 1289 refuse again.
+Re-planning at lowering is rejected. Size stays M.
 
 ## Deliverable
 
