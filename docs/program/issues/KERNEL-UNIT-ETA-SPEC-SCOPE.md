@@ -1,7 +1,7 @@
 ---
 id: KERNEL-UNIT-ETA-SPEC-SCOPE
 title: "Conversion gives definitional eta to every data type with one no-field constructor, including indexed families (definitional K), while spec 14 §4 gives data no eta and 17 §2 limits it to Unit and records. Count the rule's firings, then narrow it to the spec"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
