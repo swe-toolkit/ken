@@ -1,7 +1,7 @@
 ---
 id: LANG-ENSURES-PER-PATH-REALIZATION
 title: "An ensures clause or a literal refined return over a branchy body emits one obligation over the whole body, which spec 22 §2.2 forbids: a recursive postcondition then carries no induction hypothesis and cannot be discharged. Realize the postcondition at the body's leaves, under each branch's path hypotheses"
-status: active
+status: ready
 owner: language
 size: M
 tier: T1
