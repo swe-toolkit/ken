@@ -16,12 +16,12 @@
 //!   bridges the two representations.
 //! - Compound data (`Ctor`, `Pair`, `Closure`) — K3-interned, carry a `SlotId`.
 //! - Type-former values (`TypeUniverse`, `OmegaUniverse`, `PiTy`, `SigmaTy`,
-//!   `IndFormerVal`, `IndTypeApp`, `OpaquePrimType`) — not K3-interned; type
+//!   `QuotTy`, `IndFormerVal`, `IndTypeApp`, `OpaquePrimType`) — not K3-interned; type
 //!   equality is limited to canonical values admitted by C5.
 //! - `CtorPending` — accumulates positional args before the constructor saturates.
 //! - `Unknown` — open-hole residue (propagates strictly through all positions).
-//! - `Neutral` — stuck on an unsupported form or open variable; interim C8
-//!   also leaves checked closed quotient-class `Eq` neutral until P0 (`42 §3.6`).
+//! - `Neutral` — stuck on an unsupported form or open variable; quotient
+//!   equality is neutral only when a class endpoint is not canonical.
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{self, IsTerminal, Read, Write};
@@ -275,6 +275,11 @@ pub enum EvalVal {
         cod: Rc<Term>,
         env: Rc<Env>,
     },
+    /// Checked quotient formation; its equivalence proof is erased as Ω data.
+    QuotTy {
+        carrier: Rc<EvalVal>,
+        relation: Rc<EvalVal>,
+    },
     IndFormerVal {
         id: GlobalId,
     },
@@ -302,9 +307,8 @@ pub enum EvalVal {
     /// An open verification hole (`hole h`) or opaque postulate — the "unknown"
     /// truth value from `41 §6`.
     Unknown,
-    /// A neutral head or unsupported form. Interim C8 also leaves checked
-    /// closed quotient-class `Eq` neutral until Quot-Form requires an
-    /// equivalence proof (`KERNEL-QUOT-FORM-EQUIVALENCE`, `42 §3.1`/§3.6).
+    /// A neutral head or unsupported form. Quotient equality stays neutral
+    /// when a class endpoint is not canonical.
     Neutral,
 }
 
@@ -977,7 +981,9 @@ fn term_var_free(t: &Term, target: usize) -> bool {
         Term::J(m, d, e) => {
             term_var_free(m, target) || term_var_free(d, target) || term_var_free(e, target)
         }
-        Term::Quot(a, r) => term_var_free(a, target) || term_var_free(r, target),
+        Term::Quot(a, r, e) => {
+            term_var_free(a, target) || term_var_free(r, target) || term_var_free(e, target)
+        }
         Term::QuotClass(t2) => term_var_free(t2, target),
         Term::Trunc(a) => term_var_free(a, target),
         Term::TruncProj(t2) => term_var_free(t2, target),
@@ -1186,7 +1192,13 @@ fn cast_reduce(a_ty: EvalVal, b_ty: EvalVal, eq: EvalVal, val: EvalVal) -> EvalV
 ///
 /// The exact form for multi-field same-ctor is `(oracle)`; we return `Unknown`
 /// for that and for Π/Ω cases (C2/C3 are oracle-grounded, not locked here).
-fn eq_reduce(a_ty: EvalVal, lhs: EvalVal, rhs: EvalVal, globals: &GlobalEnv) -> EvalVal {
+fn eq_reduce(
+    a_ty: EvalVal,
+    lhs: EvalVal,
+    rhs: EvalVal,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
     // Unknown operands propagate strictly.
     if matches!(a_ty, EvalVal::Unknown)
         || matches!(lhs, EvalVal::Unknown)
@@ -1195,10 +1207,24 @@ fn eq_reduce(a_ty: EvalVal, lhs: EvalVal, rhs: EvalVal, globals: &GlobalEnv) -> 
         return EvalVal::Unknown;
     }
 
-    // C8 interim (16 §5.1): quotient-class equality is neutral, as in the
-    // kernel. It must not reach the inductive same-constructor rule below,
-    // which would compare representatives. Relation-as-equality is gated on
-    // KERNEL-QUOT-FORM-EQUIVALENCE.
+    // A checked quotient stores R but erases its Ω proof. Two canonical
+    // classes reduce to R a b; a non-class endpoint is neutral. Never feed
+    // synthetic class constructors to the ordinary inductive Eq branch.
+    if let EvalVal::QuotTy { relation, .. } = a_ty {
+        return match (lhs, rhs) {
+            (
+                EvalVal::Ctor { id: x_id, args: x, .. },
+                EvalVal::Ctor { id: y_id, args: y, .. },
+            ) if x_id == GlobalId(QUOT_CLASS_TYPE_ID)
+                && y_id == GlobalId(QUOT_CLASS_TYPE_ID)
+                && x.len() == 1
+                && y.len() == 1 => {
+                let first = apply((*relation).clone(), x[0].clone(), globals, store);
+                apply(first, y[0].clone(), globals, store)
+            }
+            _ => EvalVal::Neutral,
+        };
+    }
     if matches!(&lhs, EvalVal::Ctor { id, .. } if *id == GlobalId(QUOT_CLASS_TYPE_ID))
         || matches!(&rhs, EvalVal::Ctor { id, .. } if *id == GlobalId(QUOT_CLASS_TYPE_ID))
     {
@@ -1243,6 +1269,10 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
         (EvalVal::TypeUniverse(la), EvalVal::TypeUniverse(lb)) => la.equiv(lb),
         (EvalVal::OmegaUniverse(la), EvalVal::OmegaUniverse(lb)) => la.equiv(lb),
         (EvalVal::IndFormerVal { id: ia }, EvalVal::IndFormerVal { id: ib }) => ia == ib,
+        (
+            EvalVal::QuotTy { carrier: a, relation: r },
+            EvalVal::QuotTy { carrier: b, relation: s },
+        ) => eq_type_eq(a, b) && r == s,
         (
             EvalVal::OpaquePrimType { id: ia, args: aa },
             EvalVal::OpaquePrimType { id: ib, args: ba },
@@ -2253,6 +2283,11 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
 
         // --- Const: δ-unfold transparent; postulate → Unknown; prim → pending ---
         Term::Const { id, .. } => {
+            // The two kernel-owned Ω constants are rigid proposition values.
+            // In particular, quotient relations may compute to Top/Bottom.
+            if *id == globals.top_id() || *id == globals.bottom_id() {
+                return EvalVal::IndFormerVal { id: *id };
+            }
             // The checked String payload is authoritative even if an
             // independent evaluation-side table disagrees. Char literals
             // are already core IntLit values, not Const-backed side entries.
@@ -2342,12 +2377,18 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
             cast_reduce(av, bv, ev, tv)
         }
 
+        // --- Checked quotient carrier (`16 §5`) ---
+        Term::Quot(a, r, _e) => EvalVal::QuotTy {
+            carrier: Rc::new(eval(env, a, globals, store)),
+            relation: Rc::new(eval(env, r, globals, store)),
+        },
+
         // --- Eq by type (`16 §2.2`, C2–C4) ---
         Term::Eq(a, l, r) => {
             let av = eval(env, a, globals, store);
             let lv = eval(env, l, globals, store);
             let rv = eval(env, r, globals, store);
-            eq_reduce(av, lv, rv, globals)
+            eq_reduce(av, lv, rv, globals, store)
         }
 
         // --- Quotient eliminator: C9 `elim_/ M f r [a] → f a` ---

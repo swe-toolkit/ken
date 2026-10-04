@@ -14,6 +14,15 @@ fn opaque(env: &mut GlobalEnv, label: &str, ty: Term) -> Term {
     )
 }
 
+fn quotient_with_checked_equivalence(env: &mut GlobalEnv, carrier: Term, relation: Term) -> Term {
+    let equiv = opaque(
+        env,
+        "relation_equivalence",
+        ken_kernel::check::quotient_equivalence_type(&carrier, &relation),
+    );
+    Term::Quot(Box::new(carrier), Box::new(relation), Box::new(equiv))
+}
+
 fn family(
     env: &mut GlobalEnv,
     levels: Vec<LevelVar>,
@@ -356,7 +365,8 @@ fn index_rewrite_refuses_unhandled_template_but_preserves_forced_argument() {
             Term::pi(bool_ty.clone(), Term::Omega(Level::zero())),
         ),
     );
-    let quotient = Term::Quot(Box::new(bool_ty), Box::new(rel));
+    let related_endpoints = Term::app(Term::app(rel.clone(), left.clone()), right.clone());
+    let quotient = quotient_with_checked_equivalence(&mut env, bool_ty, rel);
     let qleft = Term::QuotClass(Box::new(left));
     let qright = Term::QuotClass(Box::new(right));
     let box_id = family(
@@ -396,9 +406,10 @@ fn index_rewrite_refuses_unhandled_template_but_preserves_forced_argument() {
         Box::new(source.clone()),
         Box::new(target.clone()),
     );
-    assert!(
-        matches!(whnf(&env, &Context::new(), &eq), Term::Eq(..)),
-        "single Eq telescope exists"
+    assert_eq!(
+        whnf(&env, &Context::new(), &eq),
+        related_endpoints,
+        "the single index equality now computes through class Eq to R"
     );
     let bad = ctor(&env, indexed, 0, vec![]);
     let good = Term::app(ctor(&env, indexed, 1, vec![]), qleft);
@@ -439,7 +450,7 @@ fn index_rewrite_checks_later_template_after_earlier_forced_position() {
             Term::pi(bool_ty.clone(), Term::Omega(Level::zero())),
         ),
     );
-    let quotient = Term::Quot(Box::new(bool_ty), Box::new(rel));
+    let quotient = quotient_with_checked_equivalence(&mut env, bool_ty, rel);
     let qleft = Term::QuotClass(Box::new(ctor(&env, bool_id, 0, vec![])));
     let qright = Term::QuotClass(Box::new(ctor(&env, bool_id, 1, vec![])));
     let box_id = family(
@@ -524,7 +535,7 @@ fn parameter_rewrite_fixture() -> (GlobalEnv, GlobalId, Term, Term, Term, Term) 
             Term::pi(bool_ty.clone(), Term::Omega(Level::zero())),
         ),
     );
-    let q = Term::Quot(Box::new(bool_ty), Box::new(rel));
+    let q = quotient_with_checked_equivalence(&mut env, bool_ty, rel);
     let qleft = Term::QuotClass(Box::new(ctor(&env, bool_id, 0, vec![])));
     let qright = Term::QuotClass(Box::new(ctor(&env, bool_id, 1, vec![])));
     let indexed = family(

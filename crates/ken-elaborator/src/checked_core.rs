@@ -2498,7 +2498,12 @@ fn encode_term(
             encode_term(d, symbols, out)?;
             encode_term(e, symbols, out)?;
         }
-        Term::Quot(a, r) => encode_binary("quot", a, r, symbols, out)?,
+        Term::Quot(a, r, e) => {
+            out.tag("quot");
+            encode_term(a, symbols, out)?;
+            encode_term(r, symbols, out)?;
+            encode_term(e, symbols, out)?;
+        }
         Term::QuotClass(t) => encode_unary("quot_class", t, symbols, out)?,
         Term::QuotElim {
             motive,
@@ -4093,10 +4098,16 @@ fn term_has_dependent_sigma(cursor: &mut CanonicalCursor<'_>) -> Result<bool, St
             let right = term_has_dependent_sigma(cursor)?;
             Ok(left || right)
         }
-        "app" | "pair" | "ascript" | "quot" | "absurd" => {
+        "app" | "pair" | "ascript" | "absurd" => {
             let left = term_has_dependent_sigma(cursor)?;
             let right = term_has_dependent_sigma(cursor)?;
             Ok(left || right)
+        }
+        "quot" => {
+            let carrier = term_has_dependent_sigma(cursor)?;
+            let relation = term_has_dependent_sigma(cursor)?;
+            let equivalence = term_has_dependent_sigma(cursor)?;
+            Ok(carrier || relation || equivalence)
         }
         "proj1" | "proj2" | "refl" | "quot_class" | "trunc" | "trunc_proj" => {
             term_has_dependent_sigma(cursor)
@@ -4511,10 +4522,16 @@ fn term_contains_free_var(cursor: &mut CanonicalCursor<'_>, target: usize) -> Re
             let body = term_contains_free_var(cursor, target + 1)?;
             Ok(parameter || body)
         }
-        "app" | "pair" | "ascript" | "quot" | "absurd" => {
+        "app" | "pair" | "ascript" | "absurd" => {
             let left = term_contains_free_var(cursor, target)?;
             let right = term_contains_free_var(cursor, target)?;
             Ok(left || right)
+        }
+        "quot" => {
+            let carrier = term_contains_free_var(cursor, target)?;
+            let relation = term_contains_free_var(cursor, target)?;
+            let equivalence = term_contains_free_var(cursor, target)?;
+            Ok(carrier || relation || equivalence)
         }
         "proj1" | "proj2" | "refl" | "quot_class" | "trunc" | "trunc_proj" => {
             term_contains_free_var(cursor, target)
@@ -4601,7 +4618,12 @@ fn skip_term(cursor: &mut CanonicalCursor<'_>) -> Result<(), String> {
             skip_terms(cursor)?;
             skip_term(cursor)
         }
-        "pi" | "lam" | "app" | "sigma" | "pair" | "ascript" | "quot" | "absurd" => {
+        "pi" | "lam" | "app" | "sigma" | "pair" | "ascript" | "absurd" => {
+            skip_term(cursor)?;
+            skip_term(cursor)
+        }
+        "quot" => {
+            skip_term(cursor)?;
             skip_term(cursor)?;
             skip_term(cursor)
         }
@@ -4669,6 +4691,35 @@ mod tests {
     use num_bigint::BigInt;
 
     use super::*;
+
+    #[test]
+    fn quotient_encoding_consumes_and_scans_its_equivalence_child() {
+        let table = StableSymbolTable::new();
+        let mut out = CanonicalSink::new();
+        let quot = Term::Quot(
+            Box::new(Term::Type(Level::zero())),
+            Box::new(Term::Type(Level::zero())),
+            Box::new(Term::var(0)),
+        );
+        encode_term(&quot, &table, &mut out).expect("encode quotient");
+        let bytes = out.finish();
+        let mut cursor = CanonicalCursor::new(&bytes);
+        skip_term(&mut cursor).expect("skip complete ternary quotient");
+        assert_eq!(cursor.remaining(), 0);
+        assert!(canonical_term_contains_free_var(&bytes, 0).unwrap());
+
+        let mut out = CanonicalSink::new();
+        let with_dependent_proof = Term::Quot(
+            Box::new(Term::Type(Level::zero())),
+            Box::new(Term::Type(Level::zero())),
+            Box::new(Term::sigma(Term::Type(Level::zero()), Term::var(0))),
+        );
+        encode_term(&with_dependent_proof, &table, &mut out).expect("encode dependent proof");
+        let bytes = out.finish();
+        let mut cursor = CanonicalCursor::new(&bytes);
+        assert!(term_has_dependent_sigma(&mut cursor).unwrap());
+        assert_eq!(cursor.remaining(), 0);
+    }
 
     /// Decode an `int_lit`-tagged canonical value back to its `BigInt`
     /// (`encode_term`'s `Term::IntLit` arm's exact inverse — length-prefixed

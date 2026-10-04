@@ -464,9 +464,8 @@ fn j_dependent_motive_fires() {
 ///
 /// `motive` and `method` are **transparent definitions** (not opaque postulates)
 /// so that `App(motive, [x])` reduces to a concrete type during type-checking.
-/// This is necessary because the kernel builds the cong/cast expected type with
-/// `Refl(m_x)` as the cast-equality proof, which only type-checks when
-/// `m_x ≡ m_y` is decidable by whnf (regularity).
+/// With a constant motive, the full cong/cast schema reduces by regularity;
+/// the dependent-motive direction is pinned independently in C15.
 ///
 /// Respect proofs are bare lambdas, checked in check-mode by infer_quot_elim.
 #[test]
@@ -486,16 +485,24 @@ fn quotient_respect_type_target() {
     let rel_id = declare_postulate(&mut env, "test postulate".to_string(), vec![], rel_ty).unwrap();
     let rel = Term::Const { id: rel_id, level_args: vec![] };
 
-    // quot_ty = Unit/R
-    let quot_ty = Term::Quot(Box::new(unit_t.clone()), Box::new(rel.clone()));
+    // The relation is abstract, so the fixture supplies its equivalence
+    // evidence as an explicit postulate rather than assuming it at formation.
+    let equiv_ty = ken_kernel::check::quotient_equivalence_type(&unit_t, &rel);
+    let equiv_id = declare_postulate(&mut env, "test equivalence".into(), vec![], equiv_ty).unwrap();
+    let equiv = Term::const_(equiv_id, vec![]);
+    let quot_ty = Term::Quot(
+        Box::new(unit_t.clone()),
+        Box::new(rel.clone()),
+        Box::new(equiv),
+    );
 
     // q : Unit/R
     let q_id = declare_postulate(&mut env, "test postulate".to_string(), vec![], quot_ty.clone()).unwrap();
     let q = Term::Const { id: q_id, level_args: vec![] };
 
     // M : Unit/R → Type 0  **transparent** (= λ_. Nat) so App(M, [x]) ⇝ Nat.
-    // Transparency is critical: with opaque M, m_x=App(M,[x]) and m_y=App(M,[y])
-    // are not convertible, so Refl(m_x) can't prove Eq(Type_0, m_x, m_y).
+    // A constant transparent M exposes the simple regularity control.
+    // C15 separately exercises opaque M[x] ≢ M[y] and J-derived congruence.
     let motive_fn_ty = Term::pi(quot_ty.clone(), Term::Type(Level::zero()));
     let motive_fn_body = Term::Lam(Box::new(quot_ty.clone()), Box::new(nat_ty.clone()));
     let motive_id = declare_def(&mut env, vec![], motive_fn_ty, motive_fn_body).unwrap();
@@ -780,8 +787,13 @@ fn quotient_omega_target_respect_free() {
     let rel_id = declare_postulate(&mut env, "test postulate".to_string(), vec![], rel_ty).unwrap();
     let rel = Term::Const { id: rel_id, level_args: vec![] };
 
-    // quot_ty = Unit/R
-    let quot_ty = Term::Quot(Box::new(unit_t.clone()), Box::new(rel));
+    let equiv_ty = ken_kernel::check::quotient_equivalence_type(&unit_t, &rel);
+    let equiv_id = declare_postulate(&mut env, "test equivalence".into(), vec![], equiv_ty).unwrap();
+    let quot_ty = Term::Quot(
+        Box::new(unit_t.clone()),
+        Box::new(rel),
+        Box::new(Term::const_(equiv_id, vec![])),
+    );
     let q_id = declare_postulate(&mut env, "test postulate".to_string(), vec![], quot_ty.clone()).unwrap();
     let q = Term::Const { id: q_id, level_args: vec![] };
 

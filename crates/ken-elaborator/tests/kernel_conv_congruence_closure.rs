@@ -18,7 +18,8 @@ use std::collections::BTreeSet;
 
 use ken_elaborator::ElabEnv;
 use ken_kernel::{
-    declare_def, declare_inductive, CtorSpec, GlobalId, InductiveSpec, Level, LevelVar, Term,
+    declare_def, declare_inductive, declare_postulate, CtorSpec, GlobalId, InductiveSpec, Level,
+    LevelVar, Term,
 };
 
 const OMEGA_CONSUMER: &str = include_str!("fixtures/kernel_conv_omega_consumer.ken");
@@ -52,6 +53,18 @@ fn bool_term(env: &ElabEnv) -> Term {
 fn true_term(env: &ElabEnv) -> Term {
     let id = env.globals.get("True").copied().expect("True prelude id");
     Term::constructor(id, vec![])
+}
+
+fn assumed_equivalence(env: &mut ElabEnv, carrier: &Term, relation: &Term) -> Term {
+    let expected = ken_kernel::check::quotient_equivalence_type(carrier, relation);
+    let id = declare_postulate(
+        &mut env.env,
+        "test quotient equivalence".into(),
+        vec![],
+        expected,
+    )
+    .expect("explicit equivalence evidence for the test relation");
+    Term::const_(id, vec![])
 }
 
 fn relation_type(bool_type: &Term) -> Term {
@@ -130,14 +143,32 @@ fn install_quot_fixture_prelude(env: &mut ElabEnv) {
         Term::lam(relation_type.clone(), Term::var(0)),
     );
 
+    let equiv_at_r = ken_kernel::check::quotient_equivalence_type(&bool_type, &Term::var(0));
+    install_def(
+        env,
+        "QuotEquivOf",
+        vec![],
+        Term::pi(relation_type.clone(), Term::Omega(Level::zero())),
+        Term::lam(relation_type.clone(), equiv_at_r.clone()),
+    );
     install_def(
         env,
         "QuotExpectedOf",
         vec![],
-        Term::pi(relation_type.clone(), Term::Type(Level::zero())),
+        Term::pi(
+            relation_type.clone(),
+            Term::pi(equiv_at_r.clone(), Term::Type(Level::zero())),
+        ),
         Term::lam(
             relation_type.clone(),
-            Term::Quot(Box::new(bool_type.clone()), Box::new(Term::var(0))),
+            Term::lam(
+                equiv_at_r.clone(),
+                Term::Quot(
+                    Box::new(bool_type.clone()),
+                    Box::new(Term::var(1)),
+                    Box::new(Term::var(0)),
+                ),
+            ),
         ),
     );
 
@@ -147,15 +178,22 @@ fn install_quot_fixture_prelude(env: &mut ElabEnv) {
         vec![],
         Term::pi(
             relation_type.clone(),
-            Term::Quot(
-                Box::new(bool_type),
-                Box::new(Term::app(
-                    Term::const_(relation_identity, vec![]),
-                    Term::var(0),
-                )),
+            Term::pi(
+                equiv_at_r.clone(),
+                Term::Quot(
+                    Box::new(bool_type),
+                    Box::new(Term::app(
+                        Term::const_(relation_identity, vec![]),
+                        Term::var(1),
+                    )),
+                    Box::new(Term::var(0)),
+                ),
             ),
         ),
-        Term::lam(relation_type, Term::QuotClass(Box::new(true_term(env)))),
+        Term::lam(
+            relation_type,
+            Term::lam(equiv_at_r, Term::QuotClass(Box::new(true_term(env)))),
+        ),
     );
 }
 
@@ -179,9 +217,12 @@ fn install_quot_class_fixture_prelude(env: &mut ElabEnv) {
             ),
         ),
     );
+    let relation_term = Term::const_(relation, vec![]);
+    let equivalence = assumed_equivalence(env, &bool_type, &relation_term);
     let quotient = Term::Quot(
         Box::new(bool_type.clone()),
-        Box::new(Term::const_(relation, vec![])),
+        Box::new(relation_term),
+        Box::new(equivalence),
     );
     let family = declare_inductive(&mut env.env, |_| InductiveSpec {
         level_params: vec![],
@@ -352,9 +393,12 @@ fn install_quot_elim_fixture_prelude(env: &mut ElabEnv) {
             ),
         ),
     );
+    let relation_term = Term::const_(relation, vec![]);
+    let equivalence = assumed_equivalence(env, &bool_type, &relation_term);
     let quotient = Term::Quot(
         Box::new(bool_type.clone()),
-        Box::new(Term::const_(relation, vec![])),
+        Box::new(relation_term),
+        Box::new(equivalence),
     );
     let quotient_alias = install_def(
         env,

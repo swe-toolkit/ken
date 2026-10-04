@@ -246,7 +246,11 @@ fn raw_quotient_and_truncation_heads_are_disjoint_from_other_rigid_formers() {
     let ctx = Context::new();
     let type0 = Term::Type(Level::zero());
     for former in [
-        Term::Quot(Box::new(type0.clone()), Box::new(type0.clone())),
+        Term::Quot(
+            Box::new(type0.clone()),
+            Box::new(type0.clone()),
+            Box::new(type0.clone()),
+        ),
         Term::Trunc(Box::new(type0.clone())),
     ] {
         let expr = eq(

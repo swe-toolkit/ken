@@ -952,9 +952,10 @@ fn infer_j(
     ))
 }
 
-/// `IsEquiv A R` as a proof-irrelevant conjunction of reflexivity, symmetry
-/// and transitivity. All three components are in `Ω_l`; `R` is checked first.
-fn quotient_equivalence_type(a: &Term, r: &Term) -> Term {
+/// Build `IsEquiv A R`, a proof-irrelevant conjunction of reflexivity,
+/// symmetry and transitivity. This constructs the expected type only: callers
+/// must first check `A : Type l` and `R : A → A → Ω_l` at the same level.
+pub fn quotient_equivalence_type(a: &Term, r: &Term) -> Term {
     let related = |depth: i64, x: usize, y: usize| {
         apply_args(weaken(r, depth), &[Term::var(x), Term::var(y)])
     };

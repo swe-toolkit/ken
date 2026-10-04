@@ -5,7 +5,9 @@
 use ken_kernel::env::Context;
 use ken_kernel::obs::{bottom_term, eq_reduce, top_term, tt_term};
 use ken_kernel::term::{Level, Term};
-use ken_kernel::{declare_inductive, infer, whnf, CtorSpec, GlobalEnv, InductiveSpec, KernelError};
+use ken_kernel::{
+    convert_type, declare_inductive, infer, whnf, CtorSpec, GlobalEnv, InductiveSpec, KernelError,
+};
 
 fn nullary(env: &mut GlobalEnv, count: usize) -> (Term, Vec<Term>) {
     let id = declare_inductive(env, |_| InductiveSpec {
@@ -139,6 +141,22 @@ fn total_equivalence_forms_and_class_equality_reduces_to_the_relation() {
     let neutral = Term::Eq(Box::new(q), Box::new(Term::var(0)), Box::new(rhs));
     assert_eq!(whnf(&env, &open, &neutral), neutral);
     assert_eq!(env.trusted_base(), before);
+}
+
+#[test]
+fn quotient_type_conversion_ignores_distinct_checked_equivalence_proofs() {
+    let mut env = GlobalEnv::new();
+    let (a, _) = nullary(&mut env, 2);
+    let r = relation(&a, &a, top_term(&env), Level::zero());
+    let equiv = ken_kernel::check::quotient_equivalence_type(&a, &r);
+    let mut ctx = Context::new();
+    ctx.push(equiv.clone());
+    ctx.push(equiv);
+    let first = quot(a.clone(), r.clone(), Term::var(1));
+    let second = quot(a, r, Term::var(0));
+    assert_eq!(infer(&env, &ctx, &first), Ok(Term::Type(Level::zero())));
+    assert_eq!(infer(&env, &ctx, &second), Ok(Term::Type(Level::zero())));
+    assert!(convert_type(&env, &ctx, &first, &second));
 }
 
 #[test]
