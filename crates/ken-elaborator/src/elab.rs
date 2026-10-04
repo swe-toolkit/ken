@@ -8416,6 +8416,12 @@ fn checked_index_refinement_sentinel(
         })
 }
 
+/// FRAME BUDGET (LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME): this walk
+/// recurses once per level of the relocated term, and in an unoptimized build
+/// every arm's locals are paid by every level. Each arm is therefore a single
+/// call into an `#[inline(never)]` helper that holds only that shape's
+/// temporaries; keep new arms in that form. Evaluation order is unchanged, so
+/// `map_free`'s effects and the first error are the same as before.
 fn relocate_active_premise_term<F>(
     term: &Term,
     depth: usize,
@@ -8424,106 +8430,250 @@ fn relocate_active_premise_term<F>(
 where
     F: FnMut(usize, usize) -> Result<Term, ElabError>,
 {
-    let mut go = |term: &Term, depth: usize| {
-        relocate_active_premise_term(term, depth, map_free)
-    };
-    Ok(match term {
-        Term::Var(index) if *index < depth => Term::var(*index),
-        Term::Var(index) => map_free(*index - depth, depth)?,
-        Term::Pi(domain, codomain) => {
-            Term::pi(go(domain, depth)?, go(codomain, depth + 1)?)
-        }
-        Term::Lam(domain, body) => {
-            Term::lam(go(domain, depth)?, go(body, depth + 1)?)
-        }
+    match term {
+        Term::Var(index) if *index < depth => Ok(Term::var(*index)),
+        Term::Var(index) => map_free(*index - depth, depth),
+        Term::Pi(domain, codomain) => relocate_binder(domain, codomain, depth, map_free, Term::pi),
+        Term::Lam(domain, body) => relocate_binder(domain, body, depth, map_free, Term::lam),
         Term::Sigma(domain, codomain) => {
-            Term::sigma(go(domain, depth)?, go(codomain, depth + 1)?)
+            relocate_binder(domain, codomain, depth, map_free, Term::sigma)
         }
-        Term::Let { ty, val, body } => Term::Let {
-            ty: Box::new(go(ty, depth)?),
-            val: Box::new(go(val, depth)?),
-            body: Box::new(go(body, depth + 1)?),
-        },
+        Term::Let { ty, val, body } => relocate_let(ty, val, body, depth, map_free),
         Term::App(function, argument) => {
-            Term::app(go(function, depth)?, go(argument, depth)?)
+            relocate_two(function, argument, depth, map_free, Term::app)
         }
-        Term::Pair(first, second) => Term::pair(go(first, depth)?, go(second, depth)?),
-        Term::Proj1(pair) => Term::proj1(go(pair, depth)?),
-        Term::Proj2(pair) => Term::proj2(go(pair, depth)?),
-        Term::Ascript(checked, expected) => Term::Ascript(
-            Box::new(go(checked, depth)?),
-            Box::new(go(expected, depth)?),
+        Term::Pair(first, second) => relocate_two(first, second, depth, map_free, Term::pair),
+        Term::Proj1(pair) => relocate_one(pair, depth, map_free, Term::proj1),
+        Term::Proj2(pair) => relocate_one(pair, depth, map_free, Term::proj2),
+        Term::Ascript(checked, expected) => {
+            relocate_two(checked, expected, depth, map_free, |checked, expected| {
+                Term::Ascript(Box::new(checked), Box::new(expected))
+            })
+        }
+        Term::Eq(ty, left, right) => {
+            relocate_three(ty, left, right, depth, map_free, |ty, left, right| {
+                Term::Eq(Box::new(ty), Box::new(left), Box::new(right))
+            })
+        }
+        Term::Cast(source, target, evidence, value) => relocate_four(
+            [source, target, evidence, value],
+            depth,
+            map_free,
+            |[source, target, evidence, value]| {
+                Term::Cast(
+                    Box::new(source),
+                    Box::new(target),
+                    Box::new(evidence),
+                    Box::new(value),
+                )
+            },
         ),
-        Term::Eq(ty, left, right) => Term::Eq(
-            Box::new(go(ty, depth)?),
-            Box::new(go(left, depth)?),
-            Box::new(go(right, depth)?),
-        ),
-        Term::Cast(source, target, evidence, value) => Term::Cast(
-            Box::new(go(source, depth)?),
-            Box::new(go(target, depth)?),
-            Box::new(go(evidence, depth)?),
-            Box::new(go(value, depth)?),
-        ),
-        Term::J(motive, base, evidence) => Term::J(
-            Box::new(go(motive, depth)?),
-            Box::new(go(base, depth)?),
-            Box::new(go(evidence, depth)?),
+        Term::J(motive, base, evidence) => relocate_three(
+            motive,
+            base,
+            evidence,
+            depth,
+            map_free,
+            |motive, base, evidence| Term::J(Box::new(motive), Box::new(base), Box::new(evidence)),
         ),
         Term::Quot(carrier, relation) => {
-            Term::Quot(Box::new(go(carrier, depth)?), Box::new(go(relation, depth)?))
+            relocate_two(carrier, relation, depth, map_free, |carrier, relation| {
+                Term::Quot(Box::new(carrier), Box::new(relation))
+            })
         }
-        Term::QuotClass(value) => Term::QuotClass(Box::new(go(value, depth)?)),
-        Term::Trunc(ty) => Term::Trunc(Box::new(go(ty, depth)?)),
-        Term::TruncProj(value) => Term::TruncProj(Box::new(go(value, depth)?)),
-        Term::Refl(value) => Term::Refl(Box::new(go(value, depth)?)),
+        Term::QuotClass(value) => relocate_one(value, depth, map_free, |value| {
+            Term::QuotClass(Box::new(value))
+        }),
+        Term::Trunc(ty) => relocate_one(ty, depth, map_free, |ty| Term::Trunc(Box::new(ty))),
+        Term::TruncProj(value) => relocate_one(value, depth, map_free, |value| {
+            Term::TruncProj(Box::new(value))
+        }),
+        Term::Refl(value) => {
+            relocate_one(value, depth, map_free, |value| Term::Refl(Box::new(value)))
+        }
         Term::QuotElim {
             motive,
             method,
             respect,
             scrut,
-        } => Term::QuotElim {
-            motive: Box::new(go(motive, depth)?),
-            method: Box::new(go(method, depth)?),
-            respect: Box::new(go(respect, depth)?),
-            scrut: Box::new(go(scrut, depth)?),
-        },
-        Term::Elim {
-            fam,
-            level_args,
-            params,
-            motive,
-            methods,
-            indices,
-            scrut,
-        } => Term::Elim {
-            fam: *fam,
-            level_args: level_args.clone(),
-            params: params
-                .iter()
-                .map(|parameter| go(parameter, depth))
-                .collect::<Result<Vec<_>, _>>()?,
-            motive: Box::new(go(motive, depth)?),
-            methods: methods
-                .iter()
-                .map(|method| go(method, depth))
-                .collect::<Result<Vec<_>, _>>()?,
-            indices: indices
-                .iter()
-                .map(|index| go(index, depth))
-                .collect::<Result<Vec<_>, _>>()?,
-            scrut: Box::new(go(scrut, depth)?),
-        },
-        Term::Absurd(motive, proof) => Term::Absurd(
-            Box::new(go(motive, depth)?),
-            Box::new(go(proof, depth)?),
+        } => relocate_four(
+            [motive, method, respect, scrut],
+            depth,
+            map_free,
+            |[motive, method, respect, scrut]| Term::QuotElim {
+                motive: Box::new(motive),
+                method: Box::new(method),
+                respect: Box::new(respect),
+                scrut: Box::new(scrut),
+            },
         ),
+        Term::Elim { .. } => relocate_elim(term, depth, map_free),
+        Term::Absurd(motive, proof) => {
+            relocate_two(motive, proof, depth, map_free, |motive, proof| {
+                Term::Absurd(Box::new(motive), Box::new(proof))
+            })
+        }
         Term::Type(_)
         | Term::Omega(_)
         | Term::Const { .. }
         | Term::IndFormer { .. }
         | Term::Constructor { .. }
-        | Term::IntLit(_) => term.clone(),
+        | Term::IntLit(_) => Ok(term.clone()),
+    }
+}
+
+#[inline(never)]
+fn relocate_one<F, C>(
+    term: &Term,
+    depth: usize,
+    map_free: &mut F,
+    build: C,
+) -> Result<Term, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+    C: FnOnce(Term) -> Term,
+{
+    Ok(build(relocate_active_premise_term(term, depth, map_free)?))
+}
+
+#[inline(never)]
+fn relocate_two<F, C>(
+    first: &Term,
+    second: &Term,
+    depth: usize,
+    map_free: &mut F,
+    build: C,
+) -> Result<Term, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+    C: FnOnce(Term, Term) -> Term,
+{
+    let first = relocate_active_premise_term(first, depth, map_free)?;
+    let second = relocate_active_premise_term(second, depth, map_free)?;
+    Ok(build(first, second))
+}
+
+/// The domain is relocated at `depth`, the body under one more binder.
+#[inline(never)]
+fn relocate_binder<F, C>(
+    domain: &Term,
+    body: &Term,
+    depth: usize,
+    map_free: &mut F,
+    build: C,
+) -> Result<Term, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+    C: FnOnce(Term, Term) -> Term,
+{
+    let domain = relocate_active_premise_term(domain, depth, map_free)?;
+    let body = relocate_active_premise_term(body, depth + 1, map_free)?;
+    Ok(build(domain, body))
+}
+
+#[inline(never)]
+fn relocate_three<F, C>(
+    first: &Term,
+    second: &Term,
+    third: &Term,
+    depth: usize,
+    map_free: &mut F,
+    build: C,
+) -> Result<Term, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+    C: FnOnce(Term, Term, Term) -> Term,
+{
+    let first = relocate_active_premise_term(first, depth, map_free)?;
+    let second = relocate_active_premise_term(second, depth, map_free)?;
+    let third = relocate_active_premise_term(third, depth, map_free)?;
+    Ok(build(first, second, third))
+}
+
+#[inline(never)]
+fn relocate_four<F, C>(
+    terms: [&Term; 4],
+    depth: usize,
+    map_free: &mut F,
+    build: C,
+) -> Result<Term, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+    C: FnOnce([Term; 4]) -> Term,
+{
+    let [first, second, third, fourth] = terms;
+    let first = relocate_active_premise_term(first, depth, map_free)?;
+    let second = relocate_active_premise_term(second, depth, map_free)?;
+    let third = relocate_active_premise_term(third, depth, map_free)?;
+    let fourth = relocate_active_premise_term(fourth, depth, map_free)?;
+    Ok(build([first, second, third, fourth]))
+}
+
+#[inline(never)]
+fn relocate_let<F>(
+    ty: &Term,
+    val: &Term,
+    body: &Term,
+    depth: usize,
+    map_free: &mut F,
+) -> Result<Term, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+{
+    let ty = relocate_active_premise_term(ty, depth, map_free)?;
+    let val = relocate_active_premise_term(val, depth, map_free)?;
+    let body = relocate_active_premise_term(body, depth + 1, map_free)?;
+    Ok(Term::Let {
+        ty: Box::new(ty),
+        val: Box::new(val),
+        body: Box::new(body),
+    })
+}
+
+/// A plain loop rather than an iterator `collect`, whose adapter chain adds
+/// about fifteen frames per eliminator level in an unoptimized build.
+#[inline(never)]
+fn relocate_all<F>(terms: &[Term], depth: usize, map_free: &mut F) -> Result<Vec<Term>, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+{
+    let mut relocated = Vec::with_capacity(terms.len());
+    for term in terms {
+        relocated.push(relocate_active_premise_term(term, depth, map_free)?);
+    }
+    Ok(relocated)
+}
+
+#[inline(never)]
+fn relocate_elim<F>(term: &Term, depth: usize, map_free: &mut F) -> Result<Term, ElabError>
+where
+    F: FnMut(usize, usize) -> Result<Term, ElabError>,
+{
+    let Term::Elim {
+        fam,
+        level_args,
+        params,
+        motive,
+        methods,
+        indices,
+        scrut,
+    } = term
+    else {
+        unreachable!("relocate_elim is called only on an eliminator");
+    };
+    let params = relocate_all(params, depth, map_free)?;
+    let motive = relocate_active_premise_term(motive, depth, map_free)?;
+    let methods = relocate_all(methods, depth, map_free)?;
+    let indices = relocate_all(indices, depth, map_free)?;
+    let scrut = relocate_active_premise_term(scrut, depth, map_free)?;
+    Ok(Term::Elim {
+        fam: *fam,
+        level_args: level_args.clone(),
+        params,
+        motive: Box::new(motive),
+        methods,
+        indices,
+        scrut: Box::new(scrut),
     })
 }
 
@@ -21326,7 +21476,7 @@ mod sibling_goal_refinement_tests;
 #[cfg(test)]
 mod result_transport_control_flow_tests {
     use crate::{error::Span, resolve::RExpr, ElabEnv, ElabError};
-    use ken_kernel::{convert_type, Level, Term};
+    use ken_kernel::{convert_type, GlobalId, Level, Term};
 
     use super::{
         active_premise_kernel_view, index_refinement_sentinel, kernel_check_current,
@@ -21420,6 +21570,79 @@ mod result_transport_control_flow_tests {
             cx.metas.metas[0].is_none(),
             "query-local zonking must not solve the elaborator meta"
         );
+    }
+
+    /// MEASURED: map_free sees an Elim's variables in params, motive, methods,
+    /// indices, and scrut order, and the first returned error stops traversal.
+    /// CLAIMED: the outlined helpers preserve left-to-right callback effects
+    /// and first-error identity. THE GAP: production caller suites cover real
+    /// Elims; this fixture pins one populated shape of the Elim child lists.
+    #[test]
+    fn active_premise_elim_preserves_visit_order_and_first_error() {
+        let term = Term::Elim {
+            fam: GlobalId(0),
+            level_args: vec![],
+            params: vec![Term::var(10), Term::var(11)],
+            motive: Box::new(Term::var(12)),
+            methods: vec![Term::var(13), Term::var(14)],
+            indices: vec![Term::var(15), Term::var(16)],
+            scrut: Box::new(Term::var(17)),
+        };
+        let expected_order = vec![10, 11, 12, 13, 14, 15, 16, 17];
+        let mut visited = Vec::new();
+        let relocated = super::relocate_active_premise_term(&term, 0, &mut |index, _depth| {
+            visited.push(index);
+            Ok(Term::var(index))
+        })
+        .expect("identity relocation succeeds");
+        assert_eq!(relocated, term);
+        assert_eq!(visited, expected_order);
+
+        let mut visited = Vec::new();
+        let error = super::relocate_active_premise_term(&term, 0, &mut |index, _depth| {
+            visited.push(index);
+            if index == 13 {
+                Err(ElabError::Internal("first relocation error".into()))
+            } else {
+                Ok(Term::var(index))
+            }
+        })
+        .expect_err("the first map_free error is returned");
+        assert!(matches!(error, ElabError::Internal(message)
+            if message == "first relocation error"));
+        assert_eq!(visited, vec![10, 11, 12, 13]);
+    }
+
+    /// MEASURED: a 64-level App chain relocates on a fixed 512 KiB child thread
+    /// and yields a structurally equal term.
+    /// CLAIMED: outlined traversal fits this controlled stack where the old
+    /// dispatcher/closure cycle exceeds it.
+    /// THE GAP: this pins the App recursion path; the sibling/call-site suites
+    /// exercise production terms, other variants, and translation callers.
+    /// Builder::stack_size sets this child stack directly, independent of the
+    /// libtest parent stack, ambient ulimit, or RUST_MIN_STACK default. The old
+    /// 45,152 B per-level cycle needs
+    /// 64 × 45,152 = 2,889,728 B before caller overhead, above 524,288 B.
+    #[test]
+    fn active_premise_app_chain_64_fits_stated_512k_stack() {
+        const DEPTH: usize = 64;
+        const STACK_BYTES: usize = 512 * 1024;
+
+        let input = (0..DEPTH).fold(Term::var(0), |subterm, _| Term::app(subterm, Term::var(0)));
+        let expected = input.clone();
+        let relocated = std::thread::Builder::new()
+            .name("active-premise-app-chain-64".into())
+            .stack_size(STACK_BYTES)
+            .spawn(move || {
+                super::relocate_active_premise_term(&input, 0, &mut |free_index, _depth| {
+                    Ok(Term::var(free_index))
+                })
+            })
+            .expect("spawn stated-stack relocation worker")
+            .join()
+            .expect("relocation worker does not panic")
+            .expect("identity relocation succeeds");
+        assert_eq!(relocated, expected);
     }
 
     #[test]
