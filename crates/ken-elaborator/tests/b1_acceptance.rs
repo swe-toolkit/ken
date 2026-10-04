@@ -347,7 +347,7 @@ fn removing_assume_shrinks_p_and_changes_hash() {
     );
 }
 
-/// verify/export/call-requires-versus-ffi-runtime-status
+/// Call-site Requires holes export as Unknown; FFI runtime checks stay Tested.
 ///
 /// Promise class: durable invariant (`21 §5.2`; `71 §2.1`).
 ///

@@ -465,7 +465,7 @@ fn spec_declaration_variants_have_provenance() {
     // covered by int_div_mod_surface.
 }
 
-/// verify/obligations/open-call-requires-status-survives-export
+/// A real call-site Requires hole remains Unknown through export.
 ///
 /// Promise class: durable invariant (`21 §5.1–§5.4`; `71 §2.1`).
 ///
