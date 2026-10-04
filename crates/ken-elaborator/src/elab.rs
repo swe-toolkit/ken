@@ -382,6 +382,14 @@ impl MatchFrame {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PremiseHoles {
+    /// Every Requires hole is taken into a reported result.
+    Reported,
+    /// Unsupplied Requires premises are refused before a hole is declared.
+    Refused,
+}
+
 struct ElabCtx<'e> {
     env: &'e mut GlobalEnv,
     /// Required semantic-owner label for every checking-mode `Axiom` minted
@@ -398,6 +406,7 @@ struct ElabCtx<'e> {
     globals: &'e HashMap<String, GlobalId>,
     /// Contract premise arities, selected only by checked global identity.
     preconditions: HashMap<GlobalId, (usize, usize)>,
+    premise_holes: PremiseHoles,
     num_values: &'e mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &'e NumericEnv,
     obligations: Vec<Obligation>,
@@ -629,6 +638,7 @@ impl<'e> ElabCtx<'e> {
             metas: MetaCtx::default(),
             globals,
             preconditions: HashMap::new(),
+            premise_holes: PremiseHoles::Refused,
             num_values,
             numeric_env,
             obligations: Vec::new(),
@@ -757,8 +767,13 @@ impl<'e> ElabCtx<'e> {
         self
     }
 
-    fn with_preconditions(mut self, preconditions: &HashMap<GlobalId, (usize, usize)>) -> Self {
+    fn with_preconditions(
+        mut self,
+        preconditions: &HashMap<GlobalId, (usize, usize)>,
+        premise_holes: PremiseHoles,
+    ) -> Self {
         self.preconditions.clone_from(preconditions);
+        self.premise_holes = premise_holes;
         self
     }
 
@@ -4505,6 +4520,11 @@ fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
 }
 
 fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
+    if cx.premise_holes == PremiseHoles::Refused {
+        return Err(ElabError::PremiseWithoutObligationChannel {
+            span: span.clone(),
+        });
+    }
     let closed = close_goal(&cx.ctx, &[], goal);
     let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
         .map_err(|error| ElabError::KernelRejected {
@@ -11386,7 +11406,7 @@ fn resolve_instance_dictionary(
             span: span.clone(),
         })?;
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label)
-        .with_preconditions(preconditions);
+        .with_preconditions(preconditions, PremiseHoles::Refused);
     for ty in &ctx.types {
         cx.ctx.push(ty.clone());
     }
@@ -11612,7 +11632,7 @@ fn resolve_instance_dictionary_inner(
                     })?;
                 let core_args = {
                     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label)
-        .with_preconditions(preconditions);
+                        .with_preconditions(preconditions, PremiseHoles::Refused);
                     for ty in &ctx.types {
                         cx.ctx.push(ty.clone());
                     }
@@ -13417,7 +13437,7 @@ fn declaration_param_context(
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
         .with_classes(class_env, provenance, standard_operators)
-        .with_preconditions(preconditions);
+        .with_preconditions(preconditions, PremiseHoles::Refused);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
         let domain_core = elab_type(&mut cx, domain)?;
@@ -13519,7 +13539,7 @@ fn elaborate_associated_rdecl(
             // is refused by a sort pre-check.
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(&*class_env, provenance, standard_operators)
-                .with_preconditions(preconditions);
+                .with_preconditions(preconditions, PremiseHoles::Refused);
             let ty = elab_type(&mut cx, ty)?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
@@ -13707,7 +13727,7 @@ fn elaborate_associated_rdecl(
             // of type `Type 0` whose body is A (`34 §2`).
             let (alias_body, alias_id) = {
                 let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                    .with_preconditions(preconditions);
+                    .with_preconditions(preconditions, PremiseHoles::Refused);
                 let body = elab_type(&mut cx, ty)?;
                 let body_z = cx.metas.zonk_term(&body);
                 (body_z, ())
@@ -13886,7 +13906,7 @@ fn elab_record_decl(
 ) -> Result<ElabResult, ElabError> {
     let field_types = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Refused);
         let mut types = Vec::new();
         for field in fields {
             let ty = elab_type(&mut cx, &field.ty)?;
@@ -13979,7 +13999,7 @@ fn elab_class_decl(
     let param_kind_core = if has_param {
         if let Some(kind) = param_kind {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-                .with_preconditions(preconditions);
+                .with_preconditions(preconditions, PremiseHoles::Refused);
             let kind_core = elab_type(&mut cx, kind)?;
             cx.metas.zonk_term(&kind_core)
         } else {
@@ -13997,7 +14017,7 @@ fn elab_class_decl(
     // reference for that field name lines up with the real kernel depth.
     let field_types: Vec<Term> = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Refused);
         if has_param {
             cx.ctx.push(param_kind_core.clone());
         }
@@ -14362,7 +14382,7 @@ fn elab_instance_decl(
             numeric_env,
             format!("{class_name}.{head_name}"),
         )
-        .with_preconditions(preconditions);
+        .with_preconditions(preconditions, PremiseHoles::Refused);
         push_type0_params(&mut cx, head_params.len());
         let h = elab_type(&mut cx, head_type)?;
         cx.metas.zonk_term(&h)
@@ -14397,7 +14417,7 @@ fn elab_instance_decl(
             numeric_env,
             format!("{class_name}.{head_name}"),
         )
-        .with_preconditions(preconditions);
+        .with_preconditions(preconditions, PremiseHoles::Refused);
         push_type0_params(&mut cx, head_params.len());
         constraints
             .iter()
@@ -14441,7 +14461,7 @@ fn elab_instance_decl(
     });
 
     // ---- admit the instance ----------------------------------------------
-    let (instance_id, field_effect_rows) = if has_self_ref {
+    let (instance_id, field_effect_rows, field_obligations) = if has_self_ref {
         // Direct self-referential constraint: encode as a fixpoint-arrow so
         // sct_check sees the self-loop in App position and rejects (`39 §6.4`).
         //
@@ -14461,13 +14481,13 @@ fn elab_instance_decl(
             vec![body]
         })
         .map_err(|_| ElabError::NonTerminatingInstances { span: span.clone() })?;
-        (ids[0], vec![])
+        (ids[0], vec![], Vec::new())
     } else if !constraints.is_empty() {
         // Non-self-ref constrained instance: elaborate fields, then route through
         // declare_recursive_group so sct_check runs on the group (`39 §6.4`).
         // Body has no App(Const(own_id), ...) → edges.is_empty() → sct_check
         // accepts. Mutual/indirect cycles are not detected here (see above).
-        let (ordered_vals, field_effect_rows): (Vec<Term>, Vec<crate::effects::RowType>) = {
+        let (ordered_vals, field_effect_rows, obligations) = {
             let mut cx = ElabCtx::new(
                 env,
                 globals,
@@ -14476,12 +14496,12 @@ fn elab_instance_decl(
                 format!("{class_name}.{head_name}"),
             )
             .with_classes(&*class_env, provenance, standard_operators)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
             push_type0_params(&mut cx, head_params.len());
             for (index, constraint_ty) in constraint_core_types.iter().enumerate() {
                 cx.ctx.push(weaken(constraint_ty, index as i64));
             }
-            compute_ordered_field_values(
+            let (ordered_vals, field_effect_rows) = compute_ordered_field_values(
                 &mut cx,
                 class_env,
                 class_name,
@@ -14492,7 +14512,9 @@ fn elab_instance_decl(
                 constraints,
                 effect_rows,
                 span,
-            )?
+            )?;
+            let obligations = std::mem::take(&mut cx.obligations);
+            (ordered_vals, field_effect_rows, obligations)
         };
         let pair_chain = close_type0_lams(
             wrap_premise_lams_from_full(
@@ -14507,10 +14529,10 @@ fn elab_instance_decl(
                 error: e,
                 span: span.clone(),
             })?;
-        (ids[0], field_effect_rows)
+        (ids[0], field_effect_rows, obligations)
     } else {
         // No constraints: declare_def path (no recursion possible, SCT not needed).
-        let (ordered_vals, field_effect_rows): (Vec<Term>, Vec<crate::effects::RowType>) = {
+        let (ordered_vals, field_effect_rows, obligations) = {
             let mut cx = ElabCtx::new(
                 env,
                 globals,
@@ -14519,9 +14541,9 @@ fn elab_instance_decl(
                 format!("{class_name}.{head_name}"),
             )
             .with_classes(&*class_env, provenance, standard_operators)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
             push_type0_params(&mut cx, head_params.len());
-            compute_ordered_field_values(
+            let (ordered_vals, field_effect_rows) = compute_ordered_field_values(
                 &mut cx,
                 class_env,
                 class_name,
@@ -14532,7 +14554,9 @@ fn elab_instance_decl(
                 constraints,
                 effect_rows,
                 span,
-            )?
+            )?;
+            let obligations = std::mem::take(&mut cx.obligations);
+            (ordered_vals, field_effect_rows, obligations)
         };
         let pair_chain = close_type0_lams(
             build_pair_chain(&ordered_vals, class_env.record_nil_val_id),
@@ -14544,7 +14568,7 @@ fn elab_instance_decl(
                 span: span.clone(),
             }
         })?;
-        (id, field_effect_rows)
+        (id, field_effect_rows, obligations)
     };
 
     // ---- register instance ----------------------------------------------
@@ -14586,10 +14610,12 @@ fn elab_instance_decl(
         class_env.source_instance_packages.insert(package.clone());
     }
 
+    let mut obligations = Vec::new();
+    absorb_obligations(&mut obligations, field_obligations);
     Ok(ElabResult {
         name: rdecl.name.clone(),
         def_id: instance_id,
-        obligations: vec![],
+        obligations,
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
@@ -14702,7 +14728,7 @@ fn elaborate_foreign_decl(
 
     let ty_core = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Refused);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("foreign decl must have a type annotation".into())
         })?;
@@ -14912,6 +14938,7 @@ pub(crate) fn elaborate_space_decl(
 ) -> Result<Vec<ElabResult>, ElabError> {
     let mut cell_types = Vec::with_capacity(space.cells.len());
     let mut cell_values = Vec::with_capacity(space.cells.len());
+    let mut cell_obligations = Vec::new();
     for cell in &space.cells {
         let mut cx = ElabCtx::new(
             &mut elab.env,
@@ -14920,9 +14947,10 @@ pub(crate) fn elaborate_space_decl(
             &elab.numeric_env,
             format!("{}.initial", space.name),
         )
-        .with_preconditions(&elab.preconditions);
+        .with_preconditions(&elab.preconditions, PremiseHoles::Reported);
         let cell_type = elab_type(&mut cx, &cell.ty)?;
         let cell_value = check(&mut cx, &cell.init, &cell_type, &cell.span)?;
+        absorb_obligations(&mut cell_obligations, std::mem::take(&mut cx.obligations));
         cell_types.push(cx.metas.zonk_term(&cell_type));
         cell_values.push(cx.metas.zonk_term(&cell_value));
     }
@@ -14949,6 +14977,7 @@ pub(crate) fn elaborate_space_decl(
         temporal_obligations: vec![],
         effect_row_type: None,
     }];
+    absorb_obligations(&mut results[0].obligations, cell_obligations);
 
     let state_type = Term::const_(state_id, vec![]);
     let initial_id = declare_def(
@@ -15029,7 +15058,7 @@ pub(crate) fn elaborate_space_decl(
             &mut elab.resolution_provenance,
             &elab.standard_operators,
         )
-        .with_preconditions(&elab.preconditions);
+        .with_preconditions(&elab.preconditions, PremiseHoles::Reported);
         let mut parameter_domains = Vec::with_capacity(operation.params.len());
         for (_, parameter_type) in &operation.params {
             let domain = elab_type(&mut cx, parameter_type)?;
@@ -15231,6 +15260,7 @@ pub(crate) fn elaborate_space_decl(
                 span: operation.span.clone(),
             }
         })?;
+        absorb_obligations(&mut contract_obligations, std::mem::take(&mut cx.obligations));
         drop(cx);
         elab.globals.insert(qualified_name.clone(), operation_id);
         elab.effect_rows
@@ -15300,7 +15330,7 @@ fn elaborate_v0(
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
             .with_local_dicts(local_dicts)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
         let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
@@ -15419,7 +15449,7 @@ fn elaborate_recursive_view(
     let (ty_core, type_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("recursive declaration requires a type annotation".into())
         })?;
@@ -15462,7 +15492,7 @@ fn elaborate_recursive_view(
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
         Ok((cx.metas.zonk_term(&body_c), obligations))
@@ -15540,7 +15570,7 @@ pub(crate) fn elaborate_mutual_group(
     let mut ty_cores: Vec<Term> = Vec::with_capacity(members.len());
     for rdecl in members {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Refused);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!(
                 "mutually-recursive '{}' requires a type annotation",
@@ -15661,7 +15691,7 @@ pub(crate) fn elaborate_mutual_group(
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
-                .with_preconditions(preconditions)
+                .with_preconditions(preconditions, PremiseHoles::Reported)
                 .with_recursive_group(&recursive_group);
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
             let obligations = std::mem::take(&mut cx.obligations);
@@ -15864,7 +15894,7 @@ fn elaborate_view_with_spec(
                     ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                         .with_classes(class_env, provenance, standard_operators)
                         .with_local_dicts(local_dicts)
-                        .with_preconditions(preconditions);
+                        .with_preconditions(preconditions, PremiseHoles::Reported);
                 let ty = rdecl.ty.as_ref().ok_or_else(|| {
                     ElabError::Internal(
                         "recursive declaration with spec clauses requires a type annotation".into(),
@@ -15916,7 +15946,7 @@ fn elaborate_view_with_spec(
                     ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                         .with_classes(class_env, provenance, standard_operators)
                         .with_local_dicts(local_dicts)
-                        .with_preconditions(preconditions);
+                        .with_preconditions(preconditions, PremiseHoles::Reported);
                 cx.assumptions = assumptions;
                 let (full_body, body_inner) = check_contract_body(
                     &mut cx,
@@ -15945,7 +15975,7 @@ fn elaborate_view_with_spec(
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
                 .with_local_dicts(local_dicts)
-                .with_preconditions(preconditions);
+                .with_preconditions(preconditions, PremiseHoles::Reported);
             let (full_body, body_inner, param_types, result_ty_under_requires, full_ty, req_cores) =
                 if let Some(ty) = &rdecl.ty {
                     let carrier_ty = elab_type(&mut cx, ty)?;
@@ -16186,7 +16216,7 @@ fn elaborate_prove(
 ) -> Result<ElabResult, ElabError> {
     let (phi_core, mut obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
         let omega = Term::omega(Level::Zero);
         let (phi_raw, phi_ty_raw) = infer(&mut cx, &rdecl.body)?;
         // Check φ is Ω-typed
@@ -16248,7 +16278,7 @@ fn elaborate_prop_decl(
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Refused);
         let ty = elab_type(&mut cx, prop_ty)?;
         let ty = cx.metas.zonk_term(&ty);
         let body = top_body_for_prop_type(env, &ty, &rdecl.span)?;
@@ -16330,7 +16360,7 @@ fn elaborate_checked_theorem(
     let (ty_core, body_core, body_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
         })?;
@@ -16654,7 +16684,7 @@ fn elaborate_law(
                 numeric_env,
                 format!("{}.{}", rdecl.name, field_name),
             )
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Reported);
             // param is the law's `param` argument — it's in scope (resolver pushed it)
             // For elaboration, we need the param in scope. Since the resolver resolved
             // field_phi with param in scope at Var(0), we replicate that:
@@ -16743,7 +16773,7 @@ fn elab_in_ctx_at_omega(
     )
     .with_classes(class_env, provenance, standard_operators)
     .with_local_dicts(local_dicts)
-    .with_preconditions(preconditions);
+    .with_preconditions(preconditions, PremiseHoles::Reported);
     // Populate cx.ctx from the snapshot. The requires binders are real entries
     // in this context; only their source-level visibility is hidden.
     for ty in &ctx.types {
@@ -21054,7 +21084,7 @@ pub(crate) fn elaborate_rexpr(
 ) -> Result<(Term, Term), ElabError> {
     let (core, ty, expr_span) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner_label)
-            .with_preconditions(preconditions);
+            .with_preconditions(preconditions, PremiseHoles::Refused);
         let (core_raw, ty_raw) = infer(&mut cx, rexpr)?;
         let c = cx.metas.zonk_term(&core_raw);
         let t = cx.metas.zonk_term(&ty_raw);

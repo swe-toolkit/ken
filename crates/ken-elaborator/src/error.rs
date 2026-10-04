@@ -230,6 +230,9 @@ pub enum ElabError {
     /// (`33 §3.2`, ADR 0014 MRES-2). `cycle` is the closed path in import-edge
     /// order, rooted at the entry unit (for example, `A`, `B`, `A`).
     ImportCycle { cycle: Vec<String>, span: Span },
+    /// A call's `requires` premise is not in scope, and this context has no
+    /// channel through which to report the resulting hole.
+    PremiseWithoutObligationChannel { span: Span },
     /// The elaborator surfaced a kernel type-mismatch (`39 §5.6`).
     TypeMismatch { span: Span, reason: String },
     /// A λ was checked against a non-Π type — V0 structural rejection (`39 §5.6`).
@@ -706,6 +709,11 @@ impl fmt::Display for ElabError {
                 span.start,
                 span.end,
                 cycle.join(" → "),
+            ),
+            ElabError::PremiseWithoutObligationChannel { span } => write!(
+                f,
+                "callee has an unmet `requires` premise at {}-{}, but this context cannot report an obligation",
+                span.start, span.end,
             ),
             ElabError::TypeMismatch { span, reason } => {
                 write!(f, "type mismatch at {}-{}: {}", span.start, span.end, reason)

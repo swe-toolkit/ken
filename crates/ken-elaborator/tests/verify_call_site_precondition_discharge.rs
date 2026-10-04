@@ -3,8 +3,8 @@
 
 use std::collections::HashSet;
 
-use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
-use ken_interp::{EvalStore, EvalVal, eval};
+use ken_elaborator::{ElabEnv, ElabError, ElabResult, ObligationKind};
+use ken_interp::{eval, EvalStore, EvalVal};
 use ken_kernel::GlobalId;
 
 fn trusted(env: &ElabEnv) -> HashSet<GlobalId> {
@@ -17,6 +17,205 @@ fn only_requires(result: &ElabResult) {
         result.obligations[0].kind,
         ObligationKind::Requires
     ));
+}
+
+fn assert_reported_delta(env: &ElabEnv, before: &HashSet<GlobalId>, result: &ElabResult) {
+    let obligation_ids = result
+        .obligations
+        .iter()
+        .map(|obligation| obligation.id)
+        .collect::<HashSet<_>>();
+    assert_eq!(obligation_ids.len(), result.obligations.len());
+    let reported = result
+        .obligations
+        .iter()
+        .map(|obligation| obligation.hole_id)
+        .collect::<HashSet<_>>();
+    assert_eq!(
+        trusted(env)
+            .difference(before)
+            .copied()
+            .collect::<HashSet<_>>(),
+        reported
+    );
+}
+
+/// AC-1 and AC-2. Promise class: durable invariant.
+/// MEASURED: an unsupplied premise in an instance field becomes one reported
+/// hole, and that hole is the complete trusted-base delta. CLAIMED: instance
+/// field call-site obligations reach the instance result. THE GAP: the
+/// trusted-base identity set must equal the result's reported hole IDs.
+#[test]
+fn instance_field_requires_hole_is_reported() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&env);
+    let results = env
+        .elaborate_file_v1(
+            "fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x\n\
+             class Endo A { apply : A -> A }\n\
+             instance Endo Int { apply = \\x. d x x }",
+        )
+        .expect("instance field call elaborates and reports its premise hole");
+    let instance_id = env.globals["Endo_instance_Int"];
+    let instance = results
+        .iter()
+        .find(|result| result.def_id == instance_id)
+        .expect("the instance result exists");
+    assert_reported_delta(&env, &before, instance);
+    only_requires(instance);
+
+    let mut control = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&control);
+    let results = control
+        .elaborate_file_v1(
+            "class Endo A { apply : A -> A }\n\
+             instance Endo Int { apply = \\x. x }",
+        )
+        .expect("premise-free instance control elaborates");
+    let instance_id = control.globals["Endo_instance_Int"];
+    let instance = results
+        .iter()
+        .find(|result| result.def_id == instance_id)
+        .expect("control instance result");
+    assert!(instance.obligations.is_empty());
+    assert_eq!(trusted(&control), before);
+}
+
+/// AC-1 and AC-2. Promise class: durable invariant.
+/// MEASURED: the cell initializer's Requires hole is reported by the space
+/// state result, and its ID is the complete trusted-base delta. CLAIMED:
+/// initial-state call-site holes have a declaration result channel. THE GAP:
+/// compare identities, not counts.
+#[test]
+fn space_cell_requires_hole_is_reported() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&env);
+    let results = env
+        .elaborate_file_v1(
+            "fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x\n\
+             space S { mut cell : Int = d 0 0 }",
+        )
+        .expect("space cell initializer reports its premise hole");
+    let state = results
+        .iter()
+        .find(|result| result.name == "S")
+        .expect("space state result");
+    assert_reported_delta(&env, &before, state);
+    only_requires(state);
+
+    let mut control = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&control);
+    let results = control
+        .elaborate_file_v1("space S { mut cell : Int = 0 }")
+        .expect("premise-free cell control elaborates");
+    let state = results
+        .iter()
+        .find(|result| result.name == "S")
+        .expect("control space state result");
+    assert!(state.obligations.is_empty());
+    assert_eq!(trusted(&control), before);
+}
+
+/// AC-2. Promise class: durable invariant.
+/// MEASURED: an operation-body Requires hole is reported alongside that
+/// operation's contract obligations, and its ID is the complete trusted-base
+/// delta. CLAIMED: operation call-site holes reach the operation result. THE
+/// GAP: the equality is over hole identities, not obligation counts.
+#[test]
+fn space_operation_requires_hole_is_reported() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&env);
+    let results = env
+        .elaborate_file_v1(
+            "fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x\n\
+             space S { mut cell : Int = 0\n\
+               proc call () : Int ensures Equal Int result 0 visits [S] = d 0 0\n\
+             }",
+        )
+        .expect("space operation reports its body Requires hole");
+    let operation = results
+        .iter()
+        .find(|result| result.name == "S.call")
+        .expect("operation result");
+    assert_reported_delta(&env, &before, operation);
+    assert_eq!(operation.obligations.len(), 2);
+    assert!(operation
+        .obligations
+        .iter()
+        .any(|obligation| matches!(obligation.kind, ObligationKind::Requires)));
+    assert!(operation
+        .obligations
+        .iter()
+        .any(|obligation| matches!(obligation.kind, ObligationKind::Ensures)));
+
+    let mut control = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&control);
+    let results = control
+        .elaborate_file_v1(
+            "space S { mut cell : Int = 0\n\
+               proc call () : Int visits [S] = 0\n\
+             }",
+        )
+        .expect("premise-free operation control elaborates");
+    let operation = results
+        .iter()
+        .find(|result| result.name == "S.call")
+        .expect("control operation result");
+    assert!(operation.obligations.is_empty());
+    assert_eq!(trusted(&control), before);
+}
+
+/// AC-1 and AC-2. Promise class: durable invariant.
+/// MEASURED: the standalone API refuses before its first Requires hole is
+/// postulated. CLAIMED: an API without an obligation channel cannot add hidden
+/// trust. THE GAP: the trusted-base delta is checked directly, and the exact
+/// refusal variant proves this is not an unrelated elaboration failure.
+#[test]
+fn standalone_expression_refuses_unsupplied_requires_without_hole() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    env.elaborate_decl_v1("fn d (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x")
+        .expect("callee declaration");
+    let before = trusted(&env);
+    let result = env.elaborate_expr("standalone-call", "d 0 0");
+    assert_eq!(trusted(&env), before);
+    let error = result.expect_err("standalone expression has no obligation channel");
+    assert!(
+        matches!(&error, ElabError::PremiseWithoutObligationChannel { .. }),
+        "expected the no-channel Requires refusal, got {error:?}"
+    );
+    let message = error.to_string();
+    assert!(
+        message.contains("requires") && message.contains("cannot report"),
+        "{message}"
+    );
+}
+
+/// AC-2. Promise class: durable invariant.
+/// MEASURED: a zero-argument Requires callee in the base of a type projection
+/// reaches the refusal choke point in a TypeAlias context, with no trusted-base
+/// delta. CLAIMED: the surface-reachable RProj route refuses before making a
+/// hole. THE GAP: assert both the exact refusal and the independent delta.
+#[test]
+fn type_alias_projection_base_refuses_requires_without_hole() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&env);
+    let result = env.elaborate_file_v1(
+        "const premise_value : Bool requires Equal Int 0 0 = True\n\
+         def Projected = premise_value.field",
+    );
+    let delta = trusted(&env)
+        .difference(&before)
+        .copied()
+        .collect::<HashSet<_>>();
+    assert!(
+        delta.is_empty(),
+        "Refused TypeAlias added trusted entries: {delta:?}"
+    );
+    let error = result.expect_err("type projection's base requires a proof");
+    assert!(
+        matches!(&error, ElabError::PremiseWithoutObligationChannel { .. }),
+        "expected the no-channel Requires refusal, got {error:?}"
+    );
 }
 
 /// AC-1, AC-4, AC-5. MEASURED: P1 reports one Requires hole, its id is the
