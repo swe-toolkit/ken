@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-LINK-DEAD-CODE-STRIP
 title: "Every native executable is about 20.7 MB (11.3 MB stripped) whatever it does, because the link step keeps the whole runtime archive, Cranelift backend and JIT included, though no run-time path calls them. Link with section garbage collection and strip, so an executable carries only the code it reaches"
-status: ready
+status: merged
 owner: runtime
 size: S
 tier: T2
@@ -74,3 +74,12 @@ strip keeps, or it runs on an unstripped link. Name the choice in the handoff.
 - A run-time path needs a symbol that garbage collection or stripping removes,
   for example a `dlsym` lookup or a trap report that names symbols.
 - The packaging targets a linker that does not take `--gc-sections`.
+
+## Closeout
+
+Merged `39992d356` from exact `be2f8cf58` (PR run 37168894136, after a
+close and reopen cleared a check frozen at `in_progress`). Runtime QA
+`evt_3mq6zrkncd5b`, Architect `evt_5cd1yekj815ze`, Decision
+`dec_257h947hmf4ys`. A release hello-world drops from 20,882,072 to 762,880
+bytes with identical stdout and status; the link always garbage-collects
+sections and strips symbols unless a test retains them.

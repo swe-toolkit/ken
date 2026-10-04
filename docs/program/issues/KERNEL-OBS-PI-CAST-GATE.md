@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-PI-CAST-GATE
 title: "Cast and J rules fire without checking a side condition their result needs: the Π cast projects from a neutral Eq Type (NotASigma), the index, parameter and level cast arms build ill-typed reducts, and infer_j accepts a motive with a wrong second domain. Gate each rule on its side condition and leave the term neutral otherwise"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1

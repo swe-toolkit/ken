@@ -6,7 +6,7 @@ owner: foundation
 size: S
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME]
 blocks: []
 github: null
 origin: "L3 proof backfill (operator 2026-09-13: 'A catalog package is not finished until its proofs are complete'; Architect evt_5f1ewknxv3m6h: L3 turns to proof backfill). Named deferred laws in spec/50-stdlib/60-length-indexed-vectors.md §5. Steward-filed per COORDINATION section 2."
@@ -54,6 +54,20 @@ stop and report the mismatch; do not build around it.
    equates `zip_with f (map g xs) (map h ys)` with `zip_with k xs ys`. The
    lambda instance is recovered at the use site. It stays deferred until
    `LANG-REFINED-SIBLING-MATCH-TAIL` lands.
+4. The whole-package loader exceeds the 2 MiB libtest worker once the
+   i→xs→ys proof is in `Vector.ken.md`; keyed on how deep elaboration nests
+   within one declaration (Architect `evt_2xpqwxn09fkah`; §1a 1 to 2). No
+   stack change and no `RUST_MIN_STACK`, and the theorem stays as stated.
+   - D0 measures the peak stack and the overflowing cycle.
+   - P1 moves the vector peeling into private helper theorems, so
+     `lookup_zip_with` matches only `i`. It lands if the cycle is the
+     nested-match chain and P1 passes `ken check` at a stated 1536 KiB.
+   - Otherwise item 5 is blocked on a Language per-level frame-reduction
+     WP, which the Steward frames, and the WIP `4e2ab6520` is kept as is.
+   - D0 (`evt_4kp6w90qgapq0`): the cycle is `relocate_active_premise_term`,
+     at about 22.5 KB per level, not the nested-match chain. Item 5 is
+     blocked on `LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME`, and then
+     resumes from `4e2ab6520` unchanged.
 
 ## Increments landed
 

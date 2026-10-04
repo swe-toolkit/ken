@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ADMIT-BODIES-UPGRADABLE-ONLY
 title: "The kernel proves Bottom with an empty trusted base, because admit_bodies upgrades any Opaque declaration: it will give the prelude Bottom the body Top, or re-upgrade a recursion-barrier fold that earlier declarations were checked against. Upgrade only a hole the kernel staged or recorded as an assumption"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -69,3 +69,12 @@ kernel-owned state that the env tracks by `GlobalId`. Do not key it on
 - A production caller upgrades an id outside the two eligible kinds: stop to
   the Architect with the site.
 - A spec change. Spec 18 §5 already excludes this.
+
+## Closeout
+
+Merged `45a15f913` from exact `80940773f` (PR run 37163447048). Kernel QA
+`evt_1vx4ggbtak510`, Architect `evt_1jgprkpzymw3k`, Decision
+`dec_2p820w4zhs4zv`. `admit_bodies` keys eligibility on kernel-recorded
+origin per `GlobalId`: a pending staged placeholder or a recorded assumption.
+P1, P2, P3 and a forged id are refused, and the bare-Opaque falsifier reddens
+them while the two eligible controls pass.
