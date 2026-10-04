@@ -1,5 +1,7 @@
-use ken_elaborator::{v2_extract, ElabEnv, ProvKind};
-use ken_kernel::{Level, Term};
+use std::collections::HashSet;
+
+use ken_elaborator::{v2_extract, ElabEnv, ElabError, ObligationKind, ProvKind};
+use ken_kernel::{GlobalId, Level, Term};
 
 fn arbitrary_predicate(env: &mut ElabEnv) {
     let int = Term::const_(env.globals["Int"], vec![]);
@@ -478,6 +480,113 @@ fn ill_typed_constructor_refinement_rejects_without_partial_registration() {
     );
     env.elaborate_decl("record BadRecordRefinement { value : Int }")
         .expect("a failed record predicate must not hold its name");
+}
+
+fn trusted(env: &ElabEnv) -> HashSet<GlobalId> {
+    env.env.trusted_base().into_iter().collect()
+}
+
+/// R1, R3, R4. Promise class: durable invariant.
+/// MEASURED: each undischarged hole in a standalone expression is refused,
+/// without adding a global or trusted-base entry. CLAIMED: the no-sink
+/// expression API cannot silently accept an unreported obligation. THE GAP:
+/// each fixture must reach its own generating arm, pinned by its Reported twin.
+#[test]
+fn undischarged_standalone_obligations_refuse_before_declaration() {
+    for (expression, declaration, kind) in [
+        (
+            "(0 : { z : Int | Not (Equal Int z 0) })",
+            "const open_refinement : Int = (0 : { z : Int | Not (Equal Int z 0) })",
+            ObligationKind::RefinementIntroduction,
+        ),
+        (
+            "7 / 0",
+            "fn divide_zero (n : Int) : Int = n / 0",
+            ObligationKind::PartialPrim,
+        ),
+        (
+            "(250 : UInt8) + (10 : UInt8)",
+            "fn add_bytes (n : UInt8) : UInt8 = n + (10 : UInt8)",
+            ObligationKind::PartialPrim,
+        ),
+    ] {
+        let mut standalone = ElabEnv::new().expect("prelude");
+        let before = trusted(&standalone);
+        let declarations = standalone.env.declarations().len();
+        let error = standalone
+            .elaborate_expr("no_sink", expression)
+            .expect_err("an unreported obligation must be refused");
+        assert!(
+            matches!(error, ElabError::ObligationWithoutChannel { .. }),
+            "{expression}: wrong refusal: {error:?}"
+        );
+        assert_eq!(trusted(&standalone), before, "{expression}: leaked trust");
+        assert_eq!(
+            standalone.env.declarations().len(),
+            declarations,
+            "{expression}: refused obligation still declared a global"
+        );
+
+        let mut reported = ElabEnv::new().expect("prelude");
+        let before = trusted(&reported);
+        let result = reported
+            .elaborate_decl_v1(declaration)
+            .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
+        assert_eq!(result.obligations.len(), 1, "{declaration}");
+        assert_eq!(
+            std::mem::discriminant(&result.obligations[0].kind),
+            std::mem::discriminant(&kind),
+            "{declaration}"
+        );
+        assert!(reported.is_open_hole(result.obligations[0].hole_id));
+        assert_eq!(
+            trusted(&reported)
+                .difference(&before)
+                .copied()
+                .collect::<HashSet<_>>(),
+            HashSet::from([result.obligations[0].hole_id]),
+            "{declaration}: open trusted-base delta must equal reported hole"
+        );
+    }
+}
+
+/// R2. Promise class: durable invariant.
+/// MEASURED: an equality of the same closed integer checks without any
+/// declaration or trust delta in Refused mode. CLAIMED: only undischarged
+/// obligations need a reporting channel. THE GAP: the Reported twin must
+/// contain a checked, non-open refinement obligation for the same predicate.
+#[test]
+fn discharged_standalone_refinement_records_nothing() {
+    let source = "(0 : { z : Int | Equal Int z 0 })";
+    let mut standalone = ElabEnv::new().expect("prelude");
+    let before = trusted(&standalone);
+    let declarations = standalone.env.declarations().len();
+    standalone
+        .elaborate_expr("closed", source)
+        .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    assert_eq!(trusted(&standalone), before);
+    assert_eq!(
+        standalone.env.declarations().len(),
+        declarations,
+        "a discharged Refused refinement must not declare even a filled hole"
+    );
+
+    let mut reported = ElabEnv::new().expect("prelude");
+    let before = trusted(&reported);
+    let result = reported
+        .elaborate_decl_v1("const closed_refinement : Int = (0 : { z : Int | Equal Int z 0 })")
+        .expect("the same predicate in a reported declaration");
+    assert_eq!(result.obligations.len(), 1);
+    assert!(matches!(
+        result.obligations[0].kind,
+        ObligationKind::RefinementIntroduction
+    ));
+    assert!(!reported.is_open_hole(result.obligations[0].hole_id));
+    assert_eq!(
+        trusted(&reported),
+        before,
+        "admitted bodies are not trusted assumptions"
+    );
 }
 
 #[test]

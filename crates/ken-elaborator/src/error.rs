@@ -233,6 +233,9 @@ pub enum ElabError {
     /// A call's `requires` premise is not in scope, and this context has no
     /// channel through which to report the resulting hole.
     PremiseWithoutObligationChannel { span: Span },
+    /// An elaborator obligation is not proved where it is generated, and
+    /// this context has no channel through which to report the hole.
+    ObligationWithoutChannel { span: Span },
     /// The elaborator surfaced a kernel type-mismatch (`39 §5.6`).
     TypeMismatch { span: Span, reason: String },
     /// A λ was checked against a non-Π type — V0 structural rejection (`39 §5.6`).
@@ -713,6 +716,11 @@ impl fmt::Display for ElabError {
             ElabError::PremiseWithoutObligationChannel { span } => write!(
                 f,
                 "callee has an unmet `requires` premise at {}-{}, but this context cannot report an obligation",
+                span.start, span.end,
+            ),
+            ElabError::ObligationWithoutChannel { span } => write!(
+                f,
+                "an obligation at {}-{} is not proved, but this context cannot report it",
                 span.start, span.end,
             ),
             ElabError::TypeMismatch { span, reason } => {

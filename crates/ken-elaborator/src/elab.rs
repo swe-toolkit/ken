@@ -401,9 +401,10 @@ impl MatchFrame {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PremiseHoles {
-    /// Every Requires hole is taken into a reported result.
+    /// Every elaborator obligation hole is taken into a reported result.
     Reported,
-    /// Unsupplied Requires premises are refused before a hole is declared.
+    /// An undischarged elaborator obligation is refused before a hole is
+    /// declared, and a discharged one records nothing.
     Refused,
 }
 
@@ -4653,27 +4654,49 @@ fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
     })
 }
 
-fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
+/// Mint an elaborator obligation hole for `closed` and record it, or refuse
+/// when this context has no obligation channel. Every hole the elaborator
+/// generates inside an `ElabCtx` is declared here.
+fn declare_obligation_hole(
+    cx: &mut ElabCtx<'_>,
+    closed: Term,
+    span: &Span,
+    kind: ObligationKind,
+) -> Result<GlobalId, ElabError> {
     if cx.premise_holes == PremiseHoles::Refused {
-        return Err(ElabError::PremiseWithoutObligationChannel {
-            span: span.clone(),
+        return Err(match kind {
+            ObligationKind::Requires => {
+                ElabError::PremiseWithoutObligationChannel { span: span.clone() }
+            }
+            ObligationKind::PartialPrim
+            | ObligationKind::RefinementIntroduction
+            | ObligationKind::Ensures
+            | ObligationKind::Prove
+            | ObligationKind::LawField(_)
+            | ObligationKind::FfiRuntimeCheck => {
+                ElabError::ObligationWithoutChannel { span: span.clone() }
+            }
         });
     }
-    let closed = close_goal(&cx.ctx, &[], goal);
     let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
         .map_err(|error| ElabError::KernelRejected {
             error,
             span: span.clone(),
         })?;
-    let obligation_id = cx.obl_counter;
-    cx.obl_counter += 1;
     cx.obligations.push(Obligation {
-        id: obligation_id,
+        id: cx.obl_counter,
         hole_id,
         goal_closed: closed,
         span: span.clone(),
-        kind: ObligationKind::Requires,
+        kind,
     });
+    cx.obl_counter += 1;
+    Ok(hole_id)
+}
+
+fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
+    let closed = close_goal(&cx.ctx, &[], goal);
+    let hole_id = declare_obligation_hole(cx, closed, span, ObligationKind::Requires)?;
     Ok((0..cx.ctx.len())
         .rev()
         .fold(Term::const_(hole_id, vec![]), |proof, index| {
@@ -10940,21 +10963,7 @@ fn elab_binop(
                         rhs_core.clone(),
                     );
                     let closed = close_goal(&cx.ctx, &[], phi);
-                    let hole_id =
-                        declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
-                            .map_err(|e| ElabError::KernelRejected {
-                            error: e,
-                            span: span.clone(),
-                        })?;
-                    let obl_id = cx.obl_counter;
-                    cx.obl_counter += 1;
-                    cx.obligations.push(Obligation {
-                        id: obl_id,
-                        hole_id,
-                        goal_closed: closed,
-                        span: span.clone(),
-                        kind: ObligationKind::PartialPrim,
-                    });
+                    declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
                 }
             }
 
@@ -11014,21 +11023,7 @@ fn elab_binop(
             let known = premise_proof_in_scope(cx, &goal).is_some();
             if !known {
                 let closed = close_goal(&cx.ctx, &[], goal);
-                let hole_id =
-                    declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
-                        .map_err(|error| ElabError::KernelRejected {
-                            error,
-                            span: span.clone(),
-                        })?;
-                let obl_id = cx.obl_counter;
-                cx.obl_counter += 1;
-                cx.obligations.push(Obligation {
-                    id: obl_id,
-                    hole_id,
-                    goal_closed: closed,
-                    span: span.clone(),
-                    kind: ObligationKind::PartialPrim,
-                });
+                declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
             }
             Ok((applied, result_ty))
         }
@@ -11348,20 +11343,17 @@ fn emit_refinement_predicate(
             kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
                 .ok().map(|_| certificate)
         });
-    let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
-        .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
+    if proof.is_some() && cx.premise_holes == PremiseHoles::Refused {
+        // Discharged where it is generated; a context with no obligation
+        // channel records nothing, so the environment is left unchanged.
+        return Ok(());
+    }
+    let hole_id =
+        declare_obligation_hole(cx, closed, span, ObligationKind::RefinementIntroduction)?;
     if let Some(proof) = proof {
         ken_kernel::check::admit_bodies(cx.env, &[(hole_id, proof)])
             .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
     }
-    cx.obligations.push(Obligation {
-        id: cx.obl_counter,
-        hole_id,
-        goal_closed: closed,
-        span: span.clone(),
-        kind: ObligationKind::RefinementIntroduction,
-    });
-    cx.obl_counter += 1;
     Ok(())
 }
 
