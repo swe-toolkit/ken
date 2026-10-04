@@ -1337,6 +1337,7 @@ pub fn stage_placeholders(
             level_params,
             ty,
         });
+        env.record_staged_placeholder(id);
         ids.push(id);
     }
     Ok(PendingAdmission {
@@ -1424,6 +1425,20 @@ pub fn admit_bodies(env: &mut GlobalEnv, group: &[(GlobalId, Term)]) -> KernelRe
         return Err(KernelError::IllFormedDecl(
             "duplicate checked-upgrade group member".into(),
         ));
+    }
+    // Preflight the entire group before checking even its first body: an
+    // ineligible member must not be masked by an earlier typing failure.
+    for (id, _) in group {
+        if !matches!(env.lookup(*id), Some(Decl::Opaque { .. })) {
+            return Err(KernelError::IllFormedDecl(
+                "checked upgrade requires a present opaque member".into(),
+            ));
+        }
+        if !env.is_upgradable_opaque(*id) {
+            return Err(KernelError::IllFormedDecl(
+                "checked upgrade requires a staged placeholder or recorded assumption".into(),
+            ));
+        }
     }
     let empty = Context::new();
     for (id, body) in group {
@@ -1552,6 +1567,7 @@ pub fn declare_postulate(
         level_params,
         ty,
     });
+    env.record_postulate_assumption(id);
     Ok(id)
 }
 
