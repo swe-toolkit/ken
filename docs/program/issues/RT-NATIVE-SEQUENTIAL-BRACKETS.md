@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-SEQUENTIAL-BRACKETS
 title: "Native execution of two sequential resource brackets is distinguishable: a two-bracket program whose brackets get different responses exits with a code that encodes both outcomes, natively and in the interpreter, so a swapped response pairing changes the observation"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: architect
@@ -82,6 +82,15 @@ which stays unchanged.
   last-by-origin. Record each outcome: a typed refusal, a changed exit (12
   or 99) or a changed trace all discriminate. The only failing outcome is
   exit 21 with equal traces.
+
+## Closeout
+
+Merged `5bad638bf` from exact `51e0c5de4` (PR run 37175009186). Runtime QA
+`evt_4x06wd1qvss9m`, Architect `evt_215yd33pthv03`, Decision
+`dec_403ay1rq3bdy7`. The distinguishable fixture exits 21 natively and in the
+interpreter. The test also pins the plan rows that fix which call each
+response selects, so forcing first-by-origin or last-by-origin reddens it.
+Test-only; no production change.
 
 ## Stop conditions
 
