@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-SUPPORT-CRATE-SPLIT
 title: "The run-time support a native executable calls lives in the same crate as the Cranelift compiler backend, so the runtime archive contains the compiler and only link-time garbage collection keeps it out of an executable. Move the run-time support into its own crate with no compiler dependency, and link its archive instead"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
