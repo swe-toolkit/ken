@@ -54,14 +54,26 @@ if [[ -d "$(dirname "$ken_tmpdir")" ]] && mkdir -p "$ken_tmpdir" 2>/dev/null; th
   # exactly like a regression. This is the same misreading the TMPDIR
   # redirection above was written to prevent, one volume over.
   #
-  # Age-gated so it cannot touch a live run: no individual test here runs for
-  # hours, and the build mutex below serializes seats. Deliberately dumb —
-  # it decides nothing, reports nothing, and never fails the build.
+  # Age-gated on the newest thing inside an entry, not the entry itself.
+  # Appending to a log updates the file's mtime but not its directory's, so
+  # gating on the directory alone deleted a seat's census directory while the
+  # run was still writing to it (2026-10-04). An entry is reaped only when
+  # nothing under it changed for KEN_TMP_REAP_MINUTES. Deliberately dumb: it
+  # decides nothing, reports nothing, and never fails the build.
   # KEN_TMP_REAP_MINUTES=0 disables it.
   reap_minutes="${KEN_TMP_REAP_MINUTES:-120}"
   if [[ "$reap_minutes" -gt 0 ]]; then
-    find "$ken_tmpdir" -maxdepth 1 -mindepth 1 -mmin "+${reap_minutes}" \
-      -exec rm -rf -- {} + 2>/dev/null || true
+    {
+      find "$ken_tmpdir" -maxdepth 1 -mindepth 1 -mmin "+${reap_minutes}" \
+        -print0 2>/dev/null |
+        while IFS= read -r -d '' entry; do
+          if [[ -d "$entry" && ! -L "$entry" ]] &&
+            [[ -n "$(find "$entry" -mmin "-${reap_minutes}" -print -quit 2>/dev/null)" ]]; then
+            continue
+          fi
+          rm -rf -- "$entry" 2>/dev/null || true
+        done
+    } || true
   fi
 fi
 
