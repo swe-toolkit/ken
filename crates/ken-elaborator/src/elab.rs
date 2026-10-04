@@ -15092,31 +15092,6 @@ fn collect_constructor_field_predicates(
     Ok(result)
 }
 
-/// The checked body sees the carrier of a named refined result. Its one
-/// return obligation is emitted after checking, as for a literal refinement.
-fn carrier_check_type_for_named_return(
-    env: &GlobalEnv,
-    facts: &RefinementFacts,
-    ty: &Term,
-    remaining_params: usize,
-) -> Term {
-    if remaining_params == 0 {
-        if let Term::Const { id, .. } = ty {
-            if facts.refinement_predicates.contains_key(id) {
-                return whnf(env, &Context::new(), ty);
-            }
-        }
-        return ty.clone();
-    }
-    match ty {
-        Term::Pi(domain, codomain) => Term::pi(
-            *domain.clone(),
-            carrier_check_type_for_named_return(env, facts, codomain, remaining_params - 1),
-        ),
-        _ => ty.clone(),
-    }
-}
-
 fn declared_named_return_id(
     rdecl: &RDecl,
     globals: &HashMap<String, GlobalId>,
@@ -16449,6 +16424,7 @@ fn elaborate_view_with_spec(
                         req_cores,
                     )
                 };
+
 
             absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
             (

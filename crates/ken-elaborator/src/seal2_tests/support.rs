@@ -106,6 +106,10 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         env: global_env,
         globals,
         class_env,
+        // Predicate templates are Ω-valued obligations, not independently
+        // source-reachable value producers. Their owning GlobalIds and carrier
+        // domains are reached through globals/global_env or class_env above.
+        refinement_facts,
         // --- fields that hold NO carrier-bearing `Term` of their own ---
         // Each is either an index of `GlobalId`s into `global_env` (its producer
         // types are therefore already reached through `globals` below) or an
@@ -134,6 +138,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         resolution_provenance,
     } = env;
     let _ = (
+        refinement_facts,
         num_values,
         preconditions,
         fixities,
