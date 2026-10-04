@@ -321,6 +321,20 @@ fn distinct_refinement_aliases_do_not_share_an_int_carrier_key() {
         .elaborate_decl_v1("const converted : Pos = negative")
         .expect("a different alias still requires introduction");
     assert_eq!(conversion.obligations.len(), 1);
+    let p = Term::const_(env.globals["P"], vec![]);
+    let expected_neg = Term::app(
+        Term::const_(env.globals["Not"], vec![]),
+        Term::app(p.clone(), Term::IntLit(5.into())),
+    );
+    assert_eq!(
+        negative.obligations[0].goal_closed, expected_neg,
+        "Neg must emit Not (P 5), not the predicate of another Int alias"
+    );
+    let expected_pos = Term::app(p, Term::const_(env.globals["negative"], vec![]));
+    assert_eq!(
+        conversion.obligations[0].goal_closed, expected_pos,
+        "Pos must emit P negative when converting from Neg"
+    );
     assert!(env.is_open_hole(conversion.obligations[0].hole_id));
 }
 
