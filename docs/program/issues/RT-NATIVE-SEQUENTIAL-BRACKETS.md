@@ -1,9 +1,9 @@
 ---
 id: RT-NATIVE-SEQUENTIAL-BRACKETS
-title: "Native execution of two sequential resource brackets: a program that uses two withBuffer brackets in sequence builds and runs natively with the observation the interpreter gives, instead of refusing in object emission at the BoundaryCarrier carried-recursive-hypothesis arity check"
+title: "Native execution of two sequential resource brackets is distinguishable: a two-bracket program whose brackets get different responses exits with a code that encodes both outcomes, natively and in the interpreter, so a swapped response pairing changes the observation"
 status: active
 owner: runtime
-size: M
+size: S
 gate: architect
 tier: T1
 depends_on: [RT-IGNORED-ROWS-NEXT-GROUP, RT-NATIVE-CONTINUATION-ENV-CARRIAGE]
@@ -24,65 +24,70 @@ research advisory `evt_7rqnbfnw80fe`. WIP `a6a07bfd2` is not a candidate.
 
 ## Objective
 
-A native program can use two resource brackets one after the other.
+A native program can use two resource brackets one after the other, and its
+observation shows that each bracket received its own response.
 
-## Settled inputs (runtime-implementer `evt_5nmkjfcnemamh`, on the NEXT-GROUP repair at `c569eef94`)
+## AC-0 result (Architect `evt_edpt4e5rpsy0`, on `45a15f913`)
 
-- The AC-0b witness (`withBuffer 1 ; withBuffer 1`) gets past both
-  host-response refusals once the occurrence-key repair is in. It then
-  refuses in object emission:
-  `unsupported runtime-IR lowering: BoundaryCarrier: a carried recursive
-  hypothesis is an eliminated value, not a callable, so it takes no
-  arguments, but the call provides 1`.
-- The message comes from `reject_carried_residual_arguments` in
-  `crates/ken-runtime/src/cranelift_backend/lowering/core.rs` (`:3128`).
-- **Controls.** One bracket with the same body compiles (exit 0). The same
-  refusal appears when the second bracket is moved into a separately named
-  `proc` with capacity 6.
-- **Ruled INDEPENDENT of the route selection** (Architect
-  `evt_20tgpkchtnck2`). The refusal persists under the "last by origin"
-  selection, in which no route hands the refusing call to any Vis.
-- **The site, pinned.** It is the source-machine guard at
-  `crates/ken-runtime/src/cranelift_backend/lowering/source.rs:5015`
-  (arguments 1, funcid 44, owner `PredeclaredFunctionId(3)`,
-  `pending_application` None), reached from call `StaticOriginId(187)`.
-  - In the witness plan, 187 is CM12's Vis-case dispatch continuation call:
-    IHInvocation188 -> Let191 -> leaf Match309 -> root Match312 ->
-    IHSlots313 -> CM12 Vis.
-  - The refusal needs the second bracket's CM318 nested in CM12's Ret case,
-    which is why one bracket compiles.
-  - Logs: `/tmp/rt-ignored-build/a1-{repaired-instrumented2,first,last}.log`.
-- **Possible overlap.** Both `rt_escape` rows also use two brackets
-  (`withResource` then `withBuffer`). `RT-NATIVE-TREE-MATCH-RUNTIME-SCRUTINEE`
-  may reach this refusal next. AC-0 checks that, so that the two nodes do not
-  each repair the same site.
+- **The refusal is cleared by landed work.** ENV-CARRIAGE I-2, inside
+  `2edc10ac9`, cleared the BoundaryCarrier refusal. The witness
+  `rt_ignored_two_buffer_witness.ken` is byte-identical between
+  `958121efa` and main. On `958121efa` its test pinned the refusal verbatim,
+  and on main it runs with parity (runtime-implementer `evt_2yk1jehzrzh8s`).
+  AC-2's revert control therefore holds by history. The one-bracket control
+  `one_bracket_retains_native_parity` is green on main.
+- **The arity guard stays.** `reject_carried_residual_arguments` fires only
+  when `recursive_unit_body` is `None`, the eliminated-hypothesis case.
+- **The current witness cannot tell the brackets apart** (check 8). Both
+  bodies are the same `buffer_body`, the exit is always `Success`, and the
+  releases are compared as a sorted set. A run that hands each Vis the other
+  bracket's response gives the observation the test accepts.
+- **The `rt_escape` rows are not this WP's.** `ESCAPE_FILE_THEN_READAT`
+  (`:660`) stops first at "Match: dynamic arms must produce scalar Int or
+  Bool values", and `ESCAPE_BUFFER_THEN_READAT` (`:691`) at the
+  generated-entry typed-consumer-projection invariant. The Steward places
+  them in L1.
 
 ## Deliverable
 
-The witness, with its two brackets distinguishable at runtime, builds and
-runs natively. Its exit code or output encodes both brackets' outcomes, and
-it matches the interpreter. The repair is ruled by the Architect.
+Test-only, in `crates/ken-cli/tests/`, with no production edit: a new
+fixture, `rt_two_bracket_distinguishable.ken` or similar, beside the old one,
+which stays unchanged.
+
+- The first bracket is `withBuffer AFull Unit Unit (1 : Int) err_body`, whose
+  body returns `ResourceBodyErr Unit Unit MkUnit`. The second is
+  `withBuffer AFull Unit Unit (2 : Int) ok_body`, returning
+  `ResourceBodyOk Unit Unit MkUnit`.
+- Inside `\second`, match `first` and then `second`, each arm a direct
+  `host_exit AFull (...)`, the shape at `px8f_buffer_native.rs:121-127`.
+  First `ResourceBracketBodyError` with second `ResourceBracketOk` exits
+  `Failure 21`; the swap exits `Failure 12`; anything else `Failure 99`.
 
 ## Acceptance
 
-- **AC-0 (probe, then D0; no build).**
-  - Re-measure the witness and the one-bracket control on the landed
-    NEXT-GROUP repair (Check 4).
-  - At the refusal, report the call's origin, its callee, and why lowering
-    treats that callee as a carried recursive hypothesis.
-  - Say whether either `rt_escape` row reaches the same site.
-  - Propose the repair. The Architect rules before any build.
-- **AC-1.** The witness runs natively with the expected observation. The
-  NEXT-GROUP A2 fixed-order mutations change that observation rather than
-  refusing.
-- **AC-2 (control).** Reverting the repair returns the witness to the AC-0
-  refusal. The one-bracket control stays green.
+- **D0 (probe, then report).** Native build and run, and the interpreter, on
+  main: exit, stdout and stderr. `first` is now live across the second
+  bracket, a new capture, so a native refusal is possible. A refusal is a D0
+  result, reported verbatim, and the Architect rules the site. The candidate
+  is written only after the Architect accepts the D0.
+- **AC-1.** A test on the new fixture asserts:
+  - native exit equals the interpreter's, and both are 21;
+  - the non-release traces are equal;
+  - the releases are equal as a set, with two distinct members (sizes 1
+    and 2). Chronology belongs to `RT-BRACKET-RELEASE-ORDER-PARITY`; do not
+    assert order.
+- **AC-2 (mutation, QA, scratch, restored byte-identically).** In the
+  more-than-one-candidate selection in
+  `planning/static_transition/responses.rs`, force first-by-origin and then
+  last-by-origin. Record each outcome: a typed refusal, a changed exit (12
+  or 99) or a changed trace all discriminate. The only failing outcome is
+  exit 21 with equal traces.
 
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change (an operator question).
-- Relaxing the arity check for a value that really is an eliminated
-  hypothesis is an Architect stop.
+- Any production edit, or relaxing the arity check for a value that really
+  is an eliminated hypothesis: an Architect stop.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
 

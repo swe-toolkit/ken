@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-04 00:57:51Z — from 847 issue file(s) in `docs/program/issues/`.
+2026-10-04 01:28:06Z — from 847 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -692,7 +692,7 @@ the committed file matches the generator's output.
 | `RT-NATIVE-LINK-DEAD-CODE-STRIP` | Every native executable is about 20.7 MB (11.3 MB stripped) whatever it does, because the link step keeps the whole runtime archive, Cranelift backend and JIT included, though no run-time path calls them. Link with section garbage collection and strip, so an executable carries only the code it reaches | active | runtime | S | architect | — |
 | `RT-NATIVE-READEOF-WITNESS-FOLD` | Two-quarter native carried-value fold: un-ignore the ReadEof full-program row via a new zero-TCB rt_cap41 executing native-closure witness, and confirm the already-green SemanticErrorV1 (InvalidOffset) row stays rearmed. Honest progress toward RT-NATIVE-CARRIED-VALUE's four-value PX8 closure; Wrote and ReadSome remain #[ignore]d under the composed-return arc and this node does NOT close the parent. | merged | runtime | S | none | — |
 | `RT-NATIVE-RUN-OPTIONS-RESERVED-KEY-SILENT-OVERRIDE` | NativeEffectRunOptionsV1 silently discards a caller-supplied value for KEN_HOST_OBSERVATION_PATH: the launcher applies options.environment and then sets the reserved key, so Command::env's insert-or-update overwrites the caller's value before exec with no error, no warning, and no documented precedence. Refuse the reserved key instead of overwriting it. | ready | runtime | S | none | — |
-| `RT-NATIVE-SEQUENTIAL-BRACKETS` | Native execution of two sequential resource brackets: a program that uses two withBuffer brackets in sequence builds and runs natively with the observation the interpreter gives, instead of refusing in object emission at the BoundaryCarrier carried-recursive-hypothesis arity check | active | runtime | M | architect | — |
+| `RT-NATIVE-SEQUENTIAL-BRACKETS` | Native execution of two sequential resource brackets is distinguishable: a two-bracket program whose brackets get different responses exits with a code that encodes both outcomes, natively and in the interpreter, so a swapped response pairing changes the observation | active | runtime | S | architect | — |
 | `RT-NATIVE-STRING-CONSTRUCTION` | Native String construction disagrees with the interpreter: Cranelift list_char_to_string treats each Char as a UTF-8 byte (a silent wrong value for scalars 128-255, refusals above), and native and runtime-IR bytes_decode skip NFC; fix every native String ingress together so the trusted byte contracts stay true on every engine | merged | runtime | M | architect | — |
 | `RT-NATIVE-SUPPORT-CRATE-SPLIT` | The run-time support a native executable calls lives in the same crate as the Cranelift compiler backend, so the runtime archive contains the compiler and only link-time garbage collection keeps it out of an executable. Move the run-time support into its own crate with no compiler dependency, and link its archive instead | ready | runtime | M | architect | — |
 | `RT-NATIVE-TRACK0-REARM` | Track 0 of the native carried-value program — un-ignore the stale first-order native rows, re-measure, and re-arm the vacuous native CI jobs (decision-4 de-vacuuming), using the workspace ignored-sweep as the oracle | merged | runtime | S | none | — |
