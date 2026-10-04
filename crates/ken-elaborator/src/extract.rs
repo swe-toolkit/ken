@@ -32,9 +32,11 @@ pub enum ProvKind {
     Prove,
     /// `law Name { field : φ }` field (`22 §2.4`).
     LawField { field_name: String },
-    /// Precondition at a call site (`22 §2.3`).
-    /// `[placeholder — reifies in V3]`: requires Eq + proof-arg tracking.
-    CallPrecond,
+    /// Open proof obligation generated for an unsatisfied call-site premise
+    /// (`22 §2.3`). An undischarged hole exports as `unknown`.
+    CallRequires,
+    /// Runtime-tested contract at a foreign boundary (`21 §5.2`, `38 §3.3`).
+    FfiRuntimeCheck,
     /// Partial-primitive side condition (`22 §2.4`, `35 §3`).
     /// `[placeholder — reifies in V4]`: requires runtime primitive recognition.
     PartialPrim,
@@ -136,12 +138,12 @@ fn lift_obligation(def_name: &str, obl: &Obligation) -> ObligationTriple {
         ),
         ObligationKind::Requires => (
             format!("{}.requires.{}", def_name, obl.id),
-            ProvKind::CallPrecond,
+            ProvKind::CallRequires,
         ),
-        // A `foreign` runtime-check slot: listed postulate, tested status (`38 §3.3`).
+        // A `foreign` runtime-check slot: tested status (`21 §5.2`, `38 §3.3`).
         ObligationKind::FfiRuntimeCheck => (
             format!("{}.ffi_runtime_check.{}", def_name, obl.id),
-            ProvKind::CallPrecond, // closest existing kind; treated as `tested` in export
+            ProvKind::FfiRuntimeCheck,
         ),
     };
 

@@ -1860,7 +1860,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             let exp_wh = whnf(cx.env, &cx.ctx, expected);
             match exp_wh {
                 Term::Pi(dom, cod) => {
-let domain = *dom;
+                    let domain = *dom;
                     let position = cx.ctx.len();
                     let is_proposition = kernel_infer_current(cx, &domain)
                         .ok()
