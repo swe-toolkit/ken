@@ -6762,13 +6762,7 @@ fn check_dependent_branch_body(
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
-    let path_base = cx.path_conditions.len();
-    let path_eq = Term::Eq(
-        Box::new(weaken(scrut_ty, n as i64)),
-        Box::new(weaken(scrut_core, n as i64)),
-        Box::new(concrete.clone()),
-    );
-    cx.path_conditions.push((path_eq, cx.ctx.len()));
+    let path_base = push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n);
 
     let outcome = (|| {
         if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
@@ -6860,13 +6854,10 @@ fn check_dependent_branch_body(
         // Kernel conversion may expose a named refinement's carrier while
         // shaping the branch motive. Its source identity must survive at the
         // introduction check so each arm leaves its own predicate obligation.
-        let source_expected = match cx.metas.zonk_term(expected_here) {
-            Term::Const { id, .. }
-                if cx.refinement_facts.is_some_and(|facts| facts.refinement_predicates.contains_key(&id)) =>
-            {
-                expected_here
-            }
-            _ => &expected_unrefined,
+        let source_expected = if names_source_refinement(cx, expected_here) {
+            expected_here
+        } else {
+            &expected_unrefined
         };
         let attempt = check(cx, &arm.body, source_expected, &arm.span).and_then(|checked| {
             kernel_check_current(cx, &checked, &expected_unrefined)
@@ -6911,6 +6902,38 @@ fn check_dependent_branch_body(
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
     outcome
+}
+
+/// Install the arm's path equation `scrut = concrete` and return the
+/// truncation base. Outlined so the recursive branch frame does not hold the
+/// equation's temporaries.
+#[inline(never)]
+fn push_branch_path_condition(
+    cx: &mut ElabCtx,
+    scrut_ty: &Term,
+    scrut_core: &Term,
+    concrete: &Term,
+    n: usize,
+) -> usize {
+    let path_base = cx.path_conditions.len();
+    let path_eq = Term::Eq(
+        Box::new(weaken(scrut_ty, n as i64)),
+        Box::new(weaken(scrut_core, n as i64)),
+        Box::new(concrete.clone()),
+    );
+    cx.path_conditions.push((path_eq, cx.ctx.len()));
+    path_base
+}
+
+/// Whether the arm's expected type is a named source refinement whose
+/// identity the introduction check keeps. Outlined for the same reason.
+#[inline(never)]
+fn names_source_refinement(cx: &ElabCtx, expected: &Term) -> bool {
+    matches!(
+        cx.metas.zonk_term(expected),
+        Term::Const { id, .. }
+            if cx.refinement_facts.is_some_and(|facts| facts.refinement_predicates.contains_key(&id))
+    )
 }
 
 #[inline(never)]
@@ -9819,6 +9842,32 @@ fn emit_call_refinements(
     Ok(())
 }
 
+/// `(e : T)`. An ascription at a source refinement introduces its predicate
+/// obligation. Outlined so the recursive `infer` frame does not hold the
+/// kernel query.
+#[inline(never)]
+fn infer_ascription(
+    cx: &mut ElabCtx<'_>,
+    e: &RExpr,
+    ty: &RType,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let ty_core = elab_type(cx, ty)?;
+    let e_core = check(cx, e, &ty_core, e.span())?;
+    if !matches!(ty, RType::RRefine(..)) {
+        return Ok((e_core, ty_core));
+    }
+    let inferred = kernel_infer_current(cx, &e_core).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        },
+    })?;
+    let e_core = emit_refinement_introduction(cx, &ty_core, &inferred, e_core, span, Some(ty))?;
+    Ok((e_core, ty_core))
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -10007,20 +10056,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             }
         }
 
-        RExpr::RAsc(e, ty, span) => {
-            let ty_core = elab_type(cx, ty)?;
-            let e_core = check(cx, e, &ty_core, e.span())?;
-            let e_core = if matches!(ty.as_ref(), RType::RRefine(..)) {
-                let inferred = kernel_infer_current(cx, &e_core).map_err(|error| match error {
-                    CurrentKernelQueryError::View(error) => error,
-                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                        error, span: span.clone(),
-                    },
-                })?;
-                emit_refinement_introduction(cx, &ty_core, &inferred, e_core, span, Some(ty.as_ref()))?
-            } else { e_core };
-            Ok((e_core, ty_core))
-        }
+        RExpr::RAsc(e, ty, span) => infer_ascription(cx, e, ty, span),
 
         RExpr::RLam(_, _, span) => Err(ElabError::TypeMismatch {
             span: span.clone(),
