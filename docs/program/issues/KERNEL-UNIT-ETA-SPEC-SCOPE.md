@@ -1,7 +1,7 @@
 ---
 id: KERNEL-UNIT-ETA-SPEC-SCOPE
 title: "Conversion gives definitional eta to every data type with one no-field constructor, including indexed families (definitional K), while spec 14 §4 gives data no eta and 17 §2 limits it to Unit and records. Count the rule's firings, then narrow it to the spec"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -60,3 +60,15 @@ stop and report the mismatch.
 - Any proof relies on eta at another family: stop to the Architect with the
   AC-0 list. A spec amendment for the non-indexed case is then a separate
   spec decision; the indexed case is narrowed either way.
+
+## Closeout
+
+Merged `97813245e` from exact `c46143c9b` (PR run 37189178539). Kernel QA
+`evt_3qpphmvrhjapr`, Architect `evt_75yhe4xz3vjb3`, Decision
+`dec_699181z0p9zre`. AC-0 found no firing outside a Unit family across the
+kernel, elaborator and catalog suites (Architect `evt_4nmr2psmmk0jz`).
+Unit-η is keyed on a once-only, shape-validated `register_unit_type`
+designation, which the prelude makes with its checked `Unit` id. An
+unregistered or indexed one-nullary family no longer converts by η.
+Carried: families that no suite exercised were not observed, and CI is the
+remaining census.
