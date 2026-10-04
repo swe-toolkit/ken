@@ -43,9 +43,9 @@ const DISTINGUISHABLE_STACK_BYTES: usize = 4 * 1024 * 1024 + 4 * 1024 * 1024;
 
 /// Promise class: durable invariant. A first bracket whose body fails and a
 /// second whose body succeeds must retain that pairing across native and
-/// interpreter execution. Exit 21 and capacities 1/2 are fixed-fixture values;
-/// swapping the responses has a different exit, while internal planner changes
-/// preserving the pair leave the observation equal.
+/// interpreter execution. Exit 21 and capacities 1/2 are fixed-fixture values.
+/// A wrong planned response route can leave runtime output unchanged, so the
+/// selected plan rows are checked separately from native/interpreter parity.
 #[cfg(target_os = "linux")]
 #[test]
 fn distinguishable_brackets_keep_native_interpreter_pairing() {
@@ -363,14 +363,51 @@ fn run_distinguishable_brackets_witness() {
         .prefix("ken-rt-distinguishable-brackets-")
         .tempdir()
         .expect("unique distinguishable-bracket output root");
-    let compiled = ken_cli::build_native_program(
-        DISTINGUISHABLE_BRACKETS,
-        ken_cli::SourceFormat::Ken,
-        "rt_two_bracket_distinguishable",
-        output.path(),
-        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-    )
-    .expect("two distinguishable brackets build natively");
+    let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        ken_cli::build_native_program(
+            DISTINGUISHABLE_BRACKETS,
+            ken_cli::SourceFormat::Ken,
+            "rt_two_bracket_distinguishable",
+            output.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    let compiled = compiled.expect("two distinguishable brackets build natively");
+    // The route is chosen at planning time and is absent from the runtime
+    // observation; pin each bracket's pairing on its planned response row.
+    let rows = diagnostics
+        .iter()
+        .flat_map(|plan| &plan.all_static_response_rows)
+        .filter(|row| row.operation == "ResourceRelease")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        rows.len(),
+        2,
+        "the distinguishable witness must plan two response-Vis rows"
+    );
+    assert_ne!(rows[0].vis_origin, rows[1].vis_origin);
+    assert_ne!(
+        rows[0].producer_call_origin, rows[1].producer_call_origin,
+        "each bracket's release must select its own producer call"
+    );
+    assert_ne!(
+        rows[0].selected_leaf, rows[1].selected_leaf,
+        "the selected calls must belong to distinct producer leaves"
+    );
+    for row in &rows {
+        assert!(
+            row.eliminating_cm.is_some(),
+            "Vis {}: selected leaf {} must have a Vis-case CM",
+            row.vis_origin,
+            row.selected_leaf,
+        );
+        assert!(
+            row.cm_scrutinee_contains_vis,
+            "Vis {}: selected leaf {} in CM {:?} must be in that CM's scrutinee",
+            row.vis_origin, row.selected_leaf, row.eliminating_cm,
+        );
+    }
+    assert_ne!(rows[0].eliminating_cm, rows[1].eliminating_cm);
     let native = ken_runtime::run_bound_process_effect_observation(
         &compiled.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
