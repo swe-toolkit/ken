@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIER-RESIDUAL-TYPED-OPERAND
 title: "In native lowering a private residual word travels through the same untyped carried operand as an ordinary value, so each consumer re-derives its plane from a producer-keyed side table or not at all, and a residual reaches an ordinary match raw. Give the residual its own operand type with one decoding conversion, and let the planner issue an ABI slot kind wherever a residual crosses a frame boundary"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
@@ -313,7 +313,10 @@ The ruling carries the code and is authoritative where this summary differs.
 - I-1: merged `6dcd95f29` from exact `454e72e74` (FULL CI green, run
   `37145977399`); the main tree equals the routed merge tree, 7 paths.
   Gates: runtime QA `evt_1n848wz9eppys`, Architect `evt_nw9r18fcbca2`,
-  Decision `dec_5r9srgwg8brzg`. I-2 stays held.
+  Decision `dec_5r9srgwg8brzg`.
+- Closed: both increments are on main. ENV-CARRIAGE I-2 landed with I-0.
+  Carried, not this WP: the nested source-machine frame-depth bound, and the
+  dead `Representation::Residual` arm to a K→R coercion design.
 
 ## Acceptance
 
