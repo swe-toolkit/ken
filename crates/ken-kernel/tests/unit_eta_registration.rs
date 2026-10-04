@@ -117,7 +117,12 @@ fn registering_a_second_unit_is_rejected_without_changing_identity() {
         constructors: vec![nullary()],
     })
     .expect("second Unit-shaped family");
+    let before_registration = env.clone();
     register_unit_type(&mut env, first).expect("first registration");
+    assert_ne!(
+        env, before_registration,
+        "Unit identity is environment state"
+    );
     assert_eq!(env.unit_type(), Some(first));
     expect_invalid_registration(&mut env, second);
     assert_eq!(env.unit_type(), Some(first));
