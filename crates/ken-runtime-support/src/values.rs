@@ -85,14 +85,14 @@ use std::fmt;
 /// does not exist, so there is no value for a comparison to be about:
 ///
 /// ```compile_fail,E0599
-/// use ken_runtime::Value;
+/// use ken_runtime_support::Value;
 /// let _closure = Value::Closure { captured: vec![Value::Bool(true)] };
 /// ```
 ///
 /// **No structural equality (`D3`):**
 ///
 /// ```compile_fail,E0277
-/// use ken_runtime::Value;
+/// use ken_runtime_support::Value;
 /// fn requires_eq<T: PartialEq>(_: &T) {}
 /// let v = Value::Record { type_id: 1, fields: vec![Value::Bool(true)] };
 /// requires_eq(&v);
@@ -101,7 +101,7 @@ use std::fmt;
 /// **No ordering (`D3`):**
 ///
 /// ```compile_fail,E0277
-/// use ken_runtime::Value;
+/// use ken_runtime_support::Value;
 /// fn requires_ord<T: Ord>(_: &T) {}
 /// let v = Value::Record { type_id: 1, fields: vec![Value::Bool(true)] };
 /// requires_ord(&v);
@@ -110,7 +110,7 @@ use std::fmt;
 /// **No canonical hash (`D3`):**
 ///
 /// ```compile_fail,E0277
-/// use ken_runtime::Value;
+/// use ken_runtime_support::Value;
 /// fn requires_hash<T: std::hash::Hash>(_: &T) {}
 /// let v = Value::Record { type_id: 1, fields: vec![Value::Bool(true)] };
 /// requires_hash(&v);
@@ -126,8 +126,8 @@ use std::fmt;
 /// genuinely available rather than merely well-typed:
 ///
 /// ```rust
-/// use ken_runtime::Value;
-/// use ken_runtime::canonical::CanonicalWitness;
+/// use ken_runtime_support::Value;
+/// use ken_runtime_support::canonical::CanonicalWitness;
 /// fn requires_eq<T: PartialEq>(_: &T) {}
 /// fn requires_ord<T: Ord>(_: &T) {}
 /// fn requires_hash<T: std::hash::Hash>(_: &T) {}

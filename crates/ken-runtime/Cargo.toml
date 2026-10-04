@@ -9,13 +9,10 @@ rust-version.workspace = true
 
 description = "Runtime crate — production content-addressed value store (K3)"
 
-# `RT-FNSPLIT-C3-ACTIVATION` `D1` — the linked starter needs ONE Rust runtime
-# authority as its support archive. Copies the landed `ken-host` pattern
-# (`ken-host/Cargo.toml`), which is why this is a copy rather than an invention.
-# ⛔ The starter links `libken_runtime.a` and NOT also `libken_host.a`: this
-# archive already owns the direction `ken-runtime -> ken-host`.
+# Compiler and packaging APIs stay here; the linked archive is supplied by
+# ken-runtime-support, which owns the dependency on ken-host.
 [lib]
-crate-type = ["rlib", "staticlib"]
+crate-type = ["rlib"]
 
 # `AC-10`'s two evasion probes are gated on cfgs rather than features so that no
 # `--all-features` build can ever turn a deliberately-uncompilable block on.
@@ -51,6 +48,7 @@ checked-ih-realization-observation = []
 
 [dependencies]
 ken-host = { path = "../ken-host" }
+ken-runtime-support = { path = "../ken-runtime-support" }
 cranelift-codegen = "0.113.1"
 cranelift-frontend = "0.113.1"
 cranelift-jit = "0.113.1"
@@ -60,4 +58,6 @@ cranelift-object = "0.113.1"
 unicode-normalization = "0.1"
 
 [dev-dependencies]
+# Resolver v2 keeps this test-only fault-injection edge out of normal builds.
+ken-runtime-support = { path = "../ken-runtime-support", features = ["test-hooks"] }
 tempfile = "3"

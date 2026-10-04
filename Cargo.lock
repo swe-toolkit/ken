@@ -670,7 +670,16 @@ dependencies = [
  "cranelift-native",
  "cranelift-object",
  "ken-host",
+ "ken-runtime-support",
  "tempfile",
+ "unicode-normalization",
+]
+
+[[package]]
+name = "ken-runtime-support"
+version = "0.0.0"
+dependencies = [
+ "ken-host",
  "unicode-normalization",
 ]
 

@@ -601,8 +601,9 @@ pub struct CheckedComputationalIHBinderMorphism {
 }
 
 impl CheckedComputationalIHBinderMorphism {
-    #[cfg(test)]
-    pub(crate) const fn identity_for_test(runtime_binder_index: u64) -> Self {
+    #[cfg(any(test, feature = "test-hooks"))]
+    #[doc(hidden)]
+    pub const fn identity_for_test(runtime_binder_index: u64) -> Self {
         Self {
             method_argument_count: 0,
             method_ih_count: 1,
@@ -843,13 +844,13 @@ pub struct ComputationalFrameHeader<'a> {
 /// An ordinary **case slice** is not a header slice:
 ///
 /// ```compile_fail
-/// use ken_runtime::{MatchFrameHeaders, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode};
+/// use ken_runtime_support::{MatchFrameHeaders, RuntimeMatchCase, RuntimeTrap, RuntimeTrapCode};
 /// let cases: Vec<RuntimeMatchCase> = Vec::new();
 /// let default = RuntimeTrap {
 ///     code: RuntimeTrapCode::PatternMatchFailure,
 ///     message: String::new(),
 /// };
-/// let _ = ken_runtime::compiler_private_match_frame_header_fingerprint(
+/// let _ = ken_runtime_support::compiler_private_match_frame_header_fingerprint(
 ///     MatchFrameHeaders::Ordinary(&cases),
 ///     &default,
 /// );
@@ -858,13 +859,13 @@ pub struct ComputationalFrameHeader<'a> {
 /// A computational **case slice** is not a header slice:
 ///
 /// ```compile_fail
-/// use ken_runtime::{MatchFrameHeaders, RuntimeComputationalMatchCase, RuntimeTrap, RuntimeTrapCode};
+/// use ken_runtime_support::{MatchFrameHeaders, RuntimeComputationalMatchCase, RuntimeTrap, RuntimeTrapCode};
 /// let cases: Vec<RuntimeComputationalMatchCase> = Vec::new();
 /// let default = RuntimeTrap {
 ///     code: RuntimeTrapCode::PatternMatchFailure,
 ///     message: String::new(),
 /// };
-/// let _ = ken_runtime::compiler_private_match_frame_header_fingerprint(
+/// let _ = ken_runtime_support::compiler_private_match_frame_header_fingerprint(
 ///     MatchFrameHeaders::Computational(&cases),
 ///     &default,
 /// );
@@ -873,7 +874,7 @@ pub struct ComputationalFrameHeader<'a> {
 /// The header carrier has **no body-bearing field** to smuggle one through:
 ///
 /// ```compile_fail
-/// use ken_runtime::{OrdinaryFrameHeader, RuntimeExpr, RuntimeTrapCode, RuntimeTrap};
+/// use ken_runtime_support::{OrdinaryFrameHeader, RuntimeExpr, RuntimeTrapCode, RuntimeTrap};
 /// let constructor = String::from("Cons");
 /// let _ = OrdinaryFrameHeader {
 ///     constructor: &constructor,
@@ -889,14 +890,14 @@ pub struct ComputationalFrameHeader<'a> {
 /// that the operand is a genuine header sequence. It **must compile and run**:
 ///
 /// ```
-/// use ken_runtime::{MatchFrameHeaders, OrdinaryFrameHeader, RuntimeTrap, RuntimeTrapCode};
+/// use ken_runtime_support::{MatchFrameHeaders, OrdinaryFrameHeader, RuntimeTrap, RuntimeTrapCode};
 /// let constructor = String::from("Cons");
 /// let headers = vec![OrdinaryFrameHeader { constructor: &constructor, binders: 2 }];
 /// let default = RuntimeTrap {
 ///     code: RuntimeTrapCode::PatternMatchFailure,
 ///     message: String::new(),
 /// };
-/// let _ = ken_runtime::compiler_private_match_frame_header_fingerprint(
+/// let _ = ken_runtime_support::compiler_private_match_frame_header_fingerprint(
 ///     MatchFrameHeaders::Ordinary(&headers),
 ///     &default,
 /// );
@@ -1062,7 +1063,7 @@ pub fn compiler_private_computational_match_frame_fingerprint(
 /// **No structural equality (`D2` — the derive was removed):**
 ///
 /// ```compile_fail,E0277
-/// use ken_runtime::RuntimeValue;
+/// use ken_runtime_support::RuntimeValue;
 /// fn requires_eq<T: PartialEq>(_: &T) {}
 /// let c = RuntimeValue::ClosureRef { symbol: "f".to_string(), captured: vec![] };
 /// requires_eq(&c);
@@ -1071,7 +1072,7 @@ pub fn compiler_private_computational_match_frame_fingerprint(
 /// **No ordering:**
 ///
 /// ```compile_fail,E0277
-/// use ken_runtime::RuntimeValue;
+/// use ken_runtime_support::RuntimeValue;
 /// fn requires_ord<T: Ord>(_: &T) {}
 /// let c = RuntimeValue::ClosureRef { symbol: "f".to_string(), captured: vec![] };
 /// requires_ord(&c);
@@ -1080,7 +1081,7 @@ pub fn compiler_private_computational_match_frame_fingerprint(
 /// **No canonical hash:**
 ///
 /// ```compile_fail,E0277
-/// use ken_runtime::RuntimeValue;
+/// use ken_runtime_support::RuntimeValue;
 /// fn requires_hash<T: std::hash::Hash>(_: &T) {}
 /// let c = RuntimeValue::ClosureRef { symbol: "f".to_string(), captured: vec![] };
 /// requires_hash(&c);
@@ -1099,7 +1100,7 @@ pub fn compiler_private_computational_match_frame_fingerprint(
 /// malformed `ClosureRef` literal:
 ///
 /// ```
-/// use ken_runtime::RuntimeValue;
+/// use ken_runtime_support::RuntimeValue;
 /// let c = RuntimeValue::ClosureRef { symbol: "f".to_string(), captured: vec![] };
 /// assert!(matches!(c, RuntimeValue::ClosureRef { .. }));
 /// ```
@@ -1110,8 +1111,8 @@ pub fn compiler_private_computational_match_frame_fingerprint(
 /// witness. ⇒ The carrier is not merely comparison-hostile; it routes:
 ///
 /// ```
-/// use ken_runtime::RuntimeValue;
-/// use ken_runtime::canonical::{project_operational_to_canonical, CanonicalWitness};
+/// use ken_runtime_support::RuntimeValue;
+/// use ken_runtime_support::canonical::{project_operational_to_canonical, CanonicalWitness};
 /// fn requires_eq<T: PartialEq>(_: &T) {}
 /// fn requires_ord<T: Ord>(_: &T) {}
 /// fn requires_hash<T: std::hash::Hash>(_: &T) {}

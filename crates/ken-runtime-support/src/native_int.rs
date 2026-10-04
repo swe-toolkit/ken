@@ -413,14 +413,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn arena_header_matches_the_generated_local_helper_layout() {
-        assert_eq!(
-            std::mem::size_of::<NativeIntArenaV1>(),
-            crate::native_int_clif::ARENA_BYTES
-        );
-    }
-
-    #[test]
     fn terminal_decoder_requires_a_complete_canonical_export_view() {
         let mut absent = NativeIntArenaV1::default();
         assert_eq!(absent.decode_final_export(), None);

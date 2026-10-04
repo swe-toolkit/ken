@@ -150,7 +150,7 @@ fn b2f_ac8_the_inventory_enumerator_sees_a_second_emitters_declarations() {
     let mut both = new_jit_module().expect("JIT module constructs");
     let graph = crate::native_int_clif::emit_native_int_local_graph(&mut both, false)
         .expect("local helper graph emits");
-    let plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+    let plan = crate::boundary_emission_plan::BoundaryEmissionPlan::derive();
     crate::boundary_value_clif::emit_boundary_value_local_graph(&mut both, &graph, &plan)
         .expect("boundary-value graph emits");
     let both_inventory = native_int_declared_inventory(&both);

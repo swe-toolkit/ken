@@ -1308,7 +1308,7 @@ impl LoweredVariant {
     }
 }
 
-impl crate::boundary_value::BoundaryEmissionPlan {
+impl crate::boundary_emission_plan::BoundaryEmissionPlan {
     /// Derive the emission plan from the representation authority.
     ///
     /// ⛔ **Nothing here is written down.** The admitted class set is collected
@@ -1325,8 +1325,8 @@ impl crate::boundary_value::BoundaryEmissionPlan {
     pub(crate) fn derive() -> Self {
         use crate::boundary_value::{
             BoundaryClass, BoundaryReferentOwner, BoundaryStorageShape, BoundaryTag,
-            BoundaryTagAdmission,
         };
+        use crate::boundary_emission_plan::BoundaryTagAdmission;
         use std::collections::{BTreeMap, BTreeSet};
 
         let mut admitted: BTreeSet<BoundaryClass> = BTreeSet::new();
@@ -1381,7 +1381,7 @@ impl crate::boundary_value::BoundaryEmissionPlan {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
-        crate::boundary_value::BoundaryEmissionPlan::new(
+        crate::boundary_emission_plan::BoundaryEmissionPlan::new(
             int_magnitude,
             byte_span,
             BoundaryTagAdmission::new(
@@ -2301,7 +2301,8 @@ mod tests {
     /// `recut2_the_plan_is_derived_from_the_partition_not_restated` below.
     #[test]
     fn recut2_the_emitted_helper_graph_changes_when_the_authority_changes() {
-        use crate::boundary_value::{BoundaryClass, BoundaryEmissionPlan};
+        use crate::boundary_value::BoundaryClass;
+        use crate::boundary_emission_plan::BoundaryEmissionPlan;
 
         let derived = BoundaryEmissionPlan::derive();
         let real = crate::boundary_value_clif::tests::capture_with_plan(&derived);
@@ -2356,7 +2357,8 @@ mod tests {
     /// stopped consulting either reddens.
     #[test]
     fn recut2_the_plan_is_derived_from_the_partition_not_restated() {
-        use crate::boundary_value::{BoundaryClass, BoundaryEmissionPlan, BoundaryStorageShape};
+        use crate::boundary_value::{BoundaryClass, BoundaryStorageShape};
+        use crate::boundary_emission_plan::BoundaryEmissionPlan;
         use std::collections::BTreeSet;
 
         let mut admitted: BTreeSet<BoundaryClass> = BTreeSet::new();
@@ -2418,7 +2420,8 @@ mod tests {
     /// closed by `recut2_the_tag_admission_is_derived_from_the_partition_not_restated`.
     #[test]
     fn recut2_the_emitted_helper_graph_changes_when_the_tag_sets_change() {
-        use crate::boundary_value::{BoundaryEmissionPlan, BoundaryTag, BoundaryTagAdmission};
+        use crate::boundary_value::BoundaryTag;
+        use crate::boundary_emission_plan::{BoundaryEmissionPlan, BoundaryTagAdmission};
 
         let derived = BoundaryEmissionPlan::derive();
         let real = crate::boundary_value_clif::tests::capture_with_plan(&derived);
@@ -2515,7 +2518,7 @@ mod tests {
     /// ownership from a hardcoded threshold, and every assertion there would pass.
     #[test]
     fn recut2_the_emitted_helper_graph_changes_when_the_owner_bands_change() {
-        use crate::boundary_value::{BoundaryEmissionPlan, BoundaryTagAdmission};
+        use crate::boundary_emission_plan::{BoundaryEmissionPlan, BoundaryTagAdmission};
 
         let derived = BoundaryEmissionPlan::derive();
         let real = crate::boundary_value_clif::tests::capture_with_plan(&derived);
@@ -2573,7 +2576,8 @@ mod tests {
     /// `derive()` that stopped consulting it reddens.
     #[test]
     fn recut2_the_tag_admission_is_derived_from_the_partition_not_restated() {
-        use crate::boundary_value::{BoundaryEmissionPlan, BoundaryReferentOwner, BoundaryTag};
+        use crate::boundary_value::{BoundaryReferentOwner, BoundaryTag};
+        use crate::boundary_emission_plan::BoundaryEmissionPlan;
         use std::collections::{BTreeMap, BTreeSet};
 
         let mut immediate: BTreeSet<BoundaryTag> = BTreeSet::new();
