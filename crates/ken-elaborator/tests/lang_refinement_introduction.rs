@@ -193,27 +193,65 @@ fn named_return_over_a_match_is_realized_per_leaf() {
         2,
         "one obligation per leaf, none over the whole match"
     );
-    assert!(
-        leaves
-            .obligations
-            .iter()
-            .all(|o| !env.is_open_hole(o.hole_id)),
-        "each closed leaf discharges"
-    );
+    let bool_ty = Term::indformer(env.globals["Bool"], vec![]);
+    let is_scalar = Term::const_(env.globals["isScalar"], vec![]);
+    for (obligation, (branch, value)) in
+        leaves.obligations.iter().zip([("True", 48), ("False", 57)])
+    {
+        let equation = Term::Eq(
+            Box::new(bool_ty.clone()),
+            Box::new(Term::var(0)),
+            Box::new(Term::constructor(env.globals[branch], vec![])),
+        );
+        let expected = Term::pi(
+            bool_ty.clone(),
+            Term::pi(
+                equation,
+                Term::app(is_scalar.clone(), Term::IntLit(value.into())),
+            ),
+        );
+        assert_eq!(
+            obligation.goal_closed, expected,
+            "{branch}: scalar goal must use its own leaf"
+        );
+        assert!(
+            !env.is_open_hole(obligation.hole_id),
+            "{branch}: closed scalar leaf discharges"
+        );
+    }
     let open = env
         .elaborate_decl_v1(
             "fn widen (b : Bool) (n : Int) : Char = match b { True |-> 48 ; False |-> n }",
         )
         .expect("open leaf");
     assert_eq!(open.obligations.len(), 2);
-    assert_eq!(
-        open.obligations
-            .iter()
-            .filter(|o| env.is_open_hole(o.hole_id))
-            .count(),
-        1,
-        "only the unconstrained leaf stays open"
-    );
+    let int_ty = Term::const_(env.globals["Int"], vec![]);
+    for (obligation, (branch, value, is_open)) in open.obligations.iter().zip([
+        ("True", Term::IntLit(48.into()), false),
+        ("False", Term::var(1), true),
+    ]) {
+        let equation = Term::Eq(
+            Box::new(bool_ty.clone()),
+            Box::new(Term::var(1)),
+            Box::new(Term::constructor(env.globals[branch], vec![])),
+        );
+        let expected = Term::pi(
+            bool_ty.clone(),
+            Term::pi(
+                int_ty.clone(),
+                Term::pi(equation, Term::app(is_scalar.clone(), value)),
+            ),
+        );
+        assert_eq!(
+            obligation.goal_closed, expected,
+            "{branch}: widen must use its own leaf"
+        );
+        assert_eq!(
+            env.is_open_hole(obligation.hole_id),
+            is_open,
+            "{branch}: only n stays open"
+        );
+    }
 }
 
 #[test]
@@ -272,6 +310,10 @@ fn parametrized_constructor_literal_field_obligates_its_own_argument() {
         (
             "data SBox a = MkSBox { value : { x : Int | P x } }",
             "const s : SBox Bool = MkSBox Bool 5",
+        ),
+        (
+            "data TwoBox a b = MkTwoBox { value : { x : Int | P x } }",
+            "const two : TwoBox Bool Bool = MkTwoBox Bool Bool 5",
         ),
         (
             "data RBox a = MkRBox { other : a, value : { x : Int | P x } }",
