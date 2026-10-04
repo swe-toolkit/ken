@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CALL-SITE-PRECONDITION-DISCHARGE
 title: "No caller of a function with requires can be elaborated, because nothing supplies the premise proofs at a call site (spec 22 §2.3). Insert the proofs at each call, recognised from the caller's premises or raised as call-site obligations, and stage a spec'd declaration at its full type so self-calls see it"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -149,3 +149,17 @@ stop and report the mismatch.
   `requires`, spec 21 §6.3). That desugar is LANG-REFINED-PARAM-REQUIRES-DESUGAR,
   which flips the `int_div_mod_surface` refined-divisor rows. Here a refined
   parameter keeps its as-built behaviour (Steward `evt_4jn0dq80tp3ng`).
+
+## Closeout
+
+Merged `392578133` from exact `8df075b01` (PR run 37181638288). Verify QA
+`evt_7yrk3ht11zjy0`, Architect `evt_3fjpymfrfgcvh`, Decision
+`dec_3ckfexpc1dqfk`. Every call to a `requires` function elaborates, and
+recursive calls take the same path. A premise in scope discharges; otherwise
+the call raises one obligation per precondition, keyed on the checked
+`GlobalId`. An open call-site `Requires` hole exports as Unknown. Both
+global-head probe routes raise exactly one obligation for an applied
+zero-parameter contract. The first candidate `69e2e2be9` failed CI on two
+test doc comments parsed as conformance row claims; the respin reworded them.
+Unblocks `LANG-REFINED-PARAM-REQUIRES-DESUGAR` and
+`LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME`.
