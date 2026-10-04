@@ -6,6 +6,8 @@
 #[cfg(target_os = "linux")]
 const TWO_BUFFER_WITNESS: &str = include_str!("rt_ignored_two_buffer_witness.ken");
 #[cfg(target_os = "linux")]
+const DISTINGUISHABLE_BRACKETS: &str = include_str!("rt_two_bracket_distinguishable.ken");
+#[cfg(target_os = "linux")]
 const ONE_BUFFER_WITNESS: &str = include_str!("rt_one_buffer_residual_layout.ken");
 #[cfg(target_os = "linux")]
 const PLAIN_MATCH_WITNESS: &str = include_str!("rt_plain_match_layout.ken");
@@ -30,6 +32,30 @@ fn sequential_brackets_carry_independent_residuals_with_native_parity() {
         .expect("spawn stated-stack witness")
         .join()
         .expect("sequential-brackets witness thread");
+}
+
+// A stated 2 MiB worker overflowed; a stated 4 MiB worker completed this
+// fixture. Provision the measured completing bound (4 MiB) plus 4 MiB of
+// local headroom. Completion bounds the peak below 4 MiB but does not measure
+// its exact depth. This worker size does not rely on ambient RUST_MIN_STACK.
+#[cfg(target_os = "linux")]
+const DISTINGUISHABLE_STACK_BYTES: usize = 4 * 1024 * 1024 + 4 * 1024 * 1024;
+
+/// Promise class: durable invariant. A first bracket whose body fails and a
+/// second whose body succeeds must retain that pairing across native and
+/// interpreter execution. Exit 21 and capacities 1/2 are fixed-fixture values;
+/// swapping the responses has a different exit, while internal planner changes
+/// preserving the pair leave the observation equal.
+#[cfg(target_os = "linux")]
+#[test]
+fn distinguishable_brackets_keep_native_interpreter_pairing() {
+    std::thread::Builder::new()
+        .name("rt-distinguishable-brackets".to_string())
+        .stack_size(DISTINGUISHABLE_STACK_BYTES)
+        .spawn(run_distinguishable_brackets_witness)
+        .expect("spawn stated-stack distinguishable witness")
+        .join()
+        .expect("distinguishable witness thread");
 }
 
 /// Promise class: durable invariant. The one-bracket baseline retains its
@@ -329,4 +355,139 @@ fn run_sequential_brackets_witness() {
     let native_releases = releases(&native);
     assert_eq!(native_releases.len(), 2, "the witness executes both release effects");
     assert_eq!(native_releases, releases(&interpreted));
+}
+
+#[cfg(target_os = "linux")]
+fn run_distinguishable_brackets_witness() {
+    let output = tempfile::Builder::new()
+        .prefix("ken-rt-distinguishable-brackets-")
+        .tempdir()
+        .expect("unique distinguishable-bracket output root");
+    let compiled = ken_cli::build_native_program(
+        DISTINGUISHABLE_BRACKETS,
+        ken_cli::SourceFormat::Ken,
+        "rt_two_bracket_distinguishable",
+        output.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+    .expect("two distinguishable brackets build natively");
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &compiled.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: output.path().to_owned(),
+            plan_hash: compiled.plan_transport_hash,
+        },
+    )
+    .expect("linked distinguishable-bracket object executes");
+    let mut host = ken_interp::PosixHost::new_at(output.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        DISTINGUISHABLE_BRACKETS,
+        ken_cli::SourceFormat::Ken,
+        &[],
+        &[],
+        output.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .expect("the same distinguishable source executes under the interpreter");
+
+    assert_eq!(native.exit_status, interpreted.exit_status);
+    assert_eq!(
+        native.exit_status, 21,
+        "first BodyError and second Ok select 21"
+    );
+    assert_eq!(native.terminal_error, interpreted.terminal_error);
+    let non_release = |observed: &ken_runtime::EffectObservation| {
+        observed
+            .effect_trace
+            .iter()
+            .filter(|event| event.operation != ken_runtime::HostOpV1::ResourceRelease)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(non_release(&native), non_release(&interpreted));
+
+    let releases = |observed: &ken_runtime::EffectObservation| {
+        observed
+            .effect_trace
+            .iter()
+            .filter(|event| event.operation == ken_runtime::HostOpV1::ResourceRelease)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let native_releases = releases(&native);
+    let interpreted_releases = releases(&interpreted);
+    assert_eq!(native_releases.len(), 2, "both buffers must be released");
+    assert_eq!(interpreted_releases.len(), 2);
+    let release_set = |events: &[ken_runtime::EffectEvent]| {
+        let mut rows = events
+            .iter()
+            .map(|event| {
+                format!(
+                    "{:?}",
+                    (&event.resource_bindings, &event.request, &event.outcome,)
+                )
+            })
+            .collect::<Vec<_>>();
+        rows.sort();
+        rows
+    };
+    assert_eq!(
+        release_set(&native_releases),
+        release_set(&interpreted_releases)
+    );
+
+    // BufferAllocate and ResourceRelease both record the allocated buffer as a
+    // Target binding. ResourceRelease's request itself is a unit variant, so
+    // capacity is checked at allocation, and release is linked by identity.
+    let target_identity = |event: &ken_runtime::EffectEvent| {
+        let targets = event
+            .resource_bindings
+            .iter()
+            .filter(|(role, _)| *role == ken_runtime::ResourceBindingRole::Target)
+            .map(|(_, identity)| *identity)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            targets.len(),
+            1,
+            "one target identity per buffer event: {event:?}"
+        );
+        targets[0]
+    };
+    let release_ids = native_releases
+        .iter()
+        .map(|event| target_identity(event))
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        release_ids.len(),
+        2,
+        "the two releases must target distinct buffers"
+    );
+    let allocations = native
+        .effect_trace
+        .iter()
+        .filter(|event| event.operation == ken_runtime::HostOpV1::BufferAllocate)
+        .collect::<Vec<_>>();
+    assert_eq!(allocations.len(), 2, "each bracket allocates one buffer");
+    let mut capacities = allocations
+        .iter()
+        .map(|event| {
+            let ken_runtime::CanonicalRequestV1::BufferAllocate { capacity } = &event.request
+            else {
+                panic!("allocation event lacks its typed capacity: {event:?}");
+            };
+            *capacity
+        })
+        .collect::<Vec<_>>();
+    capacities.sort_unstable();
+    assert_eq!(capacities, [1, 2], "the two requested capacities differ");
+    let allocated_ids = allocations
+        .iter()
+        .map(|event| target_identity(event))
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        release_ids, allocated_ids,
+        "release exactly the allocated buffers"
+    );
 }
