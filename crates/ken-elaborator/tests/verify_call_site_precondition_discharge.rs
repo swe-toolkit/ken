@@ -61,8 +61,8 @@ fn instance_field_requires_hole_is_reported() {
         .iter()
         .find(|result| result.def_id == instance_id)
         .expect("the instance result exists");
-    only_requires(instance);
     assert_reported_delta(&env, &before, instance);
+    only_requires(instance);
 
     let mut control = ElabEnv::new().expect("numeric prelude");
     let before = trusted(&control);
@@ -100,8 +100,8 @@ fn space_cell_requires_hole_is_reported() {
         .iter()
         .find(|result| result.name == "S")
         .expect("space state result");
-    only_requires(state);
     assert_reported_delta(&env, &before, state);
+    only_requires(state);
 
     let mut control = ElabEnv::new().expect("numeric prelude");
     let before = trusted(&control);
@@ -137,6 +137,7 @@ fn space_operation_requires_hole_is_reported() {
         .iter()
         .find(|result| result.name == "S.call")
         .expect("operation result");
+    assert_reported_delta(&env, &before, operation);
     assert_eq!(operation.obligations.len(), 2);
     assert!(operation
         .obligations
@@ -146,7 +147,6 @@ fn space_operation_requires_hole_is_reported() {
         .obligations
         .iter()
         .any(|obligation| matches!(obligation.kind, ObligationKind::Ensures)));
-    assert_reported_delta(&env, &before, operation);
 
     let mut control = ElabEnv::new().expect("numeric prelude");
     let before = trusted(&control);
