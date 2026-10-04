@@ -333,3 +333,37 @@ fn applied_zero_parameter_contract_raises_one_call_site_obligation() {
         reported
     );
 }
+
+/// MEASURED: a checked global imported from a module, applied at a call,
+/// reports exactly one Requires hole, and that hole is the trusted-base delta.
+/// CLAIMED: probing an imported `RCheckedGlobal` head does not insert the same
+/// premise before generic application. THE GAP: the same-unit regression
+/// exercises `RCon`; the checked-import route must be independently reached.
+#[test]
+fn imported_zero_parameter_contract_raises_one_call_site_obligation() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&env);
+    let results = env
+        .elaborate_file_v1(
+            "module M { pub const k : Int -> Int requires Equal Int 0 0 = \\m. m }\n\
+             import M\n\
+             fn caller (x : Int) : Int = M.k x",
+        )
+        .expect("imported caller elaborates with one open precondition");
+    let caller = results
+        .last()
+        .expect("the file contains the imported caller");
+    only_requires(caller);
+    let reported = caller
+        .obligations
+        .iter()
+        .map(|obligation| obligation.hole_id)
+        .collect::<HashSet<_>>();
+    assert_eq!(
+        trusted(&env)
+            .difference(&before)
+            .copied()
+            .collect::<HashSet<_>>(),
+        reported
+    );
+}
