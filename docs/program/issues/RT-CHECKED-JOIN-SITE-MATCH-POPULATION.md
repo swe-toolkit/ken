@@ -1,13 +1,13 @@
 ---
 id: RT-CHECKED-JOIN-SITE-MATCH-POPULATION
 title: "The NativeJoinPlanV1 Match-site plane is dormant in production: its producer, planner reach and consumer were exercised only by fixtures. Measure every remaining layer and whether demoting every SpecializedOnly Match to CarrierWord lowers correctly, so one ruling chooses activation or demotion"
-status: active
+status: closed
 owner: runtime
 size: M
 tier: T1
 gate: architect
 depends_on: []
-blocks: [RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT]
+blocks: []
 github: null
 origin: "Architect ruling evt_4mp5dtzn0f5rb on the RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT D1 frame stop (runtime-leader evt_74k9ej0zqr505): the scalar-pair repair needs a CheckedJoinSite around each scalar-result Match, and D1 measured none. Separate node because it changes the population of an erasure-produced artifact that every runtime plane consumes. Steward-filed per COORDINATION section 2."
 ---
@@ -129,3 +129,27 @@ in production and every layer was exercised only by fixtures.
 
 1. CheckedJoinSite Match marker not consumed by ordinary Match lowering —
    keyed on the Match lowering route.
+
+## Closeout (closed without repair)
+
+Architect `evt_1xj5yh86d75st` on the recut AC-0 report (`evt_5337gyhq3akdz`,
+`evt_7vdtnmxsf222d`, evidence `/workspaces/ken/local/rt-checked-join-match-m123/`).
+Activation (α) is not justified, and demotion (β) is refuted. Under
+demote-all, `console_direct_exit_nested_match_uses_existing_route` traps
+natively.
+
+- **M2.** 0 of the 207 reached Ok scalar merges sit under an Int/Bool WRAP.
+  The Ok population is admitted by `merge_scalar_operand` (`joins.rs:2527`)
+  through the root ExitCode site's `Ret` unwrap, not by any per-Match site.
+  The plane this WP would activate is disjoint from the population
+  SCALAR-PAIR must decide.
+- **M1.** The motive-shape fix creates 374 sites that nothing consumes. WIP
+  `a7d46d6f2` must not land alone; it stays unlanded on the WP branch.
+- **Shared predicate.** The join representation is chosen on a plane that
+  does not carry the property admission keys on. The closure belongs to
+  `RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT`, recut.
+- **Carried facts about the plane as activated, with no action:** the
+  nested-IH nested-marker refusal, and the parity failure
+  `checked_ih_direct_application_pairs_one_declared_call_result`.
+
+The native trap is filed as `RT-CARRIER-ROOT-EXIT-NESTED-MATCH-TRAP`.

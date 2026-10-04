@@ -1,12 +1,12 @@
 ---
 id: RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT
 title: "A dynamic source Match whose specialized result is a constructor with fields is planned NativeScalarPair, because the planner chooses the join representation from phase alone, so object emission refuses with 'Match: dynamic arms must produce scalar Int or Bool values'. Plan such a join from its result shape as well"
-status: ready
+status: active
 owner: runtime
 size: M
 gate: architect
 tier: T1
-depends_on: [RT-CHECKED-JOIN-SITE-MATCH-POPULATION]
+depends_on: []
 blocks: []
 github: null
 origin: "Architect evt_2dt20kx3h81pt, the RT-JOIN-PHASE-CASE-BINDER-CARRIED AC-0 result: that WP's witness is gone from main, and the nat row's first refusal is now this shape gap. Also the first refusal of rt_escape ESCAPE_FILE_THEN_READAT (:660), which the Steward placed in L1 (RT-NATIVE-SEQUENTIAL-BRACKETS). Size is provisional and is re-set at AC-0. Steward-filed per COORDINATION section 2."
@@ -46,53 +46,77 @@ result has fields.
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch; do not build around it.
 
-## Parked behind `RT-CHECKED-JOIN-SITE-MATCH-POPULATION`
+## Recut (Architect `evt_1xj5yh86d75st`)
 
-AC-0 and D1 ran (evidence `/workspaces/ken/local/rt-scalar-d1/`). The frame's
-new-plane stop fired: 0 of 268 Ok scalar merges sit under a
-`CheckedJoinSite`, and the checked answer kinds do not reach the planner.
-Architect `evt_4mp5dtzn0f5rb` rules the repair as two links: (a) every
-scalar-result Match is wrapped, which is the prerequisite; and (b) the answer
-kinds are threaded into `StaticTransitionPlan` along `core.rs:2263`, `:2305`,
-`static_transition.rs:949`, `construction.rs:1439` and `joins_traps.rs:614`,
-which stays in this WP. After the prerequisite lands, rebase onto main and add
-(b). Then `joins_traps.rs:533` plans `NativeScalarPair` for
-`SpecializedOnly` only when the origin's checked answer kind is `Int` or
-`Bool`, and `CarrierWord` otherwise. Acceptance: all 268 D1 merges stay Ok,
-1289 plans `CarrierWord` and passes the 256 MiB Nat test, and parity is
-186/186. Mutation: dropping the answer-kind guard makes 1289 refuse again.
-Re-planning at lowering is rejected. Size stays M.
+The parked two-link plan (`evt_4mp5dtzn0f5rb`) is withdrawn.
+`RT-CHECKED-JOIN-SITE-MATCH-POPULATION` closed without repair: no per-Match
+Int/Bool site admits any of the 207 Ok merges.
+
+- **Admission**, on main `f1ef79406`. `merge_scalar_operand`
+  (`joins.rs:2527`) admits `RecursiveBackedge`, `Int`, `Bool`,
+  `StructuralNat`, the zero-arg Bool constructors, `ProcessExitStatus`, and
+  `exit_success` and `exit_failure`.
+  - The exit constructors count only under the root-exit flag.
+  - It strips `ITree::Ret` through `unwrap_terminal_ret` (`calls.rs:2653`)
+    only when `has_checked_root_exit_representation()` (`mod.rs:13732`)
+    holds, which needs a consumed root ExitCode site.
+  - 154 of the Ok merges are `Constructor[args=1]`, logged before the
+    unwrap, so they are `Ret(x)` arms.
+- **Planner.** `joins_traps.rs:533` chooses `NativeScalarPair` from
+  `ResultPhase` alone.
+- **Shared predicate.** The representation is chosen on a plane that does
+  not carry admission's keys: constructor identity, the scalar kind of the
+  `Ret` payload, and the root-exit flag.
+- **Closure.** One admission predicate. The planner uses it to choose the
+  representation, and `merge_scalar_operand` uses or asserts it, with no
+  second rule on either side.
+- **Nat.** Under demote-all, Nat passes 1289 and stops at
+  `ContinuationSpecialization: the detached-result seat projected 4
+  undischarged causal calls onto one unit result`. That is a successor WP,
+  not this one. So "Nat passes" is not this WP's acceptance.
 
 ## Deliverable
 
-One planner repair, ruled by the Architect at AC-0, after which a join with a
-specialized non-scalar result plans a carrier representation. Re-point the
-nat row's ignore annotation at its current first refusal and this WP's id
-(it still quotes join 1244).
+1. **AC-0, measure only, on main.** Run the six default targets plus
+   `nat_fanout`. Extend the existing `DASM_C2_SCALAR_MERGE_OBSERVATION` hook
+   (`joins.rs:159`) rather than adding a second log. For every
+   `merge_scalar_operand` call, log:
+   - (a) the constructor symbol before the unwrap;
+   - (b) `has_checked_root_exit_representation()`;
+   - (c) the lowered value kind after the unwrap;
+   - (d) the payload's constructor symbol when (c) is still a constructor;
+   - (e) the planner's `ResultPhase` and why it was chosen;
+   - (f) ok or err.
+
+   Answer one question: does {(a), (b), (d)} separate the 207 Ok merges from
+   Err 1289 with zero overlap, and can the planner compute it statically? On
+   1289, tell apart a non-scalar payload from a false root-exit flag that
+   leaves `Ret` unstripped, because those are different fixes.
+
+   Single-site experiment: demote only 1289 to `CarrierWord`, and report the
+   next stop and the native-tree result.
+2. **Then the Architect rules.** If the answer is yes, the repair is the
+   shared predicate (size S or M, set at the ruling). If it is no, that is a
+   frame stop back to the Architect. Re-point the nat row's ignore
+   annotation at its current first refusal.
 
 ## Acceptance
 
-- **AC-0 (probe, then ruling; no product change).**
-  - A census of every source join planned `NativeScalarPair` with an arm
-    whose lowered operand is not a scalar-pair kind. It covers the ken-cli
-    native suites and runs the nat row and `ESCAPE_FILE_THEN_READAT`
-    explicitly. Name each join and its refusal.
-  - Say whether the IR at the planning seam carries the result shape. If it
-    does not, name the plane where that type is still known.
-  - The Architect rules the repair and sets the size.
-- **AC-1.** The nat row gets past 1289, and so does `ESCAPE_FILE_THEN_READAT`
-  if the census places it here. Record each one's next first refusal
-  verbatim. A row that runs natively must match the interpreter, and it
-  stays ignored unless it goes green.
+- **AC-0** is reported in the WP thread with the (a)-(f) table per target,
+  the separation verdict and the 1289 experiment. Each count names its log.
+- **AC-1 (repair).**
+  - All 207 Ok merges stay Ok, and 1289 no longer refuses at `:400`. Record
+    its next first refusal verbatim.
+  - Every default target and `rt_parity_native` stay at baseline at 4
+    threads.
+  - A planner test pins the predicate, and a phase-only plan fails it.
 - **AC-2 (control).** Reverting the repair restores the verbatim 1289
-  refusal. Every join the census named as scalar keeps `NativeScalarPair`,
-  pinned by a planner test that a phase-only plan fails. The targeted runtime
-  and ken-cli suites stay green.
+  refusal.
 
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change (an operator question).
-- The result shape is known only below the planner, so the repair needs a
-  new plane: stop to the Architect with the AC-0 evidence.
+- The predicate is not computable at the planner: stop to the Architect with
+  the AC-0 evidence.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
-  `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+  `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, and never land `a7d46d6f2`.
