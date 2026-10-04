@@ -9,7 +9,15 @@
 //! `// [placeholder — reifies in <WP>]` and assert the structural property
 //! that is checkable today.
 
-use ken_elaborator::{v2_extract, ElabEnv, ObligationKind, ProvKind};
+use std::collections::BTreeSet;
+
+use ken_elaborator::{
+    ElabEnv, ObligationKind, PStatus, ProvKind,
+    compiler_driver::{CompilerSource, compile_checked_target_denotation},
+    emit_checked_target_export,
+    prover::Verdict,
+    v2_extract,
+};
 use ken_kernel::{Level, Term};
 
 fn mk_env() -> ElabEnv {
@@ -418,10 +426,10 @@ fn trivial_clause_still_emits_obligation() {
 /// variant without an arm is a **compile error**, satisfying §2.5's
 /// exhaustiveness property (`22 §2.5`).
 ///
-/// This test verifies all currently-known variants produce non-empty
-/// provenance (structural: each arm is reachable and returns a `ProvKind`).
+/// This test covers declaration-origin variants; the other obligation kinds
+/// are exercised at their producing and projection seams.
 #[test]
-fn exhaustive_traversal_no_silent_skip() {
+fn spec_declaration_variants_have_provenance() {
     let mut env = mk_env();
     decl_nat_pred(&mut env, "EProp");
     env.declare_postulate_raw("EGoal", Term::omega(Level::Zero))
@@ -452,7 +460,64 @@ fn exhaustive_traversal_no_silent_skip() {
         .iter()
         .all(|o| matches!(o.provenance.kind, ProvKind::LawField { .. })));
 
-    // [placeholder — reifies in V3/V4]: CallPrecond and PartialPrim arms
+    // CallRequires is covered by the following end-to-end test;
+    // FfiRuntimeCheck status is covered by b1_acceptance; PartialPrim is
+    // covered by int_div_mod_surface.
+}
+
+/// A real call-site Requires hole remains Unknown through export.
+///
+/// Promise class: durable invariant (`21 §5.1–§5.4`; `71 §2.1`).
+///
+/// MEASURED: a real explicit-requires caller creates a trusted-base hole,
+/// V2 preserves its identity and provenance, and the checked exporter emits
+/// the hole in P as Unknown.
+/// CLAIMED: an open call-site proof obligation is never exported as Tested.
+/// THE GAP: the test supplies the V3 Unknown verdict; it pins V1-to-V2
+/// extraction and V2-to-export projection, not prover search.
+#[test]
+fn open_call_requires_hole_exports_unknown() {
+    let callee_source = "fn guarded (n : Int) (d : Int) : Int requires Not (Equal Int d 0) = n";
+    let caller_source = "fn caller (value : Int) : Int = guarded 1 0";
+    let mut env = mk_env();
+    let callee = env
+        .elaborate_decl_v1(callee_source)
+        .expect("explicit-requires callee");
+    assert!(callee.obligations.is_empty());
+
+    let caller = env
+        .elaborate_decl_v1(caller_source)
+        .expect("caller retains an open Requires proof hole");
+    let [call_obligation] = caller.obligations.as_slice() else {
+        panic!("one unsatisfied premise creates exactly one call-site hole")
+    };
+    assert!(matches!(call_obligation.kind, ObligationKind::Requires));
+    let call_hole = call_obligation.hole_id;
+    let extracted = v2_extract(&caller);
+    let [triple] = extracted.obligations.as_slice() else {
+        panic!("V2 preserves the call-site obligation")
+    };
+    assert_eq!(triple.hole_id, call_hole);
+    assert!(matches!(&triple.provenance.kind, ProvKind::CallRequires));
+
+    let trusted_base = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    assert!(trusted_base.contains(&call_hole));
+    let results = vec![(triple.clone(), Verdict::Unknown { hole_id: call_hole })];
+    let program_source = format!("{callee_source}\n{caller_source}");
+    let denotation = compile_checked_target_denotation(
+        "v2_acceptance_callsite_requires_status",
+        CompilerSource::new("callsite_requires_status.ken", program_source),
+        "caller",
+    )
+    .expect("checked target containing the explicit-requires call");
+    let export = emit_checked_target_export(&denotation, &results, &trusted_base, vec![], vec![])
+        .expect("open proof hole exports to P");
+
+    assert!(export.guarantees.is_empty());
+    assert_eq!(export.assumptions.len(), 1);
+    let entry = &export.assumptions[0];
+    assert_eq!(entry.obligation_id, "caller.requires.0");
+    assert_eq!(entry.status, PStatus::Unknown);
 }
 
 // ======================================================================

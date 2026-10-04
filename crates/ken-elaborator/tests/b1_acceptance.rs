@@ -347,6 +347,80 @@ fn removing_assume_shrinks_p_and_changes_hash() {
     );
 }
 
+/// Call-site Requires holes export as Unknown; FFI runtime checks stay Tested.
+///
+/// Promise class: durable invariant (`21 §5.2`; `71 §2.1`).
+///
+/// MEASURED: same goal, trusted-base membership, and Unknown verdict enter
+/// the exporter with only provenance varied.
+/// CLAIMED: open call-site Requires exports Unknown; FFI runtime checks
+/// retain Tested status.
+/// THE GAP: synthetic triples isolate exporter projection; V2 acceptance
+/// separately exercises the real call-site producer and extraction path.
+#[test]
+fn call_requires_holes_are_unknown_while_ffi_runtime_checks_are_tested() {
+    let mut ke = make_kern_env();
+    let phi = ke.p_term.clone();
+    let call_hole = declare_postulate(
+        &mut ke.env,
+        "call-site Requires hole".to_string(),
+        vec![],
+        phi.clone(),
+    )
+    .expect("Requires hole");
+    let ffi_hole = declare_postulate(
+        &mut ke.env,
+        "FFI runtime-check hole".to_string(),
+        vec![],
+        phi.clone(),
+    )
+    .expect("FFI runtime-check hole");
+    let results = [
+        (
+            closed_triple(
+                call_hole,
+                "status.requires.0",
+                phi.clone(),
+                ProvKind::CallRequires,
+            ),
+            Verdict::Unknown { hole_id: call_hole },
+        ),
+        (
+            closed_triple(
+                ffi_hole,
+                "status.ffi_runtime_check.0",
+                phi,
+                ProvKind::FfiRuntimeCheck,
+            ),
+            Verdict::Unknown { hole_id: ffi_hole },
+        ),
+    ];
+    let export = emit_export(
+        "status_discriminator",
+        &results,
+        &trusted_base_set(&ke.env),
+        EffectRow::empty(),
+        vec![],
+        vec![],
+    )
+    .expect("both open claims export to P");
+
+    assert!(export.guarantees.is_empty());
+    assert_eq!(export.assumptions.len(), 2);
+    let call_entry = export
+        .assumptions
+        .iter()
+        .find(|entry| entry.obligation_id == "status.requires.0")
+        .expect("call-site Requires entry");
+    assert_eq!(call_entry.status, PStatus::Unknown);
+    let ffi_entry = export
+        .assumptions
+        .iter()
+        .find(|entry| entry.obligation_id == "status.ffi_runtime_check.0")
+        .expect("FFI runtime-check entry");
+    assert_eq!(ffi_entry.status, PStatus::Tested);
+}
+
 // ─── EX-C. Alphabet reuse (AC4/I3) ───────────────────────────────────────────
 
 /// EX-C1: export/alphabet-equals-perform-node-signatures (AC4)

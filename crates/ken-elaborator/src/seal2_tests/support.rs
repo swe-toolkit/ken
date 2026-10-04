@@ -111,19 +111,20 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         // types are therefore already reached through `globals` below) or an
         // alias/value table carrying no `Term`. Named explicitly, with a reason,
         // so the build breaks the instant one of these stops being true.
-        num_values,   // literal VALUES keyed by GlobalId — no type of their own
-        fixities,     // GlobalId -> surface fixity metadata — carries no Term
-        fixity_spans, // GlobalId -> diagnostic spans — carries no Term
-        ctor_decl_spans, // constructor spelling -> first-decl span (dup diagnostic) — no Term
-        numeric_env,  // GlobalId op / dispatch tables — types live in global_env
+        num_values,         // literal VALUES keyed by GlobalId — no type of their own
+        preconditions,      // GlobalId -> parameter/requires arities — carries no Term
+        fixities,           // GlobalId -> surface fixity metadata — carries no Term
+        fixity_spans,       // GlobalId -> diagnostic spans — carries no Term
+        ctor_decl_spans,    // constructor spelling -> first-decl span (dup diagnostic) — no Term
+        numeric_env,        // GlobalId op / dispatch tables — types live in global_env
         standard_operators, // role -> GlobalId identities — types live in global_env
-        bytes_env,    // GlobalId type / op ids — types live in global_env
-        foreign_env,  // FFI postulate GlobalIds — types live in global_env
-        effect_rows,  // effect-row algebra — carries no Term
-        effect_rows_by_id, // checked GlobalId -> effect row — carries no Term
-        space_metadata: _, // private GlobalId index — types live in global_env
-        prelude_env,  // GlobalIds for prelude decls — types live in global_env
-        module_state, // surface-name -> canonical-name aliases into global_env
+        bytes_env,          // GlobalId type / op ids — types live in global_env
+        foreign_env,        // FFI postulate GlobalIds — types live in global_env
+        effect_rows,        // effect-row algebra — carries no Term
+        effect_rows_by_id,  // checked GlobalId -> effect row — carries no Term
+        space_metadata: _,  // private GlobalId index — types live in global_env
+        prelude_env,        // GlobalIds for prelude decls — types live in global_env
+        module_state,       // surface-name -> canonical-name aliases into global_env
         // Resolution provenance: `InstanceResolution` is `instance_id:
         // GlobalId` plus three `String`s (class, head spelling, defining
         // package) and carries NO `Term`. It is an append-only LOG of choices
@@ -134,6 +135,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
     } = env;
     let _ = (
         num_values,
+        preconditions,
         fixities,
         fixity_spans,
         ctor_decl_spans,

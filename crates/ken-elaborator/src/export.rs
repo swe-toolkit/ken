@@ -417,13 +417,13 @@ fn assemble_checked_export(
             Verdict::Unknown { .. } => {
                 // P entry: goal is in trusted_base (an open hole).
                 // Status depends on provenance:
-                //   Ensures → open obligation hole → Unknown.
-                //   Prove / LawField → explicit statement trusted by assertion → Tested.
+                //   Ensures / call-site requires → open proof hole → Unknown.
+                //   FFI runtime checks → tested boundary assertion → Tested.
                 let status = match &triple.provenance.kind {
-                    ProvKind::Ensures { .. } => PStatus::Unknown,
+                    ProvKind::Ensures { .. } | ProvKind::CallRequires => PStatus::Unknown,
                     ProvKind::Prove
                     | ProvKind::LawField { .. }
-                    | ProvKind::CallPrecond
+                    | ProvKind::FfiRuntimeCheck
                     | ProvKind::PartialPrim => PStatus::Tested,
                 };
                 assumptions.push(PEntry {

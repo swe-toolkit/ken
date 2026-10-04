@@ -139,6 +139,8 @@ pub struct SpaceElaborationMetadata {
 pub struct ElabEnv {
     pub env: GlobalEnv,
     pub globals: HashMap<String, GlobalId>,
+    /// Caller-visible `requires` arities keyed by checked declaration identity.
+    pub(crate) preconditions: HashMap<GlobalId, (usize, usize)>,
     /// Numeric literal values keyed by their opaque-postulate GlobalId.
     /// Accumulated during elaboration; copied to `EvalStore.num_values` for eval.
     pub num_values: HashMap<GlobalId, NumericLitVal>,
@@ -234,6 +236,7 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
     let ElabEnv {
         env: _,
         globals: _,
+        preconditions: _,
         num_values: _,
         fixities: _,
         fixity_spans: _,
@@ -296,6 +299,7 @@ impl ElabEnv {
         let mut elab = Self {
             env,
             globals,
+            preconditions: HashMap::new(),
             num_values: HashMap::new(),
             fixities: HashMap::new(),
             fixity_spans: HashMap::new(),
@@ -575,6 +579,7 @@ impl ElabEnv {
         elab::elaborate_rexpr(
             &mut self.env,
             &self.globals,
+            &self.preconditions,
             &mut self.num_values,
             &self.numeric_env,
             owner_label,
