@@ -42,10 +42,11 @@ proofs are definitionally equal (no coherence baggage; `16` par. 1.2).
 (`16` par. 2.2): pointwise at a Pi-type (so **funext is definitional**),
 componentwise at a Sigma-type, structurally at an inductive, to mutual
 implication at Omega (**propext**), and to literal equality at a primitive.
-At a quotient `A/R` it remains **neutral** in the interim, even for two
-classes; reduction to the user relation awaits P0's checked Quot-Form
-equivalence proof (`KERNEL-QUOT-FORM-EQUIVALENCE`, `16 §2.2`/§5). On a
-neutral `A` it is also a neutral proposition.
+At a quotient already formed with `e : IsEquiv A R`, Eq at two
+canonical classes reduces to the user relation:
+`Eq (A/R) [a] [b] ⇝ R a b` (`16 §2.2`/§5). Quot-Form checks `R` at
+the carrier's Ω level, so the reduct stays at Eq's level. Eq with a
+non-class endpoint remains neutral, as does Eq at a neutral carrier.
 
 `Eq` has **no primitive reduction rules of its own** -- it delegates
 entirely to the type-directed computation defined in `16` par. 2.2. The
@@ -150,10 +151,12 @@ Because `J` is built from `cast`, when its equality argument is a
 *non-`refl`* but otherwise canonical proof -- e.g. one produced by
 `subst` or a constructor's congruence -- `J` **reduces** by the
 corresponding `cast` computation (`16` par. 3.2) rather than getting
-stuck. A proof `h : R a b` from a quotient relation does **not** supply
-`Eq (A/R) [a] [b]` by conversion in the interim: class equality is
-neutral (`16 §2.2`/§5). That example becomes available only after P0
-checks Quot-Form's equivalence proof and restores relation-as-equality.
+stuck. For an already formed quotient `A / R / e`, a proof `h : R a b`
+supplies `Eq (A/R) [a] [b]` by conversion: class equality reduces
+to `R a b` at canonical endpoints (`16 §2.2`/§5). This provides a
+non-`refl` equality argument to `J` without any quotient-soundness
+postulate. If either endpoint is not class-headed, this particular
+conversion does not fire.
 
 Concretely:
 

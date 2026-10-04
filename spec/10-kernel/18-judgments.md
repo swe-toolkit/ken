@@ -205,7 +205,7 @@ function check(env, ctx, t, A):                    // Γ ⊢ t ⇐ A
     (Refl(a), Eq(A₁, x, y)):                        // 15 §2
         check(a, A₁); require conv(A₁, x, a) ∧ conv(A₁, y, a)
         return Ok                                  // Eq : Ω ⇒ content irrelevant
-    (QuotClass(a), Quot(A₁, R)):  check(a, A₁); return Ok      // 16 §5
+    (QuotClass(a), Quot(A₁, R, e)):  check(a, A₁); return Ok   // 16 §5; R/e checked at Quot-Form
     (TruncElt(a), Trunc(A₁)):     check(a, A₁); return Ok      // 16 §6
     // intro forms whose target is an inductive/primitive are checked by their
     // formation rule against W (14, 14 §5).

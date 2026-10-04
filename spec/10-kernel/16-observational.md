@@ -412,15 +412,22 @@ constructor), `Eq` is neutral.
 
 ---
 
-**Quotient type (interim).** `A` reduces to `A' / R` (par. 5).
-`Eq (A'/R) u v` remains neutral for **every** pair of endpoints, including two
-canonical
-classes `[a]` and `[b]`; it does not reduce to `R a b`. Quot-Form does not yet
-require an equivalence proof for `R`, so reducing even `Eq (A'/R) [a] [a]` to
-`R a a` would let `refl [a]` prove an arbitrary non-reflexive relation. Neutral
-class equality is sound but incomplete. The relation-as-equality reduction is
-deferred until Quot-Form carries a checked equivalence proof
-(`KERNEL-QUOT-FORM-EQUIVALENCE`, par. 5).
+**Quotient type.** `A` reduces to the formed quotient `A' / R / e`
+(par. 5), whose relation has type `A' → A' → Ω_l` for `A' : Type l`
+and whose `e : IsEquiv A' R` was checked at formation. At two
+canonical classes, quotient equality computes:
+
+```
+Eq (A'/R) [a] [b]  ⇝  R a b : Ω_l
+```
+
+This reduct has the same level as `Eq (A'/R) [a] [b] : Ω_l`.
+A proof `h : R a b` thus also proves class equality by conversion;
+`refl [a]` cannot derive an arbitrary non-reflexive `R a a`, since
+such a quotient fails formation without an equivalence proof. If
+either endpoint is not class-headed, quotient equality stays neutral.
+The notation `A'/R` here abbreviates an already formed `A'/R/e`,
+not a two-argument former (par. 5).
 
 ---
 
@@ -897,35 +904,55 @@ which terminates by structural descent on the finite type `P a (refl a)`
 
 ## 5. Quotient types
 
-Set-quotients are **native** (not HITs):
+Set-quotients are **native** (not HITs). Formation checks both relation
+domains against `A` and pins its codomain to `Ω_l`, the carrier's level:
 
 ```
-  Gamma |- A : Type l      Gamma |- R : A -> A -> Omega
-  ────────────────────────────────────────────────────────  (Quot-Form)
-  Gamma |- A / R : Type l
+  Γ ⊢ A : Type l    Γ ⊢ R : A → A → Ω_l    Γ ⊢ e : IsEquiv A R
+  ──────────────────────────────────────────────────────────  (Quot-Form)
+  Γ ⊢ A / R / e : Type l
+
+  IsEquiv A R : Ω_l :=
+      ((x:A) → R x x)
+    ∧ ((x y:A) → R x y → R y x)
+    ∧ ((x y z:A) → R x y → R y z → R x z)
 ```
+
+The kernel classifies `IsEquiv A R` and checks `e` against it before
+admitting the quotient. Its level is `Ω_l`: each clause quantifies over
+`A : Type l` and returns a relation proposition at `Ω_l` (`12 §2`).
+A relation lacking a checked equivalence witness, a wrong second
+domain, or a relation into `Ω_(suc l)` cannot form this quotient.
+No quotient-soundness postulate replaces `e`. In later rules `A/R`
+abbreviates the **already formed** `A/R/e`; the core former has three
+arguments. Equality of quotient type formers compares the carrier and
+relation but not the proof `e` (Ω proof irrelevance, §1.2).
 
 - **Introduction:** `[a] : A / R` for `a : A`. This is the equivalence
   class of `a`.
-- **Equality (interim):** `Eq (A/R) [a] [b]` stays neutral, even at two
-  classes (par. 2.2). No proof of `R a b` follows from `refl [a]`; conversion
-  does not identify class equality with the unverified relation. The
-  relation-as-equality reduction waits for a Quot-Form equivalence proof
-  (`KERNEL-QUOT-FORM-EQUIVALENCE`).
-- **Elimination:**
+- **Equality:** At two classes `Eq (A/R) [a] [b] ⇝ R a b` (§2.2);
+  other endpoint pairs stay neutral. Both the Eq and its relation reduct
+  inhabit `Ω_l`, and `h : R a b` supplies class equality by conversion.
+- **Elimination into a Type target:**
   ```
-    Gamma |- M : (z : A/R) -> Type k
-    Gamma |- f : (x : A) -> M [x]
-    Gamma |- r : (x y : A) -> R x y -> Eq (M [x]) (f x)
-                    (cast (M [y]) (M [x]) (sym (cong M (R x y))) (f y))
-    Gamma |- q : A / R
+    Γ ⊢ q : A/R                (formed per Quot-Form with A : Type l)
+    Γ ⊢ M : (z : A/R) → Type k
+    Γ ⊢ f : (x : A) → M [x]
+    Γ ⊢ r : (x y : A) → (h : R x y)
+          → Eq (M [x]) (f x)
+               (cast (M [y]) (M [x]) (sym (cong M h')) (f y))
+      where h' := (h : Eq (A/R) [x] [y])
+            -- legal by Eq (A/R) [x] [y] ⇝ R x y at two classes (§2.2)
     ─────────────────────────────────────────────────────────  (Quot-Elim)
-    Gamma |- elim_/ M f r q : M q
+    Γ ⊢ elim_/ M f r q : M q
   ```
-  The respect condition `r` records that `f` sends `R`-related elements
-  to equal results in `M`. The displayed dependent `cong`/`cast` transport
-  is the full schema targeted by P0. During the interim the Type-target
-  restriction in §5.1 applies; the Ω-target rule is unchanged.
+  The kernel checks this entire dependent respect type at admission
+  (§5.1). `cong` and `sym` are the derived terms of §4: the target
+  `Eq (Type k) (M [y]) (M [x]) : Ω_(suc k)` fixes the proposition
+  used to cast `f y`, not a particular J encoding of its proof.
+  By Ω-PI (§1.2) and the proof-inert cast (§3.4), any valid proof of
+  that proposition gives the same schema. A Type-target `Quot-Elim`
+  requires a quotient; it refuses a `‖A‖` scrutinee.
 
   **Computation:**
   ```
@@ -934,11 +961,17 @@ Set-quotients are **native** (not HITs):
   This is the i-reduction for quotients: eliminating on a class just
   applies the underlying function.
 
-  **Respect-free elimination (Omega target).** When `M z : Omega` for all
-  `z`, the respect condition `r` is **free** by Omega-PI (par. 1.2): any
-  two proofs of `Eq (M [x]) ...` in Omega are definitionally equal, so the
-  kernel can fill a trivial proof. This makes quotients into Omega
-  convenient and coherence-free.
+  **Respect-free elimination (Omega target):**
+  ```
+    Γ ⊢ q : A/R               Γ ⊢ M : (z : A/R) → Ω_j
+    Γ ⊢ f : (x : A) → M [x]    r well-scoped in Γ
+    ────────────────────────────────────────────────  (Quot-Elim-Ω)
+    Γ ⊢ elim_/ M f r q : M q
+  ```
+  There is **no typing premise on `r`**: when every `M z : Ω_j`, its
+  inhabitants are proof-irrelevant, so respect holds by Ω-PI (§1.2).
+  The kernel checks only the scoping of `r`, not a proposed respect
+  witness. This makes elimination into Ω coherence-free.
 
 - Quotients give `Int`-as-quotient, finite maps/sets up to equivalence,
   and the set-level constructions HITs would have provided. *General*
@@ -947,8 +980,9 @@ Set-quotients are **native** (not HITs):
 
 ### 5.1 Respect verification (the `cong`/`cast` schema for non-Ω targets)
 
-The eliminator's admission **gates on the respect proof `r`**. The kernel
-dispatches on the **sort of the motive's codomain** — `M : (z : A/R) →
+The eliminator's admission checks `r` against the dependent respect
+schema for Type targets, and checks only its scoping for Ω targets. The
+kernel dispatches on the **sort of the motive's codomain** — `M : (z : A/R) →
 S`, where `S` is `whnf`'d:
 
 - **`S = Omega_l` (proposition target) — respect-free.** When every `M z`
@@ -959,46 +993,37 @@ S`, where `S` is `whnf`'d:
   not `M z ≡ Omega_l`; PI is about *elements of a proposition*, §1.2.) This
   is the K2 deliverable and is **unchanged** — do not regress it.
 
-- **`S = Type ℓ` (genuine type target) — the full schema.** The
-  dependent-transport schema below is the P0 target. Respect is its
-  **entire** soundness content: without it a non-respecting `f` (one that
-  *observes* the class representative) could distinguish `R`-related
-  elements. Once P0 restores `Eq (A/R) [x] [y] ⇝ R x y` (§2.2), `cong`
-  of that observation would derive `Eq Bool true false ⇝ Bottom` — a
-  **closed inhabitant of `Empty`**. The full `cong`/`cast` schema is:
+- **`S = Type ℓ` (genuine type target) — the full schema.** Respect is
+  its **entire** soundness content: without it a non-respecting `f`
+  (one that *observes* the class representative) could distinguish
+  `R`-related elements. Since `Eq (A/R) [x] [y] ⇝ R x y` (§2.2),
+  `cong` of that observation could derive `Eq Bool true false ⇝ Bottom`
+  — a **closed inhabitant of `Empty`**. The `cong`/`cast` schema is:
 
   ```
   r : (x y : A) → (h : R x y)
         → Eq (M [x]) (f x) (cast (M [y]) (M [x]) (sym (cong M h')) (f y))
-    where h' : Eq (A/R) [x] [y]   is h transported through the quotient-Eq
-          reduction Eq (A/R) [x] [y] ⇝ R x y (§2.2), and
-          cong M h' : Eq Type (M [x]) (M [y])   (a proof in Omega, §4)
-          sym (cong M h') : Eq Type (M [y]) (M [x])   — the transport
+    where h' := (h : Eq (A/R) [x] [y]) is h ascribed at class equality;
+          Eq (A/R) [x] [y] ⇝ R x y (§2.2) makes conversion legal
+          because both endpoints are canonical classes. No transport term
+          constructs h'.
+          cong M h' : Eq (Type ℓ) (M [x]) (M [y]) : Ω_(suc ℓ) (§4)
+          sym (cong M h') : Eq (Type ℓ) (M [y]) (M [x]) — transport
               direction: with the kernel convention cast A B e (a:A) : B
               (§3.1), the value f y : M [y] is the source and the result
               lands in M [x] (the type the enclosing Eq (M [x]) … requires)
   ```
 
   The schema asks `r` to equate `f x` and `f y` at `M [x]`, transporting
-  the latter along the motive's action on class equality. At P0 the kernel
-  must form this expected type and `check` `r` against it; an `r` failing
-  that check is rejected.
-
-  **Interim (until `KERNEL-QUOT-FORM-EQUIVALENCE`).** `Eq (A/R) [x] [y]`
-  stays neutral (§2.2), so `h : R x y` cannot supply `h'` by conversion,
-  and `sym (cong M h')` cannot be formed. The Type-target respect check
-  remains at admission where transport collapses by regularity —
-  `M [x] ≡ M [y]`, including every constant motive — and then requires
-  `Eq (M [x]) (f x) (f y)`. A Type-target elimination whose respect
-  requires class equality not supplied by reflexivity is refused: this
-  includes a dependent motive with `M [x] ≢ M [y]`, or a quotient-valued
-  motive whose result classes need non-reflexive equality. A constant
-  quotient-valued motive with reflexively equal results is not excluded.
+  the latter along the motive's action on class equality. Because the
+  quotient was formed with `e : IsEquiv A R`, `h : R x y` checks as `h'`
+  by conversion, without an extra quotient-soundness axiom. The kernel
+  forms the expected dependent type and checks `r` against it; a proof
+  of the wrong transport direction or a non-respecting `f` is refused.
   The Ω-target respect-free rule above is unchanged.
 
-**Where the guard sits.** Admission remains gated on checking `r` (Type
-target) or confirming it well-scoped (Ω target); the full dependent schema
-above is deferred to P0, not silently admitted in the interim. An un-invoked
+**Where the guard sits.** Admission checks `r` against the dependent
+schema (Type target), or confirms it well-scoped (Ω target). An un-invoked
 respect check while `elim_/` reduces unconditionally (`elim_/ M f r [a] ⇝ f a`,
 §5) would be an unsound **accept**, not a sound stuck fallback. The
 **i-reduction itself is unchanged**; respect is an admission-time obligation,
@@ -1014,19 +1039,16 @@ true true ⇝ Top` and is **accepted**). A kernel that raw-well-formed `r`
 instead of checking the schema would accept the observing `f` and reduce
 `elim_/ … [true]` to a closed proof of `Empty`.
 
-**The transport-direction acceptance criterion is deferred to P0.** The
-probe above has a **constant** motive (`M := λ_. Bool`), so `M [x] ≡ M [y]`
-and the cast collapses by **regularity** (`cast B B refl a ⇝ a`, §3.2)
-regardless of its direction. It confirms that the respect check fires, but
-cannot witness the direction. Once P0 supplies a valid `h'` and implements
-the dependent schema, the **correct-direction** proof
-`cast (M [y]) (M [x]) (sym (cong M h')) (f y)` at `M [x] ≢ M [y]` must be
-accepted, while the **reversed** proof
-`cast (M [x]) (M [y]) (cong M h') (f y)` is rejected: it feeds
-`f y : M [y]` to a cast from `M [x]`. During the interim **both**
-dependent-motive attempts are refused; accepting the correct-direction
-proof is not claimed here. The deferred accept/refuse pair must be an
-executed kernel admission test at P0, not only a `whnf` observation
+**The transport-direction acceptance criterion.** The probe above has
+a **constant** motive (`M := λ_. Bool`), so `M [x] ≡ M [y]` and the cast
+collapses by **regularity** (`cast B B refl a ⇝ a`, §3.2) regardless of
+its direction. It confirms that the respect check fires, but cannot
+witness the direction. At a genuinely **dependent** motive with
+`M [x] ≢ M [y]`, the **correct-direction** proof
+`cast (M [y]) (M [x]) (sym (cong M h')) (f y)` is accepted, while the
+**reversed** proof `cast (M [x]) (M [y]) (cong M h') (f y)` is refused:
+it feeds `f y : M [y]` to a cast from `M [x]`. This accept/refuse pair
+is an executed kernel admission test, not only a `whnf` observation
 (`conversion/quotient-respect-schema-dependent-motive`, C15).
 
 ## 6. Propositional truncation
@@ -1047,7 +1069,9 @@ Omega).
     ──────────────────────────────────────────────  (Trunc-Elim)
     Gamma |- elim_trunc P f t : P
   ```
-  The computation rule:
+  The `Quot-Elim-Ω` checking rule (§5) also covers truncation: its
+  respect term needs only to be well-scoped, whereas the Type-target
+  `Quot-Elim` refuses a truncation scrutinee. The computation rule:
   ```
   elim_trunc P f |a|  ≡  f a
   ```
@@ -1160,10 +1184,10 @@ The critical cases for this amendment are:
   reduction changes its type `Omega_l`. In particular `Eq ‖A‖ u v`
   stays neutral even at levels above 0; the bare `Top : Omega_0` cannot
   be its reduct in non-cumulative Ken.
-- Eq at a quotient-classified carrier (par. 2.2) is neutral, even for two
-  classes. It produces no `R a b` reduct at R's possibly different level.
-  Quot-Form's missing relation-level and equivalence premises are deferred
-  to `KERNEL-QUOT-FORM-EQUIVALENCE`; the interim does not add a lift.
+- Eq at a quotient-classified carrier (par. 2.2) reduces on two classes
+  to `R a b : Ω_l`, exactly the level of `Eq (A/R) [a] [b] : Ω_l`.
+  Quot-Form checks `R : A → A → Ω_l` and `e : IsEquiv A R` at formation
+  (§5); other endpoint pairs stay neutral. No level lift is required.
 - Eq at a Type-classified Sigma or inductive with an Omega-classified
   component (par. 2.2): the component's conjunct is `Eq T b b` at that
   component's own level, and no transport is formed. For the Sigma
@@ -1184,22 +1208,22 @@ level lower); Eq at `Type l` with universe heads or distinct rigid
 formers (`Top`/`Bottom`); Eq at `Type l` between applications of the
 same inductive former whose parameter and index types sit below the
 family; Eq at an inductive value (the field conjunction, `Top`,
-`Bottom`). Eq at quotient classes no longer belongs to this inventory:
-its interim rule is neutral. Exact-level subject reduction does not hold
-for the remaining arms. Kernel checking infers an Eq's sort from Eq-Form,
-not from its reduct, so
-these mismatches are refused rather than accepted wrongly.
+`Bottom`). Eq at quotient classes is level-exact where it reduces (§2.2):
+its checked relation reduct inhabits `Ω_l`. Exact-level subject
+reduction does not hold for the remaining arms. Kernel checking infers
+an Eq's sort from Eq-Form, not from its reduct, so these mismatches are
+refused rather than accepted wrongly.
 
-(2) Upward reducts (a predicativity defect, pending a kernel fix).
-Quot-Form does not pin R's level, and inductive admission does not
-bound parameter or index levels. Eq at quotient classes is neutral in the
-interim, but Eq at `Type l` between quotient **type formers** and Eq at
-`Type l` between applications of a family with a parameter or index type
-two or more levels above
-it can reduce to a proposition *above* the Eq's level. This
-contradicts §1.1 and is to be closed at formation and admission (a
-separate kernel item). Neutralizing class equality does not close these
-other upward arms.
+(2) Upward reducts (remaining predicativity defect, pending a kernel fix).
+Quot-Form now pins `R` to `Ω_l` and checks `IsEquiv A R`. This closes
+both the quotient-class arm and Eq at `Type l` between quotient **type
+formers**: a relation comparison sits at `Ω_(suc l)`, the latter Eq's
+level. Inductive admission still does not bound parameter or index
+levels. Eq at `Type l` between applications of a family with a
+parameter or index type two or more levels above it can reduce to a
+proposition *above* the Eq's level. This remaining arm contradicts
+§1.1 and needs the separate inductive-admission fix; P0 does not
+close it.
 
 Other critical cases retain their previous obligations:
 
@@ -1239,9 +1263,10 @@ A conforming kernel MUST:
 3. Provide **`cast`** with **`cast`-refl regularity** and
    **`cast`-by-type** computation (par. 3.2), from which `subst`/`J`
    **reduce on non-`refl`** (par. 4, `15-identity.md` par. 4).
-4. Provide **quotient types** `A / R` with neutral class equality until
-   Quot-Form carries an equivalence proof (P0), and the respect-checked
-   eliminator under the interim Type-target restriction (par. 5–5.1).
+4. Form **quotient types** `A / R / e` only when `R : A → A → Ω_l` at
+   `A : Type l` and `e : IsEquiv A R` checks; reduce equality of two
+   classes to `R a b` and check the dependent Type-target respect schema
+   at elimination (par. 2.2, 5–5.1).
 5. Provide **propositional truncation** `||A||` (par. 6).
 6. Extend **conversion** with the reductions and Omega-PI shortcut
    (par. 8), leaving K1's structural comparison unchanged.
@@ -1258,7 +1283,7 @@ The soundness-critical, separately-tested behaviours:
 | C5 | `cast A A refl a` reduces to `a` (regularity) | par. 3.2 | `observational/cast-refl` |
 | C6 | `cast` computes on closed canonical type-equalities (canonicity) | par. 3.2 | `observational/cast-computes` |
 | C7 | `J` reduces on non-`refl` equality (via cast) | par. 4 | `observational/j-nonrefl` |
-| C8 | `Eq (A/R) [a] [b]` stays neutral for every pair of classes; it does not reduce to unverified `R a b`, so an arbitrary relation cannot prove a false equality; relation-as-equality awaits P0 | par. 2.2, 5 | `observational/quotient-eq` |
+| C8 | After checked `A / R / e` formation, `Eq (A/R) [a] [b] ⇝ R a b : Ω_l` at two classes; other endpoint pairs stay neutral. A relation without checked `IsEquiv` is refused at formation, not turned into class equality | par. 2.2, 5 | `observational/quotient-eq` |
 | C9 | `elim_/ M f r [a]` reduces to `f a` | par. 5 | `observational/quotient-elim` |
 | C10 | `elim_trunc P f |a|` reduces to `f a` | par. 6 | `observational/trunc-elim` |
 | C11 | All K1 rules preserved (no regression) | par. 8.3 | CI on K1 conformance subset |
@@ -1266,7 +1291,7 @@ The soundness-critical, separately-tested behaviours:
 | C13 | `Eq` at an inductive with a **dependent telescope** decomposes with the inter-argument `cast`s (the mutual sibling of C12) | par. 2.2 | `observational/eq-inductive-dependent` |
 | C14 | `J` reduces at a **dependent (non-constant) motive** via `cast` on the endpoint types (bottoming through C12); stays stuck only where the inner `cast` stalls on an open index | par. 4.1 | `observational/j-dependent-motive` |
 | C15a | At the **constant Type motive `M := λ_. Bool`**, quotient elim still checks `r`: respecting `f` accepted, non-respecting `f` rejected (closed-`Empty` guard); Ω targets stay respect-free | par. 5.1 | `conversion/quotient-respect-schema-{rejects,accepts}` |
-| C15b | At a **dependent Type motive**, both correct-direction `r_ok` and reversed `r_bad` are refused in the interim; the `r_ok` accept and `r_bad` refuse direction pair is deferred to P0, with an executed admission pin | par. 5.1 | `conversion/quotient-respect-schema-dependent-motive` |
+| C15b | At a **dependent Type motive**, `r_ok` in the correct `M [y] → M [x]` transport direction is accepted and reversed `r_bad` is refused by executed kernel admission | par. 5.1 | `conversion/quotient-respect-schema-dependent-motive` |
 
 Conformance corpus: `../../conformance/kernel/observational/` and
 `../../conformance/kernel/conversion/`. C12–C15 are the **series-2**
