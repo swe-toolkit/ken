@@ -3960,7 +3960,7 @@ fn compile_wrong_resource_tag_order_probe() -> (JITModule, *const u8) {
     let mut module = JITModule::new(jit);
     let native = crate::native_int_clif::emit_native_int_local_graph(&mut module, false)
         .expect("native-int graph emits");
-    let boundary_plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+    let boundary_plan = crate::boundary_emission_plan::BoundaryEmissionPlan::derive();
     let helpers = crate::boundary_value_clif::emit_boundary_value_local_graph(
         &mut module,
         &native,

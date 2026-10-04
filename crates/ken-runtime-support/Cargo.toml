@@ -1,0 +1,24 @@
+[package]
+name = "ken-runtime-support"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+description = "Compiler-independent run-time support for linked Ken executables"
+
+# One archive contains the run-time support and its ken-host dependency.
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[features]
+default = []
+# Enables fault injection only for ken-runtime's compiler-dependent unit tests.
+# No normal dependency edge enables this feature.
+test-hooks = []
+
+[dependencies]
+ken-host = { path = "../ken-host" }
+unicode-normalization = "0.1"

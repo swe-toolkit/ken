@@ -254,7 +254,7 @@ struct Graph {
 pub(crate) fn emit_boundary_value_local_graph<M: Module>(
     module: &mut M,
     native_int: &crate::native_int_clif::NativeIntLocalFuncs,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<BoundaryLocalFuncs, CraneliftBackendError> {
     let resolve = declare(module, "ken_boundary_resolve_local", 3)?;
     let class = declare(module, "ken_boundary_class_local", 3)?;
@@ -390,7 +390,7 @@ pub(crate) fn emit_boundary_value_local_graph<M: Module>(
 pub(crate) fn capture_boundary_value_local_graph<M: Module>(
     module: &mut M,
 ) -> Result<String, CraneliftBackendError> {
-    let plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+    let plan = crate::boundary_emission_plan::BoundaryEmissionPlan::derive();
     capture_boundary_value_local_graph_with_plan(module, &plan)
 }
 
@@ -404,7 +404,7 @@ pub(crate) fn capture_boundary_value_local_graph<M: Module>(
 #[cfg(test)]
 pub(crate) fn capture_boundary_value_local_graph_with_plan<M: Module>(
     module: &mut M,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<String, CraneliftBackendError> {
     let native = crate::native_int_clif::emit_native_int_local_graph(module, false)?;
     BOUNDARY_CLIF_CAPTURE.with(|capture| *capture.borrow_mut() = Some(Vec::new()));
@@ -539,9 +539,9 @@ fn tag_in_set(
 fn refuse_unadmitted_tag(
     b: &mut FunctionBuilder<'_>,
     tag: cranelift_codegen::ir::Value,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) {
-    let retired = crate::boundary_value::boundary_retired_tags(plan.tags().admitted());
+    let retired = crate::boundary_emission_plan::boundary_retired_tags(plan.tags().admitted());
     let is_retired = tag_in_set(b, tag, &retired);
     let retired_block = b.create_block();
     let unknown = b.create_block();
@@ -574,7 +574,7 @@ fn select_region_by_owner_band(
     arena: cranelift_codegen::ir::Value,
     tag: cranelift_codegen::ir::Value,
     selected: cranelift_codegen::ir::Block,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) {
     for (owner, tags) in plan.tags().owner_bands() {
         let hit = b.create_block();
@@ -641,7 +641,7 @@ const RESOLVED_REGION: i32 = 8;
 fn define_resolve<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.resolve, 3);
@@ -800,7 +800,7 @@ fn define_node_word<M: Module>(
 fn define_class<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.class, 3);
@@ -1213,7 +1213,7 @@ fn host_result_guard(
 fn define_make_immediate<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let mut func = begin(module, graph.make_immediate, 3);
     let mut fctx = FunctionBuilderContext::new();
@@ -1324,7 +1324,7 @@ fn define_make_immediate<M: Module>(
 fn define_escape_check<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.escape_check, 2);
@@ -1443,7 +1443,7 @@ fn select_region_by_tag(
     ptr: cranelift_codegen::ir::Type,
     arena: cranelift_codegen::ir::Value,
     tag: cranelift_codegen::ir::Value,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> cranelift_codegen::ir::Value {
     // ⛔ **Recognition (`-1`) and shape (`-2`) MOVED to `define_alloc`'s ordered
     // prologue** — this is the sole caller, and leaving copies here would make
@@ -1474,7 +1474,7 @@ fn select_region_by_tag(
 fn owner_of_tag(
     b: &mut FunctionBuilder<'_>,
     tag: cranelift_codegen::ir::Value,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> cranelift_codegen::ir::Value {
     let mut chain = b
         .ins()
@@ -1514,7 +1514,7 @@ fn one_i64(b: &mut FunctionBuilder<'_>) -> cranelift_codegen::ir::Value {
 fn relation_mask(
     b: &mut FunctionBuilder<'_>,
     tag: cranelift_codegen::ir::Value,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> cranelift_codegen::ir::Value {
     let mut chain = b.ins().iconst(types::I64, 0);
     for (tag_value, classes) in plan.tags().handle_class_relation() {
@@ -1538,7 +1538,7 @@ fn relation_mask(
 fn define_alloc<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.alloc, 5);
@@ -1940,7 +1940,7 @@ fn define_store_node_word<M: Module>(
 fn define_store_field<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.store_field, 4);
@@ -2282,7 +2282,7 @@ fn region_data_base(
 fn define_bytes_view<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.bytes_view, 3);
@@ -2333,7 +2333,7 @@ fn define_bytes_view<M: Module>(
 fn define_store_int_limbs<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.store_int_limbs, 5);
@@ -2441,7 +2441,7 @@ fn define_store_int_limbs<M: Module>(
 fn define_seal_int<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.seal_int, 2);
@@ -2522,7 +2522,7 @@ fn define_seal_int<M: Module>(
 fn define_store_int_limb<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.store_int_limb, 4);
@@ -2573,7 +2573,7 @@ fn define_store_int_limb<M: Module>(
 fn define_store_bytes_len<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.store_bytes_len, 4);
@@ -2640,7 +2640,7 @@ fn define_byte_access<M: Module>(
     graph: Graph,
     id: FuncId,
     write: bool,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, id, 4);
@@ -2704,7 +2704,7 @@ fn define_byte_access<M: Module>(
 fn define_store_int_tag<M: Module>(
     module: &mut M,
     graph: Graph,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     let ptr = module.target_config().pointer_type();
     let mut func = begin(module, graph.store_int_tag, 3);
@@ -2815,7 +2815,7 @@ fn define_int_part<M: Module>(
     graph: Graph,
     id: FuncId,
     part: IntPart,
-    plan: &crate::boundary_value::BoundaryEmissionPlan,
+    plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
 ) -> Result<(), CraneliftBackendError> {
     use crate::native_int_clif::{VIEW_LEN, VIEW_LIMBS, VIEW_SIGN};
 
@@ -3010,7 +3010,7 @@ fn define_int_part<M: Module>(
 pub(crate) mod tests {
 
     /// Capture the emitted helper graph under an injected plan (RECUT 2 causal).
-    pub(crate) fn capture_with_plan(plan: &crate::boundary_value::BoundaryEmissionPlan) -> String {
+    pub(crate) fn capture_with_plan(plan: &crate::boundary_emission_plan::BoundaryEmissionPlan) -> String {
         let mut module = jit();
         super::capture_boundary_value_local_graph_with_plan(&mut module, plan).expect("graph emits")
     }
@@ -3071,7 +3071,7 @@ pub(crate) mod tests {
     fn compile_probe(probe: Probe) -> (JITModule, *const u8) {
         compile_probe_with_plan(
             probe,
-            &crate::boundary_value::BoundaryEmissionPlan::derive(),
+            &crate::boundary_emission_plan::BoundaryEmissionPlan::derive(),
         )
     }
 
@@ -3083,7 +3083,7 @@ pub(crate) mod tests {
     /// what it *answers* can.
     fn compile_probe_with_plan(
         probe: Probe,
-        plan: &crate::boundary_value::BoundaryEmissionPlan,
+        plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
     ) -> (JITModule, *const u8) {
         let mut module = jit();
         let native = crate::native_int_clif::emit_native_int_local_graph(&mut module, false)
@@ -3998,8 +3998,8 @@ pub(crate) mod tests {
         // written down: a tag whose only lane is retired is still **vocabulary**,
         // so it must be refused BY NAME (`-12`) and never collapse into `-1`,
         // which is what an arbitrary corrupt byte produces.
-        let retired_tags = crate::boundary_value::boundary_retired_tags(
-            crate::boundary_value::BoundaryEmissionPlan::derive()
+        let retired_tags = crate::boundary_emission_plan::boundary_retired_tags(
+            crate::boundary_emission_plan::BoundaryEmissionPlan::derive()
                 .tags()
                 .admitted(),
         );
@@ -4174,7 +4174,7 @@ pub(crate) mod tests {
         compile_producer_with_plan(
             arity,
             emit,
-            &crate::boundary_value::BoundaryEmissionPlan::derive(),
+            &crate::boundary_emission_plan::BoundaryEmissionPlan::derive(),
         )
     }
 
@@ -4189,7 +4189,7 @@ pub(crate) mod tests {
             &[cranelift_codegen::ir::Value],
             cranelift_codegen::ir::Type,
         ),
-        plan: &crate::boundary_value::BoundaryEmissionPlan,
+        plan: &crate::boundary_emission_plan::BoundaryEmissionPlan,
     ) -> (JITModule, *const u8) {
         let mut module = jit();
         let native = crate::native_int_clif::emit_native_int_local_graph(&mut module, false)
@@ -6367,7 +6367,7 @@ pub(crate) mod tests {
         let mut module = jit();
         let native = crate::native_int_clif::emit_native_int_local_graph(&mut module, false)
             .expect("native-int graph emits");
-        let plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+        let plan = crate::boundary_emission_plan::BoundaryEmissionPlan::derive();
         let helpers =
             emit_boundary_value_local_graph(&mut module, &native, &plan).expect("graph emits");
         let ptr = module.target_config().pointer_type();
@@ -8070,9 +8070,8 @@ pub(crate) mod tests {
     /// implied by this test's name.
     #[test]
     fn b2v_every_emitted_tag_admission_test_is_the_plans() {
-        use crate::boundary_value::{
-            BOUNDARY_ERR_TAG, BOUNDARY_TAG_BITS, BoundaryEmissionPlan, BoundaryTagAdmission,
-        };
+        use crate::boundary_value::{BOUNDARY_ERR_TAG, BOUNDARY_TAG_BITS};
+        use crate::boundary_emission_plan::{BoundaryEmissionPlan, BoundaryTagAdmission};
 
         let plan = BoundaryEmissionPlan::derive();
         let mut store = c1_d2_store();
@@ -8155,9 +8154,8 @@ pub(crate) mod tests {
     /// rather than assume.
     #[test]
     fn b2v_every_emitted_owner_band_test_is_the_plans() {
-        use crate::boundary_value::{
-            BoundaryEmissionPlan, BoundaryReferentOwner, BoundaryTagAdmission,
-        };
+        use crate::boundary_value::BoundaryReferentOwner;
+        use crate::boundary_emission_plan::{BoundaryEmissionPlan, BoundaryTagAdmission};
 
         let plan = BoundaryEmissionPlan::derive();
         let mut store = c1_d2_store();
@@ -8256,7 +8254,7 @@ pub(crate) mod tests {
     /// product rather than a sample.
     #[test]
     fn b2v_the_rust_mirror_and_the_derived_relation_reconcile_over_the_product() {
-        let plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+        let plan = crate::boundary_emission_plan::BoundaryEmissionPlan::derive();
         let derived_admits = |tag: BoundaryTag, class: BoundaryClass| {
             plan.tags()
                 .handle_class_relation()
@@ -8365,7 +8363,7 @@ pub(crate) mod tests {
     /// the partition's own answer — closed by the derivation control.
     #[test]
     fn b2v_the_emitted_relation_is_the_plans_per_cell() {
-        use crate::boundary_value::{BoundaryEmissionPlan, BoundaryTagAdmission};
+        use crate::boundary_emission_plan::{BoundaryEmissionPlan, BoundaryTagAdmission};
 
         let plan = BoundaryEmissionPlan::derive();
         let with_relation = |relation: Vec<(BoundaryTag, Vec<BoundaryClass>)>| {
@@ -8573,9 +8571,8 @@ pub(crate) mod tests {
     /// which now sweeps this relation too.
     #[test]
     fn b2v_the_emitted_immediate_class_is_the_plans() {
-        use crate::boundary_value::{
-            BOUNDARY_ERR_CLASS, BOUNDARY_OK, BoundaryEmissionPlan, BoundaryTagAdmission,
-        };
+        use crate::boundary_value::{BOUNDARY_ERR_CLASS, BOUNDARY_OK};
+        use crate::boundary_emission_plan::{BoundaryEmissionPlan, BoundaryTagAdmission};
 
         let plan = BoundaryEmissionPlan::derive();
         let mut store = c1_d2_store();
@@ -8699,7 +8696,8 @@ pub(crate) mod tests {
     /// remains the whole-graph pin plus review. Named, not implied.
     #[test]
     fn b2v_every_emitted_class_guard_is_the_plans() {
-        use crate::boundary_value::{BOUNDARY_ERR_CLASS, BoundaryEmissionPlan};
+        use crate::boundary_value::BOUNDARY_ERR_CLASS;
+        use crate::boundary_emission_plan::BoundaryEmissionPlan;
 
         let plan = BoundaryEmissionPlan::derive();
         // ⛔ Perturb ONLY the int-magnitude class set. `Record` is an admitted
@@ -8794,7 +8792,7 @@ pub(crate) mod tests {
     fn b2v_the_plan_owner_bands_agree_with_referent_owner() {
         use std::collections::BTreeSet;
 
-        let plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+        let plan = crate::boundary_emission_plan::BoundaryEmissionPlan::derive();
         let bands = plan.tags().owner_bands();
 
         // Positive controls FIRST: agreement over an empty relation, or one

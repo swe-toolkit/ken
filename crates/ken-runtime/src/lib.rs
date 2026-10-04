@@ -9,38 +9,25 @@
 //! - Arena page chaining beyond a single flat Vec (`44 §1b`)
 //! - `unknown` propagation (Kleene/Heyting logic, `41 §6`)
 
-/// `RT-FNSPLIT-C3-ACTIVATION` `D4` — the deployment-supplied capacity
-/// authority for boundary storage. ⛔ Resource policy, never emitter-derived.
-/// `RT-FNSPLIT-C3-ACTIVATION` `D3` — the Rust-owned activation: the
-/// per-invocation arenas, the services record, and the ruled lifecycle.
-/// `RT-FNSPLIT-C3-ACTIVATION` `D2` — the small C ABI over an opaque
-/// activation handle. ⛔ C stores a pointer and a status, nothing else.
-pub mod activation_abi;
-/// `RT-FNSPLIT-B2F` `S6` — the fixed activation-services record generated code
-/// receives beside its frame. ⛔ Host runtime services, never a Ken value.
-pub mod activation_services;
-pub mod artifact_validation;
-pub mod boundary_activation;
-pub mod boundary_resource_profile;
-/// `RT-FNSPLIT-B2V` — the executable boundary-value ABI: one closed 64-bit
-/// tagged word for every source-valued boundary transfer.
-pub mod boundary_value;
+// Preserve every consumer's module path while the run-time implementation
+// lives in the compiler-independent support crate.
+pub use ken_runtime_support::{
+    activation_abi, activation_services, artifact_validation, boundary_activation,
+    boundary_resource_profile, boundary_value, canonical, hash, invocation_tickets, ir,
+    native_int, store, values,
+};
 /// `RT-FNSPLIT-B2V` — the emitted-code half of the boundary-value ABI.
 ///
 /// Private, exactly like `native_int_clif`: the CLIF graph is compiler-internal
 /// and is reached through [`boundary_value`]'s published layout constants.
 mod boundary_value_clif;
-pub mod canonical;
+mod boundary_emission_plan;
 pub mod cranelift_backend;
 pub mod executable_artifact_contract;
 pub mod executable_entrypoint_packaging;
-pub mod hash;
-pub mod ir;
-mod invocation_tickets;
 #[cfg(test)]
 mod native_effect_v1;
 pub mod native_execution_differential;
-pub mod native_int;
 mod native_int_clif;
 
 #[doc(hidden)]
@@ -52,22 +39,17 @@ pub mod object_linker_packaging;
 pub mod oriented_subcontinuation_plan;
 pub mod platform_runtime_support;
 pub mod runtime_ir_evaluator;
-pub mod store;
 pub mod target_abi;
 pub mod unknown;
-pub mod values;
 
-pub use activation_abi::*;
-pub use activation_services::*;
-pub use artifact_validation::*;
-pub use boundary_activation::*;
-pub use boundary_resource_profile::*;
-pub use canonical::Canonical;
+pub use ken_runtime_support::{
+    activation_abi::*, activation_services::*, artifact_validation::*, boundary_activation::*,
+    boundary_resource_profile::*, canonical::Canonical,
+};
 pub use cranelift_backend::*;
 pub use executable_artifact_contract::*;
 pub use executable_entrypoint_packaging::*;
-pub use hash::fnv1a_64;
-pub use ir::*;
+pub use ken_runtime_support::{hash::fnv1a_64, ir::*};
 pub use ken_host::{
     CanonicalOutcomeV1, CanonicalReplyV1, CanonicalRequestV1, CapacityExhaustedV1,
     CapacityResourceV1, CapacityScopeV1, ConsoleStreamV1, EffectEvent, EffectObservation,
@@ -79,7 +61,7 @@ pub use ken_host::{
     observe_effective_uid_v1,
 };
 pub use native_execution_differential::*;
-pub use native_int::*;
+pub use ken_runtime_support::native_int::*;
 #[doc(hidden)]
 pub use native_join_plan::*;
 pub use native_process_authority::*;
@@ -89,7 +71,20 @@ pub use object_linker_packaging::*;
 pub use oriented_subcontinuation_plan::*;
 pub use platform_runtime_support::*;
 pub use runtime_ir_evaluator::*;
-pub use store::{InternResult, Space, Store, StoreStats};
+pub use ken_runtime_support::store::{InternResult, Space, Store, StoreStats};
 pub use target_abi::*;
 pub use unknown::Unknown;
-pub use values::{Sign, Value};
+pub use ken_runtime_support::values::{Sign, Value};
+
+// This cross-crate layout check needs the compiler's generated helper layout;
+// unlike the run-time arithmetic tests it cannot live in runtime-support.
+#[cfg(test)]
+mod support_layout_tests {
+    #[test]
+    fn arena_header_matches_the_generated_local_helper_layout() {
+        assert_eq!(
+            std::mem::size_of::<crate::native_int::NativeIntArenaV1>(),
+            crate::native_int_clif::ARENA_BYTES
+        );
+    }
+}

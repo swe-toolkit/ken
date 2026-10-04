@@ -1491,8 +1491,8 @@ fn link_starter_executable_with_symbols(
 /// **`RT-FNSPLIT-C3-ACTIVATION` `D1`/`§3a` — the starter's ONE runtime-support
 /// archive.**
 ///
-/// ⛔ **It links `libken_runtime.a` and NOT also `libken_host.a`.** The runtime
-/// archive already owns the direction `ken-runtime -> ken-host`, so linking both
+/// ⛔ **It links `libken_runtime_support.a` and NOT also `libken_host.a`.**
+/// The support archive owns `ken-runtime-support -> ken-host`; linking both
 /// would be `§4`'s banned two-archive shape — and the reason it is banned is
 /// that a second copy of the host symbols is a second authority for the same
 /// contract.
@@ -1516,8 +1516,8 @@ fn ken_runtime_staticlib() -> Result<std::path::PathBuf, ObjectLinkerPackagingEr
                     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
                         continue;
                     };
-                    if (name == "libken_runtime.a"
-                        || (name.starts_with("libken_runtime-") && name.ends_with(".a")))
+                    if (name == "libken_runtime_support.a"
+                        || (name.starts_with("libken_runtime_support-") && name.ends_with(".a")))
                         && path.is_file()
                     {
                         candidates.push(path);
@@ -1533,7 +1533,7 @@ fn ken_runtime_staticlib() -> Result<std::path::PathBuf, ObjectLinkerPackagingEr
     Err(packaging_error(
         ObjectLinkerPackagingStage::Toolchain,
         "ken_runtime_staticlib",
-        "Cargo did not materialize the required ken-host static runtime",
+        "Cargo did not materialize the required ken-runtime-support static archive",
     ))
 }
 

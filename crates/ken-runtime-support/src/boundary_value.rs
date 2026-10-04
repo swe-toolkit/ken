@@ -12,9 +12,9 @@
 //!
 //! This module supplies the missing half: **one closed 64-bit tagged word** for
 //! every source-valued boundary transfer, together with the flat tables emitted
-//! code reads it out of and writes it into. The CLIF side lives in
-//! [`crate::boundary_value_clif`]; the two are one deliverable and must not be
-//! separated — a representation without an executable interface is exactly the
+//! code reads it out of and writes it into. The CLIF side lives in the
+//! compiler crate; the two must agree on one representation — a representation
+//! without an executable interface is exactly the
 //! shape that produced `#9` and then `#10` one layer down.
 //!
 //! ## The word
@@ -462,168 +462,6 @@ impl BoundaryClass {
     }
 }
 
-/// The emission plan — the representation authority, reduced to what the
-/// emitter needs in order to *generate* the helper bodies.
-///
-/// ⛔ **Computed once at the `lowering/core` → `emit_boundary_value_local_graph`
-/// seam and passed in.** It is deliberately data-only and crate-private: the
-/// derivation lives with the `LoweredVariant`/`BoundaryInput` authority in
-/// `cranelift_backend::lowering`, which is the only place that can see it, and
-/// the emitter may **consume** the plan but cannot restate it.
-///
-/// ⚠ **It carries no seed value and no sampled runtime value** — only the
-/// finite class sets the partition admits. A representation chosen by
-/// inspecting a value describes a program that cannot be written (`D1`/`AC-2`).
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct BoundaryEmissionPlan {
-    int_magnitude_classes: Vec<BoundaryClass>,
-    byte_span_classes: Vec<BoundaryClass>,
-    tags: BoundaryTagAdmission,
-}
-
-/// The tag half of the plan: which tags the partition admits, split by the
-/// distinctions the emitted helpers actually branch on.
-///
-/// ⛔ **Sets, never ordinal bands.** The emitter previously asked *"is this tag
-/// numerically at or below `LAST_PERSISTENT_TAG`"*, which is a second authority
-/// derived by hand from [`BoundaryTag`]'s declaration order: reordering the
-/// enum leaves both constants well-formed and silently re-points every
-/// persistent word at the invocation arena. A set has no such failure mode, and
-/// it does not require the admitted tags to be contiguous in the first place.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct BoundaryTagAdmission {
-    admitted: Vec<BoundaryTag>,
-    immediate: Vec<BoundaryTag>,
-    handle: Vec<BoundaryTag>,
-    owner_bands: Vec<(BoundaryReferentOwner, Vec<BoundaryTag>)>,
-    immediate_value_classes: Vec<(BoundaryTag, BoundaryClass)>,
-    handle_class_relation: Vec<(BoundaryTag, Vec<BoundaryClass>)>,
-}
-
-impl BoundaryTagAdmission {
-    /// Build the tag admission from already-derived sets.
-    pub(crate) fn new(
-        admitted: Vec<BoundaryTag>,
-        immediate: Vec<BoundaryTag>,
-        handle: Vec<BoundaryTag>,
-        owner_bands: Vec<(BoundaryReferentOwner, Vec<BoundaryTag>)>,
-        immediate_value_classes: Vec<(BoundaryTag, BoundaryClass)>,
-        handle_class_relation: Vec<(BoundaryTag, Vec<BoundaryClass>)>,
-    ) -> Self {
-        BoundaryTagAdmission {
-            admitted,
-            immediate,
-            handle,
-            owner_bands,
-            immediate_value_classes,
-            handle_class_relation,
-        }
-    }
-
-    /// Every tag any admitted outcome can carry. A tag outside this set is the
-    /// third outcome that fails, never a fall-through.
-    pub(crate) fn admitted(&self) -> &[BoundaryTag] {
-        &self.admitted
-    }
-
-    /// The tags whose payload is the value itself.
-    pub(crate) fn immediate(&self) -> &[BoundaryTag] {
-        &self.immediate
-    }
-
-    /// The tags whose payload indexes a node.
-    pub(crate) fn handle(&self) -> &[BoundaryTag] {
-        &self.handle
-    }
-
-    /// Each referent owner the partition publishes handles for, paired with
-    /// exactly the tags it publishes under that owner.
-    ///
-    /// ⛔ **A relation, not a two-way split.** The emitter used to assume there
-    /// are exactly two handle owners and discriminate them with one threshold;
-    /// an owner the partition started admitting would have been silently folded
-    /// into whichever side of that threshold its tag landed on.
-    pub(crate) fn owner_bands(&self) -> &[(BoundaryReferentOwner, Vec<BoundaryTag>)] {
-        &self.owner_bands
-    }
-
-    /// Each admitted immediate tag paired with the class the `class` helper
-    /// must report for it.
-    ///
-    /// ⛔ **Not a node class.** See [`BoundaryTag::immediate_value_class`] for
-    /// why this is a separate contract from [`BOUNDARY_TAG_CLASS_RELATION`]. A
-    /// tag absent from this relation has no classification, and the emitted
-    /// helper fails closed on it rather than defaulting.
-    pub(crate) fn immediate_value_classes(&self) -> &[(BoundaryTag, BoundaryClass)] {
-        &self.immediate_value_classes
-    }
-
-    /// The normalized handle `BoundaryTag → set<BoundaryClass>` relation — what
-    /// may be written into a **node's** `NODE_CLASS`.
-    ///
-    /// ⛔ **This is the emitted allocator's sole authority for the relation**,
-    /// and it is derived from `BoundaryOutcome::HandleWord` in the one
-    /// partition sweep. `ImmediateWord` is excluded by construction: an
-    /// immediate has no node, so it has no node class. A tag with no row here
-    /// admits nothing, and the allocator's fold is seeded with the empty mask so
-    /// that absence is `BOUNDARY_ERR_RELATION` on its own rather than something
-    /// an earlier guard has to make unreachable.
-    pub(crate) fn handle_class_relation(&self) -> &[(BoundaryTag, Vec<BoundaryClass>)] {
-        &self.handle_class_relation
-    }
-
-    /// The tags published under one owner — empty if the partition publishes
-    /// none, which is a legitimate answer and not a missing entry.
-    pub(crate) fn tags_owned_by(&self, owner: BoundaryReferentOwner) -> &[BoundaryTag] {
-        self.owner_bands
-            .iter()
-            .find(|(band, _)| *band == owner)
-            .map(|(_, tags)| tags.as_slice())
-            .unwrap_or(&[])
-    }
-}
-
-impl BoundaryEmissionPlan {
-    /// Build a plan from already-derived class and tag sets.
-    ///
-    /// ⛔ There is deliberately **no** whole-admitted-class set here. One was
-    /// carried for a while and no emitted helper ever read it — `rustc` said so
-    /// on every lib build (`method admitted_classes is never used`). A derived
-    /// set with no production consumer is a declaration, and `RULING R3` is
-    /// explicit that a declaration does not discharge the predicate. The
-    /// per-storage-shape sets below are the ones the emitter actually uses.
-    ///
-    /// ⛔ Crate-private and unexported: the only caller is the derivation in
-    /// `cranelift_backend::lowering`, so a second hand-written plan cannot
-    /// appear beside the helper bodies.
-    pub(crate) fn new(
-        int_magnitude_classes: Vec<BoundaryClass>,
-        byte_span_classes: Vec<BoundaryClass>,
-        tags: BoundaryTagAdmission,
-    ) -> Self {
-        BoundaryEmissionPlan {
-            int_magnitude_classes,
-            byte_span_classes,
-            tags,
-        }
-    }
-
-    /// The tag sets the emitted helpers branch on.
-    pub(crate) fn tags(&self) -> &BoundaryTagAdmission {
-        &self.tags
-    }
-
-    /// The classes a limb-storage helper may touch.
-    pub(crate) fn int_magnitude_classes(&self) -> &[BoundaryClass] {
-        &self.int_magnitude_classes
-    }
-
-    /// The classes a byte-span helper may touch.
-    pub(crate) fn byte_span_classes(&self) -> &[BoundaryClass] {
-        &self.byte_span_classes
-    }
-}
-
 // ---------------------------------------------------------------------------
 // The tag × class relation
 // ---------------------------------------------------------------------------
@@ -667,7 +505,8 @@ impl BoundaryEmissionPlan {
 ///
 /// Immediate tags are absent by construction — they have no node, so they have
 /// no class.
-pub(crate) const BOUNDARY_TAG_CLASS_RELATION: &[(BoundaryTag, &[BoundaryClass])] = &[
+#[doc(hidden)]
+pub const BOUNDARY_TAG_CLASS_RELATION: &[(BoundaryTag, &[BoundaryClass])] = &[
     (
         BoundaryTag::PersistentGround,
         // The ground classes plus the spill arm: an `Int` too wide for the
@@ -720,7 +559,8 @@ pub(crate) const BOUNDARY_TAG_CLASS_RELATION: &[(BoundaryTag, &[BoundaryClass])]
 /// `Closure` / `DeclarationClosure` remain `FailClosedForbidden`, and no
 /// `RepresentedHandle { PersistentClosure, Closure }` may be restored — the
 /// point is a recognition/admission split, not a revived capability.
-pub(crate) const BOUNDARY_RETIRED_LANES: &[(BoundaryTag, BoundaryClass)] =
+#[doc(hidden)]
+pub const BOUNDARY_RETIRED_LANES: &[(BoundaryTag, BoundaryClass)] =
     &[(BoundaryTag::PersistentClosure, BoundaryClass::Closure)];
 
 /// Whether this `(tag, class)` pair names a retired lane.
@@ -729,35 +569,11 @@ pub(crate) const BOUNDARY_RETIRED_LANES: &[(BoundaryTag, BoundaryClass)] =
 /// retired"* — it is **not** a malformed pair. `PersistentClosure + Bool` is
 /// malformed and answers `false`, keeping its [`BOUNDARY_ERR_RELATION`]
 /// diagnostic; only the exactly-paired lane reaches this.
-pub(crate) fn boundary_lane_is_retired(tag: BoundaryTag, class: BoundaryClass) -> bool {
+#[doc(hidden)]
+pub fn boundary_lane_is_retired(tag: BoundaryTag, class: BoundaryClass) -> bool {
     BOUNDARY_RETIRED_LANES
         .iter()
         .any(|(retired_tag, retired_class)| *retired_tag == tag && *retired_class == class)
-}
-
-/// The tags that are **recognized but carry no admitted lane**, given the
-/// partition's admitted tag set (`RT-FNSPLIT-C1` `D5`).
-///
-/// ⛔ **Derived from BOTH authorities at every call site, never written down.**
-/// A tag is retired exactly when it names a retired lane *and* the live
-/// partition admits it nowhere — so a tag that still has one surviving admitted
-/// lane is **not** reported here, because such a tag is genuinely admitted and
-/// refusing it by name would be the inverse error.
-///
-/// ⭐ **Why this is a function of the plan and not a seventh field on
-/// [`BoundaryTagAdmission`].** Every emitted helper already holds the plan's
-/// admitted set; taking it as an argument means each mutation fixture derives
-/// its retired set from *its own* admitted set rather than from a hand-written
-/// list that would drift into a second authority — which is the defect the
-/// whole partition-derived plan exists to avoid.
-pub(crate) fn boundary_retired_tags(admitted: &[BoundaryTag]) -> Vec<BoundaryTag> {
-    let mut tags: Vec<BoundaryTag> = Vec::new();
-    for (retired_tag, _) in BOUNDARY_RETIRED_LANES {
-        if !admitted.contains(retired_tag) && !tags.contains(retired_tag) {
-            tags.push(*retired_tag);
-        }
-    }
-    tags
 }
 
 /// Whether the ABI admits this `(tag, class)` pair, per the Rust mirror.
@@ -768,7 +584,8 @@ pub(crate) fn boundary_retired_tags(admitted: &[BoundaryTag]) -> Vec<BoundaryTag
 /// ⚠ **A retired lane is RECOGNIZED but NOT admitted**, so this still answers
 /// `false` for `(PersistentClosure, Closure)`. Recognition governs which
 /// *diagnostic* a refusal carries; it never widens what is admitted.
-pub(crate) fn boundary_relation_admits(tag: BoundaryTag, class: BoundaryClass) -> bool {
+#[doc(hidden)]
+pub fn boundary_relation_admits(tag: BoundaryTag, class: BoundaryClass) -> bool {
     // ⛔ Recognition first, admission second — the retired lane is in the
     // schema below **precisely so it can be named**, and reading the schema
     // alone would therefore report it as admitted. That is the inversion this
@@ -1702,7 +1519,7 @@ impl BoundaryRegion {
     /// the guard — it is the "pin that never exercises the violating mechanism"
     /// shape again. This injects the corruption directly, which is the only way
     /// to ask the question at all.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn poke_node_field(&mut self, index: u64, offset: i32, value: u64) {
         let base = index as usize * NODE_WORDS;
         self.nodes[base + (offset as usize / 8)] = value;
@@ -2239,7 +2056,7 @@ impl BoundaryValueStore {
     /// the store did not grant, which is what keeps this from being a second,
     /// unaccountable heap.
     /// The persistent image, mutably — **fault injection, tests only.**
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-hooks"))]
     pub fn image_mut(&mut self) -> &mut BoundaryPersistentImage {
         &mut self.image
     }
@@ -2980,7 +2797,8 @@ impl BoundaryValueStore {
     /// adoption. This is the native-observation inverse of materialization,
     /// not a lowering conversion: generated code still never converts a
     /// carried word back into a specialized value.
-    pub(crate) fn observe_adopted_ground(
+    #[doc(hidden)]
+    pub fn observe_adopted_ground(
         &self,
         word: BoundaryWord,
     ) -> Option<RuntimeGroundValue> {
@@ -3104,8 +2922,9 @@ impl BoundaryValueStore {
     /// node's minted identity back out of the image. It exists because
     /// *"adoption returned `Err`"* and *"adoption left no slot behind"* are
     /// different claims, and only the second is what `AC-V5` requires.
-    #[cfg(test)]
-    pub(crate) fn node_slot_of(&self, index: u64) -> Option<u64> {
+    #[cfg(any(test, feature = "test-hooks"))]
+    #[doc(hidden)]
+    pub fn node_slot_of(&self, index: u64) -> Option<u64> {
         self.image.0.node_field(index, NODE_SLOT)
     }
 
@@ -3118,8 +2937,9 @@ impl BoundaryValueStore {
     /// field of the emitted image — and "no producer sets it today" is a claim
     /// about callers, not about reachability, which is the distinction `AC-V4`
     /// already turns on.
-    #[cfg(test)]
-    pub(crate) fn install_node_slot_for_test(&mut self, index: u64, slot: SlotId) {
+    #[cfg(any(test, feature = "test-hooks"))]
+    #[doc(hidden)]
+    pub fn install_node_slot_for_test(&mut self, index: u64, slot: SlotId) {
         self.image.0.set_node_slot(index, slot);
     }
 
@@ -3586,7 +3406,8 @@ fn decode_invocation_child(
 /// - a node already **black** is sharing, which is legal and is decoded once;
 /// - deep valid data therefore costs arena nodes, **not host stack frames**, so
 ///   a legitimately deep aggregate cannot overflow the decoder.
-pub(crate) fn decode_invocation_ground(
+#[doc(hidden)]
+pub fn decode_invocation_ground(
     arena: &BoundaryArenaV1,
     store: &mut BoundaryValueStore,
     word: BoundaryWord,

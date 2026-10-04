@@ -5,8 +5,8 @@
 //! arena.** [`crate::native_int::NativeIntArenaV1`] and
 //! [`crate::boundary_value::BoundaryArenaV1`] are different runtime objects with
 //! different layouts and different ownership; a single `arena` binding that
-//! served both was a false equality, retracted in
-//! [`crate::cranelift_backend`]'s `carrier_arena` accessor.
+//! served both was a false equality; the compiler's `carrier_arena` accessor
+//! no longer shares the two arenas.
 //!
 //! ## What this record is, and what it deliberately is not
 //!

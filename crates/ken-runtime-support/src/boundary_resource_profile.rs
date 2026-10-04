@@ -244,9 +244,8 @@ impl BoundaryResourceProfileV3 {
 /// not each invent a different one and call that agreement.
 ///
 /// ⚠ Nothing consumes it implicitly: every packaging call still passes a profile
-/// explicitly, and omitting one is refused at
-/// [`crate::object_linker_packaging::ObjectLinkerPackagingStage::ResourceProfile`]
-/// before anything is emitted. ⛔ If this were reachable as a fallback it would
+/// explicitly, and omitting one is refused by the compiler's object-linker
+/// packaging stage before anything is emitted. ⛔ If this were reachable as a fallback it would
 /// be the banned default wearing a constructor's name.
 pub const fn starter_smoke_profile() -> BoundaryResourceProfileV3 {
     BoundaryResourceProfileV3 {

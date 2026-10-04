@@ -2718,7 +2718,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // does not restate the authority and cannot reach it (`BoundaryInput` is
     // private to `cranelift_backend::lowering`). Ruled in scope and required by
     // the Architect: production codegen consumption is not `B2F` activation.
-    let boundary_plan = crate::boundary_value::BoundaryEmissionPlan::derive();
+    let boundary_plan = crate::boundary_emission_plan::BoundaryEmissionPlan::derive();
     // ⭐ `RT-FNSPLIT-C1` `AC-C8` — the emitted graph's result is **consumed**,
     // not bound to `_`. ⚠ Labelled honestly: this is *necessary, not
     // sufficient*. Consuming the handle only proves the helpers are reachable;

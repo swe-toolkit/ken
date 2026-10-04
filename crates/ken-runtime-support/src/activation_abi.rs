@@ -170,7 +170,7 @@ pub struct KenSelectedCallFailureV1 {
     fault: IssuerTerminalFaultV1,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-hooks"))]
 thread_local! {
     static COPIED_OLD_TICKET_AT_ISSUE: std::cell::Cell<Option<SelectedCallTicketV1>> =
         const { std::cell::Cell::new(None) };
@@ -184,8 +184,9 @@ thread_local! {
         const { std::cell::Cell::new(0) };
 }
 
-#[cfg(test)]
-pub(crate) fn with_replayed_spent_slot_ticket<T>(action: impl FnOnce() -> T) -> (T, usize) {
+#[cfg(any(test, feature = "test-hooks"))]
+#[doc(hidden)]
+pub fn with_replayed_spent_slot_ticket<T>(action: impl FnOnce() -> T) -> (T, usize) {
     REPLAY_SPENT_SLOT_TICKET.with(|cell| assert!(!cell.replace(true)));
     FIRST_SPENT_SLOT_TICKET.with(|cell| cell.set(None));
     REPLAY_SPENT_SLOT_APPLICATIONS.with(|cell| cell.set(0));
@@ -196,8 +197,9 @@ pub(crate) fn with_replayed_spent_slot_ticket<T>(action: impl FnOnce() -> T) -> 
     (outcome, applications)
 }
 
-#[cfg(test)]
-pub(crate) fn with_copied_old_ticket_at_issue<T>(
+#[cfg(any(test, feature = "test-hooks"))]
+#[doc(hidden)]
+pub fn with_copied_old_ticket_at_issue<T>(
     old: SelectedCallTicketV1,
     action: impl FnOnce() -> T,
 ) -> (T, usize) {
@@ -236,7 +238,7 @@ pub unsafe extern "C" fn ken_selected_call_v1_issue(
     }
     match issuer.issue(SelectedCallTargetV1 { body, callee }) {
         Ok(ticket) => {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-hooks"))]
             let ticket = COPIED_OLD_TICKET_AT_ISSUE.with(|cell| match cell.get() {
                 Some(old) => {
                     COPIED_OLD_TICKET_APPLICATIONS.with(|count| count.set(count.get() + 1));
@@ -244,7 +246,7 @@ pub unsafe extern "C" fn ken_selected_call_v1_issue(
                 }
                 None => ticket,
             });
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-hooks"))]
             let ticket = if REPLAY_SPENT_SLOT_TICKET.with(std::cell::Cell::get) {
                 FIRST_SPENT_SLOT_TICKET.with(|cell| match cell.get() {
                     None => { cell.set(Some(ticket)); ticket }
