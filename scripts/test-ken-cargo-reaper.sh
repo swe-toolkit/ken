@@ -5,6 +5,13 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
 
+assert_dir() {
+  [[ -d "$1" ]] || { echo "expected directory: $1" >&2; exit 1; }
+}
+assert_absent() {
+  [[ ! -e "$1" ]] || { echo "expected path to be reaped: $1" >&2; exit 1; }
+}
+
 mkdir -p "$scratch/tmp/ken-runtime-old" \
   "$scratch/tmp/ken-runtime-new" \
   "$scratch/tmp/rt-scalar-ac0" \
@@ -41,14 +48,17 @@ for _ in {1..100}; do
   sleep 0.02
 done
 [[ -e "$scratch/waiting-for-lock" ]]
-[[ -d "$scratch/tmp/ken-runtime-old" ]]
-[[ -d "$scratch/tmp/rt-scalar-ac0" ]]
+if [[ ! -d "$scratch/tmp/ken-runtime-old" ]]; then
+  echo 'reaper ran before the build lock was acquired' >&2
+  exit 1
+fi
+assert_dir "$scratch/tmp/rt-scalar-ac0"
 "$real_flock" -u 9
 wait "$wrapper"
 
 # Once the exclusive lock is acquired, old named scratch is reaped, while
 # unrelated evidence and recent scratch survive.
-[[ ! -e "$scratch/tmp/ken-runtime-old" ]]
-[[ -d "$scratch/tmp/rt-scalar-ac0" ]]
-[[ -d "$scratch/tmp/ken-runtime-new" ]]
+assert_absent "$scratch/tmp/ken-runtime-old"
+assert_dir "$scratch/tmp/rt-scalar-ac0"
+assert_dir "$scratch/tmp/ken-runtime-new"
 printf 'ken-cargo reaper: passed\n'
