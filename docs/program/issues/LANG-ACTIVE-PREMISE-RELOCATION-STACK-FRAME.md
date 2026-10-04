@@ -1,7 +1,7 @@
 ---
 id: LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME
 title: "relocate_active_premise_term spends about 22.5 KB of stack per level of the term it walks, so relocating a deep checked term during a nested dependent match overflows the 2 MiB test worker: the Vector package with the lookup_zip_with proof needs 2.56 MiB against 2 MiB on main. Cut the per-level cost so the walk's stack does not scale with that frame size"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T1
