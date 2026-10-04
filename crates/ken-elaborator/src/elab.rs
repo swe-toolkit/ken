@@ -4561,25 +4561,48 @@ fn apply_zero_arity_preconditions(
     }
 }
 
+/// The checked global at a call head, before zero-arity premise insertion.
+/// Probing a call for its precondition arity must not raise a call-site
+/// obligation: a declined probe falls through to generic application, which
+/// infers the head again and would raise the same premise a second time.
+fn infer_unpremised_global_head(
+    cx: &mut ElabCtx<'_>,
+    head: &RExpr,
+) -> Result<Option<(GlobalId, Term, Term)>, ElabError> {
+    let (core, ty) = match head {
+        RExpr::RCheckedGlobal { name, id, .. } => {
+            let id = *id;
+            if cx.env.constructor(id).is_some() || cx.env.inductive(id).is_some() {
+                return Ok(None);
+            }
+            let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "no checked type for imported global '{name}' {id:?}"
+                ))
+            })?;
+            (Term::const_(id, vec![]), ty.clone())
+        }
+        // Surface eliminators such as `J` can be unresolved RCons until their
+        // dedicated application arm sees the complete arity. Do not infer an
+        // arbitrary head while probing for call-site metadata.
+        RExpr::RCon(name, span) if cx.globals.contains_key(name) => {
+            infer_spelling_global(cx, name, span)?
+        }
+        _ => return Ok(None),
+    };
+    let Term::Const { id, .. } = &core else {
+        return Ok(None);
+    };
+    Ok(Some((*id, core, ty)))
+}
+
 fn infer_preconditioned_application(
     cx: &mut ElabCtx<'_>,
     expr: &RExpr,
     span: &Span,
 ) -> Result<Option<(Term, Term)>, ElabError> {
     let (head, arguments) = call_application_spine(expr);
-    let resolvable_global = match head {
-        RExpr::RCheckedGlobal { .. } => true,
-        RExpr::RCon(name, _) => cx.globals.contains_key(name),
-        _ => false,
-    };
-    if !resolvable_global {
-        // Surface eliminators such as `J` can be unresolved RCons until their
-        // dedicated application arm sees the complete arity. Do not infer an
-        // arbitrary head while probing for call-site metadata.
-        return Ok(None);
-    }
-    let (head_core, mut ty) = infer(cx, head)?;
-    let Term::Const { id, .. } = head_core else {
+    let Some((id, head_core, mut ty)) = infer_unpremised_global_head(cx, head)? else {
         return Ok(None);
     };
     let Some((parameter_arity, requires_arity)) = cx.preconditions.get(&id).copied() else {
@@ -4608,16 +4631,7 @@ fn append_saturated_preconditions(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let (head, arguments) = call_application_spine(expr);
-    let resolvable_global = match head {
-        RExpr::RCheckedGlobal { .. } => true,
-        RExpr::RCon(name, _) => cx.globals.contains_key(name),
-        _ => false,
-    };
-    if !resolvable_global {
-        return Ok(call);
-    }
-    let (head_core, _) = infer(cx, head)?;
-    let Term::Const { id, .. } = head_core else {
+    let Some((id, _, _)) = infer_unpremised_global_head(cx, head)? else {
         return Ok(call);
     };
     let Some((parameter_arity, requires_arity)) = cx.preconditions.get(&id).copied() else {

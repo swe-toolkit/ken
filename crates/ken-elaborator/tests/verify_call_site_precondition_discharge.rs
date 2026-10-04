@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
-use ken_interp::{eval, EvalStore, EvalVal};
+use ken_interp::{EvalStore, EvalVal, eval};
 use ken_kernel::GlobalId;
 
 fn trusted(env: &ElabEnv) -> HashSet<GlobalId> {
@@ -297,5 +297,39 @@ fn partial_spine_gets_no_precondition_insertion() {
         trusted(&env),
         before,
         "partial spine minted no Requires hole"
+    );
+}
+
+/// MEASURED: a zero-parameter contract whose result is a function, applied at
+/// a call, reports exactly one Requires hole, and the trusted-base delta is
+/// that hole. CLAIMED: probing the call head for its precondition arity raises
+/// no obligation of its own. THE GAP: on `02d2610` this caller reported two
+/// Requires holes for one premise, because the declined probe had already
+/// raised one before generic application raised it again.
+#[test]
+fn applied_zero_parameter_contract_raises_one_call_site_obligation() {
+    let mut env = ElabEnv::new().expect("numeric prelude");
+    let before = trusted(&env);
+    let results = env
+        .elaborate_file_v1(
+            "const k : Int -> Int requires Equal Int 0 0 = \\m. m\n\
+             fn g (x : Int) : Int = k x",
+        )
+        .expect("caller elaborates with one open precondition");
+    let [_, g] = results.as_slice() else {
+        panic!("the file contains the callee and caller")
+    };
+    only_requires(g);
+    let reported = g
+        .obligations
+        .iter()
+        .map(|obligation| obligation.hole_id)
+        .collect::<HashSet<_>>();
+    assert_eq!(
+        trusted(&env)
+            .difference(&before)
+            .copied()
+            .collect::<HashSet<_>>(),
+        reported
     );
 }
