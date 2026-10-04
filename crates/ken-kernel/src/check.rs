@@ -54,9 +54,14 @@ fn raw_wf(ctx: &Context, t: &Term, offset: usize) -> KernelResult<()> {
             raw_wf(ctx, val, offset)?;
             raw_wf(ctx, body, offset + 1)
         }
-        Term::App(f, a) | Term::Pair(f, a) | Term::Ascript(f, a) | Term::Quot(f, a) => {
+        Term::App(f, a) | Term::Pair(f, a) | Term::Ascript(f, a) => {
             raw_wf(ctx, f, offset)?;
             raw_wf(ctx, a, offset)
+        }
+        Term::Quot(a, r, e) => {
+            raw_wf(ctx, a, offset)?;
+            raw_wf(ctx, r, offset)?;
+            raw_wf(ctx, e, offset)
         }
         Term::Proj1(p)
         | Term::Proj2(p)
@@ -434,10 +439,20 @@ pub fn infer(env: &GlobalEnv, ctx: &Context, t: &Term) -> KernelResult<Term> {
             Ok((**b_ty).clone())
         }
         Term::J(m, d, e) => infer_j(env, ctx, m, d, e),
-        Term::Quot(a, r) => {
-            // `A / R : Type l` for `R : A → A → Ω` (`16 §5`).
+        Term::Quot(a, r, e) => {
+            // `A / R / e : Type l` for `R : A → A → Ω_l` and
+            // `e : IsEquiv A R` (`16 §5`).
             let l = synth_type(env, ctx, a)?;
-            check_quotient_rel(env, ctx, a, r)?;
+            check_quotient_rel(env, ctx, a, r, &l)?;
+            let equiv = quotient_equivalence_type(a, r);
+            // Relation formation already pins its Ω level to l. Classify the
+            // derived type to validate every Π/Σ component before checking e.
+            if !matches!(classify(env, ctx, &equiv)?, Sort::Omega(_)) {
+                return Err(KernelError::BadEliminator(
+                    "quotient equivalence proposition is not in Ω".into(),
+                ));
+            }
+            check(env, ctx, e, &equiv)?;
             Ok(Term::Type(l))
         }
         Term::Trunc(a) => {
@@ -595,7 +610,7 @@ pub fn check(env: &GlobalEnv, ctx: &Context, t: &Term, ty: &Term) -> KernelResul
             // `[a] : A / R`  iff  `a : A` (`16 §5`).
             let ty_w = whnf(env, ctx, ty);
             match &ty_w {
-                Term::Quot(a_ty, _r) => check(env, ctx, a, a_ty),
+                Term::Quot(a_ty, _r, _e) => check(env, ctx, a, a_ty),
                 _ => Err(KernelError::TypeMismatch {
                     expected: Box::new(ty.clone()),
                     found: Box::new(ty_w.clone()),
@@ -937,20 +952,55 @@ fn infer_j(
     ))
 }
 
-/// Check `R : A → A → Ω` (the quotient relation, `16 §5`): infer `R`'s type and
-/// verify the Π–Π–Ω shape with the first domain ≡ `A`. (The second domain is
-/// `A` under the first binder; a strict check needs a context shift, so only the
-/// shape and first domain are verified — sound for well-elaborated input.)
-fn check_quotient_rel(env: &GlobalEnv, ctx: &Context, a: &Term, r: &Term) -> KernelResult<()> {
+/// `IsEquiv A R` as a proof-irrelevant conjunction of reflexivity, symmetry
+/// and transitivity. All three components are in `Ω_l`; `R` is checked first.
+fn quotient_equivalence_type(a: &Term, r: &Term) -> Term {
+    let related = |depth: i64, x: usize, y: usize| {
+        apply_args(weaken(r, depth), &[Term::var(x), Term::var(y)])
+    };
+    let reflexive = Term::pi(a.clone(), related(1, 0, 0));
+    let symmetric = Term::pi(
+        a.clone(),
+        Term::pi(weaken(a, 1), Term::pi(related(2, 1, 0), related(3, 1, 2))),
+    );
+    let transitive = Term::pi(
+        a.clone(),
+        Term::pi(
+            weaken(a, 1),
+            Term::pi(
+                weaken(a, 2),
+                Term::pi(
+                    related(3, 2, 1),
+                    Term::pi(related(4, 2, 1), related(5, 4, 2)),
+                ),
+            ),
+        ),
+    );
+    Term::sigma(
+        reflexive,
+        Term::sigma(weaken(&symmetric, 1), weaken(&transitive, 2)),
+    )
+}
+
+/// Check both relation domains at `A`, and the codomain at exactly the
+/// carrier's universe level. The context extensions keep open relations and
+/// non-constant telescopes from bypassing formation (`16 §5`).
+fn check_quotient_rel(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a: &Term,
+    r: &Term,
+    level: &Level,
+) -> KernelResult<()> {
     let r_ty = infer(env, ctx, r)?;
-    let cod1 = match &whnf(env, ctx, &r_ty) {
+    let cod1 = match whnf(env, ctx, &r_ty) {
         Term::Pi(dom1, cod1) => {
-            if !convert_type(env, ctx, dom1, a) {
+            if !convert_type(env, ctx, &dom1, a) {
                 return Err(KernelError::BadEliminator(
                     "quotient relation's first domain ≠ A".into(),
                 ));
             }
-            (**cod1).clone()
+            cod1
         }
         _ => {
             return Err(KernelError::BadEliminator(
@@ -958,16 +1008,29 @@ fn check_quotient_rel(env: &GlobalEnv, ctx: &Context, a: &Term, r: &Term) -> Ker
             ))
         }
     };
-    let cod2 = match &whnf(env, ctx, &cod1) {
-        Term::Pi(_, cod2) => (**cod2).clone(),
+    let mut first_ctx = ctx.clone();
+    first_ctx.push(a.clone());
+    let cod2 = match whnf(env, &first_ctx, &cod1) {
+        Term::Pi(dom2, cod2) => {
+            if !convert_type(env, &first_ctx, &dom2, &weaken(a, 1)) {
+                return Err(KernelError::BadEliminator(
+                    "quotient relation's second domain ≠ A".into(),
+                ));
+            }
+            cod2
+        }
         _ => {
             return Err(KernelError::BadEliminator(
                 "quotient relation is not of type A → A → Ω".into(),
             ))
         }
     };
-    match &whnf(env, ctx, &cod2) {
-        Term::Omega(_) => Ok(()),
+    first_ctx.push(weaken(a, 1));
+    match whnf(env, &first_ctx, &cod2) {
+        Term::Omega(rel_level) if level_eq(&rel_level, level) => Ok(()),
+        Term::Omega(_) => Err(KernelError::BadEliminator(
+            "quotient relation's Ω level ≠ carrier level".into(),
+        )),
         _ => Err(KernelError::BadEliminator(
             "quotient relation's codomain is not Ω".into(),
         )),
@@ -990,7 +1053,7 @@ fn infer_quot_elim(
     let scrut_ty = infer(env, ctx, scrut)?;
     let scrut_whnf = whnf(env, ctx, &scrut_ty);
     let (underlying_a, opt_rel) = match scrut_whnf {
-        Term::Quot(a, r) => (*a, Some(*r)),
+        Term::Quot(a, r, _e) => (*a, Some(*r)),
         Term::Trunc(a) => (*a, None),
         _ => {
             return Err(KernelError::BadEliminator(
@@ -1017,9 +1080,9 @@ fn infer_quot_elim(
     };
     // Motive codomain sort ⇒ target kind (§5):
     //   Ω_l ⇒ respect-free (Ω-PI); Type ℓ ⇒ verify cong/cast schema (§5.1).
-    let type_target = match whnf(env, ctx, &m_cod) {
-        Term::Omega(_) => false,
-        Term::Type(_) => true,
+    let target_level = match whnf(env, ctx, &m_cod) {
+        Term::Omega(_) => None,
+        Term::Type(level) => Some(level),
         _ => {
             return Err(KernelError::BadEliminator(
                 "motive's codomain is not a type (Type ℓ' or Ω_l)".into(),
@@ -1033,9 +1096,10 @@ fn infer_quot_elim(
     );
     check(env, ctx, method, &expected_method_ty)?;
     // Respect proof.
-    if type_target {
-        // §5.1 cong/cast schema: r must have type
-        //   (x:A) → (y:A) → (h:R x y) → Eq(M[x])(f x)(cast M[x] M[y] refl(M[x]) (f y))
+    if let Some(target_level) = target_level {
+        // §5.1: r must prove the checked dependent congruence/transport
+        // schema. The class equality h' is h at the restored quotient-Eq
+        // reduct; cong M h' runs J, then symmetry transports f y to M[x].
         // Requires a proper Quot (not Trunc).
         let rel = match opt_rel {
             Some(r) => r,
@@ -1048,16 +1112,49 @@ fn infer_quot_elim(
         // depth 3: x=Var(2), y=Var(1), h=Var(0) under (x:A)(y:A)(h:R x y)
         let x_class = Term::QuotClass(Box::new(Term::var(2)));
         let y_class = Term::QuotClass(Box::new(Term::var(1)));
-        let m_x = Term::app(weaken(motive, 3), x_class);
-        let m_y = Term::app(weaken(motive, 3), y_class);
+        let m_x = Term::app(weaken(motive, 3), x_class.clone());
+        let m_y = Term::app(weaken(motive, 3), y_class.clone());
         let f_x = Term::app(weaken(method, 3), Term::var(2));
         let f_y = Term::app(weaken(method, 3), Term::var(1));
-        // Transport f_y from M[y] (its type) to M[x] (the Eq's required RHS type).
-        // Source = M[y], target = M[x]; cast ignores the proof (§3.4).
+        let quot_ty = weaken(&scrut_ty, 3);
+        let class_eq = Term::Eq(
+            Box::new(quot_ty.clone()),
+            Box::new(x_class.clone()),
+            Box::new(y_class),
+        );
+        // In Γ,x,y,h,z,p, the J motive gives Eq Type (M[x]) (M[z]).
+        let proof_domain = Term::Eq(
+            Box::new(weaken(&quot_ty, 1)),
+            Box::new(weaken(&x_class, 1)),
+            Box::new(Term::var(0)),
+        );
+        let cong_motive = Term::Ascript(
+            Box::new(Term::lam(
+                quot_ty.clone(),
+                Term::lam(
+                    proof_domain.clone(),
+                    Term::Eq(
+                        Box::new(Term::Type(target_level.clone())),
+                        Box::new(weaken(&m_x, 2)),
+                        Box::new(Term::app(weaken(motive, 5), Term::var(1))),
+                    ),
+                ),
+            )),
+            Box::new(Term::pi(
+                quot_ty,
+                Term::pi(proof_domain, Term::Omega(target_level.clone().suc())),
+            )),
+        );
+        let cong = Term::J(
+            Box::new(cong_motive),
+            Box::new(Term::Refl(Box::new(m_x.clone()))),
+            Box::new(Term::Ascript(Box::new(Term::var(0)), Box::new(class_eq))),
+        );
+        let sym_cong = crate::obs::type_eq_sym(&target_level, &m_x, &m_y, cong);
         let cast_fy = Term::Cast(
             Box::new(m_y.clone()),
             Box::new(m_x.clone()),
-            Box::new(Term::Refl(Box::new(m_y.clone()))),
+            Box::new(sym_cong),
             Box::new(f_y),
         );
         let eq_body = Term::Eq(Box::new(m_x), Box::new(f_x), Box::new(cast_fy));
@@ -1067,6 +1164,7 @@ fn infer_quot_elim(
             underlying_a.clone(),
             Term::pi(weaken(&underlying_a, 1), Term::pi(h_ty, eq_body)),
         );
+        classify(env, ctx, &expected)?;
         check(env, ctx, respect, &expected)?;
     } else {
         // Ω-target: respect-free by Ω-PI; well-formedness only.

@@ -322,8 +322,8 @@ pub enum Term {
     Cast(Box<Term>, Box<Term>, Box<Term>, Box<Term>),
     /// `J M d e` — `[K2]` derived eliminator (`15`).
     J(Box<Term>, Box<Term>, Box<Term>),
-    /// `A / R` — `[K2]` set-quotient (`16`).
-    Quot(Box<Term>, Box<Term>),
+    /// `A / R / e` — `[K2]` set-quotient with `e : IsEquiv A R` (`16 §5`).
+    Quot(Box<Term>, Box<Term>, Box<Term>),
     /// `[t]` — `[K2]` quotient class (`16`).
     QuotClass(Box<Term>),
     /// `elim_/ M f r q` — `[K2]` quotient eliminator (`16 §5`): motive `M`,
@@ -435,7 +435,7 @@ impl Term {
             Term::Eq(a, t, u) => vec![a, t, u],
             Term::Cast(a, b, e, t) => vec![a, b, e, t],
             Term::J(m, d, e) => vec![m, d, e],
-            Term::Quot(a, r) => vec![a, r],
+            Term::Quot(a, r, e) => vec![a, r, e],
             Term::QuotElim {
                 motive,
                 method,
@@ -500,7 +500,7 @@ impl fmt::Debug for Term {
             Term::Refl(t) => write!(f, "refl {:?}", t),
             Term::Cast(a, b, e, t) => write!(f, "cast {:?} {:?} {:?} {:?}", a, b, e, t),
             Term::J(m, d, e) => write!(f, "J {:?} {:?} {:?}", m, d, e),
-            Term::Quot(a, r) => write!(f, "{:?}/{:?}", a, r),
+            Term::Quot(a, r, e) => write!(f, "{:?}/{:?}/{:?}", a, r, e),
             Term::QuotClass(t) => write!(f, "[{:?}]", t),
             Term::QuotElim {
                 motive,
