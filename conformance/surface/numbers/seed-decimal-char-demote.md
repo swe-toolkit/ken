@@ -364,9 +364,10 @@ corrected forward obligation re-defers *there*, **not** to a
   (the decidable `inRangeBool` closed-interval `leq_int` check fires and
   rejects, under ruling (A)) — concretely for `0xD800`:
   `leq 0xD800 0xD7FF ⇒ false`, `leq 0xE000 0xD800 ⇒ false` →
-  `or_bool false false ⇒ false` → `IsTrue false ≡ Bottom` → **rejected, and it
-  *reduces*** (not a stuck neutral). The **non-degenerate pair** (surrogate/OOR
-  reject *while* valid accept) **flips against a stub `isScalar := true`**
+  transparent Bool elimination selects `False` in both intervals and in their
+  outer match → `IsTrue false ≡ Bottom` (not a stuck neutral). The
+  **non-degenerate pair** (surrogate/OOR reject *while* valid accept) **flips
+  against a stub `isScalar := true`**
   (which would give `Some` for `0xD800`/`0x110000` too).
 - why: AC-C3 — the refinement obligation must **actually reduce** (the decidable
   `inRangeBool` check fires and rejects), not name-match. A single valid-scalar
@@ -422,14 +423,13 @@ lawful-classes-lane WP — see the deferred section.
   Architect's Ω-encoding-lane hazard)** — `isScalar`'s **type** is
   `IsTrue <bool-expr>` (the sub-singleton bridge):
   `isScalar c := IsTrue (inRangeBool c)`, with `inRangeBool c` =
-  `(0 ≤? c && c ≤? 0xD7FF) || (0xE000 ≤? c && c ≤? 0x10FFFF)` (value-level
-  `&&`/`||`, i.e. `and_bool`/`or_bool`, over `leq_int`). The scalar set is
-  **irreducibly two disjoint intervals** (`[0,0xD7FF] ∪ [0xE000,0x10FFFF]`), so
-  `inRangeBool` **necessarily** contains **value-level** `or_bool`/`and_bool`/
-  `not_bool` composing the `leq_int` results — these **reduce** and are
-  **REQUIRED**; grepping them to zero **false-flags the only correct encoding**
-  (the 44 §3 over-strip shape —
-  [[grounding-a-fabricated-citation-two-failure-modes]]). The **FORBIDDEN** form
+  `(0 ≤? c && c ≤? 0xD7FF) || (0xE000 ≤? c && c ≤? 0x10FFFF)` at the
+  **value-level Bool**, implemented by transparent Bool elimination of the
+  `leq_int` results inside each interval and between intervals. The scalar
+  set is **irreducibly two disjoint intervals**
+  (`[0,0xD7FF] ∪ [0xE000,0x10FFFF]`); the Bool composition reduces on
+  closed literals without requiring opaque `and_bool`/`or_bool`. Its spelling
+  is not the discriminator. The **FORBIDDEN** form
   is a raw `∨`/`∃`/multi-ctor `Or`/`Sum` **as the *type* (sort Ω) of
   `isScalar`** — the discriminator is the **sort** of the disjunction
   (Bool-value inside `IsTrue` = fine; Ω-prop as the predicate former = the
