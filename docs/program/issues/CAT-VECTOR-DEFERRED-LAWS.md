@@ -1,7 +1,7 @@
 ---
 id: CAT-VECTOR-DEFERRED-LAWS
 title: "Prove the Vector laws spec 60 §5 defers: the lookup/map/zip_with cons computations, map fusion, lookup after map and after zip_with, and zip_with/map naturality, replacing the concrete Bool examples as the package's evidence"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -78,14 +78,17 @@ stop and report the mismatch; do not build around it.
 - `d0ba7efc3` (exact `09a3b9eda`): the pointwise `zip_with_map` (item 3),
   with Transport's `sym`/`trans`/`cong`. Foundation QA `evt_6ebxcc9ftsh84`,
   Architect `evt_678xkzzx27868`, Decision `dec_70vey7m6wysdt`.
-- Released: `lookup_zip_with` (item 2, deliverable 5), the last open law.
-  `LANG-SIBLING-GOAL-REFINEMENT` increment 2 merged `61fde2caf` and removed
-  the `elab.rs:3535` convoy overlap. Its elaborator fixture
-  `tests/fixtures/sibling_goal_refinement/lookup_zip_with.ken.md` checks
-  without axioms, but that is a test fixture, not `Vector.ken.md`. Start
-  from `61fde2caf`: state the law in `Vector.ken.md` with AC-1 and AC-3,
-  plus a well-typed mutation of `zip_with` or `lookup` for AC-2. The WP
-  closes when it lands.
+- `baac9fbf8` (exact `1f221aac5`, PR run 37220903807): `lookup_zip_with`
+  (item 2, deliverable 5), the last open law. Foundation QA
+  `evt_6v9gp4kn529mk`, Architect `evt_5b9cbt7fnw5rf`, Decision
+  `dec_1z2cm6bkasy7t`. It fits the default 2 MiB worker, the same minimum as
+  a one-declaration file, after `LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME`
+  (`8bf29cbc2`).
+
+## Closeout
+
+All six theorems are in `Vector.ken.md` with zero trust and no new export;
+the private inventory is 24. Successor: `CAT-JSON-LAWS`.
 
 ## Deliverable
 

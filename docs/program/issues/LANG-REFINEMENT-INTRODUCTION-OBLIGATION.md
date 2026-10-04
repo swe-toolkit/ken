@@ -145,9 +145,10 @@ base, stop and report the mismatch.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 2 (Architect `evt_5qg2098zmhd20` on stop `evt_4g6d57z5x6wqz`;
-`evt_62k15kkjw0818` on stop `evt_5b9ywyr5p5w32`). The 3rd advancing stop
-is a hold, research and §1b.
+§1a count: 3 (Architect `evt_5qg2098zmhd20` on stop `evt_4g6d57z5x6wqz`;
+`evt_62k15kkjw0818` on stop `evt_5b9ywyr5p5w32`; hold `evt_mf00284n2xk6`
+on stop `evt_186b4fyad5z8x`, pending a research prior-art advisory). The
+three entries are independent (Architect `evt_mf00284n2xk6`).
 
 1. A closed Int refinement obligation stays open. The kernel has no
    reduction for primitive `leq_int` on `IntLit` (keyed on primitive-Op
@@ -168,3 +169,14 @@ is a hold, research and §1b.
 2. A whole-body return obligation over a branchy body is undischargeable;
    keyed on obligation placement (whole term against per leaf). Ruled per
    leaf (`evt_62k15kkjw0818`).
+3. A refinement-introduction hole is minted in a context with no obligation
+   channel (standalone `elaborate_expr` and the REPL); keyed on the
+   elaboration context's sink, not on the obligation. It appeared on the
+   rebase onto `ca2855abd`, after `VERIFY-CALL-SITE-OBLIGATION-CHANNEL`
+   introduced `PremiseHoles`. The single minting site is
+   `emit_refinement_predicate`. Ruled (a) (`evt_3h5n5b9y0wzf`, on Research
+   `evt_6wfy5c9wpn849`): all four elaborator obligation-mint sites go
+   through one gate that refuses an undischarged hole in a Refused context,
+   and a discharged refinement there records nothing. The Adversary's `+`
+   and `/`/`%` arms (`evt_4jcsdc2rhwp5q`) fold into this WP. Respin from
+   `e8506c605`.
