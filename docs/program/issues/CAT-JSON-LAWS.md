@@ -1,7 +1,7 @@
 ---
 id: CAT-JSON-LAWS
 title: "json_size is checked only by one nested fixture. Prove its constructor equations over the existing six-constructor Json, so the fold is specified by theorems rather than by a test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -78,3 +78,20 @@ and §7 validation evidence to cite them.
   (for example in nested recursion through `List` or `Pair`): stop to the
   Architect with the failing declaration.
 - The package fails the default 2 MiB test worker after the addition.
+
+## Closeout
+
+Merged `4d22f8a5f` from exact `e7f091129` (PR #4499, run 37237871485).
+Foundation QA `evt_6vrek0z1m38f5`, Architect `evt_2m3njc6gmvpvk`, Decision
+`dec_69rnqc426wxrv`.
+
+- Nine private checked equations determine `json_size`: the four leaves, the
+  array and object nil and cons laws, and the `json_nat_add` successor lemma.
+- The proofs import the zero-trust `Core.Logic.Transport.{cong, sym}`.
+  `trusted_base()` and the public API are unchanged.
+- The first candidate, `77b6ee7ea`, failed CI on the two Tier-E consumer
+  pins in `cat_tier_e_json_import.rs`. The respin updated them: the import
+  ledger gains `cong` and `sym`, and the external closure reads Json's
+  constructors from the checked family as local.
+
+Successor on L3: `CAT-SYSTEM-RESOURCE-LAWS`.

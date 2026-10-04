@@ -1,7 +1,7 @@
 ---
 id: CAT-SYSTEM-RESOURCE-LAWS
 title: "System.Resource promises acquire-before-body, settle-after-body and a fixed body/release result ordering, but only two interpreter fixtures check it. Prove the bracket's sequencing and settlement ordering over the existing effect tree"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
