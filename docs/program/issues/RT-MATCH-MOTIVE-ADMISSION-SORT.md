@@ -6,7 +6,7 @@ owner: runtime
 size: M
 tier: T1
 gate: architect
-depends_on: [RT-CHECKED-JOIN-SITE-MATCH-POPULATION]
+depends_on: []
 blocks: []
 github: null
 origin: "Architect carry evt_37bbprs1gwajn in the RT-CHECKED-JOIN-SITE-MATCH-POPULATION AC-0 ruling: the second decoder with the same ascript-first assumption, explicitly not repaired by that node's shape fix, because admission needs the sort and a bare lambda does not carry it. Steward-filed per COORDINATION section 2. Measured at origin/main e771f7e7d."
@@ -37,9 +37,10 @@ for the classification.
     `UnsupportedDependentMotive`.
   - The `ConstantType` arm and the `UnsupportedProofOnlyMatch` refusal
     never see an elaborated motive.
-- The join-site shape fix in the parent node accepts the bare `lam` there,
-  because `record_match`'s answer-symbol head gate supplies the sort. That
-  fix must not be copied here: admission has no such gate.
+- The join-site shape fix (`a7d46d6f2`, never landed; its WP closed without
+  repair, `evt_1xj5yh86d75st`) accepted the bare `lam` only because
+  `record_match`'s answer-symbol head gate supplies the sort. Do not copy
+  it here: admission has no such gate.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
