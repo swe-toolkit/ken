@@ -767,7 +767,7 @@ fn eq_at_inductive(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term
 // cast-by-type (`16 §3.2`)
 // ===========================================================================
 
-/// A Σ or quotient cast may project `e.1`/`e.2` only if its Eq-at-Type arm
+/// A compound cast may project `e.1`/`e.2` only if its Eq-at-Type arm
 /// exposes a Σ of component equalities. Neutral Eq Type stays neutral.
 fn type_eq_has_components(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> bool {
     matches!(eq_at_type(env, ctx, a, b), Some(Term::Sigma(..)))
@@ -792,7 +792,9 @@ pub fn cast_reduce(
         return Some(t.clone());
     }
     match (a, b) {
-        (Term::Pi(a1, b1), Term::Pi(a2, b2)) => cast_at_pi(env, ctx, a1, b1, a2, b2, e, t),
+        (Term::Pi(a1, b1), Term::Pi(a2, b2)) if type_eq_has_components(env, ctx, a, b) => {
+            cast_at_pi(env, ctx, a1, b1, a2, b2, e, t)
+        }
         (Term::Sigma(a1, b1), Term::Sigma(a2, b2)) if type_eq_has_components(env, ctx, a, b) => {
             Some(cast_at_sigma(env, ctx, a1, b1, a2, b2, e, t))
         }
@@ -891,6 +893,65 @@ fn cast_at_sigma(
     Term::pair(p1_cast, p2_cast)
 }
 
+/// A family equality with at least one parameter/index exposes a right-nested
+/// telescope of exactly that many equality components. A singleton telescope
+/// is its Eq component, not a Σ. Unknown or incomplete decompositions cannot
+/// justify projections from the original equality witness.
+fn inductive_eq_has_telescope(
+    env: &GlobalEnv,
+    ctx: &Context,
+    a: &Term,
+    b: &Term,
+    fields: usize,
+) -> bool {
+    let Some(reduct) = eq_at_type(env, ctx, a, b) else {
+        return false;
+    };
+    let mut remainder = &reduct;
+    for _ in 1..fields {
+        let Term::Sigma(first, rest) = remainder else {
+            return false;
+        };
+        if !matches!(&**first, Term::Eq(..)) {
+            return false;
+        }
+        remainder = rest;
+    }
+    fields > 0 && matches!(remainder, Term::Eq(..))
+}
+
+/// A rebuilt constructor must actually inhabit the target family's indices.
+/// This checks each position after substituting the new parameters and all
+/// rebuilt constructor arguments, including template positions that did not
+/// contribute a forced argument in the index-inversion pass.
+#[allow(clippy::too_many_arguments)]
+fn constructor_indices_match_target(
+    env: &GlobalEnv,
+    ctx: &Context,
+    ind: &crate::env::InductiveDecl,
+    ctor: &crate::env::ConstructorDecl,
+    level_args: &[Level],
+    params: &[Term],
+    args: &[Term],
+    target: &[Term],
+) -> bool {
+    let m = ind.params.len();
+    let n = ctor.args.len();
+    ctor.target_indices.len() == target.len()
+        && ctor
+            .target_indices
+            .iter()
+            .zip(target)
+            .all(|(template, expected)| {
+                let instantiated = subst_levels(
+                    &subst_outer(template, m, params, n),
+                    &ind.level_params,
+                    level_args,
+                );
+                convert_type(env, ctx, &subst_tel(&instantiated, args), expected)
+            })
+}
+
 /// `cast (D Δp ī) (D Δp j̄) e (c_k ā) ⇝ c_k (cast A_1 A_1' eq_1 a_1, …)` — each
 /// constructor argument is transported from its `i`-bar type to its `j`-bar type
 /// (`16 §3.2`). The sub-equalities come from the `Eq Type (D ī) (D j̄)`
@@ -905,15 +966,21 @@ fn cast_at_inductive(
 ) -> Option<Term> {
     let (a_head, a_args) = peel_app(a);
     let (b_head, b_args) = peel_app(b);
-    let d_id = match a_head {
-        Term::IndFormer { id, .. } => id,
+    let (d_id, source_levels) = match a_head {
+        Term::IndFormer { id, level_args } => (id, level_args),
         _ => return None,
     };
-    let b_id = match b_head {
-        Term::IndFormer { id, .. } => id,
+    let (b_id, target_levels) = match b_head {
+        Term::IndFormer { id, level_args } => (id, level_args),
         _ => return None,
     };
-    if d_id != b_id {
+    if d_id != b_id
+        || source_levels.len() != target_levels.len()
+        || !source_levels
+            .iter()
+            .zip(target_levels.iter())
+            .all(|(source, target)| source.equiv(target))
+    {
         return None;
     }
     let ind = env.inductive(d_id)?;
@@ -972,6 +1039,18 @@ fn cast_at_inductive(
                 return None;
             }
             new_args.push(val.clone());
+        }
+        if !constructor_indices_match_target(
+            env,
+            ctx,
+            ind,
+            c,
+            &level_args,
+            b_param_args,
+            &new_args[m..],
+            &b_args[m..],
+        ) {
+            return None;
         }
         return Some(apply_args(
             Term::Constructor {
@@ -1160,6 +1239,23 @@ fn cast_at_inductive(
         };
         new_args.push(new_val);
         target_earlier.push(target_val);
+    }
+    // One index-path gate covers both the shape of the Eq Type telescope
+    // projected above and every rebuilt target index (including unchanged
+    // template positions). Neither condition alone establishes the other.
+    if !inductive_eq_has_telescope(env, ctx, a, b, a_args.len())
+        || !constructor_indices_match_target(
+            env,
+            ctx,
+            ind,
+            c,
+            &level_args,
+            b_param_args,
+            &target_earlier,
+            j_bar,
+        )
+    {
+        return None;
     }
     Some(apply_args(
         Term::Constructor {

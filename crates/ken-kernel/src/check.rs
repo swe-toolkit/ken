@@ -871,21 +871,58 @@ fn infer_j(
 ) -> KernelResult<Term> {
     // e : Eq A a b ⇒ use its recorded formation, or the old raw fallback.
     let (a_ty, a_idx, b_idx) = j_endpoints(env, ctx, eq)?;
-    // motive : (b:A) → (e':Eq A a b) → Type ℓ'. Verify the first domain ≡ A.
+    // motive : (b:A) → (e':Eq A a b) → Type ℓ' (or Ω ℓ').
+    // The second binder depends on b; checking only the first Π would allow
+    // an arbitrary domain there and an ill-classified inferred J result.
     let m_ty = infer(env, ctx, motive)?;
-    match &whnf(env, ctx, &m_ty) {
-        Term::Pi(m_dom, _) => {
-            if !convert_type(env, ctx, m_dom, &a_ty) {
-                return Err(KernelError::BadEliminator(
-                    "J motive's first domain ≠ the equality's type A".into(),
-                ));
-            }
-        }
+    let (m_dom, m_cod) = match whnf(env, ctx, &m_ty) {
+        Term::Pi(dom, cod) => (dom, cod),
         _ => {
             return Err(KernelError::BadEliminator(
                 "J motive is not a Π over A".into(),
             ))
         }
+    };
+    if !convert_type(env, ctx, &m_dom, &a_ty) {
+        return Err(KernelError::BadEliminator(
+            "J motive's first domain ≠ the equality's type A".into(),
+        ));
+    }
+    let mut target_ctx = ctx.clone();
+    target_ctx.push(a_ty.clone());
+    let expected_eq = Term::Eq(
+        Box::new(weaken(&a_ty, 1)),
+        Box::new(weaken(&a_idx, 1)),
+        Box::new(Term::var(0)),
+    );
+    let (m_eq_dom, m_result) = match whnf(env, &target_ctx, &m_cod) {
+        Term::Pi(dom, cod) => (dom, cod),
+        _ => {
+            return Err(KernelError::BadEliminator(
+                "J motive is not a Π over its equality".into(),
+            ))
+        }
+    };
+    if !convert_type(env, &target_ctx, &m_eq_dom, &expected_eq) {
+        return Err(KernelError::BadEliminator(
+            "J motive's second domain ≠ Eq A a b".into(),
+        ));
+    }
+    target_ctx.push(expected_eq.clone());
+    let sort = match whnf(env, &target_ctx, &m_result) {
+        Term::Type(level) => Term::Type(level),
+        Term::Omega(level) => Term::Omega(level),
+        _ => {
+            return Err(KernelError::BadEliminator(
+                "J motive's codomain is not a universe".into(),
+            ))
+        }
+    };
+    let expected_motive = Term::pi(a_ty.clone(), Term::pi(expected_eq, sort));
+    if !convert_type(env, ctx, &m_ty, &expected_motive) {
+        return Err(KernelError::BadEliminator(
+            "J motive's full type differs from its equality telescope".into(),
+        ));
     }
     // base : motive a (refl a).
     let base_ty = Term::app(
