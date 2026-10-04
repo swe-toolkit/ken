@@ -31,6 +31,8 @@ import Data.Collections.Derived (length)
 
 import Data.Numeric.Nat.Order (lt_nat)
 
+import Core.Logic.Transport (cong, sym)
+
 import Capability.Parsing.Cursor
   (CursorOps,
     MkCursorOps,
@@ -141,6 +143,81 @@ position without routing the proof-bearing core through a byte cursor.
 
 ## 4. Laws & proofs
 
+The four scalar constructors each have size one, as do empty arrays and
+objects. A successor on the right of `json_nat_add` can move outside the sum:
+induction on its left argument proves this because addition recurses there.
+For either non-empty collection, the tail's child sum is one less than the
+size of the collection containing it. The successor law relates that child
+sum to the size of the complete tail, including its collection constructor.
+The object equation counts the member's JSON value, not its string key.
+
+```ken
+theorem json_nat_add_right_suc
+      (m : Nat) (n : Nat)
+    : Equal Nat (json_nat_add m (Suc n)) (Suc (json_nat_add m n)) =
+  match m {
+    Zero ↦ Refl;
+    Suc rest ↦
+      cong
+        Nat
+        Nat
+        (json_nat_add rest (Suc n))
+        (Suc (json_nat_add rest n))
+        Suc
+        (json_nat_add_right_suc rest n)
+  }
+
+theorem json_size_null : Equal Nat (json_size JsonNull) (Suc Zero) = Proved
+
+theorem json_size_bool (flag : Bool) : Equal Nat (json_size (JsonBool flag)) (Suc Zero) = Proved
+
+theorem json_size_number (number : Int) : Equal Nat (json_size (JsonNumber number)) (Suc Zero) =
+  Proved
+
+theorem json_size_string (text : String) : Equal Nat (json_size (JsonString text)) (Suc Zero) =
+  Proved
+
+theorem json_size_array_nil : Equal Nat (json_size (JsonArray (Nil Json))) (Suc Zero) = Proved
+
+theorem json_size_object_nil
+    : Equal Nat (json_size (JsonObject (Nil (Pair String Json)))) (Suc Zero) =
+  Proved
+
+theorem json_size_array_cons
+      (child : Json) (rest : List Json)
+    : Equal Nat
+        (json_size (JsonArray (Cons Json child rest)))
+        (json_nat_add (json_size child) (json_size (JsonArray rest))) =
+  let rest_children_size =
+    match json_size (JsonArray rest) {
+      Zero ↦ Zero;
+      Suc children_size ↦ children_size
+    }
+  in
+    sym
+      Nat
+      (json_nat_add (json_size child) (json_size (JsonArray rest)))
+      (json_size (JsonArray (Cons Json child rest)))
+      (json_nat_add_right_suc (json_size child) rest_children_size)
+
+theorem json_size_object_cons
+      (key : String) (value : Json) (rest : List (Pair String Json))
+    : Equal Nat
+        (json_size (JsonObject (Cons (Pair String Json) (mk_pair String Json key value) rest)))
+        (json_nat_add (json_size value) (json_size (JsonObject rest))) =
+  let rest_children_size =
+    match json_size (JsonObject rest) {
+      Zero ↦ Zero;
+      Suc children_size ↦ children_size
+    }
+  in
+    sym
+      Nat
+      (json_nat_add (json_size value) (json_size (JsonObject rest)))
+      (json_size (JsonObject (Cons (Pair String Json) (mk_pair String Json key value) rest)))
+      (json_nat_add_right_suc (json_size value) rest_children_size)
+```
+
 The cursor laws follow by case analysis on the unconsumed list and the
 checked `lt_nat::self_suc` proof from `Data.Numeric.Nat.Order`. A successful
 peek exposes a `Cons`; advancing that branch removes exactly one constructor.
@@ -245,6 +322,9 @@ admission.
 
 **Validation evidence.** A raw package check resolves the complete dependency
 closure from this source's declared imports. Focused acceptance resolves the
-family, every constructor, the cursor dictionary, and all four proof witnesses
-as real registered kernel globals; checks concrete cursor behavior; and executes
-the structural fold over nested arrays and objects.
+family, every constructor, the cursor dictionary, and all four cursor proofs
+as registered kernel globals; independently checks the nine private size and
+addition theorems against their exact generic propositions; checks concrete
+cursor behavior; and evaluates the structural fold over nested arrays and
+objects. The checked size equations cover every JSON constructor, while the
+nested example also exercises array and object recursion at a concrete value.
