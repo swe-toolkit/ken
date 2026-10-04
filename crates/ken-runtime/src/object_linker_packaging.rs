@@ -1431,7 +1431,31 @@ fn link_starter_executable(
     executable_path: &Path,
     static_library: Option<&Path>,
 ) -> Result<(), ObjectLinkerPackagingError> {
+    link_starter_executable_with_symbols(
+        linker,
+        object_path,
+        stub_path,
+        executable_path,
+        static_library,
+        false,
+    )
+}
+
+// The product link always strips. Only the symbol-inspection tests retain a
+// symbol table on a second link of the same object, stub and single archive.
+fn link_starter_executable_with_symbols(
+    linker: &str,
+    object_path: &Path,
+    stub_path: &Path,
+    executable_path: &Path,
+    static_library: Option<&Path>,
+    retain_symbols: bool,
+) -> Result<(), ObjectLinkerPackagingError> {
     let mut command = Command::new(linker);
+    command.arg("-Wl,--gc-sections");
+    if !retain_symbols {
+        command.arg("-s");
+    }
     command.arg(object_path).arg(stub_path);
     if let Some(static_library) = static_library {
         command
@@ -2836,18 +2860,58 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn assert_no_undefined_native_int_service(path: &std::path::Path) {
+    fn native_int_service_symbols_resolved(path: &std::path::Path) -> Result<(), String> {
+        let defined = Command::new("nm")
+            .arg("--defined-only")
+            .arg(path)
+            .output()
+            .map_err(|error| format!("nm could not inspect symbols: {error}"))?;
+        if !defined.status.success() || defined.stdout.is_empty() {
+            return Err(format!(
+                "no readable static symbol table in {}: {}",
+                path.display(),
+                String::from_utf8_lossy(&defined.stderr)
+            ));
+        }
         let output = Command::new("nm")
             .arg("-u")
             .arg(path)
             .output()
-            .expect("nm is part of the linked-artifact toolchain");
-        assert!(output.status.success(), "nm -u failed");
+            .map_err(|error| format!("nm -u could not inspect symbols: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "nm -u failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
         let undefined = String::from_utf8_lossy(&output.stdout);
-        assert!(
-            !undefined.contains("ken_runtime_native_int_"),
-            "native Int service remained undefined:\n{undefined}"
-        );
+        if undefined.contains("ken_runtime_native_int_") {
+            return Err(format!(
+                "native Int service remained undefined:\n{undefined}"
+            ));
+        }
+        Ok(())
+    }
+
+    #[cfg(target_os = "linux")]
+    fn assert_no_undefined_native_int_service(path: &std::path::Path) {
+        native_int_service_symbols_resolved(path).unwrap_or_else(|error| panic!("{error}"));
+    }
+
+    #[cfg(target_os = "linux")]
+    fn unstripped_symbol_control(output_dir: &std::path::Path) -> std::path::PathBuf {
+        let options = ObjectLinkerPackagingOptions::starter_host();
+        let executable = output_dir.join("ken-unstripped-symbol-control");
+        link_starter_executable_with_symbols(
+            &options.linker_command,
+            &output_dir.join(&options.object_relative_path),
+            &output_dir.join(&options.stub_relative_path),
+            &executable,
+            Some(&ken_runtime_staticlib().expect("same runtime support archive")),
+            true,
+        )
+        .expect("symbol control links the same object, stub and archive without stripping");
+        executable
     }
 
     #[test]
@@ -2903,6 +2967,43 @@ mod tests {
             package.toolchain.whole_compiler_proof,
             ObjectLinkerEvidenceFact::Unavailable { .. }
         ));
+    }
+
+    /// Promise: durable product-path size bound. The fixture exercises the
+    /// ordinary linker, not a test-only relink or a recorded package length.
+    /// Removing section GC from the production link must exceed this bound.
+    #[test]
+    fn product_linked_starter_is_below_two_megabytes() {
+        let observation = RuntimeObservation::Returned(RuntimeGroundValue::Int(42.into()));
+        let program = starter_program(int_body(42), observation);
+        let (_report, entrypoint) = packaged_entrypoint(&program);
+        let run_report = runtime_ir_run_report(&program);
+        let support = platform_support(&program, &entrypoint, &run_report);
+        let output_dir = temp_output_dir("compact-product-starter");
+        let package = package_synthetic_starter_executable_artifact_with_profile(
+            &program,
+            &entrypoint,
+            &support,
+            &run_report,
+            &NativeSeedEnvironment::empty(
+                crate::boundary_resource_profile::starter_smoke_profile(),
+            ),
+            &output_dir,
+            "product-link size control",
+            crate::boundary_resource_profile::starter_smoke_profile(),
+            &crate::native_process_authority::synthetic_test_legacy_authority(),
+        )
+        .expect("product link and execution succeed");
+        let executable = output_dir.join(&package.executable_artifact.relative_path);
+        let size = fs::metadata(executable)
+            .expect("product executable exists on disk")
+            .len();
+        assert!(
+            size < 2_000_000,
+            "product executable is {size} bytes, not under 2 MB"
+        );
+        assert_eq!(package.smoke.stdout, "42\n");
+        assert!(package.smoke.passed);
     }
 
     /// Promise: durable real-starter epoch resource boundary. Both runs use
@@ -3202,9 +3303,13 @@ mod tests {
             assert_no_undefined_native_int_service(
                 &output_dir.join(&package.object_artifact.relative_path),
             );
-            assert_no_undefined_native_int_service(
-                &output_dir.join(&package.executable_artifact.relative_path),
+            let executable = output_dir.join(&package.executable_artifact.relative_path);
+            assert!(
+                native_int_service_symbols_resolved(&executable)
+                    .expect_err("stripped product has no inspectable static symbol table")
+                    .contains("no readable static symbol table")
             );
+            assert_no_undefined_native_int_service(&unstripped_symbol_control(&output_dir));
         }
     }
 
@@ -3325,7 +3430,12 @@ mod tests {
         assert_no_undefined_native_int_service(
             &output_dir.join(ObjectLinkerPackagingOptions::starter_host().object_relative_path),
         );
-        assert_no_undefined_native_int_service(&executable);
+        assert!(
+            native_int_service_symbols_resolved(&executable)
+                .expect_err("stripped product has no inspectable static symbol table")
+                .contains("no readable static symbol table")
+        );
+        assert_no_undefined_native_int_service(&unstripped_symbol_control(&output_dir));
         let status = Command::new(&executable)
             .status()
             .expect("PX8-I linked process executes");
