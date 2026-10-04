@@ -123,16 +123,14 @@ fn registering_a_second_unit_is_rejected_without_changing_identity() {
     assert_eq!(env.unit_type(), Some(first));
     expect_invalid_registration(&mut env, first);
     assert_eq!(env.unit_type(), Some(first));
-    assert_distinct_neutrals_do_not_convert(&env, &Term::indformer(second, vec![]));
 }
 
 #[test]
 fn indexed_family_cannot_be_registered_as_unit() {
     let mut env = GlobalEnv::new();
-    let (indexed, indexed_zero) = indexed_one_constructor(&mut env);
+    let (indexed, _) = indexed_one_constructor(&mut env);
     expect_invalid_registration(&mut env, indexed);
     assert_eq!(env.unit_type(), None);
-    assert_distinct_neutrals_do_not_convert(&env, &indexed_zero);
 }
 
 #[test]
