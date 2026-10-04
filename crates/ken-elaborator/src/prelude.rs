@@ -2453,6 +2453,96 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude withMapping failed: {e}")))?;
     elab.elaborate_decl(
+        r#"theorem resource_settle_body_ok_clean (o : Type) (e : Type) (r : Type) (value : r)
+          : And
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value))) =
+          and_intro
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value)))
+            Refl Refl"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_settle_body_ok_clean failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem resource_settle_body_error_clean (o : Type) (e : Type) (r : Type)
+          (body_error : e)
+          : And
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error))) =
+          and_intro
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error)))
+            Refl Refl"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_settle_body_error_clean failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem resource_settle_body_ok_release_error
+          (o : Type) (e : Type) (r : Type) (value : r)
+          (release_error : ResourceError)
+          : Not (Equal ResourceError release_error Closed)
+            → Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Err ResourceError Unit release_error))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketReleaseError e r release_error)) =
+          match release_error {
+            ResourceHostIO io ↦ λnot_closed. Proved;
+            Closed ↦ λnot_closed. absurd (not_closed Proved);
+            MalformedResource ↦ λnot_closed. Proved;
+            RightNotHeld required held ↦ λnot_closed. Proved;
+            ReleaseFailed kind identity io ↦ λnot_closed. Proved;
+            ResourceKindMismatch expected actual ↦ λnot_closed. Proved;
+            BufferLimit ↦ λnot_closed. Proved;
+            AllocationFailed ↦ λnot_closed. Proved;
+            InvalidOffset ↦ λnot_closed. Proved;
+            InvalidBounds ↦ λnot_closed. Proved;
+            NoProgress ↦ λnot_closed. Proved;
+            MappingLimit ↦ λnot_closed. Proved
+          }"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_settle_body_ok_release_error failed: {e}")))?;
+    elab.elaborate_decl(
+        "theorem resource_after_open_error (a : Auth) (e : Type) (r : Type) \
+           (body : Resource ResourceKind.FsHandle -> HostIO a (ResourceBodyResult e r)) \
+           (open_error : FileError) \
+           : Equal (HostIO a (Result FileError (ResourceBracketResult e r))) \
+             (private_with_resource_after_open a e r body \
+               (Err FileError (Resource ResourceKind.FsHandle) open_error)) \
+             (Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result FileError (ResourceBracketResult e r)) \
+               (Err FileError (ResourceBracketResult e r) open_error)) = Refl",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_after_open_error failed: {e}")))?;
+    elab.elaborate_decl(
         "proc mapBytes (a : Auth) (mapping : MappingHandle) (window : MappingWindow) \
            : HostIO a (Result ResourceError Bytes) visits [FS] = \
          Vis (Coproduct (FSOp a) AmbientOp) \
