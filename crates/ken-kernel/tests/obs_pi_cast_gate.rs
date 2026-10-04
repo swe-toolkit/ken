@@ -498,6 +498,60 @@ fn j_carrier_nat_env() -> (GlobalEnv, Term, Term) {
     (env, nat_ty, nat_zero)
 }
 
+/// The second J domain is dependent on the NEW `b`, not the original `a`.
+/// With open outer A/a bindings, a wrong but still Eq-shaped domain must fail.
+#[test]
+fn j_motive_second_domain_uses_bound_endpoint_in_open_context() {
+    let (env, nat, zero) = j_carrier_nat_env();
+    let mut ctx = Context::new();
+    ctx.push(Term::Type(Level::zero())); // A
+    ctx.push(Term::var(0)); // a : A
+    ctx.push(Term::Eq(
+        Box::new(Term::var(1)),
+        Box::new(Term::var(0)),
+        Box::new(Term::var(0)),
+    )); // e : Eq A a a
+    let good_domain = Term::Eq(
+        Box::new(Term::var(3)),
+        Box::new(Term::var(2)),
+        Box::new(Term::var(0)), // newly bound b
+    );
+    let wrong_domain = Term::Eq(
+        Box::new(Term::var(3)),
+        Box::new(Term::var(2)),
+        Box::new(Term::var(2)), // original a, not b
+    );
+    let make_j = |domain: Term| {
+        let motive = Term::Ascript(
+            Box::new(Term::lam(
+                Term::var(2),
+                Term::lam(domain.clone(), nat.clone()),
+            )),
+            Box::new(Term::pi(
+                Term::var(2),
+                Term::pi(domain, Term::Type(Level::zero())),
+            )),
+        );
+        Term::J(
+            Box::new(motive),
+            Box::new(zero.clone()),
+            Box::new(Term::var(0)),
+        )
+    };
+    let trusted = env.trusted_base();
+    let wrong = make_j(wrong_domain);
+    assert_eq!(
+        infer(&env, &ctx, &wrong),
+        Err(KernelError::BadEliminator(
+            "J motive's second domain ≠ Eq A a b".into()
+        ))
+    );
+    let right = make_j(good_domain);
+    let ty = infer(&env, &ctx, &right).expect("open dependent J motive");
+    assert!(ken_kernel::convert_type(&env, &ctx, &ty, &nat));
+    assert_eq!(env.trusted_base(), trusted);
+}
+
 /// A constant lambda deliberately ignores its ill-typed second argument on
 /// beta reduction. The old first-domain-only inference accepted this J.
 #[test]
