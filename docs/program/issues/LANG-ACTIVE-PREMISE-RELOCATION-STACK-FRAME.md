@@ -27,6 +27,9 @@ change.
   `ulimit -s`, at 256 KiB steps, with the same freshly built debug binary.
   - Base source passes at 2048 KiB and aborts at 1792.
   - WIP source `4e2ab6520` passes at 2560 and aborts at 2304.
+  - The 1792 abort is the prelude floor, not Vector: a one-declaration file
+    also fails 1792 and passes 2048 on the main binary, 6 runs each
+    (Architect `evt_5nd334k34j0mk`).
 - **The cycle.** LLDB at 2048 KiB stops inside
   `relocate_active_premise_term` (`elab.rs:8228`).
   - Frames #0 to #112 are that function, its `go` closure, and the iterator
@@ -55,20 +58,20 @@ stop and report the mismatch; do not build around it.
 `relocate_active_premise_term`'s stack per level of term depth is cut to a
 small fraction of today's 22.5 KB. It must not grow with the number of
 `Term` variants. The relocation result is unchanged for every input. The
-technique belongs to the ring and the Architect. Two candidates are
-outlining the arms into `#[inline(never)]` helpers, and an explicit work
-stack. Report the per-level bytes before and after, measured from the `rsp`
-deltas as D0 did. Then re-measure the frames below #112. If another
-recursive walk on the same caller chain now dominates, it is part of this WP
-(check 7).
+technique is outlining each arm into an `#[inline(never)]` helper, with no
+explicit work stack (Architect `evt_5nd334k34j0mk`, which gives the code and
+its measured frames). Report the per-level bytes before and after, measured
+from the `rsp` deltas as D0 did. Then re-measure the frames below #112. If
+another recursive walk on the same caller chain now dominates, it is part of
+this WP (check 7). Reducing the prelude floor itself is not this WP.
 
 ## Acceptance
 
 - **AC-1 (the failing observation).** Use the debug `ken` binary built from
-  the candidate. `ken check` of `Vector.ken.md` with the WIP source
-  `4e2ab6520` passes at a stated `ulimit -s` of 1536 KiB. The same
-  measurement aborts on the `origin/main` binary. Report the bisected
-  minimum for base and WIP source.
+  the candidate, without a debugger, at 256 KiB steps and 6 runs per cell.
+  `ken check` of `Vector.ken.md` with the WIP source `4e2ab6520` has the same
+  bisected minimum as a one-declaration file on the same binary. The
+  `origin/main` binary aborts the WIP at 2048 and 2304 KiB. Report the table.
 - **AC-2 (durable control).** A test relocates a synthetic term of stated
   depth on a thread with a stated stack. The fix passes it, and restoring
   the old per-level frame overflows it. Name the depth, the stack and the
@@ -82,5 +85,6 @@ recursive walk on the same caller chain now dominates, it is part of this WP
 
 - The cut needs a change to `Term`, to the kernel, or to the relocation's
   semantics.
-- After the cut, the Vector WIP still fails 1536 KiB, and the dominant cycle
-  is outside this caller chain. Stop to the Architect with its composition.
+- After the cut, the WIP minimum is above the one-declaration minimum, and
+  the dominant cycle is outside this caller chain. Stop to the Architect with
+  its composition.

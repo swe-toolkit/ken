@@ -34,6 +34,11 @@ crate that provides it has no Cranelift dependency.
   `values`. None of them names a `cranelift_*` crate or `cranelift_backend`
   except in doc comments (`activation_services.rs:9`, `boundary_value.rs:16`,
   `boundary_resource_profile.rs:248`).
+  - On `5bad638bf` the closure also reaches `artifact_validation`:
+    `BoundaryValueStore` stores `Option<RuntimeArtifactIdentity>`
+    (`boundary_value.rs:2159`), defined at `artifact_validation.rs:50`. And
+    `canonical` calls `unicode_normalization`'s `.nfc()` (`:406`, `:593`).
+    Neither names a compiler item (runtime-implementer `evt_472a4ytd2c33w`).
 - **The archive.** `ken-runtime` is `rlib` plus `staticlib`. The packaging
   finds `libken_runtime.a` through `ken_runtime_staticlib()`
   (`object_linker_packaging.rs:1478`). The one-archive rule (`:1470`) holds:
@@ -49,7 +54,10 @@ these files. Re-measure the closure on the base you start from.
 ## Scope
 
 A new workspace crate, `ken-runtime-support`, which is `rlib` plus
-`staticlib` and depends on `ken-host` only. The closure moves into it.
+`staticlib`. It depends on `ken-host` and on the non-compiler crates the
+closure already uses, such as `unicode-normalization`, and never on a
+`cranelift-*` crate or on `ken-runtime`. The measured closure, including
+`artifact_validation`, moves into it.
 `ken-runtime` depends on it, drops `staticlib`, and re-exports the moved
 modules so consumers need not change their paths. The packaging links
 `libken_runtime_support.a`. Do not change the `extern "C"` ABI, the emitted
