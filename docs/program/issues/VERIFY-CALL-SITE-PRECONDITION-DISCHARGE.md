@@ -154,12 +154,17 @@ stop and report the mismatch.
 
 Merged `392578133` from exact `8df075b01` (PR run 37181638288). Verify QA
 `evt_7yrk3ht11zjy0`, Architect `evt_3fjpymfrfgcvh`, Decision
-`dec_3ckfexpc1dqfk`. Every call to a `requires` function elaborates, and
-recursive calls take the same path. A premise in scope discharges; otherwise
-the call raises one obligation per precondition, keyed on the checked
-`GlobalId`. An open call-site `Requires` hole exports as Unknown. Both
-global-head probe routes raise exactly one obligation for an applied
-zero-parameter contract. The first candidate `69e2e2be9` failed CI on two
-test doc comments parsed as conformance row claims; the respin reworded them.
-Unblocks `LANG-REFINED-PARAM-REQUIRES-DESUGAR` and
-`LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME`.
+`dec_3ckfexpc1dqfk`. A call to a `requires` function in expression position
+elaborates, and recursive calls take the same path. A premise in scope
+discharges; otherwise the call raises one obligation per precondition, keyed
+on the checked `GlobalId`. An open call-site `Requires` hole exports as
+Unknown. Both global-head probe routes raise exactly one obligation for an
+applied zero-parameter contract. The first candidate `69e2e2be9` failed CI
+on two test doc comments parsed as conformance row claims; the respin
+reworded them.
+Unblocks `LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME`.
+
+Carried (Adversary `evt_29hvmst78v9dp`): instance fields, space cells and
+`elaborate_expr` postulate the hole without reporting it, which is
+`VERIFY-CALL-SITE-OBLIGATION-CHANNEL`. A call in a type position is refused
+even with its premise in scope; it fails closed and is not yet framed.

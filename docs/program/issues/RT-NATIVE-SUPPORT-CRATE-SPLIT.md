@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-SUPPORT-CRATE-SPLIT
 title: "The run-time support a native executable calls lives in the same crate as the Cranelift compiler backend, so the runtime archive contains the compiler and only link-time garbage collection keeps it out of an executable. Move the run-time support into its own crate with no compiler dependency, and link its archive instead"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -90,3 +90,16 @@ object, or the C stub.
 - A closure module needs a compiler item at run time, or a support type has to
   embed a compiler type, which would give a dependency cycle.
 - The split needs an ABI change.
+
+## Closeout
+
+Merged `4441a1422` from exact `8e3b0a666` (PR run 37191810169). Runtime QA
+`evt_5pxvv2t5mb0h4`, Architect `evt_7xpvp2h4q7nzn`, Decision
+`dec_61h9gqnadq57c`. The 13-module closure lives in `ken-runtime-support`,
+whose normal dependencies are `ken-host` and `unicode-normalization` only.
+`ken-runtime` is rlib-only and re-exports the old paths. Packaging links one
+`libken_runtime_support.a`, which has no Cranelift symbol and the same 16 C
+exports. The product hello-world is 746,496 bytes with `--gc-sections` and
+1,954,928 without. Carried: narrow `ken-runtime`'s `invocation_tickets`
+re-export to a private `use`, and correct the `boundary_emission_plan`
+comment, on the next touch of those files.

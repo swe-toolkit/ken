@@ -1,7 +1,7 @@
 ---
 id: RT-JOIN-PHASE-CASE-BINDER-CARRIED
 title: "The join planner gives a case binder the phase that lowering will see: a source join whose scrutinee is a carried case binder (the nat_fanout_escaped row's join 1244 under ReadProgress::ReadSome) is not planned NativeScalarPair, so it no longer refuses in object emission with 'planned native scalar lanes but lowering produced a carried boundary word'"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: architect
