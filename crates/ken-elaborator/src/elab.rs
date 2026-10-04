@@ -9798,9 +9798,16 @@ fn emit_call_refinements(
         Term::Const { id, .. } => cx.refinement_facts
             .and_then(|facts| facts.refined_params.get(&id))
             .and_then(|params| params.get(previous_args.len())),
-        Term::Constructor { id, .. } => cx.refinement_facts
-            .and_then(|facts| facts.constructor_field_predicates.get(&id))
-            .and_then(|fields| fields.get(previous_args.len())),
+        // A constructor spine starts with its family parameters; the field
+        // predicates are indexed by constructor argument position.
+        Term::Constructor { id, .. } => {
+            let params = cx.env.constructor(id).map_or(0, |(family, _)| family.params.len());
+            previous_args.len().checked_sub(params).and_then(|field| {
+                cx.refinement_facts
+                    .and_then(|facts| facts.constructor_field_predicates.get(&id))
+                    .and_then(|fields| fields.get(field))
+            })
+        },
         _ => None,
     }
     .and_then(Option::as_ref)

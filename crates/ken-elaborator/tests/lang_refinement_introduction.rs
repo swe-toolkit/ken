@@ -263,6 +263,48 @@ fn constructor_fields_and_direct_refined_arguments_emit_once() {
 }
 
 #[test]
+fn parametrized_constructor_literal_field_obligates_its_own_argument() {
+    let mut env = ElabEnv::new().expect("prelude");
+    arbitrary_predicate(&mut env);
+    let predicate = Term::const_(env.globals["P"], vec![]);
+    let (five, _) = env.elaborate_expr("five", "5").expect("literal");
+    for (decl, source) in [
+        (
+            "data SBox a = MkSBox { value : { x : Int | P x } }",
+            "const s : SBox Bool = MkSBox Bool 5",
+        ),
+        (
+            "data RBox a = MkRBox { other : a, value : { x : Int | P x } }",
+            "const r : RBox Bool = MkRBox Bool True 5",
+        ),
+        (
+            "data LBox a = MkLBox { value : { x : Int | P x }, other : a }",
+            "const l : LBox Bool = MkLBox Bool 5 True",
+        ),
+        (
+            "data UBox = MkUBox { value : { x : Int | P x } }",
+            "const u : UBox = MkUBox 5",
+        ),
+    ] {
+        env.elaborate_decl(decl)
+            .unwrap_or_else(|error| panic!("{decl}: {error:?}"));
+        let result = env
+            .elaborate_decl_v1(source)
+            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        assert_eq!(result.obligations.len(), 1, "{source}");
+        assert_eq!(
+            result.obligations[0].goal_closed,
+            Term::app(predicate.clone(), five.clone()),
+            "{source}: the refined field, not a family parameter, is introduced"
+        );
+        assert!(
+            env.is_open_hole(result.obligations[0].hole_id),
+            "{source}: P is open"
+        );
+    }
+}
+
+#[test]
 fn named_record_literal_field_introduces_its_site_predicate() {
     let mut env = ElabEnv::new().expect("prelude");
     arbitrary_predicate(&mut env);
