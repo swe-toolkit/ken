@@ -491,63 +491,80 @@ fn trusted(env: &ElabEnv) -> HashSet<GlobalId> {
 /// without adding a global or trusted-base entry. CLAIMED: the no-sink
 /// expression API cannot silently accept an unreported obligation. THE GAP:
 /// each fixture must reach its own generating arm, pinned by its Reported twin.
-#[test]
-fn undischarged_standalone_obligations_refuse_before_declaration() {
-    for (expression, declaration, kind) in [
-        (
-            "(0 : { z : Int | Not (Equal Int z 0) })",
-            "const open_refinement : Int = (0 : { z : Int | Not (Equal Int z 0) })",
-            ObligationKind::RefinementIntroduction,
-        ),
-        (
-            "7 / 0",
-            "fn divide_zero (n : Int) : Int = n / 0",
-            ObligationKind::PartialPrim,
-        ),
-        (
-            "(250 : UInt8) + (10 : UInt8)",
-            "fn add_bytes (n : UInt8) : UInt8 = n + (10 : UInt8)",
-            ObligationKind::PartialPrim,
-        ),
-    ] {
-        let mut standalone = ElabEnv::new().expect("prelude");
-        let before = trusted(&standalone);
-        let declarations = standalone.env.declarations().len();
-        let error = standalone
-            .elaborate_expr("no_sink", expression)
-            .expect_err("an unreported obligation must be refused");
-        assert!(
-            matches!(error, ElabError::ObligationWithoutChannel { .. }),
-            "{expression}: wrong refusal: {error:?}"
-        );
-        assert_eq!(trusted(&standalone), before, "{expression}: leaked trust");
-        assert_eq!(
-            standalone.env.declarations().len(),
-            declarations,
-            "{expression}: refused obligation still declared a global"
-        );
+fn assert_unsinkable_obligation(expression: &str, declaration: &str, kind: ObligationKind) {
+    let mut standalone = ElabEnv::new().expect("prelude");
+    let before = trusted(&standalone);
+    let declarations = standalone.env.declarations().len();
+    let error = standalone
+        .elaborate_expr("no_sink", expression)
+        .expect_err("an unreported obligation must be refused");
+    assert!(
+        matches!(error, ElabError::ObligationWithoutChannel { .. }),
+        "{expression}: wrong refusal: {error:?}"
+    );
+    assert_eq!(trusted(&standalone), before, "{expression}: leaked trust");
+    assert_eq!(
+        standalone.env.declarations().len(),
+        declarations,
+        "{expression}: refused obligation still declared a global"
+    );
 
-        let mut reported = ElabEnv::new().expect("prelude");
-        let before = trusted(&reported);
-        let result = reported
-            .elaborate_decl_v1(declaration)
-            .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
-        assert_eq!(result.obligations.len(), 1, "{declaration}");
-        assert_eq!(
-            std::mem::discriminant(&result.obligations[0].kind),
-            std::mem::discriminant(&kind),
-            "{declaration}"
-        );
-        assert!(reported.is_open_hole(result.obligations[0].hole_id));
-        assert_eq!(
-            trusted(&reported)
-                .difference(&before)
-                .copied()
-                .collect::<HashSet<_>>(),
-            HashSet::from([result.obligations[0].hole_id]),
-            "{declaration}: open trusted-base delta must equal reported hole"
-        );
-    }
+    let mut reported = ElabEnv::new().expect("prelude");
+    let before = trusted(&reported);
+    let result = reported
+        .elaborate_decl_v1(declaration)
+        .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
+    assert_eq!(result.obligations.len(), 1, "{declaration}");
+    assert_eq!(
+        std::mem::discriminant(&result.obligations[0].kind),
+        std::mem::discriminant(&kind),
+        "{declaration}"
+    );
+    assert!(reported.is_open_hole(result.obligations[0].hole_id));
+    assert_eq!(
+        trusted(&reported)
+            .difference(&before)
+            .copied()
+            .collect::<HashSet<_>>(),
+        HashSet::from([result.obligations[0].hole_id]),
+        "{declaration}: open trusted-base delta must equal reported hole"
+    );
+}
+
+#[test]
+fn r1_open_refinement_refuses_without_a_hole() {
+    assert_unsinkable_obligation(
+        "(0 : { z : Int | Not (Equal Int z 0) })",
+        "const open_refinement : Int = (0 : { z : Int | Not (Equal Int z 0) })",
+        ObligationKind::RefinementIntroduction,
+    );
+}
+
+#[test]
+fn r3_unknown_divisor_refuses_without_a_hole() {
+    assert_unsinkable_obligation(
+        "7 / 0",
+        "fn divide_zero (n : Int) : Int = n / 0",
+        ObligationKind::PartialPrim,
+    );
+}
+
+#[test]
+fn r3_remainder_shares_the_unknown_divisor_gate() {
+    assert_unsinkable_obligation(
+        "7 % 0",
+        "fn remainder_zero (n : Int) : Int = n % 0",
+        ObligationKind::PartialPrim,
+    );
+}
+
+#[test]
+fn r4_fixed_width_add_refuses_without_a_hole() {
+    assert_unsinkable_obligation(
+        "(250 : UInt8) + (10 : UInt8)",
+        "fn add_bytes (n : UInt8) : UInt8 = n + (10 : UInt8)",
+        ObligationKind::PartialPrim,
+    );
 }
 
 /// R2. Promise class: durable invariant.
