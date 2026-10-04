@@ -1744,12 +1744,12 @@ fn k2_j_nonrefl_reduces_not_stuck() {
 }
 
 // --- C6: cast computes on a compound type (`16 §3.2`) ----------------------
-// `cast ((x:A)→Type 0) ((x:A)→Type 1) e f` (non-convertible codomain) ⇝ a
-// λ (a constructor form), not stuck. This is a raw reducer-shape control;
-// the typed projection and subject-reduction case lives in
-// `obs_type_eq_structural::pi_structural_equality_and_typed_cast`.
+// `cast ((x:A)→Type 0) ((x:A)→Type 1) e f` has a neutral Eq Type:
+// codomain levels disagree, so no component equality can be projected from e.
+// This is a raw reducer-shape control; the typed end-to-end negative and
+// positive are in obs_pi_cast_gate.
 #[test]
-fn k2_cast_computes_pi_to_lambda() {
+fn k2_cast_pi_codomain_level_mismatch_stays_neutral() {
     let (env, _s) = std_env();
     let l0 = Level::zero();
     let l1 = Level::suc(Level::zero());
@@ -1769,11 +1769,10 @@ fn k2_cast_computes_pi_to_lambda() {
         Box::new(Term::var(0)),                                   // e
         Box::new(Term::var(1)),                                   // f
     );
-    // Raw reduction control only: these two Π types inhabit different
-    // universes, so the raw input has no typed subject-reduction claim.
-    // The typed Π row in obs_type_eq_structural checks the exact projection
-    // types and neutral-evidence symmetry.
-    assert!(matches!(whnf(&env, &ctx, &cast), Term::Lam(..)));
+    // Raw input also has mismatched endpoint universes, so it makes no
+    // typed subject-reduction claim. Even here, a missing codomain
+    // decomposition must leave the cast neutral.
+    assert_eq!(whnf(&env, &ctx, &cast), cast);
 }
 
 // Raw reduction control only: `(x:A)×Type 1 : Type 2`, so `e : Eq (Type 1) _ _`
