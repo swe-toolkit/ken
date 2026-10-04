@@ -1049,14 +1049,13 @@ fn convert_path(
             convert_path(env, ctx, &cod_a1, &a2, &b2, path, memo)
         }
         _ => {
-            // (4) Unit-η / single-constructor-no-field inductive (`17 §2`):
-            // any two values of a no-field single-constructor type are equal.
+            // (4) Unit-η (`17 §2`): any two values of the registered `Unit`
+            // are equal. No other `data` family has η (`14 §4`), so this is
+            // keyed on the registered identity, never on constructor shape.
             let (ty_head, _ty_args) = crate::inductive::peel_app(&ty_w);
             if let Term::IndFormer { id, .. } = &ty_head {
-                if let Some(ind) = env.inductive(*id) {
-                    if ind.constructors.len() == 1 && ind.constructors[0].args.is_empty() {
-                        return true;
-                    }
+                if env.unit_type() == Some(*id) {
+                    return true;
                 }
             }
             conv_struct_path_memo(env, ctx, a, b, path, memo)

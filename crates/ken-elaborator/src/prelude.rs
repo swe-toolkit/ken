@@ -1065,6 +1065,8 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         .map_err(|e| ElabError::Internal(format!("Decimal/Char demote failed: {}", e)))?;
     ken_kernel::check::register_checked_char_carrier(&mut elab.env, decimal_char_env.char_id)
         .map_err(|e| ElabError::Internal(format!("literal Char carrier failed: {e}")))?;
+    ken_kernel::check::register_unit_type(&mut elab.env, unit_id)
+        .map_err(|e| ElabError::Internal(format!("prelude Unit registration failed: {e:?}")))?;
 
     // `IntN<->Int` conversion floor + `checked_*`/`saturating_*` DEMOTE
     // (`18a §5.7`, Phase-2 tranche #4). Needs the 8 `IntN`/`UIntN` type ids

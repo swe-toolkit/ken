@@ -4,6 +4,7 @@
 //! cases and `17 §2` Unit-η; `conformance/kernel/judgments/seed-judgments.md`
 //! declare-def-sct-admits / declare-def-sct-rejects.
 
+use ken_kernel::check::register_unit_type;
 use ken_kernel::env::Context;
 use ken_kernel::sct::count_params;
 use ken_kernel::term::{Level, Term};
@@ -95,6 +96,7 @@ fn unit_env() -> (GlobalEnv, GlobalId, GlobalId) {
         }],
     })
     .expect("Unit");
+    register_unit_type(&mut env, unit).expect("register Unit");
     let tt = env.inductive(unit).unwrap().constructors[0].id;
     (env, unit, tt)
 }
@@ -656,8 +658,7 @@ fn sct_reject_ctor_wrap_compose() {
 }
 
 // ---------------------------------------------------------------------------
-// Unit-η: any two elements of a single-constructor no-field inductive convert
-// (`17 §2`).
+// Unit-η: any two elements of the registered Unit family convert (`17 §2`).
 // ---------------------------------------------------------------------------
 
 #[test]
