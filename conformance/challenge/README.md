@@ -43,7 +43,7 @@ through — the load-bearing negative).
 | **C4** `indexed-vec-head` | **KNOWN-GAP at the *declaration* step** — `data Vec a : Nat → Type` doesn't parse (residual #1) | ✓✓ confirms the flagged refinement (decl-step, earlier than head-absurdity) |
 | **C5** `verified-sort` | sound **PASS**; unsound `const Nil` **ELABORATES** (not rejected at elab) | **SPECIFIED, not a gap** — obligations are emit-at-elaboration (V1) / discharge-later (V3); elaboration never rejects on an undischarged obligation (`21 §5`, `22-obligations.md`). The bogus sort is caught at the *verify* stage, not elab. |
 | **C6** `lawful-ord-vs-stub` | law-proved `Ord` **PASS**; `Axiom`-stub `Ord` **also ELABORATES** (admitted) | as predicted — the "a provable law must not be postulated" enforcement is a **documented known-gap** (deferred lawful-classes work). Run with `lawful_classes.ken` prepended. |
-| **C7** `quotient-respect` | sound & unsound both **REJECT — parser gap** (`A / R` surface unparseable, `'/'` unexpected) (residual #2) | the README's flagged caveat, confirmed |
+| **C7** `quotient-respect` | neither arm produces a `Quot` term: `/` is integer division, not quotient syntax (residual #2) | legacy sketches also omit checked `e` and do not test `respect` |
 | **C8** `funext-definitional` | sound (convertible-pointwise) **PASS**; unsound (differ) **REJECT** | funext **IS** surface-reachable (`eq_at_pi` reduces function-`Equal`) — corrected from the first pass. Reachable for *convertible*-pointwise fns; the *non-convertible* case (needs a case-split) is residual #4. |
 
 ### Known-frontier residuals (documented, NOT open WPs)
@@ -55,9 +55,10 @@ frontier-map — logged here, not opened as work, per the operator (Option A).
    not parse (`ParseError "expected Eq, found LParen"`). Kernel has indexed
    families; the surface grammar + `data.rs` (hardcodes `indices: vec![]`) do
    not. *(C4.)*
-2. **Quotients** — `A / R`, `[t]`, `elim_/` do not parse (`unexpected character
-   '/'`). Kernel has `Term::Quot`/`QuotClass`/`QuotElim` (K2); surface reserved,
-   unimplemented. *(C7.)*
+2. **Quotients** — the frontend has no quotient production; `/` is built-in
+   integer division, not `A / R / e`. Quotient class and eliminator forms are
+   not surface-reachable. Kernel has checked `Term::Quot`/`QuotClass`/`QuotElim`
+   (K2). *(C7.)*
 3. **Ω-data constructors** — `data P : Ω where … : … P (…)` does not parse
    (`ParseError`). The Ω proof-irrelevance *sort* gate is never reached — a
    parser gap masks it. *(C2-unsound.)*
@@ -116,30 +117,36 @@ Format per entry — **`slug` · axis · flavor** — sound arm → / unsound ar
   conjuncts PASS / `const Nil` (isSorted-only) **REJECT**.
 - **C6 · `lawful-ord-vs-stub` · law-carrying instances · B** — law-**proved**
   `Ord` (zero-delta) / `Axiom`-stub `Ord` (grows trust base).
-- **C7 · `quotient-respect` · observational / quotient · B** — quotient elim
-  with valid `respect` PASS / non-respecting elim **REJECT**.
+- **C7 · `quotient-respect` · observational / quotient · B** — intended
+  quotient-elim pair; current fixtures cannot reach Quot-Form: `/` is integer
+  division, and the sketches also lack a checked `e`. See the C7 README.
 - **C8 · `funext-definitional` · observational / funext · B** — pointwise-equal
   functions equal via `Eq`-at-Pi (`\x.x` ≡ `\x. and_bool x True`) PASS /
   same proof shape over functions that **differ at a point** (`\x.True` vs
   `\x.x`) **REJECT**.
 
 C1 and C7 tell **one story**: the naive `DecEq` over a non-canonical carrier
-(C1) is unsound; the quotient with a `respect` obligation (C7) is *how you do it
-soundly*. C2 and C5 are coupled: C5's `Perm` must sit at the universe C2
+(C1) is unsound; a lawful quotient with a `respect` obligation is the sound
+design target for C7. The current C7 fixtures still lack valid quotient
+formation. C2 and C5 are coupled: C5's `Perm` must sit at the universe C2
 establishes (`‖Perm‖`/count-equality, never a proof-relevant Ω inductive). C7
 and C8 are the **two OTT faces** — C7 the *quotient* fragment (equality you
-*impose*, gated by `respect`), C8 the *funext* fragment (equality that
-*computes* pointwise) — Ken's signature observational equality from both sides.
+*impose*, gated by checked formation and `respect`), C8 the *funext* fragment
+(equality that *computes* pointwise) — Ken's signature observational equality
+from both sides.
 
 ## Grounding
 
-Every expected-behavior is grounded against the landed code / spec at authoring
-(`origin/main`), cited per exercise. Surface syntax follows the landed
-`catalog/packages/Core/Classes/LawfulClasses.ken.md` (classes/instances/`Axiom`/
-`IsTrue`/`Equal`), the `es2_acceptance.rs` refinement form
-(`{ ys : List a | And (isSorted a leq ys) (Perm a ys xs) }`), K5 `absurd`
-(Bottom-elim), and the reserved quotient surface (`A / R`, `[t]`, `elim_/`,
-`11-syntax.md`). Where an encoding pushes past the landed surface, that is
+The original challenge results were grounded against landed code/spec at
+authoring (`origin/main`), cited per exercise. The C7 status update is
+reconciled against `16 §5` and the current parser grammar. Surface examples
+follow the landed catalog package
+`catalog/packages/Core/Classes/LawfulClasses.ken.md`
+(classes/instances/`Axiom`/`IsTrue`/`Equal`) and the `es2_acceptance.rs`
+refinement form (`{ ys : List a | And (isSorted a leq ys) (Perm a ys xs) }`).
+K5 `absurd` is the documented Bottom eliminator. The quotient kernel forms
+`A / R / e`, `[t]`, and `elim_/` are specified in `11-syntax.md`. Where an
+encoding pushes past the landed surface, that is
 called out in the exercise as a **surface-expressibility note** — itself a
 prepared depth result, not a defect in the instrument.
 

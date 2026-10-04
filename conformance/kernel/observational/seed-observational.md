@@ -9,6 +9,10 @@ regression).
 Cases tagged **(oracle)** are to be validated against the prototype at
 build time by the Spec enclave.
 
+**Quotient-term convention.** Every quotient in this seed is formed as
+`A / R / e` with `R : A → A → Ω_l` and checked `e : IsEquiv A R`
+(`16 §5`); `A/R` abbreviates that formed type.
+
 ---
 
 ## Acceptance criterion: Omega proof-irrelevance (frame par. 2 item 5, README #9)
@@ -260,8 +264,8 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ### observational/cast-computes-quotient
 - spec: `spec/10-kernel/16-observational.md` par. 3.2
-- given: `A/R : Type 0`, `a : A`; canonical type equality
-  `Eq Type (A/R) (A/R)`; `cast (A/R) (A/R) proof [a]`
+- given: formed `Q := A / R / e : Type 0`, `a : A`; canonical type
+  equality `Eq Type Q Q`; `cast Q Q proof [a]`
 - expect: **reduces** (class preserved)
 - why: cast at quotient preserves the class structure, transporting
   the representative.
@@ -307,15 +311,27 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ## Acceptance criterion: Quotients (frame par. 2 item 7, README #14)
 
-### observational/quotient-eq (soundness, C8 interim)
+### observational/quotient-eq (soundness, C8)
 - spec: `spec/10-kernel/16-observational.md` §2.2, §5
-- given: `R : A → A → Omega`, `a b : A`; `Eq (A / R) [a] [b]`, including
-  canonical classes.
-- expect: **stays neutral** for every pair of endpoints; it does not reduce to
-  `R a b`. Relation-as-equality is
-  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
-- why: Quot-Form has not supplied a checked equivalence proof for `R`; reducing
-  to an arbitrary relation is deferred until P0.
+- given: (a) an open context `A : Type l`, `R : A → A → Ω_l`,
+  `e : IsEquiv A R`, and `a,b : A`, with canonical classes `[a]`, `[b]`;
+  query `whnf(Eq (A / R / e) [a] [b])`; (b) closed `Nat`, total `R`, and
+  checked total-equivalence witness `e` for the `Top` control.
+- expect: (a) **reduces to** `R a b : Ω_l`, even if that application is
+  neutral because `R` is opaque; the outer `Eq` is gone. (b) reduces to
+  `Top`.
+- why: two class-headed endpoints expose the relation only after `e` has
+  checked. An invalid relation is rejected at formation; see
+  `../seed-kernel.md` `kernel/formation/quotient-requires-checked-equivalence`.
+  Non-class endpoints stay neutral in the adjacent case.
+
+### observational/quotient-eq-neutral-endpoint (soundness, C8)
+- spec: `spec/10-kernel/16-observational.md` §2.2
+- given: a formed `Q := A / R / e`, open `q : Q`, and `a : A`; query
+  `whnf(Eq Q q [a])`.
+- expect: remains neutral as `Eq Q q [a]`; it does not reduce to `R`.
+- why: the quotient-Eq rule requires both endpoints to be canonical classes.
+  This pins the non-class endpoint arm, not the class-pair C8 reduct.
 
 ### observational/quotient-elim (soundness)
 - spec: `spec/10-kernel/16-observational.md` par. 5

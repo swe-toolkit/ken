@@ -29,6 +29,10 @@ so constructors can self-reference `D`. Where a case below writes
 only) — the behavior a case asserts is keyed on the returned `GlobalId`, never
 on a name parameter.
 
+**Quotient-term convention.** Every quotient in this seed is formed as
+`A / R / e` with `R : A → A → Ω_l` and checked `e : IsEquiv A R`
+(`16 §5`); `A/R` abbreviates that formed type.
+
 **Build-sequencing note (`18 §4.6`).** Four gate-invoking cases below assert the
 **complete-kernel** gate behavior and so go green only once the in-flight builds
 land: the **W-style** admission cases ride **K1.5-build** (`dec_2vc6ytrbcbfc5`;
@@ -250,9 +254,11 @@ it**.
 
 ### kernel/judgments/quot-respect-admits (soundness) [K2c-s2-build]
 - spec: `18 §4.3`; `16 §5.1`
-- given: typing `elim_/ M f r [a] : M [a]` over `Bool / (λ _ _. Top)` with a
-  **Type-target** motive `M := λ _. Bool` and a **respecting** map `f := λ _.
-  true` whose respect proof `r : (x y : Bool) -> R x y -> Eq Bool (f x) (f y)`
+- given: `R := λ _ _. Top` on `Bool`, formed `Q := Bool / R / e` with
+  checked total-equivalence witness `e`, and typing `elim_/ M f r [a] :
+  M [a]` with **Type-target** motive `M := λ _. Bool`, respecting map
+  `f := λ _. true`, and `r : (x y : Bool) -> R x y ->
+  Eq Bool (f x) (f y)`
   reduces to `Eq Bool true true ⇝ Top` — `check`/`infer` the `QuotElim`
 - expect: **Ok** — the elimination type-checks (the respect proof checks against
   the `cong`/`cast` respect schema), and the i-reduction `elim_/ M f r [a] ⇝ f
@@ -263,10 +269,11 @@ it**.
 
 ### kernel/judgments/quot-respect-rejects (soundness) [K2c-s2-build]
 - spec: `18 §4.3`; `16 §5.1` (the closed-`Empty` respect probe)
-- given: the **same** `Bool / (λ _ _. Top)`, `M := λ _. Bool`, but an
-  **observing** map `f := λ x. x` — its respect obligation needs `r : (x y :
-  Bool) -> Top -> Eq Bool x y`, i.e. `Eq Bool true false` for `x,y :=
-  true,false`, which `⇝ Bottom` (uninhabited) — `check`/`infer` the `QuotElim`
+- given: the **same formed** `Q := Bool / R / e`, `M := λ _. Bool`,
+  but an **observing** map `f := λ x. x` — its respect obligation needs
+  `r : (x y : Bool) -> Top -> Eq Bool x y`, requiring
+  `Eq Bool true false` for the pair `true,false`, which `⇝ Bottom`
+  (uninhabited) — `check`/`infer` the `QuotElim`
 - expect: **Err(`BadEliminator`)** — no respecting `r` exists, so the
   elimination is **refused at typing**
 - why: the total relation `λ _ _. Top` equates every pair, so an observing `f`

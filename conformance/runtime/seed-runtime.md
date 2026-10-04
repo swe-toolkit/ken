@@ -29,13 +29,16 @@ runtime representation, and the runtime-local opaque callable boundary.
 - why: arbitrary-precision `Int` permits a private small-integer fast path.
 
 ## runtime/evaluation/canonicity
-- spec: `spec/40-runtime/42-evaluation.md §1`, `§3.6` (C8 exception)
-- given: a closed computation of an inductive (or a closed `Eq`/`cast` op),
-  excluding `Eq (A/R) [a] [b]` on closed classes (C8)
-- expect: **reduces** to a constructor form (resp. computes); no closed,
-  well-typed ground input in this population gets stuck. The excluded C8 case
-  stays neutral under the interim rule.
-- why: canonicity (a soundness commitment).
+- spec: `spec/40-runtime/42-evaluation.md §1`, §3.6
+- given: a closed inductive computation (or closed `Eq`/`cast` op), including
+  C8 for formed `A / R / e` with `A : Type l`, `R : A → A → Ω_l`, checked
+  `e : IsEquiv A R`, and a computing `R a b`.
+- expect: **reduces** to a constructor form (resp. computes); C8 reduces to
+  `R a b` (for `R := λ _ _. Top`, to `Top`). No listed closed, well-typed
+  ground input in this computed population gets stuck. If `R` is opaque, its
+  application may remain neutral after C8 reduces the outer `Eq`.
+- why: canonicity (a soundness commitment), with opaque relation behavior
+  following the relation's own reduction rules.
 
 ## runtime/evaluation/unknown-propagates
 - spec: `spec/40-runtime/41-values.md §6`, `42 §4`
