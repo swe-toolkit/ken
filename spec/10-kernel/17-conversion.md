@@ -168,8 +168,8 @@ function whnf(env, ctx, t):
       // obs: Eq-by-type / cast / quotient-elim / truncation-elim  (16 §2,3,5,6)
       Eq(A, a, b):       return whnfObs(env, ctx, Eq(A, a, b))    // 16 §2.2 dispatch on whnf(A)
       Cast(A, B, e, a):  return whnfObs(env, ctx, Cast(A, B, e, a)) // 16 §3.2 incl. cast-refl regularity
-      QuotElim(M, f, s): if whnf(s) is Class(a): t := App(f, a); continue
-                         else: return QuotElim(M, f, whnf(s))
+      QuotElim(M, f, r, s): if whnf(s) is Class(a): t := App(f, a); continue
+                            else: return QuotElim(M, f, r, whnf(s))
       TruncElim(P, f, s):if whnf(s) is Trunc(a): t := App(f, a); continue
                          else: return TruncElim(P, f, whnf(s))
 
@@ -197,6 +197,10 @@ Notes.
   including the `cast A A refl a ⇝ a` regularity rule), and returns a neutral
   when the governing type is neutral. K2c **consumes** these rules; it does not
   re-derive them (frame: "the obs conversions are K2's").
+- **`QuotElim` respect.** Admission checks `r` against the Type-target
+  respect schema (`16 §5.1`); at an Ω target it checks only scoping. The
+  reducer carries `r` unchanged through a neutral scrutinee and never
+  inspects it when i-reduction fires on a class.
 - **`deltaWanted`** governs the *laziness* of δ at the head. In a bare `whnf`
   call it is `true` (a transparent head unfolds). In conversion, `whnf` is first
   run with δ **deferred** so heads can be compared before unfolding; δ fires
