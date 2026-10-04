@@ -1,7 +1,7 @@
 ---
 id: RT-JOIN-PHASE-CASE-BINDER-CARRIED
 title: "The join planner gives a case binder the phase that lowering will see: a source join whose scrutinee is a carried case binder (the nat_fanout_escaped row's join 1244 under ReadProgress::ReadSome) is not planned NativeScalarPair, so it no longer refuses in object emission with 'planned native scalar lanes but lowering produced a carried boundary word'"
-status: active
+status: closed
 owner: runtime
 size: S
 gate: architect
@@ -71,3 +71,18 @@ refusal or runs natively.
   is a stop to the Architect with the census of affected joins.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout: witness gone from main; no change
+
+Architect `evt_2dt20kx3h81pt`. The node closes with no code change, and its
+§1a count stays at 0.
+
+- On clean `4441a1422`, the nat row's first refusal is "Match: dynamic arms
+  must produce scalar Int or Bool values", at source Match 1289. Origins
+  1244 and 1249 are not Match nodes on this base, so join 1244 and its
+  case-binder premise no longer occur. Intervening landings rewrote that
+  source shape; which one was not bisected.
+- Join 70 in the TREE-MATCH Option fixture is masked by an earlier
+  generic-transfer refusal and has no reaching path.
+- At 1289 the phase plane is correct. The gap is result shape, not phase,
+  and it moves to `RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT`.
