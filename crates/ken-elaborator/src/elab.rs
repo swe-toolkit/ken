@@ -4664,9 +4664,12 @@ fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
 /// Declaration-level producers (contract and space `ensures`, `prove`, law
 /// fields, FFI runtime checks) do not record into `cx.obligations`: each
 /// builds its `Obligation` beside the mint and returns it in
-/// `ElabResult::obligations`, a sink that always reaches the module reporter,
-/// so they need no mode check and do not call this gate. Any new producer
-/// that records into `cx.obligations` must mint through this function.
+/// `ElabResult::obligations` to the declaration elaborator's caller, the same
+/// channel every `Reported` context's obligations take. Whether that caller
+/// reports or discards an `ElabResult` is the caller's contract, not this
+/// gate's; no `ElabCtx` mode applies to these producers, so they do not call
+/// this gate. Any new producer that records into `cx.obligations` must mint
+/// through this function.
 fn declare_obligation_hole(
     cx: &mut ElabCtx<'_>,
     closed: Term,
