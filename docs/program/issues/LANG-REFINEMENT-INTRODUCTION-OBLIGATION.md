@@ -63,6 +63,17 @@ base, stop and report the mismatch.
   - a predicate table keyed on GlobalId;
   - a literal refinement becomes an anonymous named one;
   - one emission helper, with arm path conditions.
+- **A named refined return is realized at the body's leaves** (Architect
+  `evt_62k15kkjw0818`, spec 22 §2.2). It withdraws the one-whole-body
+  Ensures rule (`evt_dx9dtb9vyrst` R4, `evt_y1v2wbnhx9ej` R1). The repair:
+  delete `carrier_check_type_for_named_return` and the post-hoc Ensures
+  block, and check the body against the declared type at both
+  `elaborate_view_with_spec` sites. Leaf obligations keep
+  `ObligationKind::RefinementIntroduction`. The `named_match` row becomes 2,
+  plus the test `named_return_over_a_match_is_realized_per_leaf`. QA
+  mutation: restore the carrier swap, and `pick` gives 1 open whole-body
+  obligation. Literal returns, lets and `ensures` clauses stay as they are
+  here; they are `LANG-ENSURES-PER-PATH-REALIZATION`.
 
 ## Acceptance
 
@@ -134,7 +145,9 @@ base, stop and report the mismatch.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 1 (Architect `evt_5qg2098zmhd20` on stop `evt_4g6d57z5x6wqz`).
+§1a count: 2 (Architect `evt_5qg2098zmhd20` on stop `evt_4g6d57z5x6wqz`;
+`evt_62k15kkjw0818` on stop `evt_5b9ywyr5p5w32`). The 3rd advancing stop
+is a hold, research and §1b.
 
 1. A closed Int refinement obligation stays open. The kernel has no
    reduction for primitive `leq_int` on `IntLit` (keyed on primitive-Op
@@ -152,3 +165,6 @@ base, stop and report the mismatch.
      building on it. `SPEC-REFINED-PARAM-REQUIRES-DESUGAR` (`80afb1b10`)
      makes a refined parameter a `requires`, which is
      `LANG-REFINED-PARAM-REQUIRES-DESUGAR`, not this WP.
+2. A whole-body return obligation over a branchy body is undischargeable;
+   keyed on obligation placement (whole term against per leaf). Ruled per
+   leaf (`evt_62k15kkjw0818`).
