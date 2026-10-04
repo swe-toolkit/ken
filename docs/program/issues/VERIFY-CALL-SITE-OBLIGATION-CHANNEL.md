@@ -86,6 +86,15 @@ orphan over-reports in `trusted_base()` and is unreachable from source, so it
 is queued, not framed. Re-raise it when a product path reuses a failed
 session's environment, including `compiler_driver.rs:4251`.
 
+The `Refused` gate covers only `precondition_proof`. The binary-operator
+holes (`/` and `%` at `elab.rs:10782`, `+` NoOvf at `:10708`) are still
+declared in `elaborate_expr`'s Refused context and dropped, so `7 / 0` at the
+REPL adds one unreported `Nonzero 0` entry to the session's trusted base
+(Adversary M8 `evt_4jcsdc2rhwp5q`). It over-reports and the term does not
+reference the hole. It is repaired in
+`LANG-REFINEMENT-INTRODUCTION-OBLIGATION`, whose shared obligation gate
+covers these arms (Architect `evt_3h5n5b9y0wzf`).
+
 ## Closeout
 
 Merged `684e935fb` from exact `d02bb62e2` (PR run 37214263011). Verify QA
