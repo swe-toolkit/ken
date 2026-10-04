@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OBS-PI-CAST-GATE
 title: "Cast and J rules fire without checking a side condition their result needs: the Π cast projects from a neutral Eq Type (NotASigma), the index, parameter and level cast arms build ill-typed reducts, and infer_j accepts a motive with a wrong second domain. Gate each rule on its side condition and leave the term neutral otherwise"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -125,3 +125,13 @@ stop and report the mismatch.
   the Architect.
 - The inductive path needs more than a gate: stop to the Architect.
 - A spec change.
+
+## Closeout
+
+Merged `b46d96fe8` from exact `a89042e52` (PR run 37179046825). Kernel QA
+`evt_6mg3j327qzkq5`, Architect `evt_4w8qe0g5x2t58`, Decision
+`dec_3s6dn1zsvcgsk`. The Π cast fires only under `type_eq_has_components`.
+The inductive index path admits only the right-nested `Σ(Eq, …)` telescope.
+S3/S4 require every instantiated target-index template to convert. S6
+refuses mismatched family levels, and S11 checks the whole J motive type.
+Otherwise the term stays neutral. No spec or trusted-base change.
