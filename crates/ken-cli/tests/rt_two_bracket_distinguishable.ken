@@ -1,0 +1,53 @@
+program capabilities FS AFull
+proc err_body (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult Unit Unit)
+    (ResourceBodyErr Unit Unit MkUnit)
+
+proc ok_body (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult Unit Unit)
+    (ResourceBodyOk Unit Unit MkUnit)
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+        (withBuffer AFull Unit Unit (1 : Int) err_body)
+        (\first. bind (Coproduct (FSOp AFull) AmbientOp)
+          (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+          (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+          (withBuffer AFull Unit Unit (2 : Int) ok_body)
+          (\second. match first {
+            Err first_allocation_error |-> host_exit AFull (Failure 99);
+            Ok first_bracket |-> match first_bracket {
+              ResourceBracketOk first_value |-> match second {
+                Err second_allocation_error |-> host_exit AFull (Failure 99);
+                Ok second_bracket |-> match second_bracket {
+                  ResourceBracketOk second_value |-> host_exit AFull (Failure 99);
+                  ResourceBracketBodyError second_error |-> host_exit AFull (Failure 12);
+                  ResourceBracketReleaseError second_error |-> host_exit AFull (Failure 99);
+                  ResourceBracketBodyAndReleaseError second_body_error second_release_error |-> host_exit AFull (Failure 99)
+                }
+              };
+              ResourceBracketBodyError first_error |-> match second {
+                Err second_allocation_error |-> host_exit AFull (Failure 99);
+                Ok second_bracket |-> match second_bracket {
+                  ResourceBracketOk second_value |-> host_exit AFull (Failure 21);
+                  ResourceBracketBodyError second_error |-> host_exit AFull (Failure 99);
+                  ResourceBracketReleaseError second_error |-> host_exit AFull (Failure 99);
+                  ResourceBracketBodyAndReleaseError second_body_error second_release_error |-> host_exit AFull (Failure 99)
+                }
+              };
+              ResourceBracketReleaseError first_error |-> host_exit AFull (Failure 99);
+              ResourceBracketBodyAndReleaseError first_body_error first_release_error |-> host_exit AFull (Failure 99)
+            }
+          }))
+  }
