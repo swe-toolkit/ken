@@ -360,6 +360,27 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 - why: truncation eliminator computes. Since `P : Omega`, no respect
   condition is required.
 
+### observational/trunc-quot-elim-target-sort-boundary (soundness)
+- spec: `spec/10-kernel/16-observational.md` §5 (Quot-Elim-Ω and the
+  Type-target restriction), §6 (Trunc-Elim), and §8.2
+- given: `A : Type l`, `a : A`, `t := |a| : ‖A‖`; one context also
+  contains `MΩ : ‖A‖ → Ω_j`, `fΩ : (x : A) → MΩ |x|`,
+  `MT : ‖A‖ → Type k`, and `fT : (x : A) → MT |x|`. Let `r := a`
+  (well-scoped only). Query `infer` on core `QuotElim MΩ fΩ r t` and
+  `QuotElim MT fT r t`; also query `whnf` on the Ω-target term.
+- expect: Ω-target `infer` **accepts** at type `MΩ t`, and `whnf`
+  reduces to `fΩ a`. Type-target `infer` **rejects at the
+  Quot-scrutinee requirement**; no error variant or diagnostic text
+  is fixed.
+- why: The paired inputs share `A`, `a`, `t`, and `r`; only the
+  motive's target sort and corresponding method type differ. Both
+  methods are well-typed for the truncation injection. The method
+  check compares `M` arguments at `‖A‖ : Ω` and passes by Ω-PI
+  (`§8.2`); the Type-target guard is the first refusing premise. A
+  Type-target path that wrongly uses respect-free Trunc elimination
+  would accept the second input. The Ω arm remains the positive
+  control for `Quot-Elim-Ω` over truncation.
+
 ### observational/trunc-or-exists
 - spec: `spec/10-kernel/16-observational.md` par. 6
 - given: `P :|| Nat + Bool ||` (i.e. `P or` with `Nat` and `Bool`),
