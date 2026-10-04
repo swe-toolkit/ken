@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CALL-SITE-OBLIGATION-CHANNEL
 title: "A call-site Requires hole raised in an instance field, a space cell or elaborate_expr is postulated into the trusted base but never reported as an obligation, because those contexts drop cx.obligations. Report every such hole or refuse the call, so the trusted-base delta always equals the reported holes"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
