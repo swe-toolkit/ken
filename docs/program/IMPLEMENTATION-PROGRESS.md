@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-04 22:22:22Z — from 854 issue file(s) in `docs/program/issues/`.
+2026-10-04 22:48:36Z — from 854 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -159,7 +159,7 @@ the committed file matches the generator's output.
 | `CAT-SORT` | Verified insertion sort — Algorithm/Sorting: sort an Ord-ordered List with the Sorted and Permutation laws proved, the simplest-first anchor of the Foundation expressibility trial | merged | foundation | M | none | — |
 | `CAT-SYSTEM-ERROR-PRELUDE-MOVE` | Move the PX9 System.Error classification model (SystemError, Operation, ResourceRef, SafeContext, Transience, Idempotence, RetryGuidance, file_error_to_system, error_transience, operation_idempotence, retry_guidance) out of the prelude into a catalog package, with its two spec-normative laws as kernel-checked proofs; fifth L3 slice of the minimal-prelude program | merged | foundation | M | architect | — |
 | `CAT-SYSTEM-IO-LAWS` | System.IO's five writeAll theorems prove facts about helper functions, not about writeAll: write_all_first_error error = Err error, write_all_complete Zero = True. Spec 38 §1.7.3 requires kernel-checked terms over the real loop for strict decrease, fuel sufficiency, success-implies-full-transfer and error-prefix preservation. Prove them over the actual writeAll tree at zero TCB | merged | foundation | M | architect | — |
-| `CAT-SYSTEM-RESOURCE-LAWS` | System.Resource promises acquire-before-body, settle-after-body and a fixed body/release result ordering, but only two interpreter fixtures check it. Prove the bracket's sequencing and settlement ordering over the existing effect tree | active | foundation | S | none | — |
+| `CAT-SYSTEM-RESOURCE-LAWS` | System.Resource promises acquire-before-body, settle-after-body and a fixed body/release result ordering, but only two interpreter fixtures check it. Prove the bracket's sequencing and settlement ordering as prelude theorems beside the definitions, before the hide | active | foundation | S | none | — |
 | `CAT-TRANSPORT-COMBINATOR-CONSOLIDATION` | Transport's header lists subst as public API but declares it private, and eleven body-identical private copies of Transport's combinators sit in seven packages. Publish subst at zero TCB, correct the header for cast, and retire the eleven copies to Transport | merged | foundation | M | architect | — |
 | `CAT-VALIDATION-AP-ERROR-LAW` | Proof-backfill for Data/Sums/Validation.ken.md: prove privately that validation_ap accumulates two errors by the supplied semigroup in order -- for every e, a, b, sg and errors left, right, applying Invalid left to Invalid right gives Invalid (sg.op left right) -- instead of only the concrete NonEmpty String example | merged | foundation | S | architect | — |
 | `CAT-VEC-MAP-IDENTITY-LAW` | Proof-backfill for Data/Vector/Vector.ken.md: prove privately that map with the identity function returns its input -- for every a, n and xs : Vec a n, map a a n (idf a) xs = xs, using the existing public identity function idf -- with a test that pins the law's checked proposition, not only its name and trust | merged | foundation | S | architect | — |
