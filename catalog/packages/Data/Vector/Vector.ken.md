@@ -184,6 +184,35 @@ theorem lookup_map
       }
   }
 
+theorem lookup_zip_with
+      (a : Type)
+      (b : Type)
+      (c : Type)
+      (n : Nat)
+      (f : a → b → c)
+      (xs : Vec a n)
+      (ys : Vec b n)
+      (i : Fin n)
+    : Equal c
+        (lookup c n (zip_with a b c n f xs ys) i)
+        (f (lookup a n xs i) (lookup b n ys i)) =
+  match i {
+    FZero m ↦
+      match xs {
+        VCons _ x tail_xs ↦
+          match ys {
+            VCons _ y tail_ys ↦ Refl
+          }
+      };
+    FSuc m rest ↦
+      match xs {
+        VCons _ x tail_xs ↦
+          match ys {
+            VCons _ y tail_ys ↦ lookup_zip_with a b c m f tail_xs tail_ys rest
+          }
+      }
+  }
+
 theorem zip_with_map
       (a : Type)
       (a2 : Type)
@@ -277,7 +306,10 @@ maps equals mapping their composite `comp a b c g f`. The two empty cases
 collapse; in each successor case, `cong` lifts the recursive equality under
 `VCons`. Looking up an element after mapping is the same as mapping the
 original lookup result: matching `Fin n`, then its vector, follows the index
-into the successor tail. These laws are private checked proofs, not exports.
+into the successor tail. To look up after `zip_with`, match the bounded index
+first and then peel both vectors at that index. The first-position case reduces
+reflexively; the successor case reuses the same property for both tails. These
+laws are private checked proofs, not exports.
 
 Pointwise alignment of `k` with the mapped binary function makes mapping
 before `zip_with` equivalent to zipping with `k`. In the successor case,
@@ -285,7 +317,7 @@ before `zip_with` equivalent to zipping with `k`. In the successor case,
 and the recursive tail equality under `VCons`; `trans` joins the two changes.
 This checked private theorem works at arbitrary element types and lengths.
 
-The checked examples first use all five backfilled private laws at their
+The checked examples use the private computation and lookup laws at their
 generic propositions, then illustrate the operations at concrete indices.
 The Boolean helpers exist only for those illustrations and are not package laws.
 
@@ -397,12 +429,11 @@ zip-with operation.
 
 The implementation recurses structurally. `zip_with` and `lookup` refine a
 sibling indexed value through nested matches. Generic cons computation for
-`zip_with` checks by `Refl`. Lookup after `zip_with` remains outside the
-proved laws because its indexed sibling tails do not yet refine in the
-required generic goal. `zip_with`/map naturality instead states a pointwise
-premise on the combining function; this states the general law without an
-inline lambda in a proposition type. Concrete checked examples illustrate
-the operations but do not stand in for those general laws.
+`zip_with` checks by `Refl`. Lookup after `zip_with` follows its bounded index
+through both input tails and is checked generically. `zip_with`/map naturality
+states a pointwise premise on the combining function; this states the general
+law without an inline lambda in a proposition type. Concrete checked
+examples illustrate the operations but do not stand in for those general laws.
 
 ## References
 
@@ -426,8 +457,8 @@ surfaces. The private map and naturality laws reuse
 
 The public API is `Vec`, `VNil`, `VCons`, `Fin`, `FZero`, `FSuc`, `head`,
 `tail`, `map`, `zip_with`, and `lookup`. Eight computation theorems, map
-composition, lookup after map, and pointwise `zip_with`/map naturality are
-private checked laws.
+composition, lookup after map and after `zip_with`, and pointwise
+`zip_with`/map naturality are private checked laws.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
