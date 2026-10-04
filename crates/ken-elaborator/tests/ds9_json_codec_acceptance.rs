@@ -652,6 +652,138 @@ fn json_size_consumes_array_and_pair_nested_object_results() {
     );
 }
 
+/// Promise class: durable invariant for the nine private size equations.
+/// MEASURED: roots loading installs each law as a transparent, provider-owned
+/// kernel declaration; independent clients restate every full proposition and
+/// apply the real proof, with raw checked types equal to the provider types.
+/// CLAIMED: the package specifies the size fold on every Json constructor and
+/// right-successor addition without a new assumption or public name. THE GAP:
+/// this pins the checked propositions rather than their particular proof
+/// structure. Separate production-operand mutations exercise the computation.
+#[test]
+fn json_size_constructor_equations_are_private_checked_propositions() {
+    let (mut env, trust_before) = json_env();
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], JSON_MODULE)
+        .expect("Json owner must retain its checked identities");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "Json laws must add no local trust beyond the loaded provider closure"
+    );
+    env.elaborate_file(JSON_PUBLIC_IMPORT)
+        .expect("the existing Json public API must still be importable");
+
+    let laws = [
+        (
+            "json_nat_add_right_suc",
+            "theorem contract_json_nat_add_right_suc (m : Nat) (n : Nat)
+               : Equal Nat (json_nat_add m (Suc n)) (Suc (json_nat_add m n)) =
+               json_nat_add_right_suc m n",
+        ),
+        (
+            "json_size_null",
+            "theorem contract_json_size_null
+               : Equal Nat (json_size JsonNull) (Suc Zero) = json_size_null",
+        ),
+        (
+            "json_size_bool",
+            "theorem contract_json_size_bool (flag : Bool)
+               : Equal Nat (json_size (JsonBool flag)) (Suc Zero) = json_size_bool flag",
+        ),
+        (
+            "json_size_number",
+            "theorem contract_json_size_number (number : Int)
+               : Equal Nat (json_size (JsonNumber number)) (Suc Zero) =
+               json_size_number number",
+        ),
+        (
+            "json_size_string",
+            "theorem contract_json_size_string (text : String)
+               : Equal Nat (json_size (JsonString text)) (Suc Zero) =
+               json_size_string text",
+        ),
+        (
+            "json_size_array_nil",
+            "theorem contract_json_size_array_nil
+               : Equal Nat (json_size (JsonArray (Nil Json))) (Suc Zero) =
+               json_size_array_nil",
+        ),
+        (
+            "json_size_array_cons",
+            "theorem contract_json_size_array_cons (child : Json) (rest : List Json)
+               : Equal Nat
+                   (json_size (JsonArray (Cons Json child rest)))
+                   (json_nat_add (json_size child) (json_size (JsonArray rest))) =
+               json_size_array_cons child rest",
+        ),
+        (
+            "json_size_object_nil",
+            "theorem contract_json_size_object_nil
+               : Equal Nat (json_size (JsonObject (Nil (Pair String Json))))
+                   (Suc Zero) = json_size_object_nil",
+        ),
+        (
+            "json_size_object_cons",
+            "theorem contract_json_size_object_cons
+                 (key : String) (value : Json) (rest : List (Pair String Json))
+               : Equal Nat
+                   (json_size
+                     (JsonObject
+                       (Cons (Pair String Json)
+                         (mk_pair String Json key value) rest)))
+                   (json_nat_add (json_size value) (json_size (JsonObject rest))) =
+               json_size_object_cons key value rest",
+        ),
+    ];
+
+    let prefix = format!("{JSON_MODULE}.");
+    let private_aliases = env
+        .globals
+        .iter()
+        .filter_map(|(qualified, id)| {
+            qualified
+                .strip_prefix(&prefix)
+                .map(|local| (local.to_owned(), *id))
+        })
+        .collect::<Vec<_>>();
+    for (name, client) in laws {
+        let id = catalog_or::provider_owned_id(&env, &owned, JSON_MODULE, name)
+            .unwrap_or_else(|error| panic!("{name} must belong to Json: {error}"));
+        let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("owned law must exist") else {
+            panic!("{name} must be a registered kernel-checked theorem, not an assumption");
+        };
+        let actual = ty.clone();
+        match env.elaborate_file(&format!("import {JSON_MODULE} ({name})")) {
+            Err(ElabError::UnboundName { name: rejected, .. }) => {
+                assert_eq!(rejected, format!("{JSON_MODULE}.{name}"));
+            }
+            other => panic!("{name} must remain private, got {other:?}"),
+        }
+        env.globals.extend(private_aliases.iter().cloned());
+        env.elaborate_file(client)
+            .unwrap_or_else(|error| panic!("{name} full contract must elaborate: {error:?}"));
+        let client_name = format!("contract_{name}");
+        let client_id = env.globals[&client_name];
+        let Decl::Transparent { ty: expected, .. } = env
+            .env
+            .lookup(client_id)
+            .expect("client theorem must register")
+        else {
+            panic!("{client_name} must be a checked, transparent theorem");
+        };
+        assert_eq!(
+            &actual, expected,
+            "{name} must have the client's exact generic checked proposition"
+        );
+    }
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "the independently checked clients must not extend the trusted base"
+    );
+}
+
 #[test]
 fn decoder_recursive_reaches_array_and_object_many_branches() {
     // Transition sentinel (D3-probe; retire when the full DS-9 decoder lands).
