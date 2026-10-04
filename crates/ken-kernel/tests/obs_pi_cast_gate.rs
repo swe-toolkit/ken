@@ -366,10 +366,9 @@ fn index_rewrite_checks_later_template_after_earlier_forced_position() {
     );
 }
 
-/// The same target-index check rejects a parameter-only rewrite whose result
-/// carries the wrong index, while preserving a fixed-index constructor.
-#[test]
-fn parameter_rewrite_checks_rebuilt_target_index() {
+/// The parameter arm's two constructors differ only in whether their target
+/// index follows the parameter or stays at the original fixed quotient class.
+fn parameter_rewrite_fixture() -> (GlobalEnv, GlobalId, Term, Term, Term, Term) {
     let mut env = GlobalEnv::new();
     let bool_id = family(
         &mut env,
@@ -418,17 +417,31 @@ fn parameter_rewrite_checks_rebuilt_target_index() {
     let former = Term::indformer(indexed, vec![]);
     let source = Term::app(Term::app(former.clone(), qleft.clone()), qleft.clone());
     let target = Term::app(Term::app(former, qright.clone()), qleft.clone());
-    let invalid_value = Term::app(ctor(&env, indexed, 0, vec![]), qleft.clone());
-    let (ctx, bad) = cast(&mut env, source.clone(), target.clone(), invalid_value);
-    assert_stuck(&env, &ctx, &bad);
-    let valid_value = Term::app(ctor(&env, indexed, 1, vec![]), qleft);
-    let (ctx, good) = cast(&mut env, source, target, valid_value);
-    let reduct = assert_reduct_checks(&env, &ctx, &good);
-    assert_eq!(reduct, Term::app(ctor(&env, indexed, 1, vec![]), qright));
+    (env, indexed, source, target, qleft, qright)
 }
 
+/// Rebuilding `rfl qright` changes the target index away from `qleft`.
 #[test]
-fn level_instantiation_mismatch_stays_neutral_but_same_instantiation_computes() {
+fn parameter_rewrite_checks_rebuilt_target_index() {
+    let (mut env, indexed, source, target, qleft, _) = parameter_rewrite_fixture();
+    let value = Term::app(ctor(&env, indexed, 0, vec![]), qleft);
+    let (ctx, redex) = cast(&mut env, source, target, value);
+    assert_stuck(&env, &ctx, &redex);
+}
+
+/// `fixed qright` still targets `qleft`, so the same parameter arm reduces.
+#[test]
+fn parameter_rewrite_preserves_fixed_target_index() {
+    let (mut env, indexed, source, target, qleft, qright) = parameter_rewrite_fixture();
+    let value = Term::app(ctor(&env, indexed, 1, vec![]), qleft);
+    let (ctx, redex) = cast(&mut env, source, target, value);
+    assert_eq!(
+        assert_reduct_checks(&env, &ctx, &redex),
+        Term::app(ctor(&env, indexed, 1, vec![]), qright)
+    );
+}
+
+fn level_cast_fixture() -> (GlobalEnv, GlobalId, Term, Term, Term, Term, Term, Level) {
     let mut env = GlobalEnv::new();
     let indexed = family(
         &mut env,
@@ -447,12 +460,23 @@ fn level_instantiation_mismatch_stays_neutral_but_same_instantiation_computes() 
     let source = Term::app(Term::indformer(indexed, vec![l0.clone()]), p.clone());
     let target_mismatch = Term::app(Term::indformer(indexed, vec![l1]), q.clone());
     let value = Term::app(ctor(&env, indexed, 0, vec![l0.clone()]), p);
-    let (ctx, bad) = cast(&mut env, source.clone(), target_mismatch, value.clone());
-    assert_stuck(&env, &ctx, &bad);
     let target = Term::app(Term::indformer(indexed, vec![l0.clone()]), q.clone());
-    let (ctx, good) = cast(&mut env, source, target, value);
+    (env, indexed, source, target_mismatch, target, value, q, l0)
+}
+
+#[test]
+fn level_instantiation_mismatch_stays_neutral() {
+    let (mut env, _, source, target_mismatch, _, value, _, _) = level_cast_fixture();
+    let (ctx, redex) = cast(&mut env, source, target_mismatch, value);
+    assert_stuck(&env, &ctx, &redex);
+}
+
+#[test]
+fn level_same_instantiation_still_computes() {
+    let (mut env, indexed, source, _, target, value, q, l0) = level_cast_fixture();
+    let (ctx, redex) = cast(&mut env, source, target, value);
     assert_eq!(
-        assert_reduct_checks(&env, &ctx, &good),
+        assert_reduct_checks(&env, &ctx, &redex),
         Term::app(ctor(&env, indexed, 0, vec![l0]), q)
     );
 }
