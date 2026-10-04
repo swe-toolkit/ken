@@ -1,7 +1,7 @@
 ---
 id: KERNEL-QUOT-FORM-EQUIVALENCE
 title: "Quot-Form accepts any relation at any Omega level, which is what made quotient equality unsound and lets its reduct sit above the Eq's level. Make Quot-Form take an IsEquiv proof with the relation at the carrier's level, and restore Eq at quotient classes reducing to the relation"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1
