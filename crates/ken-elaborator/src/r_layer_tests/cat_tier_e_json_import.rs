@@ -7,11 +7,12 @@ mod catalog_publication;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ken_elaborator::{Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind, literate, parser};
+use ken_elaborator::{literate, parser, Decl as SurfaceDecl, ElabEnv, ElabError, ImportKind};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const JSON: &str = "Data.Serialization.Json";
-const JSON_SOURCE: &str = include_str!("../../../../catalog/packages/Data/Serialization/Json.ken.md");
+const JSON_SOURCE: &str =
+    include_str!("../../../../catalog/packages/Data/Serialization/Json.ken.md");
 
 fn names(items: &[&str]) -> BTreeSet<String> {
     items.iter().map(|item| (*item).to_owned()).collect()
@@ -126,8 +127,9 @@ fn assert_private(surface: &str) {
 /// Promise class: normative compatibility vector.
 ///
 /// MEASURED: the real Ken parser reads Json's module dependency interface and
-/// returns exactly the three Order-factored module/name sets. CLAIMED: Json adopts the
-/// measured selective imports without an unused addition or ambient residue.
+/// returns exactly the four selective module/name sets, including the shared
+/// proof combinators. CLAIMED: Json adopts its checked providers without an
+/// unused addition or ambient residue.
 /// THE GAP: AST equality establishes the declared dependency interface but not
 /// that each name reaches checked code, which the provider-identity test covers.
 #[test]
@@ -155,6 +157,7 @@ fn json_selective_import_ledger_is_exact() {
         })
         .collect::<BTreeMap<_, _>>();
     let expected = BTreeMap::from([
+        ("Core.Logic.Transport".to_string(), names(&["cong", "sym"])),
         (
             "Capability.Parsing.Cursor".to_string(),
             names(&[
@@ -212,16 +215,18 @@ fn json_loader_visible_inventory_is_exact() {
 
 /// Promise class: normative compatibility vector.
 ///
-/// MEASURED: every non-base identity in Json's checked declarations is exactly
-/// one of the Derived, Cursor or Order identities, including the three
-/// Cursor selectors retained inside normalized law types. CLAIMED: Json has no
-/// undeclared provider or unexpected Tier-E edge. THE GAP: checked-core identity
-/// closure cannot distinguish an unused extra source import, while the strict
-/// roots loader and the evidence-frontier parsed-edge census cover that residue.
+/// MEASURED: after excluding Json's six constructors by their checked family
+/// identity, every non-base, non-owned identity in Json's checked declarations
+/// is exactly a Derived, Cursor, Order, or Transport proof-provider identity.
+/// CLAIMED: Json has no undeclared provider or unexpected Tier-E edge. THE GAP:
+/// checked-core identity closure cannot distinguish an unused extra source
+/// import; the strict roots loader and parsed-edge census cover that residue.
 #[test]
 fn json_checked_provider_identity_closure_is_exact() {
     let (env, owned, base_ids) = load_json();
     let expected_names = names(&[
+        "Core.Logic.Transport.cong",
+        "Core.Logic.Transport.sym",
         "Capability.Parsing.Cursor.CursorAdvanceProgress",
         "Capability.Parsing.Cursor.CursorEndValid",
         "Capability.Parsing.Cursor.CursorLaws",
@@ -240,6 +245,34 @@ fn json_checked_provider_identity_closure_is_exact() {
         .map(|name| env.globals[name])
         .collect::<BTreeSet<_>>();
 
+    let json_id = env.globals[&format!("{JSON}.Json")];
+    assert!(
+        owned.contains(&json_id),
+        "the Json family must be provider-owned"
+    );
+    let constructors = env
+        .env
+        .inductive(json_id)
+        .expect("Json must be a checked inductive family")
+        .constructors
+        .iter()
+        .map(|constructor| constructor.id)
+        .collect::<BTreeSet<_>>();
+    let expected_constructors = [
+        "JsonNull",
+        "JsonBool",
+        "JsonNumber",
+        "JsonString",
+        "JsonArray",
+        "JsonObject",
+    ]
+    .into_iter()
+    .map(|name| env.globals[&format!("{JSON}.{name}")])
+    .collect::<BTreeSet<_>>();
+    assert_eq!(constructors, expected_constructors);
+    let mut local = owned.clone();
+    local.extend(constructors);
+
     let mut resolved = BTreeSet::new();
     for identity in &owned {
         collect_decl_globals(
@@ -250,7 +283,7 @@ fn json_checked_provider_identity_closure_is_exact() {
         );
     }
     let external = resolved
-        .difference(&owned)
+        .difference(&local)
         .copied()
         .collect::<BTreeSet<_>>()
         .difference(&base_ids)
@@ -263,7 +296,8 @@ fn json_checked_provider_identity_closure_is_exact() {
         .iter()
         .filter(|(name, identity)| {
             external.contains(identity)
-                && (name.starts_with("Capability.Parsing.Cursor.")
+                && (name.starts_with("Core.Logic.Transport.")
+                    || name.starts_with("Capability.Parsing.Cursor.")
                     || name.starts_with("Data.Collections.Derived.")
                     || name.starts_with("Data.Numeric.Nat.Order."))
         })
