@@ -356,6 +356,10 @@ pub struct GlobalEnv {
     /// registered — bookkeeping metadata (like `deceq_certs`), never a
     /// `trusted_base()` member.
     int_lit_ty: Option<GlobalId>,
+    /// The `Unit` family (`17 §2` Unit-η), set once by
+    /// [`crate::check::register_unit_type`]. `None` until registered, and
+    /// then no `data` family has η, which is `14 §4`'s default for `data`.
+    unit_type: Option<GlobalId>,
     /// K3 literal views: source syntax is validated against declared carriers
     /// before its immutable value is installed; never sourced from side tables
     /// supplied at conversion time.
@@ -390,6 +394,7 @@ impl PartialEq for GlobalEnv {
             tt_id,
             deceq_certs,
             int_lit_ty,
+            unit_type,
             literal_char_view,
             checked_string_carrier,
             checked_char_carrier,
@@ -412,6 +417,7 @@ impl PartialEq for GlobalEnv {
             && tt_id == &other.tt_id
             && deceq_certs == &other.deceq_certs
             && int_lit_ty == &other.int_lit_ty
+            && unit_type == &other.unit_type
             && literal_char_view == &other.literal_char_view
             && checked_string_carrier == &other.checked_string_carrier
             && checked_char_carrier == &other.checked_char_carrier
@@ -983,6 +989,15 @@ impl GlobalEnv {
     /// rather than assume a default.
     pub fn int_lit_type(&self) -> Option<GlobalId> {
         self.int_lit_ty
+    }
+
+    /// The registered `Unit` family, if any (`17 §2`).
+    pub fn unit_type(&self) -> Option<GlobalId> {
+        self.unit_type
+    }
+
+    pub(crate) fn install_unit_type(&mut self, id: GlobalId) {
+        self.unit_type = Some(id);
     }
 
     /// Checked literal payload for interpreter/native lowering and conversion.

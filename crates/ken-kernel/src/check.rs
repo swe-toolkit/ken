@@ -1630,6 +1630,26 @@ pub fn declare_primitive(
     Ok(id)
 }
 
+/// Designate the one `data` family that has Unit-η (`17 §2`). Every other
+/// `data` declaration, including a single-constructor one, has none (`14 §4`).
+/// The target must be a monomorphic, unparametrized, non-indexed family with
+/// exactly one constructor and no fields, so a designation can only name a
+/// family on which η is consistent. Once only.
+pub fn register_unit_type(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
+    let unit_shaped = env.inductive(id).is_some_and(|ind| {
+        ind.level_params.is_empty()
+            && ind.params.is_empty()
+            && ind.indices.is_empty()
+            && ind.constructors.len() == 1
+            && ind.constructors[0].args.is_empty()
+    });
+    if env.unit_type().is_some() || !unit_shaped {
+        return Err(KernelError::Msg("invalid or duplicate Unit type".into()));
+    }
+    env.install_unit_type(id);
+    Ok(())
+}
+
 /// Register a literal carrier when its type is admitted. Prelude declarations
 /// may contain checked String literals before the List Char view is installed.
 pub fn register_checked_string_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
