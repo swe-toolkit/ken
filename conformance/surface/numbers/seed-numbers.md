@@ -304,16 +304,15 @@ not depend on the spelling.
 - spec: `35 §2.4`, `§4.1`, `18a §5.9.1 (1), (3)`, `31 §3`
 - given: `const char_D7FF : Char = 55295` (U+D7FF) and
   `const char_D800 : Char = 55296` (U+D800)
-- expect: the first accepts as `Char` with scalar U+D7FF; the second rejects.
-  Both use bare integer literals in a `Char`-typed position, not an escaped
-  character literal or `Int.toChar`.
-- why: a typed numeric literal uses its expected type (`35 §4.1`), and `Char`
-  admits only Unicode scalars (`35 §2.4`; `18a §5.9.1`). The declarations have
-  identical form and expected type; only the scalar value changes, so the
-  valid boundary value and the first surrogate produce opposite verdicts on
-  this direct integer-literal path. The reported U+D800 acceptance remains
-  unreproduced; this case does not claim current implementation behavior,
-  tests, or CI.
+- expect: both declarations elaborate at `Char`. The U+D7FF value emits
+  `isScalar 55295` and leaves no open refinement obligation; U+D800 emits
+  `isScalar 55296` as an open, undischarged obligation. Neither is an escaped
+  character literal or a call to `Int.toChar`.
+- why: a typed numeric literal uses its expected type (`35 §4.1`). `Char`
+  carries a scalar predicate (`18a §5.9.1`), so both introductions emit its
+  obligation (`34 §5`); only the valid boundary value discharges. A missed
+  obligation on the surrogate would falsely report verification. This row
+  observes the obligation and its discharge status, not declaration rejection.
 
 ## Coverage map (AC → cases)
 

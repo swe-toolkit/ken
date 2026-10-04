@@ -226,14 +226,22 @@ pub fn register_decimal_char(elab: &mut ElabEnv) -> Result<DecimalCharEnv, ElabE
     // Scalar bounds `[0, 0xD7FF] ∪ [0xE000, 0x10FFFF]` spelled in decimal
     // (this grammar has no hex-literal lexing): 55295 / 57344 / 1114111.
     // Closed-interval `leq_int` bounds exclude the surrogate block without
-    // needing strict `<` (`18a §5.9.1(2)`); value-level `and_bool`/`or_bool`
-    // (not the `Ω`-sort) compose the two disjoint intervals — required, not
-    // forbidden (the forbidden form is a raw `∨`/`∃` as `isScalar`'s own
-    // Ω-sort, which `IsTrue (<Bool>)` below never is).
+    // needing strict `<` (`18a §5.9.1(2)`). Transparent Bool elimination
+    // retains the same interval predicate but exposes the selected arm to
+    // conversion when the integer comparisons reduce at a closed literal.
+    elab.elaborate_decl(
+        "fn inLowerScalarBool (c : Int) : Bool = \
+         match (leq_int 0 c) { True |-> leq_int c 55295 ; False |-> False }",
+    )
+    .map_err(|e| ElabError::Internal(format!("inLowerScalarBool failed: {}", e)))?;
+    elab.elaborate_decl(
+        "fn inUpperScalarBool (c : Int) : Bool = \
+         match (leq_int 57344 c) { True |-> leq_int c 1114111 ; False |-> False }",
+    )
+    .map_err(|e| ElabError::Internal(format!("inUpperScalarBool failed: {}", e)))?;
     elab.elaborate_decl(
         "fn inRangeBool (c : Int) : Bool = \
-         or_bool (and_bool (leq_int 0 c) (leq_int c 55295)) \
-                 (and_bool (leq_int 57344 c) (leq_int c 1114111))",
+         match (inLowerScalarBool c) { True |-> True ; False |-> inUpperScalarBool c }",
     )
     .map_err(|e| ElabError::Internal(format!("inRangeBool failed: {}", e)))?;
 

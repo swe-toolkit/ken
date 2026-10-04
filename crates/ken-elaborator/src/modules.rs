@@ -3753,6 +3753,7 @@ fn elaborate_mutual_group_with_fixities(
         &standard_operators_for_group,
         &mut elab.fixities,
         &mut elab.fixity_spans,
+        &elab.refinement_facts,
         &member_fixities,
         members,
     )
