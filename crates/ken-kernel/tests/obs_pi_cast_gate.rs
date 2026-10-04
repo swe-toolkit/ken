@@ -195,6 +195,135 @@ fn dependent_earlier_index_decomposes_but_nonconstructor_change_stays_neutral() 
     assert_stuck(&env, &ctx, &redex);
 }
 
+/// The constructor has only one Nat argument, forced by every changed
+/// index, so its index cast never projects an equality proof for a dependent
+/// constructor argument. The fourth index either depends on the first index
+/// or has the fixed type Nat; both cast paths must reach the shape gate.
+fn deep_index_shape_fixture(last_index_dependent: bool) -> (GlobalEnv, Term, Term, Term, Term) {
+    let mut env = GlobalEnv::new();
+    let nat_id = declare_inductive(&mut env, |id| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::indformer(id, vec![])],
+                target_indices: vec![],
+            },
+        ],
+    })
+    .unwrap();
+    let nat = Term::indformer(nat_id, vec![]);
+    let suc = ctor(&env, nat_id, 1, vec![]);
+    let n0 = opaque(&mut env, "deep_n0", nat.clone());
+    let n1 = opaque(&mut env, "deep_n1", nat.clone());
+    let box_id = family(
+        &mut env,
+        vec![],
+        vec![],
+        vec![nat.clone()],
+        vec![CtorSpec {
+            args: vec![nat.clone()],
+            target_indices: vec![Term::app(suc.clone(), Term::var(0))],
+        }],
+    );
+    let box_ty = Term::indformer(box_id, vec![]);
+    let mk_box = ctor(&env, box_id, 0, vec![]);
+    let mut indices = vec![
+        nat.clone(),
+        Term::app(box_ty.clone(), Term::var(0)),
+        Term::app(box_ty.clone(), Term::var(1)),
+    ];
+    indices.push(if last_index_dependent {
+        Term::app(box_ty, Term::var(2))
+    } else {
+        nat.clone()
+    });
+    let mut target_indices = vec![
+        Term::app(suc.clone(), Term::var(0)),
+        Term::app(mk_box.clone(), Term::var(0)),
+        Term::app(mk_box.clone(), Term::var(0)),
+    ];
+    target_indices.push(if last_index_dependent {
+        Term::app(mk_box.clone(), Term::var(0))
+    } else {
+        Term::app(suc.clone(), Term::var(0))
+    });
+    let indexed = family(
+        &mut env,
+        vec![],
+        vec![],
+        indices,
+        vec![CtorSpec {
+            args: vec![nat],
+            target_indices,
+        }],
+    );
+    let former = Term::indformer(indexed, vec![]);
+    let endpoints = |n: &Term| {
+        let mut result = former.clone();
+        result = Term::app(result, Term::app(suc.clone(), n.clone()));
+        for _ in 0..2 {
+            result = Term::app(result, Term::app(mk_box.clone(), n.clone()));
+        }
+        Term::app(
+            result,
+            if last_index_dependent {
+                Term::app(mk_box.clone(), n.clone())
+            } else {
+                Term::app(suc.clone(), n.clone())
+            },
+        )
+    };
+    let source = endpoints(&n0);
+    let target = endpoints(&n1);
+    let value = Term::app(ctor(&env, indexed, 0, vec![]), n0);
+    let rebuilt = Term::app(ctor(&env, indexed, 0, vec![]), n1);
+    (env, source, target, value, rebuilt)
+}
+
+/// Transition sentinel: four consecutively dependent indices currently leave
+/// Eq Type neutral. If the equality builder later supports that telescope,
+/// review this case and replace the neutral witness rather than deleting the
+/// shape condition. Removing only that condition makes this cast reduce.
+#[test]
+fn index_cast_waits_for_neutral_four_index_type_equality_without_projection() {
+    let (mut env, source, target, value, _) = deep_index_shape_fixture(true);
+    let ctx = Context::new();
+    let eq = Term::Eq(
+        Box::new(Term::Type(Level::zero())),
+        Box::new(source.clone()),
+        Box::new(target.clone()),
+    );
+    assert_eq!(infer(&env, &ctx, &eq), Ok(Term::Omega(Level::zero().suc())));
+    assert_eq!(whnf(&env, &ctx, &eq), eq, "no index telescope");
+    let (ctx, redex) = cast(&mut env, source, target, value);
+    assert_stuck(&env, &ctx, &redex);
+}
+
+/// Same index-change and no-projection constructor, but the fourth binder is
+/// independent. Its Eq Type exposes a typed Sigma and the cast still reduces.
+#[test]
+fn index_cast_with_decomposing_four_index_type_equality_still_reduces() {
+    let (mut env, source, target, value, rebuilt) = deep_index_shape_fixture(false);
+    let ctx = Context::new();
+    let eq = Term::Eq(
+        Box::new(Term::Type(Level::zero())),
+        Box::new(source.clone()),
+        Box::new(target.clone()),
+    );
+    let reduct = whnf(&env, &ctx, &eq);
+    assert!(matches!(reduct, Term::Sigma(..)));
+    assert!(infer(&env, &ctx, &reduct).is_ok());
+    let (ctx, redex) = cast(&mut env, source, target, value);
+    assert_eq!(assert_reduct_checks(&env, &ctx, &redex), rebuilt);
+}
+
 /// A one-index family exposes a single Eq component, not an outer Sigma.
 /// An unhandled *constant* target-index template must not be silently carried.
 #[test]
