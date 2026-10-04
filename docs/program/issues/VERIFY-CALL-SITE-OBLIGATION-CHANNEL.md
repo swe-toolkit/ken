@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CALL-SITE-OBLIGATION-CHANNEL
 title: "A call-site Requires hole raised in an instance field, a space cell or elaborate_expr is postulated into the trusted base but never reported as an obligation, because those contexts drop cx.obligations. Report every such hole or refuse the call, so the trusted-base delta always equals the reported holes"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
@@ -77,3 +77,11 @@ stop and report the mismatch; do not build around it.
 A `requires` call in a type position (`elab_type`'s `RType::RApp` arm,
 `elab.rs:1115`) is refused even with its premise in scope (Adversary F2). It
 fails closed and stays out of this node.
+
+A declaration that fails after `precondition_proof` has declared its hole
+leaves an orphan hole postulate in a reusable `ElabEnv`: the REPL `Session`,
+`modules::expand_and_elaborate`, and `load_unit` (Architect
+`evt_7x9fznedwjygv`). It affects every form without pending admission. The
+orphan over-reports in `trusted_base()` and is unreachable from source, so it
+is queued, not framed. Re-raise it when a product path reuses a failed
+session's environment, including `compiler_driver.rs:4251`.
