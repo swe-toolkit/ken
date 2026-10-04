@@ -188,7 +188,7 @@ fn relation_one_omega_level_above_carrier_is_refused() {
 fn relation_second_domain_must_match_the_carrier() {
     let mut env = GlobalEnv::new();
     let (a, _) = nullary(&mut env, 2);
-    let (b, _) = nullary(&mut env, 1);
+    let (b, _, _) = nat_with_zero_and_one(&mut env);
     let r = relation(&a, &b, top_term(&env), Level::zero());
     let q = quot(
         a.clone(),
