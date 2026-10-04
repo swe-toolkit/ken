@@ -17,10 +17,10 @@ origin: "The last unframed row of docs/program/CATALOG-PROOF-COMPLETENESS-SURVEY
 ## Objective
 
 The guarantees `Capability/System/Resource.ken.md` states in prose are
-checked theorems: each of `withResource`, `withBuffer` and `withMapping`
+checked, citable theorems: each of `withResource`, `withBuffer` and `withMapping`
 acquires before its body and settles after it, and the settled result is
-fixed by the body result and the release result. No new trust, and no new
-resolvable name.
+fixed by the body result and the release result. No new trust, and no
+new resolvable definition.
 
 ## Reframe (Architect `evt_7zjnsss4tdbt2`, measured on `origin/main`)
 
@@ -85,11 +85,11 @@ Theorems in `crates/ken-elaborator/src/prelude.rs`, placed after the
      the same resource;
    - `release_if_live` is the release `Vis` continued by `Ret` of the
      settlement.
-3. **Visibility: hidden.** Add the theorem names to `private_names`. The
-   operator has ruled the prelude a fixed surface that must be the minimal
-   set required (2026-09-25), and a visible theorem name is one more
-   reserved name. The focused test reaches each theorem by checked
-   `GlobalId`.
+3. **Visibility: visible** (operator 2026-10-04, choosing the simpler form).
+   Follow the `write_all_*` precedent. Leave the theorem names out of
+   `private_names`, so they are nameable proofs that users can cite. The
+   helpers they mention stay hidden. No definition, constructor or effect
+   becomes resolvable, and a theorem adds no trust.
 4. **Package prose.** `Resource.ken.md` names the prelude theorems where it
    states each guarantee. Add no package theorem.
 
@@ -98,8 +98,8 @@ Theorems in `crates/ken-elaborator/src/prelude.rs`, placed after the
 - **AC-1.** The prelude loads at the default 2 MiB test worker. The
   prelude-load suites, the PX7-F suites and the stack-victim set that the
   prelude stack-floor carry tracks all pass. `trusted_base()` is unchanged.
-  A focused test checks each theorem's checked statement, found by
-  `GlobalId`, against an independently written statement.
+  A focused test resolves each theorem by name and checks its checked
+  statement against an independently written client statement.
 - **AC-2 (falsifiers, restored byte-identically).**
   - M1: map `Closed` to `ResourceBracketReleaseError Closed` in
     `resource_settle_ok_error_for`, and the body-ok/`Closed` law reddens.
@@ -107,8 +107,8 @@ Theorems in `crates/ken-elaborator/src/prelude.rs`, placed after the
     `ResourceHostIO` arm, and the body-and-release law reddens.
   - M3: continue `private_with_resource_after_open`'s `Ok` arm with
     `release_if_live` before `body`, and the sequencing law reddens.
-- **AC-3.** The PX7-F absence pin stays green, so the helpers and the new
-  theorems stay unresolvable.
+- **AC-3.** The PX7-F absence pin stays green, so the helpers stay
+  unresolvable.
 
 ## Stop conditions
 
