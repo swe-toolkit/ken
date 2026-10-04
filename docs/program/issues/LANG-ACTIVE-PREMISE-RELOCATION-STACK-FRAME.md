@@ -1,7 +1,7 @@
 ---
 id: LANG-ACTIVE-PREMISE-RELOCATION-STACK-FRAME
 title: "relocate_active_premise_term spends about 22.5 KB of stack per level of the term it walks, so relocating a deep checked term during a nested dependent match overflows the 2 MiB test worker: the Vector package with the lookup_zip_with proof needs 2.56 MiB against 2 MiB on main. Cut the per-level cost so the walk's stack does not scale with that frame size"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1
@@ -88,3 +88,16 @@ this WP (check 7). Reducing the prelude floor itself is not this WP.
 - After the cut, the WIP minimum is above the one-declaration minimum, and
   the dominant cycle is outside this caller chain. Stop to the Architect with
   its composition.
+
+## Closeout
+
+Merged `8bf29cbc2` from exact `11b0a7fdc` (PR run 37201032596). Verify QA
+`evt_n4n77wzmvv18`, Architect `evt_3t0zx2182awbk`, Decision
+`dec_pt0x5wk3d2z8`. The recursive `Term` arms are outlined into
+`#[inline(never)]` helpers and the `Elim` collections are ordered loops, with
+no work stack. Per level, the walk now takes about 3,520 bytes for an `App`
+and 7,072 bytes at the worst `Elim`, against 22.5 KB before (Verify QA). A
+stated-stack depth control and an `Elim` order and first-error control pin
+it. `CAT-VECTOR-DEFERRED-LAWS` item 5 resumes from WIP `4e2ab6520`. Carried:
+the prelude itself needs about 2 MiB to check, which sets the floor for
+every test worker.
