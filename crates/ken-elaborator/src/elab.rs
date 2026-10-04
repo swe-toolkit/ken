@@ -18,7 +18,7 @@ use ken_kernel::{
         RecursiveArgumentShape,
     },
     infer as kernel_infer_raw,
-    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, subst_var, weaken},
+    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
 };
@@ -4654,9 +4654,19 @@ fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
     })
 }
 
-/// Mint an elaborator obligation hole for `closed` and record it, or refuse
-/// when this context has no obligation channel. Every hole the elaborator
-/// generates inside an `ElabCtx` is declared here.
+/// The single mint point for obligation holes recorded in an `ElabCtx`'s
+/// `cx.obligations`: `requires` premises, partial-primitive side conditions
+/// (`+` overflow, `/` and `%` nonzero), and refinement introductions. In a
+/// context whose obligations cannot reach a reporter
+/// (`PremiseHoles::Refused`) it refuses before `declare_postulate`, so no
+/// unreported hole enters the environment.
+///
+/// Declaration-level producers (contract and space `ensures`, `prove`, law
+/// fields, FFI runtime checks) do not record into `cx.obligations`: each
+/// builds its `Obligation` beside the mint and returns it in
+/// `ElabResult::obligations`, a sink that always reaches the module reporter,
+/// so they need no mode check and do not call this gate. Any new producer
+/// that records into `cx.obligations` must mint through this function.
 fn declare_obligation_hole(
     cx: &mut ElabCtx<'_>,
     closed: Term,
@@ -9841,19 +9851,23 @@ fn emit_call_refinements(
 ) -> Result<(), ElabError> {
     let (head, previous_args) = peel_app(function);
     let template = match head {
-        Term::Const { id, .. } => cx.refinement_facts
+        Term::Const { id, .. } => cx
+            .refinement_facts
             .and_then(|facts| facts.refined_params.get(&id))
             .and_then(|params| params.get(previous_args.len())),
         // A constructor spine starts with its family parameters; the field
         // predicates are indexed by constructor argument position.
         Term::Constructor { id, .. } => {
-            let params = cx.env.constructor(id).map_or(0, |(family, _)| family.params.len());
+            let params = cx
+                .env
+                .constructor(id)
+                .map_or(0, |(family, _)| family.params.len());
             previous_args.len().checked_sub(params).and_then(|field| {
                 cx.refinement_facts
                     .and_then(|facts| facts.constructor_field_predicates.get(&id))
                     .and_then(|fields| fields.get(field))
             })
-        },
+        }
         _ => None,
     }
     .and_then(Option::as_ref)
