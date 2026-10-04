@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CALL-SITE-OBLIGATION-CHANNEL
 title: "A call-site Requires hole raised in an instance field, a space cell or elaborate_expr is postulated into the trusted base but never reported as an obligation, because those contexts drop cx.obligations. Report every such hole or refuse the call, so the trusted-base delta always equals the reported holes"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -85,3 +85,15 @@ leaves an orphan hole postulate in a reusable `ElabEnv`: the REPL `Session`,
 orphan over-reports in `trusted_base()` and is unreachable from source, so it
 is queued, not framed. Re-raise it when a product path reuses a failed
 session's environment, including `compiler_driver.rs:4251`.
+
+## Closeout
+
+Merged `684e935fb` from exact `d02bb62e2` (PR run 37214263011). Verify QA
+`evt_5pbjhymmzte7e`, Architect `evt_7k1t37xnjtykx`, Decision
+`dec_183jvr0chtq3x`. Every context that installs preconditions states a
+`PremiseHoles` mode: `Reported` takes each hole into a reported result, and
+`Refused` refuses an unsupplied premise before a hole is declared, with the
+new `ElabError::PremiseWithoutObligationChannel`. The call-site discharge
+suite pins the Reported and Refused rows and asserts each hole delta first.
+`LANG-REFINED-PARAM-REQUIRES-DESUGAR` is unblocked. The orphan hole above
+stays queued.
