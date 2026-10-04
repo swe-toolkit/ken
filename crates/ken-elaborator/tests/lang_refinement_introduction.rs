@@ -165,7 +165,7 @@ fn introductions_cover_literal_and_named_returns_lets_and_match_arms() {
 }
 
 #[test]
-fn named_return_over_a_match_is_realized_per_leaf() {
+fn named_return_reuses_a_refined_constructor_field() {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_decl(
         "data Glyph : Type where { MkGlyph : (code : Int) -> (glyph : Char) -> Glyph }",
@@ -180,6 +180,11 @@ fn named_return_over_a_match_is_realized_per_leaf() {
         reuse.obligations.is_empty(),
         "an arm returning a Char-typed field is a re-use"
     );
+}
+
+#[test]
+fn named_return_over_a_match_is_realized_per_leaf() {
+    let mut env = ElabEnv::new().expect("prelude");
     let leaves = env
         .elaborate_decl_v1("fn pick (b : Bool) : Char = match b { True |-> 48 ; False |-> 57 }")
         .expect("closed leaves");
