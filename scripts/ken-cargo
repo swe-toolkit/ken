@@ -101,7 +101,15 @@ fi
 # entries may be durable logs or campaign evidence, even when old.
 reap_minutes="${KEN_TMP_REAP_MINUTES:-120}"
 if [[ -d "$ken_tmpdir" && "$reap_minutes" -gt 0 ]]; then
-  find "$ken_tmpdir" -maxdepth 1 -mindepth 1 -type d -name 'ken-*' \
-    -mmin "+${reap_minutes}" -exec rm -rf -- {} + 2>/dev/null || true
+  {
+    find "$ken_tmpdir" -maxdepth 1 -mindepth 1 -type d -name 'ken-*' \
+      -mmin "+${reap_minutes}" -print0 2>/dev/null |
+      while IFS= read -r -d '' entry; do
+        if [[ -n "$(find "$entry" -mmin "-${reap_minutes}" -print -quit 2>/dev/null)" ]]; then
+          continue
+        fi
+        rm -rf -- "$entry" 2>/dev/null || true
+      done
+  } || true
 fi
 run "$@"

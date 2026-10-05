@@ -13,19 +13,34 @@ assert_absent() {
 }
 
 mkdir -p "$scratch/tmp/ken-runtime-old" \
+  "$scratch/tmp/ken-runtime-active" \
   "$scratch/tmp/ken-runtime-new" \
   "$scratch/tmp/rt-scalar-ac0" \
   "$scratch/bin" "$scratch/locks"
 printf evidence > "$scratch/tmp/ken-runtime-old/data"
+printf evidence > "$scratch/tmp/ken-runtime-active/log"
 printf evidence > "$scratch/tmp/rt-scalar-ac0/log"
+touch -d '3 hours ago' "$scratch/tmp/ken-runtime-old/data"
 touch -d '3 hours ago' "$scratch/tmp/ken-runtime-old"
+touch -d '3 hours ago' "$scratch/tmp/ken-runtime-active"
 touch -d '3 hours ago' "$scratch/tmp/rt-scalar-ac0"
+touch "$scratch/tmp/ken-runtime-active/log"
 
 cat > "$scratch/bin/cargo" <<'SH'
 #!/usr/bin/env bash
 exit 0
 SH
-chmod +x "$scratch/bin/cargo"
+cat > "$scratch/bin/sem" <<'SH'
+#!/usr/bin/env bash
+: > "$KEN_TEST_SEM_RAN"
+while [[ "$#" -gt 0 && "$1" != "--" ]]; do
+  shift
+done
+[[ "$#" -gt 0 ]] || exit 64
+shift
+exec "$@"
+SH
+chmod +x "$scratch/bin/cargo" "$scratch/bin/sem"
 real_flock=$(command -v flock)
 cat > "$scratch/bin/flock" <<SH
 #!/usr/bin/env bash
@@ -59,6 +74,21 @@ wait "$wrapper"
 # Once the exclusive lock is acquired, old named scratch is reaped, while
 # unrelated evidence and recent scratch survive.
 assert_absent "$scratch/tmp/ken-runtime-old"
+assert_dir "$scratch/tmp/ken-runtime-active"
 assert_dir "$scratch/tmp/rt-scalar-ac0"
 assert_dir "$scratch/tmp/ken-runtime-new"
+
+# The concurrent semaphore route intentionally skips best-effort cleanup.
+mkdir -p "$scratch/slots/tmp/ken-runtime-old" "$scratch/slots/locks"
+printf evidence > "$scratch/slots/tmp/ken-runtime-old/data"
+touch -d '3 hours ago' "$scratch/slots/tmp/ken-runtime-old/data"
+touch -d '3 hours ago' "$scratch/slots/tmp/ken-runtime-old"
+PATH="$scratch/bin:$PATH" \
+KEN_BUILD_SLOTS=2 \
+KEN_TEST_SEM_RAN="$scratch/sem-ran" \
+KEN_TMPDIR="$scratch/slots/tmp" \
+KEN_LOCK_DIR="$scratch/slots/locks" \
+  "$root/scripts/ken-cargo" build -p ken-kernel
+[[ -e "$scratch/sem-ran" ]]
+assert_dir "$scratch/slots/tmp/ken-runtime-old"
 printf 'ken-cargo reaper: passed\n'
