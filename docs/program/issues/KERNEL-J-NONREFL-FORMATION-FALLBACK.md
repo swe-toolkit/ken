@@ -1,7 +1,7 @@
 ---
 id: KERNEL-J-NONREFL-FORMATION-FALLBACK
 title: "Since KERNEL-J-NONREFL-ENDPOINT-SHARING, a J over evidence at a one-parameter or one-index former reduces at the formation endpoints while infer_j types it at the whnf endpoints, so a well-typed check the kernel accepted before is refused. Use the formation read only where the guard types the motive at it, and otherwise reduce at exactly infer_j's endpoints"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -68,3 +68,20 @@ with the four rows.
   between typing and reduction widens `infer` and is not this WP.
 - Any change to the linearity pins' bounds.
 - Any spec change.
+
+## Closeout
+
+Merged `b2f0da751` from exact `b66cebbdf` (PR #4532 from
+`wp/KERNEL-J-NONREFL-FORMATION-FALLBACK`, main push run 37383732035). Kernel
+QA `evt_6rqava1bzhj90`, Architect `evt_53w7jxw136y5t`, Decision
+`dec_580bfyvjg3x6e`.
+
+- `j_nonrefl` uses the formation endpoints only where `infer_j_at`
+  succeeds at them, and otherwise reduces at exactly `infer_j`'s endpoints.
+  `infer_j`, `j_endpoints`, the linearity pins and `trusted_base()` are
+  unchanged.
+- `obs_j_formation_fallback.rs` pins the four rows. A and Ω-A are restored,
+  and red without the fallback. B and Ω-B are pinned as the ruled widening
+  and as sentinels for the `infer_j` carry.
+- Carry, unframed: one shared endpoint function for typing and reduction.
+  It widens `infer`, so it is an operator question when framed.

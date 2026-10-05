@@ -1,7 +1,7 @@
 ---
 id: KERNEL-INT-LIT-CARRIER-CHECKED
 title: "Code outside the kernel can make every IntLit check at any type, because GlobalEnv::register_int_lit_type is pub and unchecked. Register the Int literal carrier through a checked kernel entry point, as the String and Char carriers already are, and make the raw setter crate-private"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
