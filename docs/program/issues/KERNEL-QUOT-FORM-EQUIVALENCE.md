@@ -1,7 +1,7 @@
 ---
 id: KERNEL-QUOT-FORM-EQUIVALENCE
 title: "Quot-Form accepts any relation at any Omega level, which is what made quotient equality unsound and lets its reduct sit above the Eq's level. Make Quot-Form take an IsEquiv proof with the relation at the carrier's level, and restore Eq at quotient classes reducing to the relation"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -79,3 +79,26 @@ stop and report the mismatch.
 
 - A consumer outside the listed sites needs semantic change, not a third
   child: stop to the Architect.
+
+## Closeout
+
+Merged `436bb78b5` from exact `a4ba3f7d4` (PR #4510, main push run
+37261404222). Kernel QA `evt_4ddwhr73439t9`, Architect `evt_22vjk37rwaqj3`
+(crates and spec), CV Spec/conformance carried under COORDINATION §8a
+(`evt_1v6dr5fwxnmna`), Decision `dec_33ffpw170tmxx`.
+
+- Quot-Form takes `e : IsEquiv A R` with `R : A → A → Ω_l` at the
+  carrier's level, and both domains of `R` are checked against `A`.
+  `Term::Quot` carries `e`; conversion skips it.
+- `Eq (A/R) [a] [b]` reduces to `R a b` again, replacing the interim cast.
+  A Type-target `QuotElim` on `Trunc` gets a target-sort pair, and a
+  neutral `QuotElim` keeps its `r` field under `whnf`.
+- Spec 11, 15, 16, 17, 18 and 42, the kernel README and the open-decisions
+  entry are updated.
+- The first candidate, `1623c2686`, failed CI to build: `ken-cli`'s REPL
+  printer matched `EvalVal` exhaustively and lacked the new `QuotTy` arm.
+  The respin adds that one arm. An earlier `1eecb6f0e` was blocked by the
+  CV for a missing neutral-`QuotElim` field-preservation oracle, which the
+  CV added.
+- From the operator's 2026-10-03 plan, P1 (inductive parameter and index
+  levels, census-gated) and the P3 measurement remain. Neither is framed.

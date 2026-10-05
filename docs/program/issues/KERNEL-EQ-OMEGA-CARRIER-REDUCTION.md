@@ -1,7 +1,7 @@
 ---
 id: KERNEL-EQ-OMEGA-CARRIER-REDUCTION
 title: "The kernel refuses Eq at an Omega-classified carrier, leaves the Sigma and inductive Eq reducts stuck whenever a component is Omega, and keeps a Trunc-to-Top reduct that breaks subject reduction at level 1. Form Eq with classify, make every Omega-carrier Eq neutral, discard Omega components, and delete the Trunc arm"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1
@@ -28,9 +28,15 @@ wrong level.
   stays that way.
 - **`eq_reduce`** (`obs.rs:122`) has the Trunc arm `Trunc → Top` at `:128`.
   `Top` is `Ω_0`, and `‖A‖ : Ω_l`.
-- **`eq_at_sigma`** (`obs.rs:293`) and **`inductive_conjuncts`** (`:583`)
-  build the dependent component through `type_eq_by_j`, which returns None
-  for a non-Type source. Both are stuck today whenever a component is Ω.
+- **`eq_at_sigma`** (`obs.rs:293`) builds its second conjunct only through
+  `type_eq_by_j`, which returns None for a non-Type source, so it is stuck
+  whenever the codomain is Ω.
+- **`inductive_conjuncts`** (`:583`) has two routes for a field (Architect
+  `evt_23w4nhn35ez1t`, at `436bb78b5`). When the source and target field
+  types convert (`:604-608`), it forms `Eq A_j p q` with no witness; at an
+  Ω field that reduct is **ill-formed** under the current Eq-Form, a
+  subject-reduction break this WP closes. Otherwise it uses `type_eq_by_j`
+  (`:662`), which is stuck at an Ω field.
 - **Refl** (`check.rs:483-499`) checks by `convert_type` against
   `Eq (infer a) a a`. `convert_path`'s Ω-PI shortcut (`conv.rs:1018`)
   accepts any two terms at an Ω type, so no Refl change is needed.
@@ -52,25 +58,37 @@ stop and report the mismatch; do not build around it.
    conjunct `Eq (B1 q.1) q.2 q.2`, with no Cast.
 4. **R3.** In `inductive_conjuncts`, an Ω-classified field gives
    `Eq (A_j[b̄]) b_j b_j`, with no J witness, at the field's own level.
-   Add no level lift or guard: the inductive rule's level gap is
+   The Ω test comes **before** the convertible fast path, so both routes
+   take the discard, and it uses the same `omega_classified` predicate as
+   R1. Add no level lift or guard: the inductive rule's level gap is
    pre-existing and is a separate question (`evt_5hryk5pap4q78`).
-5. **Rows.** The five `SPEC-EQ-FORM-OMEGA-CARRIER` conformance rows pass, as
-   kernel tests beside `obs_sigma_quot_cast_gate.rs`.
+5. **Rows.** The six `SPEC-EQ-FORM-OMEGA-CARRIER` cases in
+   `conformance/kernel/observational/seed-observational.md` (`:114`) pass,
+   as kernel tests beside `obs_sigma_quot_cast_gate.rs`.
 
 ## Acceptance
 
 - **AC-0 (measure; no edit).**
-  - Record each of the five rows on main as refused or stuck.
+  - Record each of the six cases on main as refused, stuck, or
+    **ill-formed reduct** (`whnf` succeeds but `infer` of the result refuses
+    at Eq-Form). Report any row that differs from the Architect's
+    prediction in `evt_23w4nhn35ez1t`; do not adapt to it.
   - Sweep every source root (`crates/*/tests`, `catalog/`, `conformance/`,
     `examples/`) for a row that asserts Eq-Form refuses an Ω carrier, or
     that Eq at Trunc is Top. List each one; it flips or is reported.
-- **AC-1.** The five rows pass. Row 2 is a `Type 0` family with two
-  syntactically distinct Ω-field proofs.
+- **AC-1.** The six cases pass. `eq-inductive-omega-field-dependent-type`
+  is a `Type 0` family with two syntactically distinct Ω-field proofs.
 - **AC-2 (falsifiers; each must redden).**
-  - Removing the R1 guard reddens row 4's whnf assertion.
-  - Restoring Trunc→Top without the guard reddens row 3.
-  - Removing the R2 discard reddens row 1, and removing the R3 discard
-    reddens row 2.
+  - Removing the R1 guard reddens the whnf assertion of
+    `eq-canonical-omega-carriers-neutral`.
+  - Restoring Trunc→Top without the guard reddens
+    `eq-trunc-omega-level-one`.
+  - Removing the R2 discard reddens `eq-subset-sigma-omega-field`.
+  - Removing the R3 discard reddens
+    `eq-inductive-omega-field-dependent-type`. That test compares the
+    WHNF's Ω conjunct **syntactically** with `Eq P q q`: Ω proof
+    irrelevance makes `Eq P p q` convertible with it, so a conversion-based
+    assertion would pass without R3.
 - **AC-3 (controls).**
   - `subset_sigma_neutral_equality_stays_stuck` and the other cast-side
     rows are unchanged.
@@ -83,5 +101,5 @@ stop and report the mismatch; do not build around it.
 - Any cast-side Ω sibling (`eq_at_type` Σ/Π, `cast_at_sigma`,
   `cast_at_inductive`) would need to compute: stop to the Architect.
 - `trusted_base()` changes: an operator question.
-- A term outside the five rows starts or stops checking: stop to the
+- A term outside the six cases starts or stops checking: stop to the
   Architect with it.
