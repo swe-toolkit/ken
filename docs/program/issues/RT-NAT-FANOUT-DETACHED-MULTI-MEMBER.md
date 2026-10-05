@@ -1,7 +1,7 @@
 ---
 id: RT-NAT-FANOUT-DETACHED-MULTI-MEMBER
 title: "After the scalar-admission retry forces source Match 1289 to CarrierWord, the Nat fanout escaped-resource row refuses at object emission: the detached-result seat sees 4 undischarged causal calls on one unit result, a multi-member projection it rejects by design. Find why 4 edges reach that seat, and repair the upstream discharge so the row reaches native/interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1

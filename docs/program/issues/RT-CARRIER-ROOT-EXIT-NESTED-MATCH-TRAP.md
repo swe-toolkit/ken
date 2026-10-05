@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIER-ROOT-EXIT-NESTED-MATCH-TRAP
 title: "A root-exit nested Match lowered as CarrierWord builds but traps natively with UnclassifiedRuntimeTrap { terminal_value: -1 }, where the NativeScalarPair route passes 7/7. Find whether the carrier word reaching emit_result has the wrong boundary tag, and fix the CarrierWord route"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -76,3 +76,22 @@ stop and report the mismatch.
 - The fix needs a kernel, trust or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, and never land `a7d46d6f2`.
+
+## Closeout
+
+Merged `77c6b0041` from exact `ecb9c26be` (PR #4523 from
+`wp/RT-CARRIER-ROOT-EXIT-NESTED-MATCH-TRAP`, main push run 37339510488).
+Runtime QA `evt_37dpe5s7rb12t`, Architect `evt_7tnmah846h86a`, Decision
+`dec_vq7zgm4srvyk`.
+
+- The trap was the checked root's ExitCode decoder in `units.rs`. It
+  required the carrier's boundary tag to be `PersistentGround`, but the root
+  may read invocation-owned constructor nodes. It now requires the node class
+  `Constructor` (Architect `evt_4wvxm7657qvgw`).
+- A scoped `cfg(test)` planner hook forces the minimized site to
+  `CarrierWord`. The new pin in `rt_native_tree_match_case_of_case.rs` is a
+  durable parity invariant for that route, 8/8 with the default rows.
+  Restoring the old tag check traps on byte 2.
+- The c91 unit-IR fixture was recaptured; its only semantic hunk is the
+  class check.
+- The L1 successor is `RT-NAT-FANOUT-DETACHED-MULTI-MEMBER`.
