@@ -8,7 +8,6 @@
 
 use ken_kernel::env::Context;
 use ken_kernel::inductive::peel_app;
-use ken_kernel::subst::weaken;
 use ken_kernel::term::{Level, LevelVar, Term};
 use ken_kernel::{
     convert, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, GlobalId,
@@ -1315,13 +1314,6 @@ fn bot(env: &GlobalEnv) -> Term {
         level_args: Vec::new(),
     }
 }
-/// Prelude `Top : Ω_0` term.
-fn top(env: &GlobalEnv) -> Term {
-    Term::Const {
-        id: env.top_id(),
-        level_args: Vec::new(),
-    }
-}
 /// `c` (a constructor) applied to no level args.
 fn ctor(id: GlobalId) -> Term {
     Term::Constructor {
@@ -1603,9 +1595,9 @@ fn k2_trunc_elim_on_proj() {
 }
 
 #[test]
-fn k2_trunc_eq_is_top() {
-    // `Eq ‖A‖ |a| |b| ⇝ Top` — a truncation is a proposition (quotient by the
-    // total relation), so any two elements are equal.
+fn k2_trunc_eq_stays_neutral() {
+    // `Eq ‖A‖ |a| |b|` forms in Ω and stays neutral even for projections.
+    // Reducing to `Top : Ω₀` would break subject reduction at higher levels.
     let (env, _s) = std_env();
     let mut ctx = Context::new();
     ctx.push(Term::Type(Level::zero())); // A  (A=0)
@@ -1616,7 +1608,8 @@ fn k2_trunc_eq_is_top() {
         Box::new(Term::TruncProj(Box::new(Term::var(1)))), // |a|
         Box::new(Term::TruncProj(Box::new(Term::var(0)))), // |b|
     );
-    assert_eq!(whnf(&env, &ctx, &eq), top(&env));
+    assert_eq!(infer(&env, &ctx, &eq), Ok(Term::Omega(Level::zero())));
+    assert_eq!(whnf(&env, &ctx, &eq), eq);
 }
 
 // --- funext with ≥2 distinct level variables (K1 retro lesson) -------------

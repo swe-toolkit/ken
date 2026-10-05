@@ -3,10 +3,10 @@
 //! the public `check` path, not an isolated structural-comparison helper.
 
 use ken_kernel::env::Context;
-use ken_kernel::term::{Level, LevelVar, Term};
+use ken_kernel::term::{Level, Term};
 use ken_kernel::{
-    check, convert, convert_type, declare_inductive, declare_postulate, infer, whnf, CtorSpec,
-    GlobalEnv, InductiveSpec, KernelError,
+    check, convert, convert_type, declare_inductive, declare_postulate, infer, CtorSpec, GlobalEnv,
+    InductiveSpec, KernelError,
 };
 
 fn eq(carrier: Term, left: Term, right: Term) -> Term {
@@ -33,11 +33,10 @@ fn nat(env: &mut GlobalEnv) -> Term {
     Term::indformer(id.expect("Nat"), vec![])
 }
 
-/// `Eq P x y` with `P : Ω` is not a well-formed Eq type (`16 §2.1`).
-/// Declaration classification must reject before the typed congruence arm;
-/// testing raw `check(Refl x, Eq P x y)` would bypass that precondition.
+/// `Eq P x y` with `P : Ω` forms at the same level (`16 §2.1`).
+/// Declaration admission, rather than raw Refl checking, witnesses formation.
 #[test]
-fn omega_carrier_eq_is_rejected_at_declaration_classification() {
+fn omega_carrier_eq_forms_at_declaration_classification() {
     let mut env = GlobalEnv::new();
     let prop = Term::const_(
         declare_postulate(&mut env, "P".into(), vec![], Term::Omega(Level::zero())).expect("P : Ω"),
@@ -51,20 +50,20 @@ fn omega_carrier_eq_is_rejected_at_declaration_classification() {
         declare_postulate(&mut env, "y".into(), vec![], prop.clone()).expect("y : P"),
         vec![],
     );
-    let illegal = eq(prop, x, y);
+    let carrier_eq = eq(prop, x, y);
     let before = env.trusted_base();
     assert_eq!(
-        declare_postulate(&mut env, "bad_eq".into(), vec![], illegal),
-        Err(KernelError::TypeMismatch {
-            expected: Box::new(Term::Type(Level::Var(LevelVar(0)))),
-            found: Box::new(Term::Omega(Level::zero())),
-        }),
-        "classification, not raw Refl checking, rejects an Ω-carrier Eq",
+        infer(&env, &Context::new(), &carrier_eq),
+        Ok(Term::Omega(Level::zero()))
     );
-    assert_eq!(env.trusted_base(), before, "rejection adds no trust");
-    assert!(
-        before.len() >= 3,
-        "control's three declared hypotheses exist"
+    let admitted = declare_postulate(&mut env, "carrier_eq".into(), vec![], carrier_eq)
+        .expect("Ω-carrier Eq must pass declaration classification");
+    let mut expected = before;
+    expected.push(admitted);
+    assert_eq!(
+        env.trusted_base(),
+        expected,
+        "only this test's admitted postulate adds trust"
     );
 }
 

@@ -14,6 +14,7 @@
 //! a sub-proof the kernel cannot build leaves the `Eq`/`cast` **neutral**
 //! (stuck) — sound: a stuck `Eq`/`cast` simply does not reduce.
 
+use crate::check::{classify, Sort};
 use crate::conv::{convert_type, convert_type_deferred_operands, whnf};
 use crate::env::{Context, GlobalEnv};
 use crate::inductive::peel_app;
@@ -116,16 +117,24 @@ fn type_eq(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term> {
 // Eq-by-type (`16 §2.2`)
 // ===========================================================================
 
+/// Whether a type itself inhabits Ω, rather than being an Ω-valued universe.
+fn omega_classified(env: &GlobalEnv, ctx: &Context, ty: &Term) -> bool {
+    matches!(classify(env, ctx, ty), Ok(Sort::Omega(_)))
+}
+
 /// Reduce `Eq ty a b` by recursion on the (already-whnf'd) type `ty`
-/// (`16 §2.2`). Returns the reduct, or `None` if `ty` is neutral. `ty` is whnf'd
-/// by the caller.
+/// (`16 §2.2`). Returns the reduct, or `None` if `ty` is neutral or Ω-classified.
 pub fn eq_reduce(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term) -> Option<Term> {
+    // An Ω carrier is proof-irrelevant, regardless of its canonical head.
+    // In particular, no Π/Σ or Trunc arm may produce an Eq reduct for it.
+    if omega_classified(env, ctx, ty) {
+        return None;
+    }
     match ty {
         Term::Pi(a1, b1) => Some(eq_at_pi(a1, b1, a, b)),
         Term::Sigma(a1, b1) => eq_at_sigma(env, ctx, a1, b1, a, b),
         Term::Omega(_) => Some(eq_at_omega(a, b)),
         Term::Type(_) => eq_at_type(env, ctx, a, b),
-        Term::Trunc(_) => Some(top_term(env)),
         // Formation checked an equivalence proof at the carrier's Ω level.
         // Only two canonical classes expose representatives; open endpoints
         // leave quotient equality neutral (`16 §2.2`, §5).
@@ -293,9 +302,10 @@ fn type_eq_by_j_with_base(
     Some(result)
 }
 
-/// `Eq ((x:A1)×B1) p q ⇝ Eq A1 p.1 q.1 and Eq (B1 q.1)
-/// (cast (B1 p.1) (B1 q.1) (cong (x.B1 x) eq-fst) p.2) q.2` (`16 §2.2`).
-/// The equality proof is available only inside the Σ codomain.
+/// `Eq ((x:A1)×B1) p q` compares first projections, then the second
+/// components at `B1 q.1` (`16 §2.2`). An Ω codomain discards the source proof
+/// and compares `q.2` to itself; a Type codomain transports `p.2` using J.
+/// The first-projection equality proof is available inside the Σ codomain.
 fn eq_at_sigma(
     env: &GlobalEnv,
     ctx: &Context,
@@ -313,6 +323,15 @@ fn eq_at_sigma(
     );
     let b1_p1 = subst0(b1, &p1);
     let b1_q1 = subst0(b1, &q1);
+    if omega_classified(env, ctx, &b1_q1) {
+        let target = weaken(&whnf(env, ctx, &Term::proj2(q.clone())), 1);
+        let second = Term::Eq(
+            Box::new(weaken(&b1_q1, 1)),
+            Box::new(target.clone()),
+            Box::new(target),
+        );
+        return Some(Term::sigma(eq_fst, second));
+    }
     let mut proof_ctx = ctx.clone();
     proof_ctx.push(eq_fst.clone());
     // At the motive's depth Γ, h, y, _ the original B1 is still under its
@@ -593,8 +612,9 @@ fn telescope_projection(t: &Term, k: usize, len: usize) -> Term {
 }
 
 /// Build one inductive argument equality in the context where all preceding
-/// equality conjuncts are bound. Its dependent cast uses `J` over their
-/// right-nested proof tuple, then binds this conjunct for the suffix.
+/// equality conjuncts are bound. An Ω field compares the target proof with
+/// itself; a non-Ω dependent cast uses `J` over the right-nested prefix proof
+/// tuple. The conjunct is then bound for the remaining suffix.
 fn inductive_conjuncts(
     env: &GlobalEnv,
     proof_ctx: &Context,
@@ -606,81 +626,84 @@ fn inductive_conjuncts(
 ) -> Option<Term> {
     let a_ty = weaken(&subst_tel(&a_tpl[j], &a_bar[..j]), j as i64);
     let b_ty = weaken(&subst_tel(&b_tpl[j], &b_bar[..j]), j as i64);
-    let lhs = if convert_type(env, proof_ctx, &a_ty, &b_ty) {
-        weaken(&a_bar[j], j as i64)
+    let target = weaken(&b_bar[j], j as i64);
+    let conjunct = if omega_classified(env, proof_ctx, &b_ty) {
+        // Ω proofs are irrelevant: compare the target proof to itself without
+        // transporting the source proof or constructing a J witness.
+        Term::Eq(Box::new(b_ty), Box::new(target.clone()), Box::new(target))
     } else {
-        let prefix = (0..j).rev().fold(None, |tail: Option<Term>, k| {
-            Some(match tail {
-                Some(rest) => Term::sigma(a_tpl[k].clone(), rest),
-                None => a_tpl[k].clone(),
-            })
-        })?;
-        let prefix = weaken(&prefix, j as i64);
-        let a_values = a_bar[..j]
-            .iter()
-            .map(|x| weaken(x, j as i64))
-            .collect::<Vec<_>>();
-        let b_values = b_bar[..j]
-            .iter()
-            .map(|x| weaken(x, j as i64))
-            .collect::<Vec<_>>();
-        let (left, right) = if j == 1 {
-            (telescope_tuple(&a_values), telescope_tuple(&b_values))
+        let lhs = if convert_type(env, proof_ctx, &a_ty, &b_ty) {
+            weaken(&a_bar[j], j as i64)
         } else {
-            (
-                Term::Ascript(
-                    Box::new(telescope_tuple(&a_values)),
-                    Box::new(prefix.clone()),
-                ),
-                Term::Ascript(
-                    Box::new(telescope_tuple(&b_values)),
-                    Box::new(prefix.clone()),
-                ),
+            let prefix = (0..j).rev().fold(None, |tail: Option<Term>, k| {
+                Some(match tail {
+                    Some(rest) => Term::sigma(a_tpl[k].clone(), rest),
+                    None => a_tpl[k].clone(),
+                })
+            })?;
+            let prefix = weaken(&prefix, j as i64);
+            let a_values = a_bar[..j]
+                .iter()
+                .map(|x| weaken(x, j as i64))
+                .collect::<Vec<_>>();
+            let b_values = b_bar[..j]
+                .iter()
+                .map(|x| weaken(x, j as i64))
+                .collect::<Vec<_>>();
+            let (left, right) = if j == 1 {
+                (telescope_tuple(&a_values), telescope_tuple(&b_values))
+            } else {
+                (
+                    Term::Ascript(
+                        Box::new(telescope_tuple(&a_values)),
+                        Box::new(prefix.clone()),
+                    ),
+                    Term::Ascript(
+                        Box::new(telescope_tuple(&b_values)),
+                        Box::new(prefix.clone()),
+                    ),
+                )
+            };
+            let prefix_eq = Term::Eq(
+                Box::new(prefix.clone()),
+                Box::new(left.clone()),
+                Box::new(right),
+            );
+            let earlier = (0..j).map(|k| Term::var(j - 1 - k)).collect::<Vec<_>>();
+            let evidence = Term::Ascript(
+                Box::new(if j == 1 {
+                    earlier[0].clone()
+                } else {
+                    telescope_tuple(&earlier)
+                }),
+                Box::new(prefix_eq),
+            );
+            // Shift the outer context past the j constructor positions and the
+            // j+2 proof/motive binders; substitute projected tuple components for
+            // those constructor positions. The second motive binder is ignored.
+            let at_y = (0..j)
+                .map(|k| telescope_projection(&Term::var(1), k, j))
+                .collect::<Vec<_>>();
+            let family_at_y = subst_tel(&shift(&a_tpl[j], j as i64 + 2, j), &at_y);
+            let witness = type_eq_by_j(
+                env,
+                proof_ctx,
+                &prefix,
+                &left,
+                &a_ty,
+                &b_ty,
+                family_at_y,
+                evidence,
+            )?;
+            Term::Cast(
+                Box::new(a_ty),
+                Box::new(b_ty.clone()),
+                Box::new(witness),
+                Box::new(weaken(&a_bar[j], j as i64)),
             )
         };
-        let prefix_eq = Term::Eq(
-            Box::new(prefix.clone()),
-            Box::new(left.clone()),
-            Box::new(right),
-        );
-        let earlier = (0..j).map(|k| Term::var(j - 1 - k)).collect::<Vec<_>>();
-        let evidence = Term::Ascript(
-            Box::new(if j == 1 {
-                earlier[0].clone()
-            } else {
-                telescope_tuple(&earlier)
-            }),
-            Box::new(prefix_eq),
-        );
-        // Shift the outer context past the j constructor positions and the
-        // j+2 proof/motive binders; substitute projected tuple components for
-        // those constructor positions. The second motive binder is ignored.
-        let at_y = (0..j)
-            .map(|k| telescope_projection(&Term::var(1), k, j))
-            .collect::<Vec<_>>();
-        let family_at_y = subst_tel(&shift(&a_tpl[j], j as i64 + 2, j), &at_y);
-        let witness = type_eq_by_j(
-            env,
-            proof_ctx,
-            &prefix,
-            &left,
-            &a_ty,
-            &b_ty,
-            family_at_y,
-            evidence,
-        )?;
-        Term::Cast(
-            Box::new(a_ty),
-            Box::new(b_ty.clone()),
-            Box::new(witness),
-            Box::new(weaken(&a_bar[j], j as i64)),
-        )
+        Term::Eq(Box::new(b_ty), Box::new(lhs), Box::new(target))
     };
-    let conjunct = Term::Eq(
-        Box::new(b_ty),
-        Box::new(lhs),
-        Box::new(weaken(&b_bar[j], j as i64)),
-    );
     if j + 1 == a_tpl.len() {
         Some(conjunct)
     } else {

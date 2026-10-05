@@ -413,8 +413,8 @@ pub fn infer(env: &GlobalEnv, ctx: &Context, t: &Term) -> KernelResult<Term> {
         ),
         // --- K2 formers (`15`, `16`) ---
         Term::Eq(a_ty, x, y) => {
-            // `Eq A a b : Ω_l` for `A : Type l` (`16 §2.1`).
-            let l = synth_type(env, ctx, a_ty)?;
+            // `Eq A a b : Ω_l` for `A : Type l` or `A : Ω_l` (`16 §2.1`).
+            let l = classify(env, ctx, a_ty)?.level().clone();
             check(env, ctx, x, a_ty)?;
             check(env, ctx, y, a_ty)?;
             Ok(Term::Omega(l))
