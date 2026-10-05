@@ -381,6 +381,34 @@ corrected forward obligation re-defers *there*, **not** to a
   obligation on inputs that the guard rejects. Ruling (A)'s `leq_int`
   reduction is required to select either branch on these closed inputs.
 
+### surface/numbers/int-to-char-branch-obligation-status  (soundness)
+- spec: `18a §5.9.1(3)` (guarded refinement introduction), `34 §5`,
+  `22 §2.1`; `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` AC-2
+- given: elaborate the installed `intToChar : Int → Option Char` definition
+  at a symbolic `n : Int`:
+  ```ken
+  match (inRangeBool n) {
+    True  |-> Some Char n
+    False |-> None Char
+  }
+  ```
+  Observe the emitted refinement obligations and their status **per arm**.
+  As a control, elaborate the same `Some Char n` body without the
+  True-arm guard equation.
+- expect: the guarded True arm emits **exactly one**
+  `RefinementIntroduction` for `isScalar n`, under its path equation
+  `Eq Bool (inRangeBool n) True`; that equation discharges the obligation,
+  leaving **no open hole**. The False arm emits **zero** refinement
+  obligations: it returns `None Char` without introducing `Char n`.
+  Without the guard equation, the same `Some Char n` emits one
+  `isScalar n` obligation that **remains open**. These assertions concern
+  elaboration obligation status, not reporting at a caller.
+- why: value-level `None`/`Some` results alone cannot distinguish a
+  missing or undischarged scalar obligation on the guarded Some branch.
+  Requiring one closed True-arm obligation and zero False-arm obligations
+  distinguishes the correct branch discipline from both a silently
+  dropped obligation and a rejected-value obligation.
+
 ### surface/numbers/char-eq-and-ord-on-projection  (soundness)
 - spec: `18a §5.9.1(3)` (derived ops over projection, incl. `Ord Char`),
   `docs/program/wp/decimal-char-demote.md` AC-C2
@@ -505,6 +533,8 @@ lawful-classes-lane WP — see the deferred section.
   `char-eq-and-ord-on-projection`
 - **AC-C3** (surrogate/OOR reject, flips vs `inRangeBool:=True`) —
   `int-to-char-rejects-surrogate-and-oor`
+- **LANG-REFINEMENT AC-2** (guarded Some discharged; None introduces none) —
+  `int-to-char-branch-obligation-status`
 - **Char pin 1** (Ω-encoding → codepoint-collapse) —
   `char-deceq-collapses-on-codepoint` (hard-AC)
 - **Char pin 2** (extraction computes the proof) —
