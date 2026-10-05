@@ -46,6 +46,8 @@ fn run_checked_bounded_nat_fixture(
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
     let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut compiler = Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env: &seed_env,

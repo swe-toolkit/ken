@@ -263,6 +263,7 @@ fn summarize_result_phase(
     plan: &StaticTransitionPlan<'_>,
     origin: StaticOriginId,
     functionized_units: bool,
+    forced_carrier_joins: &BTreeSet<StaticOriginId>,
     environment: &[ResultPhaseSummary],
     joins: &mut [Option<PlannedJoinResult>],
 ) -> Result<ResultPhaseSummary, CraneliftBackendError> {
@@ -293,6 +294,7 @@ fn summarize_result_phase(
             plan,
             child_origin,
             functionized_units,
+            forced_carrier_joins,
             &child_environment,
             joins,
         )?;
@@ -301,7 +303,7 @@ fn summarize_result_phase(
         }
         Ok(summary)
     };
-    let summary = match expr {
+    let mut summary = match expr {
         RuntimeExpr::Trap(_) => ResultPhaseSummary::TRAP,
         RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
@@ -531,6 +533,11 @@ fn summarize_result_phase(
         | RuntimeExpr::Effect { .. } => ResultPhaseSummary::SPECIALIZED,
     };
     if is_source_join(expr) {
+        if forced_carrier_joins.contains(&origin) {
+            // Propagate lowering's previous admission refusal as carrier phase
+            // through the same lattice used by naturally carried joins.
+            summary.phase = ResultPhase::CarrierRequired;
+        }
         let result = PlannedJoinResult {
             representation: match summary.phase {
                 ResultPhase::SpecializedOnly => JoinResultRepresentation::NativeScalarPair,
@@ -614,6 +621,7 @@ fn result_phase_environment_for_owner(
 pub(super) fn build_join_result_plan(
     plan: &StaticTransitionPlan<'_>,
     functionized_units: bool,
+    forced_carrier_joins: &BTreeSet<StaticOriginId>,
 ) -> Result<Vec<Option<PlannedJoinResult>>, CraneliftBackendError> {
     let mut joins = vec![None; plan.source_occurrences.len()];
     for descriptor in &plan.abi.descriptors {
@@ -624,7 +632,9 @@ pub(super) fn build_join_result_plan(
         // summary at its entry instead of its body.
         let root = descriptor.body_occurrence;
         let environment = result_phase_environment_for_owner(plan, root, functionized_units)?;
-        summarize_result_phase(plan, root, functionized_units, &environment, &mut joins)?;
+        summarize_result_phase(
+            plan, root, functionized_units, forced_carrier_joins, &environment, &mut joins,
+        )?;
     }
     for occurrence in plan.source_occurrences.iter().flatten() {
         if is_source_join(occurrence.expr) && joins[occurrence.static_origin.0 as usize].is_none() {
@@ -637,12 +647,47 @@ pub(super) fn build_join_result_plan(
                 plan,
                 occurrence.static_origin,
                 functionized_units,
+                forced_carrier_joins,
                 &environment,
                 &mut joins,
             )?;
         }
     }
     Ok(joins)
+}
+
+impl StaticTransitionPlan<'_> {
+    /// Keep the original source identity for every potential feedback join.
+    /// Re-planning must never reinterpret a previously refused origin.
+    pub(in crate::cranelift_backend) fn check_forced_source_expr_identity(
+        &self,
+        forced: &BTreeSet<StaticOriginId>,
+        original: &mut std::collections::BTreeMap<StaticOriginId, *const RuntimeExpr>,
+    ) -> Result<(), CraneliftBackendError> {
+        if original.is_empty() {
+            if !forced.is_empty() {
+                return Err(planner_error("forced join has no initial source identity"));
+            }
+            for occurrence in self.source_occurrences.iter().flatten() {
+                if is_source_join(occurrence.expr) {
+                    original.insert(occurrence.static_origin, occurrence.expr);
+                }
+            }
+        } else {
+            for &origin in forced {
+                let initial = original.get(&origin).ok_or_else(|| {
+                    planner_error("refused scalar join was not an initial source join")
+                })?;
+                let replanned = self.source_occurrence(origin)?;
+                if !std::ptr::eq(*initial, replanned) {
+                    return Err(planner_error(
+                        "refused scalar join changed source expression across re-planning",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'src> Planner<'src> {
@@ -1007,6 +1052,64 @@ mod tests {
     };
     use super::*;
     use crate::{RuntimeMatchCase, RuntimeValue};
+
+    /// Promise: durable invariant. MEASURED: a forced inner source Match and
+    /// its enclosing Match both use carrier joins; with no forced origins both
+    /// use native scalar lanes. CLAIMED: refusal propagates through continuing
+    /// answer paths. GAP: lowerer admission and driver retry are separate pins.
+    #[test]
+    fn scalar_join_feedback_forced_child_propagates_to_enclosing_join() {
+        let inner = RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+            cases: vec![RuntimeMatchCase {
+                constructor: "ctor:fixture::Bool::True".to_string(),
+                binders: 0,
+                body: RuntimeExpr::Construct {
+                    constructor: "ctor:fixture::Option::Some".to_string(),
+                    args: vec![RuntimeExpr::Value(RuntimeValue::Int(7.into()))],
+                },
+            }],
+            default: trap("inner match default"),
+        };
+        let expr = RuntimeExpr::Match {
+            scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+            cases: vec![RuntimeMatchCase {
+                constructor: "ctor:fixture::Bool::True".to_string(),
+                binders: 0,
+                body: inner,
+            }],
+            default: trap("outer match default"),
+        };
+        let symbols = crate::NativeProcessSymbols::legacy_prelude();
+        let plan = |forced: &BTreeSet<StaticOriginId>| {
+            super::super::plan_static_transition_graph_with_symbols_and_forced_carrier(
+                &expr,
+                &BTreeMap::new(),
+                &symbols,
+                AbiRootIngress::Value,
+                true,
+                forced,
+            )
+            .expect("fixture plans")
+        };
+        let initial = plan(&BTreeSet::new());
+        let outer = initial.root_static_origin().expect("outer source origin");
+        let inner = initial.semantic.child_origin(outer, 1).expect("inner origin");
+        for origin in [inner, outer] {
+            assert_eq!(
+                initial.join_plan_token(origin).expect("unforced source join").representation,
+                JoinResultRepresentation::NativeScalarPair
+            );
+        }
+        let forced = plan(&BTreeSet::from([inner]));
+        for origin in [inner, outer] {
+            assert_eq!(
+                forced.join_plan_token(origin).expect("carrier source join").representation,
+                JoinResultRepresentation::CarrierWord,
+                "a forced child must also demote its continuing parent"
+            );
+        }
+    }
 
     fn d8_mixed_join(swapped: bool) -> RuntimeExpr {
         let carried = RuntimeMatchCase {

@@ -16,7 +16,98 @@ mod tests;
 
 pub(super) mod api;
 
-use std::collections::BTreeMap;
+use std::cell::Cell;
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::cranelift_backend::planning::StaticOriginId;
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScalarJoinFeedbackObservation {
+    pub attempts: usize,
+    pub forced_origins: BTreeSet<u32>,
+    pub refused_origins: Vec<u32>,
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static SCALAR_JOIN_FEEDBACK_OBSERVATIONS:
+        std::cell::RefCell<Option<Vec<ScalarJoinFeedbackObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Collect all bound compiler attempts, including a terminal failed attempt.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+pub fn with_scalar_join_feedback_attempts<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<ScalarJoinFeedbackObservation>) {
+    struct Restore(Option<Vec<ScalarJoinFeedbackObservation>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SCALAR_JOIN_FEEDBACK_OBSERVATIONS.with(|cell| *cell.borrow_mut() = self.0.take());
+        }
+    }
+    let prior = SCALAR_JOIN_FEEDBACK_OBSERVATIONS.with(|cell| cell.replace(Some(Vec::new())));
+    let _restore = Restore(prior);
+    let result = operation();
+    let observed = SCALAR_JOIN_FEEDBACK_OBSERVATIONS.with(|cell| {
+        cell.replace(None).expect("feedback recorder was installed")
+    });
+    (result, observed)
+}
+
+/// Lowering decides scalar admission, the planner decides representation, and
+/// a retry transfers only the refused join's identity to a fresh module.
+fn compile_with_scalar_join_feedback<T>(
+    mut attempt: impl FnMut(
+        &BTreeSet<StaticOriginId>,
+        &Cell<Option<StaticOriginId>>,
+    ) -> Result<T, CraneliftBackendError>,
+) -> Result<T, CraneliftBackendError> {
+    let mut forced = BTreeSet::new();
+    let mut attempts = 0;
+    let mut refused_origins = Vec::new();
+    loop {
+        attempts += 1;
+        let refused = Cell::new(None);
+        let outcome = attempt(&forced, &refused);
+        if let Err(error) = outcome {
+            if let Some(origin) = refused.get() {
+                refused_origins.push(origin.ticket_body_ordinal());
+                if forced.insert(origin) {
+                    continue;
+                }
+            }
+            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            record_scalar_join_feedback(attempts, &forced, &refused_origins);
+            return Err(error);
+        }
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        record_scalar_join_feedback(attempts, &forced, &refused_origins);
+        return outcome;
+    }
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_scalar_join_feedback(
+    attempts: usize,
+    forced: &BTreeSet<StaticOriginId>,
+    refused_origins: &[u32],
+) {
+    let record = ScalarJoinFeedbackObservation {
+        attempts,
+        forced_origins: forced.iter().map(|origin| origin.ticket_body_ordinal()).collect(),
+        refused_origins: refused_origins.to_vec(),
+    };
+    SCALAR_JOIN_FEEDBACK_OBSERVATIONS.with(|cell| {
+        if let Some(records) = cell.borrow_mut().as_mut() {
+            records.push(record.clone());
+        }
+    });
+    if std::env::var_os("RT_SCALAR_FEEDBACK_LOG").is_some() {
+        eprintln!("SCALAR_FEEDBACK {record:?}");
+    }
+}
 
 use cranelift_codegen::isa::OwnedTargetIsa;
 use cranelift_codegen::settings::{self, Configurable};
@@ -83,23 +174,29 @@ fn compile_program_expr(
     seed_env: &NativeSeedEnvironment,
     authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledExpr, CraneliftBackendError> {
-    compile_program_expr_into_module(
-        new_jit_module()?,
-        "ken_nc6_seed",
-        Linkage::Local,
-        expr,
-        seed_env,
-        program
-            .declarations
-            .iter()
-            .map(|declaration| (declaration.symbol.as_str(), declaration))
-            .collect(),
-        None,
-        false,
-        authority,
-        None,
-        None,
-    )
+    let mut source_exprs = BTreeMap::new();
+    compile_with_scalar_join_feedback(|forced, refused| {
+        compile_program_expr_into_module(
+            new_jit_module()?,
+            "ken_nc6_seed",
+            Linkage::Local,
+            expr,
+            seed_env,
+            program
+                .declarations
+                .iter()
+                .map(|declaration| (declaration.symbol.as_str(), declaration))
+                .collect(),
+            None,
+            false,
+            authority,
+            None,
+            None,
+            forced,
+            refused,
+            &mut source_exprs,
+        )
+    })
 }
 
 fn compile_expr_with_declarations<'a>(
@@ -139,23 +236,31 @@ fn compile_program_expr_object(
     entry_symbol: &str,
     authority: &crate::NativeProcessSymbols,
 ) -> Result<CompiledModule<ObjectModule>, CraneliftBackendError> {
-    compile_program_expr_into_object_module(
-        new_object_module("ken-runtime-cranelift-object")?,
-        entry_symbol,
-        Linkage::Export,
-        expr,
-        seed_env,
-        program
-            .declarations
-            .iter()
-            .map(|declaration| (declaration.symbol.as_str(), declaration))
-            .collect(),
-        None,
-        false,
-        authority,
-        native_join_plan_for_program(program)?,
-        oriented_subcontinuation_plan_for_program(program)?,
-    )
+    let native_join_plan = native_join_plan_for_program(program)?;
+    let oriented_subcontinuation_plan = oriented_subcontinuation_plan_for_program(program)?;
+    let mut source_exprs = BTreeMap::new();
+    compile_with_scalar_join_feedback(|forced, refused| {
+        compile_program_expr_into_object_module(
+            new_object_module("ken-runtime-cranelift-object")?,
+            entry_symbol,
+            Linkage::Export,
+            expr,
+            seed_env,
+            program
+                .declarations
+                .iter()
+                .map(|declaration| (declaration.symbol.as_str(), declaration))
+                .collect(),
+            None,
+            false,
+            authority,
+            native_join_plan.clone(),
+            oriented_subcontinuation_plan.clone(),
+            forced,
+            refused,
+            &mut source_exprs,
+        )
+    })
 }
 
 fn native_isa() -> Result<OwnedTargetIsa, CraneliftBackendError> {

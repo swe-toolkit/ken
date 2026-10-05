@@ -28,7 +28,7 @@ use crate::{
 
 // Owner-named sibling imports (§10.3: `artifact::api -> artifact, planning,
 // surface`). Never through the facade.
-use crate::cranelift_backend::lowering::core::compile_expr_into_object_module;
+use crate::cranelift_backend::lowering::core::compile_program_expr_into_object_module;
 use crate::cranelift_backend::planning::{
     native_join_plan_for_program, oriented_subcontinuation_plan_for_program,
 };
@@ -46,7 +46,8 @@ use crate::cranelift_backend::surface::{
 // rest of this file is untouched (§10.5).
 use super::{
     compile_expr, compile_expr_with_declarations_and_process_input, compile_program_expr,
-    compile_program_expr_object, native_platform_target_name, new_object_module, program_admission,
+    compile_program_expr_object, compile_with_scalar_join_feedback, native_platform_target_name,
+    new_object_module, program_admission,
 };
 
 pub fn run_nc6_seed_examples(
@@ -398,23 +399,33 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
 ) -> Result<CraneliftObjectArtifact, CraneliftBackendError> {
     let entry_symbol = entry_symbol.into();
     reject_program_blockers(program)?;
-    let compiled = compile_expr_into_object_module(
-        new_object_module("ken-runtime-bound-process-entrypoint")?,
-        &entry_symbol,
-        Linkage::Export,
-        entrypoint,
-        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
-        program
-            .declarations
-            .iter()
-            .map(|declaration| (declaration.symbol.as_str(), declaration))
-            .collect(),
-        None,
-        true,
-        Some(symbols),
-        native_join_plan_for_program(program)?,
-        oriented_subcontinuation_plan_for_program(program)?,
-    )?;
+    let native_join_plan = native_join_plan_for_program(program)?;
+    let oriented_subcontinuation_plan = oriented_subcontinuation_plan_for_program(program)?;
+    let mut source_exprs = BTreeMap::new();
+    let compiled = compile_with_scalar_join_feedback(|forced, refused| {
+        compile_program_expr_into_object_module(
+            new_object_module("ken-runtime-bound-process-entrypoint")?,
+            &entry_symbol,
+            Linkage::Export,
+            entrypoint,
+            &NativeSeedEnvironment::empty(
+                crate::boundary_resource_profile::starter_smoke_profile(),
+            ),
+            program
+                .declarations
+                .iter()
+                .map(|declaration| (declaration.symbol.as_str(), declaration))
+                .collect(),
+            None,
+            true,
+            symbols,
+            native_join_plan.clone(),
+            oriented_subcontinuation_plan.clone(),
+            forced,
+            refused,
+            &mut source_exprs,
+        )
+    })?;
     let verifier_passed = compiled.verifier_passed;
     let assumptions = compiled.assumptions.clone();
     let unsupported = compiled.unsupported.clone();

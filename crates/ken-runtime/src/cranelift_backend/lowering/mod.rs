@@ -414,6 +414,7 @@ use super::planning::{
 pub(in crate::cranelift_backend) use super::planning::{
     collect_checked_oriented_markers, collect_checked_subcontinuation_frames,
     build_static_continuation_fusion_plan, plan_static_transition_graph_with_symbols,
+    plan_static_transition_graph_with_symbols_and_forced_carrier,
     FusionCompositionLayer, FusionRegionClaim, FusionRegionClaimLedger,
     StaticContinuationFusionId, StaticContinuationFusionView,
     validate_oriented_subcontinuation_transport,
@@ -3219,6 +3220,10 @@ struct Lowering<'a> {
     /// pins exactly that, by requiring `CompiledModule: 'static`; give the
     /// artifact a borrowed field and the pin stops compiling.
     static_transition_plan: StaticTransitionPlan<'a>,
+    /// The sole scalar-admission refusal flag; reset for each scalar operand.
+    scalar_operand_refused: bool,
+    /// Present on every module compile; direct inert test fixtures use None.
+    refused_scalar_join: Option<&'a std::cell::Cell<Option<StaticOriginId>>>,
     pending_vis_record_protocol: Option<PendingVisRecordProtocol>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,

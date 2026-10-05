@@ -953,6 +953,19 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
     root_ingress: AbiRootIngress,
     functionized_units: bool,
 ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
+    plan_static_transition_graph_with_symbols_and_forced_carrier(
+        entry, declarations, symbols, root_ingress, functionized_units, &BTreeSet::new(),
+    )
+}
+
+pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_and_forced_carrier<'src>(
+    entry: &'src RuntimeExpr,
+    declarations: &BTreeMap<&str, &'src RuntimeDeclaration>,
+    symbols: &crate::NativeProcessSymbols,
+    root_ingress: AbiRootIngress,
+    functionized_units: bool,
+    forced_carrier_joins: &BTreeSet<StaticOriginId>,
+) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
     #[cfg(test)]
     reset_recursive_lowering_frame_count();
     let mut planner = Planner::new()?;
@@ -1011,7 +1024,7 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols<'s
         }
     }
     planner.connect_declaration_calls(&declaration_entries)?;
-    let plan = planner.finish(symbols, root_ingress, functionized_units)?;
+    let plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
     #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]

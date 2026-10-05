@@ -33,6 +33,36 @@ use cranelift_module::{Linkage, Module};
 use crate::cranelift_backend::lowering::require_i64_for_artifact_tests;
 use crate::cranelift_backend::lowering::verify_cranelift_function_for_artifact_tests as verify_cranelift_function;
 
+/// Promise: durable invariant. MEASURED: a non-admission failure with an
+/// untouched identity Cell leaves the driver at one attempt and no forced
+/// origins. CLAIMED: only the lowerer's recorded scalar refusal retries.
+/// GAP: the separate RecursiveBackedge operand pin establishes that this
+/// particular lowerer error does not set the Cell.
+#[test]
+fn scalar_join_feedback_does_not_retry_unmarked_recursive_backedge() {
+    let mut entered = 0;
+    let (result, observed) = with_scalar_join_feedback_attempts(|| {
+        compile_with_scalar_join_feedback(|forced, refused| {
+            entered += 1;
+            assert!(forced.is_empty());
+            assert_eq!(refused.get(), None);
+            Err::<(), _>(crate::cranelift_backend::surface::unsupported(
+                "RecursiveBackedge",
+                "a carried word cannot mint a recursive-backedge control marker",
+            ))
+        })
+    });
+    assert_eq!(entered, 1);
+    assert!(matches!(
+        result,
+        Err(CraneliftBackendError::Unsupported(_))
+    ));
+    assert_eq!(observed.len(), 1);
+    assert_eq!(observed[0].attempts, 1);
+    assert!(observed[0].forced_origins.is_empty());
+    assert!(observed[0].refused_origins.is_empty());
+}
+
 #[test]
 fn px8i_jit_and_object_construct_identical_local_helper_clif() {
     let mut jit = new_jit_module().expect("JIT module constructs");

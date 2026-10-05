@@ -81,6 +81,41 @@ fn carrier_word_join_refuses_residual_predecessor_without_a_residual_plane() {
     ).expect("the same declared K join accepts K");
 }
 
+/// Promise: durable invariant. MEASURED: the concrete RecursiveBackedge
+/// scalar-operand refusal leaves the feedback flag and origin Cell empty.
+/// CLAIMED: a non-admission error cannot induce a carrier re-plan. GAP: the
+/// driver wrapper is independently pinned with this untouched Cell.
+#[test]
+fn recursive_backedge_refusal_does_not_mark_scalar_admission() {
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    let refused = std::cell::Cell::new(None);
+    lowering.refused_scalar_join = Some(&refused);
+    let mut func = Function::new();
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut func, &mut context);
+    let entry = builder.create_block();
+    builder.switch_to_block(entry);
+    let word = builder.ins().iconst(types::I64, 0);
+    let error = lowering.merge_scalar_operand(
+        &mut builder,
+        LoweringOperand::Carried(CarriedBoundaryWord { word }),
+        Some(ScalarMergeKind::RecursiveBackedge),
+        "RecursiveBackedge",
+    );
+    assert!(matches!(
+        error,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "RecursiveBackedge",
+            reason,
+        })) if reason == "a carried word cannot mint a recursive-backedge control marker"
+    ));
+    assert!(!lowering.scalar_operand_refused);
+    assert_eq!(refused.get(), None);
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
     Delete,
@@ -95,6 +130,8 @@ pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
 /// lower a fixture builds its own `Lowering` with that fixture's plan.
 pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowering<'a> {
     Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env,
@@ -284,6 +321,8 @@ fn run_px8j_malformed_recursor_consumer(
     };
     let (static_transition_plan, fixture_origin) = planned_root_occurrence(lowered_fixture);
     let mut compiler = Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env: &seed_env,
@@ -2340,6 +2379,8 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
 fn distinguished_root_cannot_discharge_missing_match_site_marker() {
     let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut lowering = Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env: &seed_env,

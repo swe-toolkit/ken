@@ -397,7 +397,18 @@ impl<'a> Lowering<'a> {
                             join_plan.origin, planned.expr
                         )));
                     }
-                    let (value, kind) = self.merge_scalar_branch(builder, join_plan, lowered, join)?;
+                    let (value, kind) =
+                        match self.merge_scalar_branch(builder, join_plan, lowered, join) {
+                            Ok(merged) => merged,
+                            Err(refusal) => {
+                                if std::mem::take(&mut self.scalar_operand_refused) {
+                                    self.refused_scalar_join
+                                        .expect("module lowering has a scalar-join feedback cell")
+                                        .set(Some(join_plan.origin));
+                                }
+                                return Err(refusal);
+                            }
+                        };
                     Self::record_scalar_merge_kind(join, merge_kind, kind)?;
                     builder
                         .ins()
@@ -2531,6 +2542,7 @@ impl<'a> Lowering<'a> {
             required_kind: Option<ScalarMergeKind>,
             construct: &'static str,
         ) -> Result<(NativeScalarPairV1, ScalarMergeKind), CraneliftBackendError> {
+            self.scalar_operand_refused = false;
             if let LoweringOperand::Carried(word) = lowered {
                 let required_kind = required_kind.ok_or_else(|| {
                     backend_module(
@@ -2694,10 +2706,13 @@ impl<'a> Lowering<'a> {
                         ScalarMergeKind::ExitCode,
                     ))
                 },
-                _ => Err(unsupported(
-                    construct,
-                    "dynamic arms must produce scalar Int or Bool values",
-                )),
+                _ => {
+                    self.scalar_operand_refused = true;
+                    Err(unsupported(
+                        construct,
+                        "dynamic arms must produce scalar Int or Bool values",
+                    ))
+                },
             };
             #[cfg(any(test, feature = "dasm-c2-observation"))]
             if let Some((observed_operand_kind, observed_constructor)) = observation {

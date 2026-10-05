@@ -191,6 +191,8 @@ fn run_dynamic_constructor_dispatch_fixture(
         default: default.clone(),
     };
     let mut compiler = Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env: &seed_env,
@@ -2148,6 +2150,8 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
     plan: StaticTransitionPlan<'src>,
 ) -> Lowering<'src> {
     Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env,
