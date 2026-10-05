@@ -1102,7 +1102,9 @@ mod tests {
             );
         }
         let forced = plan(&BTreeSet::from([inner]));
-        for origin in [inner, outer] {
+        // Parent first: a missing phase propagation fails at the enclosing
+        // join, even if the forced child's own result pin would also fail.
+        for origin in [outer, inner] {
             assert_eq!(
                 forced.join_plan_token(origin).expect("carrier source join").representation,
                 JoinResultRepresentation::CarrierWord,
