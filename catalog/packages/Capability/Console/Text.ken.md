@@ -26,7 +26,60 @@ proc eprintLine (text : String) : IO (Result IOError Unit) visits [Console] =
     (bytes_concat
       (bytes_encode text)
       (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char)))))
+
+fn console_line_payload (text : String) : Bytes =
+  bytes_concat
+    (bytes_encode text)
+    (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char))))
+
+fn console_write_tree (stream : Stream) (payload : Bytes) : IO (Result IOError Unit) =
+  Vis
+    ConsoleOp
+    console_resp
+    (Result IOError Unit)
+    (Write stream payload)
+    (λr. Ret ConsoleOp console_resp (Result IOError Unit) r)
+
+theorem console_tree_refl (a : Type) (x : a) : Equal a x x = Refl
+
+pub theorem print_write_tree
+      (text : String)
+    : Equal
+        (IO (Result IOError Unit))
+        (print text)
+        (console_write_tree Stdout (bytes_encode text)) =
+  console_tree_refl (IO (Result IOError Unit)) (print text)
+
+pub theorem print_line_write_tree
+      (text : String)
+    : Equal
+        (IO (Result IOError Unit))
+        (printLine text)
+        (console_write_tree Stdout (console_line_payload text)) =
+  console_tree_refl (IO (Result IOError Unit)) (printLine text)
+
+pub theorem eprint_write_tree
+      (text : String)
+    : Equal
+        (IO (Result IOError Unit))
+        (eprint text)
+        (console_write_tree Stderr (bytes_encode text)) =
+  console_tree_refl (IO (Result IOError Unit)) (eprint text)
+
+pub theorem eprint_line_write_tree
+      (text : String)
+    : Equal
+        (IO (Result IOError Unit))
+        (eprintLine text)
+        (console_write_tree Stderr (console_line_payload text)) =
+  console_tree_refl (IO (Result IOError Unit)) (eprintLine text)
 ```
+
+`print_write_tree`, `print_line_write_tree`, `eprint_write_tree`, and
+`eprint_line_write_tree` expose each helper's single `Write`, chosen stream,
+payload, and unchanged response in a checked interaction tree. The newline is
+encoded explicitly as character 10; these laws do not prove facts about the
+primitive encoder's output bytes.
 
 The helpers preserve `write`'s total `Result IOError Unit`; broken pipes remain
 named values visible to callers rather than host exceptions.
