@@ -1,7 +1,7 @@
 ---
 id: KERNEL-J-NONREFL-ENDPOINT-SHARING
 title: "A non-refl J reduction re-reduces the level below about eight times, through j_endpoints, the type-equality witness and the Cast arm's components, so a source-derived chain of J over step_i helpers costs work exponential in its depth. Make whnf of that chain linear in depth by reducing each endpoint once, with the J reduct's shape unchanged"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1
