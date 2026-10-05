@@ -17,7 +17,7 @@
 //! Ops: registered as `PrimReduction::Op { symbol }` with matching entries
 //! in `ken-interp`'s `prim_reduce`. The symbol names are the stable interface.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use ken_kernel::{
     declare_deceq_certificate, declare_def, declare_postulate, declare_primitive, GlobalEnv,
@@ -173,6 +173,16 @@ struct FixedIntLiteralDescriptor {
 }
 
 impl NumericEnv {
+    pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<GlobalId>) {
+        self.fixed_int_literal_descriptors
+            .retain(|descriptor| !removed.contains(&descriptor.type_id));
+        self.add_table.retain(|id, _| !removed.contains(id));
+        self.eq_table.retain(|id, _| !removed.contains(id));
+        self.sub_table.retain(|id, _| !removed.contains(id));
+        self.mul_table.retain(|id, _| !removed.contains(id));
+        self.div_table.retain(|id, _| !removed.contains(id));
+    }
+
     pub(crate) fn fixed_int_literal_descriptor(
         &self,
         ty_id: GlobalId,

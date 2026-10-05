@@ -350,3 +350,51 @@ pub fn run() {
 
     println!("bye");
 }
+
+#[cfg(test)]
+mod reused_env_rollback_tests {
+    use std::collections::BTreeSet;
+
+    use ken_kernel::{Decl, GlobalId, Term};
+
+    use super::{do_def, Session};
+
+    fn trusted_ids(session: &Session) -> BTreeSet<GlobalId> {
+        session.env.env.trusted_base().into_iter().collect()
+    }
+
+    #[test]
+    fn failed_repl_definition_rolls_back_and_keeps_the_session_reusable() {
+        let mut session = Session::new().expect("REPL environment");
+        do_def(
+            &mut session,
+            "const ac0_need : Int requires Equal Int 0 0 = 0",
+        );
+        let before = trusted_ids(&session);
+        let next_id = session.env.env.next_global_id();
+
+        do_def(&mut session, "const ac0_bad : Bool = ac0_need");
+        let after = trusted_ids(&session);
+        assert_eq!(
+            after.difference(&before).copied().collect::<BTreeSet<_>>(),
+            BTreeSet::new()
+        );
+        assert!(!session.names.iter().any(|name| name == "ac0_bad"));
+
+        do_def(&mut session, "const ac0_after : Bool = True");
+        let id = session.env.globals["ac0_after"];
+        assert_eq!(id, next_id);
+        assert!(matches!(
+            session.env.env.lookup(id),
+            Some(Decl::Transparent { body, .. })
+                if *body == Term::constructor(session.env.globals["True"], Vec::new())
+        ));
+        let aliases: Vec<_> = session
+            .env
+            .globals
+            .iter()
+            .filter_map(|(name, candidate)| (*candidate == id).then_some(name.as_str()))
+            .collect();
+        assert_eq!(aliases, ["ac0_after"]);
+    }
+}

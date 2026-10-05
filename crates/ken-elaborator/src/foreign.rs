@@ -118,6 +118,25 @@ pub struct ForeignEnv {
 }
 
 impl ForeignEnv {
+    pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<GlobalId>) {
+        let dropped_names: HashSet<_> = self
+            .bindings
+            .iter()
+            .filter_map(|(name, binding)| {
+                (removed.contains(&binding.postulate_id)
+                    || binding
+                        .runtime_checks
+                        .iter()
+                        .any(|check| removed.contains(&check.hole_id)))
+                .then_some(name.clone())
+            })
+            .collect();
+        self.bindings
+            .retain(|name, _| !dropped_names.contains(name));
+        self.io_effect_rows
+            .retain(|name, _| !dropped_names.contains(name));
+    }
+
     pub fn empty() -> Self {
         Self {
             bindings: HashMap::new(),
