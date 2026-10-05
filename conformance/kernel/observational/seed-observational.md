@@ -351,6 +351,26 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ---
 
+### observational/quotient-elim-neutral-preserves-respect-term (soundness)
+- spec: `spec/10-kernel/16-observational.md` §5 (Quot-Elim-Ω);
+  `spec/10-kernel/17-conversion.md` §3.2
+- given: `A := Bool`, `a := true`, `R := λ _ _. Top`, and a checked
+  total-equivalence witness `e`; form `Q := A / R / e`. In context
+  `q : Q` (neutral), `M : (z : Q) → Ω_0`, and
+  `f : (x : A) → M [x]`. Let `r := a` (well-scoped but not a proof).
+  Query `infer` and `whnf` on core `QuotElim M f r q`; also query
+  `whnf` on `QuotElim M f r [a]`.
+- expect: `infer(QuotElim M f a q)` accepts at type `M q`.
+  `whnf(QuotElim M f a q) = QuotElim M f a q`, with `r := a`
+  preserved exactly. `whnf(QuotElim M f a [a])` reduces to `f a`.
+- why: An Ω-target only requires `r` to be well-scoped, so `a : A`
+  is a valid non-proof respect field. The neutral-scrutinee rule
+  preserves that field; the class-headed control fires iota and
+  ignores it. Dropping `r` from the neutral result changes the
+  asserted `whnf` term.
+
+---
+
 ## Acceptance criterion: Truncation (frame par. 2 item 8)
 
 ### observational/trunc-elim
