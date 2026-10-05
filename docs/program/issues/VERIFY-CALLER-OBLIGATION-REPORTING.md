@@ -1,6 +1,6 @@
 ---
 id: VERIFY-CALLER-OBLIGATION-REPORTING
-title: "ken check, ken run, the compiler driver and the REPL elaborate through ID-only wrappers that drop ElabResult.obligations, so a successful declaration's open obligation may reach no report. Make every user-facing caller report its open obligations and fail or flag them"
+title: "ken check, ken run, ken native-build, the compiler driver and the REPL elaborate through ID-only wrappers that drop ElabResult.obligations, so an open obligation gets no report and the package obligation map stays empty. Make every user-facing caller report each open obligation and still succeed"
 status: active
 owner: verify
 size: M
@@ -16,53 +16,77 @@ origin: "Architect evt_2sb1ehveqk5m0 (from the REFINEMENT review carry evt_53r1r
 
 ## Objective
 
-When `ken check`, `ken run`, the compiler driver or the REPL accepts a
-declaration whose `ElabResult.obligations` is non-empty, the user sees each
-open obligation, and the command does not report a clean success.
+When `ken check`, `ken run`, `ken native-build`, the compiler driver or the
+REPL accepts a declaration whose `ElabResult.obligations` is non-empty, the
+user sees each open obligation as `unknown`, and the package records it.
+The command still succeeds (spec 21 §5.1-5.2, 24 §2): silence is the
+defect, not success.
 
-## Settled inputs (measured at `3ad9a5590`)
+## AC-0 result (verify `evt_1kb41zsgdvjep`, ruled `evt_6jvxr0czd8cfr`)
 
-- **The callers** use wrappers that return only `GlobalId`s:
-  - `ken check` and `ken run` (`crates/ken-cli/src/main.rs:383-395`) call
-    `elaborate_module_from_roots`, `elaborate_ken_md_file` or
-    `elaborate_file`;
-  - the compiler driver (`crates/ken-elaborator/src/compiler_driver.rs:629`
-    and `:1212`) calls `elaborate_ken_md_file` or `elaborate_file`;
-  - the REPL `do_def` (`crates/ken-cli/src/repl.rs:137`) calls
-    `elaborate_decl`.
-- **Reporting APIs.** `elaborate_decl_v1` (`lib.rs:408`) and
-  `elaborate_file_v1` (`lib.rs:439`) return obligations. The `.ken.md` and
-  module-root paths have no `_v1` counterpart today, so adding them is in
-  scope (CHECKS 4).
-- **Not this WP.** A failed declaration's orphan hole is
-  `VERIFY-REUSED-ENV-TRUST-RESIDUE` (environment rollback).
+On one open `requires` (`ac0_use`), at `3c9a283e2`:
+- `ken check` exits 0 with no output;
+- `ken run` exits 0 and prints only the program's output;
+- both driver entries return `Ok` with an empty `report.obligations`, while
+  the hole sits in `report.assumptions` and `trusted_base_delta`;
+- the REPL prints `defined:` and nothing else.
 
-Treat anchors as perishable. If a settled input is false on the landed base,
-stop and report the mismatch.
+No catalog, example, conformance or test consumer relies on the silence.
+`v2_acceptance::open_call_requires_hole_exports_unknown` needs only `Ok`
+from the denotation route, which flagged success keeps.
 
-## Deliverable
+## Deliverable: the ruled repair (size M, T1)
 
-1. **AC-0, at the start of the repair.** For each of the four callers, run
-   a file with one open `requires` obligation (a call with no in-scope
-   premise) and record the exit status and output. The Architect then rules,
-   per caller, whether an open obligation fails the command or is reported
-   as a flagged success. If `/spec` does not settle that, the Architect
-   routes it to the Spec enclave.
-2. **The ruled repair.** Every caller elaborates through an API that returns
-   obligations, and applies the ruled behaviour.
+- **One shared renderer** in `ken-elaborator`, `render_open_obligations`:
+  one line per open obligation, `unknown <id> at <span>: <goal>`. The CLI and
+  the REPL both call it. Wherever stdout carries a product, report to stderr.
+- **`ken check`** (`main.rs:383-395`): print the report, then `ken check: N
+  open obligation(s), status unknown`. Exit 0.
+- **`ken run`**: print the report before execution. The exit status stays the
+  program's own.
+- **`ken native-build`** (`main.rs:218`, through
+  `prepare_native_program_sources`): report to stderr; stdout stays the
+  executable path. Exit 0. Measure its row first as its AC-0 baseline.
+- **REPL `do_def`** (`repl.rs:137`): use `elaborate_decl_v1`, as `do_check`
+  does (`repl.rs:158-163`), and print the report after `defined:`.
+- **Compiler driver.** Thread the V2 triples into `emit_package_from_env`
+  (`compiler_driver.rs:3279`). Per triple, fill `semantic.obligations` with
+  the canonically encoded goal and `obligation_metadata` with status
+  `Unknown`, origin the owning declaration's stable symbol, and
+  `affects_runtime_meaning: true`. All four driver routes (denotation,
+  package, native, the denotation's carried package) inherit it. The trust
+  delta entry stays.
+- **APIs.** Add `elaborate_ken_md_file_v1` (including `ken example` fence
+  results; `ken reject` ranges are excluded) and
+  `elaborate_module_from_roots_v1` (every declaration it elaborates,
+  dependencies included). Each ID-only wrapper becomes a projection of its
+  `_v1` form.
 
 ## Acceptance
 
-- **AC-1.** For each caller, the open-obligation file shows each obligation
-  and gets the ruled exit behaviour. Each row asserts the exit status first.
-- **AC-2 (controls).** A file whose obligations are all discharged, and a
-  file with none, still exit 0 with unchanged output. The catalog and
-  example suites stay green.
-- **AC-3 (falsifier).** Switching one caller back to its ID-only wrapper
-  turns its row red.
+- **AC-1.** Rows for check, run, REPL, native-build and the four driver
+  routes, on the AC-0 file.
+  - Each asserts its exit status first, then exactly one report line starting
+    `unknown ac0_use.requires.`.
+  - Driver rows assert exactly one `report.obligations` key with that prefix,
+    with status `Unknown` and origin `ac0_use`'s symbol.
+  - Assert the prefix and the count, never the numeric suffix.
+- **AC-2 (controls).** A discharged-premise twin and a no-`requires` file
+  print no report line, keep byte-identical output, and keep
+  `core_semantic_hash` unchanged on the driver routes. Catalog and examples
+  stay green. The denotation consumers rerun: `v2_acceptance`,
+  `b1_acceptance`, `b1_exact_denotation_alphabet`, `b2_acceptance`,
+  `px7f_resource_lifetime_export`, `px8p_checked_buffer_producer`,
+  `px8x_static_export_projection`, and `ken-interp` `b3_acceptance`. A hash
+  change is expected only where an open obligation exists (spec 46 §3.1).
+- **AC-3 (falsifier).** Pointing any one caller back at its ID-only wrapper
+  reddens its row and leaves the controls green.
 
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change.
-- A catalog, example, conformance or test consumer relies on a clean exit
-  with open obligations: stop to the Architect with the consumer (CHECKS 3).
+- A consumer relies on a clean exit or an empty obligation map with open
+  obligations: stop to the Architect with the consumer (CHECKS 3).
+- **Not this WP:** obligation identities that depend on allocation order
+  (`VERIFY-OBLIGATION-STABLE-IDENTITY`), and a strict mode that fails on
+  open obligations.
