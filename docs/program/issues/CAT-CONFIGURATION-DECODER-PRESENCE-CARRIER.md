@@ -1,7 +1,7 @@
 ---
 id: CAT-CONFIGURATION-DECODER-PRESENCE-CARRIER
 title: "replace the decoder's lossy List Bytes result with List (Option Bytes) -- empty Bytes is an ordinary value in this package, not a reserved sentinel, so the current map sends two distinct inputs (no entry, and an entry whose value is empty) to one indistinguishable result element; carry the validated payload instead of recomputing it, and delete env_config_values with its placeholder branch so the agreement obligation disappears at its source rather than being proved"
-status: draft
+status: ready
 owner: foundation
 size: M
 gate: none
@@ -37,11 +37,16 @@ emits `Cons Bytes (list_to_bytes (Nil UInt8))` on `None`, and
 exactly on the optional lane.
 
 **The consumer census, and why it decides the shape.** Measured independently
-by the Steward at `d5d7e6299`, agreeing with the Architect's own: the two
-exported decoders have **no catalog, example, conformance, or production
-consumers.** The only external references are two elaborator test files,
-`crates/ken-elaborator/tests/cc8_env_config_decoder_acceptance.rs` and
-`crates/ken-elaborator/tests/cat_tier_e_decoder_import.rs`. Ken is under
+by the Steward at `d5d7e6299`, agreeing with the Architect's own, and
+re-measured at `c0c49b874`: the two exported decoders have **no catalog,
+example, conformance, or production consumers.** `Derived.ken.md:2703` only
+names the package in prose. The external references are elaborator tests:
+`tests/cc8_env_config_decoder_acceptance.rs`,
+`tests/lang_mod_strict_resolution_d0.rs`,
+`src/r_layer_tests/cat_tier_e_decoder_import.rs`,
+`src/r_layer_tests/cat_transport_pub_export.rs` (it names the
+`env_config_values::lookup_some` law that AC-3 retires) and
+`src/seal2_tests/producer_closure.rs`. The build migrates each one. Ken is under
 PRINCIPLES transient T, so there is no compatibility beneficiary. That is what
 authorizes replacing the type IN PLACE rather than adding a parallel decoder.
 
@@ -105,9 +110,9 @@ and must still hold under the new carrier.
 Stop and report if the change cannot be made without a new primitive,
 postulate, `Axiom`, new data type, or trusted-base entry; if `Option` is not
 available to this package without widening an import beyond what `Schema`
-already permits; or if any consumer outside the two named elaborator test
-files turns out to exist on the landed base, since that would refute the
-census that authorizes an in-place type change.
+already permits; or if any consumer outside `crates/ken-elaborator` tests
+turns out to exist on the landed base, since that would refute the census
+that authorizes an in-place type change.
 
 ## 6. Not this node
 
@@ -118,9 +123,8 @@ not re-prove the required-field agreement from scratch; it is
 
 ## 7. Release condition
 
-`status: draft` deliberately. The Architect ruled that this node begins only
-from a landed current main and does not authorize work ahead of
-`CAT-CONFIGURATION-DECODER-LAWS`. Flip to `ready` and release only after that
-node's candidate has landed, and re-measure section 2's coordinates against
-the landed base first -- this node deletes a function that node proves laws
-about.
+Met: `CAT-CONFIGURATION-DECODER-LAWS` has landed, and section 2's census is
+re-measured at `c0c49b874`. The defect is still present there:
+`Decoder.ken.md:127` emits `list_to_bytes (Nil UInt8)` on `None`, inside
+`env_config_values` (`:130`). This node deletes a function that node proves
+laws about, so AC-3's retirement is atomic with it.
