@@ -290,13 +290,18 @@ fn console_direct_exit_nested_match_uses_existing_route() {
     }
 }
 
-// Promise class: transition sentinel for the test-forced CarrierWord route.
-// MEASURED: a scoped planner hook admits specialized Match joins to the
-// carrier route and both selected bytes execute natively with the same
-// stdout, exit, and effects as the interpreter. CLAIMED: a root ExitCode
-// constructor is decoded by its value class, not by allocation lifetime.
-// THE GAP: this fixture cannot cover every ExitCode constructor; the hook's
-// positive count and an old-root-guard mutation pin this reached boundary.
+// Spec: 42 §3.3 and §6 (selected arm and effects); 45 §4 (native parity).
+// Promise class: durable invariant for a supported forced-carrier route.
+// MEASURED: the scoped hook reaches specialized Match joins, and both bytes
+// of this checked source produce identical native/interpreter observations.
+// CLAIMED: a carried root ExitCode constructor decodes correctly regardless
+// of its allocation lifetime. THE GAP: two bytes do not cover every ExitCode
+// shape; the positive hook count and old-tag-guard mutation establish that
+// byte 2 actually reaches the root decoder's class check.
+// Maintenance: retuning the default planner or constructor lifetimes must
+// leave this forced-route parity green. A trap, divergent observation, or
+// silently skipped carrier route must red. If CarrierWord is retired, migrate
+// this route witness while preserving the general differential obligation.
 #[cfg(target_os = "linux")]
 #[test]
 fn carrier_root_exit_nested_match_agrees_with_interpreter() {
