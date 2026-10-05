@@ -59,6 +59,15 @@ base, stop and report the mismatch.
   `:420-422`) is amended to "value-level Bool composition inside `IsTrue`,
   here by transparent Bool elimination", which takes the
   conformance-validator's Spec vote.
+- **Spec 18a §5.9.1** (`spec/10-kernel/18a-primitive-registry.md:761-764`)
+  says the AC-C3 `Int.toChar` pair fails against a stub
+  `isScalar := true`. It is reconciled in this WP with the direct
+  `inRangeBool` guard and the corrected C3 discriminator, because landing
+  the conformance correction without it leaves the two contradicting (CV
+  `evt_5ynna1mrc4jsh`). The spec-author writes the paragraph on the WP
+  branch, and the conformance-validator takes the Spec vote. It corrects a
+  stated discriminator, not a behavioral contract: expected `None` and
+  `Some` outputs are unchanged.
 - The design is ruled at AC-0 (Architect `evt_y1v2wbnhx9ej`, R3 and R4):
   - a predicate table keyed on GlobalId;
   - a literal refinement becomes an anonymous named one;
@@ -99,7 +108,11 @@ base, stop and report the mismatch.
     introduction.
 - **AC-2 (consumers and controls).**
   - The prelude's `intToChar` discharges its `Some Char n` from the arm's
-    `inRangeBool n = True`.
+    `inRangeBool n = True`. **A test asserts this at elaboration level:** the
+    guarded `Some Char n` branch leaves no open refinement obligation, and
+    with the arm's guard removed the same branch leaves one. Runtime
+    `Some 'A'` output and the generic Char-literal row do not pin this
+    branch (CV `evt_5ynna1mrc4jsh`).
   - The guide's `const five : PosInt = 5` (`surface-reference.ken.md:108`)
     discharges.
   - The seeds `seed-def-refinement`, `seed-data-match`, `seed-obligations`
