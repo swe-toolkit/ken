@@ -464,88 +464,11 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // a *second* `readAt` on the escaped file. The Nat match fans out (Zero/Suc off
 // one `brif`) and the second read's checked frame lives in its shared tail, so
 // pre-fix it tripped the identical "consumed more than once" on the Nat lane
-// (verified by reverting only the Nat-lane fork). Now interpreter-equivalent.
+// (verified by reverting only the Nat-lane fork). The current compiler gets
+// past its scalar-join refusal but stops at ContinuationSpecialization;
+// interpreter/native parity is not yet established for this ignored row.
 #[cfg(target_os = "linux")]
-const NAT_FANOUT_ESCAPED_RESOURCE: &str = r#"program capabilities FS AFull
-proc second_read (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
-    (\r2. Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
-
-proc after_read (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  (outcome : Result ResourceError ReadProgress)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  match outcome {
-    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
-    Ok progress |-> match progress {
-      ReadEof |-> second_read file_closed buffer;
-      ReadSome span count |->
-        bind (Coproduct (FSOp AFull) AmbientOp)
-          (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-          (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-          (match buffer_span_budget span {
-            Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);
-            Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)
-              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)
-          })
-          (\_ignored. second_read file_closed buffer)
-    }
-  }
-
-proc read_body (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
-    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
-    (\outcome. after_read file_closed buffer outcome)
-
-proc after_file_escape (file_closed : Resource ResourceKind.FsHandle)
-  : HostIO AFull ExitCode visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
-    (withBuffer AFull Unit Unit (6 : Int) (read_body file_closed))
-    (\outcome. host_exit AFull Success)
-
-proc handle_outer (outcome : Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
-  : HostIO AFull ExitCode visits [FS] =
-  match outcome {
-    Err open_error |-> host_exit AFull (Failure 96);
-    Ok bracket |-> match bracket {
-      ResourceBracketOk file_closed |-> after_file_escape file_closed;
-      ResourceBracketBodyError error |-> host_exit AFull (Failure 93);
-      ResourceBracketReleaseError error |-> host_exit AFull (Failure 94);
-      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 95)
-    }
-  }
-
-proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  match caps {
-    MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
-        (withResource AFull Unit (Resource ResourceKind.FsHandle)
-          cap (bytes_encode "held.bin") ResourceRead
-          (\resource. Ret (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
-            (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)))
-        (\outcome. handle_outer outcome)
-  }
-"#;
+const NAT_FANOUT_ESCAPED_RESOURCE: &str = include_str!("rt_nat_fanout_escaped_resource.ken");
 
 #[cfg(target_os = "linux")]
 // Readmitted under RT-IGNORED-PASSING-ROWS, row 6 of 11.
@@ -717,13 +640,14 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-NATIVE-TREE-MATCH D1: first ObjectEmission refusal is a carried `Match` arm source join StaticOriginId(1244) planned native scalar lanes but lowering produced a carried boundary word; arm origin 1241, PredeclaredFunctionId(6); RT-JOIN-PHASE-CASE-BINDER-CARRIED AC-0 owns this witness, not native parity"]
+#[ignore = "RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT: scalar admission retry forces source Match 1289 into CarrierWord; first ObjectEmission refusal is ContinuationSpecialization: the detached-result seat projected 4 undischarged causal calls onto one unit result; a multi-member projection is a hard stop, never a preference rule, because one result value cannot discharge two causal calls; successor owns parity"]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     // Closure across the bounded-Nat fanout lowerer: an escaped-resource checked
     // frame in the shared continuation of a `match n {Zero;Suc}` fanout. Pre-fix
     // this tripped "consumed more than once" on the Nat lane (confirmed by
-    // reverting only `lower_source_bounded_nat_match`'s fork); now reaches native
-    // execution with interpreter-equal semantics.
+    // reverting only `lower_source_bounded_nat_match`'s fork). This ignored row
+    // still stops during object emission; the active test pins its feedback
+    // path, not native/interpreter parity.
     in_large_stack_thread("rt-escape-nat-fanout", || {
         let diff = differential("nat-fanout-escaped", NAT_FANOUT_ESCAPED_RESOURCE);
         assert_native_matches_interpreter("nat-fanout-escaped", &diff);

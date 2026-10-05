@@ -1310,6 +1310,7 @@ impl<'src> Planner<'src> {
         symbols: &crate::NativeProcessSymbols,
         root_ingress: AbiRootIngress,
         functionized_units: bool,
+        forced_carrier_joins: &BTreeSet<StaticOriginId>,
     ) -> Result<StaticTransitionPlan<'src>, CraneliftBackendError> {
         self.reconcile_realized_checked_ih_recursors()?;
         let (synthesized_identities, synthesized_io_roles) =
@@ -1436,7 +1437,8 @@ impl<'src> Planner<'src> {
         // `continuation_contexts` both require the ABI installed above, so the
         // earliest possible view is built after this line.
         finalize_continuation_availability_plan(&mut self.plan)?;
-        self.plan.join_results = build_join_result_plan(&self.plan, functionized_units)?;
+        self.plan.join_results =
+            build_join_result_plan(&self.plan, functionized_units, forced_carrier_joins)?;
         self.plan.pre_schema_transport_sources =
             derive_checked_ih_transport_source_population(&self.plan)?;
         self.plan.preselected_response_callers =

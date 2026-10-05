@@ -42,6 +42,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::RuntimeProgram;
 
 pub(crate) mod artifact;
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+pub use artifact::{with_scalar_join_feedback_attempts, ScalarJoinFeedbackObservation};
 pub(crate) mod compiled;
 mod grafted_spine_control_graph;
 mod lowering;

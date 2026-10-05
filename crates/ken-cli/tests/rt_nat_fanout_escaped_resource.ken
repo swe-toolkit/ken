@@ -1,0 +1,79 @@
+program capabilities FS AFull
+proc second_read (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
+    (\r2. Ret (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
+
+proc after_read (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  (outcome : Result ResourceError ReadProgress)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+    Ok progress |-> match progress {
+      ReadEof |-> second_read file_closed buffer;
+      ReadSome span count |->
+        bind (Coproduct (FSOp AFull) AmbientOp)
+          (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+          (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+          (match buffer_span_budget span {
+            Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);
+            Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)
+          })
+          (\_ignored. second_read file_closed buffer)
+    }
+  }
+
+proc read_body (file_closed : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file_closed (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
+    (\outcome. after_read file_closed buffer outcome)
+
+proc after_file_escape (file_closed : Resource ResourceKind.FsHandle)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withBuffer AFull Unit Unit (6 : Int) (read_body file_closed))
+    (\outcome. host_exit AFull Success)
+
+proc handle_outer (outcome : Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle)))
+  : HostIO AFull ExitCode visits [FS] =
+  match outcome {
+    Err open_error |-> host_exit AFull (Failure 96);
+    Ok bracket |-> match bracket {
+      ResourceBracketOk file_closed |-> after_file_escape file_closed;
+      ResourceBracketBodyError error |-> host_exit AFull (Failure 93);
+      ResourceBracketReleaseError error |-> host_exit AFull (Failure 94);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 95)
+    }
+  }
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result FileError (ResourceBracketResult Unit (Resource ResourceKind.FsHandle))) ExitCode
+        (withResource AFull Unit (Resource ResourceKind.FsHandle)
+          cap (bytes_encode "held.bin") ResourceRead
+          (\resource. Ret (Coproduct (FSOp AFull) AmbientOp)
+            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+            (ResourceBodyResult Unit (Resource ResourceKind.FsHandle))
+            (ResourceBodyOk Unit (Resource ResourceKind.FsHandle) resource)))
+        (\outcome. handle_outer outcome)
+  }

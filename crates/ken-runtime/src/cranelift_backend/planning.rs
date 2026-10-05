@@ -114,7 +114,10 @@ pub(in crate::cranelift_backend) use static_transition::{
     with_fusion_producer_capture_mutation, D2jCause, FusionClaimParameterMutation,
     FusionProducerCaptureMutation, D2J_DECLARATION,
 };
-pub(super) use static_transition::plan_static_transition_graph_with_symbols;
+pub(super) use static_transition::{
+    plan_static_transition_graph_with_symbols,
+    plan_static_transition_graph_with_symbols_and_forced_carrier,
+};
 #[cfg(test)]
 pub(super) use static_transition::{
     contspec_nested_fixture, governed_nested_resource_bracket,

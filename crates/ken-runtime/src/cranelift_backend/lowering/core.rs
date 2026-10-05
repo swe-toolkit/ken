@@ -2111,6 +2111,8 @@ pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
     let resolved = process_symbols
         .cloned()
         .unwrap_or_else(seed_only_legacy_authority);
+    let refused = std::cell::Cell::new(None);
+    let mut source_exprs = BTreeMap::new();
     compile_expr_into_module_with_root_projection(
         module,
         function_name,
@@ -2125,6 +2127,9 @@ pub(in crate::cranelift_backend) fn compile_expr_into_module<'a, M: Module>(
         oriented_subcontinuation_plan,
         false,
         false,
+        &BTreeSet::new(),
+        &refused,
+        &mut source_exprs,
     )
 }
 
@@ -2152,6 +2157,8 @@ pub(in crate::cranelift_backend) fn compile_expr_into_object_module<'a, M: Modul
     let resolved = process_symbols
         .cloned()
         .unwrap_or_else(seed_only_legacy_authority);
+    let refused = std::cell::Cell::new(None);
+    let mut source_exprs = BTreeMap::new();
     compile_expr_into_module_with_root_projection(
         module,
         function_name,
@@ -2166,6 +2173,9 @@ pub(in crate::cranelift_backend) fn compile_expr_into_object_module<'a, M: Modul
         oriented_subcontinuation_plan,
         !process_mode,
         process_mode,
+        &BTreeSet::new(),
+        &refused,
+        &mut source_exprs,
     )
 }
 
@@ -2197,6 +2207,9 @@ pub(in crate::cranelift_backend) fn compile_program_expr_into_module<'a, M: Modu
     process_symbols: &crate::NativeProcessSymbols,
     native_join_plan: Option<crate::NativeJoinPlanV1>,
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+    forced_carrier_joins: &BTreeSet<StaticOriginId>,
+    refused_scalar_join: &std::cell::Cell<Option<StaticOriginId>>,
+    source_exprs: &mut BTreeMap<StaticOriginId, *const RuntimeExpr>,
 ) -> Result<CompiledModule<M>, CraneliftBackendError> {
     compile_expr_into_module_with_root_projection(
         module,
@@ -2212,6 +2225,9 @@ pub(in crate::cranelift_backend) fn compile_program_expr_into_module<'a, M: Modu
         oriented_subcontinuation_plan,
         false,
         false,
+        forced_carrier_joins,
+        refused_scalar_join,
+        source_exprs,
     )
 }
 
@@ -2229,6 +2245,9 @@ pub(in crate::cranelift_backend) fn compile_program_expr_into_object_module<'a, 
     process_symbols: &crate::NativeProcessSymbols,
     native_join_plan: Option<crate::NativeJoinPlanV1>,
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
+    forced_carrier_joins: &BTreeSet<StaticOriginId>,
+    refused_scalar_join: &std::cell::Cell<Option<StaticOriginId>>,
+    source_exprs: &mut BTreeMap<StaticOriginId, *const RuntimeExpr>,
 ) -> Result<CompiledModule<M>, CraneliftBackendError> {
     compile_expr_into_module_with_root_projection(
         module,
@@ -2244,6 +2263,9 @@ pub(in crate::cranelift_backend) fn compile_program_expr_into_object_module<'a, 
         oriented_subcontinuation_plan,
         !process_mode,
         process_mode,
+        forced_carrier_joins,
+        refused_scalar_join,
+        source_exprs,
     )
 }
 
@@ -2262,6 +2284,9 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     oriented_subcontinuation_plan: Option<crate::OrientedSubcontinuationPlanV1>,
     project_public_scalar_root: bool,
     _root_trap_process_sentinel: bool,
+    forced_carrier_joins: &BTreeSet<StaticOriginId>,
+    refused_scalar_join: &'a std::cell::Cell<Option<StaticOriginId>>,
+    source_exprs: &mut BTreeMap<StaticOriginId, *const RuntimeExpr>,
 ) -> Result<CompiledModule<M>, CraneliftBackendError> {
     #[cfg(test)]
     {
@@ -2302,7 +2327,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // which derive their authority through the fail-closed validation lane, so
     // there is no longer any path by which a package silently lowers against
     // prelude spellings its own checked package never recorded.
-    let mut static_transition_plan = plan_static_transition_graph_with_symbols(
+    let mut static_transition_plan = plan_static_transition_graph_with_symbols_and_forced_carrier(
         expr,
         &declarations,
         process_symbols,
@@ -2312,7 +2337,9 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             AbiRootIngress::Value
         },
         true,
+        forced_carrier_joins,
     )?;
+    static_transition_plan.check_forced_source_expr_identity(forced_carrier_joins, source_exprs)?;
     // No full compilation may execute Boxed R until a graph-authorized
     // consumer and a discriminating execution witness exist. The planner
     // still issues its complete slot schema; this boundary is before every
@@ -2889,6 +2916,8 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         source_control_root: None,
         active_oriented_semantic_regions: 0,
         active_carried_computational_eliminations: Vec::new(),
+        scalar_operand_refused: false,
+        refused_scalar_join: Some(refused_scalar_join),
         native_join_plan,
         consumed_join_sites: BTreeSet::new(),
         root_terminal_authority: None,

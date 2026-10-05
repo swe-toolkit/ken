@@ -81,6 +81,95 @@ fn carrier_word_join_refuses_residual_predecessor_without_a_residual_plane() {
     ).expect("the same declared K join accepts K");
 }
 
+/// Promise: durable invariant. MEASURED: the concrete RecursiveBackedge
+/// scalar-operand refusal leaves the feedback flag and origin Cell empty.
+/// CLAIMED: a non-admission error cannot induce a carrier re-plan. GAP: the
+/// driver wrapper is independently pinned with this untouched Cell.
+#[test]
+fn recursive_backedge_refusal_does_not_mark_scalar_admission() {
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    let refused = std::cell::Cell::new(None);
+    lowering.refused_scalar_join = Some(&refused);
+    let mut func = Function::new();
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut func, &mut context);
+    let entry = builder.create_block();
+    builder.switch_to_block(entry);
+    let word = builder.ins().iconst(types::I64, 0);
+    let error = lowering.merge_scalar_operand(
+        &mut builder,
+        LoweringOperand::Carried(CarriedBoundaryWord { word }),
+        Some(ScalarMergeKind::RecursiveBackedge),
+        "RecursiveBackedge",
+    );
+    assert!(matches!(
+        error,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "RecursiveBackedge",
+            reason,
+        })) if reason == "a carried word cannot mint a recursive-backedge control marker"
+    ));
+    assert!(!lowering.scalar_operand_refused);
+    assert_eq!(refused.get(), None);
+}
+
+/// Promise: durable invariant. MEASURED: a direct test Lowering with no
+/// feedback Cell returns its original scalar refusal rather than panicking.
+/// CLAIMED: inert test constructors do not become a second admission route.
+/// GAP: module-backed constructors always install a Cell; the Nat pin checks it.
+#[test]
+fn direct_lowering_without_feedback_cell_returns_original_refusal() {
+    let source = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: "ctor:prelude::Bool::True".to_string(),
+            binders: 0,
+            body: RuntimeExpr::Value(RuntimeValue::Int(7.into())),
+        }],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "unmatched feedback fixture".to_string(),
+        },
+    };
+    let (plan, origin) = planned_root_occurrence(&source);
+    let join_plan = plan.join_plan_token(origin).expect("source Match has join");
+    assert_eq!(join_plan.representation, JoinResultRepresentation::NativeScalarPair);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    lowering.static_transition_plan = plan;
+    let mut func = Function::new();
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut func, &mut context);
+    let entry = builder.create_block();
+    let join = builder.create_block();
+    lowering.append_planned_join_params(&mut builder, join, &join_plan);
+    builder.switch_to_block(entry);
+    let value = builder.ins().iconst(types::I64, 0);
+    let mut merge_kind = None;
+    let result = lowering.jump_planned_join_arm(
+        &mut builder,
+        join,
+        &join_plan,
+        origin,
+        LoweringOperand::Specialized(Lowered::CapabilityToken { value }),
+        &mut merge_kind,
+        "Match",
+    );
+    assert!(matches!(
+        result,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            reason,
+        })) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ));
+    assert_eq!(merge_kind, None);
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
     Delete,
@@ -95,6 +184,8 @@ pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
 /// lower a fixture builds its own `Lowering` with that fixture's plan.
 pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(seed_env: &'a NativeSeedEnvironment) -> Lowering<'a> {
     Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env,
@@ -284,6 +375,8 @@ fn run_px8j_malformed_recursor_consumer(
     };
     let (static_transition_plan, fixture_origin) = planned_root_occurrence(lowered_fixture);
     let mut compiler = Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env: &seed_env,
@@ -2340,6 +2433,8 @@ fn nested_computational_outer_missing_selects_exact_outer_default() {
 fn distinguished_root_cannot_discharge_missing_match_site_marker() {
     let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let mut lowering = Lowering {
+        scalar_operand_refused: false,
+        refused_scalar_join: None,
         grafted_spine_builder: None,
         grafted_spine_graph: None,
         seed_env: &seed_env,
