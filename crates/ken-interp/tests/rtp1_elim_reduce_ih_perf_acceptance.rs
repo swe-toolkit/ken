@@ -197,7 +197,10 @@ fn div10Fueled (fuel : Nat) (n : Nat) (q : Nat) : Nat =
 fn div10 (n : Nat) : Nat = div10Fueled n n Zero
 
 fn digitChar (d : Nat) : String =
-  list_char_to_string (Cons Char ((48 : Int) + natToInt d) (Nil Char))
+  match intToChar ((48 : Int) + natToInt d) {
+    Some c |-> list_char_to_string (Cons Char c (Nil Char)) ;
+    None |-> list_char_to_string (Nil Char)
+  }
 
 fn natToDecimalFueled (fuel : Nat) (n : Nat) : String =
   match fuel {

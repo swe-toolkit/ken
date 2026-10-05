@@ -754,14 +754,18 @@ bottoming out at `DecEq Int`, and re-homes to the lawful-classes lane per (3).)
   **zero-NEW-delta** (bottoms out at `DecEq Int`; re-homes to the lawful-classes
   lane, like `Ord Char`).
 - `Char.toInt := proj` — reduces.
-- `Int.toChar : Int → Option Char` = refinement-intro guarded by the decidable
-  check (**face-(c)**): `isScalar c` reduces (via `leq_int`, §5.2.2) to
-  `Top`/`Bottom`, so `Int.toChar` reduces to `Some ⟨c, proof⟩` on a scalar and
-  `None` on a surrogate/out-of-range `Int`, **never** a silent `Some`.
+- `Int.toChar : Int → Option Char` matches the **direct Bool guard**
+  `inRangeBool c` (**face-(c)**), which computes via `leq_int` (§5.2.2).
+  `False` selects `None` before any `Some Char c` introduction and incurs
+  no rejected-value scalar obligation. `True` selects `Some ⟨c, proof⟩`,
+  whose `isScalar c` refinement is checked on that arm. Thus a scalar
+  reduces to `Some`, and a surrogate/out-of-range `Int` reduces to
+  `None`, **never** a silent `Some` under the checked guard.
   Discriminating (AC-C3): `Int.toChar 0xD800` (surrogate) and
   `Int.toChar 0x110000` (out-of-range) **reduce to `None`**; a valid scalar
-  reduces to `Some` — and this **fails against a stub `isScalar := true`** (the
-  obligation actually reduces, not name-matches).
+  reduces to `Some`. Stubbing `inRangeBool := True` flips both invalid
+  inputs to `Some`; stubbing only `isScalar := true` leaves this direct
+  match unchanged and cannot discriminate this case.
 - `Ord Char`: `leq_char a b := leq_int (proj a) (proj b)` — the **op** reduces
   (via `leq_int`, §5.2.2), computational and unaffected; its completeness rides
   `leq_int` reducing (lands this tranche → **no F5 dependency remains for

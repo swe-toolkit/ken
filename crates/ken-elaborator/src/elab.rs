@@ -18,7 +18,7 @@ use ken_kernel::{
         RecursiveArgumentShape,
     },
     infer as kernel_infer_raw,
-    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, subst_var, weaken},
+    subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
 };
@@ -39,6 +39,19 @@ use crate::resolve::{
 
 // ----- obligation model -----
 
+/// Surface refinement facts never enter the kernel's carrier type. An alias
+/// identity, not its spelling or its carrier, selects an introduction site.
+#[derive(Clone, Default)]
+pub(crate) struct RefinementFacts {
+    pub refinement_predicates: HashMap<GlobalId, Term>,
+    pub refined_params: HashMap<GlobalId, Vec<Option<Term>>>,
+    /// Literal constructor-field clauses survive carrier erasure by the
+    /// owning constructor identity and its checked argument position.
+    pub constructor_field_predicates: HashMap<GlobalId, Vec<Option<Term>>>,
+    /// A record's literal field clauses follow its checked owner identity.
+    pub record_field_predicates: HashMap<GlobalId, Vec<Option<Term>>>,
+}
+
 /// Source clause kind for a V1 obligation hole (`22 §1`, §2).
 #[derive(Debug, Clone)]
 pub enum ObligationKind {
@@ -52,6 +65,8 @@ pub enum ObligationKind {
     PartialPrim,
     /// A callee's `requires` premise that is absent in the caller (`22 §2.3`).
     Requires,
+    /// From an introduction at a named or site-local refinement (`22 §2.1`).
+    RefinementIntroduction,
     /// A `foreign` boundary contract that is statically unprovable → lowered
     /// to a runtime-checked assertion (`21 §5.2`, `38 §3.3`).
     FfiRuntimeCheck,
@@ -386,9 +401,10 @@ impl MatchFrame {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PremiseHoles {
-    /// Every Requires hole is taken into a reported result.
+    /// Every elaborator obligation hole is taken into a reported result.
     Reported,
-    /// Unsupplied Requires premises are refused before a hole is declared.
+    /// An undischarged elaborator obligation is refused before a hole is
+    /// declared, and a discharged one records nothing.
     Refused,
 }
 
@@ -413,6 +429,10 @@ struct ElabCtx<'e> {
     numeric_env: &'e NumericEnv,
     obligations: Vec<Obligation>,
     obl_counter: u32,
+    refinement_facts: Option<&'e RefinementFacts>,
+    /// Logical branch equations for refinement obligations; never used as
+    /// unchecked evidence in the emitted program.
+    path_conditions: Vec<(Term, usize)>,
     /// The typeclass registry, when available — needed only for `.field`
     /// Σ-record projection (`RExpr::RProj`, `33 §5.2` η). `None` in every
     /// elaboration path that predates class support and never projects
@@ -645,6 +665,8 @@ impl<'e> ElabCtx<'e> {
             numeric_env,
             obligations: Vec::new(),
             obl_counter: 0,
+            refinement_facts: None,
+            path_conditions: Vec::new(),
             class_env: None,
             standard_operators: None,
             provenance: None,
@@ -756,6 +778,11 @@ impl<'e> ElabCtx<'e> {
         self.class_env = Some(class_env);
         self.provenance = Some(provenance);
         self.standard_operators = Some(standard_operators);
+        self
+    }
+
+    fn with_refinements(mut self, facts: &'e RefinementFacts) -> Self {
+        self.refinement_facts = Some(facts);
         self
     }
 
@@ -1209,6 +1236,15 @@ fn prepare_let_rhs(
         Some(ty) => {
             let ty_core = elab_type(cx, ty)?;
             let rhs_core = check(cx, rhs, &ty_core, span)?;
+            let rhs_core = if matches!(ty, RType::RRefine(..)) {
+                let inferred = kernel_infer_current(cx, &rhs_core).map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                        error, span: span.clone(),
+                    },
+                })?;
+                emit_refinement_introduction(cx, &ty_core, &inferred, rhs_core, span, Some(ty))?
+            } else { rhs_core };
             Ok((rhs_core, ty_core))
         }
         None => infer(cx, rhs),
@@ -1362,8 +1398,22 @@ fn check_if(
     span: &Span,
 ) -> Result<Term, ElabError> {
     let condition_core = elaborate_if_condition(cx, condition)?;
-    let then_core = check(cx, then_branch, expected, then_branch.span())?;
-    let else_core = check(cx, else_branch, expected, else_branch.span())?;
+    let base = cx.path_conditions.len();
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
+    ), cx.ctx.len()));
+    let then_result = check(cx, then_branch, expected, then_branch.span());
+    cx.path_conditions.truncate(base);
+    let then_core = then_result?;
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
+    ), cx.ctx.len()));
+    let else_result = check(cx, else_branch, expected, else_branch.span());
+    cx.path_conditions.truncate(base);
+    let else_core = else_result?;
     make_if_elim(cx, condition_core, then_core, else_core, expected, span)
 }
 
@@ -1375,8 +1425,22 @@ fn infer_if(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let condition_core = elaborate_if_condition(cx, condition)?;
-    let (then_core, result_ty) = infer(cx, then_branch)?;
-    let else_core = check(cx, else_branch, &result_ty, else_branch.span())?;
+    let base = cx.path_conditions.len();
+    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
+    ), cx.ctx.len()));
+    let then_result = infer(cx, then_branch);
+    cx.path_conditions.truncate(base);
+    let (then_core, result_ty) = then_result?;
+    cx.path_conditions.push((Term::Eq(
+        Box::new(bool_ty), Box::new(condition_core.clone()),
+        Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
+    ), cx.ctx.len()));
+    let else_result = check(cx, else_branch, &result_ty, else_branch.span());
+    cx.path_conditions.truncate(base);
+    let else_core = else_result?;
     let core = make_if_elim(cx, condition_core, then_core, else_core, &result_ty, span)?;
     Ok((core, result_ty))
 }
@@ -1480,7 +1544,17 @@ fn check_record(
         args.extend(values.iter().cloned());
         let field_expected = subst_tel(&field_types[index], &args);
         let value = if let Some((_, expr, _)) = fields.iter().find(|(given, _, _)| given == name) {
-            check(cx, expr, &field_expected, expr.span())?
+            let value = check(cx, expr, &field_expected, expr.span())?;
+            if let Some(template) = cx.refinement_facts
+                .and_then(|facts| facts.record_field_predicates.get(&owner_id))
+                .and_then(|predicates| predicates.get(index))
+                .and_then(Option::as_ref)
+                .cloned()
+            {
+                let predicate = subst_outer(&template, args.len(), &args, 0);
+                emit_refinement_predicate(cx, predicate, value.clone(), expr.span())?;
+            }
+            value
         } else {
             let mut projected = base_core.clone().expect("update base established");
             for _ in 0..index {
@@ -1691,7 +1765,7 @@ fn check_inferred_without_group_transport(
 ) -> Result<Term, ElabError> {
     let (core, inferred_ty) = infer(cx, expr)?;
     unify_types(&mut cx.metas, expected, &inferred_ty);
-    Ok(core)
+    emit_refinement_introduction(cx, expected, &inferred_ty, core, expr.span(), None)
 }
 
 #[inline(never)]
@@ -1708,10 +1782,54 @@ fn check_inferred_with_group_transport(
         inferred_ty.clone(),
         expected,
     )? {
-        return Ok(transported);
+        return emit_refinement_introduction(
+            cx, expected, &inferred_ty, transported, expr.span(), None,
+        );
     }
     unify_types(&mut cx.metas, expected, &inferred_ty);
-    Ok(core)
+    emit_refinement_introduction(cx, expected, &inferred_ty, core, expr.span(), None)
+}
+
+#[inline(never)]
+fn check_refined_index_variable(
+    cx: &mut ElabCtx<'_>,
+    index: usize,
+    name: &str,
+    span: &Span,
+    expected: &Term,
+) -> Result<Term, ElabError> {
+    let core = check_variable_with_index_views_named(cx, index, name, span, expected)?;
+    let inferred = kernel_infer_current(cx, &core).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        },
+    })?;
+    emit_refinement_introduction(cx, expected, &inferred, core, span, None)
+}
+
+#[inline(never)]
+fn check_refined_number_literal(
+    cx: &mut ElabCtx<'_>,
+    literal: &NumLit,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let core = elab_num_lit_checked(cx, literal, expected, span)?;
+    let inferred = Term::const_(cx.numeric_env.int_id, vec![]);
+    emit_refinement_introduction(cx, expected, &inferred, core, span, None)
+}
+
+#[inline(never)]
+fn check_refined_string_literal(
+    cx: &mut ElabCtx<'_>,
+    literal: &str,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let (core, inferred) = elab_str_lit(cx, literal, Some(expected), span)?;
+    emit_refinement_introduction(cx, expected, &inferred, core, span, None)
 }
 
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
@@ -1764,7 +1882,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         // expected type selects the view at checking boundaries (notably local
         // helper arguments); inference remains outer-refined by default.
         RExpr::RVar(index, name, span) if !cx.var_refinements.is_empty() => {
-            check_variable_with_index_views_named(cx, *index, name, span, expected)
+            check_refined_index_variable(cx, *index, name, span, expected)
         }
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
         RExpr::RRecord { base, fields, span } => {
@@ -1776,8 +1894,10 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             else_branch,
             span,
         } => check_if(cx, condition, then_branch, else_branch, expected, span),
-        RExpr::RNumLit(lit, num_span) => elab_num_lit_checked(cx, lit, expected, num_span),
-        RExpr::RStr(s, span) => elab_str_lit(cx, s, Some(expected), span).map(|(t, _)| t),
+        RExpr::RNumLit(lit, num_span) => {
+            check_refined_number_literal(cx, lit, expected, num_span)
+        }
+        RExpr::RStr(s, span) => check_refined_string_literal(cx, s, expected, span),
         // `Refl` — reflexivity, checked (never inferred): the expected goal
         // must originate as a kernel `Eq A t u` / prelude `Equal A t u` with
         // `t`/`u` CONVERTIBLE. If observational equality reduces that equality
@@ -1973,7 +2093,9 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             } else {
                 let (core, inferred_ty) = infer_match(cx, scrut, arms, span, Some(expected))?;
                 unify_types(&mut cx.metas, expected, &inferred_ty);
-                Ok(core)
+                // This is an inferred match, not the checked structural path;
+                // each branch has already been checked against its result.
+                emit_refinement_introduction(cx, expected, &inferred_ty, core, span, None)
             }
         }
         _ if cx.recursive_group.is_empty() => {
@@ -4532,27 +4654,62 @@ fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
     })
 }
 
-fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
+/// The single mint point for obligation holes recorded in an `ElabCtx`'s
+/// `cx.obligations`: `requires` premises, partial-primitive side conditions
+/// (`+` overflow, `/` and `%` nonzero), and refinement introductions. In a
+/// context whose obligations cannot reach a reporter
+/// (`PremiseHoles::Refused`) it refuses before `declare_postulate`, so no
+/// unreported hole enters the environment.
+///
+/// Declaration-level producers (contract and space `ensures`, `prove`, law
+/// fields, FFI runtime checks) do not record into `cx.obligations`: each
+/// builds its `Obligation` beside the mint and returns it in
+/// `ElabResult::obligations` to the declaration elaborator's caller, the same
+/// channel every `Reported` context's obligations take. Whether that caller
+/// reports or discards an `ElabResult` is the caller's contract, not this
+/// gate's; no `ElabCtx` mode applies to these producers, so they do not call
+/// this gate. Any new producer that records into `cx.obligations` must mint
+/// through this function.
+fn declare_obligation_hole(
+    cx: &mut ElabCtx<'_>,
+    closed: Term,
+    span: &Span,
+    kind: ObligationKind,
+) -> Result<GlobalId, ElabError> {
     if cx.premise_holes == PremiseHoles::Refused {
-        return Err(ElabError::PremiseWithoutObligationChannel {
-            span: span.clone(),
+        return Err(match kind {
+            ObligationKind::Requires => {
+                ElabError::PremiseWithoutObligationChannel { span: span.clone() }
+            }
+            ObligationKind::PartialPrim
+            | ObligationKind::RefinementIntroduction
+            | ObligationKind::Ensures
+            | ObligationKind::Prove
+            | ObligationKind::LawField(_)
+            | ObligationKind::FfiRuntimeCheck => {
+                ElabError::ObligationWithoutChannel { span: span.clone() }
+            }
         });
     }
-    let closed = close_goal(&cx.ctx, &[], goal);
     let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
         .map_err(|error| ElabError::KernelRejected {
             error,
             span: span.clone(),
         })?;
-    let obligation_id = cx.obl_counter;
-    cx.obl_counter += 1;
     cx.obligations.push(Obligation {
-        id: obligation_id,
+        id: cx.obl_counter,
         hole_id,
         goal_closed: closed,
         span: span.clone(),
-        kind: ObligationKind::Requires,
+        kind,
     });
+    cx.obl_counter += 1;
+    Ok(hole_id)
+}
+
+fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
+    let closed = close_goal(&cx.ctx, &[], goal);
+    let hole_id = declare_obligation_hole(cx, closed, span, ObligationKind::Requires)?;
     Ok((0..cx.ctx.len())
         .rev()
         .fold(Term::const_(hole_id, vec![]), |proof, index| {
@@ -6641,6 +6798,7 @@ fn check_dependent_branch_body(
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
+    let path_base = push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n);
 
     let outcome = (|| {
         if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
@@ -6729,7 +6887,15 @@ fn check_dependent_branch_body(
                 });
         }
         let obligation_base = cx.obligations.len();
-        let attempt = check(cx, &arm.body, &expected_unrefined, &arm.span).and_then(|checked| {
+        // Kernel conversion may expose a named refinement's carrier while
+        // shaping the branch motive. Its source identity must survive at the
+        // introduction check so each arm leaves its own predicate obligation.
+        let source_expected = if names_source_refinement(cx, expected_here) {
+            expected_here
+        } else {
+            &expected_unrefined
+        };
+        let attempt = check(cx, &arm.body, source_expected, &arm.span).and_then(|checked| {
             kernel_check_current(cx, &checked, &expected_unrefined)
                 .map(|()| checked)
                 .map_err(|error| match error {
@@ -6766,11 +6932,44 @@ fn check_dependent_branch_body(
 
     cx.active_index_premise_frames
         .truncate(active_index_premise_frame_base);
+    cx.path_conditions.truncate(path_base);
     cx.result_refinements.truncate(result_refinement_base);
     cx.active_index_refinements
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
     outcome
+}
+
+/// Install the arm's path equation `scrut = concrete` and return the
+/// truncation base. Outlined so the recursive branch frame does not hold the
+/// equation's temporaries.
+#[inline(never)]
+fn push_branch_path_condition(
+    cx: &mut ElabCtx,
+    scrut_ty: &Term,
+    scrut_core: &Term,
+    concrete: &Term,
+    n: usize,
+) -> usize {
+    let path_base = cx.path_conditions.len();
+    let path_eq = Term::Eq(
+        Box::new(weaken(scrut_ty, n as i64)),
+        Box::new(weaken(scrut_core, n as i64)),
+        Box::new(concrete.clone()),
+    );
+    cx.path_conditions.push((path_eq, cx.ctx.len()));
+    path_base
+}
+
+/// Whether the arm's expected type is a named source refinement whose
+/// identity the introduction check keeps. Outlined for the same reason.
+#[inline(never)]
+fn names_source_refinement(cx: &ElabCtx, expected: &Term) -> bool {
+    matches!(
+        cx.metas.zonk_term(expected),
+        Term::Const { id, .. }
+            if cx.refinement_facts.is_some_and(|facts| facts.refinement_predicates.contains_key(&id))
+    )
 }
 
 #[inline(never)]
@@ -9643,6 +9842,72 @@ fn infer_named_local_variable(
     Ok((Term::var(actual_index), ty))
 }
 
+/// A direct call can introduce a checked argument at a source-refined
+/// parameter or constructor field; the recursive `infer` frame does not carry
+/// the predicate lookup's transient application spine.
+#[inline(never)]
+fn emit_call_refinements(
+    cx: &mut ElabCtx<'_>,
+    function: &Term,
+    argument: &Term,
+    span: &Span,
+) -> Result<(), ElabError> {
+    let (head, previous_args) = peel_app(function);
+    let template = match head {
+        Term::Const { id, .. } => cx
+            .refinement_facts
+            .and_then(|facts| facts.refined_params.get(&id))
+            .and_then(|params| params.get(previous_args.len())),
+        // A constructor spine starts with its family parameters; the field
+        // predicates are indexed by constructor argument position.
+        Term::Constructor { id, .. } => {
+            let params = cx
+                .env
+                .constructor(id)
+                .map_or(0, |(family, _)| family.params.len());
+            previous_args.len().checked_sub(params).and_then(|field| {
+                cx.refinement_facts
+                    .and_then(|facts| facts.constructor_field_predicates.get(&id))
+                    .and_then(|fields| fields.get(field))
+            })
+        }
+        _ => None,
+    }
+    .and_then(Option::as_ref)
+    .cloned();
+    if let Some(template) = template {
+        let instantiated = subst_outer(&template, previous_args.len(), &previous_args, 0);
+        emit_refinement_predicate(cx, instantiated, argument.clone(), span)?;
+    }
+    Ok(())
+}
+
+/// `(e : T)`. An ascription at a source refinement introduces its predicate
+/// obligation. Outlined so the recursive `infer` frame does not hold the
+/// kernel query.
+#[inline(never)]
+fn infer_ascription(
+    cx: &mut ElabCtx<'_>,
+    e: &RExpr,
+    ty: &RType,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let ty_core = elab_type(cx, ty)?;
+    let e_core = check(cx, e, &ty_core, e.span())?;
+    if !matches!(ty, RType::RRefine(..)) {
+        return Ok((e_core, ty_core));
+    }
+    let inferred = kernel_infer_current(cx, &e_core).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        },
+    })?;
+    let e_core = emit_refinement_introduction(cx, &ty_core, &inferred, e_core, span, Some(ty))?;
+    Ok((e_core, ty_core))
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -9823,6 +10088,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             match f_ty_wh {
                 Term::Pi(dom, cod) => {
                     let a_core = check(cx, a, &dom, span)?;
+                    emit_call_refinements(cx, &f_core, &a_core, span)?;
                     let result_ty = subst0(&cod, &a_core);
                     Ok((Term::app(f_core, a_core), result_ty))
                 }
@@ -9830,11 +10096,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             }
         }
 
-        RExpr::RAsc(e, ty, _) => {
-            let ty_core = elab_type(cx, ty)?;
-            let e_core = check(cx, e, &ty_core, e.span())?;
-            Ok((e_core, ty_core))
-        }
+        RExpr::RAsc(e, ty, span) => infer_ascription(cx, e, ty, span),
 
         RExpr::RLam(_, _, span) => Err(ElabError::TypeMismatch {
             span: span.clone(),
@@ -10718,21 +10980,7 @@ fn elab_binop(
                         rhs_core.clone(),
                     );
                     let closed = close_goal(&cx.ctx, &[], phi);
-                    let hole_id =
-                        declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
-                            .map_err(|e| ElabError::KernelRejected {
-                            error: e,
-                            span: span.clone(),
-                        })?;
-                    let obl_id = cx.obl_counter;
-                    cx.obl_counter += 1;
-                    cx.obligations.push(Obligation {
-                        id: obl_id,
-                        hole_id,
-                        goal_closed: closed,
-                        span: span.clone(),
-                        kind: ObligationKind::PartialPrim,
-                    });
+                    declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
                 }
             }
 
@@ -10792,21 +11040,7 @@ fn elab_binop(
             let known = premise_proof_in_scope(cx, &goal).is_some();
             if !known {
                 let closed = close_goal(&cx.ctx, &[], goal);
-                let hole_id =
-                    declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
-                        .map_err(|error| ElabError::KernelRejected {
-                            error,
-                            span: span.clone(),
-                        })?;
-                let obl_id = cx.obl_counter;
-                cx.obl_counter += 1;
-                cx.obligations.push(Obligation {
-                    id: obl_id,
-                    hole_id,
-                    goal_closed: closed,
-                    span: span.clone(),
-                    kind: ObligationKind::PartialPrim,
-                });
+                declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
             }
             Ok((applied, result_ty))
         }
@@ -11050,6 +11284,94 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
         obligation.id = dst.len() as u32;
         dst.push(obligation);
     }
+}
+
+/// Close a logical refinement goal over ordinary binders followed by branch
+/// equations and refined-parameter assumptions. The latter are assumptions
+/// only in the obligation, never unchecked evidence in an emitted program.
+#[inline(never)]
+fn close_refinement_goal(cx: &ElabCtx<'_>, goal: Term, proof: Option<Term>) -> (Term, Option<Term>) {
+    let count = cx.path_conditions.len();
+    let mut closed = weaken(&goal, count as i64);
+    let mut certificate = proof;
+    for (index, (condition, install_depth)) in cx.path_conditions.iter().enumerate().rev() {
+        let growth = cx.ctx.len() - install_depth;
+        let domain = weaken(condition, (growth + index) as i64);
+        closed = Term::pi(domain.clone(), closed);
+        certificate = certificate.map(|term| Term::lam(domain, term));
+    }
+    let mut result = closed;
+    for stored in cx.ctx.types.iter().rev() {
+        result = Term::pi(stored.clone(), result);
+        certificate = certificate.map(|term| Term::lam(stored.clone(), term));
+    }
+    (result, certificate)
+}
+
+#[inline(never)]
+fn emit_refinement_introduction(
+    cx: &mut ElabCtx<'_>,
+    expected: &Term,
+    inferred_ty: &Term,
+    core: Term,
+    span: &Span,
+    literal: Option<&RType>,
+) -> Result<Term, ElabError> {
+    let named = match cx.metas.zonk_term(expected) {
+        Term::Const { id, .. } => cx.refinement_facts
+            .and_then(|facts| facts.refinement_predicates.get(&id))
+            .filter(|_| !matches!(cx.metas.zonk_term(inferred_ty), Term::Const { id: source, .. } if source == id))
+            .cloned(),
+        _ => None,
+    };
+    let predicate = if let Some(RType::RRefine(_, _, phi, _)) = literal {
+        let carrier = cx.metas.zonk_term(expected);
+        cx.ctx.push(carrier.clone());
+        let checked = elab_prop_at_omega(cx, phi, phi.span());
+        cx.ctx.pop();
+        Some(Term::lam(carrier, checked?))
+    } else {
+        named
+    };
+    let Some(predicate) = predicate else { return Ok(core) };
+    emit_refinement_predicate(cx, predicate, core.clone(), span)?;
+    Ok(core)
+}
+
+fn apply_refinement_predicate(predicate: Term, value: Term) -> Term {
+    match predicate {
+        Term::Lam(_, body) => subst0(&body, &value),
+        other => Term::app(other, value),
+    }
+}
+
+#[inline(never)]
+fn emit_refinement_predicate(
+    cx: &mut ElabCtx<'_>, predicate: Term, core: Term, span: &Span,
+) -> Result<(), ElabError> {
+    let goal = apply_refinement_predicate(predicate, core);
+    let (closed, _) = close_refinement_goal(cx, goal.clone(), None);
+    let proof = (0..cx.path_conditions.len())
+        .map(Term::var)
+        .chain(std::iter::once(Term::const_(cx.env.tt_id(), vec![])))
+        .find_map(|candidate| {
+            let (_, certificate) = close_refinement_goal(cx, goal.clone(), Some(candidate));
+            let certificate = certificate?;
+            kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
+                .ok().map(|_| certificate)
+        });
+    if proof.is_some() && cx.premise_holes == PremiseHoles::Refused {
+        // Discharged where it is generated; a context with no obligation
+        // channel records nothing, so the environment is left unchanged.
+        return Ok(());
+    }
+    let hole_id =
+        declare_obligation_hole(cx, closed, span, ObligationKind::RefinementIntroduction)?;
+    if let Some(proof) = proof {
+        ken_kernel::check::admit_bodies(cx.env, &[(hole_id, proof)])
+            .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
+    }
+    Ok(())
 }
 
 // ----- declaration elaboration -----
@@ -13421,6 +13743,7 @@ pub(crate) fn elaborate_rdecl_v1(
     // only within this single declaration. The persistent cross-declaration
     // registry travels through the module path via `ElabEnv::ctor_decl_spans`.
     let mut ctor_decl_spans = HashMap::new();
+    let mut refinement_facts = RefinementFacts::default();
     let no_names = HashMap::new();
     let no_checked_ids = HashMap::new();
     let mut preconditions = HashMap::new();
@@ -13437,6 +13760,7 @@ pub(crate) fn elaborate_rdecl_v1(
         &mut fixities,
         &mut fixity_spans,
         &mut ctor_decl_spans,
+        &mut refinement_facts,
         None,
         rdecl,
     )
@@ -13486,6 +13810,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
+    refinement_facts: &mut RefinementFacts,
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
@@ -13506,6 +13831,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
             fixities,
             fixity_spans,
             ctor_decl_spans,
+            refinement_facts,
             declared_fixity,
             rdecl,
         );
@@ -13525,6 +13851,7 @@ pub(crate) fn elaborate_rdecl_v1_with_effect_rows(
         fixities,
         fixity_spans,
         ctor_decl_spans,
+        refinement_facts,
         declared_fixity,
         &associated,
     )
@@ -13544,6 +13871,7 @@ fn elaborate_associated_rdecl(
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     ctor_decl_spans: &mut HashMap<String, Span>,
+    refinement_facts: &mut RefinementFacts,
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
@@ -13630,6 +13958,7 @@ fn elaborate_associated_rdecl(
                 standard_operators,
                 rdecl,
                 &local_dicts,
+                refinement_facts,
                 fixities,
                 fixity_spans,
                 declared_fixity.clone(),
@@ -13650,6 +13979,7 @@ fn elaborate_associated_rdecl(
             standard_operators,
             rdecl,
             &HashMap::new(),
+            refinement_facts,
             fixities,
             fixity_spans,
             declared_fixity.clone(),
@@ -13704,8 +14034,10 @@ fn elaborate_associated_rdecl(
             fields.clone(),
         ),
         RDeclKind::DataDecl { type_params, ctors } => {
-            let d_id =
-                data::elab_data_decl(env, globals, ctor_decl_spans, &rdecl.name, type_params, ctors, &rdecl.span)?;
+            let d_id = elaborate_data_with_refinements(
+                env, globals, num_values, numeric_env, ctor_decl_spans,
+                refinement_facts, &rdecl.name, type_params, ctors, &rdecl.span,
+            )?;
             // Register data type in the module map for orphan check (`33 §5.3`).
             class_env
                 .global_modules
@@ -13725,15 +14057,9 @@ fn elaborate_associated_rdecl(
             level,
             ctors,
         } => {
-            let d_id = data::elab_explicit_data_decl(
-                env,
-                globals,
-                ctor_decl_spans,
-                &rdecl.name,
-                params,
-                indices,
-                *level,
-                ctors,
+            let d_id = elaborate_explicit_data_with_refinements(
+                env, globals, num_values, numeric_env, ctor_decl_spans,
+                refinement_facts, &rdecl.name, params, indices, *level, ctors,
                 &rdecl.span,
             )?;
             class_env
@@ -13749,16 +14075,22 @@ fn elaborate_associated_rdecl(
             })
         }
         RDeclKind::TypeAlias { ty } => {
-            // A definition `def T = A` declares T as a transparent definition
-            // of type `Type 0` whose body is A (`34 §2`).
-            let (alias_body, alias_id) = {
+            // A named refinement keeps its transparent carrier body; only its
+            // GlobalId records the predicate. A literal never mints an alias.
+            let (alias_body, predicate) = {
                 let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                     .with_preconditions(preconditions, PremiseHoles::Refused);
                 let body = elab_type(&mut cx, ty)?;
-                let body_z = cx.metas.zonk_term(&body);
-                (body_z, ())
+                let predicate = if let RType::RRefine(_, _, phi, _) = ty {
+                    cx.ctx.push(body.clone());
+                    let checked = elab_prop_at_omega(&mut cx, phi, phi.span())?;
+                    cx.ctx.pop();
+                    Some(Term::lam(body.clone(), cx.metas.zonk_term(&checked)))
+                } else {
+                    None
+                };
+                (cx.metas.zonk_term(&body), predicate)
             };
-            let _ = alias_id;
             let alias_ty = Term::ty(Level::Zero);
             let id = declare_def(env, vec![], alias_ty, alias_body).map_err(|e| {
                 ElabError::KernelRejected {
@@ -13767,6 +14099,9 @@ fn elaborate_associated_rdecl(
                 }
             })?;
             globals.insert(rdecl.name.clone(), id);
+            if let Some(predicate) = predicate {
+                refinement_facts.refinement_predicates.insert(id, predicate);
+            }
             Ok(ElabResult {
                 name: rdecl.name.clone(),
                 def_id: id,
@@ -13803,6 +14138,7 @@ fn elaborate_associated_rdecl(
             num_values,
             numeric_env,
             class_env,
+            refinement_facts,
             rdecl,
             fields,
         ),
@@ -13920,6 +14256,7 @@ fn build_pair_chain(field_vals: &[Term], record_nil_val_id: GlobalId) -> Term {
 
 /// Elaborate a named-field record declaration to the existing transparent
 /// right-nested Sigma encoding and register only its shared projection facts.
+#[inline(never)]
 fn elab_record_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
@@ -13927,20 +14264,59 @@ fn elab_record_decl(
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
     class_env: &mut ClassEnv,
+    facts: &mut RefinementFacts,
     rdecl: &RDecl,
     fields: &[RRecordField],
 ) -> Result<ElabResult, ElabError> {
-    let field_types = {
+    if !fields.iter().any(|field| matches!(field.ty, RType::RRefine(..))) {
+        return elab_record_decl_checked(
+            env, globals, preconditions, num_values, numeric_env, class_env, facts, rdecl, fields,
+        );
+    }
+    let snapshot = (env.clone(), globals.clone(), num_values.clone(), facts.clone());
+    let result = elab_record_decl_checked(
+        env, globals, preconditions, num_values, numeric_env, class_env, facts, rdecl, fields,
+    );
+    if result.is_err() {
+        (*env, *globals, *num_values, *facts) = snapshot;
+    }
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn elab_record_decl_checked(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    class_env: &mut ClassEnv,
+    facts: &mut RefinementFacts,
+    rdecl: &RDecl,
+    fields: &[RRecordField],
+) -> Result<ElabResult, ElabError> {
+    let (field_types, predicates) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_preconditions(preconditions, PremiseHoles::Refused);
         let mut types = Vec::new();
+        let mut predicates = Vec::with_capacity(fields.len());
         for field in fields {
             let ty = elab_type(&mut cx, &field.ty)?;
             let ty = cx.metas.zonk_term(&ty);
+            let predicate = if let RType::RRefine(_, _, phi, _) = &field.ty {
+                cx.ctx.push(ty.clone());
+                let checked = elab_prop_at_omega(&mut cx, phi, phi.span());
+                cx.ctx.pop();
+                Some(Term::lam(ty.clone(), cx.metas.zonk_term(&checked?)))
+            } else {
+                None
+            };
+            predicates.push(predicate);
             cx.ctx.push(ty.clone());
             types.push(ty);
         }
-        types
+        (types, predicates)
     };
 
     let sigma_chain = build_sigma_chain(&field_types, class_env.record_nil_id);
@@ -13966,6 +14342,9 @@ fn elab_record_decl(
         fields.iter().map(|field| field.name.clone()).collect(),
         field_types,
     );
+    if predicates.iter().any(Option::is_some) {
+        facts.record_field_predicates.insert(id, predicates);
+    }
 
     Ok(ElabResult {
         name: rdecl.name.clone(),
@@ -14809,6 +15188,182 @@ fn elaborate_foreign_decl(
     })
 }
 
+/// A malformed literal field is found after kernel admission, because its
+/// predicate is surface-only. Rewind that one declaration and all of its
+/// constructor/numeric/side-table registrations on failure.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn elaborate_data_with_refinements(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    ctor_decl_spans: &mut HashMap<String, Span>,
+    facts: &mut RefinementFacts,
+    name: &str,
+    type_params: &[String],
+    ctors: &[crate::resolve::RCtorDecl],
+    span: &Span,
+) -> Result<GlobalId, ElabError> {
+    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| matches!(arg, RType::RRefine(..)))) {
+        return data::elab_data_decl(env, globals, ctor_decl_spans, name, type_params, ctors, span);
+    }
+    let snapshot = (
+        env.clone(), globals.clone(), num_values.clone(),
+        ctor_decl_spans.clone(), facts.clone(),
+    );
+    let result = (|| {
+        let id = data::elab_data_decl(env, globals, ctor_decl_spans, name, type_params, ctors, span)?;
+        register_legacy_constructor_fields(
+            env, globals, num_values, numeric_env, facts,
+            type_params.len(), ctors, name,
+        )?;
+        Ok(id)
+    })();
+    if result.is_err() {
+        (*env, *globals, *num_values, *ctor_decl_spans, *facts) = snapshot;
+    }
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn elaborate_explicit_data_with_refinements(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    ctor_decl_spans: &mut HashMap<String, Span>,
+    facts: &mut RefinementFacts,
+    name: &str,
+    params: &[crate::resolve::RTelescopeEntry],
+    indices: &[crate::resolve::RTelescopeEntry],
+    level: Option<u32>,
+    ctors: &[crate::resolve::RExplicitCtorDecl],
+    span: &Span,
+) -> Result<GlobalId, ElabError> {
+    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| matches!(arg.ty, RType::RRefine(..)))) {
+        return data::elab_explicit_data_decl(
+            env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
+        );
+    }
+    let snapshot = (
+        env.clone(), globals.clone(), num_values.clone(),
+        ctor_decl_spans.clone(), facts.clone(),
+    );
+    let result = (|| {
+        let id = data::elab_explicit_data_decl(
+            env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
+        )?;
+        register_explicit_constructor_fields(
+            env, globals, num_values, numeric_env, facts, params, ctors, name,
+        )?;
+        Ok(id)
+    })();
+    if result.is_err() {
+        (*env, *globals, *num_values, *ctor_decl_spans, *facts) = snapshot;
+    }
+    result
+}
+
+#[inline(never)]
+fn register_legacy_constructor_fields(
+    env: &mut GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    facts: &mut RefinementFacts,
+    param_count: usize,
+    ctors: &[crate::resolve::RCtorDecl],
+    owner: &str,
+) -> Result<(), ElabError> {
+    for ctor in ctors {
+        if !ctor.args.iter().any(|arg| matches!(arg, RType::RRefine(..))) {
+            continue;
+        }
+        let id = globals[&ctor.name];
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner.to_string());
+        for _ in 0..param_count {
+            cx.ctx.push(Term::ty(Level::Zero));
+        }
+        let args = ctor.args.iter().collect::<Vec<_>>();
+        let predicates = collect_constructor_field_predicates(&mut cx, &args)?;
+        facts.constructor_field_predicates.insert(id, predicates);
+    }
+    Ok(())
+}
+
+#[inline(never)]
+fn register_explicit_constructor_fields(
+    env: &mut GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    facts: &mut RefinementFacts,
+    params: &[crate::resolve::RTelescopeEntry],
+    ctors: &[crate::resolve::RExplicitCtorDecl],
+    owner: &str,
+) -> Result<(), ElabError> {
+    for ctor in ctors {
+        if !ctor.args.iter().any(|arg| matches!(arg.ty, RType::RRefine(..))) {
+            continue;
+        }
+        let id = globals[&ctor.name];
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, owner.to_string());
+        for param in params {
+            let ty = elab_type(&mut cx, &param.ty)?;
+            cx.ctx.push(ty);
+        }
+        let args = ctor.args.iter().map(|arg| &arg.ty).collect::<Vec<_>>();
+        let predicates = collect_constructor_field_predicates(&mut cx, &args)?;
+        facts.constructor_field_predicates.insert(id, predicates);
+    }
+    Ok(())
+}
+
+/// Constructor fields are already bare carriers in the kernel declaration.
+/// Keep only literal source predicates indexed by the checked constructor and
+/// argument position; the same check-time emitter handles their introduction.
+#[inline(never)]
+fn collect_constructor_field_predicates(
+    cx: &mut ElabCtx<'_>,
+    args: &[&RType],
+) -> Result<Vec<Option<Term>>, ElabError> {
+    let mut result = Vec::with_capacity(args.len());
+    for arg in args {
+        let carrier = elab_type(cx, arg)?;
+        let predicate = if let RType::RRefine(_, _, phi, _) = arg {
+            cx.ctx.push(carrier.clone());
+            let checked = elab_prop_at_omega(cx, phi, phi.span());
+            cx.ctx.pop();
+            Some(Term::lam(carrier.clone(), cx.metas.zonk_term(&checked?)))
+        } else {
+            None
+        };
+        result.push(predicate);
+        cx.ctx.push(carrier);
+    }
+    Ok(result)
+}
+
+fn declared_named_return_id(
+    rdecl: &RDecl,
+    globals: &HashMap<String, GlobalId>,
+    facts: &RefinementFacts,
+) -> Option<GlobalId> {
+    let mut ty = rdecl.ty.as_ref()?;
+    for _ in 0..view_param_count(rdecl) {
+        ty = match ty {
+            RType::RPi(_, _, result, _)
+            | RType::RArr(_, result, _)
+            | RType::REffectArr(_, _, result, _) => result,
+            _ => return None,
+        };
+    }
+    let id = named_head_id(ty, globals)?;
+    facts.refinement_predicates.contains_key(&id).then_some(id)
+}
+
 fn elaborate_view_or_let(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
@@ -14820,6 +15375,7 @@ fn elaborate_view_or_let(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    refinement_facts: &mut RefinementFacts,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -14829,7 +15385,8 @@ fn elaborate_view_or_let(
         .ty
         .as_ref()
         .and_then(|ty| innermost_refine_pred(ty))
-        .is_some();
+        .is_some()
+        || declared_named_return_id(rdecl, globals, refinement_facts).is_some();
     if rdecl.requires.is_empty() && rdecl.ensures.is_empty() && !has_refine_return {
         // V0 path: no spec clauses and no return-type refinement
         return elaborate_v0(
@@ -14843,6 +15400,7 @@ fn elaborate_view_or_let(
             standard_operators,
             rdecl,
             local_dicts,
+            refinement_facts,
             fixities,
             fixity_spans,
             declared_fixity,
@@ -14860,6 +15418,7 @@ fn elaborate_view_or_let(
         standard_operators,
         rdecl,
         local_dicts,
+        refinement_facts,
     )
 }
 
@@ -15317,6 +15876,38 @@ pub(crate) fn innermost_refine_pred(ty: &RType) -> Option<&RExpr> {
     }
 }
 
+/// A source-refined parameter still has a carrier Π domain. Its direct
+/// application carries the introduction obligation; callee recognition and
+/// higher-order preservation belong to LANG-REFINED-PARAM-REQUIRES-DESUGAR.
+#[inline(never)]
+fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<Option<Term>>, ElabError> {
+    let base = cx.ctx.len();
+    let result = (|| {
+        let mut params = Vec::new();
+        let mut current = declared;
+        loop {
+            let (domain, codomain) = match current {
+                RType::RPi(_, domain, codomain, _) | RType::RArr(domain, codomain, _)
+                | RType::REffectArr(domain, _, codomain, _) => (domain.as_ref(), codomain.as_ref()),
+                _ => break,
+            };
+            let carrier = elab_type(cx, domain)?;
+            let predicate = if let RType::RRefine(_, _, phi, _) = domain {
+                cx.ctx.push(carrier.clone());
+                let checked = elab_prop_at_omega(cx, phi, phi.span());
+                cx.ctx.pop();
+                Some(Term::lam(carrier.clone(), checked?))
+            } else { None };
+            params.push(predicate);
+            cx.ctx.push(carrier);
+            current = codomain;
+        }
+        Ok(params)
+    })();
+    cx.ctx.types.truncate(base);
+    result
+}
+
 fn elaborate_v0(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
@@ -15328,6 +15919,7 @@ fn elaborate_v0(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    refinement_facts: &mut RefinementFacts,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -15346,30 +15938,34 @@ fn elaborate_v0(
             class_env,
             provenance,
             standard_operators,
+            refinement_facts,
             fixities,
             fixity_spans,
             declared_fixity,
             rdecl,
         );
     }
-    let (ty_core, body_core, body_obligations) = {
+    let (ty_core, body_core, body_obligations, params) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
+            .with_refinements(refinement_facts)
             .with_local_dicts(local_dicts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
-        let (body_raw, ty_raw) = if let Some(ty) = &rdecl.ty {
+        let (body_raw, ty_raw, params) = if let Some(ty) = &rdecl.ty {
             let ty_c = elab_type(&mut cx, ty)?;
+            let params = collect_refined_params(&mut cx, ty)?;
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
-            (body_c, ty_c)
+            (body_c, ty_c, params)
         } else {
             let (body_c, ty_c) = infer(&mut cx, &rdecl.body)?;
-            (body_c, ty_c)
+            (body_c, ty_c, Vec::new())
         };
         let obligations = std::mem::take(&mut cx.obligations);
         (
             cx.metas.zonk_term(&ty_raw),
             cx.metas.zonk_term(&body_raw),
             obligations,
+            params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect::<Vec<_>>(),
         )
     };
     if rdecl.ty.is_none()
@@ -15389,6 +15985,9 @@ fn elaborate_v0(
             span: rdecl.span.clone(),
         })?;
     globals.insert(rdecl.name.clone(), id);
+    if params.iter().any(Option::is_some) {
+        refinement_facts.refined_params.insert(id, params);
+    }
     Ok(ElabResult {
         name: rdecl.name.clone(),
         def_id: id,
@@ -15466,6 +16065,7 @@ fn elaborate_recursive_view(
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    refinement_facts: &mut RefinementFacts,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
     declared_fixity: Option<(Fixity, Span)>,
@@ -15475,6 +16075,7 @@ fn elaborate_recursive_view(
     let (ty_core, type_obligations) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
+            .with_refinements(refinement_facts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("recursive declaration requires a type annotation".into())
@@ -15518,6 +16119,7 @@ fn elaborate_recursive_view(
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
+            .with_refinements(refinement_facts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let body_c = check(&mut cx, &associated.body, &ty_core, &rdecl.span)?;
         let obligations = std::mem::take(&mut cx.obligations);
@@ -15588,6 +16190,7 @@ pub(crate) fn elaborate_mutual_group(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
+    refinement_facts: &RefinementFacts,
     declared_fixities: &[Option<(Fixity, Span)>],
     members: &[RDecl],
 ) -> Result<Vec<ElabResult>, ElabError> {
@@ -15717,6 +16320,7 @@ pub(crate) fn elaborate_mutual_group(
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
+                .with_refinements(refinement_facts)
                 .with_preconditions(preconditions, PremiseHoles::Reported)
                 .with_recursive_group(&recursive_group);
             let body_c = check(&mut cx, &rdecl.body, ty_core, &rdecl.span)?;
@@ -15897,6 +16501,7 @@ fn elaborate_view_with_spec(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     rdecl: &RDecl,
     local_dicts: &HashMap<String, (Term, Term, usize)>,
+    refinement_facts: &mut RefinementFacts,
 ) -> Result<ElabResult, ElabError> {
     let mut pending: Option<ken_kernel::PendingAdmission> = None;
     let mut precondition_entry = None;
@@ -15919,6 +16524,7 @@ fn elaborate_view_with_spec(
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                         .with_classes(class_env, provenance, standard_operators)
+                        .with_refinements(refinement_facts)
                         .with_local_dicts(local_dicts)
                         .with_preconditions(preconditions, PremiseHoles::Reported);
                 let ty = rdecl.ty.as_ref().ok_or_else(|| {
@@ -15971,6 +16577,7 @@ fn elaborate_view_with_spec(
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                         .with_classes(class_env, provenance, standard_operators)
+                        .with_refinements(refinement_facts)
                         .with_local_dicts(local_dicts)
                         .with_preconditions(preconditions, PremiseHoles::Reported);
                 cx.assumptions = assumptions;
@@ -16000,6 +16607,7 @@ fn elaborate_view_with_spec(
         } else {
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
+                .with_refinements(refinement_facts)
                 .with_local_dicts(local_dicts)
                 .with_preconditions(preconditions, PremiseHoles::Reported);
             let (full_body, body_inner, param_types, result_ty_under_requires, full_ty, req_cores) =
@@ -16076,6 +16684,8 @@ fn elaborate_view_with_spec(
                         req_cores,
                     )
                 };
+
+
             absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
             (
                 cx.metas.zonk_term(&full_body),

@@ -241,7 +241,7 @@ fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
 }
 
 #[test]
-fn refined_divisor_caller_can_pass_zero_but_the_callee_keeps_its_hole() {
+fn refined_divisor_caller_owes_introduction_and_callee_keeps_its_hole() {
     for spelling in ["/", "%"] {
         let mut env = ElabEnv::new().unwrap();
         let before = env.env.trusted_base();
@@ -266,15 +266,45 @@ fn refined_divisor_caller_can_pass_zero_but_the_callee_keeps_its_hole() {
         );
         let g = env
             .elaborate_decl_v1("fn g (u : Int) : Int = f 1 0")
-            .expect("current carrier encoding accepts the zero argument");
+            .expect("a zero argument emits a caller refinement obligation");
+        let [introduction] = g.obligations.as_slice() else {
+            panic!("{spelling}: caller must owe exactly one argument introduction")
+        };
+        assert!(matches!(
+            introduction.kind,
+            ObligationKind::RefinementIntroduction
+        ));
+        assert!(env.is_open_hole(introduction.hole_id));
         assert!(
-            g.obligations.is_empty(),
-            "a caller does not currently establish the erased refinement"
+            env.is_open_hole(hole.hole_id),
+            "the callee's divisor hole remains open"
+        );
+        let Term::Pi(u, caller_goal) = &introduction.goal_closed else {
+            panic!("{spelling}: caller goal must close over u")
+        };
+        let int = Term::const_(env.globals["Int"], vec![]);
+        assert_eq!(u.as_ref(), &int);
+        let zero = Term::IntLit(0.into());
+        let eq_zero = Term::app(
+            Term::app(
+                Term::app(Term::const_(env.globals["Equal"], vec![]), int),
+                zero.clone(),
+            ),
+            zero,
         );
         assert_eq!(
-            env.env.trusted_base(),
-            after_f,
-            "no unreported argument-introduction hole can justify callee recognition"
+            caller_goal.as_ref(),
+            &Term::app(Term::const_(env.globals["Not"], vec![]), eq_zero),
+            "{spelling}: the caller owes Not (Equal Int 0 0)"
+        );
+        assert_eq!(
+            env.env
+                .trusted_base()
+                .into_iter()
+                .filter(|id| !after_f.contains(id))
+                .collect::<Vec<_>>(),
+            [introduction.hole_id],
+            "only the caller's argument introduction adds a trusted-base hole"
         );
     }
 }

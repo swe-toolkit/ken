@@ -106,15 +106,18 @@ home each; a one-line cross-reference is added to `seed-numbers.md` AC6 +
   the green-vs-green trap is using the production crate as its own oracle).
   Operands built via distinct paths (`Shl`/`Sub`/`Neg`), straddling the
   2⁶³/2¹²⁷ boundaries and mixed sign.
-- **AC-C3 is the predicate-definedness dual — the refinement obligation must
-  actually REDUCE, not name-match.** `Int.toChar` on a surrogate / out-of-range
-  `Int` must reduce to `None`; a valid scalar to `Some`. The case **flips
-  against a stub `isScalar := true`** (which accepts everything → `Some`
-  everywhere). A case that only checks a valid scalar accepts is green-vs-green
-  under `isScalar := true`; the **non-degenerate pair** (reject surrogate/OOR
-  *while* accept valid) is the net ([[two-arm-producer-needs-a-case-per-arm]]).
-  This reduces **only** because ruling (A) pulled `leq_int` up — under the
-  disproven premise it was stuck-neutral, not `None`.
+- **AC-C3 pins the direct Bool guard and its reduced decision, not an
+  obligation on rejected values.** `Int.toChar` matches `inRangeBool n`:
+  `False` selects `None Char` before any `Some Char n` introduction; `True`
+  selects `Some Char n`, whose scalar refinement is checked on that arm.
+  Surrogate and out-of-range inputs must reduce to `None`, while a valid scalar
+  reduces to `Some`. The non-degenerate pair **flips against a stub
+  `inRangeBool := True`**: both invalid inputs then select `Some` (the valid
+  input stays `Some`). Stubbing only `isScalar := true` leaves this direct
+  match unchanged and cannot discriminate this row. The reject/accept pair
+  nets both arms ([[two-arm-producer-needs-a-case-per-arm]]). The decision
+  reduces because ruling (A) pulled up `leq_int`; without it, the guard is
+  stuck-neutral rather than a selected `None`.
 - **The Ω-encoding pin is the `DecEq Char` SOUNDNESS check — a STRUCTURAL
   assertion on the `isScalar` def, not a value (Char pin 1).**
   `isScalar c := IsTrue (inRangeBool c)` where `inRangeBool c : Bool` is
@@ -359,21 +362,52 @@ corrected forward obligation re-defers *there*, **not** to a
 - given: `Int.toChar` applied to `0xD800` (a surrogate), `0x110000`
   (out-of-range, `> 0x10FFFF`), and `0x41` (valid, `'A'`).
 - expect: `Int.toChar 0xD800 ⇒ None`, `Int.toChar 0x110000 ⇒ None`,
-  `Int.toChar 0x41 ⇒ Some 'A'` — the refinement-intro is **face-(c)** (`None`
-  out of the scalar range, never a silent `Some`). The `None` results **reduce**
-  (the decidable `inRangeBool` closed-interval `leq_int` check fires and
-  rejects, under ruling (A)) — concretely for `0xD800`:
-  `leq 0xD800 0xD7FF ⇒ false`, `leq 0xE000 0xD800 ⇒ false` →
-  `or_bool false false ⇒ false` → `IsTrue false ≡ Bottom` → **rejected, and it
-  *reduces*** (not a stuck neutral). The **non-degenerate pair** (surrogate/OOR
-  reject *while* valid accept) **flips against a stub `isScalar := true`**
-  (which would give `Some` for `0xD800`/`0x110000` too).
-- why: AC-C3 — the refinement obligation must **actually reduce** (the decidable
-  `inRangeBool` check fires and rejects), not name-match. A single valid-scalar
-  `Some` case is green-vs-green under `isScalar := true`; the surrogate + OOR
-  reject arms are the net ([[two-arm-producer-needs-a-case-per-arm]] — two
-  reject arms, surrogate *and* range, each discriminating). Reduces only because
-  ruling (A) pulled `leq_int` up — else these were stuck-neutral, not `None`.
+  `Int.toChar 0x41 ⇒ Some 'A'` — the face-(c) decision returns `None` out of
+  range, never a silent `Some`. The `None` results **reduce**: closed-interval
+  `leq_int` comparisons select `False` through `inRangeBool`'s transparent
+  Bool matches. At `0xD800`, both `leq 0xD800 0xD7FF` and
+  `leq 0xE000 0xD800` reduce to `False`; at `0x110000`, the upper bound
+  `leq 0x110000 0x10FFFF` reduces to `False`. The direct `intToChar` match
+  then selects `None Char`; it emits no rejected-value `isScalar` obligation.
+  At `0x41`, the match selects `Some Char 0x41`, whose scalar refinement can
+  discharge via `IsTrue (inRangeBool 0x41)`.
+- why: AC-C3 — the **guarded decision** must reduce to reject both the
+  surrogate and the out-of-range input while accepting a valid scalar. A
+  stub `inRangeBool := True` makes both invalid inputs select `Some` and
+  fails the reject observations; the valid `Some` is a positive control, not
+  alone a discriminator. Stubbing only `isScalar := true` changes neither
+  rejected branch: no `Some Char n` is built there. This is the direct guard's
+  reject/accept net ([[two-arm-producer-needs-a-case-per-arm]]), not an
+  obligation on inputs that the guard rejects. Ruling (A)'s `leq_int`
+  reduction is required to select either branch on these closed inputs.
+
+### surface/numbers/int-to-char-branch-obligation-status  (soundness)
+- spec: `18a §5.9.1(3)` (guarded refinement introduction), `34 §5`,
+  `22 §2.1`; `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` AC-2
+- given: elaborate the installed `intToChar : Int → Option Char` definition
+  at a symbolic `n : Int`:
+  ```ken
+  match (inRangeBool n) {
+    True  |-> Some Char n
+    False |-> None Char
+  }
+  ```
+  Observe the emitted refinement obligations and their status **per arm**.
+  As a control, elaborate the same `Some Char n` body without the
+  True-arm guard equation.
+- expect: the guarded True arm emits **exactly one**
+  `RefinementIntroduction` for `isScalar n`, under its path equation
+  `Eq Bool (inRangeBool n) True`; that equation discharges the obligation,
+  leaving **no open hole**. The False arm emits **zero** refinement
+  obligations: it returns `None Char` without introducing `Char n`.
+  Without the guard equation, the same `Some Char n` emits one
+  `isScalar n` obligation that **remains open**. These assertions concern
+  elaboration obligation status, not reporting at a caller.
+- why: value-level `None`/`Some` results alone cannot distinguish a
+  missing or undischarged scalar obligation on the guarded Some branch.
+  Requiring one closed True-arm obligation and zero False-arm obligations
+  distinguishes the correct branch discipline from both a silently
+  dropped obligation and a rejected-value obligation.
 
 ### surface/numbers/char-eq-and-ord-on-projection  (soundness)
 - spec: `18a §5.9.1(3)` (derived ops over projection, incl. `Ord Char`),
@@ -422,14 +456,13 @@ lawful-classes-lane WP — see the deferred section.
   Architect's Ω-encoding-lane hazard)** — `isScalar`'s **type** is
   `IsTrue <bool-expr>` (the sub-singleton bridge):
   `isScalar c := IsTrue (inRangeBool c)`, with `inRangeBool c` =
-  `(0 ≤? c && c ≤? 0xD7FF) || (0xE000 ≤? c && c ≤? 0x10FFFF)` (value-level
-  `&&`/`||`, i.e. `and_bool`/`or_bool`, over `leq_int`). The scalar set is
-  **irreducibly two disjoint intervals** (`[0,0xD7FF] ∪ [0xE000,0x10FFFF]`), so
-  `inRangeBool` **necessarily** contains **value-level** `or_bool`/`and_bool`/
-  `not_bool` composing the `leq_int` results — these **reduce** and are
-  **REQUIRED**; grepping them to zero **false-flags the only correct encoding**
-  (the 44 §3 over-strip shape —
-  [[grounding-a-fabricated-citation-two-failure-modes]]). The **FORBIDDEN** form
+  `(0 ≤? c && c ≤? 0xD7FF) || (0xE000 ≤? c && c ≤? 0x10FFFF)` at the
+  **value-level Bool**, implemented by transparent Bool elimination of the
+  `leq_int` results inside each interval and between intervals. The scalar
+  set is **irreducibly two disjoint intervals**
+  (`[0,0xD7FF] ∪ [0xE000,0x10FFFF]`); the Bool composition reduces on
+  closed literals without requiring opaque `and_bool`/`or_bool`. Its spelling
+  is not the discriminator. The **FORBIDDEN** form
   is a raw `∨`/`∃`/multi-ctor `Or`/`Sum` **as the *type* (sort Ω) of
   `isScalar`** — the discriminator is the **sort** of the disjunction
   (Bool-value inside `IsTrue` = fine; Ω-prop as the predicate former = the
@@ -498,8 +531,10 @@ lawful-classes-lane WP — see the deferred section.
 - **AC-C1** (`Char` refinement) — `char-is-isscalar-refinement`
 - **AC-C2** (derived Char eq + Ord **ops** over projection) —
   `char-eq-and-ord-on-projection`
-- **AC-C3** (surrogate/OOR reject, flips vs `isScalar:=true`) —
+- **AC-C3** (surrogate/OOR reject, flips vs `inRangeBool:=True`) —
   `int-to-char-rejects-surrogate-and-oor`
+- **LANG-REFINEMENT AC-2** (guarded Some discharged; None introduces none) —
+  `int-to-char-branch-obligation-status`
 - **Char pin 1** (Ω-encoding → codepoint-collapse) —
   `char-deceq-collapses-on-codepoint` (hard-AC)
 - **Char pin 2** (extraction computes the proof) —

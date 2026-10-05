@@ -2991,6 +2991,7 @@ fn elaborate_checked_spine_free(
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
+        &mut elab.refinement_facts,
         None,
         rdecl,
     )?;
@@ -3025,6 +3026,7 @@ fn elaborate_checked_with_fixity(
         &mut elab.fixities,
         &mut elab.fixity_spans,
         &mut elab.ctor_decl_spans,
+        &mut elab.refinement_facts,
         declared_fixity.map(|pending| (pending.fixity, pending.declaration_span.clone())),
         rdecl,
     )?;
@@ -3751,6 +3753,7 @@ fn elaborate_mutual_group_with_fixities(
         &standard_operators_for_group,
         &mut elab.fixities,
         &mut elab.fixity_spans,
+        &elab.refinement_facts,
         &member_fixities,
         members,
     )

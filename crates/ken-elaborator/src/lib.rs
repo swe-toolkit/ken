@@ -223,6 +223,8 @@ pub struct ElabEnv {
     /// module's `pub` export table across separate `elaborate_*` calls.
     /// Purely a surface-layer concern: never touches `env`/`Σ`.
     pub module_state: modules::ModuleState,
+    /// Identity-keyed, elaborator-only refinement introduction contracts.
+    pub(crate) refinement_facts: elab::RefinementFacts,
 }
 
 /// Compile-time inventory tripwire for every field carried by [`ElabEnv`].
@@ -252,6 +254,7 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
         class_env: _,
         resolution_provenance: _,
         module_state: _,
+        refinement_facts: _,
     } = env;
 }
 
@@ -317,6 +320,7 @@ impl ElabEnv {
             class_env: classes::ClassEnv::sentinel(),
             resolution_provenance: Vec::new(),
             module_state: modules::ModuleState::default(),
+            refinement_facts: elab::RefinementFacts::default(),
         };
         // L3 prelude: Peano `Nat` (replaces the placeholder postulate) + the
         // collection inductives + Ω constants (`37`). Registered via the landed
