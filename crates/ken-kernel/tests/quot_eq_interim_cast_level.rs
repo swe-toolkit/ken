@@ -1,6 +1,6 @@
-//! Kernel-side interim quotient-Eq and cast-level fences (16 §2.2, §3.1, §5).
-//! The neutral quotient rule is a transition sentinel: P0 may restore it only
-//! after Quot-Form checks that the relation is an equivalence.
+//! Quot-Form formation fences and the independent cast-level gate
+//! (`16 §2.2`, §3.1, §5). False relations now fail at formation; checked
+//! equivalence relations restore class equality reduction.
 
 use ken_kernel::env::Context;
 use ken_kernel::obs::bottom_term;
@@ -57,84 +57,33 @@ fn relation(carrier: Term, second_domain: Term, body: Term) -> Term {
     )
 }
 
-/// Build the constructor-field route that the raw-class `eq_at_quot` arm
-/// reaches. A bare `refl [a]` cannot infer its QuotClass operand; ascribing
-/// the class instead hides the raw pair behind Ascript at the Eq redex.
-fn constructor_field_proof(env: &mut GlobalEnv, quot: Term, member: Term) -> (Term, Term) {
-    let bx_id = declare_inductive(env, |_| InductiveSpec {
-        level_params: vec![],
-        params: vec![],
-        indices: vec![],
-        level: Level::zero(),
-        constructors: vec![CtorSpec {
-            args: vec![quot.clone()],
-            target_indices: vec![],
-        }],
-    })
-    .unwrap();
-    let bx = Term::indformer(bx_id, vec![]);
-    let value = Term::app(
-        constructor(env.inductive(bx_id).unwrap().constructors[0].id),
-        Term::QuotClass(Box::new(member)),
-    );
-    let equality = eq(bx, value.clone(), value.clone());
-    let ctx = Context::new();
-    assert_eq!(infer(env, &ctx, &equality), Ok(Term::Omega(Level::zero())));
-    // The one-field constructor equality carries a raw QuotClass argument.
-    // Do not assert an intermediate reduct here: M1 must reach the final
-    // proof-refusal assertion, not fail merely because its shape changed.
-    let proof = Term::Ascript(
-        Box::new(Term::Refl(Box::new(value))),
-        Box::new(equality.clone()),
-    );
-    assert_eq!(infer(env, &ctx, &proof), Ok(equality.clone()));
-    (proof, equality)
-}
-
-fn assert_reflexive_constructor_does_not_prove_bottom(
-    env: &mut GlobalEnv,
-    quot: Term,
-    member: Term,
-) {
-    let (proof, equality) = constructor_field_proof(env, quot, member);
-    let ctx = Context::new();
-    let bottom = bottom_term(env);
-    assert_eq!(
-        check(env, &ctx, &proof, &bottom),
-        Err(KernelError::TypeMismatch {
-            expected: Box::new(bottom),
-            found: Box::new(equality),
-        }),
-        "the checked constructor reflexivity proof cannot close Bottom"
-    );
-}
-
-/// Transition sentinel, AC-1/S2: even the currently accepted malformed
-/// second domain must not turn a checked Bx reflexivity proof into Bottom.
-/// P0 may instead reject the malformed quotient at formation.
+/// S2 is refused at formation, before any constructor field can inhabit it.
 #[test]
 fn constructor_field_with_mismatched_relation_second_domain_cannot_prove_bottom() {
     let mut env = GlobalEnv::new();
     let trusted = env.trusted_base();
-    let (bool_, values) = nullary(&mut env, 2);
+    let (bool_, _) = nullary(&mut env, 2);
     let (nat, numbers) = nullary(&mut env, 1);
     let r = relation(
         bool_.clone(),
         nat.clone(),
         eq(nat, Term::var(0), numbers[0].clone()),
     );
-    let quot = Term::Quot(Box::new(bool_), Box::new(r));
+    let quot = Term::Quot(
+        Box::new(bool_),
+        Box::new(r),
+        Box::new(Term::const_(env.tt_id(), vec![])),
+    );
     assert_eq!(
         infer(&env, &Context::new(), &quot),
-        Ok(Term::Type(Level::zero()))
+        Err(KernelError::BadEliminator(
+            "quotient relation's second domain ≠ A".into()
+        ))
     );
-    assert_reflexive_constructor_does_not_prove_bottom(&mut env, quot, values[0].clone());
     assert_eq!(env.trusted_base(), trusted);
 }
 
-/// Transition sentinel, AC-1/S2: well-typed R need not be reflexive. Both
-/// this pair and the mismatched-domain pair above traverse the same raw-class
-/// equality conjunct in the inductive Eq reduction.
+/// A relation that is not reflexive cannot fake IsEquiv with `tt`.
 #[test]
 fn constructor_field_with_nonreflexive_relation_cannot_prove_bottom() {
     let mut env = GlobalEnv::new();
@@ -145,18 +94,20 @@ fn constructor_field_with_nonreflexive_relation_cannot_prove_bottom() {
         bool_.clone(),
         eq(bool_.clone(), Term::var(1), values[1].clone()),
     );
-    let quot = Term::Quot(Box::new(bool_), Box::new(r));
-    assert_eq!(
-        infer(&env, &Context::new(), &quot),
-        Ok(Term::Type(Level::zero()))
+    let quot = Term::Quot(
+        Box::new(bool_),
+        Box::new(r),
+        Box::new(Term::const_(env.tt_id(), vec![])),
     );
-    assert_reflexive_constructor_does_not_prove_bottom(&mut env, quot, values[0].clone());
+    assert!(matches!(
+        infer(&env, &Context::new(), &quot),
+        Err(KernelError::TypeMismatch { .. })
+    ));
     assert_eq!(env.trusted_base(), trusted);
 }
 
-/// Transition sentinel, AC-1/M1: an independent closed Eq Nat zero (suc zero)
-/// must not be derivable from the constructor-field reflexivity proof merely
-/// because the relation ignores its endpoints and returns that proposition.
+/// M1: a quotient by the constantly-false Eq Nat 0 1 relation is refused
+/// when its purported equivalence proof is checked, not downstream at Eq.
 #[test]
 fn closed_constructor_quotient_refl_cannot_prove_zero_equals_one() {
     let mut env = GlobalEnv::new();
@@ -181,20 +132,19 @@ fn closed_constructor_quotient_refl_cannot_prove_zero_equals_one() {
     let nat = Term::indformer(nat_id, vec![]);
     let cs = &env.inductive(nat_id).unwrap().constructors;
     let zero = constructor(cs[0].id);
-    let one = Term::app(constructor(cs[1].id), zero.clone());
-    let false_eq = eq(nat.clone(), zero.clone(), one);
-    let r = relation(nat.clone(), nat.clone(), false_eq.clone());
-    let quot = Term::Quot(Box::new(nat), Box::new(r));
-    let (proof, constructor_eq) = constructor_field_proof(&mut env, quot, zero);
-    let ctx = Context::new();
-    assert_eq!(whnf(&env, &ctx, &false_eq), bottom_term(&env));
-    assert_eq!(
-        check(&env, &ctx, &proof, &false_eq),
-        Err(KernelError::TypeMismatch {
-            expected: Box::new(false_eq),
-            found: Box::new(constructor_eq),
-        }),
+    let one = Term::app(constructor(cs[1].id), zero);
+    let false_eq = eq(nat.clone(), constructor(cs[0].id), one);
+    assert_eq!(whnf(&env, &Context::new(), &false_eq), bottom_term(&env));
+    let r = relation(nat.clone(), nat.clone(), false_eq);
+    let quot = Term::Quot(
+        Box::new(nat),
+        Box::new(r),
+        Box::new(Term::const_(env.tt_id(), vec![])),
     );
+    assert!(matches!(
+        infer(&env, &Context::new(), &quot),
+        Err(KernelError::TypeMismatch { .. })
+    ));
     assert_eq!(env.trusted_base(), trusted);
 }
 

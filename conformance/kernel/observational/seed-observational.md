@@ -9,6 +9,10 @@ regression).
 Cases tagged **(oracle)** are to be validated against the prototype at
 build time by the Spec enclave.
 
+**Quotient-term convention.** Every quotient in this seed is formed as
+`A / R / e` with `R : A → A → Ω_l` and checked `e : IsEquiv A R`
+(`16 §5`); `A/R` abbreviates that formed type.
+
 ---
 
 ## Acceptance criterion: Omega proof-irrelevance (frame par. 2 item 5, README #9)
@@ -260,8 +264,8 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ### observational/cast-computes-quotient
 - spec: `spec/10-kernel/16-observational.md` par. 3.2
-- given: `A/R : Type 0`, `a : A`; canonical type equality
-  `Eq Type (A/R) (A/R)`; `cast (A/R) (A/R) proof [a]`
+- given: formed `Q := A / R / e : Type 0`, `a : A`; canonical type
+  equality `Eq Type Q Q`; `cast Q Q proof [a]`
 - expect: **reduces** (class preserved)
 - why: cast at quotient preserves the class structure, transporting
   the representative.
@@ -307,15 +311,27 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ## Acceptance criterion: Quotients (frame par. 2 item 7, README #14)
 
-### observational/quotient-eq (soundness, C8 interim)
+### observational/quotient-eq (soundness, C8)
 - spec: `spec/10-kernel/16-observational.md` §2.2, §5
-- given: `R : A → A → Omega`, `a b : A`; `Eq (A / R) [a] [b]`, including
-  canonical classes.
-- expect: **stays neutral** for every pair of endpoints; it does not reduce to
-  `R a b`. Relation-as-equality is
-  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
-- why: Quot-Form has not supplied a checked equivalence proof for `R`; reducing
-  to an arbitrary relation is deferred until P0.
+- given: (a) an open context `A : Type l`, `R : A → A → Ω_l`,
+  `e : IsEquiv A R`, and `a,b : A`, with canonical classes `[a]`, `[b]`;
+  query `whnf(Eq (A / R / e) [a] [b])`; (b) closed `Nat`, total `R`, and
+  checked total-equivalence witness `e` for the `Top` control.
+- expect: (a) **reduces to** `R a b : Ω_l`, even if that application is
+  neutral because `R` is opaque; the outer `Eq` is gone. (b) reduces to
+  `Top`.
+- why: two class-headed endpoints expose the relation only after `e` has
+  checked. An invalid relation is rejected at formation; see
+  `../seed-kernel.md` `kernel/formation/quotient-requires-checked-equivalence`.
+  Non-class endpoints stay neutral in the adjacent case.
+
+### observational/quotient-eq-neutral-endpoint (soundness, C8)
+- spec: `spec/10-kernel/16-observational.md` §2.2
+- given: a formed `Q := A / R / e`, open `q : Q`, and `a : A`; query
+  `whnf(Eq Q q [a])`.
+- expect: remains neutral as `Eq Q q [a]`; it does not reduce to `R`.
+- why: the quotient-Eq rule requires both endpoints to be canonical classes.
+  This pins the non-class endpoint arm, not the class-pair C8 reduct.
 
 ### observational/quotient-elim (soundness)
 - spec: `spec/10-kernel/16-observational.md` par. 5
@@ -335,6 +351,26 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 
 ---
 
+### observational/quotient-elim-neutral-preserves-respect-term (soundness)
+- spec: `spec/10-kernel/16-observational.md` §5 (Quot-Elim-Ω);
+  `spec/10-kernel/17-conversion.md` §3.2
+- given: `A := Bool`, `a := true`, `R := λ _ _. Top`, and a checked
+  total-equivalence witness `e`; form `Q := A / R / e`. In context
+  `q : Q` (neutral), `M : (z : Q) → Ω_0`, and
+  `f : (x : A) → M [x]`. Let `r := a` (well-scoped but not a proof).
+  Query `infer` and `whnf` on core `QuotElim M f r q`; also query
+  `whnf` on `QuotElim M f r [a]`.
+- expect: `infer(QuotElim M f a q)` accepts at type `M q`.
+  `whnf(QuotElim M f a q) = QuotElim M f a q`, with `r := a`
+  preserved exactly. `whnf(QuotElim M f a [a])` reduces to `f a`.
+- why: An Ω-target only requires `r` to be well-scoped, so `a : A`
+  is a valid non-proof respect field. The neutral-scrutinee rule
+  preserves that field; the class-headed control fires iota and
+  ignores it. Dropping `r` from the neutral result changes the
+  asserted `whnf` term.
+
+---
+
 ## Acceptance criterion: Truncation (frame par. 2 item 8)
 
 ### observational/trunc-elim
@@ -343,6 +379,27 @@ These six cases carry `SPEC-EQ-FORM-OMEGA-CARRIER`, deliverable 2.
 - expect: **reduces-to** `f a`
 - why: truncation eliminator computes. Since `P : Omega`, no respect
   condition is required.
+
+### observational/trunc-quot-elim-target-sort-boundary (soundness)
+- spec: `spec/10-kernel/16-observational.md` §5 (Quot-Elim-Ω and the
+  Type-target restriction), §6 (Trunc-Elim), and §8.2
+- given: `A : Type l`, `a : A`, `t := |a| : ‖A‖`; one context also
+  contains `MΩ : ‖A‖ → Ω_j`, `fΩ : (x : A) → MΩ |x|`,
+  `MT : ‖A‖ → Type k`, and `fT : (x : A) → MT |x|`. Let `r := a`
+  (well-scoped only). Query `infer` on core `QuotElim MΩ fΩ r t` and
+  `QuotElim MT fT r t`; also query `whnf` on the Ω-target term.
+- expect: Ω-target `infer` **accepts** at type `MΩ t`, and `whnf`
+  reduces to `fΩ a`. Type-target `infer` **rejects at the
+  Quot-scrutinee requirement**; no error variant or diagnostic text
+  is fixed.
+- why: The paired inputs share `A`, `a`, `t`, and `r`; only the
+  motive's target sort and corresponding method type differ. Both
+  methods are well-typed for the truncation injection. The method
+  check compares `M` arguments at `‖A‖ : Ω` and passes by Ω-PI
+  (`§8.2`); the Type-target guard is the first refusing premise. A
+  Type-target path that wrongly uses respect-free Trunc elimination
+  would accept the second input. The Ω arm remains the positive
+  control for `Quot-Elim-Ω` over truncation.
 
 ### observational/trunc-or-exists
 - spec: `spec/10-kernel/16-observational.md` par. 6

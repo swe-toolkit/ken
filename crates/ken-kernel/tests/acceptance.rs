@@ -1521,28 +1521,37 @@ fn k2_j_on_refl_is_base() {
 // --- C8: quotient equality (`16 §5`) ---------------------------------------
 
 #[test]
-fn k2_quotient_eq_stays_neutral_until_relation_is_equivalence() {
-    // Interim `16 §2.2`: `Eq (A/R) [a] [b]` stays neutral even when both
-    // endpoints are classes. `A:Type 0`, `R:A→A→Ω`, `a b : A` remain open.
+fn k2_quotient_eq_reduces_to_the_checked_relation() {
+    // A, R, e:IsEquiv A R, a, b remain open. Class equality reduces to
+    // R a b, even when that relation application itself remains neutral.
     let (env, _s) = std_env();
     let mut ctx = Context::new();
-    ctx.push(Term::Type(Level::zero())); // A  (A=0)
-                                         // R : A → A → Ω = (x:A)→(y:A)→Ω. Inner A weakens past each binder.
+    ctx.push(Term::Type(Level::zero())); // A
     ctx.push(Term::pi(
         Term::var(0),
         Term::pi(Term::var(1), Term::Omega(Level::zero())),
-    )); // R  (R=0, A=1)
-    ctx.push(Term::var(1)); // a : A  (a=0, R=1, A=2)
-    ctx.push(Term::var(2)); // b : A  (b=0, a=1, R=2, A=3)
-                            // Now A=var3, R=var2, a=var1, b=var0.
+    )); // R, A=1
+    ctx.push(ken_kernel::check::quotient_equivalence_type(
+        &Term::var(1),
+        &Term::var(0),
+    )); // e, R=1, A=2
+    ctx.push(Term::var(2)); // a, e=1, R=2, A=3
+    ctx.push(Term::var(3)); // b, a=1, e=2, R=3, A=4
     for representative in [Term::var(1), Term::var(0)] {
         let eq = Term::Eq(
-            Box::new(Term::Quot(Box::new(Term::var(3)), Box::new(Term::var(2)))),
+            Box::new(Term::Quot(
+                Box::new(Term::var(4)),
+                Box::new(Term::var(3)),
+                Box::new(Term::var(2)),
+            )),
             Box::new(Term::QuotClass(Box::new(Term::var(1)))),
-            Box::new(Term::QuotClass(Box::new(representative))),
+            Box::new(Term::QuotClass(Box::new(representative.clone()))),
         );
         assert_eq!(infer(&env, &ctx, &eq), Ok(Term::Omega(Level::zero())));
-        assert_eq!(whnf(&env, &ctx, &eq), eq);
+        assert_eq!(
+            whnf(&env, &ctx, &eq),
+            Term::app(Term::app(Term::var(3), Term::var(1)), representative)
+        );
     }
 }
 
@@ -1816,14 +1825,26 @@ fn k2_cast_computes_quotient_class_preserved() {
         Term::var(0),
         Term::pi(Term::var(1), Term::Omega(Level::zero())),
     )); // R : A→A→Ω  (R=0, A=1)
-    ctx.push(Term::var(1)); // a : A  (a=0, R=1, A=2)
-                            // e : Eq Type (A/R) (A/R) — use a variable (the reflexive type-equality).
+    ctx.push(ken_kernel::check::quotient_equivalence_type(
+        &Term::var(1),
+        &Term::var(0),
+    )); // p:IsEquiv A R, R=1, A=2
+    ctx.push(Term::var(2)); // a, p=1, R=2, A=3
+    let quot_before_eq = Term::Quot(
+        Box::new(Term::var(3)),
+        Box::new(Term::var(2)),
+        Box::new(Term::var(1)),
+    );
     ctx.push(Term::Eq(
         Box::new(Term::Type(Level::zero())),
-        Box::new(Term::Quot(Box::new(Term::var(3)), Box::new(Term::var(2)))),
-        Box::new(Term::Quot(Box::new(Term::var(3)), Box::new(Term::var(2)))),
-    )); // e=0, a=1, R=2, A=3
-    let quot = Term::Quot(Box::new(Term::var(3)), Box::new(Term::var(2)));
+        Box::new(quot_before_eq.clone()),
+        Box::new(quot_before_eq),
+    )); // e=0, a=1, p=2, R=3, A=4
+    let quot = Term::Quot(
+        Box::new(Term::var(4)),
+        Box::new(Term::var(3)),
+        Box::new(Term::var(2)),
+    );
     let cast = Term::Cast(
         Box::new(quot.clone()),
         Box::new(quot),
@@ -1881,11 +1902,10 @@ fn vcons(s: &Std, a: Term, n: Term, hd: Term, tl: Term) -> Term {
     )
 }
 
-// --- Seam 3: non-Ω quotient elim MUST be rejected (closed-`Empty` exploit) --
-// The Architect's exploit: A:=Bool, R:=total, M:=λ_.Bool (Type-target), f:=λx.x,
-// r:=any. `check_respect` used to raw-well-form `r` and `whnf` reduced
-// `elim_/ M f r [a] ⇝ f a` unconditionally → `cong h e : Eq Bool true false ⇝
-// Empty`. Now `infer_quot_elim` rejects a Type-codomain motive outright.
+// --- Seam 3: Type-target elim needs a checked respect witness ---------------
+// An arbitrary well-scoped `r` cannot discharge the dependent respect
+// schema; the Type-target gate rejects it before the eliminator can compute.
+// The paired Ω-target case below stays respect-free.
 #[test]
 fn k2_seam3_nonomega_quot_elim_rejected() {
     let (env, s) = std_env();
@@ -1896,9 +1916,17 @@ fn k2_seam3_nonomega_quot_elim_rejected() {
         bool_.clone(),
         Term::pi(bool_.clone(), Term::Omega(Level::zero())),
     ));
-    // M : (z:Bool/R) → Type 0   (NON-Ω codomain — the exploit motive)
+    ctx.push(ken_kernel::check::quotient_equivalence_type(
+        &bool_,
+        &Term::var(0),
+    )); // p:IsEquiv Bool R, R at 1
+    // M : (z:Bool/R/p) → Type 0 (the exploit motive).
     ctx.push(Term::pi(
-        Term::Quot(Box::new(bool_.clone()), Box::new(Term::var(0))), // Bool/R (R at 0)
+        Term::Quot(
+            Box::new(bool_.clone()),
+            Box::new(Term::var(1)),
+            Box::new(Term::var(0)),
+        ),
         Term::Type(Level::zero()),
     ));
     // f : (x:Bool) → M [x]
@@ -1906,9 +1934,13 @@ fn k2_seam3_nonomega_quot_elim_rejected() {
         bool_.clone(),
         Term::app(Term::var(1), Term::QuotClass(Box::new(Term::var(0)))),
     ));
-    // q : Bool/R   (R now at 2)
-    ctx.push(Term::Quot(Box::new(bool_.clone()), Box::new(Term::var(2))));
-    // Final: q=0, f=1, M=2, R=3.
+    // q : Bool/R/p (R at 3, p at 2).
+    ctx.push(Term::Quot(
+        Box::new(bool_.clone()),
+        Box::new(Term::var(3)),
+        Box::new(Term::var(2)),
+    ));
+    // Final: q=0, f=1, M=2, p=3, R=4.
     let elim = Term::QuotElim {
         motive: Box::new(Term::var(2)),               // M  (Type-codomain)
         method: Box::new(Term::var(1)),               // f
@@ -1917,8 +1949,7 @@ fn k2_seam3_nonomega_quot_elim_rejected() {
     };
     assert!(
         infer(&env, &ctx, &elim).is_err(),
-        "non-Ω (Type-target) quotient elim MUST be rejected — it admits the \
-         closed-`Empty` exploit (Architect dec_7xpn5ywf4ebfw seam 3)"
+        "Type-target quotient elim without a checked respect proof must fail"
     );
 }
 
@@ -1934,16 +1965,28 @@ fn k2_seam3_omega_quot_elim_accepted() {
         bool_.clone(),
         Term::pi(bool_.clone(), Term::Omega(Level::zero())),
     ));
-    // M : (z:Bool/R) → Ω_0   (Ω codomain — respect-free)
+    ctx.push(ken_kernel::check::quotient_equivalence_type(
+        &bool_,
+        &Term::var(0),
+    )); // p:IsEquiv Bool R, R at 1
+    // M : (z:Bool/R/p) → Ω_0 (respect-free)
     ctx.push(Term::pi(
-        Term::Quot(Box::new(bool_.clone()), Box::new(Term::var(0))),
+        Term::Quot(
+            Box::new(bool_.clone()),
+            Box::new(Term::var(1)),
+            Box::new(Term::var(0)),
+        ),
         Term::Omega(Level::zero()),
     ));
     ctx.push(Term::pi(
         bool_.clone(),
         Term::app(Term::var(1), Term::QuotClass(Box::new(Term::var(0)))),
     ));
-    ctx.push(Term::Quot(Box::new(bool_.clone()), Box::new(Term::var(2))));
+    ctx.push(Term::Quot(
+        Box::new(bool_.clone()),
+        Box::new(Term::var(3)),
+        Box::new(Term::var(2)),
+    ));
     let elim = Term::QuotElim {
         motive: Box::new(Term::var(2)),
         method: Box::new(Term::var(1)),

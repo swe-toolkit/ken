@@ -550,9 +550,10 @@ pub fn normalize(env: &GlobalEnv, ctx: &Context, t: &Term) -> Term {
             Box::new(normalize(env, ctx, d)),
             Box::new(normalize(env, ctx, e)),
         ),
-        Term::Quot(a, r) => Term::Quot(
+        Term::Quot(a, r, e) => Term::Quot(
             Box::new(normalize(env, ctx, a)),
             Box::new(normalize(env, ctx, r)),
+            Box::new(normalize(env, ctx, e)),
         ),
         Term::QuotClass(t) => Term::QuotClass(Box::new(normalize(env, ctx, t))),
         Term::Trunc(a) => Term::Trunc(Box::new(normalize(env, ctx, a))),
@@ -1435,7 +1436,7 @@ fn conv_struct_deferred(
         // their carriers and relations structurally. Class introductions
         // compare only their representatives; relation-respect is an
         // elimination-time obligation, never an extra equality premise here.
-        (Term::Quot(a1, r1), Term::Quot(a2, r2)) => {
+        (Term::Quot(a1, r1, _e1), Term::Quot(a2, r2, _e2)) => {
             conv_struct_path_memo(env, ctx, a1, a2, child_path, retry_memo)
                 && conv_struct_path_memo(env, ctx, r1, r2, child_path, retry_memo)
         }
@@ -2601,23 +2602,28 @@ mod tests {
         let reducible_relation =
             beta_identity(ctx.lookup(0).expect("relation type").clone(), Term::var(0));
 
+        let quotient = |a, r| {
+            // Structural-congruence fixture: the third proof is ignored after
+            // admission and cannot change the carrier/relation comparison.
+            Term::Quot(Box::new(a), Box::new(r), Box::new(Term::var(0)))
+        };
         assert!(convert_type(
             &env,
             &ctx,
-            &Term::Quot(Box::new(carrier.clone()), Box::new(reducible_relation)),
-            &Term::Quot(Box::new(carrier.clone()), Box::new(Term::var(0))),
+            &quotient(carrier.clone(), reducible_relation),
+            &quotient(carrier.clone(), Term::var(0)),
         ));
         assert!(!convert_type(
             &env,
             &ctx,
-            &Term::Quot(Box::new(carrier.clone()), Box::new(Term::var(0))),
-            &Term::Quot(Box::new(other_carrier), Box::new(Term::var(0))),
+            &quotient(carrier.clone(), Term::var(0)),
+            &quotient(other_carrier, Term::var(0)),
         ));
         assert!(!convert_type(
             &env,
             &ctx,
-            &Term::Quot(Box::new(carrier.clone()), Box::new(Term::var(0))),
-            &Term::Quot(Box::new(carrier), Box::new(Term::var(1))),
+            &quotient(carrier.clone(), Term::var(0)),
+            &quotient(carrier, Term::var(1)),
         ));
     }
 
@@ -4472,9 +4478,39 @@ mod tests {
         let (nat, zero_id, _) = declare_nat_for_iota(&mut env);
         let nt = Term::indformer(nat, vec![]);
         let rel_ty = Term::pi(nt.clone(), Term::pi(nt.clone(), Term::Omega(Level::zero())));
-        let rel = declare_postulate(&mut env, "quot_relation".into(), vec![], rel_ty)
-            .expect("opaque quotient relation");
-        let quot_ty = Term::Quot(Box::new(nt.clone()), Box::new(cref0(rel)));
+        let top = cref0(env.top_id());
+        let tt = cref0(env.tt_id());
+        let rel = declare_def(
+            &mut env,
+            vec![],
+            rel_ty,
+            Term::lam(nt.clone(), Term::lam(nt.clone(), top.clone())),
+        )
+        .expect("checked total quotient relation");
+        let equivalence = Term::pair(
+            Term::lam(nt.clone(), tt.clone()),
+            Term::pair(
+                Term::lam(
+                    nt.clone(),
+                    Term::lam(nt.clone(), Term::lam(top.clone(), tt.clone())),
+                ),
+                Term::lam(
+                    nt.clone(),
+                    Term::lam(
+                        nt.clone(),
+                        Term::lam(
+                            nt.clone(),
+                            Term::lam(top.clone(), Term::lam(top, tt)),
+                        ),
+                    ),
+                ),
+            ),
+        );
+        let quot_ty = Term::Quot(
+            Box::new(nt.clone()),
+            Box::new(cref0(rel)),
+            Box::new(equivalence),
+        );
         let q = declare_postulate(&mut env, "opaque_quot".into(), vec![], quot_ty.clone())
             .expect("opaque quotient value");
         let alias = declare_def(&mut env, vec![], quot_ty.clone(), cref0(q))

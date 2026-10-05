@@ -928,9 +928,14 @@ fn collect_checked_perform_nodes(
                     self.visit(body)
                 }
                 Term::Ascript(value, _) => self.visit(value),
-                Term::Eq(_, left, right) | Term::Quot(left, right) => {
+                Term::Eq(_, left, right) => {
                     self.visit(left)?;
                     self.visit(right)
+                }
+                Term::Quot(carrier, relation, equivalence) => {
+                    self.visit(carrier)?;
+                    self.visit(relation)?;
+                    self.visit(equivalence)
                 }
                 Term::Cast(_, _, equality, value) => {
                     self.visit(equality)?;
@@ -1425,10 +1430,14 @@ impl RecursiveInvocationTemplateCollector<'_> {
             }
             Term::Pair(left, right)
             | Term::Ascript(left, right)
-            | Term::Quot(left, right)
             | Term::Absurd(left, right) => {
                 self.visit(owner, left, context, false)?;
                 self.visit(owner, right, context, false)?;
+            }
+            Term::Quot(carrier, relation, equivalence) => {
+                self.visit(owner, carrier, context, false)?;
+                self.visit(owner, relation, context, false)?;
+                self.visit(owner, equivalence, context, false)?;
             }
             Term::Proj1(value)
             | Term::Proj2(value)
@@ -3489,7 +3498,7 @@ fn collect_term_constants(term: &Term, output: &mut BTreeSet<GlobalId>) {
         | Term::Sigma(_, _)
         | Term::Eq(_, _, _)
         | Term::Refl(_)
-        | Term::Quot(_, _)
+        | Term::Quot(_, _, _)
         | Term::QuotClass(_)
         | Term::IndFormer { .. }
         | Term::Constructor { .. } => {}

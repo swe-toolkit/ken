@@ -212,9 +212,11 @@ impl MetaCtx {
                 Box::new(self.zonk_term(d)),
                 Box::new(self.zonk_term(e)),
             ),
-            Term::Quot(a, r) => {
-                Term::Quot(Box::new(self.zonk_term(a)), Box::new(self.zonk_term(r)))
-            }
+            Term::Quot(a, r, e) => Term::Quot(
+                Box::new(self.zonk_term(a)),
+                Box::new(self.zonk_term(r)),
+                Box::new(self.zonk_term(e)),
+            ),
             Term::QuotClass(t) => Term::QuotClass(Box::new(self.zonk_term(t))),
             Term::QuotElim {
                 motive,
@@ -2251,9 +2253,10 @@ fn subst_term_generalize_many(term: &Term, subs: &[(Term, Term)]) -> Term {
             Box::new(subst_term_generalize_many(d2, subs)),
             Box::new(subst_term_generalize_many(e, subs)),
         ),
-        Term::Quot(a, r) => Term::Quot(
+        Term::Quot(a, r, e) => Term::Quot(
             Box::new(subst_term_generalize_many(a, subs)),
             Box::new(subst_term_generalize_many(r, subs)),
+            Box::new(subst_term_generalize_many(e, subs)),
         ),
         Term::QuotClass(t) => Term::QuotClass(Box::new(subst_term_generalize_many(t, subs))),
         Term::Trunc(a) => Term::Trunc(Box::new(subst_term_generalize_many(a, subs))),
@@ -2343,8 +2346,13 @@ fn scrut_occurs(term: &Term, scrut_core: &Term) -> bool {
         | Term::Trunc(p)
         | Term::TruncProj(p)
         | Term::Refl(p) => scrut_occurs(p, scrut_core),
-        Term::Ascript(t, a) | Term::Quot(t, a) | Term::Absurd(t, a) => {
+        Term::Ascript(t, a) | Term::Absurd(t, a) => {
             scrut_occurs(t, scrut_core) || scrut_occurs(a, scrut_core)
+        }
+        Term::Quot(a, r, e) => {
+            scrut_occurs(a, scrut_core)
+                || scrut_occurs(r, scrut_core)
+                || scrut_occurs(e, scrut_core)
         }
         Term::Eq(a, t, u) | Term::J(a, t, u) => {
             scrut_occurs(a, scrut_core)
@@ -2867,9 +2875,10 @@ fn install_embedded_method_sentinels(
                 Box::new(recur(d, next_elim, seen)),
                 Box::new(recur(e, next_elim, seen)),
             ),
-            Term::Quot(a, r) => Term::Quot(
+            Term::Quot(a, r, e) => Term::Quot(
                 Box::new(recur(a, next_elim, seen)),
                 Box::new(recur(r, next_elim, seen)),
+                Box::new(recur(e, next_elim, seen)),
             ),
             Term::QuotClass(t) => Term::QuotClass(Box::new(recur(t, next_elim, seen))),
             Term::Trunc(a) => Term::Trunc(Box::new(recur(a, next_elim, seen))),
@@ -3014,7 +3023,11 @@ fn refresh_embedded_elim_evidence(
             Box::new(go(d, ctx)?),
             Box::new(go(e, ctx)?),
         )),
-        Term::Quot(a, r) => Ok(Term::Quot(Box::new(go(a, ctx)?), Box::new(go(r, ctx)?))),
+        Term::Quot(a, r, e) => Ok(Term::Quot(
+            Box::new(go(a, ctx)?),
+            Box::new(go(r, ctx)?),
+            Box::new(go(e, ctx)?),
+        )),
         Term::QuotClass(t) => Ok(Term::QuotClass(Box::new(go(t, ctx)?))),
         Term::Trunc(a) => Ok(Term::Trunc(Box::new(go(a, ctx)?))),
         Term::TruncProj(t) => Ok(Term::TruncProj(Box::new(go(t, ctx)?))),
@@ -8371,7 +8384,11 @@ fn finalize_refined_body(
             Box::new(go(d2, depth)),
             Box::new(go(e, depth)),
         ),
-        Term::Quot(a, r) => Term::Quot(Box::new(go(a, depth)), Box::new(go(r, depth))),
+        Term::Quot(a, r, e) => Term::Quot(
+            Box::new(go(a, depth)),
+            Box::new(go(r, depth)),
+            Box::new(go(e, depth)),
+        ),
         Term::QuotClass(t) => Term::QuotClass(Box::new(go(t, depth))),
         Term::Trunc(a) => Term::Trunc(Box::new(go(a, depth))),
         Term::TruncProj(t) => Term::TruncProj(Box::new(go(t, depth))),
@@ -8496,11 +8513,20 @@ where
             map_free,
             |motive, base, evidence| Term::J(Box::new(motive), Box::new(base), Box::new(evidence)),
         ),
-        Term::Quot(carrier, relation) => {
-            relocate_two(carrier, relation, depth, map_free, |carrier, relation| {
-                Term::Quot(Box::new(carrier), Box::new(relation))
-            })
-        }
+        Term::Quot(carrier, relation, equivalence) => relocate_three(
+            carrier,
+            relation,
+            equivalence,
+            depth,
+            map_free,
+            |carrier, relation, equivalence| {
+                Term::Quot(
+                    Box::new(carrier),
+                    Box::new(relation),
+                    Box::new(equivalence),
+                )
+            },
+        ),
         Term::QuotClass(value) => relocate_one(value, depth, map_free, |value| {
             Term::QuotClass(Box::new(value))
         }),
@@ -20929,9 +20955,10 @@ fn lower_pattern_type_to_common(term: &Term, k: usize) -> Option<Term> {
                 Box::new(child(base, cutoff)?),
                 Box::new(child(evidence, cutoff)?),
             )),
-            Term::Quot(carrier, relation) => Some(Term::Quot(
+            Term::Quot(carrier, relation, equivalence) => Some(Term::Quot(
                 Box::new(child(carrier, cutoff)?),
                 Box::new(child(relation, cutoff)?),
+                Box::new(child(equivalence, cutoff)?),
             )),
             Term::QuotClass(value) => Some(Term::QuotClass(Box::new(child(value, cutoff)?))),
             Term::Trunc(carrier) => Some(Term::Trunc(Box::new(child(carrier, cutoff)?))),

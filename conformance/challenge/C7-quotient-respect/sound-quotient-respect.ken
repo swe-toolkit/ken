@@ -1,8 +1,9 @@
--- C7 SOUND arm — a quotient lift with a valid `respect` proof — should-PASS.
+-- C7 intended sound arm; this is not a valid post-P0 quotient input.
+-- It omits `e : IsEquiv DPair denoteEq`; see the C7 README.
 --
--- Run against the prelude + the K2 quotient fragment (Term::Quot/QuotElim;
--- reserved surface `A / R`, `[t]`, `elim_/`, 11-syntax.md). Decimal-as-quotient:
--- the principled fix to C1's non-canonical carrier.
+-- The K2 kernel form is `A / R / e` with `Term::Quot`/`QuotElim`;
+-- the frontend has no quotient production and `/` is integer division.
+-- Decimal-as-quotient is the intended fix to C1's non-canonical carrier.
 
 data DPair = MkDPair Int Int
 
@@ -14,18 +15,18 @@ fn denoteEq (x : DPair) (y : DPair) : Prop =
     match y { MkDPair cy ey ↦
       Equal Bool (and_bool (eq_int (add_int ex 1) ey) (eq_int cx (mul_int cy 10))) True } }
 
--- The quotient carrier: canonical by construction (one class per denoted value).
+-- Intended quotient carrier; this file omits the required `e` and does not
+-- form a quotient under the post-P0 rule.
 const Decimal : Type = DPair / denoteEq
 
--- isZeroPair RESPECTS denoteEq: equal-value pairs are both zero or both non-zero.
+-- Intended law: isZeroPair respects denotational equality. This sketch has
+-- no checked proof and is not a current C7 conformance result.
 fn isZeroPair (p : DPair) : Bool =
   match p { MkDPair c e ↦ eq_int c 0 }
 
--- The respect proof obligation: (x y : DPair) -> denoteEq x y ->
---   Equal Bool (isZeroPair x) (isZeroPair y). Provable (a value's zeroness is a
--- property of the value, not the representation). Marked Axiom-as-placeholder
--- ONLY for the proof term; the point is that the obligation is TRUE and the
--- slot is DEMANDED.
+-- Intended respect obligation: (x y : DPair) -> denoteEq x y ->
+--   Equal Bool (isZeroPair x) (isZeroPair y). The Axiom below is a placeholder,
+-- not a discharged proof or a trust-free pass.
 fn isZeroRespect (x : DPair) (y : DPair) (h : denoteEq x y)
   : Equal Bool (isZeroPair x) (isZeroPair y) = Axiom
 
@@ -33,6 +34,6 @@ fn isZeroRespect (x : DPair) (y : DPair) (h : denoteEq x y)
 fn isZeroDecimal (d : Decimal) : Bool =
   elim_/ (λ _ . Bool) isZeroPair isZeroRespect d
 
--- Expected: elaborates — the respect obligation is discharged, so the lift is
--- sound. (If `A / R` / `elim_/` are not surface-reachable, record the gap.)
--- Contrast the unsound arm, where the respect obligation is UNPROVABLE.
+-- Current status: no C7 respect verdict. As written, the missing e prevents
+-- quotient formation; the Axiom placeholder does not establish respect.
+-- Repair the relation and supply checked e before treating this as a test.

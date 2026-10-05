@@ -1,61 +1,52 @@
 # C7 — quotient type + the `respect` obligation
 
-**Axis:** observational / quotient fragment (K2). **Flavor:** B (should-PASS if
-the quotient surface is reachable, else a documented known-gap). **Couples with
-C1** — the quotient is *how you soundly do* what C1's naive `DecEq Decimal`
-does unsoundly.
+**Axis:** observational / quotient fragment (K2). **Status:** prepared
+challenge, not a current conformance oracle. The current `.ken` sketches fail
+before the respect check: they omit the checked `e : IsEquiv A R` required by
+`16 §5`. **Couples with C1** — a lawful quotient is the principled alternative
+to C1's naive `DecEq Decimal`.
 
 ## Why this is a blind spot
 
 C1 shows that a value-equality over a non-canonical carrier cannot back a lawful
 `DecEq` (it inhabits `Bottom`). The **principled resolution** ADR 0010 names is
 a **quotient / setoid**: make the carrier canonical by quotienting the raw pairs
-by denotational equality, `Decimal := DPair / denoteEq`. The quotient
+by denotational equality, `Decimal := DPair / denoteEq / e` for
+`e : IsEquiv DPair denoteEq`. The quotient
 eliminator `elim_/` then **demands a `respect` proof** — that any function you
 lift out of the quotient gives equal results on related inputs. That obligation
 is exactly the check C1's unsound instance skipped. VAL2 never touched the
 observational/quotient fragment at all.
 
-## The pair
+## Intended pair
 
-- **Sound arm — `sound-quotient-respect.ken` — should-PASS (if reachable).**
-  `Decimal := DPair / denoteEq`. Lift `isZero : Decimal → Bool` via `elim_/`
-  with a **valid** `respect` proof (`isZeroPair` gives the same answer on any
-  two pairs that denote the same value). This is the sound analogue of a
-  `Decimal` decision procedure.
-- **Unsound arm — `unsound-nonrespecting.ken` — should-REJECT.** Try to lift
-  `coeff : Decimal → Int` (first projection) via `elim_/`. `coeff` does **not**
-  respect `denoteEq`: `MkDPair 10 (-1)` and `MkDPair 1 0` denote the same value
-  but have coefficients `10 ≠ 1`. The `respect` obligation is `denoteEq x y →
-  Equal Int (coeffPair x) (coeffPair y)` — **unprovable** (it would give `Equal
-  Int 10 1`, the same `Bottom` C1 reaches).
+A future C7 pair uses a genuine equivalence relation and checked witness `e`.
+A respecting `isZero` lift should be admitted; a `coeff` lift that separates
+related representatives should be refused. These are design expectations,
+not current conformance verdicts: the existing sketches do not reach the
+respect check.
 
-## Expected behavior (exact)
+## Current reachability and fixture status
 
-- Sound arm: **PASS** — `elim_/` with a discharged `respect` proof lifts
-  `isZero` to the quotient. (Kernel support is present: `Term::Quot` /
-  `Term::QuotElim { motive, method, respect, scrut }`, `foreign.rs`; surface
-  `A / R`, `[t]`, `elim_/` reserved, `11-syntax.md`.)
-- Unsound arm: **should-REJECT** — the `respect` obligation for `coeff` is
-  **unprovable**; `elim_/` must refuse the lift. **If it accepts a non-
-  respecting lift (or lets the `respect` slot be skipped/`Axiom`-ed), that is
-  the finding** — the quotient's soundness *is* the `respect` gate, and it is
-  the same door C1 exposes.
+The frontend has no quotient construction: `/` is parsed as built-in integer
+division, not as `Term::Quot`. The legacy expressions therefore do not reach
+kernel quotient formation; that is a surface-gap result only. The current
+sources also use `DPair / denoteEq` without the required third
+argument `e`. At `x = y`, the displayed exponent clause requires
+`eq_int (add_int ex 1) ex`, and no checked reflexivity witness is supplied.
+Thus spelling alone cannot make this a formed quotient or reach `elim_/`.
 
-## Discriminates
-
-Does `elim_/` **enforce** the `respect` obligation? A respecting lift (`isZero`,
-PASS) vs a non-respecting one (`coeff`, must REJECT) is the flip. This closes
-the C1↔C7 story: C1 = "the naive projection is unsound"; C7 = "the quotient
-catches exactly that projection, because it demands `respect`."
+The `isZeroRespect` `Axiom` is a placeholder assumption, not a discharged
+proof. It cannot show that the sound arm is proven, or that the pair
+discriminates the respect gate. Do not cite either fixture as a current C7
+respect verdict. A future C7 oracle needs a valid equivalence relation, a
+checked `e`, and a respecting/non-respecting pair that reaches Quot-Elim.
 
 ## Surface-expressibility note
 
-Quotients are **kernel-level** (`Term::Quot`/`QuotElim`) with **reserved**
-surface (`A / R`, `[t]`, `elim_/`). Whether they are **surface-reachable** today
-is the open question — the Steward flagged that "quotient/respect isn't yet
-surface-expressible" is itself a **legitimate prepared depth-gap result**, not
-wasted effort. If the surface can't yet write `A / R` or `elim_/`, record that
-as the finding (the quotient fragment is landed in the kernel but not surfaced),
-and note that C1's hole stays open until this fix is surface-reachable. Push the
-encoding as far as the grammar allows before calling it a gap.
+Quotients are kernel-level (`Term::Quot`/`QuotElim`); formation is
+`A / R / e` with checked `e : IsEquiv A R` (`11-syntax.md`, `16 §5`).
+The frontend has no quotient production; `/` is integer division. That
+surface gap is not evidence about the `respect` gate.
+A future C7 input must first provide a genuine equivalence and checked `e`;
+the current sketches do neither.

@@ -132,6 +132,17 @@ impl Fixture {
             vec![],
         )
     }
+    fn quotient_assuming_equiv(&mut self, carrier: Term, relation: Term) -> Term {
+        let witness = self.opaque(
+            "structural quotient equivalence",
+            ken_kernel::check::quotient_equivalence_type(&carrier, &relation),
+        );
+        Term::Quot(
+            Box::new(carrier),
+            Box::new(relation),
+            Box::new(witness),
+        )
+    }
 }
 
 fn assert_typed_cast(
@@ -388,17 +399,19 @@ fn quotient_structural_equality_and_typed_cast() {
             )),
         )
     };
-    let a = Term::Quot(Box::new(f.nat.clone()), Box::new(relation(n)));
-    let b = Term::Quot(Box::new(f.nat.clone()), Box::new(relation(m)));
+    let r = relation(n);
+    let s = relation(m);
+    let a = f.quotient_assuming_equiv(f.nat.clone(), r);
+    let b = f.quotient_assuming_equiv(f.nat.clone(), s);
     let ctx = Context::new();
     let reduct = whnf(&f.env, &ctx, &type_eq(a.clone(), b.clone()));
     let Term::Sigma(dom_eq, rel_family) = &reduct else {
         panic!("Quot/Quot must decompose")
     };
-    let Term::Quot(source_dom, source_rel) = &a else {
+    let Term::Quot(source_dom, source_rel, _proof) = &a else {
         unreachable!()
     };
-    let Term::Quot(target_dom, target_rel) = &b else {
+    let Term::Quot(target_dom, target_rel, _proof) = &b else {
         unreachable!()
     };
     assert!(convert_type(
@@ -493,8 +506,10 @@ fn quotient_cast_orients_distinct_underlying_domains() {
             )),
         )
     };
-    let source = Term::Quot(Box::new(a.clone()), Box::new(relation(a)));
-    let target = Term::Quot(Box::new(b.clone()), Box::new(relation(b)));
+    let r = relation(a.clone());
+    let s = relation(b.clone());
+    let source = f.quotient_assuming_equiv(a, r);
+    let target = f.quotient_assuming_equiv(b, s);
     assert_typed_cast(
         &f,
         &Context::new(),
@@ -795,7 +810,7 @@ fn inductive_arity_and_level_mismatches_stay_neutral() {
 /// cannot be converted into a spurious structural component equality.
 #[test]
 fn quotient_relation_level_mismatch_stays_neutral() {
-    let f = Fixture::new();
+    let mut f = Fixture::new();
     let ctx = Context::new();
     let relation = |omega: Level, body: Term| {
         Term::Ascript(
@@ -811,10 +826,19 @@ fn quotient_relation_level_mismatch_stays_neutral() {
         eq(f.nat.clone(), f.zero.clone(), f.zero.clone()),
     );
     let high = relation(Level::zero().suc(), type_eq(f.nat.clone(), f.nat.clone()));
-    let a = Term::Quot(Box::new(f.nat.clone()), Box::new(low));
-    let b = Term::Quot(Box::new(f.nat.clone()), Box::new(high));
-    let pair = type_eq(a, b);
-    assert_eq!(whnf(&f.env, &ctx, &pair), pair);
+    let a = f.quotient_assuming_equiv(f.nat.clone(), low);
+    assert_eq!(infer(&f.env, &ctx, &a), Ok(Term::Type(Level::zero())));
+    let b = Term::Quot(
+        Box::new(f.nat.clone()),
+        Box::new(high),
+        Box::new(Term::const_(f.env.tt_id(), vec![])),
+    );
+    assert_eq!(
+        infer(&f.env, &ctx, &b),
+        Err(KernelError::BadEliminator(
+            "quotient relation's Ω level ≠ carrier level".into()
+        ))
+    );
 }
 
 /// Durable invariant: the domain pair of different rigid Π heads is

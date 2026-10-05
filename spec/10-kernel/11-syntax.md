@@ -35,7 +35,7 @@ t, u, A, B ::=
   | cast A B e t                       -- [K2] cast along Eq Type A B (16)
   | J M d e                            -- [K2] eq eliminator (derived) (15)
   | elim_D M [c_k ↦ t_k]ₖ s            -- inductive elim (14)
-  | A / R | [t] | elim_/ M f s         -- [K2] quotient: type / class / elim (16)
+  | A / R / e | [t] | elim_/ M f r s   -- [K2] quotient: type / class / elim (16)
   | ‖ A ‖ | |t|                        -- [K2] propositional truncation (16)
   | let x := t : A in u
   | (t : A)                          -- ascription (erased after check)

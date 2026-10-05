@@ -1,4 +1,5 @@
--- C7 UNSOUND arm — a non-respecting quotient lift — should-REJECT.
+-- C7 intended non-respecting arm; this is not a valid post-P0 quotient input.
+-- It omits `e : IsEquiv DPair denoteEq`; see the C7 README.
 --
 -- Run against the prelude + the K2 quotient fragment. Same Decimal quotient as
 -- the sound arm; here we try to lift the first projection `coeff`, which does
@@ -26,13 +27,7 @@ fn coeffRespect (x : DPair) (y : DPair) (h : denoteEq x y)
 fn coeffDecimal (d : Decimal) : Int =
   elim_/ (λ _ . Int) coeffPair coeffRespect d
 
--- Expected correct behavior: REJECTED — the `respect` obligation for `coeff` is
--- unprovable, so `elim_/` cannot be given a valid respect argument; the lift
--- must be refused. (The `coeffRespect = Axiom` above is the tell: it postulates
--- a FALSE respect law — the same move C1's `sound = Axiom` makes.)
---
--- If ACCEPTED (elim_/ takes the non-respecting lift, or the respect slot is
--- skippable / Axiom-able without challenge): the finding — the quotient's
--- soundness IS the respect gate, and it has the same hole as C1. This is why
--- C1 and C7 are one story: the quotient is the sound construction ONLY if
--- `respect` is genuinely enforced.
+-- Current status: no C7 respect verdict. The missing e prevents quotient
+-- formation, so this input cannot observe whether `coeffRespect` is checked.
+-- An Axiom for a false respect law is a trusted assumption, not evidence.
+-- Supply a valid equivalence and checked e before using this as a respect test.

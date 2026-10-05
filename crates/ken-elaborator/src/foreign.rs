@@ -304,9 +304,10 @@ fn collect_consts_in_tb(
             collect_consts_in_tb(b, tb, out);
             collect_consts_in_tb(c, tb, out);
         }
-        Term::Quot(a, b) => {
+        Term::Quot(a, r, e) => {
             collect_consts_in_tb(a, tb, out);
-            collect_consts_in_tb(b, tb, out);
+            collect_consts_in_tb(r, tb, out);
+            collect_consts_in_tb(e, tb, out);
         }
         Term::QuotClass(a) => {
             collect_consts_in_tb(a, tb, out);

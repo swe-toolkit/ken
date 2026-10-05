@@ -168,8 +168,8 @@ function whnf(env, ctx, t):
       // obs: Eq-by-type / cast / quotient-elim / truncation-elim  (16 §2,3,5,6)
       Eq(A, a, b):       return whnfObs(env, ctx, Eq(A, a, b))    // 16 §2.2 dispatch on whnf(A)
       Cast(A, B, e, a):  return whnfObs(env, ctx, Cast(A, B, e, a)) // 16 §3.2 incl. cast-refl regularity
-      QuotElim(M, f, s): if whnf(s) is Class(a): t := App(f, a); continue
-                         else: return QuotElim(M, f, whnf(s))
+      QuotElim(M, f, r, s): if whnf(s) is Class(a): t := App(f, a); continue
+                            else: return QuotElim(M, f, r, whnf(s))
       TruncElim(P, f, s):if whnf(s) is Trunc(a): t := App(f, a); continue
                          else: return TruncElim(P, f, whnf(s))
 
@@ -197,6 +197,10 @@ Notes.
   including the `cast A A refl a ⇝ a` regularity rule), and returns a neutral
   when the governing type is neutral. K2c **consumes** these rules; it does not
   re-derive them (frame: "the obs conversions are K2's").
+- **`QuotElim` respect.** Admission checks `r` against the Type-target
+  respect schema (`16 §5.1`); at an Ω target it checks only scoping. The
+  reducer carries `r` unchanged through a neutral scrutinee and never
+  inspects it when i-reduction fires on a class.
 - **`deltaWanted`** governs the *laziness* of δ at the head. In a bare `whnf`
   call it is `true` (a transparent head unfolds). In conversion, `whnf` is first
   run with δ **deferred** so heads can be compared before unfolding; δ fires
@@ -466,17 +470,15 @@ identical whichever way it is computed.
 **Where Ken's *theory* differs from Lean's** (its engine is shared; ADR 0005):
 `J`/`subst` reduce on **non-`refl`** equalities via the observational `cast`
 rules (`15`, `16 §3`), where Lean's `Eq.rec` is stuck off `refl`.
-**Canonicity is kept for the computing cases**, with the interim C8
-neutral class-equality exception — and Ken assumes **none** of Lean's
-axioms: in the observational
-foundation **funext and propext are *definitional***. Quotient-class `Eq`
-in the interim is **neutral**, not the relation (`16 §2.2`/§5); a proof of
-`R a b` does not yet yield class equality by conversion, and Ken does not
-assume a quotient-soundness axiom in its place. Once Quot-Form checks an
-equivalence proof, P0 restores the definitional relation-as-equality target
-without an added axiom. Ken also assumes no `choice`; the reflective prover
-(`../20-verification/23 §3`) relies on closed terms computing where their
-specified reductions apply.
+**Canonicity is kept for the computing cases** — and Ken assumes
+**none** of Lean's axioms: in the observational foundation **funext
+and propext are *definitional***. For a checked quotient `A / R / e`,
+`Eq (A/R) [a] [b] ⇝ R a b` at two classes (`16 §2.2`/§5). A proof of
+`R a b` yields class equality by conversion, with no quotient-soundness
+axiom; Quot-Form checks `e : IsEquiv A R` and pins `R` to the carrier's
+Ω level. Non-class endpoints keep Eq neutral. Ken also assumes no
+`choice`; the reflective prover (`../20-verification/23 §3`) relies
+on closed terms computing where their specified reductions apply.
 **Definitional proof irrelevance** — which Lean gets from its impredicative
 `Prop` — Ken **also has**, from the *predicative* strict-prop universe Ω (`16
 §1`, `OQ-Prop`), without impredicativity.
@@ -814,10 +816,10 @@ K1/K2 retro discipline applies:
    comparison, §3.4).
 5. **Obs conversions through the unified algorithm.** `cast-refl`
    (`cast A A refl a ≡ a`), `eq-by-type-funext` (`Eq ((x:A)→B) f g` reduces and
-   conversion uses the result), and `quotient-eq` (interim `Eq (A/R) [a] [b]`
-   stays neutral and does **not** convert to `R a b`) — each decided through
-   `conv`/`whnf` of §3. Neutral class equality still compares reflexively
-   with itself; reduction to the relation is the P0 target. K2c consumes
+   conversion uses the result), and `quotient-eq` (`Eq (A/R) [a] [b]`
+   reduces to `R a b` after checked Quot-Form, so the two convert) — each
+   decided through `conv`/`whnf` of §3. Class Eq with a non-class endpoint
+   remains neutral and compares reflexively with itself. K2c consumes
    K2's obs reductions and neutral cases rather than re-deriving them.
 6. **Decidability (meta-property).** `decidable-halts`: every conversion query
    in the corpus halts — a property of the whole runner, not a single case (§5).

@@ -128,8 +128,10 @@ fn contains_const(term: &Term, needle: GlobalId) -> bool {
         | Term::Sigma(a, b)
         | Term::App(a, b)
         | Term::Pair(a, b)
-        | Term::Quot(a, b)
         | Term::Absurd(a, b) => contains_const(a, needle) || contains_const(b, needle),
+        Term::Quot(a, r, e) => {
+            contains_const(a, needle) || contains_const(r, needle) || contains_const(e, needle)
+        }
         Term::Eq(a, b, c) | Term::J(a, b, c) => {
             contains_const(a, needle) || contains_const(b, needle) || contains_const(c, needle)
         }

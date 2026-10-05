@@ -54,7 +54,7 @@ fn is_refl(t: &Term) -> bool {
 
 /// Typed symmetry of `h : Eq (Type l) A B`, including neutral evidence.
 /// Both the Π type-equality arm and Π cast use this identical J construction.
-fn type_eq_sym(level: &crate::term::Level, a: &Term, b: &Term, h: Term) -> Term {
+pub(crate) fn type_eq_sym(level: &crate::term::Level, a: &Term, b: &Term, h: Term) -> Term {
     let type_l = Term::Type(level.clone());
     let proof_domain = Term::Eq(
         Box::new(type_l.clone()),
@@ -126,10 +126,13 @@ pub fn eq_reduce(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term) 
         Term::Omega(_) => Some(eq_at_omega(a, b)),
         Term::Type(_) => eq_at_type(env, ctx, a, b),
         Term::Trunc(_) => Some(top_term(env)),
-        // Until Quot-Form checks an equivalence witness, a relation need not
-        // be reflexive. Reducing class equality to R a b would let refl [a]
-        // prove an arbitrary proposition, including Bottom.
-        Term::Quot(_, _) => None,
+        // Formation checked an equivalence proof at the carrier's Ω level.
+        // Only two canonical classes expose representatives; open endpoints
+        // leave quotient equality neutral (`16 §2.2`, §5).
+        Term::Quot(_, r, _) => match (whnf(env, ctx, a), whnf(env, ctx, b)) {
+            (Term::QuotClass(x), Term::QuotClass(y)) => Some(apply_args((**r).clone(), &[*x, *y])),
+            _ => None,
+        },
         Term::App(_, _) | Term::IndFormer { .. } => eq_at_inductive(env, ctx, ty, a, b),
         // A primitive type with a registered decidable-equality certificate
         // (ADR 0013 Layer 2) decides `Eq` between two checked literals by
@@ -465,7 +468,7 @@ fn eq_at_type(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term
             )?;
             Some(Term::sigma(dom_eq, Term::pi(weaken(a1, 1), cod_eq)))
         }
-        (Term::Quot(a1, r), Term::Quot(a2, s)) => {
+        (Term::Quot(a1, r, _e), Term::Quot(a2, s, _f)) => {
             let dom_eq = type_eq(env, ctx, a1, a2)?;
             let mut rel_ctx = ctx.clone();
             rel_ctx.push(dom_eq.clone());
@@ -802,7 +805,7 @@ pub fn cast_reduce(
         (Term::App(_, _) | Term::IndFormer { .. }, Term::App(_, _) | Term::IndFormer { .. }) => {
             cast_at_inductive(env, ctx, a, b, e, t)
         }
-        (Term::Quot(_, _), Term::Quot(_, _)) if type_eq_has_components(env, ctx, a, b) => {
+        (Term::Quot(_, _, _), Term::Quot(_, _, _)) if type_eq_has_components(env, ctx, a, b) => {
             cast_at_quot(a, b, e, t)
         }
         // `cast Type Type (refl _) A ⇝ A`; non-refl type-equality at a universe
@@ -1272,11 +1275,11 @@ fn cast_at_inductive(
 fn cast_at_quot(a: &Term, b: &Term, e: &Term, t: &Term) -> Option<Term> {
     let e0 = Term::proj1(e.clone());
     let a_inner = match a {
-        Term::Quot(x, _) => (**x).clone(),
+        Term::Quot(x, _, _) => (**x).clone(),
         _ => return None,
     };
     let b_inner = match b {
-        Term::Quot(y, _) => (**y).clone(),
+        Term::Quot(y, _, _) => (**y).clone(),
         _ => return None,
     };
     match t {

@@ -76,9 +76,11 @@ pub fn shift(term: &Term, d: i64, cutoff: usize) -> Term {
             Box::new(shift(d2, d, cutoff)),
             Box::new(shift(e, d, cutoff)),
         ),
-        Term::Quot(a, r) => {
-            Term::Quot(Box::new(shift(a, d, cutoff)), Box::new(shift(r, d, cutoff)))
-        }
+        Term::Quot(a, r, e) => Term::Quot(
+            Box::new(shift(a, d, cutoff)),
+            Box::new(shift(r, d, cutoff)),
+            Box::new(shift(e, d, cutoff)),
+        ),
         Term::QuotClass(t) => Term::QuotClass(Box::new(shift(t, d, cutoff))),
         Term::Trunc(a) => Term::Trunc(Box::new(shift(a, d, cutoff))),
         Term::TruncProj(t) => Term::TruncProj(Box::new(shift(t, d, cutoff))),
@@ -179,7 +181,11 @@ pub fn subst_var(term: &Term, j: usize, u: &Term) -> Term {
             Box::new(subst_var(d2, j, u)),
             Box::new(subst_var(e, j, u)),
         ),
-        Term::Quot(a, r) => Term::Quot(Box::new(subst_var(a, j, u)), Box::new(subst_var(r, j, u))),
+        Term::Quot(a, r, e) => Term::Quot(
+            Box::new(subst_var(a, j, u)),
+            Box::new(subst_var(r, j, u)),
+            Box::new(subst_var(e, j, u)),
+        ),
         Term::QuotClass(t) => Term::QuotClass(Box::new(subst_var(t, j, u))),
         Term::Trunc(a) => Term::Trunc(Box::new(subst_var(a, j, u))),
         Term::TruncProj(t) => Term::TruncProj(Box::new(subst_var(t, j, u))),
@@ -305,9 +311,10 @@ pub fn subst_outer(term: &Term, m: usize, params: &[Term], inner_depth: usize) -
             Box::new(subst_outer(d2, m, params, inner_depth)),
             Box::new(subst_outer(e, m, params, inner_depth)),
         ),
-        Term::Quot(a, r) => Term::Quot(
+        Term::Quot(a, r, e) => Term::Quot(
             Box::new(subst_outer(a, m, params, inner_depth)),
             Box::new(subst_outer(r, m, params, inner_depth)),
+            Box::new(subst_outer(e, m, params, inner_depth)),
         ),
         Term::QuotClass(t) => Term::QuotClass(Box::new(subst_outer(t, m, params, inner_depth))),
         Term::Trunc(a) => Term::Trunc(Box::new(subst_outer(a, m, params, inner_depth))),
@@ -522,9 +529,10 @@ pub fn subst_levels(term: &Term, params: &[LevelVar], args: &[Level]) -> Term {
             Box::new(subst_levels(d2, params, args)),
             Box::new(subst_levels(e, params, args)),
         ),
-        Term::Quot(a, r) => Term::Quot(
+        Term::Quot(a, r, e) => Term::Quot(
             Box::new(subst_levels(a, params, args)),
             Box::new(subst_levels(r, params, args)),
+            Box::new(subst_levels(e, params, args)),
         ),
         Term::QuotClass(t) => Term::QuotClass(Box::new(subst_levels(t, params, args))),
         Term::Trunc(a) => Term::Trunc(Box::new(subst_levels(a, params, args))),

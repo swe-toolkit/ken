@@ -33,6 +33,10 @@ level equality `convLevel`; §4.1 sct_check, §4.2 size_change_matrix, §4.3 mat
 composition + idempotent closure. (`18-judgments.md` keeps §2 (Conv), §3
 bidirectional, §4 API, §5 trusted base.)
 
+**Quotient-term convention.** Unless a case tests failed formation, each
+`A/R` below abbreviates formed `A/R/e` with checked `e : IsEquiv A R`
+and `R : A → A → Ω_l` (`16 §5`).
+
 ---
 
 ## Acceptance criterion: SCT-accept (frame Acceptance item 1)
@@ -361,15 +365,25 @@ conversion must consume the obs WHNF rules and decide.
   **exact** level, per the K2 retro). ≥2 distinct levels, open `f`,`g`,
   dependent `B x`.
 
-### conversion/quotient-eq-through-conv (soundness, C8 interim)
-- spec: `17 §3.2`; `16 §2.2`, `§5` (interim quotient equality)
-- given: `R := λ _ _. Top` on `Nat`, canonical classes `[0]`, `[1]`;
-  query `convert(Omega_0, Eq (Nat / R) [0] [1], R 0 1)`.
-- expect: **not convertible (false)** — `Eq (Nat/R) [0] [1]` stays neutral
-  and does not reduce to `R 0 1` (`Top`). The relation-as-equality reduct is
-  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`.
-- why: the D2 neutral verdict flips against the old rule, which would reduce
-  both sides to `Top`. `Quot-Form` has not supplied a checked equivalence proof.
+### conversion/quotient-eq-through-conv (soundness, C8)
+- spec: `17 §3.2`; `16 §2.2`, §5
+- given: `R := λ _ _. Top` on `Nat`, a checked total-equivalence witness
+  `e`, `Q := Nat / R / e`, and canonical classes `[0]`, `[1]`; query
+  `convert(Omega_0, Eq Q [0] [1], R 0 1)`.
+- expect: **convertible (true)** at `Omega_0`: class-pair Eq reduces to
+  `R 0 1`, which is `Top` at the same level.
+- why: this distinguishes the restored C8 reduct from the old neutral rule,
+  which would answer false. The quotient is formed with checked `e`.
+
+### conversion/quotient-former-proof-irrelevance (soundness)
+- spec: `16 §5`; `17 §3.2`
+- given: in context `A : Type l`, `R : A → A → Ω_l`, and distinct
+  `e1 e2 : IsEquiv A R`, form `Q1 := A / R / e1` and
+  `Q2 := A / R / e2`; query `convert(Type l, Q1, Q2)`.
+- expect: **convertible (true)**.
+- why: type-former equality compares the carrier and relation. The checked
+  equivalence witnesses are proofs in `Ω_l`, so they do not distinguish the
+  formed quotient types.
 
 ---
 
@@ -576,9 +590,11 @@ discriminating cases live here.
 
 ### conversion/quotient-respect-schema-rejects-non-respecting (soundness)
 - spec: `16 §5.1`, `§5` (Quot-Elim)
-- given: `A/R = Bool / (λ _ _. Top)` (the total relation, collapsing `Bool` to
-  one class); motive `M := λ _. Bool` (a **Type** target, `Type 0`); function
-  `f := λ x. x` (observes the representative); `elim_/ M f r q`
+- given: `R := λ _ _. Top` on `Bool`, and formed `Q := Bool / R / e` with
+  `e` a checked total-equivalence witness; motive `M := λ _. Bool`
+  (a **Type** target,
+  `Type 0`); function `f := λ x. x` (observes the representative);
+  `elim_/ M f r q`
 - expect: **rejected** at admission — **no** valid respect proof `r` exists
 - why: a Type target gates admission on the full `cong`/`cast` respect schema
   (`§5.1`): `r` must prove `Eq (M [x]) (f x)
@@ -599,8 +615,9 @@ discriminating cases live here.
 
 ### conversion/quotient-respect-schema-accepts-respecting (soundness)
 - spec: `16 §5.1`
-- given: the same `A/R = Bool / (λ _ _. Top)`, `M := λ _. Bool` (Type target),
-  but a **respecting** `f := λ _. true` (ignores the representative)
+- given: the same formed `Q := Bool / R / e`, `M := λ _. Bool` (Type
+  target), but a **respecting** `f := λ _. true` (ignores the
+  representative)
 - expect: **accepted**, and `elim_/ M f r [a] ⇝ f a = true` (the i-reduction,
   `§5`, unchanged)
 - why: a constant `f` respects any relation — the schema demands `Eq Bool (f x)
@@ -614,8 +631,8 @@ discriminating cases live here.
 
 ### conversion/quotient-respect-omega-target-unchanged (soundness)
 - spec: `16 §5.1`, `§5` (respect-free Ω target)
-- given: a quotient `A/R` with motive `M : (z : A/R) → Omega` (an **Ω** target);
-  `elim_/ M f r [a]`
+- given: a formed quotient `Q := A / R / e` with motive
+  `M : (z : Q) → Omega` (an **Ω** target); `elim_/ M f r [a]`
 - expect: **accepted** respect-free, `⇝ f a` — **unchanged** from K2
 - why: the dispatch is on the motive-codomain **sort** — `typeOf(M z) = Omega_l`
   (i.e. `M z : Ω`), **not** `M z ≡ Omega_l` (the Ω-element-vs-proof line: PI is
@@ -627,27 +644,20 @@ discriminating cases live here.
   wrongly free a Type-target elim whose motive merely *mentions* Ω.
 
 ### conversion/quotient-respect-schema-dependent-motive (soundness)
-- spec: `16 §5.1` (transport-direction note), `§5` (Quot-Elim), `§3.1` (`cast`
-  convention)
-- given: an **open** context — `R := λ _ _. Top` on `Bool`, reps `x := true`,
-  `y := false`, and `h : R x y`; no class equality `h'` is supplied or derived
-  from `h` in the interim. An **abstract** motive
-  `M : (z : Bool / R) → Type 0` makes `M [true]` and `M [false]` distinct
-  neutral types. `f : (b : Bool) → M [b]`; attempt the correct-direction
-  `r_ok` and reversed-direction `r_bad` Type-target respect forms for
-  `elim_/ M f r [true]` without the reduction-derived `h'`.
-- expect: both `r_ok` and `r_bad` are **refused** in the interim; `h : R x y`
-  cannot supply `h' : Eq (Bool/R) [x] [y]` by conversion, so the dependent
-  `cong`/`cast` respect schema cannot be formed. The `r_ok` acceptance half is
-  `(gated: KERNEL-QUOT-FORM-EQUIVALENCE)`; after P0, correct-direction `r_ok`
-  is accepted and reversed-direction `r_bad` is rejected.
-- why: unlike the unchanged constant-motive controls, `M [true]` and
-  `M [false]` are distinct, so a quotient class equality is needed to form the
-  transport. The interim supplies no `h'`; both candidate directions are
-  refused. P0 restores the correct-direction `cast (M [y]) (M [x])
-  (sym (cong M h'))` admission and leaves the reversed direction rejected.
-  The positive `r_ok` arm is gated; the constant-motive accept/refuse rows
-  remain the live checks until P0.
+- spec: `16 §5.1` (transport direction), §5 (Quot-Elim), §3.1 (`cast`)
+- given: `R := λ _ _. Top` on `Bool`, and formed `Q := Bool / R / e`
+  with `e` a checked total-equivalence witness. In an open context,
+  `x := true`, `y := false`, and `h : R x y`. An abstract motive
+  `M : (z : Q) → Type 0` makes
+  `M [true]` and `M [false]` distinct neutral types; `f : (b : Bool) →
+  M [b]`. Attempt both the correct-direction `r_ok` and reversed-direction
+  `r_bad` respect forms for `elim_/ M f r [true]`.
+- expect: kernel admission **accepts** `r_ok` and **rejects** `r_bad`.
+  The ascription `h' : Eq Q [x] [y]` is legal by conversion from `h`.
+- why: non-degenerate motive endpoints expose the transport direction. The
+  expected schema casts `f y : M [y]` to `M [x]` by
+  `cast (M [y]) (M [x]) (sym (cong M h')) (f y)`; the reversed form does
+  not check. This is an executed admission case, not only a `whnf` query.
 
 ---
 

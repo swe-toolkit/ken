@@ -54,11 +54,10 @@ unless it is one of the two specified prim redexes (`17 §1`); in the
 interpreter, saturated runtime-value arguments reach `apply`, which selects
 `prim_reduce` or a specialized structural-view path as applicable. For
 **closed, ground** programs in the computed fragment (§3.6), evaluation
-does not get stuck on a neutral. The interim C8 exception is
-`Eq (A/R) [a] [b]`: it stays neutral even at two closed classes, not
-`unknown`, until Quot-Form carries a checked equivalence proof
-(`KERNEL-QUOT-FORM-EQUIVALENCE`, `16 §2.2`/§5). The other marked departures
-from canonical value are **`unknown`** (an open hole, §4) and, for an opt-in
+does not get stuck on a neutral. For a formed quotient, `Eq (A/R) [a] [b]`
+reduces on two classes to `R a b` (`16 §2.2`/§5), rather than comparing
+representative identities. The other marked departures from canonical
+value are **`unknown`** (an open hole, §4) and, for an opt-in
 opaque non-total definition, **divergence** (§3.3, `43 §2, case 4`). The
 interpreter computes values; the kernel's **η** (`17 §2`, type-directed) and **Ω
 proof-irrelevance** are *conversion-time* equalities, not evaluation steps
@@ -143,7 +142,7 @@ v ::= n                          -- typed scalar: Int, Bool, Char, Float, Decima
     | Type ℓ | (x:A)→B | (x:A)×B  -- type values (types ARE values; canonical type formers)
     | str | bytes | array | map | set   -- collection values (41 §2)
     | unknown                     -- the open-hole residue (41 §6, §4)
-    | ⟨neutral⟩                   -- a stuck head + value spine; also closed quotient-class Eq until P0 (§3.6)
+    | ⟨neutral⟩                   -- a stuck head + value spine (outside the computed fragment)
 ```
 
 An **environment** `ρ` maps de Bruijn indices to values (`ρ(i)`), a persistent
@@ -293,10 +292,9 @@ level computation to reconcile against `12`.
 
 ### 3.6 Canonicity (testable)
 
-**Canonicity, with the interim C8 exception.** A **closed, well-typed,
+**Canonicity in the computed fragment.** A **closed, well-typed,
 ground** term in the computed fragment below evaluates to a canonical
-**value**, never a stuck neutral, except for Eq at a quotient-classified
-carrier. The computed cases are:
+**value**, never a stuck neutral. The computed cases are:
 
 - of an **inductive** type → a **constructor form** `cₖ v̄`;
 - `cast A A refl a` → `a` (C5); a closed canonical type equality → `cast`
@@ -304,25 +302,25 @@ carrier. The computed cases are:
 - a **quotient** `elim_/ M f r [a]` → `f a` (C9); truncation likewise (C10);
 - `Eq`-by-type on closed canonical types → its computed proposition (C2–C4),
   proof-irrelevant at the value layer; at a quotient-classified carrier,
-  **no** relation-as-equality computation occurs (C8 interim, even for two
-  classes).
+  `Eq (A/R) [a] [b] → R a b` on two classes (C8, `16 §2.2`/§5).
 
-**C8 exception.** `Eq (A/R) [a] [b]` stays **neutral** even at two closed
-classes; it is not `unknown` and does not compare representatives. Its
-relation-as-equality computation awaits a checked equivalence proof for `R`
-(`KERNEL-QUOT-FORM-EQUIVALENCE`, `16 §2.2`/§5). The kernel rule in `16 §2.2`
-also leaves other endpoint pairs neutral; the X1 closed-ground exception here
-pins the checked class-pair case.
+The C8 class-pair rule reduces to the **checked relation**, not to a
+representative-identity comparison or `unknown`. The relation has the
+carrier's Ω level, and its further evaluation follows its own reduction
+rules. If `R` has an opaque head, its application may remain neutral,
+just like any opaque computation outside the computed fragment (§1);
+this is not a special neutral quotient-Eq rule. With a non-class
+endpoint, Eq itself remains neutral (`16 §2.2`).
 
 The kernel's **confluence** (`17 §1`) + **totality** (`43 §1`) make a
 closure-free comparable result unique directly. If a result contains a callable
 at any depth, uniqueness is observable only through selected well-typed
 projections/applications to such results; it does not require a unique closure
 representation (`41 §2.1`). The marked departures from canonical value
-are `unknown` (an open hole, §4), intentionally **neutral** closed C8
-quotient-class equality, and divergence of an opt-in **opaque non-total**
-definition (§3.3, `43 §2.4`) — all listed, never silent. The C8 residue is
-neither an open hole nor a result of representative comparison.
+are `unknown` (an open hole, §4) and divergence of an opt-in
+**opaque non-total** definition (§3.3, `43 §2.4`) — both listed, never
+silent. Opaque relations remain outside the computed fragment; no
+checked class-pair Eq remains neutral at its own head.
 
 **Branch laziness (AC3)** is the structural face of canonicity here: an
 untaken eliminator method is never evaluated, so a branch that *would*

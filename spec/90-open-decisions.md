@@ -47,14 +47,14 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   declarative reference**; lazy-WHNF is the recommended implementation.
 - **Deliberate divergences from Lean's *theory*** (fixed by other Ken
   decisions, ADR 0005): observational `J`-on-non-`refl` via `cast` (not
-  `Eq.rec`-on-`refl`); **canonicity for computing cases** with the interim
-  C8 neutral quotient-class exception. Funext and propext are definitional,
-  not added axioms. Quotient soundness is **not** definitional in the
-  interim: `Eq (A/R) [a] [b]` stays neutral rather than reducing to `R a b`
-  until P0 checks Quot-Form's equivalence proof (`16 §2.2`/§5). Ken adds no
-  quotient-soundness postulate in its place and assumes no `choice`. Lean's
-  **definitional proof irrelevance** Ken **also has**, from the predicative
-  strict-prop Ω (`OQ-Prop`/ADR 0005), without impredicativity.
+  `Eq.rec`-on-`refl`); **canonicity for computing cases**, including
+  quotient-class Eq's relation reduct at two canonical classes. Funext
+  and propext are definitional, not added axioms. Quotient soundness is
+  **definitional for a formed quotient**: `Eq (A/R) [a] [b] ⇝ R a b`
+  after Quot-Form checks `e : IsEquiv A R` at the carrier's level
+  (`16 §2.2`/§5). Ken adds no quotient-soundness postulate and assumes
+  no `choice`. Lean's **definitional proof irrelevance** Ken **also has**,
+  from the predicative strict-prop Ω (`OQ-Prop`/ADR 0005), without impredicativity.
 - **Affects.** `10-kernel/17` (updated). Interacts with `OQ-Prop`, `OQ-4`.
 
 ### OQ-2 — Cumulativity — **DECIDED**

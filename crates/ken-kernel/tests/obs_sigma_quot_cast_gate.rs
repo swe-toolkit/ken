@@ -4,6 +4,7 @@ use ken_kernel::env::Context;
 use ken_kernel::term::{Level, Term};
 use ken_kernel::{
     check, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, InductiveSpec,
+    KernelError,
 };
 
 fn opaque(env: &mut GlobalEnv, label: &str, ty: Term) -> Term {
@@ -11,6 +12,15 @@ fn opaque(env: &mut GlobalEnv, label: &str, ty: Term) -> Term {
         declare_postulate(env, label.into(), vec![], ty).unwrap(),
         vec![],
     )
+}
+
+fn quotient_assuming_equiv(env: &mut GlobalEnv, carrier: Term, relation: Term) -> Term {
+    let proof = opaque(
+        env,
+        "quotient equivalence",
+        ken_kernel::check::quotient_equivalence_type(&carrier, &relation),
+    );
+    Term::Quot(Box::new(carrier), Box::new(relation), Box::new(proof))
 }
 
 fn nat(env: &mut GlobalEnv) -> Term {
@@ -97,13 +107,12 @@ fn subset_sigma_neutral_equality_stays_stuck() {
     assert_neutral_cast(&env, source, target, value);
 }
 
-/// Durable invariant: different relation Ω levels prevent quotient type
-/// equality from yielding components, even for a class-headed payload.
+/// An upward relation Ω level now fails at Quot-Form, before cast can
+/// inspect any apparent equality components.
 #[test]
 fn quotient_relation_level_mismatch_stays_stuck() {
     let mut env = GlobalEnv::new();
     let n = nat(&mut env);
-    let member = opaque(&mut env, "member", n.clone());
     let r0 = opaque(
         &mut env,
         "R0",
@@ -117,9 +126,19 @@ fn quotient_relation_level_mismatch_stays_stuck() {
             Term::pi(n.clone(), Term::Omega(Level::zero().suc())),
         ),
     );
-    let source = Term::Quot(Box::new(n.clone()), Box::new(r0));
-    let target = Term::Quot(Box::new(n), Box::new(r1));
-    assert_neutral_cast(&env, source, target, Term::QuotClass(Box::new(member)));
+    let source = quotient_assuming_equiv(&mut env, n.clone(), r0);
+    assert_eq!(infer(&env, &Context::new(), &source), Ok(Term::Type(Level::zero())));
+    let target = Term::Quot(
+        Box::new(n),
+        Box::new(r1),
+        Box::new(Term::const_(env.tt_id(), vec![])),
+    );
+    assert_eq!(
+        infer(&env, &Context::new(), &target),
+        Err(KernelError::BadEliminator(
+            "quotient relation's Ω level ≠ carrier level".into()
+        ))
+    );
 }
 
 /// Durable invariant: an Ω-sorted first component cannot be projected as an
@@ -173,7 +192,7 @@ fn quotient_decomposition_still_fires_with_typed_reduct() {
     let relation_ty = Term::pi(n.clone(), Term::pi(n.clone(), Term::Omega(Level::zero())));
     let r = opaque(&mut env, "R", relation_ty.clone());
     let s = opaque(&mut env, "S", relation_ty);
-    let source = Term::Quot(Box::new(n.clone()), Box::new(r));
-    let target = Term::Quot(Box::new(n), Box::new(s));
+    let source = quotient_assuming_equiv(&mut env, n.clone(), r);
+    let target = quotient_assuming_equiv(&mut env, n, s);
     assert_decomposed_cast(&env, source, target, Term::QuotClass(Box::new(member)));
 }

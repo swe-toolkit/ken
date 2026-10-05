@@ -539,9 +539,14 @@ fn collect_calls(
             );
         }
         // Terms with no binders: recurse uniformly.
-        Term::Pair(a, b) | Term::Ascript(a, b) | Term::Quot(a, b) => {
+        Term::Pair(a, b) | Term::Ascript(a, b) => {
             collect_calls(a, caller_idx, n_caller, group, prov, recon, env, out);
             collect_calls(b, caller_idx, n_caller, group, prov, recon, env, out);
+        }
+        Term::Quot(a, r, e) => {
+            collect_calls(a, caller_idx, n_caller, group, prov, recon, env, out);
+            collect_calls(r, caller_idx, n_caller, group, prov, recon, env, out);
+            collect_calls(e, caller_idx, n_caller, group, prov, recon, env, out);
         }
         Term::Proj1(p)
         | Term::Proj2(p)

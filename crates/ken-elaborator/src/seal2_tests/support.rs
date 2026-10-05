@@ -305,9 +305,13 @@ fn occurs(
         | Term::App(a, b)
         | Term::Pair(a, b)
         | Term::Ascript(a, b)
-        | Term::Quot(a, b)
         | Term::Absurd(a, b) => {
             occurs(env, a, carrier, scanned) || occurs(env, b, carrier, scanned)
+        }
+        Term::Quot(a, r, e) => {
+            occurs(env, a, carrier, scanned)
+                || occurs(env, r, carrier, scanned)
+                || occurs(env, e, carrier, scanned)
         }
         Term::Let { ty, val, body } => {
             occurs(env, ty, carrier, scanned)
@@ -429,8 +433,12 @@ pub fn conservative_mentions(t: &Term, target: GlobalId) -> bool {
         | Term::Sigma(a, b)
         | Term::Pair(a, b)
         | Term::Ascript(a, b)
-        | Term::Quot(a, b)
         | Term::Absurd(a, b) => conservative_mentions(a, target) || conservative_mentions(b, target),
+        Term::Quot(a, r, e) => {
+            conservative_mentions(a, target)
+                || conservative_mentions(r, target)
+                || conservative_mentions(e, target)
+        }
         Term::Eq(a, b, c) | Term::J(a, b, c) => {
             conservative_mentions(a, target)
                 || conservative_mentions(b, target)

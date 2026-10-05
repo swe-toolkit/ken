@@ -1244,7 +1244,7 @@ fn mentions_var0(term: &Term) -> bool {
             Term::Eq(a, t, u) => go(a, depth) || go(t, depth) || go(u, depth),
             Term::Cast(a, b, e, t) => go(a, depth) || go(b, depth) || go(e, depth) || go(t, depth),
             Term::J(m, d2, e) => go(m, depth) || go(d2, depth) || go(e, depth),
-            Term::Quot(a, r) => go(a, depth) || go(r, depth),
+            Term::Quot(a, r, e) => go(a, depth) || go(r, depth) || go(e, depth),
             Term::QuotClass(t) | Term::Trunc(t) | Term::TruncProj(t) | Term::Refl(t) => {
                 go(t, depth)
             }
@@ -1993,8 +1993,9 @@ mod tests {
         check("J.m", Term::J(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())));
         check("J.d2", Term::J(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())));
         check("J.e", Term::J(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))));
-        check("Quot.a", Term::Quot(Box::new(Term::Var(0)), Box::new(leaf())));
-        check("Quot.r", Term::Quot(Box::new(leaf()), Box::new(Term::Var(0))));
+        check("Quot.a", Term::Quot(Box::new(Term::Var(0)), Box::new(leaf()), Box::new(leaf())));
+        check("Quot.r", Term::Quot(Box::new(leaf()), Box::new(Term::Var(0)), Box::new(leaf())));
+        check("Quot.e", Term::Quot(Box::new(leaf()), Box::new(leaf()), Box::new(Term::Var(0))));
         check("QuotClass", Term::QuotClass(Box::new(Term::Var(0))));
         check(
             "QuotElim.motive",
