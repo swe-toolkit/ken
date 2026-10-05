@@ -35,88 +35,98 @@ result has fields.
   Nat, an exit status or a nullary Bool constructor (`:2629-2690`), never a
   constructor with fields. The phase plane at 1289 is correct; it does not
   carry scalar-ness (check 5).
-- **Repair family.** The planner keys the representation on result shape as
-  well as phase, so a specialized non-scalar result plans `CarrierWord`.
-  Boxing the arm into a carrier word in lowering is not admissible, because
-  the plan stays the single authority.
-- **Unmeasured:** whether the runtime IR at a join carries enough to
-  classify result shape without lowering; how many joins on main the change
-  re-plans; whether `ESCAPE_FILE_THEN_READAT` refuses at the same site.
+- **The plan stays the single representation authority** on every compile
+  attempt. Boxing an arm into a carrier word in lowering is not admissible.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch; do not build around it.
 
-## Recut (Architect `evt_1xj5yh86d75st`)
+## AC-0 result (runtime `evt_449ksg86zp7xt`, ruled `evt_65ej3g70cs8gs`)
 
-The parked two-link plan (`evt_4mp5dtzn0f5rb`) is withdrawn.
-`RT-CHECKED-JOIN-SITE-MATCH-POPULATION` closed without repair: no per-Match
-Int/Bool site admits any of the 207 Ok merges.
+Evidence: `/workspaces/ken/local/rt-scalar-recut-ac0/`, at `18543f8e8`.
 
-- **Admission**, on main `f1ef79406`. `merge_scalar_operand`
-  (`joins.rs:2527`) admits `RecursiveBackedge`, `Int`, `Bool`,
-  `StructuralNat`, the zero-arg Bool constructors, `ProcessExitStatus`, and
-  `exit_success` and `exit_failure`.
-  - The exit constructors count only under the root-exit flag.
-  - It strips `ITree::Ret` through `unwrap_terminal_ret` (`calls.rs:2653`)
-    only when `has_checked_root_exit_representation()` (`mod.rs:13732`)
-    holds, which needs a consumed root ExitCode site.
-  - 154 of the Ok merges are `Constructor[args=1]`, logged before the
-    unwrap, so they are `Ret(x)` arms.
-- **Planner.** `joins_traps.rs:533` chooses `NativeScalarPair` from
-  `ResultPhase` alone.
-- **Shared predicate.** The representation is chosen on a plane that does
-  not carry admission's keys: constructor identity, the scalar kind of the
-  `Ret` payload, and the root-exit flag.
-- **Closure.** One admission predicate. The planner uses it to choose the
-  representation, and `merge_scalar_operand` uses or asserts it, with no
-  second rule on either side.
-- **Nat.** Under demote-all, Nat passes 1289 and stops at
-  `ContinuationSpecialization: the detached-result seat projected 4
-  undischarged causal calls onto one unit result`. That is a successor WP,
-  not this one. So "Nat passes" is not this WP's acceptance.
+- All 269 `merge_scalar_operand` calls pair with planner rows. The 268 Ok
+  operands are exit-code constructors (178) or `ProcessExitStatus` (90).
+  **None is `ITree::Ret`.**
+- 1289 is `Option::Some` with an Int payload, the root-exit flag is true, and
+  the unwrap leaves it unchanged. Only constructor identity separates it.
+- The root-exit flag and the post-specialization kind exist only at
+  lowering, so the planner cannot mirror admission. The earlier "one shared
+  admission predicate" closure is withdrawn.
+- Demoting 1289 alone moves Nat to the `ContinuationSpecialization` wall (4
+  undischarged causal calls onto one unit result), a successor WP. Native
+  tree stays 7/7.
 
-## Deliverable
+## Deliverable: lowering feedback into re-planning (size M, T1)
 
-1. **AC-0, measure only, on main.** Run the six default targets plus
-   `nat_fanout`. Extend the existing `DASM_C2_SCALAR_MERGE_OBSERVATION` hook
-   (`joins.rs:159`) rather than adding a second log. For every
-   `merge_scalar_operand` call, log:
-   - (a) the constructor symbol before the unwrap;
-   - (b) `has_checked_root_exit_representation()`;
-   - (c) the lowered value kind after the unwrap;
-   - (d) the payload's constructor symbol when (c) is still a constructor;
-   - (e) the planner's `ResultPhase` and why it was chosen;
-   - (f) ok or err.
+Architect `evt_16se76agavv64` withdraws the planner leaf rule of
+`evt_65ej3g70cs8gs`. Source arm leaves are not the merged operand: lowering
+composes eliminator frames into a join before it merges
+(`lowering/core.rs:6464-6481` and `:6486-6531`). Each decision gets one
+owner: lowering decides admission, the planner decides representation given
+the joins lowering refused, and a driver re-plans until no join is refused.
+No kernel, spec or `trusted_base()` change.
 
-   Answer one question: does {(a), (b), (d)} separate the 207 Ok merges from
-   Err 1289 with zero overlap, and can the planner compute it statically? On
-   1289, tell apart a non-scalar payload from a false root-exit flag that
-   leaves `Ret` unstripped, because those are different fixes.
-
-   Single-site experiment: demote only 1289 to `CarrierWord`, and report the
-   next stop and the native-tree result.
-2. **Then the Architect rules.** If the answer is yes, the repair is the
-   shared predicate (size S or M, set at the ruling). If it is no, that is a
-   frame stop back to the Architect. Re-point the nat row's ignore
-   annotation at its current first refusal.
+1. **Revert** the WIP `73947db34`'s `arm_forces_carrier`, its `symbols`
+   threading and its three pins.
+2. **Planner.** Add a `forced_carrier_joins: &BTreeSet<StaticOriginId>`
+   variant of the planner entry; the existing entry delegates with an empty
+   set. In `summarize_result_phase`, a forced source join gets
+   `ResultPhase::CarrierRequired`, so enclosing joins see a carried result
+   through the existing lattice.
+3. **Lowering.** Record the refusal by identity, never by error text
+   (CHECKS 10). A `scalar_operand_refused` flag is set only in
+   `merge_scalar_operand`'s final refusal arm (`joins.rs:~2697`), and
+   `jump_planned_join_arm` (`joins.rs:379`) records `join_plan.origin` in a
+   `Cell` only when that flag is set. No other refusal records an origin.
+4. **Driver.** `compile_program_expr` and `compile_program_expr_object`
+   (`artifact/mod.rs:79`, `:135`) wrap compilation in
+   `compile_with_scalar_join_feedback`. It retries into a fresh module with
+   the refused origin added to the forced set, and stops when a refusal
+   names no new origin. Assert that the refused origin names the same
+   occurrence in the re-plan. A test-support counter records attempts and
+   the final forced set per compile.
 
 ## Acceptance
 
-- **AC-0** is reported in the WP thread with the (a)-(f) table per target,
-  the separation verdict and the 1289 experiment. Each count names its log.
-- **AC-1 (repair).**
-  - All 207 Ok merges stay Ok, and 1289 no longer refuses at `:400`. Record
-    its next first refusal verbatim.
-  - Every default target and `rt_parity_native` stay at baseline at 4
-    threads.
-  - A planner test pins the predicate, and a phase-only plan fails it.
-- **AC-2 (control).** Reverting the repair restores the verbatim 1289
-  refusal.
+- **AC-1 (Nat).** That compile records 2 attempts and forced = {1289}, and
+  the 1289 refusal is gone. Record the new first refusal verbatim and
+  re-point the ignore annotation at it. "Nat passes" is not this WP's
+  acceptance.
+- **AC-2 (zero collateral).** The six default targets stay at baseline,
+  `rt_parity_native` stays 186/186 at 4 threads, and
+  `rt_native_tree_match_case_of_case` stays 7/7. Every compile in them
+  records 1 attempt and an empty forced set.
+- **AC-3 (pins).**
+  - Planner: on the `Option::Some(Int)` fixture, forced {root} plans
+    `CarrierWord`, and so does a join whose arm returns that join. The empty
+    set plans `NativeScalarPair`.
+  - Driver: a 1289-shaped program compiles in exactly 2 attempts, and the
+    `Cell` names that join's origin.
+  - A non-admission refusal (such as the `RecursiveBackedge` arm) leaves the
+    `Cell` empty and does not retry.
+- **Mutations.**
+  - m1: drop the `CarrierRequired` line; the enclosing-join pin reddens.
+  - m2: the driver ignores the `Cell`; Nat restores the verbatim 1289
+    refusal.
+  - m3: remove the flag set in the final arm; the driver pin reddens.
 
 ## Stop conditions
 
+- Any default-target compile records more than one attempt: stop to the
+  Architect with the origin.
+- Any new `CarrierWord` in `rt_native_tree_match_case_of_case`
+  (`RT-CARRIER-ROOT-EXIT-NESTED-MATCH-TRAP` is open).
 - Any kernel, `trusted_base()` or spec change (an operator question).
-- The predicate is not computable at the planner: stop to the Architect with
-  the AC-0 evidence.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, and never land `a7d46d6f2`.
+
+## Hard-stop inventory (§1b)
+
+§1a count: 1 (Architect `evt_16se76agavv64` on stop `evt_6yx4h3eq90esj`).
+The shared predicate is that the planner chooses representation on a plane
+that lacks lowering's admission keys.
+
+1. A non-scalar join keyed on source arm-leaf constructor identity; source
+   leaves are not the merged operand under eliminator composition
+   (`core.rs:6464-6531`).
