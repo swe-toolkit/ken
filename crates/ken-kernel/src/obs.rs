@@ -1405,19 +1405,35 @@ fn j_nonrefl(
 ) -> Option<Term> {
     #[cfg(test)]
     j_nonrefl_probe::bump();
-    // At a universe carrier, use the Eq formation inferred for this evidence.
-    // Eq-at-Type never returns an Eq formation; WHNF of that Eq type would
-    // reduce the source endpoint here, in the guard and again in the Cast.
+    // At a universe carrier, prefer the Eq formation inferred for this
+    // evidence: WHNF of that Eq type would reduce the source endpoint here, in
+    // the guard and again in the Cast.
     let eq_ty = crate::check::infer(env, ctx, eq).ok()?;
-    let endpoints = match crate::check::eq_formation_head(env, &eq_ty) {
+    let formation = match crate::check::eq_formation_head(env, &eq_ty) {
         Term::Eq(carrier, x, y) => match whnf(env, ctx, &carrier) {
-            Term::Type(level) => (Term::Type(level), *x, *y),
-            _ => crate::check::j_endpoints(env, ctx, eq).ok()?,
+            Term::Type(level) => Some((Term::Type(level), *x, *y)),
+            _ => None,
         },
-        _ => crate::check::j_endpoints(env, ctx, eq).ok()?,
+        _ => None,
     };
-    // Establish the raw redex's J typing once, at exactly those endpoints.
-    crate::check::infer_j_at(env, ctx, motive, base, eq, endpoints.clone()).ok()?;
+    // Establish the raw redex's J typing once, at exactly the endpoints used.
+    // The formation read is used only where the guard types the motive at it.
+    // Eq-at-Type CAN return an Eq formation: a one-parameter or one-index
+    // former's single conjunct is returned bare, so whnf(Eq Type (B X) (B Y))
+    // is Eq Type X Y and infer_j types this J at X, Y. Fall back to exactly
+    // those whnf endpoints, so every J that infer types reduces as before.
+    let endpoints = match formation {
+        Some(endpoints)
+            if crate::check::infer_j_at(env, ctx, motive, base, eq, endpoints.clone()).is_ok() =>
+        {
+            endpoints
+        }
+        _ => {
+            let endpoints = crate::check::j_endpoints(env, ctx, eq).ok()?;
+            crate::check::infer_j_at(env, ctx, motive, base, eq, endpoints.clone()).ok()?;
+            endpoints
+        }
+    };
     let (a_type, a_idx, b_idx) = endpoints;
     let p_a_refl = apply_args(
         motive.clone(),
