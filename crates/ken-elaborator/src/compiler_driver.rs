@@ -5530,29 +5530,29 @@ proc main
         assert!(rendered[0].starts_with("unknown ac0_use.requires."));
     }
 
-    /// Promise class: normative compatibility vector for the two fixed control
-    /// sources at base 75e458cc. Their checked semantics contain no open hole,
-    /// so adding obligation reporting must not change their canonical hash.
-    #[test]
-    fn controls_preserve_base_core_semantic_hashes_on_driver_routes() {
-        let controls = [
+    fn caller_reporting_controls() -> [(&'static str, &'static str, u64, u64, u64); 2] {
+        [
             (
                 "none",
                 CALLER_NONE_SOURCE,
-                12_237_734_083_413_434_944_u64,
-                4_216_260_380_077_809_109_u64,
-                8_364_889_614_452_174_481_u64,
+                12_237_734_083_413_434_944,
+                4_216_260_380_077_809_109,
+                8_364_889_614_452_174_481,
             ),
             (
                 "discharged",
                 CALLER_DISCHARGED_SOURCE,
-                11_018_522_036_893_705_244_u64,
-                2_315_880_598_206_190_060_u64,
-                12_231_505_609_661_209_818_u64,
+                11_018_522_036_893_705_244,
+                2_315_880_598_206_190_060,
+                12_231_505_609_661_209_818,
             ),
-        ];
+        ]
+    }
 
-        for (name, source, package_hash, denotation_hash, native_hash) in controls {
+    /// Promise class: normative compatibility vector against base 75e458cc.
+    #[test]
+    fn package_controls_preserve_base_core_semantic_hashes() {
+        for (name, source, package_hash, _, _) in caller_reporting_controls() {
             let package_name = format!("caller_reporting_base_{name}");
             let output = compile_ken_source(
                 &package_name,
@@ -5563,7 +5563,13 @@ proc main
             assert!(output.report.obligations.is_empty());
             assert!(output.package.artifact.semantic.obligations.is_empty());
             assert_eq!(output.package.core_semantic_hash, package_hash);
+        }
+    }
 
+    /// Promise class: normative compatibility vector against base 75e458cc.
+    #[test]
+    fn denotation_controls_preserve_base_core_semantic_hashes() {
+        for (name, source, _, denotation_hash, _) in caller_reporting_controls() {
             let package_name = format!("caller_reporting_denotation_{name}");
             let denotation = compile_checked_target_denotation(
                 &package_name,
@@ -5573,7 +5579,13 @@ proc main
             .expect("control denotation compiles");
             assert!(denotation.package.artifact.semantic.obligations.is_empty());
             assert_eq!(denotation.core_semantic_hash, denotation_hash);
+        }
+    }
 
+    /// Promise class: normative compatibility vector against base 75e458cc.
+    #[test]
+    fn native_controls_preserve_base_core_semantic_hashes() {
+        for (name, source, _, _, native_hash) in caller_reporting_controls() {
             let package_name = format!("caller_reporting_native_{name}");
             let preparation = prepare_native_program_sources(
                 &package_name,
