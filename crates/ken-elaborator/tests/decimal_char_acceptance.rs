@@ -205,7 +205,7 @@ fn char_eq_and_ord_on_projection() {
     assert_eq!(eval_view("const t = charToInt 65"), EvalVal::Int(65));
 }
 
-// ── AC-C3 — surrogate/OOR reject, flips vs isScalar:=true (soundness) ──────
+// AC-C3 — surrogate/OOR reject, flips vs inRangeBool := True (soundness)
 
 /// surface/numbers/int-to-char-rejects-surrogate-and-oor (soundness)
 ///
