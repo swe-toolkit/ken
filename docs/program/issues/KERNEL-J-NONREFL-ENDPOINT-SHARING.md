@@ -1,7 +1,7 @@
 ---
 id: KERNEL-J-NONREFL-ENDPOINT-SHARING
 title: "A non-refl J reduction re-reduces the level below about eight times, through j_endpoints, the type-equality witness and the Cast arm's components, so a source-derived chain of J over step_i helpers costs work exponential in its depth. Reduce each child J once, so J reductions are linear in depth and reducer entries quadratic, with the J reduct's shape unchanged"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -165,3 +165,26 @@ handoff names that trust.
 `infer_j`'s whnf-and-`Eq` requirement is not stable under substitution: on
 main a well-typed term β-reduces to a J that `infer_j` rejects. That is a
 kernel completeness item for its own frame (`evt_5f79a35xp026p`).
+
+## Closeout
+
+Merged `f973876aa` from exact `60e722869` (PR #4528 from
+`wp/KERNEL-J-NONREFL-ENDPOINT-SHARING`, main push run 37357186140). Kernel QA
+`evt_pr4vkgdxhyav`, Architect `evt_2kb1j0xykmx4h`, Decision
+`dec_48dmfbm5efq6r`.
+
+- `j_nonrefl` reads J's endpoints from the evidence's inferred `Eq`
+  formation at a universe carrier, and guards once with `infer_j_at`.
+  `infer_j` is `j_endpoints` plus `infer_j_at`, with its body unchanged.
+- **Trust, operator-approved for this WP.** In production, a typed J
+  redex's witness W relies on the J-witness typing lemma, which is stated
+  with its side conditions on the builder. Under `cfg(test)`, every
+  instance is still checked, except in the count pins. The Sigma and
+  inductive builders keep their fail-closed check.
+- S runs exactly 6k `j_nonrefl` calls, and its entries are pinned at most
+  220·k² at k = 4, 8 and 16. The conversion widening (spec 15 §4.3) is
+  pinned by `rigid_type_eq_j_reduces_after_beta`. QA ran 439/439 kernel
+  tests, and the 57-package census shows zero verdict or output changes.
+- The Architect's cast-gate stop was cleared: `obs_pi_cast_gate` passes
+  15/15 unchanged.
+- Carry: the `infer_j` substitution-stability gap (above) is unframed.
