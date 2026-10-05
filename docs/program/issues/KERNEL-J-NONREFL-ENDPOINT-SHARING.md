@@ -1,6 +1,6 @@
 ---
 id: KERNEL-J-NONREFL-ENDPOINT-SHARING
-title: "A non-refl J reduction re-reduces the level below about eight times, through j_endpoints, the type-equality witness and the Cast arm's components, so a source-derived chain of J over step_i helpers costs work exponential in its depth. Make whnf of that chain linear in depth by reducing each endpoint once, with the J reduct's shape unchanged"
+title: "A non-refl J reduction re-reduces the level below about eight times, through j_endpoints, the type-equality witness and the Cast arm's components, so a source-derived chain of J over step_i helpers costs work exponential in its depth. Reduce each child J once, so J reductions are linear in depth and reducer entries quadratic, with the J reduct's shape unchanged"
 status: active
 owner: kernel
 size: M
@@ -16,8 +16,11 @@ origin: "Architect evt_1k4yc761p6rty on the KERNEL-OBS-NESTED-CAST-LINEAR site D
 
 ## Objective
 
-Kernel `check` of the source-derived nested-J fixture S costs reducer work
-linear in its depth k, with the verdict it gives today.
+Kernel `check` of the source-derived nested-J fixture S runs J reductions
+linear in its depth k and reducer entries O(k²), with the verdict it gives
+today. Linear entries are out of reach under the typed witness and the level
+from `infer(source)`: each guard types `P a refl` at an endpoint of depth i,
+which costs O(i) (Architect `evt_5f79a35xp026p`).
 
 ## Settled inputs (D0 `evt_3maz6hzwmq32r`, on `10daa9242` plus N0–N2)
 
@@ -34,10 +37,10 @@ linear in its depth k, with the verdict it gives today.
     `j_nonrefl` call counts on main.
   - With the assertion on, totals are ×2.5-4 higher and also grow ×10, so
     they are not comparable to these.
-- **No single site repeats.** Per `j_nonrefl` call, each site's cost is
-  constant at every k: A (the Cast arm's components) about 6.6, D
-  (`j_endpoints`) about 4.5, E (the type-equality witness) about 148.
-  Cast regularity and `cast_at_inductive` are 0 with N0–N2 in place.
+- **Per-call site cost grows with depth.** `type_eq_by_j` alone costs 57,
+  75 and 93 entries per `j_nonrefl` call at k = 2, 3 and 4, and 309 at
+  k = 16 (`evt_5f79a35xp026p`). Cast regularity and `cast_at_inductive` are
+  0 with N0–N2 in place.
 - **The mechanism** (Architect `evt_1k4yc761p6rty`). One non-refl J
   reduction re-reduces the level below about 8 times, through D, E and A.
   - `j_nonrefl` is at `obs.rs:1207` (spec 15 §4.3).
@@ -80,10 +83,39 @@ base, stop and report the mismatch.
 
   Spec 15 §4.1 already permits synthesizing pair-eq, so there is no spec
   edit. The prelude-constant variant is not adopted.
+- **AC-0' result** (implementer `evt_11rqp6rgvkh2p`). Both rows kept 2 or
+  more children per parent. The guard's `infer_j` and `j_nonrefl` each call
+  `j_endpoints`, whose `whnf(Eq Type a b)` reduces the child J, and the Cast
+  arm reduces it a third time.
+- **Mechanism, final** (Architect `evt_5f79a35xp026p`, replacing step 1
+  above). At a universe carrier, read J's endpoints from the evidence's
+  inferred `Eq` formation, without whnf of the `Eq` type, and run the guard
+  once at those endpoints.
+  - `check.rs`: `eq_formation_head` (`:835`) becomes `pub(crate)`.
+    `infer_j` (`:880`) splits into `j_endpoints` plus a `pub(crate)
+    infer_j_at` taking the endpoints; `infer_j_at`'s body is the existing
+    `infer_j` text from the motive check on, unchanged.
+  - `obs.rs` `j_nonrefl`: its first line is replaced by the formation read
+    (other carriers keep `j_endpoints`), then one `infer_j_at` call as the
+    guard. The ruling's code block is the text.
+  - `eq_at_type` never returns an `Eq` formation (`obs.rs:431-546`), so
+    wherever the old read succeeds it gives the same endpoints. The reduct
+    is built from them, so its shape is kept.
+  - Steps 2-4 above stand.
+- **Conversion widens, as spec 15 §4.3 requires.** Where `whnf(Eq Type X
+  Y)` is Top, Bottom or a Sigma, the old read failed and the J stayed stuck
+  inside a well-typed term after β. With the mechanism it reduces ("never a
+  stuck J node"). `infer_j` is unchanged, so kernel typing is unchanged.
+- **Prototype** on `7fb8e3226`, suppressed: verdict Ok at every k, and Ok
+  with the assertion on at k ≤ 4. `j_nonrefl` runs exactly 6k times.
+  Entries are 126k² (1,140 at k=2; 37,498 at k=16). The patch at
+  `/workspaces/ken/tmp/arch-jn3-v2-instrumented.patch` is reference only;
+  its `arch_site` counters are not committed.
 
 ## Deliverable
 
-Whnf of S costs work linear in k, by the ruled mechanism. The production
+Whnf of S runs J reductions linear in k and reducer entries O(k²), by the
+ruled mechanism. The production
 kernel relies on the J-witness lemma where `:301` used to check, and the
 handoff names that trust.
 
@@ -93,20 +125,15 @@ handoff names that trust.
   at level i−1, name the site of the level-i reduction that encloses it.
   The ×8 must come out as a sum over D, E and A, at k = 2 to 4. Done
   (above).
-- **AC-0' (measure, then stop to the Architect).** In suppressed mode on
-  current main, S at k = 2 to 6, report entries and D/E/A children per
-  parent for two rows:
-  - Row 1: steps 1-3 only, with endpoints as `j_endpoints` returns them.
-  - Row 2: Row 1 plus `p_a_refl` and `p_b_e` built from the whnf of the
-    endpoints. W keeps the original endpoints.
-
-  The target is at most 1 child per parent. If both rows show 2 or more,
-  stop with the table. No formation-head endpoint read.
-- **AC-1.**
-  - A committed pin bounds S's entries by `c·k` at k = 4, 8 and 16,
-    counted with the assertion suppressed.
-  - Its verdict equals today's.
-  - The k=4 pin from `KERNEL-OBS-NESTED-CAST-LINEAR` becomes a bounded pin.
+- **AC-0' (measure, then stop to the Architect).** Done (above).
+- **AC-1.** Three committed pins at k = 4, 8 and 16, counted with the
+  assertion suppressed:
+  - (a) S's check runs `j_nonrefl` exactly 6k times, by a `cfg(test)`
+    counter.
+  - (b) S's entries are at most 220·k² (measured 207k², 167k², 146k²).
+  - (c) entries(16) / entries(8) is at most 4 (measured 3.51).
+  - The verdict equals today's, and the k=4 pin from
+    `KERNEL-OBS-NESTED-CAST-LINEAR` becomes a bounded pin.
 - **AC-2 (controls).**
   - Reverting the repair reddens the S pin.
   - The T1 and T2 pins and their N1/N2 reverts keep their results.
@@ -119,6 +146,10 @@ handoff names that trust.
     reduces to the same Cast term as on base, compared syntactically.
   - The `cfg(test)` witness re-check stays on in every kernel test except
     the count pins.
+  - The ruling's `rigid_type_eq_j_reduces_after_beta` row, in the `conv.rs`
+    tests module, is green: the β-instantiated J whnfs to `t0` and its
+    `Refl` check is Ok. Reverting the formation read to `j_endpoints` makes
+    the whnf a stuck J and the check a TypeMismatch.
 
 ## Stop conditions
 
@@ -126,4 +157,11 @@ handoff names that trust.
   mechanism, for example taking the universe level from the motive instead
   of `infer(source)`. That is an operator question before any build.
 - Any fuel, cache keyed on term identity, or depth cutoff.
-- Any change to what the kernel accepts: stop to the Architect.
+- Any change to what the kernel accepts beyond the ruled conversion
+  widening: stop to the Architect.
+
+## Carry, not this WP
+
+`infer_j`'s whnf-and-`Eq` requirement is not stable under substitution: on
+main a well-typed term β-reduces to a J that `infer_j` rejects. That is a
+kernel completeness item for its own frame (`evt_5f79a35xp026p`).
