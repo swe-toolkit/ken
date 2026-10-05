@@ -134,6 +134,39 @@ struct ExportProvenance {
     member_ids: ProviderExportIds,
 }
 
+impl ModuleState {
+    pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
+        self.root_scope.scrub_global_ids(removed);
+        for scope in self.loaded_unit_scopes.values_mut() {
+            scope.scrub_global_ids(removed);
+        }
+        for ids in self.loaded_units.values_mut() {
+            ids.retain(|id| !removed.contains(id));
+        }
+        self.file_export_ids.retain(|_, modules| {
+            modules.retain(|_, ids| {
+                ids.retain(|_, id| !removed.contains(id));
+                !ids.is_empty()
+            });
+            !modules.is_empty()
+        });
+        for provenance in self.export_provenance.values_mut() {
+            provenance.member_ids.retain(|_, ids| {
+                ids.retain(|_, id| !removed.contains(id));
+                !ids.is_empty()
+            });
+        }
+        self.constructor_members.retain(|parent, members| {
+            members.retain(|_, id| !removed.contains(id));
+            !removed.contains(parent)
+        });
+        self.private_ids.retain(|id| !removed.contains(id));
+        self.scoped_constructor_types
+            .retain(|id| !removed.contains(id));
+        self.prelude_floor_ids.retain(|_, id| !removed.contains(id));
+    }
+}
+
 /// The complete Ken-defined always-present type floor (`30-taxonomy §4`).
 ///
 /// Strict resolution consults [`is_prelude_floor_name`] so the configured type
@@ -500,6 +533,19 @@ struct Scope {
 }
 
 impl Scope {
+    fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
+        self.qualified_ids.retain(|_, id| !removed.contains(id));
+        self.binding_ids.retain(|_, id| !removed.contains(id));
+        self.exported_ids.retain(|_, id| !removed.contains(id));
+        self.checked_local_ids.retain(|_, id| !removed.contains(id));
+        self.floor_type_ids.retain(|_, id| !removed.contains(id));
+        self.constructor_members.retain(|parent, members| {
+            members.retain(|_, id| !removed.contains(id));
+            !removed.contains(parent)
+        });
+        self.private_ids.retain(|id| !removed.contains(id));
+    }
+
     fn with_mode(mode: ResolutionMode, kernel_names: HashSet<String>) -> Self {
         Self {
             mode,
@@ -3053,11 +3099,13 @@ fn elaborate_checked(
     rdecl: &crate::resolve::RDecl,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    if declared_fixity.is_none() && !rdecl.contains_infix_spine {
-        elaborate_checked_spine_free(elab, rdecl)
-    } else {
-        elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
-    }
+    elab.with_env_mark_rollback(|elab| {
+        if declared_fixity.is_none() && !rdecl.contains_infix_spine {
+            elaborate_checked_spine_free(elab, rdecl)
+        } else {
+            elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
+        }
+    })
 }
 
 #[inline(never)]
@@ -4139,7 +4187,9 @@ fn expand_scope(
                 }
                 let resolved =
                     resolve::resolve_space_decl(&qualified_name, cells, operations, span)?;
-                ids.extend(elaborate_resolved_space(elab, &resolved)?);
+                let space_results =
+                    elab.with_env_mark_rollback(|elab| elaborate_resolved_space(elab, &resolved))?;
+                ids.extend(space_results);
                 i += 1;
             }
             // A maximal run of non-`pub` definitions — auto-grouped by
@@ -4306,11 +4356,9 @@ fn expand_scope(
                                 &elab.class_env,
                             )?;
                         }
-                        let results = elaborate_mutual_group_with_fixities(
-                            elab,
-                            &members,
-                            &declared_fixities,
-                        )?;
+                        let results = elab.with_env_mark_rollback(|elab| {
+                            elaborate_mutual_group_with_fixities(elab, &members, &declared_fixities)
+                        })?;
                         for (rdecl, result) in members.iter().zip(results) {
                             register_effect_row(elab, &result);
                             register_declared_effect_row(elab, rdecl)?;
@@ -7920,3 +7968,7 @@ mod namespace_effect_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "modules_reused_env_tests.rs"]
+mod reused_env_identity_scrub_tests;

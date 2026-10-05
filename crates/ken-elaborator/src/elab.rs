@@ -67,6 +67,22 @@ impl RefinementFacts {
         self.refinement_root(id)
             .and_then(|root| self.refinement_predicates.get(&root))
     }
+
+    pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<GlobalId>) {
+        let Self {
+            refinement_predicates,
+            refinement_aliases,
+            refined_params,
+            constructor_field_predicates,
+            record_field_predicates,
+        } = self;
+        refinement_predicates.retain(|id, _| !removed.contains(id));
+        refinement_aliases
+            .retain(|alias, root| !removed.contains(alias) && !removed.contains(root));
+        refined_params.retain(|id, _| !removed.contains(id));
+        constructor_field_predicates.retain(|id, _| !removed.contains(id));
+        record_field_predicates.retain(|id, _| !removed.contains(id));
+    }
 }
 
 /// Source clause kind for a V1 obligation hole (`22 §1`, §2).

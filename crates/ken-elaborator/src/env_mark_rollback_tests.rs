@@ -1,0 +1,130 @@
+use std::collections::BTreeSet;
+
+use ken_kernel::{declare_postulate, GlobalId, Level, Term};
+use num_bigint::BigInt;
+
+use crate::classes::InstanceResolution;
+use crate::effects::{EffectRow, RowType};
+use crate::error::{ElabError, Span};
+use crate::foreign::{FfiRuntimeCheck, ForeignBinding};
+use crate::numbers::{AddEntry, NumericLitVal};
+use crate::standard_operators::StandardOperatorRole;
+use crate::{ast, ElabEnv};
+
+fn trusted_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
+    env.env.trusted_base().into_iter().collect()
+}
+
+/// MEASURED: a deliberately failed operation adds an opaque ID, populates the
+/// ElabEnv identity maps, and leaves the exact trusted-base delta empty after
+/// rollback; the same ID is then reused for a transparent declaration.
+/// CLAIMED: every inventoried ElabEnv ID table is scrubbed before reuse.
+/// THE GAP: ModuleState's private nested indexes are exercised by its own
+/// module test; this test covers the top-level ElabEnv inventory.
+#[test]
+fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let before = trusted_ids(&env);
+    let mut allocated = None;
+
+    let result: Result<(), ElabError> = env.with_env_mark_rollback(|env| {
+        let id = declare_postulate(
+            &mut env.env,
+            "ac0_scrub_probe".to_string(),
+            Vec::new(),
+            Term::Type(Level::zero()),
+        )
+        .expect("probe postulate");
+        allocated = Some(id);
+        env.globals.insert("ac0_scrub_probe".into(), id);
+        env.preconditions.insert(id, (0, 1));
+        env.num_values
+            .insert(id, NumericLitVal::Int(BigInt::from(17)));
+        env.fixities.insert(id, ast::Fixity::DEFAULT);
+        env.fixity_spans.insert(id, Span::zero());
+        env.ctor_decl_spans
+            .insert("ac0_scrub_probe".into(), Span::zero());
+        env.numeric_env.set_add_entry(
+            id,
+            AddEntry {
+                op_id: id,
+                wrapping_id: Some(id),
+                no_ovf_id: Some(id),
+                result_id: id,
+            },
+        );
+        env.standard_operators.insert(StandardOperatorRole::And, id);
+        env.foreign_env.register(
+            "ac0_scrub_probe".into(),
+            ForeignBinding {
+                postulate_id: id,
+                symbol: "ac0_scrub_probe".into(),
+                library: "c".into(),
+                is_pure: false,
+                effect_row: EffectRow::singleton("FS"),
+                marshal_sig: None,
+                runtime_checks: vec![FfiRuntimeCheck {
+                    hole_id: id,
+                    clause_kind: "ensures",
+                    clause_str: "probe".into(),
+                }],
+            },
+        );
+        env.effect_rows
+            .insert("ac0_scrub_probe".into(), RowType::empty());
+        env.effect_rows_by_id.insert(id, RowType::empty());
+        env.space_metadata
+            .initial_states
+            .insert("ac0_scrub_probe".into(), id);
+        env.prelude_env.native_trusted_base.insert(id);
+        env.class_env
+            .register_record("ac0_scrub_probe".into(), id, Vec::new(), Vec::new());
+        env.resolution_provenance.push(InstanceResolution {
+            instance_id: id,
+            class_name: "probe".into(),
+            head_type: "probe".into(),
+            defining_package: "probe".into(),
+        });
+        env.refinement_facts
+            .refinement_predicates
+            .insert(id, Term::constructor(env.env.tt_id(), Vec::new()));
+        Err(ElabError::Internal("rollback probe".into()))
+    });
+
+    let after = trusted_ids(&env);
+    assert_eq!(
+        after.difference(&before).copied().collect::<BTreeSet<_>>(),
+        BTreeSet::new()
+    );
+    assert!(matches!(result, Err(ElabError::Internal(message)) if message == "rollback probe"));
+    let id = allocated.expect("probe allocated an identity");
+    assert_eq!(env.env.next_global_id(), id);
+    assert!(!env.globals.contains_key("ac0_scrub_probe"));
+    assert!(!env.preconditions.contains_key(&id));
+    assert!(!env.num_values.contains_key(&id));
+    assert!(!env.fixities.contains_key(&id));
+    assert!(!env.fixity_spans.contains_key(&id));
+    assert!(!env.ctor_decl_spans.contains_key("ac0_scrub_probe"));
+    assert!(env
+        .numeric_env
+        .classify_add(&Term::const_(id, Vec::new()))
+        .is_none());
+    assert!(!env.standard_operators.values().any(|stored| *stored == id));
+    assert!(!env.foreign_env.bindings.contains_key("ac0_scrub_probe"));
+    assert!(!env.effect_rows.contains_key("ac0_scrub_probe"));
+    assert!(!env.effect_rows_by_id.contains_key(&id));
+    assert_eq!(env.space_initial_state("ac0_scrub_probe"), None);
+    assert!(!env.prelude_env.native_trusted_base.contains(&id));
+    assert!(env.class_env.projection_by_type_id(id).is_none());
+    assert!(env.resolution_provenance.is_empty());
+    assert!(!env.refinement_facts.refinement_predicates.contains_key(&id));
+
+    let replacement = env
+        .elaborate_decl_v1("const ac0_after : Bool = True")
+        .expect("the rolled-back identity remains reusable");
+    assert_eq!(replacement.def_id, id);
+    assert!(env
+        .numeric_env
+        .classify_add(&Term::const_(replacement.def_id, Vec::new()))
+        .is_none());
+}

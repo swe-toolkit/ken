@@ -1,7 +1,7 @@
 use ken_kernel::{
-    CtorSpec, Decl, GlobalEnv, InductiveSpec, KernelError, Level, PrimReduction, Term,
     declare_deceq_certificate, declare_def, declare_inductive, declare_postulate,
-    declare_primitive, declare_recursive_group, env_mark, rollback_to_mark,
+    declare_primitive, declare_recursive_group, env_mark, rollback_to_mark, CtorSpec, Decl,
+    GlobalEnv, InductiveSpec, KernelError, Level, PrimReduction, Term,
 };
 
 fn postulate(env: &mut GlobalEnv, name: &str) -> ken_kernel::GlobalId {

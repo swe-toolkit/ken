@@ -9,7 +9,7 @@ use crate::ast::DefKeyword;
 use crate::error::Span;
 use crate::resolve::RType;
 use ken_kernel::{GlobalId, Term};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Whether a class is a property class (Ω-sorted Σ-chain, coherence-free via
 /// Ω-PI) or a structure class (Type-sorted, canonical-one-per-head rule).
@@ -241,6 +241,24 @@ pub struct ClassEnv {
 }
 
 impl ClassEnv {
+    pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<GlobalId>) {
+        self.named_field_owners.retain(|id, info| {
+            !removed.contains(id) && !removed.contains(&info.projection.type_id)
+        });
+        self.current_names.retain(|_, id| !removed.contains(id));
+        self.instances.retain(|_, info| {
+            !removed.contains(&info.instance_id) && !removed.contains(&info.class_id)
+        });
+        self.instances_by_id.retain(|(class_id, head), info| {
+            !removed.contains(class_id)
+                && !matches!(head, InstanceHeadKey::Global(id) if removed.contains(id))
+                && !removed.contains(&info.instance_id)
+                && !removed.contains(&info.class_id)
+        });
+        self.global_modules.retain(|id, _| !removed.contains(id));
+        self.direct_use_instances.retain(|id| !removed.contains(id));
+    }
+
     /// Enumerate every registered class through the storage-independent
     /// borrowed view.
     pub fn class_entries(&self) -> impl Iterator<Item = ClassView<'_>> + '_ {

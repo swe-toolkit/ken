@@ -58,14 +58,19 @@ mod z3_process;
 #[cfg(test)]
 extern crate self as ken_elaborator;
 #[cfg(test)]
+mod env_mark_rollback_tests;
+#[cfg(test)]
 mod r_layer_tests;
 #[cfg(test)]
 mod seal2_tests;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
-use ken_kernel::{check as kernel_check, declare_postulate, Context, GlobalEnv, GlobalId, Term};
+use ken_kernel::{
+    check as kernel_check, declare_postulate, env_mark, rollback_to_mark, Context,
+    Decl as KernelDecl, EnvMark, GlobalEnv, GlobalId, Term,
+};
 
 pub use ast::{
     BinOp, BoundaryHeader, BoundaryKind, CapabilityDecl, ConstructorSignature,
@@ -634,6 +639,97 @@ impl ElabEnv {
         self.env.trusted_base().contains(&hole_id)
     }
 
+    pub(crate) fn with_env_mark_rollback<T>(
+        &mut self,
+        operation: impl FnOnce(&mut Self) -> Result<T, ElabError>,
+    ) -> Result<T, ElabError> {
+        let mark = env_mark(&self.env);
+        let provenance_len = self.resolution_provenance.len();
+        match operation(self) {
+            Ok(value) => Ok(value),
+            Err(error) => match self.rollback_env_mark(mark) {
+                Ok(()) => {
+                    self.resolution_provenance.truncate(provenance_len);
+                    Err(error)
+                }
+                Err(rollback_error) => Err(ElabError::Internal(format!(
+                    "operation failed ({error:?}); environment rollback failed ({rollback_error:?})"
+                ))),
+            },
+        }
+    }
+
+    fn rollback_env_mark(&mut self, mark: EnvMark) -> Result<(), ElabError> {
+        let removed = rollback_to_mark(&mut self.env, mark).map_err(|error| {
+            ElabError::Internal(format!("environment rollback failed: {error:?}"))
+        })?;
+        let mut removed_ids = HashSet::new();
+        for declaration in &removed {
+            removed_ids.insert(declaration.id());
+            if let KernelDecl::Inductive(inductive) = declaration {
+                removed_ids.extend(inductive.constructors.iter().map(|ctor| ctor.id));
+            }
+        }
+        if removed_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut removed_names: HashSet<String> = removed
+            .iter()
+            .filter_map(|declaration| match declaration {
+                KernelDecl::Opaque { name, .. } => Some(name.clone()),
+                _ => None,
+            })
+            .collect();
+        let ElabEnv {
+            env: _,
+            globals,
+            preconditions,
+            num_values,
+            fixities,
+            fixity_spans,
+            ctor_decl_spans,
+            numeric_env,
+            standard_operators,
+            bytes_env: _,
+            foreign_env,
+            effect_rows,
+            effect_rows_by_id,
+            space_metadata,
+            prelude_env,
+            class_env,
+            resolution_provenance: _,
+            module_state,
+            refinement_facts,
+        } = self;
+        removed_names.extend(
+            globals
+                .iter()
+                .filter_map(|(name, id)| removed_ids.contains(id).then_some(name.clone())),
+        );
+        globals.retain(|_, id| !removed_ids.contains(id));
+        preconditions.retain(|id, _| !removed_ids.contains(id));
+        num_values.retain(|id, _| !removed_ids.contains(id));
+        fixities.retain(|id, _| !removed_ids.contains(id));
+        fixity_spans.retain(|id, _| !removed_ids.contains(id));
+        ctor_decl_spans.retain(|name, _| !removed_names.contains(name));
+        numeric_env.scrub_global_ids(&removed_ids);
+        standard_operators.retain(|_, id| !removed_ids.contains(id));
+        foreign_env.scrub_global_ids(&removed_ids);
+        effect_rows.retain(|name, _| !removed_names.contains(name));
+        effect_rows_by_id.retain(|id, _| !removed_ids.contains(id));
+        space_metadata
+            .initial_states
+            .retain(|_, id| !removed_ids.contains(id));
+        prelude_env
+            .native_trusted_base
+            .retain(|id| !removed_ids.contains(id));
+        class_env.scrub_global_ids(&removed_ids);
+        module_state.scrub_global_ids(&removed_ids);
+        refinement_facts.scrub_global_ids(&removed_ids);
+        Ok(())
+    }
+
     /// Elaborate a standalone expression from source.
     pub fn elaborate_expr(
         &mut self,
@@ -642,16 +738,19 @@ impl ElabEnv {
     ) -> Result<(Term, Term), ElabError> {
         let expr = parser::parse_expr(src)?;
         let rexpr = resolve::resolve_expr_standalone(&expr)?;
-        elab::elaborate_rexpr(
-            &mut self.env,
-            &self.globals,
-            &self.preconditions,
-            &mut self.num_values,
-            &self.numeric_env,
-            &self.refinement_facts,
-            owner_label,
-            &rexpr,
-        )
+        let owner_label = owner_label.into();
+        self.with_env_mark_rollback(|env| {
+            elab::elaborate_rexpr(
+                &mut env.env,
+                &env.globals,
+                &env.preconditions,
+                &mut env.num_values,
+                &env.numeric_env,
+                &env.refinement_facts,
+                owner_label,
+                &rexpr,
+            )
+        })
     }
 
     pub fn kernel_version(&self) -> &'static str {
