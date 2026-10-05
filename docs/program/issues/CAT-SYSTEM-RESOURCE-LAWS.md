@@ -1,7 +1,7 @@
 ---
 id: CAT-SYSTEM-RESOURCE-LAWS
 title: "System.Resource promises acquire-before-body, settle-after-body and a fixed body/release result ordering, but only two interpreter fixtures check it. Prove the bracket's sequencing and settlement ordering as prelude theorems beside the definitions, before the hide"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -105,8 +105,10 @@ Theorems in `crates/ken-elaborator/src/prelude.rs`, placed after the
     `resource_settle_ok_error_for`, and the body-ok/`Closed` law reddens.
   - M2: drop `body_error` in `resource_settle_body_error_for`'s
     `ResourceHostIO` arm, and the body-and-release law reddens.
-  - M3: continue `private_with_resource_after_open`'s `Ok` arm with
-    `release_if_live` before `body`, and the sequencing law reddens.
+  - M3: in `private_with_resource_after_open`'s `Ok` arm, move
+    `release_if_live` ahead of `body` and drop the trailing release, so the
+    code still releases exactly once, and the sequencing law reddens
+    (Steward `evt_418ekfb3xm2hr`).
 - **AC-3.** The PX7-F absence pin stays green, so the helpers stay
   unresolvable.
 
@@ -119,3 +121,24 @@ Theorems in `crates/ken-elaborator/src/prelude.rs`, placed after the
 - Out of scope: runtime generation liveness, rights, revocation, controlled
   traps and exactly-once settlement. These are TCB contracts, not Ken proof
   targets.
+
+## Closeout
+
+Merged `f025859e6` from exact `e1e8cab68` (PR #4526 from
+`wp/CAT-SYSTEM-RESOURCE-LAWS-resource-bracket`, main push run 37348796449).
+Foundation QA `evt_4x76eg52jrecn`, Architect `evt_13w46phmbagc8`, Decision
+`dec_1dmvhb350nq43`. The earlier candidate `51a1027a8` (PR #4516) was
+withdrawn red and closed unmerged.
+
+- 15 visible prelude theorems cover `withResource`, `withBuffer` and
+  `withMapping`, the after-open and after-allocate cases, the settle laws and
+  `resource_release_settles`. No new primitive, postulate or axiom, and
+  `trusted_base()` is unchanged.
+- The 17 checked declarations register through a private
+  `#[inline(never)] register_resource_bracket_laws`, which keeps the prelude
+  stack margin at the default worker with no override.
+- Scope gained `px7f_system_resource_acceptance.rs` for one deletion:
+  `shipped_source_states_the_runtime_honesty_boundary`, which asserted
+  prose in `Resource.ken.md` (Steward `evt_5me28kh63jks2`). Its two behavior
+  tests are unchanged.
+- This was the last survey row. The L3 successor is `CAT-CONSOLE-TEXT-LAWS`.
