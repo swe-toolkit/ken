@@ -356,6 +356,36 @@ fn eq_omega_carrier_admitted_while_cast_and_non_type_eq_refuse() {
 }
 
 #[test]
+fn eq_type_inductive_omega_parameter_compares_target_proof() {
+    // Eq-Type caller of the shared inductive conjunct builder (`16 §2.2`).
+    // On the pre-R3 kernel this well-formed Eq reduced to an ill-formed
+    // `Eq P p q`; R3 compares the target proof with itself on both callers.
+    let mut env = GlobalEnv::new();
+    let ctx = Context::new();
+    let p_ty = post(&mut env, "P", Term::Omega(Level::zero()));
+    let d_id = declare_inductive(&mut env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![p_ty.clone()],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![CtorSpec {
+            args: vec![],
+            target_indices: vec![],
+        }],
+    })
+    .expect("D : P -> Type 0");
+    let d = |arg: Term| Term::app(Term::indformer(d_id, vec![]), arg);
+    let p = post(&mut env, "p", p_ty.clone());
+    let q = post(&mut env, "q", p_ty.clone());
+    assert_ne!(p, q);
+    let equality = eq(Term::Type(Level::zero()), d(p), d(q.clone()));
+    let reduct = whnf(&env, &ctx, &equality);
+    assert_eq!(reduct, eq(p_ty, q.clone(), q.clone()));
+    assert_eq!(infer(&env, &ctx, &reduct), Ok(Term::Omega(Level::zero())));
+    assert_eq!(check(&env, &ctx, &Term::Refl(Box::new(q)), &reduct), Ok(()));
+}
+
+#[test]
 fn construction_without_postulates_keeps_trusted_base_identical() {
     // AC-3: this control uses no test-only postulates, so a fixture's own
     // trust-inventory growth cannot mask a kernel/prelude trust-base delta.

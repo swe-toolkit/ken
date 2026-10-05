@@ -332,7 +332,7 @@ pub struct GlobalEnv {
     /// conformance at the actual environment-carrier boundary.
     support_edges: HashMap<GlobalId, Vec<GlobalId>>,
     /// The prelude `Top : Ω_0` constant (`16 §1.3`) — the truth proposition,
-    /// produced by Eq-by-type at `Trunc` (`Eq ‖A‖ _ _ ⇝ Top`) and the canonical
+    /// produced by Eq-by-type where no conjunct remains, and the canonical
     /// "trivial proof" target. Set by [`GlobalEnv::new`].
     top_id: Option<GlobalId>,
     /// The prelude `Bottom : Ω_0` constant (`16 §1.3`) — the falsity

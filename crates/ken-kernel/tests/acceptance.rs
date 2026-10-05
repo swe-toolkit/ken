@@ -8,7 +8,6 @@
 
 use ken_kernel::env::Context;
 use ken_kernel::inductive::peel_app;
-use ken_kernel::subst::weaken;
 use ken_kernel::term::{Level, LevelVar, Term};
 use ken_kernel::{
     convert, declare_inductive, declare_postulate, infer, whnf, CtorSpec, GlobalEnv, GlobalId,
@@ -1312,13 +1311,6 @@ fn ac6_subject_reduction_k1_property() {
 fn bot(env: &GlobalEnv) -> Term {
     Term::Const {
         id: env.bottom_id(),
-        level_args: Vec::new(),
-    }
-}
-/// Prelude `Top : Ω_0` term.
-fn top(env: &GlobalEnv) -> Term {
-    Term::Const {
-        id: env.top_id(),
         level_args: Vec::new(),
     }
 }

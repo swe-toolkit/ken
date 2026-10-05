@@ -5,8 +5,8 @@
 use ken_kernel::env::Context;
 use ken_kernel::term::{Level, Term};
 use ken_kernel::{
-    check, convert, convert_type, declare_inductive, declare_postulate, infer, whnf, CtorSpec,
-    GlobalEnv, InductiveSpec, KernelError,
+    check, convert, convert_type, declare_inductive, declare_postulate, infer, CtorSpec, GlobalEnv,
+    InductiveSpec, KernelError,
 };
 
 fn eq(carrier: Term, left: Term, right: Term) -> Term {
