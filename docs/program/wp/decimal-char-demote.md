@@ -120,9 +120,11 @@ surrogate/out-of-range, never a silent `Some`).
 
 **AC-C3 — the discriminating Char test: a surrogate/out-of-range `Int` is
 REJECTED.** `Int.toChar 0xD800` (surrogate) and `Int.toChar 0x110000`
-(out-of-range) reduce to `None`; a valid scalar reduces to `Some`. This must
-**fail against a stub `isScalar := true`** (the predicate-definedness dual) —
-i.e. the refinement obligation **actually reduces**, not name-matches.
+(out-of-range) reduce to `None`; a valid scalar reduces to `Some`. The
+discriminator is the direct Bool guard `inRangeBool` (spec 18a §5.9.1):
+stubbing `inRangeBool := True` flips both invalid inputs to `Some`. Stubbing
+only `isScalar := true` leaves the direct match unchanged, so it cannot
+discriminate this case.
 
 ### Two load-bearing Char soundness pins (hard, `18a §5.9`)
 

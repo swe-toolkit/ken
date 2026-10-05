@@ -1,7 +1,7 @@
 ---
 id: LANG-ENSURES-PER-PATH-REALIZATION
 title: "An ensures clause or a literal refined return over a branchy body emits one obligation over the whole body, which spec 22 §2.2 forbids: a recursive postcondition then carries no induction hypothesis and cannot be discharged. Realize the postcondition at the body's leaves, under each branch's path hypotheses"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
@@ -60,6 +60,9 @@ straight-line body still emits exactly one obligation with the same goal.
   `decimal_char_acceptance`, `ds9_json_codec_acceptance`, `v1_acceptance`,
   `v2_acceptance`), and so do `rtp1_elim_reduce_ih_perf_acceptance` and
   `rosetta`. CI is green.
+  The AC-C3 heading comment in `decimal_char_acceptance.rs` names the
+  `inRangeBool := True` flip (spec 18a §5.9.1), not `isScalar := true`.
+  This is carried from `LANG-REFINEMENT-INTRODUCTION-OBLIGATION`.
 - **AC-3 (mutation, QA).** Restoring the whole-body emission for `ensures`
   reddens the recursive row and the per-leaf counts.
 
