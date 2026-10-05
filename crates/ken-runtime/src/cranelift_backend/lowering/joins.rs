@@ -402,9 +402,9 @@ impl<'a> Lowering<'a> {
                             Ok(merged) => merged,
                             Err(refusal) => {
                                 if std::mem::take(&mut self.scalar_operand_refused) {
-                                    self.refused_scalar_join
-                                        .expect("module lowering has a scalar-join feedback cell")
-                                        .set(Some(join_plan.origin));
+                                    if let Some(cell) = self.refused_scalar_join {
+                                        cell.set(Some(join_plan.origin));
+                                    }
                                 }
                                 return Err(refusal);
                             }

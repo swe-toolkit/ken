@@ -116,6 +116,60 @@ fn recursive_backedge_refusal_does_not_mark_scalar_admission() {
     assert_eq!(refused.get(), None);
 }
 
+/// Promise: durable invariant. MEASURED: a direct test Lowering with no
+/// feedback Cell returns its original scalar refusal rather than panicking.
+/// CLAIMED: inert test constructors do not become a second admission route.
+/// GAP: module-backed constructors always install a Cell; the Nat pin checks it.
+#[test]
+fn direct_lowering_without_feedback_cell_returns_original_refusal() {
+    let source = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+        cases: vec![crate::RuntimeMatchCase {
+            constructor: "ctor:prelude::Bool::True".to_string(),
+            binders: 0,
+            body: RuntimeExpr::Value(RuntimeValue::Int(7.into())),
+        }],
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "unmatched feedback fixture".to_string(),
+        },
+    };
+    let (plan, origin) = planned_root_occurrence(&source);
+    let join_plan = plan.join_plan_token(origin).expect("source Match has join");
+    assert_eq!(join_plan.representation, JoinResultRepresentation::NativeScalarPair);
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    let mut lowering = root_authority_test_lowering(&seed_env);
+    lowering.static_transition_plan = plan;
+    let mut func = Function::new();
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut func, &mut context);
+    let entry = builder.create_block();
+    let join = builder.create_block();
+    lowering.append_planned_join_params(&mut builder, join, &join_plan);
+    builder.switch_to_block(entry);
+    let value = builder.ins().iconst(types::I64, 0);
+    let mut merge_kind = None;
+    let result = lowering.jump_planned_join_arm(
+        &mut builder,
+        join,
+        &join_plan,
+        origin,
+        LoweringOperand::Specialized(Lowered::CapabilityToken { value }),
+        &mut merge_kind,
+        "Match",
+    );
+    assert!(matches!(
+        result,
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+            construct: "Match",
+            reason,
+        })) if reason == "dynamic arms must produce scalar Int or Bool values"
+    ));
+    assert_eq!(merge_kind, None);
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(in crate::cranelift_backend::lowering) enum Px8dsEdgeMutation {
     Delete,
