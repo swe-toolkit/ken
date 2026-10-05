@@ -1,7 +1,7 @@
 ---
 id: RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT
 title: "A dynamic source Match whose specialized result is a constructor with fields is planned NativeScalarPair, because the planner chooses the join representation from phase alone, so object emission refuses with 'Match: dynamic arms must produce scalar Int or Bool values'. Plan such a join from its result shape as well"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
@@ -143,3 +143,23 @@ that lacks lowering's admission keys.
 1. A non-scalar join keyed on source arm-leaf constructor identity; source
    leaves are not the merged operand under eliminator composition
    (`core.rs:6464-6531`).
+
+## Closeout
+
+Merged `3695cd16a` from exact `bb22ef7c6` (PR from
+`wp/RT-JOIN-SCALAR-PAIR-BOUND-PROCESS-FEEDBACK`, main push run
+37288769802). Runtime QA `evt_5305rr281e701`, Architect `evt_1je587b64j3wh`
+(crates only), Decision `dec_3amykkwkf1s39`.
+
+- Lowering's non-scalar operand refusal feeds a bounded re-plan at carrier
+  representation on the three program callers (JIT, object,
+  bound-process). The seed lane and the expression entries stay
+  single-attempt.
+- AC-1: the Nat bound-process row runs in 2 attempts with `{1289}`
+  forced. Its next refusal, ContinuationSpecialization on a multi-member
+  projection, is the successor and starts its own count.
+- AC-2 was relaxed for build-lock time (`evt_4mzqmhksbrnx9`): the 186-row
+  native parity is CI's, QA did not rerun parity locally, and the default
+  recorder summary came from the implementer's log.
+- The first QA block (`02611250`) was a 256 MiB test stack with no stated
+  peak. The respin states a sampled peak of 2,308 KiB at the site.

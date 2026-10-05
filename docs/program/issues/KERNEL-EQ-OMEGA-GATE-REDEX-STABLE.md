@@ -40,10 +40,28 @@ typed `Eq` the gates see.
   - **R2 stuck:** `S := Σ (F : N → Ω_0). F z`.
     `Eq S ((λn.P), p) ((λn.P), q)` stays neutral, and the J fallback's
     `infer(source)` errs as well.
-  - **R1, an Ω carrier reduces:** `Eq (Π x:N. (λn.P) x) f0 g0` takes the Π
-    arm, and `infer(whnf)` errs.
+  - **R1, an Ω carrier reduces.** The Adversary's `Eq (Π x:N. (λn.P) x)
+    f0 g0` fails `infer` at Eq-Form and cannot be formed. R1 is reached
+    through a reduct, so the row is the Architect's reachable instance
+    (`evt_3ent3naf8qv7q`): `D2 : Type 1` with
+    `mk2 : (F : N → Ω_0) → (Π x:N. F x) → D2`, and postulated
+    `f1, g1 : Π x:N. P`. `Eq D2 (mk2 (λn.P) f1) (mk2 (λn.P) g1)` infers
+    `Ω_1`. Its field-1 conjunct takes the Π arm on main.
 - Every AC-1/AC-2 fixture of the parent WP uses postulated predicates, so
   none reaches this axis.
+
+## AC-0 ruling (Architect `evt_3ent3naf8qv7q`, prototype on `669a5cf91`)
+
+- One structural, fail-closed judgment, `omega_sort` / `omega_sort_whnf`,
+  replaces `omega_classified`. It decides Π and Σ by their formation rules
+  (`sort_pi`, `sort_sigma`) after WHNF, and classifies only a WHNF type
+  with no former head. `None` (undecided) leaves the Eq neutral. R1 uses
+  the `_whnf` form, because re-normalizing its already-WHNF carrier is
+  exponential through nested Eq carriers.
+- Covered: all three gates (R1 `:130`, R2 `:326`, R3 `:630`), and with R3
+  both of its callers. Outside: `type_eq_by_j`, `type_eq_by_j_with_base`,
+  `type_level`, the Quot sites and `cast_at_inductive` `:1219`. These
+  already fail closed and need a Type level, not Ω-ness.
 
 ## Deliverable
 
@@ -61,16 +79,26 @@ binder form.
   a reduction decision, including the R2 J fallback's `infer(source)`. The
   Architect rules the mechanism, and which of those sites it covers,
   against that list.
-- **AC-1.** The four rows above are kernel tests. In each, `Eq …` infers at
-  its Ω level and `infer(whnf(Eq …))` succeeds:
-  - R1 stays neutral;
-  - R2 and both R3 rows reduce, with the Ω conjunct comparing the target
-    proof with itself, checked syntactically as in the parent's R3 pin.
+- **AC-1.** The four rows above are kernel tests. In each, `Eq …` infers,
+  `infer(normalize(whnf(Eq …)))` succeeds, and:
+  - R2 and both R3 rows reduce, with the Ω conjunct target/target, checked
+    syntactically as in the parent's R3 pin;
+  - R1: the field-1 conjunct is exactly `Eq (Π x:N. (λn.P) x) g1 g1`, and
+    its `whnf` in the empty context equals it (R1 neutral).
+
+  `infer(whnf(…))` is not the observation: a correct reduct still carries
+  the uninferable redex `(λn.P) z`. The reduct's level may sit below the
+  Eq's (16 §8.4 (1)).
 
   The four postulated controls stay green and unchanged.
 - **AC-2.** Restoring classify-on-instance at each gate in isolation
   reddens that gate's row at its named assertion. The parent's suite
-  `obs_eq_omega_carrier_reduction.rs` stays 8/8.
+  `obs_eq_omega_carrier_reduction.rs` stays 8/8, and
+  `conv::tests::stuck_nested_components_take_linear_reducer_entries` stays
+  green.
+- **AC-3.** One catalog census run, compared against the same run on its
+  base, shows no change. An undecided carrier now stays neutral instead of
+  reducing.
 
 ## Stop conditions
 

@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIER-ROOT-EXIT-NESTED-MATCH-TRAP
 title: "A root-exit nested Match lowered as CarrierWord builds but traps natively with UnclassifiedRuntimeTrap { terminal_value: -1 }, where the NativeScalarPair route passes 7/7. Find whether the carrier word reaching emit_result has the wrong boundary tag, and fix the CarrierWord route"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
