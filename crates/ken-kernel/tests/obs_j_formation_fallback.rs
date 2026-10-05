@@ -1,10 +1,17 @@
 //! J reduction agrees with checked whnf endpoints when Eq-at-Type exposes a
 //! bare single-conjunct Eq, without losing the formation-head widening.
 //!
-//! Promise classes: A and Ω-A are durable typed-J reduction invariants.
-//! B and Ω-B are transition sentinels for the separately tracked infer_j
-//! substitution-stability widening: they intentionally keep the current
-//! infer-refusal / whnf-reduction boundary until that rule changes.
+//! Contract for A/Ω-A: spec/10-kernel/15-identity.md §4.3 and
+//! conformance/kernel/observational/seed-observational.md
+//! §observational/j-nonrefl. Promise: durable typed-J reduction invariants.
+//! B/Ω-B are transition sentinels for infer_j's current whnf-only endpoint
+//! choice, not a normative refusal. The infer_j substitution-stability carry
+//! in docs/program/issues/KERNEL-J-NONREFL-ENDPOINT-SHARING.md §Carry is
+//! currently unframed. Retirement trigger (Architect evt_4v6x90s993kz9):
+//! when an authorized infer_j substitution-stability WP makes B/Ω-B typable,
+//! revisit or retire their exact BadEliminator assertions in that WP. Their
+//! whnf-to-zero and Refl assertions remain behavioral
+//! pins; a red refusal is a review signal, not grounds for silent rebaselining.
 
 use ken_kernel::env::Context;
 use ken_kernel::subst::weaken;
