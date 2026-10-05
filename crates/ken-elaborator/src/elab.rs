@@ -367,6 +367,8 @@ struct MatchFrame {
     convoy_originals: HashSet<usize>,
     refined_target: Option<Term>,
     scrutinee_level: Option<usize>,
+    /// Result-position postconditions owned by this match, not its scrutinee.
+    result_predicates: Vec<ResultPredicate>,
 }
 
 #[inline(never)]
@@ -395,6 +397,7 @@ impl MatchFrame {
             convoy_originals: HashSet::new(),
             refined_target,
             scrutinee_level,
+            result_predicates: Vec::new(),
         }
     }
 }
@@ -454,9 +457,6 @@ struct ElabCtx<'e> {
     path_conditions: Vec<(Term, usize)>,
     /// One-shot result-position channel. Never visible to a subterm check.
     result_predicates: Vec<ResultPredicate>,
-    /// Match producers may descend through internal matrix/motive work before
-    /// checking an arm. Only their arm-body checks read the top frame.
-    match_result_predicates: Vec<(Vec<Span>, Vec<ResultPredicate>)>,
     /// The typeclass registry, when available — needed only for `.field`
     /// Σ-record projection (`RExpr::RProj`, `33 §5.2` η). `None` in every
     /// elaboration path that predates class support and never projects
@@ -692,7 +692,6 @@ impl<'e> ElabCtx<'e> {
             refinement_facts: None,
             path_conditions: Vec::new(),
             result_predicates: Vec::new(),
-            match_result_predicates: Vec::new(),
             class_env: None,
             standard_operators: None,
             provenance: None,
@@ -1877,16 +1876,14 @@ fn check_result_position(
     result
 }
 
-/// Select by the source arm span, including a checked match's constructor
-/// arm synthesized from a cloned source fallback. Motive work may infer a
-/// different match inside a scrutinee, which must not inherit this channel.
+/// An arm body belongs to the innermost match frame. Synthetic/cloned arms
+/// have exactly the same obligation channel as that frame's original arms.
 #[inline(never)]
 fn check_match_arm_result(
     cx: &mut ElabCtx<'_>, arm: &RMatchArm, expected: &Term, span: &Span,
 ) -> Result<Term, ElabError> {
-    let predicates = cx.match_result_predicates.iter().rev()
-        .find(|(spans, _)| spans.contains(&arm.span))
-        .map(|(_, predicates)| predicates.clone()).unwrap_or_default();
+    let predicates = cx.match_frames.last()
+        .map(|frame| frame.result_predicates.clone()).unwrap_or_default();
     check_result_position(cx, &arm.body, expected, span, &predicates)
 }
 
@@ -2146,10 +2143,7 @@ fn check_match_result(
     arms: &[RMatchArm], expected: &Term, span: &Span,
     predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
-    cx.match_result_predicates.push((
-        arms.iter().map(|arm| arm.span.clone()).collect(), predicates.to_vec(),
-    ));
-    let result = (|| {
+    {
             // Gate on PATTERN SHAPE, not goal-dependence: `check_match_
             // dependent` is correct whenever every arm's pattern is FLAT
             // (a constructor with only `Var`/`Wild` sub-patterns) —
@@ -2186,7 +2180,7 @@ fn check_match_result(
                 matches!(head, Term::IndFormer { .. })
             };
             if dependent_eligible {
-                check_match_dependent(cx, scrut, equation, arms, expected, span)
+                check_match_dependent(cx, scrut, equation, arms, expected, span, predicates)
             } else if equation.is_some() {
                 Err(ElabError::TypeMismatch {
                     span: span.clone(),
@@ -2194,15 +2188,14 @@ fn check_match_result(
                         .into(),
                 })
             } else {
-                let (core, inferred_ty) = infer_match(cx, scrut, arms, span, Some(expected))?;
+                let (core, inferred_ty) =
+                    infer_match_with_predicates(cx, scrut, arms, span, Some(expected), predicates)?;
                 unify_types(&mut cx.metas, expected, &inferred_ty);
                 // This is an inferred match, not the checked structural path;
                 // each branch has already been checked against its result.
                 emit_refinement_introduction(cx, expected, &inferred_ty, core, span, None)
             }
-    })();
-    cx.match_result_predicates.pop();
-    result
+    }
 }
 
 fn refl_goal_originates_in_equality(cx: &ElabCtx, expected: &Term) -> bool {
@@ -5031,6 +5024,7 @@ fn install_lift_binding(
 /// `All` evidence. The support constructors are aligned with the host
 /// constructors; their leading fields are the source fields and their trailing
 /// fields are the exact lifted evidence selected by the kernel producer.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn check_match_with_lift(
     cx: &mut ElabCtx,
@@ -5042,6 +5036,25 @@ fn check_match_with_lift(
     host_level_args: &[Level],
     host_params: &[Term],
     binding: LiftBinding,
+) -> Result<Term, ElabError> {
+    check_match_with_lift_with_predicates(
+        cx, arms, expected, span, scrut_core, host, host_level_args,
+        host_params, binding, &[],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn check_match_with_lift_with_predicates(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    expected: &Term,
+    span: &Span,
+    scrut_core: &Term,
+    host: &InductiveDecl,
+    host_level_args: &[Level],
+    host_params: &[Term],
+    binding: LiftBinding,
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     ensure_arm_ctors_belong_to_family(cx, arms, host, host.id)?;
     let support = binding
@@ -5175,7 +5188,9 @@ fn check_match_with_lift(
             });
         }
         let base = cx.ctx.len();
-        cx.match_frames.push(MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None));
+        let mut frame = MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None);
+        frame.result_predicates = predicates.to_vec();
+        cx.match_frames.push(frame);
         let mut domains = Vec::with_capacity(raw_domains.len());
         for (position, raw_domain) in raw_domains.iter().enumerate() {
             let domain = whnf(cx.env, &cx.ctx, raw_domain);
@@ -5290,7 +5305,13 @@ fn check_match_with_lift(
             ),
         );
         cx.match_frames.last_mut().expect("lifted arm frame").refined_target = Some(expected_here.clone());
-        let checked = check_match_arm_result(cx, arm, &expected_here, &arm.span);
+        let mut scrut_ty = Term::indformer(host.id, host_level_args.to_vec());
+        for param in host_params {
+            scrut_ty = Term::app(scrut_ty, param.clone());
+        }
+        let path_base = push_branch_path_condition(cx, &scrut_ty, scrut_core, &concrete, total, 0);
+        let checked = check_match_arm_result(cx, &arm, &expected_here, &arm.span);
+        cx.path_conditions.truncate(path_base);
 
         for source_field in evidence_positions {
             cx.lift_bindings.remove(&(base + source_field));
@@ -5370,6 +5391,7 @@ fn check_structured_constructor_method(
     motive: &Term,
     level_args: &[Level],
     shapes: &[RecursiveArgumentShape],
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     let constructor = &ind.constructors[ordinal];
     if !ind.indices.is_empty() {
@@ -5393,7 +5415,9 @@ fn check_structured_constructor_method(
         });
     }
     let base = cx.ctx.len();
-    cx.match_frames.push(MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None));
+    let mut frame = MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None);
+    frame.result_predicates = predicates.to_vec();
+    cx.match_frames.push(frame);
     let mut domains = Vec::with_capacity(raw_domains.len());
     for (position, raw_domain) in raw_domains.iter().enumerate() {
         let domain = whnf(cx.env, &cx.ctx, raw_domain);
@@ -5453,7 +5477,13 @@ fn check_structured_constructor_method(
         ),
     );
     cx.match_frames.last_mut().expect("structured arm frame").refined_target = Some(expected_here.clone());
+    let mut scrut_ty = Term::indformer(ind.id, level_args.to_vec());
+    for param in params {
+        scrut_ty = Term::app(scrut_ty, param.clone());
+    }
+    let path_base = push_branch_path_condition(cx, &scrut_ty, scrut_core, &concrete, total, 0);
     let checked = check_match_arm_result(cx, arm, &expected_here, &arm.span);
+    cx.path_conditions.truncate(path_base);
 
     for shape in shapes {
         cx.lift_bindings.remove(&(base + shape.position));
@@ -6899,7 +6929,7 @@ fn check_dependent_branch_body(
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
-    let path_base = push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n);
+    let path_base = push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n, 0);
 
     let outcome = (|| {
         if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
@@ -7051,6 +7081,7 @@ fn push_branch_path_condition(
     scrut_core: &Term,
     concrete: &Term,
     n: usize,
+    future_fields: usize,
 ) -> usize {
     let path_base = cx.path_conditions.len();
     let path_eq = Term::Eq(
@@ -7058,7 +7089,9 @@ fn push_branch_path_condition(
         Box::new(weaken(scrut_core, n as i64)),
         Box::new(concrete.clone()),
     );
-    cx.path_conditions.push((path_eq, cx.ctx.len()));
+    // Matrix buckets install an equation before their method's field binders
+    // are entered; the proposition already names those future binders.
+    cx.path_conditions.push((path_eq, cx.ctx.len() + future_fields));
     path_base
 }
 
@@ -7264,14 +7297,14 @@ fn open_checked_constructor_arm_frame(
     sentinel_region: usize,
     target: &Term,
     scrutinee_level: Option<usize>,
+    predicates: &[ResultPredicate],
 ) -> Result<(), ElabError> {
     let start_level = cx.ctx.len();
-    cx.match_frames.push(MatchFrame::new(
-        start_level,
-        sentinel_region,
-        Some(target.clone()),
-        scrutinee_level,
-    ));
+    let mut frame = MatchFrame::new(
+        start_level, sentinel_region, Some(target.clone()), scrutinee_level,
+    );
+    frame.result_predicates = predicates.to_vec();
+    cx.match_frames.push(frame);
     for (j, domain) in ctor.args.iter().enumerate() {
         let raw_ty = subst_levels(
             &subst_outer(domain, ind.params.len(), params, j),
@@ -7296,6 +7329,7 @@ fn check_match_dependent(
     arms: &[RMatchArm],
     expected: &Term,
     span: &Span,
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     let hidden_group_result_refinement = equation.is_none()
         && !cx.recursive_group.is_empty()
@@ -7303,9 +7337,9 @@ fn check_match_dependent(
             .iter()
             .any(|arm| expression_mentions_recursive_group(cx, &arm.body));
     if hidden_group_result_refinement {
-        check_match_dependent_mode::<true>(cx, scrut, equation, arms, expected, span)
+        check_match_dependent_mode::<true>(cx, scrut, equation, arms, expected, span, predicates)
     } else {
-        check_match_dependent_mode::<false>(cx, scrut, equation, arms, expected, span)
+        check_match_dependent_mode::<false>(cx, scrut, equation, arms, expected, span, predicates)
     }
 }
 
@@ -7317,6 +7351,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     arms: &[RMatchArm],
     expected: &Term,
     span: &Span,
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
@@ -7389,16 +7424,10 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         if let Some(position) = frame.scrutinee_level {
             if let Some(binding) = cx.lift_bindings.get(&position).copied() {
                 if binding.support.is_some() {
-                    return check_match_with_lift(
-                        cx,
-                        arms,
-                        expected,
-                        span,
-                        &Term::var(cx.ctx.len() - 1 - position),
-                        &ind,
-                        &family_level_args,
-                        &params_terms,
-                        binding,
+                    return check_match_with_lift_with_predicates(
+                        cx, arms, expected, span,
+                        &Term::var(cx.ctx.len() - 1 - position), &ind,
+                        &family_level_args, &params_terms, binding, predicates,
                     );
                 }
             }
@@ -7514,6 +7543,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 &motive,
                 &family_level_args,
                 &shapes,
+                predicates,
             )?);
             continue;
         }
@@ -7541,6 +7571,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             sentinel_region,
             expected,
             frame.scrutinee_level,
+            predicates,
         ));
         let constructor_frame = frame_try!(build_dependent_constructor_frame(
             cx,
@@ -9996,7 +10027,7 @@ fn infer_ascription(
     let ty_core = elab_type(cx, ty)?;
     let predicate = literal_result_predicate(cx, ty, &ty_core)?;
     let e_core = if let Some(predicate) = predicate {
-        check_result_position(cx, e, &ty_core, span, &[predicate])?
+        check_result_position(cx, e, &ty_core, e.span(), &[predicate])?
     } else {
         check(cx, e, &ty_core, e.span())?
     };
@@ -11385,11 +11416,6 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
 /// Close a logical refinement goal over ordinary binders followed by branch
 /// equations and refined-parameter assumptions. The latter are assumptions
 /// only in the obligation, never unchecked evidence in an emitted program.
-#[inline(never)]
-fn close_refinement_goal(cx: &ElabCtx<'_>, goal: Term, proof: Option<Term>) -> (Term, Option<Term>) {
-    close_refinement_goal_with(cx, goal, &[], proof)
-}
-
 /// Recursive-call contracts and path equations extend the obligation only;
 /// neither is evidence introduced into the emitted definition.
 #[inline(never)]
@@ -16765,7 +16791,7 @@ fn elaborate_view_with_spec(
         let (
             full_body,
             _body_inner,
-            param_types,
+            _param_types,
             result_ty_under_requires,
             full_ty,
             pre_admit_id,
@@ -17649,18 +17675,6 @@ fn split_params(ty: &Term, n: usize) -> Option<(Vec<Term>, Term)> {
         current = codomain;
     }
     Some((domains, current.clone()))
-}
-
-/// Strip exactly `n` parameter lambdas; `None` when the body has fewer.
-fn strip_param_lams(term: &Term, n: usize) -> Option<Term> {
-    let mut current = term;
-    for _ in 0..n {
-        let Term::Lam(_, body) = current else {
-            return None;
-        };
-        current = body;
-    }
-    Some(current.clone())
 }
 
 /// Number of arrows `innermost_refine_pred` crosses to reach its refinement.
@@ -19170,6 +19184,16 @@ fn consume_literal_column(row: RowState) -> RowState {
 /// Compile one literal column as ordered value tests plus an unguarded residual
 /// fallback. The fresh binder is an alignment device only: matching never adds
 /// a proof or refinement to `cx`.
+/// Boolean comparator decisions are the path facts of a literal matrix.
+/// A later literal is reached only when all earlier comparisons were false.
+fn push_literal_branch_condition(cx: &mut ElabCtx<'_>, condition: Term, truth: bool) {
+    let chosen = if truth { cx.numeric_env.bool_true_id } else { cx.numeric_env.bool_false_id };
+    cx.path_conditions.push((Term::Eq(
+        Box::new(Term::indformer(cx.numeric_env.bool_id, vec![])),
+        Box::new(condition), Box::new(Term::constructor(chosen, vec![])),
+    ), cx.ctx.len()));
+}
+
 #[inline(never)]
 #[allow(clippy::too_many_arguments)]
 fn compile_literal_column(
@@ -19257,6 +19281,7 @@ fn compile_literal_column(
         }
 
         let mut compiled = Vec::with_capacity(groups.len());
+        let mut prior_conditions: Vec<Term> = Vec::new();
         for (value, plan) in &groups {
             let branch_rows = rows
                 .iter()
@@ -19268,34 +19293,33 @@ fn compile_literal_column(
                 })
                 .map(|(row, _)| consume_literal_column(row.clone()))
                 .collect::<Vec<_>>();
-            let body = compile_match_matrix(
-                cx,
-                arms,
-                &col_types[1..],
-                &col_kinds[1..],
-                branch_rows,
-                real_depth_so_far + 1,
-                top_span,
-                root_frame_depth,
-                ret_ty_slot,
-                arm_used,
-                subsumed_by,
-            )?;
-            compiled.push((plan.condition(cx, Term::var(0))?, body));
+            let condition = plan.condition(cx, Term::var(0))?;
+            let path_base = cx.path_conditions.len();
+            for earlier in &prior_conditions {
+                push_literal_branch_condition(cx, earlier.clone(), false);
+            }
+            push_literal_branch_condition(cx, condition.clone(), true);
+            let checked = compile_match_matrix(
+                cx, arms, &col_types[1..], &col_kinds[1..], branch_rows,
+                real_depth_so_far + 1, top_span, root_frame_depth,
+                ret_ty_slot, arm_used, subsumed_by,
+            );
+            cx.path_conditions.truncate(path_base);
+            let body = checked?;
+            compiled.push((condition.clone(), body));
+            prior_conditions.push(condition);
         }
-        let mut body = compile_match_matrix(
-            cx,
-            arms,
-            &col_types[1..],
-            &col_kinds[1..],
-            residual_rows,
-            real_depth_so_far + 1,
-            top_span,
-            root_frame_depth,
-            ret_ty_slot,
-            arm_used,
-            subsumed_by,
-        )?;
+        let path_base = cx.path_conditions.len();
+        for earlier in &prior_conditions {
+            push_literal_branch_condition(cx, earlier.clone(), false);
+        }
+        let fallback = compile_match_matrix(
+            cx, arms, &col_types[1..], &col_kinds[1..], residual_rows,
+            real_depth_so_far + 1, top_span, root_frame_depth,
+            ret_ty_slot, arm_used, subsumed_by,
+        );
+        cx.path_conditions.truncate(path_base);
+        let mut body = fallback?;
         let ret_ty = ret_ty_slot
             .as_ref()
             .expect("literal compilation reaches a body leaf")
@@ -19892,9 +19916,8 @@ fn compile_match_leaf(
     }
     let first_occurrences = first_row.leaf_binding_occurrences().to_vec();
     let first_arm = &arms[first_row.arm_idx];
-    let has_result_predicate = cx.match_result_predicates.iter().rev().any(|(spans, predicates)| {
-        !predicates.is_empty() && spans.contains(&first_arm.span)
-    });
+    let has_result_predicate = cx.match_frames.last()
+        .is_some_and(|frame| !frame.result_predicates.is_empty());
     let (first_guard, first_body, body_ty_ctx) = if has_result_predicate {
         let seed = ret_ty_slot.as_ref().ok_or_else(|| ElabError::Internal(
             "result predicate on an unseeded match leaf needs a checked motive".into(),
@@ -20340,6 +20363,8 @@ fn compile_match_matrix(
             // owning match decides whether to rerun.
             cx.push_match_binder(col_types[0].clone(), MatchBinderOrigin::Scrutinee);
             cx.hidden_positions.push(cx.ctx.len() - 1);
+            let predicates = cx.match_frames.last()
+                .map(|frame| frame.result_predicates.clone()).unwrap_or_default();
             let raw_methods_result = build_ctor_buckets(
                 cx, arms, &ind0, d_id0, m0, &params0, rows,
                 &col_types[1..], &col_kinds[1..], real_depth_so_far,
@@ -20349,7 +20374,7 @@ fn compile_match_matrix(
                     Term::IndFormer { level_args, .. } => level_args,
                     _ => unreachable!("nested split head is an inductive former"),
                 },
-                Some(&col_types[0]), Some(&split_span),
+                Some(&col_types[0]), Some(&split_span), &predicates,
             );
             let hidden = cx.hidden_positions.pop();
             debug_assert_eq!(hidden, Some(cx.ctx.len() - 1));
@@ -20461,6 +20486,7 @@ fn build_ctor_buckets(
     split_level_args: &[Level],
     split_column_type: Option<&Term>,
     split_span: Option<&Span>,
+    predicates: &[ResultPredicate],
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
     let mut nested_motive: Option<Term> = None;
@@ -20634,10 +20660,29 @@ fn build_ctor_buckets(
         new_col_kinds.extend(std::iter::repeat(ColKind::Ih).take(p_ihs0));
         new_col_kinds.extend_from_slice(tail_col_kinds);
 
+        // The occurrence is the matched source value at the root, and the
+        // installed split binder at a nested constructor column.
+        let split_scrut = rows[0].real_occurrences[0].term.clone();
+        let mut split_ty = Term::indformer(d_id0, split_level_args.to_vec());
+        for arg in params0 {
+            let arg = if tail_under_split { weaken(arg, 1) } else { arg.clone() };
+            split_ty = Term::app(split_ty, arg);
+        }
+        let mut concrete = Term::constructor(c0.id, split_level_args.to_vec());
+        for param in params0.iter().take(m0) {
+            concrete = Term::app(concrete,
+                weaken(param, (n_args0 + usize::from(tail_under_split)) as i64));
+        }
+        for position in 0..n_args0 {
+            concrete = Term::app(concrete, Term::var(n_args0 - 1 - position));
+        }
         let base = cx.ctx.len();
-        cx.match_frames.push(MatchFrame::new(
-            base, cx.match_frames.len(), ret_ty_slot.clone(), None,
-        ));
+        let mut frame = MatchFrame::new(base, cx.match_frames.len(), ret_ty_slot.clone(), None);
+        frame.result_predicates = predicates.to_vec();
+        cx.match_frames.push(frame);
+        let path_base = push_branch_path_condition(
+            cx, &split_ty, &split_scrut, &concrete, n_args0, n_args0,
+        );
         let result = compile_match_matrix(
             cx,
             arms,
@@ -20651,6 +20696,7 @@ fn build_ctor_buckets(
             arm_used,
             subsumed_by,
         );
+        cx.path_conditions.truncate(path_base);
         cx.match_frames.pop();
         let inner = result?;
         methods[k0] = Some(inner);
@@ -20946,6 +20992,29 @@ fn check_mode_result_seed(cx: &ElabCtx<'_>, expected: Option<&Term>) -> Option<T
 
 /// Run one matrix entry. Only its own first-leaf signal may restart the
 /// descent; the leaf and literal plans remain in the same environment once.
+#[inline(never)]
+fn compile_result_matrix_entry<T>(
+    cx: &mut ElabCtx<'_>,
+    root_frame_depth: usize,
+    ret_ty_slot: Option<Term>,
+    arm_count: usize,
+    predicates: &[ResultPredicate],
+    build: impl FnMut(
+        &mut ElabCtx<'_>, &mut Option<Term>, &mut [bool], &mut [Vec<usize>],
+    ) -> Result<T, ElabError>,
+) -> Result<(T, Option<Term>, Vec<bool>, Vec<Vec<usize>>), ElabError> {
+    if predicates.is_empty() {
+        return compile_matrix_entry(cx, root_frame_depth, ret_ty_slot, arm_count, build);
+    }
+    let base = cx.match_frames.len();
+    let mut frame = MatchFrame::new(cx.ctx.len(), base, None, None);
+    frame.result_predicates = predicates.to_vec();
+    cx.match_frames.push(frame);
+    let result = compile_matrix_entry(cx, root_frame_depth, ret_ty_slot, arm_count, build);
+    cx.match_frames.truncate(base);
+    result
+}
+
 fn compile_matrix_entry<T>(
     cx: &mut ElabCtx<'_>,
     root_frame_depth: usize,
@@ -21021,6 +21090,7 @@ fn infer_tuple_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if matches!(
@@ -21052,8 +21122,8 @@ fn infer_tuple_match(
 
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             #[cfg(test)]
@@ -21103,6 +21173,7 @@ fn infer_record_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if matches!(
@@ -21128,8 +21199,8 @@ fn infer_record_match(
     record_pattern_projection(cx, &scrut_ty, span)?;
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             #[cfg(test)]
@@ -21247,6 +21318,7 @@ fn infer_or_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if top_pattern_is_catchall(&arm.pat) {
@@ -21277,8 +21349,8 @@ fn infer_or_match(
 
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             let body = compile_match_matrix(
@@ -21366,6 +21438,7 @@ fn infer_literal_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if !top_pattern_is_literal_form(&arm.pat) {
@@ -21380,8 +21453,8 @@ fn infer_literal_match(
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             let body = compile_match_matrix(
@@ -21418,6 +21491,7 @@ fn infer_literal_match(
     ))
 }
 
+#[inline(always)]
 fn infer_match(
     cx: &mut ElabCtx,
     scrut: &RExpr,
@@ -21425,26 +21499,38 @@ fn infer_match(
     span: &Span,
     expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
+    infer_match_with_predicates(cx, scrut, arms, span, expected, &[])
+}
+
+#[inline(never)]
+fn infer_match_with_predicates(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    arms: &[RMatchArm],
+    span: &Span,
+    expected: Option<&Term>,
+    predicates: &[ResultPredicate],
+) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
     }
     if arms.iter().any(|arm| top_pattern_contains_literal(&arm.pat)) {
-        return infer_literal_match(cx, scrut, arms, span, expected);
+        return infer_literal_match(cx, scrut, arms, span, expected, predicates);
     }
     if arms_have_top_or(arms) {
-        return infer_or_match(cx, scrut, arms, span, expected);
+        return infer_or_match(cx, scrut, arms, span, expected, predicates);
     }
     if arms
         .iter()
         .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Record(_)))
     {
-        return infer_record_match(cx, scrut, arms, span, expected);
+        return infer_record_match(cx, scrut, arms, span, expected, predicates);
     }
     if arms
         .iter()
         .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Tuple(_)))
     {
-        return infer_tuple_match(cx, scrut, arms, span, expected);
+        return infer_tuple_match(cx, scrut, arms, span, expected, predicates);
     }
 
     // 1. Infer scrutinee.
@@ -21545,6 +21631,7 @@ fn infer_match(
                     },
                     None,
                     None,
+                    predicates,
                 )
             })();
             finish_pattern_alias_frame(cx, methods)

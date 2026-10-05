@@ -2,7 +2,7 @@
 //! The predicate is opaque so no reduction can conceal whole-body emission.
 
 use ken_elaborator::{ElabEnv, ObligationKind};
-use ken_kernel::{Level, Term};
+use ken_kernel::{GlobalId, Level, Term};
 
 fn predicate_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
@@ -98,6 +98,29 @@ fn straight_line_postcondition_preserves_the_original_goal() {
     }
 }
 
+/// Durable invariant. A condition or argument that branches is not itself
+/// the declaration's result position. The surrounding application is one
+/// leaf, so its postcondition is neither lost nor duplicated in the argument.
+#[test]
+fn argument_branch_does_not_inherit_the_result_predicate() {
+    let mut env = predicate_env();
+    env.elaborate_decl("fn identity (n : Int) : Int = n")
+        .expect("ordinary identity");
+    let result = env
+        .elaborate_decl_v1(
+            "fn with_argument (b : Bool) : Int ensures P result = identity (if b then 5 else 6)",
+        )
+        .expect("branch in argument, not result position");
+    let [obligation] = result.obligations.as_slice() else {
+        panic!("one result leaf")
+    };
+    assert!(matches!(obligation.kind, ObligationKind::Ensures));
+    assert!(
+        contains_elim(&obligation.goal_closed),
+        "argument still contains the conditional"
+    );
+}
+
 /// Durable invariant. A recursive call's postcondition is assumed only in
 /// that leaf's obligation: Zero remains open and Suc is discharged by its IH.
 #[test]
@@ -130,6 +153,101 @@ fn recursive_postcondition_uses_direct_self_call_hypothesis() {
             format!("{:?}", suc.goal_closed).contains("Eq"),
             "Suc path equation"
         );
+    }
+}
+
+/// Durable invariant. A non-flat constructor pattern splits again inside
+/// the Suc bucket. MEASURED: each emitted goal has one equation per split,
+/// and the recursive leaf has its contract IH. CLAIMED: obligations are
+/// localized under every constructor path. THE GAP: an unthreaded matrix
+/// would still produce three goals; the Eq-domain census closes that gap.
+#[test]
+fn nested_matrix_postconditions_carry_every_constructor_equation() {
+    fn equation_constructors(goal: &Term) -> Vec<GlobalId> {
+        let mut constructors = Vec::new();
+        let mut current = goal;
+        while let Term::Pi(domain, rest) = current {
+            if let Term::Eq(_, _, right) = domain.as_ref() {
+                let mut head = right.as_ref();
+                while let Term::App(function, _) = head {
+                    head = function;
+                }
+                let Term::Constructor { id, .. } = head else {
+                    panic!("path equation lost its constructor: {domain:?}")
+                };
+                constructors.push(*id);
+            }
+            current = rest;
+        }
+        constructors
+    }
+    let mut env = predicate_env();
+    let result = env.elaborate_decl_v1(
+        "fn nested_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> nested_rec m }",
+    ).expect("recursive nested constructor match");
+    assert_eq!(
+        result.obligations.len(),
+        3,
+        "one obligation per matrix path"
+    );
+    for (obligation, (constructors, open)) in result.obligations.iter().zip([
+        (vec![env.globals["Zero"]], true),
+        (vec![env.globals["Suc"], env.globals["Zero"]], true),
+        (vec![env.globals["Suc"], env.globals["Suc"]], false),
+    ]) {
+        assert!(matches!(obligation.kind, ObligationKind::Ensures));
+        assert_eq!(
+            equation_constructors(&obligation.goal_closed),
+            constructors,
+            "every split contributes its own equation: {:?}",
+            obligation.goal_closed
+        );
+        assert_eq!(
+            env.is_open_hole(obligation.hole_id),
+            open,
+            "only the recursive path has a postcondition IH"
+        );
+        assert!(!contains_elim(&obligation.goal_closed));
+    }
+}
+
+/// Durable invariant. Literal-pattern branches use boolean comparison path
+/// equations, including the false residual; no obligation is placed on the
+/// entire match or silently discarded in its specialized matrix producer.
+#[test]
+fn literal_pattern_match_carries_the_comparator_path() {
+    let mut env = predicate_env();
+    let result = env
+        .elaborate_decl_v1(
+            "fn literal_case (n : Int) : Int ensures P result = match n { 5 |-> 5 ; _ |-> 6 }",
+        )
+        .expect("literal and catchall match");
+    assert_eq!(result.obligations.len(), 2);
+    for (obligation, (expected_value, branch)) in
+        result.obligations.iter().zip([(5, "True"), (6, "False")])
+    {
+        let mut current = &obligation.goal_closed;
+        let mut comparator_branches = Vec::new();
+        while let Term::Pi(domain, rest) = current {
+            if let Term::Eq(ty, _, right) = domain.as_ref() {
+                if matches!(ty.as_ref(), Term::IndFormer { id, .. } if *id == env.globals["Bool"]) {
+                    comparator_branches.push(right.as_ref().clone());
+                }
+            }
+            current = rest;
+        }
+        assert_eq!(
+            comparator_branches,
+            vec![Term::constructor(env.globals[branch], vec![])],
+            "comparison path: {:?}",
+            obligation.goal_closed
+        );
+
+        let Term::App(_, value) = current else {
+            panic!("opaque P at leaf: {current:?}")
+        };
+        assert_eq!(value.as_ref(), &Term::IntLit(expected_value.into()));
+        assert!(!contains_elim(&obligation.goal_closed));
     }
 }
 
