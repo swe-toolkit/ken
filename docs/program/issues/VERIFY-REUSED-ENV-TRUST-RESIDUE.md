@@ -1,7 +1,7 @@
 ---
 id: VERIFY-REUSED-ENV-TRUST-RESIDUE
-title: "A reusable elaboration environment keeps trusted-base entries nobody reports: a declaration that fails after minting a premise hole leaves an orphan postulate, and an Axiom in elaborate_expr or the REPL persists from a context with no obligation channel. Make a failed declaration and a reporting-free expression leave no trust residue"
-status: active
+title: "A reusable elaboration environment keeps a trusted-base entry nobody reports: a declaration that fails after minting a premise hole leaves an orphan postulate in the REPL, expand_and_elaborate, load_unit and a reused ElabEnv. Roll the environment back to a mark taken before each declaration"
+status: blocked
 owner: verify
 size: M
 tier: T1
@@ -19,7 +19,8 @@ origin: "Operator 2026-10-04 (concur): queue the two reused-environment residues
 In every environment that outlives one declaration or expression (the REPL
 `Session`, `modules::expand_and_elaborate`, `load_unit`, and
 `elaborate_expr`), `trusted_base()` grows only by entries that a successful
-declaration reports, or by an explicit user `axiom` declaration.
+declaration reports, or by an explicit user `axiom` declaration or `Axiom`
+term, recorded under its caller's owner label (AX-2).
 
 ## Settled inputs (measured at `18543f8e8`)
 
@@ -31,11 +32,6 @@ declaration reports, or by an explicit user `axiom` declaration.
     (`crates/ken-cli/src/repl.rs:27`), `expand_and_elaborate`
     (`modules.rs:4589`) and `load_unit` (`modules.rs:1753`).
   - It over-reports in `trusted_base()`, and no source can reference it.
-- **Axiom in a reporting-free context** (Architect `evt_3m2d23whyhqk1`).
-  `(Axiom : P)` in `elaborate_expr` (`lib.rs:572`) or a REPL expression
-  persists a trusted-base entry. The context has no obligation channel
-  (`PremiseHoles::Refused`). The entry is explicit and visible, but nothing
-  reports it.
 - **Prior art** (research `evt_6wfy5c9wpn849`). Lean refuses to evaluate
   terms that depend on `sorry`, and elaborates commands under
   `withoutModifyingEnv`.
@@ -45,38 +41,53 @@ declaration reports, or by an explicit user `axiom` declaration.
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
 
-## Deliverable
+## AC-0 result (verify `evt_czej6qsb7131`, ruled `evt_2sb1ehveqk5m0`)
 
-1. **AC-0, at the start of the repair.**
-   - For each reusable environment above, measure the `trusted_base()`
-     delta for two rows:
-     - a declaration that mints a premise hole and then fails;
-     - `(Axiom : P)` evaluated as an expression.
-   - The Architect then rules the mechanism for each row. For a failed
-     declaration: transactional rollback of the environment, or deferring
-     the hole's declaration until success. For a reporting-free expression:
-     refuse an `Axiom`, or elaborate without persisting.
-2. **The ruled repair**, applied to every reusable environment in the list,
-   not only the REPL (CHECKS 2).
+- **Failed declaration.** In all four environments the delta is one orphan
+  hole: the hole is minted, then the kernel rejects the body that references
+  it (`KernelRejected(TypeMismatch)`). The staged paths (`elab.rs:15462`,
+  `:15588`, `:15929`) already roll back; the orphan comes from the unstaged
+  declaration paths.
+- **`(Axiom : P)` is not a residue.** It is the AX-2 contract, pinned by
+  `crates/ken-elaborator/tests/ax2_axiom_named_postulates.rs:86-110`: an
+  explicit postulate whose report is the `Opaque` under its owner label.
+  No change.
+
+## Blocked: kernel API needs operator approval
+
+The ruled mechanism is **rollback, not deferral**: the hole must be in the
+environment when the kernel checks the body.
+
+- **Kernel.** A public `EnvMark` with `env_mark` and `rollback_to_mark`,
+  generalized from `rollback_pending` (`crates/ken-kernel/src/check.rs:1349`)
+  without the staged-tail requirement. `rollback_pending` is rewritten in
+  terms of it. It only removes declarations, never admits one.
+  `GlobalEnv::remove_last` (`env.rs:691`) is `pub(crate)` today.
+- **Elaborator.** Mark before each declaration at each reuse seam (REPL
+  `do_def`, the per-declaration loop of `expand_and_elaborate`, `load_unit`,
+  `elaborate_decl_v1`). On `Err`, roll back and scrub every `GlobalId`-keyed
+  table in `ElabEnv`, enforced by an exhaustive destructuring with no `..`.
+  Rollback resets the next id, so a stale entry would alias a later
+  declaration (CHECKS 10).
+
+The frame's stop condition fired. Implementation waits for the operator.
 
 ## Acceptance
 
-- **AC-1.** In each reusable environment:
-  - a failed declaration leaves the `trusted_base()` delta at 0;
-  - a reporting-free `(Axiom : P)` gets the ruled behaviour: refused, or
-    delta 0.
-
-  Each row asserts the delta before it asserts anything else.
+- **AC-1.** In each reusable environment, a failed declaration leaves the
+  `trusted_base()` delta at 0. Each row asserts the delta first.
 - **AC-2 (controls).**
   - A successful declaration with reported holes keeps its delta, which
     equals its reported `hole_id`s.
-  - An explicit `axiom` declaration is still recorded.
+  - An explicit `axiom` declaration and a standalone `Axiom` term are still
+    recorded (AX-2).
+  - After a rolled-back failure, the next successful declaration's
+    `GlobalId` resolves only to itself in every scrubbed table.
   - The call-site discharge and opaque-hole suites stay green.
-- **AC-3 (falsifier).** Reverting the repair at one environment turns its
-  row red.
+- **AC-3 (falsifier).** Removing the rollback at one seam turns its row red.
 
 ## Stop conditions
 
-- The ruled mechanism needs a kernel or spec change.
-- A catalog or example consumer relies on the residue: stop to the
+- Any kernel change beyond the removal-only `EnvMark` API.
+- A catalog, conformance or test consumer relies on the residue: stop to the
   Architect with the consumer (CHECKS 3).
