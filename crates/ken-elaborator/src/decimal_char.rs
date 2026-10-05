@@ -305,6 +305,30 @@ mod tests {
         let guarded = env
             .elaborate_decl_v1(&guarded_source)
             .expect("re-elaborate the actual guarded prelude declaration");
+        let ken_kernel::Decl::Transparent {
+            ty: actual_ty,
+            body: actual_body,
+            ..
+        } = env
+            .env
+            .lookup(env.globals["intToChar"])
+            .expect("prelude intToChar")
+        else {
+            panic!("prelude intToChar must be a checked transparent definition");
+        };
+        let ken_kernel::Decl::Transparent {
+            ty: checked_ty,
+            body: checked_body,
+            ..
+        } = env.env.lookup(guarded.def_id).expect("guarded twin")
+        else {
+            panic!("guarded twin must be a checked transparent definition");
+        };
+        assert_eq!(
+            (actual_ty, actual_body),
+            (checked_ty, checked_body),
+            "the inspected arm must be the actual prelude's checked arm"
+        );
         assert_eq!(guarded.obligations.len(), 1, "the Some arm introduces Char");
         let obligation = &guarded.obligations[0];
         assert!(matches!(
