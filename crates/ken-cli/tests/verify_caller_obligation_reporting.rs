@@ -103,7 +103,10 @@ fn assert_native_build_row(
     );
     assert_eq!(built.status.code(), Some(0), "stderr: {:?}", built.stderr);
     let executable = output_dir.join("ken-starter");
-    assert_eq!(built.stdout, format!("{}\n", executable.display()).as_bytes());
+    assert_eq!(
+        built.stdout,
+        format!("{}\n", executable.display()).as_bytes()
+    );
     assert!(executable.is_file());
     if expects_report {
         assert_one_open_report(&built.stderr);
@@ -125,7 +128,12 @@ fn cli_and_repl_report_open_requires_and_succeed() {
     let open_path = fixture(root.path(), "open.ken", OPEN);
 
     let checked = run("check", &[open_path.as_os_str()]);
-    assert_eq!(checked.status.code(), Some(0), "stderr: {:?}", checked.stderr);
+    assert_eq!(
+        checked.status.code(),
+        Some(0),
+        "stderr: {:?}",
+        checked.stderr
+    );
     assert!(checked.stdout.is_empty());
     assert_one_open_report(&checked.stderr);
     assert!(String::from_utf8_lossy(&checked.stderr)
@@ -141,7 +149,12 @@ fn cli_and_repl_report_open_requires_and_succeed() {
          :def const ac0_use : String = ac0_need\n\
          :list\n:quit\n",
     );
-    assert_eq!(open_repl.status.code(), Some(0), "stderr: {:?}", open_repl.stderr);
+    assert_eq!(
+        open_repl.status.code(),
+        Some(0),
+        "stderr: {:?}",
+        open_repl.stderr
+    );
     let open_repl_stdout = String::from_utf8_lossy(&open_repl.stdout);
     let repl_reports = open_repl_stdout
         .lines()
@@ -155,7 +168,12 @@ fn cli_and_repl_report_open_requires_and_succeed() {
         ":def module Ac0 { const ac0_need : String requires Equal Int 0 0 = \"ac0-run\" const ac0_use : String = ac0_need const ac0_tail : String = \"tail\" }\n\
          :quit\n",
     );
-    assert_eq!(module_repl.status.code(), Some(0), "stderr: {:?}", module_repl.stderr);
+    assert_eq!(
+        module_repl.status.code(),
+        Some(0),
+        "stderr: {:?}",
+        module_repl.stderr
+    );
     let module_stdout = String::from_utf8_lossy(&module_repl.stdout);
     let module_reports = module_stdout
         .lines()
@@ -183,7 +201,12 @@ fn cli_and_repl_closed_controls_remain_silent_and_keep_products_unchanged() {
 
     for path in [&none_path, &discharged_path] {
         let checked = run("check", &[path.as_os_str()]);
-        assert_eq!(checked.status.code(), Some(0), "stderr: {:?}", checked.stderr);
+        assert_eq!(
+            checked.status.code(),
+            Some(0),
+            "stderr: {:?}",
+            checked.stderr
+        );
         assert!(checked.stdout.is_empty());
         assert!(checked.stderr.is_empty());
 
@@ -199,7 +222,12 @@ fn cli_and_repl_closed_controls_remain_silent_and_keep_products_unchanged() {
          :def fn ac0_use (p : Top) : String = ac0_need\n:list\n:quit\n",
     ] {
         let control = repl(script);
-        assert_eq!(control.status.code(), Some(0), "stderr: {:?}", control.stderr);
+        assert_eq!(
+            control.status.code(),
+            Some(0),
+            "stderr: {:?}",
+            control.stderr
+        );
         assert!(control.stderr.is_empty());
         assert_no_open_report(&control.stdout);
         assert!(String::from_utf8_lossy(&control.stdout).ends_with("bye\n"));

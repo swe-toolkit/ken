@@ -1,6 +1,6 @@
 use std::fs;
 
-use ken_elaborator::{ElabEnv, render_open_obligations};
+use ken_elaborator::{render_open_obligations, ElabEnv};
 use tempfile::tempdir;
 
 const OPEN_FILE: &str = r#"const ac0_need : String requires Equal Int 0 0 = "ac0-run"
@@ -51,11 +51,19 @@ fn file_and_literate_v1_results_preserve_open_obligations_and_wrapper_ids() {
 
     let mut legacy = ElabEnv::new().expect("prelude");
     let ids = legacy.elaborate_file(OPEN_FILE).expect("ID wrapper");
-    assert_eq!(ids, results.iter().map(|result| result.def_id).collect::<Vec<_>>());
+    assert_eq!(
+        ids,
+        results
+            .iter()
+            .map(|result| result.def_id)
+            .collect::<Vec<_>>()
+    );
 
     for source in [NONE_FILE, DISCHARGED_FILE] {
         let mut control = ElabEnv::new().expect("prelude");
-        let control_results = control.elaborate_file_v1(source).expect("control elaborates");
+        let control_results = control
+            .elaborate_file_v1(source)
+            .expect("control elaborates");
         assert!(control_results
             .iter()
             .all(|result| result.obligations.is_empty()));
@@ -150,7 +158,13 @@ fn module_roots_and_loaded_literate_fences_return_their_elaboration_results() {
     let ids = legacy
         .elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
         .expect("ID-only roots wrapper");
-    assert_eq!(ids, results.iter().map(|result| result.def_id).collect::<Vec<_>>());
+    assert_eq!(
+        ids,
+        results
+            .iter()
+            .map(|result| result.def_id)
+            .collect::<Vec<_>>()
+    );
 
     let literate_source = root.path().join("LiterateEntry.ken.md");
     fs::write(&literate_source, LITERATE).expect("write literate entry");
