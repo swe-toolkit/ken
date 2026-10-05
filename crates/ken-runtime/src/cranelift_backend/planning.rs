@@ -15,6 +15,7 @@ mod static_transition;
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use static_transition::{
+    with_forced_carrier_match_joins,
     with_recursive_residual_disposition_census, RecursiveResidualDispositionCensus,
     with_recursive_residual_disposition_mutation, RecursiveResidualDispositionMutation,
     checked_ih_continuation_inheritance_mutation_is_exact,
