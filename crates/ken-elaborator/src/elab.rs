@@ -11431,7 +11431,8 @@ fn close_refinement_goal_with(
         certificate = certificate.map(|term| Term::lam(domain, term));
     }
     for (index, (condition, install_depth)) in cx.path_conditions.iter().enumerate().rev() {
-        let growth = cx.ctx.len() - install_depth;
+        let growth = cx.ctx.len().checked_sub(*install_depth)
+            .expect("path condition consumed before its field binders were entered");
         let domain = weaken(condition, (growth + index) as i64);
         closed = Term::pi(domain.clone(), closed);
         certificate = certificate.map(|term| Term::lam(domain, term));

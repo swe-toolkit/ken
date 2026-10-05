@@ -219,36 +219,55 @@ fn literal_pattern_match_carries_the_comparator_path() {
     let mut env = predicate_env();
     let result = env
         .elaborate_decl_v1(
-            "fn literal_case (n : Int) : Int ensures P result = match n { 5 |-> 5 ; _ |-> 6 }",
+            "fn literal_case (n : Int) : Int ensures P result = match n { 5 |-> 5 ; 6 |-> 6 ; _ |-> 7 }",
         )
-        .expect("literal and catchall match");
-    assert_eq!(result.obligations.len(), 2);
-    for (obligation, (expected_value, branch)) in
-        result.obligations.iter().zip([(5, "True"), (6, "False")])
-    {
+        .expect("two literal arms and catchall match");
+    assert_eq!(result.obligations.len(), 3);
+    let mut facts = Vec::new();
+    for (obligation, expected_value) in result.obligations.iter().zip([5, 6, 7]) {
         let mut current = &obligation.goal_closed;
-        let mut comparator_branches = Vec::new();
+        let mut branch_facts = Vec::new();
         while let Term::Pi(domain, rest) = current {
-            if let Term::Eq(ty, _, right) = domain.as_ref() {
+            if let Term::Eq(ty, condition, right) = domain.as_ref() {
                 if matches!(ty.as_ref(), Term::IndFormer { id, .. } if *id == env.globals["Bool"]) {
-                    comparator_branches.push(right.as_ref().clone());
+                    branch_facts.push((condition.as_ref().clone(), right.as_ref().clone()));
                 }
             }
             current = rest;
         }
-        assert_eq!(
-            comparator_branches,
-            vec![Term::constructor(env.globals[branch], vec![])],
-            "comparison path: {:?}",
-            obligation.goal_closed
-        );
-
         let Term::App(_, value) = current else {
             panic!("opaque P at leaf: {current:?}")
         };
         assert_eq!(value.as_ref(), &Term::IntLit(expected_value.into()));
         assert!(!contains_elim(&obligation.goal_closed));
+        facts.push(branch_facts);
     }
+    let truth = Term::constructor(env.globals["True"], vec![]);
+    let falsehood = Term::constructor(env.globals["False"], vec![]);
+    let [first, second, fallback] = facts.as_slice() else {
+        unreachable!()
+    };
+    assert_eq!(first.len(), 1);
+    assert_eq!(second.len(), 2);
+    assert_eq!(fallback.len(), 2);
+    assert_eq!(first[0].1, truth);
+    assert_eq!(second[0].1, falsehood);
+    assert_eq!(second[1].1, truth);
+    assert_eq!(fallback[0].1, falsehood);
+    assert_eq!(fallback[1].1, falsehood);
+    assert_eq!(
+        first[0].0, second[0].0,
+        "first comparator reused in arm two"
+    );
+    assert_eq!(
+        first[0].0, fallback[0].0,
+        "first comparator reused in fallback"
+    );
+    assert_eq!(
+        second[1].0, fallback[1].0,
+        "second comparator reused in fallback"
+    );
+    assert_ne!(first[0].0, second[1].0, "two different literal comparisons");
 }
 
 /// Durable invariant. Literal annotations introduce an obligation at each
