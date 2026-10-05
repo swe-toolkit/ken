@@ -1,13 +1,13 @@
-//! Checked Int literal-carrier registration (ADR 0013 Layer 2).
-//! Promise class: kernel admission boundary. Only a live opaque primitive type
-//! may become the unique carrier; unsuccessful registration changes no carrier
-//! or trusted-base entry. The API privacy boundary is pinned by the doctest
-//! on `check::register_checked_int_lit_carrier`.
+//! Checked Int literal-carrier registration (spec 14 §5; ADR 0013 Layer 2).
+//! Promise class: durable behavioral invariant. Only a live, monomorphic
+//! opaque primitive declared at Type may become the unique literal carrier;
+//! unsuccessful registration changes no carrier or trusted-base entry.
+//! External API privacy is pinned by the doctest on the checked entry point.
 
 use ken_kernel::check::register_checked_int_lit_carrier;
 use ken_kernel::{
     declare_def, declare_inductive, declare_primitive, infer, Context, CtorSpec, GlobalEnv,
-    GlobalId, InductiveSpec, KernelError, Level, PrimReduction, Term,
+    GlobalId, InductiveSpec, KernelError, Level, LevelVar, PrimReduction, Term,
 };
 use num_bigint::BigInt;
 
@@ -78,6 +78,57 @@ fn non_opaque_primitive_cannot_register_as_int_lit_carrier() {
     )
     .unwrap();
     assert_refused_unchanged(&mut env, operation);
+}
+
+#[test]
+fn value_primitive_tagged_opaque_type_cannot_register_as_int_lit_carrier() {
+    let mut env = GlobalEnv::new();
+    let bool_ = declare_inductive(&mut env, |_| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::Zero,
+        constructors: vec![CtorSpec {
+            args: vec![],
+            target_indices: vec![],
+        }],
+    })
+    .unwrap();
+    let value = declare_primitive(
+        &mut env,
+        vec![],
+        Term::indformer(bool_, vec![]),
+        PrimReduction::OpaqueType,
+    )
+    .unwrap();
+    assert_refused_unchanged(&mut env, value);
+}
+
+#[test]
+fn omega_primitive_tagged_opaque_type_cannot_register_as_int_lit_carrier() {
+    let mut env = GlobalEnv::new();
+    let proposition = declare_primitive(
+        &mut env,
+        vec![],
+        Term::omega(Level::Zero),
+        PrimReduction::OpaqueType,
+    )
+    .unwrap();
+    assert_refused_unchanged(&mut env, proposition);
+}
+
+#[test]
+fn polymorphic_primitive_cannot_type_closed_int_literals() {
+    let mut env = GlobalEnv::new();
+    let u = LevelVar(0);
+    let polymorphic = declare_primitive(
+        &mut env,
+        vec![u],
+        Term::ty(Level::Var(u)),
+        PrimReduction::OpaqueType,
+    )
+    .unwrap();
+    assert_refused_unchanged(&mut env, polymorphic);
 }
 
 #[test]

@@ -1761,8 +1761,9 @@ pub fn register_unit_type(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()>
     Ok(())
 }
 
-/// Register the sole type of `Term::IntLit`. The registrant must be a live
-/// opaque primitive type, not a definition, inductive family, or operation.
+/// Register the sole type of `Term::IntLit`. The registrant must be a live,
+/// monomorphic opaque primitive declared at `Type ℓ`, not a definition,
+/// inductive family, operation, or value merely tagged `OpaqueType`.
 /// This changes no declarations or trusted-base entries.
 ///
 /// The raw environment setter is not callable from outside this crate:
@@ -1793,8 +1794,11 @@ pub fn register_checked_int_lit_carrier(env: &mut GlobalEnv, id: GlobalId) -> Ke
             env.lookup(id),
             Some(Decl::Primitive {
                 reduction: PrimReduction::OpaqueType,
+                level_params,
+                ty,
                 ..
-            })
+            }) if level_params.is_empty()
+                && matches!(whnf(env, &Context::new(), ty), Term::Type(_))
         )
     {
         return Err(KernelError::Msg(
