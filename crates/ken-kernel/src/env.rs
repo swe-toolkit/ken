@@ -352,7 +352,7 @@ pub struct GlobalEnv {
     deceq_certs: HashMap<GlobalId, DecEqCert>,
     /// The primitive type `Term::IntLit` terms belong to
     /// (`docs/adr/0013-int-decidable-equality-kernel-posture.md` Layer 2),
-    /// set once by [`GlobalEnv::register_int_lit_type`]. `None` until
+    /// set once by [`crate::check::register_checked_int_lit_carrier`]. `None` until
     /// registered — bookkeeping metadata (like `deceq_certs`), never a
     /// `trusted_base()` member.
     int_lit_ty: Option<GlobalId>,
@@ -977,10 +977,9 @@ impl GlobalEnv {
         self.deceq_certs.get(&prim_ty)
     }
 
-    /// Record that `Term::IntLit` terms have type `id` (ADR 0013 Layer 2).
-    /// Set once by the elaborator, alongside the primitive's own
-    /// `declare_deceq_certificate` call.
-    pub fn register_int_lit_type(&mut self, id: GlobalId) {
+    /// Store the checked `Term::IntLit` carrier (ADR 0013 Layer 2).
+    /// Only `check::register_checked_int_lit_carrier` may authorize this setter.
+    pub(crate) fn register_int_lit_type(&mut self, id: GlobalId) {
         self.int_lit_ty = Some(id);
     }
 

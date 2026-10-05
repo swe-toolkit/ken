@@ -8,6 +8,7 @@
 use num_bigint::BigInt;
 use std::collections::BTreeSet;
 
+use ken_kernel::check::register_checked_int_lit_carrier;
 use ken_kernel::env::{Context, Decl, PrimReduction};
 use ken_kernel::term::{Level, Term};
 use ken_kernel::{
@@ -63,7 +64,7 @@ fn mk_env() -> (GlobalEnv, Env0) {
 
     let _cert = declare_deceq_certificate(&mut env, prim_t, eq_op, bool_, true_)
         .expect("well-shaped eq_op registers");
-    env.register_int_lit_type(prim_t);
+    register_checked_int_lit_carrier(&mut env, prim_t).unwrap();
 
     (env, Env0 { prim_t })
 }

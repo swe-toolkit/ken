@@ -1761,6 +1761,50 @@ pub fn register_unit_type(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()>
     Ok(())
 }
 
+/// Register the sole type of `Term::IntLit`. The registrant must be a live
+/// opaque primitive type, not a definition, inductive family, or operation.
+/// This changes no declarations or trusted-base entries.
+///
+/// The raw environment setter is not callable from outside this crate:
+///
+/// ```compile_fail
+/// use ken_kernel::{declare_primitive, GlobalEnv, Level, PrimReduction, Term};
+/// let mut env = GlobalEnv::new();
+/// let int = declare_primitive(
+///     &mut env, vec![], Term::ty(Level::Zero), PrimReduction::OpaqueType,
+/// ).unwrap();
+/// env.register_int_lit_type(int);
+/// ```
+///
+/// Use the checked entry point instead:
+///
+/// ```
+/// use ken_kernel::{declare_primitive, GlobalEnv, Level, PrimReduction, Term};
+/// let mut env = GlobalEnv::new();
+/// let int = declare_primitive(
+///     &mut env, vec![], Term::ty(Level::Zero), PrimReduction::OpaqueType,
+/// ).unwrap();
+/// ken_kernel::check::register_checked_int_lit_carrier(&mut env, int).unwrap();
+/// assert_eq!(env.int_lit_type(), Some(int));
+/// ```
+pub fn register_checked_int_lit_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
+    if env.int_lit_type().is_some()
+        || !matches!(
+            env.lookup(id),
+            Some(Decl::Primitive {
+                reduction: PrimReduction::OpaqueType,
+                ..
+            })
+        )
+    {
+        return Err(KernelError::Msg(
+            "invalid or duplicate Int literal carrier".into(),
+        ));
+    }
+    env.register_int_lit_type(id);
+    Ok(())
+}
+
 /// Register a literal carrier when its type is admitted. Prelude declarations
 /// may contain checked String literals before the List Char view is installed.
 pub fn register_checked_string_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {

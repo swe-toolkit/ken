@@ -438,7 +438,8 @@ pub fn register_numeric_env(
     // `Int` literal constructs an `IntLit` yet (that wiring is a separate,
     // committed follow-up), so this registration is inert until then —
     // `infer`/`eq_reduce`'s new `IntLit` arms simply have nothing to see.
-    env.register_int_lit_type(int_id);
+    ken_kernel::check::register_checked_int_lit_carrier(env, int_id)
+        .map_err(|e| ElabError::Internal(format!("Int literal carrier failed: {e}")))?;
 
     // Internal, transparent NonZeroDivisor b := Eq Int b 0 → Bottom.
     // Keep it out of the global surface-name table: only `/` and `%` gain
