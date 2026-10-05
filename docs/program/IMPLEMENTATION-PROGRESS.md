@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-05 11:13:16Z — from 862 issue file(s) in `docs/program/issues/`.
+2026-10-05 14:38:52Z — from 862 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -262,7 +262,7 @@ the committed file matches the generator's output.
 | `KERNEL-INT-DIV-MOD-NATIVE` | Int has no division: spec 18a lists div_int and mod_int as a GAP with a NATIVE verdict, and the l1_acceptance division row stays ignored. Register both as neutral kernel Ops, give raw / and % on Int a non-zero-divisor obligation, and un-ignore the row | merged | kernel | M | architect | — |
 | `KERNEL-INT-LIT-CARRIER-CHECKED` | Code outside the kernel can make every IntLit check at any type, because GlobalEnv::register_int_lit_type is pub and unchecked. Register the Int literal carrier through a checked kernel entry point, as the String and Char carriers already are, and make the raw setter crate-private | ready | kernel | S | architect | — |
 | `KERNEL-INTRINSIC-ALL-LIFT-NESTED-POSITIVE` | Complete the intrinsic All former-lift guest-path resolution to descend through NESTED positive formers (List (Pair String X)), so the eliminator of a strictly-positive inductive whose recursive occurrence sits one former-nesting deeper than a direct application can be built — preserving strict positivity (positive former nestings only, never a negative-position path). | merged | kernel | M | kernel | — |
-| `KERNEL-J-NONREFL-ENDPOINT-SHARING` | A non-refl J reduction re-reduces the level below about eight times, through j_endpoints, the type-equality witness and the Cast arm's components, so a source-derived chain of J over step_i helpers costs work exponential in its depth. Make whnf of that chain linear in depth by reducing each endpoint once, with the J reduct's shape unchanged | active | kernel | M | architect | — |
+| `KERNEL-J-NONREFL-ENDPOINT-SHARING` | A non-refl J reduction re-reduces the level below about eight times, through j_endpoints, the type-equality witness and the Cast arm's components, so a source-derived chain of J over step_i helpers costs work exponential in its depth. Reduce each child J once, so J reductions are linear in depth and reducer entries quadratic, with the J reduct's shape unchanged | active | kernel | M | architect | — |
 | `KERNEL-LEQ-INT-LITERAL-REDUCTION` | The kernel cannot compute leq_int on two Int literals, so a closed refinement obligation such as PosInt 5 has no proof term. Extend ADR 0013 Layer 2 to leq_int only: leq_int (IntLit m) (IntLit n) reduces to True or False by the same BigInt comparison the interpreter runs | merged | kernel | S | architect | — |
 | `KERNEL-LEVEL-CLOSURE-CHECK` | The kernel proves Bottom with no postulate, because no admission checks a declaration's free level variables against its level parameters, so a definition's own u escapes instantiation. Check level closure and distinct parameters at every admission, and emit Bottom for unequal universes only over closed levels | merged | kernel | S | architect | — |
 | `KERNEL-LITERAL-CHAR-VIEW` | K3: the kernel reduces string_to_list_char on a checked String literal to its List Char and charToInt on a checked Char literal to its IntLit codepoint, so a generic client can build a checked ASCII witness for a fresh literal; no other primitive gains reduction | merged | kernel | M | architect | — |
