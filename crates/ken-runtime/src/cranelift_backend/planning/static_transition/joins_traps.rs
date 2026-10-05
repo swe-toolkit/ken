@@ -564,19 +564,29 @@ fn summarize_result_phase(
         }
         #[cfg(feature = "px8-ds-test-support")]
         let forced_match = summary.phase == ResultPhase::SpecializedOnly
-            && matches!(expr, RuntimeExpr::Match { .. } | RuntimeExpr::ComputationalMatch { .. })
+            && matches!(
+                expr,
+                RuntimeExpr::Match { .. } | RuntimeExpr::ComputationalMatch { .. }
+            )
             && FORCE_CARRIER_MATCH_JOINS.with(Cell::get);
         #[cfg(not(feature = "px8-ds-test-support"))]
         let forced_match = false;
         #[cfg(feature = "px8-ds-test-support")]
         if forced_match {
             FORCED_CARRIER_MATCH_JOINS.with(|count| {
-                count.set(count.get().checked_add(1).expect("forced Match count fits usize"));
+                count.set(
+                    count
+                        .get()
+                        .checked_add(1)
+                        .expect("forced Match count fits usize"),
+                );
             });
         }
         let result = PlannedJoinResult {
             representation: match summary.phase {
-                ResultPhase::SpecializedOnly if forced_match => JoinResultRepresentation::CarrierWord,
+                ResultPhase::SpecializedOnly if forced_match => {
+                    JoinResultRepresentation::CarrierWord
+                }
                 ResultPhase::SpecializedOnly => JoinResultRepresentation::NativeScalarPair,
                 ResultPhase::CarrierRequired => JoinResultRepresentation::CarrierWord,
             },
