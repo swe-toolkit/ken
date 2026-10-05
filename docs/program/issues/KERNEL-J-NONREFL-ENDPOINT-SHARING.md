@@ -50,18 +50,58 @@ linear in its depth k, with the verdict it gives today.
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
 
+## AC-0 result and ruled mechanism
+
+- **AC-0** (implementer `evt_5bze1d19akass`, suppressed mode on
+  `3695cd16a`). Each non-refl J spawns 8 children one level down:
+  - D = 1 (`j_endpoints`);
+  - E = 6, under the witness check at `obs.rs:301` (4 from `infer_j`,
+    plus 2 from the final conversion);
+  - A = 1 (the Cast source component).
+- **Endpoint sharing alone fails** (Architect `evt_64yx9v9m9bgvs`).
+  Reducing the endpoints made it ×23.7 worse. Syntactic alignment kept
+  ×8.18.
+- **Operator 2026-10-05: "(c) then (a)".** Research advisory
+  `evt_4xjj6256dapa4`, then the witness is typed by construction. This
+  trust change is operator-approved within this WP.
+- **Mechanism** (Architect `evt_3kv8v4ajegm7q`), in `obs.rs`:
+  1. At the top of `j_nonrefl`, before `j_endpoints`, the redex's own
+     typing is established once with `crate::check::infer` on the `J`
+     term. On `Err` the J stays neutral.
+  2. The witness `check` at `:301` runs only under `#[cfg(test)]`, as an
+     assertion on by default and suppressed by
+     `DeferredFixedPointAssertionsGuard`. A mismatch panics with the lemma
+     instance.
+  3. Research's J-witness typing lemma, side conditions (i)-(iv)
+     verbatim, is the doc comment of `type_eq_by_j_with_base`.
+  4. Unchanged: W's and the Cast reduct's term schema, the level from
+     `infer(source)`, the Ω-motive neutral gate (`:269-271`) and
+     `canonical_type_eq_base`'s check.
+
+  Spec 15 §4.1 already permits synthesizing pair-eq, so there is no spec
+  edit. The prelude-constant variant is not adopted.
+
 ## Deliverable
 
-Whnf of S costs work linear in k. Each endpoint of a non-refl J reduct is
-reduced once, and the reduct is built from the reduced forms with its shape
-unchanged. The Architect rules the repair after AC-0.
+Whnf of S costs work linear in k, by the ruled mechanism. The production
+kernel relies on the J-witness lemma where `:301` used to check, and the
+handoff names that trust.
 
 ## Acceptance
 
 - **AC-0 (parent attribution; measure only).** For each `j_nonrefl` call
   at level i−1, name the site of the level-i reduction that encloses it.
-  The ×8 must come out as a sum over D, E and A, at k = 2 to 4. The
-  Architect rules the repair from that table, before any edit.
+  The ×8 must come out as a sum over D, E and A, at k = 2 to 4. Done
+  (above).
+- **AC-0' (measure, then stop to the Architect).** In suppressed mode on
+  current main, S at k = 2 to 6, report entries and D/E/A children per
+  parent for two rows:
+  - Row 1: steps 1-3 only, with endpoints as `j_endpoints` returns them.
+  - Row 2: Row 1 plus `p_a_refl` and `p_b_e` built from the whnf of the
+    endpoints. W keeps the original endpoints.
+
+  The target is at most 1 child per parent. If both rows show 2 or more,
+  stop with the table. No formation-head endpoint read.
 - **AC-1.**
   - A committed pin bounds S's entries by `c·k` at k = 4, 8 and 16,
     counted with the assertion suppressed.
@@ -74,12 +114,16 @@ unchanged. The Architect rules the repair after AC-0.
     results.
   - The 57-package census shows no verdict change, and `trusted_base()` is
     equal.
+  - A raw ill-typed J (base not at `P a (refl a)`) stays neutral under
+    whnf, and removing the guard reddens it. A well-typed non-refl J
+    reduces to the same Cast term as on base, compared syntactically.
+  - The `cfg(test)` witness re-check stays on in every kernel test except
+    the count pins.
 
 ## Stop conditions
 
-- **A repair that changes the J reduct's shape.** Two examples: building
-  the witness without typing it, or taking the universe level from the
-  motive instead of `infer(source)`. Either is a change to the J reduction
-  rule's implementation and an operator question before any build.
+- **A repair that changes the J reduct's shape** beyond the ruled
+  mechanism, for example taking the universe level from the motive instead
+  of `infer(source)`. That is an operator question before any build.
 - Any fuel, cache keyed on term identity, or depth cutoff.
 - Any change to what the kernel accepts: stop to the Architect.
