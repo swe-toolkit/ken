@@ -27,21 +27,6 @@ proc eprintLine (text : String) : IO (Result IOError Unit) visits [Console] =
       (bytes_encode text)
       (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char)))))
 
-fn console_line_payload (text : String) : Bytes =
-  bytes_concat
-    (bytes_encode text)
-    (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char))))
-
-fn console_write_tree (stream : Stream) (payload : Bytes) : IO (Result IOError Unit) =
-  Vis
-    ConsoleOp
-    console_resp
-    (Result IOError Unit)
-    (Write stream payload)
-    (λr. Ret ConsoleOp console_resp (Result IOError Unit) r)
-
-theorem console_tree_refl (a : Type) (x : a) : Equal a x x = Refl
-
 pub theorem print_write_tree
       (text : String)
     : Equal
@@ -73,6 +58,21 @@ pub theorem eprint_line_write_tree
         (eprintLine text)
         (console_write_tree Stderr (console_line_payload text)) =
   console_tree_refl (IO (Result IOError Unit)) (eprintLine text)
+
+fn console_write_tree (stream : Stream) (payload : Bytes) : IO (Result IOError Unit) =
+  Vis
+    ConsoleOp
+    console_resp
+    (Result IOError Unit)
+    (Write stream payload)
+    (λr. Ret ConsoleOp console_resp (Result IOError Unit) r)
+
+fn console_line_payload (text : String) : Bytes =
+  bytes_concat
+    (bytes_encode text)
+    (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char))))
+
+theorem console_tree_refl (a : Type) (x : a) : Equal a x x = Refl
 ```
 
 `print_write_tree`, `print_line_write_tree`, `eprint_write_tree`, and
