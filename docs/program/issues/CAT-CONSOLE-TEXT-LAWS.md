@@ -1,7 +1,7 @@
 ---
 id: CAT-CONSOLE-TEXT-LAWS
 title: "Console.Text's four helpers (print, printLine, eprint, eprintLine) have no proof: their stream choice, exact bytes, single trailing newline and Result preservation are only executed by i2_console_floor.rs. Prove each helper's write tree in the package at zero TCB"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
