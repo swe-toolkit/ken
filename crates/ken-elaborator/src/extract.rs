@@ -112,6 +112,29 @@ pub fn v2_extract(elab_result: &ElabResult) -> ExtractionResult {
     ExtractionResult { obligations }
 }
 
+/// Render every open proof obligation as an `unknown` diagnostic line.
+///
+/// Foreign runtime checks have status `tested`, not `unknown`, and are not
+/// rendered as open proof holes (`21 §5.2`, `22 §2.4`).
+pub fn render_open_obligations(results: &[ElabResult]) -> Vec<String> {
+    let mut lines = Vec::new();
+    for result in results {
+        for triple in v2_extract(result).obligations {
+            if matches!(&triple.provenance.kind, ProvKind::FfiRuntimeCheck) {
+                continue;
+            }
+            lines.push(format!(
+                "unknown {} at {}..{}: {:?}",
+                triple.id.0,
+                triple.provenance.span.start,
+                triple.provenance.span.end,
+                triple.phi,
+            ));
+        }
+    }
+    lines
+}
+
 /// Lift a V1 `Obligation` to a V2 `ObligationTriple`.
 ///
 /// Every `ObligationKind` arm is explicit — NO catch-all — satisfying the

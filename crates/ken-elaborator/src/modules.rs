@@ -79,6 +79,12 @@ pub struct ModuleState {
     catalog_roots: Vec<PathBuf>,
     /// Successfully elaborated file units, keyed by dotted module path.
     loaded_units: HashMap<String, Vec<ken_kernel::GlobalId>>,
+    /// V1 results owned by each loaded file unit, retained for cached roots
+    /// calls without duplicating every transitive dependency at each ancestor.
+    loaded_unit_results: HashMap<String, Vec<crate::elab::ElabResult>>,
+    /// File-unit import edges, in source traversal order, for reconstructing a
+    /// cached root's dependency-first result list.
+    loaded_unit_dependencies: HashMap<String, Vec<String>>,
     /// Raw source and the one authoritative extraction for loaded literate
     /// units. Loading does not execute checked fences; an entry front end may
     /// request that separate document-check step after the module graph loads.
@@ -1747,6 +1753,62 @@ fn refresh_carried_instance_admission(elab: &mut ElabEnv) {
     elab.class_env.direct_use_instances.extend(carried);
 }
 
+/// Rebuild a cached unit's dependency-first V1 result closure, deduplicated by
+/// definition id, from the per-unit results and import edges retained at load.
+fn loaded_results_for_unit(
+    elab: &ElabEnv,
+    module: &str,
+) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    fn collect(
+        elab: &ElabEnv,
+        module: &str,
+        visited_modules: &mut HashSet<String>,
+        visited_ids: &mut HashSet<ken_kernel::GlobalId>,
+        results: &mut Vec<crate::elab::ElabResult>,
+    ) -> Result<(), ElabError> {
+        if !visited_modules.insert(module.to_string()) {
+            return Ok(());
+        }
+        let dependencies = elab
+            .module_state
+            .loaded_unit_dependencies
+            .get(module)
+            .ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "loaded module '{module}' has no retained dependency edges"
+                ))
+            })?;
+        for dependency in dependencies {
+            collect(elab, dependency, visited_modules, visited_ids, results)?;
+        }
+        let own_results = elab
+            .module_state
+            .loaded_unit_results
+            .get(module)
+            .ok_or_else(|| {
+                ElabError::Internal(format!(
+                    "loaded module '{module}' has no retained V1 results"
+                ))
+            })?;
+        for result in own_results {
+            if visited_ids.insert(result.def_id) {
+                results.push(result.clone());
+            }
+        }
+        Ok(())
+    }
+
+    let mut results = Vec::new();
+    collect(
+        elab,
+        module,
+        &mut HashSet::new(),
+        &mut HashSet::new(),
+        &mut results,
+    )?;
+    Ok(results)
+}
+
 /// Load one file unit through the active-stack gate. Import edges are
 /// discovered before `expand_scope`, so a cyclic unit is rejected before any
 /// of that unit's declarations are admitted to the flat kernel environment.
@@ -1755,7 +1817,7 @@ fn load_unit(
     module: &str,
     span: &Span,
     mode: ResolutionMode,
-) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
+) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
     if let Some(start) = elab
         .module_state
         .active_imports
@@ -1770,7 +1832,8 @@ fn load_unit(
         });
     }
     if let Some(ids) = elab.module_state.loaded_units.get(module) {
-        return Ok(ids.clone());
+        let results = loaded_results_for_unit(elab, module)?;
+        return Ok((ids.clone(), results));
     }
 
     let root = elab
@@ -1814,6 +1877,8 @@ fn load_unit(
     };
 
     elab.module_state.active_imports.push(module.to_string());
+    let mut dependency_results = Vec::new();
+    let mut loaded_dependencies = Vec::new();
     let result = (|| {
         let mut local_modules = HashSet::new();
         declared_module_paths(&decls, module, &mut local_modules);
@@ -1824,7 +1889,9 @@ fn load_unit(
             // declared later: the ordered pass will reject its premature use
             // at the import. An unrelated global export is not a file load.
             if declared_inline_import(&owner, Some(module), &dependency, &local_modules).is_none() {
-                load_unit(elab, &dependency, &import_span, mode)?;
+                let (_, results) = load_unit(elab, &dependency, &import_span, mode)?;
+                loaded_dependencies.push(dependency.clone());
+                dependency_results.extend(results);
             }
         }
         refresh_carried_instance_admission(elab);
@@ -1849,7 +1916,7 @@ fn load_unit(
             true,
         )?;
         let ids: Vec<ken_kernel::GlobalId> =
-            results.into_iter().map(|result| result.def_id).collect();
+            results.iter().map(|result| result.def_id).collect();
         // A file's descendants are those it declared AND expanded, not
         // similarly spelled edges retained from another source unit. Keep
         // the current import provenance paired with this export-table write;
@@ -1907,7 +1974,7 @@ fn load_unit(
         elab.module_state
             .loaded_unit_scopes
             .insert(module.to_string(), scope);
-        Ok(ids)
+        Ok((ids, results))
     })();
     let popped = elab.module_state.active_imports.pop();
     debug_assert_eq!(popped.as_deref(), Some(module));
@@ -1916,19 +1983,32 @@ fn load_unit(
     elab.class_env.direct_use_instances = previous_direct_instances;
     elab.class_env.implicit_single_provider = previous_implicit_single_provider;
 
-    let ids = result?;
+    let (ids, own_results) = result?;
+    let mut closure_results = Vec::new();
+    let mut seen_ids = HashSet::new();
+    for result in dependency_results.into_iter().chain(own_results.iter().cloned()) {
+        if seen_ids.insert(result.def_id) {
+            closure_results.push(result);
+        }
+    }
     if root_unit {
         elab.module_state.boundary_header = boundary.map(|(header, _)| header);
     }
     elab.module_state
         .loaded_units
         .insert(module.to_string(), ids.clone());
+    elab.module_state
+        .loaded_unit_results
+        .insert(module.to_string(), own_results);
+    elab.module_state
+        .loaded_unit_dependencies
+        .insert(module.to_string(), loaded_dependencies);
     if let Some(literate) = literate {
         elab.module_state
             .loaded_literate_units
             .insert(module.to_string(), literate);
     }
-    Ok(ids)
+    Ok((ids, closure_results))
 }
 
 /// Execute the document-check obligations for one already-loaded entry unit.
@@ -1936,10 +2016,10 @@ fn load_unit(
 /// Dependency loading never calls this function. A front end calls it only for
 /// the dotted module selected as its entry, preserving the isolated `.ken.md`
 /// contract without turning checked fences into part of a module's interface.
-pub(crate) fn execute_loaded_entry_checked_fences(
+pub(crate) fn execute_loaded_entry_checked_fences_v1(
     elab: &mut ElabEnv,
     entry: &str,
-) -> Result<(), ElabError> {
+) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     if !elab.module_state.loaded_units.contains_key(entry) {
         return Err(ElabError::Internal(format!(
             "cannot check fences for unloaded module entry '{entry}'"
@@ -1947,7 +2027,7 @@ pub(crate) fn execute_loaded_entry_checked_fences(
     }
     let Some((source, extracted)) = elab.module_state.loaded_literate_units.get(entry).cloned()
     else {
-        return Ok(());
+        return Ok(Vec::new());
     };
     let scope = elab
         .module_state
@@ -1960,7 +2040,7 @@ pub(crate) fn execute_loaded_entry_checked_fences(
             ))
         })?;
     let previous = std::mem::replace(&mut elab.module_state.root_scope, scope);
-    let result = elab.execute_ken_md_checked_fences(&source, &extracted);
+    let result = elab.execute_ken_md_checked_fences_v1(&source, &extracted);
     elab.module_state.root_scope = previous;
     result
 }
@@ -1971,7 +2051,20 @@ pub fn elaborate_module_from_roots(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    elaborate_module_from_roots_with_mode(elab, roots, entry, ResolutionMode::Legacy)
+    elaborate_module_from_roots_v1(elab, roots, entry)
+        .map(|results| results.into_iter().map(|result| result.def_id).collect())
+}
+
+/// Elaborate a roots-loaded unit and return the V1 results of its whole
+/// dependency closure, whether loaded by this call or cached from an earlier
+/// one, dependency-first and deduplicated by definition id.
+pub fn elaborate_module_from_roots_v1(
+    elab: &mut ElabEnv,
+    roots: &[PathBuf],
+    entry: &str,
+) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
+        .map(|(_, results)| results)
 }
 
 /// Opt-in strict roots entry. WP-4 will move the real catalog caller to this
@@ -1981,15 +2074,16 @@ pub fn elaborate_module_from_roots_strict(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    elaborate_module_from_roots_with_mode(elab, roots, entry, ResolutionMode::Strict)
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Strict)
+        .map(|(ids, _)| ids)
 }
 
-fn elaborate_module_from_roots_with_mode(
+fn elaborate_module_from_roots_with_mode_v1(
     elab: &mut ElabEnv,
     roots: &[PathBuf],
     entry: &str,
     mode: ResolutionMode,
-) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
+) -> Result<(Vec<ken_kernel::GlobalId>, Vec<crate::elab::ElabResult>), ElabError> {
     // The public globals map may change after the pre-source capture. Recheck
     // before loading or reusing any strict unit; do not heal a forged map.
     if mode == ResolutionMode::Strict {

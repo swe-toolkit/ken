@@ -16,14 +16,16 @@ use crate::checked_core::{
     AssumptionTrustKind, AssumptionTrustMetadata, CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
     CheckedCoreBodyViewError, CheckedCoreBodyViewSelection, CheckedCorePackage,
     CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
-    ConstructorMetadata, DataMetadata, LowerabilityStatus, PartialityMetadata, PrimitiveMetadata,
+    ConstructorMetadata, DataMetadata, LowerabilityStatus, ObligationMetadata, ObligationStatus,
+    PartialityMetadata, PrimitiveMetadata,
     PrimitiveReductionMetadata, RecursionAdmission, RecursionMetadata, StableSymbol,
     StableSymbolTable, SymbolNamespace, canonical_decl_bytes, canonical_symbol_bytes,
     canonical_term_bytes, checked_core_declaration_body_view, emit_checked_core_package,
     semantic_fingerprint, validate_checked_core_package,
 };
+use crate::extract::{v2_extract, ObligationTriple, ProvKind};
 use crate::program_admission::{CheckedMainDescriptor, ProgramAdmissionError, admit_checked_main};
-use crate::{ElabEnv, ElabError};
+use crate::{ElabEnv, ElabError, ElabResult};
 
 const PRODUCER: &str = "ken-elaborator:compiler-driver:nc10";
 const KERNEL_REF: &str = "ken-kernel:current";
@@ -269,6 +271,7 @@ impl NativeEntrypointPlanV1 {
 #[derive(Clone, Debug)]
 pub struct NativeProgramBuildOutput {
     pub package: CheckedCorePackage,
+    pub open_obligation_reports: Vec<String>,
     pub plan: NativeEntrypointPlanV1,
     pub plan_transport_hash: u64,
     pub closure: TargetClosure,
@@ -626,11 +629,13 @@ pub fn compile_checked_target_denotation(
 
     let manifest = CompilerManifest::new(package_name, Vec::new());
     let mut env = ElabEnv::new()?;
-    let mut admitted = if source.name.ends_with(".ken.md") {
-        env.elaborate_ken_md_file(&source.text)?
+    let results = if source.name.ends_with(".ken.md") {
+        env.elaborate_ken_md_file_v1(&source.text)?
     } else {
-        env.elaborate_file(&source.text)?
+        env.elaborate_file_v1(&source.text)?
     };
+    let obligations = owned_v2_obligations(&results);
+    let mut admitted = results.iter().map(|result| result.def_id).collect::<Vec<_>>();
     let source_declarations = admitted.iter().copied().collect::<BTreeSet<_>>();
     let target_id = env.globals.get(target_name).copied().ok_or_else(|| {
         CheckedTargetDenotationError::MissingSourceTarget {
@@ -660,6 +665,7 @@ pub fn compile_checked_target_denotation(
         std::slice::from_ref(&source),
         &env,
         &admitted,
+        &obligations,
         Some(b"B1CheckedTargetDenotationV1".to_vec()),
     )?;
 
@@ -1212,16 +1218,19 @@ fn compile_ken_package_sources_with_env(
 
     let mut env = ElabEnv::new()?;
     let mut admitted = Vec::new();
+    let mut results = Vec::new();
     for source in &sources {
-        let ids = if source.name.ends_with(".ken.md") {
-            env.elaborate_ken_md_file(&source.text)?
+        let source_results = if source.name.ends_with(".ken.md") {
+            env.elaborate_ken_md_file_v1(&source.text)?
         } else {
-            env.elaborate_file(&source.text)?
+            env.elaborate_file_v1(&source.text)?
         };
-        admitted.extend(ids);
+        admitted.extend(source_results.iter().map(|result| result.def_id));
+        results.extend(source_results);
     }
+    let obligations = owned_v2_obligations(&results);
 
-    let package = emit_package_from_env(manifest, &sources, &env, &admitted, None)?;
+    let package = emit_package_from_env(manifest, &sources, &env, &admitted, &obligations, None)?;
     let selected = select_targets(manifest, &package, selector)?;
     let closures = build_target_closures(&package, &selected)?;
     let executable_entrypoints = package_executable_entrypoints(&package, &closures)?;
@@ -2265,16 +2274,20 @@ pub fn prepare_native_program_sources(
         .map_err(CompilerDriverError::Elaboration)
         .map_err(NativeProgramBuildError::Driver)?;
     let mut admitted_ids = Vec::new();
+    let mut results = Vec::new();
     for source in &sources {
-        let ids = if source.name.ends_with(".ken.md") {
-            env.elaborate_ken_md_file(&source.text)
+        let source_results = if source.name.ends_with(".ken.md") {
+            env.elaborate_ken_md_file_v1(&source.text)
         } else {
-            env.elaborate_file(&source.text)
+            env.elaborate_file_v1(&source.text)
         }
         .map_err(CompilerDriverError::Elaboration)
         .map_err(NativeProgramBuildError::Driver)?;
-        admitted_ids.extend(ids);
+        admitted_ids.extend(source_results.iter().map(|result| result.def_id));
+        results.extend(source_results);
     }
+    let obligations = owned_v2_obligations(&results);
+    let open_obligation_reports = crate::render_open_obligations(&results);
     let checked = admit_checked_main(&env).map_err(NativeProgramBuildError::Admission)?;
     // Checked-main admission has already proved the exact HostIO ABI. An
     // empty effect row is still a HostIO computation (`Ret`), so it must use
@@ -2297,9 +2310,15 @@ pub fn prepare_native_program_sources(
     admitted_ids.extend(env.env.decls().map(Decl::id));
     admitted_ids.sort();
     admitted_ids.dedup();
-    let mut package =
-        emit_package_from_env(&manifest, &sources, &env, &admitted_ids, Some(plan_bytes))
-            .map_err(NativeProgramBuildError::Driver)?;
+    let mut package = emit_package_from_env(
+        &manifest,
+        &sources,
+        &env,
+        &admitted_ids,
+        &obligations,
+        Some(plan_bytes),
+    )
+    .map_err(NativeProgramBuildError::Driver)?;
     if main_has_host_effect {
         let symbol = StableSymbol::new(
             SymbolNamespace::Metadata,
@@ -2634,6 +2653,7 @@ pub fn prepare_native_program_sources(
         executable_entrypoint: Box::new(executable_entrypoint),
         runtime_program: Box::new(runtime_program),
         selected,
+        open_obligation_reports,
     })
 }
 
@@ -2661,6 +2681,7 @@ pub struct NativeProgramPreparationV1 {
     executable_entrypoint: Box<ExecutableEntrypointPackage>,
     runtime_program: Box<ken_runtime::RuntimeProgram>,
     selected: Vec<SelectedTargetReport>,
+    open_obligation_reports: Vec<String>,
 }
 
 impl NativeProgramPreparationV1 {
@@ -2687,6 +2708,11 @@ impl NativeProgramPreparationV1 {
     /// into the runtime program.
     pub fn executable_closure(&self) -> &BTreeSet<StableSymbol> {
         &self.executable_closure
+    }
+
+    /// Human-readable open obligations observed during source elaboration.
+    pub fn open_obligation_reports(&self) -> &[String] {
+        &self.open_obligation_reports
     }
 }
 
@@ -2837,6 +2863,7 @@ fn complete_native_program_preparation(
         executable_entrypoint,
         runtime_program,
         selected,
+        open_obligation_reports,
     } = preparation;
     let package = *package;
     let plan = *plan;
@@ -2848,6 +2875,7 @@ fn complete_native_program_preparation(
     report.report_identity = target_report_fingerprint(&report);
     Ok(NativeProgramBuildOutput {
         package,
+        open_obligation_reports,
         plan,
         plan_transport_hash,
         closure,
@@ -3285,11 +3313,64 @@ fn flatten_lanes(lanes: &BTreeMap<StableSymbol, Vec<UnavailableLane>>) -> Vec<Un
         .collect()
 }
 
+fn owned_v2_obligations(results: &[ElabResult]) -> Vec<(GlobalId, ObligationTriple)> {
+    results
+        .iter()
+        .flat_map(|result| {
+            let owner = result.def_id;
+            v2_extract(result)
+                .obligations
+                .into_iter()
+                .map(move |triple| (owner, triple))
+        })
+        .collect()
+}
+
+fn add_obligation_metadata(
+    obligations: &[(GlobalId, ObligationTriple)],
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
+    table: &StableSymbolTable,
+    semantic: &mut CheckedCoreSemanticInputs,
+) -> Result<(), CompilerDriverError> {
+    for (owner, triple) in obligations {
+        let origin = symbols
+            .get(owner)
+            .cloned()
+            .ok_or(CompilerDriverError::MissingStableSymbol { id: *owner })?;
+        let obligation = StableSymbol::obligation(triple.id.0.clone());
+        let goal = canonical_term_bytes(&triple.goal_closed, table).map_err(|error| match error {
+            crate::checked_core::CanonicalEncodingError::MissingStableSymbol(id) => {
+                CompilerDriverError::MissingStableSymbol { id }
+            }
+        })?;
+        let status = match &triple.provenance.kind {
+            ProvKind::FfiRuntimeCheck => ObligationStatus::Tested,
+            ProvKind::Ensures { .. }
+            | ProvKind::Prove
+            | ProvKind::LawField { .. }
+            | ProvKind::CallRequires
+            | ProvKind::PartialPrim => ObligationStatus::Unknown,
+        };
+        semantic.symbols.insert(obligation.clone());
+        semantic.obligations.insert(obligation.clone(), goal);
+        semantic.obligation_metadata.insert(
+            obligation,
+            ObligationMetadata {
+                status,
+                origin,
+                affects_runtime_meaning: true,
+            },
+        );
+    }
+    Ok(())
+}
+
 fn emit_package_from_env(
     manifest: &CompilerManifest,
     sources: &[CompilerSource],
     env: &ElabEnv,
     admitted: &[GlobalId],
+    obligations: &[(GlobalId, ObligationTriple)],
     native_entrypoint_plan: Option<Vec<u8>>,
 ) -> Result<CheckedCorePackage, CompilerDriverError> {
     let package_identity = package_identity(&manifest.package_name);
@@ -3353,6 +3434,7 @@ fn emit_package_from_env(
     }
     apply_manifest_target_metadata(manifest, &mut semantic);
     add_trusted_base_metadata(env, &symbols, &mut semantic);
+    add_obligation_metadata(obligations, &symbols, &table, &mut semantic)?;
     if let Some(plan) = native_entrypoint_plan {
         let symbol = StableSymbol::new(
             SymbolNamespace::Metadata,
@@ -5326,6 +5408,183 @@ mod tests {
         ObligationStatus, emit_checked_core_package,
     };
     use crate::erasure::erase_checked_core_package_for_target;
+
+    const CALLER_OPEN_SOURCE: &str = r#"program capabilities FS APartial
+const ac0_need : String requires Equal Int 0 0 = "ac0-run"
+const ac0_use : String = ac0_need
+proc main
+      (_input : ProcessInput) (_caps : ProgramCaps APartial)
+    : HostIO APartial ExitCode
+    visits [Console] =
+  host_program APartial (print_line ac0_use)
+"#;
+
+    const CALLER_NONE_SOURCE: &str = r#"program capabilities FS APartial
+const ac0_use : String = "ac0-run"
+proc main
+      (_input : ProcessInput) (_caps : ProgramCaps APartial)
+    : HostIO APartial ExitCode
+    visits [Console] =
+  host_program APartial (print_line ac0_use)
+"#;
+
+    const CALLER_DISCHARGED_SOURCE: &str = r#"program capabilities FS APartial
+const ac0_need : String requires Equal Int 0 0 = "ac0-run"
+fn ac0_use (p : Top) : String = ac0_need
+proc main
+      (_input : ProcessInput) (_caps : ProgramCaps APartial)
+    : HostIO APartial ExitCode
+    visits [Console] =
+  host_program APartial (print_line (ac0_use Proved))
+"#;
+
+    fn assert_one_unknown_requires(
+        package_name: &str,
+        package: &CheckedCorePackage,
+        report: &TargetSelectionReport,
+    ) {
+        let matching = report
+            .obligations
+            .iter()
+            .filter(|symbol| {
+                symbol.namespace == SymbolNamespace::Obligation
+                    && symbol.components.first().is_some_and(|id| {
+                        id.starts_with("ac0_use.requires.")
+                    })
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(matching.len(), 1, "obligations: {:?}", report.obligations);
+        assert_eq!(report.obligations.len(), 1);
+        let obligation = matching[0];
+        let semantic = &package.artifact.semantic;
+        assert_eq!(semantic.obligations.len(), 1);
+        assert_eq!(semantic.obligation_metadata.len(), 1);
+        let metadata = semantic
+            .obligation_metadata
+            .get(obligation)
+            .expect("open obligation metadata");
+        assert_eq!(metadata.status, ObligationStatus::Unknown);
+        assert_eq!(
+            metadata.origin,
+            StableSymbol::declaration(package_name, &[], "ac0_use")
+        );
+        assert!(metadata.affects_runtime_meaning);
+        assert!(semantic.obligations.contains_key(obligation));
+    }
+
+    fn report_for_denotation(
+        package_name: &str,
+        denotation: &CheckedTargetDenotationV1,
+    ) -> TargetSelectionReport {
+        let manifest = manifest(package_name);
+        let selected = select_targets(
+            &manifest,
+            &denotation.package,
+            selector(package_name, main_symbol(package_name)),
+        )
+        .expect("denotation target is selected");
+        build_target_selection_report(&denotation.package, selected)
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: each package producer carries one obligation-map key whose
+    /// origin is the declaration that owns the call-site hole and whose status
+    /// is `Unknown`; the native preparation also uses the shared renderer.
+    /// CLAIMED: no package driver turns a trusted-base hole into an empty
+    /// obligation report. THE GAP: the separate native-build CLI test checks
+    /// that its rendered line reaches stderr while stdout remains the path.
+    #[test]
+    fn open_requires_reaches_package_denotation_and_native_driver_reports() {
+        let package_name = "caller_reporting_open_package";
+        let output = compile_ken_source(
+            package_name,
+            CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE),
+            selector(package_name, main_symbol(package_name)),
+        )
+        .expect("package driver compiles an open obligation");
+        assert_one_unknown_requires(package_name, &output.package, &output.report);
+
+        let package_name = "caller_reporting_open_denotation";
+        let denotation = compile_checked_target_denotation(
+            package_name,
+            CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE),
+            "main",
+        )
+        .expect("denotation driver keeps flagged success");
+        let report = report_for_denotation(package_name, &denotation);
+        assert_one_unknown_requires(package_name, &denotation.package, &report);
+
+        let package_name = "caller_reporting_open_native";
+        let preparation = prepare_native_program_sources(
+            package_name,
+            vec![CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE)],
+        )
+        .expect("native preparation accepts open obligations");
+        let report = build_target_selection_report(
+            &preparation.package,
+            preparation.selected.clone(),
+        );
+        assert_one_unknown_requires(package_name, &preparation.package, &report);
+        let rendered = preparation.open_obligation_reports();
+        assert_eq!(rendered.len(), 1);
+        assert!(rendered[0].starts_with("unknown ac0_use.requires."));
+    }
+
+    /// Promise class: normative compatibility vector for the two fixed control
+    /// sources at base 75e458cc. Their checked semantics contain no open hole,
+    /// so adding obligation reporting must not change their canonical hash.
+    #[test]
+    fn controls_preserve_base_core_semantic_hashes_on_driver_routes() {
+        let controls = [
+            (
+                "none",
+                CALLER_NONE_SOURCE,
+                12_237_734_083_413_434_944_u64,
+                4_216_260_380_077_809_109_u64,
+                8_364_889_614_452_174_481_u64,
+            ),
+            (
+                "discharged",
+                CALLER_DISCHARGED_SOURCE,
+                11_018_522_036_893_705_244_u64,
+                2_315_880_598_206_190_060_u64,
+                12_231_505_609_661_209_818_u64,
+            ),
+        ];
+
+        for (name, source, package_hash, denotation_hash, native_hash) in controls {
+            let package_name = format!("caller_reporting_base_{name}");
+            let output = compile_ken_source(
+                &package_name,
+                CompilerSource::new("src/main.ken", source),
+                selector(&package_name, main_symbol(&package_name)),
+            )
+            .expect("control package compiles");
+            assert!(output.report.obligations.is_empty());
+            assert!(output.package.artifact.semantic.obligations.is_empty());
+            assert_eq!(output.package.core_semantic_hash, package_hash);
+
+            let package_name = format!("caller_reporting_denotation_{name}");
+            let denotation = compile_checked_target_denotation(
+                &package_name,
+                CompilerSource::new("src/main.ken", source),
+                "main",
+            )
+            .expect("control denotation compiles");
+            assert!(denotation.package.artifact.semantic.obligations.is_empty());
+            assert_eq!(denotation.core_semantic_hash, denotation_hash);
+
+            let package_name = format!("caller_reporting_native_{name}");
+            let preparation = prepare_native_program_sources(
+                &package_name,
+                vec![CompilerSource::new("src/main.ken", source)],
+            )
+            .expect("control native preparation succeeds");
+            assert!(preparation.package.artifact.semantic.obligations.is_empty());
+            assert!(preparation.open_obligation_reports().is_empty());
+            assert_eq!(preparation.package.core_semantic_hash, native_hash);
+        }
+    }
 
     #[test]
     fn native_literal_metadata_uses_only_live_checked_provenance_after_rollback() {

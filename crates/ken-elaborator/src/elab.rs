@@ -93,7 +93,7 @@ pub struct Obligation {
 }
 
 /// Result of a V1 declaration elaboration.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElabResult {
     /// Declaration name — used by V2 for stable obligation ids (`22 §1`).
     pub name: String,

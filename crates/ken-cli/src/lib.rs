@@ -71,6 +71,24 @@ pub fn run_program<H: ken_interp::HostHandler>(
     cwd: &[u8],
     host: &mut H,
 ) -> Result<ProgramOutcome, RunError> {
+    run_program_with_obligations(source, format, arguments, environment, cwd, host, |_| {})
+}
+
+/// Elaborate and run one Ken application, delivering open-obligation reports
+/// after elaboration and before admission or execution.
+pub fn run_program_with_obligations<H, F>(
+    source: &str,
+    format: SourceFormat,
+    arguments: &[Vec<u8>],
+    environment: &[(Vec<u8>, Vec<u8>)],
+    cwd: &[u8],
+    host: &mut H,
+    report_obligations: F,
+) -> Result<ProgramOutcome, RunError>
+where
+    H: ken_interp::HostHandler,
+    F: FnMut(&[String]),
+{
     let effective_uid = ken_runtime::observe_effective_uid_v1()
         .map_err(|_| RunError::RootExecutionObservationUnavailable)?;
     run_program_inner(
@@ -82,6 +100,7 @@ pub fn run_program<H: ken_interp::HostHandler>(
         host,
         false,
         effective_uid,
+        report_obligations,
     )
     .map(|(outcome, _)| outcome)
 }
@@ -111,11 +130,12 @@ pub fn run_program_effect_observation<H: ken_interp::HostHandler>(
         host,
         true,
         effective_uid,
+        |_| {},
     )
     .map(|(_, observation)| observation.expect("observation requested"))
 }
 
-fn run_program_inner<H: ken_interp::HostHandler>(
+fn run_program_inner<H, F>(
     source: &str,
     format: SourceFormat,
     arguments: &[Vec<u8>],
@@ -124,20 +144,29 @@ fn run_program_inner<H: ken_interp::HostHandler>(
     host: &mut H,
     observe_effects: bool,
     effective_uid: ken_runtime::EffectiveUidSnapshotV1,
-) -> Result<(ProgramOutcome, Option<ken_runtime::EffectObservation>), RunError> {
+    mut report_obligations: F,
+) -> Result<(ProgramOutcome, Option<ken_runtime::EffectObservation>), RunError>
+where
+    H: ken_interp::HostHandler,
+    F: FnMut(&[String]),
+{
     let mut elab_env = ken_elaborator::ElabEnv::new().map_err(RunError::Initialization)?;
-    let elaborated = match format {
-        SourceFormat::Ken => elab_env.elaborate_file(source),
-        SourceFormat::LiterateKen => elab_env.elaborate_ken_md_file(source),
+    let results = match format {
+        SourceFormat::Ken => elab_env.elaborate_file_v1(source),
+        SourceFormat::LiterateKen => elab_env.elaborate_ken_md_file_v1(source),
     };
-    if let Err(error) = elaborated {
-        return match error {
-            ken_elaborator::ElabError::DuplicateDefinition { ref name, .. } if name == "main" => {
-                Err(RunError::DuplicateEntrypoint)
-            }
-            other => Err(RunError::Elaboration(other)),
-        };
-    }
+    let results = match results {
+        Ok(results) => results,
+        Err(error) => {
+            return match error {
+                ken_elaborator::ElabError::DuplicateDefinition { ref name, .. }
+                    if name == "main" => Err(RunError::DuplicateEntrypoint),
+                other => Err(RunError::Elaboration(other)),
+            };
+        }
+    };
+    let reports = ken_elaborator::render_open_obligations(&results);
+    report_obligations(&reports);
 
     let admitted = ken_elaborator::program_admission::admit_checked_main(&elab_env)
         .map_err(map_program_admission_error)?;
@@ -791,6 +820,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
             &mut host,
             true,
             ken_runtime::EffectiveUidSnapshotV1::scripted(effective_uid),
+            |_| {},
         )
         .expect("checked program reaches the real interpreter runner");
         (observation.expect("observation requested"), host)

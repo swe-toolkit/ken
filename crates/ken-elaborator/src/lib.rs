@@ -90,7 +90,8 @@ pub use export::{
     WardResourceLifetimeMonitor,
 };
 pub use extract::{
-    v2_extract, ExtractionResult, ObligationId, ObligationTriple, ProvKind, Provenance,
+    render_open_obligations, v2_extract, ExtractionResult, ObligationId, ObligationTriple,
+    ProvKind, Provenance,
 };
 pub use foreign::{
     trusted_base_delta, FfiRuntimeCheck, ForeignBinding, ForeignEnv, MarshalKind, MarshalSig,
@@ -395,17 +396,7 @@ impl ElabEnv {
     ///
     /// On success the declaration is registered in `self.env`.
     pub fn elaborate_decl(&mut self, src: &str) -> Result<GlobalId, ElabError> {
-        let decls = parser::parse_decls(src)?;
-        if decls.len() != 1 {
-            return Err(ElabError::ParseError {
-                msg: format!("expected exactly one declaration, found {}", decls.len()),
-                span: Span::zero(),
-            });
-        }
-        let results = modules::expand_and_elaborate(self, &decls)?;
-        results.into_iter().last().map(|r| r.def_id).ok_or_else(|| {
-            ElabError::Internal("declaration produced no definition (bare import?)".into())
-        })
+        self.elaborate_decl_v1(src).map(|result| result.def_id)
     }
 
     /// Elaborate a V1/L1 declaration, returning obligations alongside the id.
@@ -423,6 +414,22 @@ impl ElabEnv {
         })
     }
 
+    /// Elaborate one declaration, returning every result it expands to
+    /// (a `module { ... }` block yields one per inner declaration).
+    pub fn elaborate_decl_results_v1(
+        &mut self,
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        let decls = parser::parse_decls(src)?;
+        if decls.len() != 1 {
+            return Err(ElabError::ParseError {
+                msg: format!("expected exactly one declaration, found {}", decls.len()),
+                span: Span::zero(),
+            });
+        }
+        modules::expand_and_elaborate(self, &decls)
+    }
+
     /// Elaborate zero or more declarations from source, in order.
     ///
     /// Each declaration is elaborated and registered in `self.env` before the
@@ -433,9 +440,8 @@ impl ElabEnv {
     /// never a kernel-visible module concept. Returns the `GlobalId` of
     /// every successfully elaborated declaration.
     pub fn elaborate_file(&mut self, src: &str) -> Result<Vec<GlobalId>, ElabError> {
-        let decls = parser::parse_decls(src)?;
-        let results = modules::expand_and_elaborate(self, &decls)?;
-        Ok(results.into_iter().map(|r| r.def_id).collect())
+        self.elaborate_file_v1(src)
+            .map(|results| results.into_iter().map(|result| result.def_id).collect())
     }
 
     /// Elaborate a file while retaining verification obligations, including
@@ -455,7 +461,19 @@ impl ElabEnv {
         roots: &[PathBuf],
         entry: &str,
     ) -> Result<Vec<GlobalId>, ElabError> {
-        modules::elaborate_module_from_roots(self, roots, entry)
+        self.elaborate_module_from_roots_v1(roots, entry)
+            .map(|results| results.into_iter().map(|result| result.def_id).collect())
+    }
+
+    /// Elaborate a roots-loaded unit and return the V1 results of its whole
+    /// dependency closure, whether loaded by this call or cached from an earlier
+    /// one, dependency-first and deduplicated by definition id.
+    pub fn elaborate_module_from_roots_v1(
+        &mut self,
+        roots: &[PathBuf],
+        entry: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        modules::elaborate_module_from_roots_v1(self, roots, entry)
     }
 
     /// Elaborate a roots-loaded unit with strict bare-name resolution.
@@ -477,7 +495,17 @@ impl ElabEnv {
     /// entry's `ken reject`/`ken example` contract without executing roles from
     /// imported dependency documents. Plain `.ken` entries are a no-op.
     pub fn execute_loaded_entry_checked_fences(&mut self, entry: &str) -> Result<(), ElabError> {
-        modules::execute_loaded_entry_checked_fences(self, entry)
+        self.execute_loaded_entry_checked_fences_v1(entry).map(|_| ())
+    }
+
+    /// Execute a loaded entry's checked fences and retain open obligations
+    /// from its `ken example` fences. Rejected `ken reject` fences contribute
+    /// no result.
+    pub fn execute_loaded_entry_checked_fences_v1(
+        &mut self,
+        entry: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        modules::execute_loaded_entry_checked_fences_v1(self, entry)
     }
 
     /// Number of successfully loaded cross-file units in this elaboration run.
@@ -510,15 +538,22 @@ impl ElabEnv {
     /// observe declarations an earlier one introduced, and neither role
     /// forks/rolls back env state.
     pub fn elaborate_ken_md_file(&mut self, src: &str) -> Result<Vec<GlobalId>, ElabError> {
+        self.elaborate_ken_md_file_v1(src)
+            .map(|results| results.into_iter().map(|result| result.def_id).collect())
+    }
+
+    /// Elaborate a `.ken.md` artifact and retain results from its declarations
+    /// and every successful `ken example` fence.
+    pub fn elaborate_ken_md_file_v1(
+        &mut self,
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
         let extracted = literate::extract_ken_md(src)?;
         literate::validate_ken_md_fences(&extracted)?;
         let decls = parser::parse_decls(&extracted.source)?;
-        let results = modules::expand_and_elaborate(self, &decls)?;
-        let ids = results.into_iter().map(|r| r.def_id).collect();
-
-        self.execute_ken_md_checked_fences(src, &extracted)?;
-
-        Ok(ids)
+        let mut results = modules::expand_and_elaborate(self, &decls)?;
+        results.extend(self.execute_ken_md_checked_fences_v1(src, &extracted)?);
+        Ok(results)
     }
 
     /// Execute one literate entry's checked-but-not-tangled fence roles.
@@ -531,6 +566,17 @@ impl ElabEnv {
         src: &str,
         extracted: &literate::KenMdExtraction,
     ) -> Result<(), ElabError> {
+        self.execute_ken_md_checked_fences_v1(src, extracted)
+            .map(|_| ())
+    }
+
+    /// Execute checked literate fences and return results from successful
+    /// `ken example` fences. `ken reject` ranges are checked and excluded.
+    pub fn execute_ken_md_checked_fences_v1(
+        &mut self,
+        src: &str,
+        extracted: &literate::KenMdExtraction,
+    ) -> Result<Vec<ElabResult>, ElabError> {
         for range in &extracted.reject_ranges {
             if self.elaborate_file(&src[range.clone()]).is_ok() {
                 return Err(ElabError::ParseError {
@@ -541,14 +587,17 @@ impl ElabEnv {
                 });
             }
         }
+        let mut results = Vec::new();
         for range in &extracted.example_ranges {
-            self.elaborate_file(&src[range.clone()])
+            let example_results = self
+                .elaborate_file_v1(&src[range.clone()])
                 .map_err(|_| ElabError::ParseError {
                     msg: "a 'ken example' block failed to elaborate".to_string(),
                     span: Span::new(range.start, range.end),
                 })?;
+            results.extend(example_results);
         }
-        Ok(())
+        Ok(results)
     }
 
     /// Try to discharge an obligation hole with a certificate term.
