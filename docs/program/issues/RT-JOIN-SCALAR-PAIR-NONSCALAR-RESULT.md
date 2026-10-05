@@ -79,18 +79,27 @@ No kernel, spec or `trusted_base()` change.
    `merge_scalar_operand`'s final refusal arm (`joins.rs:~2697`), and
    `jump_planned_join_arm` (`joins.rs:379`) records `join_plan.origin` in a
    `Cell` only when that flag is set. No other refusal records an origin.
-4. **Driver.** `compile_program_expr` and `compile_program_expr_object`
-   (`artifact/mod.rs:79`, `:135`) wrap compilation in
-   `compile_with_scalar_join_feedback`. It retries into a fresh module with
-   the refused origin added to the forced set, and stops when a refusal
-   names no new origin. Assert that the refused origin names the same
-   occurrence in the re-plan. A test-support counter records attempts and
-   the final forced set per compile.
+4. **Driver** (as corrected by Architect `evt_70vtg3vb66bs9`).
+   `compile_with_scalar_join_feedback` retries into a fresh module with the
+   refused origin added to the forced set, and stops when a refusal names no
+   new origin. It wraps exactly the three production program-backed callers:
+   `artifact/mod.rs:86` (JIT program), `:142` (object program) and
+   `artifact/api.rs:401` (`emit_bound_process_program_object_with_cranelift`,
+   the Nat route).
+   - api.rs:401 is rewired from `compile_expr_into_object_module` to
+     `compile_program_expr_into_object_module`, which is behaviour-identical
+     for that caller under process mode.
+   - The seed lane (`mod.rs:119`) and every test caller stay single-attempt,
+     with an empty set and a local `Cell`.
+   - Assert that the refused origin names the same occurrence in the
+     re-plan. A test-support counter records attempts and the final forced
+     set per compile.
 
 ## Acceptance
 
-- **AC-1 (Nat).** That compile records 2 attempts and forced = {1289}, and
-  the 1289 refusal is gone. Record the new first refusal verbatim and
+- **AC-1 (Nat).** Through `ken_cli::build_native_program`, the api.rs:401
+  wrapper records 2 attempts and forced = {1289}, and the 1289 refusal is
+  gone. Record the new first refusal verbatim and
   re-point the ignore annotation at it. "Nat passes" is not this WP's
   acceptance.
 - **AC-2 (zero collateral).** The six default targets stay at baseline,
@@ -101,8 +110,10 @@ No kernel, spec or `trusted_base()` change.
   - Planner: on the `Option::Some(Int)` fixture, forced {root} plans
     `CarrierWord`, and so does a join whose arm returns that join. The empty
     set plans `NativeScalarPair`.
-  - Driver: a 1289-shaped program compiles in exactly 2 attempts, and the
-    `Cell` names that join's origin.
+  - Driver: on the bound-process route, a 1289-shaped program compiles in
+    exactly 2 attempts, and the `Cell` names that join's origin.
+  - The planner forced-child and enclosing-parent pin from `62d8ebc80`
+    stays.
   - A non-admission refusal (such as the `RecursiveBackedge` arm) leaves the
     `Cell` empty and does not retry.
 - **Mutations.**
@@ -123,7 +134,9 @@ No kernel, spec or `trusted_base()` change.
 
 ## Hard-stop inventory (§1b)
 
-§1a count: 1 (Architect `evt_16se76agavv64` on stop `evt_6yx4h3eq90esj`).
+§1a count: 1 (Architect `evt_16se76agavv64` on stop `evt_6yx4h3eq90esj`;
+the entry-point stop `evt_6wya435ge849j` was non-advancing,
+`evt_70vtg3vb66bs9`).
 The shared predicate is that the planner chooses representation on a plane
 that lacks lowering's admission keys.
 
