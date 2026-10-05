@@ -3,7 +3,19 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 scratch=$(mktemp -d)
-trap 'rm -rf -- "$scratch"' EXIT
+real_flock=$(command -v flock)
+wrapper=
+cleanup() {
+  local status=$?
+  trap - EXIT
+  if [[ -n "$wrapper" ]]; then
+    "$real_flock" -u 9 2>/dev/null || true
+    wait "$wrapper" 2>/dev/null || true
+  fi
+  rm -rf -- "$scratch"
+  exit "$status"
+}
+trap cleanup EXIT
 
 assert_dir() {
   [[ -d "$1" ]] || { echo "expected directory: $1" >&2; exit 1; }
@@ -24,6 +36,7 @@ touch -d '3 hours ago' "$scratch/tmp/ken-runtime-old/data"
 touch -d '3 hours ago' "$scratch/tmp/ken-runtime-old"
 touch -d '3 hours ago' "$scratch/tmp/ken-runtime-active"
 touch -d '3 hours ago' "$scratch/tmp/rt-scalar-ac0"
+touch -d '3 hours ago' "$scratch/tmp/rt-scalar-ac0/log"
 touch "$scratch/tmp/ken-runtime-active/log"
 
 cat > "$scratch/bin/cargo" <<'SH'
@@ -41,7 +54,6 @@ shift
 exec "$@"
 SH
 chmod +x "$scratch/bin/cargo" "$scratch/bin/sem"
-real_flock=$(command -v flock)
 cat > "$scratch/bin/flock" <<SH
 #!/usr/bin/env bash
 : > "$scratch/waiting-for-lock"
