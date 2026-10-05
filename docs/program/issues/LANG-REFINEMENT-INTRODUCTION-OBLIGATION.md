@@ -113,6 +113,14 @@ base, stop and report the mismatch.
     with the arm's guard removed the same branch leaves one. Runtime
     `Some 'A'` output and the generic Char-literal row do not pin this
     branch (CV `evt_5ynna1mrc4jsh`).
+  - **A `/conformance` expectation pins the same composition** (CV
+    rejection of `3cecbcd59`, ruled in place `evt_40wtsg8nqs5yw`). The
+    guarded True arm's `Some Char n` introduces exactly one refinement
+    obligation, and the guard discharges it. The False arm introduces none.
+    It states obligation status only, not caller reporting, in the
+    vocabulary of `seed-numbers.md`'s Char-literal rows. The Spec enclave
+    writes it on the WP branch and the conformance-validator reviews it.
+    The Rust unit test is implementation evidence and does not substitute.
   - The guide's `const five : PosInt = 5` (`surface-reference.ken.md:108`)
     discharges.
   - The seeds `seed-def-refinement`, `seed-data-match`, `seed-obligations`

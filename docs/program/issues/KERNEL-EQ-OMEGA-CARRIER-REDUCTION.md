@@ -1,7 +1,7 @@
 ---
 id: KERNEL-EQ-OMEGA-CARRIER-REDUCTION
 title: "The kernel refuses Eq at an Omega-classified carrier, leaves the Sigma and inductive Eq reducts stuck whenever a component is Omega, and keeps a Trunc-to-Top reduct that breaks subject reduction at level 1. Form Eq with classify, make every Omega-carrier Eq neutral, discard Omega components, and delete the Trunc arm"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -103,3 +103,21 @@ stop and report the mismatch; do not build around it.
 - `trusted_base()` changes: an operator question.
 - A term outside the six cases starts or stops checking: stop to the
   Architect with it.
+
+## Closeout
+
+Merged `e15c9d35c` from exact `3c2e96313` (PR #4514, main push run
+37277872219). Kernel QA `evt_5fn30ea394mxd`, Architect `evt_6n04r7njkdf88`
+(crates only), Decision `dec_24t2zzm85m1a0`.
+
+- Eq-Form takes the carrier level from `classify`. An Ω carrier stays
+  neutral (R1), and truncation equality no longer reduces to Top.
+- Σ and inductive Ω positions compare the target proof with itself (R2,
+  R3). R3 runs before the convertible fast path in `inductive_conjuncts`.
+- The first candidate, `a4f943709`, was QA-blocked: R3 also changes the
+  Eq-Type caller `eq_type_at_inductive` (`Eq P p q` becomes `Eq P q q`).
+  The Architect ruled that intended and in scope (`evt_42cqspbkbyrq7`), and
+  `eq_type_inductive_omega_parameter_compares_target_proof` pins it.
+- Carry to the CV: an optional observational conformance row for the
+  Eq-Type route, `Eq (Type 0) (D p) (D q)` with an Ω parameter, whose WHNF
+  is `Eq P q q`.
