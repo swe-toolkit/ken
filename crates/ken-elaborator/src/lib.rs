@@ -454,15 +454,16 @@ impl ElabEnv {
     /// Elaborate the in-repo compilation unit named by `entry` under the
     /// plural catalog-root input (`33 §3.2`, ADR 0014 MRES-1/2/3a).
     ///
-    /// N2 populates exactly one root. The plural slice is the stable API shape;
-    /// multi-root precedence remains deliberately deferred.
+    /// Returns only declarations from the entry unit; dependencies remain in
+    /// [`Self::elaborate_module_from_roots_v1`]. N2 populates exactly one root.
+    /// The plural slice is the stable API shape; multi-root precedence remains
+    /// deliberately deferred.
     pub fn elaborate_module_from_roots(
         &mut self,
         roots: &[PathBuf],
         entry: &str,
     ) -> Result<Vec<GlobalId>, ElabError> {
-        self.elaborate_module_from_roots_v1(roots, entry)
-            .map(|results| results.into_iter().map(|result| result.def_id).collect())
+        modules::elaborate_module_from_roots(self, roots, entry)
     }
 
     /// Elaborate a roots-loaded unit and return the V1 results of its whole
@@ -538,8 +539,11 @@ impl ElabEnv {
     /// observe declarations an earlier one introduced, and neither role
     /// forks/rolls back env state.
     pub fn elaborate_ken_md_file(&mut self, src: &str) -> Result<Vec<GlobalId>, ElabError> {
-        self.elaborate_ken_md_file_v1(src)
-            .map(|results| results.into_iter().map(|result| result.def_id).collect())
+        let (declarations, _examples) = self.elaborate_ken_md_file_parts(src)?;
+        Ok(declarations
+            .into_iter()
+            .map(|result| result.def_id)
+            .collect())
     }
 
     /// Elaborate a `.ken.md` artifact and retain results from its declarations
@@ -548,12 +552,21 @@ impl ElabEnv {
         &mut self,
         src: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
+        let (mut declarations, examples) = self.elaborate_ken_md_file_parts(src)?;
+        declarations.extend(examples);
+        Ok(declarations)
+    }
+
+    fn elaborate_ken_md_file_parts(
+        &mut self,
+        src: &str,
+    ) -> Result<(Vec<ElabResult>, Vec<ElabResult>), ElabError> {
         let extracted = literate::extract_ken_md(src)?;
         literate::validate_ken_md_fences(&extracted)?;
         let decls = parser::parse_decls(&extracted.source)?;
-        let mut results = modules::expand_and_elaborate(self, &decls)?;
-        results.extend(self.execute_ken_md_checked_fences_v1(src, &extracted)?);
-        Ok(results)
+        let declarations = modules::expand_and_elaborate(self, &decls)?;
+        let examples = self.execute_ken_md_checked_fences_v1(src, &extracted)?;
+        Ok((declarations, examples))
     }
 
     /// Execute one literate entry's checked-but-not-tangled fence roles.

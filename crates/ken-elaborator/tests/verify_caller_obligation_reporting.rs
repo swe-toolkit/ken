@@ -31,11 +31,12 @@ const ac0_bad : Bool = missing_ac0_name
 "#;
 
 /// Promise class: durable invariant.
-/// MEASURED: V1 returns one open result for the same source whose result-row
-/// counts are `[0, 1, 0]`; both ID-only wrappers project those exact IDs.
-/// CLAIMED: API callers can report every open result without drifting from the
-/// legacy ID set. THE GAP: the compiler driver still has separate integration
-/// checks for target selection and package metadata.
+/// MEASURED: file V1 carries one open declaration result; literate V1 includes
+/// a declaration and a checked example. ID-only wrappers retain their original
+/// declaration populations, excluding example-only results.
+/// CLAIMED: callers can report every open V1 result without widening the
+/// ID-only APIs. THE GAP: the compiler driver has separate checks for target
+/// selection and package metadata.
 #[test]
 fn file_and_literate_v1_results_preserve_open_obligations_and_wrapper_ids() {
     let mut env = ElabEnv::new().expect("prelude");
@@ -89,22 +90,18 @@ fn file_and_literate_v1_results_preserve_open_obligations_and_wrapper_ids() {
     let literate_ids = literate_legacy
         .elaborate_ken_md_file(LITERATE)
         .expect("ID wrapper shares the V1 path");
-    assert_eq!(
-        literate_ids,
-        literate_results
-            .iter()
-            .map(|result| result.def_id)
-            .collect::<Vec<_>>()
-    );
+    let literate_declaration_id = literate_legacy.globals["ac0_need"];
+    assert_eq!(literate_ids, vec![literate_declaration_id]);
 }
 
 /// Promise class: durable invariant.
-/// MEASURED: Dependency owns one open call-site hole. Entry loads it first;
-/// a second roots call loads Other through the cached Dependency and still
-/// returns that hole. The loaded literate entry's example result is returned by
-/// the separate fence V1 operation.
-/// CLAIMED: roots V1 reports dependency obligations on both fresh and cached
-/// routes. THE GAP: the fixture has one shared dependency edge, not a wide DAG.
+/// MEASURED: both roots V1 calls include the dependency's open call-site
+/// result; ID-only roots calls return direct entry-unit declarations. The
+/// loaded literate entry's example result is returned by the separate fence V1
+/// operation.
+/// CLAIMED: roots V1 reports dependency obligations on fresh and cached routes
+/// without widening the ID-only roots population. THE GAP: the fixture has one
+/// shared dependency edge, not a wide DAG.
 #[test]
 fn module_roots_and_loaded_literate_fences_return_their_elaboration_results() {
     let root = tempdir().expect("module root");
@@ -145,26 +142,16 @@ fn module_roots_and_loaded_literate_fences_return_their_elaboration_results() {
     assert_eq!(render_open_obligations(&cached_results).len(), 1);
     let cached_ids = env
         .elaborate_module_from_roots(&[root.path().to_path_buf()], "Other")
-        .expect("cached dependency ID wrapper projects the V1 results");
-    assert_eq!(
-        cached_ids,
-        cached_results
-            .iter()
-            .map(|result| result.def_id)
-            .collect::<Vec<_>>()
-    );
+        .expect("cached dependency ID wrapper keeps the entry-unit IDs");
+    let other_declaration_id = env.globals["Other.other_value"];
+    assert_eq!(cached_ids, vec![other_declaration_id]);
 
     let mut legacy = ElabEnv::new().expect("prelude");
     let ids = legacy
         .elaborate_module_from_roots(&[root.path().to_path_buf()], "Entry")
         .expect("ID-only roots wrapper");
-    assert_eq!(
-        ids,
-        results
-            .iter()
-            .map(|result| result.def_id)
-            .collect::<Vec<_>>()
-    );
+    let entry_declaration_id = legacy.globals["Entry.entry_value"];
+    assert_eq!(ids, vec![entry_declaration_id]);
 
     let literate_source = root.path().join("LiterateEntry.ken.md");
     fs::write(&literate_source, LITERATE).expect("write literate entry");

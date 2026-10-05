@@ -2051,8 +2051,9 @@ pub fn elaborate_module_from_roots(
     roots: &[PathBuf],
     entry: &str,
 ) -> Result<Vec<ken_kernel::GlobalId>, ElabError> {
-    elaborate_module_from_roots_v1(elab, roots, entry)
-        .map(|results| results.into_iter().map(|result| result.def_id).collect())
+    // Direct entry-unit IDs, exactly as on main and as the strict entry returns.
+    elaborate_module_from_roots_with_mode_v1(elab, roots, entry, ResolutionMode::Legacy)
+        .map(|(ids, _)| ids)
 }
 
 /// Elaborate a roots-loaded unit and return the V1 results of its whole
