@@ -3349,7 +3349,8 @@ fn add_obligation_metadata(
             | ProvKind::Prove
             | ProvKind::LawField { .. }
             | ProvKind::CallRequires
-            | ProvKind::PartialPrim => ObligationStatus::Unknown,
+            | ProvKind::PartialPrim
+            | ProvKind::RefinementIntroduction => ObligationStatus::Unknown,
         };
         semantic.symbols.insert(obligation.clone());
         semantic.obligations.insert(obligation.clone(), goal);
@@ -5419,6 +5420,15 @@ proc main
   host_program APartial (print_line ac0_use)
 "#;
 
+    const CALLER_REFINEMENT_SOURCE: &str = r#"program capabilities FS APartial
+const ac0_use : String = ("ac0-run" : { text : String | Equal Int 0 1 })
+proc main
+      (_input : ProcessInput) (_caps : ProgramCaps APartial)
+    : HostIO APartial ExitCode
+    visits [Console] =
+  host_program APartial (print_line ac0_use)
+"#;
+
     const CALLER_NONE_SOURCE: &str = r#"program capabilities FS APartial
 const ac0_use : String = "ac0-run"
 proc main
@@ -5438,19 +5448,22 @@ proc main
   host_program APartial (print_line (ac0_use Proved))
 "#;
 
-    fn assert_one_unknown_requires(
+    fn assert_one_unknown_obligation(
         package_name: &str,
         package: &CheckedCorePackage,
         report: &TargetSelectionReport,
+        id_prefix: &str,
+        owner_name: &str,
     ) {
         let matching = report
             .obligations
             .iter()
             .filter(|symbol| {
                 symbol.namespace == SymbolNamespace::Obligation
-                    && symbol.components.first().is_some_and(|id| {
-                        id.starts_with("ac0_use.requires.")
-                    })
+                    && symbol
+                        .components
+                        .first()
+                        .is_some_and(|id| id.starts_with(id_prefix))
             })
             .collect::<Vec<_>>();
         assert_eq!(matching.len(), 1, "obligations: {:?}", report.obligations);
@@ -5466,10 +5479,24 @@ proc main
         assert_eq!(metadata.status, ObligationStatus::Unknown);
         assert_eq!(
             metadata.origin,
-            StableSymbol::declaration(package_name, &[], "ac0_use")
+            StableSymbol::declaration(package_name, &[], owner_name)
         );
         assert!(metadata.affects_runtime_meaning);
         assert!(semantic.obligations.contains_key(obligation));
+    }
+
+    fn assert_one_unknown_requires(
+        package_name: &str,
+        package: &CheckedCorePackage,
+        report: &TargetSelectionReport,
+    ) {
+        assert_one_unknown_obligation(
+            package_name,
+            package,
+            report,
+            "ac0_use.requires.",
+            "ac0_use",
+        );
     }
 
     fn report_for_denotation(
@@ -5517,6 +5544,29 @@ proc main
         .expect("denotation driver keeps flagged success");
         let report = report_for_denotation(package_name, &denotation);
         assert_one_unknown_requires(package_name, &denotation.package, &report);
+    }
+
+    /// Promise class: durable invariant.
+    /// MEASURED: a source-level refinement introduction produces one package
+    /// obligation with `Unknown` status and the introducing declaration as its
+    /// origin. CLAIMED: open refinement obligations are not promoted to tested.
+    /// THE GAP: this package-route row does not cover every other caller route.
+    #[test]
+    fn package_route_reports_unknown_refinement_introduction() {
+        let package_name = "caller_reporting_refinement_introduction";
+        let output = compile_ken_source(
+            package_name,
+            CompilerSource::new("src/main.ken", CALLER_REFINEMENT_SOURCE),
+            selector(package_name, main_symbol(package_name)),
+        )
+        .expect("package driver compiles an open refinement introduction");
+        assert_one_unknown_obligation(
+            package_name,
+            &output.package,
+            &output.report,
+            "ac0_use.refinement.",
+            "ac0_use",
+        );
     }
 
     /// Promise class: durable invariant.
