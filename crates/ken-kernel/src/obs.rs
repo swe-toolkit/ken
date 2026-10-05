@@ -117,9 +117,35 @@ fn type_eq(env: &GlobalEnv, ctx: &Context, a: &Term, b: &Term) -> Option<Term> {
 // Eq-by-type (`16 §2.2`)
 // ===========================================================================
 
-/// Whether a type itself inhabits Ω, rather than being an Ω-valued universe.
-fn omega_classified(env: &GlobalEnv, ctx: &Context, ty: &Term) -> bool {
-    matches!(classify(env, ctx, ty), Ok(Sort::Omega(_)))
+/// Whether a type inhabits Ω, stable under substitution of a λ value.
+/// Classify Π/Σ by their formation rules instead of inferring a substituted
+/// codomain, where a β-redex can have a λ head. An undecided sort leaves Eq
+/// neutral rather than authorizing a Type-only reduction.
+fn omega_sort(env: &GlobalEnv, ctx: &Context, ty: &Term) -> Option<bool> {
+    omega_sort_whnf(env, ctx, &whnf(env, ctx, ty))
+}
+
+/// Classify a type already in WHNF; R1 must not WHNF its carrier twice.
+fn omega_sort_whnf(env: &GlobalEnv, ctx: &Context, ty: &Term) -> Option<bool> {
+    match ty {
+        Term::Pi(dom, cod) => {
+            let mut cod_ctx = ctx.clone();
+            cod_ctx.push((**dom).clone());
+            omega_sort(env, &cod_ctx, cod)
+        }
+        Term::Sigma(fst, snd) => {
+            let first = omega_sort(env, ctx, fst)?;
+            let mut snd_ctx = ctx.clone();
+            snd_ctx.push((**fst).clone());
+            Some(first && omega_sort(env, &snd_ctx, snd)?)
+        }
+        Term::Eq(..) | Term::Trunc(_) => Some(true),
+        Term::Type(_) | Term::Omega(_) | Term::Quot(..) => Some(false),
+        head => match classify(env, ctx, head).ok()? {
+            Sort::Omega(_) => Some(true),
+            Sort::Type(_) => Some(false),
+        },
+    }
 }
 
 /// Reduce `Eq ty a b` by recursion on the (already-whnf'd) type `ty`
@@ -127,7 +153,7 @@ fn omega_classified(env: &GlobalEnv, ctx: &Context, ty: &Term) -> bool {
 pub fn eq_reduce(env: &GlobalEnv, ctx: &Context, ty: &Term, a: &Term, b: &Term) -> Option<Term> {
     // An Ω carrier is proof-irrelevant, regardless of its canonical head.
     // In particular, no Π/Σ or Trunc arm may produce an Eq reduct for it.
-    if omega_classified(env, ctx, ty) {
+    if omega_sort_whnf(env, ctx, ty) != Some(false) {
         return None;
     }
     match ty {
@@ -323,7 +349,7 @@ fn eq_at_sigma(
     );
     let b1_p1 = subst0(b1, &p1);
     let b1_q1 = subst0(b1, &q1);
-    if omega_classified(env, ctx, &b1_q1) {
+    if omega_sort(env, ctx, &b1_q1)? {
         let target = weaken(&whnf(env, ctx, &Term::proj2(q.clone())), 1);
         let second = Term::Eq(
             Box::new(weaken(&b1_q1, 1)),
@@ -627,7 +653,7 @@ fn inductive_conjuncts(
     let a_ty = weaken(&subst_tel(&a_tpl[j], &a_bar[..j]), j as i64);
     let b_ty = weaken(&subst_tel(&b_tpl[j], &b_bar[..j]), j as i64);
     let target = weaken(&b_bar[j], j as i64);
-    let conjunct = if omega_classified(env, proof_ctx, &b_ty) {
+    let conjunct = if omega_sort(env, proof_ctx, &b_ty)? {
         // Ω proofs are irrelevant: compare the target proof to itself without
         // transporting the source proof or constructing a J witness.
         Term::Eq(Box::new(b_ty), Box::new(target.clone()), Box::new(target))
