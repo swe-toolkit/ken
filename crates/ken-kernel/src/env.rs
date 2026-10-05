@@ -678,10 +678,9 @@ impl GlobalEnv {
         self.by_id.get(&id).map(|&i| &self.decls[i])
     }
 
-    /// Remove the most-recently added declaration (provisional admission
-    /// rollback: an inductive whose signature fails checking is withdrawn so
-    /// its not-yet-finalized id is not left dangling). Reindexes the lookup
-    /// maps; the popped [`GlobalId`]s become free for re-use.
+    /// Remove the most-recently added declaration. Reindexes lookup maps and
+    /// removes registry entries that refer to the popped [`GlobalId`], so the
+    /// id and every kernel-owned index are safe to reuse.
     ///
     /// ```compile_fail
     /// use ken_kernel::GlobalEnv;
@@ -702,11 +701,46 @@ impl GlobalEnv {
         // so provisional admission rollback restores the allocator as well as
         // the lookup tables.
         self.next_id = self.next_id.min(decl.id().0);
+        self.top_id = self.top_id.filter(|id| *id != decl.id());
+        self.bottom_id = self.bottom_id.filter(|id| *id != decl.id());
+        self.tt_id = self.tt_id.filter(|id| *id != decl.id());
+        self.deceq_certs.retain(|prim_ty, cert| {
+            *prim_ty != decl.id()
+                && cert.eq_op != decl.id()
+                && cert.sound != decl.id()
+                && cert.complete != decl.id()
+        });
+        if self.int_lit_ty == Some(decl.id()) {
+            self.int_lit_ty = None;
+        }
+        if self.unit_type == Some(decl.id()) {
+            self.unit_type = None;
+        }
+        self.literal_char_view = self.literal_char_view.take().filter(|view| {
+            view.char_type != decl.id()
+                && view.operation != decl.id()
+                && view.nil != decl.id()
+                && view.cons != decl.id()
+        });
+        self.checked_string_carrier = self
+            .checked_string_carrier
+            .filter(|carrier| *carrier != decl.id());
+        self.checked_char_carrier = self
+            .checked_char_carrier
+            .filter(|carrier| *carrier != decl.id());
         self.terminal_supports.remove(&decl.id());
-        self.support_edges.remove(&decl.id());
-        self.all_supports.retain(|_, family| *family != decl.id());
+        self.support_edges.retain(|host, supports| {
+            if *host == decl.id() {
+                return false;
+            }
+            supports.retain(|family| *family != decl.id());
+            true
+        });
+        self.all_supports
+            .retain(|(host, _, _), family| *host != decl.id() && *family != decl.id());
         self.checked_literals.remove(&decl.id());
         self.sct_decreasing.remove(&decl.id());
+        self.referrers.remove(&decl.id());
         if let Decl::Transparent { id, .. } = &decl {
             let refs = self
                 .body_refs
@@ -720,9 +754,6 @@ impl GlobalEnv {
                     }
                 }
             }
-            // The popped id will be reusable; no referrer edge to its former
-            // declaration may survive into the next admission at that id.
-            self.referrers.remove(id);
         }
         if self.recursive_transparent.remove(&decl.id()) {
             self.recompute_transparent_cycles();
