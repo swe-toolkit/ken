@@ -7,6 +7,13 @@
 #[cfg(target_os = "linux")]
 #[test]
 fn bound_process_nat_retries_only_the_refused_join() {
+    // Baseline provisioning for the same Nat source as the existing ignored
+    // parity row, not a repair to a pre-existing failing test. On this fixture,
+    // sampling the worker's 256 MiB VMA at 20 Hz via /proc/<pid>/smaps observed
+    // at most 2,308 KiB resident stack pages. Retain that row's stated stack:
+    // 262,144 KiB = 2,308 KiB observed peak + 259,836 KiB headroom. A run
+    // without this override aborted on stack overflow; 4 MiB also passed.
+    // Measurement: local/rt-scalar-bound-feedback/qa-stack-measure-256-*.{log,tsv}.
     std::thread::Builder::new()
         .name("rt-scalar-feedback-nat".to_owned())
         .stack_size(256 * 1024 * 1024)
