@@ -1855,15 +1855,25 @@ fn check_refined_string_literal(
     emit_refinement_introduction(cx, expected, &inferred, core, span, None)
 }
 
-/// Install the one-shot channel only for a result-position child.
-#[inline(never)]
+/// An empty channel must not introduce an extra frame on every checked
+/// expression in a nested match. The nonempty route is cold and isolated.
+#[inline(always)]
 fn check_result_position(
     cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
     predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     if predicates.is_empty() {
-        return check(cx, expr, expected, span);
+        check(cx, expr, expected, span)
+    } else {
+        check_result_position_with_predicates(cx, expr, expected, span, predicates)
     }
+}
+
+#[inline(never)]
+fn check_result_position_with_predicates(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
     if !cx.result_predicates.is_empty() {
         return Err(ElabError::Internal("result predicate escaped its owning check".into()));
     }
@@ -1878,13 +1888,26 @@ fn check_result_position(
 
 /// An arm body belongs to the innermost match frame. Synthetic/cloned arms
 /// have exactly the same obligation channel as that frame's original arms.
-#[inline(never)]
+/// Ordinary arms go directly to `check` without another repeating frame.
+#[inline(always)]
 fn check_match_arm_result(
     cx: &mut ElabCtx<'_>, arm: &RMatchArm, expected: &Term, span: &Span,
 ) -> Result<Term, ElabError> {
+    if cx.match_frames.last().is_none_or(|frame| frame.result_predicates.is_empty()) {
+        check(cx, &arm.body, expected, span)
+    } else {
+        check_match_arm_result_with_predicates(cx, arm, expected, span)
+    }
+}
+
+#[inline(never)]
+fn check_match_arm_result_with_predicates(
+    cx: &mut ElabCtx<'_>, arm: &RMatchArm, expected: &Term, span: &Span,
+) -> Result<Term, ElabError> {
     let predicates = cx.match_frames.last()
-        .map(|frame| frame.result_predicates.clone()).unwrap_or_default();
-    check_result_position(cx, &arm.body, expected, span, &predicates)
+        .expect("result match arm has an owning frame")
+        .result_predicates.clone();
+    check_result_position_with_predicates(cx, &arm.body, expected, span, &predicates)
 }
 
 /// The only entry that forwards a pending predicate to a result-position form.
@@ -19856,6 +19879,33 @@ fn reuse_matrix_first_leaf(
     Ok(body)
 }
 
+// An annotated postcondition checks the first leaf against its seeded motive.
+// Keep this checked-only telescope work out of the ordinary inference leaf's
+// stack frame; most nested matrix compilations carry no result predicate.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn check_matrix_first_result_leaf(
+    cx: &mut ElabCtx,
+    first_arm: &RMatchArm,
+    first_row: &RowState,
+    first_occurrences: &[Option<Term>],
+    real_depth_so_far: usize,
+    owner: usize,
+    ret_ty_slot: &Option<Term>,
+) -> Result<(Option<Term>, Term, Term), ElabError> {
+    let seed = ret_ty_slot.as_ref().ok_or_else(|| ElabError::Internal(
+        "result predicate on an unseeded match leaf needs a checked motive".into(),
+    ))?;
+    let depth = matrix_telescope_depth(cx, cx.matrix_entries[owner].outer_ctx_len)?;
+    let body_ty_ctx = weaken(seed, depth as i64);
+    let (guard, body) = check_arm_at_matrix_leaf(
+        cx, first_arm, first_row.arm_idx, first_occurrences, real_depth_so_far,
+        &first_row.virtual_surface_positions, &first_row.virtual_aliases,
+        &first_row.row_hidden_surface_positions, &body_ty_ctx,
+    )?;
+    Ok((guard, body, body_ty_ctx))
+}
+
 /// Compile one matrix leaf. Keeping guard-only vectors and conditionals in a
 /// non-recursive frame preserves the existing recursive matrix stack budget.
 #[inline(never)]
@@ -19920,17 +19970,10 @@ fn compile_match_leaf(
     let has_result_predicate = cx.match_frames.last()
         .is_some_and(|frame| !frame.result_predicates.is_empty());
     let (first_guard, first_body, body_ty_ctx) = if has_result_predicate {
-        let seed = ret_ty_slot.as_ref().ok_or_else(|| ElabError::Internal(
-            "result predicate on an unseeded match leaf needs a checked motive".into(),
-        ))?;
-        let depth = matrix_telescope_depth(cx, cx.matrix_entries[owner].outer_ctx_len)?;
-        let body_ty_ctx = weaken(seed, depth as i64);
-        let (guard, body) = check_arm_at_matrix_leaf(
-            cx, first_arm, first_row.arm_idx, &first_occurrences, real_depth_so_far,
-            &first_row.virtual_surface_positions, &first_row.virtual_aliases,
-            &first_row.row_hidden_surface_positions, &body_ty_ctx,
-        )?;
-        (guard, body, body_ty_ctx)
+        check_matrix_first_result_leaf(
+            cx, first_arm, first_row, &first_occurrences, real_depth_so_far,
+            owner, ret_ty_slot,
+        )?
     } else {
         infer_arm_at_matrix_leaf(
             cx, first_arm, first_row.arm_idx, &first_occurrences, real_depth_so_far,
@@ -20457,6 +20500,38 @@ fn compile_match_matrix(
     }
 }
 
+// Build the per-bucket equation before descending into the recursive matrix.
+// Its temporary constructor/type terms must not enlarge every live matrix
+// frame on a deeply nested match when no result predicate is in scope.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn push_matrix_constructor_path_condition(
+    cx: &mut ElabCtx,
+    split_scrut: &Term,
+    d_id0: GlobalId,
+    split_level_args: &[Level],
+    params0: &[Term],
+    m0: usize,
+    n_args0: usize,
+    tail_under_split: bool,
+    constructor_id: GlobalId,
+) -> usize {
+    let mut split_ty = Term::indformer(d_id0, split_level_args.to_vec());
+    for arg in params0 {
+        let arg = if tail_under_split { weaken(arg, 1) } else { arg.clone() };
+        split_ty = Term::app(split_ty, arg);
+    }
+    let mut concrete = Term::constructor(constructor_id, split_level_args.to_vec());
+    for param in params0.iter().take(m0) {
+        concrete = Term::app(concrete,
+            weaken(param, (n_args0 + usize::from(tail_under_split)) as i64));
+    }
+    for position in 0..n_args0 {
+        concrete = Term::app(concrete, Term::var(n_args0 - 1 - position));
+    }
+    push_branch_path_condition(cx, &split_ty, split_scrut, &concrete, n_args0, n_args0)
+}
+
 /// Group `rows` (whose `real_pats[0]` matches the inductive `ind0`) into one
 /// bucket per constructor — expanding a `Wild`/`Var` row into every
 /// constructor (it matches all of them) — and recurse to build each
@@ -20661,28 +20736,17 @@ fn build_ctor_buckets(
         new_col_kinds.extend(std::iter::repeat(ColKind::Ih).take(p_ihs0));
         new_col_kinds.extend_from_slice(tail_col_kinds);
 
+        let base = cx.ctx.len();
+        cx.match_frames.push(MatchFrame::new(
+            base, cx.match_frames.len(), ret_ty_slot.clone(), None,
+        ));
+        cx.match_frames.last_mut().expect("new matrix frame")
+            .result_predicates.extend_from_slice(predicates);
         // The occurrence is the matched source value at the root, and the
         // installed split binder at a nested constructor column.
-        let split_scrut = rows[0].real_occurrences[0].term.clone();
-        let mut split_ty = Term::indformer(d_id0, split_level_args.to_vec());
-        for arg in params0 {
-            let arg = if tail_under_split { weaken(arg, 1) } else { arg.clone() };
-            split_ty = Term::app(split_ty, arg);
-        }
-        let mut concrete = Term::constructor(c0.id, split_level_args.to_vec());
-        for param in params0.iter().take(m0) {
-            concrete = Term::app(concrete,
-                weaken(param, (n_args0 + usize::from(tail_under_split)) as i64));
-        }
-        for position in 0..n_args0 {
-            concrete = Term::app(concrete, Term::var(n_args0 - 1 - position));
-        }
-        let base = cx.ctx.len();
-        let mut frame = MatchFrame::new(base, cx.match_frames.len(), ret_ty_slot.clone(), None);
-        frame.result_predicates = predicates.to_vec();
-        cx.match_frames.push(frame);
-        let path_base = push_branch_path_condition(
-            cx, &split_ty, &split_scrut, &concrete, n_args0, n_args0,
+        let path_base = push_matrix_constructor_path_condition(
+            cx, &rows[0].real_occurrences[0].term, d_id0, split_level_args,
+            params0, m0, n_args0, tail_under_split, c0.id,
         );
         let result = compile_match_matrix(
             cx,
