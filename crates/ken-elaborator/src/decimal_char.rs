@@ -27,6 +27,12 @@ pub struct DecimalCharEnv {
     pub char_id: GlobalId,
 }
 
+// The prelude and its AC-2 elaboration control use the same checked source.
+// A change to the actual guard must reach the obligation assertion, not only
+// a test-local imitation of `intToChar`.
+const INT_TO_CHAR_DECL: &str = "fn intToChar (n : Int) : Option Char = \
+     match (inRangeBool n) { True |-> Some Char n ; False |-> None Char }";
+
 /// Exact decimal literal `10^k` as a base-10 string (a leading `1` followed
 /// by `k` zeros) — used to generate the bounded `decimalPow10` cascade.
 fn pow10_literal(k: u32) -> String {
@@ -265,11 +271,8 @@ pub fn register_decimal_char(elab: &mut ElabEnv) -> Result<DecimalCharEnv, ElabE
     // `Int.toChar` — face-(c): `None` on surrogate/out-of-range, `Some` on a
     // valid scalar; the `inRangeBool` check REDUCES (via the pulled-up
     // `leq_int`), so this is not a stuck neutral on rejection (AC-C3).
-    elab.elaborate_decl(
-        "fn intToChar (n : Int) : Option Char = \
-         match (inRangeBool n) { True |-> Some Char n ; False |-> None Char }",
-    )
-    .map_err(|e| ElabError::Internal(format!("intToChar failed: {}", e)))?;
+    elab.elaborate_decl(INT_TO_CHAR_DECL)
+        .map_err(|e| ElabError::Internal(format!("intToChar failed: {}", e)))?;
 
     let eq_char_id = *elab.globals.get("eqChar").unwrap();
     elab.numeric_env
@@ -281,4 +284,83 @@ pub fn register_decimal_char(elab: &mut ElabEnv) -> Result<DecimalCharEnv, ElabE
         mkdecimalpair_id,
         char_id,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ObligationKind;
+
+    /// AC-2, durable invariant. MEASURED: elaborating the prelude's own
+    /// `intToChar` source produces one closed `Some Char n` introduction under
+    /// the True-arm equation. Removing that guard produces one open
+    /// introduction for the SAME `Some Char n` body. CLAIMED: the guard
+    /// discharges the branch's scalar obligation. THE GAP: sharing the
+    /// production source makes changes to its guard reach this test; this
+    /// observes elaboration, not what an id-only caller reports.
+    #[test]
+    fn ac2_int_to_char_true_arm_discharge_depends_on_its_guard() {
+        let mut env = ElabEnv::new().expect("prelude");
+        let guarded_source = INT_TO_CHAR_DECL.replacen("fn intToChar", "fn guarded_int_to_char", 1);
+        let guarded = env
+            .elaborate_decl_v1(&guarded_source)
+            .expect("re-elaborate the actual guarded prelude declaration");
+        assert_eq!(guarded.obligations.len(), 1, "the Some arm introduces Char");
+        let obligation = &guarded.obligations[0];
+        assert!(matches!(
+            obligation.kind,
+            ObligationKind::RefinementIntroduction
+        ));
+        let Term::Pi(_, after_n) = &obligation.goal_closed else {
+            panic!("guarded goal has no n binder: {:?}", obligation.goal_closed);
+        };
+        let Term::Pi(equation, _) = after_n.as_ref() else {
+            panic!(
+                "guarded goal has no arm equation: {:?}",
+                obligation.goal_closed
+            );
+        };
+        assert!(matches!(equation.as_ref(), Term::Eq(..)));
+        assert!(
+            !env.is_open_hole(obligation.hole_id),
+            "inRangeBool n = True must discharge the Some-branch obligation: {:?}",
+            obligation.goal_closed
+        );
+
+        let unguarded_source = INT_TO_CHAR_DECL
+            .replacen("fn intToChar", "fn unguarded_int_to_char", 1)
+            .replacen(
+                "match (inRangeBool n) { True |-> Some Char n ; False |-> None Char }",
+                "Some Char n",
+                1,
+            );
+        let unguarded = env
+            .elaborate_decl_v1(&unguarded_source)
+            .expect("same Some arm without its path guard");
+        assert_eq!(
+            unguarded.obligations.len(),
+            1,
+            "same Some Char n introduction"
+        );
+        let obligation = &unguarded.obligations[0];
+        assert!(matches!(
+            obligation.kind,
+            ObligationKind::RefinementIntroduction
+        ));
+        let Term::Pi(_, predicate) = &obligation.goal_closed else {
+            panic!(
+                "unguarded goal has no n binder: {:?}",
+                obligation.goal_closed
+            );
+        };
+        assert_eq!(
+            predicate.as_ref(),
+            &Term::app(Term::const_(env.globals["isScalar"], vec![]), Term::var(0)),
+            "the open goal must be the same scalar introduction, without a path equation"
+        );
+        assert!(
+            env.is_open_hole(obligation.hole_id),
+            "without the guard, the Some-branch scalar obligation stays open"
+        );
+    }
 }
