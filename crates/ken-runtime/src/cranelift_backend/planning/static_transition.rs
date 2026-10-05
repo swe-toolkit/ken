@@ -27,6 +27,8 @@ pub(in crate::cranelift_backend) use continuations::tests::contspec_activation_o
 mod effects;
 mod immediate_bridge;
 mod joins_traps;
+#[cfg(feature = "px8-ds-test-support")]
+pub use joins_traps::with_forced_carrier_match_joins;
 mod occurrences;
 mod responses;
 mod returned_vis;

@@ -15,7 +15,7 @@
 //! `lowering/mod.rs` (item 14's territory); see the `D0` ledger's frozen-
 //! predicate application in `docs/program/issues/RT-PLANNER-JOINS-TRAPS-SPLIT.md`.
 
-#[cfg(test)]
+#[cfg(any(test, feature = "px8-ds-test-support"))]
 use std::cell::Cell;
 use std::collections::BTreeSet;
 
@@ -130,6 +130,30 @@ enum ResultPhase {
 thread_local! {
     static D8_FORCE_VARIABLE_SPECIALIZED: Cell<bool> = const { Cell::new(false) };
     static D8_REMOVE_VARIABLE_CALLABLE_SUMMARY: Cell<bool> = const { Cell::new(false) };
+}
+
+// Test-only forced-representation probe. The guard scopes one compilation to
+// the calling test thread; the count proves that planning used the hook.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static FORCE_CARRIER_MATCH_JOINS: Cell<bool> = const { Cell::new(false) };
+    static FORCED_CARRIER_MATCH_JOINS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_forced_carrier_match_joins<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    struct Reset;
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            FORCE_CARRIER_MATCH_JOINS.with(|enabled| enabled.set(false));
+        }
+    }
+    FORCE_CARRIER_MATCH_JOINS.with(|enabled| assert!(!enabled.replace(true)));
+    FORCED_CARRIER_MATCH_JOINS.with(|count| count.set(0));
+    let _reset = Reset;
+    let result = operation();
+    let count = FORCED_CARRIER_MATCH_JOINS.with(Cell::get);
+    (result, count)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -538,8 +562,21 @@ fn summarize_result_phase(
             // through the same lattice used by naturally carried joins.
             summary.phase = ResultPhase::CarrierRequired;
         }
+        #[cfg(feature = "px8-ds-test-support")]
+        let forced_match = summary.phase == ResultPhase::SpecializedOnly
+            && matches!(expr, RuntimeExpr::Match { .. } | RuntimeExpr::ComputationalMatch { .. })
+            && FORCE_CARRIER_MATCH_JOINS.with(Cell::get);
+        #[cfg(not(feature = "px8-ds-test-support"))]
+        let forced_match = false;
+        #[cfg(feature = "px8-ds-test-support")]
+        if forced_match {
+            FORCED_CARRIER_MATCH_JOINS.with(|count| {
+                count.set(count.get().checked_add(1).expect("forced Match count fits usize"));
+            });
+        }
         let result = PlannedJoinResult {
             representation: match summary.phase {
+                ResultPhase::SpecializedOnly if forced_match => JoinResultRepresentation::CarrierWord,
                 ResultPhase::SpecializedOnly => JoinResultRepresentation::NativeScalarPair,
                 ResultPhase::CarrierRequired => JoinResultRepresentation::CarrierWord,
             },

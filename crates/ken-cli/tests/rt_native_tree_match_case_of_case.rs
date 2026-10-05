@@ -290,6 +290,80 @@ fn console_direct_exit_nested_match_uses_existing_route() {
     }
 }
 
+// Promise class: transition sentinel for the test-forced CarrierWord route.
+// MEASURED: a scoped planner hook admits specialized Match joins to the
+// carrier route and both selected bytes execute natively with the same
+// stdout, exit, and effects as the interpreter. CLAIMED: a root ExitCode
+// constructor is decoded by its value class, not by allocation lifetime.
+// THE GAP: this fixture cannot cover every ExitCode constructor; the hook's
+// positive count and an old-root-guard mutation pin this reached boundary.
+#[cfg(target_os = "linux")]
+#[test]
+fn carrier_root_exit_nested_match_agrees_with_interpreter() {
+    let dir = tempfile::tempdir().unwrap();
+    let ((build, d1_hits), forced_matches) = ken_runtime::with_forced_carrier_match_joins(|| {
+        ken_runtime::with_exit_code_case_of_case_route_count(|| {
+            ken_cli::build_native_program(
+                SOURCE,
+                ken_cli::SourceFormat::Ken,
+                "rt-tree-exit-forced-carrier",
+                dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        })
+    });
+    assert!(
+        forced_matches > 0,
+        "planning must run on the guarded test thread"
+    );
+    assert_eq!(d1_hits, 0, "the ordinary direct-exit route must not use D1");
+    let artifact = build.expect("the forced-carrier checked Match emits an artifact");
+    for (byte, stdout, exit) in [
+        (1_u8, b"seed\naccepted\n".as_slice(), 0),
+        (2_u8, b"seed\nrejected\n".as_slice(), 7),
+    ] {
+        let mut host = ken_interp::PosixHost::new_at(dir.path());
+        let interpreted = ken_cli::run_program_effect_observation(
+            SOURCE,
+            ken_cli::SourceFormat::Ken,
+            &[b"ken".to_vec(), vec![byte]],
+            &[],
+            dir.path().as_os_str().as_encoded_bytes(),
+            &mut host,
+        )
+        .expect("the checked source executes in the interpreter");
+        assert_eq!(interpreted.stdout, stdout, "interpreter byte {byte}");
+        assert_eq!(interpreted.exit_status, exit, "interpreter byte {byte}");
+        let native = ken_runtime::run_bound_process_effect_observation(
+            &artifact.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: vec![std::ffi::OsString::from_vec(vec![byte])],
+                environment: Vec::new(),
+                cwd: dir.path().to_owned(),
+                plan_hash: artifact.plan_transport_hash,
+            },
+        )
+        .expect("the forced-carrier checked Match must not trap natively");
+        assert_eq!(native.stdout, stdout, "native byte {byte}");
+        assert_eq!(native.exit_status, exit, "native byte {byte}");
+        assert_eq!(
+            native.effect_trace.len(),
+            2,
+            "both effects execute on byte {byte}"
+        );
+        assert_eq!(native.stdout, interpreted.stdout, "stdout byte {byte}");
+        assert_eq!(
+            native.exit_status, interpreted.exit_status,
+            "status byte {byte}"
+        );
+        assert_eq!(
+            native.effect_trace, interpreted.effect_trace,
+            "effects byte {byte}"
+        );
+        assert_eq!(native, interpreted, "complete observation byte {byte}");
+    }
+}
+
 // Spec: 42 §3.3 and §6 (one selected arm, ordered effects); 45 §4
 // (native/interpreter agreement). Both tests use this checked source and the
 // same full observation oracle, but own distinct runtime branches.

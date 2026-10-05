@@ -9439,7 +9439,11 @@ fn define_unit_body<M: Module>(
                     builder.ins().jump(decoded, &[status.into()]);
 
                     builder.switch_to_block(persistent);
-                    Lowering::require_i64(&mut builder, tag, BoundaryTag::PersistentGround as i64);
+                    // Decode a checked ExitCode by constructor shape, not by the
+                    // allocation lifetime of its fields. The root reads either
+                    // persistent or invocation-owned nodes in this invocation.
+                    let class = compiler.emit_carrier_class(&mut builder, word)?;
+                    Lowering::require_i64(&mut builder, class, BoundaryClass::Constructor as i64);
                     // The non-root Ret result edge retains its constructor field.
                     // Only the checked process root projects that carried ExitCode.
                     let constructor = compiler.emit_carrier_tag(&mut builder, word)?;
