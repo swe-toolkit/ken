@@ -5487,14 +5487,11 @@ proc main
     }
 
     /// Promise class: durable invariant.
-    /// MEASURED: each package producer carries one obligation-map key whose
-    /// origin is the declaration that owns the call-site hole and whose status
-    /// is `Unknown`; the native preparation also uses the shared renderer.
-    /// CLAIMED: no package driver turns a trusted-base hole into an empty
-    /// obligation report. THE GAP: the separate native-build CLI test checks
-    /// that its rendered line reaches stderr while stdout remains the path.
+    /// MEASURED: the package route succeeds with one `Unknown` obligation-map
+    /// entry owned by the declaration containing the open call.
+    /// THE GAP: success alone would also permit an empty obligation map.
     #[test]
-    fn open_requires_reaches_package_denotation_and_native_driver_reports() {
+    fn package_route_reports_open_requires_and_succeeds() {
         let package_name = "caller_reporting_open_package";
         let output = compile_ken_source(
             package_name,
@@ -5503,7 +5500,14 @@ proc main
         )
         .expect("package driver compiles an open obligation");
         assert_one_unknown_requires(package_name, &output.package, &output.report);
+    }
 
+    /// Promise class: durable invariant.
+    /// MEASURED: the denotation route and its carried package retain one open
+    /// obligation while returning success. THE GAP: checking `Ok` alone would
+    /// not detect a dropped package report.
+    #[test]
+    fn denotation_route_reports_open_requires_and_succeeds() {
         let package_name = "caller_reporting_open_denotation";
         let denotation = compile_checked_target_denotation(
             package_name,
@@ -5513,7 +5517,14 @@ proc main
         .expect("denotation driver keeps flagged success");
         let report = report_for_denotation(package_name, &denotation);
         assert_one_unknown_requires(package_name, &denotation.package, &report);
+    }
 
+    /// Promise class: durable invariant.
+    /// MEASURED: native preparation succeeds with one obligation-map entry and
+    /// one rendered report line. THE GAP: a successful artifact preparation
+    /// could otherwise omit the hole.
+    #[test]
+    fn native_route_reports_open_requires_and_succeeds() {
         let package_name = "caller_reporting_open_native";
         let preparation = prepare_native_program_sources(
             package_name,

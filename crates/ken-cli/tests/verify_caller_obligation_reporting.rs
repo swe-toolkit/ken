@@ -118,15 +118,13 @@ fn assert_native_build_row(
 }
 
 /// Promise class: durable invariant.
-/// MEASURED: a source with one open call-site `Requires` yields one `unknown`
-/// line through each user-facing route, and all callers keep their success
-/// behavior. THE GAP: controls are exercised independently below so a failing
-/// open row cannot skip their observations.
+/// MEASURED: one open call-site requirement is reported and `check` succeeds.
+/// CLAIMED: closed controls remain separate rows below. THE GAP: a status
+/// check alone would miss an omitted or duplicate diagnostic.
 #[test]
-fn cli_and_repl_report_open_requires_and_succeed() {
+fn check_reports_open_requires_and_succeeds() {
     let root = TempDir::new().expect("scratch fixture directory");
     let open_path = fixture(root.path(), "open.ken", OPEN);
-
     let checked = run("check", &[open_path.as_os_str()]);
     assert_eq!(
         checked.status.code(),
@@ -138,16 +136,34 @@ fn cli_and_repl_report_open_requires_and_succeed() {
     assert_one_open_report(&checked.stderr);
     assert!(String::from_utf8_lossy(&checked.stderr)
         .contains("ken check: 1 open obligation(s), status unknown"));
+}
 
+/// Promise class: durable invariant.
+/// MEASURED: `run` reports one open requirement and preserves program output
+/// and success. CLAIMED: it does not turn an obligation into failure. THE GAP:
+/// the exit code alone would miss a silent obligation.
+#[test]
+fn run_reports_open_requires_and_succeeds() {
+    let root = TempDir::new().expect("scratch fixture directory");
+    let open_path = fixture(root.path(), "open.ken", OPEN);
     let ran = run("run", &[open_path.as_os_str()]);
     assert_eq!(ran.status.code(), Some(0), "stderr: {:?}", ran.stderr);
     assert_eq!(ran.stdout, b"ac0-run\n");
     assert_one_open_report(&ran.stderr);
+}
 
+/// Promise class: durable invariant.
+/// MEASURED: REPL definitions report open obligations after definition and
+/// continue to completion, including every result expanded from a module.
+/// THE GAP: a single-declaration example would not expose dropped module rows.
+#[test]
+fn repl_reports_open_requires_and_succeeds_for_expanded_declarations() {
     let open_repl = repl(
-        ":def const ac0_need : String requires Equal Int 0 0 = \"ac0-run\"\n\
-         :def const ac0_use : String = ac0_need\n\
-         :list\n:quit\n",
+        r#":def const ac0_need : String requires Equal Int 0 0 = "ac0-run"
+:def const ac0_use : String = ac0_need
+:list
+:quit
+"#,
     );
     assert_eq!(
         open_repl.status.code(),
@@ -165,8 +181,9 @@ fn cli_and_repl_report_open_requires_and_succeed() {
     assert!(open_repl_stdout.ends_with("bye\n"));
 
     let module_repl = repl(
-        ":def module Ac0 { const ac0_need : String requires Equal Int 0 0 = \"ac0-run\" const ac0_use : String = ac0_need const ac0_tail : String = \"tail\" }\n\
-         :quit\n",
+        r#":def module Ac0 { const ac0_need : String requires Equal Int 0 0 = "ac0-run" const ac0_use : String = ac0_need const ac0_tail : String = "tail" }
+:quit
+"#,
     );
     assert_eq!(
         module_repl.status.code(),
@@ -181,7 +198,16 @@ fn cli_and_repl_report_open_requires_and_succeed() {
         .collect::<Vec<_>>();
     assert_eq!(module_reports.len(), 1, "stdout: {module_stdout}");
     assert!(module_stdout.ends_with("bye\n"));
+}
 
+/// Promise class: durable invariant.
+/// MEASURED: native-build reports one open requirement while succeeding and
+/// keeping stdout as the artifact path. CLAIMED: the diagnostic goes to stderr.
+/// THE GAP: a successful build alone would allow silence.
+#[test]
+fn native_build_reports_open_requires_and_succeeds() {
+    let root = TempDir::new().expect("scratch fixture directory");
+    let open_path = fixture(root.path(), "open.ken", OPEN);
     let profile_path = root.path().join("resource-profile.json");
     std::fs::write(&profile_path, PROFILE).expect("write resource profile");
     assert_native_build_row(root.path(), &profile_path, "open", &open_path, true);
