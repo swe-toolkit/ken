@@ -464,6 +464,329 @@ pub struct PreludeEnv {
     pub release_failed_id: GlobalId,
 }
 
+/// Keep checked Resource, Buffer, and Mapping law registration off the large
+/// `register_prelude` frame, which sits beneath the decimal-char recursion.
+/// The call site preserves definition order before private names are hidden.
+#[inline(never)]
+fn register_resource_bracket_laws(elab: &mut ElabEnv) -> Result<(), ElabError> {
+    elab.elaborate_decl(
+        r#"theorem resource_settle_body_ok_clean (o : Type) (e : Type) (r : Type) (value : r)
+          : And
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value))) =
+          and_intro
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r) (ResourceBracketOk e r value)))
+            Refl Refl"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!("prelude resource_settle_body_ok_clean failed: {e}"))
+    })?;
+    elab.elaborate_decl(
+        r#"theorem resource_settle_body_error_clean (o : Type) (e : Type) (r : Type)
+          (body_error : e)
+          : And
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error))) =
+          and_intro
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Ok ResourceError Unit MkUnit))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error)))
+            (Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Err ResourceError Unit Closed))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyError e r body_error)))
+            Refl Refl"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude resource_settle_body_error_clean failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        r#"theorem resource_settle_body_ok_release_error
+          (o : Type) (e : Type) (r : Type) (value : r)
+          (release_error : ResourceError)
+          : Not (Equal ResourceError release_error Closed)
+            → Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyOk e r value)
+                (Err ResourceError Unit release_error))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketReleaseError e r release_error)) =
+          match release_error {
+            ResourceHostIO io ↦ λnot_closed. Refl;
+            Closed ↦ λnot_closed. absurd (not_closed Proved);
+            MalformedResource ↦ λnot_closed. Proved;
+            RightNotHeld required held ↦ λnot_closed. Refl;
+            ReleaseFailed kind identity io ↦ λnot_closed. Refl;
+            ResourceKindMismatch expected actual ↦ λnot_closed. Refl;
+            BufferLimit ↦ λnot_closed. Proved;
+            AllocationFailed ↦ λnot_closed. Proved;
+            InvalidOffset ↦ λnot_closed. Proved;
+            InvalidBounds ↦ λnot_closed. Proved;
+            NoProgress ↦ λnot_closed. Proved;
+            MappingLimit ↦ λnot_closed. Proved
+          }"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude resource_settle_body_ok_release_error failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        r#"theorem resource_settle_body_error_release_error
+          (o : Type) (e : Type) (r : Type) (body_error : e)
+          (release_error : ResourceError)
+          : Not (Equal ResourceError release_error Closed)
+            → Equal (Result o (ResourceBracketResult e r))
+              (resource_settle_result_for o e r (ResourceBodyErr e r body_error)
+                (Err ResourceError Unit release_error))
+              (Ok o (ResourceBracketResult e r)
+                (ResourceBracketBodyAndReleaseError e r body_error release_error)) =
+          match release_error {
+            ResourceHostIO io ↦ λnot_closed. Refl;
+            Closed ↦ λnot_closed. absurd (not_closed Proved);
+            MalformedResource ↦ λnot_closed. Refl;
+            RightNotHeld required held ↦ λnot_closed. Refl;
+            ReleaseFailed kind identity io ↦ λnot_closed. Refl;
+            ResourceKindMismatch expected actual ↦ λnot_closed. Refl;
+            BufferLimit ↦ λnot_closed. Refl;
+            AllocationFailed ↦ λnot_closed. Refl;
+            InvalidOffset ↦ λnot_closed. Refl;
+            InvalidBounds ↦ λnot_closed. Refl;
+            NoProgress ↦ λnot_closed. Refl;
+            MappingLimit ↦ λnot_closed. Refl
+          }"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude resource_settle_body_error_release_error failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        "theorem resource_after_open_error (a : Auth) (e : Type) (r : Type) \
+           (body : Resource ResourceKind.FsHandle -> HostIO a (ResourceBodyResult e r)) \
+           (open_error : FileError) \
+           : Equal (HostIO a (Result FileError (ResourceBracketResult e r))) \
+             (private_with_resource_after_open a e r body \
+               (Err FileError (Resource ResourceKind.FsHandle) open_error)) \
+             (Ret (Coproduct (FSOp a) AmbientOp) \
+               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+               (Result FileError (ResourceBracketResult e r)) \
+               (Err FileError (ResourceBracketResult e r) open_error)) = Refl",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_after_open_error failed: {e}")))?;
+    elab.elaborate_decl("theorem resource_refl (t : Type) (x : t) : Equal t x x = Refl")
+        .map_err(|e| ElabError::Internal(format!("prelude resource_refl failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem resource_with_acquire
+          (a : Auth) (e : Type) (r : Type) (cap : Cap a)
+          (path : Bytes) (mode : ResourceOpenMode)
+          (body : Resource ResourceKind.FsHandle -> HostIO a (ResourceBodyResult e r))
+          : Equal (HostIO a (Result FileError (ResourceBracketResult e r)))
+            (withResource a e r cap path mode body)
+            (Vis (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result FileError (ResourceBracketResult e r))
+              (InL (FSOp a) AmbientOp (PrivateFsOpen a cap path mode))
+              (private_with_resource_after_open a e r body)) =
+          resource_refl (HostIO a (Result FileError (ResourceBracketResult e r)))
+            (withResource a e r cap path mode body)"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_with_acquire failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem resource_after_open_success
+          (a : Auth) (e : Type) (r : Type)
+          (body : Resource ResourceKind.FsHandle -> HostIO a (ResourceBodyResult e r))
+          (resource : Resource ResourceKind.FsHandle)
+          : Equal (HostIO a (Result FileError (ResourceBracketResult e r)))
+            (private_with_resource_after_open a e r body
+              (Ok FileError (Resource ResourceKind.FsHandle) resource))
+            (bind (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (ResourceBodyResult e r) (Result FileError (ResourceBracketResult e r))
+              (body resource)
+              (release_if_live a FileError e r ResourceKind.FsHandle resource)) = Refl"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_after_open_success failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem buffer_with_acquire
+          (a : Auth) (e : Type) (r : Type) (capacity : Int)
+          (body : BufferHandle -> HostIO a (ResourceBodyResult e r))
+          : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (withBuffer a e r capacity body)
+            (Vis (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result ResourceError (ResourceBracketResult e r))
+              (InL (FSOp a) AmbientOp (PrivateBufferAllocate a capacity))
+              (private_with_buffer_after_allocate a e r capacity body)) =
+          resource_refl (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (withBuffer a e r capacity body)"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude buffer_with_acquire failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem buffer_after_allocate_error
+          (a : Auth) (e : Type) (r : Type) (capacity : Int)
+          (body : BufferHandle -> HostIO a (ResourceBodyResult e r))
+          (allocate_error : ResourceError)
+          : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (private_with_buffer_after_allocate a e r capacity body
+              (Err ResourceError (Resource ResourceKind.Buffer) allocate_error))
+            (Ret (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result ResourceError (ResourceBracketResult e r))
+              (Err ResourceError (ResourceBracketResult e r) allocate_error)) = Refl"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude buffer_after_allocate_error failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem buffer_after_allocate_success
+          (a : Auth) (e : Type) (r : Type) (capacity : Int)
+          (body : BufferHandle -> HostIO a (ResourceBodyResult e r))
+          (resource : Resource ResourceKind.Buffer)
+          : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (private_with_buffer_after_allocate a e r capacity body
+              (Ok ResourceError (Resource ResourceKind.Buffer) resource))
+            (bind (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (ResourceBodyResult e r) (Result ResourceError (ResourceBracketResult e r))
+              (body (PrivateBufferHandle resource capacity))
+              (release_if_live a ResourceError e r ResourceKind.Buffer resource)) = Refl"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!("prelude buffer_after_allocate_success failed: {e}"))
+    })?;
+    elab.elaborate_decl(
+        r#"theorem mapping_with_anonymous_acquire
+          (a : Auth) (e : Type) (r : Type)
+          (length : Int) (protection : MappingProt)
+          (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
+          : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (withMapping a e r (Anonymous length) protection body)
+            (Vis (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result ResourceError (ResourceBracketResult e r))
+              (InL (FSOp a) AmbientOp
+                (PrivateMappingAllocate a length protection))
+              (private_with_mapping_after_allocate a e r length body)) =
+          resource_refl (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (withMapping a e r (Anonymous length) protection body)"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude mapping_with_anonymous_acquire failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        r#"theorem mapping_with_file_acquire
+          (a : Auth) (e : Type) (r : Type)
+          (file : Resource ResourceKind.FsHandle) (length : Int)
+          (protection : MappingProt)
+          (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
+          : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (withMapping a e r (FileBacked file length) protection body)
+            (Vis (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result ResourceError (ResourceBracketResult e r))
+              (InL (FSOp a) AmbientOp
+                (PrivateMappingAcquireFile a file length protection))
+              (private_with_mapping_after_allocate a e r length body)) =
+          resource_refl (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (withMapping a e r (FileBacked file length) protection body)"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude mapping_with_file_acquire failed: {e}")))?;
+    elab.elaborate_decl(
+        r#"theorem mapping_after_allocate_error
+          (a : Auth) (e : Type) (r : Type) (length : Int)
+          (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
+          (allocate_error : ResourceError)
+          : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (private_with_mapping_after_allocate a e r length body
+              (Err ResourceError (Resource ResourceKind.Mapping) allocate_error))
+            (Ret (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result ResourceError (ResourceBracketResult e r))
+              (Err ResourceError (ResourceBracketResult e r) allocate_error)) = Refl"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!("prelude mapping_after_allocate_error failed: {e}"))
+    })?;
+    elab.elaborate_decl(
+        r#"theorem mapping_after_allocate_success
+          (a : Auth) (e : Type) (r : Type) (length : Int)
+          (body : MappingHandle -> HostIO a (ResourceBodyResult e r))
+          (resource : Resource ResourceKind.Mapping)
+          : Equal (HostIO a (Result ResourceError (ResourceBracketResult e r)))
+            (private_with_mapping_after_allocate a e r length body
+              (Ok ResourceError (Resource ResourceKind.Mapping) resource))
+            (bind (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (ResourceBodyResult e r) (Result ResourceError (ResourceBracketResult e r))
+              (body (PrivateMappingHandle resource (MkMappingExtent length)))
+              (release_if_live a ResourceError e r ResourceKind.Mapping resource)) = Refl"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude mapping_after_allocate_success failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        r#"fn private_resource_release_result
+          (a : Auth) (o : Type) (e : Type) (r : Type)
+          (body_result : ResourceBodyResult e r)
+          (settled : Result ResourceError Unit)
+          : HostIO a (Result o (ResourceBracketResult e r)) =
+          Ret (Coproduct (FSOp a) AmbientOp)
+            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+            (Result o (ResourceBracketResult e r))
+            (resource_settle_result_for o e r body_result settled)"#,
+    )
+    .map_err(|e| {
+        ElabError::Internal(format!(
+            "prelude private_resource_release_result failed: {e}"
+        ))
+    })?;
+    elab.elaborate_decl(
+        r#"theorem resource_release_settles
+          (a : Auth) (o : Type) (e : Type) (r : Type)
+          (kind : ResourceKind) (resource : Resource kind)
+          (body_result : ResourceBodyResult e r)
+          : Equal (HostIO a (Result o (ResourceBracketResult e r)))
+            (release_if_live a o e r kind resource body_result)
+            (Vis (Coproduct (FSOp a) AmbientOp)
+              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
+              (Result o (ResourceBracketResult e r))
+              (InL (FSOp a) AmbientOp (PrivateResourceRelease a kind resource))
+              (private_resource_release_result a o e r body_result)) =
+          resource_refl (HostIO a (Result o (ResourceBracketResult e r)))
+            (release_if_live a o e r kind resource body_result)"#,
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude resource_release_settles failed: {e}")))?;
+    Ok(())
+}
+
 /// Register the L3 prelude in `elab` (called from `ElabEnv::empty`).
 ///
 /// `LANG-STACK-ARC-EVIDENCE-USABILITY` `D3`/`AC-5`: this function's own
@@ -2452,6 +2775,282 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
          }",
     )
     .map_err(|e| ElabError::Internal(format!("prelude withMapping failed: {e}")))?;
+    register_resource_bracket_laws(elab)?;
+    register_post_bracket_io(elab)?;
+
+    // No raw acquire or representation constructor is a public Ken identity.
+    // Their GlobalIds remain reachable only through the checked definitions
+    // above and the immutable `PreludeEnv` driver record.
+    let private_names = [
+        "PrivateFsOpen",
+        "PrivateFsHandleMetadata",
+        "PrivateBufferAllocate",
+        "PrivateFsReadAt",
+        "PrivateFsWriteAt",
+        "PrivateBufferFreeze",
+        "PrivateMappingAllocate",
+        "PrivateMappingReadView",
+        "PrivateMappingWriteView",
+        "PrivateMappingAcquireFile",
+        "PrivateMappingHandle",
+        "mapping_handle_resource",
+        "mapping_handle_length",
+        "mapping_window_start",
+        "mapping_window_length",
+        "PrivateBufferHandle",
+        "PrivateBufferSpan",
+        "PrivateTransferCount",
+        "buffer_handle_resource",
+        "buffer_handle_capacity",
+        "buffer_span_origin",
+        "write_all_advance_span",
+        "PrivateResourceRelease",
+        "PrivateResourceTraceIdentity",
+        "private_resource_acquire",
+        "private_with_resource_after_open",
+        "private_with_buffer_after_allocate",
+        "private_with_mapping_after_allocate",
+        "private_resource_release_result",
+        "private_read_at_result",
+        "private_read_at_admit_window",
+        "private_read_at_positive",
+        "buffer_min_int",
+        "private_write_all_fuel",
+        "private_write_all_after_wrote",
+        "private_write_all_step",
+        "private_write_all_next",
+        "write_all_refl",
+        "resource_refl",
+        "resource_settle_ok_error_for",
+        "resource_settle_body_error_for",
+        "resource_settle_ok_for",
+        "resource_settle_err_for",
+        "resource_settle_result_for",
+        "release_if_live",
+    ];
+    elab.module_state
+        .hide_prelude_names(&mut elab.globals, &private_names)?;
+
+    // Program-I I-1 entrypoint ABI. These are ordinary, kernel-checked Ken
+    // declarations: the host runner knows their fixed shape, but no kernel
+    // rule or trusted primitive is added for them.
+    elab.elaborate_decl("data ExitCode = Success | Failure UInt8")
+        .map_err(|e| ElabError::Internal(format!("prelude ExitCode failed: {}", e)))?;
+    elab.elaborate_decl(
+        "data ProcessInput = MkProcessInput (List Bytes) (List (Prod Bytes Bytes)) Bytes",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude ProcessInput failed: {}", e)))?;
+
+    // The surface `data` helper cannot currently express this constructor
+    // field because `Cap` is indexed by the value-level `Auth` family. Use
+    // the ordinary kernel inductive API, exactly as `FSOp` above does; this is
+    // still a checked inductive and adds no primitive or trusted rule.
+    let program_caps_id = declare_inductive(&mut elab.env, |_id| InductiveSpec {
+        level_params: vec![],
+        params: vec![auth_t.clone()],
+        indices: vec![],
+        level: Level::Zero,
+        constructors: vec![CtorSpec {
+            args: vec![Term::app(Term::const_(cap_id, vec![]), Term::var(0))],
+            target_indices: vec![],
+        }],
+    })
+    .map_err(|e| ElabError::Internal(format!("prelude ProgramCaps failed: {e}")))?;
+    elab.globals.insert("ProgramCaps".into(), program_caps_id);
+    let program_caps_ctor = elab
+        .env
+        .inductive(program_caps_id)
+        .and_then(|ind| ind.constructors.first())
+        .map(|ctor| ctor.id)
+        .ok_or_else(|| ElabError::Internal("prelude: MkProgramCaps missing".into()))?;
+    elab.globals
+        .insert("MkProgramCaps".into(), program_caps_ctor);
+
+    elab.elaborate_decl(
+        "fn host_exit (a : Auth) (code : ExitCode) : HostIO a ExitCode = \
+         Ret (Coproduct (FSOp a) AmbientOp) \
+           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+           ExitCode code",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_exit failed: {}", e)))?;
+    elab.elaborate_decl(
+        "proc host_console (a : Auth) (r : Type) (action : IO r) \
+         : HostIO a r visits [Console] = \
+         inject_r (FSOp a) AmbientOp (fs_resp a) ambient_resp r \
+           (ambient_console r action)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_console failed: {}", e)))?;
+    elab.elaborate_decl(
+        "proc host_clock (a : Auth) (r : Type) (action : ClockIO r) \
+         : HostIO a r visits [Clock] = \
+         inject_r (FSOp a) AmbientOp (fs_resp a) ambient_resp r \
+           (ambient_clock r action)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_clock failed: {}", e)))?;
+    elab.elaborate_decl(
+        "proc host_entropy (a : Auth) (r : Type) (action : EntropyIO r) \
+         : HostIO a r visits [Entropy] = \
+         inject_r (FSOp a) AmbientOp (fs_resp a) ambient_resp r \
+           (ambient_entropy r action)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_entropy failed: {}", e)))?;
+    elab.elaborate_decl(
+        "proc host_program_then (a : Auth) (action : IO Unit) (code : ExitCode) \
+         : HostIO a ExitCode visits [Console] = \
+         bind (Coproduct (FSOp a) AmbientOp) \
+           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
+           Unit ExitCode \
+           (host_console a Unit action) \
+           (\\_. host_exit a code)",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_program_then failed: {}", e)))?;
+    elab.elaborate_decl(
+        "proc host_program (a : Auth) (action : IO Unit) : HostIO a ExitCode visits [Console] = \
+         host_program_then a action Success",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude host_program failed: {}", e)))?;
+
+    // I-4 Option-(ii) program-facing wrappers. These are ordinary checked Ken
+    // definitions over the unchanged authority-polymorphic I-3 producers.
+    // Both only consume opaque capabilities. readFile remains polymorphic;
+    // writeFile's AFull argument is the security-critical static write gate.
+    // There is deliberately no capability-producing attenuation operation.
+    elab.elaborate_decl(
+        "proc readFile (a : Auth) (cap : Cap a) (path : Bytes) \
+         : FS a (Result FileError Bytes) visits [FS] = \
+         read_bytes a cap path",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude readFile failed: {e}")))?;
+    elab.elaborate_decl(
+        "proc writeFile (cap : Cap AFull) (path : Bytes) \
+         (policy : CreatePolicy) (contents : Bytes) \
+         : FS AFull (Result FileError Unit) visits [FS] = \
+         write_file AFull cap path policy contents",
+    )
+    .map_err(|e| ElabError::Internal(format!("prelude writeFile failed: {e}")))?;
+
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Capture the canonical role
+    // roster HERE — every prelude declaration is registered and no package
+    // source has been elaborated, so each spelling still denotes the prelude's
+    // own declaration. After this point the roster is closed: the ids it holds
+    // survive any later shadowing declaration, which is the whole point.
+    let runtime_roles = CanonicalRuntimeRoles::capture(&elab.globals)?;
+
+    // `D1b-role-c1`. ⛔ The trusted-base roster is deliberately NOT captured
+    // here, even though this is where the sibling role roster is captured.
+    //
+    // MEASURED: capturing at this line yields 98 targets while a clean package
+    // emits 107 trust tuples -- `register_safe_bytes_ops` and `init_class_env`
+    // run in `ElabEnv::empty()` AFTER this function returns, and they declare
+    // `bytes_at`, `bytes_decode`, `bytes_list_roundtrip`, `RecordNil` and the
+    // rest. Those are compiler-owned prelude stages, not package source, so
+    // their postulates belong to the pre-source base; a roster captured here
+    // would refuse every real package for entries the user never wrote.
+    //
+    // The capture therefore sits at the END of `ElabEnv::empty()` in `lib.rs`,
+    // after every compiler-owned initializer has run and immediately before the
+    // constructor returns an environment any package source could elaborate
+    // into. That constructor phase transition is the authority boundary.
+    //
+    // ⛔ It is NOT `install_prelude_floor()`, even though the assignment sits
+    // adjacent to that call. That method installs only the unshadowable source-
+    // NAME floor; naming it as the boundary would attribute the guarantee to a
+    // mechanism that does not provide it. See the comment at the capture site.
+    Ok(PreludeEnv {
+        runtime_roles,
+        native_trusted_base: std::collections::BTreeSet::new(),
+        nat_id,
+        zero_id,
+        suc_id,
+        list_id,
+        nil_id,
+        cons_id,
+        option_id,
+        none_id,
+        some_id,
+        result_id,
+        err_id,
+        ok_id,
+        prod_id,
+        mkprod_id,
+        equal_id,
+        empty_id,
+        and_id,
+        issorted_id,
+        perm_id,
+        byte_length_id,
+        char_length_id,
+        string_to_list_char_id,
+        list_char_to_string_id,
+        unit_id,
+        mkunit_id,
+        stream_id,
+        stdin_id,
+        stdout_id,
+        stderr_id,
+        console_op_id,
+        read_id,
+        write_id,
+        flush_id,
+        is_terminal_id,
+        instant_id,
+        mkinstant_id,
+        clock_op_id,
+        wall_now_id,
+        read_result_id,
+        chunk_id,
+        eof_id,
+        itree_id,
+        ret_id,
+        vis_id,
+        io_id,
+        print_line_id,
+        mkdecimalpair_id: decimal_char_env.mkdecimalpair_id,
+        state_op_id,
+        get_id,
+        put_id,
+        coproduct_id,
+        inl_id,
+        inr_id,
+        resp_state_id,
+        resp_coproduct_id,
+        bind_id,
+        run_state_id,
+        get_fn_id,
+        put_fn_id,
+        inject_l_id,
+        inject_r_id,
+        private_fs_open_id,
+        private_fs_handle_metadata_id,
+        private_buffer_allocate_id,
+        private_fs_read_at_id,
+        private_fs_write_at_id,
+        private_buffer_freeze_id,
+        private_mapping_allocate_id,
+        private_mapping_read_view_id,
+        private_mapping_write_view_id,
+        private_mapping_acquire_file_id,
+        private_buffer_handle_id,
+        buffer_handle_resource_id,
+        buffer_handle_capacity_id,
+        private_buffer_span_id,
+        private_transfer_count_id,
+        private_resource_release_id,
+        private_resource_trace_identity_id,
+        fs_handle_id,
+        resource_host_io_id,
+        closed_id,
+        malformed_resource_id,
+        right_not_held_id,
+        release_failed_id,
+    })
+}
+
+/// Preserve the pre-hide order of the positioned I/O and writeAll definitions
+/// without extending the prelude registration frame under the decimal-char
+/// recursion. No source declaration or checked type changes at this boundary.
+#[inline(never)]
+fn register_post_bracket_io(elab: &mut ElabEnv) -> Result<(), ElabError> {
     elab.elaborate_decl(
         "proc mapBytes (a : Auth) (mapping : MappingHandle) (window : MappingWindow) \
            : HostIO a (Result ResourceError Bytes) visits [FS] = \
@@ -2826,268 +3425,5 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(|e| ElabError::Internal(format!("prelude writeAll all-success proof failed: {e}")))?;
 
-    // No raw acquire or representation constructor is a public Ken identity.
-    // Their GlobalIds remain reachable only through the checked definitions
-    // above and the immutable `PreludeEnv` driver record.
-    let private_names = [
-        "PrivateFsOpen",
-        "PrivateFsHandleMetadata",
-        "PrivateBufferAllocate",
-        "PrivateFsReadAt",
-        "PrivateFsWriteAt",
-        "PrivateBufferFreeze",
-        "PrivateMappingAllocate",
-        "PrivateMappingReadView",
-        "PrivateMappingWriteView",
-        "PrivateMappingAcquireFile",
-        "PrivateMappingHandle",
-        "mapping_handle_resource",
-        "mapping_handle_length",
-        "mapping_window_start",
-        "mapping_window_length",
-        "PrivateBufferHandle",
-        "PrivateBufferSpan",
-        "PrivateTransferCount",
-        "buffer_handle_resource",
-        "buffer_handle_capacity",
-        "buffer_span_origin",
-        "write_all_advance_span",
-        "PrivateResourceRelease",
-        "PrivateResourceTraceIdentity",
-        "private_resource_acquire",
-        "private_with_resource_after_open",
-        "private_with_buffer_after_allocate",
-        "private_with_mapping_after_allocate",
-        "private_read_at_result",
-        "private_read_at_admit_window",
-        "private_read_at_positive",
-        "buffer_min_int",
-        "private_write_all_fuel",
-        "private_write_all_after_wrote",
-        "private_write_all_step",
-        "private_write_all_next",
-        "write_all_refl",
-        "resource_settle_ok_error_for",
-        "resource_settle_body_error_for",
-        "resource_settle_ok_for",
-        "resource_settle_err_for",
-        "resource_settle_result_for",
-        "release_if_live",
-    ];
-    elab.module_state
-        .hide_prelude_names(&mut elab.globals, &private_names)?;
-
-    // Program-I I-1 entrypoint ABI. These are ordinary, kernel-checked Ken
-    // declarations: the host runner knows their fixed shape, but no kernel
-    // rule or trusted primitive is added for them.
-    elab.elaborate_decl("data ExitCode = Success | Failure UInt8")
-        .map_err(|e| ElabError::Internal(format!("prelude ExitCode failed: {}", e)))?;
-    elab.elaborate_decl(
-        "data ProcessInput = MkProcessInput (List Bytes) (List (Prod Bytes Bytes)) Bytes",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude ProcessInput failed: {}", e)))?;
-
-    // The surface `data` helper cannot currently express this constructor
-    // field because `Cap` is indexed by the value-level `Auth` family. Use
-    // the ordinary kernel inductive API, exactly as `FSOp` above does; this is
-    // still a checked inductive and adds no primitive or trusted rule.
-    let program_caps_id = declare_inductive(&mut elab.env, |_id| InductiveSpec {
-        level_params: vec![],
-        params: vec![auth_t.clone()],
-        indices: vec![],
-        level: Level::Zero,
-        constructors: vec![CtorSpec {
-            args: vec![Term::app(Term::const_(cap_id, vec![]), Term::var(0))],
-            target_indices: vec![],
-        }],
-    })
-    .map_err(|e| ElabError::Internal(format!("prelude ProgramCaps failed: {e}")))?;
-    elab.globals.insert("ProgramCaps".into(), program_caps_id);
-    let program_caps_ctor = elab
-        .env
-        .inductive(program_caps_id)
-        .and_then(|ind| ind.constructors.first())
-        .map(|ctor| ctor.id)
-        .ok_or_else(|| ElabError::Internal("prelude: MkProgramCaps missing".into()))?;
-    elab.globals
-        .insert("MkProgramCaps".into(), program_caps_ctor);
-
-    elab.elaborate_decl(
-        "fn host_exit (a : Auth) (code : ExitCode) : HostIO a ExitCode = \
-         Ret (Coproduct (FSOp a) AmbientOp) \
-           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-           ExitCode code",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude host_exit failed: {}", e)))?;
-    elab.elaborate_decl(
-        "proc host_console (a : Auth) (r : Type) (action : IO r) \
-         : HostIO a r visits [Console] = \
-         inject_r (FSOp a) AmbientOp (fs_resp a) ambient_resp r \
-           (ambient_console r action)",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude host_console failed: {}", e)))?;
-    elab.elaborate_decl(
-        "proc host_clock (a : Auth) (r : Type) (action : ClockIO r) \
-         : HostIO a r visits [Clock] = \
-         inject_r (FSOp a) AmbientOp (fs_resp a) ambient_resp r \
-           (ambient_clock r action)",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude host_clock failed: {}", e)))?;
-    elab.elaborate_decl(
-        "proc host_entropy (a : Auth) (r : Type) (action : EntropyIO r) \
-         : HostIO a r visits [Entropy] = \
-         inject_r (FSOp a) AmbientOp (fs_resp a) ambient_resp r \
-           (ambient_entropy r action)",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude host_entropy failed: {}", e)))?;
-    elab.elaborate_decl(
-        "proc host_program_then (a : Auth) (action : IO Unit) (code : ExitCode) \
-         : HostIO a ExitCode visits [Console] = \
-         bind (Coproduct (FSOp a) AmbientOp) \
-           (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
-           Unit ExitCode \
-           (host_console a Unit action) \
-           (\\_. host_exit a code)",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude host_program_then failed: {}", e)))?;
-    elab.elaborate_decl(
-        "proc host_program (a : Auth) (action : IO Unit) : HostIO a ExitCode visits [Console] = \
-         host_program_then a action Success",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude host_program failed: {}", e)))?;
-
-    // I-4 Option-(ii) program-facing wrappers. These are ordinary checked Ken
-    // definitions over the unchanged authority-polymorphic I-3 producers.
-    // Both only consume opaque capabilities. readFile remains polymorphic;
-    // writeFile's AFull argument is the security-critical static write gate.
-    // There is deliberately no capability-producing attenuation operation.
-    elab.elaborate_decl(
-        "proc readFile (a : Auth) (cap : Cap a) (path : Bytes) \
-         : FS a (Result FileError Bytes) visits [FS] = \
-         read_bytes a cap path",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude readFile failed: {e}")))?;
-    elab.elaborate_decl(
-        "proc writeFile (cap : Cap AFull) (path : Bytes) \
-         (policy : CreatePolicy) (contents : Bytes) \
-         : FS AFull (Result FileError Unit) visits [FS] = \
-         write_file AFull cap path policy contents",
-    )
-    .map_err(|e| ElabError::Internal(format!("prelude writeFile failed: {e}")))?;
-
-    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Capture the canonical role
-    // roster HERE — every prelude declaration is registered and no package
-    // source has been elaborated, so each spelling still denotes the prelude's
-    // own declaration. After this point the roster is closed: the ids it holds
-    // survive any later shadowing declaration, which is the whole point.
-    let runtime_roles = CanonicalRuntimeRoles::capture(&elab.globals)?;
-
-    // `D1b-role-c1`. ⛔ The trusted-base roster is deliberately NOT captured
-    // here, even though this is where the sibling role roster is captured.
-    //
-    // MEASURED: capturing at this line yields 98 targets while a clean package
-    // emits 107 trust tuples -- `register_safe_bytes_ops` and `init_class_env`
-    // run in `ElabEnv::empty()` AFTER this function returns, and they declare
-    // `bytes_at`, `bytes_decode`, `bytes_list_roundtrip`, `RecordNil` and the
-    // rest. Those are compiler-owned prelude stages, not package source, so
-    // their postulates belong to the pre-source base; a roster captured here
-    // would refuse every real package for entries the user never wrote.
-    //
-    // The capture therefore sits at the END of `ElabEnv::empty()` in `lib.rs`,
-    // after every compiler-owned initializer has run and immediately before the
-    // constructor returns an environment any package source could elaborate
-    // into. That constructor phase transition is the authority boundary.
-    //
-    // ⛔ It is NOT `install_prelude_floor()`, even though the assignment sits
-    // adjacent to that call. That method installs only the unshadowable source-
-    // NAME floor; naming it as the boundary would attribute the guarantee to a
-    // mechanism that does not provide it. See the comment at the capture site.
-    Ok(PreludeEnv {
-        runtime_roles,
-        native_trusted_base: std::collections::BTreeSet::new(),
-        nat_id,
-        zero_id,
-        suc_id,
-        list_id,
-        nil_id,
-        cons_id,
-        option_id,
-        none_id,
-        some_id,
-        result_id,
-        err_id,
-        ok_id,
-        prod_id,
-        mkprod_id,
-        equal_id,
-        empty_id,
-        and_id,
-        issorted_id,
-        perm_id,
-        byte_length_id,
-        char_length_id,
-        string_to_list_char_id,
-        list_char_to_string_id,
-        unit_id,
-        mkunit_id,
-        stream_id,
-        stdin_id,
-        stdout_id,
-        stderr_id,
-        console_op_id,
-        read_id,
-        write_id,
-        flush_id,
-        is_terminal_id,
-        instant_id,
-        mkinstant_id,
-        clock_op_id,
-        wall_now_id,
-        read_result_id,
-        chunk_id,
-        eof_id,
-        itree_id,
-        ret_id,
-        vis_id,
-        io_id,
-        print_line_id,
-        mkdecimalpair_id: decimal_char_env.mkdecimalpair_id,
-        state_op_id,
-        get_id,
-        put_id,
-        coproduct_id,
-        inl_id,
-        inr_id,
-        resp_state_id,
-        resp_coproduct_id,
-        bind_id,
-        run_state_id,
-        get_fn_id,
-        put_fn_id,
-        inject_l_id,
-        inject_r_id,
-        private_fs_open_id,
-        private_fs_handle_metadata_id,
-        private_buffer_allocate_id,
-        private_fs_read_at_id,
-        private_fs_write_at_id,
-        private_buffer_freeze_id,
-        private_mapping_allocate_id,
-        private_mapping_read_view_id,
-        private_mapping_write_view_id,
-        private_mapping_acquire_file_id,
-        private_buffer_handle_id,
-        buffer_handle_resource_id,
-        buffer_handle_capacity_id,
-        private_buffer_span_id,
-        private_transfer_count_id,
-        private_resource_release_id,
-        private_resource_trace_identity_id,
-        fs_handle_id,
-        resource_host_io_id,
-        closed_id,
-        malformed_resource_id,
-        right_not_held_id,
-        release_failed_id,
-    })
+    Ok(())
 }

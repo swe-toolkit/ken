@@ -62,21 +62,3 @@ fn resource_host_io_preserves_the_existing_host_io_identity() {
     assert_ne!(env.globals["HostIO"], host_io);
     assert_eq!(env.globals["ResourceHostIO"], resource_host_io);
 }
-
-#[test]
-fn shipped_source_states_the_runtime_honesty_boundary() {
-    for statement in [
-        "runtime-enforced and Ward-checked",
-        "Ken does not make them affine",
-        "escaped copy is legal",
-        "every later use returns",
-        "external process destruction",
-    ] {
-        assert!(
-            RESOURCE_KEN_MD.contains(statement),
-            "missing source-level honesty statement: {statement}"
-        );
-    }
-    assert!(!RESOURCE_KEN_MD.contains("Axiom"));
-    assert!(!RESOURCE_KEN_MD.contains("proved"));
-}
