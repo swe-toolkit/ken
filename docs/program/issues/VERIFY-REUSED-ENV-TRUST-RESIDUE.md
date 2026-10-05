@@ -53,7 +53,7 @@ stop and report the mismatch.
   explicit postulate whose report is the `Opaque` under its owner label.
   No change.
 
-## Blocked: kernel API needs operator approval
+## Mechanism (kernel API operator-approved 2026-10-05)
 
 The ruled mechanism is **rollback, not deferral**: the hole must be in the
 environment when the kernel checks the body.
@@ -70,7 +70,10 @@ environment when the kernel checks the body.
   Rollback resets the next id, so a stale entry would alias a later
   declaration (CHECKS 10).
 
-The frame's stop condition fired. Implementation waits for the operator.
+The operator approved the removal-only `EnvMark` API on 2026-10-05. The
+verify ring writes both halves in this WP, because the API has no use
+without its elaborator consumer. **Kernel QA reviews the `crates/ken-kernel`
+diff** alongside verify QA, and the Architect gate stands.
 
 ## Acceptance
 
