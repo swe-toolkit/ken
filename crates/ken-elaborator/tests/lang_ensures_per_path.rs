@@ -156,6 +156,57 @@ fn recursive_postcondition_uses_direct_self_call_hypothesis() {
     }
 }
 
+/// Durable invariant. A recursive contract depending on an early parameter
+/// must instantiate its IH with the direct call's full parameter and requires
+/// telescope. MEASURED: the recursive path closes while the base case stays
+/// open, with a non-final `tag` binder before `n` and `Q tag` in both goals.
+/// CLAIMED: the IH substitutes actual call arguments, not the raw predicate.
+/// THE GAP: mutating the IH collector to retain `psi` uninstantiated must
+/// redden the recursive-path assertion while the original suite stays green.
+#[test]
+fn recursive_postcondition_substitutes_nonfinal_parameter_and_requirement() {
+    let mut env = predicate_env();
+    let int = Term::const_(env.globals["Int"], vec![]);
+    let omega = Term::omega(Level::Zero);
+    env.declare_postulate_raw(
+        "P2",
+        Term::pi(int.clone(), Term::pi(int.clone(), omega.clone())),
+    )
+    .expect("P2 : Int -> Int -> Omega");
+    env.declare_postulate_raw("Q", Term::pi(int.clone(), omega))
+        .expect("Q : Int -> Omega");
+    let result = env.elaborate_decl_v1(
+        "fn rec_dep (tag : Int) (n : Nat) : Int requires Q tag ensures P2 tag result = match n { Zero |-> 5 ; Suc m |-> rec_dep tag m }",
+    ).expect("parameter-dependent recursive contract");
+    let [zero, suc] = result.obligations.as_slice() else {
+        panic!("exactly one contract goal per leaf; no extra requires hole")
+    };
+    let q_tag = Term::app(Term::const_(env.globals["Q"], vec![]), Term::var(1));
+    for obligation in [zero, suc] {
+        assert!(matches!(obligation.kind, ObligationKind::Ensures));
+        let Term::Pi(tag_ty, rest) = &obligation.goal_closed else {
+            panic!("missing first parameter binder")
+        };
+        assert_eq!(tag_ty.as_ref(), &int);
+        let Term::Pi(_, rest) = rest.as_ref() else {
+            panic!("missing second parameter binder")
+        };
+        let Term::Pi(requirement, _) = rest.as_ref() else {
+            panic!("missing requires binder")
+        };
+        assert_eq!(requirement.as_ref(), &q_tag);
+        assert!(!contains_elim(&obligation.goal_closed));
+    }
+    assert!(
+        env.is_open_hole(zero.hole_id),
+        "opaque base P2 tag 5 remains open"
+    );
+    assert!(
+        !env.is_open_hole(suc.hole_id),
+        "P2 tag (rec_dep tag m) must use the instantiated IH"
+    );
+}
+
 /// Durable invariant. A non-flat constructor pattern splits again inside
 /// the Suc bucket. MEASURED: each emitted goal has one equation per split,
 /// and the recursive leaf has its contract IH. CLAIMED: obligations are
