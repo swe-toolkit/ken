@@ -62,8 +62,10 @@ stop and report the mismatch.
   natively and matches the interpreter. A focused native test pins that
   configuration. The pin must fail on main before the repair (CHECKS 8).
 - **AC-2.** `rt_native_tree_match_case_of_case` stays 7/7 on the default
-  plan. The six default targets and `rt_parity_native` stay at baseline at 4
-  threads.
+  plan. The six default targets stay at baseline at 4 threads. The full
+  `rt_parity_native` suite is CI's: it is not run locally (Steward
+  `evt_6fh5hhabpjyvx`), and any parity rows the repair touches are run by
+  name.
 - **AC-3 (falsifier).** Reverting the repair brings back the verbatim trap
   on the pin.
 
