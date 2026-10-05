@@ -5596,21 +5596,22 @@ proc main
             (
                 "none",
                 CALLER_NONE_SOURCE,
-                12_237_734_083_413_434_944,
-                4_216_260_380_077_809_109,
-                8_364_889_614_452_174_481,
+                3_246_669_094_614_986_648,
+                2_056_602_819_449_838_026,
+                1_701_401_059_151_077_843,
             ),
             (
                 "discharged",
                 CALLER_DISCHARGED_SOURCE,
-                11_018_522_036_893_705_244,
-                2_315_880_598_206_190_060,
-                12_231_505_609_661_209_818,
+                3_207_145_488_757_215_216,
+                11_590_591_040_317_647_007,
+                6_588_721_369_320_766_734,
             ),
         ]
     }
 
-    /// Promise class: normative compatibility vector against base 75e458cc.
+    /// Promise class: normative compatibility vector against base
+    /// `7fb8e32267a8e457563b48391b4020bce04507bc`.
     #[test]
     fn package_controls_preserve_base_core_semantic_hashes() {
         for (name, source, package_hash, _, _) in caller_reporting_controls() {
@@ -5627,7 +5628,8 @@ proc main
         }
     }
 
-    /// Promise class: normative compatibility vector against base 75e458cc.
+    /// Promise class: normative compatibility vector against base
+    /// `7fb8e32267a8e457563b48391b4020bce04507bc`.
     #[test]
     fn denotation_controls_preserve_base_core_semantic_hashes() {
         for (name, source, _, denotation_hash, _) in caller_reporting_controls() {
@@ -5643,7 +5645,8 @@ proc main
         }
     }
 
-    /// Promise class: normative compatibility vector against base 75e458cc.
+    /// Promise class: normative compatibility vector against base
+    /// `7fb8e32267a8e457563b48391b4020bce04507bc`.
     #[test]
     fn native_controls_preserve_base_core_semantic_hashes() {
         for (name, source, _, _, native_hash) in caller_reporting_controls() {
