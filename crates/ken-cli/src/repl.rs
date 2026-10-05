@@ -105,6 +105,7 @@ fn show_val(v: &EvalVal) -> String {
         EvalVal::OmegaUniverse(l) => format!("Prop {}", l),
         EvalVal::PiTy { .. } => "<Π-type>".to_owned(),
         EvalVal::SigmaTy { .. } => "<Σ-type>".to_owned(),
+        EvalVal::QuotTy { .. } => "<quotient type>".to_owned(),
         EvalVal::IndFormerVal { id } => format!("<inductive {}>", id),
         EvalVal::OpaquePrimType { .. } => "<primitive type>".to_owned(),
         EvalVal::IndTypeApp { id, .. } => format!("<inductive {} applied>", id),
