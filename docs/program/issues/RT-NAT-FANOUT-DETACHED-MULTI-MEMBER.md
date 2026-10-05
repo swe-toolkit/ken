@@ -6,7 +6,7 @@ owner: runtime
 size: M
 tier: T1
 gate: architect
-depends_on: [RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT]
+depends_on: [RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT, RT-CARRIED-CHILD-REFERENT-CONTAINMENT]
 blocks: []
 github: null
 origin: "The successor recorded by RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT AC-1 on the ignore annotation of nat_fanout_escaped_resource_matches_interpreter (merged 3695cd16a). L1 objective: clear the selected ignored runtime rows. Steward-filed per COORDINATION section 2."
@@ -39,6 +39,18 @@ with the interpreter's result and is un-ignored.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
+
+## Hold (Architect `evt_5r92yzz8zdd32`)
+
+The AC-0 rounds located the four edges in Ret arms reached through claimed
+producer Constructs (378, 349, 1227), which the planner summarizes
+`SpecializedOnly` while lowering yields their Carried continuation result.
+The ruled designs R1-R4' are withdrawn. This WP holds behind
+`RT-CARRIED-CHILD-REFERENT-CONTAINMENT`.
+- If that WP's AC-0 (a) shows its witnesses share the claimed-producer
+  predicate, one planner rule is ruled there, and R6 is rebuilt here on top
+  of it.
+- If not, the Architect rules a separate R7 here.
 
 ## Deliverable
 
