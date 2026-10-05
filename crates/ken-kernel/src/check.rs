@@ -832,7 +832,7 @@ fn motive_expected_type(
 /// domain, check `base : motive a (refl a)`, and return `motive b eq`.
 /// Peel only β/δ/let/ascription/function heads of a recorded Eq formation;
 /// never reduce the Eq head itself when reading the recording.
-fn eq_formation_head(env: &GlobalEnv, ty: &Term) -> Term {
+pub(crate) fn eq_formation_head(env: &GlobalEnv, ty: &Term) -> Term {
     let mut current = ty.clone();
     loop {
         current = match current {
@@ -885,7 +885,19 @@ fn infer_j(
     eq: &Term,
 ) -> KernelResult<Term> {
     // e : Eq A a b ⇒ use its recorded formation, or the old raw fallback.
-    let (a_ty, a_idx, b_idx) = j_endpoints(env, ctx, eq)?;
+    let endpoints = j_endpoints(env, ctx, eq)?;
+    infer_j_at(env, ctx, motive, base, eq, endpoints)
+}
+
+/// Type a J at the endpoints already read from its evidence's Eq formation.
+pub(crate) fn infer_j_at(
+    env: &GlobalEnv,
+    ctx: &Context,
+    motive: &Term,
+    base: &Term,
+    eq: &Term,
+    (a_ty, a_idx, b_idx): (Term, Term, Term),
+) -> KernelResult<Term> {
     // motive : (b:A) → (e':Eq A a b) → Type ℓ' (or Ω ℓ').
     // The second binder depends on b; checking only the first Π would allow
     // an arbitrary domain there and an ill-classified inferred J result.

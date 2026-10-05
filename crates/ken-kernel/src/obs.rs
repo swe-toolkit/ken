@@ -228,6 +228,7 @@ fn type_eq_by_j(
     target: &Term,
     family_at_y: Term,
     evidence: Term,
+    typed_by_lemma: bool,
 ) -> Option<Term> {
     let level = match crate::check::infer(env, ctx, source).ok()? {
         Term::Type(level) => level,
@@ -249,12 +250,42 @@ fn type_eq_by_j(
         family_at_y,
         evidence,
         base,
+        typed_by_lemma,
     )
 }
 
 /// Chain a J transport onto a previously checked Eq Type witness. The left
 /// endpoint remains the original source, while the right endpoint advances
 /// through the forced constructor arguments one index at a time.
+///
+/// J-witness typing lemma: let Γ ⊢ eq : Eq A a b. Let
+/// Γ ⊢ P : (y:A) → Eq A a y → Type l and Γ ⊢ d : P a (refl a). Then
+/// W := J (λy h. Eq (Type l) (P a (refl a)) (P y h))
+///        (refl (P a (refl a))) eq
+/// has type Eq (Type l) (P a (refl a)) (P b eq), and
+/// cast (P a (refl a)) (P b eq) W d has type P b eq. The motive has sort
+/// Ω_(l+1) by Eq-Form; its base type β-reduces to Eq (Type l) X X for
+/// X := P a (refl a). The J rule types W; the Cast rule types the result.
+/// Only `j_nonrefl` takes `typed_by_lemma = true`: production then relies on
+/// this lemma instead of checking W. The other three builders have no typed
+/// redex and retain the fail-closed witness check in production.
+///
+/// Side conditions (research `evt_4xjj6256dapa4`):
+/// (i) Motive sort and level. P's codomain is `Type l`, never Ω. The Ω case
+/// stays neutral, as the `infer(source)` gate does today. `l` comes from
+/// formation, not from a reduct; `infer` is syntactic, so Eq-reduct level
+/// gaps cannot perturb it.
+/// (ii) One `eq`, one set of endpoints. The `eq` term, and the `a` and `b`
+/// that W and `p_b_e` mention, must be the same terms the guard typed under
+/// the existing ascription. Reducing endpoints before constructing W breaks
+/// this alignment. At a universe carrier `j_nonrefl` instead reads the
+/// inferred Eq formation directly, then calls `infer_j_at` at those very
+/// endpoints; the other carriers retain `j_endpoints`.
+/// (iii) The base typing `d : P a (refl a)`. Cast needs it. It is part of
+/// what the once-only `infer_j_at` guard establishes.
+/// (iv) de Bruijn hygiene. `motive_at_y` is the motive weakened by 2 and
+/// applied to `@1 @0`. The kernel checks this lemma instance in tests, except
+/// the production-cost count pins that suppress the test-only assertion.
 fn type_eq_by_j_with_base(
     env: &GlobalEnv,
     ctx: &Context,
@@ -265,6 +296,7 @@ fn type_eq_by_j_with_base(
     family_at_y: Term,
     evidence: Term,
     base: Term,
+    typed_by_lemma: bool,
 ) -> Option<Term> {
     let level = match crate::check::infer(env, ctx, source).ok()? {
         Term::Type(level) => level,
@@ -298,7 +330,22 @@ fn type_eq_by_j_with_base(
         Box::new(source.clone()),
         Box::new(target.clone()),
     );
-    crate::check::check(env, ctx, &result, &expected).ok()?;
+    if typed_by_lemma {
+        // Only J reduction has a redex checked by infer_j_at. Production
+        // relies on the lemma; tests check each instance except count pins.
+        #[cfg(test)]
+        if crate::conv::deferred_fixed_point_assertions_enabled() {
+            assert_eq!(
+                crate::check::check(env, ctx, &result, &expected),
+                Ok(()),
+                "J-witness lemma instance: source={source:?}, target={target:?}, W={result:?}"
+            );
+        }
+    } else {
+        // Σ, inductive Eq and inductive Cast construct their own witnesses;
+        // their fail-closed production check cannot rely on the J lemma.
+        crate::check::check(env, ctx, &result, &expected).ok()?;
+    }
     Some(result)
 }
 
@@ -347,6 +394,7 @@ fn eq_at_sigma(
         &weaken(&b1_q1, 1),
         b1_at_y,
         Term::Ascript(Box::new(Term::var(0)), Box::new(weaken(&eq_fst, 1))),
+        false,
     )?;
     let p2_cast = Term::Cast(
         Box::new(weaken(&b1_p1, 1)),
@@ -694,6 +742,7 @@ fn inductive_conjuncts(
                 &b_ty,
                 family_at_y,
                 evidence,
+                false,
             )?;
             Term::Cast(
                 Box::new(a_ty),
@@ -1246,6 +1295,7 @@ fn cast_at_inductive(
                     family_at_y,
                     Term::Ascript(Box::new(index_evidence), Box::new(indexed_eq)),
                     witness,
+                    false,
                 )?;
                 current_ty = next_ty;
             }
@@ -1353,7 +1403,22 @@ fn j_nonrefl(
     base: &Term,
     eq: &Term,
 ) -> Option<Term> {
-    let (a_type, a_idx, b_idx) = crate::check::j_endpoints(env, ctx, eq).ok()?;
+    #[cfg(test)]
+    j_nonrefl_probe::bump();
+    // At a universe carrier, use the Eq formation inferred for this evidence.
+    // Eq-at-Type never returns an Eq formation; WHNF of that Eq type would
+    // reduce the source endpoint here, in the guard and again in the Cast.
+    let eq_ty = crate::check::infer(env, ctx, eq).ok()?;
+    let endpoints = match crate::check::eq_formation_head(env, &eq_ty) {
+        Term::Eq(carrier, x, y) => match whnf(env, ctx, &carrier) {
+            Term::Type(level) => (Term::Type(level), *x, *y),
+            _ => crate::check::j_endpoints(env, ctx, eq).ok()?,
+        },
+        _ => crate::check::j_endpoints(env, ctx, eq).ok()?,
+    };
+    // Establish the raw redex's J typing once, at exactly those endpoints.
+    crate::check::infer_j_at(env, ctx, motive, base, eq, endpoints.clone()).ok()?;
+    let (a_type, a_idx, b_idx) = endpoints;
     let p_a_refl = apply_args(
         motive.clone(),
         &[a_idx.clone(), Term::Refl(Box::new(a_idx.clone()))],
@@ -1378,6 +1443,7 @@ fn j_nonrefl(
                 Box::new(b_idx),
             )),
         ),
+        true,
     )?;
     Some(Term::Cast(
         Box::new(p_a_refl),
@@ -1385,6 +1451,35 @@ fn j_nonrefl(
         Box::new(pair_eq),
         Box::new(base.clone()),
     ))
+}
+
+#[cfg(test)]
+mod j_nonrefl_probe {
+    use std::cell::Cell;
+
+    thread_local! {
+        static CALLS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    pub(super) fn bump() {
+        CALLS.with(|c| c.set(c.get() + 1));
+    }
+    pub(super) fn reset() {
+        CALLS.with(|c| c.set(0));
+    }
+    pub(super) fn calls() -> u64 {
+        CALLS.with(Cell::get)
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn reset_j_nonrefl_calls() {
+    j_nonrefl_probe::reset();
+}
+
+#[cfg(test)]
+pub(crate) fn j_nonrefl_calls() -> u64 {
+    j_nonrefl_probe::calls()
 }
 
 #[cfg(test)]

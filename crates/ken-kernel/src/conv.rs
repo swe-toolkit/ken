@@ -1544,6 +1544,11 @@ fn conv_struct_deferred(
 }
 
 #[cfg(test)]
+pub(crate) fn deferred_fixed_point_assertions_enabled() -> bool {
+    delta_probe::deferred_fixed_point_assertions_enabled()
+}
+
+#[cfg(test)]
 fn debug_assert_deferred_fixed_point(
     env: &GlobalEnv,
     ctx: &Context,
@@ -2150,11 +2155,11 @@ mod tests {
     /// each transparent helper's body is `J (λx _. x) t e`. Inline J in the
     /// dependent parameter type does not parse on the surface; the helper
     /// form was source-checked separately in AC-0b (`evt_27neq92xrvanm`).
-    /// At k=4 the N0–N2 kernel-local check measured 560,397 reducer entries;
-    /// this is deliberately a VERDICT pin, not a linear-work count: the
-    /// multiplying non-refl J endpoints belong to the J-sharing successor.
-    #[test]
-    fn source_derived_nested_j_cast_check_accepts_at_four() {
+    /// Both the assertion-on verdict and suppressed production-cost pins use
+    /// this exact source-derived fixture. Only the depth k varies.
+    fn source_derived_nested_j_cast_fixture(
+        k: usize,
+    ) -> (GlobalEnv, Context, Term, Term, Vec<GlobalId>) {
         let mut env = GlobalEnv::new();
         let type0 = Term::Type(Level::zero());
         let type_id = crate::check::declare_def(
@@ -2165,7 +2170,6 @@ mod tests {
         )
         .expect("transparent type identity");
         let trust = env.trusted_base();
-        let k = 4;
         let mut ctx = Context::new();
         ctx.push(Term::Type((0..k).fold(Level::zero(), |l, _| l.suc())));
         let mut current = Term::var(0);
@@ -2241,8 +2245,237 @@ mod tests {
             Box::new(Term::app(Term::const_(type_id, vec![]), current.clone())),
         );
         let proof = Term::Refl(Box::new(current));
-        // Unlike the T1/T2 count rows, leave the N2 fixed-point assertion on.
+        (env, ctx, proof, equality, trust)
+    }
+
+    /// The committed verdict pin keeps both test-only assertions on.
+    #[test]
+    fn source_derived_nested_j_cast_check_accepts_at_four() {
+        let (env, ctx, proof, equality, trust) = source_derived_nested_j_cast_fixture(4);
         assert_eq!(crate::check::check(&env, &ctx, &proof, &equality), Ok(()));
+        assert_eq!(env.trusted_base(), trust);
+    }
+
+    /// Production-cost work pin: the J population is linear, and reducer
+    /// entries remain quadratic with a fourfold bound from depth 8 to 16.
+    /// Suppress only test-only assertions; the verdict above keeps them on.
+    #[test]
+    fn source_derived_nested_j_cast_check_has_quadratic_entries() {
+        let mut entries_at_eight = None;
+        for k in [4_u64, 8, 16] {
+            let (env, ctx, proof, equality, trust) =
+                source_derived_nested_j_cast_fixture(k as usize);
+            let _measurement = delta_probe::DeferredFixedPointAssertionsGuard::suppress();
+            crate::obs::reset_j_nonrefl_calls();
+            delta_probe::reset();
+            let verdict = crate::check::check(&env, &ctx, &proof, &equality);
+            let entries = delta_probe::reducer_entries();
+            let calls = crate::obs::j_nonrefl_calls();
+            drop(_measurement);
+            assert_eq!(verdict, Ok(()), "source-derived check at depth {k}");
+            assert_eq!(calls, 6 * k, "each J reduces only once at depth {k}");
+            assert!(
+                entries <= 220 * k * k,
+                "depth {k} exceeded the quadratic reducer-entry bound: {entries}"
+            );
+            assert_eq!(env.trusted_base(), trust, "no new trusted declarations");
+            if k == 8 {
+                entries_at_eight = Some(entries);
+            } else if k == 16 {
+                assert!(
+                    entries <= 4 * entries_at_eight.expect("depth 8 was measured"),
+                    "depth 16 entry count {entries} exceeds fourfold growth"
+                );
+            }
+        }
+    }
+
+    /// Formation-head endpoints permit a well-typed J to reduce after β,
+    /// even when whnf of its Eq Type evidence has become Top or a Sigma.
+    #[test]
+    fn rigid_type_eq_j_reduces_after_beta() {
+        let mut env = GlobalEnv::new();
+        let trust = env.trusted_base();
+        let type0 = Term::Type(Level::zero());
+        let type1 = Term::Type(Level::zero().suc());
+        let domain_eq = Term::Eq(
+            Box::new(type1.clone()),
+            Box::new(Term::var(0)),
+            Box::new(type0.clone()),
+        );
+        let helper_ty = Term::pi(
+            type1.clone(),
+            Term::pi(domain_eq.clone(), Term::pi(Term::var(1), type0.clone())),
+        );
+        let eq_at_x = Term::Eq(
+            Box::new(type1.clone()),
+            Box::new(Term::var(3)),
+            Box::new(Term::var(0)),
+        );
+        let motive = Term::Ascript(
+            Box::new(Term::lam(
+                type1.clone(),
+                Term::lam(eq_at_x.clone(), Term::var(1)),
+            )),
+            Box::new(Term::pi(type1.clone(), Term::pi(eq_at_x, type1.clone()))),
+        );
+        let step = crate::check::declare_def(
+            &mut env,
+            vec![],
+            helper_ty,
+            Term::lam(
+                type1.clone(),
+                Term::lam(
+                    domain_eq,
+                    Term::lam(
+                        Term::var(1),
+                        Term::J(
+                            Box::new(motive),
+                            Box::new(Term::var(0)),
+                            Box::new(Term::var(1)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        .expect("step helper checks with a neutral X");
+        let mut ctx = Context::new();
+        ctx.push(Term::Eq(
+            Box::new(type1.clone()),
+            Box::new(type0.clone()),
+            Box::new(type0.clone()),
+        ));
+        ctx.push(type0.clone());
+        let term = Term::app(
+            Term::app(
+                Term::app(Term::const_(step, vec![]), type0.clone()),
+                Term::var(1),
+            ),
+            Term::var(0),
+        );
+        assert_eq!(crate::check::infer(&env, &ctx, &term), Ok(type0.clone()));
+        assert_eq!(whnf(&env, &ctx, &term), Term::var(0));
+        assert_eq!(
+            crate::check::check(
+                &env,
+                &ctx,
+                &Term::Refl(Box::new(Term::var(0))),
+                &Term::Eq(Box::new(type0), Box::new(term), Box::new(Term::var(0))),
+            ),
+            Ok(())
+        );
+        assert_eq!(env.trusted_base(), trust);
+    }
+
+    /// A typed evidence ascription leaves a non-refl J reducible. The result
+    /// is syntactically the original Cast and J-witness schema, not merely
+    /// convertible to it. A wrong-typed raw base must stay a neutral J.
+    #[test]
+    fn nonrefl_j_guard_preserves_reduct_and_refuses_ill_typed_raw_base() {
+        let env = GlobalEnv::new();
+        let trust = env.trusted_base();
+        let type0 = Term::Type(Level::zero());
+        let type1 = Term::Type(Level::zero().suc());
+        let type2 = Term::Type(Level::zero().suc().suc());
+        let carrier = type1.clone();
+        let mut ctx = Context::new();
+        let recorded_eq = Term::Eq(
+            Box::new(carrier.clone()),
+            Box::new(type0.clone()),
+            Box::new(type0.clone()),
+        );
+        ctx.push(recorded_eq.clone());
+        let evidence = Term::Ascript(Box::new(Term::var(0)), Box::new(recorded_eq.clone()));
+        let proof_domain = Term::Eq(
+            Box::new(weaken(&carrier, 1)),
+            Box::new(weaken(&type0, 1)),
+            Box::new(Term::var(0)),
+        );
+        let motive = Term::Ascript(
+            Box::new(Term::lam(
+                carrier.clone(),
+                Term::lam(proof_domain.clone(), type1.clone()),
+            )),
+            Box::new(Term::pi(
+                carrier.clone(),
+                Term::pi(proof_domain.clone(), type2.clone()),
+            )),
+        );
+        let base = type0.clone();
+        let good = Term::J(
+            Box::new(motive.clone()),
+            Box::new(base.clone()),
+            Box::new(evidence.clone()),
+        );
+        assert!(convert_type(
+            &env,
+            &ctx,
+            &crate::check::infer(&env, &ctx, &good).expect("typed J"),
+            &type1,
+        ));
+
+        let source = Term::app(
+            Term::app(motive.clone(), type0.clone()),
+            Term::Refl(Box::new(type0.clone())),
+        );
+        let target = Term::app(Term::app(motive.clone(), type0.clone()), evidence.clone());
+        let family_at_y = Term::app(Term::app(weaken(&motive, 2), Term::var(1)), Term::var(0));
+        let witness_motive = Term::Ascript(
+            Box::new(Term::lam(
+                carrier.clone(),
+                Term::lam(
+                    proof_domain.clone(),
+                    Term::Eq(
+                        Box::new(type2.clone()),
+                        Box::new(weaken(&source, 2)),
+                        Box::new(family_at_y),
+                    ),
+                ),
+            )),
+            Box::new(Term::pi(
+                carrier.clone(),
+                Term::pi(proof_domain, Term::Omega(Level::zero().suc().suc().suc())),
+            )),
+        );
+        let witness = Term::J(
+            Box::new(witness_motive),
+            Box::new(Term::Refl(Box::new(source.clone()))),
+            Box::new(Term::Ascript(
+                Box::new(evidence.clone()),
+                Box::new(recorded_eq),
+            )),
+        );
+        let expected = Term::Cast(
+            Box::new(source),
+            Box::new(target),
+            Box::new(witness),
+            Box::new(base),
+        );
+        assert_eq!(
+            crate::obs::j_reduce(&env, &ctx, &motive, &type0, &evidence),
+            Some(expected),
+            "well-typed reduct keeps the precise pre-repair Cast schema"
+        );
+
+        let wrong_base = type1;
+        let raw = Term::J(
+            Box::new(motive.clone()),
+            Box::new(wrong_base.clone()),
+            Box::new(evidence.clone()),
+        );
+        assert!(
+            matches!(
+                crate::check::infer(&env, &ctx, &raw),
+                Err(crate::error::KernelError::TypeMismatch { .. })
+            ),
+            "wrong-typed raw J base must be refused as a type mismatch"
+        );
+        assert_eq!(whnf(&env, &ctx, &raw), raw, "ill-typed raw J stays neutral");
+        assert_eq!(
+            crate::obs::j_reduce(&env, &ctx, &motive, &wrong_base, &evidence),
+            None,
+            "without the guard this raw J would produce a Cast"
+        );
         assert_eq!(env.trusted_base(), trust);
     }
 
