@@ -182,32 +182,36 @@ fn nested_matrix_postconditions_carry_every_constructor_equation() {
         constructors
     }
     let mut env = predicate_env();
-    let result = env.elaborate_decl_v1(
+    for source in [
         "fn nested_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> nested_rec m }",
-    ).expect("recursive nested constructor match");
-    assert_eq!(
-        result.obligations.len(),
-        3,
-        "one obligation per matrix path"
-    );
-    for (obligation, (constructors, open)) in result.obligations.iter().zip([
-        (vec![env.globals["Zero"]], true),
-        (vec![env.globals["Suc"], env.globals["Zero"]], true),
-        (vec![env.globals["Suc"], env.globals["Suc"]], false),
-    ]) {
-        assert!(matches!(obligation.kind, ObligationKind::Ensures));
+        "fn lit_nested_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> lit_nested_rec m }",
+    ] {
+        let result = env.elaborate_decl_v1(source)
+            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
         assert_eq!(
-            equation_constructors(&obligation.goal_closed),
-            constructors,
-            "every split contributes its own equation: {:?}",
-            obligation.goal_closed
+            result.obligations.len(),
+            3,
+            "one obligation per matrix path: {source}"
         );
-        assert_eq!(
-            env.is_open_hole(obligation.hole_id),
-            open,
-            "only the recursive path has a postcondition IH"
-        );
-        assert!(!contains_elim(&obligation.goal_closed));
+        for (obligation, (constructors, open)) in result.obligations.iter().zip([
+            (vec![env.globals["Zero"]], true),
+            (vec![env.globals["Suc"], env.globals["Zero"]], true),
+            (vec![env.globals["Suc"], env.globals["Suc"]], false),
+        ]) {
+            assert!(matches!(obligation.kind, ObligationKind::Ensures));
+            assert_eq!(
+                equation_constructors(&obligation.goal_closed),
+                constructors,
+                "every split contributes its own equation: {:?}",
+                obligation.goal_closed
+            );
+            assert_eq!(
+                env.is_open_hole(obligation.hole_id),
+                open,
+                "only the recursive path has a postcondition IH: {source}"
+            );
+            assert!(!contains_elim(&obligation.goal_closed));
+        }
     }
 }
 
