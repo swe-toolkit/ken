@@ -1,7 +1,7 @@
 ---
 id: VERIFY-REUSED-ENV-TRUST-RESIDUE
 title: "A reusable elaboration environment keeps a trusted-base entry nobody reports: a declaration that fails after minting a premise hole leaves an orphan postulate in the REPL, expand_and_elaborate, load_unit and a reused ElabEnv. Roll the environment back to a mark taken before each declaration"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1

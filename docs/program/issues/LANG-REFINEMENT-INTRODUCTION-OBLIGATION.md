@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-INTRODUCTION-OBLIGATION
 title: "A value introduced at a def-named refinement (Char, PosInt) emits no obligation, so const c : Char = 55296 elaborates with isScalar 55296 untracked; spec 34 section 5 requires every introduction at a refinement, literal or named, to emit phi a. Record the named predicate by GlobalId and emit at the one expected-type check"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -201,3 +201,29 @@ three entries are independent (Architect `evt_mf00284n2xk6`).
    and a discharged refinement there records nothing. The Adversary's `+`
    and `/`/`%` arms (`evt_4jcsdc2rhwp5q`) fold into this WP. Respin from
    `e8506c605`.
+
+## Closeout
+
+Merged `7ca183831` from exact `dca635c45` (PR #4518 from
+`wp/LANG-REFINEMENT-INTRODUCTION-OBLIGATION`, main push run 37299557605).
+Language QA `evt_2cnzx0crfy4cw`, CV Spec/conformance `evt_3485dw8payk7`,
+Architect `evt_5r9yfg9pcpdfg` (crates and spec; carried for the
+conformance-only delta, ruling `evt_40wtsg8nqs5yw`), Decision
+`dec_mmw8q1a5dhpz`.
+
+- Every introduction at a named refinement emits `φ a`, realized per leaf.
+  The predicate is recorded by checked identity. Argument, let,
+  constructor-field and return introductions are covered.
+- All four obligation-mint sites go through one gate, which refuses an
+  undischarged hole in a context with no obligation channel (stop 3, ruled
+  `evt_3h5n5b9y0wzf`).
+- `intToChar`'s False arm carries no obligation, and its True arm
+  discharges from the guard. Spec 18a §5.9.1 names the direct
+  `inRangeBool` guard as AC-C3's discriminator, and
+  `docs/program/wp/decimal-char-demote.md` AC-C3 now says the same.
+  Conformance pins the composed obligation status.
+- The CV's first rejection (no composed conformance case) was resolved in
+  place (`evt_40wtsg8nqs5yw`).
+- Carried to `LANG-ENSURES-PER-PATH-REALIZATION`: the AC-C3 heading comment
+  in `crates/ken-elaborator/tests/decimal_char_acceptance.rs` still names
+  `isScalar := true` as the flip.

@@ -1,7 +1,7 @@
 ---
 id: KERNEL-J-NONREFL-ENDPOINT-SHARING
 title: "A non-refl J reduction re-reduces the level below about eight times, through j_endpoints, the type-equality witness and the Cast arm's components, so a source-derived chain of J over step_i helpers costs work exponential in its depth. Make whnf of that chain linear in depth by reducing each endpoint once, with the J reduct's shape unchanged"
-status: ready
+status: active
 owner: kernel
 size: M
 tier: T1
@@ -24,9 +24,16 @@ linear in its depth k, with the verdict it gives today.
 - **The fixture.** S is `KERNEL-OBS-NESTED-CAST-LINEAR`'s source-derived
   `step_i` / `J (λx _. x) t e` chain. It checks `Refl Lk : Eq Type0 Lk
   (type_id Type0 Lk)`, and its k=4 verdict pin lands with that WP.
-- **The growth.** Total reducer entries are 8,531, 69,808, 560,397 and
-  4,485,482 at k = 2 to 5, about ×8 per level. `j_nonrefl` calls are 54,
-  438, 3,510 and 28,086, at the same ratio.
+- **The growth** (Architect `evt_2jph7dvytz0xn`). Totals are measured with
+  the `cfg(test)` deferred-fixed-point assertion suppressed
+  (`DeferredFixedPointAssertionsGuard::suppress()`, `delta_probe::reset()`
+  just before the measured call). That is the production cost.
+  - At k = 2, 3 and 4: 8,528, 69,805 and 560,394 at `90ca730f6`; 9,018,
+    73,751 and 591,988 at `3695cd16a`.
+  - Growth is about ×8 per level on both bases. AC-0 re-measures the
+    `j_nonrefl` call counts on main.
+  - With the assertion on, totals are ×2.5-4 higher and also grow ×10, so
+    they are not comparable to these.
 - **No single site repeats.** Per `j_nonrefl` call, each site's cost is
   constant at every k: A (the Cast arm's components) about 6.6, D
   (`j_endpoints`) about 4.5, E (the type-equality witness) about 148.
@@ -56,7 +63,8 @@ unchanged. The Architect rules the repair after AC-0.
   The ×8 must come out as a sum over D, E and A, at k = 2 to 4. The
   Architect rules the repair from that table, before any edit.
 - **AC-1.**
-  - A committed pin bounds S's entries by `c·k` at k = 4, 8 and 16.
+  - A committed pin bounds S's entries by `c·k` at k = 4, 8 and 16,
+    counted with the assertion suppressed.
   - Its verdict equals today's.
   - The k=4 pin from `KERNEL-OBS-NESTED-CAST-LINEAR` becomes a bounded pin.
 - **AC-2 (controls).**
