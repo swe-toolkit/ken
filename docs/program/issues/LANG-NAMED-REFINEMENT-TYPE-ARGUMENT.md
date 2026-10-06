@@ -1,12 +1,12 @@
 ---
 id: LANG-NAMED-REFINEMENT-TYPE-ARGUMENT
 title: "A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six, List Char admits 55296, and so do Int → Five results, classes, aliases, data fields and expression-level type arguments. Refuse the nested introduction at the check choke point, keyed on polarity and the checked refinement identity"
-status: active
+status: ready
 owner: language
 size: M
 tier: T1
 gate: architect
-depends_on: [LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION]
+depends_on: [LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION, LANG-MATCH-RESULT-REFINEMENT-IDENTITY]
 blocks: []
 github: null
 origin: "F-E: separate finding the Architect's TYPE-POSITION D0 ruling evt_5am0p8wy7vc9j asked to be measured; measured on c49297983 by the language implementer (evt_2tgrvgpr76kwm), boundary confirmed by the Architect (evt_19x6v93jytdy4). Fails open: a program the refinement forbids is accepted. No kernel impact: predicates are erased and the kernel term stays well-typed. Steward-filed per COORDINATION section 2."
@@ -48,6 +48,11 @@ really has the refined type, such as the prelude's `List Char`, stays legal.
   by construction, plus the transported type at the transported return. The
   top-level case stays `emit_refinement_introduction`'s.
 - `forgets` (F-H) is out of scope: `LANG-NAMED-REFINED-BINDER-FIRST-CLASS`.
+- **Held on `LANG-MATCH-RESULT-REFINEMENT-IDENTITY`** (stop 2,
+  `evt_6qq1wtsekh42j`). The emit guard stays as built at WIP `398fda461`,
+  with its 8 passing pins. The match routes drop the result refinement even
+  at the top level, so the two match rows pass only after that WP lands.
+  Rebase onto it, then finish.
 - Kernel soundness is intact: the kernel sees the carrier.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
@@ -70,8 +75,8 @@ Base `f5d6d7f54` versus candidate, every row.
   (`evt_4qbync1qst672`); forged `List Char` (`Cons Int 55296 (Nil Int)`) and
   forged `Option Char`. Also an indexed-match branch variable of local type
   `List Int` checked at `List Five`, and a non-dependent `match` whose arms
-  infer `List Int` at expected `List Five`; either may record "not
-  expressible" with the attempt.
+  infer `List Int` at expected `List Five` (pc and pd of stop 2): both
+  refused once `LANG-MATCH-RESULT-REFINEMENT-IDENTITY` has landed.
 - **AC-2 (controls; accepted, obligation counts unchanged).**
   - `ElabEnv::new()` and `intToChar`; `LawfulClasses` `Ord.Char` and
     `DecEq.Char`; Derived's `RefinementView`;
@@ -105,4 +110,5 @@ Base `f5d6d7f54` versus candidate, every row.
 ```text
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. position-keyed refusal of a named refinement (type argument, expression, codomain) refused the prelude's `Char` under `List`/`Option`; keyed on syntactic position
+2. nested-introduction guard keyed on elaborator check routes; match compilation checks leaves against an inferred or δ-simplified substitute, so the refinement never reaches `check` — keyed on the type a leaf is checked against
 ```
