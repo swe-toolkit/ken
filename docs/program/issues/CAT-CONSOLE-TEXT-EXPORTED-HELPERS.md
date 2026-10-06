@@ -41,10 +41,20 @@ stop and report the mismatch.
 
 ## Deliverable
 
-The helpers exported, and each law's type naming only public names (export
-or inline the payload helper; the Architect rules which). The package prose
-names the export. No new primitive, postulate or axiom, and no prelude
-change.
+Ruled by the Architect (`evt_2t6eg0v4btbj5`): export the payload helper,
+do not inline it.
+
+- `pub proc` on the four helpers, and `pub fn console_line_payload (text :
+  String) : Bytes` with its body unchanged.
+- `printLine` and `eprintLine` are each one `write` of `console_line_payload
+  text`. The four law types and their proofs stay byte-identical.
+- `console_tree_refl` stays private.
+- Order: the four helpers, the four laws, `console_line_payload`, then
+  `console_tree_refl`. The prose names the nine exports and states that
+  `console_line_payload text` is `bytes_encode text` followed by the encoding
+  of character 10.
+
+No new primitive, postulate or axiom, and no prelude change.
 
 ## Acceptance
 
@@ -53,13 +63,20 @@ change.
   and states each law's type with the helper as its subject. `ken check` and
   `ken fmt --check` pass on the package; `trusted_base()` is unchanged.
 - **AC-2 (controls).** The existing AC-2 falsifiers of CAT-CONSOLE-TEXT-LAWS
-  and `i2_console_floor` keep their results, and the ambient passthrough
-  census stays green.
+  keep their results, including all four conversions against
+  `client_console_line_bytes` in `cat_console_text_laws.rs`.
+  `i2_console_floor`'s output bytes are identical, and the ambient
+  passthrough census stays green.
 - **AC-3 (mutation, QA).** Removing `pub` from any one helper reddens the
-  AC-1 client.
+  AC-1 client. Removing it from `console_line_payload` reddens the client's
+  two line-law statements with `UnboundName`.
 
 ## Stop conditions
 
 - The export changes any package's resolution or a prelude collision
   census: stop to the Architect.
 - `trusted_base()` changes: an operator question.
+- The Console.Text prelude-name set pinned at
+  `lang_mod_strict_resolution_d0.rs:520` (`{IO, IOError, Stderr, Stdout,
+  Unit, write}`) changes, or any hash, snapshot or artifact pin on
+  `printLine` or `eprintLine` moves: stop to the Architect.
