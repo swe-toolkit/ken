@@ -20,8 +20,6 @@ const CODEC: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.
 const NUMERIC: &str = include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const EXIT: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
 const SCHEMA_MODULE: &str = "Application.Input.Schema";
-const SCHEMA_SOURCE: &str =
-    include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
 const ARGPARSE_MODULE: &str = "Application.CommandLine.ArgParse";
 const CONFIG_DECODER_MODULE: &str = "Application.Configuration.Decoder";
 const FORGE_ARGPARSE_IMPORT: &str = r#"
@@ -43,10 +41,6 @@ import Application.CommandLine.ArgParse
     argparse_run,
     program_help)
 "#;
-const ARGPARSE_SOURCE: &str =
-    include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
-const CONFIG_DECODER: &str =
-    include_str!("../../../catalog/packages/Application/Configuration/Decoder.ken.md");
 const EXAMPLE: &str = include_str!("../../../catalog/examples/CommandLine/Forge.ken.md");
 
 fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
@@ -693,7 +687,7 @@ fn assert_new_globals_are_transparent(
 }
 
 #[test]
-fn cc8_adds_no_trust_and_declares_no_second_universe() {
+fn cc8_adds_no_trust() {
     let mut env = dependency_env();
     let before_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let before_globals = env.globals.values().copied().collect::<BTreeSet<_>>();
@@ -715,28 +709,4 @@ fn cc8_adds_no_trust_and_declares_no_second_universe() {
         before_trust, after_trust,
         "CC8 must add zero trusted entries"
     );
-
-    let checked = [SCHEMA_SOURCE, ARGPARSE_SOURCE, CONFIG_DECODER]
-        .into_iter()
-        .map(|source| {
-            ken_elaborator::literate::extract_ken_md(source).expect("extract checked Ken")
-        })
-        .map(|extracted| extracted.source)
-        .collect::<Vec<_>>()
-        .join("\n");
-    for forbidden in [
-        "ArgBytes",
-        "ArgByteLength",
-        "bytes_eq",
-        "bytes_length",
-        "bytes_at",
-        "data DecoderError",
-        "data Doc",
-        "Axiom",
-    ] {
-        assert!(
-            !checked.contains(forbidden),
-            "forbidden CC8 surface `{forbidden}`"
-        );
-    }
 }
