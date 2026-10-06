@@ -1,12 +1,12 @@
 //! Real checked-bound-process scalar-admission feedback gate.
 //!
-//! The source is shared byte-for-byte with the ignored native/interpreter
-//! parity row. This test checks compiler routing only; its later refusal is a
-//! separate successor and does not establish native execution or parity.
+//! The source is shared byte-for-byte with the active native/interpreter
+//! parity row. This test checks compiler feedback and successful preparation;
+//! the separate parity row establishes native execution on the stated stack.
 
 #[cfg(target_os = "linux")]
 #[test]
-fn bound_process_nat_retries_only_the_refused_join() {
+fn bound_process_nat_retries_only_newly_refused_joins() {
     // Baseline provisioning for the same Nat source as the existing ignored
     // parity row, not a repair to a pre-existing failing test. On this fixture,
     // sampling the worker's 256 MiB VMA at 20 Hz via /proc/<pid>/smaps observed
@@ -29,23 +29,25 @@ fn bound_process_nat_retries_only_the_refused_join() {
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                 )
             });
-            // Promise: transition sentinel for this checked Nat source origin.
-            // MEASURED: the bound-process object compiler reports its exact
-            // attempt count and refused/forced origin identities. CLAIMED:
-            // only the rejected scalar join enters a fresh carrier plan.
-            // GAP: this is compiler preparation, not executable parity.
+            // Promise class: durable feedback-loop invariant on this checked
+            // Nat source. MEASURED at 74daf7a: refused [1289, 1121, 947]
+            // over four attempts; those numbers describe a run, not the pin.
+            // CLAIMED: a successful build retries once per *new* refused join,
+            // forces exactly those joins, then stops. THE GAP: this fixture
+            // does not bound every program's number of static join origins;
+            // the independent active differential pins native parity.
             assert_eq!(observations.len(), 1, "exactly one bound-process compile");
             let record = &observations[0];
-            assert_eq!(record.attempts, 2, "one refusal and one re-plan");
-            assert_eq!(record.refused_origins, [1289]);
-            assert_eq!(record.forced_origins, [1289].into_iter().collect());
-            if let Err(error) = build {
-                assert!(
-                    !format!("{error:?}")
-                        .contains("Match: dynamic arms must produce scalar Int or Bool values"),
-                    "the formerly refused merge must now use its carrier plan"
-                );
-            }
+            build.expect("the Nat fanout source compiles through scalar-join feedback");
+            // The loop retries only when forced.insert(origin) is new, and the
+            // successful attempt pushes no refusal: one retry per distinct
+            // refusal, no extra forced join, then one successful attempt.
+            let refused: std::collections::BTreeSet<u32> =
+                record.refused_origins.iter().copied().collect();
+            assert_eq!(refused.len(), record.refused_origins.len(), "no origin is refused twice");
+            assert_eq!(record.forced_origins, refused, "only refused joins are forced to carriers");
+            assert_eq!(record.attempts, record.refused_origins.len() + 1,
+                "one retry per refusal, then success");
         })
         .expect("Nat test-local 256 MiB compiler thread")
         .join()

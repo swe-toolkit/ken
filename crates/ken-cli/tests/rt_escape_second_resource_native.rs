@@ -464,9 +464,10 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
 // a *second* `readAt` on the escaped file. The Nat match fans out (Zero/Suc off
 // one `brif`) and the second read's checked frame lives in its shared tail, so
 // pre-fix it tripped the identical "consumed more than once" on the Nat lane
-// (verified by reverting only the Nat-lane fork). The current compiler gets
-// past its scalar-join refusal but stops at ContinuationSpecialization;
-// interpreter/native parity is not yet established for this ignored row.
+// (verified by reverting only the Nat-lane fork). The current compiler retries
+// unclaimed scalar joins, emits the native artifact, and matches interpreter
+// stdout, full effects, and terminal observations in the active Nat row on its
+// explicitly provisioned 256 MiB thread; no default-stack claim is made.
 #[cfg(target_os = "linux")]
 const NAT_FANOUT_ESCAPED_RESOURCE: &str = include_str!("rt_nat_fanout_escaped_resource.ken");
 
