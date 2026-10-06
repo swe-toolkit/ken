@@ -1,7 +1,7 @@
 ---
 id: CAT-CONFIGURATION-DECODER-PRESENCE-CARRIER
 title: "replace the decoder's lossy List Bytes result with List (Option Bytes) -- empty Bytes is an ordinary value in this package, not a reserved sentinel, so the current map sends two distinct inputs (no entry, and an entry whose value is empty) to one indistinguishable result element; carry the validated payload instead of recomputing it, and delete env_config_values with its placeholder branch so the agreement obligation disappears at its source rather than being proved"
-status: ready
+status: active
 owner: foundation
 size: M
 gate: none

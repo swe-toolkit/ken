@@ -101,3 +101,13 @@ R6 and R7 together; the ruling's code is the text.
 - Any kernel, trust or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, and never land `a7d46d6f2`.
+
+## Symptom inventory
+
+Seeded from Architect `evt_3a83pjbkea81n`, which also rules R8 (built with
+R6+R7 on `b1a837a12`).
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. source-machine ComputationalMatchScrutinee seat lacked the Residual operand arm its sibling scrutinee seats carry (refusal source.rs:1914, Match1004, CheckedSelectedRecursor) — keyed on operand variant (Residual vs Carried) at one of five scrutinee seats
+```

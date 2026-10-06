@@ -1,7 +1,7 @@
 ---
 id: CAT-CONSOLE-TEXT-LAWS
 title: "Console.Text's four helpers (print, printLine, eprint, eprintLine) have no proof: their stream choice, exact bytes, single trailing newline and Result preservation are only executed by i2_console_floor.rs. Prove each helper's write tree in the package at zero TCB"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -66,3 +66,19 @@ client states it in full (Architect `evt_6sebv20q74qfn`).
   being one byte: that is a primitive contract (spec 38), not a Ken proof.
   Stop to the Architect, and do not add an axiom.
 - `trusted_base()` changes: an operator question.
+
+## Closeout
+
+Merged `a0a3f703f` from exact `bca405e8e` (PR #4531, main push run
+37420601092). Foundation QA `evt_4vnb9dfmv2rr9`, Decision
+`dec_1cnxmhavrqzz3`.
+
+- Each of `print`, `printLine`, `eprint` and `eprintLine` carries a checked
+  theorem `helper text = write <stream> <payload>`; the line forms' payload
+  is the `bytes_concat` of the text's encoding and the newline's. The tree is
+  reached by conversion through transparent `write`.
+- An independent client states each tree in full, and swapping a stream,
+  dropping a newline or discarding `r` fails the matching theorem.
+- The package binds its tree vocabulary explicitly, so the ambient
+  passthrough census is unchanged. No primitive, postulate, axiom or prelude
+  change; `trusted_base()` is unchanged.

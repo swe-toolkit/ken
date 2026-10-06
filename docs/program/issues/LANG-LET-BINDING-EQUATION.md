@@ -1,7 +1,7 @@
 ---
 id: LANG-LET-BINDING-EQUATION
 title: "Since LANG-ENSURES-PER-PATH-REALIZATION, a postcondition over a let in result position is realized at the let body's leaf with the binder bare: no Eq A x e is in the context, so the goal is closed over an unconstrained x and cannot be discharged. Spec 22 §3 requires the let equation. Push it at the let binder for the body's extent"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
