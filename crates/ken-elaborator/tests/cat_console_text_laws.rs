@@ -18,7 +18,7 @@ fn console_text_laws_check_against_independent_trees_without_trust() {
         "package adds no trusted declarations"
     );
 
-    // These are not the package's console_write_tree or console_line_payload.
+    // These do not use the package's console_line_payload.
     // They give the clients an independently authored expected tree and byte
     // expression. A package law has to convert to each client's statement.
     env.elaborate_decl(
