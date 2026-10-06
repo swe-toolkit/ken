@@ -4013,8 +4013,10 @@ fn ordinary_coherent_frame_plan(
 }
 
 #[inline(never)]
-fn boxed_simplify_branch_goal(env: &GlobalEnv, ctx: &Context, term: &Term) -> Box<Term> {
-    Box::new(simplify_branch_goal(env, ctx, term))
+fn boxed_simplify_branch_goal(
+    env: &GlobalEnv, facts: &RefinementFacts, ctx: &Context, term: &Term,
+) -> Box<Term> {
+    Box::new(simplify_branch_goal_keeping_refinements(env, facts, ctx, term))
 }
 
 #[inline(never)]
@@ -4056,7 +4058,9 @@ fn plan_coherent_frame_motive(
             frame,
         );
     }
-    let expanded_expected = boxed_simplify_branch_goal(cx.env, &zonked_ctx, original_expected);
+    let expanded_expected = boxed_simplify_branch_goal(
+        cx.env, cx.refinement_facts, &zonked_ctx, original_expected,
+    );
     let has_nontrivial_coupled_sides = matches!(original_expected, Term::Eq(_, _, _))
         || matches!(expanded_expected.as_ref(), Term::Eq(_, _, _));
     let probe_context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
@@ -4266,49 +4270,92 @@ fn compute_context_convoy(
 /// eliminator methods. Full normalisation can chase recursive transparent defs
 /// indefinitely under neutral scrutinees; this deliberately stops at stuck
 /// `Elim` nodes.
-fn simplify_branch_goal(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
+fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
     match whnf(env, ctx, term) {
         Term::Pi(a, b) => {
-            let a_s = simplify_branch_goal(env, ctx, &a);
+            let a_s = simplify_branch_goal_unguarded(env, ctx, &a);
             let mut ctx2 = ctx.clone();
             ctx2.push(a_s.clone());
-            Term::pi(a_s, simplify_branch_goal(env, &ctx2, &b))
+            Term::pi(a_s, simplify_branch_goal_unguarded(env, &ctx2, &b))
         }
         Term::Sigma(a, b) => {
-            let a_s = simplify_branch_goal(env, ctx, &a);
+            let a_s = simplify_branch_goal_unguarded(env, ctx, &a);
             let mut ctx2 = ctx.clone();
             ctx2.push(a_s.clone());
-            Term::sigma(a_s, simplify_branch_goal(env, &ctx2, &b))
+            Term::sigma(a_s, simplify_branch_goal_unguarded(env, &ctx2, &b))
         }
         Term::Eq(a, x, y) => Term::Eq(
-            Box::new(simplify_branch_goal(env, ctx, &a)),
-            Box::new(simplify_branch_goal(env, ctx, &x)),
-            Box::new(simplify_branch_goal(env, ctx, &y)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &x)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &y)),
         ),
         Term::App(f, a) => Term::app(
-            simplify_branch_goal(env, ctx, &f),
-            simplify_branch_goal(env, ctx, &a),
+            simplify_branch_goal_unguarded(env, ctx, &f),
+            simplify_branch_goal_unguarded(env, ctx, &a),
         ),
         Term::Ascript(t, a) => Term::Ascript(
-            Box::new(simplify_branch_goal(env, ctx, &t)),
-            Box::new(simplify_branch_goal(env, ctx, &a)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &t)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
         ),
         Term::Cast(a, b, e, t) => Term::Cast(
-            Box::new(simplify_branch_goal(env, ctx, &a)),
-            Box::new(simplify_branch_goal(env, ctx, &b)),
-            Box::new(simplify_branch_goal(env, ctx, &e)),
-            Box::new(simplify_branch_goal(env, ctx, &t)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &b)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &e)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &t)),
         ),
         Term::J(motive, base, eq) => Term::J(
-            Box::new(simplify_branch_goal(env, ctx, &motive)),
-            Box::new(simplify_branch_goal(env, ctx, &base)),
-            Box::new(simplify_branch_goal(env, ctx, &eq)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &motive)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &base)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &eq)),
         ),
         Term::Absurd(motive, proof) => Term::Absurd(
-            Box::new(simplify_branch_goal(env, ctx, &motive)),
-            Box::new(simplify_branch_goal(env, ctx, &proof)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &motive)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &proof)),
         ),
         other => other,
+    }
+}
+
+/// Keep checked refinement identities rigid while exposing beta/iota and
+/// ordinary transparent heads needed by dependent branch goals.
+#[inline(never)]
+fn simplify_branch_goal_keeping_refinements(
+    env: &GlobalEnv, facts: &RefinementFacts, ctx: &Context, term: &Term,
+) -> Term {
+    let mut roots = Vec::new();
+    collect_refinement_consts(facts, term, &mut roots);
+    if roots.is_empty() {
+        return simplify_branch_goal_unguarded(env, ctx, term);
+    }
+    let k = roots.len();
+    let mut extended = ctx.clone();
+    for root in &roots {
+        let Term::Const { id, level_args } = root else { unreachable!("collected Const") };
+        let (params, ty) = env.const_type(*id).expect("refinement constant is declared");
+        extended.push(subst_levels(&ty, params, level_args));
+    }
+    let substitutions: Vec<(Term, Term)> = roots.iter().enumerate()
+        .map(|(i, root)| (root.clone(), Term::var(k - 1 - i)))
+        .collect();
+    let abstracted = subst_term_generalize_many(&weaken(term, k as i64), &substitutions);
+    let mut out = simplify_branch_goal_unguarded(env, &extended, &abstracted);
+    for root in roots.iter().rev() {
+        out = subst0(&out, root);
+    }
+    out
+}
+
+/// Enumerate distinct checked Const uses, including those below binders and
+/// applications. `children()` covers every kernel Term form without a default.
+fn collect_refinement_consts(facts: &RefinementFacts, term: &Term, roots: &mut Vec<Term>) {
+    let mut pending = vec![term];
+    while let Some(node) = pending.pop() {
+        if let Term::Const { id, .. } = node {
+            if facts.refinement_root(*id).is_some() && !roots.contains(node) {
+                roots.push(node.clone());
+            }
+        }
+        pending.extend(node.children());
     }
 }
 
@@ -5424,10 +5471,13 @@ fn check_match_with_lift_with_predicates(
         for position in 0..host_ctor.args.len() {
             concrete = Term::app(concrete, Term::var(total - 1 - position));
         }
-        let expected_here = subst_term_generalize(
+        let source_expected = subst_term_generalize(
             &weaken(expected, total as i64),
             &weaken(scrut_core, total as i64),
             &concrete,
+        );
+        let expected_here = simplify_branch_goal_keeping_refinements(
+            cx.env, cx.refinement_facts, &cx.ctx, &source_expected,
         );
         cx.match_frames.last_mut().expect("lifted arm frame").refined_target = Some(expected_here.clone());
         let mut scrut_ty = Term::indformer(host.id, host_level_args.to_vec());
@@ -5592,10 +5642,13 @@ fn check_structured_constructor_method(
     for position in 0..field_count {
         concrete = Term::app(concrete, Term::var(total - 1 - position));
     }
-    let expected_here = subst_term_generalize(
+    let source_expected = subst_term_generalize(
         &weaken(expected, total as i64),
         &weaken(scrut_core, total as i64),
         &concrete,
+    );
+    let expected_here = simplify_branch_goal_keeping_refinements(
+        cx.env, cx.refinement_facts, &cx.ctx, &source_expected,
     );
     cx.match_frames.last_mut().expect("structured arm frame").refined_target = Some(expected_here.clone());
     let mut scrut_ty = Term::indformer(ind.id, level_args.to_vec());
@@ -5688,6 +5741,7 @@ fn check_match_dependent_refined_fallback(
     scrut_indices: &[Term],
     n: usize,
     expected_here: &Term,
+    preserve_goal: bool,
 ) -> Result<Term, ElabError> {
     let (goal_refined, goal_restorations) = refine_branch_goal(
         cx,
@@ -5704,6 +5758,7 @@ fn check_match_dependent_refined_fallback(
         goal_refined,
         goal_restorations,
         expected_here,
+        preserve_goal,
     )
 }
 
@@ -5714,6 +5769,7 @@ fn check_generalized_branch_goal(
     goal_refined: Term,
     restorations: Vec<BranchGoalRestoration>,
     expected_here: &Term,
+    preserve_goal: bool,
 ) -> Result<Term, ElabError> {
     // Do not introduce an additional early kernel admission for a branch
     // whose goal needs no dependent binder. In particular, declaration
@@ -5721,9 +5777,13 @@ fn check_generalized_branch_goal(
     if !restorations.iter().any(|restoration| {
         matches!(restoration, BranchGoalRestoration::Generalized { binders, .. } if !binders.is_empty())
     }) {
-        // The fallback is a second value-checking route, not permission to
-        // delta-unfold the result after the first checked attempt failed.
-        let expected = goal_refined;
+        let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+            goal_refined
+        } else {
+            simplify_branch_goal_keeping_refinements(
+                cx.env, cx.refinement_facts, &cx.ctx, &goal_refined,
+            )
+        };
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         for restoration in restorations.into_iter().rev() {
             body = restoration.apply(body);
@@ -5789,7 +5849,13 @@ fn check_generalized_branch_goal(
                 inner_goal = *codomain;
             }
         }
-        let expected = inner_goal;
+        let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+            inner_goal
+        } else {
+            simplify_branch_goal_keeping_refinements(
+                cx.env, cx.refinement_facts, &cx.ctx, &inner_goal,
+            )
+        };
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         kernel_check_current(cx, &body, &expected).map_err(|error| match error {
             CurrentKernelQueryError::View(error) => error,
@@ -7090,11 +7156,13 @@ fn check_dependent_branch_body(
         {
                 expected_here.clone()
             } else {
-                simplify_branch_goal(cx.env, &cx.ctx, expected_here)
+                simplify_branch_goal_keeping_refinements(
+                    cx.env, cx.refinement_facts, &cx.ctx, expected_here,
+                )
             };
         cx.match_frames.last_mut().ok_or_else(|| {
             ElabError::Internal("dependent arm has no owning match frame".into())
-        })?.refined_target = Some(expected_here.clone());
+        })?.refined_target = Some(expected_unrefined.clone());
         if let Some(premise_slot) = hidden_result_premise_slot {
             if premise_slot >= premise_domains.len() {
                 return Err(ElabError::Internal(format!(
@@ -7130,11 +7198,9 @@ fn check_dependent_branch_body(
                 });
         }
         let obligation_base = cx.obligations.len();
-        // The source result is the checking goal under branch substitution.
-        // Simplification above shapes the method's kernel motive, not the
-        // source value: it may delta-unfold a nested refinement to its
-        // carrier, which must not replace the goal at this introduction.
-        let attempt = check_match_arm_result(cx, arm, expected_here, &arm.span).and_then(|checked| {
+        // The simplified goal retains every refinement root while exposing
+        // ordinary heads needed by dependent matches and their index convoy.
+        let attempt = check_match_arm_result(cx, arm, &expected_unrefined, &arm.span).and_then(|checked| {
             kernel_check_current(cx, &checked, &expected_unrefined)
                 .map(|()| checked)
                 .map_err(|error| match error {
@@ -7162,6 +7228,7 @@ fn check_dependent_branch_body(
                     scrut_indices,
                     n,
                     expected_here,
+                    equation_convoy || preserve_nested_goal,
                 )?
             }
         };
@@ -7755,7 +7822,9 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 ))
             }
         } else {
-            let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
+            let expected_here = simplify_branch_goal_keeping_refinements(
+                cx.env, cx.refinement_facts, &cx.ctx, &expected_here,
+            );
             let missing = missing_pattern_witness(cx, ctor.id);
             frame_try!(synthesize_omitted_index_method(
                 cx,
