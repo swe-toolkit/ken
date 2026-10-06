@@ -1,7 +1,7 @@
 ---
 id: CAT-LIST-LENGTH-TRUST-FREE-BASE
 title: "The canonical List length lives in Data.Collections.Derived, whose import closure declares five trusted axioms, so a zero-trust package such as Vector cannot import it. Move length verbatim into a trust-free base list module that Derived re-exports with the same checked identity"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -72,3 +72,16 @@ stop and report the mismatch.
 
 - A consumer whose resolution changes, not only its test key.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `c3843e968` from exact `ea019f421` (PR #4562). Foundation QA
+`evt_7a28c79mt74q3`, Architect `evt_1mb5kbb453crk`, Decision
+`dec_7w6xpzjhbs56x`.
+
+- `Data.Collections.List` holds the sole catalog `pub fn length`, with no
+  module imports; Derived imports and re-exports it with the same checked
+  identity. Twelve consumer tests are re-keyed to the provider `GlobalId`.
+- The first FULL (`20f3dec6f`, PR #4558) was red on the rosetta flat
+  harness, which emulated Derived's import closure by text. The harness now
+  flattens the List provider first and finds directives with Ken's lexer.

@@ -1,7 +1,7 @@
 ---
 id: CAT-VECTOR-TO-LIST-LENGTH-LAW
 title: "Prove the length/to_list bridge spec 60 §5 defers, length (to_list xs) = n for xs : Vec a n, importing length from the trust-free base list module so Vector's trust delta stays zero"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
