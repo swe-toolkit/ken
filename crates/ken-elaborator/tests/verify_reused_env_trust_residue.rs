@@ -7,6 +7,12 @@ use tempfile::tempdir;
 
 const NEEDS_PREMISE: &str = "const ac0_need : Int requires Equal Int 0 0 = 0";
 const BAD_CALLER: &str = "const ac0_bad : Bool = ac0_need";
+const SPACE_DECL_AFTER_HOLE: &str = r#"
+space S {
+  mut cell : Int = 0
+  proc call () : Bool visits [S] = ac0_space_callee 0 0
+}
+"#;
 
 fn trusted_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
     env.env.trusted_base().into_iter().collect()
@@ -109,6 +115,31 @@ fn failed_roots_loaded_declaration_has_exact_zero_delta() {
     let after = trusted_ids(&env);
     assert_eq!(added_ids(&before, &after), BTreeSet::new());
     assert_type_mismatch(result.expect_err("the entry's caller has the wrong result type"));
+}
+
+/// Promise class: durable rollback invariant (AC-1 and AC-3).
+/// MEASURED: a real SpaceDecl calls a requires-bearing function with false
+/// arguments, returns the exact kernel TypeMismatch, and leaves no new trusted
+/// IDs after its post-hole failure.
+/// CLAIMED: the SpaceDecl rollback seam removes obligations created before its
+/// later operation error while preserving the caller-visible failure.
+/// THE GAP: the failed call must reach the real SpaceDecl production wrapper;
+/// deleting only that wrapper is the AC-3 mutation for this row.
+#[test]
+fn failed_space_decl_after_premise_hole_has_exact_zero_delta() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_decl_v1(
+        r#"fn ac0_space_callee (x : Int) (y : Int) : Int requires Not (Equal Int x y) = x"#,
+    )
+    .expect("the requires-bearing callee is checked");
+
+    let before = trusted_ids(&env);
+    let declarations =
+        parser::parse_decls(SPACE_DECL_AFTER_HOLE).expect("the space fixture parses");
+    let result = modules::expand_and_elaborate(&mut env, &declarations);
+    let after = trusted_ids(&env);
+    assert_eq!(added_ids(&before, &after), BTreeSet::new());
+    assert_type_mismatch(result.expect_err("the SpaceDecl operation has an Int/Bool mismatch"));
 }
 
 /// MEASURED: the exact trusted-base delta from an expression that allocates
