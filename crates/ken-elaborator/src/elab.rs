@@ -14706,6 +14706,25 @@ pub(crate) fn alias_nested_refinement(ty: &RType) -> Option<(&Span, &'static str
     }
 }
 
+/// Constructor field types pass through the ordinary type elaborator when
+/// they contain an application or a refinement, even without a literal field
+/// predicate to record. Keep the gate exhaustive as RType grows.
+fn rtype_has_application_or_refinement(ty: &RType) -> bool {
+    match ty {
+        RType::RRefine(..) | RType::RApp(..) => true,
+        RType::RPi(_, domain, codomain, _)
+        | RType::REffectArr(domain, _, codomain, _)
+        | RType::RArr(domain, codomain, _)
+        | RType::RSigma(_, domain, codomain, _) =>
+            rtype_has_application_or_refinement(domain)
+                || rtype_has_application_or_refinement(codomain),
+        RType::RTrunc(inner, _) => rtype_has_application_or_refinement(inner),
+        RType::RUniv(_, _) | RType::RCon(_, _) | RType::RCheckedGlobal { .. }
+        | RType::RVarTy(_, _, _) | RType::RPatternAliasTy(_, _, _)
+        | RType::RProj(_, _, _) => false,
+    }
+}
+
 /// Elaborate a named-field record declaration to the existing transparent
 /// right-nested Sigma encoding and register only its shared projection facts.
 #[inline(never)]
@@ -15664,7 +15683,7 @@ fn elaborate_data_with_refinements(
     ctors: &[crate::resolve::RCtorDecl],
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| matches!(arg, RType::RRefine(..)))) {
+    if !ctors.iter().any(|ctor| ctor.args.iter().any(rtype_has_application_or_refinement)) {
         return data::elab_data_decl(env, globals, ctor_decl_spans, name, type_params, ctors, span);
     }
     let snapshot = (
@@ -15701,7 +15720,7 @@ fn elaborate_explicit_data_with_refinements(
     ctors: &[crate::resolve::RExplicitCtorDecl],
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| matches!(arg.ty, RType::RRefine(..)))) {
+    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| rtype_has_application_or_refinement(&arg.ty))) {
         return data::elab_explicit_data_decl(
             env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
         );
@@ -15737,7 +15756,7 @@ fn register_legacy_constructor_fields(
     owner: &str,
 ) -> Result<(), ElabError> {
     for ctor in ctors {
-        if !ctor.args.iter().any(|arg| matches!(arg, RType::RRefine(..))) {
+        if !ctor.args.iter().any(rtype_has_application_or_refinement) {
             continue;
         }
         let id = globals[&ctor.name];
@@ -15764,7 +15783,7 @@ fn register_explicit_constructor_fields(
     owner: &str,
 ) -> Result<(), ElabError> {
     for ctor in ctors {
-        if !ctor.args.iter().any(|arg| matches!(arg.ty, RType::RRefine(..))) {
+        if !ctor.args.iter().any(|arg| rtype_has_application_or_refinement(&arg.ty)) {
             continue;
         }
         let id = globals[&ctor.name];
@@ -15781,8 +15800,13 @@ fn register_explicit_constructor_fields(
 }
 
 /// Constructor fields are already bare carriers in the kernel declaration.
-/// Keep only literal source predicates indexed by the checked constructor and
-/// argument position; the same check-time emitter handles their introduction.
+/// Check each field's type applications here after that declaration is built;
+/// a discharged refinement needs no obligation channel, but an undischarged
+/// one refuses and the wrapper rolls back the entire declaration. Keep only
+/// literal field predicates indexed by checked constructor and argument.
+/// Earlier refined fields are not installed as path hypotheses in this pass:
+/// applications depending on their predicates refuse, rather than inheriting
+/// the broader hypothesis environment other systems may provide.
 #[inline(never)]
 fn collect_constructor_field_predicates(
     cx: &mut ElabCtx<'_>,

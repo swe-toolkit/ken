@@ -208,6 +208,99 @@ fn anonymous_theorem_signature_domain_emits_type_position_argument_once() {
     }
 }
 
+fn data_with_field(explicit: bool, field: &str) -> String {
+    if explicit {
+        format!("data D : Type where {{ Mk : (x : {field}) → D }}")
+    } else {
+        format!("data D = Mk ({field})")
+    }
+}
+
+#[test]
+fn constructor_type_applications_refuse_undischarged_literal_formals_and_rollback() {
+    for explicit in [false, true] {
+        let mut env = type_position_box_env();
+        let source = data_with_field(explicit, "Box six");
+        let error = env
+            .elaborate_decl_v1(&source)
+            .expect_err("a constructor's field type must check Box six");
+        let ElabError::ObligationWithoutChannel { span } = error else {
+            panic!("{source}: expected an undischarged refinement, found {error:?}");
+        };
+        let start = source.find("Box six").expect("fixture has the field type");
+        assert!(
+            span.start <= start && span.end >= start + "Box six".len(),
+            "refusal belongs to the constructor field application: {span:?}"
+        );
+        assert!(!env.globals.contains_key("D"), "data type must roll back");
+        assert!(
+            !env.globals.contains_key("Mk"),
+            "constructor must roll back"
+        );
+        env.elaborate_decl("const five : Int = 5")
+            .expect("retry value");
+        let retry = data_with_field(explicit, "Box five");
+        let accepted = env
+            .elaborate_decl_v1(&retry)
+            .unwrap_or_else(|e| panic!("rollback must leave D/Mk reusable: {e:?}"));
+        assert!(
+            accepted.obligations.is_empty(),
+            "discharged retry needs no hole"
+        );
+        assert!(env.globals.contains_key("D") && env.globals.contains_key("Mk"));
+    }
+}
+
+#[test]
+fn constructor_type_applications_admit_discharged_literal_formals() {
+    for explicit in [false, true] {
+        let mut env = type_position_box_env();
+        env.elaborate_decl("const five : Int = 5")
+            .expect("closed argument");
+        let source = data_with_field(explicit, "Box five");
+        let accepted = env
+            .elaborate_decl_v1(&source)
+            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        assert!(
+            accepted.obligations.is_empty(),
+            "closed Equal Int 5 5 discharges"
+        );
+    }
+}
+
+#[test]
+fn constructor_type_applications_check_named_formals_and_reuse_refined_arguments() {
+    for explicit in [false, true] {
+        let mut bad_env = type_position_box_env();
+        let bad = data_with_field(explicit, "NBox six");
+        assert!(
+            matches!(
+                bad_env.elaborate_decl_v1(&bad),
+                Err(ElabError::ObligationWithoutChannel { .. })
+            ),
+            "{bad}: a named root cannot erase an ordinary Int argument"
+        );
+
+        let mut good_env = type_position_box_env();
+        let value = good_env
+            .elaborate_decl_v1("const five : Five = 5")
+            .expect("the source can carry the checked refined type");
+        let source = data_with_field(explicit, "NBox five");
+        let accepted = good_env
+            .elaborate_decl_v1(&source)
+            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        assert!(
+            accepted.obligations.is_empty(),
+            "same-root reuse must not emit a second obligation"
+        );
+        assert_eq!(
+            value.obligations.len(),
+            1,
+            "any distinct introduction belongs to the earlier five declaration"
+        );
+    }
+}
+
 #[test]
 fn anonymous_arrows_in_proof_signature_are_not_local_binders() {
     let mut env = ElabEnv::new().expect("prelude");
