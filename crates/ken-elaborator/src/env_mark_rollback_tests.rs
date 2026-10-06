@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use ken_kernel::{declare_postulate, Decl, GlobalId, KernelError, Level, Term};
 use num_bigint::BigInt;
@@ -184,14 +184,16 @@ fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
     );
 }
 
-/// Promise class: durable ClassEnv identity-scrubbing invariant (AC-2).
-/// MEASURED: a real `instance` declaration containing `Axiom` populates the
-/// production class/head index inside an outer failed EnvMark transaction;
-/// its head ID is then reused by a replacement declaration.
-/// CLAIMED: rollback removes the failed instance from every ClassEnv index
-/// while preserving a pre-mark instance and its explicit Axiom trust entry.
-/// THE GAP: the fixture exercises parsed class and instance declarations;
-/// the assertions inspect identity-keyed maps rather than source spellings.
+/// Promise class: durable declaration-local ClassEnv identity-scrubbing
+/// invariant (AC-2).
+/// MEASURED: parsed data, class, and instance declarations populate the
+/// production GlobalId-keyed ClassEnv planes inside an outer failed EnvMark
+/// transaction; their IDs are removed and the first ID is then reused.
+/// CLAIMED: rollback removes each reachable declaration-owned ID while
+/// preserving stable pre-mark class, instance, and module entries.
+/// THE GAP: `direct_use_instances` is populated from already-loaded public
+/// dependency IDs before declaration marks and restored at loader boundaries;
+/// this fixture does not reach that flow. Its scrub arm has a direct unit pin.
 #[test]
 fn failed_elabenv_rollback_scrubs_class_instances_before_id_reuse() {
     let mut env = ElabEnv::new().expect("base environment");
@@ -217,20 +219,35 @@ instance QaProvider Int { evidence = Axiom }"#,
     let stable_head_id = env.globals["Int"];
     let stable_key = (class_id, InstanceHeadKey::Global(stable_head_id));
     let stable_instance_id = env.class_env.instances_by_id[&stable_key].instance_id;
+    let stable_instance_module = *env
+        .class_env
+        .global_modules
+        .get(&stable_instance_id)
+        .expect("the stable instance has a module owner");
+    let stable_class_module = *env
+        .class_env
+        .global_modules
+        .get(&class_id)
+        .expect("the stable class has a module owner");
+    assert!(env.class_env.class("QaProvider").is_some());
+    assert!(env.class_env.class_by_id(class_id).is_some());
     assert_eq!(
         env.class_env.instance_search("QaProvider", "Int"),
         Some(stable_instance_id)
     );
     let before = trusted_ids(&env);
+    let transaction_start_id = env.env.next_global_id();
     let mut removed_head = None;
+    let mut removed_class = None;
     let mut removed_instance = None;
 
     let result: Result<(), ElabError> = env.with_env_mark_rollback(|env| {
         env.elaborate_file_v1(
-            "data QaProviderType = MkQaProviderType\n\
+            "class QaRollbackClass A { marker : Top }\n\
+             data QaProviderType = MkQaProviderType\n\
              instance QaProvider QaProviderType { evidence = Axiom }",
         )
-        .expect("transaction creates a real provider instance");
+        .expect("transaction creates a data head, class, and provider instance");
         let provider_axiom_id = trusted_ids(env)
             .difference(&before)
             .copied()
@@ -246,9 +263,23 @@ instance QaProvider Int { evidence = Axiom }"#,
         assert!(during.contains(&provider_axiom_id));
 
         let head_id = env.globals["QaProviderType"];
+        let transient_class_id = env.globals["QaRollbackClass"];
         let key = (class_id, InstanceHeadKey::Global(head_id));
         let instance_id = env.class_env.instances_by_id[&key].instance_id;
+        let module_id = env.class_env.current_module;
+        assert_eq!(env.class_env.global_modules.get(&head_id), Some(&module_id));
+        assert_eq!(
+            env.class_env.global_modules.get(&transient_class_id),
+            Some(&module_id)
+        );
+        assert_eq!(
+            env.class_env.global_modules.get(&instance_id),
+            Some(&module_id)
+        );
+        assert!(env.class_env.class("QaRollbackClass").is_some());
+        assert!(env.class_env.class_by_id(transient_class_id).is_some());
         removed_head = Some(head_id);
+        removed_class = Some(transient_class_id);
         removed_instance = Some(instance_id);
         let failure = env
             .elaborate_decl_v1("const ac0_bad_after_instance : Bool = MkQaProviderType")
@@ -274,10 +305,30 @@ instance QaProvider Int { evidence = Axiom }"#,
         })
     ));
     let head_id = removed_head.expect("provider head was registered");
+    let transient_class_id = removed_class.expect("transient class was registered");
     let instance_id = removed_instance.expect("provider instance was registered");
     let removed_key = (class_id, InstanceHeadKey::Global(head_id));
 
-    assert_eq!(env.env.next_global_id(), head_id);
+    assert_eq!(env.env.next_global_id(), transaction_start_id);
+    assert_eq!(transient_class_id, transaction_start_id);
+    assert!(!env.class_env.global_modules.contains_key(&head_id));
+    assert!(!env
+        .class_env
+        .global_modules
+        .contains_key(&transient_class_id));
+    assert!(!env.class_env.global_modules.contains_key(&instance_id));
+    assert_eq!(
+        env.class_env.global_modules.get(&stable_instance_id),
+        Some(&stable_instance_module)
+    );
+    assert_eq!(
+        env.class_env.global_modules.get(&class_id),
+        Some(&stable_class_module)
+    );
+    assert!(env.class_env.class("QaProvider").is_some());
+    assert!(env.class_env.class_by_id(class_id).is_some());
+    assert!(env.class_env.class("QaRollbackClass").is_none());
+    assert!(env.class_env.class_by_id(transient_class_id).is_none());
     assert!(!env.globals.contains_key("QaProviderType"));
     assert!(env.env.lookup(instance_id).is_none());
     assert!(!env.class_env.instances_by_id.contains_key(&removed_key));
@@ -310,10 +361,25 @@ instance QaProvider Int { evidence = Axiom }"#,
         Some(Decl::Opaque { name, .. }) if name == "QaProvider.Int.evidence"
     ));
 
-    let replacement = env
-        .elaborate_decl_v1("const QaProviderType : Type = Int")
-        .expect("rolled-back head ID is reusable");
-    assert_eq!(replacement.def_id, head_id);
+    let replacements = env
+        .elaborate_file_v1(
+            "class QaReplacementClass A { marker : Top }\n\
+             data QaProviderType = MkQaProviderType",
+        )
+        .expect("rolled-back class and data IDs are reusable");
+    assert_eq!(replacements[0].def_id, transient_class_id);
+    assert_eq!(replacements[1].def_id, head_id);
+    assert!(env.class_env.class("QaReplacementClass").is_some());
+    assert!(env.class_env.class_by_id(transient_class_id).is_some());
+    assert!(env.class_env.class("QaRollbackClass").is_none());
+    assert_eq!(
+        env.class_env.global_modules.get(&transient_class_id),
+        Some(&stable_class_module)
+    );
+    assert_eq!(
+        env.class_env.global_modules.get(&head_id),
+        Some(&stable_class_module)
+    );
     assert!(!env.class_env.instances_by_id.contains_key(&removed_key));
     assert_eq!(
         env.class_env
@@ -324,4 +390,25 @@ instance QaProvider Int { evidence = Axiom }"#,
         env.class_env.instances_by_id[&stable_key].instance_id,
         stable_instance_id
     );
+}
+
+/// Promise class: durable ClassEnv scrubber invariant for direct-use IDs.
+/// MEASURED: the scrubber receives one removed and one stable ID already in its
+/// direct-use set, then removes only the listed ID.
+/// CLAIMED: direct-use instance identities follow the same deletion-only
+/// filter as the other ClassEnv ID planes.
+/// THE GAP: production carries direct-use IDs from already-loaded exports
+/// before declaration marks; this unit pin tests the scrub arm, not that loader
+/// population path.
+#[test]
+fn class_env_scrub_global_ids_filters_direct_use_instance_ids() {
+    let removed = GlobalId(41);
+    let stable = GlobalId(42);
+    let mut class_env = crate::classes::ClassEnv::sentinel();
+    class_env.direct_use_instances.extend([removed, stable]);
+
+    class_env.scrub_global_ids(&HashSet::from([removed]));
+
+    assert!(!class_env.direct_use_instances.contains(&removed));
+    assert!(class_env.direct_use_instances.contains(&stable));
 }
