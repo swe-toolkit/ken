@@ -2,7 +2,7 @@
 //! Spec: 20-surface/21 §2 and 20-verification/22 §2.1. A checked arm
 //! introduces the source result's predicate, not its inferred carrier.
 
-use ken_elaborator::{ElabEnv, ElabResult};
+use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
 use ken_kernel::{GlobalId, Term};
 
 const FIVE: &str = "def Five = { n : Int | Equal Int n 5 }\n";
@@ -115,6 +115,86 @@ fn indexed_branch_obligations_survive_heterogeneous_constructor_paths() {
         ),
         3,
     );
+}
+
+/// The match can be nested under another result producer; only new values
+/// incur an introduction. A recursive call already checked at Five does not
+/// introduce Five again. Result predicates have an independent obligation
+/// per leaf and do not consume the named refinement obligation.
+#[test]
+fn surrounding_if_let_result_predicates_and_recursive_calls() {
+    let matrix = "match ys { Nil ↦ x; Cons True t ↦ x; Cons False t ↦ x }";
+    checked(
+        &format!(
+            "{FIVE}fn g (x : Int) (ys : List Bool) (b : Bool) : Five =\n\
+        if b then {matrix} else x"
+        ),
+        4,
+    );
+    checked(
+        &format!(
+            "{FIVE}fn g (x : Int) (ys : List Bool) : Five =\n\
+        let y : Five = {matrix} in y"
+        ),
+        3,
+    );
+    let (_, ensured) = checked(
+        &format!(
+            "{FIVE}fn g (x : Int) (ys : List Bool) :\n\
+        Five ensures Equal Int result x = {matrix}"
+        ),
+        6,
+    );
+    assert_eq!(
+        ensured
+            .obligations
+            .iter()
+            .filter(|o| matches!(o.kind, ObligationKind::RefinementIntroduction))
+            .count(),
+        3
+    );
+    assert_eq!(
+        ensured
+            .obligations
+            .iter()
+            .filter(|o| matches!(o.kind, ObligationKind::Ensures))
+            .count(),
+        3
+    );
+    checked(
+        &format!(
+            "{FIVE}fn rec (n : Nat) (x : Int) : Five =\n\
+        match n {{ Zero ↦ x; Suc m ↦ rec m x }}"
+        ),
+        1,
+    );
+    checked(
+        &format!(
+            "{FIVE}{INDEX}fn g (n : Nat) (i : Ix n) (x : Int) : Five =\n\
+        match i {{ Z xs ↦ match xs {{ Nil ↦ x; Cons y ys ↦ x }}; S ys ↦ 6 }}"
+        ),
+        3,
+    );
+}
+
+/// A `requires` goal uses the same indexed branch context but is not a
+/// refinement introduction; filtering malformed constructor equations must
+/// not disable this independent obligation channel.
+#[test]
+fn indexed_branch_requires_remains_a_live_obligation() {
+    let (_, result) = checked(
+        &format!(
+            "{FIVE}{INDEX}\
+        fn need (x : Int) : Int requires Equal Int x 5 = x\n\
+        fn g (n : Nat) (i : Ix n) (x : Int) : Int =\n\
+        match i {{ Z xs ↦ need x; S ys ↦ x }}"
+        ),
+        1,
+    );
+    assert!(matches!(
+        result.obligations[0].kind,
+        ObligationKind::Requires
+    ));
 }
 
 fn contains_constructor(term: &Term, constructor: GlobalId) -> bool {
