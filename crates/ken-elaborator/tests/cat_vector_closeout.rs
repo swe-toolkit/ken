@@ -259,6 +259,7 @@ fn vector_uses_canonical_checked_provider_identities() {
     ] {
         expected_external.insert(via_vector.globals[name]);
     }
+    expected_external.insert(via_vector.globals["Data.Collections.List.length"]);
     assert_eq!(
         external, expected_external,
         "Vector's checked external identity inventory changed"
