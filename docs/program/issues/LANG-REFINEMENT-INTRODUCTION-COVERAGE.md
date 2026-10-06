@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-INTRODUCTION-COVERAGE
 title: "LANG-REFINEMENT-INTRODUCTION-OBLIGATION emits a named refinement's obligation only where the context carries the refinement table and the alias body is literally a refinement. Instance, class, record and expression-entry contexts, alias chains and named function-valued refinements still accept an introduction with no obligation and no refusal. Close every named introduction the way the literal form already is"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -85,3 +85,19 @@ Architect rules the mechanism at AC-0.
 - Any kernel, `trusted_base()` or spec change.
 - A checked catalog, library or example program gains an obligation it
   cannot discharge: stop to the Architect with it.
+
+## Closeout
+
+Merged `4ae2f60cf` from exact `860b743f1` (PR #4540, main push run
+37425888888). Language QA `evt_235pp5q7xs42v`, Architect
+`evt_3aa915qna396t`, Decision `dec_2n4y92z38q0m4`.
+
+- The refinement table is a required `ElabCtx::new` argument, so every
+  context carries it by construction; each context's `PremiseHoles` policy
+  decides the named outcome as for the literal form.
+- An alias of a named refinement maps to its root, and lookups go through
+  the root. A refinement nested anywhere but outermost in an alias body is
+  refused at the alias declaration.
+- Carry: the literal-side fail-opens F-A, F-B and F-C go to
+  `LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION`; F-C is a named `#[ignore]`
+  row there.
