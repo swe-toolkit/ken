@@ -484,6 +484,17 @@ fn summarize_result_phase(
                 },
             )?;
             result.callable_result = None;
+            // A planned continuation-call producer is replaced in lowering by the
+            // call's declared-unit result (core.rs claim / fused outer realization),
+            // so the frame consuming this position receives a carrier word. Arguments
+            // are still summarized above: lowering lowers them before it claims.
+            if functionized_units
+                && result.continues
+                && matches!(expr, RuntimeExpr::Construct { .. })
+                && plan.is_continuation_call_producer(origin)?
+            {
+                result.phase = ResultPhase::CarrierRequired;
+            }
             result
         }
         RuntimeExpr::Record { fields } => {

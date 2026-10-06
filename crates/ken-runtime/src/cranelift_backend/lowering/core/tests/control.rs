@@ -23,6 +23,138 @@ use crate::cranelift_backend::lowering::units::{
 };
 
 
+/// Promise class: durable invariant. The real producer-Match consumer is
+/// called on a planned Match whose scrutinee is bound to a carried word, with
+/// one pending invocation-return frame. MEASURED: depth 8 enters its case
+/// lowering and returns its declared trap; depth 9 refuses at the R6 guard.
+/// CLAIMED: the producer route admits the limit and fails closed on the first
+/// excess. THE GAP: depth is preloaded in a test Lowering, not constructed
+/// from eight nested source Matches. The empty-case default shows guard
+/// admission, not actual suffix continuation; the Option parity row exercises
+/// a nonempty producer suffix at its naturally reached depth of one.
+#[test]
+fn carried_producer_match_reentry_admits_limit_and_refuses_first_excess() {
+    let source = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Var(0)),
+        cases: Vec::new(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "bounded producer-case trap".to_string(),
+        },
+    };
+    let (plan, origin) = planned_root_occurrence(&source);
+    let RuntimeExpr::Match { scrutinee, cases, default } = &source else {
+        unreachable!("the fixture is a Match")
+    };
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    for (depth, rejected) in [
+        (CARRIED_SUFFIX_REENTRY_LIMIT - 1, false),
+        (CARRIED_SUFFIX_REENTRY_LIMIT, true),
+    ] {
+        let mut lowering = super::constructors::bare_carrier_test_lowering(&seed_env, plan.clone());
+        lowering.carried_suffix_reentries = depth;
+        let mut function = Function::new();
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut function, &mut context);
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+        let value = builder.ins().iconst(types::I64, 19);
+        let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+            CarriedBoundaryWord { word: value },
+        ))];
+        lowering.enter_source_occurrence_plan(origin).expect("the Match join is planned");
+        let result = lowering.lower_computational_producer_match(
+            &mut builder, origin, scrutinee, cases, default, &env,
+            &[EliminatorFrame::InvocationReturn],
+        );
+        assert_eq!(lowering.carried_suffix_reentries, depth, "balanced R6 guard");
+        if rejected {
+            assert!(matches!(result,
+                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "BoundaryCarrier", reason,
+                })) if reason == "a carried producer match's pending eliminators exceeded the bounded re-entry depth"
+            ), "the first excess must refuse at the producer guard");
+        } else {
+            assert!(matches!(result,
+                Ok(LoweringOperand::Specialized(Lowered::Trap(trap)))
+                    if trap.message == default.message
+            ), "at-limit producer Match must enter its declared case/default path");
+        }
+    }
+}
+
+/// Promise class: durable invariant. The same planned carried Match is
+/// consumed through the *ordinary* producer-stack arm, with one nonempty
+/// composed suffix. At depth 8 its declared default is reached; at depth 9
+/// only that arm's exact fail-closed refusal is returned. The test preloads
+/// nesting depth rather than claiming to construct eight source frames.
+#[test]
+fn carried_ordinary_suffix_reentry_admits_limit_and_refuses_first_excess() {
+    let source = RuntimeExpr::Match {
+        scrutinee: Box::new(RuntimeExpr::Var(0)),
+        cases: Vec::new(),
+        default: RuntimeTrap {
+            code: RuntimeTrapCode::PatternMatchFailure,
+            message: "bounded ordinary-case trap".to_string(),
+        },
+    };
+    let (plan, origin) = planned_root_occurrence(&source);
+    let RuntimeExpr::Match { cases, default, .. } = &source else {
+        unreachable!("the fixture is a Match")
+    };
+    let seed_env = NativeSeedEnvironment::empty(
+        crate::boundary_resource_profile::starter_smoke_profile(),
+    );
+    for (depth, rejected) in [
+        (CARRIED_SUFFIX_REENTRY_LIMIT - 1, false),
+        (CARRIED_SUFFIX_REENTRY_LIMIT, true),
+    ] {
+        let mut lowering = super::constructors::bare_carrier_test_lowering(&seed_env, plan.clone());
+        lowering.carried_suffix_reentries = depth;
+        let mut function = Function::new();
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut function, &mut context);
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+        let value = builder.ins().iconst(types::I64, 19);
+        let env = [LoweringEnvironmentBinding::Value(LoweringOperand::Carried(
+            CarriedBoundaryWord { word: value },
+        ))];
+        lowering.enter_source_occurrence_plan(origin).expect("the Match join is planned");
+        let frames = [
+            EliminatorFrame::Ordinary(OrdinaryEliminatorFrame {
+                cases,
+                default,
+                env: &env,
+                static_origin: origin,
+                retained_scrutinee_index: None,
+                deferred_constructor_case: None,
+            }),
+            EliminatorFrame::InvocationReturn,
+        ];
+        let result = lowering.lower_computational_match_value_composed(
+            &mut builder,
+            RoutedAnswer::direct(LoweringOperand::Carried(CarriedBoundaryWord { word: value })),
+            &frames,
+        );
+        assert_eq!(lowering.carried_suffix_reentries, depth, "balanced D2 guard");
+        if rejected {
+            assert!(matches!(result,
+                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "BoundaryCarrier", reason,
+                })) if reason.contains("a carried ordinary elimination's composed suffix exceeded")
+            ), "the first excess must refuse at the ordinary guard");
+        } else {
+            assert!(matches!(result,
+                Ok(LoweringOperand::Specialized(Lowered::Trap(trap)))
+                    if trap.message == default.message
+            ), "at-limit ordinary Match must enter its declared case/default path");
+        }
+    }
+}
+
 #[test]
 fn carrier_word_join_refuses_residual_predecessor_without_a_residual_plane() {
     // RT-CARRIER AC-2; durable invariant. MEASURED: the production join helper

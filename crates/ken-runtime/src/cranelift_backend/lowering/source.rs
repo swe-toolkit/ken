@@ -1722,6 +1722,18 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                 };
                             }
                             self.enter_source_occurrence_plan(static_origin)?;
+                            // A residual scrutinee is a carried child in residual encoding. Decode
+                            // it and take the Carried arm below, as every sibling scrutinee seat
+                            // already does (core.rs generic Match and producer fallback;
+                            // source.rs ordinary Match). Placed after the backedge forward and
+                            // fused takeover, which pass the operand on unchanged without
+                            // selecting a case.
+                            let value = match value {
+                                LoweringOperand::Residual(residual) => LoweringOperand::Carried(
+                                    self.decode_residual_child(builder, residual)?,
+                                ),
+                                other => other,
+                            };
                             #[cfg(test)]
                             d5a_trace(format!(
                                 "RT-D2 D COMPUTATIONAL-MATCH-SCRUTINEE consumed \
