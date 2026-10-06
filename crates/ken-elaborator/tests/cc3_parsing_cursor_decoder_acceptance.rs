@@ -279,9 +279,10 @@ fn neutralize_fixture_proofs(env: &ElabEnv, store: &mut EvalStore, names: &[&str
 /// Promise class: durable invariant.
 ///
 /// MEASURED: the literal expected population of dependency-loaded transparent
-/// Cursor bodies routes a saturated application of the base List `length`
-/// identity re-exported by Derived directly into the first argument of a saturated application of the
-/// exact `arg_cursor_normalize` identity. The retired local declaration is
+/// Cursor bodies route a saturated application of the base List `length`
+/// identity re-exported by Derived into the first argument of a saturated
+/// application of the exact `arg_cursor_normalize` identity. The retired local
+/// declaration is
 /// absent, no consumer-local qualified-name trust is added, and a selective-
 /// import pair distinguishes the named binding from an available sibling.
 ///

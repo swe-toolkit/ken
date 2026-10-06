@@ -35,9 +35,9 @@ fn base_env() -> ElabEnv {
 }
 
 // MEASURED: real roots loading locates each requested operation at its checked
-// owner (base List for length, Derived for the others); owner-local examples
-// reference those GlobalIds, and checked reject fences
-// fail without becoming package exports or introducing trust.
+// owner (base List for length, Derived for the others). Owner-local examples
+// cite those GlobalIds; checked reject fences fail without becoming package
+// exports or introducing trust.
 // CLAIMED: the two selected DS4 functions exercise Derived's private laws
 // without relying on the synthetic flat-alias fixture.
 // THE GAP: a `ken reject` fence checks rejection, not its diagnostic kind;
