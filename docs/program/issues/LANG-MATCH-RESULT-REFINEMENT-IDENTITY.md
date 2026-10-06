@@ -1,6 +1,6 @@
 ---
 id: LANG-MATCH-RESULT-REFINEMENT-IDENTITY
-title: "A match through the nested-pattern matrix or the indexed dependent-branch path checks its leaves against an inferred or δ-simplified substitute for the result type, so a refinement result is dropped even at the top level: fn g (n : Nat) (i : Ix n) (x : Int) : Five = match i { Z xs ↦ x; S ys ↦ 6 } checks with zero obligations and returns 6 as a Five. Check every leaf against the result type as written, under substitution only"
+title: "A match through the nested-pattern matrix or the indexed dependent-branch path checks its leaves against an inferred or δ-simplified substitute for the result type, so a refinement result is dropped even at the top level: fn g (n : Nat) (i : Ix n) (x : Int) : Five = match i { Z xs ↦ x; S ys ↦ 6 } checks with zero obligations and returns 6 as a Five. Check every leaf against the result type with its refinement constants kept rigid"
 status: active
 owner: language
 size: M
@@ -17,8 +17,8 @@ origin: "Architect ruling evt_6qq1wtsekh42j on LANG-NAMED-REFINEMENT-TYPE-ARGUME
 ## Objective
 
 Every match leaf and branch body is checked by `check` against the match's
-result type as written, instantiated per branch by substitution only, so a
-refinement result introduces its predicate on every route.
+result type, instantiated per branch with every refinement-rooted constant
+kept rigid, so a refinement result introduces its predicate on every route.
 
 ## Settled inputs (Architect ruling `evt_6qq1wtsekh42j`, measured on `f5d6d7f54`)
 
@@ -80,16 +80,16 @@ stop and report the mismatch.
 2. **The closure.**
    - With a seeded result slot, every leaf, the first included, goes through
      `check(cx, leaf, seed)`.
-   - The branch goal is the source expected type with the scrutinee and
-     indices substituted, computed by `subst` with no `whnf` or δ. Where goal
-     simplification must expose structure (index equations, convoy
-     premises), a refinement-rooted `Const` head stays rigid at every depth.
-   - At the lift arm (`:5411`) and the structured method (`:5583`), the
-     checking goal and `refined_target` are `subst_term_generalize` of the
-     weakened expected type, with no `simplify_branch_goal`. The `:7098`
-     `refined_target` write stores `expected_here`, unless D0 shows it is
-     unread. A corpus row that needs the simplified form is a stop; do not
-     reinstate simplify.
+   - **Simplification through one refinement-keeping entry** (hard stop 1
+     ruling `evt_6f7syasn73j1y`). Goal simplification stays: dependent
+     matches need beta, iota and δ of ordinary heads. A single entry,
+     `simplify_branch_goal_keeping_refinements`, abstracts each distinct
+     refinement-rooted `Const` to a fresh context variable, simplifies, and
+     instantiates back. The plain simplifier is private to its recursion,
+     and all seven external call sites (`:4043`, `:5411`, `:5583`, `:5722`,
+     `:5792`, `:7094`, `:7775`) go through the entry.
+   - The per-site de-simplification is reverted to the base shape. The
+     `names_source_refinement` rescue is deleted as redundant.
    - A sweep by mechanism, starting from `check_match_arm_result`,
      `compile_match_leaf`, `infer_match*`, `check_match_dependent`,
      `refined_target` and `ret_ty_slot`, states for each site where an arm,
@@ -108,24 +108,34 @@ Every row with `ken check`, base versus candidate.
   a `let`-bound match. At a bare `Five` result each leaves one obligation per
   leaf, including q4, q5, pa and pb. Base then candidate: r0 1 to 2, r1 1
   to 3, r2 1 to 3, r3 1 to 2.
+- **AC-1b (loss count).** The D0 loss instrument on the candidate records 0
+  refinement-rooted `Const` losses at every site over the prelude, the 81
+  roots, the 55 packages and the probes (base: 407 corpus and 345 package
+  losses at `:7094`/`:7098`). `Map.ken.md` exits 0 with 0 open.
 - **AC-2 (controls).** The four control counts above are unchanged. Corpus
   and catalog rows move only as D0 reported and the Architect judged.
 - **AC-3 (mutation, QA).**
   - M-first-leaf (infer the first leaf again) returns q4 and pa to 0.
-  - M-goal-whnf (unfold refinement `Const`s in goal simplification) returns
-    q5 and pb to 0.
-  - M-structured-simplify (simplify again at `:5583` only) returns r3 to 1.
-  - M-lift-simplify (simplify again at `:5411` only) returns r2 to 1. If
-    r2's inner match does not reach `:5411`, use a D0 row that does, or
-    record "not expressible" with the D0 count. A mutant that does not
-    redden is a stop.
+  - M-goal-whnf (the keeping entry calls the unguarded simplifier) returns
+    q5, pb and r0 to r3 to their base counts.
+  - The sweep table records the candidate arrival count at `:5411`.
 
 The `List Five` result on each route belongs to
 `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT`, refused by its guard once both land.
 
 ## Stop conditions
 
-- A swept site that checks against anything other than the as-written result
-  under substitution, and is not repaired here: stop with the site.
+- A swept site that checks against anything other than the result type with
+  its refinement constants rigid, and is not repaired here: stop with the
+  site.
+- A row that needs a structural read through a refinement whose carrier is a
+  Pi, Sigma or Eq: stop with the row.
 - A corpus or catalog row that moves outside what D0 reported.
 - Any kernel, `trusted_base()` or spec change.
+
+## Symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. value checks against the unsimplified substituted goal lose structure that dependent matches rely on (a delta-exposed computed scrutinee in Map; motive beta and indices in q5) — keyed on goal reduction mode
+```

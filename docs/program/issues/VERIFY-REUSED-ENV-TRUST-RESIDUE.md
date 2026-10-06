@@ -94,3 +94,10 @@ diff** alongside verify QA, and the Architect gate stands.
 - Any kernel change beyond the removal-only `EnvMark` API.
 - A catalog, conformance or test consumer relies on the residue: stop to the
   Architect with the consumer (CHECKS 3).
+
+## Symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. an inner clone-restore replaced the environment under an outer mark, keyed on environment instance identity
+```
