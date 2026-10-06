@@ -381,11 +381,11 @@ pub struct GlobalEnv {
     checked_literals: HashMap<GlobalId, CheckedStringLiteral>,
 }
 
-// Value equality is the pre-existing structural environment comparison. The
-// ownership token and allocation-history tokens are deliberately excluded:
-// cloning preserves checked declarations/indexes but mints a different
-// transaction owner, and rollback history does not change the current checked
-// environment. Destructuring every field makes additions a review point.
+// Value equality compares checked declarations and indexes, not transaction
+// capabilities. The ownership token and allocation-history tokens are
+// deliberately excluded: cloning preserves the checked environment while it
+// mints a different owner. Destructuring every field makes additions a review
+// point.
 impl PartialEq for GlobalEnv {
     fn eq(&self, other: &Self) -> bool {
         let Self {
