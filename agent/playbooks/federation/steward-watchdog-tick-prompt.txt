@@ -6,8 +6,9 @@ interval. Do not switch providers or nudge seats against a quota.
 The `integrator` seat is retired. Never rouse, reseat, or route it.
 
 1. RESOURCE EMERGENCY. Check `free -h` and `df -h /workspaces/ken / /tmp`.
-Below 2G RAM or 5G filesystem free: reclaim safe aged scratch only; never a
-live seat's target or worktree.
+Below 2G RAM or 5G filesystem free: reclaim safe aged scratch and idle
+seats' targets (steward/worktree-hygiene.md); never a building seat's target
+or any worktree.
 
 2. HELD FINISHED WORK. Route any approved candidate waiting on the Steward.
 Confirm the lieutenant owns any SHA already marked `ROUTED:`.
