@@ -5362,8 +5362,9 @@ mod tests {
         );
     }
 
-    /// Durable source-derived proof pin: the prelude theorem's result type
-    /// depends on the `TransferCount` scrutinee and is spelled through `Prop`.
+    /// Durable source-derived proof pin (`14-inductive.md` §3 Ω-motive and
+    /// `46-checked-core-package.md` §1.2 checked body views): the prelude
+    /// theorem's result type depends on `TransferCount` through `Prop`.
     /// Unlike the synthetic alias reader pin, this reaches the full delivered
     /// native package of an elaborated host program and the admission fan-in.
     #[test]

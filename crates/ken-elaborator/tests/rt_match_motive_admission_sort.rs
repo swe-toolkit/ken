@@ -1,5 +1,6 @@
 //! Elaborated-source controls for checked-core Match-motive admission.
-//! These assert the body-view boundary rather than checking repository text.
+//! `spec/40-runtime/46-checked-core-package.md` §1.2 defines the body-view
+//! fail-closed boundary; `spec/10-kernel/14-inductive.md` §3 admits Ω motives.
 
 use ken_elaborator::checked_core::{
     checked_core_declaration_body_view, CheckedCoreBodyViewError, CheckedCoreBodyViewSelection,
