@@ -140,6 +140,32 @@ fn rollback_clears_public_and_certificate_registries() {
     assert_eq!(env.int_lit_type(), None);
 }
 
+/// Promise class: durable EnvMark boundary invariant.
+/// MEASURED: rollback and reallocation preserve the same ID count but replace
+/// the allocation incarnation; the stale mark refuses without changing env.
+/// CLAIMED: marks distinguish a reused ID from its former prefix position.
+/// THE GAP: this exercises a one-ID replacement; the sibling test covers a
+/// replacement that consumes constructor IDs.
+#[test]
+fn stale_mark_refuses_single_id_replacement_after_rollback() {
+    let mut env = GlobalEnv::new();
+    let earlier = env_mark(&env);
+    let old = postulate(&mut env, "old one-ID prefix");
+    let stale = env_mark(&env);
+    rollback_to_mark(&mut env, earlier).expect("earlier same-env mark");
+
+    let replacement = postulate(&mut env, "replacement one-ID prefix");
+    assert_eq!(replacement, old, "the allocator reuses the removed ID");
+    let before_rejection = env.clone();
+    let error = rollback_to_mark(&mut env, stale)
+        .expect_err("a mark for the old allocation prefix is stale after ID reuse");
+    assert!(matches!(error, KernelError::IllFormedDecl(message)
+        if message == "environment mark is not a prefix of the current environment"));
+    assert_eq!(env, before_rejection);
+    assert_eq!(env.next_global_id(), before_rejection.next_global_id());
+    assert!(env.trusted_base().contains(&replacement));
+}
+
 #[test]
 fn stale_mark_cannot_rewind_past_replacement_constructor_ids() {
     let mut env = GlobalEnv::new();
