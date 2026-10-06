@@ -1318,6 +1318,27 @@ fn refine_let_rhs(
     Ok(())
 }
 
+/// Spec 22 §3: relate a let binder to its RHS for obligations inside the body.
+/// Both the RHS and its type live before the binder, so weaken them once before
+/// forming the equation with the new binder (`Var(0)`). Proof terms classify
+/// by Ω and need no equation under definitional proof irrelevance. An unknown
+/// classifier leaves the context too weak, never too strong. This logical
+/// hypothesis does not enter the emitted `Term::Let`.
+#[inline(never)]
+fn let_equation(cx: &ElabCtx<'_>, rhs_ty: &Term, rhs_core: &Term) -> Option<Term> {
+    let ty = cx.metas.zonk_term(rhs_ty);
+    let informative = kernel_infer_current(cx, &ty)
+        .ok()
+        .is_some_and(|sort| matches!(whnf(cx.env, &cx.ctx, &sort), Term::Type(_)));
+    informative.then(|| {
+        Term::Eq(
+            Box::new(weaken(&ty, 1)),
+            Box::new(Term::var(0)),
+            Box::new(weaken(&cx.metas.zonk_term(rhs_core), 1)),
+        )
+    })
+}
+
 /// Check a local `let` outside `check`'s always-paid recursive frame. The
 /// helper remains live only for an actual `RLet`; unrelated deep match trees
 /// pay the original single-call dispatch frame.
@@ -1333,8 +1354,14 @@ fn check_let(
 ) -> Result<Term, ElabError> {
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
+    let equation = let_equation(cx, &rhs_ty, &rhs_core);
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
+    let path_base = cx.path_conditions.len();
+    if let Some(equation) = equation {
+        cx.path_conditions.push((equation, cx.ctx.len()));
+    }
     let body_result = check_result_position(cx, body, &weaken(expected, 1), span, result_predicates);
+    cx.path_conditions.truncate(path_base);
     cx.ctx.pop();
     let body_core = body_result?;
     Ok(Term::Let {
@@ -10267,8 +10294,14 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RLet(_x, ty_opt, rhs, body, span) => {
             let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
+            let equation = let_equation(cx, &rhs_ty, &rhs_core);
             cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
+            let path_base = cx.path_conditions.len();
+            if let Some(equation) = equation {
+                cx.path_conditions.push((equation, cx.ctx.len()));
+            }
             let body_result = infer(cx, body);
+            cx.path_conditions.truncate(path_base);
             cx.ctx.pop();
             let (body_core, body_ty) = body_result?;
             let result_ty = subst0(&body_ty, &rhs_core);
