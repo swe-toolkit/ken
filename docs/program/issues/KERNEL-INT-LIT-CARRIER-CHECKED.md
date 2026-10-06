@@ -1,7 +1,7 @@
 ---
 id: KERNEL-INT-LIT-CARRIER-CHECKED
 title: "Code outside the kernel can make every IntLit check at any type, because GlobalEnv::register_int_lit_type is pub and unchecked. Register the Int literal carrier through a checked kernel entry point, as the String and Char carriers already are, and make the raw setter crate-private"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -77,3 +77,17 @@ stop and report the mismatch.
   to the Architect with the registrant as found.
 - Any change to what the kernel accepts for a correctly registered carrier,
   or any spec change: stop to the Architect.
+
+## Closeout
+
+Merged `79c392063` from exact `a1328e1cb` (PR #4538, main push run
+37411694304). Kernel QA `evt_ca3jsrxpshah`, Architect `evt_7z7g8kgk04z84`,
+Decision `dec_67mnd7jb463qb`.
+
+- `register_checked_int_lit_carrier` refuses unless the id is a live
+  `OpaqueType` primitive with no level parameters whose declared type whnfs
+  to `Type ℓ`, and no carrier is registered. The raw setter is `pub(crate)`
+  and runs only after every check.
+- IntLit typing, `eq_reduce` and `trusted_base()` are unchanged.
+- Carry: the String carrier has the same gap, framed as
+  `KERNEL-STRING-CARRIER-CHECKED-SORT`.

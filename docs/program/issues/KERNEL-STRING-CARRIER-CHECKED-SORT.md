@@ -1,7 +1,7 @@
 ---
 id: KERNEL-STRING-CARRIER-CHECKED-SORT
 title: "register_checked_string_carrier checks only that the id is a Primitive with OpaqueType reduction, so it admits the two shapes KERNEL-INT-LIT-CARRIER-CHECKED's respin closed for Int: a value tagged OpaqueType, whose type is not a Type, and a polymorphic primitive. Require a Type-sorted monomorphic carrier the same way"
-status: ready
+status: active
 owner: kernel
 size: S
 tier: T1
