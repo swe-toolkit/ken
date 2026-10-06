@@ -29,10 +29,7 @@ proc eprintLine (text : String) : IO (Result IOError Unit) visits [Console] =
 
 pub theorem print_write_tree
       (text : String)
-    : Equal
-        (IO (Result IOError Unit))
-        (print text)
-        (console_write_tree Stdout (bytes_encode text)) =
+    : Equal (IO (Result IOError Unit)) (print text) (write Stdout (bytes_encode text)) =
   console_tree_refl (IO (Result IOError Unit)) (print text)
 
 pub theorem print_line_write_tree
@@ -40,15 +37,12 @@ pub theorem print_line_write_tree
     : Equal
         (IO (Result IOError Unit))
         (printLine text)
-        (console_write_tree Stdout (console_line_payload text)) =
+        (write Stdout (console_line_payload text)) =
   console_tree_refl (IO (Result IOError Unit)) (printLine text)
 
 pub theorem eprint_write_tree
       (text : String)
-    : Equal
-        (IO (Result IOError Unit))
-        (eprint text)
-        (console_write_tree Stderr (bytes_encode text)) =
+    : Equal (IO (Result IOError Unit)) (eprint text) (write Stderr (bytes_encode text)) =
   console_tree_refl (IO (Result IOError Unit)) (eprint text)
 
 pub theorem eprint_line_write_tree
@@ -56,16 +50,8 @@ pub theorem eprint_line_write_tree
     : Equal
         (IO (Result IOError Unit))
         (eprintLine text)
-        (console_write_tree Stderr (console_line_payload text)) =
+        (write Stderr (console_line_payload text)) =
   console_tree_refl (IO (Result IOError Unit)) (eprintLine text)
-
-fn console_write_tree (stream : Stream) (payload : Bytes) : IO (Result IOError Unit) =
-  Vis
-    ConsoleOp
-    console_resp
-    (Result IOError Unit)
-    (Write stream payload)
-    (λr. Ret ConsoleOp console_resp (Result IOError Unit) r)
 
 fn console_line_payload (text : String) : Bytes =
   bytes_concat
@@ -76,10 +62,13 @@ theorem console_tree_refl (a : Type) (x : a) : Equal a x x = Refl
 ```
 
 `print_write_tree`, `print_line_write_tree`, `eprint_write_tree`, and
-`eprint_line_write_tree` expose each helper's single `Write`, chosen stream,
-payload, and unchanged response in a checked interaction tree. The newline is
-encoded explicitly as character 10; these laws do not prove facts about the
-primitive encoder's output bytes.
+`eprint_line_write_tree` state that each helper is exactly one `write` to its
+stream with its exact payload, so it returns `write`'s `Result IOError Unit`
+unchanged. `write` is transparent, so each law also converts to the one-node
+interaction tree `Vis ConsoleOp console_resp (Result IOError Unit) (Write
+stream payload) (λr. Ret … r)`, and a client may state that tree and use the
+law directly. The newline is encoded explicitly as character 10; these laws
+do not prove facts about the primitive encoder's output bytes.
 
 The helpers preserve `write`'s total `Result IOError Unit`; broken pipes remain
 named values visible to callers rather than host exceptions.
