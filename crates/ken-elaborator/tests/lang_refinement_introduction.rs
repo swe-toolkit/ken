@@ -155,9 +155,8 @@ fn introductions_cover_literal_and_named_returns_lets_and_match_arms() {
         ("const literal_let : Int = let x : { x : Int | P x } = 5 in x", 1),
         ("const named_match : Pos = match True { True |-> 5 ; False |-> 6 }", 2),
         ("const let_match : Int = let y : Pos = match True { True |-> 5 ; False |-> 6 } in y", 2),
-        // Current literal site seed: §22 §2.2 per-leaf realization is a
-        // successor, not a conformance claim of this row.
-        ("const literal_let_match : Int = let y : { x : Int | P x } = match True { True |-> 5 ; False |-> 6 } in y", 1),
+        // A literal annotation checks each returned match value in its arm.
+        ("const literal_let_match : Int = let y : { x : Int | P x } = match True { True |-> 5 ; False |-> 6 } in y", 2),
         ("const plain_carrier : Int = 5", 0),
     ] {
         let result = env.elaborate_decl_v1(source)

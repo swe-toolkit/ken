@@ -367,6 +367,8 @@ struct MatchFrame {
     convoy_originals: HashSet<usize>,
     refined_target: Option<Term>,
     scrutinee_level: Option<usize>,
+    /// Result-position postconditions owned by this match, not its scrutinee.
+    result_predicates: Vec<ResultPredicate>,
 }
 
 #[inline(never)]
@@ -395,6 +397,7 @@ impl MatchFrame {
             convoy_originals: HashSet::new(),
             refined_target,
             scrutinee_level,
+            result_predicates: Vec::new(),
         }
     }
 }
@@ -406,6 +409,25 @@ pub(crate) enum PremiseHoles {
     /// An undischarged elaborator obligation is refused before a hole is
     /// declared, and a discharged one records nothing.
     Refused,
+}
+
+/// A postcondition carried through result positions and realized at leaves.
+#[derive(Clone)]
+struct ResultPredicate {
+    /// `lambda result. psi` in the context at `install_depth`.
+    predicate: Term,
+    install_depth: usize,
+    kind: ObligationKind,
+    recursive_self: Option<RecursiveSelf>,
+}
+
+#[derive(Clone)]
+struct RecursiveSelf {
+    id: GlobalId,
+    params: usize,
+    requires: usize,
+    /// The proposition in the parameter, requirement, result telescope.
+    psi: Term,
 }
 
 struct ElabCtx<'e> {
@@ -433,6 +455,8 @@ struct ElabCtx<'e> {
     /// Logical branch equations for refinement obligations; never used as
     /// unchecked evidence in the emitted program.
     path_conditions: Vec<(Term, usize)>,
+    /// One-shot result-position channel. Never visible to a subterm check.
+    result_predicates: Vec<ResultPredicate>,
     /// The typeclass registry, when available — needed only for `.field`
     /// Σ-record projection (`RExpr::RProj`, `33 §5.2` η). `None` in every
     /// elaboration path that predates class support and never projects
@@ -667,6 +691,7 @@ impl<'e> ElabCtx<'e> {
             obl_counter: 0,
             refinement_facts: None,
             path_conditions: Vec::new(),
+            result_predicates: Vec::new(),
             class_env: None,
             standard_operators: None,
             provenance: None,
@@ -1235,16 +1260,12 @@ fn prepare_let_rhs(
     match ty_opt {
         Some(ty) => {
             let ty_core = elab_type(cx, ty)?;
-            let rhs_core = check(cx, rhs, &ty_core, span)?;
-            let rhs_core = if matches!(ty, RType::RRefine(..)) {
-                let inferred = kernel_infer_current(cx, &rhs_core).map_err(|error| match error {
-                    CurrentKernelQueryError::View(error) => error,
-                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                        error, span: span.clone(),
-                    },
-                })?;
-                emit_refinement_introduction(cx, &ty_core, &inferred, rhs_core, span, Some(ty))?
-            } else { rhs_core };
+            let predicate = literal_result_predicate(cx, ty, &ty_core)?;
+            let rhs_core = if let Some(predicate) = predicate {
+                check_result_position(cx, rhs, &ty_core, span, &[predicate])?
+            } else {
+                check(cx, rhs, &ty_core, span)?
+            };
             Ok((rhs_core, ty_core))
         }
         None => infer(cx, rhs),
@@ -1295,11 +1316,12 @@ fn check_let(
     body: &RExpr,
     expected: &Term,
     span: &Span,
+    result_predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
-    let body_result = check(cx, body, &weaken(expected, 1), span);
+    let body_result = check_result_position(cx, body, &weaken(expected, 1), span, result_predicates);
     cx.ctx.pop();
     let body_core = body_result?;
     Ok(Term::Let {
@@ -1396,6 +1418,7 @@ fn check_if(
     else_branch: &RExpr,
     expected: &Term,
     span: &Span,
+    result_predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     let condition_core = elaborate_if_condition(cx, condition)?;
     let base = cx.path_conditions.len();
@@ -1404,14 +1427,14 @@ fn check_if(
         Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
         Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
     ), cx.ctx.len()));
-    let then_result = check(cx, then_branch, expected, then_branch.span());
+    let then_result = check_result_position(cx, then_branch, expected, then_branch.span(), result_predicates);
     cx.path_conditions.truncate(base);
     let then_core = then_result?;
     cx.path_conditions.push((Term::Eq(
         Box::new(bool_ty), Box::new(condition_core.clone()),
         Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
     ), cx.ctx.len()));
-    let else_result = check(cx, else_branch, expected, else_branch.span());
+    let else_result = check_result_position(cx, else_branch, expected, else_branch.span(), result_predicates);
     cx.path_conditions.truncate(base);
     let else_core = else_result?;
     make_if_elim(cx, condition_core, then_core, else_core, expected, span)
@@ -1832,7 +1855,88 @@ fn check_refined_string_literal(
     emit_refinement_introduction(cx, expected, &inferred, core, span, None)
 }
 
+/// An empty channel must not introduce an extra frame on every checked
+/// expression in a nested match. The nonempty route is cold and isolated.
+#[inline(always)]
+fn check_result_position(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    if predicates.is_empty() {
+        check(cx, expr, expected, span)
+    } else {
+        check_result_position_with_predicates(cx, expr, expected, span, predicates)
+    }
+}
+
+#[inline(never)]
+fn check_result_position_with_predicates(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    if !cx.result_predicates.is_empty() {
+        return Err(ElabError::Internal("result predicate escaped its owning check".into()));
+    }
+    cx.result_predicates.extend_from_slice(predicates);
+    let result = check(cx, expr, expected, span);
+    if !cx.result_predicates.is_empty() {
+        cx.result_predicates.clear();
+        return Err(ElabError::Internal("result predicate was not consumed".into()));
+    }
+    result
+}
+
+/// An arm body belongs to the innermost match frame. Synthetic/cloned arms
+/// have exactly the same obligation channel as that frame's original arms.
+/// Ordinary arms go directly to `check` without another repeating frame.
+#[inline(always)]
+fn check_match_arm_result(
+    cx: &mut ElabCtx<'_>, arm: &RMatchArm, expected: &Term, span: &Span,
+) -> Result<Term, ElabError> {
+    if cx.match_frames.last().is_none_or(|frame| frame.result_predicates.is_empty()) {
+        check(cx, &arm.body, expected, span)
+    } else {
+        check_match_arm_result_with_predicates(cx, arm, expected, span)
+    }
+}
+
+#[inline(never)]
+fn check_match_arm_result_with_predicates(
+    cx: &mut ElabCtx<'_>, arm: &RMatchArm, expected: &Term, span: &Span,
+) -> Result<Term, ElabError> {
+    let predicates = cx.match_frames.last()
+        .expect("result match arm has an owning frame")
+        .result_predicates.clone();
+    check_result_position_with_predicates(cx, &arm.body, expected, span, &predicates)
+}
+
+/// The only entry that forwards a pending predicate to a result-position form.
+#[inline(never)]
+fn check_with_result_predicates(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+) -> Result<Term, ElabError> {
+    let predicates = std::mem::take(&mut cx.result_predicates);
+    match expr {
+        RExpr::RIf { condition, then_branch, else_branch, span } =>
+            check_if(cx, condition, then_branch, else_branch, expected, span, &predicates),
+        RExpr::RLet(_, ty, rhs, body, span) =>
+            check_let(cx, ty, rhs, body, expected, span, &predicates),
+        RExpr::RMatch { scrut, equation, arms, span } =>
+            check_match_result(cx, scrut, equation.as_deref(), arms, expected, span, &predicates),
+        _ => {
+            let core = check(cx, expr, expected, span)?;
+            for predicate in &predicates {
+                emit_result_predicate(cx, predicate, &core, expected, span)?;
+            }
+            Ok(core)
+        }
+    }
+}
+
 fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Result<Term, ElabError> {
+    if !cx.result_predicates.is_empty() {
+        return check_with_result_predicates(cx, expr, expected, _span);
+    }
     // FRAME BUDGET: this match is reached by every checked expression in
     // every compile, and in an unoptimized build a new arm's locals are paid
     // by every call regardless of which arm runs (LANG-RECORD-STACK-OVERFLOW,
@@ -1893,7 +1997,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             then_branch,
             else_branch,
             span,
-        } => check_if(cx, condition, then_branch, else_branch, expected, span),
+        } => check_if(cx, condition, then_branch, else_branch, expected, span, &[]),
         RExpr::RNumLit(lit, num_span) => {
             check_refined_number_literal(cx, lit, expected, num_span)
         }
@@ -2021,7 +2125,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             }
         }
         RExpr::RLet(_name, ty_opt, rhs, body, span) => {
-            check_let(cx, ty_opt, rhs, body, expected, span)
+            check_let(cx, ty_opt, rhs, body, expected, span, &[])
         }
         RExpr::ROld(inner, span) => {
             let Some(pre_state) = cx.space_pre_state.clone() else {
@@ -2046,7 +2150,23 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             equation,
             arms,
             span,
-        } => {
+        } => check_match_result(cx, scrut, equation.as_deref(), arms, expected, span, &[]),
+        _ if cx.recursive_group.is_empty() => {
+            check_inferred_without_group_transport(cx, expr, expected)
+        }
+        _ => check_inferred_with_group_transport(cx, expr, expected),
+    }
+}
+
+/// Match setup and motive construction run with no result predicate. Only
+/// checked arm bodies receive it, including seeded general-matrix leaves.
+#[inline(never)]
+fn check_match_result(
+    cx: &mut ElabCtx<'_>, scrut: &RExpr, equation: Option<&str>,
+    arms: &[RMatchArm], expected: &Term, span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    {
             // Gate on PATTERN SHAPE, not goal-dependence: `check_match_
             // dependent` is correct whenever every arm's pattern is FLAT
             // (a constructor with only `Var`/`Wild` sub-patterns) —
@@ -2083,7 +2203,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                 matches!(head, Term::IndFormer { .. })
             };
             if dependent_eligible {
-                check_match_dependent(cx, scrut, equation.as_deref(), arms, expected, span)
+                check_match_dependent(cx, scrut, equation, arms, expected, span, predicates)
             } else if equation.is_some() {
                 Err(ElabError::TypeMismatch {
                     span: span.clone(),
@@ -2091,17 +2211,13 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                         .into(),
                 })
             } else {
-                let (core, inferred_ty) = infer_match(cx, scrut, arms, span, Some(expected))?;
+                let (core, inferred_ty) =
+                    infer_match_with_predicates(cx, scrut, arms, span, Some(expected), predicates)?;
                 unify_types(&mut cx.metas, expected, &inferred_ty);
                 // This is an inferred match, not the checked structural path;
                 // each branch has already been checked against its result.
                 emit_refinement_introduction(cx, expected, &inferred_ty, core, span, None)
             }
-        }
-        _ if cx.recursive_group.is_empty() => {
-            check_inferred_without_group_transport(cx, expr, expected)
-        }
-        _ => check_inferred_with_group_transport(cx, expr, expected),
     }
 }
 
@@ -4656,13 +4772,14 @@ fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
 
 /// The single mint point for obligation holes recorded in an `ElabCtx`'s
 /// `cx.obligations`: `requires` premises, partial-primitive side conditions
-/// (`+` overflow, `/` and `%` nonzero), and refinement introductions. In a
+/// (`+` overflow, `/` and `%` nonzero), refinement introductions, and
+/// contract `ensures` realized at result leaves. In a
 /// context whose obligations cannot reach a reporter
 /// (`PremiseHoles::Refused`) it refuses before `declare_postulate`, so no
 /// unreported hole enters the environment.
 ///
-/// Declaration-level producers (contract and space `ensures`, `prove`, law
-/// fields, FFI runtime checks) do not record into `cx.obligations`: each
+/// Other declaration-level producers (space `ensures`, `prove`, law fields,
+/// FFI runtime checks) do not record into `cx.obligations`: each
 /// builds its `Obligation` beside the mint and returns it in
 /// `ElabResult::obligations` to the declaration elaborator's caller, the same
 /// channel every `Reported` context's obligations take. Whether that caller
@@ -4930,6 +5047,7 @@ fn install_lift_binding(
 /// `All` evidence. The support constructors are aligned with the host
 /// constructors; their leading fields are the source fields and their trailing
 /// fields are the exact lifted evidence selected by the kernel producer.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn check_match_with_lift(
     cx: &mut ElabCtx,
@@ -4941,6 +5059,25 @@ fn check_match_with_lift(
     host_level_args: &[Level],
     host_params: &[Term],
     binding: LiftBinding,
+) -> Result<Term, ElabError> {
+    check_match_with_lift_with_predicates(
+        cx, arms, expected, span, scrut_core, host, host_level_args,
+        host_params, binding, &[],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn check_match_with_lift_with_predicates(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    expected: &Term,
+    span: &Span,
+    scrut_core: &Term,
+    host: &InductiveDecl,
+    host_level_args: &[Level],
+    host_params: &[Term],
+    binding: LiftBinding,
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     ensure_arm_ctors_belong_to_family(cx, arms, host, host.id)?;
     let support = binding
@@ -5074,7 +5211,9 @@ fn check_match_with_lift(
             });
         }
         let base = cx.ctx.len();
-        cx.match_frames.push(MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None));
+        let mut frame = MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None);
+        frame.result_predicates = predicates.to_vec();
+        cx.match_frames.push(frame);
         let mut domains = Vec::with_capacity(raw_domains.len());
         for (position, raw_domain) in raw_domains.iter().enumerate() {
             let domain = whnf(cx.env, &cx.ctx, raw_domain);
@@ -5189,7 +5328,13 @@ fn check_match_with_lift(
             ),
         );
         cx.match_frames.last_mut().expect("lifted arm frame").refined_target = Some(expected_here.clone());
-        let checked = check(cx, &arm.body, &expected_here, &arm.span);
+        let mut scrut_ty = Term::indformer(host.id, host_level_args.to_vec());
+        for param in host_params {
+            scrut_ty = Term::app(scrut_ty, param.clone());
+        }
+        let path_base = push_branch_path_condition(cx, &scrut_ty, scrut_core, &concrete, total, 0);
+        let checked = check_match_arm_result(cx, &arm, &expected_here, &arm.span);
+        cx.path_conditions.truncate(path_base);
 
         for source_field in evidence_positions {
             cx.lift_bindings.remove(&(base + source_field));
@@ -5269,6 +5414,7 @@ fn check_structured_constructor_method(
     motive: &Term,
     level_args: &[Level],
     shapes: &[RecursiveArgumentShape],
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     let constructor = &ind.constructors[ordinal];
     if !ind.indices.is_empty() {
@@ -5292,7 +5438,9 @@ fn check_structured_constructor_method(
         });
     }
     let base = cx.ctx.len();
-    cx.match_frames.push(MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None));
+    let mut frame = MatchFrame::new(base, cx.match_frames.len(), Some(expected.clone()), None);
+    frame.result_predicates = predicates.to_vec();
+    cx.match_frames.push(frame);
     let mut domains = Vec::with_capacity(raw_domains.len());
     for (position, raw_domain) in raw_domains.iter().enumerate() {
         let domain = whnf(cx.env, &cx.ctx, raw_domain);
@@ -5352,7 +5500,13 @@ fn check_structured_constructor_method(
         ),
     );
     cx.match_frames.last_mut().expect("structured arm frame").refined_target = Some(expected_here.clone());
-    let checked = check(cx, &arm.body, &expected_here, &arm.span);
+    let mut scrut_ty = Term::indformer(ind.id, level_args.to_vec());
+    for param in params {
+        scrut_ty = Term::app(scrut_ty, param.clone());
+    }
+    let path_base = push_branch_path_condition(cx, &scrut_ty, scrut_core, &concrete, total, 0);
+    let checked = check_match_arm_result(cx, arm, &expected_here, &arm.span);
+    cx.path_conditions.truncate(path_base);
 
     for shape in shapes {
         cx.lift_bindings.remove(&(base + shape.position));
@@ -5477,7 +5631,7 @@ fn check_generalized_branch_goal(
         } else {
             simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
         };
-        let mut body = check(cx, &arm.body, &expected, &arm.span)?;
+        let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         for restoration in restorations.into_iter().rev() {
             body = restoration.apply(body);
         }
@@ -5547,7 +5701,7 @@ fn check_generalized_branch_goal(
         } else {
             simplify_branch_goal(cx.env, &cx.ctx, &inner_goal)
         };
-        let mut body = check(cx, &arm.body, &expected, &arm.span)?;
+        let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         kernel_check_current(cx, &body, &expected).map_err(|error| match error {
             CurrentKernelQueryError::View(error) => error,
             CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
@@ -6153,7 +6307,7 @@ fn check_large_convoy_recursive_arm(
     let checked_base = (|| {
         let refined_target = cx.match_frames.last().and_then(|frame| frame.refined_target.clone())
             .ok_or_else(|| ElabError::Internal("large convoy arm lost its refined target".into()))?;
-        let core = check(cx, &arm.body, &refined_target, &arm.span)?;
+        let core = check_match_arm_result(cx, arm, &refined_target, &arm.span)?;
         let base = wrap_premise_lams_finalized(core, &source_domains, source_region);
         let base_ty = wrap_premise_pis_finalized(base_goal.clone(), &source_domains, source_region);
         validate_large_convoy_base(cx, &base, &base_ty, &arm.span)
@@ -6798,7 +6952,7 @@ fn check_dependent_branch_body(
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
-    let path_base = push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n);
+    let path_base = push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n, 0);
 
     let outcome = (|| {
         if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
@@ -6895,7 +7049,7 @@ fn check_dependent_branch_body(
         } else {
             &expected_unrefined
         };
-        let attempt = check(cx, &arm.body, source_expected, &arm.span).and_then(|checked| {
+        let attempt = check_match_arm_result(cx, arm, source_expected, &arm.span).and_then(|checked| {
             kernel_check_current(cx, &checked, &expected_unrefined)
                 .map(|()| checked)
                 .map_err(|error| match error {
@@ -6950,6 +7104,7 @@ fn push_branch_path_condition(
     scrut_core: &Term,
     concrete: &Term,
     n: usize,
+    future_fields: usize,
 ) -> usize {
     let path_base = cx.path_conditions.len();
     let path_eq = Term::Eq(
@@ -6957,7 +7112,9 @@ fn push_branch_path_condition(
         Box::new(weaken(scrut_core, n as i64)),
         Box::new(concrete.clone()),
     );
-    cx.path_conditions.push((path_eq, cx.ctx.len()));
+    // Matrix buckets install an equation before their method's field binders
+    // are entered; the proposition already names those future binders.
+    cx.path_conditions.push((path_eq, cx.ctx.len() + future_fields));
     path_base
 }
 
@@ -7163,14 +7320,14 @@ fn open_checked_constructor_arm_frame(
     sentinel_region: usize,
     target: &Term,
     scrutinee_level: Option<usize>,
+    predicates: &[ResultPredicate],
 ) -> Result<(), ElabError> {
     let start_level = cx.ctx.len();
-    cx.match_frames.push(MatchFrame::new(
-        start_level,
-        sentinel_region,
-        Some(target.clone()),
-        scrutinee_level,
-    ));
+    let mut frame = MatchFrame::new(
+        start_level, sentinel_region, Some(target.clone()), scrutinee_level,
+    );
+    frame.result_predicates = predicates.to_vec();
+    cx.match_frames.push(frame);
     for (j, domain) in ctor.args.iter().enumerate() {
         let raw_ty = subst_levels(
             &subst_outer(domain, ind.params.len(), params, j),
@@ -7195,6 +7352,7 @@ fn check_match_dependent(
     arms: &[RMatchArm],
     expected: &Term,
     span: &Span,
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     let hidden_group_result_refinement = equation.is_none()
         && !cx.recursive_group.is_empty()
@@ -7202,9 +7360,9 @@ fn check_match_dependent(
             .iter()
             .any(|arm| expression_mentions_recursive_group(cx, &arm.body));
     if hidden_group_result_refinement {
-        check_match_dependent_mode::<true>(cx, scrut, equation, arms, expected, span)
+        check_match_dependent_mode::<true>(cx, scrut, equation, arms, expected, span, predicates)
     } else {
-        check_match_dependent_mode::<false>(cx, scrut, equation, arms, expected, span)
+        check_match_dependent_mode::<false>(cx, scrut, equation, arms, expected, span, predicates)
     }
 }
 
@@ -7216,6 +7374,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
     arms: &[RMatchArm],
     expected: &Term,
     span: &Span,
+    predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
@@ -7288,16 +7447,10 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         if let Some(position) = frame.scrutinee_level {
             if let Some(binding) = cx.lift_bindings.get(&position).copied() {
                 if binding.support.is_some() {
-                    return check_match_with_lift(
-                        cx,
-                        arms,
-                        expected,
-                        span,
-                        &Term::var(cx.ctx.len() - 1 - position),
-                        &ind,
-                        &family_level_args,
-                        &params_terms,
-                        binding,
+                    return check_match_with_lift_with_predicates(
+                        cx, arms, expected, span,
+                        &Term::var(cx.ctx.len() - 1 - position), &ind,
+                        &family_level_args, &params_terms, binding, predicates,
                     );
                 }
             }
@@ -7413,6 +7566,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 &motive,
                 &family_level_args,
                 &shapes,
+                predicates,
             )?);
             continue;
         }
@@ -7440,6 +7594,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             sentinel_region,
             expected,
             frame.scrutinee_level,
+            predicates,
         ));
         let constructor_frame = frame_try!(build_dependent_constructor_frame(
             cx,
@@ -7500,7 +7655,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     Box::new(concrete.clone()),
                 );
                 cx.push_match_binder(eq_dom.clone(), MatchBinderOrigin::GeneratedEquation);
-                let body = frame_try!(check(cx, &arm.body, &weaken(&expected_here, 1), &arm.span,));
+                let body = frame_try!(check_match_arm_result(cx, arm, &weaken(&expected_here, 1), &arm.span));
                 cx.ctx.pop();
                 Term::lam(eq_dom, body)
             } else {
@@ -9890,21 +10045,15 @@ fn infer_ascription(
     cx: &mut ElabCtx<'_>,
     e: &RExpr,
     ty: &RType,
-    span: &Span,
+    _span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let ty_core = elab_type(cx, ty)?;
-    let e_core = check(cx, e, &ty_core, e.span())?;
-    if !matches!(ty, RType::RRefine(..)) {
-        return Ok((e_core, ty_core));
-    }
-    let inferred = kernel_infer_current(cx, &e_core).map_err(|error| match error {
-        CurrentKernelQueryError::View(error) => error,
-        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-            error,
-            span: span.clone(),
-        },
-    })?;
-    let e_core = emit_refinement_introduction(cx, &ty_core, &inferred, e_core, span, Some(ty))?;
+    let predicate = literal_result_predicate(cx, ty, &ty_core)?;
+    let e_core = if let Some(predicate) = predicate {
+        check_result_position(cx, e, &ty_core, e.span(), &[predicate])?
+    } else {
+        check(cx, e, &ty_core, e.span())?
+    };
     Ok((e_core, ty_core))
 }
 
@@ -11183,6 +11332,7 @@ fn check_contract_body(
     param_count: usize,
     requires: &[Term],
     span: &Span,
+    result_predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     let (param_types, carrier_result) = split_params(carrier_ty, param_count).ok_or_else(|| {
         ElabError::Internal("declaration parameter telescope is shorter than its source arity".into())
@@ -11218,7 +11368,7 @@ fn check_contract_body(
             cx.hidden_positions.push(position);
         }
         let body_ty = weaken(&carrier_result, requires.len() as i64);
-        let body_inner = check(cx, current, &body_ty, span)?;
+        let body_inner = check_result_position(cx, current, &body_ty, span, result_predicates)?;
         let mut full_body = body_inner.clone();
         for requirement in requires.iter().rev() {
             full_body = Term::lam(requirement.clone(), full_body);
@@ -11289,13 +11439,23 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
 /// Close a logical refinement goal over ordinary binders followed by branch
 /// equations and refined-parameter assumptions. The latter are assumptions
 /// only in the obligation, never unchecked evidence in an emitted program.
+/// Recursive-call contracts and path equations extend the obligation only;
+/// neither is evidence introduced into the emitted definition.
 #[inline(never)]
-fn close_refinement_goal(cx: &ElabCtx<'_>, goal: Term, proof: Option<Term>) -> (Term, Option<Term>) {
+fn close_refinement_goal_with(
+    cx: &ElabCtx<'_>, goal: Term, hypotheses: &[Term], proof: Option<Term>,
+) -> (Term, Option<Term>) {
     let count = cx.path_conditions.len();
-    let mut closed = weaken(&goal, count as i64);
+    let mut closed = weaken(&goal, (count + hypotheses.len()) as i64);
     let mut certificate = proof;
+    for (index, hypothesis) in hypotheses.iter().enumerate().rev() {
+        let domain = weaken(hypothesis, (count + index) as i64);
+        closed = Term::pi(domain.clone(), closed);
+        certificate = certificate.map(|term| Term::lam(domain, term));
+    }
     for (index, (condition, install_depth)) in cx.path_conditions.iter().enumerate().rev() {
-        let growth = cx.ctx.len() - install_depth;
+        let growth = cx.ctx.len().checked_sub(*install_depth)
+            .expect("path condition consumed before its field binders were entered");
         let domain = weaken(condition, (growth + index) as i64);
         closed = Term::pi(domain.clone(), closed);
         certificate = certificate.map(|term| Term::lam(domain, term));
@@ -11306,6 +11466,23 @@ fn close_refinement_goal(cx: &ElabCtx<'_>, goal: Term, proof: Option<Term>) -> (
         certificate = certificate.map(|term| Term::lam(stored.clone(), term));
     }
     (result, certificate)
+}
+
+#[inline(never)]
+fn literal_result_predicate(
+    cx: &mut ElabCtx<'_>, literal: &RType, expected: &Term,
+) -> Result<Option<ResultPredicate>, ElabError> {
+    let RType::RRefine(_, _, phi, _) = literal else { return Ok(None) };
+    let carrier = cx.metas.zonk_term(expected);
+    let install_depth = cx.ctx.len();
+    cx.ctx.push(carrier.clone());
+    let checked = elab_prop_at_omega(cx, phi, phi.span());
+    cx.ctx.pop();
+    Ok(Some(ResultPredicate {
+        predicate: Term::lam(carrier, checked?), install_depth,
+        kind: ObligationKind::RefinementIntroduction,
+        recursive_self: None,
+    }))
 }
 
 #[inline(never)]
@@ -11324,12 +11501,8 @@ fn emit_refinement_introduction(
             .cloned(),
         _ => None,
     };
-    let predicate = if let Some(RType::RRefine(_, _, phi, _)) = literal {
-        let carrier = cx.metas.zonk_term(expected);
-        cx.ctx.push(carrier.clone());
-        let checked = elab_prop_at_omega(cx, phi, phi.span());
-        cx.ctx.pop();
-        Some(Term::lam(carrier, checked?))
+    let predicate = if let Some(literal) = literal {
+        literal_result_predicate(cx, literal, expected)?.map(|p| p.predicate)
     } else {
         named
     };
@@ -11350,12 +11523,21 @@ fn emit_refinement_predicate(
     cx: &mut ElabCtx<'_>, predicate: Term, core: Term, span: &Span,
 ) -> Result<(), ElabError> {
     let goal = apply_refinement_predicate(predicate, core);
-    let (closed, _) = close_refinement_goal(cx, goal.clone(), None);
-    let proof = (0..cx.path_conditions.len())
+    emit_refinement_predicate_with(cx, goal, &[], span, ObligationKind::RefinementIntroduction)
+}
+
+#[inline(never)]
+fn emit_refinement_predicate_with(
+    cx: &mut ElabCtx<'_>, goal: Term, hypotheses: &[Term],
+    span: &Span, kind: ObligationKind,
+) -> Result<(), ElabError> {
+    let (closed, _) = close_refinement_goal_with(cx, goal.clone(), hypotheses, None);
+    let proof = (0..hypotheses.len() + cx.path_conditions.len())
         .map(Term::var)
         .chain(std::iter::once(Term::const_(cx.env.tt_id(), vec![])))
         .find_map(|candidate| {
-            let (_, certificate) = close_refinement_goal(cx, goal.clone(), Some(candidate));
+            let (_, certificate) =
+                close_refinement_goal_with(cx, goal.clone(), hypotheses, Some(candidate));
             let certificate = certificate?;
             kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
                 .ok().map(|_| certificate)
@@ -11365,13 +11547,72 @@ fn emit_refinement_predicate(
         // channel records nothing, so the environment is left unchanged.
         return Ok(());
     }
-    let hole_id =
-        declare_obligation_hole(cx, closed, span, ObligationKind::RefinementIntroduction)?;
+    let hole_id = declare_obligation_hole(cx, closed, span, kind)?;
     if let Some(proof) = proof {
         ken_kernel::check::admit_bodies(cx.env, &[(hole_id, proof)])
             .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
     }
     Ok(())
+}
+
+/// Do not walk into a leaf's own binders: their indices do not belong to the
+/// obligation context. A direct, fully-applied staged self is the only IH.
+#[inline(never)]
+fn recursive_call_hypotheses(rs: &RecursiveSelf, leaf: &Term) -> Vec<Term> {
+    fn collect(rs: &RecursiveSelf, term: &Term, out: &mut Vec<Term>) {
+        let mut args = Vec::new();
+        let mut head = term;
+        while let Term::App(f, arg) = head {
+            args.push(arg.as_ref().clone());
+            head = f;
+        }
+        if matches!(head, Term::Const { id, .. } if *id == rs.id)
+            && args.len() == rs.params + rs.requires
+        {
+            args.reverse();
+            let with_args = subst_outer(&rs.psi, args.len(), &args, 1);
+            let hypothesis = subst0(&with_args, term);
+            if !out.contains(&hypothesis) {
+                out.push(hypothesis);
+            }
+        }
+        match term {
+            Term::Pi(dom, _) | Term::Lam(dom, _) | Term::Sigma(dom, _) =>
+                collect(rs, dom, out),
+            Term::Let { ty, val, .. } => {
+                collect(rs, ty, out);
+                collect(rs, val, out);
+            }
+            other => {
+                for child in other.children() {
+                    collect(rs, child, out);
+                }
+            }
+        }
+    }
+    let mut hypotheses = Vec::new();
+    collect(rs, leaf, &mut hypotheses);
+    hypotheses
+}
+
+#[inline(never)]
+fn emit_result_predicate(
+    cx: &mut ElabCtx<'_>, predicate: &ResultPredicate, leaf: &Term,
+    result_ty: &Term, span: &Span,
+) -> Result<(), ElabError> {
+    let growth = cx.ctx.len().checked_sub(predicate.install_depth).ok_or_else(|| {
+        ElabError::Internal("result predicate escaped its installation context".into())
+    })?;
+    let value = if matches!(whnf(cx.env, &cx.ctx, result_ty), Term::Pi(..)) {
+        Term::Ascript(Box::new(leaf.clone()), Box::new(result_ty.clone()))
+    } else {
+        leaf.clone()
+    };
+    let goal = apply_refinement_predicate(weaken(&predicate.predicate, growth as i64), value);
+    let hypotheses = predicate.recursive_self.as_ref()
+        .map(|self_info| recursive_call_hypotheses(self_info, leaf))
+        .unwrap_or_default();
+    emit_refinement_predicate_with(cx, goal, &hypotheses, span, predicate.kind.clone())
 }
 
 // ----- declaration elaboration -----
@@ -16489,6 +16730,55 @@ pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
     }
 }
 
+/// Elaborate all postconditions before checking a declared body. Each
+/// predicate remains in the parameter, requirement, result telescope until
+/// one result-position leaf consumes it (`22 §2.2`).
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn prepare_contract_ensures(
+    env: &mut GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    class_env: &ClassEnv,
+    provenance: &mut Vec<crate::classes::InstanceResolution>,
+    standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
+    preconditions: &HashMap<GlobalId, (usize, usize)>,
+    local_dicts: &HashMap<String, (Term, Term, usize)>,
+    rdecl: &RDecl,
+    ensures: &[&RExpr],
+    param_types: &[Term],
+    requires: &[Term],
+    result_ty: &Term,
+    recursive_id: Option<GlobalId>,
+) -> Result<(Vec<ResultPredicate>, Vec<Obligation>), ElabError> {
+    let mut param_ctx = Context::new();
+    for param in param_types { param_ctx.push(param.clone()); }
+    let mut ens_ctx = param_ctx.clone();
+    for requirement in requires { ens_ctx.push(requirement.clone()); }
+    let install_depth = ens_ctx.len();
+    ens_ctx.push(result_ty.clone());
+    let mut predicates = Vec::new();
+    let mut obligations = Vec::new();
+    for ens in ensures {
+        let (psi, nested_obligations) = elab_in_ctx_at_omega(
+            env, globals, num_values, numeric_env, class_env, provenance,
+            standard_operators, preconditions, local_dicts, &ens_ctx,
+            requires, param_types.len(), ens, &rdecl.span, &rdecl.name,
+        )?;
+        absorb_obligations(&mut obligations, nested_obligations);
+        predicates.push(ResultPredicate {
+            predicate: Term::lam(result_ty.clone(), psi.clone()),
+            install_depth,
+            kind: ObligationKind::Ensures,
+            recursive_self: recursive_id.map(|id| RecursiveSelf {
+                id, params: param_types.len(), requires: requires.len(), psi,
+            }),
+        });
+    }
+    Ok((predicates, obligations))
+}
+
 /// Elaborate a `view` with `requires`/`ensures` clauses (`21 §6.3`).
 fn elaborate_view_with_spec(
     env: &mut GlobalEnv,
@@ -16510,11 +16800,22 @@ fn elaborate_view_with_spec(
         // Annotated contracts stage before checking their body so recursive
         // calls see the full type and all body holes share the admission rollback.
         let param_count = view_param_count(rdecl);
+        let mut all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
+        if let Some(phi) = rdecl.ty.as_ref().and_then(|ty| innermost_refine_pred(ty)) {
+            if rdecl.ty.as_ref().and_then(refine_return_depth) != Some(param_count) {
+                return Err(ElabError::TypeMismatch {
+                    span: rdecl.span.clone(),
+                    reason: "a refinement under a function-valued return type is not supported yet"
+                        .into(),
+                });
+            }
+            all_ensures.push(phi);
+        }
         let mut decl_obligations = Vec::new();
         let (
             full_body,
             _body_inner,
-            param_types,
+            _param_types,
             result_ty_under_requires,
             full_ty,
             pre_admit_id,
@@ -16573,6 +16874,13 @@ fn elaborate_view_with_spec(
             }
             pending = Some(staged);
             globals.insert(rdecl.name.clone(), id);
+            let (predicates, psi_obligations) = prepare_contract_ensures(
+                env, globals, num_values, numeric_env, class_env, provenance,
+                standard_operators, preconditions, local_dicts, rdecl,
+                &all_ensures, &param_types, &req_cores, &result_ty_under_requires,
+                is_recursive.then_some(id),
+            )?;
+            absorb_obligations(&mut decl_obligations, psi_obligations);
             let (full_body, body_inner) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, rdecl.name.clone())
@@ -16588,6 +16896,7 @@ fn elaborate_view_with_spec(
                     param_count,
                     &req_cores,
                     &rdecl.span,
+                    &predicates,
                 )?;
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
                 (
@@ -16629,6 +16938,7 @@ fn elaborate_view_with_spec(
                         param_count,
                         &req_cores,
                         &rdecl.span,
+                        &[],
                     )?;
                     (
                         full_body,
@@ -16701,90 +17011,39 @@ fn elaborate_view_with_spec(
             )
         };
 
-        let mut param_ctx = Context::new();
-        for parameter in &param_types {
-            param_ctx.push(parameter.clone());
-        }
-        let mut ens_goal_ctx = param_ctx.clone();
-        for requirement in &req_cores {
-            ens_goal_ctx.push(requirement.clone());
-        }
-        let mut ens_ctx = ens_goal_ctx.clone();
-        ens_ctx.push(result_ty_under_requires.clone());
-        // Phase 2 elaborates ensures in the same kernel context as the body:
-        // parameters, requires binders, then the result binder.
-
-        // Recover the body under parameter and requires binders from the full
-        // telescope, splitting first at the explicit parameter arity.
-        let body_after_params = strip_param_lams(&full_body, param_count).ok_or_else(|| {
-            ElabError::Internal("declaration body has fewer lambdas than its parameters".into())
-        })?;
-        let body_inner = strip_param_lams(&body_after_params, req_cores.len()).ok_or_else(|| {
-            ElabError::Internal("declaration body has fewer lambdas than its requires".into())
-        })?;
-
-        // Collect ensures: explicit clauses + implicit from return-type refinement (`22 §2.1`).
-        // A `{ x : A | φ }` return type is a refinement introduction at the body site;
-        // its predicate φ is an implicit ensures with the same ψ[body/result] structure.
-        let mut all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
-        if let Some(phi) = rdecl.ty.as_ref().and_then(|ty| innermost_refine_pred(ty)) {
-            if rdecl.ty.as_ref().and_then(refine_return_depth) != Some(param_count) {
-                return Err(ElabError::TypeMismatch {
-                    span: rdecl.span.clone(),
-                    reason: "a refinement under a function-valued return type is not supported yet"
-                        .into(),
+        // A type-inferred declaration has no expected carrier until after its
+        // body is inferred. Keep its existing straight-line fallback separate
+        // from the checked contract path; no annotated contract uses it.
+        if pre_admit_id.is_none() && !all_ensures.is_empty() {
+            let mut ens_ctx = Context::new();
+            for requirement in &req_cores { ens_ctx.push(requirement.clone()); }
+            let mut result_ctx = ens_ctx.clone();
+            result_ctx.push(result_ty_under_requires.clone());
+            for ens in &all_ensures {
+                let (psi, nested) = elab_in_ctx_at_omega(
+                    env, globals, num_values, numeric_env, class_env, provenance,
+                    standard_operators, preconditions, local_dicts, &result_ctx,
+                    &req_cores, 0, ens, &rdecl.span, &rdecl.name,
+                )?;
+                absorb_obligations(&mut decl_obligations, nested);
+                let value = if matches!(
+                    whnf(env, &ens_ctx, &result_ty_under_requires), Term::Pi(..)
+                ) {
+                    Term::Ascript(
+                        Box::new(_body_inner.clone()),
+                        Box::new(result_ty_under_requires.clone()),
+                    )
+                } else { _body_inner.clone() };
+                let closed = close_goal(&ens_ctx, &[], subst0(&psi, &value));
+                let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
+                    .map_err(|error| ElabError::KernelRejected {
+                        error, span: rdecl.span.clone(),
+                    })?;
+                decl_obligations.push(Obligation {
+                    id: decl_obligations.len() as u32, hole_id, goal_closed: closed,
+                    span: rdecl.span.clone(), kind: ObligationKind::Ensures,
                 });
             }
-            all_ensures.push(phi);
-        }
-
-        for ens in &all_ensures {
-            let (psi_core, psi_obligations) = elab_in_ctx_at_omega(
-                env,
-                globals,
-                num_values,
-                numeric_env,
-                class_env,
-                provenance,
-                standard_operators,
-                preconditions,
-                local_dicts,
-                &ens_ctx,
-                &req_cores,
-                param_ctx.len(),
-                ens,
-                &rdecl.span,
-                &rdecl.name,
-            )?;
-            absorb_obligations(&mut decl_obligations, psi_obligations);
-            // `psi_core` is in params + requires + result context. Substitute
-            // the body at its result type under the requires binders.
-            let result_is_function = matches!(
-                whnf(env, &ens_goal_ctx, &result_ty_under_requires),
-                Term::Pi(..)
-            );
-            let result_term = if result_is_function {
-                Term::Ascript(
-                    Box::new(body_inner.clone()),
-                    Box::new(result_ty_under_requires.clone()),
-                )
-            } else {
-                body_inner.clone()
-            };
-            let goal_open = subst0(&psi_core, &result_term);
-            let closed = close_goal(&ens_goal_ctx, &[], goal_open);
-            let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
-                .map_err(|e| ElabError::KernelRejected {
-                    error: e,
-                    span: rdecl.span.clone(),
-                })?;
-            decl_obligations.push(Obligation {
-                id: decl_obligations.len() as u32,
-                hole_id,
-                goal_closed: closed,
-                span: rdecl.span.clone(),
-                kind: ObligationKind::Ensures,
-            });
         }
 
         // Phase 4's full contract type and body were built before staging.
@@ -17440,18 +17699,6 @@ fn split_params(ty: &Term, n: usize) -> Option<(Vec<Term>, Term)> {
         current = codomain;
     }
     Some((domains, current.clone()))
-}
-
-/// Strip exactly `n` parameter lambdas; `None` when the body has fewer.
-fn strip_param_lams(term: &Term, n: usize) -> Option<Term> {
-    let mut current = term;
-    for _ in 0..n {
-        let Term::Lam(_, body) = current else {
-            return None;
-        };
-        current = body;
-    }
-    Some(current.clone())
 }
 
 /// Number of arrows `innermost_refine_pred` crosses to reach its refinement.
@@ -18221,7 +18468,7 @@ fn check_arm_at_matrix_leaf(
             .map(|guard| elaborate_if_condition(cx, guard))
             .transpose();
         let guard = guard_result?;
-        let body = check(cx, &arm.body, expected, &arm.body.span())?;
+        let body = check_match_arm_result(cx, arm, expected, &arm.body.span())?;
         Ok((guard, body))
     })();
     leave_pattern_alias_leaf(cx, scope);
@@ -18961,6 +19208,16 @@ fn consume_literal_column(row: RowState) -> RowState {
 /// Compile one literal column as ordered value tests plus an unguarded residual
 /// fallback. The fresh binder is an alignment device only: matching never adds
 /// a proof or refinement to `cx`.
+/// Boolean comparator decisions are the path facts of a literal matrix.
+/// A later literal is reached only when all earlier comparisons were false.
+fn push_literal_branch_condition(cx: &mut ElabCtx<'_>, condition: Term, truth: bool) {
+    let chosen = if truth { cx.numeric_env.bool_true_id } else { cx.numeric_env.bool_false_id };
+    cx.path_conditions.push((Term::Eq(
+        Box::new(Term::indformer(cx.numeric_env.bool_id, vec![])),
+        Box::new(condition), Box::new(Term::constructor(chosen, vec![])),
+    ), cx.ctx.len()));
+}
+
 #[inline(never)]
 #[allow(clippy::too_many_arguments)]
 fn compile_literal_column(
@@ -19048,6 +19305,7 @@ fn compile_literal_column(
         }
 
         let mut compiled = Vec::with_capacity(groups.len());
+        let mut prior_conditions: Vec<Term> = Vec::new();
         for (value, plan) in &groups {
             let branch_rows = rows
                 .iter()
@@ -19059,34 +19317,33 @@ fn compile_literal_column(
                 })
                 .map(|(row, _)| consume_literal_column(row.clone()))
                 .collect::<Vec<_>>();
-            let body = compile_match_matrix(
-                cx,
-                arms,
-                &col_types[1..],
-                &col_kinds[1..],
-                branch_rows,
-                real_depth_so_far + 1,
-                top_span,
-                root_frame_depth,
-                ret_ty_slot,
-                arm_used,
-                subsumed_by,
-            )?;
-            compiled.push((plan.condition(cx, Term::var(0))?, body));
+            let condition = plan.condition(cx, Term::var(0))?;
+            let path_base = cx.path_conditions.len();
+            for earlier in &prior_conditions {
+                push_literal_branch_condition(cx, earlier.clone(), false);
+            }
+            push_literal_branch_condition(cx, condition.clone(), true);
+            let checked = compile_match_matrix(
+                cx, arms, &col_types[1..], &col_kinds[1..], branch_rows,
+                real_depth_so_far + 1, top_span, root_frame_depth,
+                ret_ty_slot, arm_used, subsumed_by,
+            );
+            cx.path_conditions.truncate(path_base);
+            let body = checked?;
+            compiled.push((condition.clone(), body));
+            prior_conditions.push(condition);
         }
-        let mut body = compile_match_matrix(
-            cx,
-            arms,
-            &col_types[1..],
-            &col_kinds[1..],
-            residual_rows,
-            real_depth_so_far + 1,
-            top_span,
-            root_frame_depth,
-            ret_ty_slot,
-            arm_used,
-            subsumed_by,
-        )?;
+        let path_base = cx.path_conditions.len();
+        for earlier in &prior_conditions {
+            push_literal_branch_condition(cx, earlier.clone(), false);
+        }
+        let fallback = compile_match_matrix(
+            cx, arms, &col_types[1..], &col_kinds[1..], residual_rows,
+            real_depth_so_far + 1, top_span, root_frame_depth,
+            ret_ty_slot, arm_used, subsumed_by,
+        );
+        cx.path_conditions.truncate(path_base);
+        let mut body = fallback?;
         let ret_ty = ret_ty_slot
             .as_ref()
             .expect("literal compilation reaches a body leaf")
@@ -19622,6 +19879,33 @@ fn reuse_matrix_first_leaf(
     Ok(body)
 }
 
+// An annotated postcondition checks the first leaf against its seeded motive.
+// Keep this checked-only telescope work out of the ordinary inference leaf's
+// stack frame; most nested matrix compilations carry no result predicate.
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn check_matrix_first_result_leaf(
+    cx: &mut ElabCtx,
+    first_arm: &RMatchArm,
+    first_row: &RowState,
+    first_occurrences: &[Option<Term>],
+    real_depth_so_far: usize,
+    owner: usize,
+    ret_ty_slot: &Option<Term>,
+) -> Result<(Option<Term>, Term, Term), ElabError> {
+    let seed = ret_ty_slot.as_ref().ok_or_else(|| ElabError::Internal(
+        "result predicate on an unseeded match leaf needs a checked motive".into(),
+    ))?;
+    let depth = matrix_telescope_depth(cx, cx.matrix_entries[owner].outer_ctx_len)?;
+    let body_ty_ctx = weaken(seed, depth as i64);
+    let (guard, body) = check_arm_at_matrix_leaf(
+        cx, first_arm, first_row.arm_idx, first_occurrences, real_depth_so_far,
+        &first_row.virtual_surface_positions, &first_row.virtual_aliases,
+        &first_row.row_hidden_surface_positions, &body_ty_ctx,
+    )?;
+    Ok((guard, body, body_ty_ctx))
+}
+
 /// Compile one matrix leaf. Keeping guard-only vectors and conditionals in a
 /// non-recursive frame preserves the existing recursive matrix stack budget.
 #[inline(never)]
@@ -19682,16 +19966,21 @@ fn compile_match_leaf(
         return reuse_matrix_first_leaf(cx, owner, first_row.arm_idx);
     }
     let first_occurrences = first_row.leaf_binding_occurrences().to_vec();
-    let (first_guard, first_body, body_ty_ctx) = infer_arm_at_matrix_leaf(
-        cx,
-        &arms[first_row.arm_idx],
-        first_row.arm_idx,
-        &first_occurrences,
-        real_depth_so_far,
-        &first_row.virtual_surface_positions,
-        &first_row.virtual_aliases,
-        &first_row.row_hidden_surface_positions,
-    )?;
+    let first_arm = &arms[first_row.arm_idx];
+    let has_result_predicate = cx.match_frames.last()
+        .is_some_and(|frame| !frame.result_predicates.is_empty());
+    let (first_guard, first_body, body_ty_ctx) = if has_result_predicate {
+        check_matrix_first_result_leaf(
+            cx, first_arm, first_row, &first_occurrences, real_depth_so_far,
+            owner, ret_ty_slot,
+        )?
+    } else {
+        infer_arm_at_matrix_leaf(
+            cx, first_arm, first_row.arm_idx, &first_occurrences, real_depth_so_far,
+            &first_row.virtual_surface_positions, &first_row.virtual_aliases,
+            &first_row.row_hidden_surface_positions,
+        )?
+    };
     let mut branches = vec![(first_row.arm_idx, first_guard, first_body)];
     for row in &candidates[1..=fallback] {
         let occurrences = row.leaf_binding_occurrences().to_vec();
@@ -20118,6 +20407,8 @@ fn compile_match_matrix(
             // owning match decides whether to rerun.
             cx.push_match_binder(col_types[0].clone(), MatchBinderOrigin::Scrutinee);
             cx.hidden_positions.push(cx.ctx.len() - 1);
+            let predicates = cx.match_frames.last()
+                .map(|frame| frame.result_predicates.clone()).unwrap_or_default();
             let raw_methods_result = build_ctor_buckets(
                 cx, arms, &ind0, d_id0, m0, &params0, rows,
                 &col_types[1..], &col_kinds[1..], real_depth_so_far,
@@ -20127,7 +20418,7 @@ fn compile_match_matrix(
                     Term::IndFormer { level_args, .. } => level_args,
                     _ => unreachable!("nested split head is an inductive former"),
                 },
-                Some(&col_types[0]), Some(&split_span),
+                Some(&col_types[0]), Some(&split_span), &predicates,
             );
             let hidden = cx.hidden_positions.pop();
             debug_assert_eq!(hidden, Some(cx.ctx.len() - 1));
@@ -20209,6 +20500,38 @@ fn compile_match_matrix(
     }
 }
 
+// Build the per-bucket equation before descending into the recursive matrix.
+// Its temporary constructor/type terms must not enlarge every live matrix
+// frame on a deeply nested match when no result predicate is in scope.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn push_matrix_constructor_path_condition(
+    cx: &mut ElabCtx,
+    split_scrut: &Term,
+    d_id0: GlobalId,
+    split_level_args: &[Level],
+    params0: &[Term],
+    m0: usize,
+    n_args0: usize,
+    tail_under_split: bool,
+    constructor_id: GlobalId,
+) -> usize {
+    let mut split_ty = Term::indformer(d_id0, split_level_args.to_vec());
+    for arg in params0 {
+        let arg = if tail_under_split { weaken(arg, 1) } else { arg.clone() };
+        split_ty = Term::app(split_ty, arg);
+    }
+    let mut concrete = Term::constructor(constructor_id, split_level_args.to_vec());
+    for param in params0.iter().take(m0) {
+        concrete = Term::app(concrete,
+            weaken(param, (n_args0 + usize::from(tail_under_split)) as i64));
+    }
+    for position in 0..n_args0 {
+        concrete = Term::app(concrete, Term::var(n_args0 - 1 - position));
+    }
+    push_branch_path_condition(cx, &split_ty, split_scrut, &concrete, n_args0, n_args0)
+}
+
 /// Group `rows` (whose `real_pats[0]` matches the inductive `ind0`) into one
 /// bucket per constructor — expanding a `Wild`/`Var` row into every
 /// constructor (it matches all of them) — and recurse to build each
@@ -20239,6 +20562,7 @@ fn build_ctor_buckets(
     split_level_args: &[Level],
     split_column_type: Option<&Term>,
     split_span: Option<&Span>,
+    predicates: &[ResultPredicate],
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
     let mut nested_motive: Option<Term> = None;
@@ -20416,6 +20740,14 @@ fn build_ctor_buckets(
         cx.match_frames.push(MatchFrame::new(
             base, cx.match_frames.len(), ret_ty_slot.clone(), None,
         ));
+        cx.match_frames.last_mut().expect("new matrix frame")
+            .result_predicates.extend_from_slice(predicates);
+        // The occurrence is the matched source value at the root, and the
+        // installed split binder at a nested constructor column.
+        let path_base = push_matrix_constructor_path_condition(
+            cx, &rows[0].real_occurrences[0].term, d_id0, split_level_args,
+            params0, m0, n_args0, tail_under_split, c0.id,
+        );
         let result = compile_match_matrix(
             cx,
             arms,
@@ -20429,6 +20761,7 @@ fn build_ctor_buckets(
             arm_used,
             subsumed_by,
         );
+        cx.path_conditions.truncate(path_base);
         cx.match_frames.pop();
         let inner = result?;
         methods[k0] = Some(inner);
@@ -20724,6 +21057,29 @@ fn check_mode_result_seed(cx: &ElabCtx<'_>, expected: Option<&Term>) -> Option<T
 
 /// Run one matrix entry. Only its own first-leaf signal may restart the
 /// descent; the leaf and literal plans remain in the same environment once.
+#[inline(never)]
+fn compile_result_matrix_entry<T>(
+    cx: &mut ElabCtx<'_>,
+    root_frame_depth: usize,
+    ret_ty_slot: Option<Term>,
+    arm_count: usize,
+    predicates: &[ResultPredicate],
+    build: impl FnMut(
+        &mut ElabCtx<'_>, &mut Option<Term>, &mut [bool], &mut [Vec<usize>],
+    ) -> Result<T, ElabError>,
+) -> Result<(T, Option<Term>, Vec<bool>, Vec<Vec<usize>>), ElabError> {
+    if predicates.is_empty() {
+        return compile_matrix_entry(cx, root_frame_depth, ret_ty_slot, arm_count, build);
+    }
+    let base = cx.match_frames.len();
+    let mut frame = MatchFrame::new(cx.ctx.len(), base, None, None);
+    frame.result_predicates = predicates.to_vec();
+    cx.match_frames.push(frame);
+    let result = compile_matrix_entry(cx, root_frame_depth, ret_ty_slot, arm_count, build);
+    cx.match_frames.truncate(base);
+    result
+}
+
 fn compile_matrix_entry<T>(
     cx: &mut ElabCtx<'_>,
     root_frame_depth: usize,
@@ -20799,6 +21155,7 @@ fn infer_tuple_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if matches!(
@@ -20830,8 +21187,8 @@ fn infer_tuple_match(
 
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             #[cfg(test)]
@@ -20881,6 +21238,7 @@ fn infer_record_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if matches!(
@@ -20906,8 +21264,8 @@ fn infer_record_match(
     record_pattern_projection(cx, &scrut_ty, span)?;
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             #[cfg(test)]
@@ -21025,6 +21383,7 @@ fn infer_or_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if top_pattern_is_catchall(&arm.pat) {
@@ -21055,8 +21414,8 @@ fn infer_or_match(
 
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             let body = compile_match_matrix(
@@ -21144,6 +21503,7 @@ fn infer_literal_match(
     arms: &[RMatchArm],
     span: &Span,
     expected: Option<&Term>,
+    predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         if !top_pattern_is_literal_form(&arm.pat) {
@@ -21158,8 +21518,8 @@ fn infer_literal_match(
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
-    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
-        cx, root_frame_depth, seed, arms.len(),
+    let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
+        cx, root_frame_depth, seed, arms.len(), predicates,
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
             let body = compile_match_matrix(
@@ -21196,6 +21556,7 @@ fn infer_literal_match(
     ))
 }
 
+#[inline(always)]
 fn infer_match(
     cx: &mut ElabCtx,
     scrut: &RExpr,
@@ -21203,26 +21564,38 @@ fn infer_match(
     span: &Span,
     expected: Option<&Term>,
 ) -> Result<(Term, Term), ElabError> {
+    infer_match_with_predicates(cx, scrut, arms, span, expected, &[])
+}
+
+#[inline(never)]
+fn infer_match_with_predicates(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    arms: &[RMatchArm],
+    span: &Span,
+    expected: Option<&Term>,
+    predicates: &[ResultPredicate],
+) -> Result<(Term, Term), ElabError> {
     for arm in arms {
         ensure_pattern_constructors_resolve(cx, &arm.pat)?;
     }
     if arms.iter().any(|arm| top_pattern_contains_literal(&arm.pat)) {
-        return infer_literal_match(cx, scrut, arms, span, expected);
+        return infer_literal_match(cx, scrut, arms, span, expected, predicates);
     }
     if arms_have_top_or(arms) {
-        return infer_or_match(cx, scrut, arms, span, expected);
+        return infer_or_match(cx, scrut, arms, span, expected, predicates);
     }
     if arms
         .iter()
         .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Record(_)))
     {
-        return infer_record_match(cx, scrut, arms, span, expected);
+        return infer_record_match(cx, scrut, arms, span, expected, predicates);
     }
     if arms
         .iter()
         .any(|arm| matches!(pattern_without_aliases(&arm.pat).kind, RPatKind::Tuple(_)))
     {
-        return infer_tuple_match(cx, scrut, arms, span, expected);
+        return infer_tuple_match(cx, scrut, arms, span, expected, predicates);
     }
 
     // 1. Infer scrutinee.
@@ -21323,6 +21696,7 @@ fn infer_match(
                     },
                     None,
                     None,
+                    predicates,
                 )
             })();
             finish_pattern_alias_frame(cx, methods)
