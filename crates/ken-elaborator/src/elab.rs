@@ -5696,7 +5696,6 @@ fn check_match_dependent_refined_fallback(
     scrut_indices: &[Term],
     n: usize,
     expected_here: &Term,
-    preserve_goal: bool,
 ) -> Result<Term, ElabError> {
     let (goal_refined, goal_restorations) = refine_branch_goal(
         cx,
@@ -5713,7 +5712,6 @@ fn check_match_dependent_refined_fallback(
         goal_refined,
         goal_restorations,
         expected_here,
-        preserve_goal,
     )
 }
 
@@ -5724,7 +5722,6 @@ fn check_generalized_branch_goal(
     goal_refined: Term,
     restorations: Vec<BranchGoalRestoration>,
     expected_here: &Term,
-    preserve_goal: bool,
 ) -> Result<Term, ElabError> {
     // Do not introduce an additional early kernel admission for a branch
     // whose goal needs no dependent binder. In particular, declaration
@@ -5732,11 +5729,9 @@ fn check_generalized_branch_goal(
     if !restorations.iter().any(|restoration| {
         matches!(restoration, BranchGoalRestoration::Generalized { binders, .. } if !binders.is_empty())
     }) {
-        let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
-            goal_refined
-        } else {
-            simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
-        };
+        // The fallback is a second value-checking route, not permission to
+        // delta-unfold the result after the first checked attempt failed.
+        let expected = goal_refined;
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         for restoration in restorations.into_iter().rev() {
             body = restoration.apply(body);
@@ -5802,11 +5797,7 @@ fn check_generalized_branch_goal(
                 inner_goal = *codomain;
             }
         }
-        let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
-            inner_goal
-        } else {
-            simplify_branch_goal(cx.env, &cx.ctx, &inner_goal)
-        };
+        let expected = inner_goal;
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         kernel_check_current(cx, &body, &expected).map_err(|error| match error {
             CurrentKernelQueryError::View(error) => error,
@@ -7147,15 +7138,11 @@ fn check_dependent_branch_body(
                 });
         }
         let obligation_base = cx.obligations.len();
-        // Kernel conversion may expose a named refinement's carrier while
-        // shaping the branch motive. Its source identity must survive at the
-        // introduction check so each arm leaves its own predicate obligation.
-        let source_expected = if names_source_refinement(cx, expected_here) {
-            expected_here
-        } else {
-            &expected_unrefined
-        };
-        let attempt = check_match_arm_result(cx, arm, source_expected, &arm.span).and_then(|checked| {
+        // The source result is the checking goal under branch substitution.
+        // Simplification above shapes the method's kernel motive, not the
+        // source value: it may delta-unfold a nested refinement to its
+        // carrier, which must not replace the goal at this introduction.
+        let attempt = check_match_arm_result(cx, arm, expected_here, &arm.span).and_then(|checked| {
             kernel_check_current(cx, &checked, &expected_unrefined)
                 .map(|()| checked)
                 .map_err(|error| match error {
@@ -7183,7 +7170,6 @@ fn check_dependent_branch_body(
                     scrut_indices,
                     n,
                     expected_here,
-                    equation_convoy || preserve_nested_goal,
                 )?
             }
         };
@@ -7222,17 +7208,6 @@ fn push_branch_path_condition(
     // are entered; the proposition already names those future binders.
     cx.path_conditions.push((path_eq, cx.ctx.len() + future_fields));
     path_base
-}
-
-/// Whether the arm's expected type is a named source refinement whose
-/// identity the introduction check keeps. Outlined for the same reason.
-#[inline(never)]
-fn names_source_refinement(cx: &ElabCtx, expected: &Term) -> bool {
-    matches!(
-        cx.metas.zonk_term(expected),
-        Term::Const { id, .. }
-            if cx.refinement_facts.refinement_root(id).is_some()
-    )
 }
 
 #[inline(never)]
@@ -20353,9 +20328,10 @@ fn compile_match_leaf(
     }
     let first_occurrences = first_row.leaf_binding_occurrences().to_vec();
     let first_arm = &arms[first_row.arm_idx];
-    let has_result_predicate = cx.match_frames.last()
-        .is_some_and(|frame| !frame.result_predicates.is_empty());
-    let (first_guard, first_body, body_ty_ctx) = if has_result_predicate {
+    // A known result belongs to the source match, even at its first leaf.
+    // Inferring that leaf instead silently replaces a named refinement result
+    // with its carrier before any leaf is checked against the predicate.
+    let (first_guard, first_body, body_ty_ctx) = if ret_ty_slot.is_some() {
         check_matrix_first_result_leaf(
             cx, first_arm, first_row, &first_occurrences, real_depth_so_far,
             owner, ret_ty_slot,
