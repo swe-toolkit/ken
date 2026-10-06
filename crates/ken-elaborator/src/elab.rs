@@ -477,6 +477,9 @@ struct ElabCtx<'e> {
     obligations: Vec<Obligation>,
     obl_counter: u32,
     refinement_facts: &'e RefinementFacts,
+    /// Only throwaway type prepasses defer introductions to their admitting
+    /// elaboration. The default is to emit or refuse, never silently erase.
+    type_introductions: bool,
     /// One-shot permission to erase a source refinement only when its caller
     /// records that predicate. Consumed before visiting any type children.
     refinement_slot: RefinementSlot,
@@ -719,6 +722,7 @@ impl<'e> ElabCtx<'e> {
             obligations: Vec::new(),
             obl_counter: 0,
             refinement_facts,
+            type_introductions: true,
             refinement_slot: RefinementSlot::None,
             path_conditions: Vec::new(),
             result_predicates: Vec::new(),
@@ -742,6 +746,13 @@ impl<'e> ElabCtx<'e> {
             indexed_match_roots: Vec::new(),
             matrix_entries: Vec::new(),
         }
+    }
+
+    /// A pre-pass whose type result is discarded or re-derived by the admitting
+    /// elaboration of the same source type. The admitting elaboration emits.
+    fn deferring_type_introductions(mut self) -> Self {
+        self.type_introductions = false;
+        self
     }
 
     fn surface_binding_target(&self, index: usize) -> Option<SurfaceBindingTarget> {
@@ -10076,10 +10087,6 @@ fn infer_named_local_variable(
     Ok((Term::var(actual_index), ty))
 }
 
-/// A direct call can introduce a checked argument at a source-refined
-/// parameter or constructor field; the recursive `infer` frame does not carry
-/// the predicate lookup's transient application spine.
-#[inline(never)]
 /// An application in a written type owes the same refinement introduction as
 /// a value call. The already-checked global identity selects literal parameter
 /// or constructor-field facts; named domains use the value route's alias-root
@@ -10088,6 +10095,7 @@ fn infer_named_local_variable(
 fn introduce_type_position_argument(
     cx: &mut ElabCtx<'_>, function: &Term, argument: &Term, span: &Span,
 ) -> Result<(), ElabError> {
+    if !cx.type_introductions { return Ok(()); }
     emit_call_refinements(cx, function, argument, span)?;
     let (head, previous_args) = peel_app(function);
     if !matches!(head, Term::Const { .. } | Term::Constructor { .. }) {
@@ -10119,6 +10127,10 @@ fn introduce_type_position_argument(
     emit_refinement_introduction(cx, &domain, &argument_ty, argument.clone(), span, None).map(|_| ())
 }
 
+/// A direct call can introduce a checked argument at a source-refined
+/// parameter or constructor field; the recursive `infer` frame does not carry
+/// the predicate lookup's transient application spine.
+#[inline(never)]
 fn emit_call_refinements(
     cx: &mut ElabCtx<'_>,
     function: &Term,
@@ -14174,6 +14186,7 @@ fn declaration_param_context(
     // the class env for the same reason they do: the name-to-index lookup
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
+        .deferring_type_introductions()
         .with_classes(class_env, provenance, standard_operators)
         .with_preconditions(preconditions, PremiseHoles::Refused);
     let mut current = rdecl.ty.as_ref();
@@ -14282,6 +14295,7 @@ fn elaborate_associated_rdecl(
             // name-to-index lookup has no field list and a well-formed binding
             // is refused by a sort pre-check.
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, &*refinement_facts, rdecl.name.clone())
+                .deferring_type_introductions()
                 .with_classes(&*class_env, provenance, standard_operators)
                 .with_preconditions(preconditions, PremiseHoles::Refused);
             // This pre-pass checks sort but admits no definition. Match the
@@ -16331,7 +16345,8 @@ fn elab_signature(
     cx: &mut ElabCtx<'_>, ty: &RType, result: bool,
 ) -> Result<(Term, Vec<Option<Term>>), ElabError> {
     let core = elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })?;
-    let params = collect_refined_params(cx, ty)?;
+    let core = cx.metas.zonk_term(&core);
+    let params = collect_refined_params(cx, ty, &core)?;
     Ok((core, params))
 }
 
@@ -16345,14 +16360,16 @@ fn record_refined_params(facts: &mut RefinementFacts, id: GlobalId, params: Vec<
 /// application carries the introduction obligation; callee recognition and
 /// higher-order preservation belong to LANG-REFINED-PARAM-REQUIRES-DESUGAR.
 #[inline(never)]
-fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<Option<Term>>, ElabError> {
+fn collect_refined_params(
+    cx: &mut ElabCtx<'_>, declared: &RType, core: &Term,
+) -> Result<Vec<Option<Term>>, ElabError> {
     let base = cx.ctx.len();
     let result = (|| {
         let mut params = Vec::new();
         // One entry per core Pi binder; only dependent Pi binds in the
-        // resolver context. Anonymous arrows bind in core after weakening.
+        // resolver context. Never re-elaborate a signature domain here.
         let mut bound = Vec::new();
-        let mut current = declared;
+        let (mut current, mut telescope) = (declared, core);
         loop {
             let (domain, codomain, binds) = match current {
                 RType::RPi(_, domain, codomain, _) => (domain.as_ref(), codomain.as_ref(), true),
@@ -16360,7 +16377,11 @@ fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<
                     (domain.as_ref(), codomain.as_ref(), false),
                 _ => break,
             };
-            let carrier = elab_type_in_slot(cx, domain, RefinementSlot::Outermost)?;
+            let Term::Pi(core_domain, core_codomain) = telescope else {
+                return Err(ElabError::Internal(
+                    "a signature's source spine and its core telescope disagree".into()));
+            };
+            let carrier = lower_over_anonymous(core_domain, &bound);
             let predicate = if let RType::RRefine(_, _, phi, _) = domain {
                 cx.ctx.push(carrier.clone());
                 let checked = elab_prop_at_omega(cx, phi, phi.span());
@@ -16371,6 +16392,7 @@ fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<
             if binds { cx.ctx.push(carrier); }
             bound.push(binds);
             current = codomain;
+            telescope = core_codomain;
         }
         Ok(params)
     })();
@@ -16378,15 +16400,24 @@ fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<
     result
 }
 
-/// Re-scope a predicate written under resolver binders to the core telescope,
-/// which also contains a binder for each anonymous arrow domain.
+/// Re-scope a term written under resolver binders to the core telescope.
+/// Each anonymous binder is inserted at its position, counting all inside it.
 fn lift_over_anonymous(term: &Term, bound: &[bool]) -> Term {
-    let mut cutoff = 0;
     let mut lifted = term.clone();
-    for &binds in bound.iter().rev() {
-        if binds { cutoff += 1 } else { lifted = shift(&lifted, 1, cutoff) }
+    for (position, &binds) in bound.iter().rev().enumerate() {
+        if !binds { lifted = shift(&lifted, 1, position) }
     }
     lifted
+}
+
+/// Inverse of the lift on terms that cannot mention anonymous binders.
+fn lower_over_anonymous(term: &Term, bound: &[bool]) -> Term {
+    let n = bound.len();
+    let mut lowered = term.clone();
+    for (index, &binds) in bound.iter().enumerate() {
+        if !binds { lowered = shift(&lowered, -1, n - 1 - index) }
+    }
+    lowered
 }
 
 fn elaborate_v0(
