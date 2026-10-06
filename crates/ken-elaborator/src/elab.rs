@@ -10089,17 +10089,32 @@ fn introduce_type_position_argument(
     cx: &mut ElabCtx<'_>, function: &Term, argument: &Term, span: &Span,
 ) -> Result<(), ElabError> {
     emit_call_refinements(cx, function, argument, span)?;
-    if !matches!(peel_app(function).0, Term::Const { .. } | Term::Constructor { .. }) {
+    let (head, previous_args) = peel_app(function);
+    if !matches!(head, Term::Const { .. } | Term::Constructor { .. }) {
         return Ok(());
     }
+    // The head's checked global type does not depend on local binder
+    // alignment. Infer a local argument only when the Pi domain actually
+    // carries a named refinement; literal parameters were handled above.
     let unchecked = |_| ElabError::TypeMismatch {
         span: span.clone(),
         reason: "cannot check an argument's refinement in type position".into(),
     };
-    let function_ty = kernel_infer_current(cx, function).map_err(unchecked)?;
-    let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &function_ty) else {
+    let mut ty = kernel_infer_current(cx, &head).map_err(unchecked)?;
+    for arg in &previous_args {
+        let Term::Pi(_, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+            return Ok(());
+        };
+        ty = subst0(&codomain, arg);
+    }
+    let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &ty) else {
         return Ok(());
     };
+    let named = matches!(cx.metas.zonk_term(&domain),
+        Term::Const { id, .. } if cx.refinement_facts.refinement_predicate(id).is_some());
+    if !named {
+        return Ok(());
+    }
     let argument_ty = kernel_infer_current(cx, argument).map_err(unchecked)?;
     emit_refinement_introduction(cx, &domain, &argument_ty, argument.clone(), span, None).map(|_| ())
 }
@@ -14163,7 +14178,9 @@ fn declaration_param_context(
         .with_preconditions(preconditions, PremiseHoles::Refused);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
-        let domain_core = elab_type(&mut cx, domain)?;
+        // This is a throwaway context pre-pass; the admitting signature
+        // collects its predicate. Permit the same recorded domain here.
+        let domain_core = elab_type_in_slot(&mut cx, domain, RefinementSlot::Outermost)?;
         cx.ctx.push(cx.metas.zonk_term(&domain_core));
         current = Some(codomain);
     }
@@ -14267,7 +14284,10 @@ fn elaborate_associated_rdecl(
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, &*refinement_facts, rdecl.name.clone())
                 .with_classes(&*class_env, provenance, standard_operators)
                 .with_preconditions(preconditions, PremiseHoles::Refused);
-            let ty = elab_type(&mut cx, ty)?;
+            // This pre-pass checks sort but admits no definition. Match the
+            // admitting signature's domain/result permissions and collect its
+            // templates rather than rejecting a legitimate refined return.
+            let (ty, _) = elab_signature(&mut cx, ty, innermost_refine_pred(ty).is_some())?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
         }
@@ -16329,11 +16349,15 @@ fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<
     let base = cx.ctx.len();
     let result = (|| {
         let mut params = Vec::new();
+        // One entry per core Pi binder; only dependent Pi binds in the
+        // resolver context. Anonymous arrows bind in core after weakening.
+        let mut bound = Vec::new();
         let mut current = declared;
         loop {
-            let (domain, codomain) = match current {
-                RType::RPi(_, domain, codomain, _) | RType::RArr(domain, codomain, _)
-                | RType::REffectArr(domain, _, codomain, _) => (domain.as_ref(), codomain.as_ref()),
+            let (domain, codomain, binds) = match current {
+                RType::RPi(_, domain, codomain, _) => (domain.as_ref(), codomain.as_ref(), true),
+                RType::RArr(domain, codomain, _) | RType::REffectArr(domain, _, codomain, _) =>
+                    (domain.as_ref(), codomain.as_ref(), false),
                 _ => break,
             };
             let carrier = elab_type_in_slot(cx, domain, RefinementSlot::Outermost)?;
@@ -16341,16 +16365,28 @@ fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<
                 cx.ctx.push(carrier.clone());
                 let checked = elab_prop_at_omega(cx, phi, phi.span());
                 cx.ctx.pop();
-                Some(Term::lam(carrier.clone(), checked?))
+                Some(lift_over_anonymous(&Term::lam(carrier.clone(), checked?), &bound))
             } else { None };
             params.push(predicate);
-            cx.ctx.push(carrier);
+            if binds { cx.ctx.push(carrier); }
+            bound.push(binds);
             current = codomain;
         }
         Ok(params)
     })();
     cx.ctx.types.truncate(base);
     result
+}
+
+/// Re-scope a predicate written under resolver binders to the core telescope,
+/// which also contains a binder for each anonymous arrow domain.
+fn lift_over_anonymous(term: &Term, bound: &[bool]) -> Term {
+    let mut cutoff = 0;
+    let mut lifted = term.clone();
+    for &binds in bound.iter().rev() {
+        if binds { cutoff += 1 } else { lifted = shift(&lifted, 1, cutoff) }
+    }
+    lifted
 }
 
 fn elaborate_v0(
