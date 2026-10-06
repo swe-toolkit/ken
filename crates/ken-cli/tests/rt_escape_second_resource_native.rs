@@ -621,33 +621,15 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CLOSURE-BOUNDARY-LANE.
-//
-// Observed signature, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and
-//     live-domain only, and it has no durable lane
-//
-// Owner node: RT-CLOSURE-BOUNDARY-LANE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// The refusal surfaces on the helper thread 'rt-escape-nat-fanout'; this
-// test thread then fails only with the wrapper
-//   called `Result::unwrap()` on an `Err` value: Any { .. }
-// which carries no signature of its own. The signature above is the
-// real cause.
-// Annotation only -- test body and expectations are unchanged.
+// Promise class: durable interpreter/native differential. The bounded-Nat
+// fanout selects an escaped-resource frame in a shared continuation; compare
+// its emitted native observations to the interpreter's on the same input.
+// MEASURED: the fixture's complete observation envelope on both engines.
+// CLAIMED: the composed producer result and pending eliminators preserve
+// the selected effects and terminal result. THE GAP: this one fixture does
+// not cover all recursively composed Nat or resource shapes.
 #[test]
-#[ignore = "RT-JOIN-SCALAR-PAIR-NONSCALAR-RESULT: scalar admission retry forces source Match 1289 into CarrierWord; first ObjectEmission refusal is ContinuationSpecialization: the detached-result seat projected 4 undischarged causal calls onto one unit result; a multi-member projection is a hard stop, never a preference rule, because one result value cannot discharge two causal calls; successor owns parity"]
 fn nat_fanout_escaped_resource_matches_interpreter() {
-    // Closure across the bounded-Nat fanout lowerer: an escaped-resource checked
-    // frame in the shared continuation of a `match n {Zero;Suc}` fanout. Pre-fix
-    // this tripped "consumed more than once" on the Nat lane (confirmed by
-    // reverting only `lower_source_bounded_nat_match`'s fork). This ignored row
-    // still stops during object emission; the active test pins its feedback
-    // path, not native/interpreter parity.
     in_large_stack_thread("rt-escape-nat-fanout", || {
         let diff = differential("nat-fanout-escaped", NAT_FANOUT_ESCAPED_RESOURCE);
         assert_native_matches_interpreter("nat-fanout-escaped", &diff);

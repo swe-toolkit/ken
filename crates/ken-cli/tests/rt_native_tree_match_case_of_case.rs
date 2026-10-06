@@ -126,8 +126,8 @@ fn root_exit_discriminator_source(runtime_failure: bool) -> String {
 }
 
 // The same shared-bind and ProcessInput harness as SHARED_BIND_SOURCE, but the
-// inner result and outer case family are Option. Neither arm has native parity
-// authorization: both remain on the pre-D1 fail-closed build path.
+// inner result and outer case family are Option. R6's bounded carried suffix
+// reaches both arms; the test compares their full native/interpreter envelopes.
 #[cfg(target_os = "linux")]
 const OPTION_OUTER_SOURCE: &str = r#"program capabilities FS APartial
 proc decide (byte : UInt8) : HostIO APartial ExitCode visits [Console] =
@@ -459,16 +459,26 @@ fn shared_bind_failure_arm_matches_interpreter_on_d1_route() {
     shared_bind_exit_code_arm_matches_interpreter(2, b"rejected\n", 7);
 }
 
-// Promise class: transition sentinel until a separate Option-family parity
-// decision. MEASURED: both Option arms execute in the interpreter, while the
-// native build refuses at the previously checked planned-source-join boundary
-// without an artifact. CLAIMED: D1 no longer admits this untested family; THE
-// GAP: this refusal does not establish native Option parity. The paired
-// ExitCode byte-2 run proves the selected D1 family still emits and agrees.
+// Promise class: durable interpreter/native differential. MEASURED: both
+// selected Option arms' stdout, exit, terminal status and effect operations on
+// the same checked source. CLAIMED: the carried producer suffix does not drop
+// or duplicate a pending eliminator. THE GAP: these two selected bytes do not
+// cover every constructor family; the ExitCode D1 control remains separate.
 #[cfg(target_os = "linux")]
 #[test]
-fn option_outer_family_refuses_before_artifact_while_exit_code_uses_d1() {
+fn option_outer_family_matches_interpreter_while_exit_code_uses_d1() {
     let dir = tempfile::tempdir().unwrap();
+    let (build, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
+        ken_cli::build_native_program(
+            OPTION_OUTER_SOURCE,
+            ken_cli::SourceFormat::Ken,
+            "rt-tree-option-outer-parity",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    assert_eq!(d1_hits, 0, "Option must not enter the ExitCode D1 route");
+    let artifact = build.expect("the checked Option fixture emits a native artifact");
     for (byte, stdout, exit) in [
         (1_u8, b"some\n".as_slice(), 3),
         (2_u8, b"none\n".as_slice(), 4),
@@ -483,41 +493,31 @@ fn option_outer_family_refuses_before_artifact_while_exit_code_uses_d1() {
             &mut host,
         )
         .expect("the same checked Option source runs in the interpreter");
-        assert_eq!(interpreted.stdout, stdout, "Option byte {byte}");
-        assert_eq!(interpreted.exit_status, exit, "Option byte {byte}");
-        let operations: Vec<_> = interpreted
-            .effect_trace
-            .iter()
-            .map(|event| event.operation)
-            .collect();
-        assert_eq!(operations, vec![ken_runtime::HostOpV1::ConsoleWrite]);
-    }
-
-    let (build, d1_hits) = ken_runtime::with_exit_code_case_of_case_route_count(|| {
-        ken_cli::build_native_program(
-            OPTION_OUTER_SOURCE,
-            ken_cli::SourceFormat::Ken,
-            "rt-tree-option-outer-refusal",
-            dir.path(),
-            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        let native = ken_runtime::run_bound_process_effect_observation(
+            &artifact.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: vec![std::ffi::OsString::from_vec(vec![byte])],
+                environment: Vec::new(),
+                cwd: dir.path().to_owned(),
+                plan_hash: artifact.plan_transport_hash,
+            },
         )
-    });
-    assert_eq!(d1_hits, 0, "Option must not enter the ExitCode D1 route");
-    // R2 now refuses this source-identity slot allocation at generic
-    // transfer before the old source-join boundary can inspect the Option.
-    // Preserve the fail-closed, no-artifact contract and name the new arm.
-    let error = build.expect_err("untested Option family must refuse before artifact emission");
-    let message = format!("{error:?}");
-    assert!(
-        message.contains("RecursiveResidual: a source slot constructor reached generic transfer")
-            && message.contains("without its creation-site suffix"),
-        "the source-store guard must refuse before the prior join boundary: {message}"
-    );
-    assert!(
-        std::fs::read_dir(dir.path()).unwrap().next().is_none(),
-        "no object or executable may be emitted for this build refusal"
-    );
-    eprintln!("RT_TREE_OPTION_REFUSAL {message}");
+        .expect("the checked native Option artifact runs on this byte");
+        let operations = |observation: &ken_runtime::EffectObservation| {
+            observation.effect_trace.iter().map(|event| event.operation)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(interpreted.stdout, stdout, "interpreter Option byte {byte}");
+        assert_eq!(interpreted.exit_status, exit, "interpreter Option byte {byte}");
+        assert_eq!(native.stdout, stdout, "native Option byte {byte}: {native:?}");
+        assert_eq!(native.exit_status, exit, "native Option byte {byte}: {native:?}");
+        assert_eq!(native.stdout, interpreted.stdout);
+        assert_eq!(native.exit_status, interpreted.exit_status);
+        assert_eq!(native.terminal_error, interpreted.terminal_error);
+        assert_eq!(native.terminal_exit, interpreted.terminal_exit);
+        assert_eq!(operations(&native), vec![ken_runtime::HostOpV1::ConsoleWrite]);
+        assert_eq!(native.effect_trace, interpreted.effect_trace);
+    }
 
     shared_bind_exit_code_arm_matches_interpreter(2, b"rejected\n", 7);
 }
