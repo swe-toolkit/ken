@@ -75,6 +75,15 @@ stop and report the mismatch.
   unchanged.
 - **AC-3 (mutation, QA).** Reverting the closure brings back the zero
   obligation on each row.
+- **AC-4 (recut, Architect `evt_239h9qvrxr021`, `evt_5f53yztwe6566`).**
+  Constructor field types are checked by the one type elaborator: the
+  constructor-field registration pass and its snapshot run on every
+  constructor whose argument contains an `RRefine` or an `RApp`, so
+  `elab_type` introduces each type application once; `data.rs:663` stays the
+  kernel builder. An undischarged field obligation is refused at the
+  declaration (`ObligationWithoutChannel`) and rolled back; a discharged one
+  is admitted. Rows: `Mk : (x : Box six) → D` refused, `Mk : (x : Box 5) →
+  D` accepted, the named `NBox` pair, on the explicit and legacy forms.
 
 ## Stop conditions
 
@@ -91,4 +100,5 @@ WIP `482227c63` on `c49297983` (§1a count 1).
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. type-position argument refinement decided by local kernel inference -- keyed on the elaboration context being kernel-ready, which collect_refined_params violates under anonymous arrows
 2. collect_refined_params re-elaborates signature domains that elab_type already elaborated -- keyed on elab_type being pure, which F-B ended
+3. data.rs rtype_to_kernel_checked builds a constructor argument type's applications without the introduction -- keyed on a second RType-to-core converter outside elab_type
 ```
