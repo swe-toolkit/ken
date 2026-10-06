@@ -38,7 +38,11 @@ Follow `docs/program/07-catalog-style-guide.md` and
 
 ## Acceptance
 
-- **AC-1.** `to_list_length` checks for every `xs : Vec a n`.
+- **AC-1.** `to_list_length` checks for every `xs : Vec a n`, and one
+  generic client in Vector's `ken example` fence uses it at the literal
+  goal `Equal Nat (length a (to_list a n xs)) n`. Control: a same-name
+  reflexive weakening reddens the client at its own span, in `ken check`
+  and in a CI-run target.
 - **AC-2 (controls).** The cold Vector trust test passes with its trust
   assertions unchanged. Its `expected_owned_names()` gains exactly
   `to_list_length`, the rebaseline the test names for the next authorized
