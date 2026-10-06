@@ -37,6 +37,16 @@ and reports the obligation, as it does without that binder.
 - **Not a drive-by.** Zonking the hole early is unsafe: a meta defaulted to
   `Zero` inside the hole, then solved to another level by the declaration,
   would make the hole's binder types disagree with the place it is applied.
+- **Second witness.** TYPE-POSITION stop 6 (`evt_6j1vhh7kkhjgs`): a zonk
+  inside `elab_signature` defaulted a level that a later match leaf would
+  solve. Finalizing levels within a declaration belongs to this WP.
+- **Prior art** (Research `evt_2zr65ywbasbw5` (c), Architect
+  `evt_4wwar843ce4e0`). Lean's `Meta.Closure` abstracts each unsolved level
+  meta an auxiliary declaration meets into a fresh universe parameter, and
+  applies the auxiliary at its use site to the original metas, so minting
+  the hole does not change level timing. Ken's level metas and level
+  parameters share `LevelVar`, so the abstraction keys on origin, not
+  spelling (CHECKS 10).
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.

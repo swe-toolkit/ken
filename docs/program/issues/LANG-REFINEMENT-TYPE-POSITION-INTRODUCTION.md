@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION
 title: "Three literal-side refinement fail-opens: a refinement nested inside a type argument (List ({ x : Int | phi })) is erased and accepted with no obligation; an application written in type position (RType::RApp) checks a refined argument with no obligation; and a theorem, proof or recursive view with a literal refined parameter records no fact, so its call sites emit nothing. Spec 34 §5 says every introduction emits phi a. Close all three, after a D0 census"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -103,4 +103,24 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 3. data.rs rtype_to_kernel_checked builds a constructor argument type's applications without the introduction -- keyed on a second RType-to-core converter outside elab_type
 4. F-B relevance gated on head variant (global heads only) -- keyed on where the head's type is stored (env vs ctx) rather than on the head's Pi domain itself
 5. obligation hole closed over a context that still holds an unsolved level metavariable -- keyed on the hole being declared before level metas are zonked
+6. elab_signature zonks the admitting signature before the body is checked, defaulting an unsolved universe level to 0 that a later match leaf would solve -- keyed on level metas being read mid-declaration
 ```
+
+## Closeout
+
+Merged `6b938b70b` from exact `f97cc43b8` (PR #4550). Language QA
+`evt_4c0pqzc09dhdv`, Architect `evt_6ejr3awkng2jc`, Decision
+`dec_7xwzn26gqq7x6`. §1a count 6.
+
+- A refinement in an admitted slot introduces its obligation once; a
+  nested `RRefine` with no slot is refused. Every callable admission route
+  runs `elab_signature`, relevance is read off each head's Pi domain, and
+  constructor and telescope types are gated. Derived's `RefinementView`
+  takes the named `TrueBool`.
+- The first route, `62ed6baa7`, went red in CI: `elab_signature` zonked
+  the signature before the body, defaulting a level a match leaf would
+  solve. It now returns the raw core, and callers zonk at scope end as at
+  base.
+- Residuals, filed: `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` (a named
+  refinement as a type argument stays δ-transparent) and
+  `LANG-OBLIGATION-HOLE-LEVEL-META-CLOSURE` (entries 5 and 6).

@@ -1,7 +1,7 @@
 ---
 id: CAT-LIST-LENGTH-TRUST-FREE-BASE
 title: "The canonical List length lives in Data.Collections.Derived, whose import closure declares five trusted axioms, so a zero-trust package such as Vector cannot import it. Move length verbatim into a trust-free base list module that Derived re-exports with the same checked identity"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2
