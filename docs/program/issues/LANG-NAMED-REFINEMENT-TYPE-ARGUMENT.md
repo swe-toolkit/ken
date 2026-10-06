@@ -1,7 +1,7 @@
 ---
 id: LANG-NAMED-REFINEMENT-TYPE-ARGUMENT
 title: "A named refinement used as a type argument is δ-transparent: def Five = { x : Int | Equal Int x 5 } and const ys : List Five = Cons Int six (Nil Int) check with zero obligations, so List Five admits 6. The literal form is refused by LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION's slot guard, which sees only source RRefine. Introduce or refuse the named form"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
