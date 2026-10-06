@@ -1,7 +1,7 @@
 ---
 id: LANG-ENSURES-PER-PATH-REALIZATION
 title: "An ensures clause or a literal refined return over a branchy body emits one obligation over the whole body, which spec 22 §2.2 forbids: a recursive postcondition then carries no induction hypothesis and cannot be discharged. Realize the postcondition at the body's leaves, under each branch's path hypotheses"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -70,3 +70,21 @@ straight-line body still emits exactly one obligation with the same goal.
 
 - Any kernel or `trusted_base()` change, or a spec change.
 - A checked program gains an obligation it cannot discharge.
+
+## Closeout
+
+Merged `b81ecf220` from exact `3fb33b063` (PR #4525 from
+`wp/LANG-ENSURES-PER-PATH-REALIZATION`, main push run 37393484637). Language
+QA `evt_7fdtdzn1yx9xa`, Architect `evt_gke41vvc57gq`, Decision
+`dec_7r11vwm1w9qnv`.
+
+- `ensures` clauses and literal refinements at a return, let or ascription
+  are realized at each leaf through `check`, under the branch path
+  hypotheses. A recursive branch gets its induction hypothesis, with the
+  call's actual arguments substituted into the contract. A straight-line
+  body still emits one obligation with the same goal.
+- The respin restores the default-worker stack margin in `elab.rs` with no
+  stack override. The four default-stack CI victims of the withdrawn head
+  `8c69c6ebb` pass.
+- The AC-C3 heading comment in `decimal_char_acceptance.rs` names the
+  `inRangeBool := True` flip.

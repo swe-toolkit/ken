@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-INTRODUCTION-COVERAGE
 title: "LANG-REFINEMENT-INTRODUCTION-OBLIGATION emits a named refinement's obligation only where the context carries the refinement table and the alias body is literally a refinement. Instance, class, record and expression-entry contexts, alias chains and named function-valued refinements still accept an introduction with no obligation and no refusal. Close every named introduction the way the literal form already is"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
