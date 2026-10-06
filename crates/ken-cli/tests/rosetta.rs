@@ -19,7 +19,8 @@
 //! source. This legacy runner extracts the canonical closure, removes every
 //! now-redundant import edge from the flattened provider sources with exact
 //! cardinality checks, and orders Transport, Or, OrdResult, Compare, the
-//! canonical Nat operations and function combinators, then Derived.
+//! canonical Nat operations and function combinators, then base List and
+//! Derived.
 //!
 //! **This concatenation is NOT applied blanket to every example.**
 //! Empirically, unconditionally prepending declarations that a given
@@ -63,16 +64,16 @@ fn catalog_source(path: &str) -> String {
         .source
 }
 
-fn remove_flattened_import(source: &mut String, owner: &str, import: &str) {
-    let mut imports = source.match_indices(import);
-    let (start, _) = imports
+fn remove_flattened_directive(source: &mut String, owner: &str, directive: &str) {
+    let mut occurrences = source.match_indices(directive);
+    let (start, _) = occurrences
         .next()
-        .unwrap_or_else(|| panic!("{owner} must carry import `{import}`"));
+        .unwrap_or_else(|| panic!("{owner} must carry directive `{directive}`"));
     assert!(
-        imports.next().is_none(),
-        "{owner} must carry exactly one import `{import}`"
+        occurrences.next().is_none(),
+        "{owner} must carry exactly one directive `{directive}`"
     );
-    source.replace_range(start..start + import.len(), "");
+    source.replace_range(start..start + directive.len(), "");
 }
 
 fn flattened_exact_line_declaration(
@@ -191,17 +192,18 @@ fn collections_prelude() -> String {
     .collect::<Vec<_>>()
     .join("\n");
     let combinators = catalog_source("catalog/packages/Core/Function/Combinators.ken.md");
+    let list = catalog_source("catalog/packages/Data/Collections/List.ken.md");
     let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
 
-    // `ken run` consumes one flat source unit here. Remove every import whose
-    // provider source this compatibility runner has flattened immediately
-    // above it, failing closed if a provider edge changes shape or cardinality.
+    // `ken run` consumes one flat source unit here. Remove imports whose
+    // providers this runner flattened above, plus Derived's facade-only export.
+    // Fail closed if an edge changes shape or cardinality.
     for import in [
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
         "import Core.Logic.Transport (sym)",
     ] {
-        remove_flattened_import(&mut compare, "Compare", import);
+        remove_flattened_directive(&mut compare, "Compare", import);
     }
     for import in [
         "import Core.Function.Combinators (comp, idf)",
@@ -212,12 +214,14 @@ fn collections_prelude() -> String {
         "import Core.Logic.Transport (cong, sym, trans)",
         "import Data.Numeric.Nat.Order (min, sub)",
         "import Data.Numeric.Nat.Arithmetic (add)",
+        "import Data.Collections.List (length)",
+        "export length",
     ] {
-        remove_flattened_import(&mut collections, "Derived", import);
+        remove_flattened_directive(&mut collections, "Derived", import);
     }
 
     format!(
-        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{nat_arithmetic}\n{combinators}\n{collections}"
+        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{nat_arithmetic}\n{combinators}\n{list}\n{collections}"
     )
 }
 
