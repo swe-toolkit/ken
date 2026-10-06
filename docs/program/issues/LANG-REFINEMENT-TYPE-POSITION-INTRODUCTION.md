@@ -90,4 +90,5 @@ WIP `482227c63` on `c49297983` (§1a count 1).
 ```text
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. type-position argument refinement decided by local kernel inference -- keyed on the elaboration context being kernel-ready, which collect_refined_params violates under anonymous arrows
+2. collect_refined_params re-elaborates signature domains that elab_type already elaborated -- keyed on elab_type being pure, which F-B ended
 ```
