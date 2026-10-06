@@ -4,11 +4,11 @@ use ken_kernel::GlobalId;
 
 use super::{ExportProvenance, ModuleState, Scope};
 
-/// MEASURED: the same fake identity occurs in every private ModuleState table
-/// that can select, expose, or cache a checked global; all occurrences vanish.
-/// CLAIMED: a reused ID cannot inherit a stale module binding after rollback.
-/// THE GAP: this isolates ModuleState's scrubber; production reachability is
-/// established by the enclosing ElabEnv rollback test.
+/// MEASURED: one synthetic ID is inserted into the named ModuleState identity
+/// maps below, and each selected occurrence is removed by the scrubber.
+/// CLAIMED: these maps drop rolled-back identities by GlobalId.
+/// THE GAP: this isolates scrubber breadth; the companion integration test
+/// below reaches it through ElabEnv rollback with a real exported ID.
 #[test]
 fn scrub_removes_reused_ids_from_scopes_and_module_exports() {
     let id = GlobalId(9000);
@@ -61,4 +61,67 @@ fn scrub_removes_reused_ids_from_scopes_and_module_exports() {
     assert!(state.scoped_constructor_types.is_empty());
     assert!(state.file_export_ids.is_empty());
     assert!(state.export_provenance["M"].member_ids.is_empty());
+}
+
+/// Promise class: durable identity-scrubbing invariant (AC-2).
+/// MEASURED: a real inline-module export records a new declaration ID; the
+/// enclosing failed transaction removes it while preserving an older export,
+/// then the declaration ID is reused.
+/// CLAIMED: rollback scrubs only removed identities from ModuleState at the
+/// production callback.
+/// THE GAP: this integration witness covers exported member IDs; the companion
+/// unit test checks the additional private ModuleState identity maps.
+#[test]
+fn failed_elabenv_rollback_scrubs_module_export_before_id_reuse() {
+    let mut env = crate::ElabEnv::new().expect("base environment");
+    let stable = env
+        .elaborate_file_v1("const ac0_stable : Bool = True module Stable { export ac0_stable }")
+        .expect("preexisting export");
+    assert_eq!(stable.len(), 1);
+    let stable_id = stable[0].def_id;
+    let next_id = env.env.next_global_id();
+    let mut allocated = None;
+
+    let result: Result<(), crate::error::ElabError> = env.with_env_mark_rollback(|env| {
+        let results = env.elaborate_file_v1(
+            "const ac0_probe : Bool = True module Provider { export ac0_probe }",
+        )?;
+        assert_eq!(results.len(), 1);
+        let id = results[0].def_id;
+        assert_eq!(id, next_id);
+        assert_eq!(
+            env.module_state.export_provenance["Provider"].member_ids["Provider"]["ac0_probe"],
+            id
+        );
+        allocated = Some(id);
+        Err(crate::error::ElabError::Internal(
+            "module rollback integration probe".into(),
+        ))
+    });
+
+    assert!(
+        matches!(result, Err(crate::error::ElabError::Internal(message))
+        if message == "module rollback integration probe")
+    );
+    let id = allocated.expect("the inline module exported its checked declaration");
+    assert_eq!(env.env.next_global_id(), id);
+    assert_eq!(
+        env.module_state.export_provenance["Stable"].member_ids["Stable"]["ac0_stable"], stable_id,
+        "rollback must preserve module identities from before its mark"
+    );
+    assert!(env.module_state.export_provenance["Provider"]
+        .member_ids
+        .is_empty());
+
+    let replacement = env
+        .elaborate_decl_v1("const ac0_after : Bool = True")
+        .expect("the rolled-back GlobalId remains reusable");
+    assert_eq!(replacement.def_id, id);
+    assert!(env.module_state.export_provenance["Provider"]
+        .member_ids
+        .is_empty());
+    assert_eq!(
+        env.module_state.export_provenance["Stable"].member_ids["Stable"]["ac0_stable"],
+        stable_id
+    );
 }

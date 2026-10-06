@@ -13,8 +13,8 @@
 
 use crate::conv::{convert_type, level_eq, whnf};
 use crate::env::{
-    telescope_to_pi, AllSupportSort, CheckedStringLiteral, Context, Decl, GlobalEnv, InductiveDecl,
-    PrimReduction,
+    telescope_to_pi, AllSupportSort, AllocationPrefixGeneration, CheckedStringLiteral, Context,
+    Decl, GlobalEnv, InductiveDecl, PrimReduction,
 };
 use crate::error::{KernelError, KernelResult};
 use crate::inductive::{
@@ -1414,24 +1414,34 @@ fn validate_inductive_decl_inner(
 
 /// Opaque position in one [`GlobalEnv`] from which later declarations can be
 /// removed. Marks are single-use and cannot be transferred to a cloned or
-/// unrelated environment.
+/// unrelated environment. Reusing an ID after rolling back past this boundary
+/// does not revive a mark for its former allocation prefix.
 #[must_use]
 pub struct EnvMark {
     mark_len: usize,
     mark_next_id: GlobalId,
+    prefix_generation: AllocationPrefixGeneration,
     env_instance: u64,
 }
 
 /// Record the current declaration boundary of `env`.
 pub fn env_mark(env: &GlobalEnv) -> EnvMark {
+    let mark_next_id = env.next_global_id();
+    let prefix_generation = env
+        .allocation_prefix_generation_at(mark_next_id)
+        .expect("current allocation prefix has an incarnation token");
     EnvMark {
         mark_len: env.declarations().len(),
-        mark_next_id: env.next_global_id(),
+        mark_next_id,
+        prefix_generation,
         env_instance: env.instance_id(),
     }
 }
 
 fn environment_mark_prefix_valid(env: &GlobalEnv, mark: &EnvMark) -> bool {
+    if env.allocation_prefix_generation_at(mark.mark_next_id) != Some(mark.prefix_generation) {
+        return false;
+    }
     let Some(prefix) = env.declarations().get(..mark.mark_len) else {
         return false;
     };
@@ -1449,9 +1459,10 @@ fn environment_mark_prefix_valid(env: &GlobalEnv, mark: &EnvMark) -> bool {
 
 /// Remove every declaration admitted after `mark`, newest first.
 ///
-/// The mark is valid only for its originating environment and only while its
-/// recorded declaration boundary still exists. Rollback restores the global
-/// ID allocator and its kernel-owned indexes; it never admits a declaration.
+/// The mark is valid only for its originating environment and while the same
+/// allocated-ID prefix remains. Reusing an ID after rolling back past the mark
+/// invalidates it. Rollback restores the allocator and kernel-owned indexes;
+/// it never admits a declaration.
 pub fn rollback_to_mark(env: &mut GlobalEnv, mark: EnvMark) -> KernelResult<Vec<Decl>> {
     if env.instance_id() != mark.env_instance {
         return Err(KernelError::Msg(
@@ -2365,6 +2376,7 @@ mod tests {
             mark: EnvMark {
                 mark_len: pending.mark.mark_len,
                 mark_next_id: pending.mark.mark_next_id,
+                prefix_generation: pending.mark.prefix_generation,
                 env_instance: pending.mark.env_instance,
             },
             staged_types: pending.staged_types.clone(),

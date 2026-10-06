@@ -294,6 +294,14 @@ impl Clone for EnvInstance {
     }
 }
 
+/// Allocation history at an environment prefix boundary, used to refuse marks
+/// whose GlobalIds were removed and later reallocated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AllocationPrefixGeneration {
+    Empty,
+    Allocated(u64),
+}
+
 /// The global environment `Σ` — checked declarations plus SCT-admitted
 /// recursive bodies (`11 §4`, `17 §4`).
 #[derive(Clone, Debug, Default)]
@@ -301,6 +309,10 @@ pub struct GlobalEnv {
     instance: EnvInstance,
     decls: Vec<Decl>,
     by_id: HashMap<GlobalId, usize>,
+    /// Incarnation token for each allocated GlobalId, in allocation order.
+    /// Truncated with the allocator; the token source itself is never rewound.
+    prefix_generations: Vec<u64>,
+    next_prefix_generation: u64,
     /// Only staged placeholders and checked postulate assumptions may receive
     /// a body. Recorded by identity at creation, never inferred from a name,
     /// `Decl::Opaque`, or the derived trusted-base inventory.
@@ -370,9 +382,10 @@ pub struct GlobalEnv {
 }
 
 // Value equality is the pre-existing structural environment comparison. The
-// ownership token is deliberately excluded: cloning preserves every checked
-// declaration/index while minting a different transaction owner. Destructuring
-// every field makes a newly added state field a compile-time review point.
+// ownership token and allocation-history tokens are deliberately excluded:
+// cloning preserves checked declarations/indexes but mints a different
+// transaction owner, and rollback history does not change the current checked
+// environment. Destructuring every field makes additions a review point.
 impl PartialEq for GlobalEnv {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -386,6 +399,8 @@ impl PartialEq for GlobalEnv {
             body_refs,
             ctor_index,
             next_id,
+            prefix_generations: _,
+            next_prefix_generation: _,
             all_supports,
             terminal_supports,
             support_edges,
@@ -562,9 +577,32 @@ impl GlobalEnv {
     /// Allocate a fresh, unused [`GlobalId`]. Used during admission so a
     /// family's constructors can reference the family before it is committed.
     pub fn fresh_id(&mut self) -> GlobalId {
+        debug_assert_eq!(self.prefix_generations.len(), self.next_id as usize);
+        let generation = self.next_prefix_generation;
+        let next_generation = generation
+            .checked_add(1)
+            .expect("environment allocation generations exhausted");
         let id = GlobalId(self.next_id);
         self.next_id += 1;
+        self.next_prefix_generation = next_generation;
+        self.prefix_generations.push(generation);
         id
+    }
+
+    /// Allocation incarnation at one prefix boundary. `None` means the
+    /// requested nonempty prefix is not present in this environment.
+    pub(crate) fn allocation_prefix_generation_at(
+        &self,
+        boundary: GlobalId,
+    ) -> Option<AllocationPrefixGeneration> {
+        match boundary.0.checked_sub(1) {
+            None => Some(AllocationPrefixGeneration::Empty),
+            Some(last_id) => self
+                .prefix_generations
+                .get(last_id as usize)
+                .copied()
+                .map(AllocationPrefixGeneration::Allocated),
+        }
     }
 
     /// Commit an already-checked declaration. The caller is responsible for
@@ -701,6 +739,7 @@ impl GlobalEnv {
         // so provisional admission rollback restores the allocator as well as
         // the lookup tables.
         self.next_id = self.next_id.min(decl.id().0);
+        self.prefix_generations.truncate(self.next_id as usize);
         self.top_id = self.top_id.filter(|id| *id != decl.id());
         self.bottom_id = self.bottom_id.filter(|id| *id != decl.id());
         self.tt_id = self.tt_id.filter(|id| *id != decl.id());
@@ -766,6 +805,7 @@ impl GlobalEnv {
     pub(crate) fn release_unused_id(&mut self, mark: GlobalId) {
         debug_assert!(self.by_id.keys().all(|id| id.0 < mark.0));
         self.next_id = mark.0;
+        self.prefix_generations.truncate(mark.0 as usize);
     }
 
     /// The (level_params, type) of a const/former/primitive use, for `infer`.
