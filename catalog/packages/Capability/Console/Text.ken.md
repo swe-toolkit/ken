@@ -2,30 +2,27 @@
 
 This package keeps text policy above the byte-exact Console ABI. The built-in
 `write` operation accepts bytes without encoding or newline behavior; these
-four helpers choose UTF-8 encoding, select stdout or stderr, and make the
-line-ending choice explicit. They are ordinary kernel-checked Ken definitions
-with zero `trusted_base()` delta.
+four public helpers `print`, `printLine`, `eprint`, and `eprintLine`
+choose UTF-8 encoding and select stdout or stderr. The public
+`console_line_payload text` is `bytes_encode text` followed by the encoding
+of character 10; each line helper performs one `write` of that payload. The
+four public laws `print_write_tree`, `print_line_write_tree`,
+`eprint_write_tree`, and `eprint_line_write_tree` state the corresponding
+single-write trees. These nine exports are ordinary kernel-checked Ken
+definitions with zero `trusted_base()` delta.
 
 ```ken
-proc print (text : String) : IO (Result IOError Unit) visits [Console] =
+pub proc print (text : String) : IO (Result IOError Unit) visits [Console] =
   write Stdout (bytes_encode text)
 
-proc printLine (text : String) : IO (Result IOError Unit) visits [Console] =
-  write
-    Stdout
-    (bytes_concat
-      (bytes_encode text)
-      (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char)))))
+pub proc printLine (text : String) : IO (Result IOError Unit) visits [Console] =
+  write Stdout (console_line_payload text)
 
-proc eprint (text : String) : IO (Result IOError Unit) visits [Console] =
+pub proc eprint (text : String) : IO (Result IOError Unit) visits [Console] =
   write Stderr (bytes_encode text)
 
-proc eprintLine (text : String) : IO (Result IOError Unit) visits [Console] =
-  write
-    Stderr
-    (bytes_concat
-      (bytes_encode text)
-      (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char)))))
+pub proc eprintLine (text : String) : IO (Result IOError Unit) visits [Console] =
+  write Stderr (console_line_payload text)
 
 pub theorem print_write_tree
       (text : String)
@@ -53,7 +50,7 @@ pub theorem eprint_line_write_tree
         (write Stderr (console_line_payload text)) =
   console_tree_refl (IO (Result IOError Unit)) (eprintLine text)
 
-fn console_line_payload (text : String) : Bytes =
+pub fn console_line_payload (text : String) : Bytes =
   bytes_concat
     (bytes_encode text)
     (bytes_encode (list_char_to_string (Cons Char (10 : Int) (Nil Char))))
