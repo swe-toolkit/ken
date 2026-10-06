@@ -28,10 +28,12 @@ really has the refined type, such as the prelude's `List Char`, stays legal.
   stay as refs and are not candidates. `Some Char n` and `None Char` stay
   legal.
 - **The leak is the conversion, not the type.** `Cons Int six (Nil Int)`
-  checked against `List Five` passes `unify_types` only by δ-unfolding `Five`
-  to `Int`. The prelude's `Char` has the same forgery: `const cs : List Char =
-  Cons Int 55296 (Nil Int)` is accepted with 0 obligations, while `const c :
-  Char = 55296` emits 1 (`evt_61vhrwkc583y3`).
+  checked against `List Five` is admitted by the kernel re-check's
+  δ-conversion of `Five` to `Int`; `unify_types` solves level metas only
+  (`evt_50b544fv42ney`). The prelude's `Char` has the same forgery:
+  `const cs : List Char = Cons Int 55296 (Nil Int)` is accepted with 0
+  obligations, while `const c : Char = 55296` emits 1
+  (`evt_61vhrwkc583y3`).
 - **The rule, from the D0' census `evt_1t4qxd37d8a06`.** A nested
   introduction is safe only at a function input (an odd count of `dom` steps)
   reached through no type argument or `Σ`, or at an equality's carrier.
@@ -41,11 +43,10 @@ really has the refined type, such as the prelude's `List Char`, stays legal.
 - **Mechanism, as ruled.** The census walk becomes a production guard,
   `nested_introduction_is_safe` over `ConvStep { Dom, Cod, Arg, Sig,
   EqCarrier }`. It δ-steps non-refinement `Const` heads so `Equal Char x y`
-  becomes `Term::Eq` structurally. It runs after `unify_types` at
-  `check_inferred_without_group_transport`, at
-  `check_inferred_with_group_transport` and on the transported early return.
-  The top-level case stays `emit_refinement_introduction`'s. The other 19
-  `unify_types` callers are enumerated in the handoff.
+  becomes `Term::Eq` structurally. It runs first in
+  `emit_refinement_introduction`, so its seven non-test callers are covered
+  by construction, plus the transported type at the transported return. The
+  top-level case stays `emit_refinement_introduction`'s.
 - `forgets` (F-H) is out of scope: `LANG-NAMED-REFINED-BINDER-FIRST-CLASS`.
 - Kernel soundness is intact: the kernel sees the carrier.
 
@@ -54,8 +55,8 @@ stop and report the mismatch.
 
 ## Deliverable
 
-The ruled guard, with the 19 other `unify_types` callers enumerated in the
-handoff. The `lang_named` WIP tests that pinned the position rules are
+The ruled guard, checked against the classified fan-in table in
+`evt_50b544fv42ney`. The `lang_named` WIP tests that pinned the position rules are
 replaced by the rows below.
 
 ## Acceptance
@@ -67,7 +68,10 @@ Base `f5d6d7f54` versus candidate, every row.
   six .. }`; P1, P2, P3's tail `t`, P8, P9, P10, P11, P12; `List (G Five)`
   with `const G : Type → Type = λa. List a` and value `Nil (List Int)`
   (`evt_4qbync1qst672`); forged `List Char` (`Cons Int 55296 (Nil Int)`) and
-  forged `Option Char`.
+  forged `Option Char`. Also an indexed-match branch variable of local type
+  `List Int` checked at `List Five`, and a non-dependent `match` whose arms
+  infer `List Int` at expected `List Five`; either may record "not
+  expressible" with the attempt.
 - **AC-2 (controls; accepted, obligation counts unchanged).**
   - `ElabEnv::new()` and `intToChar`; `LawfulClasses` `Ord.Char` and
     `DecEq.Char`; Derived's `RefinementView`;
@@ -83,6 +87,9 @@ Base `f5d6d7f54` versus candidate, every row.
   - M-carrier (drop the `EqCarrier` exemption) refuses `LawfulClasses`.
   - M-transport (skip the guard on the transported return) needs a reaching
     row, or records "not expressible" with the attempt.
+  - M-emit (guard only after the two inferred chokes) reddens the
+    variable-route row, else the inferred-match row; if neither is
+    expressible, say so.
 
 ## Stop conditions
 
