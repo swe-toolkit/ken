@@ -6,7 +6,10 @@ pairs come from `Capability.Process.Environment`, while config pairs are handed
 in by the caller. Keys and present values remain raw `Bytes`; an absent optional
 field has its own `None` result element.
 
-## 1. Local provenance and values
+## 1. Decoder interface
+
+The entry points follow the schema's field order. They return a value for
+present fields and a distinct absence marker for missing optional fields.
 
 ```ken
 import Application.Input.Schema
@@ -47,6 +50,33 @@ import Data.Sums.Validation (Invalid, Valid, Validation)
 
 data EnvConfigOrigin = EnvVariableOrigin String | ConfigEntryOrigin (List String)
 
+fn decode_process_environment
+      (schema : Schema) (input : ProcessInput)
+    : Validation (NonEmpty Diagnostic) (List (Option Bytes)) =
+  decode_environment_entries schema (process_environment input)
+
+fn decode_config_entries
+      (schema : Schema) (entries : List (Prod Bytes Bytes))
+    : Validation (NonEmpty Diagnostic) (List (Option Bytes)) =
+  env_config_validation
+    (schema_validate EnvConfigOrigin (Option Bytes) (config_field_check entries) schema)
+
+fn env_config_help (schema : Schema) : Doc = schema_help schema
+
+pub fn env_config_lookup (key : Bytes) (entries : List (Prod Bytes Bytes)) : Option Bytes =
+  match entries {
+    Nil ↦ None Bytes;
+    Cons entry rest ↦ env_config_lookup_choice key entry (env_config_lookup key rest)
+  }
+```
+
+## 2. Raw lookup and origins
+
+The landed lawful byte dictionary supplies the key decision. No cached length,
+string decoding, or client-local equality is involved. Both sources retain
+their own issue origins.
+
+```ken
 fn env_config_origin_to_origin (origin : EnvConfigOrigin) : Origin =
   match origin {
     EnvVariableOrigin name ↦ EnvironmentOrigin name;
@@ -57,14 +87,7 @@ fn env_config_issue_diagnostic (issue : SchemaIssue EnvConfigOrigin) : Diagnosti
   MkDiagnostic
     (env_config_origin_to_origin (schema_issue_origin EnvConfigOrigin issue))
     (MkDiagnosticCode (schema_issue_code EnvConfigOrigin issue))
-```
 
-## 2. Plain-Bytes lookup
-
-The landed lawful byte dictionary supplies the key decision. No cached length,
-string decoding, or client-local equality is involved.
-
-```ken
 fn env_config_entry_key (entry : Prod Bytes Bytes) : Bytes =
   match entry {
     MkProd key value ↦ key
@@ -81,12 +104,6 @@ fn env_config_lookup_choice
   match bytes_deceq_eq (env_config_entry_key entry) key {
     True ↦ Some Bytes (env_config_entry_value entry);
     False ↦ fallback
-  }
-
-pub fn env_config_lookup (key : Bytes) (entries : List (Prod Bytes Bytes)) : Option Bytes =
-  match entries {
-    Nil ↦ None Bytes;
-    Cons entry rest ↦ env_config_lookup_choice key entry (env_config_lookup key rest)
   }
 
 fn env_config_missing_field
@@ -123,13 +140,12 @@ fn config_field_check
   env_config_field_check (config_field_origin (schema_field_name field)) entries field
 ```
 
-## 3. Schema-driven decoding
+## 3. Schema-driven validation
 
-Both entry points use the shared accumulating traversal for their aligned
-values. Their origin construction remains local, and only this specialization
-injects issues into `Diagnostic`. A present field retains its raw bytes under
-`Some`; an absent optional field retains `None` in the same schema position.
-Missing required fields still produce an issue.
+The private checker records `Some` of the original bytes for a present field
+and `None` for an absent optional field. The shared accumulating traversal
+preserves those values in schema order. Only this specialization converts
+invalid issues to `Diagnostic`; missing required fields still produce an issue.
 
 ```ken
 fn env_config_validation
@@ -153,19 +169,6 @@ fn decode_environment_entries
     : Validation (NonEmpty Diagnostic) (List (Option Bytes)) =
   env_config_validation
     (schema_validate EnvConfigOrigin (Option Bytes) (environment_field_check entries) schema)
-
-fn decode_process_environment
-      (schema : Schema) (input : ProcessInput)
-    : Validation (NonEmpty Diagnostic) (List (Option Bytes)) =
-  decode_environment_entries schema (process_environment input)
-
-fn decode_config_entries
-      (schema : Schema) (entries : List (Prod Bytes Bytes))
-    : Validation (NonEmpty Diagnostic) (List (Option Bytes)) =
-  env_config_validation
-    (schema_validate EnvConfigOrigin (Option Bytes) (config_field_check entries) schema)
-
-fn env_config_help (schema : Schema) : Doc = schema_help schema
 
 export decode_process_environment, decode_config_entries, env_config_help
 ```

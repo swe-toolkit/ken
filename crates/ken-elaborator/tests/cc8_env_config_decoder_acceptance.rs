@@ -549,18 +549,19 @@ fn optional_absence_and_present_empty_have_distinct_aligned_carriers() {
     }
 }
 
-/// Promise class: durable invariant. Two identical keys appear in acquisition
-/// order; schema order and raw bytes, not entry order or a last-match override,
-/// determine the aligned results. A missing optional tail remains in position.
+/// Promise class: durable invariant. TOKEN precedes HOST in the input, opposite
+/// their schema order; two HOST entries also pin first-match shadowing. Schema
+/// order and raw bytes determine the aligned results, and the missing optional
+/// tail remains in position.
 #[test]
 fn present_values_preserve_schema_order_first_match_and_raw_bytes() {
     let mut env = full_env();
     add_schema_fixtures(&mut env);
     let mut store = make_store(&env);
     let entries = [
+        (b"TOKEN".to_vec(), vec![0x00, 0x80]),
         (b"HOST".to_vec(), vec![0xff]),
         (b"HOST".to_vec(), b"shadowed".to_vec()),
-        (b"TOKEN".to_vec(), vec![0x00, 0x80]),
     ];
     for (decoder, process) in [
         ("decode_process_environment", true),
