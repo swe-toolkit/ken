@@ -547,6 +547,10 @@ pub enum CheckedCoreBodyViewError {
         symbol: StableSymbol,
         family: StableSymbol,
     },
+    UnreadableMatchMotiveSort {
+        symbol: StableSymbol,
+        family: StableSymbol,
+    },
     UnsupportedEliminatorShape {
         symbol: StableSymbol,
         family: StableSymbol,
@@ -676,6 +680,9 @@ impl CheckedCoreBodyViewError {
             CheckedCoreBodyViewError::UnsupportedProofOnlyMatch { .. } => {
                 "unsupported_proof_only_match"
             }
+            CheckedCoreBodyViewError::UnreadableMatchMotiveSort { .. } => {
+                "unreadable_match_motive_sort"
+            }
             CheckedCoreBodyViewError::UnsupportedEliminatorShape { .. } => {
                 "unsupported_eliminator_shape"
             }
@@ -798,6 +805,10 @@ impl fmt::Display for CheckedCoreBodyViewError {
             CheckedCoreBodyViewError::UnsupportedProofOnlyMatch { symbol, family } => write!(
                 f,
                 "declaration {symbol} uses unsupported proof-only match for {family}"
+            ),
+            CheckedCoreBodyViewError::UnreadableMatchMotiveSort { symbol, family } => write!(
+                f,
+                "declaration {symbol} match for {family}: motive result sort is not readable from delivered declarations"
             ),
             CheckedCoreBodyViewError::UnsupportedEliminatorShape {
                 symbol,
@@ -4360,21 +4371,36 @@ fn validate_supported_match_motive(
             family: family.clone(),
         });
     }
-    match inspect_non_dependent_motive(motive).map_err(|reason| malformed_body(owner, reason))? {
-        MotiveShape::ConstantType => Ok(true),
-        MotiveShape::Dependent
-            if semantic
-                .metadata
-                .values()
-                .any(|bytes| bytes.starts_with(b"HostEffectSpineV1\0")) =>
-        {
-            Ok(true)
+    match inspect_non_dependent_motive(semantic, motive)
+        .map_err(|reason| malformed_body(owner, reason))?
+    {
+        Some(MotiveShape::ConstantType) => Ok(true),
+        Some(MotiveShape::Dependent) => {
+            Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
+                symbol: owner.clone(),
+                family: family.clone(),
+            })
         }
-        MotiveShape::Dependent => Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
-            symbol: owner.clone(),
-            family: family.clone(),
-        }),
-        MotiveShape::ProofOnly => Err(CheckedCoreBodyViewError::UnsupportedProofOnlyMatch {
+        Some(MotiveShape::ProofOnly) => {
+            let owner_type = delivered_declaration_type(semantic, owner)
+                .map_err(|reason| malformed_body(owner, reason))?;
+            if owner_type
+                .as_deref()
+                .map(|ty| delivered_sort_kind(semantic, ty))
+                .transpose()
+                .map_err(|reason| malformed_body(owner, reason))?
+                .flatten()
+                == Some(SortKind::Omega)
+            {
+                Ok(true)
+            } else {
+                Err(CheckedCoreBodyViewError::UnsupportedProofOnlyMatch {
+                    symbol: owner.clone(),
+                    family: family.clone(),
+                })
+            }
+        }
+        None => Err(CheckedCoreBodyViewError::UnreadableMatchMotiveSort {
             symbol: owner.clone(),
             family: family.clone(),
         }),
@@ -4388,31 +4414,174 @@ enum MotiveShape {
     ProofOnly,
 }
 
-fn inspect_non_dependent_motive(motive: &[u8]) -> Result<MotiveShape, String> {
+fn inspect_non_dependent_motive(
+    semantic: &CheckedCoreSemanticInputs,
+    motive: &[u8],
+) -> Result<Option<MotiveShape>, String> {
     let mut cursor = CanonicalCursor::new(motive);
-    if cursor.read_tag()?.as_str() != "ascript" {
-        return Ok(MotiveShape::Dependent);
-    }
-
-    if cursor.read_tag()?.as_str() != "lam" {
-        return Ok(MotiveShape::Dependent);
-    }
+    let ascribed = match cursor.read_tag()?.as_str() {
+        "ascript" => {
+            if cursor.read_tag()? != "lam" {
+                return Ok(None);
+            }
+            true
+        }
+        "lam" => false,
+        _ => return Ok(None),
+    };
     skip_term(&mut cursor)?;
-    let body_start = cursor.pos;
-    skip_term(&mut cursor)?;
-    let body = &cursor.bytes[body_start..cursor.pos];
-    if canonical_term_contains_free_var(body, 0)? {
-        return Ok(MotiveShape::Dependent);
-    }
-
-    let sort = inspect_non_indexed_motive_type_sort(&mut cursor)?;
+    let body = capture_canonical_term(&mut cursor)?;
+    let dependent = canonical_term_contains_free_var(&body, 0)?;
+    let kind = if ascribed {
+        match inspect_non_indexed_motive_type_sort(&mut cursor)? {
+            MotiveShape::ConstantType => Some(SortKind::Type),
+            MotiveShape::ProofOnly => Some(SortKind::Omega),
+            MotiveShape::Dependent => None,
+        }
+    } else {
+        delivered_sort_kind(semantic, &body)?
+    };
     if cursor.remaining() != 0 {
         return Err(format!(
             "motive bytes have {} trailing bytes",
             cursor.remaining()
         ));
     }
-    Ok(sort)
+    Ok(match kind {
+        Some(SortKind::Omega) => Some(MotiveShape::ProofOnly),
+        Some(SortKind::Type) if dependent => Some(MotiveShape::Dependent),
+        Some(SortKind::Type) => Some(MotiveShape::ConstantType),
+        None => None,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SortKind {
+    Type,
+    Omega,
+}
+
+/// The checked type carried in a delivered declaration, not producer metadata.
+fn delivered_declaration_type(
+    semantic: &CheckedCoreSemanticInputs,
+    symbol: &StableSymbol,
+) -> Result<Option<Vec<u8>>, String> {
+    let Some(bytes) = semantic.declarations.get(symbol) else {
+        return Ok(None);
+    };
+    let mut cursor = CanonicalCursor::new(bytes);
+    let kind = cursor.read_tag()?;
+    if !matches!(kind.as_str(), "transparent" | "opaque" | "primitive" | "inductive") {
+        return Ok(None);
+    }
+    if decode_stable_symbol(&mut cursor)? != *symbol {
+        return Ok(None);
+    }
+    if kind == "opaque" {
+        cursor.read_str()?;
+    }
+    decode_level_params(&mut cursor)?;
+    if kind == "inductive" {
+        skip_terms(&mut cursor)?; // parameters
+        skip_terms(&mut cursor)?; // indices
+        skip_level(&mut cursor)?;
+    }
+    Ok(Some(capture_canonical_term(&mut cursor)?))
+}
+
+/// Kind follows the kernel: Pi takes the codomain's kind; Sigma is Omega
+/// only when both components are Omega. Neither arguments nor levels are
+/// re-checked here. Unreadable terms and missing declarations fail closed.
+fn delivered_sort_kind(
+    semantic: &CheckedCoreSemanticInputs,
+    ty: &[u8],
+) -> Result<Option<SortKind>, String> {
+    let mut cursor = CanonicalCursor::new(ty);
+    let kind = match cursor.read_tag()?.as_str() {
+        "type" | "omega" => {
+            skip_level(&mut cursor)?;
+            Some(SortKind::Type)
+        }
+        "eq" => {
+            skip_term(&mut cursor)?;
+            skip_term(&mut cursor)?;
+            skip_term(&mut cursor)?;
+            Some(SortKind::Omega)
+        }
+        "trunc" => {
+            skip_term(&mut cursor)?;
+            Some(SortKind::Omega)
+        }
+        "pi" => {
+            skip_term(&mut cursor)?;
+            delivered_sort_kind(semantic, &capture_canonical_term(&mut cursor)?)?
+        }
+        "sigma" => {
+            let first = delivered_sort_kind(semantic, &capture_canonical_term(&mut cursor)?)?;
+            let second = delivered_sort_kind(semantic, &capture_canonical_term(&mut cursor)?)?;
+            match (first, second) {
+                (Some(SortKind::Omega), Some(SortKind::Omega)) => Some(SortKind::Omega),
+                (Some(_), Some(_)) => Some(SortKind::Type),
+                _ => None,
+            }
+        }
+        "app" | "ind_former" | "const" => return head_spine_sort_kind(semantic, ty),
+        _ => return Ok(None),
+    };
+    Ok(if cursor.remaining() == 0 { kind } else { None })
+}
+
+fn head_spine_sort_kind(
+    semantic: &CheckedCoreSemanticInputs,
+    ty: &[u8],
+) -> Result<Option<SortKind>, String> {
+    fn head_and_arity(cursor: &mut CanonicalCursor<'_>) -> Result<Option<(StableSymbol, usize)>, String> {
+        match cursor.read_tag()?.as_str() {
+            "app" => {
+                let head = head_and_arity(cursor)?;
+                skip_term(cursor)?;
+                Ok(head.and_then(|(symbol, count)| count.checked_add(1).map(|n| (symbol, n))))
+            }
+            "const" | "ind_former" => {
+                let symbol = decode_stable_symbol(cursor)?;
+                skip_levels(cursor)?;
+                Ok(Some((symbol, 0)))
+            }
+            _ => Ok(None),
+        }
+    }
+    let mut cursor = CanonicalCursor::new(ty);
+    let Some((head, arity)) = head_and_arity(&mut cursor)? else {
+        return Ok(None);
+    };
+    if cursor.remaining() != 0 {
+        return Ok(None);
+    }
+    let Some(mut head_type) = delivered_declaration_type(semantic, &head)? else {
+        return Ok(None);
+    };
+    for _ in 0..arity {
+        let mut binder = CanonicalCursor::new(&head_type);
+        if binder.read_tag()? != "pi" {
+            return Ok(None);
+        }
+        skip_term(&mut binder)?;
+        let codomain = capture_canonical_term(&mut binder)?;
+        if binder.remaining() != 0 {
+            return Ok(None);
+        }
+        head_type = codomain;
+    }
+    let mut sort = CanonicalCursor::new(&head_type);
+    let kind = match sort.read_tag()?.as_str() {
+        "type" => Some(SortKind::Type),
+        "omega" => Some(SortKind::Omega),
+        _ => None,
+    };
+    if kind.is_some() {
+        skip_level(&mut sort)?;
+    }
+    Ok(if sort.remaining() == 0 { kind } else { None })
 }
 
 /// Return the exact checked result type of a constant, non-indexed Match
@@ -4922,6 +5091,99 @@ mod tests {
             Box::new(Term::lam(scrut_ty.clone(), Term::Omega(Level::zero()))),
             Box::new(Term::pi(scrut_ty, Term::Omega(Level::zero()))),
         )
+    }
+
+    #[test]
+    fn delivered_motive_sort_reads_declared_head_and_owner_type() {
+        let owner = decl_symbol("owner");
+        let head = decl_symbol("Head");
+        let table = table_many(&[(GlobalId(1), owner.clone()), (GlobalId(2), head.clone())]);
+        let ty = Term::Type(Level::zero());
+        let proposition = Term::Eq(
+            Box::new(ty.clone()),
+            Box::new(ty.clone()),
+            Box::new(ty.clone()),
+        );
+        let mut semantic = CheckedCoreSemanticInputs::default();
+        let head_decl = Decl::Opaque {
+            id: GlobalId(2),
+            name: "Head".to_string(),
+            level_params: Vec::new(),
+            ty: Term::pi(ty.clone(), Term::Omega(Level::zero())),
+        };
+        semantic.declarations.insert(
+            head.clone(),
+            canonical_decl_bytes(&head_decl, &table).unwrap(),
+        );
+        let bare_head = Term::Const {
+            id: GlobalId(2),
+            level_args: Vec::new(),
+        };
+        assert_eq!(
+            delivered_sort_kind(&semantic, &canonical_term_bytes(&bare_head, &table).unwrap())
+                .unwrap(),
+            None,
+            "the unapplied head still has a Pi type, not an Omega result"
+        );
+        let result = Term::App(Box::new(bare_head), Box::new(ty.clone()));
+        let motive = Term::lam(ty.clone(), result.clone());
+        let bytes = canonical_term_bytes(&motive, &table).unwrap();
+        assert_eq!(
+            inspect_non_dependent_motive(&semantic, &bytes).unwrap(),
+            Some(MotiveShape::ProofOnly)
+        );
+        let owner_decl = Decl::Opaque {
+            id: GlobalId(1),
+            name: "owner".to_string(),
+            level_params: Vec::new(),
+            ty: proposition,
+        };
+        semantic.declarations.insert(
+            owner.clone(),
+            canonical_decl_bytes(&owner_decl, &table).unwrap(),
+        );
+        assert_eq!(
+            validate_supported_match_motive(
+                &semantic,
+                &owner,
+                &head,
+                &DataMetadata {
+                    parameter_count: 0,
+                    index_count: 0,
+                    constructors: Vec::new(),
+                    eliminator: LowerabilityStatus::Supported,
+                    lowerability: LowerabilityStatus::Supported,
+                },
+                &bytes,
+            ),
+            Ok(true)
+        );
+        semantic.declarations.remove(&head);
+        assert_eq!(
+            inspect_non_dependent_motive(&semantic, &bytes).unwrap(),
+            None,
+            "a missing delivered head may not be supplied by producer metadata"
+        );
+
+        let dependent_type = Term::lam(
+            ty.clone(),
+            Term::pi(Term::Var(0), Term::Type(Level::zero())),
+        );
+        assert_eq!(
+            inspect_non_dependent_motive(
+                &semantic,
+                &canonical_term_bytes(&dependent_type, &table).unwrap(),
+            )
+            .unwrap(),
+            Some(MotiveShape::Dependent)
+        );
+        let sigma = Term::Sigma(Box::new(ty), Box::new(result));
+        assert_eq!(
+            delivered_sort_kind(&semantic, &canonical_term_bytes(&sigma, &table).unwrap())
+                .unwrap(),
+            None,
+            "a Sigma with an unreadable component must not default to Type"
+        );
     }
 
     fn data_match_package() -> (CheckedCorePackage, StableSymbol, StableSymbol, StableSymbol) {
