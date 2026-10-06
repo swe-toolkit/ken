@@ -103,4 +103,5 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 3. data.rs rtype_to_kernel_checked builds a constructor argument type's applications without the introduction -- keyed on a second RType-to-core converter outside elab_type
 4. F-B relevance gated on head variant (global heads only) -- keyed on where the head's type is stored (env vs ctx) rather than on the head's Pi domain itself
 5. obligation hole closed over a context that still holds an unsolved level metavariable -- keyed on the hole being declared before level metas are zonked
+6. elab_signature zonks the admitting signature before the body is checked, defaulting an unsolved universe level to 0 that a later match leaf would solve -- keyed on level metas being read mid-declaration
 ```
