@@ -7,13 +7,15 @@
 #[cfg(target_os = "linux")]
 #[test]
 fn bound_process_nat_retries_only_newly_refused_joins() {
-    // Baseline provisioning for the same Nat source as the existing ignored
-    // parity row, not a repair to a pre-existing failing test. On this fixture,
-    // sampling the worker's 256 MiB VMA at 20 Hz via /proc/<pid>/smaps observed
-    // at most 2,308 KiB resident stack pages. Retain that row's stated stack:
-    // 262,144 KiB = 2,308 KiB observed peak + 259,836 KiB headroom. A run
-    // without this override aborted on stack overflow; 4 MiB also passed.
-    // Measurement: local/rt-scalar-bound-feedback/qa-stack-measure-256-*.{log,tsv}.
+    // Provision the same Nat source as the now-active interpreter/native
+    // parity row, not a repair to a newly failing baseline test. On exact
+    // 95cb816b7, with ambient RUST_MIN_STACK unset, a 20 Hz /proc/<pid>/smaps
+    // sample of this worker's 256 MiB VMA observed 3,936 KiB resident stack
+    // high-water: 262,144 KiB = 3,936 KiB observed + 258,208 KiB headroom.
+    // This sampled residency is not an exact deepest-stack measurement; a
+    // scratch 4 MiB Builder variant passed, but the ruled stated stack remains
+    // 256 MiB. This test makes no default-stack adequacy claim.
+    // Measurement: /tmp/qa-natfanout-95cb-* (789 no-logger observations).
     std::thread::Builder::new()
         .name("rt-scalar-feedback-nat".to_owned())
         .stack_size(256 * 1024 * 1024)
