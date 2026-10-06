@@ -5424,14 +5424,10 @@ fn check_match_with_lift_with_predicates(
         for position in 0..host_ctor.args.len() {
             concrete = Term::app(concrete, Term::var(total - 1 - position));
         }
-        let expected_here = simplify_branch_goal(
-            cx.env,
-            &cx.ctx,
-            &subst_term_generalize(
-                &weaken(expected, total as i64),
-                &weaken(scrut_core, total as i64),
-                &concrete,
-            ),
+        let expected_here = subst_term_generalize(
+            &weaken(expected, total as i64),
+            &weaken(scrut_core, total as i64),
+            &concrete,
         );
         cx.match_frames.last_mut().expect("lifted arm frame").refined_target = Some(expected_here.clone());
         let mut scrut_ty = Term::indformer(host.id, host_level_args.to_vec());
@@ -5596,14 +5592,10 @@ fn check_structured_constructor_method(
     for position in 0..field_count {
         concrete = Term::app(concrete, Term::var(total - 1 - position));
     }
-    let expected_here = simplify_branch_goal(
-        cx.env,
-        &cx.ctx,
-        &subst_term_generalize(
-            &weaken(expected, total as i64),
-            &weaken(scrut_core, total as i64),
-            &concrete,
-        ),
+    let expected_here = subst_term_generalize(
+        &weaken(expected, total as i64),
+        &weaken(scrut_core, total as i64),
+        &concrete,
     );
     cx.match_frames.last_mut().expect("structured arm frame").refined_target = Some(expected_here.clone());
     let mut scrut_ty = Term::indformer(ind.id, level_args.to_vec());
@@ -7102,7 +7094,7 @@ fn check_dependent_branch_body(
             };
         cx.match_frames.last_mut().ok_or_else(|| {
             ElabError::Internal("dependent arm has no owning match frame".into())
-        })?.refined_target = Some(expected_unrefined.clone());
+        })?.refined_target = Some(expected_here.clone());
         if let Some(premise_slot) = hidden_result_premise_slot {
             if premise_slot >= premise_domains.len() {
                 return Err(ElabError::Internal(format!(
