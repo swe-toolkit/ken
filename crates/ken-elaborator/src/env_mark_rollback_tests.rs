@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 
-use ken_kernel::{declare_postulate, GlobalId, Level, Term};
+use ken_kernel::{declare_postulate, Decl, GlobalId, KernelError, Level, Term};
 use num_bigint::BigInt;
 
-use crate::classes::InstanceResolution;
+use crate::classes::{InstanceHeadKey, InstanceResolution};
 use crate::effects::{EffectRow, RowType};
 use crate::error::{ElabError, Span};
 use crate::foreign::{FfiRuntimeCheck, ForeignBinding};
@@ -181,5 +181,147 @@ fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
     assert_eq!(
         env.refinement_facts.refinement_root(stable_alias),
         Some(stable_root)
+    );
+}
+
+/// Promise class: durable ClassEnv identity-scrubbing invariant (AC-2).
+/// MEASURED: a real `instance` declaration containing `Axiom` populates the
+/// production class/head index inside an outer failed EnvMark transaction;
+/// its head ID is then reused by a replacement declaration.
+/// CLAIMED: rollback removes the failed instance from every ClassEnv index
+/// while preserving a pre-mark instance and its explicit Axiom trust entry.
+/// THE GAP: the fixture exercises parsed class and instance declarations;
+/// the assertions inspect identity-keyed maps rather than source spellings.
+#[test]
+fn failed_elabenv_rollback_scrubs_class_instances_before_id_reuse() {
+    let mut env = ElabEnv::new().expect("base environment");
+    let initial = trusted_ids(&env);
+    env.elaborate_file_v1(
+        r#"class QaProvider A { evidence : Top }
+instance QaProvider Int { evidence = Axiom }"#,
+    )
+    .expect("pre-mark class and instance");
+    let stable_trust = trusted_ids(&env);
+    let stable_axiom_id = stable_trust
+        .difference(&initial)
+        .copied()
+        .find(|id| {
+            matches!(
+                env.env.lookup(*id),
+                Some(Decl::Opaque { name, .. }) if name == "QaProvider.Int.evidence"
+            )
+        })
+        .expect("the stable Axiom has its canonical instance-field owner");
+
+    let class_id = env.globals["QaProvider"];
+    let stable_head_id = env.globals["Int"];
+    let stable_key = (class_id, InstanceHeadKey::Global(stable_head_id));
+    let stable_instance_id = env.class_env.instances_by_id[&stable_key].instance_id;
+    assert_eq!(
+        env.class_env.instance_search("QaProvider", "Int"),
+        Some(stable_instance_id)
+    );
+    let before = trusted_ids(&env);
+    let mut removed_head = None;
+    let mut removed_instance = None;
+
+    let result: Result<(), ElabError> = env.with_env_mark_rollback(|env| {
+        env.elaborate_file_v1(
+            "data QaProviderType = MkQaProviderType\n\
+             instance QaProvider QaProviderType { evidence = Axiom }",
+        )
+        .expect("transaction creates a real provider instance");
+        let provider_axiom_id = trusted_ids(env)
+            .difference(&before)
+            .copied()
+            .find(|id| {
+                matches!(
+                    env.env.lookup(*id),
+                    Some(Decl::Opaque { name, .. }) if name == "QaProvider.QaProviderType.evidence"
+                )
+            })
+            .expect("provider instance creates its named Axiom");
+        let during = trusted_ids(env);
+        assert!(!before.contains(&provider_axiom_id));
+        assert!(during.contains(&provider_axiom_id));
+
+        let head_id = env.globals["QaProviderType"];
+        let key = (class_id, InstanceHeadKey::Global(head_id));
+        let instance_id = env.class_env.instances_by_id[&key].instance_id;
+        removed_head = Some(head_id);
+        removed_instance = Some(instance_id);
+        let failure = env
+            .elaborate_decl_v1("const ac0_bad_after_instance : Bool = MkQaProviderType")
+            .expect_err("the constructor cannot check as Bool");
+        assert!(
+            env.class_env.instances_by_id.contains_key(&key),
+            "the inner failed declaration must retain the earlier instance"
+        );
+        Err(failure)
+    });
+
+    let after = trusted_ids(&env);
+    assert_eq!(
+        after.difference(&before).copied().collect::<BTreeSet<_>>(),
+        BTreeSet::new(),
+        "the failed outer operation rolls back the instance's Axiom trust"
+    );
+    assert!(matches!(
+        result,
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            ..
+        })
+    ));
+    let head_id = removed_head.expect("provider head was registered");
+    let instance_id = removed_instance.expect("provider instance was registered");
+    let removed_key = (class_id, InstanceHeadKey::Global(head_id));
+
+    assert_eq!(env.env.next_global_id(), head_id);
+    assert!(!env.globals.contains_key("QaProviderType"));
+    assert!(env.env.lookup(instance_id).is_none());
+    assert!(!env.class_env.instances_by_id.contains_key(&removed_key));
+    assert!(!env
+        .class_env
+        .instances_by_id
+        .values()
+        .any(|info| info.instance_id == instance_id));
+    assert!(!env
+        .class_env
+        .instances
+        .values()
+        .any(|info| info.instance_id == instance_id));
+    assert_eq!(
+        env.class_env
+            .instance_search("QaProvider", "QaProviderType"),
+        None
+    );
+    assert_eq!(
+        env.class_env.instances_by_id[&stable_key].instance_id,
+        stable_instance_id
+    );
+    assert_eq!(
+        env.class_env.instance_search("QaProvider", "Int"),
+        Some(stable_instance_id)
+    );
+    assert!(after.contains(&stable_axiom_id));
+    assert!(matches!(
+        env.env.lookup(stable_axiom_id),
+        Some(Decl::Opaque { name, .. }) if name == "QaProvider.Int.evidence"
+    ));
+
+    let replacement = env
+        .elaborate_decl_v1("const QaProviderType : Type = Int")
+        .expect("rolled-back head ID is reusable");
+    assert_eq!(replacement.def_id, head_id);
+    assert!(!env.class_env.instances_by_id.contains_key(&removed_key));
+    assert_eq!(
+        env.class_env
+            .instance_search("QaProvider", "QaProviderType"),
+        None
+    );
+    assert_eq!(
+        env.class_env.instances_by_id[&stable_key].instance_id,
+        stable_instance_id
     );
 }
