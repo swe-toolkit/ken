@@ -792,6 +792,28 @@ impl<'src> StaticTransitionPlan<'src> {
         })
     }
 
+    /// Whether a source join may be consumed through the process-composed
+    /// CarrierWord interface. Every such emitter supplies a source Match;
+    /// this domain may include Matches that take another route at emission.
+    /// The pre-schema transport set is available when aggregate owners are
+    /// chosen, and agrees with the post-ownership transport set at closeout.
+    pub(in crate::cranelift_backend) fn join_may_take_process_carrier(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        if self.pre_schema_transport_sources.is_empty() {
+            return Ok(false);
+        }
+        let occurrence = self
+            .source_occurrences
+            .get(origin.0 as usize)
+            .and_then(Option::as_ref)
+            .ok_or_else(|| {
+                planner_error("process-carrier domain names an origin outside the plan")
+            })?;
+        Ok(matches!(occurrence.expr, RuntimeExpr::Match { .. }))
+    }
+
     /// Use one nested producer's topology with the process-object result
     /// interface when the active continuation stores that interface outside the
     /// explicit eliminator suffix.
@@ -799,6 +821,11 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
         local_origin: StaticOriginId,
     ) -> Result<JoinPlanToken, CraneliftBackendError> {
+        if !self.join_may_take_process_carrier(local_origin)? {
+            return Err(planner_error(
+                "a process-composed join token was requested outside its planned domain",
+            ));
+        }
         let local = self.join_plan_token(local_origin)?;
         Ok(JoinPlanToken {
             origin: local.origin,

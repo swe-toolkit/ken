@@ -754,6 +754,52 @@ fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
     });
 }
 
+/// Promise class: transition sentinel for this r2 fixture's source origins.
+/// Construct782 field 0 is Match781 on the frozen fixture; if origin issuance
+/// changes, review the fixture identity rather than silently updating the pin.
+/// Measured: the completed planner's actual child-owner record for that field.
+/// Claimed: a process-composed Match child may refer to persistent storage.
+/// Gap: this pins the planner's allowance, not the executed word's owner;
+/// the artifact is built here, not executed. The R1 owner repair retires the
+/// old NoReferent-only disposition, not this fixture's observable assertion.
+#[test]
+fn r2_process_composed_match_child_allows_persistent_referent() {
+    in_large_stack_thread("rt-escape-r2-process-carrier-owners", || {
+        let root = output_dir("r2-process-carrier-owners");
+        let (compiled, diagnostics) =
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_cli::build_native_program(
+                    R2_CROSS_BUFFER_FREEZE,
+                    ken_cli::SourceFormat::Ken,
+                    "rt_escape_r2_cross_buffer_freeze",
+                    root.path(),
+                    ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                )
+            });
+        compiled.expect("r2 compiles to an artifact before inspecting its owner plan");
+        assert_eq!(
+            diagnostics.len(),
+            1,
+            "one completed r2 source ownership plan"
+        );
+        let children = diagnostics[0]
+            .source_aggregate_children
+            .iter()
+            .filter(|child| child.parent_origin == 782 && child.position == 0)
+            .collect::<Vec<_>>();
+        assert_eq!(children.len(), 1, "one Construct782 child-0 owner record");
+        let child = children[0];
+        assert_eq!(child.child_origin, Some(781), "the exact r2 source child");
+        assert!(
+            child
+                .owners
+                .contains(&ken_runtime::boundary_value::BoundaryReferentOwner::PersistentStore),
+            "process-composed Match781 must retain a possible persistent referent: {:?}",
+            child.owners
+        );
+    });
+}
+
 /// Promise class: transition sentinel for the selected-call fixture shape.
 /// MEASURED: the pre-schema transport source and response selection both name
 /// the r2 S5→S6 call selected by the installed owner-4 plan.

@@ -1138,10 +1138,22 @@ pub struct StaticResponseFeasibilityDiagnostic {
     /// the early and late strata agree on exact members rather than counts.
     pub pre_schema_transport_sources: Vec<String>,
     pub preselected_response_callers: Vec<String>,
+    /// Source aggregate facts from the completed plan, not an emitter claim.
+    pub source_aggregate_children: Vec<SourceAggregateChildObservation>,
     /// The complete Deferred residual: P1 plus ineligible or test-suppressed
     /// P2. Together with the Specialized rows this is the full response-Vis
     /// classification.
     pub static_response_deferred: Vec<DeferredResponseObservation>,
+}
+
+/// Test-support projection of a source aggregate's actual planned child owners.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceAggregateChildObservation {
+    pub parent_origin: u32,
+    pub position: u32,
+    pub child_origin: Option<u32>,
+    pub owners: Vec<BoundaryReferentOwner>,
 }
 
 /// Planned returned-Vis origin and exact existing or candidate response row.
@@ -1364,6 +1376,19 @@ fn record_static_response_feasibility_diagnostic(
                     .map(|identity| format!("{identity:?}")).collect(),
                 preselected_response_callers: plan.preselected_response_callers.iter()
                     .map(|identity| format!("{identity:?}")).collect(),
+                source_aggregate_children: plan.aggregate_ownership.iter()
+                    .filter_map(|record| match &record.producer {
+                        AggregateOccurrenceProducer::Source(parent) => Some(
+                            record.children.iter().map(|child| SourceAggregateChildObservation {
+                                parent_origin: parent.0,
+                                position: child.position,
+                                child_origin: child.origin.map(|origin| origin.0),
+                                owners: child.owners.clone(),
+                            }).collect::<Vec<_>>(),
+                        ),
+                        AggregateOccurrenceProducer::SynthesizedUse { .. } => None,
+                    })
+                    .flatten().collect(),
                 static_response_deferred,
             });
         }
