@@ -424,6 +424,15 @@ fn function_domain_checks_named_indformer_argument() {
         result.obligations[0].goal_closed, goal,
         "the goal is Equal Int six 5, with six declared as 6"
     );
+    assert_eq!(
+        ken_kernel::whnf(
+            &env.env,
+            &ken_kernel::Context::new(),
+            &Term::const_(env.globals["six"], vec![])
+        ),
+        Term::IntLit(6.into()),
+        "the checked six used by that exact goal reduces to 6"
+    );
 }
 
 #[test]
