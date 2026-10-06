@@ -5362,6 +5362,95 @@ mod tests {
         );
     }
 
+    /// Durable source-derived proof pin: the prelude theorem's result type
+    /// depends on the `TransferCount` scrutinee and is spelled through `Prop`.
+    /// Unlike the synthetic alias reader pin, this reaches the full delivered
+    /// native package of an elaborated host program and the admission fan-in.
+    #[test]
+    fn elaborated_transfer_count_proof_motive_is_admitted_as_proof_only() {
+        // This is baseline provisioning, not a regression repair: analogous
+        // native preparation measured 3,936 KiB resident on a fixed 256 MiB
+        // Builder stack, leaving 258,208 KiB numeric headroom.
+        std::thread::Builder::new()
+            .stack_size(256 * 1024 * 1024)
+            .spawn(|| {
+                let source = "program capabilities FS APartial\n\
+                    proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+                      : HostIO APartial ExitCode visits [FS] = host_exit APartial Success";
+                let package_name = "rt_motive_prelude_proof";
+                let preparation = crate::compiler_driver::prepare_native_program_sources(
+                    package_name,
+                    vec![crate::compiler_driver::CompilerSource::new(
+                        "src/main.ken",
+                        source,
+                    )],
+                )
+                .expect("a host program delivers its checked prelude declarations");
+                let semantic = &preparation.checked_package_for_test().artifact.semantic;
+                let owner = StableSymbol::declaration(package_name, &[], "transfer_count_positive");
+                let mut declaration = CanonicalCursor::new(
+                    semantic
+                        .declarations
+                        .get(&owner)
+                        .expect("prelude theorem is delivered"),
+                );
+                declaration.expect_tag("transparent").unwrap();
+                assert_eq!(decode_stable_symbol(&mut declaration).unwrap(), owner);
+                decode_level_params(&mut declaration).unwrap();
+                let owner_type = capture_canonical_term(&mut declaration).unwrap();
+                assert_eq!(
+                    delivered_sort_kind(semantic, &owner_type).unwrap(),
+                    Some(SortKind::Omega),
+                    "the prelude theorem's delivered declared type is proof-sorted"
+                );
+                let body = capture_canonical_term(&mut declaration).unwrap();
+                assert_eq!(declaration.remaining(), 0);
+                let mut lambda = CanonicalCursor::new(&body);
+                lambda.expect_tag("lam").unwrap();
+                skip_term(&mut lambda).unwrap();
+                let match_term = capture_canonical_term(&mut lambda).unwrap();
+                assert_eq!(lambda.remaining(), 0);
+                let mut eliminator = CanonicalCursor::new(&match_term);
+                eliminator.expect_tag("elim").unwrap();
+                let family = decode_stable_symbol(&mut eliminator).unwrap();
+                assert!(family
+                    .components
+                    .last()
+                    .is_some_and(|name| name == "TransferCount"));
+                skip_levels(&mut eliminator).unwrap();
+                skip_terms(&mut eliminator).unwrap();
+                let motive = capture_canonical_term(&mut eliminator).unwrap();
+                assert_eq!(
+                    inspect_non_dependent_motive(semantic, &motive).unwrap(),
+                    Some(MotiveShape::ProofOnly),
+                    "the prelude's elaborated dependent proof motive takes ProofOnly"
+                );
+                let mut ascription = CanonicalCursor::new(&motive);
+                ascription.expect_tag("ascript").unwrap();
+                ascription.expect_tag("lam").unwrap();
+                skip_term(&mut ascription).unwrap();
+                let motive_body = capture_canonical_term(&mut ascription).unwrap();
+                assert!(canonical_term_contains_free_var(&motive_body, 0).unwrap());
+                assert_eq!(
+                    validate_supported_match_motive(
+                        semantic,
+                        &owner,
+                        &family,
+                        semantic
+                            .data_metadata
+                            .get(&family)
+                            .expect("family is delivered"),
+                        &motive,
+                    ),
+                    Ok(true),
+                    "proof-sorted dependent motive is admitted in its proof owner"
+                );
+            })
+            .expect("spawn stated-stack checked-prelude worker")
+            .join()
+            .expect("checked-prelude worker must complete");
+    }
+
     fn data_match_package() -> (CheckedCorePackage, StableSymbol, StableSymbol, StableSymbol) {
         let target = decl_symbol("target_data_match");
         let target_id = GlobalId(1);

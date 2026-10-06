@@ -2685,6 +2685,11 @@ pub struct NativeProgramPreparationV1 {
 }
 
 impl NativeProgramPreparationV1 {
+    #[cfg(test)]
+    pub(crate) fn checked_package_for_test(&self) -> &CheckedCorePackage {
+        &self.package
+    }
+
     /// The planned Runtime program exactly as production carries it into object
     /// emission.
     pub fn runtime_program(&self) -> &ken_runtime::RuntimeProgram {

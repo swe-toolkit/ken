@@ -93,10 +93,11 @@ fn selected_body(
 /// follows sort, dependence and owner, not a host metadata marker. The gap is
 /// reachability: the ascript-first and owner/dependence mutants must redden
 /// these assertions; source checking alone is not the admission boundary.
-/// A separately selected proof owner is refused because the Library selection
-/// omits its `Top` declaration; the host preparation delivers that declaration.
+/// The final selected-Library refusal below is a transition sentinel: it
+/// intentionally turns red when RT-SELECTED-LIBRARY-DECLARATION-CLOSURE
+/// delivers `Top`; at that event replace it with the admitted proof-owner pin.
 #[test]
-fn elaborated_match_sort_and_owner_admission() {
+fn elaborated_match_sort_and_selected_delivery_boundary() {
     // Baseline provisioning, not a stack regression repair: comparable RT
     // preparation measured 3,936 KiB peak on a 256 MiB Builder stack, leaving
     // 258,208 KiB numeric headroom. The stack is local, not RUST_MIN_STACK.
@@ -131,6 +132,8 @@ fn elaborated_match_sort_and_owner_admission() {
                 CheckedCoreBodyViewError::UnsupportedDependentMotive { .. }
             ));
 
+            // The host preparation carries Top, but this selected Library
+            // package omits it. The reader cannot assume the owner's sort.
             let proof =
                 selected_body("rt_motive_proof", HOST_AND_PROOF, "proof_match").unwrap_err();
             assert!(
