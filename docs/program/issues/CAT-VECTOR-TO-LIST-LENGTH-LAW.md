@@ -39,7 +39,10 @@ Follow `docs/program/07-catalog-style-guide.md` and
 ## Acceptance
 
 - **AC-1.** `to_list_length` checks for every `xs : Vec a n`.
-- **AC-2 (controls).** The cold Vector trust test passes unchanged.
+- **AC-2 (controls).** The cold Vector trust test passes with its trust
+  assertions unchanged. Its `expected_owned_names()` gains exactly
+  `to_list_length`, the rebaseline the test names for the next authorized
+  Vector declaration extension.
 - **AC-3 (mutation, QA).** Dropping the head element in `to_list` reddens
   AC-1.
 - **AC-4 (readability).** The proof and its prose read under the style
