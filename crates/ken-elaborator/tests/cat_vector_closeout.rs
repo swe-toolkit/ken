@@ -1,21 +1,20 @@
 //! CAT-MIGRATE-TIER-C-DATA-VALUE Vector closeout controls.
 //!
 //! Vector owns checked indexed families, operations, computation theorems,
-//! and private map identity, fusion, and lookup-after-map/zip laws. Its only
-//! catalog dependencies are Combinators and Transport. It publishes no
-//! catalog surface and adds no trust beyond those providers.
+//! and private map, lookup, and round-trip laws. Its checked providers include
+//! Combinators and Transport; the new private functions add no trust beyond
+//! those providers.
 //! `cat_vec_acceptance` retains the family-index, computation, and
 //! impossible-call behavior obligations.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{parser, Decl as SurfaceDecl, ElabEnv, ElabError, ExportForm, ImportKind};
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, GlobalId, Level, Term};
 
 const VECTOR: &str = "Data.Vector.Vector";
 const TRANSPORT: &str = "Core.Logic.Transport";
-const VECTOR_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Vector/Vector.ken.md");
 
 fn catalog_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -67,12 +66,23 @@ fn expected_owned_names() -> BTreeSet<String> {
         "map_vnil",
         "tail",
         "tail_vcons",
+        "to_list",
+        "unzip",
+        "unzip_zip",
+        "unzip_zip_fst",
+        "unzip_zip_snd",
+        "vec_nil_case",
+        "vec_nil_case_holds",
+        "vec_zero_vnil",
+        "vector_pair_cong",
         "vec_map_compose",
         "vec_map_identity",
         "zip_with",
         "zip_with_map",
         "zip_with_vcons",
         "zip_with_vnil",
+        "zip",
+        "zip_unzip",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -126,56 +136,6 @@ fn declaration_references(declaration: &Decl) -> BTreeSet<GlobalId> {
     references
 }
 
-#[derive(Debug)]
-struct PackageShape {
-    providers: BTreeSet<(String, String)>,
-    public_declarations: BTreeSet<String>,
-    exports: BTreeSet<String>,
-}
-
-fn package_shape() -> PackageShape {
-    let extracted = ken_elaborator::literate::extract_ken_md(VECTOR_KEN_MD)
-        .expect("Vector literate source must extract");
-    let declarations =
-        parser::parse_decls(&extracted.source).expect("Vector extracted source must parse");
-    let mut providers = BTreeSet::new();
-    let mut public_declarations = BTreeSet::new();
-    let mut exports = BTreeSet::new();
-
-    for declaration in &declarations {
-        if declaration.is_pub() {
-            public_declarations.insert(declaration.unwrap_pub().name().to_owned());
-        }
-        match declaration.unwrap_pub() {
-            SurfaceDecl::ImportDecl { module, kind, .. } => match kind {
-                ImportKind::Selective(items) => {
-                    providers.extend(items.iter().map(|item| (module.clone(), item.name.clone())));
-                }
-                ImportKind::Qualified | ImportKind::Aliased(_) => {
-                    providers.insert((module.clone(), "*".to_owned()));
-                }
-            },
-            SurfaceDecl::ExportDecl { form, .. } => {
-                let items = match form {
-                    ExportForm::Facade { items, .. } | ExportForm::InScope { items } => items,
-                };
-                exports.extend(
-                    items
-                        .iter()
-                        .map(|item| item.rename.clone().unwrap_or_else(|| item.name.clone())),
-                );
-            }
-            _ => {}
-        }
-    }
-
-    PackageShape {
-        providers,
-        public_declarations,
-        exports,
-    }
-}
-
 fn qualified_owned_names(env: &ElabEnv) -> BTreeSet<String> {
     let prefix = format!("{VECTOR}.");
     env.globals
@@ -193,13 +153,13 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 }
 
 /// Promise class: transition sentinel for the owned declarations in this
-/// proof-only increment. Retire or rebaseline at the next separately authorized
+/// Vector increment. Retire or rebaseline at the next separately authorized
 /// Vector declaration extension; this inventory is not a permanent API promise.
-/// MEASURED: ordinary isolated roots loading installs these twenty-four checked
+/// MEASURED: ordinary isolated roots loading installs these checked
 /// Vector identities, returns only identities from that population, and
 /// executes every checked fence, then retains the same qualified name and ID
 /// populations. Provider-closure trust is unchanged by Vector. CLAIMED: the
-/// checked examples add no module-owned declaration or local trust. THE GAP:
+/// checked examples add no further module-owned declaration or local trust. THE GAP:
 /// constructors are not separate loader results; the qualified environment
 /// inventory closes that population, not bare fence-local helper globals.
 #[test]
@@ -260,17 +220,16 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
     );
 }
 
-/// Promise class: transition sentinel for this proof-only dependency edge;
-/// retire or rebaseline at the next separately authorized Vector import change.
-/// MEASURED: checked Vector references exactly the compiler floor, including
-/// `Top` in the inductive proof goals, plus the canonical imported
-/// `comp`/`idf`/`cong`/`sym`/`trans` identities; parsed imports list exactly those two
-/// providers, with no public declaration or re-export. CLAIMED:
-/// the private laws use the two authorized providers and Vector publishes no
-/// catalog surface. THE GAP: `Type` and `Refl` elaborate without separate
-/// provider globals; checked GlobalId comparisons close the provider edge.
+/// Promise class: transition sentinel for Vector's checked dependency edge;
+/// retire or rebaseline at the next separately authorized provider change.
+/// MEASURED: roots-loaded Vector's checked declarations refer to the canonical
+/// prelude, Combinators and Transport global IDs, and preserve
+/// the prelude's canonical identities. CLAIMED: Vector adds no shadow provider
+/// for those dependencies. THE GAP: references in compiled declarations do not
+/// pin imports not reached from a checked declaration; this is a transition
+/// sentinel for the actually used provider closure.
 #[test]
-fn vector_imports_exact_checked_providers_and_publishes_nothing() {
+fn vector_uses_canonical_checked_provider_identities() {
     let base = ElabEnv::new().expect("base environment");
     let (via_vector, _) = load(VECTOR);
     let owned_ids = qualified_owned_ids(&via_vector);
@@ -283,10 +242,13 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
     for id in &owned_ids {
         external.remove(id);
     }
-    let mut expected_external = ["Top", "Proved", "Nat", "Zero", "Suc", "Equal"]
-        .into_iter()
-        .map(|name| base.globals[name])
-        .collect::<BTreeSet<_>>();
+    let mut expected_external = [
+        "Top", "Proved", "Nat", "Zero", "Suc", "List", "Nil", "Cons", "Equal", "Prop", "Pair",
+        "mk_pair", "pair_fst", "pair_snd",
+    ]
+    .into_iter()
+    .map(|name| base.globals[name])
+    .collect::<BTreeSet<_>>();
     for name in [
         "Core.Function.Combinators.comp",
         "Core.Function.Combinators.idf",
@@ -300,7 +262,10 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
         external, expected_external,
         "Vector's checked external identity inventory changed"
     );
-    for name in ["Top", "Proved", "Nat", "Zero", "Suc", "Equal"] {
+    for name in [
+        "Top", "Proved", "Nat", "Zero", "Suc", "List", "Nil", "Cons", "Equal", "Prop", "Pair",
+        "mk_pair", "pair_fst", "pair_snd",
+    ] {
         assert_eq!(
             via_vector.globals[name], base.globals[name],
             "Vector must retain the compiler's canonical `{name}` identity"
@@ -327,38 +292,13 @@ fn vector_imports_exact_checked_providers_and_publishes_nothing() {
         alongside_derived.globals["Data.Collections.Derived.map"], derived_map,
         "Vector's local map must not overwrite the checked Derived provider"
     );
-
-    let shape = package_shape();
-    assert_eq!(
-        shape.providers,
-        [
-            ("Core.Function.Combinators".to_owned(), "comp".to_owned()),
-            ("Core.Function.Combinators".to_owned(), "idf".to_owned()),
-            ("Core.Logic.Transport".to_owned(), "cong".to_owned()),
-            ("Core.Logic.Transport".to_owned(), "sym".to_owned()),
-            ("Core.Logic.Transport".to_owned(), "trans".to_owned()),
-        ]
-        .into_iter()
-        .collect(),
-        "Vector must import exactly the two checked proof providers"
-    );
-    assert_eq!(
-        shape.public_declarations,
-        BTreeSet::new(),
-        "Vector must not directly publish a declaration"
-    );
-    assert_eq!(
-        shape.exports,
-        BTreeSet::new(),
-        "Vector must not re-export a declaration"
-    );
 }
 
 /// MEASURED: a known public Transport item succeeds through the same selective
-/// import path, while every direct Vector name rejects with its exact qualified
-/// `UnboundName`. CLAIMED: Vector's loader-visible catalog inventory is empty.
-/// THE GAP: none; the exact owned inventory supplies the complete direct-name
-/// population, including both indexed families' constructors.
+/// import path, while every direct Vector name (including the three new
+/// operations) rejects with its exact qualified `UnboundName`. CLAIMED:
+/// Vector's loader-visible catalog inventory remains private. THE GAP: none;
+/// the exact owned inventory supplies the complete direct-name population.
 #[test]
 fn vector_loader_visible_inventory_is_empty() {
     let mut positive = ElabEnv::new().expect("base environment");

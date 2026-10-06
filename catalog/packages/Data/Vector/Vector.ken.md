@@ -21,9 +21,10 @@ that describes its length. `Vec a (Suc n)` therefore excludes the empty
 constructor, and `Fin n` represents only positions that are strictly below
 `n`.
 
-The same index also states the alignment contract of `map` and `zip_with`.
-Their result types retain the input length, and `zip_with` accepts only two
-vectors with the same length.
+The same index also states the alignment contract of `map`, `zip_with`, and
+`zip`. Their result types retain the input length, and each zip operation
+accepts only two vectors with the same length. `to_list` forgets the index,
+while `unzip` recovers both aligned input vectors from paired elements.
 
 ## Definition
 
@@ -31,6 +32,8 @@ vectors with the same length.
 `Zero`; `VCons` extends a vector at length `n` to length `Suc n`. Neither
 constructor of `Fin` targets `Fin Zero`. The map laws use checked `idf` and
 `comp` from the combinator package and `cong` from the transport package.
+`Pair`, `mk_pair`, `pair_fst` and `pair_snd` come from the prelude, not an
+additional catalog provider.
 
 ```ken
 import Core.Function.Combinators (comp, idf)
@@ -74,6 +77,31 @@ fn zip_with
       }
   }
 
+fn to_list (a : Type) (n : Nat) (xs : Vec a n) : List a =
+  match xs {
+    VNil ↦ Nil a;
+    VCons m x tail_xs ↦ Cons a x (to_list a m tail_xs)
+  }
+
+fn zip (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n) : Vec (Pair a b) n =
+  zip_with a b (Pair a b) n (mk_pair a b) xs ys
+
+fn unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n) : Pair (Vec a n) (Vec b n) =
+  match ps {
+    VNil ↦ mk_pair (Vec a Zero) (Vec b Zero) (VNil a) (VNil b);
+    VCons m p tail_ps ↦
+      let
+        tails = unzip a b m tail_ps;
+        left_tail = pair_fst (Vec a m) (Vec b m) tails;
+        right_tail = pair_snd (Vec a m) (Vec b m) tails
+      in
+        mk_pair
+          (Vec a (Suc m))
+          (Vec b (Suc m))
+          (VCons a m (pair_fst a b p) left_tail)
+          (VCons b m (pair_snd a b p) right_tail)
+  }
+
 fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
   match i {
     FZero m ↦
@@ -84,6 +112,130 @@ fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
       match xs {
         VCons _ x tail_xs ↦ lookup a m tail_xs rest
       }
+  }
+
+theorem unzip_zip
+      (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+    : Equal
+        (Pair (Vec a n) (Vec b n))
+        (unzip a b n (zip a b n xs ys))
+        (mk_pair (Vec a n) (Vec b n) xs ys) =
+  let
+    reconstructed = unzip a b n (zip a b n xs ys);
+    left_round_trip = unzip_zip_fst a b n xs ys;
+    right_round_trip = unzip_zip_snd a b n xs ys
+  in
+    vector_pair_cong
+      a
+      b
+      n
+      (pair_fst (Vec a n) (Vec b n) reconstructed)
+      xs
+      (pair_snd (Vec a n) (Vec b n) reconstructed)
+      ys
+      left_round_trip
+      right_round_trip
+
+theorem unzip_zip_fst
+      (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+    : Equal (Vec a n) (pair_fst (Vec a n) (Vec b n) (unzip a b n (zip a b n xs ys))) xs =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      match ys {
+        VCons _ y tail_ys ↦
+          cong
+            (Vec a m)
+            (Vec a (Suc m))
+            (pair_fst (Vec a m) (Vec b m) (unzip a b m (zip a b m tail_xs tail_ys)))
+            tail_xs
+            (VCons a m x)
+            (unzip_zip_fst a b m tail_xs tail_ys)
+      }
+  }
+
+theorem unzip_zip_snd
+      (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+    : Equal (Vec b n) (pair_snd (Vec a n) (Vec b n) (unzip a b n (zip a b n xs ys))) ys =
+  match xs {
+    VNil ↦ vec_zero_vnil b ys;
+    VCons m x tail_xs ↦
+      match ys {
+        VCons _ y tail_ys ↦
+          cong
+            (Vec b m)
+            (Vec b (Suc m))
+            (pair_snd (Vec a m) (Vec b m) (unzip a b m (zip a b m tail_xs tail_ys)))
+            tail_ys
+            (VCons b m y)
+            (unzip_zip_snd a b m tail_xs tail_ys)
+      }
+  }
+
+theorem vector_pair_cong
+      (a : Type)
+      (b : Type)
+      (n : Nat)
+      (xs : Vec a n)
+      (xs2 : Vec a n)
+      (ys : Vec b n)
+      (ys2 : Vec b n)
+      (px : Equal (Vec a n) xs xs2)
+      (py : Equal (Vec b n) ys ys2)
+    : Equal
+        (Pair (Vec a n) (Vec b n))
+        (mk_pair (Vec a n) (Vec b n) xs ys)
+        (mk_pair (Vec a n) (Vec b n) xs2 ys2) =
+  J
+    (λxs2' _.
+      Equal
+        (Pair (Vec a n) (Vec b n))
+        (mk_pair (Vec a n) (Vec b n) xs ys)
+        (mk_pair (Vec a n) (Vec b n) xs2' ys2))
+    (cong (Vec b n) (Pair (Vec a n) (Vec b n)) ys ys2 (mk_pair (Vec a n) (Vec b n) xs) py)
+    px
+
+theorem vec_zero_vnil (b : Type) (ys : Vec b Zero) : Equal (Vec b Zero) (VNil b) ys =
+  vec_nil_case_holds b Zero ys
+
+theorem vec_nil_case_holds (b : Type) (n : Nat) (ys : Vec b n) : vec_nil_case b n ys =
+  match ys {
+    VNil ↦ Proved;
+    VCons m y tail_ys ↦ Proved
+  }
+
+fn vec_nil_case (b : Type) (n : Nat) : Vec b n → Prop =
+  match n {
+    Zero ↦ λys. Equal (Vec b Zero) (VNil b) ys;
+    Suc m ↦ λys. Top
+  }
+
+theorem zip_unzip
+      (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+    : Equal
+        (Vec (Pair a b) n)
+        (zip
+          a
+          b
+          n
+          (pair_fst (Vec a n) (Vec b n) (unzip a b n ps))
+          (pair_snd (Vec a n) (Vec b n) (unzip a b n ps)))
+        ps =
+  match ps {
+    VNil ↦ Proved;
+    VCons m p tail_ps ↦
+      cong
+        (Vec (Pair a b) m)
+        (Vec (Pair a b) (Suc m))
+        (zip
+          a
+          b
+          m
+          (pair_fst (Vec a m) (Vec b m) (unzip a b m tail_ps))
+          (pair_snd (Vec a m) (Vec b m) (unzip a b m tail_ps)))
+        tail_ps
+        (VCons (Pair a b) m p)
+        (zip_unzip a b m tail_ps)
   }
 
 theorem head_vcons
@@ -277,8 +429,12 @@ selects the position after `i`; its constructor requires `i : Fin n`, so each
 recursive lookup step consumes one vector element and one bound witness
 together.
 
-`map` changes only the element type. `zip_with` requires both inputs at the
-same `n` and returns its output at that same `n`, so truncation cannot occur.
+`map` changes only the element type. `zip_with` and `zip` require both inputs
+at the same `n` and return their output at that same `n`, so truncation cannot
+occur. `zip` pairs corresponding elements by applying `zip_with` to the
+prelude pair constructor. `unzip` traverses that paired vector, returning a
+pair of component vectors at the same index. `to_list` traverses a vector
+from head to tail, retaining element order while dropping the index.
 
 ## Laws & proofs
 
@@ -286,9 +442,13 @@ Length preservation is carried by the signatures:
 
 - `map` returns `Vec b n` from `Vec a n`.
 - `zip_with` returns `Vec c n` from two inputs at the same `n`.
+- `zip` returns `Vec (Pair a b) n` from two inputs at the same `n`.
+- `unzip` returns two `Vec`s, each indexed by its input's `n`.
 
-No separate arithmetic theorem is needed to recover those facts. The kernel
-checks the index at every constructor assembly and recursive call.
+No separate arithmetic theorem is needed to recover those indexed facts.
+The kernel checks the index at every constructor assembly and recursive call.
+The length of the unindexed `to_list` view is a separate law, deferred until
+`List` length has a trust-free canonical provider.
 
 Totality is likewise carried by the domain types. `head` and `tail` accept only
 `Vec a (Suc n)`, while `lookup` requires a `Fin n` paired with `Vec a n`.
@@ -316,6 +476,18 @@ before `zip_with` equivalent to zipping with `k`. In the successor case,
 `sym` orients the head alignment toward `k`, while `cong` lifts that equality
 and the recursive tail equality under `VCons`; `trans` joins the two changes.
 This checked private theorem works at arbitrary element types and lengths.
+
+The two private checked round-trip theorems close the paired-vector bridge.
+`unzip_zip` projects both components of `unzip (zip xs ys)` and proves each
+matches its corresponding input, then assembles the pair equality with
+`vector_pair_cong`. Its first projection is direct induction. In its empty
+branch, the second projection needs uniqueness of `Vec b Zero`; the private
+`vec_nil_case` states a proposition indexed by `n` that reduces to this
+uniqueness at `Zero` and to `Top` at `Suc n`. Matching `ys` at a variable
+index checks both cases, and `vec_zero_vnil` supplies the empty-branch proof.
+`zip_unzip` inducts over the paired input: pair projections and Sigma eta
+preserve each head, while `cong` lifts its recursive proof through `VCons`.
+Neither direction adds an axiom or a trusted declaration.
 
 The checked examples use the private computation and lookup laws at their
 generic propositions, then illustrate the operations at concrete indices.
@@ -422,18 +594,19 @@ theorem vec_example_zip_second
 Its constructors make the bound structural and give the accessor a single,
 canonical totality story.
 
-Constructor names are PascalCase because constructors are type-like public
-names on the current surface. Function names are snake_case; in particular,
-`zip_with` follows the catalog naming convention while preserving the usual
-zip-with operation.
+Constructor names are PascalCase because constructors are type-like names
+on the current surface. Function names are snake_case; `zip_with` and `zip`
+follow the catalog convention while preserving their usual distinct operations.
 
 The implementation recurses structurally. `zip_with` and `lookup` refine a
 sibling indexed value through nested matches. Generic cons computation for
 `zip_with` checks by `Refl`. Lookup after `zip_with` follows its bounded index
 through both input tails and is checked generically. `zip_with`/map naturality
 states a pointwise premise on the combining function; this states the general
-law without an inline lambda in a proposition type. Concrete checked
-examples illustrate the operations but do not stand in for those general laws.
+law without an inline lambda in a proposition type. Both zip/unzip directions
+are checked over generic types, lengths and vectors; the `to_list` length law
+awaits its trust-free canonical `List` length provider. Concrete examples
+illustrate the operations but do not stand in for the checked laws.
 
 ## References
 
@@ -453,12 +626,16 @@ This entry realizes the length-indexed vector contract in
 `data`, structural recursion, dependent `match`, `Equal`, `Refl`, and `Proved`
 surfaces. The private map and naturality laws reuse
 `Core.Function.Combinators.comp`/`idf` and
-`Core.Logic.Transport.cong`/`sym`/`trans`.
+`Core.Logic.Transport.cong`/`sym`/`trans`. The two round-trip proofs use
+ordinary `Pair` projections, `J`, and Sigma eta, with a checked index-computed
+motive for the empty vector's uniqueness.
 
-The public API is `Vec`, `VNil`, `VCons`, `Fin`, `FZero`, `FSuc`, `head`,
-`tail`, `map`, `zip_with`, and `lookup`. Eight computation theorems, map
-composition, lookup after map and after `zip_with`, and pointwise
-`zip_with`/map naturality are private checked laws.
+The `Vec` and `Fin` families, their constructors, all operations including
+`to_list`, `zip`, and `unzip`, and all theorems remain private to this package.
+Eight computation theorems, map composition, lookup after map and after
+`zip_with`, pointwise `zip_with`/map naturality, `unzip_zip`, and `zip_unzip`
+are checked laws. The `to_list`/`length` bridge is deferred to its separate
+trust-free-provider follow-up.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
@@ -468,6 +645,6 @@ base set. The imported combinator and congruence providers contribute no
 trusted items, and Vector adds none.
 
 Targeted validation checks the package through the roots-based module loader,
-the exact family indices and constructor targets, generic operation types,
-rejection of empty and out-of-bounds calls, computation and identity theorems,
-and the provider-closure before/after trusted-base set.
+the exact family indices and constructor targets, generic operation and
+round-trip proof types, rejection of empty and out-of-bounds calls, computation
+and identity theorems, and the provider-closure before/after trusted-base set.

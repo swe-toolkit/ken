@@ -190,6 +190,143 @@ fn empty_and_out_of_bounds_calls_are_rejected_by_their_indices() {
     }
 }
 
+/// Promise class: durable invariant. From an actually roots-loaded Vector,
+/// independently restate and apply both private, checked inverse laws.
+/// MEASURED: the elaborator/kernel checks every quantified statement and its
+/// proof application, not a source spelling. CLAIMED: both zip/unzip inverse
+/// directions hold for arbitrary element types, length and vectors. THE GAP:
+/// the proof clients use private test aliases because the package does not
+/// export its Vec family or operations;
+/// the original checked declarations are independently verified by roots load.
+#[test]
+fn bridge_laws_check_at_independent_generic_client_types() {
+    let mut env = internal_vector_fixture_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_file(
+        r#"
+fn bridge_as_list (a : Type) (n : Nat) (xs : Vec a n) : List a = to_list a n xs
+fn bridge_zip (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+  : Vec (Pair a b) n = zip a b n xs ys
+fn bridge_unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+  : Pair (Vec a n) (Vec b n) = unzip a b n ps
+
+theorem bridge_unzip_zip
+    (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+  : Equal (Pair (Vec a n) (Vec b n))
+      (unzip a b n (zip a b n xs ys))
+      (mk_pair (Vec a n) (Vec b n) xs ys) =
+  unzip_zip a b n xs ys
+
+theorem bridge_zip_unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+  : Equal (Vec (Pair a b) n)
+      (zip a b n
+        (pair_fst (Vec a n) (Vec b n) (unzip a b n ps))
+        (pair_snd (Vec a n) (Vec b n) (unzip a b n ps)))
+      ps =
+  zip_unzip a b n ps
+"#,
+    )
+    .expect("both generic round-trip laws must inhabit independent client types");
+    assert_eq!(
+        before,
+        env.env.trusted_base().into_iter().collect(),
+        "generic law clients must not add a trusted assumption"
+    );
+}
+
+/// Promise class: durable invariant. Closed vectors at two distinct lengths
+/// carry their actual heads, and unzip preserves two unequal Bool components.
+/// MEASURED: checked concrete computations; CLAIMED: `to_list` keeps order,
+/// `zip` pairs position-wise and `unzip` does not exchange pair projections.
+/// THE GAP: concrete examples cover these witnesses, not arbitrary inputs;
+/// the generic client above carries the universally quantified proof.
+#[test]
+fn vector_bridge_preserves_concrete_content_and_component_order() {
+    let mut env = internal_vector_fixture_env();
+    env.elaborate_file(
+        r#"
+theorem bridge_empty_list : Equal (List Bool) (to_list Bool Zero (VNil Bool)) (Nil Bool) =
+  Proved
+
+theorem bridge_two_list
+  : Equal (List Bool)
+      (to_list Bool (Suc (Suc Zero))
+        (VCons Bool (Suc Zero) True (VCons Bool Zero False (VNil Bool))))
+      (Cons Bool True (Cons Bool False (Nil Bool))) =
+  Refl
+
+theorem bridge_paired_head
+  : Equal (List (Pair Bool Bool))
+      (to_list (Pair Bool Bool) (Suc Zero)
+        (zip Bool Bool (Suc Zero)
+          (VCons Bool Zero True (VNil Bool))
+          (VCons Bool Zero False (VNil Bool))))
+      (Cons (Pair Bool Bool) (mk_pair Bool Bool True False) (Nil (Pair Bool Bool))) =
+  Refl
+
+theorem bridge_unzipped_left
+  : Equal (Vec Bool (Suc Zero))
+      (pair_fst (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero))
+        (unzip Bool Bool (Suc Zero)
+          (VCons (Pair Bool Bool) Zero (mk_pair Bool Bool True False)
+            (VNil (Pair Bool Bool)))))
+      (VCons Bool Zero True (VNil Bool)) =
+  Refl
+
+theorem bridge_unzipped_right
+  : Equal (Vec Bool (Suc Zero))
+      (pair_snd (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero))
+        (unzip Bool Bool (Suc Zero)
+          (VCons (Pair Bool Bool) Zero (mk_pair Bool Bool True False)
+            (VNil (Pair Bool Bool)))))
+      (VCons Bool Zero False (VNil Bool)) =
+  Refl
+"#,
+    )
+    .expect("closed head order and the two unequal projections must check");
+}
+
+/// Promise class: durable invariant. For identical component types, swapping
+/// the unequal left/right outputs is a well-typed but false inverse claim.
+/// MEASURED: the correct generic law checks above, while using its proof for
+/// this swapped Bool claim is kernel-rejected. CLAIMED: the two components of
+/// `unzip` are not interchangeable. THE GAP: this is a concrete same-type
+/// counterexample; generic inverse proofs establish the all-type property.
+#[test]
+fn swapped_unzip_components_are_rejected_for_unequal_bool_values() {
+    let mut env = internal_vector_fixture_env();
+    env.elaborate_file(
+        "const bridge_left : Vec Bool (Suc Zero) = VCons Bool Zero True (VNil Bool)\n\
+         const bridge_right : Vec Bool (Suc Zero) = VCons Bool Zero False (VNil Bool)\n\
+         theorem bridge_unswapped\n\
+           : Equal (Pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero)))\n\
+               (unzip Bool Bool (Suc Zero)\n\
+                 (zip Bool Bool (Suc Zero) bridge_left bridge_right))\n\
+               (mk_pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero))\n\
+                 bridge_left bridge_right) =\n\
+           unzip_zip Bool Bool (Suc Zero) bridge_left bridge_right",
+    )
+    .expect("real unequal heads must satisfy the original round trip");
+    let swapped = "theorem bridge_swapped\n\
+      : Equal (Pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero)))\n\
+          (unzip Bool Bool (Suc Zero) (zip Bool Bool (Suc Zero) bridge_left bridge_right))\n\
+          (mk_pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero)) bridge_right bridge_left) =\n\
+        unzip_zip Bool Bool (Suc Zero) bridge_left bridge_right";
+    let error = env
+        .elaborate_decl(swapped)
+        .expect_err("swapped unequal component values must not satisfy unzip_zip");
+    assert!(
+        matches!(
+            error,
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "swapped result must fail by kernel type mismatch: {error:?}"
+    );
+}
+
 #[test]
 fn entry_adds_no_trusted_declarations_beyond_its_providers() {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
