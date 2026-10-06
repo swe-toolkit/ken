@@ -412,3 +412,141 @@ fn class_env_scrub_global_ids_filters_direct_use_instance_ids() {
     assert!(!class_env.direct_use_instances.contains(&removed));
     assert!(class_env.direct_use_instances.contains(&stable));
 }
+
+fn refined_type_position_env() -> ElabEnv {
+    let mut env = ElabEnv::new().expect("base environment");
+    for source in [
+        "const six : Int = 6",
+        "def Five = { v : Int | Equal Int v 5 }",
+        "fn Box (y : { v : Int | Equal Int v 5 }) : Type = Int",
+        "fn NBox (y : Five) : Type = Int",
+    ] {
+        env.elaborate_decl(source)
+            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    }
+    env
+}
+
+fn assert_failed_inner_snapshot_preserves_outer_mark(
+    env: &mut ElabEnv,
+    failed_source: &str,
+    failed_name: &str,
+    replacement_source: &str,
+    replacement_name: &str,
+    expected_error: impl FnOnce(&ElabError) -> bool,
+) {
+    let before_trust = trusted_ids(env);
+    let before_env = env.env.clone();
+    let start_id = env.env.next_global_id();
+    let mark = ken_kernel::env_mark(&env.env);
+
+    let error = env
+        .elaborate_decl_v1(failed_source)
+        .expect_err("the selected declaration route must refuse");
+    assert_eq!(
+        trusted_ids(env)
+            .difference(&before_trust)
+            .copied()
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::new(),
+        "the failed declaration leaves zero trusted-base delta"
+    );
+    assert!(
+        expected_error(&error),
+        "expected primary refusal, got {error:?}"
+    );
+    assert_eq!(env.env, before_env, "kernel environment value is restored");
+    assert_eq!(env.env.next_global_id(), start_id);
+    assert!(
+        !env.globals.contains_key(failed_name),
+        "failed declaration name must not remain registered"
+    );
+    assert!(
+        ken_kernel::rollback_to_mark(&mut env.env, mark)
+            .expect("outer EnvMark still belongs to this environment")
+            .is_empty(),
+        "the checked rollback already removed the failed declaration tail"
+    );
+
+    let replacement = env
+        .elaborate_decl_v1(replacement_source)
+        .unwrap_or_else(|error| panic!("replacement {replacement_source}: {error:?}"));
+    assert_eq!(replacement.def_id, start_id);
+    assert_eq!(env.globals.get(replacement_name), Some(&start_id));
+    assert_eq!(env.env.lookup(start_id).map(Decl::id), Some(start_id));
+    let names_at_reused_id = env
+        .globals
+        .iter()
+        .filter_map(|(name, id)| (*id == start_id).then_some(name.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(names_at_reused_id, vec![replacement_name]);
+}
+
+/// Promise class: durable refusal-and-reuse invariant for the legacy data
+/// declaration path under the enclosing declaration transaction.
+/// MEASURED: the public legacy-data path refuses `Box six`, restores the
+/// structural environment and accepts a same-name replacement at the old ID.
+/// CLAIMED: the preexisting EnvMark remains valid across inner error handling.
+/// THE GAP: the helper observes this route's outermost transaction, not every
+/// caller of the lower-level data elaborator.
+#[test]
+fn failed_legacy_data_snapshot_preserves_outer_env_mark() {
+    let mut env = refined_type_position_env();
+    assert_failed_inner_snapshot_preserves_outer_mark(
+        &mut env,
+        "data QaSnapshotLegacy = MkQaSnapshotLegacy (Box six)",
+        "QaSnapshotLegacy",
+        "data QaSnapshotLegacy = MkQaSnapshotLegacy",
+        "QaSnapshotLegacy",
+        |error| matches!(error, ElabError::ObligationWithoutChannel { .. }),
+    );
+}
+
+/// Promise class: durable refusal-and-reuse invariant for the explicit data
+/// declaration path under the enclosing declaration transaction.
+/// MEASURED: the explicit-data path refuses `Box six`, restores the structural
+/// environment and accepts a same-name replacement at the old ID.
+/// CLAIMED: the preexisting EnvMark remains valid across inner error handling.
+/// THE GAP: the helper observes this route's outermost transaction, not every
+/// caller of the lower-level data elaborator.
+#[test]
+fn failed_explicit_data_snapshot_preserves_outer_env_mark() {
+    let mut env = refined_type_position_env();
+    assert_failed_inner_snapshot_preserves_outer_mark(
+        &mut env,
+        concat!(
+            "data QaSnapshotExplicit : Type where { ",
+            "MkQaSnapshotExplicit : (x : Box six) → QaSnapshotExplicit }"
+        ),
+        "QaSnapshotExplicit",
+        "data QaSnapshotExplicit : Type where { MkQaSnapshotExplicit : QaSnapshotExplicit }",
+        "QaSnapshotExplicit",
+        |error| matches!(error, ElabError::ObligationWithoutChannel { .. }),
+    );
+}
+
+/// Promise class: durable refusal-and-reuse invariant for the refined-field
+/// record snapshot path under the enclosing declaration transaction.
+/// MEASURED: a record with an invalid refined-field proposition refuses before
+/// registration, restores the structural environment, and reuses its ID.
+/// CLAIMED: this snapshot path cannot replace the environment under an EnvMark.
+/// THE GAP: record registration has no fallible operation after it; this pins
+/// the earliest reachable failure through the refined-field snapshot route.
+#[test]
+fn failed_refined_record_snapshot_preserves_outer_env_mark() {
+    let mut env = ElabEnv::new().expect("base environment");
+    assert_failed_inner_snapshot_preserves_outer_mark(
+        &mut env,
+        "record QaSnapshotRecord { field : { x : Int | Type } }",
+        "QaSnapshotRecord",
+        "record QaSnapshotRecord { field : Bool }",
+        "QaSnapshotRecord",
+        |error| {
+            matches!(
+                error,
+                ElabError::TypeMismatch { reason, .. }
+                    if reason == "spec proposition must have type Ω, found non-proposition"
+            )
+        },
+    );
+}
