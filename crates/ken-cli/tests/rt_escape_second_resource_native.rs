@@ -754,16 +754,17 @@ fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
     });
 }
 
-/// Promise class: transition sentinel for this r2 fixture's source origins.
-/// Construct782 field 0 is Match781 on the frozen fixture; if origin issuance
-/// changes, review the fixture identity rather than silently updating the pin.
-/// Measured: the completed planner's actual child-owner record for that field.
-/// Claimed: a process-composed Match child may refer to persistent storage.
-/// Gap: this pins the planner's allowance, not the executed word's owner;
-/// the artifact is built here, not executed. The R1 owner repair retires the
-/// old NoReferent-only disposition, not this fixture's observable assertion.
+/// Promise class: durable invariant over the r2 fixture's planned Match children.
+/// MEASURED: every persistent source-Match child with a scalar join plan under
+/// nonempty process transports retains PersistentStore in its possible owners.
+/// CLAIMED: a process-composed CarrierWord may still name a persistent referent
+/// even if that Match's standalone join plan has no referent.
+/// THE GAP: this checks the planner's allowance, not actual word ownership or
+/// native execution; the positive-domain assertion prevents an empty fixture
+/// from passing. Source-origin renumbering and added Match children stay green
+/// when the planner preserves this relation.
 #[test]
-fn r2_process_composed_match_child_allows_persistent_referent() {
+fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
     in_large_stack_thread("rt-escape-r2-process-carrier-owners", || {
         let root = output_dir("r2-process-carrier-owners");
         let (compiled, diagnostics) =
@@ -782,21 +783,33 @@ fn r2_process_composed_match_child_allows_persistent_referent() {
             1,
             "one completed r2 source ownership plan"
         );
-        let children = diagnostics[0]
+        let plan = &diagnostics[0];
+        assert!(
+            !plan.pre_schema_transport_sources.is_empty(),
+            "the r2 fixture must have a process-composed transport domain"
+        );
+        let possible_carried_children = plan
             .source_aggregate_children
             .iter()
-            .filter(|child| child.parent_origin == 782 && child.position == 0)
+            .filter(|child| {
+                child.source_is_match
+                    && child.join_is_native_scalar_pair
+                    && child.child_is_persistent
+            })
             .collect::<Vec<_>>();
-        assert_eq!(children.len(), 1, "one Construct782 child-0 owner record");
-        let child = children[0];
-        assert_eq!(child.child_origin, Some(781), "the exact r2 source child");
         assert!(
-            child
-                .owners
-                .contains(&ken_runtime::boundary_value::BoundaryReferentOwner::PersistentStore),
-            "process-composed Match781 must retain a possible persistent referent: {:?}",
-            child.owners
+            !possible_carried_children.is_empty(),
+            "r2 must have a persistent scalar-planned source-Match aggregate child"
         );
+        for child in possible_carried_children {
+            assert!(
+                child.owners.contains(
+                    &ken_runtime::boundary_value::BoundaryReferentOwner::PersistentStore
+                ),
+                "a process-domain source-Match child must allow a persistent referent: parent={} position={} child={:?} owners={:?}",
+                child.parent_origin, child.position, child.child_origin, child.owners
+            );
+        }
     });
 }
 

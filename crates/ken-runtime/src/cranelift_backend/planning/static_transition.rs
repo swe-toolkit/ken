@@ -1154,6 +1154,10 @@ pub struct SourceAggregateChildObservation {
     pub position: u32,
     pub child_origin: Option<u32>,
     pub owners: Vec<BoundaryReferentOwner>,
+    /// Inputs to the owner rule, projected independently of its output.
+    pub source_is_match: bool,
+    pub join_is_native_scalar_pair: bool,
+    pub child_is_persistent: bool,
 }
 
 /// Planned returned-Vis origin and exact existing or candidate response row.
@@ -1379,11 +1383,30 @@ fn record_static_response_feasibility_diagnostic(
                 source_aggregate_children: plan.aggregate_ownership.iter()
                     .filter_map(|record| match &record.producer {
                         AggregateOccurrenceProducer::Source(parent) => Some(
-                            record.children.iter().map(|child| SourceAggregateChildObservation {
-                                parent_origin: parent.0,
-                                position: child.position,
-                                child_origin: child.origin.map(|origin| origin.0),
-                                owners: child.owners.clone(),
+                            record.children.iter().map(|child| {
+                                let source_is_match = child.origin.is_some_and(|origin| {
+                                    let source = plan.source_occurrences
+                                        .get(origin.0 as usize)
+                                        .and_then(Option::as_ref)
+                                        .expect("a source aggregate child has a source occurrence");
+                                    matches!(source.expr, RuntimeExpr::Match { .. })
+                                });
+                                let join_is_native_scalar_pair = child.origin.is_some_and(|origin| {
+                                    plan.join_results.get(origin.0 as usize)
+                                        .and_then(Option::as_ref)
+                                        .is_some_and(|join| join.representation
+                                            == JoinResultRepresentation::NativeScalarPair)
+                                });
+                                SourceAggregateChildObservation {
+                                    parent_origin: parent.0,
+                                    position: child.position,
+                                    child_origin: child.origin.map(|origin| origin.0),
+                                    owners: child.owners.clone(),
+                                    source_is_match,
+                                    join_is_native_scalar_pair,
+                                    child_is_persistent: child.lifetime
+                                        == PlannedReferentLifetime::Persistent,
+                                }
                             }).collect::<Vec<_>>(),
                         ),
                         AggregateOccurrenceProducer::SynthesizedUse { .. } => None,
