@@ -107,7 +107,8 @@ fn rollback_clears_public_and_certificate_registries() {
         PrimReduction::OpaqueType,
     )
     .expect("opaque primitive type");
-    env.register_int_lit_type(primitive_type);
+    ken_kernel::check::register_checked_int_lit_carrier(&mut env, primitive_type)
+        .expect("checked primitive literal carrier");
     let primitive_term = top_const(primitive_type);
     let bool_term = Term::indformer(bool_family, Vec::new());
     let eq_operation = declare_primitive(

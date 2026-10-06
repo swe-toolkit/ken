@@ -25,6 +25,15 @@ fn trusted_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
     let mut env = ElabEnv::new().expect("base environment");
     let before = trusted_ids(&env);
+    let stable_root = env.globals["Bool"];
+    let stable_alias = env.globals["True"];
+    let alias_to_removed_root = env.globals["False"];
+    env.refinement_facts
+        .refinement_predicates
+        .insert(stable_root, Term::constructor(env.env.tt_id(), Vec::new()));
+    env.refinement_facts
+        .refinement_aliases
+        .insert(stable_alias, stable_root);
     let mut allocated = None;
 
     let result: Result<(), ElabError> = env.with_env_mark_rollback(|env| {
@@ -85,9 +94,25 @@ fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
             head_type: "probe".into(),
             defining_package: "probe".into(),
         });
+        let retained_term = Term::const_(stable_root, Vec::new());
         env.refinement_facts
             .refinement_predicates
-            .insert(id, Term::constructor(env.env.tt_id(), Vec::new()));
+            .insert(id, retained_term.clone());
+        env.refinement_facts
+            .refinement_aliases
+            .insert(id, stable_root);
+        env.refinement_facts
+            .refinement_aliases
+            .insert(alias_to_removed_root, id);
+        env.refinement_facts
+            .refined_params
+            .insert(id, vec![Some(retained_term.clone())]);
+        env.refinement_facts
+            .constructor_field_predicates
+            .insert(id, vec![Some(retained_term.clone())]);
+        env.refinement_facts
+            .record_field_predicates
+            .insert(id, vec![Some(retained_term)]);
         Err(ElabError::Internal("rollback probe".into()))
     });
 
@@ -118,6 +143,28 @@ fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
     assert!(env.class_env.projection_by_type_id(id).is_none());
     assert!(env.resolution_provenance.is_empty());
     assert!(!env.refinement_facts.refinement_predicates.contains_key(&id));
+    assert!(!env.refinement_facts.refinement_aliases.contains_key(&id));
+    assert!(!env
+        .refinement_facts
+        .refinement_aliases
+        .contains_key(&alias_to_removed_root));
+    assert_eq!(
+        env.refinement_facts.refinement_aliases.get(&stable_alias),
+        Some(&stable_root)
+    );
+    assert!(!env.refinement_facts.refined_params.contains_key(&id));
+    assert!(!env
+        .refinement_facts
+        .constructor_field_predicates
+        .contains_key(&id));
+    assert!(!env
+        .refinement_facts
+        .record_field_predicates
+        .contains_key(&id));
+    assert!(env
+        .refinement_facts
+        .refinement_predicate(stable_alias)
+        .is_some());
 
     let replacement = env
         .elaborate_decl_v1("const ac0_after : Bool = True")
@@ -127,4 +174,12 @@ fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
         .numeric_env
         .classify_add(&Term::const_(replacement.def_id, Vec::new()))
         .is_none());
+    assert_eq!(
+        env.refinement_facts.refinement_root(replacement.def_id),
+        None
+    );
+    assert_eq!(
+        env.refinement_facts.refinement_root(stable_alias),
+        Some(stable_root)
+    );
 }
