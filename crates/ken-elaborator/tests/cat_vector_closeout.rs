@@ -67,6 +67,7 @@ fn expected_owned_names() -> BTreeSet<String> {
         "tail",
         "tail_vcons",
         "to_list",
+        "to_list_length",
         "unzip",
         "unzip_zip",
         "unzip_zip_fst",

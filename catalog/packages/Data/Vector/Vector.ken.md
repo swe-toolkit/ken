@@ -40,6 +40,8 @@ import Core.Function.Combinators (comp, idf)
 
 import Core.Logic.Transport (cong, sym, trans)
 
+import Data.Collections.List (length)
+
 data Vec (a : Type) : Nat → Type where {
   VNil : Vec a Zero;
   VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)
@@ -81,6 +83,15 @@ fn to_list (a : Type) (n : Nat) (xs : Vec a n) : List a =
   match xs {
     VNil ↦ Nil a;
     VCons m x tail_xs ↦ Cons a x (to_list a m tail_xs)
+  }
+
+theorem to_list_length
+      (a : Type) (n : Nat) (xs : Vec a n)
+    : Equal Nat (length a (to_list a n xs)) n =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      cong Nat Nat (length a (to_list a m tail_xs)) m Suc (to_list_length a m tail_xs)
   }
 
 fn zip (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n) : Vec (Pair a b) n =
@@ -447,8 +458,13 @@ Length preservation is carried by the signatures:
 
 No separate arithmetic theorem is needed to recover those indexed facts.
 The kernel checks the index at every constructor assembly and recursive call.
-The length of the unindexed `to_list` view is a separate law, deferred until
-`List` length has a trust-free canonical provider.
+The unindexed `to_list` view has a separate checked bridge:
+
+- `to_list_length` proves `length a (to_list a n xs) = n` for every
+  `xs : Vec a n`.
+
+The empty case reduces to `Zero`; the successor case lifts the tail proof
+under `Suc` with `cong`.
 
 Totality is likewise carried by the domain types. `head` and `tail` accept only
 `Vec a (Suc n)`, while `lookup` requires a `Fin n` paired with `Vec a n`.
@@ -604,8 +620,8 @@ sibling indexed value through nested matches. Generic cons computation for
 through both input tails and is checked generically. `zip_with`/map naturality
 states a pointwise premise on the combining function; this states the general
 law without an inline lambda in a proposition type. Both zip/unzip directions
-are checked over generic types, lengths and vectors; the `to_list` length law
-awaits its trust-free canonical `List` length provider. Concrete examples
+are checked over generic types, lengths and vectors. The `to_list` length
+law imports the trust-free canonical `List` length. Concrete examples
 illustrate the operations but do not stand in for the checked laws.
 
 ## References
@@ -634,15 +650,15 @@ The `Vec` and `Fin` families, their constructors, all operations including
 `to_list`, `zip`, and `unzip`, and all theorems remain private to this package.
 Eight computation theorems, map composition, lookup after map and after
 `zip_with`, pointwise `zip_with`/map naturality, `unzip_zip`, and `zip_unzip`
-are checked laws. The `to_list`/`length` bridge is deferred to its separate
-trust-free-provider follow-up.
+are checked laws. The private `to_list_length` theorem relates the structural
+`List` length to the vector's index.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
 adds no axiom, postulate, primitive, foreign declaration, or unresolved hole.
 Its cold roots-loaded `trusted_base()` set equals a separately fresh compiler
-base set. The imported combinator and congruence providers contribute no
-trusted items, and Vector adds none.
+base set. The imported combinator, congruence, and `Data.Collections.List` length
+providers contribute no trusted items, and Vector adds none.
 
 Targeted validation checks the package through the roots-based module loader,
 the exact family indices and constructor targets, generic operation and
