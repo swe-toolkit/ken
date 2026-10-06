@@ -190,10 +190,115 @@ fn empty_and_out_of_bounds_calls_are_rejected_by_their_indices() {
     }
 }
 
+/// Promise class: durable invariant. From an actually roots-loaded Vector,
+/// independently restate and apply the three private, checked generic laws.
+/// MEASURED: the elaborator/kernel checks every quantified statement and its
+/// proof application, not a source spelling. CLAIMED: list length equals the
+/// index and both zip/unzip inverse directions hold for arbitrary element
+/// types, length and vectors. THE GAP: the proof clients use private test
+/// aliases because the package does not export its Vec family or operations;
+/// the original checked declarations are independently verified by roots load.
+#[test]
+fn bridge_laws_check_at_independent_generic_client_types() {
+    let mut env = internal_vector_fixture_env();
+    let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    env.elaborate_file(
+        r#"
+import Data.Collections.Derived (length)
+fn bridge_as_list (a : Type) (n : Nat) (xs : Vec a n) : List a = to_list a n xs
+fn bridge_zip (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+  : Vec (Pair a b) n = zip a b n xs ys
+fn bridge_unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+  : Pair (Vec a n) (Vec b n) = unzip a b n ps
+
+theorem bridge_length (a : Type) (n : Nat) (xs : Vec a n)
+  : Equal Nat (length a (to_list a n xs)) n =
+  to_list_length a n xs
+
+theorem bridge_unzip_zip
+    (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+  : Equal (Pair (Vec a n) (Vec b n))
+      (unzip a b n (zip a b n xs ys))
+      (mk_pair (Vec a n) (Vec b n) xs ys) =
+  unzip_zip a b n xs ys
+
+theorem bridge_zip_unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+  : Equal (Vec (Pair a b) n)
+      (zip a b n
+        (pair_fst (Vec a n) (Vec b n) (unzip a b n ps))
+        (pair_snd (Vec a n) (Vec b n) (unzip a b n ps)))
+      ps =
+  zip_unzip a b n ps
+"#,
+    )
+    .expect("three generic bridge laws must inhabit independent client types");
+    assert_eq!(
+        before,
+        env.env.trusted_base().into_iter().collect(),
+        "generic law clients must not add a trusted assumption"
+    );
+}
+
+/// Promise class: durable invariant. Closed vectors at two distinct lengths
+/// carry their actual heads, and unzip preserves two unequal Bool components.
+/// MEASURED: checked concrete computations; CLAIMED: `to_list` keeps order,
+/// `zip` pairs position-wise and `unzip` does not exchange pair projections.
+/// THE GAP: concrete examples cover these witnesses, not arbitrary inputs;
+/// the generic client above carries the universally quantified proof.
+#[test]
+fn vector_bridge_preserves_concrete_content_and_component_order() {
+    let mut env = internal_vector_fixture_env();
+    env.elaborate_file(
+        r#"
+theorem bridge_empty_list : Equal (List Bool) (to_list Bool Zero (VNil Bool)) (Nil Bool) =
+  Proved
+
+theorem bridge_two_list
+  : Equal (List Bool)
+      (to_list Bool (Suc (Suc Zero))
+        (VCons Bool (Suc Zero) True (VCons Bool Zero False (VNil Bool))))
+      (Cons Bool True (Cons Bool False (Nil Bool))) =
+  Refl
+
+theorem bridge_paired_head
+  : Equal (List (Pair Bool Bool))
+      (to_list (Pair Bool Bool) (Suc Zero)
+        (zip Bool Bool (Suc Zero)
+          (VCons Bool Zero True (VNil Bool))
+          (VCons Bool Zero False (VNil Bool))))
+      (Cons (Pair Bool Bool) (mk_pair Bool Bool True False) (Nil (Pair Bool Bool))) =
+  Refl
+
+theorem bridge_unzipped_left
+  : Equal (Vec Bool (Suc Zero))
+      (pair_fst (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero))
+        (unzip Bool Bool (Suc Zero)
+          (VCons (Pair Bool Bool) Zero (mk_pair Bool Bool True False)
+            (VNil (Pair Bool Bool)))))
+      (VCons Bool Zero True (VNil Bool)) =
+  Refl
+
+theorem bridge_unzipped_right
+  : Equal (Vec Bool (Suc Zero))
+      (pair_snd (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero))
+        (unzip Bool Bool (Suc Zero)
+          (VCons (Pair Bool Bool) Zero (mk_pair Bool Bool True False)
+            (VNil (Pair Bool Bool)))))
+      (VCons Bool Zero False (VNil Bool)) =
+  Refl
+"#,
+    )
+    .expect("closed head order and the two unequal projections must check");
+}
+
 #[test]
 fn entry_adds_no_trusted_declarations_beyond_its_providers() {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
-    for provider in ["Core.Function.Combinators", "Core.Logic.Transport"] {
+    for provider in [
+        "Core.Function.Combinators",
+        "Core.Logic.Transport",
+        "Data.Collections.Derived",
+    ] {
         env.elaborate_module_from_roots(&[catalog_root()], provider)
             .unwrap_or_else(|error| panic!("{provider} must roots-load: {error:?}"));
     }
