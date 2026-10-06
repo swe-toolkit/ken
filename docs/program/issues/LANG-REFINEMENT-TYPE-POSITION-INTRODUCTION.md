@@ -75,13 +75,15 @@ stop and report the mismatch.
   unchanged.
 - **AC-3 (mutation, QA).** Reverting the closure brings back the zero
   obligation on each row.
-- **AC-4 (recut, Architect `evt_239h9qvrxr021`).** Both RType-to-core
-  converters, `elab_type` (`elab.rs:1151`) and `rtype_to_kernel_checked`
-  (`data.rs:663`), apply one shared relevance predicate over head identity
-  and argument position. Its row is `data D : Type where { Mk : (x : Box
-  six) → D }`, which gives 0 obligations at WIP `73bc4da87`; the
-  disposition in a declaration without an obligation channel follows the
-  Architect's ruling after the Research advisory.
+- **AC-4 (recut, Architect `evt_239h9qvrxr021`, `evt_5f53yztwe6566`).**
+  Constructor field types are checked by the one type elaborator: the
+  constructor-field registration pass and its snapshot run on every
+  constructor whose argument contains an `RRefine` or an `RApp`, so
+  `elab_type` introduces each type application once; `data.rs:663` stays the
+  kernel builder. An undischarged field obligation is refused at the
+  declaration (`ObligationWithoutChannel`) and rolled back; a discharged one
+  is admitted. Rows: `Mk : (x : Box six) → D` refused, `Mk : (x : Box 5) →
+  D` accepted, the named `NBox` pair, on the explicit and legacy forms.
 
 ## Stop conditions
 
