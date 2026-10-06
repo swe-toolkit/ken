@@ -241,6 +241,10 @@ fn ac8_off_by_one_range_length_rejected() {
 #[test]
 fn ac8_zip_length_is_min_not_left_length() {
     let mut env = base_env();
+    // This legacy flat-scope negative must reach the wrong law, not fail at
+    // a missing helper alias after length moves to the base provider.
+    let provider = env.globals["Data.Collections.List.length"];
+    env.globals.insert("length".to_owned(), provider);
     let r = env.elaborate_decl(
         "fn bad_zip_length_ignores_shorter (a : Type) (b : Type) (xs : List a) (ys : List b) : \
            Equal Nat (length (Pair a b) (zip a b xs ys)) (length a xs) = zip_length a b xs ys",
