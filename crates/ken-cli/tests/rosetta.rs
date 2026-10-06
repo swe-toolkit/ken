@@ -100,9 +100,13 @@ fn remove_flattened_directive(source: &mut String, owner: &str, directive: &str)
     source.replace_range(range.clone(), "");
 }
 
-/// A comment or string literal may repeat a directive's spelling without
-/// creating a second binding. Missing and duplicated active directives must
-/// still refuse rather than silently change the flattened provider closure.
+/// Promise class: durable invariant (CAT-LIST-LENGTH-TRUST-FREE-BASE AC-2).
+///
+/// MEASURED: Ken's lexer distinguishes active import tokens from comments and
+/// strings, and the flattener refuses zero or two active copies. CLAIMED: a
+/// behavior-neutral source comment cannot block Rosetta while a real closure
+/// edge change fails closed. THE GAP: these synthetic cases isolate the token
+/// discriminator; the full Rosetta test exercises the real catalog closure.
 #[test]
 fn flattened_directives_ignore_comments_and_refuse_real_omissions_or_duplicates() {
     let directive = "import Data.Collections.List (length)";
