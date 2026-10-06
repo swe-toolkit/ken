@@ -1,7 +1,7 @@
 ---
 id: RT-MATCH-MOTIVE-ADMISSION-SORT
 title: "Checked-core body-view admission classifies every elaborated Match motive as Dependent, because inspect_non_dependent_motive expects an ascribed motive the elaborator never emits. Key admission on the motive's checked sort, so the ConstantType and ProofOnly arms see their real population"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1

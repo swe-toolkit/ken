@@ -1,7 +1,7 @@
 ---
 id: RT-NAT-FANOUT-DETACHED-MULTI-MEMBER
 title: "After the scalar-admission retry forces source Match 1289 to CarrierWord, the Nat fanout escaped-resource row refuses at object emission: the detached-result seat sees 4 undischarged causal calls on one unit result, a multi-member projection it rejects by design. Find why 4 edges reach that seat, and repair the upstream discharge so the row reaches native/interpreter parity"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -111,3 +111,24 @@ R6+R7 on `b1a837a12`).
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. source-machine ComputationalMatchScrutinee seat lacked the Residual operand arm its sibling scrutinee seats carry (refusal source.rs:1914, Match1004, CheckedSelectedRecursor) — keyed on operand variant (Residual vs Carried) at one of five scrutinee seats
 ```
+
+## Closeout
+
+Merged `21defbec2` from exact `b3d704667` (PR #4544). Runtime QA
+`evt_sznzjjy4p216`, Architect `evt_1f3r3am1s1z0k`, Decision
+`dec_1t2ctwtphy465`. §1a count 1.
+
+- The Nat fanout escaped-resource row runs natively with interpreter parity
+  and is un-ignored. R6 runs the carried producer match's pending
+  eliminators under a fail-closed re-entry limit of 8. R7 raises a claimed
+  Construct continuation producer to `CarrierRequired`. R8 decodes the
+  `Residual` scrutinee seat to `Carried`.
+- The first route went red in CI on a scalar-feedback sentinel that pinned
+  `attempts == 2`. The respin asserts the retry loop's invariant instead,
+  with no production change.
+- Residuals (Architect): the row runs on the shared 256 MiB helper stack,
+  and the limit of 8 is a bound, not a measured depth.
+- Residual (Adversary `evt_6dy48x09rfktx`): the row's read fails on the
+  closed handle before its Nat fanout runs, so its parity does not measure
+  arm selection. A reached fanout refuses at `aggregates.rs:8215`.
+  `RT-GENERATED-ENTRY-PROJECTION-INVARIANT` owns both.
