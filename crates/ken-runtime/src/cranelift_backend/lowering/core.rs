@@ -6569,15 +6569,24 @@ impl<'a> Lowering<'a> {
             LoweringOperand::Specialized(_) => None,
         };
         if let Some(word) = carried {
-            return self.lower_carried_match(
-                builder,
-                word,
-                producer_cases,
-                producer_default,
-                static_origin,
-                producer_env,
-                None,
+            if !eliminators.is_empty() {
+                self.carried_suffix_reentries += 1;
+                if self.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
+                    self.carried_suffix_reentries -= 1;
+                    return Err(unsupported(
+                        "BoundaryCarrier",
+                        "a carried producer match's pending eliminators exceeded the bounded re-entry depth",
+                    ));
+                }
+            }
+            let eliminated = self.lower_carried_match(
+                builder, word, producer_cases, producer_default, static_origin, producer_env,
+                Some(eliminators),
             );
+            if !eliminators.is_empty() {
+                self.carried_suffix_reentries -= 1;
+            }
+            return eliminated;
         }
         if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = selected {
             let true_case = producer_cases

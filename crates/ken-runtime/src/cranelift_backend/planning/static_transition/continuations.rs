@@ -7769,6 +7769,23 @@ impl<'src> StaticTransitionPlan<'src> {
         Ok(found)
     }
 
+    /// Whether lowering may replace this producer `Construct` with the result of a
+    /// planned continuation call. Both replacement seats (the claim and the fused
+    /// outer realization) select only through `continuation_call_binding_for`,
+    /// whose population is exactly `continuation_calls()`, so this is that
+    /// population projected onto the producer. The phase planner reads it so the
+    /// eliminator consuming this position binds carried fields, never the
+    /// constructor's specialized arguments.
+    pub(in crate::cranelift_backend) fn is_continuation_call_producer(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<bool, CraneliftBackendError> {
+        Ok(self
+            .continuation_calls()?
+            .iter()
+            .any(|call| call.token.producer_construct_origin == origin))
+    }
+
     /// The independently validated consumer-level occurrence for one exact
     /// continuation call.
     ///
