@@ -144,8 +144,7 @@ fn anonymous_before_and_after_named_binder_preserves_predicate_scope() {
     );
 }
 
-#[test]
-fn type_position_introductions_emit_once_across_signature_prepasses() {
+fn type_position_box_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
     for declaration in [
         "const six : Int = 6",
@@ -156,6 +155,12 @@ fn type_position_introductions_emit_once_across_signature_prepasses() {
         env.elaborate_decl(declaration)
             .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
     }
+    env
+}
+
+#[test]
+fn function_parameter_prepasses_defer_type_position_introduction() {
+    let mut env = type_position_box_env();
     for (source, owner) in [
         (
             "fn h_lit (b : Bool) (t : Box six) : Int = 0",
@@ -165,6 +170,23 @@ fn type_position_introductions_emit_once_across_signature_prepasses() {
             "fn h_named (b : Bool) (t : NBox six) : Int = 0",
             "fn domain / named",
         ),
+    ] {
+        let result = env
+            .elaborate_decl_v1(source)
+            .unwrap_or_else(|error| panic!("{owner}: {error:?}"));
+        assert_eq!(
+            open_refinements(&env, &result),
+            1,
+            "{owner}: no prepass refusal"
+        );
+        assert_eq!(result.obligations.len(), 1, "{owner}: no prepass emission");
+    }
+}
+
+#[test]
+fn anonymous_theorem_signature_domain_emits_type_position_argument_once() {
+    let mut env = type_position_box_env();
+    for (source, owner) in [
         (
             "theorem p_lit : Bool → (Box six) → Top = λb. λt. Proved",
             "anonymous theorem / literal",
@@ -180,7 +202,7 @@ fn type_position_introductions_emit_once_across_signature_prepasses() {
         assert_eq!(
             open_refinements(&env, &result),
             1,
-            "{owner}: re-elaborating or discarding a signature domain is not introduction"
+            "{owner}: one introduction"
         );
         assert_eq!(result.obligations.len(), 1, "{owner}: no duplicate emitter");
     }
