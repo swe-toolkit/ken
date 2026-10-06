@@ -128,3 +128,7 @@ Merged `21defbec2` from exact `b3d704667` (PR #4544). Runtime QA
   with no production change.
 - Residuals (Architect): the row runs on the shared 256 MiB helper stack,
   and the limit of 8 is a bound, not a measured depth.
+- Residual (Adversary `evt_6dy48x09rfktx`): the row's read fails on the
+  closed handle before its Nat fanout runs, so its parity does not measure
+  arm selection. A reached fanout refuses at `aggregates.rs:8215`.
+  `RT-GENERATED-ENTRY-PROJECTION-INVARIANT` owns both.
