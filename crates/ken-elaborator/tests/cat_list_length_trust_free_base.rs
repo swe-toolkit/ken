@@ -61,10 +61,6 @@ fn cold_list_length_and_derived_reexport_share_the_checked_provider_identity() {
         !derived_owned.contains(&length),
         "Derived must not mint a second length identity"
     );
-    assert!(
-        !env.globals.contains_key("Data.Collections.Derived.length"),
-        "a re-export must not masquerade as a locally owned global"
-    );
     env.elaborate_file(
         "import Data.Collections.List (length as direct_length)\n\
          import Data.Collections.Derived (length as derived_length)\n\
@@ -83,4 +79,8 @@ fn cold_list_length_and_derived_reexport_share_the_checked_provider_identity() {
             "{name} must cite the exact base-provider GlobalId"
         );
     }
+    assert!(
+        !env.globals.contains_key("Data.Collections.Derived.length"),
+        "a re-export must not masquerade as a locally owned global"
+    );
 }
