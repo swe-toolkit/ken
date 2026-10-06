@@ -602,6 +602,11 @@ theorem vec_example_zip_second
           (FSuc (Suc Zero) (FZero Zero)))
         False =
   Proved
+
+theorem vec_example_to_list_length
+      (a : Type) (n : Nat) (xs : Vec a n)
+    : Equal Nat (length a (to_list a n xs)) n =
+  to_list_length a n xs
 ```
 
 ## Design notes
