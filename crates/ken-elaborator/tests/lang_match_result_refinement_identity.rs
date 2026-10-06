@@ -35,6 +35,13 @@ fn seeded_matrix_checks_first_and_later_leaves() {
     );
     checked(
         &format!(
+            "{FIVE}fn pa (x : Int) (y : Option Bool) : Five =\n\
+        match y {{ None ↦ x; Some True ↦ x; Some False ↦ x }}"
+        ),
+        3,
+    );
+    checked(
+        &format!(
             "{FIVE}fn g (x : Int) (ys : List Bool) : Five =\n\
         match ys {{ Nil ↦ x; Cons a t ↦ x }}"
         ),
@@ -85,6 +92,13 @@ fn indexed_branch_obligations_survive_heterogeneous_constructor_paths() {
             obligation.goal_closed
         );
     }
+    checked(
+        &format!(
+            "{prefix}fn pb (n : Nat) (i : Ix n) (x : Int) : Five =\n\
+        match i {{ Z xs ↦ x; S ys ↦ x }}"
+        ),
+        2,
+    );
     checked(
         &format!(
             "{prefix}fn g (n : Nat) (i : Ix n) (x : Int) :\n\
