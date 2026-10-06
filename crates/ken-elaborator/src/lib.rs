@@ -586,6 +586,7 @@ impl ElabEnv {
             &self.preconditions,
             &mut self.num_values,
             &self.numeric_env,
+            &self.refinement_facts,
             owner_label,
             &rexpr,
         )
