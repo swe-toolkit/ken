@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION
 title: "Three literal-side refinement fail-opens: a refinement nested inside a type argument (List ({ x : Int | phi })) is erased and accepted with no obligation; an application written in type position (RType::RApp) checks a refined argument with no obligation; and a theorem, proof or recursive view with a literal refined parameter records no fact, so its call sites emit nothing. Spec 34 §5 says every introduction emits phi a. Close all three, after a D0 census"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
@@ -81,3 +81,14 @@ stop and report the mismatch.
 - Any kernel, `trusted_base()` or spec change.
 - A checked catalog, library or example program gains an obligation it
   cannot discharge, or is newly refused: stop to the Architect with it.
+
+## Symptom inventory
+
+Seeded from Architect `evt_5m4fpkn01rhdj`, which also rules the respin of
+WIP `482227c63` on `c49297983` (§1a count 1).
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. type-position argument refinement decided by local kernel inference -- keyed on the elaboration context being kernel-ready, which collect_refined_params violates under anonymous arrows
+2. collect_refined_params re-elaborates signature domains that elab_type already elaborated -- keyed on elab_type being pure, which F-B ended
+```

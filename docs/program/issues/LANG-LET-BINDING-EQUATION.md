@@ -1,7 +1,7 @@
 ---
 id: LANG-LET-BINDING-EQUATION
 title: "Since LANG-ENSURES-PER-PATH-REALIZATION, a postcondition over a let in result position is realized at the let body's leaf with the binder bare: no Eq A x e is in the context, so the goal is closed over an unconstrained x and cannot be discharged. Spec 22 §3 requires the let equation. Push it at the let binder for the body's extent"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -70,3 +70,17 @@ of the rows above.
 - Any kernel, `trusted_base()` or spec change.
 - A checked catalog, library or example program gains an obligation it
   cannot discharge.
+
+## Closeout
+
+Merged `c49297983` from exact `de2f4fa48` (PR #4543). Language QA
+`evt_t5p85baddcyq`, Architect `evt_5dqn322zs91p7`, Decision
+`dec_54ca03kh3jrk4`.
+
+- Both let sites push `Eq A x e` onto `path_conditions` for the body when
+  `whnf(sort(A)) = Type _`; Ω proof-lets push nothing. Emitted core is still
+  an ordinary `Term::Let`.
+- Obligations closed through `close_refinement_goal_with` consume the
+  equation, and certificates are kernel-checked against the hole type.
+- Carry: `close_goal` callers (call-site `requires`, `PartialPrim`) still
+  ignore path facts, framed as `LANG-CLOSE-GOAL-PATH-CONDITIONS`.

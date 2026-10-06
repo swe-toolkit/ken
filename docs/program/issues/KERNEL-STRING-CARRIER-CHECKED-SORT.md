@@ -1,7 +1,7 @@
 ---
 id: KERNEL-STRING-CARRIER-CHECKED-SORT
 title: "register_checked_string_carrier checks only that the id is a Primitive with OpaqueType reduction, so it admits the two shapes KERNEL-INT-LIT-CARRIER-CHECKED's respin closed for Int: a value tagged OpaqueType, whose type is not a Type, and a polymorphic primitive. Require a Type-sorted monomorphic carrier the same way"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -60,3 +60,13 @@ shapes.
 - Any change to how String literals are typed or reduced, or to
   `trusted_base()`.
 - Any spec change.
+
+## Closeout
+
+Merged `c7b5c2b38` from exact `d18477f8c` (PR #4542). Kernel QA
+`evt_q7wpey1q9ywb`, Decision `dec_3j8wd57r8sxmv`.
+
+- `register_checked_string_carrier` now also requires empty `level_params`
+  and a declared type whose whnf is `Type ℓ`, both checked before the
+  carrier is installed: the guard the Int carrier gained.
+- String literal typing, reduction and `trusted_base()` are unchanged.
