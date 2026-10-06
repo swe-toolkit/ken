@@ -40,11 +40,14 @@ fn innermost_match_frame_owns_fields_even_with_stale_parent_level() {
     // even under binder pop/reuse. THE GAP: the checked law fixture pins the
     // real large-convoy producer; this probes the private ownership rule.
     let mut env = ElabEnv::new().expect("prelude");
+
+    let refinement_facts = RefinementFacts::default();
     let mut cx = ElabCtx::new(
         &mut env.env,
         &env.globals,
         &mut env.num_values,
         &env.numeric_env,
+        &refinement_facts,
         "match-field-owner-control",
     );
     cx.match_frames.push(MatchFrame::new(0, 0, None, None));
@@ -105,11 +108,14 @@ fn whole_pi_restores_existing_alias_once_at_original_goal() {
     let nat_ty = nat(env.globals["Nat"]);
     let vec_id = env.globals["NestedVec"];
     let vec_ty = |a: Term, i: Term| app2(nat(vec_id), a, i);
+
+    let refinement_facts = RefinementFacts::default();
     let mut cx = ElabCtx::new(
         &mut env.env,
         &env.globals,
         &mut env.num_values,
         &env.numeric_env,
+        &refinement_facts,
         "double-refinement-control",
     );
     // Context: n,m,k,l:Nat; h0:Eq Nat n m; d:Vec (Vec Nat n) k.
@@ -200,11 +206,14 @@ fn scoped_premise_redirects_consumed_proof_and_restores_on_failure() {
     // proof-consumer seam; the source-facing f6 row remains separate.
     let mut env = ElabEnv::new().expect("prelude");
     let nat_ty = nat(env.globals["Nat"]);
+
+    let refinement_facts = RefinementFacts::default();
     let mut cx = ElabCtx::new(
         &mut env.env,
         &env.globals,
         &mut env.num_values,
         &env.numeric_env,
+        &refinement_facts,
         "premise-redirect-control",
     );
     cx.ctx.push(nat_ty.clone()); // n
@@ -261,11 +270,14 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
     // exact f4 source additionally reaches the equation-convoy overlap guard.
     let mut env = ElabEnv::new().expect("prelude");
     let nat_ty = nat(env.globals["Nat"]);
+
+    let refinement_facts = RefinementFacts::default();
     let mut cx = ElabCtx::new(
         &mut env.env,
         &env.globals,
         &mut env.num_values,
         &env.numeric_env,
+        &refinement_facts,
         "nested-premise-inference-control",
     );
     cx.ctx.push(nat_ty.clone()); // n
@@ -351,11 +363,14 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
         .clone();
     let nat_ty = nat(env.globals["Nat"]);
     let vec_ty = |index: Term| app2(nat(vec_id), nat_ty.clone(), index);
+
+    let refinement_facts = RefinementFacts::default();
     let mut cx = ElabCtx::new(
         &mut env.env,
         &env.globals,
         &mut env.num_values,
         &env.numeric_env,
+        &refinement_facts,
         "real-sibling-convoy-control",
     );
     cx.ctx.push(nat_ty.clone()); // n
@@ -418,11 +433,14 @@ fn generalized_premise_generated_proof_is_consumed_by_body() {
     // from a surface declaration with the same two-leaf shape.
     let mut env = ElabEnv::new().expect("prelude");
     let nat_ty = nat(env.globals["Nat"]);
+
+    let refinement_facts = RefinementFacts::default();
     let mut cx = ElabCtx::new(
         &mut env.env,
         &env.globals,
         &mut env.num_values,
         &env.numeric_env,
+        &refinement_facts,
         "generated-proof-body-control",
     );
     cx.ctx.push(nat_ty.clone()); // n
