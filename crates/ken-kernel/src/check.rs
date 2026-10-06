@@ -1809,16 +1809,21 @@ pub fn register_checked_int_lit_carrier(env: &mut GlobalEnv, id: GlobalId) -> Ke
     Ok(())
 }
 
-/// Register a literal carrier when its type is admitted. Prelude declarations
-/// may contain checked String literals before the List Char view is installed.
+/// Register a monomorphic primitive type as the String literal carrier.
+/// Prelude declarations may contain checked String literals before the List
+/// Char view is installed. The registrant's declared type must reduce to a
+/// `Type ℓ`, and the closed literal reference cannot supply level arguments.
 pub fn register_checked_string_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
     if env.checked_string_type().is_some()
         || !matches!(
             env.lookup(id),
             Some(Decl::Primitive {
                 reduction: PrimReduction::OpaqueType,
+                level_params,
+                ty,
                 ..
-            })
+            }) if level_params.is_empty()
+                && matches!(whnf(env, &Context::new(), ty), Term::Type(_))
         )
     {
         return Err(KernelError::Msg(
@@ -2058,6 +2063,47 @@ mod tests {
     use super::*;
     use crate::env::GlobalEnv;
     use crate::term::Level;
+
+    // Spec 14 §5: String literals inhabit an opaque primitive type, not a
+    // value merely tagged OpaqueType. Promise class: durable invariant. Each
+    // refusal has one valid guard axis and one invalid axis; a valid carrier is
+    // exercised by the K3 literal/Char tests and elaborator String prelude.
+    fn assert_string_carrier_refused_unchanged(env: &mut GlobalEnv, id: GlobalId) {
+        let carrier = env.checked_string_type();
+        let trust = env.trusted_base();
+        assert_eq!(
+            register_checked_string_carrier(env, id),
+            Err(KernelError::Msg(
+                "invalid or duplicate String literal carrier".into()
+            ))
+        );
+        assert_eq!(env.checked_string_type(), carrier);
+        assert_eq!(env.trusted_base(), trust);
+    }
+
+    #[test]
+    fn string_carrier_refuses_opaque_tagged_value_of_bool_type() {
+        let (mut env, ids) = bool_nat_env();
+        let value =
+            declare_primitive(&mut env, vec![], bool_ty(&ids), PrimReduction::OpaqueType).unwrap();
+        assert_eq!(env.checked_string_type(), None);
+        assert_string_carrier_refused_unchanged(&mut env, value);
+    }
+
+    #[test]
+    fn string_carrier_refuses_polymorphic_opaque_type() {
+        let mut env = GlobalEnv::new();
+        let u = LevelVar(0);
+        let polymorphic = declare_primitive(
+            &mut env,
+            vec![u],
+            Term::ty(Level::Var(u)),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        assert_eq!(env.checked_string_type(), None);
+        assert_string_carrier_refused_unchanged(&mut env, polymorphic);
+    }
 
     #[test]
     fn level_closure_reaches_every_explicit_level_slot_and_nested_child() {
