@@ -5351,7 +5351,7 @@ mod tests {
             "a transparent alias to a non-sort must fail closed"
         );
         semantic.declarations.insert(
-            head,
+            head.clone(),
             canonical_decl_bytes(&head_decl(constant(GlobalId(2))), &table).unwrap(),
         );
         semantic.declarations.remove(&prop);
@@ -5359,6 +5359,16 @@ mod tests {
             inspect_non_dependent_motive(&semantic, &prop_motive).unwrap(),
             None,
             "a missing delivered Prop declaration cannot be supplied by metadata"
+        );
+        // The reader's None must reach the actual admission boundary as a
+        // named refusal, not become Ok(true). This is the missing-delivery
+        // neighbour of the same motive and proof owner admitted above.
+        assert_eq!(
+            validate_supported_match_motive(&semantic, &owner, &head, &data, &prop_motive),
+            Err(CheckedCoreBodyViewError::UnreadableMatchMotiveSort {
+                symbol: owner.clone(),
+                family: head.clone(),
+            }),
         );
     }
 
