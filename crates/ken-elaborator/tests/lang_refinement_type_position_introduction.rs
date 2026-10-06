@@ -435,6 +435,169 @@ fn function_domain_checks_named_indformer_argument() {
     );
 }
 
+fn assert_closed_local_head_goal(env: &ElabEnv, result: &ElabResult, head_type: Term) {
+    assert_eq!(
+        open_refinements(env, result),
+        1,
+        "one open local-head introduction"
+    );
+    assert_eq!(
+        result.obligations.len(),
+        1,
+        "no duplicate local-head emission"
+    );
+    let int = Term::const_(env.globals["Int"], vec![]);
+    let equal = Term::const_(env.globals["Equal"], vec![]);
+    let predicate = Term::app(
+        Term::app(Term::app(equal, int.clone()), Term::var(0)),
+        Term::IntLit(5.into()),
+    );
+    let expected = Term::pi(head_type, Term::pi(int, predicate));
+    assert_eq!(
+        result.obligations[0].goal_closed, expected,
+        "closed goal must quantify the head, then n, and state Equal Int n 5"
+    );
+}
+
+#[test]
+fn local_head_named_domain_emits_and_plain_domain_does_not() {
+    let mut refined = ElabEnv::new().expect("prelude");
+    refined
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    let result = refined
+        .elaborate_decl_v1("fn h (f : Five → Type 0) (n : Int) (x : f n) : Int = 0")
+        .expect("the aligned local head type has a named refined domain");
+    let head = Term::pi(
+        Term::const_(refined.globals["Five"], vec![]),
+        Term::ty(ken_kernel::Level::Zero),
+    );
+    assert_closed_local_head_goal(&refined, &result, head);
+
+    let mut plain = ElabEnv::new().expect("prelude");
+    plain
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    let result = plain
+        .elaborate_decl_v1("fn h (f : Int → Type 0) (n : Int) (x : f n) : Int = 0")
+        .expect("unrefined local head");
+    assert!(
+        result.obligations.is_empty(),
+        "the plain control stays obligation-free"
+    );
+}
+
+#[test]
+fn local_head_previous_argument_preserves_refinement_position() {
+    let mut refined = ElabEnv::new().expect("prelude");
+    refined
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    refined
+        .elaborate_decl("const zero : Int = 0")
+        .expect("type-position value");
+    let result = refined
+        .elaborate_decl_v1("fn h2 (g : Int → Five → Type 0) (n : Int) (x : g zero n) : Int = 0")
+        .expect("the earlier argument must not hide the refined second domain");
+    let int = Term::const_(refined.globals["Int"], vec![]);
+    let five = Term::const_(refined.globals["Five"], vec![]);
+    assert_closed_local_head_goal(
+        &refined,
+        &result,
+        Term::pi(int, Term::pi(five, Term::ty(ken_kernel::Level::Zero))),
+    );
+
+    let mut plain = ElabEnv::new().expect("prelude");
+    plain
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    plain
+        .elaborate_decl("const zero : Int = 0")
+        .expect("type-position value");
+    let result = plain
+        .elaborate_decl_v1("fn h2 (g : Int → Int → Type 0) (n : Int) (x : g zero n) : Int = 0")
+        .expect("plain two-argument local head");
+    assert!(
+        result.obligations.is_empty(),
+        "plain second domain stays free"
+    );
+}
+
+#[test]
+fn local_head_named_domain_reuses_refined_argument_root() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    let result = env
+        .elaborate_decl_v1("fn h3 (f : Five → Type 0) (m : Five) (x : f m) : Int = 0")
+        .expect("the local m already carries Five's refinement root");
+    assert!(
+        result.obligations.is_empty(),
+        "same-root reuse needs no new hole"
+    );
+}
+
+#[test]
+fn local_head_data_field_refuses_false_and_accepts_plain() {
+    let mut refined = ElabEnv::new().expect("prelude");
+    refined
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    let error = refined
+        .elaborate_decl_v1(
+            "data D (f : Five → Type 0) (n : Int) : Type where { Mk : (x : f n) → D f n }",
+        )
+        .expect_err("a refined application inside a constructor field has no channel");
+    assert!(
+        matches!(error, ElabError::ObligationWithoutChannel { .. }),
+        "expected the false predicate's no-channel refusal: {error:?}"
+    );
+    assert!(
+        !refined.globals.contains_key("D") && !refined.globals.contains_key("Mk"),
+        "failed postadmission check rolls back the data family"
+    );
+
+    let mut plain = ElabEnv::new().expect("prelude");
+    plain
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    let result = plain
+        .elaborate_decl_v1(
+            "data D (f : Int → Type 0) (n : Int) : Type where { Mk : (x : f n) → D f n }",
+        )
+        .expect("ordinary local-head field type");
+    assert!(
+        result.obligations.is_empty(),
+        "plain data declaration stays free"
+    );
+}
+
+#[test]
+fn unannotated_higher_order_head_is_fail_closed_without_changing_plain_type() {
+    // F-F: a separate, baseline universe-level hole-closure gap. This test
+    // pins fail-closed handling, not a claimed successful introduction.
+    let mut refined = ElabEnv::new().expect("prelude");
+    refined
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    let error = refined
+        .elaborate_decl_v1("fn h (f : Five → Type) (n : Int) (x : f n) : Int = 0")
+        .expect_err("an unzonked universe in an obligation must not erase it");
+    assert!(
+        matches!(error, ElabError::KernelRejected { .. }),
+        "F-F remains a separate fail-closed kernel rejection: {error:?}"
+    );
+
+    let mut plain = ElabEnv::new().expect("prelude");
+    plain
+        .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
+        .expect("alias");
+    let result = plain
+        .elaborate_decl_v1("fn h (f : Int → Type) (n : Int) (x : f n) : Int = 0")
+        .expect("unannotated but unrefined type remains allowed");
+    assert!(result.obligations.is_empty());
+}
+
 #[test]
 fn anonymous_arrows_in_proof_signature_are_not_local_binders() {
     let mut env = ElabEnv::new().expect("prelude");

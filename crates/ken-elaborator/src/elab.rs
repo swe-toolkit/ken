@@ -10098,12 +10098,9 @@ fn introduce_type_position_argument(
     if !cx.type_introductions { return Ok(()); }
     emit_call_refinements(cx, function, argument, span)?;
     let (head, previous_args) = peel_app(function);
-    if !matches!(head, Term::Const { .. } | Term::Constructor { .. } | Term::IndFormer { .. }) {
-        return Ok(());
-    }
-    // The head's checked global type does not depend on local binder
-    // alignment. Infer a local argument only when the Pi domain actually
-    // carries a named refinement; literal parameters were handled above.
+    // Relevance belongs to the head's Pi domain, not its variant. The aligned
+    // resolver context supplies local heads; checked globals supply the rest.
+    // If its type cannot be read, refusal is safer than silent erasure.
     let unchecked = |_| ElabError::TypeMismatch {
         span: span.clone(),
         reason: "cannot check an argument's refinement in type position".into(),
