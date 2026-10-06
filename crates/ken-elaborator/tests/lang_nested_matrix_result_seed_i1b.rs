@@ -115,6 +115,34 @@ fn type_zero_arms_and_inference_mode_remain_accepted() {
     );
 }
 
+/// Durable invariant. MEASURED: an explicit Type 1 result checks through the
+/// contract-bearing view route, computes to Type 0, and emits one Top
+/// postcondition per OR leaf. CLAIMED: the spec route still elaborates a
+/// Type-valued result and preserves per-leaf obligations. THE GAP: the
+/// unannotated result level is finalized before this route checks its body,
+/// even on the frozen base; this row does not claim late-level solving there.
+#[test]
+fn contract_view_type_valued_or_result_preserves_explicit_level() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let result = env
+        .elaborate_decl_v1(
+            "fn pick (b : Bool) : Type 1 ensures Top = match b { True | False ↦ Type }",
+        )
+        .expect("explicit universe with a contract");
+    assert_eq!(result.obligations.len(), 2, "one postcondition per OR leaf");
+    env.elaborate_decl("const observed : Type 1 = pick False")
+        .expect("contract-bearing function is callable");
+    let observed = env
+        .env
+        .transparent_body(env.globals["observed"])
+        .expect("checked transparent value")
+        .1;
+    assert_eq!(
+        normalize(&env.env, &Context::new(), &observed),
+        Term::ty(Level::Zero),
+    );
+}
+
 #[test]
 fn plain_flat_match_late_level_solve_stays_a_transition_refusal() {
     // Transition sentinel for LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE, not an I-1b

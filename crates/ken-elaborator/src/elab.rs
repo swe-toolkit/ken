@@ -16386,12 +16386,15 @@ pub(crate) fn innermost_refine_pred(ty: &RType) -> Option<&RExpr> {
 /// The only admission route for a written callable signature. Its carrier
 /// erasure and literal-parameter facts are produced in one scope: an eligible
 /// spine domain cannot be admitted without collecting its predicate.
+/// The returned core is NOT zonked: an unsolved universe level must stay a
+/// meta until the declaration's own scope end, where the body may solve it.
+/// Metas are level-only, so the raw core has the same Pi spine the collector
+/// reads.
 #[must_use]
 fn elab_signature(
     cx: &mut ElabCtx<'_>, ty: &RType, result: bool,
 ) -> Result<(Term, Vec<Option<Term>>), ElabError> {
     let core = elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })?;
-    let core = cx.metas.zonk_term(&core);
     let params = collect_refined_params(cx, ty, &core)?;
     Ok((core, params))
 }
