@@ -411,12 +411,13 @@ fn json_and_all_six_constructors_are_real_globals() {
     // and the roots-loaded Json source elaborates `char_cursor_remaining` as a
     // transparent
     // wrapper whose complete application spine is headed by the exact canonical
-    // Derived `length` identity at the provider's declaration-derived arity.
+    // base List `length` identity, re-exported by Derived, at its checked arity.
     // CLAIMED: the shipped Json cursor uses that selective import rather than
     // the retired Cursor helper or an ambient alias. THE GAP: this structural
     // body-shape pin does not by itself prove runtime reduction; the concrete
     // dictionary observations below independently exercise that behavior.
-    let length = env.globals["Data.Collections.Derived.length"];
+    let length = catalog_or::list_length_via_derived_reexport(&mut env);
+    assert_eq!(length, env.globals["Data.Collections.List.length"]);
     assert!(
         transparent_body_is_saturated_provider_application(
             &env,
@@ -424,7 +425,7 @@ fn json_and_all_six_constructors_are_real_globals() {
             length,
         ),
         "Json char_cursor_remaining must be headed by a saturated application of the \
-         exact Derived length provider"
+         exact base List length provider"
     );
 
     // Durable invariant (AC-2): re-check every law witness at its literal

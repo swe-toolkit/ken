@@ -243,7 +243,7 @@ fn property_uses_derived_map_identity_for_gen_map() {
 ///
 /// MEASURED: among transparent declarations introduced by the real Property
 /// source, exactly `byte_cursor_remaining` contains a saturated application
-/// spine headed by the exact Derived `length` identity. The retired local name
+/// spine headed by the base List `length` identity re-exported by Derived. The retired local name
 /// is absent, qualified-name trust does not grow, the real import resolves with
 /// the flat alias withheld, and an available unimported sibling stays unresolved.
 ///
@@ -290,7 +290,7 @@ fn property_length_occurrence_and_selective_import_are_pinned() {
         .copied()
         .filter(|id| !before_globals.contains(id))
         .collect();
-    let provider = env.globals["Data.Collections.Derived.length"];
+    let provider = env.globals["Data.Collections.List.length"];
     assert_eq!(
         transparent_property_bodies_with_saturated_provider_occurrence(
             &env,
@@ -314,6 +314,10 @@ fn property_length_occurrence_and_selective_import_are_pinned() {
     assert!(
         matches!(error, ElabError::UnresolvedCon { ref name, .. } if name == "reverse"),
         "the non-import control must fail at the omitted binding, got {error:?}"
+    );
+    assert_eq!(
+        catalog_or::list_length_via_derived_reexport(&mut env),
+        provider
     );
 }
 

@@ -8,7 +8,7 @@ mod catalog_publication;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
+use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const PRETTY_DOC_KEN_MD: &str =
@@ -23,16 +23,25 @@ struct Cc5ProviderOwned {
 
 fn dependency_env_with_provider_owned() -> (ElabEnv, Cc5ProviderOwned) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
-    let (transport_owned, core_or) =
-        catalog_or::load_core_logic_compare_with_or_owned(&mut env);
+    let (transport_owned, core_or) = catalog_or::load_core_logic_compare_with_or_owned(&mut env);
     catalog_or::expose_core_logic_transport(&mut env, &transport_owned);
-    let lawful = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
+    let lawful = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let arithmetic = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
+    let arithmetic = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Arithmetic")
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
     let (_, derived) =
         catalog_or::load_derived_importing_fixture_many(&mut env, &["length", "list_append"]);
-    (env, Cc5ProviderOwned { derived, lawful, arithmetic, core_or })
+    (
+        env,
+        Cc5ProviderOwned {
+            derived,
+            lawful,
+            arithmetic,
+            core_or,
+        },
+    )
 }
 
 fn dependency_env() -> ElabEnv {
@@ -44,7 +53,9 @@ fn full_env() -> ElabEnv {
     env.elaborate_ken_md_file(PRETTY_DOC_KEN_MD)
         .expect("Capability.Formatting.Doc and every checked fence must elaborate third");
     catalog_or::assert_transparent_result_uses_core_logic_or(
-        &env, &dependencies.core_or, "pretty_bool_cases",
+        &env,
+        &dependencies.core_or,
+        "pretty_bool_cases",
     );
     env
 }
@@ -58,10 +69,7 @@ fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
     let rooted_render = names.contains(&"render").then(|| {
         let mut rooted = ElabEnv::new().expect("base environment");
         let owned = rooted
-            .elaborate_module_from_roots(
-                &[catalog_or::catalog_root()],
-                "Capability.Formatting.Doc",
-            )
+            .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
             .expect("Formatting.Doc must load through its real roots closure");
         (rooted, owned)
     });
@@ -313,13 +321,11 @@ fn add_law_probes(env: &mut ElabEnv) {
 #[test]
 fn render_host_read_ignores_forged_flat_fixture_alias() {
     let mut env = ElabEnv::new().expect("base environment");
-    let owned = env.elaborate_module_from_roots(
-        &[catalog_or::catalog_root()],
-        "Capability.Formatting.Doc",
-    )
-    .expect("Formatting.Doc must roots-load");
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+        .expect("Formatting.Doc must roots-load");
     let canonical = checked_render_id(&env, &owned);
-    let forged = env.globals["Data.Collections.Derived.length"];
+    let forged = env.globals["Data.Collections.List.length"];
     assert_ne!(canonical, forged);
     env.globals.insert("render".to_owned(), forged);
     assert_eq!(checked_render_id(&env, &owned), canonical);
@@ -522,20 +528,28 @@ fn pretty_doc_loader_surface_and_string_boundary_are_behavioral() {
 fn cc5_reuses_canonical_nat_operations_with_zero_trust_delta() {
     let (mut env, provider_owned) = dependency_env_with_provider_owned();
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
-    let doc_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+    let doc_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
         .expect("Capability.Formatting.Doc must roots-load over its dependency fixture");
     let after: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     assert_eq!(before, after, "CC5 must add zero trusted-base entries");
 
-    let length = catalog_or::provider_owned_id(
-        &env, &provider_owned.derived, "Data.Collections.Derived", "length",
-    ).expect("Derived must own canonical length");
+    let length = catalog_or::list_length_via_derived_reexport(&mut env);
+    assert_eq!(length, env.globals["Data.Collections.List.length"]);
     let add = catalog_or::provider_owned_id(
-        &env, &provider_owned.arithmetic, "Data.Numeric.Nat.Arithmetic", "add",
-    ).expect("Nat.Arithmetic must own canonical add");
+        &env,
+        &provider_owned.arithmetic,
+        "Data.Numeric.Nat.Arithmetic",
+        "add",
+    )
+    .expect("Nat.Arithmetic must own canonical add");
     let leq_nat = catalog_or::provider_owned_id(
-        &env, &provider_owned.lawful, "Core.Classes.LawfulClasses", "leq_nat",
-    ).expect("LawfulClasses must own canonical leq_nat");
+        &env,
+        &provider_owned.lawful,
+        "Core.Classes.LawfulClasses",
+        "leq_nat",
+    )
+    .expect("LawfulClasses must own canonical leq_nat");
     assert!(env.env.transparent_body(length).is_some());
     assert!(env.env.transparent_body(add).is_some());
     assert!(env.env.transparent_body(leq_nat).is_some());

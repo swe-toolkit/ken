@@ -603,7 +603,7 @@ fn parsing_module_loader_visible_inventory_is_exact_and_coherent() {
 /// by the production-side removal campaign.
 #[test]
 fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
-    let loaded = direct_parsing();
+    let mut loaded = direct_parsing();
     let refs = owned_refs(&loaded.env, &loaded.parsing);
     let intersection_names = |module: &str, owned: &BTreeSet<GlobalId>| {
         let ids = refs.intersection(owned).copied().collect::<BTreeSet<_>>();
@@ -669,7 +669,6 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
         intersection_names("Data.Collections.Derived", &loaded.derived),
         names(&[
             "bytes_nat_length",
-            "length",
             "list_append",
             "list_append::assoc",
             "list_append::right_unit",
@@ -678,6 +677,12 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
             "nth",
             "nth::some_below_length"
         ])
+    );
+    let list_owned = module_ids(&loaded.env, "Data.Collections.List");
+    assert_eq!(
+        intersection_names("Data.Collections.List", &list_owned),
+        names(&["length"]),
+        "Parsing must cite the base-provider length identity, not a Derived duplicate"
     );
     assert_eq!(
         intersection_names(
@@ -730,6 +735,7 @@ fn parsing_module_provider_closure_is_exact_and_sibling_disjoint() {
         refs.is_disjoint(&loaded.arguments_sibling),
         "Parsing must remain disjoint from Process.Arguments"
     );
+    catalog_or::list_length_via_derived_reexport(&mut loaded.env);
 }
 
 /// Promise class: durable invariant.

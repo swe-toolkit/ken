@@ -27,8 +27,42 @@ pub fn provider_owned_id(
     if owned.contains(&id) {
         Ok(id)
     } else {
-        Err(format!("`{qualified}` resolves to {id:?}, which {provider} does not own"))
+        Err(format!(
+            "`{qualified}` resolves to {id:?}, which {provider} does not own"
+        ))
     }
+}
+
+/// Use the real facade selective import, then inspect the checked client's
+/// body rather than inferring a re-export from either module's global spelling.
+/// Call after loading Derived in the same environment whose ID is returned.
+pub fn list_length_via_derived_reexport(env: &mut ElabEnv) -> GlobalId {
+    let provider = env.globals["Data.Collections.List.length"];
+    let suffix = env.env.next_global_id().0;
+    let alias = format!("cat_list_length_facade_{suffix}");
+    let client = format!("cat_list_length_facade_client_{suffix}");
+    env.elaborate_file(&format!(
+        "import Data.Collections.Derived (length as {alias})\n\
+         fn {client} (xs : List Bool) : Nat = {alias} Bool xs"
+    ))
+    .expect("Derived.length must remain selectively importable through the facade");
+    let (_, body) = env
+        .env
+        .transparent_body(env.globals[&client])
+        .expect("facade length client must be checked and transparent");
+    assert!(
+        declaration_term_references(&body, provider),
+        "Derived facade must preserve base List.length's checked identity"
+    );
+    provider
+}
+
+fn declaration_term_references(term: &Term, provider: GlobalId) -> bool {
+    matches!(term, Term::Const { id, .. } if *id == provider)
+        || term
+            .children()
+            .into_iter()
+            .any(|child| declaration_term_references(child, provider))
 }
 
 fn collect_references(term: &Term, references: &mut BTreeSet<GlobalId>) {
@@ -102,18 +136,20 @@ pub fn load_fokripke_providers(env: &mut ElabEnv) {
         .expect("Core.Logic.Transport must load through strict catalog resolution");
 }
 
-pub fn load_core_logic_compare_with_or_owned(
-    env: &mut ElabEnv,
-) -> (Vec<GlobalId>, Vec<GlobalId>) {
+pub fn load_core_logic_compare_with_or_owned(env: &mut ElabEnv) -> (Vec<GlobalId>, Vec<GlobalId>) {
     // Match Compare's declared import order so the dependency fixture keeps
     // the same provider closure and checked GlobalId allocation order.
-    let or_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Or")
+    let or_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Or")
         .expect("the Core.Logic.Or comparison dependency must roots-load");
-    let ord_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.OrdResult")
+    let ord_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Core.Logic.OrdResult")
         .expect("the Core.Logic.OrdResult comparison dependency must roots-load");
-    let transport_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Transport")
+    let transport_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Transport")
         .expect("the Core.Logic.Transport comparison dependency must roots-load");
-    let compare_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Compare")
+    let compare_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Compare")
         .expect("the Core.Logic comparison provider closure must load");
 
     // Older acceptance fixtures elaborate a catalog consumer as a flat source
@@ -196,7 +232,8 @@ pub fn load_derived_fixture(env: &mut ElabEnv) -> Vec<GlobalId> {
     env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Derived's canonical Nat-order dependency must roots-load");
     let provider_state = env.module_state.clone();
-    let owned = env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
 
     // These legacy fixture suites append declarations in a synthetic flat
@@ -217,9 +254,11 @@ pub fn load_derived_importing_fixture_many(
     env: &mut ElabEnv,
     imports: &[&str],
 ) -> (Vec<GlobalId>, Vec<GlobalId>) {
-    let lawful_owned = env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
+    let lawful_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Derived's canonical Nat-order dependency must roots-load");
-    let derived_owned = env.elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
+    let derived_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
     expose_module(env, "Core.Classes.LawfulClasses");
     expose_module(env, "Data.Collections.Derived");
@@ -296,10 +335,7 @@ pub fn restore_lc_bool_and_flat_aliases(env: &mut ElabEnv, lawful_owned: &[Globa
 /// retained its canonical class owner. Re-loading the provider must be a no-op:
 /// if `load_derived_fixture` restores a state from before LawfulClasses, the
 /// attempted reload reaches the duplicate-instance failure this control guards.
-pub fn assert_derived_fixture_retains_lawfulclasses(
-    env: &mut ElabEnv,
-    lawful_owned: &[GlobalId],
-) {
+pub fn assert_derived_fixture_retains_lawfulclasses(env: &mut ElabEnv, lawful_owned: &[GlobalId]) {
     let loaded_before = env.loaded_module_count();
     env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the shared Derived fixture must retain its canonical class owner");
