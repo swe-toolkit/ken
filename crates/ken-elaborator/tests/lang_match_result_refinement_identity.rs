@@ -1,6 +1,8 @@
-//! Durable checked-behavior pins for match-result refinement identity.
-//! Spec: 20-surface/21 §2 and 20-verification/22 §2.1. A checked arm
-//! introduces the source result's predicate, not its inferred carrier.
+//! Match-result refinement identity. Promise: durable behavioral invariant.
+//! Spec: spec/30-surface/34-data-match.md §§3.1–3.3 (branch checking),
+//! spec/20-verification/21-spec-syntax.md §2 (refinement carrier), and
+//! spec/20-verification/22-obligations.md §§2.1–2.2 (per-leaf obligations).
+//! Each checked arm introduces the source result's predicate, not its carrier.
 
 use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
 use ken_kernel::{GlobalId, Term};
