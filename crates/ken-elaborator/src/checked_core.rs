@@ -4375,12 +4375,10 @@ fn validate_supported_match_motive(
         .map_err(|reason| malformed_body(owner, reason))?
     {
         Some(MotiveShape::ConstantType) => Ok(true),
-        Some(MotiveShape::Dependent) => {
-            Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
-                symbol: owner.clone(),
-                family: family.clone(),
-            })
-        }
+        Some(MotiveShape::Dependent) => Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
+            symbol: owner.clone(),
+            family: family.clone(),
+        }),
         Some(MotiveShape::ProofOnly) => {
             let owner_type = delivered_declaration_type(semantic, owner)
                 .map_err(|reason| malformed_body(owner, reason))?;
@@ -4477,7 +4475,10 @@ fn delivered_declaration_type(
     };
     let mut cursor = CanonicalCursor::new(bytes);
     let kind = cursor.read_tag()?;
-    if !matches!(kind.as_str(), "transparent" | "opaque" | "primitive" | "inductive") {
+    if !matches!(
+        kind.as_str(),
+        "transparent" | "opaque" | "primitive" | "inductive"
+    ) {
         return Ok(None);
     }
     if decode_stable_symbol(&mut cursor)? != *symbol {
@@ -4591,7 +4592,9 @@ fn head_spine_sort_kind(
     semantic: &CheckedCoreSemanticInputs,
     ty: &[u8],
 ) -> Result<Option<SortKind>, String> {
-    fn head_and_arity(cursor: &mut CanonicalCursor<'_>) -> Result<Option<(StableSymbol, usize)>, String> {
+    fn head_and_arity(
+        cursor: &mut CanonicalCursor<'_>,
+    ) -> Result<Option<(StableSymbol, usize)>, String> {
         match cursor.read_tag()?.as_str() {
             "app" => {
                 let head = head_and_arity(cursor)?;
@@ -5167,8 +5170,11 @@ mod tests {
             level_args: Vec::new(),
         };
         assert_eq!(
-            delivered_sort_kind(&semantic, &canonical_term_bytes(&bare_head, &table).unwrap())
-                .unwrap(),
+            delivered_sort_kind(
+                &semantic,
+                &canonical_term_bytes(&bare_head, &table).unwrap()
+            )
+            .unwrap(),
             None,
             "the unapplied head still has a Pi type, not an Omega result"
         );
@@ -5226,8 +5232,7 @@ mod tests {
         );
         let sigma = Term::Sigma(Box::new(ty), Box::new(result));
         assert_eq!(
-            delivered_sort_kind(&semantic, &canonical_term_bytes(&sigma, &table).unwrap())
-                .unwrap(),
+            delivered_sort_kind(&semantic, &canonical_term_bytes(&sigma, &table).unwrap()).unwrap(),
             None,
             "a Sigma with an unreadable component must not default to Type"
         );
@@ -5277,11 +5282,8 @@ mod tests {
         let mut semantic = CheckedCoreSemanticInputs::default();
         semantic.declarations.insert(
             prop.clone(),
-            canonical_decl_bytes(
-                &alias_decl(GlobalId(2), Term::Omega(Level::zero())),
-                &table,
-            )
-            .unwrap(),
+            canonical_decl_bytes(&alias_decl(GlobalId(2), Term::Omega(Level::zero())), &table)
+                .unwrap(),
         );
         semantic.declarations.insert(
             head.clone(),
@@ -5336,11 +5338,7 @@ mod tests {
         );
         semantic.declarations.insert(
             non_sort,
-            canonical_decl_bytes(
-                &alias_decl(GlobalId(3), constant(GlobalId(4))),
-                &table,
-            )
-            .unwrap(),
+            canonical_decl_bytes(&alias_decl(GlobalId(3), constant(GlobalId(4))), &table).unwrap(),
         );
         semantic.declarations.insert(
             head.clone(),
