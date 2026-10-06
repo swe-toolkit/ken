@@ -4433,11 +4433,17 @@ fn inspect_non_dependent_motive(
     let body = capture_canonical_term(&mut cursor)?;
     let dependent = canonical_term_contains_free_var(&body, 0)?;
     let kind = if ascribed {
-        match inspect_non_indexed_motive_type_sort(&mut cursor)? {
-            MotiveShape::ConstantType => Some(SortKind::Type),
-            MotiveShape::ProofOnly => Some(SortKind::Omega),
-            MotiveShape::Dependent => None,
+        let ascription = capture_canonical_term(&mut cursor)?;
+        let mut pi = CanonicalCursor::new(&ascription);
+        if pi.read_tag()? != "pi" {
+            return Ok(None);
         }
+        skip_term(&mut pi)?;
+        let codomain = capture_canonical_term(&mut pi)?;
+        if pi.remaining() != 0 {
+            return Ok(None);
+        }
+        delivered_sort_literal(semantic, &codomain)?
     } else {
         delivered_sort_kind(semantic, &body)?
     };
@@ -4487,6 +4493,56 @@ fn delivered_declaration_type(
         skip_level(&mut cursor)?;
     }
     Ok(Some(capture_canonical_term(&mut cursor)?))
+}
+
+/// A term in sort position: a literal sort, or a transparent constant whose
+/// delivered body is a sort. Levels cannot change Type versus Omega. Bounded
+/// unfolding fails closed rather than consulting producer metadata or the kernel.
+fn delivered_sort_literal(
+    semantic: &CheckedCoreSemanticInputs,
+    term: &[u8],
+) -> Result<Option<SortKind>, String> {
+    let mut term = term.to_vec();
+    for _ in 0..8 {
+        let mut cursor = CanonicalCursor::new(&term);
+        let kind = match cursor.read_tag()?.as_str() {
+            "type" => SortKind::Type,
+            "omega" => SortKind::Omega,
+            "const" => {
+                let symbol = decode_stable_symbol(&mut cursor)?;
+                skip_levels(&mut cursor)?;
+                if cursor.remaining() != 0 {
+                    return Ok(None);
+                }
+                let Some(body) = delivered_transparent_body(semantic, &symbol)? else {
+                    return Ok(None);
+                };
+                term = body;
+                continue;
+            }
+            _ => return Ok(None),
+        };
+        skip_level(&mut cursor)?;
+        return Ok((cursor.remaining() == 0).then_some(kind));
+    }
+    Ok(None)
+}
+
+fn delivered_transparent_body(
+    semantic: &CheckedCoreSemanticInputs,
+    symbol: &StableSymbol,
+) -> Result<Option<Vec<u8>>, String> {
+    let Some(bytes) = semantic.declarations.get(symbol) else {
+        return Ok(None);
+    };
+    let mut cursor = CanonicalCursor::new(bytes);
+    if cursor.read_tag()? != "transparent" || decode_stable_symbol(&mut cursor)? != *symbol {
+        return Ok(None);
+    }
+    decode_level_params(&mut cursor)?;
+    skip_term(&mut cursor)?; // declared type
+    let body = capture_canonical_term(&mut cursor)?;
+    Ok((cursor.remaining() == 0).then_some(body))
 }
 
 /// Kind follows the kernel: Pi takes the codomain's kind; Sigma is Omega
@@ -4572,16 +4628,7 @@ fn head_spine_sort_kind(
         }
         head_type = codomain;
     }
-    let mut sort = CanonicalCursor::new(&head_type);
-    let kind = match sort.read_tag()?.as_str() {
-        "type" => Some(SortKind::Type),
-        "omega" => Some(SortKind::Omega),
-        _ => None,
-    };
-    if kind.is_some() {
-        skip_level(&mut sort)?;
-    }
-    Ok(if sort.remaining() == 0 { kind } else { None })
+    delivered_sort_literal(semantic, &head_type)
 }
 
 /// Return the exact checked result type of a constant, non-indexed Match
@@ -5183,6 +5230,137 @@ mod tests {
                 .unwrap(),
             None,
             "a Sigma with an unreadable component must not default to Type"
+        );
+    }
+
+    #[test]
+    fn delivered_prop_alias_in_sort_position_admits_only_delivered_proofs() {
+        let owner = decl_symbol("alias_proof_owner");
+        let prop = decl_symbol("P");
+        let non_sort = decl_symbol("Q");
+        let nat = decl_symbol("Nat");
+        let head = decl_symbol("H");
+        let table = table_many(&[
+            (GlobalId(1), owner.clone()),
+            (GlobalId(2), prop.clone()),
+            (GlobalId(3), non_sort.clone()),
+            (GlobalId(4), nat.clone()),
+            (GlobalId(5), head.clone()),
+        ]);
+        let d = Term::Type(Level::zero());
+        let constant = |id| Term::Const {
+            id,
+            level_args: Vec::new(),
+        };
+        let alias_decl = |id, body| Decl::Transparent {
+            id,
+            level_params: Vec::new(),
+            ty: Term::Type(Level::suc(Level::zero())),
+            body,
+        };
+        let head_decl = |sort| Decl::Opaque {
+            id: GlobalId(5),
+            name: "H".to_string(),
+            level_params: Vec::new(),
+            ty: Term::pi(d.clone(), sort),
+        };
+        let motive = |sort| {
+            Term::Ascript(
+                Box::new(Term::lam(
+                    d.clone(),
+                    Term::App(Box::new(constant(GlobalId(5))), Box::new(Term::Var(0))),
+                )),
+                Box::new(Term::pi(d.clone(), sort)),
+            )
+        };
+        let encode = |term: &Term| canonical_term_bytes(term, &table).unwrap();
+        let mut semantic = CheckedCoreSemanticInputs::default();
+        semantic.declarations.insert(
+            prop.clone(),
+            canonical_decl_bytes(
+                &alias_decl(GlobalId(2), Term::Omega(Level::zero())),
+                &table,
+            )
+            .unwrap(),
+        );
+        semantic.declarations.insert(
+            head.clone(),
+            canonical_decl_bytes(&head_decl(constant(GlobalId(2))), &table).unwrap(),
+        );
+        semantic.declarations.insert(
+            owner.clone(),
+            canonical_decl_bytes(
+                &Decl::Opaque {
+                    id: GlobalId(1),
+                    name: "alias_proof_owner".to_string(),
+                    level_params: Vec::new(),
+                    ty: Term::pi(
+                        d.clone(),
+                        Term::App(Box::new(constant(GlobalId(5))), Box::new(Term::Var(0))),
+                    ),
+                },
+                &table,
+            )
+            .unwrap(),
+        );
+        let prop_motive = encode(&motive(constant(GlobalId(2))));
+        assert_eq!(
+            inspect_non_dependent_motive(&semantic, &prop_motive).unwrap(),
+            Some(MotiveShape::ProofOnly)
+        );
+        let data = DataMetadata {
+            parameter_count: 0,
+            index_count: 0,
+            constructors: Vec::new(),
+            eliminator: LowerabilityStatus::Supported,
+            lowerability: LowerabilityStatus::Supported,
+        };
+        assert_eq!(
+            validate_supported_match_motive(&semantic, &owner, &head, &data, &prop_motive),
+            Ok(true),
+            "the proof owner's own declared type must also resolve the alias"
+        );
+
+        semantic.declarations.insert(
+            nat.clone(),
+            canonical_decl_bytes(
+                &Decl::Opaque {
+                    id: GlobalId(4),
+                    name: "Nat".to_string(),
+                    level_params: Vec::new(),
+                    ty: d.clone(),
+                },
+                &table,
+            )
+            .unwrap(),
+        );
+        semantic.declarations.insert(
+            non_sort,
+            canonical_decl_bytes(
+                &alias_decl(GlobalId(3), constant(GlobalId(4))),
+                &table,
+            )
+            .unwrap(),
+        );
+        semantic.declarations.insert(
+            head.clone(),
+            canonical_decl_bytes(&head_decl(constant(GlobalId(3))), &table).unwrap(),
+        );
+        assert_eq!(
+            inspect_non_dependent_motive(&semantic, &encode(&motive(constant(GlobalId(3)))))
+                .unwrap(),
+            None,
+            "a transparent alias to a non-sort must fail closed"
+        );
+        semantic.declarations.insert(
+            head,
+            canonical_decl_bytes(&head_decl(constant(GlobalId(2))), &table).unwrap(),
+        );
+        semantic.declarations.remove(&prop);
+        assert_eq!(
+            inspect_non_dependent_motive(&semantic, &prop_motive).unwrap(),
+            None,
+            "a missing delivered Prop declaration cannot be supplied by metadata"
         );
     }
 
