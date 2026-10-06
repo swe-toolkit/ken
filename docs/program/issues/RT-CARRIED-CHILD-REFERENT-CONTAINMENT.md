@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-CHILD-REFERENT-CONTAINMENT
 title: "The planner overrides an aggregate child's referent owners to NoReferent from its planned NativeScalarPair join, while lowering produces the child Carried. The runtime store check refuses the only dangling pair, so this is not memory-unsafe, but at the closure-capture paths the wrong owners can allocate a parent persistent and fail a native run the interpreter accepts. Find the first planner/lowering phase divergence and repair the planner so the plan and the lowering agree"
-status: active
+status: merged
 owner: runtime
 size: S
 tier: T1
@@ -119,3 +119,22 @@ when `pre_schema_transport_sources` is non-empty.
 - Any kernel, trust or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, and never land `a7d46d6f2`.
+
+## Closeout
+
+Merged `4b2835bc8` from exact `bd7c9551e` (PR #4539, main push run
+37416137363). Runtime QA `evt_7gzyaawhy61jc`, Architect `evt_24rf604gjbz21`,
+Decision `dec_fej8yq2x4enk`.
+
+- `join_may_take_process_carrier(origin)` is the one planner-domain
+  predicate: a source `Match` in a plan with transports.
+  `process_composed_join_plan_token` refuses outside it, and
+  `aggregate_child_referent_owners` narrows `NativeScalarPair` to
+  `[NoReferent]` only outside it.
+- Parent allocation and meet are identical base against R1 (930 = 930). 60
+  changed-owner events (12 keys) are the ruled over-approximation of the
+  domain.
+- A relational pin in `rt_escape_second_resource_native` covers every
+  qualifying child. Match-only scope is review-enforced (widening stays
+  green), and the pin measures planner allowance, not emitted ownership; the
+  runtime store refusal is the execution backstop.
