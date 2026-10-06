@@ -1,7 +1,7 @@
 ---
 id: CAT-VECTOR-TO-LIST-ZIP-LAWS
 title: "Add Vector's to_list, zip and unzip and prove the zip-unzip round trip spec 60 §5 defers, with no import that raises Vector's zero trusted_base() delta"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T1
@@ -67,3 +67,16 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. uniqueness of Vec b Zero needed under a dependent match; a match on a scrutinee at a non-variable index whose goal mentions a constructor at that index builds an ill-typed motive -- keyed on the elaborator abstracting index terms rather than refining by unification
 2. the canonical List length lives in a module whose import closure carries trusted axioms, so a zero-delta package cannot import it -- keyed on trust being inherited per loaded module closure, not per used declaration
 ```
+
+## Closeout
+
+Merged `ac3a35879` from exact `282f6d1d5` (PR #4551). Foundation QA
+`evt_2vrtd4ad774eq`, Architect `evt_2njrtc4jzz4ws`, Decision
+`dec_1aa0dqhb7y0gf`. §1a count 2.
+
+- `to_list`, `zip` and `unzip` are defined beside `head`, `tail` and `map`.
+  `unzip_zip` (with its `fst` and `snd` halves) and `zip_unzip` are checked
+  for every `n`, Vec-zero uniqueness going through `vec_nil_case`.
+- The imports stay Combinators and Transport; cold trust 109 = 109.
+- The `length ∘ to_list` law moves to `CAT-VECTOR-TO-LIST-LENGTH-LAW`, after
+  `CAT-LIST-LENGTH-TRUST-FREE-BASE`.
