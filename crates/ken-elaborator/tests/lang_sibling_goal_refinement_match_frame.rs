@@ -30,11 +30,7 @@ fn verdict(fixture: &'static str) -> Result<(), ElabError> {
         .stack_size(ELABORATION_STACK_BYTES)
         .spawn(move || {
             let mut env = ElabEnv::new().expect("checked prelude");
-            for provider in [
-                "Core.Function.Combinators",
-                "Core.Logic.Transport",
-                "Data.Collections.Derived",
-            ] {
+            for provider in ["Core.Function.Combinators", "Core.Logic.Transport"] {
                 env.elaborate_module_from_roots(&[catalog_root()], provider)
                     .unwrap_or_else(|error| panic!("Vector provider {provider}: {error:?}"));
             }

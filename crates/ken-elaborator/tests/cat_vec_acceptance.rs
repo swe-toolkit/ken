@@ -191,12 +191,12 @@ fn empty_and_out_of_bounds_calls_are_rejected_by_their_indices() {
 }
 
 /// Promise class: durable invariant. From an actually roots-loaded Vector,
-/// independently restate and apply the three private, checked generic laws.
+/// independently restate and apply both private, checked inverse laws.
 /// MEASURED: the elaborator/kernel checks every quantified statement and its
-/// proof application, not a source spelling. CLAIMED: list length equals the
-/// index and both zip/unzip inverse directions hold for arbitrary element
-/// types, length and vectors. THE GAP: the proof clients use private test
-/// aliases because the package does not export its Vec family or operations;
+/// proof application, not a source spelling. CLAIMED: both zip/unzip inverse
+/// directions hold for arbitrary element types, length and vectors. THE GAP:
+/// the proof clients use private test aliases because the package does not
+/// export its Vec family or operations;
 /// the original checked declarations are independently verified by roots load.
 #[test]
 fn bridge_laws_check_at_independent_generic_client_types() {
@@ -204,16 +204,11 @@ fn bridge_laws_check_at_independent_generic_client_types() {
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_file(
         r#"
-import Data.Collections.Derived (length)
 fn bridge_as_list (a : Type) (n : Nat) (xs : Vec a n) : List a = to_list a n xs
 fn bridge_zip (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
   : Vec (Pair a b) n = zip a b n xs ys
 fn bridge_unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
   : Pair (Vec a n) (Vec b n) = unzip a b n ps
-
-theorem bridge_length (a : Type) (n : Nat) (xs : Vec a n)
-  : Equal Nat (length a (to_list a n xs)) n =
-  to_list_length a n xs
 
 theorem bridge_unzip_zip
     (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
@@ -231,7 +226,7 @@ theorem bridge_zip_unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
   zip_unzip a b n ps
 "#,
     )
-    .expect("three generic bridge laws must inhabit independent client types");
+    .expect("both generic round-trip laws must inhabit independent client types");
     assert_eq!(
         before,
         env.env.trusted_base().into_iter().collect(),
@@ -291,14 +286,51 @@ theorem bridge_unzipped_right
     .expect("closed head order and the two unequal projections must check");
 }
 
+/// Promise class: durable invariant. For identical component types, swapping
+/// the unequal left/right outputs is a well-typed but false inverse claim.
+/// MEASURED: the correct generic law checks above, while using its proof for
+/// this swapped Bool claim is kernel-rejected. CLAIMED: the two components of
+/// `unzip` are not interchangeable. THE GAP: this is a concrete same-type
+/// counterexample; generic inverse proofs establish the all-type property.
+#[test]
+fn swapped_unzip_components_are_rejected_for_unequal_bool_values() {
+    let mut env = internal_vector_fixture_env();
+    env.elaborate_file(
+        "const bridge_left : Vec Bool (Suc Zero) = VCons Bool Zero True (VNil Bool)\n\
+         const bridge_right : Vec Bool (Suc Zero) = VCons Bool Zero False (VNil Bool)\n\
+         theorem bridge_unswapped\n\
+           : Equal (Pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero)))\n\
+               (unzip Bool Bool (Suc Zero)\n\
+                 (zip Bool Bool (Suc Zero) bridge_left bridge_right))\n\
+               (mk_pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero))\n\
+                 bridge_left bridge_right) =\n\
+           unzip_zip Bool Bool (Suc Zero) bridge_left bridge_right",
+    )
+    .expect("real unequal heads must satisfy the original round trip");
+    let swapped = "theorem bridge_swapped\n\
+      : Equal (Pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero)))\n\
+          (unzip Bool Bool (Suc Zero) (zip Bool Bool (Suc Zero) bridge_left bridge_right))\n\
+          (mk_pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero)) bridge_right bridge_left) =\n\
+        unzip_zip Bool Bool (Suc Zero) bridge_left bridge_right";
+    let error = env
+        .elaborate_decl(swapped)
+        .expect_err("swapped unequal component values must not satisfy unzip_zip");
+    assert!(
+        matches!(
+            error,
+            ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            }
+        ),
+        "swapped result must fail by kernel type mismatch: {error:?}"
+    );
+}
+
 #[test]
 fn entry_adds_no_trusted_declarations_beyond_its_providers() {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
-    for provider in [
-        "Core.Function.Combinators",
-        "Core.Logic.Transport",
-        "Data.Collections.Derived",
-    ] {
+    for provider in ["Core.Function.Combinators", "Core.Logic.Transport"] {
         env.elaborate_module_from_roots(&[catalog_root()], provider)
             .unwrap_or_else(|error| panic!("{provider} must roots-load: {error:?}"));
     }

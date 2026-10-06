@@ -2,8 +2,8 @@
 //!
 //! Vector owns checked indexed families, operations, computation theorems,
 //! and private map, lookup, and round-trip laws. Its checked providers include
-//! Combinators, Transport, and Derived.length; the new private functions
-//! add no trust beyond those providers.
+//! Combinators and Transport; the new private functions add no trust beyond
+//! those providers.
 //! `cat_vec_acceptance` retains the family-index, computation, and
 //! impossible-call behavior obligations.
 
@@ -67,7 +67,6 @@ fn expected_owned_names() -> BTreeSet<String> {
         "tail",
         "tail_vcons",
         "to_list",
-        "to_list_length",
         "unzip",
         "unzip_zip",
         "unzip_zip_fst",
@@ -166,11 +165,7 @@ fn qualified_owned_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
 #[test]
 fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
     let mut provider_only = ElabEnv::new().expect("provider environment");
-    for provider in [
-        "Core.Function.Combinators",
-        "Core.Logic.Transport",
-        "Data.Collections.Derived",
-    ] {
+    for provider in ["Core.Function.Combinators", "Core.Logic.Transport"] {
         provider_only
             .elaborate_module_from_roots(&[catalog_root()], provider)
             .unwrap_or_else(|error| panic!("provider {provider} must roots-load: {error:?}"));
@@ -228,7 +223,7 @@ fn vector_owned_inventory_transition_sentinel_and_zero_local_trust() {
 /// Promise class: transition sentinel for Vector's checked dependency edge;
 /// retire or rebaseline at the next separately authorized provider change.
 /// MEASURED: roots-loaded Vector's checked declarations refer to the canonical
-/// prelude, Combinators, Transport and Derived.length global IDs, and preserve
+/// prelude, Combinators and Transport global IDs, and preserve
 /// the prelude's canonical identities. CLAIMED: Vector adds no shadow provider
 /// for those dependencies. THE GAP: references in compiled declarations do not
 /// pin imports not reached from a checked declaration; this is a transition
@@ -260,7 +255,6 @@ fn vector_uses_canonical_checked_provider_identities() {
         "Core.Logic.Transport.cong",
         "Core.Logic.Transport.sym",
         "Core.Logic.Transport.trans",
-        "Data.Collections.Derived.length",
     ] {
         expected_external.insert(via_vector.globals[name]);
     }

@@ -32,16 +32,13 @@ while `unzip` recovers both aligned input vectors from paired elements.
 `Zero`; `VCons` extends a vector at length `n` to length `Suc n`. Neither
 constructor of `Fin` targets `Fin Zero`. The map laws use checked `idf` and
 `comp` from the combinator package and `cong` from the transport package.
-`to_list_length` uses the public `length` of `Data.Collections.Derived`; this
-import does not create a dependency cycle. `Pair`, `mk_pair`, `pair_fst` and
-`pair_snd` come from the prelude, not an additional catalog provider.
+`Pair`, `mk_pair`, `pair_fst` and `pair_snd` come from the prelude, not an
+additional catalog provider.
 
 ```ken
 import Core.Function.Combinators (comp, idf)
 
 import Core.Logic.Transport (cong, sym, trans)
-
-import Data.Collections.Derived (length)
 
 data Vec (a : Type) : Nat → Type where {
   VNil : Vec a Zero;
@@ -117,31 +114,27 @@ fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
       }
   }
 
-theorem to_list_length
-      (a : Type) (n : Nat) (xs : Vec a n)
-    : Equal Nat (length a (to_list a n xs)) n =
-  match xs {
-    VNil ↦ Proved;
-    VCons m x tail_xs ↦
-      cong Nat Nat (length a (to_list a m tail_xs)) m Suc (to_list_length a m tail_xs)
-  }
-
 theorem unzip_zip
       (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
     : Equal
         (Pair (Vec a n) (Vec b n))
         (unzip a b n (zip a b n xs ys))
         (mk_pair (Vec a n) (Vec b n) xs ys) =
-  vector_pair_cong
-    a
-    b
-    n
-    (pair_fst (Vec a n) (Vec b n) (unzip a b n (zip a b n xs ys)))
-    xs
-    (pair_snd (Vec a n) (Vec b n) (unzip a b n (zip a b n xs ys)))
-    ys
-    (unzip_zip_fst a b n xs ys)
-    (unzip_zip_snd a b n xs ys)
+  let
+    reconstructed = unzip a b n (zip a b n xs ys);
+    left_round_trip = unzip_zip_fst a b n xs ys;
+    right_round_trip = unzip_zip_snd a b n xs ys
+  in
+    vector_pair_cong
+      a
+      b
+      n
+      (pair_fst (Vec a n) (Vec b n) reconstructed)
+      xs
+      (pair_snd (Vec a n) (Vec b n) reconstructed)
+      ys
+      left_round_trip
+      right_round_trip
 
 theorem unzip_zip_fst
       (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
@@ -452,10 +445,10 @@ Length preservation is carried by the signatures:
 - `zip` returns `Vec (Pair a b) n` from two inputs at the same `n`.
 - `unzip` returns two `Vec`s, each indexed by its input's `n`.
 
-No separate arithmetic theorem is needed to recover those facts. The kernel
-checks the index at every constructor assembly and recursive call. The
-`to_list_length` theorem additionally proves that `length a (to_list a n xs)`
-recovers the index `n`, by induction on `xs` and `cong` under `Suc`.
+No separate arithmetic theorem is needed to recover those indexed facts.
+The kernel checks the index at every constructor assembly and recursive call.
+The length of the unindexed `to_list` view is a separate law, deferred until
+`List` length has a trust-free canonical provider.
 
 Totality is likewise carried by the domain types. `head` and `tail` accept only
 `Vec a (Suc n)`, while `lookup` requires a `Fin n` paired with `Vec a n`.
@@ -610,10 +603,10 @@ sibling indexed value through nested matches. Generic cons computation for
 `zip_with` checks by `Refl`. Lookup after `zip_with` follows its bounded index
 through both input tails and is checked generically. `zip_with`/map naturality
 states a pointwise premise on the combining function; this states the general
-law without an inline lambda in a proposition type. The `to_list` bridge and
-both zip/unzip directions are checked over generic types, lengths and vectors;
-concrete examples illustrate the operations but do not stand in for those
-laws.
+law without an inline lambda in a proposition type. Both zip/unzip directions
+are checked over generic types, lengths and vectors; the `to_list` length law
+awaits its trust-free canonical `List` length provider. Concrete examples
+illustrate the operations but do not stand in for the checked laws.
 
 ## References
 
@@ -633,25 +626,23 @@ This entry realizes the length-indexed vector contract in
 `data`, structural recursion, dependent `match`, `Equal`, `Refl`, and `Proved`
 surfaces. The private map and naturality laws reuse
 `Core.Function.Combinators.comp`/`idf` and
-`Core.Logic.Transport.cong`/`sym`/`trans`. The length bridge uses
-`Data.Collections.Derived.length`. The two round-trip proofs use ordinary
-`Pair` projections, `J`, and Sigma eta, with a checked index-computed motive
-for the empty vector's uniqueness.
+`Core.Logic.Transport.cong`/`sym`/`trans`. The two round-trip proofs use
+ordinary `Pair` projections, `J`, and Sigma eta, with a checked index-computed
+motive for the empty vector's uniqueness.
 
 The `Vec` and `Fin` families, their constructors, all operations including
 `to_list`, `zip`, and `unzip`, and all theorems remain private to this package.
 Eight computation theorems, map composition, lookup after map and after
-`zip_with`, pointwise `zip_with`/map naturality, `to_list_length`, `unzip_zip`,
-and `zip_unzip` are checked laws.
+`zip_with`, pointwise `zip_with`/map naturality, `unzip_zip`, and `zip_unzip`
+are checked laws. The `to_list`/`length` bridge is deferred to its separate
+trust-free-provider follow-up.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
 adds no axiom, postulate, primitive, foreign declaration, or unresolved hole.
 Its cold roots-loaded `trusted_base()` set equals a separately fresh compiler
-base set. Vector adds no local axiom or trusted declaration. At this checkpoint,
-loading the Derived length provider adds five inherited trusted identities to
-the cold Vector closure. This fails the zero-new-trust stop condition and is
-not a releasable package until the provider boundary is resolved.
+base set. The imported combinator and congruence providers contribute no
+trusted items, and Vector adds none.
 
 Targeted validation checks the package through the roots-based module loader,
 the exact family indices and constructor targets, generic operation and
