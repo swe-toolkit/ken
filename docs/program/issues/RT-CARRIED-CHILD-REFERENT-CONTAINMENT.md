@@ -3,7 +3,7 @@ id: RT-CARRIED-CHILD-REFERENT-CONTAINMENT
 title: "The planner overrides an aggregate child's referent owners to NoReferent from its planned NativeScalarPair join, while lowering produces the child Carried. The runtime store check refuses the only dangling pair, so this is not memory-unsafe, but at the closure-capture paths the wrong owners can allocate a parent persistent and fail a native run the interpreter accepts. Find the first planner/lowering phase divergence and repair the planner so the plan and the lowering agree"
 status: active
 owner: runtime
-size: M
+size: S
 tier: T1
 gate: architect
 depends_on: []
@@ -68,53 +68,54 @@ interpreter accepts.
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
 
+## AC-0'' result (Architect `evt_61aq80xm34yb7`, on `7a1fe0473`)
+
+- **Measured** (implementer `evt_5s32v5tm7yfpz`): 109 consumed token
+  mismatches over the 1,031-row population, all Matches. 81 are
+  process-composed and 28 suffix-composed. 33 events reach
+  `aggregate_child_referent_owners`, all at caller `:5532` with child
+  lifetime `Persistent`. Zero are decision-changing.
+- **Process-composed is the defect.** `process_composed_join_plan_token`
+  (`joins_traps.rs:798-809`) returns CarrierWord for every composed Match
+  join under a non-empty transport set, while
+  `aggregate_child_referent_owners` narrows to `[NoReferent]` from the raw
+  `join_results`. Two readers give two answers.
+- **Suffix-composed is by design.** `composed_join_plan_token` is the
+  interface morphism: the local Match never materializes, and its
+  `join_results` entry has no value consumer (0 aggregate reads).
+- **RT-NAT-FANOUT is not ordered behind this WP.** Its reached joins are
+  suffix-composed, so the shared-predicate stop did not fire. The
+  Architect rules R7 in that WP's thread.
+
 ## Deliverable
 
-1. **AC-0', static plane only (measure only, disposable probes).**
-   - (a) **First divergence.** For Var780 (funcid61/Spec(3)) and Var1029
-     (funcid63/Spec(1)), walk each binder back to the first point where
-     the planner's slot phase (`joins_traps.rs` `summarize_result_phase`)
-     says SpecializedOnly while lowering holds a Carried operand. Name the
-     planner arm and line and the lowering site, and say whether it is
-     RT-NAT-FANOUT's F819/F15 arm and origin kind.
-   - (c) **Consequence census.** Over the same 1031-row population, every
-     call to `aggregate_child_referent_owners` that returned through the
-     NativeScalarPair arm for a child lowered Carried: the count, the caller
-     line, the child lifetime and the parent's allocation. Separate the
-     decision-changing cases, where `lifetime_referent_affinity` of the
-     child's lifetime contains `InvocationArena`.
-   - (d) **Executed witness, only if (c) finds a decision-changing case.**
-     Run that row natively and compare it with the interpreter. The
-     predicted failure is native ERR_ESCAPE (-1) against interpreter
-     success.
-
-   The Architect then rules the repair.
-2. **The ruled repair.** The planner stays the single authority on
-   representation and referents.
+**R1** (the ruling's code is the text): one planner-domain predicate,
+`join_may_take_process_carrier(origin)`, true for a source `Match` origin
+when `pre_schema_transport_sources` is non-empty.
+`process_composed_join_plan_token` refuses outside that domain, and
+`aggregate_child_referent_owners` narrows `NativeScalarPair` to
+`[NoReferent]` only outside it. No R6 and no RT-NAT-FANOUT code.
 
 ## Acceptance
 
-- **AC-1.** A focused test pins that the witnesses' planned child owners
-  match the lowered representation. If (d) produced a divergence, the
-  executed witness matches the interpreter. The test fails on main before
-  the repair (CHECKS 8).
-- **AC-2 (controls).**
-  - The (c) census is zero after the repair.
-  - The runtime lib tests, `rt_escape_second_resource_native` and
-    `rt_native_tree_match_case_of_case` keep their default results. The
-    full `rt_parity_native` suite is CI's: it is not run locally, and
-    touched parity rows are run by name.
-- **AC-3 (falsifier).** Reverting the repair brings back the plan/lowering
-  mismatch on the witnesses.
+- **AC-1 (behaviour).** On the census population, the 33
+  aggregate-consumed events change child owners from `[NoReferent]` to
+  `lifetime_referent_affinity(Persistent)`. Every parent allocation and
+  meet in the consumer records is identical, base against R1.
+- **AC-2 (domain).** The new refusal in `process_composed_join_plan_token`
+  never fires across the runtime lib active suite,
+  `rt_escape_second_resource_native` and `rt_native_tree_match_case_of_case`.
+  The full `rt_parity_native` suite is CI's; touched rows are run by name.
+- **AC-3 (mutation, QA).** Restoring the unguarded `NativeScalarPair ⇒
+  [NoReferent]` arm reddens a new test: the r2 relay row asserting that
+  Construct782's child-0 owners contain `PersistentStore`. Widening the
+  predicate to all source joins is recorded; the assertion test still
+  passes.
 
 ## Stop conditions
 
-- **(a) finds no divergence**, meaning the planner already says Carried for
-  780 and 1029: stop to the Architect.
-- **(a) names RT-NAT-FANOUT's arm:** stop to the Architect, who rules one
-  planner rule here. RT-NAT-FANOUT then rebuilds R6 on top of it.
-- **(d) native differs from the interpreter:** a conformance defect on main.
-  Stop to the Architect and the Steward.
+- **Any parent allocation or meet change** under R1: stop to the
+  Architect.
 - Any kernel, trust or spec change.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, and never land `a7d46d6f2`.
