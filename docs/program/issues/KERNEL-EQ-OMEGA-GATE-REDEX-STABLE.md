@@ -1,7 +1,7 @@
 ---
 id: KERNEL-EQ-OMEGA-GATE-REDEX-STABLE
 title: "The three Omega gates that KERNEL-EQ-OMEGA-CARRIER-REDUCTION added decide Omega-ness with classify on the substituted instance, which errs on a lambda-headed redex and so answers false for a well-typed Omega type. An Omega carrier then reduces (R1), a subset Sigma stays stuck (R2), and an inductive Eq reduct is ill-formed or stuck (R3). Make each gate's Omega decision stable under substitution"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1
@@ -107,3 +107,21 @@ binder form.
 - `trusted_base()` changes: an operator question.
 - A term outside the four rows and the AC-0 list starts or stops checking:
   stop to the Architect with it.
+
+## Closeout
+
+Merged `e140cad94` from exact `b5c72d681` (PR #4535 from
+`wp/KERNEL-EQ-OMEGA-GATE-REDEX-STABLE-respin`, main push run 37399851282;
+the withdrawn head's PR #4521 is closed). Kernel QA `evt_32vfnsw7amgpj`,
+Architect `evt_3852cbkmea262`, Decision `dec_6yf02gy6vn212`.
+
+- One judgment, `omega_sort` / `omega_sort_whnf`, replaces
+  `omega_classified`. It decides Π and Σ by their formation rules after
+  WHNF, decides an inductive-former spine as not Ω in any context, and
+  keeps the fail-closed `classify` fallback for other neutral heads. An
+  undecided sort leaves the Eq neutral at all three gates.
+- Four kernel rows pin R1-R3, each with a postulated control, and
+  restoring the old decision at any gate reddens its row. `check.rs`,
+  `conv.rs` and `trusted_base()` are unchanged.
+- Carry, unframed: the R1 context item named in the Architect's approval
+  `evt_3852cbkmea262`.
