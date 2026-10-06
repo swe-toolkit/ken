@@ -1,7 +1,7 @@
 ---
 id: CAT-CONSOLE-TEXT-EXPORTED-HELPERS
 title: "Console.Text's four helpers are private procs, so no client module can call print, printLine, eprint or eprintLine, and the four pub laws CAT-CONSOLE-TEXT-LAWS added name private subjects a client cannot write. Export the helpers and prove the laws usable from another module"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -80,3 +80,18 @@ No new primitive, postulate or axiom, and no prelude change.
   `lang_mod_strict_resolution_d0.rs:520` (`{IO, IOError, Stderr, Stdout,
   Unit, write}`) changes, or any hash, snapshot or artifact pin on
   `printLine` or `eprintLine` moves: stop to the Architect.
+
+## Closeout
+
+Merged `b048c127b` from exact `936fc1466` (PR #4548). Foundation QA
+`evt_52ct65yhkp7hd`, Architect `evt_18a7psqektkvq`, Decision
+`dec_6kppymps43n9t`.
+
+- `print`, `printLine`, `eprint`, `eprintLine` and `console_line_payload`
+  are public. The line helpers call the one payload definition, and the
+  four laws name only public identifiers. Law types and proofs are
+  unchanged.
+- A roots-loader client imports all nine exports, calls the helpers and
+  restates the laws. Removing any one `pub` fails it with `UnboundName`.
+- Residual (QA): `ken check` renders one discharged refinement record as
+  `unknown`. The trusted base is unchanged at 109.

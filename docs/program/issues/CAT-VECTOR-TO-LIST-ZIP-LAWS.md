@@ -1,7 +1,7 @@
 ---
 id: CAT-VECTOR-TO-LIST-ZIP-LAWS
 title: "Add Vector's to_list, zip and unzip and prove the laws spec 60 §5 still defers: length of to_list is the index, and zip and unzip are mutually inverse"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T1
