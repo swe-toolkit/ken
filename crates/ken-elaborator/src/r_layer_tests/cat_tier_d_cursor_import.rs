@@ -116,7 +116,7 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
 }
 
 fn assert_providers_consumed(module: &str, providers: &[&str]) {
-    let (env, owned) = load_module(module);
+    let (mut env, owned) = load_module(module);
     for provider in providers {
         let provider_id = env.globals[*provider];
         let consumers = owned
@@ -132,6 +132,9 @@ fn assert_providers_consumed(module: &str, providers: &[&str]) {
             consumers > 0,
             "{module} must consume the canonical provider {provider}"
         );
+    }
+    if providers.contains(&"Data.Collections.List.length") {
+        catalog_or::list_length_via_derived_reexport(&mut env);
     }
 }
 
@@ -259,7 +262,7 @@ fn formatting_doc_imports_are_canonical_and_visibility_only() {
             "Core.Logic.Transport.cong",
             "Core.Logic.Transport.sym",
             "Core.Logic.Transport.trans",
-            "Data.Collections.Derived.length",
+            "Data.Collections.List.length",
             "Data.Collections.Derived.list_append",
             "Data.Numeric.Nat.Arithmetic.add",
         ],
@@ -329,7 +332,7 @@ fn parsing_cursor_imports_are_canonical_and_visibility_only() {
             "Capability.Diagnostics.Core.origin_range_end",
             "Capability.Diagnostics.Core.origin_range_start",
             "Data.Collections.Derived.bytes_nat_length",
-            "Data.Collections.Derived.length",
+            "Data.Collections.List.length",
             "Data.Collections.Derived.nth",
             "Data.Numeric.Nat.Arithmetic.add",
             "Core.Classes.LawfulClasses.IsTrue",

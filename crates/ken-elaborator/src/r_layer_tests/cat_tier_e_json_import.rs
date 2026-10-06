@@ -217,13 +217,13 @@ fn json_loader_visible_inventory_is_exact() {
 ///
 /// MEASURED: after excluding Json's six constructors by their checked family
 /// identity, every non-base, non-owned identity in Json's checked declarations
-/// is exactly a Derived, Cursor, Order, or Transport proof-provider identity.
+/// is exactly a base List, Cursor, Order, or Transport proof-provider identity.
 /// CLAIMED: Json has no undeclared provider or unexpected Tier-E edge. THE GAP:
 /// checked-core identity closure cannot distinguish an unused extra source
 /// import; the strict roots loader and parsed-edge census cover that residue.
 #[test]
 fn json_checked_provider_identity_closure_is_exact() {
-    let (env, owned, base_ids) = load_json();
+    let (mut env, owned, base_ids) = load_json();
     let expected_names = names(&[
         "Core.Logic.Transport.cong",
         "Core.Logic.Transport.sym",
@@ -236,7 +236,7 @@ fn json_checked_provider_identity_closure_is_exact() {
         "Capability.Parsing.Cursor.cursor_advance",
         "Capability.Parsing.Cursor.cursor_peek",
         "Capability.Parsing.Cursor.cursor_remaining",
-        "Data.Collections.Derived.length",
+        "Data.Collections.List.length",
         "Data.Numeric.Nat.Order.lt_nat",
         "Data.Numeric.Nat.Order.lt_nat::self_suc",
     ]);
@@ -298,12 +298,13 @@ fn json_checked_provider_identity_closure_is_exact() {
             external.contains(identity)
                 && (name.starts_with("Core.Logic.Transport.")
                     || name.starts_with("Capability.Parsing.Cursor.")
-                    || name.starts_with("Data.Collections.Derived.")
+                    || name.starts_with("Data.Collections.List.")
                     || name.starts_with("Data.Numeric.Nat.Order."))
         })
         .map(|(name, _)| name.clone())
         .collect::<BTreeSet<_>>();
     assert_eq!(observed_names, expected_names);
+    catalog_or::list_length_via_derived_reexport(&mut env);
 }
 
 /// Promise class: durable invariant.

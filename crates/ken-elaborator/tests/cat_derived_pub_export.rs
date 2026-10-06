@@ -1,8 +1,9 @@
 //! CAT-DERIVED-PUB-EXPORT acceptance controls.
 //!
-//! Promise class: durable invariants. The ten structural collection operations
-//! and three generic sort operations retain their `Data.Collections.Derived`
-//! identities. The two `nth` bound
+//! Promise class: durable invariants. The structural collection operations
+//! retain their checked identities: length comes from `Data.Collections.List`
+//! through Derived's re-export; the remaining operations are Derived-owned.
+//! The two `nth` bound
 //! proofs, four `list_append` attached proofs (the three monoid laws and
 //! `list_append::length`), the `map::{id, fusion, append}`
 //! proofs, and the checked `reverse::involutive` proof are published beside
@@ -12,6 +13,9 @@
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
+
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
 
 use ken_elaborator::{parser, Decl, ElabEnv, ElabError, ExportForm};
 use ken_kernel::{GlobalId, Term};
@@ -61,8 +65,8 @@ fn assert_transparent_body_mentions(env: &ElabEnv, wrapper: &str, provider: Glob
 }
 
 /// MEASURED: real selective imports accept the public collection operations, and
-/// each consumer wrapper retains the corresponding fully-qualified provider
-/// identity. CLAIMED: visibility changes only the interface, never identity or
+/// each consumer wrapper retains its checked provider identity, including the
+/// base List length re-export. CLAIMED: visibility changes only the interface, never identity or
 /// computation. THE GAP: existing package tests own the operations' behavior.
 #[test]
 fn derived_exports_all_authorized_operation_identities() {
@@ -86,7 +90,11 @@ fn derived_exports_all_authorized_operation_identities() {
         ("bytes_nat_length", "cat_derived_pub_bytes_nat_length"),
     ]
     .map(|(name, wrapper)| {
-        let qualified = format!("{DERIVED}.{name}");
+        let qualified = if name == "length" {
+            "Data.Collections.List.length".to_owned()
+        } else {
+            format!("{DERIVED}.{name}")
+        };
         let id = env.globals[&qualified];
         assert!(
             env.env.transparent_body(id).is_some(),
@@ -142,6 +150,7 @@ fn derived_exports_all_authorized_operation_identities() {
     for (provider, wrapper) in providers {
         assert_transparent_body_mentions(&env, wrapper, provider);
     }
+    catalog_or::list_length_via_derived_reexport(&mut env);
 }
 
 struct PublicationQuery {

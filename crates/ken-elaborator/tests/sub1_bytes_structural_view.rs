@@ -10,7 +10,6 @@ use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, PrimReduction, Term};
 
-
 fn make_store(env: &ElabEnv) -> EvalStore {
     let mut store = EvalStore::new();
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
@@ -238,13 +237,8 @@ fn ac1_ac3_structural_fold_terminates_runs_and_adds_no_axiom() {
         "the derived byte surface must add zero trusted declarations"
     );
 
-    let length_id = catalog_or::provider_owned_id(
-        &env,
-        &derived_owned,
-        "Data.Collections.Derived",
-        "length",
-    )
-    .expect("the real Derived loader must own length");
+    let length_id = catalog_or::list_length_via_derived_reexport(&mut env);
+    assert_eq!(length_id, env.globals["Data.Collections.List.length"]);
     let bytes_nat_length_id = catalog_or::provider_owned_id(
         &env,
         &derived_owned,

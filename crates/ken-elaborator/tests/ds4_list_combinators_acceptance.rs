@@ -34,15 +34,19 @@ fn base_env() -> ElabEnv {
     base_env_with_derived_owned().0
 }
 
-// MEASURED: the real roots loader owns each requested operation; checked
-// owner-local examples reference those GlobalIds and checked reject fences
-// fail without becoming package exports or introducing trust.
+// MEASURED: real roots loading locates each requested operation at its checked
+// owner (base List for length, Derived for the others). Owner-local examples
+// cite those GlobalIds; checked reject fences fail without becoming package
+// exports or introducing trust.
 // CLAIMED: the two selected DS4 functions exercise Derived's private laws
 // without relying on the synthetic flat-alias fixture.
 // THE GAP: a `ken reject` fence checks rejection, not its diagnostic kind;
 // the matched positive proof and endpoint-only negative are checked together.
 fn ds4_owner_examples(examples: &[(&str, &[&str])]) -> (ElabEnv, BTreeMap<String, GlobalId>) {
     let mut env = ElabEnv::empty().expect("prelude bootstrap");
+    let list_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.List")
+        .expect("canonical list-length provider must roots-load");
     let owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], DERIVED)
         .expect("the real Derived provider and dependency closure must roots-load");
@@ -56,8 +60,19 @@ fn ds4_owner_examples(examples: &[(&str, &[&str])]) -> (ElabEnv, BTreeMap<String
         );
         for &operation in *required {
             operations.entry(operation).or_insert_with(|| {
-                catalog_or::provider_owned_id(&env, &owned, DERIVED, operation)
-                    .unwrap_or_else(|error| panic!("{operation} must be Derived-owned: {error}"))
+                if operation == "length" {
+                    catalog_or::provider_owned_id(
+                        &env,
+                        &list_owned,
+                        "Data.Collections.List",
+                        operation,
+                    )
+                    .unwrap_or_else(|error| panic!("length must be List-owned: {error}"))
+                } else {
+                    catalog_or::provider_owned_id(&env, &owned, DERIVED, operation).unwrap_or_else(
+                        |error| panic!("{operation} must be Derived-owned: {error}"),
+                    )
+                }
             });
         }
     }
@@ -99,6 +114,7 @@ fn ds4_owner_examples(examples: &[(&str, &[&str])]) -> (ElabEnv, BTreeMap<String
         }
         checked.insert((*name).to_owned(), id);
     }
+    catalog_or::list_length_via_derived_reexport(&mut env);
     (env, checked)
 }
 
@@ -225,6 +241,10 @@ fn ac8_off_by_one_range_length_rejected() {
 #[test]
 fn ac8_zip_length_is_min_not_left_length() {
     let mut env = base_env();
+    // This legacy flat-scope negative must reach the wrong law, not fail at
+    // a missing helper alias after length moves to the base provider.
+    let provider = env.globals["Data.Collections.List.length"];
+    env.globals.insert("length".to_owned(), provider);
     let r = env.elaborate_decl(
         "fn bad_zip_length_ignores_shorter (a : Type) (b : Type) (xs : List a) (ys : List b) : \
            Equal Nat (length (Pair a b) (zip a b xs ys)) (length a xs) = zip_length a b xs ys",

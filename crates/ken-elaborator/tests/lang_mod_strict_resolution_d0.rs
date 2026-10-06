@@ -1136,6 +1136,7 @@ fn catalog_ambient_passthrough_migration_census() {
     let expected_clean = [
         "Core.Function.Combinators",
         "Core.Logic.Not",
+        "Data.Collections.List",
         "Data.Numeric.Nat.Arithmetic",
         "Data.Sums.Combinators",
         "Data.Text.Codec",

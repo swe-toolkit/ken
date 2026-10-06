@@ -19,7 +19,8 @@
 //! source. This legacy runner extracts the canonical closure, removes every
 //! now-redundant import edge from the flattened provider sources with exact
 //! cardinality checks, and orders Transport, Or, OrdResult, Compare, the
-//! canonical Nat operations and function combinators, then Derived.
+//! canonical Nat operations and function combinators, then base List and
+//! Derived.
 //!
 //! **This concatenation is NOT applied blanket to every example.**
 //! Empirically, unconditionally prepending declarations that a given
@@ -34,6 +35,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
+
+use ken_elaborator::lexer::{Lexer, Token};
 
 const PER_EXAMPLE_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -63,16 +66,79 @@ fn catalog_source(path: &str) -> String {
         .source
 }
 
-fn remove_flattened_import(source: &mut String, owner: &str, import: &str) {
-    let mut imports = source.match_indices(import);
-    let (start, _) = imports
-        .next()
-        .unwrap_or_else(|| panic!("{owner} must carry import `{import}`"));
+fn remove_flattened_directive(source: &mut String, owner: &str, directive: &str) {
+    // Ken's lexer skips comments and keeps string literals as single tokens.
+    // Match active syntax, not a textual occurrence in either of those places.
+    let expected = Lexer::lex(directive)
+        .unwrap_or_else(|error| panic!("invalid {owner} directive `{directive}`: {error:?}"));
+    let expected = &expected[..expected.len() - 1]; // omit Eof
     assert!(
-        imports.next().is_none(),
-        "{owner} must carry exactly one import `{import}`"
+        matches!(
+            expected.first(),
+            Some((Token::KwImport | Token::KwExport, _))
+        ),
+        "{owner} flattened directive must be an import or export"
     );
-    source.replace_range(start..start + import.len(), "");
+    let tokens =
+        Lexer::lex(source).unwrap_or_else(|error| panic!("invalid {owner} source: {error:?}"));
+    let occurrences = tokens
+        .windows(expected.len())
+        .filter(|window| {
+            window
+                .iter()
+                .zip(expected)
+                .all(|((token, _), (wanted, _))| token == wanted)
+        })
+        .map(|window| window[0].1.start..window.last().unwrap().1.end)
+        .collect::<Vec<_>>();
+    let [range] = occurrences.as_slice() else {
+        panic!(
+            "{owner} must carry exactly one active directive `{directive}`, got {}",
+            occurrences.len()
+        );
+    };
+    source.replace_range(range.clone(), "");
+}
+
+/// Promise class: durable invariant (CAT-LIST-LENGTH-TRUST-FREE-BASE AC-2).
+///
+/// MEASURED: Ken's lexer distinguishes active import tokens from comments and
+/// strings, and the flattener refuses zero or two active copies. CLAIMED: a
+/// behavior-neutral source comment cannot block Rosetta while a real closure
+/// edge change fails closed. THE GAP: these synthetic cases isolate the token
+/// discriminator; the full Rosetta test exercises the real catalog closure.
+#[test]
+fn flattened_directives_ignore_comments_and_refuse_real_omissions_or_duplicates() {
+    let directive = "import Data.Collections.List (length)";
+    let mut source = format!(
+        "import Data.Collections.List -- inline comment\n  (length)\n\
+         -- {directive}\n\
+         const note : String = \"{directive}\"\n"
+    );
+    remove_flattened_directive(&mut source, "fixture", directive);
+    assert!(source.contains(&format!("-- {directive}")));
+    assert!(source.contains(&format!("\"{directive}\"")));
+    assert!(!source.contains("\n  (length)"));
+
+    for (input, count) in [
+        (format!("-- {directive}\n"), 0),
+        (format!("{directive}\n{directive}\n"), 2),
+    ] {
+        let failure = std::panic::catch_unwind(|| {
+            let mut input = input;
+            remove_flattened_directive(&mut input, "fixture", directive);
+        })
+        .expect_err("missing or duplicate active import must fail closed");
+        let message = failure
+            .downcast_ref::<String>()
+            .expect("refusal must carry its diagnostic");
+        assert!(
+            message.contains(&format!(
+                "exactly one active directive `{directive}`, got {count}"
+            )),
+            "unexpected refusal: {message}"
+        );
+    }
 }
 
 fn flattened_exact_line_declaration(
@@ -191,17 +257,18 @@ fn collections_prelude() -> String {
     .collect::<Vec<_>>()
     .join("\n");
     let combinators = catalog_source("catalog/packages/Core/Function/Combinators.ken.md");
+    let list = catalog_source("catalog/packages/Data/Collections/List.ken.md");
     let mut collections = catalog_source("catalog/packages/Data/Collections/Derived.ken.md");
 
-    // `ken run` consumes one flat source unit here. Remove every import whose
-    // provider source this compatibility runner has flattened immediately
-    // above it, failing closed if a provider edge changes shape or cardinality.
+    // `ken run` consumes one flat source unit here. Remove imports whose
+    // providers this runner flattened above, plus Derived's facade-only export.
+    // Fail closed if an edge changes shape or cardinality.
     for import in [
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
         "import Core.Logic.Transport (sym)",
     ] {
-        remove_flattened_import(&mut compare, "Compare", import);
+        remove_flattened_directive(&mut compare, "Compare", import);
     }
     for import in [
         "import Core.Function.Combinators (comp, idf)",
@@ -212,12 +279,14 @@ fn collections_prelude() -> String {
         "import Core.Logic.Transport (cong, sym, trans)",
         "import Data.Numeric.Nat.Order (min, sub)",
         "import Data.Numeric.Nat.Arithmetic (add)",
+        "import Data.Collections.List (length)",
+        "export length",
     ] {
-        remove_flattened_import(&mut collections, "Derived", import);
+        remove_flattened_directive(&mut collections, "Derived", import);
     }
 
     format!(
-        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{nat_arithmetic}\n{combinators}\n{collections}"
+        "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{nat_arithmetic}\n{combinators}\n{list}\n{collections}"
     )
 }
 

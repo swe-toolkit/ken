@@ -54,7 +54,9 @@ The first four of the seven floor combinators follow: `list_append`
 (deliberately a distinct name from the landed `Bytes`-domain `append`,
 FS-effect, `crates/ken-elaborator/src/bytes.rs` — this is the pure
 `List a -> List a -> List a` op and must not shadow or be shadowed by it),
-`nth`, `take`, and `drop`. `list_eq` and `list_compare` are imported from
+`nth`, `take`, and `drop`. The canonical `length` comes from the trust-free
+`Data.Collections.List` module and is re-exported here with the same checked
+identity. `list_eq` and `list_compare` are imported from
 the canonical comparison provider; `sub` is imported from the canonical Nat
 order provider and described in `§4.5`, next to the string ops that need it.
 
@@ -85,6 +87,10 @@ import Core.Logic.OrdResult
     ord_result_elim2)
 
 import Core.Logic.Transport (cong, sym, trans)
+
+import Data.Collections.List (length)
+
+export length
 
 pub fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
   match xs {
@@ -126,7 +132,8 @@ fn drop (a : Type) (n : Nat) (xs : List a) : List a =
 ## 3. Using it
 
 This package builds up in four layers, each riding the one before: the
-floor above; `§4.1`'s structural ops (`map`/`filter`/`mem`/`length`/`min`);
+floor above; `§4.1`'s structural ops (`map`/`filter`/`mem`/`min`) and the canonical
+`length` imported from `Data.Collections.List`;
 `§4.3`'s verified `List Bool` insertion sort, a caller-facing example of
 proving a concrete instantiation of the generic `sort`/`insert` sound and
 permutation-preserving; and `§4.6`'s 5 derived `String` ops
@@ -236,12 +243,6 @@ fn mem (a : Type) (eqf : a → a → Bool) (x : a) (xs : List a) : Bool =
         True ↦ True;
         False ↦ mem a eqf x t
       }
-  }
-
-pub fn length (a : Type) (xs : List a) : Nat =
-  match xs {
-    Nil ↦ Zero;
-    Cons h t ↦ Suc (length a t)
   }
 
 pub proof some_below_length for nth

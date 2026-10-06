@@ -1,5 +1,6 @@
 //! List combinator acceptance: `zip` lives in the prelude; structural
-//! `map`/`filter`/`length` are checked exports of `Data.Collections.Derived`.
+//! `map`/`filter` are checked Derived exports; `length` is re-exported there
+//! from the trust-free `Data.Collections.List` provider.
 //! The four compose over the same List identities (`37 §4.1`, §9).
 
 use std::path::PathBuf;
@@ -7,6 +8,9 @@ use std::path::PathBuf;
 use ken_elaborator::ElabEnv;
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{whnf, Context, Decl, GlobalId, Term};
+
+#[path = "support/catalog_or.rs"]
+mod catalog_or;
 
 fn with_derived_combinators() -> ElabEnv {
     let mut env = ElabEnv::new().expect("base env");
@@ -22,7 +26,12 @@ fn with_derived_combinators() -> ElabEnv {
     env.elaborate_module_from_roots(&[root], "Data.Collections.Derived")
         .expect("Derived must roots-load with real provider imports");
     for name in ["map", "filter", "length"] {
-        let id = env.globals[&format!("Data.Collections.Derived.{name}")];
+        let qualified = if name == "length" {
+            "Data.Collections.List.length".to_owned()
+        } else {
+            format!("Data.Collections.Derived.{name}")
+        };
+        let id = env.globals[&qualified];
         assert!(
             env.env.transparent_body(id).is_some(),
             "{name} must be checked"
@@ -191,20 +200,20 @@ fn ac2_filter_computes_and_rejects_at_least_one_element() {
 }
 
 /// Promise class: durable trust invariant.
-/// MEASURED: prelude zip and qualified Derived.map/filter/length identities
+/// MEASURED: prelude zip, qualified Derived.map/filter and base List.length identities
 /// are transparent and absent from `trusted_base()`. CLAIMED: using these
 /// checked combinators adds no assumptions. THE GAP: this per-name check cannot
 /// detect a separately named assumption; the full bare-env trust enumeration below
 /// guards inherited membership, and the Derived package gate checks its delta.
 #[test]
 fn ac5_new_combinators_add_zero_trusted_base_entries() {
-    let env = with_derived_combinators();
+    let mut env = with_derived_combinators();
     let trusted = env.env.trusted_base();
     for name in [
         "zip",
         "Data.Collections.Derived.map",
         "Data.Collections.Derived.filter",
-        "Data.Collections.Derived.length",
+        "Data.Collections.List.length",
     ] {
         let id = env.globals[name];
         assert!(
@@ -212,6 +221,7 @@ fn ac5_new_combinators_add_zero_trusted_base_entries() {
             "{name} must be a transparent definition, not a trusted-base postulate"
         );
     }
+    catalog_or::list_length_via_derived_reexport(&mut env);
 }
 
 /// Every `trusted_base()` entry's label, tagged with its `ken_kernel::Decl`
