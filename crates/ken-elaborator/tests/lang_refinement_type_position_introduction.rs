@@ -308,6 +308,124 @@ fn constructor_type_applications_check_named_formals_and_reuse_refined_arguments
     }
 }
 
+fn check_family_telescope_refusal_and_rollback(parameter: bool) {
+    let mut env = type_position_box_env();
+    let source = if parameter {
+        "data D (t : Box six) : Type where { Mk : D t }"
+    } else {
+        "data D : (t : Box six) → Type where { Mk : D six }"
+    };
+    let error = env
+        .elaborate_decl_v1(source)
+        .expect_err("a family telescope cannot silently erase Box six");
+    let ElabError::ObligationWithoutChannel { span } = error else {
+        panic!("{source}: expected an undischarged refinement, got {error:?}");
+    };
+    let start = source
+        .find("Box six")
+        .expect("the family carries the refined application");
+    assert!(
+        span.start <= start && span.end >= start + "Box six".len(),
+        "refusal belongs to the family telescope entry: {span:?}"
+    );
+    assert!(
+        !env.globals.contains_key("D") && !env.globals.contains_key("Mk"),
+        "postadmission failure must roll the entire data family back"
+    );
+}
+
+#[test]
+fn explicit_data_parameter_checks_refined_type_application() {
+    check_family_telescope_refusal_and_rollback(true);
+}
+
+#[test]
+fn explicit_data_index_checks_refined_type_application() {
+    check_family_telescope_refusal_and_rollback(false);
+}
+
+#[test]
+fn explicit_data_telescope_discharge_accepts_closed_argument() {
+    for parameter in [false, true] {
+        let mut env = type_position_box_env();
+        env.elaborate_decl("const five : Int = 5").expect("value");
+        let source = if parameter {
+            "data D (t : Box five) : Type where { Mk : D t }"
+        } else {
+            "data D : (t : Box five) → Type where { Mk : D five }"
+        };
+        let result = env
+            .elaborate_decl_v1(source)
+            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        assert!(
+            result.obligations.is_empty(),
+            "a discharged family-telescope refinement needs no hole"
+        );
+    }
+}
+
+fn indexed_five_family_env() -> ElabEnv {
+    let mut env = type_position_box_env();
+    let value = env
+        .elaborate_decl_v1("const five : Five = 5")
+        .expect("named refined value");
+    assert_eq!(value.obligations.len(), 1, "five owns its own introduction");
+    let family = env
+        .elaborate_decl_v1("data E : (t : Five) → Type where { MkE : E five }")
+        .expect("reusing an already refined value in the family result");
+    assert!(
+        family.obligations.is_empty(),
+        "reuse adds no family obligation"
+    );
+    env
+}
+
+#[test]
+fn explicit_data_result_checks_named_indformer_argument() {
+    let mut env = type_position_box_env();
+    let error = env
+        .elaborate_decl_v1("data E : (t : Five) → Type where { MkE : E six }")
+        .expect_err("a constructor result must check E six against Five");
+    assert!(
+        matches!(error, ElabError::ObligationWithoutChannel { .. }),
+        "expected no-channel refusal at the constructor result: {error:?}"
+    );
+    assert!(
+        !env.globals.contains_key("E") && !env.globals.contains_key("MkE"),
+        "result-position refusal rolls back the family and its constructor"
+    );
+    let accepted = indexed_five_family_env();
+    assert!(accepted.globals.contains_key("E") && accepted.globals.contains_key("MkE"));
+}
+
+#[test]
+fn function_domain_checks_named_indformer_argument() {
+    let mut env = indexed_five_family_env();
+    let result = env
+        .elaborate_decl_v1("fn k (x : E six) : Int = 0")
+        .expect("a written type on a reported route emits an obligation");
+    assert_eq!(open_refinements(&env, &result), 1);
+    assert_eq!(
+        result.obligations.len(),
+        1,
+        "the same E six is introduced once"
+    );
+    let goal = Term::app(
+        Term::app(
+            Term::app(
+                Term::const_(env.globals["Equal"], vec![]),
+                Term::const_(env.globals["Int"], vec![]),
+            ),
+            Term::const_(env.globals["six"], vec![]),
+        ),
+        Term::IntLit(5.into()),
+    );
+    assert_eq!(
+        result.obligations[0].goal_closed, goal,
+        "the goal is Equal Int six 5, with six declared as 6"
+    );
+}
+
 #[test]
 fn anonymous_arrows_in_proof_signature_are_not_local_binders() {
     let mut env = ElabEnv::new().expect("prelude");

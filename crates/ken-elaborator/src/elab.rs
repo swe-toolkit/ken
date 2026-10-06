@@ -10098,7 +10098,7 @@ fn introduce_type_position_argument(
     if !cx.type_introductions { return Ok(()); }
     emit_call_refinements(cx, function, argument, span)?;
     let (head, previous_args) = peel_app(function);
-    if !matches!(head, Term::Const { .. } | Term::Constructor { .. }) {
+    if !matches!(head, Term::Const { .. } | Term::Constructor { .. } | Term::IndFormer { .. }) {
         return Ok(());
     }
     // The head's checked global type does not depend on local binder
@@ -15720,7 +15720,11 @@ fn elaborate_explicit_data_with_refinements(
     ctors: &[crate::resolve::RExplicitCtorDecl],
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| rtype_has_application_or_refinement(&arg.ty))) {
+    let applies = |ty: &RType| rtype_has_application_or_refinement(ty);
+    let any = params.iter().chain(indices).any(|entry| applies(&entry.ty))
+        || ctors.iter().any(|ctor| ctor.args.iter().any(|arg| applies(&arg.ty))
+            || ctor.result.as_ref().is_some_and(applies));
+    if !any {
         return data::elab_explicit_data_decl(
             env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
         );
@@ -15734,7 +15738,7 @@ fn elaborate_explicit_data_with_refinements(
             env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
         )?;
         register_explicit_constructor_fields(
-            env, globals, num_values, numeric_env, facts, params, ctors, name,
+            env, globals, num_values, numeric_env, facts, params, indices, ctors, name,
         )?;
         Ok(id)
     })();
@@ -15779,21 +15783,42 @@ fn register_explicit_constructor_fields(
     numeric_env: &NumericEnv,
     facts: &mut RefinementFacts,
     params: &[crate::resolve::RTelescopeEntry],
+    indices: &[crate::resolve::RTelescopeEntry],
     ctors: &[crate::resolve::RExplicitCtorDecl],
     owner: &str,
 ) -> Result<(), ElabError> {
+    // Check each family entry once, under every preceding binder. The
+    // resolver binds anonymous indices too. An undischarged refinement has
+    // no obligation channel and rolls the entire declaration back.
+    {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string());
+        for entry in params.iter().chain(indices) {
+            let ty = elab_type(&mut cx, &entry.ty)?;
+            cx.ctx.push(ty);
+        }
+    }
     for ctor in ctors {
-        if !ctor.args.iter().any(|arg| rtype_has_application_or_refinement(&arg.ty)) {
+        let result_applies = ctor.result.as_ref().is_some_and(rtype_has_application_or_refinement);
+        if !result_applies
+            && !ctor.args.iter().any(|arg| rtype_has_application_or_refinement(&arg.ty))
+        {
             continue;
         }
         let id = globals[&ctor.name];
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string());
+        // Parameter types were checked above. Replay them only to build the
+        // constructor's resolver context, never to introduce twice.
+        cx.type_introductions = false;
         for param in params {
             let ty = elab_type(&mut cx, &param.ty)?;
             cx.ctx.push(ty);
         }
+        cx.type_introductions = true;
         let args = ctor.args.iter().map(|arg| &arg.ty).collect::<Vec<_>>();
         let predicates = collect_constructor_field_predicates(&mut cx, &args)?;
+        if let Some(result) = &ctor.result {
+            elab_type(&mut cx, result)?;
+        }
         facts.constructor_field_predicates.insert(id, predicates);
     }
     Ok(())
