@@ -36,6 +36,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+use ken_elaborator::lexer::{Lexer, Token};
+
 const PER_EXAMPLE_TIMEOUT: Duration = Duration::from_secs(90);
 
 fn workspace_root() -> PathBuf {
@@ -65,15 +67,74 @@ fn catalog_source(path: &str) -> String {
 }
 
 fn remove_flattened_directive(source: &mut String, owner: &str, directive: &str) {
-    let mut occurrences = source.match_indices(directive);
-    let (start, _) = occurrences
-        .next()
-        .unwrap_or_else(|| panic!("{owner} must carry directive `{directive}`"));
+    // Ken's lexer skips comments and keeps string literals as single tokens.
+    // Match active syntax, not a textual occurrence in either of those places.
+    let expected = Lexer::lex(directive)
+        .unwrap_or_else(|error| panic!("invalid {owner} directive `{directive}`: {error:?}"));
+    let expected = &expected[..expected.len() - 1]; // omit Eof
     assert!(
-        occurrences.next().is_none(),
-        "{owner} must carry exactly one directive `{directive}`"
+        matches!(
+            expected.first(),
+            Some((Token::KwImport | Token::KwExport, _))
+        ),
+        "{owner} flattened directive must be an import or export"
     );
-    source.replace_range(start..start + directive.len(), "");
+    let tokens =
+        Lexer::lex(source).unwrap_or_else(|error| panic!("invalid {owner} source: {error:?}"));
+    let occurrences = tokens
+        .windows(expected.len())
+        .filter(|window| {
+            window
+                .iter()
+                .zip(expected)
+                .all(|((token, _), (wanted, _))| token == wanted)
+        })
+        .map(|window| window[0].1.start..window.last().unwrap().1.end)
+        .collect::<Vec<_>>();
+    let [range] = occurrences.as_slice() else {
+        panic!(
+            "{owner} must carry exactly one active directive `{directive}`, got {}",
+            occurrences.len()
+        );
+    };
+    source.replace_range(range.clone(), "");
+}
+
+/// A comment or string literal may repeat a directive's spelling without
+/// creating a second binding. Missing and duplicated active directives must
+/// still refuse rather than silently change the flattened provider closure.
+#[test]
+fn flattened_directives_ignore_comments_and_refuse_real_omissions_or_duplicates() {
+    let directive = "import Data.Collections.List (length)";
+    let mut source = format!(
+        "import Data.Collections.List -- inline comment\n  (length)\n\
+         -- {directive}\n\
+         const note : String = \"{directive}\"\n"
+    );
+    remove_flattened_directive(&mut source, "fixture", directive);
+    assert!(source.contains(&format!("-- {directive}")));
+    assert!(source.contains(&format!("\"{directive}\"")));
+    assert!(!source.contains("\n  (length)"));
+
+    for (input, count) in [
+        (format!("-- {directive}\n"), 0),
+        (format!("{directive}\n{directive}\n"), 2),
+    ] {
+        let failure = std::panic::catch_unwind(|| {
+            let mut input = input;
+            remove_flattened_directive(&mut input, "fixture", directive);
+        })
+        .expect_err("missing or duplicate active import must fail closed");
+        let message = failure
+            .downcast_ref::<String>()
+            .expect("refusal must carry its diagnostic");
+        assert!(
+            message.contains(&format!(
+                "exactly one active directive `{directive}`, got {count}"
+            )),
+            "unexpected refusal: {message}"
+        );
+    }
 }
 
 fn flattened_exact_line_declaration(
