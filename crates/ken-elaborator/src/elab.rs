@@ -11624,6 +11624,27 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
     }
 }
 
+/// A constructor equation can state `Eq (Ix n) i (Z xs)` even though
+/// `Z xs : Ix Zero`. It is no proposition in the branch context, so it cannot
+/// be an obligation hypothesis. Dropping only such ill-typed indexed-family
+/// equations strengthens the goal; other path conditions remain unchanged.
+fn admissible_path_conditions(cx: &ElabCtx<'_>) -> Vec<Term> {
+    cx.path_conditions.iter().filter_map(|(condition, install_depth)| {
+        let growth = cx.ctx.len().checked_sub(*install_depth)
+            .expect("path condition consumed before its field binders were entered");
+        let here = weaken(condition, growth as i64);
+        let heterogeneous = is_indexed_family_equation(cx.env, &here)
+            && kernel_infer_raw(cx.env, &cx.ctx, &here).is_err();
+        (!heterogeneous).then_some(here)
+    }).collect()
+}
+
+fn is_indexed_family_equation(env: &GlobalEnv, condition: &Term) -> bool {
+    let Term::Eq(carrier, _, _) = condition else { return false };
+    matches!(peel_app(carrier).0, Term::IndFormer { id, .. }
+        if env.inductive(id).is_some_and(|ind| !ind.indices.is_empty()))
+}
+
 /// Close a logical refinement goal over ordinary binders followed by branch
 /// equations and refined-parameter assumptions. The latter are assumptions
 /// only in the obligation, never unchecked evidence in an emitted program.
@@ -11631,9 +11652,10 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
 /// neither is evidence introduced into the emitted definition.
 #[inline(never)]
 fn close_refinement_goal_with(
-    cx: &ElabCtx<'_>, goal: Term, hypotheses: &[Term], proof: Option<Term>,
+    cx: &ElabCtx<'_>, conditions: &[Term], goal: Term,
+    hypotheses: &[Term], proof: Option<Term>,
 ) -> (Term, Option<Term>) {
-    let count = cx.path_conditions.len();
+    let count = conditions.len();
     let mut closed = weaken(&goal, (count + hypotheses.len()) as i64);
     let mut certificate = proof;
     for (index, hypothesis) in hypotheses.iter().enumerate().rev() {
@@ -11641,10 +11663,8 @@ fn close_refinement_goal_with(
         closed = Term::pi(domain.clone(), closed);
         certificate = certificate.map(|term| Term::lam(domain, term));
     }
-    for (index, (condition, install_depth)) in cx.path_conditions.iter().enumerate().rev() {
-        let growth = cx.ctx.len().checked_sub(*install_depth)
-            .expect("path condition consumed before its field binders were entered");
-        let domain = weaken(condition, (growth + index) as i64);
+    for (index, condition) in conditions.iter().enumerate().rev() {
+        let domain = weaken(condition, index as i64);
         closed = Term::pi(domain.clone(), closed);
         certificate = certificate.map(|term| Term::lam(domain, term));
     }
@@ -11727,13 +11747,14 @@ fn emit_refinement_predicate_with(
     cx: &mut ElabCtx<'_>, goal: Term, hypotheses: &[Term],
     span: &Span, kind: ObligationKind,
 ) -> Result<(), ElabError> {
-    let (closed, _) = close_refinement_goal_with(cx, goal.clone(), hypotheses, None);
-    let proof = (0..hypotheses.len() + cx.path_conditions.len())
+    let conditions = admissible_path_conditions(cx);
+    let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, None);
+    let proof = (0..hypotheses.len() + conditions.len())
         .map(Term::var)
         .chain(std::iter::once(Term::const_(cx.env.tt_id(), vec![])))
         .find_map(|candidate| {
             let (_, certificate) =
-                close_refinement_goal_with(cx, goal.clone(), hypotheses, Some(candidate));
+                close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, Some(candidate));
             let certificate = certificate?;
             kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
                 .ok().map(|_| certificate)
