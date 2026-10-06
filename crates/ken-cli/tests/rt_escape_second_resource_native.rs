@@ -624,15 +624,22 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 // Promise class: durable interpreter/native differential. The bounded-Nat
 // fanout selects an escaped-resource frame in a shared continuation; compare
 // its emitted native observations to the interpreter's on the same input.
-// MEASURED: the fixture's complete observation envelope on both engines.
-// CLAIMED: the composed producer result and pending eliminators preserve
-// the selected effects and terminal result. THE GAP: this one fixture does
-// not cover all recursively composed Nat or resource shapes.
+// MEASURED: the fixture's stdout, complete effect trace, and terminal
+// observation on both engines. CLAIMED: the composed producer result and
+// pending eliminators preserve the selected effects and terminal result.
+// THE GAP: this one fixture does not cover all recursively composed Nat or
+// resource shapes. Unlike the shared operation-only helper, the full trace
+// comparison catches changes to outcomes and resource bindings as well.
 #[test]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     in_large_stack_thread("rt-escape-nat-fanout", || {
         let diff = differential("nat-fanout-escaped", NAT_FANOUT_ESCAPED_RESOURCE);
         assert_native_matches_interpreter("nat-fanout-escaped", &diff);
+        assert_eq!(diff.native.stdout, diff.interpreted.stdout, "Nat stdout parity");
+        assert_eq!(
+            diff.native.effect_trace, diff.interpreted.effect_trace,
+            "Nat complete effect-trace parity"
+        );
     });
 }
 
