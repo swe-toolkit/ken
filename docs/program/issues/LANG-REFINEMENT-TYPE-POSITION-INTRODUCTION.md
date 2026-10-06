@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION
 title: "Three literal-side refinement fail-opens: a refinement nested inside a type argument (List ({ x : Int | phi })) is erased and accepted with no obligation; an application written in type position (RType::RApp) checks a refined argument with no obligation; and a theorem, proof or recursive view with a literal refined parameter records no fact, so its call sites emit nothing. Spec 34 §5 says every introduction emits phi a. Close all three, after a D0 census"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
