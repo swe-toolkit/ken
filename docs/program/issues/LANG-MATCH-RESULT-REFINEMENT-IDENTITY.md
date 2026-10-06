@@ -60,6 +60,14 @@ kept rigid, so a refinement result introduces its predicate on every route.
     and 7 are returned as `Five` with no obligation.
   - r3 `fn r3 (r : DRose) : Five = match r { DLeaf ↦ 6; DNode kids ↦ 7 }`
     gives 1.
+- **Heterogeneous path equation (hard stop 2 ruling `evt_14s2xj8cag84b`).**
+  `push_branch_path_condition` (`:7236`) installs `Eq (weaken scrut_ty)
+  scrut_core concrete`, and `close_refinement_goal_with` (`:11617`) puts it
+  in the obligation telescope. For q5 that is `Π n i x xs. Eq (Ix n) i (Z xs)
+  → Equal Int x 5`, ill-typed because `Z xs : Ix Zero`. The defect exists on
+  base: b4, q5 at a literal `{ r : Int | Equal Int r 5 }` result, exits 1
+  with the same `TypeMismatch` on both binaries. b5/q6 (`i : Ix Zero`, one
+  arm) give exit 0, open 1 on both.
 - **The comment at `:2307`** ("each branch has already been checked against
   its result") is false on these routes.
 
@@ -90,6 +98,13 @@ stop and report the mismatch.
      `:5792`, `:7094`, `:7775`) go through the entry.
    - The per-site de-simplification is reverted to the base shape. The
      `names_source_refinement` rescue is deleted as redundant.
+   - **Admissible path conditions.** `emit_refinement_predicate_with`
+     computes `admissible_path_conditions(cx)` once and passes the list to
+     both `close_refinement_goal_with` calls. An indexed-family equation
+     that the kernel rejects in the closing context is omitted, which only
+     strengthens the obligation; every other condition is kept. The four
+     producers (`:5471`, `:5642`, `:7094`, `:20926`) and the `match ... eqn:`
+     binder (`:7745`) are unchanged.
    - A sweep by mechanism, starting from `check_match_arm_result`,
      `compile_match_leaf`, `infer_match*`, `check_match_dependent`,
      `refined_target` and `ret_ty_slot`, states for each site where an arm,
@@ -111,13 +126,29 @@ Every row with `ken check`, base versus candidate.
 - **AC-1b (loss count).** The D0 loss instrument on the candidate records 0
   refinement-rooted `Const` losses at every site over the prelude, the 81
   roots, the 55 packages and the probes (base: 407 corpus and 345 package
-  losses at `:7094`/`:7098`). `Map.ken.md` exits 0 with 0 open.
+  losses at `:7094`/`:7098`). `Map.ken.md` exits 0 with 0 open. At every
+  arrival the before-set of refinement `Const` ids is a subset of the
+  after-set, or the discarding reduction is named.
+- **AC-1c (path equations).** q5 exits 0 with 2 open; b4 opens 2; m1 and m2
+  (nested `Z (Cons y ys) ↦ x; Z Nil ↦ x; S ys ↦ 6` at `Five` and at the
+  literal) open 3; d2 (`Z xs ↦ if b then x else 5`) is reported. A count
+  below the number of introduction leaves names its discharging
+  certificate. b5/q6 stay at exit 0, open 1, and a pin shows their
+  `goal_closed` still binds `Eq (Ix Zero) i (Z xs)`, which q5's telescopes
+  do not. One reaching row each for lift and structured with an indexed
+  host (for example `IRose`), or "not expressible". A `match i eqn:` row at
+  q5's shape on base; if red, it is reported as a follow-up, not repaired
+  here.
 - **AC-2 (controls).** The four control counts above are unchanged. Corpus
   and catalog rows move only as D0 reported and the Architect judged.
 - **AC-3 (mutation, QA).**
   - M-first-leaf (infer the first leaf again) returns q4 and pa to 0.
   - M-goal-whnf (the keeping entry calls the unguarded simplifier) returns
     q5, pb and r0 to r3 to their base counts.
+  - M-path-keep-all (no omission) returns q5, b4 and m1 to the
+    `TypeMismatch`.
+  - M-path-drop-indexed (omit every indexed-family equation) reddens the
+    b5 binder pin.
   - The sweep table records the candidate arrival count at `:5411`.
 
 The `List Five` result on each route belongs to
@@ -138,4 +169,5 @@ The `List Five` result on each route belongs to
 ```text
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. value checks against the unsimplified substituted goal lose structure that dependent matches rely on (a delta-exposed computed scrutinee in Map; motive beta and indices in q5) — keyed on goal reduction mode
+2. the obligation closure states the constructor path equation homogeneously — keyed on whether the constructor's indices agree with the scrutinee's
 ```
