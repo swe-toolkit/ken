@@ -33,6 +33,8 @@ stop and report the mismatch.
 
 Import `length` from the base module, add `to_list_length` as a private
 checked theorem, and make §5's bridge bullet name it.
+Follow `docs/program/07-catalog-style-guide.md` and
+`agent/playbooks/tools/write-ken.md`.
 
 ## Acceptance
 
@@ -40,6 +42,9 @@ checked theorem, and make §5's bridge bullet name it.
 - **AC-2 (controls).** The cold Vector trust test passes unchanged.
 - **AC-3 (mutation, QA).** Dropping the head element in `to_list` reddens
   AC-1.
+- **AC-4 (readability).** The proof and its prose read under the style
+  guide: local names state a proof endpoint or stage, and the formatter
+  layout is unchanged. Reviewed independently by QA.
 
 ## Stop conditions
 
