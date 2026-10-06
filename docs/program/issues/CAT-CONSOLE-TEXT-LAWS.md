@@ -44,6 +44,10 @@ The line forms state the `bytes_concat` of the text's encoding and the
 newline's encoding as the payload. The package prose names the theorems. No
 new primitive, postulate or axiom, and no prelude change.
 
+The package states each law as `helper text = write <stream> <payload>`.
+The tree is reached by conversion through transparent `write`, and the AC-2
+client states it in full (Architect `evt_6sebv20q74qfn`).
+
 ## Acceptance
 
 - **AC-1.** `ken check` and `ken fmt --check` pass on the package.
