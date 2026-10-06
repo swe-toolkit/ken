@@ -16,6 +16,7 @@ use std::io::{self, BufRead, Write};
 
 use ken_elaborator::{
     extract::v2_extract,
+    render_open_obligations,
     prover::{attempt_obligation, Countermodel, Verdict},
     ElabEnv, ElabError,
 };
@@ -135,8 +136,8 @@ fn show_term(t: &Term) -> String {
 /// Elaborate and register a declaration (`let`, `const`, `fn`, `proc`, `prove`, `law`).
 /// On success: print the registered name. On error: print diagnostic, no registration.
 fn do_def(session: &mut Session, src: &str) {
-    match session.env.elaborate_decl(src.trim()) {
-        Ok(_id) => {
+    match session.env.elaborate_decl_results_v1(src.trim()) {
+        Ok(results) => {
             // Extract the declared name (second whitespace token after the keyword).
             let name = src
                 .split_whitespace()
@@ -146,6 +147,9 @@ fn do_def(session: &mut Session, src: &str) {
                 .to_owned();
             println!("  defined: {}", name);
             session.names.push(name);
+            for report in render_open_obligations(&results) {
+                println!("{report}");
+            }
         }
         Err(e) => println!("  error: {}", e),
     }

@@ -223,6 +223,9 @@ fn native_build_file(
         profile,
     ) {
         Ok(output) => {
+            for report in &output.open_obligation_reports {
+                eprintln!("{report}");
+            }
             println!("{}", output.artifact.executable_path.display());
             0
         }
@@ -354,7 +357,7 @@ fn os_bytes(value: &OsStr) -> Vec<u8> {
 fn elaborate_cli_file(
     cmd: &str,
     path: Option<&OsStr>,
-) -> (PathBuf, ken_elaborator::ElabEnv, Vec<ken_kernel::GlobalId>) {
+) -> (PathBuf, ken_elaborator::ElabEnv, Vec<ken_elaborator::ElabResult>) {
     let path = match path {
         Some(p) => p,
         None => {
@@ -381,22 +384,24 @@ fn elaborate_cli_file(
     };
 
     let catalog_module = ken_elaborator::modules::catalog_module_from_path(Path::new(path));
-    let ids_result = if let Some(catalog_module) = catalog_module {
+    let results_result = if let Some(catalog_module) = catalog_module {
         let roots = [catalog_module.root];
         elab_env
-            .elaborate_module_from_roots(&roots, &catalog_module.entry)
-            .and_then(|ids| {
-                elab_env.execute_loaded_entry_checked_fences(&catalog_module.entry)?;
-                Ok(ids)
+            .elaborate_module_from_roots_v1(&roots, &catalog_module.entry)
+            .and_then(|mut results| {
+                results.extend(
+                    elab_env.execute_loaded_entry_checked_fences_v1(&catalog_module.entry)?,
+                );
+                Ok(results)
             })
     } else if path.to_string_lossy().ends_with(".ken.md") {
-        elab_env.elaborate_ken_md_file(&src)
+        elab_env.elaborate_ken_md_file_v1(&src)
     } else {
-        elab_env.elaborate_file(&src)
+        elab_env.elaborate_file_v1(&src)
     };
 
-    let ids = match ids_result {
-        Ok(ids) => ids,
+    let results = match results_result {
+        Ok(results) => results,
         Err(ken_elaborator::ElabError::DuplicateDefinition { name, .. })
             if cmd == "run" && name == "main" =>
         {
@@ -413,7 +418,7 @@ fn elaborate_cli_file(
         }
     };
 
-    (PathBuf::from(path), elab_env, ids)
+    (PathBuf::from(path), elab_env, results)
 }
 
 /// `ken check <file>` — FR-3 (`docs/program/wp/ds-1-findings-remediation.md`):
@@ -429,7 +434,18 @@ fn elaborate_cli_file(
 /// still how you run it) — `ken run` itself is unchanged, strict, and has no
 /// auto-detect fallthrough to this mode.
 fn check_file(path: Option<&OsStr>) {
-    elaborate_cli_file("check", path);
+    let (_, _, results) = elaborate_cli_file("check", path);
+    let reports = ken_elaborator::render_open_obligations(&results);
+    if reports.is_empty() {
+        return;
+    }
+    for report in &reports {
+        eprintln!("{report}");
+    }
+    eprintln!(
+        "ken check: {} open obligation(s), status unknown",
+        reports.len()
+    );
 }
 
 /// `ken run <file>` — elaborate, evaluate, and drive a Console IO program.
@@ -456,13 +472,18 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
         std::process::exit(1);
     });
     let mut host = ken_interp::PosixHost::new();
-    match ken_cli::run_program(
+    match ken_cli::run_program_with_obligations(
         &source,
         format,
         arguments,
         &environment,
         &os_bytes(cwd.as_os_str()),
         &mut host,
+        |reports| {
+            for report in reports {
+                eprintln!("{report}");
+            }
+        },
     ) {
         Ok(outcome) => std::process::exit(outcome.exit_status),
         Err(ken_cli::RunError::DuplicateEntrypoint) => {
