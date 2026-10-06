@@ -1850,8 +1850,10 @@ class Representation A {
   roundtrip : (x : Bool) → Equal Bool (decode (encode x)) x
 }
 
+def TrueBool = {b : Bool | Equal Bool b True}
+
 class RefinementView A {
-  project : ({b : Bool | Equal Bool b True}) → Bool
+  project : TrueBool → Bool
 }
 
 class IndexedView A {
