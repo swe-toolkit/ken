@@ -101,4 +101,5 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. type-position argument refinement decided by local kernel inference -- keyed on the elaboration context being kernel-ready, which collect_refined_params violates under anonymous arrows
 2. collect_refined_params re-elaborates signature domains that elab_type already elaborated -- keyed on elab_type being pure, which F-B ended
 3. data.rs rtype_to_kernel_checked builds a constructor argument type's applications without the introduction -- keyed on a second RType-to-core converter outside elab_type
+4. F-B relevance gated on head variant (global heads only) -- keyed on where the head's type is stored (env vs ctx) rather than on the head's Pi domain itself
 ```
