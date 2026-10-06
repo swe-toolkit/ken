@@ -1,7 +1,7 @@
 ---
 id: CAT-CONFIGURATION-DECODER-PRESENCE-CARRIER
 title: "replace the decoder's lossy List Bytes result with List (Option Bytes) -- empty Bytes is an ordinary value in this package, not a reserved sentinel, so the current map sends two distinct inputs (no entry, and an entry whose value is empty) to one indistinguishable result element; carry the validated payload instead of recomputing it, and delete env_config_values with its placeholder branch so the agreement obligation disappears at its source rather than being proved"
-status: active
+status: merged
 owner: foundation
 size: M
 gate: none
@@ -128,3 +128,17 @@ re-measured at `c0c49b874`. The defect is still present there:
 `Decoder.ken.md:127` emits `list_to_bytes (Nil UInt8)` on `None`, inside
 `env_config_values` (`:130`). This node deletes a function that node proves
 laws about, so AC-3's retirement is atomic with it.
+
+## Closeout
+
+Merged `5cf37818a` from exact `5d63057a2` (PR #4545). Foundation QA
+`evt_7mrch07pb43m4`, Architect `evt_7e8v9pmy7c9gh`, Decision
+`dec_4f1z68x36kamn`.
+
+- Each aligned decoded element is `Option Bytes`, carried through
+  validation in one traversal, so an absent field and a present empty value
+  are distinct. The predecessor optional-lane laws retired with the second
+  traversal; the required-field agreement laws still hold.
+- Required fields, origins, field order, first-match lookup and issue
+  accumulation are unchanged. The package lists its public decoders first.
+- Residual (Architect): no separate datatype-absence assertion.

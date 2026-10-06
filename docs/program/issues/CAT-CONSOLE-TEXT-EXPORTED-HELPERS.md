@@ -1,7 +1,7 @@
 ---
 id: CAT-CONSOLE-TEXT-EXPORTED-HELPERS
 title: "Console.Text's four helpers are private procs, so no client module can call print, printLine, eprint or eprintLine, and the four pub laws CAT-CONSOLE-TEXT-LAWS added name private subjects a client cannot write. Export the helpers and prove the laws usable from another module"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
