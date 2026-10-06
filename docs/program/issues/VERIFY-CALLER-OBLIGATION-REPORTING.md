@@ -1,7 +1,7 @@
 ---
 id: VERIFY-CALLER-OBLIGATION-REPORTING
 title: "ken check, ken run, ken native-build, the compiler driver and the REPL elaborate through ID-only wrappers that drop ElabResult.obligations, so an open obligation gets no report and the package obligation map stays empty. Make every user-facing caller report each open obligation and still succeed"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -90,3 +90,16 @@ from the denotation route, which flagged success keeps.
 - **Not this WP:** obligation identities that depend on allocation order
   (`VERIFY-OBLIGATION-STABLE-IDENTITY`), and a strict mode that fails on
   open obligations.
+
+## Closeout
+
+Merged `fd1bafb0e` from exact `51cad091c` (PR #4520). Verify QA
+`evt_55h84zcg0165f`, Architect `evt_5ajsvmkq83fnz`, Decision
+`dec_mgc3t6c655hv`. Supersedes `9919c8808` and `f601c761c`.
+
+- `ken check`, `ken run`, `ken native-build`, the compiler driver and the
+  REPL report each open obligation as `unknown` through one renderer,
+  `render_open_obligations`, and keep their exit status.
+- The driver's obligation map is populated through an exhaustive
+  `ProvKind` mapping shared by the package, denotation and native routes.
+- No kernel, `trusted_base()` or spec change.
