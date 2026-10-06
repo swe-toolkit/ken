@@ -216,39 +216,46 @@ fn data_with_field(explicit: bool, field: &str) -> String {
     }
 }
 
+fn check_constructor_refusal_and_rollback(explicit: bool) {
+    let mut env = type_position_box_env();
+    let source = data_with_field(explicit, "Box six");
+    let error = env
+        .elaborate_decl_v1(&source)
+        .expect_err("a constructor's field type must check Box six");
+    let ElabError::ObligationWithoutChannel { span } = error else {
+        panic!("{source}: expected an undischarged refinement, found {error:?}");
+    };
+    let start = source.find("Box six").expect("fixture has the field type");
+    assert!(
+        span.start <= start && span.end >= start + "Box six".len(),
+        "refusal belongs to the constructor field application: {span:?}"
+    );
+    assert!(!env.globals.contains_key("D"), "data type must roll back");
+    assert!(
+        !env.globals.contains_key("Mk"),
+        "constructor must roll back"
+    );
+    env.elaborate_decl("const five : Int = 5")
+        .expect("retry value");
+    let retry = data_with_field(explicit, "Box five");
+    let accepted = env
+        .elaborate_decl_v1(&retry)
+        .unwrap_or_else(|e| panic!("rollback must leave D/Mk reusable: {e:?}"));
+    assert!(
+        accepted.obligations.is_empty(),
+        "discharged retry needs no hole"
+    );
+    assert!(env.globals.contains_key("D") && env.globals.contains_key("Mk"));
+}
+
 #[test]
-fn constructor_type_applications_refuse_undischarged_literal_formals_and_rollback() {
-    for explicit in [false, true] {
-        let mut env = type_position_box_env();
-        let source = data_with_field(explicit, "Box six");
-        let error = env
-            .elaborate_decl_v1(&source)
-            .expect_err("a constructor's field type must check Box six");
-        let ElabError::ObligationWithoutChannel { span } = error else {
-            panic!("{source}: expected an undischarged refinement, found {error:?}");
-        };
-        let start = source.find("Box six").expect("fixture has the field type");
-        assert!(
-            span.start <= start && span.end >= start + "Box six".len(),
-            "refusal belongs to the constructor field application: {span:?}"
-        );
-        assert!(!env.globals.contains_key("D"), "data type must roll back");
-        assert!(
-            !env.globals.contains_key("Mk"),
-            "constructor must roll back"
-        );
-        env.elaborate_decl("const five : Int = 5")
-            .expect("retry value");
-        let retry = data_with_field(explicit, "Box five");
-        let accepted = env
-            .elaborate_decl_v1(&retry)
-            .unwrap_or_else(|e| panic!("rollback must leave D/Mk reusable: {e:?}"));
-        assert!(
-            accepted.obligations.is_empty(),
-            "discharged retry needs no hole"
-        );
-        assert!(env.globals.contains_key("D") && env.globals.contains_key("Mk"));
-    }
+fn explicit_constructor_type_applications_refuse_and_rollback() {
+    check_constructor_refusal_and_rollback(true);
+}
+
+#[test]
+fn legacy_constructor_type_applications_refuse_and_rollback() {
+    check_constructor_refusal_and_rollback(false);
 }
 
 #[test]
