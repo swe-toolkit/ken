@@ -4828,12 +4828,13 @@ mod tests {
     fn k3_closed_iota_to_neutral_argument_does_not_report_iota_progress() {
         use crate::check::{
             declare_checked_string_literal, declare_primitive, register_checked_char_carrier,
-            register_checked_string_carrier, register_literal_char_view,
+            register_checked_int_lit_carrier, register_checked_string_carrier,
+            register_literal_char_view,
         };
         use crate::env::PrimReduction;
         let mut env = GlobalEnv::new();
         let int = declare_primitive(&mut env, vec![], type0(), PrimReduction::OpaqueType).unwrap();
-        env.register_int_lit_type(int);
+        register_checked_int_lit_carrier(&mut env, int).unwrap();
         let char_id = declare_def(&mut env, vec![], type0(), cref0(int)).unwrap();
         register_checked_char_carrier(&mut env, char_id).unwrap();
         let string_id =

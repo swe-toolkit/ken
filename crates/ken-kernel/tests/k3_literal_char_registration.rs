@@ -3,7 +3,7 @@
 
 use ken_kernel::check::{
     checked_char_literal, declare_checked_string_literal, register_checked_char_carrier,
-    register_checked_string_carrier,
+    register_checked_int_lit_carrier, register_checked_string_carrier,
 };
 use ken_kernel::{declare_primitive, GlobalEnv, Level, PrimReduction, Term};
 
@@ -37,7 +37,7 @@ fn checked_string_literal_normalizes_immutable_payload_and_refuses_absent_carrie
 fn checked_carriers_reject_wrong_shape_and_char_range_without_partial_admission() {
     let mut env = GlobalEnv::new();
     let int_ty = opaque_type(&mut env);
-    env.register_int_lit_type(int_ty);
+    register_checked_int_lit_carrier(&mut env, int_ty).unwrap();
     let wrong_char_ty = opaque_type(&mut env);
     let before = env.next_global_id();
     assert!(register_checked_char_carrier(&mut env, wrong_char_ty).is_err());

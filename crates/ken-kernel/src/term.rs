@@ -248,7 +248,7 @@ pub enum Term {
     /// A checked integer literal — a canonical `Int` value, closed (no
     /// sub-terms, no de Bruijn content) and already in weak-head normal
     /// form. Its type is the primitive registered via
-    /// [`crate::env::GlobalEnv::register_int_lit_type`] (`docs/adr/
+    /// [`crate::check::register_checked_int_lit_carrier`] (`docs/adr/
     /// 0013-int-decidable-equality-kernel-posture.md` Layer 2); `Eq` at
     /// that primitive decides two `IntLit`s by `BigInt` value equality
     /// (`crate::obs::eq_reduce`).

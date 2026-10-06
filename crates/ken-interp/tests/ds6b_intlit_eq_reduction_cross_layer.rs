@@ -9,6 +9,7 @@
 //! BigInt version) fails loud here rather than silently diverging.
 
 use ken_interp::eval::{prim_reduce, EvalVal};
+use ken_kernel::check::register_checked_int_lit_carrier;
 use ken_kernel::env::{Context, PrimReduction};
 use ken_kernel::term::{Level, Term};
 use ken_kernel::{declare_deceq_certificate, declare_inductive, declare_primitive, whnf, CtorSpec, GlobalEnv, InductiveSpec};
@@ -43,7 +44,7 @@ fn mk_env() -> (GlobalEnv, ken_kernel::GlobalId) {
     )
     .expect("eq_op");
     declare_deceq_certificate(&mut env, prim_t, eq_op, bool_, true_).expect("cert");
-    env.register_int_lit_type(prim_t);
+    register_checked_int_lit_carrier(&mut env, prim_t).unwrap();
     (env, prim_t)
 }
 

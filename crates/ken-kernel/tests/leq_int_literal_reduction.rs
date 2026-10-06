@@ -2,6 +2,7 @@
 //! weak-head Int literals computes at kernel conversion. Promise class:
 //! durable behavioral invariant (the positive, rejection, and neutral arms).
 
+use ken_kernel::check::register_checked_int_lit_carrier;
 use ken_kernel::env::{Context, PrimReduction};
 use ken_kernel::term::{Level, Term};
 use ken_kernel::{
@@ -49,7 +50,7 @@ fn fixture() -> Fixture {
         PrimReduction::OpaqueType,
     )
     .expect("Int");
-    env.register_int_lit_type(int);
+    register_checked_int_lit_carrier(&mut env, int).unwrap();
     let int_ty = Term::const_(int, vec![]);
     let cmp_ty = Term::pi(
         int_ty.clone(),
