@@ -159,15 +159,13 @@ fn checked_theorem_body_reports_named_and_literal_refinements() {
     assert_eq!(open_refinements(&env, &named), open_refinements(&env, &literal));
 }
 
-/// F-C: theorem parameters with literal refinements currently lose their
-/// call-site fact. This recorded row runs in the ignored-test sweep until the
-/// separate literal-side WP supplies the missing predicate.
+/// F-C durable invariant: a theorem parameter written as a literal refinement
+/// and its named twin both emit the same call-site introduction obligation.
 #[test]
-#[ignore = "F-C: literal theorem parameter facts are not recorded; LANG-REFINEMENT-TYPE-POSITION-INTRODUCTION"]
-fn literal_refined_theorem_parameter_still_misses_call_site_obligation() {
+fn literal_refined_theorem_parameter_matches_named_call_site_obligation() {
     let mut env = ElabEnv::new().expect("prelude");
     for declaration in [
-        "const five : Int = 5",
+        "const six : Int = 6",
         "def Five = { x : Int | Equal Int x 5 }",
         "theorem proof_five (p : Five) : Equal Int p p = Refl",
         "theorem proof_lit (p : { x : Int | Equal Int x 5 }) : Equal Int p p = Refl",
@@ -175,12 +173,14 @@ fn literal_refined_theorem_parameter_still_misses_call_site_obligation() {
         env.elaborate_decl(declaration)
             .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
     }
-    let named = env.elaborate_decl_v1("theorem thm_named : Equal Int five five = proof_five five")
+    let named = env.elaborate_decl_v1("theorem thm_named : Equal Int six six = proof_five six")
         .expect("named call");
-    let literal = env.elaborate_decl_v1("theorem thm_lit : Equal Int five five = proof_lit five")
+    let literal = env.elaborate_decl_v1("theorem thm_lit : Equal Int six six = proof_lit six")
         .expect("literal call");
-    assert_eq!(named.obligations.len(), 1);
-    assert_eq!(literal.obligations.len(), 0, "F-C is recorded for the later WP");
+    assert_eq!(open_refinements(&env, &named), 1);
+    assert_eq!(open_refinements(&env, &literal), 1);
+    assert_eq!(named.obligations[0].goal_closed, literal.obligations[0].goal_closed,
+        "the literal and named routes must instantiate the same predicate");
 }
 
 #[test]

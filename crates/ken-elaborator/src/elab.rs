@@ -438,6 +438,14 @@ struct ResultPredicate {
     recursive_self: Option<RecursiveSelf>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum RefinementSlot {
+    #[default]
+    None,
+    Outermost,
+    Signature { result: bool },
+}
+
 #[derive(Clone)]
 struct RecursiveSelf {
     id: GlobalId,
@@ -469,6 +477,12 @@ struct ElabCtx<'e> {
     obligations: Vec<Obligation>,
     obl_counter: u32,
     refinement_facts: &'e RefinementFacts,
+    /// Only throwaway type prepasses defer introductions to their admitting
+    /// elaboration. The default is to emit or refuse, never silently erase.
+    type_introductions: bool,
+    /// One-shot permission to erase a source refinement only when its caller
+    /// records that predicate. Consumed before visiting any type children.
+    refinement_slot: RefinementSlot,
     /// Logical branch equations for refinement obligations; never used as
     /// unchecked evidence in the emitted program.
     path_conditions: Vec<(Term, usize)>,
@@ -708,6 +722,8 @@ impl<'e> ElabCtx<'e> {
             obligations: Vec::new(),
             obl_counter: 0,
             refinement_facts,
+            type_introductions: true,
+            refinement_slot: RefinementSlot::None,
             path_conditions: Vec::new(),
             result_predicates: Vec::new(),
             class_env: None,
@@ -730,6 +746,13 @@ impl<'e> ElabCtx<'e> {
             indexed_match_roots: Vec::new(),
             matrix_entries: Vec::new(),
         }
+    }
+
+    /// A pre-pass whose type result is discarded or re-derived by the admitting
+    /// elaboration of the same source type. The admitting elaboration emits.
+    fn deferring_type_introductions(mut self) -> Self {
+        self.type_introductions = false;
+        self
     }
 
     fn surface_binding_target(&self, index: usize) -> Option<SurfaceBindingTarget> {
@@ -1116,7 +1139,17 @@ fn elab_type_named_variable(
     }
 }
 
+fn elab_type_in_slot(
+    cx: &mut ElabCtx<'_>, ty: &RType, slot: RefinementSlot,
+) -> Result<Term, ElabError> {
+    cx.refinement_slot = slot;
+    let result = elab_type(cx, ty);
+    cx.refinement_slot = RefinementSlot::None;
+    result
+}
+
 fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
+    let slot = std::mem::take(&mut cx.refinement_slot);
     match ty {
         RType::RUniv(None, _) => {
             let l = cx.metas.fresh();
@@ -1194,9 +1227,10 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             Ok(Term::Eq(Box::new(a_ty_k), Box::new(a_k), Box::new(b_k)))
         }
 
-        RType::RApp(f, a, _) => {
+        RType::RApp(f, a, span) => {
             let f_k = elab_type(cx, f)?;
             let a_k = elab_type(cx, a)?;
+            introduce_type_position_argument(cx, &f_k, &a_k, span)?;
             Ok(Term::app(f_k, a_k))
         }
 
@@ -1206,17 +1240,25 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         }
 
         RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _) => {
-            let a_core = elab_type(cx, a)?;
-            let b_core = elab_type(cx, b)?;
+            let (domain_slot, codomain_slot) = match slot {
+                RefinementSlot::Signature { .. } => (RefinementSlot::Outermost, slot),
+                _ => (RefinementSlot::None, RefinementSlot::None),
+            };
+            let a_core = elab_type_in_slot(cx, a, domain_slot)?;
+            let b_core = elab_type_in_slot(cx, b, codomain_slot)?;
             Ok(Term::pi(a_core, weaken(&b_core, 1)))
         }
 
         RType::RPi(_, a, b, _) => {
-            let a_core = elab_type(cx, a)?;
+            let (domain_slot, codomain_slot) = match slot {
+                RefinementSlot::Signature { .. } => (RefinementSlot::Outermost, slot),
+                _ => (RefinementSlot::None, RefinementSlot::None),
+            };
+            let a_core = elab_type_in_slot(cx, a, domain_slot)?;
             cx.push_match_binder(a_core.clone(), MatchBinderOrigin::UserLocal);
-            let b_core = elab_type(cx, b)?;
+            let b_result = elab_type_in_slot(cx, b, codomain_slot);
             cx.ctx.pop();
-            Ok(Term::pi(a_core, b_core))
+            Ok(Term::pi(a_core, b_result?))
         }
 
         RType::RSigma(_, a, b, _) => {
@@ -1229,7 +1271,15 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
 
         // Refinement lowers to the carrier type (`21 §6.3`): `{x:A|φ}` → `A`.
         // The predicate φ is tracked separately; obligation emitted at introduction.
-        RType::RRefine(_, carrier, _phi, _) => elab_type(cx, carrier),
+        RType::RRefine(_, carrier, _phi, span) => match slot {
+            RefinementSlot::Outermost | RefinementSlot::Signature { result: true } => {
+                elab_type(cx, carrier)
+            }
+            _ => Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "a refinement nested inside a type is not supported yet: only a binder's, field's or result's own annotation may be refined".into(),
+            }),
+        },
 
         // `‖A‖` — propositional truncation formation in annotation position
         // (`16 §6`, LANG-TRUNC-INTRO-DIAGNOSTIC-REMEDIES D1). Raw structural
@@ -1272,7 +1322,7 @@ fn prepare_let_rhs(
 ) -> Result<(Term, Term), ElabError> {
     match ty_opt {
         Some(ty) => {
-            let ty_core = elab_type(cx, ty)?;
+            let ty_core = elab_type_in_slot(cx, ty, RefinementSlot::Outermost)?;
             let predicate = literal_result_predicate(cx, ty, &ty_core)?;
             let rhs_core = if let Some(predicate) = predicate {
                 check_result_position(cx, rhs, &ty_core, span, &[predicate])?
@@ -10037,6 +10087,43 @@ fn infer_named_local_variable(
     Ok((Term::var(actual_index), ty))
 }
 
+/// An application in a written type owes the same refinement introduction as
+/// a value call. The already-checked global identity selects literal parameter
+/// or constructor-field facts; named domains use the value route's alias-root
+/// reuse rule. A missing obligation channel refuses rather than erasing.
+#[inline(never)]
+fn introduce_type_position_argument(
+    cx: &mut ElabCtx<'_>, function: &Term, argument: &Term, span: &Span,
+) -> Result<(), ElabError> {
+    if !cx.type_introductions { return Ok(()); }
+    emit_call_refinements(cx, function, argument, span)?;
+    let (head, previous_args) = peel_app(function);
+    // Relevance belongs to the head's Pi domain, not its variant. The aligned
+    // resolver context supplies local heads; checked globals supply the rest.
+    // If its type cannot be read, refusal is safer than silent erasure.
+    let unchecked = |_| ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "cannot check an argument's refinement in type position".into(),
+    };
+    let mut ty = kernel_infer_current(cx, &head).map_err(unchecked)?;
+    for arg in &previous_args {
+        let Term::Pi(_, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+            return Ok(());
+        };
+        ty = subst0(&codomain, arg);
+    }
+    let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &ty) else {
+        return Ok(());
+    };
+    let named = matches!(cx.metas.zonk_term(&domain),
+        Term::Const { id, .. } if cx.refinement_facts.refinement_predicate(id).is_some());
+    if !named {
+        return Ok(());
+    }
+    let argument_ty = kernel_infer_current(cx, argument).map_err(unchecked)?;
+    emit_refinement_introduction(cx, &domain, &argument_ty, argument.clone(), span, None).map(|_| ())
+}
+
 /// A direct call can introduce a checked argument at a source-refined
 /// parameter or constructor field; the recursive `infer` frame does not carry
 /// the predicate lookup's transient application spine.
@@ -10087,7 +10174,7 @@ fn infer_ascription(
     ty: &RType,
     _span: &Span,
 ) -> Result<(Term, Term), ElabError> {
-    let ty_core = elab_type(cx, ty)?;
+    let ty_core = elab_type_in_slot(cx, ty, RefinementSlot::Outermost)?;
     let predicate = literal_result_predicate(cx, ty, &ty_core)?;
     let e_core = if let Some(predicate) = predicate {
         check_result_position(cx, e, &ty_core, e.span(), &[predicate])?
@@ -14096,11 +14183,14 @@ fn declaration_param_context(
     // the class env for the same reason they do: the name-to-index lookup
     // behind a projection is a `ClassEnv` fact (`33 §6.3`, `58b §1`).
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
+        .deferring_type_introductions()
         .with_classes(class_env, provenance, standard_operators)
         .with_preconditions(preconditions, PremiseHoles::Refused);
     let mut current = rdecl.ty.as_ref();
     while let Some(RType::RPi(_, domain, codomain, _)) = current {
-        let domain_core = elab_type(&mut cx, domain)?;
+        // This is a throwaway context pre-pass; the admitting signature
+        // collects its predicate. Permit the same recorded domain here.
+        let domain_core = elab_type_in_slot(&mut cx, domain, RefinementSlot::Outermost)?;
         cx.ctx.push(cx.metas.zonk_term(&domain_core));
         current = Some(codomain);
     }
@@ -14202,9 +14292,13 @@ fn elaborate_associated_rdecl(
             // name-to-index lookup has no field list and a well-formed binding
             // is refused by a sort pre-check.
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, &*refinement_facts, rdecl.name.clone())
+                .deferring_type_introductions()
                 .with_classes(&*class_env, provenance, standard_operators)
                 .with_preconditions(preconditions, PremiseHoles::Refused);
-            let ty = elab_type(&mut cx, ty)?;
+            // This pre-pass checks sort but admits no definition. Match the
+            // admitting signature's domain/result permissions and collect its
+            // templates rather than rejecting a legitimate refined return.
+            let (ty, _) = elab_signature(&mut cx, ty, innermost_refine_pred(ty).is_some())?;
             let ty_core = cx.metas.zonk_term(&ty);
             ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
         }
@@ -14305,7 +14399,7 @@ fn elaborate_associated_rdecl(
             preconditions,
             num_values,
             numeric_env,
-            &*refinement_facts,
+            refinement_facts,
             class_env,
             provenance,
             standard_operators,
@@ -14318,7 +14412,7 @@ fn elaborate_associated_rdecl(
             preconditions,
             num_values,
             numeric_env,
-            &*refinement_facts,
+            refinement_facts,
             class_env,
             provenance,
             standard_operators,
@@ -14331,7 +14425,7 @@ fn elaborate_associated_rdecl(
             preconditions,
             num_values,
             numeric_env,
-            &*refinement_facts,
+            refinement_facts,
             class_env,
             provenance,
             standard_operators,
@@ -14399,7 +14493,7 @@ fn elaborate_associated_rdecl(
             let (alias_body, predicate) = {
                 let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, &*refinement_facts, rdecl.name.clone())
                     .with_preconditions(preconditions, PremiseHoles::Refused);
-                let body = elab_type(&mut cx, ty)?;
+                let body = elab_type_in_slot(&mut cx, ty, RefinementSlot::Outermost)?;
                 let predicate = if let RType::RRefine(_, _, phi, _) = ty {
                     cx.ctx.push(body.clone());
                     let checked = elab_prop_at_omega(&mut cx, phi, phi.span())?;
@@ -14584,7 +14678,7 @@ fn build_pair_chain(field_vals: &[Term], record_nil_val_id: GlobalId) -> Term {
 
 /// Reject a predicate erased inside an alias body before that alias is admitted.
 /// The outermost refinement is recorded by the alias arm instead.
-fn alias_nested_refinement(ty: &RType) -> Option<(&Span, &'static str)> {
+pub(crate) fn alias_nested_refinement(ty: &RType) -> Option<(&Span, &'static str)> {
     const FUNCTION: &str = "a refinement under a function-valued return type is not supported yet";
     const OTHER: &str = "a refinement nested inside a named type alias is not supported yet";
     fn walk(ty: &RType, in_function: bool) -> Option<(&Span, &'static str)> {
@@ -14606,6 +14700,25 @@ fn alias_nested_refinement(ty: &RType) -> Option<(&Span, &'static str)> {
     match ty {
         RType::RRefine(_, carrier, _, _) => walk(carrier, false),
         other => walk(other, false),
+    }
+}
+
+/// Constructor field types pass through the ordinary type elaborator when
+/// they contain an application or a refinement, even without a literal field
+/// predicate to record. Keep the gate exhaustive as RType grows.
+fn rtype_has_application_or_refinement(ty: &RType) -> bool {
+    match ty {
+        RType::RRefine(..) | RType::RApp(..) => true,
+        RType::RPi(_, domain, codomain, _)
+        | RType::REffectArr(domain, _, codomain, _)
+        | RType::RArr(domain, codomain, _)
+        | RType::RSigma(_, domain, codomain, _) =>
+            rtype_has_application_or_refinement(domain)
+                || rtype_has_application_or_refinement(codomain),
+        RType::RTrunc(inner, _) => rtype_has_application_or_refinement(inner),
+        RType::RUniv(_, _) | RType::RCon(_, _) | RType::RCheckedGlobal { .. }
+        | RType::RVarTy(_, _, _) | RType::RPatternAliasTy(_, _, _)
+        | RType::RProj(_, _, _) => false,
     }
 }
 
@@ -14657,7 +14770,7 @@ fn elab_record_decl_checked(
         let mut types = Vec::new();
         let mut predicates = Vec::with_capacity(fields.len());
         for field in fields {
-            let ty = elab_type(&mut cx, &field.ty)?;
+            let ty = elab_type_in_slot(&mut cx, &field.ty, RefinementSlot::Outermost)?;
             let ty = cx.metas.zonk_term(&ty);
             let predicate = if let RType::RRefine(_, _, phi, _) = &field.ty {
                 cx.ctx.push(ty.clone());
@@ -15567,7 +15680,7 @@ fn elaborate_data_with_refinements(
     ctors: &[crate::resolve::RCtorDecl],
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| matches!(arg, RType::RRefine(..)))) {
+    if !ctors.iter().any(|ctor| ctor.args.iter().any(rtype_has_application_or_refinement)) {
         return data::elab_data_decl(env, globals, ctor_decl_spans, name, type_params, ctors, span);
     }
     let snapshot = (
@@ -15604,7 +15717,11 @@ fn elaborate_explicit_data_with_refinements(
     ctors: &[crate::resolve::RExplicitCtorDecl],
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    if !ctors.iter().any(|ctor| ctor.args.iter().any(|arg| matches!(arg.ty, RType::RRefine(..)))) {
+    let applies = |ty: &RType| rtype_has_application_or_refinement(ty);
+    let any = params.iter().chain(indices).any(|entry| applies(&entry.ty))
+        || ctors.iter().any(|ctor| ctor.args.iter().any(|arg| applies(&arg.ty))
+            || ctor.result.as_ref().is_some_and(applies));
+    if !any {
         return data::elab_explicit_data_decl(
             env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
         );
@@ -15618,7 +15735,7 @@ fn elaborate_explicit_data_with_refinements(
             env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
         )?;
         register_explicit_constructor_fields(
-            env, globals, num_values, numeric_env, facts, params, ctors, name,
+            env, globals, num_values, numeric_env, facts, params, indices, ctors, name,
         )?;
         Ok(id)
     })();
@@ -15640,7 +15757,7 @@ fn register_legacy_constructor_fields(
     owner: &str,
 ) -> Result<(), ElabError> {
     for ctor in ctors {
-        if !ctor.args.iter().any(|arg| matches!(arg, RType::RRefine(..))) {
+        if !ctor.args.iter().any(rtype_has_application_or_refinement) {
             continue;
         }
         let id = globals[&ctor.name];
@@ -15663,29 +15780,55 @@ fn register_explicit_constructor_fields(
     numeric_env: &NumericEnv,
     facts: &mut RefinementFacts,
     params: &[crate::resolve::RTelescopeEntry],
+    indices: &[crate::resolve::RTelescopeEntry],
     ctors: &[crate::resolve::RExplicitCtorDecl],
     owner: &str,
 ) -> Result<(), ElabError> {
+    // Check each family entry once, under every preceding binder. The
+    // resolver binds anonymous indices too. An undischarged refinement has
+    // no obligation channel and rolls the entire declaration back.
+    {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string());
+        for entry in params.iter().chain(indices) {
+            let ty = elab_type(&mut cx, &entry.ty)?;
+            cx.ctx.push(ty);
+        }
+    }
     for ctor in ctors {
-        if !ctor.args.iter().any(|arg| matches!(arg.ty, RType::RRefine(..))) {
+        let result_applies = ctor.result.as_ref().is_some_and(rtype_has_application_or_refinement);
+        if !result_applies
+            && !ctor.args.iter().any(|arg| rtype_has_application_or_refinement(&arg.ty))
+        {
             continue;
         }
         let id = globals[&ctor.name];
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string());
+        // Parameter types were checked above. Replay them only to build the
+        // constructor's resolver context, never to introduce twice.
+        cx.type_introductions = false;
         for param in params {
             let ty = elab_type(&mut cx, &param.ty)?;
             cx.ctx.push(ty);
         }
+        cx.type_introductions = true;
         let args = ctor.args.iter().map(|arg| &arg.ty).collect::<Vec<_>>();
         let predicates = collect_constructor_field_predicates(&mut cx, &args)?;
+        if let Some(result) = &ctor.result {
+            elab_type(&mut cx, result)?;
+        }
         facts.constructor_field_predicates.insert(id, predicates);
     }
     Ok(())
 }
 
 /// Constructor fields are already bare carriers in the kernel declaration.
-/// Keep only literal source predicates indexed by the checked constructor and
-/// argument position; the same check-time emitter handles their introduction.
+/// Check each field's type applications here after that declaration is built;
+/// a discharged refinement needs no obligation channel, but an undischarged
+/// one refuses and the wrapper rolls back the entire declaration. Keep only
+/// literal field predicates indexed by checked constructor and argument.
+/// Earlier refined fields are not installed as path hypotheses in this pass:
+/// applications depending on their predicates refuse, rather than inheriting
+/// the broader hypothesis environment other systems may provide.
 #[inline(never)]
 fn collect_constructor_field_predicates(
     cx: &mut ElabCtx<'_>,
@@ -15693,7 +15836,7 @@ fn collect_constructor_field_predicates(
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let mut result = Vec::with_capacity(args.len());
     for arg in args {
-        let carrier = elab_type(cx, arg)?;
+        let carrier = elab_type_in_slot(cx, arg, RefinementSlot::Outermost)?;
         let predicate = if let RType::RRefine(_, _, phi, _) = arg {
             cx.ctx.push(carrier.clone());
             let checked = elab_prop_at_omega(cx, phi, phi.span());
@@ -16240,36 +16383,90 @@ pub(crate) fn innermost_refine_pred(ty: &RType) -> Option<&RExpr> {
     }
 }
 
+/// The only admission route for a written callable signature. Its carrier
+/// erasure and literal-parameter facts are produced in one scope: an eligible
+/// spine domain cannot be admitted without collecting its predicate.
+/// The returned core is NOT zonked: an unsolved universe level must stay a
+/// meta until the declaration's own scope end, where the body may solve it.
+/// Metas are level-only, so the raw core has the same Pi spine the collector
+/// reads.
+#[must_use]
+fn elab_signature(
+    cx: &mut ElabCtx<'_>, ty: &RType, result: bool,
+) -> Result<(Term, Vec<Option<Term>>), ElabError> {
+    let core = elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })?;
+    let params = collect_refined_params(cx, ty, &core)?;
+    Ok((core, params))
+}
+
+fn record_refined_params(facts: &mut RefinementFacts, id: GlobalId, params: Vec<Option<Term>>) {
+    if params.iter().any(Option::is_some) {
+        facts.refined_params.insert(id, params);
+    }
+}
+
 /// A source-refined parameter still has a carrier Π domain. Its direct
 /// application carries the introduction obligation; callee recognition and
 /// higher-order preservation belong to LANG-REFINED-PARAM-REQUIRES-DESUGAR.
 #[inline(never)]
-fn collect_refined_params(cx: &mut ElabCtx<'_>, declared: &RType) -> Result<Vec<Option<Term>>, ElabError> {
+fn collect_refined_params(
+    cx: &mut ElabCtx<'_>, declared: &RType, core: &Term,
+) -> Result<Vec<Option<Term>>, ElabError> {
     let base = cx.ctx.len();
     let result = (|| {
         let mut params = Vec::new();
-        let mut current = declared;
+        // One entry per core Pi binder; only dependent Pi binds in the
+        // resolver context. Never re-elaborate a signature domain here.
+        let mut bound = Vec::new();
+        let (mut current, mut telescope) = (declared, core);
         loop {
-            let (domain, codomain) = match current {
-                RType::RPi(_, domain, codomain, _) | RType::RArr(domain, codomain, _)
-                | RType::REffectArr(domain, _, codomain, _) => (domain.as_ref(), codomain.as_ref()),
+            let (domain, codomain, binds) = match current {
+                RType::RPi(_, domain, codomain, _) => (domain.as_ref(), codomain.as_ref(), true),
+                RType::RArr(domain, codomain, _) | RType::REffectArr(domain, _, codomain, _) =>
+                    (domain.as_ref(), codomain.as_ref(), false),
                 _ => break,
             };
-            let carrier = elab_type(cx, domain)?;
+            let Term::Pi(core_domain, core_codomain) = telescope else {
+                return Err(ElabError::Internal(
+                    "a signature's source spine and its core telescope disagree".into()));
+            };
+            let carrier = lower_over_anonymous(core_domain, &bound);
             let predicate = if let RType::RRefine(_, _, phi, _) = domain {
                 cx.ctx.push(carrier.clone());
                 let checked = elab_prop_at_omega(cx, phi, phi.span());
                 cx.ctx.pop();
-                Some(Term::lam(carrier.clone(), checked?))
+                Some(lift_over_anonymous(&Term::lam(carrier.clone(), checked?), &bound))
             } else { None };
             params.push(predicate);
-            cx.ctx.push(carrier);
+            if binds { cx.ctx.push(carrier); }
+            bound.push(binds);
             current = codomain;
+            telescope = core_codomain;
         }
         Ok(params)
     })();
     cx.ctx.types.truncate(base);
     result
+}
+
+/// Re-scope a term written under resolver binders to the core telescope.
+/// Each anonymous binder is inserted at its position, counting all inside it.
+fn lift_over_anonymous(term: &Term, bound: &[bool]) -> Term {
+    let mut lifted = term.clone();
+    for (position, &binds) in bound.iter().rev().enumerate() {
+        if !binds { lifted = shift(&lifted, 1, position) }
+    }
+    lifted
+}
+
+/// Inverse of the lift on terms that cannot mention anonymous binders.
+fn lower_over_anonymous(term: &Term, bound: &[bool]) -> Term {
+    let n = bound.len();
+    let mut lowered = term.clone();
+    for (index, &binds) in bound.iter().enumerate() {
+        if !binds { lowered = shift(&lowered, -1, n - 1 - index) }
+    }
+    lowered
 }
 
 fn elaborate_v0(
@@ -16316,8 +16513,7 @@ fn elaborate_v0(
             .with_local_dicts(local_dicts)
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let (body_raw, ty_raw, params) = if let Some(ty) = &rdecl.ty {
-            let ty_c = elab_type(&mut cx, ty)?;
-            let params = collect_refined_params(&mut cx, ty)?;
+            let (ty_c, params) = elab_signature(&mut cx, ty, false)?;
             let body_c = check(&mut cx, &rdecl.body, &ty_c, &rdecl.span)?;
             (body_c, ty_c, params)
         } else {
@@ -16349,9 +16545,7 @@ fn elaborate_v0(
             span: rdecl.span.clone(),
         })?;
     globals.insert(rdecl.name.clone(), id);
-    if params.iter().any(Option::is_some) {
-        refinement_facts.refined_params.insert(id, params);
-    }
+    record_refined_params(refinement_facts, id, params);
     Ok(ElabResult {
         name: rdecl.name.clone(),
         def_id: id,
@@ -16436,7 +16630,7 @@ fn elaborate_recursive_view(
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
     // 1. Elaborate the declared type (recursive views are annotated).
-    let (ty_core, type_obligations) = {
+    let (ty_core, type_obligations, params) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
 
@@ -16444,8 +16638,12 @@ fn elaborate_recursive_view(
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal("recursive declaration requires a type annotation".into())
         })?;
-        let ty_c = elab_type(&mut cx, ty)?;
-        (cx.metas.zonk_term(&ty_c), std::mem::take(&mut cx.obligations))
+        let (ty_c, params) = elab_signature(&mut cx, ty, false)?;
+        (
+            cx.metas.zonk_term(&ty_c),
+            std::mem::take(&mut cx.obligations),
+            params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect(),
+        )
     };
 
     // 2. Stage a checked opaque placeholder so the body can self-reference.
@@ -16480,6 +16678,8 @@ fn elaborate_recursive_view(
         }
     };
     let associated = associated.as_deref().unwrap_or(rdecl);
+    // Self-calls in the body must see this exact staged identity's facts.
+    record_refined_params(refinement_facts, id, params);
     let body_result = (|| -> Result<(Term, Vec<Obligation>), ElabError> {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
@@ -16493,6 +16693,7 @@ fn elaborate_recursive_view(
         Ok(body) => body,
         Err(error) => {
             rollback_elab_admission(env, pending, globals, num_values)?;
+            refinement_facts.refined_params.remove(&id);
             if fixity_inserted {
                 fixities.remove(&id);
                 fixity_spans.remove(&id);
@@ -16519,6 +16720,7 @@ fn elaborate_recursive_view(
         }
         Err((error, removed)) => {
             forget_rolled_back_decls(removed, globals, num_values);
+            refinement_facts.refined_params.remove(&id);
             if fixity_inserted {
                 fixities.remove(&id);
                 fixity_spans.remove(&id);
@@ -16554,13 +16756,14 @@ pub(crate) fn elaborate_mutual_group(
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
     fixities: &mut HashMap<GlobalId, Fixity>,
     fixity_spans: &mut HashMap<GlobalId, Span>,
-    refinement_facts: &RefinementFacts,
+    refinement_facts: &mut RefinementFacts,
     declared_fixities: &[Option<(Fixity, Span)>],
     members: &[RDecl],
 ) -> Result<Vec<ElabResult>, ElabError> {
     // 1. Elaborate every member's declared type FIRST (the signature
     // pre-pass) — none of these need a sibling's id, only their own params.
     let mut ty_cores: Vec<Term> = Vec::with_capacity(members.len());
+    let mut parameter_facts: Vec<Vec<Option<Term>>> = Vec::with_capacity(members.len());
     for rdecl in members {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
             .with_preconditions(preconditions, PremiseHoles::Refused);
@@ -16570,8 +16773,9 @@ pub(crate) fn elaborate_mutual_group(
                 rdecl.name
             ))
         })?;
-        let ty_c = elab_type(&mut cx, ty)?;
+        let (ty_c, params) = elab_signature(&mut cx, ty, false)?;
         ty_cores.push(cx.metas.zonk_term(&ty_c));
+        parameter_facts.push(params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect());
     }
 
     // 2. Pre-admit ALL members as Opaque, binding every name in `globals`
@@ -16675,6 +16879,11 @@ pub(crate) fn elaborate_mutual_group(
         return Err(e);
     }
 
+    // Every in-group call must see every sibling's exact staged identity.
+    for (&id, params) in ids.iter().zip(parameter_facts) {
+        record_refined_params(refinement_facts, id, params);
+    }
+
     // 3. Elaborate each body checked against its own type (every sibling
     // name, including self, already resolves via `globals` from step 2).
     let recursive_group = ids.iter().copied().collect::<HashSet<_>>();
@@ -16700,6 +16909,7 @@ pub(crate) fn elaborate_mutual_group(
     // trace, same discipline as the singleton path's rollback.
     if let Err(e) = elab_err {
         rollback_elab_admission(env, pending, globals, num_values)?;
+        for id in &ids { refinement_facts.refined_params.remove(id); }
         for inserted in &inserted_fixity_ids {
             fixities.remove(inserted);
             fixity_spans.remove(inserted);
@@ -16729,6 +16939,7 @@ pub(crate) fn elaborate_mutual_group(
             .collect()),
         Err((error, removed)) => {
             forget_rolled_back_decls(removed, globals, num_values);
+            for id in &ids { refinement_facts.refined_params.remove(id); }
             for inserted in &inserted_fixity_ids {
                 fixities.remove(inserted);
                 fixity_spans.remove(inserted);
@@ -16919,12 +17130,14 @@ fn elaborate_view_with_spec(
 ) -> Result<ElabResult, ElabError> {
     let mut pending: Option<ken_kernel::PendingAdmission> = None;
     let mut precondition_entry = None;
+    let mut recorded_pending = None;
     let result = (|| -> Result<ElabResult, ElabError> {
         let is_recursive = rexpr_mentions_name(&rdecl.body, &rdecl.name);
         // Annotated contracts stage before checking their body so recursive
         // calls see the full type and all body holes share the admission rollback.
         let param_count = view_param_count(rdecl);
         let mut all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
+        let literal_return = rdecl.ty.as_ref().and_then(innermost_refine_pred).is_some();
         if let Some(phi) = rdecl.ty.as_ref().and_then(|ty| innermost_refine_pred(ty)) {
             if rdecl.ty.as_ref().and_then(refine_return_depth) != Some(param_count) {
                 return Err(ElabError::TypeMismatch {
@@ -16945,7 +17158,7 @@ fn elaborate_view_with_spec(
             pre_admit_id,
             req_cores,
         ) = if is_recursive || rdecl.ty.is_some() {
-            let (carrier_ty, assumptions, req_cores) = {
+            let (carrier_ty, params, assumptions, req_cores) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
                         .with_classes(class_env, provenance, standard_operators)
@@ -16957,7 +17170,7 @@ fn elaborate_view_with_spec(
                         "recursive declaration with spec clauses requires a type annotation".into(),
                     )
                 })?;
-                let carrier_ty = elab_type(&mut cx, ty)?;
+                let (carrier_ty, params) = elab_signature(&mut cx, ty, literal_return)?;
                 let req_cores = install_requires_assumptions(
                     &mut cx,
                     &carrier_ty,
@@ -16977,8 +17190,9 @@ fn elaborate_view_with_spec(
                         depth: assumption.depth,
                     })
                     .collect::<Vec<_>>();
+                let params = params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect();
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
-                (carrier_ty, assumptions, req_cores)
+                (carrier_ty, params, assumptions, req_cores)
             };
             let (param_types, carrier_result, full_ty) =
                 build_contract_type(&carrier_ty, param_count, &req_cores)?;
@@ -16998,6 +17212,10 @@ fn elaborate_view_with_spec(
             }
             pending = Some(staged);
             globals.insert(rdecl.name.clone(), id);
+            // The checked signature and facts share this staged identity;
+            // recursive calls in ensures or the body already see the params.
+            record_refined_params(refinement_facts, id, params);
+            recorded_pending = Some(id);
             let (predicates, psi_obligations) = prepare_contract_ensures(
                 env, globals, num_values, numeric_env, &*refinement_facts, class_env, provenance,
                 standard_operators, preconditions, local_dicts, rdecl,
@@ -17215,6 +17433,9 @@ fn elaborate_view_with_spec(
         if let Some(staged) = pending {
             rollback_elab_admission(env, staged, globals, num_values)?;
         }
+        if let Some(id) = recorded_pending {
+            refinement_facts.refined_params.remove(&id);
+        }
         if let Some(id) = precondition_entry {
             preconditions.remove(&id);
         }
@@ -17278,7 +17499,7 @@ fn elaborate_prop_decl(
     preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
-    refinement_facts: &RefinementFacts,
+    refinement_facts: &mut RefinementFacts,
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
@@ -17293,17 +17514,18 @@ fn elaborate_prop_decl(
     })?;
     validate_seed_prop_shape(prop_ty, &rdecl.name, intros, &rdecl.span)?;
 
-    let (ty_core, body_core) = {
+    let (ty_core, body_core, params) = {
         // Carries the class env for the same reason the `fn`/`const` pre-pass
         // does: a `prop`'s telescope may be typed by a projection, and the
         // name-to-index lookup that resolves it is a `ClassEnv` fact.
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
             .with_preconditions(preconditions, PremiseHoles::Refused);
-        let ty = elab_type(&mut cx, prop_ty)?;
+        let (ty, params) = elab_signature(&mut cx, prop_ty, false)?;
         let ty = cx.metas.zonk_term(&ty);
+        let params = params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect();
         let body = top_body_for_prop_type(env, &ty, &rdecl.span)?;
-        (ty, body)
+        (ty, body, params)
     };
 
     let id = declare_def(env, vec![], ty_core.clone(), body_core).map_err(|e| {
@@ -17313,6 +17535,7 @@ fn elaborate_prop_decl(
         }
     })?;
     globals.insert(rdecl.name.clone(), id);
+    record_refined_params(refinement_facts, id, params);
 
     let mut produced = ElabResult {
         name: rdecl.name.clone(),
@@ -17366,7 +17589,7 @@ fn elaborate_checked_theorem(
     preconditions: &HashMap<GlobalId, (usize, usize)>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
-    refinement_facts: &RefinementFacts,
+    refinement_facts: &mut RefinementFacts,
     class_env: &ClassEnv,
     provenance: &mut Vec<crate::classes::InstanceResolution>,
     standard_operators: &HashMap<StandardOperatorRole, GlobalId>,
@@ -17380,14 +17603,14 @@ fn elaborate_checked_theorem(
         });
     }
 
-    let (ty_core, body_core, body_obligations) = {
+    let (ty_core, body_core, body_obligations, params) = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
             .with_classes(class_env, provenance, standard_operators)
             .with_preconditions(preconditions, PremiseHoles::Reported);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
             ElabError::Internal(format!("checked theorem '{}' has no type", rdecl.name))
         })?;
-        let ty_core = elab_type(&mut cx, ty)?;
+        let (ty_core, params) = elab_signature(&mut cx, ty, false)?;
         let ty_core = cx.metas.zonk_term(&ty_core);
         ensure_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
         if let Some(subject) = attached_subject {
@@ -17405,6 +17628,7 @@ fn elaborate_checked_theorem(
             cx.metas.zonk_term(&ty_core),
             cx.metas.zonk_term(&body_core),
             obligations,
+            params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect(),
         )
     };
     let id =
@@ -17413,6 +17637,7 @@ fn elaborate_checked_theorem(
             span: rdecl.span.clone(),
         })?;
     globals.insert(rdecl.name.clone(), id);
+    record_refined_params(refinement_facts, id, params);
     Ok(ElabResult {
         name: rdecl.name.clone(),
         def_id: id,

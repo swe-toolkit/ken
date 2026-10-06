@@ -27,6 +27,23 @@ use crate::resolve::{RCtorDecl, RExplicitCtorDecl, RTelescopeEntry, RType};
 ///
 /// Registers D (the type former) and every constructor Cₖ in `globals`.
 /// Returns the `GlobalId` of the type former.
+/// Inductive lowering is independent of `elab_type`. Only a constructor
+/// field's own outer refinement is recorded after admission; all others
+/// would disappear into its carrier without an introduction obligation.
+fn guard_data_refinement(ty: &RType, allow_outer: bool) -> Result<(), ElabError> {
+    let nested = crate::elab::alias_nested_refinement(ty).map(|(span, _)| span);
+    let outer = if allow_outer { None } else {
+        match ty { RType::RRefine(_, _, _, span) => Some(span), _ => None }
+    };
+    if let Some(span) = outer.or(nested) {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "a refinement nested inside a type is not supported yet: only a binder's, field's or result's own annotation may be refined".into(),
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn elab_data_decl(
     env: &mut GlobalEnv,
     globals: &mut HashMap<String, GlobalId>,
@@ -37,6 +54,9 @@ pub(crate) fn elab_data_decl(
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
     let m = type_params.len();
+    for ctor in ctors {
+        for arg in &ctor.args { guard_data_refinement(arg, true)?; }
+    }
 
     // Snapshot globals + inductive-id set BEFORE the `declare_inductive` closure borrows `env`.
     let global_info: HashMap<String, GlobalId> = globals.clone();
@@ -186,6 +206,12 @@ pub(crate) fn elab_explicit_data_decl(
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
     let m = params.len();
+    for param in params { guard_data_refinement(&param.ty, false)?; }
+    for index in indices { guard_data_refinement(&index.ty, false)?; }
+    for ctor in ctors {
+        for arg in &ctor.args { guard_data_refinement(&arg.ty, true)?; }
+        if let Some(result) = &ctor.result { guard_data_refinement(result, false)?; }
+    }
 
     let global_info: HashMap<String, GlobalId> = globals.clone();
     let ind_id_set: HashSet<GlobalId> = globals
