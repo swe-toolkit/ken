@@ -37,6 +37,8 @@ import Core.Function.Combinators (comp, idf)
 
 import Core.Logic.Transport (cong, sym, trans)
 
+import Data.Collections.Derived (length)
+
 data Vec (a : Type) : Nat → Type where {
   VNil : Vec a Zero;
   VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)
@@ -74,6 +76,28 @@ fn zip_with
       }
   }
 
+pub fn to_list (a : Type) (n : Nat) (xs : Vec a n) : List a =
+  match xs {
+    VNil ↦ Nil a;
+    VCons m x tail_xs ↦ Cons a x (to_list a m tail_xs)
+  }
+
+pub fn zip (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n) : Vec (Pair a b) n =
+  zip_with a b (Pair a b) n (mk_pair a b) xs ys
+
+pub fn unzip (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+    : Pair (Vec a n) (Vec b n) =
+  match ps {
+    VNil ↦ mk_pair (Vec a Zero) (Vec b Zero) (VNil a) (VNil b);
+    VCons m p tail_ps ↦
+      let tails = unzip a b m tail_ps in
+        mk_pair
+          (Vec a (Suc m))
+          (Vec b (Suc m))
+          (VCons a m (pair_fst a b p) (pair_fst (Vec a m) (Vec b m) tails))
+          (VCons b m (pair_snd a b p) (pair_snd (Vec a m) (Vec b m) tails))
+  }
+
 fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
   match i {
     FZero m ↦
@@ -84,6 +108,64 @@ fn lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a =
       match xs {
         VCons _ x tail_xs ↦ lookup a m tail_xs rest
       }
+  }
+
+theorem to_list_length
+      (a : Type) (n : Nat) (xs : Vec a n)
+    : Equal Nat (length a (to_list a n xs)) n =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      cong Nat Nat (length a (to_list a m tail_xs)) m Suc (to_list_length a m tail_xs)
+  }
+
+theorem unzip_zip_fst
+      (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+    : Equal
+        (Vec a n)
+        (pair_fst (Vec a n) (Vec b n) (unzip a b n (zip a b n xs ys)))
+        xs =
+  match xs {
+    VNil ↦ Proved;
+    VCons m x tail_xs ↦
+      match ys {
+        VCons _ y tail_ys ↦
+          cong
+            (Vec a m)
+            (Vec a (Suc m))
+            (pair_fst (Vec a m) (Vec b m) (unzip a b m (zip a b m tail_xs tail_ys)))
+            tail_xs
+            (VCons a m x)
+            (unzip_zip_fst a b m tail_xs tail_ys)
+      }
+  }
+
+theorem zip_unzip
+      (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+    : Equal
+        (Vec (Pair a b) n)
+        (zip
+          a
+          b
+          n
+          (pair_fst (Vec a n) (Vec b n) (unzip a b n ps))
+          (pair_snd (Vec a n) (Vec b n) (unzip a b n ps)))
+        ps =
+  match ps {
+    VNil ↦ Proved;
+    VCons m p tail_ps ↦
+      cong
+        (Vec (Pair a b) m)
+        (Vec (Pair a b) (Suc m))
+        (zip
+          a
+          b
+          m
+          (pair_fst (Vec a m) (Vec b m) (unzip a b m tail_ps))
+          (pair_snd (Vec a m) (Vec b m) (unzip a b m tail_ps)))
+        tail_ps
+        (VCons (Pair a b) m p)
+        (zip_unzip a b m tail_ps)
   }
 
 theorem head_vcons
