@@ -42,8 +42,10 @@ reset it from outside.
 
 ## Cargo targets
 
-Never delete a live seat's `target/`. The seat decides when to pay a cold
-rebuild. Under a coordinated idle period, ask owners to clean their own targets.
+When disk is short, clean the `target/` of idle seats: no build running in
+the worktree and no active WP, for example a ring waiting in the merge queue.
+Confirm both before deleting, and expect a cold rebuild on its next task.
+Never touch the target of a seat that is building. This is the Steward's call.
 
 Do not set one shared `CARGO_TARGET_DIR` across worktrees; cross-branch
 invalidation and lock contention replace disk pressure with rebuild pressure.

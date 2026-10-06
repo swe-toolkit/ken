@@ -95,6 +95,13 @@ ordinary sequencing and the appropriate existing gate without asking. Give the
 operator the smallest decision that separates the alternatives; do not attach a
 workflow retrospective.
 
+**Assume the operator is away. Never ask a question that waits for an
+answer.** Decide everything inside current rulings and record the decision
+where it applies. Post a genuine fork for the operator to read, hold only the
+work it blocks, and keep everything else moving. You will be tempted to use an
+interactive prompt when a decision feels risky. It stops the whole fleet until
+someone answers.
+
 **Size and tier are never an operator question**, including an L, a split
 call, or a tier mismatch. Decide, record it in the frame, and kick. You will be
 tempted to ask when a WP is large or a ring holds for confirmation.
