@@ -166,8 +166,9 @@ fn migrated_proof_bodies_use_preloaded_transport_global_identities() {
         (
             "Application.Configuration.Decoder",
             &[
-                ("env_config_head_lookup_some", "sym"),
-                ("env_config_values::lookup_some", "trans"),
+                ("env_config_required_check_lookup", "sym"),
+                ("env_config_required_values", "trans"),
+                ("env_config_required_values", "cong"),
             ],
         ),
         (
