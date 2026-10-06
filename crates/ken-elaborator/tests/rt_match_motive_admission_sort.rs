@@ -113,16 +113,6 @@ fn elaborated_match_sort_and_owner_admission() {
                 "the selected host must not be a zero-declaration preparation"
             );
 
-            let proof =
-                selected_body("rt_motive_proof", HOST_AND_PROOF, "proof_match").unwrap_err();
-            assert!(
-                matches!(
-                    proof,
-                    CheckedCoreBodyViewError::UnsupportedProofOnlyMatch { .. }
-                ),
-                "an undelivered Top in a selected Library package fails closed"
-            );
-
             let computational = selected_body(
                 "rt_motive_computational",
                 COMPUTATIONAL_PROOF,
@@ -140,6 +130,16 @@ fn elaborated_match_sort_and_owner_admission() {
                 dependent,
                 CheckedCoreBodyViewError::UnsupportedDependentMotive { .. }
             ));
+
+            let proof =
+                selected_body("rt_motive_proof", HOST_AND_PROOF, "proof_match").unwrap_err();
+            assert!(
+                matches!(
+                    proof,
+                    CheckedCoreBodyViewError::UnsupportedProofOnlyMatch { .. }
+                ),
+                "an undelivered Top in a selected Library package fails closed"
+            );
         })
         .expect("spawn stated-stack preparation worker")
         .join()
