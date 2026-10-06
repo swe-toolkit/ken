@@ -3217,9 +3217,9 @@ pub(in crate::cranelift_backend) struct PlannedAggregateOwnership {
 /// - **Lifetime** ([`lifetime_referent_affinity`]) — how long the referent may
 ///   live. `ActivationOwned` admits the invocation arena; `Persistent` does not.
 /// - **Representation** ([`JoinResultRepresentation`]) — whether there is a
-///   referent to own at all. A child the emitter materializes as a
-///   `NativeScalarPair` is an immediate: it has no heap node, so no owner but
-///   [`BoundaryReferentOwner::NoReferent`] is possible for it.
+///   referent to own at all. A child emitted as a `NativeScalarPair` has no
+///   heap node. A source Match may instead use the process-composed CarrierWord
+///   interface; its possible referents remain bounded by the child's lifetime.
 ///
 /// Reading only the first is what makes every call-shaped child look
 /// arena-owned. `derive_occurrence_lifetime` answers `ActivationOwned` for
@@ -3247,14 +3247,18 @@ pub(in crate::cranelift_backend::planning::static_transition) fn aggregate_child
         .and_then(|slot| slot.as_ref())
         .map(|result| result.representation);
     match representation {
-        // The emitter will produce a native scalar pair here. There is no
-        // boundary node, so there is nothing for an arena or a store to own.
-        Some(JoinResultRepresentation::NativeScalarPair) => {
+        // The scalar-pair result has no referent only when this join cannot
+        // instead use the process-composed CarrierWord interface at emission.
+        Some(JoinResultRepresentation::NativeScalarPair)
+            if !plan.join_may_take_process_carrier(child.origin)? =>
+        {
             Ok(vec![BoundaryReferentOwner::NoReferent])
         }
-        // A carrier word may name a node, and an occurrence with no planned
-        // join result tells us nothing. Both keep the lifetime's own answer.
-        Some(JoinResultRepresentation::CarrierWord) | None => Ok(by_lifetime),
+        // A possible carrier may name a referent. Preserve the child's
+        // lifetime affinity rather than narrowing to a non-existent node.
+        Some(JoinResultRepresentation::NativeScalarPair)
+        | Some(JoinResultRepresentation::CarrierWord)
+        | None => Ok(by_lifetime),
     }
 }
 /// Which compiler-built tree one synthesized aggregate path is rooted at.
