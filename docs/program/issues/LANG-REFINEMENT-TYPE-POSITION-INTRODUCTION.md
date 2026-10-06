@@ -81,3 +81,13 @@ stop and report the mismatch.
 - Any kernel, `trusted_base()` or spec change.
 - A checked catalog, library or example program gains an obligation it
   cannot discharge, or is newly refused: stop to the Architect with it.
+
+## Symptom inventory
+
+Seeded from Architect `evt_5m4fpkn01rhdj`, which also rules the respin of
+WIP `482227c63` on `c49297983` (§1a count 1).
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. type-position argument refinement decided by local kernel inference -- keyed on the elaboration context being kernel-ready, which collect_refined_params violates under anonymous arrows
+```
