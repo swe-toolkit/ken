@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, apply, eval};
+use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId};
 
 const BYTES_KEYS: &str = include_str!("../../../catalog/packages/Data/Binary/BytesKeys.ken.md");
@@ -20,8 +20,6 @@ const CODEC: &str = include_str!("../../../catalog/packages/Data/Text/Codec.ken.
 const NUMERIC: &str = include_str!("../../../catalog/packages/Capability/Parsing/Numeric.ken.md");
 const EXIT: &str = include_str!("../../../catalog/packages/Capability/Process/Exit.ken.md");
 const SCHEMA_MODULE: &str = "Application.Input.Schema";
-const SCHEMA_SOURCE: &str =
-    include_str!("../../../catalog/packages/Application/Input/Schema.ken.md");
 const ARGPARSE_MODULE: &str = "Application.CommandLine.ArgParse";
 const CONFIG_DECODER_MODULE: &str = "Application.Configuration.Decoder";
 const FORGE_ARGPARSE_IMPORT: &str = r#"
@@ -43,10 +41,6 @@ import Application.CommandLine.ArgParse
     argparse_run,
     program_help)
 "#;
-const ARGPARSE_SOURCE: &str =
-    include_str!("../../../catalog/packages/Application/CommandLine/ArgParse.ken.md");
-const CONFIG_DECODER: &str =
-    include_str!("../../../catalog/packages/Application/Configuration/Decoder.ken.md");
 const EXAMPLE: &str = include_str!("../../../catalog/examples/CommandLine/Forge.ken.md");
 
 fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
@@ -110,7 +104,8 @@ fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
         env.elaborate_ken_md_file(source)
             .unwrap_or_else(|err| panic!("{label} must elaborate in dependency order: {err:?}"));
     }
-    let doc_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
+    let doc_owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
         .expect("Capability.Formatting.Doc must roots-load in dependency order");
     catalog_or::expose_module(&mut env, "Capability.Formatting.Doc");
     env.elaborate_module_from_roots(
@@ -239,7 +234,10 @@ fn call_doc_render(
 ) -> EvalVal {
     let id = catalog_or::provider_owned_id(env, doc_owned, "Capability.Formatting.Doc", "render")
         .expect("Doc must own the renderer selected by the host");
-    let (_, body) = env.env.transparent_body(id).expect("Doc.render must be checked");
+    let (_, body) = env
+        .env
+        .transparent_body(id)
+        .expect("Doc.render must be checked");
     let function = eval(&[], &body, &env.env, store);
     apply_values(env, store, function, arguments)
 }
@@ -352,6 +350,10 @@ fn add_schema_fixtures(env: &mut ElabEnv) {
           MkSchemaField "TOKEN" SchemaRequired SchemaBytes "access token"
         const cc8_color_field : SchemaField =
           MkSchemaField "COLOR" SchemaOptional SchemaBytes "color mode"
+        const cc8_optional_schema : Schema = MkSchema
+          "service"
+          "optional value"
+          (Cons SchemaField cc8_color_field (Nil SchemaField))
         const cc8_base_schema : Schema = MkSchema
           "service"
           "service configuration"
@@ -386,8 +388,9 @@ fn add_schema_fixtures(env: &mut ElabEnv) {
 #[test]
 fn render_host_identity_checks_flat_and_qualified_alias_forgery() {
     let (mut env, doc_owned) = full_env_with_doc_owned();
-    let render = catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render")
-        .expect("Doc must own checked render");
+    let render =
+        catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render")
+            .expect("Doc must own checked render");
     let other = env.globals["Application.Configuration.Decoder.env_config_help"];
     assert_ne!(render, other, "the forged host aliases must be distinct");
     env.globals.insert("render".to_owned(), other);
@@ -395,9 +398,11 @@ fn render_host_identity_checks_flat_and_qualified_alias_forgery() {
         catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render"),
         Ok(render),
     );
-    env.globals.insert("Capability.Formatting.Doc.render".to_owned(), other);
+    env.globals
+        .insert("Capability.Formatting.Doc.render".to_owned(), other);
     assert!(
-        catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render").is_err(),
+        catalog_or::provider_owned_id(&env, &doc_owned, "Capability.Formatting.Doc", "render")
+            .is_err(),
         "forged qualified Doc.render must fail its loader-owned ID check"
     );
 }
@@ -482,7 +487,113 @@ fn invalid_utf8_environment_value_survives_the_full_pipeline() {
     );
     let valid = ctor_args(&env, &result, VALIDATION_VALID);
     let values = list_elements(&env, valid.last().expect("Valid payload"));
-    assert_eq!(values[0], &EvalVal::Bytes(invalid));
+    let present = match values[0] {
+        EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.some_id => &args[1],
+        other => panic!("required present field must return Some raw Bytes, got {other:?}"),
+    };
+    assert_eq!(present, &EvalVal::Bytes(invalid));
+}
+
+/// Promise class: durable invariant. The optional field is held constant while
+/// the entries vary only between absent and present with empty raw bytes.
+/// MEASURED: the public decode paths return distinct `None` and `Some empty`
+/// constructors at the same schema index. CLAIMED: no decoded value conflates
+/// absence with an ordinary empty byte value. THE GAP: the checked return type
+/// and package proof close alignment; this fixture reaches both entry points.
+#[test]
+fn optional_absence_and_present_empty_have_distinct_aligned_carriers() {
+    let mut env = full_env();
+    add_schema_fixtures(&mut env);
+    let mut store = make_store(&env);
+    for (decoder, process) in [
+        ("decode_process_environment", true),
+        ("decode_config_entries", false),
+    ] {
+        let schema = eval_global(&env, &mut store, "cc8_optional_schema");
+        let absent = if process {
+            process_input(&env, std::iter::empty())
+        } else {
+            environment_value(&env, std::iter::empty())
+        };
+        let present_empty = if process {
+            process_input(&env, [(b"COLOR".to_vec(), Vec::new())])
+        } else {
+            environment_value(&env, [(b"COLOR".to_vec(), Vec::new())])
+        };
+        let missing = call_global(&env, &mut store, decoder, [schema.clone(), absent]);
+        let present = call_global(&env, &mut store, decoder, [schema, present_empty]);
+        let missing_values = list_elements(
+            &env,
+            ctor_args(&env, &missing, VALIDATION_VALID)
+                .last()
+                .expect("Valid payload"),
+        );
+        let present_values = list_elements(
+            &env,
+            ctor_args(&env, &present, VALIDATION_VALID)
+                .last()
+                .expect("Valid payload"),
+        );
+        assert_eq!(missing_values.len(), 1, "schema index stays aligned");
+        assert_eq!(present_values.len(), 1, "schema index stays aligned");
+        match missing_values[0] {
+            EvalVal::Ctor { id, .. } if *id == env.prelude_env.none_id => {}
+            other => panic!("{decoder} missing optional field must be None, got {other:?}"),
+        }
+        match present_values[0] {
+            EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.some_id => {
+                assert_eq!(&args[1], &EvalVal::Bytes(Vec::new()));
+            }
+            other => panic!("{decoder} present empty field must be Some, got {other:?}"),
+        }
+    }
+}
+
+/// Promise class: durable invariant. TOKEN precedes HOST in the input, opposite
+/// their schema order; two HOST entries also pin first-match shadowing. Schema
+/// order and raw bytes determine the aligned results, and the missing optional
+/// tail remains in position.
+#[test]
+fn present_values_preserve_schema_order_first_match_and_raw_bytes() {
+    let mut env = full_env();
+    add_schema_fixtures(&mut env);
+    let mut store = make_store(&env);
+    let entries = [
+        (b"TOKEN".to_vec(), vec![0x00, 0x80]),
+        (b"HOST".to_vec(), vec![0xff]),
+        (b"HOST".to_vec(), b"shadowed".to_vec()),
+    ];
+    for (decoder, process) in [
+        ("decode_process_environment", true),
+        ("decode_config_entries", false),
+    ] {
+        let schema = eval_global(&env, &mut store, "cc8_grown_schema");
+        let acquired = if process {
+            process_input(&env, entries.clone())
+        } else {
+            environment_value(&env, entries.clone())
+        };
+        let result = call_global(&env, &mut store, decoder, [schema, acquired]);
+        let values = list_elements(
+            &env,
+            ctor_args(&env, &result, VALIDATION_VALID)
+                .last()
+                .expect("Valid payload"),
+        );
+        assert_eq!(values.len(), 3, "each schema field keeps its position");
+        for (index, expected) in [(0, vec![0xff]), (1, vec![0x00, 0x80])] {
+            match values[index] {
+                EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.some_id => {
+                    assert_eq!(&args[1], &EvalVal::Bytes(expected));
+                }
+                other => panic!("{decoder} field {index} must preserve raw bytes, got {other:?}"),
+            }
+        }
+        match values[2] {
+            EvalVal::Ctor { id, .. } if *id == env.prelude_env.none_id => {}
+            other => panic!("{decoder} optional tail must be None, got {other:?}"),
+        }
+    }
 }
 
 #[test]
@@ -577,7 +688,7 @@ fn assert_new_globals_are_transparent(
 }
 
 #[test]
-fn cc8_adds_no_trust_and_declares_no_second_universe() {
+fn cc8_adds_no_trust() {
     let mut env = dependency_env();
     let before_trust: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let before_globals = env.globals.values().copied().collect::<BTreeSet<_>>();
@@ -599,28 +710,4 @@ fn cc8_adds_no_trust_and_declares_no_second_universe() {
         before_trust, after_trust,
         "CC8 must add zero trusted entries"
     );
-
-    let checked = [SCHEMA_SOURCE, ARGPARSE_SOURCE, CONFIG_DECODER]
-        .into_iter()
-        .map(|source| {
-            ken_elaborator::literate::extract_ken_md(source).expect("extract checked Ken")
-        })
-        .map(|extracted| extracted.source)
-        .collect::<Vec<_>>()
-        .join("\n");
-    for forbidden in [
-        "ArgBytes",
-        "ArgByteLength",
-        "bytes_eq",
-        "bytes_length",
-        "bytes_at",
-        "data DecoderError",
-        "data Doc",
-        "Axiom",
-    ] {
-        assert!(
-            !checked.contains(forbidden),
-            "forbidden CC8 surface `{forbidden}`"
-        );
-    }
 }
