@@ -544,7 +544,7 @@ impl ElabEnv {
     /// observe declarations an earlier one introduced, and neither role
     /// forks/rolls back env state.
     pub fn elaborate_ken_md_file(&mut self, src: &str) -> Result<Vec<GlobalId>, ElabError> {
-        let (declarations, _examples) = self.elaborate_ken_md_file_parts(src)?;
+        let (declarations, _examples, _example_ids) = self.elaborate_ken_md_file_parts(src)?;
         Ok(declarations
             .into_iter()
             .map(|result| result.def_id)
@@ -557,21 +557,38 @@ impl ElabEnv {
         &mut self,
         src: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
-        let (mut declarations, examples) = self.elaborate_ken_md_file_parts(src)?;
+        let (mut declarations, examples, _example_ids) =
+            self.elaborate_ken_md_file_parts(src)?;
         declarations.extend(examples);
         Ok(declarations)
     }
 
-    fn elaborate_ken_md_file_parts(
+    pub(crate) fn elaborate_ken_md_file_parts(
         &mut self,
         src: &str,
-    ) -> Result<(Vec<ElabResult>, Vec<ElabResult>), ElabError> {
+    ) -> Result<(Vec<ElabResult>, Vec<ElabResult>, Vec<GlobalId>), ElabError> {
+        fn declaration_ids(env: &GlobalEnv) -> HashSet<GlobalId> {
+            let mut ids = HashSet::new();
+            for decl in env.decls() {
+                ids.insert(decl.id());
+                if let KernelDecl::Inductive(inductive) = decl {
+                    ids.extend(inductive.constructors.iter().map(|constructor| constructor.id));
+                }
+            }
+            ids
+        }
+
         let extracted = literate::extract_ken_md(src)?;
         literate::validate_ken_md_fences(&extracted)?;
         let decls = parser::parse_decls(&extracted.source)?;
         let declarations = modules::expand_and_elaborate(self, &decls)?;
+        let before_examples = declaration_ids(&self.env);
         let examples = self.execute_ken_md_checked_fences_v1(src, &extracted)?;
-        Ok((declarations, examples))
+        let example_ids = declaration_ids(&self.env)
+            .difference(&before_examples)
+            .copied()
+            .collect();
+        Ok((declarations, examples, example_ids))
     }
 
     /// Execute one literate entry's checked-but-not-tangled fence roles.

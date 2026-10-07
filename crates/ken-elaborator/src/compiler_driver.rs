@@ -629,14 +629,21 @@ pub fn compile_checked_target_denotation(
 
     let manifest = CompilerManifest::new(package_name, Vec::new());
     let mut env = ElabEnv::new()?;
-    let results = if source.name.ends_with(".ken.md") {
-        env.elaborate_ken_md_file_v1(&source.text)?
+    let (declarations, examples, example_ids) = if source.name.ends_with(".ken.md") {
+        env.elaborate_ken_md_file_parts(&source.text)?
     } else {
-        env.elaborate_file_v1(&source.text)?
+        (env.elaborate_file_v1(&source.text)?, Vec::new(), Vec::new())
     };
+    let example_ids = example_ids.into_iter().collect::<BTreeSet<_>>();
+    let declaration_ids = declarations
+        .iter()
+        .map(|result| result.def_id)
+        .collect::<Vec<_>>();
+    let mut results = declarations;
+    results.extend(examples);
     let obligations = owned_v2_obligations(&results);
-    let mut admitted = results.iter().map(|result| result.def_id).collect::<Vec<_>>();
-    let source_declarations = admitted.iter().copied().collect::<BTreeSet<_>>();
+    let mut admitted = declaration_ids.clone();
+    let source_declarations = declaration_ids.iter().copied().collect::<BTreeSet<_>>();
     let target_id = env.globals.get(target_name).copied().ok_or_else(|| {
         CheckedTargetDenotationError::MissingSourceTarget {
             name: target_name.to_string(),
@@ -657,7 +664,12 @@ pub fn compile_checked_target_denotation(
         .ok_or(CompilerDriverError::MissingStableSymbol { id: target_id })?;
     let host_spine = checked_host_spine_v1(&env.prelude_env, &symbols)?;
 
-    admitted.extend(env.env.decls().map(Decl::id));
+    admitted.extend(
+        env.env
+            .decls()
+            .map(Decl::id)
+            .filter(|id| !example_ids.contains(id)),
+    );
     admitted.sort();
     admitted.dedup();
     let package = emit_package_from_env(
@@ -666,6 +678,7 @@ pub fn compile_checked_target_denotation(
         &env,
         &admitted,
         &obligations,
+        &example_ids,
         Some(b"B1CheckedTargetDenotationV1".to_vec()),
     )?;
 
@@ -1218,19 +1231,30 @@ fn compile_ken_package_sources_with_env(
 
     let mut env = ElabEnv::new()?;
     let mut admitted = Vec::new();
+    let mut example_ids = BTreeSet::new();
     let mut results = Vec::new();
     for source in &sources {
-        let source_results = if source.name.ends_with(".ken.md") {
-            env.elaborate_ken_md_file_v1(&source.text)?
+        let (declarations, examples, source_example_ids) = if source.name.ends_with(".ken.md") {
+            env.elaborate_ken_md_file_parts(&source.text)?
         } else {
-            env.elaborate_file_v1(&source.text)?
+            (env.elaborate_file_v1(&source.text)?, Vec::new(), Vec::new())
         };
-        admitted.extend(source_results.iter().map(|result| result.def_id));
-        results.extend(source_results);
+        admitted.extend(declarations.iter().map(|result| result.def_id));
+        example_ids.extend(source_example_ids);
+        results.extend(declarations);
+        results.extend(examples);
     }
     let obligations = owned_v2_obligations(&results);
 
-    let package = emit_package_from_env(manifest, &sources, &env, &admitted, &obligations, None)?;
+    let package = emit_package_from_env(
+        manifest,
+        &sources,
+        &env,
+        &admitted,
+        &obligations,
+        &example_ids,
+        None,
+    )?;
     let selected = select_targets(manifest, &package, selector)?;
     let closures = build_target_closures(&package, &selected)?;
     let executable_entrypoints = package_executable_entrypoints(&package, &closures)?;
@@ -2316,6 +2340,7 @@ pub fn prepare_native_program_sources(
         &env,
         &admitted_ids,
         &obligations,
+        &BTreeSet::new(),
         Some(plan_bytes),
     )
     .map_err(NativeProgramBuildError::Driver)?;
@@ -3377,6 +3402,7 @@ fn emit_package_from_env(
     env: &ElabEnv,
     admitted: &[GlobalId],
     obligations: &[(GlobalId, ObligationTriple)],
+    example_ids: &BTreeSet<GlobalId>,
     native_entrypoint_plan: Option<Vec<u8>>,
 ) -> Result<CheckedCorePackage, CompilerDriverError> {
     let package_identity = package_identity(&manifest.package_name);
@@ -3384,8 +3410,10 @@ fn emit_package_from_env(
     let native_primitives = native_entrypoint_plan.is_some();
     let (symbols, table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives);
 
-    for symbol in symbols.values() {
-        semantic.symbols.insert(symbol.clone());
+    for (id, symbol) in &symbols {
+        if !example_ids.contains(id) {
+            semantic.symbols.insert(symbol.clone());
+        }
     }
 
     for id in admitted {
@@ -3427,7 +3455,7 @@ fn emit_package_from_env(
         canonical_checked_native_trusted_base_v1_bytes(&native_trusted_base),
     );
 
-    add_data_metadata(env, &symbols, &mut semantic);
+    add_data_metadata(env, &symbols, example_ids, &mut semantic);
     add_admitted_recursion_metadata(
         &manifest.package_name,
         env,
@@ -4273,12 +4301,16 @@ fn apply_manifest_target_metadata(
 fn add_data_metadata(
     env: &ElabEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
+    example_ids: &BTreeSet<GlobalId>,
     semantic: &mut CheckedCoreSemanticInputs,
 ) {
     for decl in env.env.decls() {
         let Decl::Inductive(ind) = decl else {
             continue;
         };
+        if example_ids.contains(&ind.id) {
+            continue;
+        }
         let Some(family) = symbols.get(&ind.id).cloned() else {
             continue;
         };
@@ -7701,5 +7733,181 @@ mod d1b_role_c1_roster_projection_is_fail_closed {
             ),
             "the refusal must name the unnameable captured id, got {error:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod package_route_example_declarations {
+    use super::*;
+
+    const PACKAGE: &str = "verify_package_route_repro";
+    const DECLARATION: &str = "const main : Bool = True\n";
+    const LITERATE: &str = "# Repro\n\n```ken\nconst main : Bool = True\n```\n\n```ken example\nconst zz_example : Bool = main\n```\n";
+
+    fn selector(package: &str) -> TargetSelector {
+        TargetSelector::StableSymbol {
+            package_identity: package_identity(package),
+            symbol: StableSymbol::declaration(package, &[], "main"),
+            kind: CompilerTargetKind::NonRuntime,
+        }
+    }
+
+    fn source_ids(semantic: &CheckedCoreSemanticInputs) -> BTreeSet<StableSymbol> {
+        semantic.declarations.keys().cloned().collect()
+    }
+
+    /// Promise class: normative compatibility vector for the fixed package
+    /// identity and source-only declarations; the relation also stays green
+    /// when unrelated `.ken` implementation details change without changing
+    /// the canonical artifact.
+    ///
+    /// MEASURED: the `.ken.md` example changes the declaration set and semantic
+    /// hash on the old route. CLAIMED: package and denotation routes admit only
+    /// declaration-fence results while keeping their source-only hashes. GAP:
+    /// this fixture pins the specified constant example, not every possible
+    /// declaration form in an example fence.
+    #[test]
+    fn package_and_denotation_exclude_example_declarations_from_admission() {
+        let source_only = CompilerSource::new("repro.ken", DECLARATION);
+        let literate = CompilerSource::new("repro.ken.md", LITERATE);
+
+        let package_source =
+            compile_ken_source(PACKAGE, source_only.clone(), selector(PACKAGE)).unwrap();
+        let package_literate =
+            compile_ken_source(PACKAGE, literate.clone(), selector(PACKAGE)).unwrap();
+        let expected = BTreeSet::from([StableSymbol::declaration(PACKAGE, &[], "main")]);
+        let example = StableSymbol::declaration(PACKAGE, &[], "zz_example");
+        assert_eq!(
+            source_ids(&package_source.package.artifact.semantic),
+            expected
+        );
+        assert_eq!(
+            source_ids(&package_literate.package.artifact.semantic),
+            expected,
+            "the example-only declaration must not enter semantic.declarations"
+        );
+        assert!(
+            !package_literate
+                .package
+                .artifact
+                .semantic
+                .symbols
+                .contains(&example),
+            "an obligation-free example must not add a package symbol"
+        );
+        assert_eq!(
+            package_source.package.core_semantic_hash,
+            0x5833_0955_0530_c391
+        );
+        assert_eq!(
+            package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
+            "a checked example without an open obligation must not change the package hash"
+        );
+
+        let denotation_source =
+            compile_checked_target_denotation(PACKAGE, source_only, "main").unwrap();
+        let denotation_literate =
+            compile_checked_target_denotation(PACKAGE, literate, "main").unwrap();
+        let denotation_declarations = source_ids(&denotation_source.package.artifact.semantic);
+        assert!(denotation_declarations.contains(&StableSymbol::declaration(PACKAGE, &[], "main")));
+        assert!(
+            !denotation_declarations.contains(&StableSymbol::declaration(
+                PACKAGE,
+                &[],
+                "zz_example"
+            ))
+        );
+        assert_eq!(
+            source_ids(&denotation_literate.package.artifact.semantic),
+            denotation_declarations,
+            "the denotation route must preserve its source-only declaration map"
+        );
+        assert!(
+            !denotation_literate
+                .package
+                .artifact
+                .semantic
+                .symbols
+                .contains(&example),
+            "an obligation-free example must not add a denotation symbol"
+        );
+        assert_eq!(
+            denotation_source.package.core_semantic_hash,
+            0x428c_ec66_b9c0_9443
+        );
+        assert_eq!(
+            denotation_literate.package.core_semantic_hash,
+            denotation_source.package.core_semantic_hash,
+            "the example must not change the denotation package hash"
+        );
+    }
+
+    /// Promise class: durable invariant.
+    ///
+    /// MEASURED: an open call obligation from an example remains in both
+    /// compiler-route obligation maps, with the example as origin and a
+    /// materialized semantic symbol. CLAIMED: excluding example declarations
+    /// from admission does not erase their obligation report. GAP: this row
+    /// covers one call-site `requires` obligation.
+    #[test]
+    fn package_and_denotation_report_open_example_obligations() {
+        const SOURCE: &str = r#"# Example obligation
+
+```ken
+const ac0_need : String requires Equal Int 0 0 = "ac0-run"
+const main : Bool = True
+```
+
+```ken example
+const zz_example : String = ac0_need
+```
+"#;
+        let package_name = "verify_package_example_obligation";
+        let source = CompilerSource::new("example_obligation.ken.md", SOURCE);
+        let example = StableSymbol::declaration(package_name, &[], "zz_example");
+
+        let package = compile_ken_source(package_name, source.clone(), selector(package_name))
+            .unwrap()
+            .package;
+        assert!(package.artifact.semantic.symbols.contains(&example));
+        assert_eq!(package.artifact.semantic.obligations.len(), 1);
+        assert_eq!(package.artifact.semantic.obligation_metadata.len(), 1);
+        let package_obligation = package
+            .artifact
+            .semantic
+            .obligation_metadata
+            .values()
+            .next()
+            .unwrap();
+        assert_eq!(package_obligation.origin, example);
+        assert_eq!(package_obligation.status, ObligationStatus::Unknown);
+
+        let denotation = compile_checked_target_denotation(package_name, source, "main").unwrap();
+        assert!(denotation
+            .package
+            .artifact
+            .semantic
+            .symbols
+            .contains(&example));
+        assert_eq!(denotation.package.artifact.semantic.obligations.len(), 1);
+        assert_eq!(
+            denotation
+                .package
+                .artifact
+                .semantic
+                .obligation_metadata
+                .len(),
+            1
+        );
+        let denotation_obligation = denotation
+            .package
+            .artifact
+            .semantic
+            .obligation_metadata
+            .values()
+            .next()
+            .unwrap();
+        assert_eq!(denotation_obligation.origin, example);
+        assert_eq!(denotation_obligation.status, ObligationStatus::Unknown);
     }
 }
