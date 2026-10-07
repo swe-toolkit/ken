@@ -70,8 +70,10 @@ No new import, export, operation, axiom or trust. Follow
   in the `Suc`/`Suc` arm. Restate `greatest` over `min0` and `least` over
   `max2`: each is refused at its own span. Restate `leq_left` and
   `leq_right` over `min0`: both check. For `max2`, a scratch
-  `Refl` proof of `Equal Bool (leq_nat (max2 one one) one) False` checks,
-  where `one` is `Suc Zero`. Delete the scratch package afterwards; the
+  proof of `Equal Bool (leq_nat (max2 one one) one) False` checks, where
+  `one` is `Suc Zero`. The closed equation computes to the trivial
+  proposition, so its proof is `Proved`, not `Refl` (foundation QA
+  `evt_6qzr4fmwh7xmw`). Delete the scratch package afterwards; the
   candidate's tree is unchanged.
 - **AC-4.** The loaded closure's trust ledger and Nat Order's exports are
   unchanged. Targeted builds only, through `scripts/ken-cargo`.
