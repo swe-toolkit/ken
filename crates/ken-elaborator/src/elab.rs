@@ -180,18 +180,24 @@ impl MetaCtx {
     }
 
     fn zonk_level(&self, l: &Level) -> Level {
+        self.zonk_level_with(l, true)
+    }
+
+    fn zonk_level_with(&self, l: &Level, default: bool) -> Level {
         match l {
             Level::Zero => Level::Zero,
-            Level::Suc(inner) => Level::Suc(Box::new(self.zonk_level(inner))),
-            Level::Max(a, b) => {
-                Level::Max(Box::new(self.zonk_level(a)), Box::new(self.zonk_level(b)))
-            }
+            Level::Suc(inner) => Level::Suc(Box::new(self.zonk_level_with(inner, default))),
+            Level::Max(a, b) => Level::Max(
+                Box::new(self.zonk_level_with(a, default)),
+                Box::new(self.zonk_level_with(b, default)),
+            ),
             Level::Var(LevelVar(m)) => match &self.metas[*m as usize] {
-                Some(sol) => self.zonk_level(sol),
-                None => {
+                Some(sol) => self.zonk_level_with(sol, default),
+                None if default => {
                     self.defaulted.set(true);
                     Level::Zero
                 }
+                None => l.clone(),
             },
         }
     }
@@ -204,34 +210,38 @@ impl MetaCtx {
     }
 
     fn zonk_term(&self, t: &Term) -> Term {
+        self.zonk_term_with(t, true)
+    }
+
+    fn zonk_term_with(&self, t: &Term, default: bool) -> Term {
         match t {
-            Term::Type(l) => Term::ty(self.zonk_level(l)),
-            Term::Omega(l) => Term::omega(self.zonk_level(l)),
+            Term::Type(l) => Term::ty(self.zonk_level_with(l, default)),
+            Term::Omega(l) => Term::omega(self.zonk_level_with(l, default)),
             Term::Var(i) => Term::var(*i),
             Term::IntLit(n) => Term::IntLit(n.clone()),
-            Term::Pi(a, b) => Term::pi(self.zonk_term(a), self.zonk_term(b)),
-            Term::Lam(a, body) => Term::lam(self.zonk_term(a), self.zonk_term(body)),
-            Term::App(f, a) => Term::app(self.zonk_term(f), self.zonk_term(a)),
+            Term::Pi(a, b) => Term::pi(self.zonk_term_with(a, default), self.zonk_term_with(b, default)),
+            Term::Lam(a, body) => Term::lam(self.zonk_term_with(a, default), self.zonk_term_with(body, default)),
+            Term::App(f, a) => Term::app(self.zonk_term_with(f, default), self.zonk_term_with(a, default)),
             Term::Let { ty, val, body } => Term::Let {
-                ty: Box::new(self.zonk_term(ty)),
-                val: Box::new(self.zonk_term(val)),
-                body: Box::new(self.zonk_term(body)),
+                ty: Box::new(self.zonk_term_with(ty, default)),
+                val: Box::new(self.zonk_term_with(val, default)),
+                body: Box::new(self.zonk_term_with(body, default)),
             },
             Term::Const { id, level_args } => {
-                Term::const_(*id, level_args.iter().map(|l| self.zonk_level(l)).collect())
+                Term::const_(*id, level_args.iter().map(|l| self.zonk_level_with(l, default)).collect())
             }
             Term::IndFormer { id, level_args } => {
-                Term::indformer(*id, level_args.iter().map(|l| self.zonk_level(l)).collect())
+                Term::indformer(*id, level_args.iter().map(|l| self.zonk_level_with(l, default)).collect())
             }
             Term::Constructor { id, level_args } => {
-                Term::constructor(*id, level_args.iter().map(|l| self.zonk_level(l)).collect())
+                Term::constructor(*id, level_args.iter().map(|l| self.zonk_level_with(l, default)).collect())
             }
-            Term::Sigma(a, b) => Term::sigma(self.zonk_term(a), self.zonk_term(b)),
-            Term::Pair(a, b) => Term::pair(self.zonk_term(a), self.zonk_term(b)),
-            Term::Proj1(p) => Term::proj1(self.zonk_term(p)),
-            Term::Proj2(p) => Term::proj2(self.zonk_term(p)),
+            Term::Sigma(a, b) => Term::sigma(self.zonk_term_with(a, default), self.zonk_term_with(b, default)),
+            Term::Pair(a, b) => Term::pair(self.zonk_term_with(a, default), self.zonk_term_with(b, default)),
+            Term::Proj1(p) => Term::proj1(self.zonk_term_with(p, default)),
+            Term::Proj2(p) => Term::proj2(self.zonk_term_with(p, default)),
             Term::Ascript(t, a) => {
-                Term::Ascript(Box::new(self.zonk_term(t)), Box::new(self.zonk_term(a)))
+                Term::Ascript(Box::new(self.zonk_term_with(t, default)), Box::new(self.zonk_term_with(a, default)))
             }
             // `[K2]`-reserved formers — `J`/`Eq`/`Cast`/`Ascript` are exactly
             // the new surface-transport constructs; recursing here closes a
@@ -244,43 +254,43 @@ impl MetaCtx {
             // reaches the raw kernel unresolved unless EVERY structural
             // variant that can carry one recurses.
             Term::Eq(a, x, y) => Term::Eq(
-                Box::new(self.zonk_term(a)),
-                Box::new(self.zonk_term(x)),
-                Box::new(self.zonk_term(y)),
+                Box::new(self.zonk_term_with(a, default)),
+                Box::new(self.zonk_term_with(x, default)),
+                Box::new(self.zonk_term_with(y, default)),
             ),
-            Term::Refl(t) => Term::Refl(Box::new(self.zonk_term(t))),
+            Term::Refl(t) => Term::Refl(Box::new(self.zonk_term_with(t, default))),
             Term::Cast(a, b, e, t) => Term::Cast(
-                Box::new(self.zonk_term(a)),
-                Box::new(self.zonk_term(b)),
-                Box::new(self.zonk_term(e)),
-                Box::new(self.zonk_term(t)),
+                Box::new(self.zonk_term_with(a, default)),
+                Box::new(self.zonk_term_with(b, default)),
+                Box::new(self.zonk_term_with(e, default)),
+                Box::new(self.zonk_term_with(t, default)),
             ),
             Term::J(m, d, e) => Term::J(
-                Box::new(self.zonk_term(m)),
-                Box::new(self.zonk_term(d)),
-                Box::new(self.zonk_term(e)),
+                Box::new(self.zonk_term_with(m, default)),
+                Box::new(self.zonk_term_with(d, default)),
+                Box::new(self.zonk_term_with(e, default)),
             ),
             Term::Quot(a, r, e) => Term::Quot(
-                Box::new(self.zonk_term(a)),
-                Box::new(self.zonk_term(r)),
-                Box::new(self.zonk_term(e)),
+                Box::new(self.zonk_term_with(a, default)),
+                Box::new(self.zonk_term_with(r, default)),
+                Box::new(self.zonk_term_with(e, default)),
             ),
-            Term::QuotClass(t) => Term::QuotClass(Box::new(self.zonk_term(t))),
+            Term::QuotClass(t) => Term::QuotClass(Box::new(self.zonk_term_with(t, default))),
             Term::QuotElim {
                 motive,
                 method,
                 respect,
                 scrut,
             } => Term::QuotElim {
-                motive: Box::new(self.zonk_term(motive)),
-                method: Box::new(self.zonk_term(method)),
-                respect: Box::new(self.zonk_term(respect)),
-                scrut: Box::new(self.zonk_term(scrut)),
+                motive: Box::new(self.zonk_term_with(motive, default)),
+                method: Box::new(self.zonk_term_with(method, default)),
+                respect: Box::new(self.zonk_term_with(respect, default)),
+                scrut: Box::new(self.zonk_term_with(scrut, default)),
             },
-            Term::Trunc(t) => Term::Trunc(Box::new(self.zonk_term(t))),
-            Term::TruncProj(t) => Term::TruncProj(Box::new(self.zonk_term(t))),
+            Term::Trunc(t) => Term::Trunc(Box::new(self.zonk_term_with(t, default))),
+            Term::TruncProj(t) => Term::TruncProj(Box::new(self.zonk_term_with(t, default))),
             Term::Absurd(c, p) => {
-                Term::Absurd(Box::new(self.zonk_term(c)), Box::new(self.zonk_term(p)))
+                Term::Absurd(Box::new(self.zonk_term_with(c, default)), Box::new(self.zonk_term_with(p, default)))
             }
             Term::Elim {
                 fam,
@@ -292,12 +302,12 @@ impl MetaCtx {
                 scrut,
             } => Term::Elim {
                 fam: *fam,
-                level_args: level_args.iter().map(|l| self.zonk_level(l)).collect(),
-                params: params.iter().map(|p| self.zonk_term(p)).collect(),
-                motive: Box::new(self.zonk_term(motive)),
-                methods: methods.iter().map(|m| self.zonk_term(m)).collect(),
-                indices: indices.iter().map(|i| self.zonk_term(i)).collect(),
-                scrut: Box::new(self.zonk_term(scrut)),
+                level_args: level_args.iter().map(|l| self.zonk_level_with(l, default)).collect(),
+                params: params.iter().map(|p| self.zonk_term_with(p, default)).collect(),
+                motive: Box::new(self.zonk_term_with(motive, default)),
+                methods: methods.iter().map(|m| self.zonk_term_with(m, default)).collect(),
+                indices: indices.iter().map(|i| self.zonk_term_with(i, default)).collect(),
+                scrut: Box::new(self.zonk_term_with(scrut, default)),
             },
         }
     }
@@ -3836,7 +3846,7 @@ fn build_index_equation_convoy_body(
         Term::app(weaken(&selector, motive_base_depth as i64), Term::var(1)),
         Term::var(0),
     );
-    kernel_infer_in_context_current(cx, motive_ctx, &body).map_err(|error| match error {
+    kernel_infer_in_context_open(cx, motive_ctx, &body).map_err(|error| match error {
         CurrentKernelQueryError::View(error) => error,
         CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
             "large index convoy constructed an ill-typed shared motive: {error:?}"
@@ -5282,7 +5292,7 @@ fn check_match_with_lift_with_predicates(
         &source_index,
     );
     let motive_ctx = motive_context_at(&cx.ctx, &support_decl, &support_params, &level_args);
-    let motive_sort = kernel_infer_in_context_current(cx, &motive_ctx, &motive_body).map_err(
+    let motive_sort = kernel_infer_in_context_open(cx, &motive_ctx, &motive_body).map_err(
         |error| match error {
             CurrentKernelQueryError::View(error) => error,
             CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
@@ -6963,7 +6973,7 @@ fn build_checked_dependent_motive(
     } else {
         wrap_premise_pis(motive_user_body, &motive_premises)
     };
-    let motive_sort = kernel_infer_in_context_current(cx, motive_ctx, &motive_body).map_err(
+    let motive_sort = kernel_infer_in_context_open(cx, motive_ctx, &motive_body).map_err(
         |error| match error {
             CurrentKernelQueryError::View(error) => error,
             CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
@@ -7385,15 +7395,7 @@ fn finish_checked_dependent_motive<const MAY_REFINE_GROUP_RESULT: bool>(
 ) -> Result<(Box<Term>, bool), ElabError> {
     let mut motive_user_body =
         std::mem::replace(&mut plan.motive_user_body, Term::Type(Level::Zero));
-    let zonked_ctx = Context {
-        types: cx
-            .ctx
-            .types
-            .iter()
-            .map(|term| cx.metas.zonk_term(term))
-            .collect(),
-    };
-    let motive_ctx = motive_context(&zonked_ctx, ind, params);
+    let motive_ctx = motive_context(&cx.ctx, ind, params);
     // The context convoy and embedded methods share one finalized telescope.
     motive_user_body = wrap_dependent_motive_convoy(
         &plan.context_convoy,
@@ -9397,6 +9399,14 @@ fn active_premise_kernel_view_for_context(
     cx: &ElabCtx<'_>,
     original_context: &Context,
 ) -> Result<Option<ActivePremiseKernelView>, ElabError> {
+    active_premise_kernel_view_for_context_with(cx, original_context, true)
+}
+
+fn active_premise_kernel_view_for_context_with(
+    cx: &ElabCtx<'_>,
+    original_context: &Context,
+    default: bool,
+) -> Result<Option<ActivePremiseKernelView>, ElabError> {
     if cx.active_index_premise_frames.is_empty() {
         if let Some(refinement) = cx.result_refinements.first() {
             return Err(ElabError::Internal(format!(
@@ -9560,7 +9570,7 @@ fn active_premise_kernel_view_for_context(
                     })?,
             ),
         };
-        let zonked_domain = cx.metas.zonk_term(&raw_domain);
+        let zonked_domain = cx.metas.zonk_term_with(&raw_domain, default);
         let relocated_domain = embedding.translate_from_original(
             &zonked_domain,
             original_prefix_len,
@@ -9594,11 +9604,15 @@ fn active_premise_kernel_view(
 
 /// The ordinary query route has no expanded frame to zonk its own context.
 fn zonked_kernel_query_context(cx: &ElabCtx<'_>, context: &Context) -> Context {
+    zonked_kernel_query_context_with(cx, context, true)
+}
+
+fn zonked_kernel_query_context_with(cx: &ElabCtx<'_>, context: &Context, default: bool) -> Context {
     Context {
         types: context
             .types
             .iter()
-            .map(|ty| cx.metas.zonk_term(ty))
+            .map(|ty| cx.metas.zonk_term_with(ty, default))
             .collect(),
     }
 }
@@ -9663,15 +9677,40 @@ fn kernel_infer_in_context_current(
     original_context: &Context,
     inferred: &Term,
 ) -> Result<Term, CurrentKernelQueryError> {
-    let Some(view) = active_premise_kernel_view_for_context(cx, original_context)
+    kernel_infer_in_context_with(cx, original_context, inferred, true)
+}
+
+/// Infer a sort that will be stored in core. The open query keeps an
+/// unresolved level open so a later solve reaches the stored sort. Level
+/// variables are rigid in the kernel and `level_eq` holds for every
+/// instantiation, so an open success implies the defaulted query succeeds with
+/// the defaulted result; an open failure returns exactly the defaulted query.
+/// Every decision is therefore the defaulted query's.
+fn kernel_infer_in_context_open(
+    cx: &ElabCtx<'_>,
+    original_context: &Context,
+    inferred: &Term,
+) -> Result<Term, CurrentKernelQueryError> {
+    kernel_infer_in_context_with(cx, original_context, inferred, false)
+        .or_else(|_| kernel_infer_in_context_with(cx, original_context, inferred, true))
+}
+
+#[inline(never)]
+fn kernel_infer_in_context_with(
+    cx: &ElabCtx<'_>,
+    original_context: &Context,
+    inferred: &Term,
+    default: bool,
+) -> Result<Term, CurrentKernelQueryError> {
+    let Some(view) = active_premise_kernel_view_for_context_with(cx, original_context, default)
         .map_err(CurrentKernelQueryError::View)?
     else {
-        let context = zonked_kernel_query_context(cx, original_context);
-        let inferred = cx.metas.zonk_term(inferred);
+        let context = zonked_kernel_query_context_with(cx, original_context, default);
+        let inferred = cx.metas.zonk_term_with(inferred, default);
         return kernel_infer_raw(cx.env, &context, &inferred)
             .map_err(CurrentKernelQueryError::Kernel);
     };
-    let inferred = cx.metas.zonk_term(inferred);
+    let inferred = cx.metas.zonk_term_with(inferred, default);
     let inferred = view
         .embedding
         .translate_from_original(
@@ -18993,10 +19032,7 @@ fn memoize_indexed_root_motive(
         root.params.clone(),
         root.scrut_indices.clone(),
     );
-    let zonked_outer = Context {
-        types: outer.types.iter().map(|ty| cx.metas.zonk_term(ty)).collect(),
-    };
-    let motive_ctx = motive_context_at(&zonked_outer, &ind, &params, &level_args);
+    let motive_ctx = motive_context_at(&outer, &ind, &params, &level_args);
     let motive = build_checked_dependent_motive(
         cx,
         &motive_ctx,
@@ -20556,11 +20592,9 @@ fn nested_matrix_motive(
         check_nested_index_variables(cx, &params[ind.params.len()..], split_span)?;
     }
     let ret_sort = if needs_reverting {
-        let mut motive_ctx = Context {
-            types: cx.ctx.types.iter().map(|ty| cx.metas.zonk_term(ty)).collect(),
-        };
-        motive_ctx.push(cx.metas.zonk_term(&col_types[0]));
-        kernel_infer_in_context_current(cx, &motive_ctx, &cx.metas.zonk_term(&codomain))
+        let mut motive_ctx = cx.ctx.clone();
+        motive_ctx.push(col_types[0].clone());
+        kernel_infer_in_context_open(cx, &motive_ctx, &codomain)
     } else {
         kernel_infer_current(cx, &codomain)
     };
