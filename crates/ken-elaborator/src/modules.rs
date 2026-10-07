@@ -3097,24 +3097,24 @@ fn is_type_node(kind: &RDeclKind) -> bool {
 /// `33 §8.4` edge: A's body or type mentions B. The declaration-kind match
 /// is exhaustive, so extending a graph node cannot silently omit its types.
 fn rdecl_mentions_name(rdecl: &crate::resolve::RDecl, name: &str) -> bool {
-    use crate::elab::{rexpr_mentions_name, rtype_mentions_name};
-    rexpr_mentions_name(&rdecl.body, name)
+    use crate::elab::{rexpr_dependency_mentions_name, rtype_dependency_mentions_name};
+    rexpr_dependency_mentions_name(&rdecl.body, name)
         || rdecl
             .ty
             .as_ref()
-            .is_some_and(|ty| rtype_mentions_name(ty, name))
+            .is_some_and(|ty| rtype_dependency_mentions_name(ty, name))
         || rdecl
             .requires
             .iter()
             .chain(&rdecl.ensures)
-            .any(|expr| rexpr_mentions_name(expr, name))
+            .any(|expr| rexpr_dependency_mentions_name(expr, name))
         || match &rdecl.kind {
             RDeclKind::View { constraints, .. } => constraints
                 .iter()
-                .any(|constraint| rtype_mentions_name(&constraint.head_type, name)),
+                .any(|constraint| rtype_dependency_mentions_name(&constraint.head_type, name)),
             RDeclKind::DataDecl { ctors, .. } => ctors
                 .iter()
-                .any(|ctor| ctor.args.iter().any(|ty| rtype_mentions_name(ty, name))),
+                .any(|ctor| ctor.args.iter().any(|ty| rtype_dependency_mentions_name(ty, name))),
             RDeclKind::ExplicitDataDecl {
                 params,
                 indices,
@@ -3124,21 +3124,21 @@ fn rdecl_mentions_name(rdecl: &crate::resolve::RDecl, name: &str) -> bool {
                 params
                     .iter()
                     .chain(indices)
-                    .any(|entry| rtype_mentions_name(&entry.ty, name))
+                    .any(|entry| rtype_dependency_mentions_name(&entry.ty, name))
                     || ctors.iter().any(|ctor| {
                         ctor.args
                             .iter()
-                            .any(|entry| rtype_mentions_name(&entry.ty, name))
+                            .any(|entry| rtype_dependency_mentions_name(&entry.ty, name))
                             || ctor
                                 .result
                                 .as_ref()
-                                .is_some_and(|ty| rtype_mentions_name(ty, name))
+                                .is_some_and(|ty| rtype_dependency_mentions_name(ty, name))
                     })
             }
-            RDeclKind::TypeAlias { ty } => rtype_mentions_name(ty, name),
+            RDeclKind::TypeAlias { ty } => rtype_dependency_mentions_name(ty, name),
             RDeclKind::Prop { intros } => intros
                 .iter()
-                .any(|intro| rtype_mentions_name(&intro.ty, name)),
+                .any(|intro| rtype_dependency_mentions_name(&intro.ty, name)),
             RDeclKind::Let | RDeclKind::Theorem | RDeclKind::AttachedProof { .. } => false,
             RDeclKind::Prove
             | RDeclKind::Law { .. }
@@ -4457,12 +4457,12 @@ fn expand_scope(
                     let scc = &sccs[k];
                     for &m in scc {
                         consumed[m] = true;
+                    }
                     if scc.len() > 1 && scc.iter().any(|&m| is_type_node(&rdecls[m].kind)) {
                         return Err(ElabError::TypeMismatch {
                             span: rdecls[k].span.clone(),
                             reason: "a type declaration cannot share a dependency cycle with another declaration".to_string(),
                         });
-                    }
                     }
                     // Existing singleton view/let recursion has its own
                     // spec-aware elaboration path.  Self edges are newly
@@ -4693,7 +4693,12 @@ fn expand_scope(
                 let inner = other.unwrap_pub();
                 // All qualifiable declarations are segment nodes; barriers
                 // remain on their original unqualified elaboration path.
-                debug_assert!(!is_qualifiable(inner));
+                if is_qualifiable(inner) {
+                    return Err(ElabError::Internal(format!(
+                        "qualifiable declaration {:?} reached the barrier path",
+                        inner.name()
+                    )));
+                }
                 {
                     // Class/instance/law/foreign/temporal/prove barriers.
                     let rdecl = resolve_scoped_decl(

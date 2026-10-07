@@ -17094,9 +17094,9 @@ pub(crate) fn elaborate_mutual_group(
     }
 }
 
-/// Does `expr` mention the global name `name` (as an `RCon`)? This walks
-/// annotations and patterns as well as value expressions: the scope graph
-/// also orders constructor-owning data nodes and type dependencies.
+/// Does `expr` mention the global name `name` (as an `RCon`)? The scope
+/// dependency graph also walks annotations and patterns, but recursive-group
+/// classification keeps its existing value-expression-only behavior.
 fn rpattern_mentions_name(pat: &crate::resolve::RPattern, name: &str) -> bool {
     match &pat.kind {
         RPatKind::Ctor(ctor, fields) => {
@@ -17119,6 +17119,14 @@ fn rpattern_mentions_name(pat: &crate::resolve::RPattern, name: &str) -> bool {
 }
 
 pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
+    rexpr_mentions_name_in::<false>(expr, name)
+}
+
+pub(crate) fn rexpr_dependency_mentions_name(expr: &RExpr, name: &str) -> bool {
+    rexpr_mentions_name_in::<true>(expr, name)
+}
+
+fn rexpr_mentions_name_in<const DEP: bool>(expr: &RExpr, name: &str) -> bool {
     match expr {
         RExpr::RCon(n, _) => n == name,
         RExpr::RCheckedGlobal { .. } => false,
@@ -17131,24 +17139,31 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         | RExpr::RStr(_, _)
         | RExpr::RCharLit(_, _)
         | RExpr::RByteStr(_, _) => false,
-        RExpr::RApp(f, a, _) => rexpr_mentions_name(f, name) || rexpr_mentions_name(a, name),
-        RExpr::RLam(_, b, _) => rexpr_mentions_name(b, name),
+        RExpr::RApp(f, a, _) => {
+            rexpr_mentions_name_in::<DEP>(f, name) || rexpr_mentions_name_in::<DEP>(a, name)
+        }
+        RExpr::RLam(_, b, _) => rexpr_mentions_name_in::<DEP>(b, name),
         RExpr::RLet(_, annotation, rhs, body, _) => {
-            annotation
-                .as_ref()
-                .is_some_and(|ty| rtype_mentions_name(ty, name))
-                || rexpr_mentions_name(rhs, name)
-                || rexpr_mentions_name(body, name)
+            (DEP
+                && annotation
+                    .as_ref()
+                    .is_some_and(|ty| rtype_mentions_name_in::<DEP>(ty, name)))
+                || rexpr_mentions_name_in::<DEP>(rhs, name)
+                || rexpr_mentions_name_in::<DEP>(body, name)
         }
         RExpr::RAsc(e, ty, _) => {
-            rexpr_mentions_name(e, name) || rtype_mentions_name(ty, name)
+            rexpr_mentions_name_in::<DEP>(e, name)
+                || (DEP && rtype_mentions_name_in::<DEP>(ty, name))
         }
-        RExpr::ROld(e, _) => rexpr_mentions_name(e, name),
-        RExpr::RBecomes(_, _, e, _) => rexpr_mentions_name(e, name),
+        RExpr::ROld(e, _) => rexpr_mentions_name_in::<DEP>(e, name),
+        RExpr::RBecomes(_, _, e, _) => rexpr_mentions_name_in::<DEP>(e, name),
         RExpr::RStandardOp { lhs, rhs, .. } => {
-            rexpr_mentions_name(lhs, name) || rexpr_mentions_name(rhs, name)
+            rexpr_mentions_name_in::<DEP>(lhs, name)
+                || rexpr_mentions_name_in::<DEP>(rhs, name)
         }
-        RExpr::RBinOp(_, l, r, _) => rexpr_mentions_name(l, name) || rexpr_mentions_name(r, name),
+        RExpr::RBinOp(_, l, r, _) => {
+            rexpr_mentions_name_in::<DEP>(l, name) || rexpr_mentions_name_in::<DEP>(r, name)
+        }
         RExpr::RInfixSpine {
             operands,
             operators,
@@ -17156,19 +17171,20 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         } => {
             operands
                 .iter()
-                .any(|operand| rexpr_mentions_name(operand, name))
+                .any(|operand| rexpr_mentions_name_in::<DEP>(operand, name))
                 || operators.iter().any(
                     |operator| matches!(operator, RInfixOperator::User(operator_name, _) if operator_name == name),
                 )
         }
         RExpr::RMatch { scrut, arms, .. } => {
-            rexpr_mentions_name(scrut, name)
+            rexpr_mentions_name_in::<DEP>(scrut, name)
                 || arms.iter().any(|arm| {
-                    rpattern_mentions_name(&arm.pat, name)
-                        || arm.guard
-                        .as_ref()
-                        .is_some_and(|guard| rexpr_mentions_name(guard, name))
-                        || rexpr_mentions_name(&arm.body, name)
+                    (DEP && rpattern_mentions_name(&arm.pat, name))
+                        || arm
+                            .guard
+                            .as_ref()
+                            .is_some_and(|guard| rexpr_mentions_name_in::<DEP>(guard, name))
+                        || rexpr_mentions_name_in::<DEP>(&arm.body, name)
                 })
         }
         RExpr::RIf {
@@ -17177,35 +17193,45 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
             else_branch,
             ..
         } => {
-            rexpr_mentions_name(condition, name)
-                || rexpr_mentions_name(then_branch, name)
-                || rexpr_mentions_name(else_branch, name)
+            rexpr_mentions_name_in::<DEP>(condition, name)
+                || rexpr_mentions_name_in::<DEP>(then_branch, name)
+                || rexpr_mentions_name_in::<DEP>(else_branch, name)
         }
         RExpr::RPair(components, _) => components
             .iter()
-            .any(|component| rexpr_mentions_name(component, name)),
+            .any(|component| rexpr_mentions_name_in::<DEP>(component, name)),
         RExpr::RRecord { base, fields, .. } => {
             base.as_deref()
-                .is_some_and(|base| rexpr_mentions_name(base, name))
+                .is_some_and(|base| rexpr_mentions_name_in::<DEP>(base, name))
                 || fields
                     .iter()
-                    .any(|(_, value, _)| rexpr_mentions_name(value, name))
+                    .any(|(_, value, _)| rexpr_mentions_name_in::<DEP>(value, name))
         }
-        RExpr::RPosProj(e, _, _) => rexpr_mentions_name(e, name),
-        RExpr::RProj(e, _, _) => rexpr_mentions_name(e, name),
+        RExpr::RPosProj(e, _, _) => rexpr_mentions_name_in::<DEP>(e, name),
+        RExpr::RProj(e, _, _) => rexpr_mentions_name_in::<DEP>(e, name),
         RExpr::RPi(_, domain, codomain, _) => {
-            rtype_mentions_name(domain, name) || rexpr_mentions_name(codomain, name)
+            (DEP && rtype_mentions_name_in::<DEP>(domain, name))
+                || rexpr_mentions_name_in::<DEP>(codomain, name)
         }
-        RExpr::RArrow(a, b, _) => rexpr_mentions_name(a, name) || rexpr_mentions_name(b, name),
+        RExpr::RArrow(a, b, _) => {
+            rexpr_mentions_name_in::<DEP>(a, name) || rexpr_mentions_name_in::<DEP>(b, name)
+        }
         RExpr::RAttachedProofRef { .. } => false,
-        RExpr::RTrunc(e, _) => rexpr_mentions_name(e, name),
+        RExpr::RTrunc(e, _) => rexpr_mentions_name_in::<DEP>(e, name),
     }
 }
 
-/// Type-side counterpart to [`rexpr_mentions_name`].  Scope dependency order
-/// must account for a declaration used only in another declaration's theorem
-/// or result type, not merely direct calls in bodies.
+/// Type-side counterpart to the expression mention walk. Scope dependency
+/// order accounts for types and their embedded expressions, not just calls.
 pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
+    rtype_mentions_name_in::<false>(ty, name)
+}
+
+pub(crate) fn rtype_dependency_mentions_name(ty: &RType, name: &str) -> bool {
+    rtype_mentions_name_in::<true>(ty, name)
+}
+
+fn rtype_mentions_name_in<const DEP: bool>(ty: &RType, name: &str) -> bool {
     match ty {
         RType::RCon(n, _) => n == name,
         RType::RCheckedGlobal { .. } => false,
@@ -17214,19 +17240,17 @@ pub(crate) fn rtype_mentions_name(ty: &RType, name: &str) -> bool {
         | RType::RArr(domain, codomain, _)
         | RType::REffectArr(domain, _, codomain, _)
         | RType::RApp(domain, codomain, _) => {
-            rtype_mentions_name(domain, name) || rtype_mentions_name(codomain, name)
+            rtype_mentions_name_in::<DEP>(domain, name)
+                || rtype_mentions_name_in::<DEP>(codomain, name)
         }
         RType::RRefine(_, carrier, predicate, _) => {
-            rtype_mentions_name(carrier, name) || rexpr_mentions_name(predicate, name)
+            rtype_mentions_name_in::<DEP>(carrier, name)
+                || rexpr_mentions_name_in::<DEP>(predicate, name)
         }
-        RType::RTrunc(inner, _) => rtype_mentions_name(inner, name),
-        // MUST recurse into the base, exactly as `RRefine` does into its
-        // predicate. This walk decides declaration dependency order, and the
-        // projected object is an expression that can name a top-level binding
-        // -- missing it would mis-order an SCC and the failure would surface
-        // far from here as an unresolved name. The FIELD name is deliberately
-        // not consulted: a class field is not a top-level binding.
-        RType::RProj(base, _, _) => rexpr_mentions_name(base, name),
+        RType::RTrunc(inner, _) => rtype_mentions_name_in::<DEP>(inner, name),
+        // The base is an expression and can name a top-level binding. The
+        // field name is not a top-level binding and is never consulted.
+        RType::RProj(base, _, _) => rexpr_mentions_name_in::<DEP>(base, name),
         RType::RUniv(_, _) | RType::RVarTy(_, _, _) | RType::RPatternAliasTy(_, _, _) => false,
     }
 }
