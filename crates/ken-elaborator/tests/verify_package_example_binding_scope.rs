@@ -158,6 +158,56 @@ fn example_only_axiom_does_not_add_trust_to_the_package() {
     assert_eq!(actual.core_semantic_hash, expected.core_semantic_hash);
 }
 
+const EXAMPLE_OBLIGATION_ADMITTED: &str =
+    "fn need (d : Int) : Int requires Equal Int d 0 = d\nconst main : Bool = True";
+
+fn assert_example_obligation_goal_keeps_example_refs(example: &str) {
+    let source =
+        format!("```ken\n{EXAMPLE_OBLIGATION_ADMITTED}\n```\n```ken example\n{example}\n```\n");
+    let out = compile_ken_package_sources(
+        &CompilerManifest::new(PKG, Vec::new()),
+        vec![CompilerSource::new("a.ken.md", source)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PKG.to_string()]),
+            symbol: decl("main"),
+            kind: CompilerTargetKind::NonRuntime,
+        },
+    )
+    .expect("a reported example-owned goal may refer to prior example bindings");
+    let semantic = &out.package.artifact.semantic;
+    assert_eq!(semantic.obligations.len(), 1);
+    assert_eq!(semantic.obligation_metadata.len(), 1);
+    assert_eq!(
+        semantic.obligation_metadata.values().next().unwrap().origin,
+        decl("zz_example")
+    );
+    assert!(!semantic.declarations.contains_key(&decl("zz_example")));
+}
+
+/// Promise class: durable invariant. MEASURED: the example-owned call goal
+/// mentions `zz_v` and its package still emits exactly one obligation whose
+/// origin is `zz_example`. CLAIMED: reporting an example's own obligation
+/// remains valid even when its goal names another excluded example binding.
+/// THE GAP: this is an explicit value, not implicit dictionary resolution.
+#[test]
+fn example_obligation_goal_may_name_prior_example_value() {
+    assert_example_obligation_goal_keeps_example_refs(
+        "const zz_v : Int = 0\nconst zz_example : Int = need zz_v",
+    );
+}
+
+/// Promise class: durable invariant. MEASURED: the example-owned call goal
+/// mentions a separate example function `zz_k`, with the same one-obligation
+/// origin outcome. CLAIMED: the full example table retains checked goals
+/// across expression shape, not just a direct variable argument. THE GAP:
+/// this tests one function application, not every possible example symbol.
+#[test]
+fn example_obligation_goal_may_name_prior_example_function() {
+    assert_example_obligation_goal_keeps_example_refs(
+        "fn zz_k (u : Int) : Int = u\nconst zz_example : Int = need (zz_k 0)",
+    );
+}
+
 /// Promise class: durable invariant. MEASURED: both a former-only use and a
 /// constructor elimination from an example family fail with a typed missing
 /// package reference. CLAIMED: an example-only family and its constructors

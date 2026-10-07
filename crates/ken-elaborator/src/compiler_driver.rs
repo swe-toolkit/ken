@@ -3373,7 +3373,9 @@ fn owned_v2_obligations(results: &[ElabResult]) -> Vec<(GlobalId, ObligationTrip
 fn add_obligation_metadata(
     obligations: &[(GlobalId, ObligationTriple)],
     symbols: &BTreeMap<GlobalId, StableSymbol>,
-    table: &StableSymbolTable,
+    package_table: &StableSymbolTable,
+    example_table: &StableSymbolTable,
+    example_ids: &BTreeSet<GlobalId>,
     outside: &impl Fn(&StableSymbol, CanonicalEncodingError) -> CompilerDriverError,
     semantic: &mut CheckedCoreSemanticInputs,
 ) -> Result<(), CompilerDriverError> {
@@ -3383,8 +3385,18 @@ fn add_obligation_metadata(
             .cloned()
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *owner })?;
         let obligation = StableSymbol::obligation(triple.id.0.clone());
-        let goal = canonical_term_bytes(&triple.goal_closed, table)
-            .map_err(|error| outside(&origin, error))?;
+        // An example's own obligation report is not admitted content. Its
+        // checked goal may mention earlier example bindings; admitted owners
+        // still close over the package's symbols.
+        let goal = if example_ids.contains(owner) {
+            canonical_term_bytes(&triple.goal_closed, example_table).map_err(|error| {
+                let CanonicalEncodingError::MissingStableSymbol(id) = error;
+                CompilerDriverError::MissingStableSymbol { id }
+            })?
+        } else {
+            canonical_term_bytes(&triple.goal_closed, package_table)
+                .map_err(|error| outside(&origin, error))?
+        };
         let status = match &triple.provenance.kind {
             ProvKind::FfiRuntimeCheck => ObligationStatus::Tested,
             ProvKind::Ensures { .. }
@@ -3420,7 +3432,7 @@ fn emit_package_from_env(
     let package_identity = package_identity(&manifest.package_name);
     let mut semantic = CheckedCoreSemanticInputs::default();
     let native_primitives = native_entrypoint_plan.is_some();
-    let (symbols, _table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives)?;
+    let (symbols, table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives)?;
 
     // Encode admitted content against exactly the package's symbol set. The
     // shared elaboration environment can still resolve an earlier source's
@@ -3500,6 +3512,8 @@ fn emit_package_from_env(
         obligations,
         &symbols,
         &package_table,
+        &table,
+        example_ids,
         &outside,
         &mut semantic,
     )?;
