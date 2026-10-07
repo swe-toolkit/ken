@@ -21,10 +21,11 @@
 > split; **D** `delete` is **rebuild-via-`from_list`**. Two enclave sub-rulings:
 > set laws are stated **membership-extensionally** (never `Equal (Set K)`), and
 > **`leq_nat` + its four order results are the D0 carrier prerequisite**
-> (`Nat`, not the `Axiom`-holed `Ord Int`/`Ord Char`). The canonical D0
-> provider is `Core.Classes.LawfulClasses` (`51 §7`); its public totality proof
-> is `IsTrue`-valued, while its `Or`-valued helper is private (§2). D1–D2
-> operations and general proofs, and D3 projection/ascending operations and
+> (`Nat`, not the assumption-dependent `Ord Int`/`Ord Char`). The
+> canonical D0 provider is `Core.Classes.LawfulClasses` (`51 §7`);
+> its public totality proof is `IsTrue`-valued, while its `Or`-valued
+> helper is private (§2). D1–D2 operations and general proofs, and D3
+> projection/ascending operations and
 > proofs are implemented in `catalog/packages/Data/Collections/Map.ken.md`.
 > D4 currently lands transparent `compose`/`converse`, property-predicate
 > definitions, and the public `size`/`dom`/`reachable_within`/`reachable_plus`
@@ -84,9 +85,11 @@ CAT-4 uses the landed `Nat` carrier with **≥ 3 distinct keys under an
 accept-arm is only load-bearing if the carrier's order laws are **genuinely
 inhabited**.
 
-- `Ord Int`/`Ord Char` on `main` are **`Axiom`-holed** — their order laws are
-  postulated, so a proof that *uses* them is vacuous and the intended flip
-  degenerates to reject-vs-reject (green-vs-green — no discrimination).
+- `Ord Int` has **visible postulated laws**; `Ord Char` derives its laws
+  from them through `Proj1`, with no new Char postulate (`18a §5.9.1`).
+  Neither supplies an assumption-free order proof: using either makes
+  the intended proof flip degenerate to reject-vs-reject
+  (green-vs-green — no discrimination).
 - `Ord Bool` is `Axiom`-free but has **only 2 keys** — it **cannot** exhibit a
   three-node transitivity witness (`a → b → c`: is `a → c` in the closure?),
   which the relation/closure discriminators require.
@@ -565,7 +568,8 @@ executes the property discriminators, and establishes closure
 faithfulness/saturation.
 Conformance lives at `../../conformance/stdlib/collections/`: its executing
 closure cases use the landed lawful `Nat` order and well-formed outer and inner
-trees, never the `Axiom`-holed `Ord Int`/`Ord Char`.
+trees, never the `Ord Int`/`Ord Char` laws that depend on audited
+`Int` assumptions.
 
 ## 9. Acceptance
 
@@ -594,7 +598,8 @@ trees, never the `Axiom`-holed `Ord Int`/`Ord Char`.
   `bool_and` corollaries via `bool_dichotomy`, not fresh `Tree` inductions.
 - **AC7 — Carrier vacuity guard.** Discriminators run on the **`Nat`** carrier
   with the real `leq_nat` dictionary (≥ 3 distinct keys for transitivity/
-  closure), **never** the `Axiom`-holed `Ord Int`/`Ord Char`.
+  closure), **never** `Ord Int`/`Ord Char` whose laws depend on
+  audited `Int` assumptions.
 - **AC8 — Evidence boundary.** Transparent D4 definitions and the current
   positive compose/converse smoke checks are landed evidence only for those
   facts. They do not discharge the absent-edge membership controls, the general

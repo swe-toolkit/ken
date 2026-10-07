@@ -69,8 +69,9 @@ closure.
   proof-relevant (`57 §3.2` cites this verbatim). `DecEq a`'s `sound`/`complete`
   fields (`:25`) tie its `eq` to kernel `Equal`.
 - **Carrier soundness (`57 §3.4`, CV caveat folded in):** `DecEq Int`/`Ord Int`
-  are **all-`Axiom`** (`Int` primitive), `Ord Char` **transports** those same
-  `Axiom`s; **only `Bool` has a real, Axiom-free `DecEq`+`Ord`**.
+  are **all-`Axiom`** (`Int` primitive), and `Ord Char` reuses those visible
+  assumptions on projected codepoints; **only `Bool` has a real, Axiom-free
+  `DecEq`+`Ord`**.
   So the proved arms carry on `List Bool`; on `List Int` the honest-sort
   discharge cannot be Axiom-free and the flip degenerates to reject-vs-reject
   (green-vs-green vacuity).
@@ -82,8 +83,9 @@ closure.
   `tt`-vs-`Refl` endpoint discrimination, **per-branch not uniform**
   (constructor-headed gives `Top` gives `tt`; neutral gives stuck `Eq` gives
   `Refl`) — inherited by `57 §1` and used at `57 §2.2`/`§3.7`/`§4.4`.
-- `21 §6.1`/`§6.3` + `22` — refinement types `{ x : A | φ }` lower to the
-  carrier + a kernel-re-checked obligation (`57 §4.2` refinement flavor).
+- `21 §2`/§6.3 + `22` — refinements `{x:A|φ}` lower to a checked subset
+  `Σ(x:A).φ`; introduction is `Pair(a,π)` plus its kernel-rechecked proof
+  obligation, and forgetting uses `Proj1` (`57 §4.2` refinement flavor).
   `13 §6` — the negative `Σ` and **definitional Σ-η** (`57 §4.4` lens set-get).
 - `conformance/challenge/C5-verified-sort/` — corroborates the sort
   discriminator (the `const Nil` unsound arm is a *stronger* non-permuting sort
@@ -409,19 +411,21 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
 - spec: `57 §4.2` (the per-flavor table), `57 §4.3` (the two walls), `21 §6.1`
   (refinement), `16 §5` (quotients, no surface intro), CAT-1 §6 (multi-param
   `class`), Lane B / L12 / L14 (obligation seam)
+- status: subset-refinement core shape is **deferred — W5**; plain Σ-record
+  flavors remain available.
 - given: the six `view` flavors — `projection (lens)`, `representation (iso)`,
   `refinement`, `indexed`, `quotient-respecting`, `obligation-producing` — each
   claimed against **landed** machinery
 - expect: **each flavor's mechanism is grounded, not hand-waved "views are
-  records".** Assert the structural observable, per `57 §4.2`: `lens`/`iso`/
-  `refinement`/`indexed` = plain `Σ`-record (concrete) → **ship now**;
-  `quotient-respecting` **setoid-morphism** form
-  `{ project ; respects }` is a plain `Σ`-record → **now** (the field is
-  `project`, not a lowercase `view`, so it never collides with the live
-  `KwView` keyword — `57 §4.2`), but the
-  **quotient-carrier** form (a view *out of* `A/R`) needs a surface
-  **quotient-intro** path the parser lacks (`16 §5` kernel formers exist, no
-  surface) → **deferred**; `obligation-producing` = the **Lane B / L12 / L14
+  records".** Per `57 §4.2`, `lens`, `iso`, and `indexed` are concrete plain
+  `Σ`-records → **ship now**. The `refinement` flavor is the subset type
+  `Σ(x:A).φ` with a checked pair on introduction, not a carrier plus a detached
+  obligation; this core shape is **deferred — W5**. The
+  `quotient-respecting` **setoid-morphism** form `{ project ; respects }` is a
+  plain `Σ`-record → **now** (the field is `project`, not a lowercase `view`,
+  so it never collides with `KwView`). The **quotient-carrier** form (a view
+  *out of* `A/R`) needs a surface **quotient-intro** path the parser lacks
+  (`16 §5`) → **deferred**; `obligation-producing` is the **Lane B / L12 / L14
   seam** → **boundary stated, deferred**; and the **polymorphic** forms
   (`Lens s a`, `Iso a b`) need a **multi-param `class`** (`57 §4.3`) → **design
   now, build fast-follow**. **Not** a verdict-flip: a `(property)` case pinning
@@ -542,9 +546,10 @@ sortId  (a) (le) (xs) : List a = xs      -- identity (fails isSorted)
 - **The `Ord.total` `bool_or` precedent** is cited as *grounding* for the
   count-equality choice (`57 §3.2`); its own conformance lives in
   `seed-lawful-classes.md`. CAT-3 tests only that `Perm` **follows** the move.
-- **Refinement-obligation emission/enforcement** is exercised by C5 and the
-  `refinement` view flavor; the general refinement machinery's conformance is
-  not re-authored here.
+- **Subset-Σ introduction/emission** is normatively exercised by C5 and the
+  `refinement` view flavor, but their checked-pair core shape is **deferred —
+  W5**. General coercion and obligation behavior lives in the V1/V2 and
+  surface/data-match seeds.
 - **`DecEq`/`Ord` law provability by carrier** (Bool real vs Int Axiom-holed) is
   owned by `seed-lawful-classes.md`; CAT-3's carrier case cites it only to
   justify `List Bool` for the proved sort arms.

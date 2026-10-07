@@ -133,12 +133,16 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   Neither is free: even honest `Eq Decimal` bottoms on missing `Int` arithmetic
   lemmas
   (`refl` needs `sub_int e e = 0`, `mul_int c 1 = c`).
-- **Contrast — `Char` is unaffected.** `Char = { c : Int | isScalar c }` is
-  **canonical** (one carrier value per codepoint, `proj` identity, `isScalar`
-  Ω-irrelevant), so `Equal Char x y ≡ Equal Int (proj x) (proj y)`
-  definitionally and `Ord Char`/`DecEq Char` transport `Int`'s **true**
-  meta-theorem `Axiom` soundly. Canonical-vs-non-canonical is the whole
-  discriminator.
+- **Contrast — `Char` is unaffected.** `Char = { c : Int | isScalar c }`
+  is the checked subset-Σ with a **relevant** codepoint and an
+  Ω-irrelevant proof (`13 §4`), not a core type convertible to `Int`.
+  Its projection is `Proj1`. Σ-η and Ω proof irrelevance make checked
+  Char values with convertible codepoints equal despite differing scalar
+  proofs; `Ord Char`/`DecEq Char` derive their laws from the visible
+  audited `Int` assumptions via that projection, with no new Char
+  postulate (`18a §5.9.1`). Decimal instead has distinct carrier pairs
+  for equal decimal values. Canonical-vs-non-canonical remains the
+  discriminator, not a claim of `Char ≡ Int`.
 - **Status.** **OPEN** — the single gate for the future `class Num` +
   `Decimal`-equality lane. The `Decimal` DEMOTE ships only its **computational**
   ops (exact base-10 arithmetic + primitive removal, `18a §5.6`), which are
@@ -159,20 +163,42 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   type mismatch. Lean `Subtype`, Agda records/Σ, Coq `sig`, and F* refinements
   exemplify core representations; this is the prior-art majority reported in
   the research advisory.
-- **Grounds.** The former kernel blocker in `21 §2` is resolved: `sort_sigma`
-  gives Ω when both components are Ω (`crates/ken-kernel/src/check.rs`). The
-  Ω second component is computationally irrelevant, meeting the
-  erasure-faithfulness concern. The subset representation requires explicit
-  introduction and elimination, with coercion insertion, and normative edits
-  to `34 §5` and `21 §2`. Existing normative text still describes the carrier
-  encoding; this register entry makes no normative edit.
+- **Grounds.** The former kernel blocker in `21 §2` is resolved:
+  `sort_sigma` classifies `Σ(x:A).φ` in `Type (max ℓ_A ℓ_φ)` when
+  `A : Type ℓ_A` and `φ : Ω_ℓ_φ` (`13 §4`,
+  `crates/ken-kernel/src/check.rs`). The Ω proof component is
+  computationally irrelevant, while the carrier and its Σ type remain
+  relevant. The checked Σ is distinct from `A` in kernel conversion.
+  The Architect's design `evt_30frdrmj45ehg` settles introduction by a
+  checked pair, forgetting by `Proj1`, outermost-only coercions, and
+  transitive proof honesty; `evt_3yj3x9zf1m833` settles `ensures` as
+  a real Σ result. Normative rules are in `34 §5`, `21 §§2, 5.4, 6.3`,
+  `22 §2.1` and their dependent consumers. The W5 elaboration/kernel
+  migration and W4 reachability-query implementation remain staged;
+  this record does not claim they have landed.
 - **Decision (operator, 2026-10-07).** Refinements are real kernel types,
   represented as core subset Σ: `{x:A|φ} ⇒ Σ x:A. φ` with an Ω second
   component. Replace the carrier encoding. The decision selects this
-  representation; introduction, elimination, coercion insertion, and any
-  kernel changes remain to be designed and framed.
-- **Affects.** `30-surface/34 §5`, `20-verification/21 §2`, elaboration and
-  kernel conversion.
+  representation; the cited Architect rulings specify the introduction,
+  elimination, coercion, and honesty contracts for the staged build.
+- **Affects.** `30-surface/34 §5`, `20-verification/21 §§2, 5.4, 6.3`,
+  `20-verification/22 §2.1`, `10-kernel/18a §5.9.1`, `40-runtime/42`,
+  elaboration and kernel conversion.
+
+### OQ-indexed-scrutinee-evidence — Packed branch equality — **OPEN**
+- **Fork.** Should an indexed `match` expose a term-backed equation between
+  the scrutinee and a branch constructor in addition to its checked index
+  refinement (`30-surface/34 §3.2`)? Their types `D ī` and `D īₖ` can differ,
+  so `Eq (D ī) s (cₖ field̄)` is not generally well-typed.
+- **Candidate, not normative.** Pack both values with their indices and
+  consider `Eq (Σ ī. D ī) (ī, s) (īₖ, cₖ field̄)`. Its construction, branch
+  evidence, and use by dependent motives remain to be designed and checked.
+- **Current rule.** Unindexed families bind a scrutinee equation through a
+  convoy; indexed families bind none and retain only index refinement. No
+  packed equality is generated (`20-verification/21 §6.3`, `22 §3`,
+  `30-surface/34 §3.3`).
+- **Affects.** Indexed `match` elaboration, V2 path evidence and any future
+  conformance row for packed equality.
 
 ## B. Verification
 
@@ -308,8 +334,10 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   unconditional), reusing the landed `preserves_ordered` wholesale. Enclave
   sub-rulings: set laws are **membership-extensional** (never `Equal (Set K)`);
   the discriminator carrier is **`Nat`** with the landed `Axiom`-free
-  `leq_nat` plus four order results (the `Axiom`-holed `Ord Int`/`Ord Char` would
-  make the accept-arm vacuous). Kernel-untouched, outer-ring, zero
+  `leq_nat` plus four order results (`Ord Int` uses audited postulates;
+  `Ord Char` derives its laws through `Proj1` from the same assumptions,
+  so neither gives an assumption-free accept arm). Kernel-untouched,
+  outer-ring, zero
   `trusted_base()` delta.
 - **Landed computation + deferred follow-on (CAT-4 Fork B / C-scope, updated
   2026-09-12) — public transitive-closure computation, then general relation
@@ -878,6 +906,7 @@ states what it cannot prove; the sibling models/tests/monitors it.
 | **OQ-4** | 2026-06-27 — **observational equality (OTT), not cubical**: `Eq`-by-type + `cast` + strict-prop Ω + set-quotients; no univalence/HITs. Smallest auditable TCB; exact set-level-software fit. | **ADR 0005** |
 | **OQ-Prop** | 2026-06-27 — predicative Ω; impredicativity ruled out. Proof irrelevance **definitional** via OTT's strict-prop Ω (`SProp`), free in the smaller kernel (revised by ADR 0005). | **ADR 0005** (recorded in `10-kernel/12`) |
 | **OQ-η-records** | 2026-06-27 — definitional η is the **`record`/Σ class**, not `data`; safe-by-construction (records are non-recursive nested Σ), low-cost under OTT. | — (recorded in `10-kernel/14`) |
+| **OQ-refinement-representation** | 2026-10-07 — `{x:A|φ}` is a real core subset `Σ(x:A).φ` with Ω proof; checked pair introduction, `Proj1` forgetting, no coercion beneath a former/binder. `ensures` has a Σ result and effectful space results use an outer Σ over the `AllRet` residual tree. | — (recorded in `20-verification/21`/`22`, `30-surface/34`/`36`) |
 | **OQ-12** | 2026-06-27 — Kripke embedding primary; three-tier routing; **reflective proved-adequacy + verified checker (a) is the target** (intrinsic merits, not effort), reconstruction (b) a feasibility hedge; Z3 primary, cvc5 optional, **Coq retired**. | — (recorded in `20-verification/23`) |
 | **OQ-spec** | 2026-06-27 — proof interface = **both, as one gradient**; **four-way epistemic status** (proved/tested/delegated/unknown) visible + exportable. `old`/state deferred → `OQ-Space` (lean explicit-state). | — (recorded in `20-verification/21`) |
 | **OQ-behavioral** | 2026-06-27 — downstream complement is a **sibling** (`Ward`) fed by an assumption-boundary export; temporal obligations as **data, not kernel modalities**; one logic, two engines. | **ADR 0006** |

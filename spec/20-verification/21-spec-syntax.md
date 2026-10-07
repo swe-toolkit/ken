@@ -9,6 +9,12 @@
 > diagnostic, **never** unsoundness. How a programmer or agent attaches a
 > *correctness specification* to code — the surface the whole verification loop
 > hangs off. This is the L1→L2 bridge at the surface level.
+>
+> **Staging.** Subset-Σ refinement elaboration (§2/§6.3) and transitive
+> proof honesty (§5.4) are the normative W1 contract. The current
+> carrier-only implementation is transitional until W5 replaces it;
+> the read-only reachability query arrives with W4. This is not a claim
+> that either implementation already matches these rules.
 
 A **specification** is one or more **propositions** (`../10-kernel/12 §5`,
 elements of Ω) attached to a definition, asserting how it must behave. Ken
@@ -80,14 +86,14 @@ Semantically, a contract **denotes** a **refined function type**
   → (r : Int) × (Equal Int (r * d + (n % d)) n)
 ```
 
-i.e. preconditions are extra (proof) arguments and the postcondition pairs the
-result with a proof. This is the **denotational** reading — the meaning of the
-contract as a type. The **operational** V1 elaboration does **not** reify the
-postcondition as a proof-carrying `Σ` *value*: the result stays at the carrier
-`Int` and the postcondition becomes a separate **obligation** (a typed hole
-discharged by a kernel-checked certificate, §6.3). The reasons — erasability and
-a kernel `Σ`-sort caveat — are in §2 and §6.3. The programmer writes
-`requires`/`ensures`; the encoding is hidden.
+i.e. **written** preconditions are extra Π proof arguments and the
+postcondition is a **kernel subset-Σ result** pairing the returned value
+with its checked proof (§6.3). For an ordinary `fn`, each body leaf
+constructs that pair; a `space` operation instead pairs its *residual
+tree* with one `AllRet` proof (§6.4). An open hole is applied as the
+proof component and remains visible in `trusted_base()` (§6.5). The
+programmer writes `requires`/`ensures`; erasure removes the proof only
+from the runtime representation (`42 §3.2`), never from the core type.
 
 ## 2. Refinement types — `{ x : A | φ x }`
 
@@ -100,49 +106,48 @@ fn head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …
   -- non-empty by type
 ```
 
-- `{ x : A | φ x }` requires `φ x : Ω`. Its inhabitants are, by the
-  comprehension reading, pairs `(x, proof-of-φx)` with the proof component a
-  **mere proposition** (`16 §1.2`), so refinements carry *no runtime payload*
-  and coerce silently to `A`.
-- Refinements are the **route to L2 at the surface**: pushing a property into a
-  type makes the checker enforce it at every use, with obligations generated
-  where a plain `A` is used as `{x:A|φ}` (`22`).
-- They compose with Π/Σ: function arguments, results, and record fields may all
-  be refined; `requires`/`ensures` (§1) is the contract spelling of refined
-  argument/result types.
+- `{ x : A | φ x }` requires `A : Type ℓ_A` and `φ x : Ω_ℓ_φ` under
+  `x : A`. It elaborates to the **core dependent pair** `Σ(x:A').φ'` at
+  `Type (max ℓ_A ℓ_φ)` (`13 §4`). The first component is relevant; only its
+  proposition-valued proof component is proof-irrelevant (`16 §1.2`).
+- Refinements are the **route to L2 at the surface**: introducing a plain
+  `a : A` at the refined type constructs `(a', π)` with a kernel-checked
+  `π : φ[a'/x]`, recording the refinement obligation and discharging it with
+  checked evidence or an explicit typed hole (`22 §2.1`). An open obligation
+  is a typed postulate, not permission to omit the pair's proof term.
+- They compose with Π/Σ: arguments, results, and record fields may be
+  refined **at their stated type**. A refined domain remains `Σ(x:A).φ` in
+  its Π type; it is not normalized to an `A` binder and an implicit proof
+  binder. Explicit written `requires` still contributes a separate Π proof
+  argument; an ordinary `fn`'s `ensures` refines the result to a kernel
+  Σ with per-leaf introductions (§6.3). A `space` operation pairs its
+  residual tree with `AllRet` evidence instead (§6.4).
 
-**The V1 core encoding (operational) — carrier-plus-obligation, normative.** A
-refinement `{x:A|φ}` elaborates **to its carrier `A`**; the predicate `φ` is
-tracked by the (untrusted) elaborator, not reified as a core type, and every
-*introduction* of a value at the refinement emits the obligation `φ a` (§6.3,
-`22 §2.1`). The naive reification `{x:A|φ} = Σ(A, φ)` with `φ : Ω` is **not**
-used in V1, for two reasons:
+**The core encoding (normative).** `elabType({x:A|φ}) = Σ(x:A').φ'`, with `A'`
+checked in `Type` and `φ'` in Ω under `x:A'`. A transparent named refinement
+unfolds to that Σ, not to its carrier. Operationally,
+`is_refinement(Γ,T)` holds **iff** `whnf(T) = Σ(x:A).φ` and
+`classify(Γ,x:A,φ) = Ω_ℓ` for some `ℓ`; neither a type's spelling nor an
+elaborator-only refinement fact decides the coercion. The kernel
+distinguishes a refined
+value from a bare carrier (`Σ(x:A).φ` is not convertible to `A`); it checks
+both the pair's carrier and its proof. This is a **subset** Σ in `Type`, not
+an Ω-valued conjunction: `sort_sigma(Type ℓ_A, Ω_ℓ_φ) =
+Type (max ℓ_A ℓ_φ)` (`13 §4`). Proof irrelevance identifies pairs with
+convertible carrier components and different proofs, **not** pairs with
+unequal carrier components. No conversion rule is added for this case: typed
+Σ-η, Ω proof irrelevance of the second component, and the existing typed Eq
+endpoint comparison already suffice (`13 §2`, `17 §3`).
 
-1. **Erasability.** The proof component is in Ω (proof-irrelevant,
-   computationally irrelevant), so the value behaves as a bare `A` at runtime;
-   keeping the carrier *as* `A` and the proof *as* an obligation realizes this
-   directly (`24 §2`).
-2. **A `Σ`-sort caveat (grounding catch, Architect-confirmed).** The kernel as
-   landed classifies `Σ(A : Type ℓ, φ : Ω_ℓ')` as a **proposition** in Ω (the
-   formation sort was keyed on the codomain only, `check.rs sort_pi_sigma`,
-   sound for Π-into-prop but over-admitting a Σ with a *relevant* first
-   component). A refinement reified that way is collapsed by Ω-proof-irrelevance
-   (`16 §1.2`): `(3, p) ≡ (5, q) : {n:Int|IsTrue (leq_int 1 n)}`
-   definitionally — the carrier is lost, and via a transport motive it closes
-   to a proof of `Empty`. The
-   Architect **confirmed** this as a reachable trust-root over-equating hole; a
-   priority kernel erratum splits the rule (`sort_sigma → Ω` iff *both*
-   components are Ω; Π stays codomain-keyed), with the matching spec erratum in
-   `../10-kernel/13 §4`/`§5`. The carrier-plus-obligation encoding here is
-   **independent** of that fix (it never forms a core `Σ` over an Ω predicate).
-   Even once the kernel admits a relevant subset-`Σ` at `Type (max ℓ_A ℓ_φ)`,
-   V1 keeps the obligation encoding as the **erasure-faithful** operational
-   form; the proof-carrying `Σ` reification remains the *denotational* reading.
-
-The kernel has **no subtyping** for refinements: `{x:A|φ} ≤ A` is free (here the
-identity, since the core type *is* `A`), and `A ≤ {x:A|φ}` generates the
-obligation `φ` — checked by emitting that obligation, never by a kernel coercion
-(§6.3).
+The kernel has **no subtyping**; the elaborator inserts only outermost,
+type-directed coercions (§6.3). Introduction `A ≤ {x:A|φ}` constructs the
+checked pair and owes `φ a`. Forgetting `{x:A|φ} ≤ A` is **free of obligations**
+but emits `Proj1`, not the identity core term. To convert one refinement to
+another, project the carrier and introduce the target proof under the source
+pair's `Proj2` hypothesis. No coercion occurs **inside** `List`, a function
+type, a binder, or any other type former; no function η-expansion invents a
+proof for arbitrary arguments. Runtime erasure of the Ω proof recovers the
+carrier value without changing the core type (`42`).
 
 ## 3. Propositional goals — `prove` / `law`
 
@@ -211,8 +216,9 @@ proof-decl ::= "proof" ident "for" path binder* ":" type "=" expr
   only for **`space` operations** (`../30-surface/36-effects.md §4.3`); for pure
   `fn`s the pre/post states coincide. **`OQ-Space` DECIDED:** `old(e)` is
   admitted, **scoped to a `space` operation's `ensures`** (a cell's pre-call
-  value), well-defined because a space's denotation is a state-transformer
-  `S → R × S` that *names* the pre-state (§6.4). There is **no global
+  value), well-defined because a space's denotation has an explicit
+  `s_pre:S` input and a residual `ITree F (R × S)` result; it collapses
+  to `S → R × S` when `F=𝟘` (§6.4, `36 §4.2`). There is **no global
   `\old`/heap** and **no separation logic** — a space's cells are non-aliased,
   so reasoning is bounded per-space Hoare. An `old` outside a `space`-op
   `ensures` is a scope error (§6.4). For explicitly-threaded state you simply
@@ -249,10 +255,10 @@ actionable and (for `proved`) re-checkable:
 | `disproved` | the proposition is refuted | a **countermodel**: a finite Kripke model forcing `¬φ` at some world (`24 §1`) | where the prover yields a proof of `¬φ`, `check(env, Γ, p, ¬φ)` certifies it; else the countermodel is a prover-asserted refutation (untrusted, but a concrete falsifying witness) |
 | `unknown` | undecided / not discharged | a **typed hole** `?h : φ` in `Γ`, admitted as a **postulate** of `φ` (`24 §2`) | none — the hole is *assumed*; it appears in `trusted_base()` (§5.4) |
 
-- A **`proved`** verdict adds **nothing** to the trusted base: the certificate
-  is a closed core term `check` validates, and a wrong certificate fails `check`
-  — it cannot make a false proposition inhabited (`18 §5`). This is the
-  soundness firewall around the untrusted prover.
+- A **`proved`** verdict has **no reachable open obligation hole** in the
+  checked certificate's dependency closure (§5.4). Audited contract axioms
+  remain visible assumptions without demoting the verdict; a wrong
+  certificate fails kernel checking (`18 §5`).
 - A **`disproved`** verdict is a hard **verification error** (`24 §3`, the
   `S_{¬φ}` region: *fix the code or the spec*). It is **never** an exported
   guarantee — you do not ship a known-false claim — so it has *no* epistemic
@@ -270,9 +276,12 @@ the feature that makes Ken a *software engineering* language rather than a
 programming language: a reader sees, per claim, whether it is *proved*, merely
 *tested*, *delegated* to behavioral checking, or still *open*.
 
-- **`proved`** — the obligation (`22`) was discharged and the kernel re-checked
-  the certificate (`23`, `../10-kernel/18 §4`). The default for a contract that
-  goes through. No annotation; it simply holds.
+- **`proved`** — the obligation (`22`) was discharged, the kernel re-checked
+  the certificate (`23`, `../10-kernel/18 §4`), and no **open obligation
+  hole** is reachable through its dependencies (§5.4). The default for
+  a contract that goes through. No annotation; the claim remains relative
+  to any audited contract axioms on its dependency closure, which stay
+  visible in the assumption boundary.
 - **`tested`** — a property that **cannot (yet) be proven** but is **asserted
   with a runtime/test obligation**: an `assume`/`test`-tagged clause (the
   keywords are reserved, `../30-surface/31 §4`; the exact clause grammar is
@@ -300,10 +309,14 @@ programming language: a reader sees, per claim, whether it is *proved*, merely
 
 By default `proved` specs are static-only (erased); `tested` adds runtime code
 by construction; `delegated` adds none to Ken (it is exported); `unknown` adds
-none. The **assumption boundary** (`../70-behavioral/`) is precisely the
-`tested` + `delegated` + open-`assume` set — what Ken could not guarantee
-statically, handed to the sibling as the exact specification of what to model,
-test, and monitor.
+none. The **assumption boundary** (`../70-behavioral/`) carries the
+`tested`/`delegated`/open-`assume` claims **and** the audited
+`trusted_base_delta` of contract axioms and open holes, with trusted
+primitive dependencies visible through `trusted_base()` (`18 §5`).
+A checked proof may be `proved` relative to a recorded contract axiom;
+that axiom remains an assumption entry, not a demotion of the claim.
+The boundary tells the sibling what must be modelled, tested, monitored,
+or accepted as an explicit trust premise.
 
 ### 5.3 How the verdict and the status relate (the projection)
 
@@ -328,31 +341,42 @@ carrying downstream (test/monitor) obligations rather than a kernel verdict.
 ### 5.4 The honesty guard (`unknown`/`tested`/`delegated` never read `proved`)
 
 The load-bearing property of the whole model (§the framing in
-`docs/wp/V1-spec-syntax.md`): a partially-verified claim must **never**
-masquerade as a proved one. The discriminator is **kernel-side, not a
-V-layer flag** — so a bug in the (untrusted) verification layer cannot forge a
-`proved`:
+`docs/wp/V1-spec-syntax.md`): a partially verified claim must **never**
+masquerade as an unconditional proof. A valid proof term can depend on a
+**different** open obligation through a transparent definition. In particular,
+`c : Σ(x:A).φ x` may contain `(a, ?h)` and `c.2 : φ a` is well-typed, but its
+use in a proof does not discharge `?h`. Checking only the current goal's own
+hole or looking for a postulate *with that goal* in `trusted_base()` would
+falsely mark such a proof as `proved`.
 
-- A `proved` claim's certificate is a closed core term that `check` accepts; it
-  introduces **no postulate** of the goal, so the goal does **not** appear in
-  `GlobalEnv::trusted_base()` (`18 §4`, `§5`: `trusted_base` enumerates exactly
-  the postulates and primitives).
-- An `unknown` claim's typed hole **is** a postulate of the goal (`24 §2`), so
-  the goal **does** appear in `trusted_base()`. Likewise a `tested`/`delegated`
-  claim is admitted as a visible assumption (its obligation is downstream, not
-  kernel-discharged).
+The discriminator is the kernel's checked term **and its transitive
+assumptions**, not a V-layer status string:
 
-Therefore the verdict is decidable from the kernel's own state, not from a label
-the layer self-reports: **a claim is `proved` iff its certificate `check`s *and*
-no postulate carrying its goal sits in `trusted_base()`.** The *presence* of
-such a postulate is the guard that the obligation is *assumed, not proved* —
-guard-gated (postulate membership), not coincidental. "Shipping a verified
-artifact" means **zero spec-induced postulates** in `trusted_base()` (or an
-explicit, recorded acceptance of the listed ones). This is the absence-assertion
-the conformance corpus must pin: an `unknown` case is distinguished from a
-`proved` case by `trusted_base()` membership + certificate-presence — a
-*structural* discriminator that flips, not a status string compared for
-equality.
+- The certificate must pass `check(env, Γ, p, φ)` (`18 §4.5`); a plausible
+  self-reported proof without a checked term never suffices.
+- A read-only kernel query `postulates_reachable(env, p)` traverses the
+  certificate and the δ-closure of its transparent dependencies, returning
+  the postulate identities it actually relies on. It is off the kernel's
+  checking and conversion paths: dependency inspection adds no reduction or
+  equality rule. A claim is `proved` only if this set contains **no open
+  obligation hole**. Audited contract axioms (`Ord Int`, StringBijection)
+  and trusted primitives on the dependency closure remain visible in the
+  assumption boundary; they do **not** by themselves demote a checked
+  certificate.
+- The same rule applies to prover certificates and term proofs (`theorem` and
+  attached `proof`). A valid term using the second projection of a refined
+  constant with an open proof component is **not** unconditionally `proved`.
+  `tested`/`delegated` remain their distinct downstream dispositions (§5.2).
+
+An open hole is still a postulate in `trusted_base()` (`24 §2`); retiring it
+requires a checked certificate. But a postulate's membership alone is not a
+proof-dependency test — reachability from the **claim's term** decides whether
+an **open obligation hole** contaminates that claim. "Shipping a verified
+artifact" requires no such reachable open holes on each exported proof's
+dependency closure, while every audited contract axiom remains listed in the
+assumption boundary. Conformance must contrast a certificate with no reachable
+open hole against one that checks yet reaches an open hole through a transparent
+refined constant; checking the goal's own hole only cannot distinguish them.
 
 ### 5.5 Scope ruling — disposition-tag syntax is deferred
 
@@ -456,86 +480,105 @@ pseudocode is **defensive** — every position that *must* be a proposition is
 explicitly `check`ed at Ω (a non-Ω body is a surface error, never silently
 admitted), and every obligation site explicitly emits a typed hole.
 
-**Function contract** — `requires`/`ensures` on an `fn`. First normalize any
-refined parameter to a carrier parameter and a generated `requires` (§2,
-below). Preconditions become Π proof-arguments (assumed in the body, discharged
-at call sites); the postcondition becomes an obligation over `result`:
+**Function contract** — `requires`/`ensures` on an `fn`. Refined parameters
+retain their subset-Σ types in the Π telescope. **Written** `requires` clauses
+become Π proof arguments, assumed in the body and discharged at call sites;
+`ensures` forms a **real subset-Σ result type**, checked at each body leaf:
 
 ```
 elabFn(Σ, ⟨ fn f (Δ) : B requires φ̄ ensures ψ̄ = body ⟩) → (coreDef, obls):
-  Δp := desugarRefinedParams(Δ)                -- for each (x : {y:A|φ}), check φ[x/y] at Ω
-                                               -- in its binder prefix; insert (x : A), (_ : φ[x/y])
-  Γ := extendTelescope(·, Δp)                  -- carrier and proof binders, in order
-  -- written requires follow all parameters and generated proof-args (22 §3)
+  Δ' := elabTelescope(Δ)                         -- refined domains stay Σ(A,φ)
+  Γ  := extendTelescope(·, Δ')
   for φᵢ in φ̄:
-    φᵢ' := check(Γ, φᵢ, Ω)                     -- MUST check at Ω (12 §5); else SURFACE ERROR
-    Γ   := extend(Γ, φᵢ')                      -- pᵢ : φᵢ now an assumption
-  B'  := elabType(Γ, B)                         -- the carrier result type (a Type)
-  b   := check(Γ, body, B')                     -- the body at the carrier
-  -- postconditions → obligations over result := b (NOT paired into b)
-  obls := ∅
+    φᵢ' := check(Γ, φᵢ, Ω)                      -- written precondition MUST be Ω
+    Γ   := extend(Γ, pᵢ : φᵢ')                  -- explicit proof argument
+  B' := elabType(Γ, B)                          -- B' : Type ℓ_B
   for ψⱼ in ψ̄:
-    ψⱼ' := check(extend(Γ, result : B'), ψⱼ, Ω) -- MUST check at Ω; result : B' in scope
-    goal := subst(ψⱼ', b / result)              -- ψⱼ[body/result]  (22 §2.2)
-    hⱼ  := freshHole()
-    emit ⟨hⱼ, Γ ⊢ goal, prov(ψⱼ)⟩              -- a typed hole = postulate (24 §2, §6.5)
-    obls := obls ∪ {hⱼ}
-  coreTy := Π(Δp). Π(φ̄'). B'                  -- generated proofs interleaved, written ones last
-  coreTm := λ(Δp). λ(p̄). b                     -- same binders, same order
-  return (declare_def-checked coreTm : coreTy, obls)
+    ψⱼ' := check(Γ, result : B', ψⱼ, Ω)          -- ψⱼ : Ω under result : B'
+  resultTy := if ψ̄ = ∅ then B'
+              else Σ(result : B').(ψ₁' ∧ … ∧ ψₙ')
+  b := check(Γ, body, resultTy)                  -- push expected Σ to each leaf
+  coreTy := Π(Δ'). Π(p̄ : φ̄'). resultTy
+  coreTm := λ(Δ'). λ(p̄). b
+  return (declare_def-checked coreTm : coreTy, obligationsFromLeaves(b))
 ```
 
-- Each precondition `Π` proof-argument is **sound**: `Π(p : φ : Ω). Rest`
-  keys its formation sort on the **codomain** `Rest` (`16 §1.1`, the landed
-  `sort_pi_sigma`), so an Ω domain does **not** collapse the function type —
-  it stays a `Type`. Proof args are at Ω (erased at runtime; discharged at the
-  call as `φ[args]`,
-  `22 §2.3`).
-- The postcondition proof is **not** paired into `b` (no `Σ(B,ψ)` value, §2);
-  it is the obligation `hⱼ`. `b` remains the bare carrier value, so contracts
-  are erasable and the encoding is independent of the `Σ`-sort caveat.
+- `Π(p : φ : Ω). Rest` keys its formation sort on `Rest` (`16 §1.1`), so an
+  Ω domain does not collapse a Type-valued function type. These **written**
+  proof arguments are erased at runtime and owed at the call (`22 §2.3`);
+  they are distinct from a refined domain, which stays a Σ.
+- The postcondition is **not** an obligation over a bare `B` and is **not** a
+  second, verification-only motive. Each leaf constructs `(bₖ,πₖ)` at the
+  checked `resultTy`; each `ψⱼ[bₖ/result]` has its own obligation identity
+  and provenance, combined as the Ω proof `πₖ` (`22 §2.2`, §4). A direct
+  self-call has the declared Σ result type, so its `Proj2` supplies evidence
+  for its postcondition; an eliminator's Σ induction hypothesis does likewise.
+  If an obligation stays open, its applied, typed hole is the second component
+  — the pair is never left without a kernel-checkable proof (`§6.5`).
+- Erasure removes the proof from the **runtime representation**, not from
+  `coreTy`: the returned value runs as `B'`, while the checked core keeps its
+  subset-Σ type (`42`).
 
-**Refinement type** — `{x:A|φ}` lowers to its carrier; uses emit obligations:
+**Refinement type and coercion** — only the outer type is inspected:
 
 ```
 elabType(Γ, {x : A | φ}) → Term:
-  A' := elabType(Γ, A)                          -- the carrier (Type ℓ_A)
-  _  := check(extend(Γ, A'), φ, Ω)              -- predicate MUST check at Ω under x : A; else SURFACE ERROR
-  recordRefinement(A', φ)                        -- elaborator-side fact: A'-values here carry φ
-  return A'                                      -- CORE TYPE IS THE CARRIER (φ not reified, §2)
+  A' := elabType(Γ, A)                         -- A' : Type ℓ_A
+  φ' := check(Γ, x : A', φ, Ω_ℓ_φ)              -- MUST check in Ω, not Type
+  return Σ(x : A').φ'                          -- Type (max ℓ_A ℓ_φ)
 
-check(Γ, a, {x:A|φ}):                            -- introduction: a : A used where {x:A|φ} expected
-  a' := check(Γ, a, A)                           -- value at the carrier
-  emit ⟨freshHole(), Γ ⊢ subst(φ, a'/x), prov⟩  -- obligation φ[a]  (22 §2.1)
-  return a'                                       -- {x:A|φ} ≤ A is free (here, identity)
+coerce(Γ, e : S, T) → Term:
+  if S ≡ T: return e
+  if T whnf's to Σ(x:B).ψ with ψ : Ω:
+    a' := coerce(Γ, e, B)
+    π  := checkedEvidenceOrHole(Γ, ψ[a'/x], e)
+    return Pair(a', π)                         -- checked at the target Σ
+  if S whnf's to Σ(x:A).φ with φ : Ω:
+    return coerce(Γ, Proj1 e, T)
+  reject TypeMismatch
 ```
 
-A **refined parameter** `(x : {y:A|φ})` is syntactic sugar for the carrier
-parameter `(x : A)` plus `requires φ[x/y]` (capture-avoiding substitution). The
-predicate is checked at Ω and gives the callee a proof assumption **only**
-through the generated precondition's Π proof-argument; the caller must provide
-that proof at application (`22 §2.3`). For multiple refined parameters, each
-generated proof-argument immediately follows its carrier binder, in
-left-to-right binder order; these generated `requires` precede the written
-`requires` clauses, which retain their source order, and all precede
-`ensures`. Thus a multi-parameter declaration and a written multi-domain
-function type have the same interleaved Π telescope, not a separate Γ-only
-refinement path. The free forgetful conversion of a *value* `{x:A|φ} ≤ A`
-(§2) is unchanged.
+The checked-evidence search tries, in order, a kernel-checked `tt`, context
+variables, `Proj2 y` for a refined variable `y`, and **term evidence** for
+path conditions (`22 §3`). If none checks, it declares a typed obligation
+hole closed over Γ, path conditions and hypotheses, and applies it to their
+**actual terms** (`§6.5`). `Pair(a',π)` must check at the Σ whether the
+obligation is already discharged or is still a visible postulate. The
+fallback hole has closed type `Π Γ. Π conds. Π hyps. ψ[a'/x]`; its
+application supplies **each** context variable and each term witness for
+condition and hypothesis in order, rather than passing unchecked
+propositions as if they were proofs. Testing the
+**target first** means a refinement-to-refinement coercion can forget its
+carrier and use the source's `Proj2` when introducing the target proof.
 
-A **refined domain in a written function type** must take the same route:
-`(x : {y:A|φ}) → B` denotes `(x : A) → (_ : φ[x/y]) → B`, with the
-proof-argument immediately after the domain it protects. This normalization
-happens **before** ordinary `elabType` erases a refinement to its carrier; it
-applies at every written function-type domain, including types in higher-order
-positions. In a multi-domain function type, each generated proof-argument
-follows its own carrier domain, just as in `elabFn`. In particular, its core
-type is **not** the plain `A → B`: substituting a function requiring `φ` for a
-value of plain `A → B` must be rejected by function-type checking. An
-application through a higher-order variable still supplies the proof argument
-and discharges the same `requires`
-premise; neither a known declaration name nor a body-local hypothesis can
-bypass that obligation (`22 §2.3`).
+A check-only λ, literal, hole or pair literal expected at a refinement first
+checks at its carrier, then introduces the checked pair **once at the check
+entry**. An `if` or `match` checked at a refinement pushes that expected type
+to its leaves. For an **unindexed** scrutinee `s : S`, the convoy motive
+`λ y. Eq S s y → T`, applied to `refl s`, binds a checked branch equation;
+each leaf introduces under that term-backed fact (`22 §3`). For an indexed
+family `D ī`, no equation between `s : D ī` and a constructor at a
+potentially different index is bound. Its branches retain their checked
+**index refinement** (`34 §3.2`), not a scrutinee equality. An `if` over
+`Bool` uses the unindexed convoy. A `let` equation carries `refl`, since
+the kernel substitutes it.
+Forgetful use of a subset at its carrier inserts `Proj1` and incurs **no**
+obligation. Before an elimination inspects an inferred type head
+(application head, match scrutinee, binop operand, field projection or
+condition), it similarly forgets an outer subset by projection, never
+by equating Σ with A.
+
+A **refined parameter** `(x : {y:A|φ})` remains a binder of type
+`Σ(y:A').φ'`; its proof assumption inside the function has the checked term
+`Proj2 x`. Calling that function with a plain `a:A` introduces the argument
+pair at the **call**, owing `φ a` (`22 §2.1`). A refined domain in a written
+higher-order function type stays a Σ domain too: `(x:{y:A|φ}) → B` is
+`Π(x:Σ(y:A).φ).B`, **not** `(x:A) → (_:φ x) → B`. No coercion is inserted
+under `List`, another type former, or a Π binder; no function η-expansion
+manufactures proofs for unconstrained arguments. Thus `List {x:A|φ}` and
+`List A`, or `(Five → Int)` and `(Int → Int)`, remain distinct kernel types.
+A higher-order callee with a refined domain still owes the checked pair at
+its call; a body-local hypothesis or known callee name cannot waive it.
 
 **Goals** — `prove`/`law` lower to standalone obligations:
 
@@ -559,22 +602,54 @@ separate kernel class.
 
 ### 6.4 `old`-capture for `space` operations
 
-A `space` operation denotes a **state-transformer** `⟦f⟧ : S → R × S`
-(`36 §4.2`); its `ensures` is a predicate relating the **pre-state**, the
-`result`, and the **post-state** (`36 §4.3`). Elaboration of an `ensures ψ` on a
-`space`-op binds three things in `ψ`'s scope:
+A `space` operation denotes a **state-transformer with residual effects**:
+`run_state s ⟦body⟧ : ITree F (R × S)` (`36 §4.2`). Its `ensures ψ` is
+an Ω predicate over **every return of that tree**, not a proof attached
+to a user-written `Ret r` (the state-passing pair `(r,s_post)` is created
+*inside* `run_state`). Define `AllRet` by the Ω-motive `elim_ITree` fold
+in `36 §4.3`: `AllRet P (Ret rs) = P rs` and
+`AllRet P (Vis e k) = Π(r:E.Resp e).AllRet P (k r)`.
 
 ```
-elabSpaceEnsures(Γ, f, ψ):                       -- f : a space op, ⟦f⟧ : S → R × S
-  -- bind s_pre : S, result : R, s_post : S; (result, s_post) = ⟦body⟧(s_pre)
-  Γ' := extend(Γ, s_pre : S, result : R, s_post : S)
+elabSpaceEnsures(Γ, f, ψ):                 -- s_pre : S at transformer input
+  Γ' := extend(Γ, s_pre : S, rs : R × S)
   resolve in ψ:
-    old(e)       ↦ ⟦e⟧ at s_pre                   -- pre-state value (36 §4.3)
-    bare cell cᵢ ↦ proj_i(s_post)                 -- post-state value
-  ψ' := check(Γ', ψ, Ω)                           -- MUST check at Ω
-  goal := ψ' with (result, s_post) := ⟦body⟧(s_pre)
-  emit ⟨freshHole(), Γ, s_pre ⊢ goal, prov(ψ)⟩
+    old(e)       ↦ ⟦e⟧ at s_pre             -- pre-state value (36 §4.3)
+    result       ↦ rs.1
+    bare cell cᵢ ↦ proj_i(rs.2)           -- post-state value
+  ψ' := check(Γ', ψ, Ω)                     -- MUST check at Ω
+  t := run_state s_pre ⟦body⟧             -- t : ITree F (R × S)
+  target := AllRet (λ rs.ψ') t             -- target : Ω
+  π := checkedEvidenceOrHole(Γ, s_pre:S, target, t)
+  resultTy := Σ(t : ITree F (R × S)).AllRet (λ rs.ψ') t
+  return λ(s_pre : S).Pair(t,π)           -- checked at the outer Σ
 ```
+
+For multiple written `ensures ψⱼ`, the outer pair's second component
+is `∧ⱼ AllRet (λ rs.ψⱼ(s_pre,rs)) t`; each clause retains its own
+obligation identity/provenance and contributes a checked proof term.
+The single-clause form above is its one-member case. Written
+`requires φ` remains a **separate Π proof argument** at the
+space operation's call: its checked type is
+`Π p̄. Π(s_pre:S).Π(h̄:φ̄(s_pre,p̄)).resultTy`, with one proof
+argument per written `requires` clause. The outer proof `π` carries
+**one recorded obligation per written `ensures` clause** for the
+computed tree; V2 reduces each `AllRet` goal by ι over any known tree
+prefix and leaves residual `Π`-quantified responses and return goals to
+proof search (`22 §2.2`). An open hole remains an applied proof term in
+the *outer* pair. A caller receives `Proj2 : AllRet (ψ s_pre) t` and may
+compose it using `all_ret_bind` (a provable `elim_ITree` lemma in W5, not
+an elaborator coercion). A recursive call likewise supplies `Proj2` at
+`AllRet`, not at a bare leaf predicate. **No** pair is inserted under
+`ITree F`, and `ITree F (R × S)` never converts to
+`ITree F (Σ(rs:R × S).ψ)`.
+
+When `F = 𝟘`, **elaboration collapses the whole result type** using
+`ITree 𝟘 X ≅ X` (`36 §2.4`), yielding
+`S → Σ(rs : R × S).ψ(s_pre,rs)` (with written `requires` arguments
+retained). This is a consequence of the general rule, not a kernel
+conversion `ITree 𝟘 X ≡ X` or an ill-typed `AllRet P` applied to a bare
+`X`. The Ω proof is erased at runtime, not evaluated as data.
 
 **The scope guard (discriminating, not coincidental).** `old(e)` is admitted
 **only** when the enclosing declaration is a `space` operation — the one place a
@@ -585,10 +660,12 @@ guard is the *kind of the enclosing declaration*, asserted explicitly — so the
 conformance verdict flips on it (`old(c)` in a `space`-op `ensures` resolves to
 `proj_i(s_pre)`; `old(x)` in a pure-`fn` `ensures` is rejected), never passing
 vacuously. Worked example (`36 §4.3`): `inc`'s
-`ensures Equal Int n (old(n) + 1)` denotes the obligation
-`Equal Int ((s_pre with .n := s_pre.n + 1).n) (s_pre.n + 1)`, which computes
-by record-β/η (`13 §3`) to `Equal Int (s_pre.n + 1) (s_pre.n + 1)`, discharged
-by `refl` (`16 §2`).
+`ensures Equal Int n (old(n) + 1)` gives the second component of the
+checked result pair the goal
+`Equal Int ((s_pre with .n := s_pre.n + 1).n) (s_pre.n + 1)`, which
+computes by record-β/η (`13 §3`) to
+`Equal Int (s_pre.n + 1) (s_pre.n + 1)`, discharged by `refl`
+(`16 §2`).
 
 ### 6.5 The obligation-hole encoding (the `22` input)
 
@@ -597,39 +674,49 @@ Each contract/refinement/goal point emits an **obligation** — a triple
 `Γ`, admitted as a **postulate** of `φ` (`24 §2`). This is the single
 representation that unifies "obligation," "typed hole," and "visible postulate":
 
-- The program **still type-checks and runs** with open holes — each is a
-  postulate in the trusted base (§5.4), so the system is *honest* about what is
-  assumed.
+- The program **still type-checks and runs** with open holes — each is an
+  applied postulate in the checked pair and a visible trusted-base entry
+  (§5.4), so the system is honest about what is assumed. Its Ω proof
+  component is erased before runtime evaluation (`42 §3.2`); an open
+  proof-only hole does not make the carrier value `unknown`.
 - **Discharging** a hole means a certificate `p` with `Γ ⊢ p : φ` that the
-  kernel `check`s (`18 §4.5`); the postulate is then retired and the claim turns
-  `proved` (§5.4). Proving is hole-filling.
+  kernel `check`s (`18 §4.5`); its postulate is retired and the pair remains
+  unchanged. The claim turns `proved` only if no other open obligation
+  hole is reachable through `p` (§5.4); audited axioms remain visible.
 - The holes are **precisely located** (provenance) and independent — provable in
   any order / in parallel (`22 §5`).
 
 The interaction of the spec forms is uniform through this encoding: specs
-elaborate to the carrier core (Σ, Π, Ω, `Eq`) plus an obligation set; refinement
-"subtyping" is the obligation `φ` on the introduction direction; and a spec
-proposition may itself use earlier `prove`d lemmas, `law`s, and refinements —
-specs compose by composing their obligations.
+elaborate to checked core (Σ, Π, Ω, `Eq`) **with typed proof terms** plus an
+obligation set. Refinement introduction produces the checked `Pair(a,π)`;
+when π comes from an open hole, its declaration is closed over Γ, condition
+equations and hypotheses, then **applied to their kernel terms**. An
+obligation-only fact without term evidence cannot be put into the pair.
+Discharging the hole supplies a checked body in place of its postulate; the
+pair remains intact. A spec proposition may use earlier checked lemmas,
+`law`s, and refinements; transitive honesty (§5.4) still applies to any
+reachable open hole.
 
 ## 7. The V1→V2 interface
 
 V1 produces, per definition, exactly what obligation generation (`22`, V2)
 consumes. The interface is four things:
 
-1. **The elaborated core term** — kernel-checkable, with the contract encodings
-   of §6.3: carrier result and parameters, written and generated precondition
-   `Π` proof-arguments, and the bare body. V0 re-checks it (`18 §4`); a
+1. **The elaborated core term** — kernel-checkable, with the contract
+   encodings of §6.3: refined parameters as subset-Σ binders, written
+   preconditions as Π proof arguments, and `ensures` as a subset-Σ result
+   whose branches introduce checked pairs. V0 re-checks it (`18 §4`); a
    spec program with a type error has no core image and is rejected (`39 §3`).
 2. **The obligation-hole set** — the ordered set of `⟨id, Γ ⊢ φ, provenance⟩`
    (§6.5), one per `ensures`/refinement-introduction/`prove`/`theorem`/`proof`/
    `law`-field site, each a typed hole `?id : φ` admitted as a postulate.
 3. **The at-introduction hypotheses** — each hole's `Γ` already carries the
-   facts in scope where the obligation *arose*: written and generated
-   preconditions (`22 §3`). V2 **extends** each `Γ` with path-sensitive
-   facts (let-equations, case-split constructor equations, body-as-motive
-   induction hypotheses — `22 §3`/`§4`); V1 provides the seed context, V2 the
-   accumulation.
+   facts in scope where the obligation *arose*: written preconditions and
+   refined-parameter projections (`22 §3`). V2 **extends** each `Γ` with
+   path-sensitive facts **and their term evidence** (let-equations,
+   convoy-bound unindexed branch equations, indexed-family index
+   refinements, Σ-result induction hypotheses — `22 §3`/`§4`); V1 provides
+   the seed context, V2 the accumulation.
 4. **The provenance** — source span + responsible clause per hole, for the
    diagnostics (`24`) and the protocol (`25`).
 
@@ -659,18 +746,22 @@ merely cited.
   lower the sort to Ω — so threading preconditions preserves the function type's
   `Type`-hood. This is the sound half of the codomain-keying (a Π *into* a
   relevant type stays relevant).
-- **Refinement carrier level.** `{x:A|φ}` elaborates to the carrier
-  `A : Type ℓ_A` (§6.3) — the predicate is elaborator-tracked, not reified — so
-  the refinement type sits at **exactly `Type ℓ_A`**, no bump. This is the level
-  reconcile's load-bearing choice: by keeping the carrier the core type, V1
-  **never forms a core `Σ` over an Ω predicate**, so it does not depend on the
-  kernel's `Σ`-over-Ω sort (the §2 caveat, now an Architect-confirmed erratum).
-  The
-  same-level refinement is the standard subset-type discipline (a subset stays
-  at its carrier's universe).
-- **Postcondition certificate.** `ψ[b/result] : Ω_ℓ`; its proof `p : ψ` is at Ω
-  (irrelevant, erasable). `check(env, Γ, p, ψ)` is an ordinary kernel check; no
-  level appears on the function beyond the carrier's.
+- **Subset-Σ refinement level.** `A : Type ℓ_A` with `φ x : Ω_ℓ_φ` under
+  `x:A` forms `Σ(x:A).φ x : Type (max ℓ_A ℓ_φ)` (`13 §4`), not Ω. The
+  relevant first component prevents proof-irrelevance from erasing A at the
+  **kernel** level; an Ω-valued second component is proof-irrelevant but may
+  raise the type's universe through predicative `max`. A higher-level
+  predicate cannot silently remain at the carrier's level (`12 §2`/§3).
+- **Postcondition certificate.** `ψ[b/result] : Ω_ℓ_ψ`; for an `ensures`
+  result `B : Type ℓ_B`, the result is the checked core
+  `Σ(result:B).ψ : Type (max ℓ_B ℓ_ψ)`. Its proof `p : ψ` is Ω-irrelevant,
+  erasable at runtime and kernel-checked inside each result pair; an open
+  typed hole is a visible postulate. For a `space` operation,
+  `B = ITree F (R × S) : Type ℓ_T` and the Ω predicate is
+  `AllRet (ψ s) t : Ω_ℓ_All`; its outer result is
+  `Type (max ℓ_T ℓ_All)`. The `AllRet` fold's Π response domains
+  contribute to `ℓ_All` predicatively (`36 §4.3`). Neither case is a
+  separate obligation over a bare-returned carrier.
 - **`prove`/`law`.** `prove name : φ` gives `name : φ : Ω_ℓ`. A `law` of all-Ω
   fields is a conjunction — the sound `Σ`-of-Ω-into-Ω case (`16 §1.3`,
   `sort_pi_sigma` with **both** components Ω) — so the bundle is itself a
@@ -678,9 +769,9 @@ merely cited.
 - **No new universes or formers.** V1 introduces no universe or proposition
   former — it reuses Ω (`16 §1`) and the derived connectives (`16 §1.3`). So the
   reconcile reduces to: every spec body lands in Ω at its scope's level, and the
-  contract encoding preserves the carrier's `Type` level. Consistent with `12`'s
-  predicative, non-cumulative regime — no implicit lifts; a level-mismatched
-  proposition is a `TypeMismatch`, not a coercion.
+  contract encoding uses the kernel's Π/Σ formation levels. Consistent with
+  `12`'s predicative, non-cumulative regime — no implicit lifts; a
+  level-mismatched proposition is a `TypeMismatch`, not a coercion.
 - **Named proof claims stay in the same Ω lane.** `prop`, `theorem`, and attached
   `proof` bodies all check at `Ω`; the attached form is still an ordinary proof
   term attached to a subject path, not metadata, not a proof search table, and
@@ -690,7 +781,7 @@ merely cited.
 
 The spec syntax (`requires`/`ensures`, `{x:A|φ}`, `prove`/`law`) with concrete
 grammar (§6.1) and AST (§6.2); its **Ω-typing** of every proposition (§4); its
-**elaboration to core** as the carrier-plus-obligation encoding (§6.3), the
+**elaboration to core** as subset-Σ plus checked proof obligations (§6.3), the
 `old`-capture rule for `space` ops (§6.4), and the obligation-hole form (§6.5);
 the **verification status model** — the per-obligation verdict
 trichotomy and the per-claim four-way epistemic status, the projection, and the
@@ -701,7 +792,11 @@ Acceptance ties to **G2**: a real function with an `ensures` whose correct proof
 is accepted (verdict `proved`, certificate kernel-`check`ed) and whose wrong
 proof is rejected (verdict `not proved` — `disproved` or `unknown`, the
 verdict-flip); a refinement introduction emits its obligation; an `incomplete`
-claim is distinguishable from `proved` by `trusted_base()` membership (§5.4);
-`old` resolves in a `space`-op `ensures` and is rejected out of scope (§6.4);
-and V0's behavior is unchanged for non-spec programs (§6.2). Conformance:
-`../../conformance/verify/spec-syntax/`.
+claim is distinguishable from `proved` by a checked certificate **and**
+`postulates_reachable` with no open obligation hole, including a hole reached
+through another refined constant's `Proj2` (§5.4); `old` resolves in a
+`space`-op `ensures` and is rejected out of scope (§6.4); and V0's behavior
+is unchanged for non-spec programs (§6.2). Conformance:
+`../../conformance/verify/spec-syntax/`. Subset-Σ core-shape expectations
+remain W5-deferred while the carrier-only implementation is current;
+transitive-honesty query expectations are W4-deferred (§intro).

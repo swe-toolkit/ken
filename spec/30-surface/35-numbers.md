@@ -117,9 +117,11 @@ universal value carrier and **not** the default for integer literals (§4). ℝ
 does not embed faithfully in `Float` — `Float` equality is the usual IEEE
 minefield (NaN ≠ NaN, ±0, rounding) and Ken does not pretend otherwise. Proofs
 about reals use `Decimal`/rationals or an explicit error-bound discipline, never
-`Float ==`. `Bool` lowers to `i1`; `Char` is a **Unicode scalar value** lowering
-to `u32` — its valid range is U+0000–U+10FFFF **excluding the surrogate block**
-U+D800–U+DFFF (a refinement on the carrier, not all `u32` are `Char`).
+`Float ==`. `Bool` lowers to `i1`; `Char` is a **Unicode scalar value**,
+the checked core `Σ(c:Int).isScalar c` (`18a §5.9.1`). Its runtime codepoint
+may lower to `u32` after erasing the Ω proof. The valid range is
+U+0000–U+10FFFF **excluding the surrogate block** U+D800–U+DFFF;
+not every `u32` or `Int` is a `Char`.
 
 ## 3. Overflow and partiality
 
@@ -132,7 +134,9 @@ discipline).
 `Int` is arbitrary-precision, so `+`/`-`/`*` are **total** (no overflow
 obligation). The one partial point is **division/modulo by zero**: `div`/`mod`
 either take a `{ d | d ≠ 0 }` refinement argument making them total (`34 §5` —
-refinement coercion `{x:A|φ} ≤ A` emits the `φ` obligation at the use site), or
+passing an `A` where `{x:A|φ}` is expected constructs a checked subset
+pair and owes `φ` at the argument site; forgetting to `A` via `Proj1` is
+free), or
 return `Option`/a checked error (`36`). A raw `/` or `%` on a possibly-zero
 divisor emits a **non-zero side-condition obligation** at the operation site
 (`22 §2.4`), not a silent trap.
@@ -296,10 +300,12 @@ and type (`Int.toFloat` above 2⁵³). `Int + Int64` *without* an explicit
 conversion is a **type error** (AC5) — there is no widening coercion to make the
 operands agree.
 
-> **Not a counterexample:** refinement coercion `{x:A|φ} ≤ A` (`34 §5`) is *not*
-> an implicit numeric coercion — it is the identity on the same underlying type
-> `A`, carrying a proof obligation, not a representation change between two
-> numeric types. The "no implicit coercion" rule is about *numeric-type* moves.
+> **Not a counterexample:** forgetting `{x:A|φ} ≤ A` (`34 §5`) inserts the
+> checked projection `Proj1` from a subset-Σ, with no new proof obligation;
+> erasure gives the same runtime carrier representation. It is **not** a
+> conversion between numeric types. Conversely introducing a plain `A` at
+> the subset type needs a checked pair and proof. The "no implicit coercion"
+> rule here is about numeric-type moves.
 
 ## 6. Kernel view and prelude laws
 

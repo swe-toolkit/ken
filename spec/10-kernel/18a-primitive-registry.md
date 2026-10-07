@@ -570,15 +570,17 @@ arithmetic lemmas — so the lawful-`Decimal` deliverable is **re-deferred**
 pending the decide-once carrier/quotient call (`90 §OQ-decimal-eq`); `Ord Char`/
 `DecEq Char` are **unaffected** (canonical carrier: one value per codepoint).
 
-The derived defs sit in the interpreter's
-tested-not-trusted ring over F1's tier-b arithmetic (§5.2.1 (5)) and §5.2.2; the
-demote touches **no** kernel file and **net-shrinks** `trusted_base()` — the
-four `*_decimal` primitives + the `Decimal` type registration leave against
-**one** honest-visible addition, the internal deferred-align postulate
-`decimalPow10Unbounded : Int → Int` (§5.6.1(2)'s large-`|Δexp|` stuck-marker;
-function-typed ⇒ soundness-inert). A **net shrink (−5** over the combined
-`Decimal`/`Char` tranche**)**, **not** a zero-addition — the same
-absolute-vs-net precision as the zero-NEW-delta `Char` laws (§5.9.1).
+The derived defs sit in the interpreter's tested-not-trusted ring over
+F1's tier-b arithmetic (§5.2.1 (5)) and §5.2.2. The **Decimal** demote
+adds no kernel rule and removes the four `*_decimal` primitives and the
+`Decimal` type registration; its one honest-visible addition is the
+internal deferred-align postulate `decimalPow10Unbounded : Int → Int`
+(§5.6.1(2)'s large-`|Δexp|` stuck-marker; function-typed ⇒
+soundness-inert). The *combined* `Decimal`/`Char` registry proposal is a
+`trusted_base()` count shrink of −5 (six removals, that one addition),
+**not** a claim that the Char subset-Σ transition touches no trusted
+kernel code: its three checked Char sites change (§5.9.1). Count the
+actual registry delta when the transition lands.
 
 ### 5.7 Conversions (`35 §5` — closed named set, no implicit coercion)
 
@@ -669,8 +671,8 @@ to `trusted_base()`.
 
 ### 5.9 `Char` — DEMOTE→derived (refinement `{ c : Int | isScalar c }`)
 
-**RULED refinement; TYPE + ops both demote (double TCB removal) — the fork was
-forced.** An *opaque* `Char` has no projection to `Int` and no case-split, so
+**RULED refinement; the primitive type retires and ops derive — the fork
+was forced.** An *opaque* `Char` has no projection to `Int` and no case-split, so
 `eq_char`/`leq_char` could not derive (nothing to project) and would be NATIVE
 by the *exact* argument that keeps `eq_int` native. The ops demote **iff**
 `Char` is the refinement (which supplies the projection + the decidable intro) —
@@ -680,10 +682,10 @@ is the coherent, strictly-better option over {opaque + native ops}
 (Char-specific postulate-only, type stays in the TCB). Given bignum `Int` (F1):
 
 - `eq_char`/`leq_char`/ordering ⇒ `eq_int`/`leq_int` on the free projection
-  `proj : Char → Int` (CV-confirmed constant-factor) → **DEMOTE** — the **ops**
-  reduce (zero-delta computational); the `DecEq`/`Ord Char` **law instances**
-  are **zero-NEW-delta** over `Int` (re-home to the lawful-classes lane,
-  §5.9.1(3)).
+  `proj := Proj1 : Char → Int` (CV-confirmed constant-factor) → **DEMOTE** —
+  the **ops** reduce (zero-delta computational); the `DecEq`/`Ord Char`
+  **law instances** are **zero-NEW-delta** over `Int` (re-home to the
+  lawful-classes lane, §5.9.1(3)).
 - `Char.toInt` = `proj` (derived); `Int.toChar : Int → Option Char` =
   refinement-intro with the decidable check → **face-(c)** (`None` on
   surrogate/out-of-range) → derived.
@@ -712,14 +714,20 @@ is the coherent, strictly-better option over {opaque + native ops}
    valid-UTF-8 `String` only yields scalars, so `isScalar c` reduces to its
    canonical inhabitant. **No primitive can fabricate a non-scalar `Char`.**
 
-`Char` literals (`'a' ↝ 97` + the scalar proof) are an elaborator concern.
+`Char` literals (`'a' ↝ Pair(IntLit 97, tt)`) are checked kernel
+subset-Σ values, not bare `IntLit` values checked at `Char`. The kernel's
+Char registration, literal admission and checked String-literal view must
+honor the pair shape (§5.9.1), even though ordinary source literal syntax
+is elaborated outside the kernel.
 
 ### 5.9.1 `Char` delivery contract — refinement + derived ops (incl. `Ord Char`)
 
 This subsection is the **normative contract** the §5.9 DEMOTE satisfies
-(representation-independent); perishable anchors live in the WP brief.
+with the subset-Σ representation (`../20-verification/21 §2`); perishable
+anchors live in the WP brief.
 
-**(1) Removal-not-shadowing — a double TCB removal.** The primitive `Char`
+**(1) Removal-not-shadowing — primitive type out, derived ops in.** The
+primitive `Char`
 **type** registration (`reg_ty!("Char")`) is **deleted**; `Char` becomes the
 refinement `{ c : Int | isScalar c }` over `Int`. `Char` has **no** native
 computing ops on main today (no `eq_char`/`leq_char`/`Char.toInt`/`Int.toChar`
@@ -729,6 +737,15 @@ through the checked-literal kernel view (`17 §1`); only direct `prim_reduce`
 returns `Neutral`), so this is a type-conversion +
 **net-new derived ops**, not the removal of working native ops. **No** surviving
 primitive `Char` type; **no** new kernel flag / `Decl` variant (AC-G).
+`Char` is a transparent name for `Σ(c:Int).isScalar c`; it is **not**
+convertible to `Int`. Three existing kernel touch points must change with
+this demote: checked registration classifies the Σ predicate at Ω and retains a
+closed witness term to check **at each scalar** (not a proof that every
+integer is scalar); checked character literals produce
+`Pair(IntLit c,w)` at `Char`; the checked String-literal view produces
+`List Char` elements of that same pair form. Every element is individually
+kernel-checked at `Char` when that view is admitted, not assumed scalar
+because a String producer happened to emit it.
 
 **(2) The refinement + `isScalar` Ω-encoding — soundness pin 1 (load-bearing).**
 `isScalar c := IsTrue (inRangeBool c)`, with `inRangeBool c : Bool` computed by
@@ -739,12 +756,14 @@ primitive `Char` type; **no** new kernel flag / `Decl` variant (AC-G).
 `A + B` (the `Bool → Ω` trap, `16 §1.3`); range-disjointness does **not** rescue
 it (the injection tag stays). The build producer-greps that the definition is
 `IsTrue(<computed Bool>)`, **not** a `∨`/`∃`/multi-constructor form at Ω.
-**Payoff (load-bearing):** Ω-PI makes `Char` equality reduce to **codepoint**
-equality (same codepoint, distinct scalar proofs → equal by Ω-PI — a
-**zero-delta** kernel fact) — holds **only** because `isScalar` is genuinely
-proof-irrelevant, which the naive `∨` is not. (The Ω-PI *collapse* is
-zero-delta; the full `DecEq Char` **lawful instance** is **zero-NEW-delta**,
-bottoming out at `DecEq Int`, and re-homes to the lawful-classes lane per (3).)
+**Payoff (load-bearing):** by Σ-η and Ω proof irrelevance, two checked
+`Char` pairs with convertible `Int` projections and different scalar
+proofs are definitionally equal; distinct codepoints remain distinct.
+This is **not** `Char ≡ Int`: the Ω-PI shortcut applies only to the proof
+component, never to the Type-valued Σ or its first component (`13 §4`).
+The full `DecEq Char` lawful instance is **zero-NEW-delta** relative to
+`DecEq Int`, by proofs over `Proj1` and Σ-η, and re-homes to the
+lawful-classes lane per (3).
 
 **(3) Derived ops over the projection — all reduce this tranche.** With
 `proj : Char → Int` the free projection:
@@ -766,37 +785,37 @@ bottoming out at `DecEq Int`, and re-homes to the lawful-classes lane per (3).)
   reduces to `Some`. Stubbing `inRangeBool := True` flips both invalid
   inputs to `Some`; stubbing only `isScalar := true` leaves this direct
   match unchanged and cannot discriminate this case.
-- `Ord Char`: `leq_char a b := leq_int (proj a) (proj b)` — the **op** reduces
-  (via `leq_int`, §5.2.2), computational and unaffected; its completeness rides
-  `leq_int` reducing (lands this tranche → **no F5 dependency remains for
-  `Char`**). The `Ord Char` **law-carrying instance** homes in the
-  **lawful-classes lane** (next to `Ord Int`), **not** this demote: after
-  refinement erasure `Char ≡ Int` (`21 §6.3`, `proj` the identity), so its `Ord`
-  laws (reflexivity / antisymmetry / transitivity / totality) **are**
-  `Ord Int`'s laws — established by **transporting** `Ord Int`'s visible
-  audited-delta
-  `Axiom`, **zero-NEW-delta** (no *new* postulate beyond `Int`'s; `§5.4`
-  `Ord Int` postulate-only), **not** independently `Axiom`-free via `proj`
-  injectivity. The honesty discriminator is a **declared-visible** law (the
-  transported `Ord Int` `Axiom`) vs a **deceptive empty/false stub**, not
-  zero-delta-vs-postulate.
+- `Ord Char`: `leq_char a b := leq_int (Proj1 a) (Proj1 b)` — the **op**
+  reduces (via `leq_int`, §5.2.2); its completeness rides `leq_int`
+  reducing (lands this tranche → **no F5 dependency remains for `Char`**).
+  The `Ord Char` **law-carrying instance** homes in the lawful-classes lane
+  (next to `Ord Int`), **not** this demote. Each law specializes the visible,
+  audited-delta `Ord Int` law to the two `Proj1` values; where the conclusion
+  is equality of `Char` values, Σ-η and Ω proof irrelevance lift equality
+  of their projections. This is **zero-NEW-delta** (no *new* postulate
+  beyond `Int`'s; `§5.4` `Ord Int` postulate-only), **not** type-level
+  transport along a false `Char ≡ Int`, nor independently Axiom-free.
+  The honesty discriminator is a declared-visible `Ord Int` assumption
+  versus a deceptive empty/false stub, not zero-delta-vs-postulate.
 
-**(4) String→`Char` extraction COMPUTES the canonical scalar proof — the runtime
-face (soundness pin 2).** `char_at` / `string_to_list_char` construct
-`(c, canonical_proof)` where the `isScalar c` witness is **reduced** from the
-`String`'s UTF-8 validity invariant — a valid `String` yields only scalars, so
-`inRangeBool c` reduces to `true` and the proof is the canonical inhabitant
-`Proved : Top`. The witness is **computed**, never `declare_postulate` / `Axiom` /
-`sorry` / hand-fed: an extraction path that *asserts* the scalar proof instead
-of reducing it is the **trusted-not-proved hole** this pin exists to catch (the
-static-vs-runtime-face discipline — grep the producer for obligation discharge,
-not the type signature). **No primitive may fabricate a non-scalar `Char`.** The
-refinement + derived ops sit in the tested-not-trusted ring over F1 + §5.2.2;
-the demote removes the `Char` primitive type and adds **no** `trusted_base()`
-line **of its own** and **no** kernel touch — a double net shrink (type +
-would-be native ops). The one postulate the combined `Decimal`/`Char` tranche
-adds is `Decimal`'s deferred-align `decimalPow10Unbounded` (§5.6.1), **not** a
-`Char` line — so the tranche net is **−5**, a shrink, not a zero-addition.
+**(4) String→`Char` extraction COMPUTES the canonical scalar proof — the
+runtime face (soundness pin 2).** `char_at` / `string_to_list_char`
+construct the checked core pair `Pair(IntLit c,w)` at `Char`, where
+`isScalar (IntLit c)` reduces to `Top` for a scalar, and the closed witness
+`w` is `Const tt`. The checked String-literal view admits each such pair
+only after the kernel checks it at `Char`; otherwise `Proj2` would become a
+proof of an unchecked scalar predicate. A surrogate makes the predicate
+reduce to `Bottom` and cannot be checked as `Char`. The witness is
+**computed**, never a postulate / `Axiom` / `sorry` / hand-fed: an
+extraction path that merely asserts it violates the static and runtime
+faces of this pin. **No primitive may fabricate a non-scalar `Char`.**
+At runtime the Ω proof is erased and never evaluated (`42`), so the value
+remains the integer codepoint. The demote removes the primitive `Char` type
+registration and adds **no Char-specific postulate** to `trusted_base()`;
+it nevertheless **requires** the three checked-kernel Char changes in (1),
+not a claim of zero kernel work or `Char ≡ Int`. The one postulate in the
+combined `Decimal`/`Char` tranche is `decimalPow10Unbounded` (§5.6.1);
+any numerical net TCB delta must be audited after these kernel changes.
 
 ### 5.10 Basic data structures — no primitive reductions
 
@@ -839,17 +858,20 @@ tranche** post-ratification, ordered by the F1 dependency root (§4.1): **F1 →
 `Decimal`/`Char` demote → F2 + F3 → F5 → conversions**, each gated on the
 independent-reference + boundary-operands oracle (§3). No drop-everything hotfix
 (kernel intact); pulling F1+F3 into a pre-ratification correctness patch is the
-Steward's call. The **TCB delta** Pat ratifies — the audit **net-shrinks** the
-trusted base (the `Decimal`/`Char` demote is a **net −5**: six primitive/type
-registrations leave against one honest-visible deferred-align postulate
-`decimalPow10Unbounded` — a net shrink, **not** a zero-addition). **Leave**
+Steward's call. The **registry trusted-base delta** projected by the audit
+is a **net −5** for the `Decimal`/`Char` demote: six primitive/type
+registrations leave against one visible deferred-align postulate
+`decimalPow10Unbounded`. This is a register count to check at landing,
+**not** a net-size claim about the kernel code: three existing
+checked-Char sites need subset-Σ changes (§5.9.1). **Leave**
 (DEMOTE→derived — the trusted op removed and its class
 laws gained: **zero-delta** on an inductive carrier like the `Bool` logic ops,
 **zero-NEW-delta** over an opaque floor like `Int`/fixed-width for the rest —
 except where a **non-canonical** carrier leaves an `Equal`-tying class law
 undeliverable (`DecEq`/`Num Decimal`, §5.6.1(4)) — in
-place of type-specific postulates): `Decimal` (type + ops), **`Char`** (type +
-ops, a *double* removal), `neg_int`, the `Bool` logic ops, and
+place of type-specific postulates): `Decimal` (type + ops), **`Char`**
+(primitive type removed and ops derived, with checked-kernel Char updates),
+`neg_int`, the `Bool` logic ops, and
 `checked`/`saturating`
 (all fixed-width). **Enter** (GAP→NATIVE, spec-mandated): `div`/`mod` and the
 **completed `IntN↔Int` conversion floor** (plus the `Int`/`Float`/`Decimal`

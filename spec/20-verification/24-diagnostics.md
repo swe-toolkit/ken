@@ -123,18 +123,21 @@ A V3 `unknown` verdict's evidence is a **typed hole** (`23 §1.2`):
   so it appears in **`trusted_base()`** (`18 §5`, `21 §5.4`): the system is
   *honest* that `φ` is **assumed, not proved**. This is the same
   kernel-structural status as the prover's honesty guard (`23 §1.3`) — a hole
-  reads `unknown`, never silently `proved`, because the discriminator is
-  postulate membership in the kernel's own `trusted_base()`, not a V-layer flag.
-  Shipping a verified artifact means **zero** spec-induced postulates in
-  `trusted_base()` (or an explicit, recorded acceptance of the listed ones,
-  `21 §5.4`).
-- **`unknown` propagation (runtime).** Evaluating an expression that depends on
-  an open hole yields the runtime third value **`unknown`** (`41 §6`, `42 §4`) —
-  the *operational face* of the diagnostic: the program **runs**, and `unknown`
-  marks exactly where the unproven property bears on a result (the Hazel "total
-  error localization, program still runs" model). The static diagnostic ("this
-  goal is `unknown`") and the runtime value are the **same third value**.
-  Propagation is Kleene/Heyting (`41 §6`, `42 §4`):
+  reads `unknown`, never silently `proved`: the discriminator is the
+  kernel-checked certificate plus transitive postulate reachability
+  (`21 §5.4`), not merely same-goal membership or a V-layer flag.
+  Shipping a verified artifact means **no reachable open obligation hole**
+  on its exported proofs; audited contract axioms remain recorded in the
+  assumption boundary (`21 §5.4`, `18 §5`).
+- **`unknown` propagation (runtime).** Evaluating an expression that
+  **computationally** depends on an open hole yields the runtime third
+  value `unknown` (`41 §6`, `42 §4`): the program runs, and the value marks
+  where the hole is demanded. An open hole in an erased subset-Σ proof
+  leaves the static verdict `unknown` and a visible trusted-base entry,
+  **but its carrier value remains definite**; the proof is never evaluated
+  (`42 §3.2`). Static `unknown` status is not itself a runtime value.
+  Propagation in computational positions is Kleene/Heyting (`41 §6`,
+  `42 §4`):
 
 ```
 strict positions propagate (apply / elim-scrutinee / strict prim / cast / Eq /
@@ -156,17 +159,20 @@ absorbing connectives short-circuit on the KNOWN operand (the hole is NOT forced
   **scrutinee** propagates, but an `unknown` in an **untaken** arm is discarded
   (`∧false`/`∨true` are decided by the *other*, known operand without forcing
   the hole — the connective is non-strict in the absorbing position, the
-  CBV-laziness carry). The discriminating runtime test flips on **hole-present ⇒
-  `unknown`** vs **hole-free ⇒ a definite value**; a hole-free program **never**
-  yields `unknown` (`41 §6`, `42 §4` AC4).
+  CBV-laziness carry). The discriminating runtime test flips on a
+  **computationally reached hole ⇒ `unknown`** vs that hole discharged ⇒ a
+  definite value; a hole-free program never yields `unknown` (`41 §6`,
+  `42 §4` AC4). For an erased subset proof, the runtime result is the same
+  carrier in both states and the **verification status** distinguishes them.
 - Holes are **precisely located** (provenance from `22 §1`) and carry their goal
   + context, so an agent (or the REPL "Little Prover", `21 §3`) can pick one
   up and try to fill it without re-deriving where it came from.
 
 This unifies **obligation** (`22`), **typed hole** (this section), and **visible
 postulate** (`18 §5`) into one concept: verification is *incremental*,
-and what remains unproven is always explicit — statically (the hole in
-`trusted_base()`) and dynamically (the propagating `unknown` value).
+and what remains unproven is always explicit **statically** (the hole in
+`trusted_base()`); it produces runtime `unknown` only when computationally
+reached, never merely because an erased Ω proof is open.
 
 **The typed-hole diagnostic value:**
 
@@ -307,8 +313,9 @@ data an agent consumes; the wire serialization is `25`, out of scope):
 1. **Kripke countermodels** (§1) with the `false`-vs-`unknown` discriminator
    read faithfully from V3's verdict (`disproved` ⇒ forces `¬φ` ⇒ `false`;
    `unknown` ⇒ no forcing world ⇒ `unknown`).
-2. **Typed holes** (§2) as visible postulates in `trusted_base()` with `unknown`
-   runtime propagation per the Kleene/Heyting table (`41 §6`, `42 §4`).
+2. **Typed holes** (§2) as visible postulates in `trusted_base()`;
+   computationally reached holes propagate runtime `unknown`, while erased
+   Ω proof holes leave a definite carrier (`41 §6`, `42 §4`).
 3. The **three-region** Heyting decomposition (§3) — proved / false / `unknown`,
    the `unknown` region being the `¬¬φ` gap.
 4. **Slice / missing-hypothesis** contextualization (§4), `unknown`-only.
@@ -322,12 +329,14 @@ The load-bearing properties, all of which conformance pins:
 - **`false` vs `unknown` is honest** (§1): a refuted goal → countermodel tagged
   `false`; a `¬¬φ`-gap goal (e.g. `p ∨ ¬p`) → `unknown`, **not** `false`
   (verdict-flip + the cross-case metatheory-consistency sweep, §3 / `23 §5`).
-- **Typed holes run** (§2): a program with an open hole type-checks + runs;
-  `unknown` propagates per the table; hole-free ⇒ no `unknown`.
+- **Typed holes run** (§2): a program with an open hole type-checks and
+  runs; `unknown` propagates from computationally reached holes, **not**
+  erased subset proofs; hole-free ⇒ no `unknown`.
 - **Three regions partition** (§3) and a fully-`proved` program emits **zero**
   diagnostics (AC5; V3's pipeline unaffected).
 
 Acceptance ties to **G4**: every failed obligation emits a schema-valid
 diagnostic (`25`) carrying a countermodel or typed hole + region-tagged
-suggested actions, and a partially-verified program runs propagating `unknown`.
-Conformance: `../../conformance/verify/diagnostics/`.
+suggested actions, and a partially verified program runs, propagating
+`unknown` only where its computation reaches a hole rather than erasing
+a proof. Conformance: `../../conformance/verify/diagnostics/`.

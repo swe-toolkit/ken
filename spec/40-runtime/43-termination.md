@@ -30,9 +30,11 @@ nicety.
 A program is not "all total all the time"; partiality enters only at **marked**
 points, never silently:
 
-1. **Open verification holes** → `unknown` at runtime (`42 §4`,
-   `../20-verification/24 §2`). The hole is a *listed postulate*
-   (`../10-kernel/18 §5`); a fully-verified program has none.
+1. **Open verification holes** → `unknown` **when computationally
+   reached** at runtime (`42 §4`, `../20-verification/24 §2`). A hole
+   in an erased subset-Σ proof stays a listed postulate and an
+   `unknown` verification status but does not taint its carrier value
+   (`42 §3.2`). A fully verified program has no open obligation holes.
 2. **Partial primitive operations** — division by zero, fixed-width overflow
    under a non-wrapping op (`../30-surface/35 §3`), array index out of bounds.
    These either (a) carry a **refinement precondition** making them total (`{ d
@@ -59,7 +61,8 @@ points, never silently:
 ## 3. The honest statement
 
 > Ken's **verified** core is total and its logic consistent. **Runtime**
-> partiality is confined to: open holes (→`unknown`, listed), unguarded partial
+> partiality is confined to: open holes (listed; →`unknown` if
+> computationally reached), unguarded partial
 > primitives (→ obligation, then fault/`unknown`), the FFI/effect boundary (→
 > listed postulate), and opt-in opaque non-total definitions — plus,
 > **distinct** from these, **resource-limit exhaustion** (`CapacityExhausted`,

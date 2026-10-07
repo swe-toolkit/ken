@@ -281,8 +281,9 @@ fn normalize(env: &GlobalEnv, ctx: &Context, t: &Term) -> Term;  // full NF (NbE
 // ── Elaborator precondition — raw syntactic well-formedness (no env, no types).
 fn raw_well_formed(ctx: &Context, t: &Term) -> KernelResult<()>;
 
-// ── Trusted-base enumeration — a method on the env (§5).
+// ── Trusted-base enumeration and read-only dependency query (§5).
 impl GlobalEnv { fn trusted_base(&self) -> Vec<GlobalId>; }
+fn postulates_reachable(env: &GlobalEnv, term: &Term) -> BTreeSet<GlobalId>; // W4 target, not landed
 ```
 
 The **input** to `declare_inductive` is the lightweight `InductiveSpec`
@@ -328,6 +329,7 @@ entry may return.
 | `normalize` | `t` well-typed | **full normal form** (NbE): whnf then normalize under binders. Total on well-typed terms | none — total |
 | `raw_well_formed` | — | `Ok` ⇒ `t`'s de Bruijn indices are in scope under `ctx` and it uses no reserved former — the **elaborator precondition** before `infer`/`check` | `VarOutOfScope`, `IllFormedDecl` |
 | `GlobalEnv::trusted_base` | — | enumerates **exactly** the postulates + primitives (as `GlobalId`s), excluding the prelude (`Top`/`Bottom`/`tt`) and excluding definitions/inductives (re-checked, not trusted); every postulate id resolves to its audit label — §5 | none — total |
+| `postulates_reachable` (W4 target) | `term` is a checked core term in `env` (possibly under a checked context) | returns the exact set of postulate `GlobalId`s reached from `term` through its term substructure and transparent declaration bodies, following δ dependencies transitively; primitives are not postulates — §5. Read-only and off `check`/`convert` | none — total on checked input |
 
 The required `String` is an audit label stored on the opaque declaration, not a
 term and not part of definitional identity. `Decl::Opaque` has a required,
@@ -508,6 +510,18 @@ postulates minted internally by the elaborator or its Rust support, not only
 surface `Axiom` expressions. Idiomatic Ken adds **no** postulates; classical
 axioms, if used, appear here and are visible (`16 §1.3` — Ω is
 intuitionistic, excluded middle is not assumed).
+
+For a checked certificate `p`, `postulates_reachable(env,p)` traverses
+its core term and the transitive δ-closure of referenced **transparent**
+definitions, accumulating postulate identities in a finite set; a
+visited-identity guard handles shared dependencies. It does not unfold
+opaque postulates, invent proof evidence, classify assumptions by their
+spelling, or change checking, reduction, conversion or `trusted_base()`.
+A reachable open **obligation hole** prevents an unconditional `proved`
+verdict (`../20-verification/21 §5.4`); a reachable audited contract axiom
+remains visible in the assumption boundary, without by itself demoting a
+checked proof. The query is a read-only inspection tool (K-b, W4), not
+an additional kernel equality or trusted proof rule.
 
 The enumeration records trusted primitive declarations/signatures, not a
 blanket permission to compute registered operations in conversion. Other

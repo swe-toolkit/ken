@@ -12,16 +12,17 @@ amplify` → AC3, `no-ambient-authority` → AC1; retired there in this WP — s
 "Placeholder absorption").
 
 Grounding (landed `§`-bodies + landed code on this branch, content-reconciled —
-not the plan): `62 §1`–`§9`/`§H` (no-ambient, the authority lattice, attenuation
-as an emitted but direction-degenerate refinement obligation, revocation
+not the plan): `62 §1`–`§9`/`§H` (no-ambient, the authority lattice,
+attenuation's normative checked subset-Σ target, revocation
 lineage/admission/projection/settlement contract, audit, compose, trust-boundary
-table); `36 §2.5`/`§3`/`§3.1` (the
-capability-passing
-translation: `Cap E` is a value parameter via ordinary Π, minted by a handler;
-the cross-workstream contract "capability `Cap E` → a value parameter (Π) → read
-by Sec2 authority/attenuation `62`"); `36 §1.4` (the EFFECT-ESCAPE check — a no-
-row `fn` is inert); `34 §5`/`21 §2` (refinement = carrier + emitted obligation
-— the attenuation encoding); `16 §1`/`61 §2.1` (the `Ω`-valued `⊑` order the
+table); its checked Pair introduction is **deferred — W5**, and the current
+host mirror is described below. `36 §2.5`/§3/§3.1 (capability-passing
+translation: `Cap E` is a value parameter via ordinary Π; Sec2 consumes it as
+authority evidence); `36 §1.4` (the EFFECT-ESCAPE check — a no-row `fn` is
+inert); `34 §5`/`21 §2` (the normative attenuation target is subset Σ
+`Σ(c':Cap E).authority c' ⊑ authority c ⊓ w`, introduced by pair plus proof
+obligation; checked Pair introduction is W5-deferred); `16 §1`/`61 §2.1`
+  (the `Ω`-valued `⊑` order the
 `Authority` lattice rides); `61 §3.1` (`L-SINK`, the flow half of AC6); `61 §4`
 (declassify is capability-gated/audited); `25 §3`/`63` (`trusted_base_delta`).
 **Landed code pinned against:** `CapParam { name, effect }` + `cap_set`
@@ -186,21 +187,27 @@ not a capability-producing surface spelling; deferred runtime mechanisms remain
   `authority`-`⊑` check (QA gate), never a synthetic flag.
 
 ### security/capabilities/attenuate-bound-discharge-mirrors-elaborator
-- spec: `62 §3.1`/`§H`, `34 §5`, `21 §2`, `23 §1`, `18 §4`
+- spec: `62 §3.1`/§H, `34 §5`, `21 §2`, `22 §2.1`, `23 §1`, `18 §4`
+- status: the current host Eq/Refl mirror is live; checked-core subset-Σ pair
+  introduction is **deferred — W5**. The {C1, C2} behavior remains the net for
+  the host's direction-sensitive bound.
 - given: the runner/host semantic `capabilities.rs::attenuate(c, w)` derives a
-  child and its **emitted obligation**; observe the discharge core for
-  `authority c' ⊑ authority c ⊓ w`. No Ken source expression constructs `c'`.
-- expect: the elaborator **emits an obligation** for
-  `authority c' ⊑ authority c ⊓ w` (`22 §2.1`) as `Eq(child, bound)` over fresh
-  opaque postulates. For the canonical child, the elaborator chooses the same
-  postulate for both sides and `Refl` discharges. For a too-strong child it
-  chooses distinct postulates, so `Refl` yields `Unknown` and the obligation is
-  **undischargeable**. The kernel never computes the meet or `⊑` relation.
-- why: (soundness) **trust-boundary assertion**, not an independent kernel net.
-  The emitted `Eq` + `Refl` mechanism is real, but its postulate identities are
-  chosen by the elaborator's Rust comparison. Therefore the discharge mirrors
-  the elaborator's decision and is direction-degenerate; the elaborator's
-  `meet`/`⊑` computation plus the non-degenerate {C1, C2} pair nets the bound.
+  child `c'`; observe the current `discharge_attenuation` result for canonical
+  and too-strong children. The target type
+  `Σ(c':Cap E).authority c' ⊑ authority c ⊓ w` is the future checked-core
+  shape. No Ken source expression constructs `c'`.
+- expect: **Landed host mirror:** `discharge_attenuation` encodes the bound as
+  an `Eq` over opaque authority postulates and tries a `Refl` certificate. The
+  canonical case reuses one postulate and yields `Proved`; a too-strong case
+  uses distinct postulates and yields `Unknown`. This is a host mirror, not a
+  checked-core `Pair` or an independent kernel computation of `meet`/`⊑`.
+  **Deferred — W5:** checked-core introduction is `Pair(c',π)` at the target
+  subset-Σ type; the kernel checks the pair and proof, and no bare `Cap E`
+  passes as the refined type.
+- why: (soundness) the current trust boundary is the host's bound decision,
+  not the opaque Eq/Refl mirror. The subset-Σ pair is a future kernel-checked
+  shape; the non-degenerate {C1, C2} pair remains the behavioral net for the
+  host's `meet`/`⊑` computation.
 
 ### security/capabilities/no-amplifying-operation-exists
 - spec: `62 §3.2`/`§2.2`
@@ -613,9 +620,10 @@ Runtime may choose its mechanism, but must satisfy D1–D4 before the bounded
 OS-operation face is conformant. General space realization remains open. Audit
 record emission (E1) remains deferred to runtime/`Ward`. The authority lattice
 `⊑` rides `Ω`
-(`16 §1`, level 0 for finite carriers); the semantic refinement `{c' | …}`
-lands at `level(Cap E) = ℓ_op` (predicative, same as the carrier, `21 §2`/
-`62 §9`). Literal source spelling `Cap_FS` stays `OQ-syntax`-deferred; raw
+(`16 §1`, level 0 for finite carriers); the semantic refinement
+`{c' : Cap E | …}` lands at `Type (max ℓ_op ℓ_bound)` for
+`Cap E : Type ℓ_op` and predicate `Ω_ℓ_bound` (`21 §2`, `62 §9`). Literal
+source spelling `Cap_FS` stays `OQ-syntax`-deferred; raw
 `attenuate` and `revoke` remain non-Ken-visible management actions. Cases pin
 value-sets + invariants, never a Ken-callable management token. Sec2 **unblocks
 B4** (the agentic boundary = Sec1 + Sec2

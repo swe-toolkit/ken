@@ -382,3 +382,22 @@ modeled on V2's `verify/obligations/exhaustive-traversal-no-silent-skip`.
   flips this value/behavior. Pins that the `../evaluation/` corpus stays green —
   X1 effect conformance is **additive** over the pure-core anchors. (property;
   regression guard.)
+
+## W1 space-result erasure — residual effects
+
+### runtime/effects/space-ensures-erases-outer-proof (deferred: W5)
+- spec: `42 §3.2`; `36 §4.3`; `21 §6.4`
+- status: **deferred** until W5 provides the checked `AllRet` declaration and
+  `LANG-REFINEMENT-PROOF-ERASURE` provides the runtime erasure route.
+- given: checked core `Pair(t, ?h)` at
+  `Σ(t:ITree F (Bool × S)).AllRet P t`, where `?h` is open and
+  `t = Vis e (λ b. Ret (b, s_post))` with `E.Resp e = Bool`.
+- expect: evaluation erases the outer Ω proof and yields the same residual tree
+  `t`; it does not force `?h` or insert a pair under `ITree`. The proof hole
+  remains visible to verification (`unknown`) but does not make the runtime
+  tree `unknown`. Driving the tree with a deterministic handler for `e` returns
+  `(b, s_post)`, not a proof-carrying return value.
+- why: the outer subset-Σ carrier is the whole residual tree. Runtime erases
+  only its proof component, while every `Vis` and `Ret` remains in the carrier.
+  This complements the type-level AllRet shape and F=0 collapse in
+  `verify/spec-syntax/seed-spec-syntax.md`.

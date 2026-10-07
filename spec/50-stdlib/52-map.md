@@ -400,10 +400,11 @@ The map's proofs — the two Branch-A laws and all five Branch-B inductive laws,
 all built (§5, §7d) — take `d : Ord k` and use
 `d.antisym`/`d.trans`/`d.total`/`d.refl` as **hypotheses**. They are therefore
 **real proof terms independent of whether a given `Ord k` instance's own laws
-are `Axiom` (Int/Char) or real (Bool)** — the proof does not care *how* the
-order laws were established, only that the dictionary provides them (so a
-Branch-B proof, when built, is real regardless of the key's instance). Two
-consequences pin the conformance (§8):
+are `Axiom` (Int), derived from those `Int` assumptions through `Proj1`
+(Char), or proved over an inductive carrier (Bool)** — the proof does not
+care *how* the order laws were established, only that the dictionary
+provides them (so a Branch-B proof, when built, is real regardless of the
+key's instance). Two consequences pin the conformance (§8):
 
 - **AC3's "fails against a stub" net is at the *map-proof* level**, not the
   `Ord k`-instance level: replace a **shipped (Branch-A)** proof term with
@@ -414,17 +415,20 @@ consequences pin the conformance (§8):
   named-deferred, so nothing stubs them and no client leans on them (§9 AC3
   guardrail). ([[lawful-class-instances-must-carry-law-proofs]].)
 - **Operations run over `Char` keys** end-to-end through the real interpreter:
-  `Ord Char`'s `leq = int_leq` **computes**, so `insert`/`lookup`/`to_list`
-  evaluate on real Char-keyed maps (the `letter-frequency` shape) even though
-  `Char`'s *order-laws* are `Axiom`. The **fully-real-all-the-way-down** proof
-  witness uses `Ord Bool`/`Ord Two` keys (the only carriers with non-`Axiom`
-  order-laws today, `51 §6`).
+  `Ord Char`'s `leq` computes by applying `leq_int` to both `Proj1`
+  codepoints, so `insert`/`lookup`/`to_list` evaluate on real Char-keyed
+  maps (the `letter-frequency` shape). Its order-law proofs depend on the
+  audited `Ord Int` assumptions but add **no new Char postulate**
+  (`18a §5.9.1`). The **fully-real-all-the-way-down** proof witness uses
+  `Ord Bool`/`Ord Two` keys (the carriers whose order laws do not depend
+  on the `Ord Int` postulates, `51 §6`).
 
-**Non-canonical carrier ≠ non-`Axiom` laws** — these are the two orthogonal ADR
-0010 axes: a `Char` key is *canonical* (so the map's `antisym` use is **sound**)
-even though `Ord Char`'s laws are *audited* (`Axiom`); a `Decimal` key would be
-*non-canonical* (so the `antisym` use inhabits `Bottom` — §2.1) regardless of
-how its laws are filed.
+**Non-canonical carrier ≠ assumption-free laws** — these are orthogonal ADR
+0010 axes: a `Char` key is *canonical* (so the map's `antisym` use is
+**sound**) even though its derived `Ord Char` laws transitively depend on
+`Ord Int`'s audited assumptions. A `Decimal` key would be *non-canonical*
+(so the `antisym` use inhabits `Bottom` — §2.1) regardless of how its
+laws are filed.
 
 ## 6. Perf note
 

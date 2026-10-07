@@ -2,47 +2,40 @@
 
 Format: `../../README.md`. These pin **WS-V V1**: the spec-annotation syntax
 (`requires`/`ensures`/refinements/`prove`/`law`), its **elaboration to core**,
-and the **verification status model** — the contract in
+and the **verification status model** — the W1 contract in the released
 `spec/20-verification/21-spec-syntax.md`. Expected results are grounded in the
-V1 contract amended at parent `5183c0437be3a14672c40acf5f0c969906031884`, the
-V0 elaborator (`ken-elaborator`, `spec/30-surface/39-elaboration.md §5`), and
-the `18 §4` certificate API (`check`), not the WP frame's prose (the
-perishable-frame discipline). The prototype (`yon`) is not mounted; none of
-these required it.
+current Spec body, settled decisions, and first principles. The prototype is
+not mounted, and no external reference material was consulted for this W1
+conformance revision.
 
-**The layer is ★★ (untrusted), so the cases live where the kernel cannot
-backstop.** Everything V1 emits is re-checked by the kernel (`18 §4`); a bug is
-a
-**wrong verdict or a poor diagnostic, never unsoundness**. The cases that matter
-are therefore the elaboration **shape** (the emitted core), the **honesty
-guard**
-(an `unknown` never reads `proved`), and the **scope guards** (`old`, `result`,
-Ω-typing) — exactly what a wrong-but-well-typed elaboration could get wrong
-while
-still kernel-checking.
+The layer is untrusted, so the cases pin the elaboration shape (the emitted
+core), the honesty guard (`unknown` never reads `proved`), and scope guards
+(`old`, `result`, Ω-typing). Every emitted proof is re-checked by the kernel
+(`18 §4`); an elaborator bug is a wrong term, verdict, or diagnostic, not a
+kernel soundness failure.
 
-**Two encoding facts these cases rest on (`21 §2`/§6.3, Architect-confirmed):**
+**W1 representation target.** A refinement `{x:A|φ}` elaborates to the checked
+subset `Σ(x:A).φ` at `Type (max ℓ_A ℓ_φ)` (`21 §2`/§6.3, `34 §5`). Its
+carrier is relevant, its Ω proof is proof-irrelevant, and the Σ is not
+convertible to `A`. Introduction constructs a checked pair; forgetting inserts
+`Proj1` without an obligation. No coercion descends under a type former or
+binder. Written `requires` remains a separate Π proof argument. The Π and Σ
+sort rules are landed (`13 §4`); **subset-Σ elaboration expectations are
+[deferred — W5]** while the transitional carrier-only implementation remains.
 
-- **Carrier-plus-obligation, not `Σ(B,ψ)`.** An `ensures`/refinement lowers to
-  its **carrier** value plus a **separate obligation** (a typed hole =
-  postulate, `24 §2`), never a proof-carrying `Σ` value. So the emitted core
-  body stays the bare carrier, contracts are erasable, and the encoding is
-  **independent of the `Σ`-sort erratum** (`sort_sigma → Ω` iff *both*
-  components Ω — a refinement's relevant carrier keeps it at `Type`;
-  Architect-confirmed, **in-flight on `wp/V1-sigma-sort`**, not this base —
-  `13 §4`/§5 + `../../kernel/pi-sigma/`). `requires φ → Π` proof-arg is sound
-  because `sort_pi(Ω, Type) = Type` (codomain-keyed, landed `16 §1.1`).
-- **The honesty discriminator is kernel-side.** `unknown ≢ proved` is decidable
-  from `GlobalEnv::trusted_base()` (`18 §5`) — a hole **is** a postulate
-  (appears), a checked certificate adds **nothing** (absent) — **not** a V-layer
-  flag, so the untrusted layer cannot forge `proved` (`21 §5.4`).
+**W1 honesty target.** `unknown ≢ proved` requires a checked certificate and
+no reachable open obligation hole (`21 §5.4`). `postulates_reachable(env, p)`
+traverses transparent dependencies; an audited contract axiom can remain visible
+without demoting a checked proof. **The transitive-query expectation is
+[deferred — W4]**; `trusted_base()` membership alone is not the honesty test.
 
 **Deferred-tag convention.** A case may describe a settled model whose concrete
 spelling or elaboration capability has not landed. Tag only that portion
 `[deferred — <named capability or section>]`, state the landed behavior
-separately, and never present the deferred portion as currently accepted. The
-tag names implementation availability, not whether the governing design
-decision is open.
+separately, and never present the deferred portion as currently accepted. Here
+`[deferred — W5]` names the subset-Σ elaboration target and `[deferred — W4]`
+names the read-only reachability query. The tag names implementation
+availability, not whether the governing design decision is open.
 
 The first instance is disposition-tag spelling (`21 §5.5`): V1 delivers the
 status **model** and concrete grammar for
@@ -80,52 +73,38 @@ rests on (`21 §5.4`) and must never regress.
   and jointly cover the expectation; neither attachment alone establishes both.
 
 ### verify/spec-syntax/refined-domain-and-requires-higher-order-boundary
-- spec: `21 §6.3`; `22 §2.3`; `30-surface/39 §5.3`
-- given: the declarations below, plus applications `plain_slot refined_fn`,
-  `plain_slot requires_fn`, `refined_slot refined_fn`, and
-  `refined_slot requires_fn`.
-- expect: **negative pair:** `plain_slot refined_fn` and
-  `plain_slot requires_fn` are both refused because each argument type has the
-  extra precondition Π argument. **Positive type-compatibility pair:**
-  `refined_slot refined_fn` and `refined_slot requires_fn` are both accepted
-  as `f` arguments, leaving the same residual `(n : Int) → Int` type. The
-  written domain desugars to the same carrier-plus-proof telescope as both
-  functions. The body application `f n` yields exactly one call-site
-  obligation with provenance at `f n`:
-
-  ```text
-  Γ = (f : (d : Int) → (_ : Not (Equal Int d 0)) → Int), (n : Int)
-  φ = Not (Equal Int n 0)
-  ```
-
-  There is no such premise in `Γ`; the plain `f 1` call in `plain_slot` emits
-  no precondition obligation.
-- why: `21 §6.3` requires refined parameters and written refined domains to
-  retain the generated proof binder in higher-order types; `22 §2.3` makes the
-  caller establish its premise. The explicit-`requires` twin controls type
-  compatibility. A refinement-erasure bug changes the negative pair's verdict
-  parity or rejects the positive pair; a call-path bug omits the obligation.
-  **Measured:** V2 emits `φ` with provenance at `f n` and emits no
-  precondition obligation at `plain_slot`'s `f 1`. **Claimed:** applying a
-  higher-order variable with a refined domain retains the caller's burden.
-  **The gap:** `f` is a variable, not a known declaration, and `n` is plain
-  `Int` with no premise in scope; the plain slot is the no-precondition control.
-  Promise class: durable invariant. The asserted
-  behavior is type compatibility and call-site obligation, not source spelling.
+- spec: `21 §2`/§6.3; `22 §2.1`/§2.3; `39 §5.3`
+- status: refined-domain and pair-introduction behavior is **deferred — W5**;
+  `requires`-as-Π behavior is the landed portion.
+- given: the declarations below and the four applications named below.
+- expect: `refined_fn` has domain `Pos = Σ(n:Int).Not (Equal Int n 0)`;
+  `requires_fn` instead has an `Int` domain followed by a separate Π proof
+  argument. `refined_slot refined_fn n` accepts, while
+  `refined_slot requires_fn n`, `plain_slot refined_fn`, and
+  `plain_slot requires_fn` reject with type mismatch. In `refined_slot`,
+  applying variable `f` to plain `n:Int` constructs a subset pair and emits
+  exactly one call-site obligation `Not (Equal Int n 0)`; the body receives no
+  hidden proof binder. The explicit `requires` call burden remains separate.
+- why: a refined domain stays a Σ binder in a higher-order Π type; it is not
+  normalized to an `Int` binder plus an implicit proof argument. A bug that
+  erases the refinement makes the rejected function assignments type-compatible;
+  a bug that invents a hidden binder changes the accepted refined-function
+  shape and loses the caller's pair-introduction obligation.
 
 The fixture declarations are:
 
 ```ken
-fn refined_fn (d : {x:Int | Not (Equal Int x 0)}) : Int = d
+def Pos = {x:Int | Not (Equal Int x 0)}
+fn refined_fn (d : Pos) : Int = d
 fn requires_fn (d : Int) : Int requires Not (Equal Int d 0) = d
 fn plain_slot (f : (d : Int) → Int) : Int = f 1
-fn refined_slot
-  (f : (d : {x:Int | Not (Equal Int x 0)}) → Int)
-  (n : Int) : Int = f n
+fn refined_slot (f : (d : Pos) → Int) (n : Int) : Int = f n
 ```
 
-The four listed applications above are the negative and positive controls;
-`f n` in `refined_slot` is the caller-obligation site.
+The applications are `plain_slot refined_fn`, `plain_slot requires_fn`,
+`refined_slot refined_fn n`, and `refined_slot requires_fn n`. The accepted
+case is `refined_slot refined_fn n`; its body `f n` is the caller-introduction
+site.
 
 ### verify/spec-syntax/requires-on-first-param-of-two
 - spec: `21 §6.3` (preconditions become proof parameters), `39 §5.3`
@@ -154,37 +133,131 @@ The four listed applications above are the negative and positive controls;
   The first-of-two case does not cover that interior-telescope shape.
 
 ### verify/spec-syntax/ensures-emits-obligation-not-sigma
-- spec: `21 §6.3` (postcondition → obligation), `§2` (carrier-plus-obligation),
-  `§6.5`
-- given: `fn abs (n : Int) : Int` with
-  `ensures IsTrue (leq_int 0 result) = if n < 0 then -n else n`
-- expect: **accepts**; the emitted core **body** has type **`Int`** — the bare
-  carrier, **not** `(r:Int) × IsTrue (leq_int 0 r)`; a **single** obligation
-  hole `?h : IsTrue (leq_int 0 (abs n))` is emitted (goal = `ψ[body/result]`,
-  §6.3, `result` replaced by the body).
-- why: §6.3/§2 use the **carrier-plus-obligation** encoding — the postcondition
-  is a separate obligation (`24 §2`), never paired into the value, so contracts
-  are erasable and the encoding is **independent of the `Σ`-sort caveat** (the
-  Architect-confirmed erratum in-flight on `wp/V1-sigma-sort` — V1 never forms
-  that `Σ`). Structural: a bug reifying `Σ(Int, IsTrue (leq_int 0 r))` flips
-  the emitted-body type from `Int` to a `Σ`; a bug dropping the obligation
-  empties the hole set.
-  Distinct from the prover-level accept (`../seed-verify.md`
-  `verify/proved-postcondition`) — this pins the **elaboration shape**.
+- spec: `21 §6.3` (current carrier-plus-obligation behavior)
+- status: Landed; superseded by `ensures-result-is-subset-sigma` at W5
+  (`LANG-REFINEMENT-SUBSET-SIGMA`).
+- given: with `NonNeg : Nat → Ω`, elaborate
+  `fn abs (n : Nat) : Nat ensures NonNeg n = n`.
+- expect: **Landed:** the core type is `Pi(Nat, Nat)` and the body is
+  `Lam(Nat, Var 0)`. Exactly one obligation is emitted, and its generated
+  hole is open.
+- why: This matches the current V1 test's emitted type and body, obligation
+  count, and open-hole assertion. The checked subset-Σ result belongs to the
+  W5 successor, not this Landed row.
+
+### verify/spec-syntax/ensures-result-is-subset-sigma
+- spec: `21 §6.3` (ordinary `fn` result), `§2`/§6.5; `22 §2.2`
+- status: **deferred — W5 subset-Σ elaboration**
+- given: `fn inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1`
+- expect: the core result type is `Σ(r:Int).Equal Int r (n + 1)` at
+  `Type 0`; the straight-line body checks as `Pair(n + 1, π)` at that type.
+  Exactly one postcondition introduction site records the goal
+  `Equal Int (n + 1) (n + 1)` with provenance for the `ensures` clause. `π` is
+  checked evidence or the applied typed hole for that goal; it is never absent
+  from the pair.
+- why: `ensures` is the kernel subset-Σ result motive, not a bare carrier plus
+  an unrelated side obligation. A carrier-only result with the same obligation
+  would not produce `Pair(n + 1, π)` or the checked Σ type. This pins the
+  elaboration shape, not merely the prover's final status.
+
+### verify/spec-syntax/ensures-result-level-is-predicative-max
+- spec: `21 §6.3`/§8; `22 §2.2`; `13 §4`
+- status: surface refinement formation is **deferred — W5**. Kernel Σ sort
+  formation remains live through `kernel/pi-sigma/`.
+- given: in a context with `A : Type 0` and `P : A → Ω_1`, elaborate
+  `fn keep (x : A) : A ensures P result = x`.
+- expect: the core result type is `Σ(r:A).P r : Type 1`, since
+  `max 0 1 = 1`; the body introduces `Pair(x,π)` with a proof site at Ω_1.
+  The function result does not remain at `Type 0` merely because its carrier
+  does.
+- why: ordinary `ensures` uses the same predicative subset-Σ formation rule as
+  a named refinement. This distinguishes the W1 result type from the old
+  carrier-only result plus a separate obligation.
 
 ### verify/spec-syntax/refinement-lowers-to-carrier
-- spec: `21 §6.3` (elabType refinement + introduction), `§2`, `§8` (level)
-- given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }`; the introduction
-  `(5 : Pos)`
-- expect: the core type of `Pos` is **`Int`** (the carrier — `φ` not reified),
-  at **exactly `Type 0`** (no level bump); the introduction `(5 : Pos)` emits
-  obligation `?h : IsTrue (leq_int 1 5)` and yields the core value `5 : Int`.
-- why: §6.3 `elabType({x:A|φ})` returns the carrier `A'` (predicate
-  elaborator-tracked, not a core type); `A ≤ {x:A|φ}` generates the obligation
-  on introduction (no kernel coercion). §8: the refinement stays at the
-  carrier's `Type ℓ_A` — the load-bearing choice that V1 **never forms a core
-  `Σ` over an Ω predicate**. Structural: emitted type IS `Int` at `Type 0` + one
-  obligation; a reification bug emits a `Σ` and may bump the level.
+- spec: `21 §6.3` (current refinement type elaboration)
+- status: Landed; superseded by `named-refinement-is-subset-sigma` at W5
+  (`LANG-REFINEMENT-SUBSET-SIGMA`).
+- given: with `NonNeg : Nat → Ω`, elaborate
+  `fn mkPos (n : Nat) : { k : Nat | NonNeg k } = n`.
+- expect: **Landed:** the declaration is accepted and its core type is exactly
+  `Pi(Nat, Nat)`, not a Pi returning `Sigma(Nat, NonNeg)`.
+- why: The current test pins carrier lowering in the function signature. The
+  named checked-Σ form belongs to the W5 successor.
+
+### verify/spec-syntax/named-refinement-is-subset-sigma
+- spec: `21 §2`/§6.3/§8; `34 §5`; `13 §4`
+- status: **deferred — W5 subset-Σ elaboration**
+- given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }` and
+  `fn keep (n : Int) : Pos = n`
+- expect: `Pos` unfolds transparently to
+  `Σ(n:Int).IsTrue (leq_int 1 n)` at `Type 0`, not to `Int`. The body checks
+  as `Pair(n, ?h n) : Pos`; its open goal is
+  `IsTrue (leq_int 1 n)` in the function context, with `?h` present in
+  `trusted_base()`.
+- why: this observes the named type's kernel form and its proof-bearing
+  introduction. The carrier encoding could emit the same goal while leaving the
+  core type and value as `Int`; the asserted Sigma type and pair distinguish
+  W1. The relevant carrier keeps the result in `Type`.
+
+### verify/spec-syntax/refinement-type-level-is-predicative-max
+- spec: `21 §2`/§8; `13 §4`; `12 §2`/§3
+- status: **deferred — W5 subset-Σ elaboration**
+- given: `A : Type 0`, `P : A → Ω_1`, `a : A`, and `p : P a`; elaborate
+  `def Ref = {x:A | P x}` and check `Pair(a,p) : Ref`.
+- expect: `Ref` unfolds to `Σ(x:A).P x : Type (max 0 1) = Type 1` — not
+  `Type 0` and not Ω. The pair checks at `Ref`; `Proj1` has type `A`.
+- why: the kernel's predicative Σ formation uses both the relevant carrier and
+  the predicate level. The old carrier encoding would leave `Ref` at `Type 0`;
+  the observed sort distinguishes the W1 representation from that behavior.
+
+### verify/spec-syntax/refinement-to-refinement-uses-source-proof
+- spec: `21 §2`/§6.3; `22 §2.1`; `16 §1.3`
+- status: **deferred — W5 subset-Σ elaboration**
+- given: in context `Γ₀ = (P : Int → Ω)`, define
+  `Positive = {n:Int | P n}` and `Strong = {n:Int | And (P n) Top}`; check the
+  expression `x` at `Positive` under `Γ = Γ₀, (x : Strong)`.
+- expect: the core body is `Pair(Proj1 x, ?h P x) : Positive`. It records one
+  target-introduction obligation `P (Proj1 x)`; the closed goal's context
+  contains `P` and `Proj2 x : And (P (Proj1 x)) Top`. V3 can discharge it with
+  `Proj1 (Proj2 x)`; otherwise the typed hole, closed over all of Γ, is applied
+  to `P` and `x`. It may not erase the pair.
+- why: target-first coercion forgets the source with `Proj1` and introduces the
+  target subset under the source pair's checked `Proj2` hypothesis. This is not
+  kernel subtyping or conversion of the two subset types. A carrier-erasing
+  implementation would return `x` as an identity term instead.
+
+### verify/spec-syntax/no-coercion-under-list
+- spec: `21 §2`/§6.3; `13 §4`; `18 §3`
+- status: **deferred — W5 subset-Σ elaboration**
+- given: `def Five = { n : Int | Equal Int n 5 }`; terms
+  `xs = Cons Int 5 (Nil Int)` and
+  `ys = Cons Five (Pair(5, Refl)) (Nil Five)`. Check each at both
+  `List Int` and `List Five`.
+- expect: the cross-checks reject with kernel `TypeMismatch` at
+  `List Int` versus `List Five`; each term checks at its own list type. The
+  kernel does not coerce the element type through `List`.
+- why: W1 allows only outermost, type-directed introduction and forgetting.
+  No coercion descends through `List`; the kernel sees distinct element types.
+  The old carrier encoding would accept the mismatched list types because
+  `Five` erased to `Int`, so this is a true discriminator, not a source-shape
+  check.
+
+### verify/spec-syntax/lambda-at-refinement-introduces-proof
+- spec: `21 §2`/§6.3; `22 §2.1`
+- status: **deferred — W5 subset-Σ elaboration**
+- given: `def SevenAtZero = { f : (x:Int) → Int | Equal Int (f 0) 7 }`;
+  check the lambda `λ x. 5` at `SevenAtZero` and at the plain type
+  `(x:Int) → Int`.
+- expect: at `SevenAtZero`, the core type is a subset Σ and the checked term
+  is `Pair(λ x.5, π)` with one goal
+  `Equal Int ((λ x.5) 0) 7` (β-reducing to `Equal Int 5 7`) and its applied
+  typed hole. At the plain Pi type the lambda needs no subset pair or
+  introduction obligation.
+- why: check-only lambdas first check at the carrier and then introduce the
+  expected subset once at the check entry. The old carrier encoding accepts
+  the same lambda without a proof component; this case distinguishes that
+  behavior from the W1 pair-plus-obligation rule.
 
 ### verify/spec-syntax/non-omega-predicate-surface-error
 - spec: `21 §4` (every spec prop `: Ω`), `§6.3` (check at Ω before any
@@ -222,19 +295,45 @@ The four listed applications above are the negative and positive controls;
 
 ### verify/spec-syntax/old-resolves-in-space-op-ensures
 - spec: `21 §6.4` (elabSpaceEnsures), `36 §4.3`; `16 §2` (`refl`)
+- status: `old` resolution is landed; the result pair is **deferred — W5**.
 - given: a **block-space** op `inc` over a cell `n : Int` with
-  `ensures Equal Int n (old(n) + 1)`
-- expect (landed): **accepts**; `old(n)` resolves to the pre-state projection
-  and bare `n` to the post-state projection. The elaborator emits the
-  postcondition obligation, and substitution plus record reduction leave a
-  reflexive equality that a kernel-checked `Refl` certificate discharges.
-- why: the block-space operation installs distinct pre-state and post-state
-  cell environments while elaborating its contracts. The landed control emits
-  three obligations using both checked and proposition-root `old`, and kernel
-  `Refl` discharges all three; changing only the promised increment from `+1`
-  to `+2` leaves the obligation open. This is specifically the block-space
-  form: modifier-form `space proc` has no cells or state environment and still
-  refuses `old` with `OldPreStateUnsupported`.
+  `ensures Equal Int n (old(n) + 1)` and residual row `F = 𝟘`
+- expect (landed): `old(n)` resolves to the pre-state projection and bare `n`
+  to the post-state projection. `run_state` returns `Ret (r, s_post)`.
+- expect (deferred — W5): with `F = 𝟘`, elaboration collapses the whole result
+  type to `Σ(rs:Int × S).ψ(s_pre,rs)` and pairs the result with its proof.
+  Substitution and record reduction discharge this `inc` example.
+- why: the empty residual row collapses the general space rule to a pure
+  state-transformer subset Σ, not a bare `(result, state)` carrier. The
+  block-space operation installs distinct pre-state and post-state cell
+  environments. Modifier-form `space proc` still has no cells or state
+  environment and refuses `old` with `OldPreStateUnsupported`.
+
+### verify/spec-syntax/space-ensures-residual-tree-allret
+- spec: `21 §6.4`; `22 §2.2`; `36 §4.3`; `13 §4`
+- status: **deferred — W5 subset-Σ space-result elaboration and AllRet**
+- given: a space operation with residual row `F` and one `ensures ψ` clause;
+  its residual tree is `t : ITree F (R × S)`. Use a residual operation whose
+  response is `Bool`, with `t = Vis e (λ b. Ret (b, s_post))` and
+  `ψ(b, s_post) = Equal Bool b True`. For the level control, take
+  `P : X → Ω_0`, `x : X`, and `t_hi = Vis e_hi (λ a. Ret x)` with
+  `E.Resp e_hi : Type 1`.
+- expect (deferred — W5): the checked result type is
+  `Σ(t : ITree F (R × S)).AllRet (λ rs.ψ(s_pre,rs)) t`; the proof is in one
+  outer pair and one obligation, not a pair inside `ITree F` or one proof per
+  user `Ret`. Its fold equations are
+  `AllRet P (Ret rs) = P rs` and
+  `AllRet P (Vis e k) = Π(r:E.Resp e).AllRet P (k r)`. On the sample tree the
+  fold is `Π(b:Bool).Equal Bool b True`, so the False response leaves the
+  obligation open; a tree whose every response returns `True` is the discharge
+  control. `AllRet P t_hi` reduces to `Π(a:E.Resp e_hi).P x` at `Ω_1`; a result
+  Σ with tree carrier at `Type ℓ_T` is at `Type (max ℓ_T 1)`. The output-type
+  shape is W1; executing the helper awaits W5.
+- why: the residual response is universal: checking only the first return
+  would discharge the mixed tree incorrectly. The result's carrier remains the
+  residual tree, and the `AllRet` proof is its outer subset-Σ component. Its
+  Π level includes the response-domain level; this is predicative formation,
+  not implicit cumulativity.
 
 ### verify/spec-syntax/old-out-of-scope-rejects (soundness)
 - spec: `21 §6.4` (scope guard), `§4`, `36 §7.3`
@@ -258,17 +357,36 @@ The four listed applications above are the negative and positive controls;
 
 ## C. The verification status model + honesty guard (`21 §5`)
 
-### verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base (soundness)
+### verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base
+- spec: `21 §5.1`/§5.4; `18 §4.5`/§5
+- status: Landed; superseded by
+  `proved-status-cert-checks-no-reachable-open-hole` at W4
+  (`VERIFY-TRANSITIVE-HONESTY`).
+- given: discharge the `ensures` obligation for
+  `fn tst (n : Nat) : Nat ensures TrueProp n = n` using a separate postulate
+  `wit` of the obligation's closed goal type.
+- expect: **Landed:** `discharge_hole` accepts the certificate and the
+  generated obligation hole is no longer open. The test does not assert an
+  empty trusted base; `wit` remains a separate postulate.
+- why: The current test pins retirement of this obligation's own hole, not
+  transitive proof-dependency honesty. The W4 successor replaces that direct
+  hole check with reachability.
+
+### verify/spec-syntax/proved-status-cert-checks-no-reachable-open-hole (soundness)
 - spec: `21 §5.1` (verdict `proved`), `§5.4` (discriminator); `18 §4.5`/§5
+- status: **deferred — W4 `postulates_reachable`**; certificate checking
+  remains live.
 - given: an `ensures` obligation `?h : φ` discharged by a certificate `p` with
   `Γ ⊢ p : φ` (a closed core proof term)
-- expect: verdict **`proved`** — `check(env, Γ, p, φ)` **accepts**, **and** the
-  goal `φ` does **not** appear in `GlobalEnv::trusted_base()` (the postulate is
-  retired on discharge).
-- why: §5.1/§5.4 — a `proved` certificate is a closed core term `check`
-  validates; it adds **nothing** to the trusted base (`18 §5`). The `proved`
-  side of the kernel-side discriminator. (The cert is given, not
-  prover-generated — V1 fixes the **status model**; the prover is V3.)
+- expect: `check(env, Γ, p, φ)` accepts. **Deferred — W4:** the claim is
+  `proved` only when `postulates_reachable(env, p)` reaches no open obligation
+  hole. Audited contract axioms may remain visible in `trusted_base()` without
+  demoting the checked proof.
+- why: §5.1/§5.4 — a `proved` certificate is a core term that `check`
+  validates and whose transitive dependencies contain no open obligation hole.
+  This is the clean-certificate side; the refined-constant contrast follows.
+  The cert is given, not prover-generated — V1 fixes the status model; the
+  prover is V3.
 
 ### verify/spec-syntax/bogus-cert-not-proved (soundness)
 - spec: `21 §5.1`, `§5.4`; `18 §4.5` (de Bruijn re-check); `../seed-verify.md`
@@ -278,33 +396,45 @@ The four listed applications above are the negative and positive controls;
   obligation stays an open hole (`unknown`), `φ` **remains** in
   `trusted_base()`.
 - why: the kernel re-check is the soundness firewall around the untrusted prover
-  (`18 §4`) — a wrong certificate cannot make `φ` `proved`. **Verdict-flips**
-  with the case above: valid cert → `proved` + `φ ∉ trusted_base()`; bogus cert
-  → not-proved + `φ ∈ trusted_base()`. The de Bruijn criterion at the
-  status-model level.
+  (`18 §4`) — a wrong certificate cannot make `φ` `proved`. It contrasts with
+  the clean-certificate case on the exact `check` result; transitive dependency
+  honesty is tested separately by the W4 pair below.
 
 ### verify/spec-syntax/unknown-hole-distinct-from-proved (soundness)
 - spec: `21 §5.4` (the honesty guard), `§5.1` (`unknown` = postulate); `18 §5`;
   `24 §2`
+- status: the direct hole is a visible postulate; transitive status is
+  **deferred — W4 `postulates_reachable`**.
 - given: an `fn` with an `ensures φ` left **undischarged** — admitted with a
   typed hole `?h : φ`; the program type-checks and runs
-- expect: the goal `φ` **appears** in `GlobalEnv::trusted_base()` (the hole
-  **is** a postulate of `φ`), whereas a `proved` claim's goal does **not**. So
-  `unknown ≢ proved` is decidable **kernel-side**: a claim is `proved` **iff**
-  its certificate `check`s **and** no postulate carrying its goal sits in
-  `trusted_base()`.
-- why: §5.4 — the discriminator is **structural and kernel-side**, not a V-layer
-  flag, so a bug in the untrusted layer **cannot forge** `proved`.
-  **Absence-assertion gate** — guard named: **`trusted_base()` membership**
-  (`18 §5` enumerates exactly postulates + primitives). **Disconfirming check:**
-  would an `unknown` claim read `proved` under the bug this targets (conflating
-  the statuses)? **Only** if the discriminator were a self-reported flag;
-  because it is the kernel's own `trusted_base()` membership, the hole-postulate
-  is **structurally present** — green-vs-red on membership, never
-  green-vs-green. The load-bearing ★★ honesty property: an `incomplete` never
-  masquerades as `proved`. (Pins `21 §9` acceptance #2; grounds the same
-  `trusted_base()` enumerated by `../../kernel/judgments/seed-judgments.md`
-  `judgments/trusted-base-enumerate`.)
+- expect: the open hole's `GlobalId` appears in `trusted_base()`.
+  **Deferred — W4:** it is reachable from the applied hole certificate and
+  makes the claim `unknown`; a checked certificate with no reachable open
+  obligation hole is `proved`. This own-hole case is only one arm of the
+  transitive rule.
+- why: §5.4 — the honesty discriminator is the checked certificate plus the
+  kernel-side dependency query, not a V-layer flag. Membership of the goal
+  itself is not a dependency test; the next case supplies the disconfirming
+  transitive contrast. The read-only query is W4-deferred.
+
+### verify/spec-syntax/proved-status-rejects-transitive-proj2-hole (soundness)
+- spec: `21 §5.4`; `18 §5`; `24 §2`
+- status: **deferred — W4 `postulates_reachable` query**
+- given: a designated audited contract axiom `audit_top : Top` and an open
+  obligation hole `?h : Top`. Define transparent
+  `clean : Σ(n:Int).Top = Pair(0, audit_top)` and
+  `refined : Σ(n:Int).Top = Pair(0, ?h)`. Let
+  `p_clean = λ (_:Top).Proj2 clean` and
+  `p_refined = λ (_:Top).Proj2 refined`; both target `Top → Top`.
+- expect: both certificates pass `check`.
+  `postulates_reachable(env, p_clean) = {id_audit}` and reaches no open hole,
+  so `p_clean` is `proved`; the query for `p_refined` returns `{id_h}`, so
+  `p_refined` is `unknown`. Both identities remain visible in `trusted_base()`.
+- why: both certificates conclude `Top → Top`; the open hole has the distinct
+  goal `Top` and is reached through the transparent constant's `Proj2`. No
+  postulate carries the target goal, so a goal-local lookup misses the hole;
+  demoting every reachable postulate misclassifies the audited-axiom control.
+  This is the W4 discriminator for transitive proof honesty.
 
 ### verify/spec-syntax/disproved-distinct-from-unknown
 - spec: `21 §5.1` (`disproved` = verification error), `§5.3` (projection),
@@ -329,16 +459,17 @@ The four listed applications above are the negative and positive controls;
 
 ### verify/spec-syntax/epistemic-projection-distinct
 - spec: `21 §5.2`/§5.3 (the projection), `§5.5` (deferred tag grammar)
+- status: the transitive `proved`/`unknown` discriminator is **deferred — W4**.
 - given: the four epistemic statuses of `21 §5.2`, each by carried evidence
-- expect (model, landed): the projection (`§5.3`) pins them **distinct** —
-  prove+`proved` → **proved** (certificate, kernel-checked, `∉ trusted_base()`);
-  prove+`unknown` → **unknown** (typed hole = postulate, `∈ trusted_base()`);
+- expect (model): the projection (`§5.3`) pins them **distinct** —
+  prove+`proved` → **proved** (checked certificate, no reachable open hole;
+  W4); prove+`unknown` → **unknown** (reachable typed hole; W4);
   `test`/`assume` → **tested** (runtime/test + generator obligation); `delegate`
   → **delegated** (temporal-logic export, model-checking obligation). The
   verifier **never returns** `tested` or `delegated` — they are author-chosen
   annotations that **bypass the prover** (`§5.3`).
-- expect (deferred): the `proved` vs `unknown` distinction is pinned
-  **structurally** here and now (via `trusted_base()`, group C); the
+- expect (deferred): the transitive `proved` vs `unknown` distinction is
+  **[deferred — W4]** (via the query cases in group C); the
   **`tested`/`delegated` clause spelling** is **`[deferred — §5.5, OQ-syntax]`**
   (`assume`/`test` reserved, grammar downstream of `../70-behavioral/`) — this
   case asserts the **model**, not un-landed grammar.
@@ -352,29 +483,29 @@ The four listed applications above are the negative and positive controls;
 ## E. The V1→V2 interface (`21 §7`)
 
 ### verify/spec-syntax/obligation-hole-set-exposed-to-v2
-- spec: `21 §7` (the interface), `§6.5` (obligation-hole encoding)
-- given: `fn f (n : Int) (m : {k:Int|Not (Equal Int k 0)}) : Int` with
-  `requires IsTrue (leq_int 1 n)`, postconditions
-  `ensures IsTrue (leq_int n result)` and `ensures IsTrue (leq_int 0 result)`,
-  and body `n + m`
-- expect: the elaborated form exposes exactly the four-part V1→V2 interface: (1)
-  the kernel-checkable core term (carrier result and parameters, with the
-  generated refined-parameter Π proof-argument immediately after `m`, followed
-  by the written precondition proof-argument); (2) the **obligation-hole set**
-  — exactly **2** holes here, one per `ensures`, each
-  `⟨id, Γ ⊢ φ, provenance⟩` (the refined parameter creates no definition-site
-  refinement-introduction hole); (3) each hole's `Γ` carries the generated
-  `Not (Equal Int m 0)` proof argument and the written
-  `IsTrue (leq_int 1 n)` precondition, each exactly once and in telescope
-  order; the obligation to establish each precondition is the **caller's** at
-  the call site (`22 §2.3`/§3); (4) provenance (source span + responsible
-  clause) per hole.
-- why: §7 — V1 hands V2 a kernel-checked elaborated form with obligation sites
-  marked; it does **not** generate VCs or walk the body (that is V2).
-  Structural: the two-hole count, interleaved generated proof binder, written
-  precondition, and each hole's `Γ`-contents are the asserted output; dropping a
-  hole, duplicating a premise, or losing binder order changes the structure.
-  Pins `21 §9` acceptance #4 (V2-ready).
+- spec: `21 §7` (the interface), `§6.3`/§6.5; `22 §2.1`/§2.2/§3
+- status: subset-Σ telescope/result shapes are **deferred — W5**.
+- given: `def NonZero = {d:Int | Not (Equal Int d 0)}`;
+  `fn f (n : Int) (m : NonZero) : Int` with `requires IsTrue (leq_int 1 n)`,
+  postconditions `IsTrue (leq_int n result)` and `IsTrue (leq_int 0 result)`,
+  and body `n + m`; callers `fn use (n:Int) (m:Int):Int = f n m` and
+  `fn use_refined (n:Int) (m:NonZero):Int = f n m`.
+- expect: the core telescope keeps `m` at
+  `Σ(d:Int).Not (Equal Int d 0)`; the written `requires` is a separate Π
+  proof argument. The result type is
+  `Σ(r:Int).(IsTrue (leq_int n r) ∧ IsTrue (leq_int 0 r))`, with one proof
+  component holding both per-clause proofs. Exactly two `ensures` obligations
+  are recorded at `f`; each `Γ` contains `Proj2 m` and the written precondition
+  once, in scope. The body forgets `m` through `Proj1`. At `use`, plain `m`
+  creates a pair-introduction obligation; `use_refined` reuses its checked
+  proof. Both callers separately owe the written `requires` proof for `n`.
+  The `f n m` result is a subset-Σ pair; `use` forgets it with `Proj1` to return
+  `Int`. Each site retains source provenance.
+- why: V1 hands V2 a kernel-checkable subset-Σ term with obligation sites
+  marked; V2 adds path-sensitive hypotheses and extracts each marked proof
+  site, not a carrier-only side table. The shape distinguishes a Σ domain from
+  a generated `requires` binder and keeps both `ensures` proofs in one result
+  pair. Pins `21 §9` acceptance #4 (V2-ready).
 
 ---
 
@@ -388,13 +519,13 @@ The four listed applications above are the negative and positive controls;
   emitted; `add_comm` is bound as a **postulate** of `φ` (usable as a proof
   term), and `φ` **appears** in `trusted_base()` (status `unknown`). **After
   discharge** by a certificate `p` with `Γ ⊢ p : φ` that `check`s — the
-  postulate is **retired**, `add_comm ↦ p`, status `proved`, `φ` **leaves**
-  `trusted_base()`.
+  postulate is **retired**, `add_comm ↦ p`, and `φ` leaves `trusted_base()`.
+  **Deferred — W4:** `add_comm` is `proved` only if
+  `postulates_reachable(env, p)` reaches no open obligation hole.
 - why: §6.3/§5.4 — `prove` is the degenerate (no function-body) obligation;
-  proving is
-  hole-filling, and the honesty guard applies identically (a goal is a visible
-  postulate until its certificate checks). Verdict/structural flip on
-  **`trusted_base()` membership** across discharge.
+  proving is hole-filling, and the goal's own postulate is retired on discharge.
+  The transitive dependency check for `proved` is W4-deferred and is covered by
+  the `postulates_reachable` contrast above.
 
 ### verify/spec-syntax/law-all-omega-fields-is-proposition
 - spec: `21 §3` (`law`), `§8`; `16 §1.3` (conjunction in Ω)
@@ -402,16 +533,11 @@ The four listed applications above are the negative and positive controls;
   field a proposition (`: Ω`)
 - expect: **accepts**; each field `check`s at Ω, and the all-Ω bundle is a
   **conjunction** landing in **Ω** (the bundle is itself a proposition) — the
-  **sound** both-components-Ω case (landed `16 §1.3`).
-- why: §8 — a `law` of all-Ω fields is `Σ`-of-Ω-into-Ω, which lands in Ω
-  **correctly** (both halves proof-irrelevant, `16 §1.3`).
-  **Internal-consistency tie:** this is the *legitimate* Ω-landing `Σ`, in
-  deliberate contrast to a **refinement** `{x:A|φ}` (relevant first component)
-  which must stay at `Type` (the in-flight `Σ`-sort erratum, `wp/V1-sigma-sort`)
-  — together they pin **both directions** of the both-components-keyed
-  `sort_sigma`, and must not contradict (a refinement is **not** a proposition;
-  a law **is**). The refinement direction is pinned by `../../kernel/pi-sigma/`
-  (the erratum's conformance third), not this file.
+  sound both-components-Ω case (`16 §1.3`).
+- why: a `law` of all-Ω fields is `Σ`-of-Ω-into-Ω, which lands in Ω because
+  both components are proof-irrelevant. Contrast the refinement subset Σ:
+  its carrier is relevant, so it stays in `Type` (`13 §4`, `21 §2`). The
+  paired conformance cases ensure the two sort rules remain distinct.
 
 ---
 
@@ -437,30 +563,33 @@ The four listed applications above are the negative and positive controls;
 
 - **#1 syntax + elaboration to core** — `requires-elaborates-to-pi-proof-arg`,
   `refined-domain-and-requires-higher-order-boundary`,
-  `ensures-emits-obligation-not-sigma`, `refinement-lowers-to-carrier`,
+  `ensures-result-is-subset-sigma`,
+  `ensures-result-level-is-predicative-max`,
+  `named-refinement-is-subset-sigma`,
+  `refinement-type-level-is-predicative-max`,
+  `refinement-to-refinement-uses-source-proof`, `no-coercion-under-list`,
+  `lambda-at-refinement-introduces-proof`,
   `non-omega-predicate-surface-error`, `result-scope`.
 - **#2 four-way status honest** —
-  `proved-status-cert-checks-not-in-trusted-base`, `bogus-cert-not-proved`,
-  `unknown-hole-distinct-from-proved`, `disproved-distinct-from-unknown`,
-  `epistemic-projection-distinct`.
-- **#3 `old` semantics** — live verdict flip:
-  `old-out-of-scope-rejects` produces `UnboundName("old")` in pure code, while
-  `old-resolves-in-space-op-ensures` accepts the same syntax against a
-  block-space cell environment and emits a `Refl`-dischargeable obligation.
-  Modifier-form `space proc` has no cells and remains refused with
-  `OldPreStateUnsupported`.
+  `proved-status-cert-checks-no-reachable-open-hole`, `bogus-cert-not-proved`,
+  `unknown-hole-distinct-from-proved`,
+  `proved-status-rejects-transitive-proj2-hole`,
+  `disproved-distinct-from-unknown`, `epistemic-projection-distinct`.
+- **#3 space contracts** — `old-out-of-scope-rejects` produces
+  `UnboundName("old")` in pure code; `old-resolves-in-space-op-ensures` pins
+  pre/post-state resolution now and the `F = 𝟘` subset-Σ collapse
+  **deferred — W5**.
+  `space-ensures-residual-tree-allret` pins the outer residual-tree Σ; its
+  Bool-response fold observation is deferred to W5. Modifier-form `space proc`
+  has no cells and remains refused with `OldPreStateUnsupported`.
 - **#4 V2-ready** — `obligation-hole-set-exposed-to-v2`.
 - **#5 no regression** — `v0-unchanged-for-non-spec-programs`.
 - **goals** — `prove-goal-obligation-and-postulate-binding`,
   `law-all-omega-fields-is-proposition`.
 
-Build-sequencing: V1 extends the **landed** V0 elaborator and reuses kernel
-`Term`
-constructors V0 never emits (`Pi`/`Sigma`/`Pair`/`Proj`/`Omega`/`Eq`, none
-`[K2]`-reserved) and the `18 §4`/§5 certificate API. The `Σ`-sort caveat (§2) is
-**not** on V1's path (carrier-plus-obligation never forms `Σ` over an Ω
-predicate);
-the `Σ`-sort discriminating guard rides the dedicated erratum branch
-`wp/V1-sigma-sort` (spec `13 §4`/§5 + the `../../kernel/pi-sigma/` conformance +
-kernel-leader's `sort_sigma` split, landing together per the Architect's 3-piece
-gate), not this file.
+Build-sequencing: the W1/W5 target elaborates refinements and ordinary
+`ensures` results to kernel subset-Σ values, using the existing
+`Sigma`/`Pair`/`Proj` constructors and landed `sort_sigma` (`13 §4`). The
+kernel checks each pair; the elaborator records and discharges the introduction
+obligation or applies a visible typed hole. W5-deferred cases pin this target;
+they do not claim that transitional carrier-only lowering already emits pairs.
