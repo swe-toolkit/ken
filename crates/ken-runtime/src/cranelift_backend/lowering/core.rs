@@ -15722,7 +15722,7 @@ impl<'a> Lowering<'a> {
             // child; that block already owns the only lowering of the Ret body.
             let return_body =
                 return_body.expect("a strict return case has a shared return-body block");
-            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            #[cfg(feature = "px8-ds-test-support")]
             let body = self.case_body_occurrence(
                 eliminator.static_origin,
                 _return_assessment.ret_case_index,
@@ -15757,44 +15757,7 @@ impl<'a> Lowering<'a> {
                     observed_order,
                 );
             }
-            #[cfg(test)]
-            let lowered_separately =
-                CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(std::cell::Cell::get);
-            #[cfg(not(test))]
-            let lowered_separately = false;
-            #[cfg(test)]
-            if lowered_separately {
-                let mut case_env = vec![LoweringEnvironmentBinding::Value(
-                    LoweringOperand::Carried(scrutinee),
-                )];
-                case_env.extend(eliminator.env.to_vec());
-                let lowered = if remaining_eliminators.is_empty() {
-                    self.lower_expr(builder, body, &case_env)?
-                } else {
-                    self.lower_computational_producer_expr(
-                        builder,
-                        body,
-                        &case_env,
-                        remaining_eliminators,
-                    )?
-                };
-                if !matches!(
-                    lowered,
-                    LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                ) {
-                    let word = self.carried_join_arm(
-                        builder,
-                        body.static_origin,
-                        lowered,
-                        None,
-                        "a test-mutated separately lowered checked-answer arm",
-                    )?;
-                    builder.ins().jump(merge, &[word.word.into()]);
-                }
-            }
-            if !lowered_separately {
-                builder.ins().jump(return_body, &[scrutinee.word.into()]);
-            }
+            builder.ins().jump(return_body, &[scrutinee.word.into()]);
 
             builder.switch_to_block(default_route);
             #[cfg(test)]

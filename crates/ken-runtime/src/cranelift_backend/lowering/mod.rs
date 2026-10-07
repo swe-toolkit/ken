@@ -14711,8 +14711,6 @@ thread_local! {
         const { std::cell::RefCell::new(Vec::new()) };
     pub(super) static PX8TR_DISABLE_DEFORESTED_ANSWER_ROUTE: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
-    pub(super) static CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING: std::cell::Cell<bool> =
-        const { std::cell::Cell::new(false) };
 }
 #[cfg(test)]
 thread_local! {
