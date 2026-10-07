@@ -85,9 +85,10 @@ required or annotated.**
 
 - **Strict CBV is the default** — application arguments, `let` bindings,
   constructor arguments, and **computationally relevant** pair components
-  are evaluated eagerly, left-to-right. A subset-Σ pair's Ω proof is the
-  exception: it is erased **before evaluation**, never forced (§3.2).
-  A bound result is evaluated once and reused; whether equal
+  are evaluated eagerly, left-to-right. Every Ω-classified position is
+  erased **before evaluation**, never forced (§3.2); this includes subset-Σ
+  proofs, proof arguments, and proof-only binders. A bound result is
+  evaluated once and reused; whether equal
   values also share physical storage is private (`41`, `44`). Ordinary closures
   and graphs containing them remain runtime-local (`41 §2.1`).
   Chosen because, the choice being meaning-preserving, strict is the most
@@ -108,8 +109,8 @@ required or annotated.**
   special rule. (An `elim` whose methods were evaluated strictly *before*
   selection would force every branch — the interpreter MUST hold methods
   unevaluated and force the selected one. This is the AC3 property, §3.6.)
-  Erasure of an Ω proof in a subset-Σ (§3.2) is **not** a scheduling or
-  branch-laziness exception: that component has no runtime computation.
+  Ω erasure (§3.2) is **not** a scheduling or branch-laziness exception:
+  erased components have no runtime computation.
 - **Laziness by explicit annotation** — an opt-in **`Lazy a`** (thunk) type
   defers an expensive, possibly-unused computation, **forced** on demand and
   memoized (call-by-need *locally*). Laziness is **visible in the type**, never
@@ -178,17 +179,33 @@ eval ρ (prim op ā)      = primReduce op (map (eval ρ) ā)          -- prim on
 eval ρ (cast A B e a)   = castReduce (eval ρ A)(eval ρ B)(eval ρ e)(eval ρ a)   -- §3.3 obs
 eval ρ (Eq A a b)       = eqReduce (eval ρ A)(eval ρ a)(eval ρ b)               -- §3.3 obs
 eval ρ (elim_D M m̄ ī s) = elimReduce ρ D M m̄ ī (eval ρ s)        -- ι; methods m̄ held UNEVALUATED (§2)
-eval ρ (hole h)         = unknown                                  -- open verification hole (§4)
+eval ρ (hole h)         = unknown                                  -- reached computational hole after Ω erasure (§4)
 
 apply ⟨ λ(x:A).t ; ρ' ⟩ u = eval (ρ' , u) t                       -- β by env extension (= t[u/x])
 apply ⟨neutral n⟩       u = ⟨neutral (n · u)⟩                      -- stuck (open terms only)
 apply unknown           u = unknown                                -- strict (§4)
 ```
 
-The pair clauses above apply to **computationally relevant** Σ components.
+These clauses describe the **computationally relevant** term after Ω
+positions have been erased, not an unconditional CBV interpretation of raw
+core. Before value-only evaluation, the interpreter obtains the same
+kernel-classified erasure plan used by checked-core lowering (`46 §4`,
+`47 §1`), from the checked declaration and its typed context. A term whose
+type's sort weak-head-normalizes to Ω is not evaluated. This includes an
+application argument when the checked function's Π domain is Ω, even if the
+argument is a variable or a transparent alias hides its `Eq` type. A λ or
+`let` binder with Ω-classified domain has no computational slot: the
+interpreter may retain the binder and bind canonical `tt` in place of its
+erased proof, while native lowering omits the slot. An Ω motive premise,
+including an unindexed convoy method's `λ e` and its `refl` application,
+follows the same rule. Classification never follows the term's `Eq`/`refl` spelling.
+The runtime erasure rule and plan are **deferred — W3**
+(`LANG-REFINEMENT-PROOF-ERASURE`); missing classification refuses, not
+falling back to relevant CBV.
+
 A refinement `{x:A|φ}` is a checked kernel `Σ(x:A).φ x : Type`, with
-`φ x : Ω` (`../20-verification/21 §2`, `13 §4`). Its runtime semantics is
-**type-directed erasure**:
+`φ x : Ω` (`../20-verification/21 §2`, `13 §4`). Its pair is the
+subset-Σ instance of the type-directed erasure:
 
 ```
 eval ρ (Pair(a,π) : Σ(x:A).φ x) = eval ρ a       -- never evaluate π
@@ -196,15 +213,15 @@ eval ρ (Proj1 p : A)            = eval ρ p       -- p has subset-Σ type
 Proj2 p : φ(Proj1 p)            = erased         -- only proof positions
 ```
 
-The proof component may contain an **open hole** that evaluates to
-`unknown` if demanded as data, but here it is **not demanded**; a refined
-value still evaluates to its carrier. A relevant Σ whose second component
-is not classified at Ω remains a strict pair; an open hole in that component
-still propagates `unknown` (§4). The same distinction applies in both
-checked-core lowering and interpreter evaluation; the interpreter is untyped,
-so its concrete way to carry the kernel's Ω classification is implementation
-latitude, **not** a licence to guess from the constructor spelling or to
-force an erased proof. A `space` operation with residual effects has
+The proof component may contain an **open hole**, but it is not evaluated
+in an Ω position; a refined value still evaluates to its carrier. A
+relevant Σ whose second component is not classified at Ω remains a strict
+pair; an open hole in that component still propagates `unknown` (§4).
+Both evaluators consume one kernel-derived classification: the package
+section carries it for native lowering (`46 §4`), and the interpreter
+derives the same plan from its `GlobalEnv` before its value-only evaluator
+runs. The interpreter must not guess from constructor
+spelling or force an erased proof. A `space` operation with residual effects has
 `Pair(t,π) : Σ(t:ITree F (R × S)).AllRet (ψ s) t` (`36 §4.3`): erasure
 keeps the **whole tree** `t` and never evaluates `π`, without inserting
 a pair at any `ITree` return. No kernel equality `Σ(x:A).φ x ≡ A`
@@ -380,11 +397,12 @@ bytes. It deliberately ignores private sharing and allocation identity.
 
 Evaluating a term that **computationally depends** on an open verification
 hole (`41 §6`, `../20-verification/24 §2`) yields `unknown`: it marks where
-an unproven property bears on a runtime result. An open hole **only in a
-subset-Σ's Ω proof** is erased and never evaluated (§3.2); it does **not**
-make the carrier result `unknown`, but the claim remains `unknown` in the
-verification status and trusted-base export (`21 §5.4`). A hole-free
-program never yields runtime `unknown` (`43 §2, case 1`).
+an unproven property bears on a runtime result. An open hole **only in an
+Ω-classified position** (including a subset-Σ proof or proof argument) is
+erased and never evaluated (§3.2); it does **not** make the computational
+result `unknown`, but the claim remains `unknown` in the verification
+status and trusted-base export (`21 §5.4`). A hole-free program never
+yields runtime `unknown` (`43 §2, case 1`).
 
 **Propagation (the Kleene/Heyting rules, `41 §6`).** `unknown` is the third
 truth value and the "result not determined" marker:
@@ -410,8 +428,8 @@ The connectives are the eliminator-branch rule (§2) in disguise: `∧`/`∨` ar
 by the *other*, known operand without forcing the `unknown` one). The
 discriminating test (AC4) flips on a **computationally reached** hole →
 `unknown` versus the same computation with the hole discharged → a definite
-value. A proof-only hole in an erased subset component is a distinct case:
-same carrier result, **different verified status**, never an `unknown`
+value. A proof-only hole in any erased Ω position is a distinct case: same
+computational result, **different verified status**, never an `unknown`
 payload merely because the proof was open.
 
 ## 5. The interpreter as oracle (and the REPL)
@@ -716,8 +734,9 @@ selected closure-free ground observations, short-circuit / branch laziness
 (untaken arm not forced), and `unknown` propagation (a computationally
 reached hole flips to `unknown`; an erased subset proof hole leaves a
 carrier value with an `unknown` verification status). The type-directed
-subset proof-erasure row is **deferred to W3** (`LANG-REFINEMENT-PROOF-ERASURE`)
-until that runtime path lands; it is not a current interpreter claim.
-Each discriminating case **flips** on its
-targeted bug or asserts a structural output (constructor head or durable bytes),
+Ω-keyed erasure rows are **deferred to W3**
+(`LANG-REFINEMENT-PROOF-ERASURE`) until both evaluators consume the plan;
+this is not a current interpreter claim. Each discriminating case **flips**
+on its targeted bug or asserts a structural output (constructor head or
+durable bytes),
 per COORDINATION §7.

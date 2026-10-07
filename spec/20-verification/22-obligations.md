@@ -254,11 +254,14 @@ visible failure, never a too-strong `Γ` (which could mask a real burden):
   substitutes the bound expression. Later obligations may rewrite using
   that checked equality, not an unrepresented Γ-only assumption.
 - **`match` / case split.** Elaborated to an eliminator (`elim_D`, `14 §3`,
-  `../30-surface/39 §2.6`). In each constructor branch `cₖ`, `Γ` gains the
-  constructor's **fields** as binders **and** the **scrutinee equation**
-  `eₖ : Eq A s (cₖ field̄)` (in Ω) — so in the `nil` branch you may assume
-  `xs ≡ nil`. Its proof is bound by the branch's dependent convoy
-  (`34 §3.6`), not invented by obligation extraction.
+  `../30-surface/39 §2.6`). Every constructor branch binds its fields.
+  For an **unindexed** family `A`, it also binds the checked scrutinee
+  equation `eₖ : Eq A s (cₖ field̄)` (in Ω), so a `nil` branch may use
+  `xs ≡ nil`. The dependent convoy supplies its proof (`34 §3.3`); the
+  extractor never invents one. For an **indexed** family `D ī`, no such
+  equation is bound: `s : D ī` and `cₖ field̄ : D īₖ` need not have the
+  same type. Only the branch's checked index refinement (`34 §3.2`)
+  enters its path context.
 - **Conditionals.** `if c then … else …` (elaborated `elim_Bool`) binds
   `e_true : Eq Bool c true` or `e_false : Eq Bool c false` through the same
   convoy (motive `λ y. Eq Bool c y → T`, applied to `refl c`). Each branch
@@ -376,11 +379,14 @@ extract(Γ, term, expectedTy) → ObligationSet:    -- checked core + V1 site/pr
   Let(x, e, A, body):
         Γ' := Γ ⊕ (x:A) ⊕ (eq : Eq A x e, refl)
         obls ∪= extract(Γ, e, A) ∪ extract(Γ', body, expectedTy)
-  Elim(M, methods, scrut, A):              -- M may be subset-Σ (§4)
+  Elim(M, methods, scrut, D):              -- M may be subset-Σ (§4)
         for (cₖ, branchₖ) ∈ methods:
            Γₖ := Γ ⊕ fields(cₖ)
-                   ⊕ (eqₖ : Eq A scrut (cₖ fields(cₖ)), convoyEvidenceₖ)
-                   ⊕ sigmaInductionHypotheses(M, cₖ, fields(cₖ))
+           if D has no indices:
+              Γₖ ⊕= (eqₖ : Eq D scrut (cₖ fields(cₖ)), convoyEvidenceₖ)
+           else:
+              Γₖ ⊕= checkedIndexRefinement(D, cₖ)  -- no scrutinee Eq
+           Γₖ ⊕= sigmaInductionHypotheses(M, cₖ, fields(cₖ))
            obls ∪= extract(Γₖ, branchₖ, M (cₖ fields(cₖ)))
   If(c, thn, els):                          -- elim_Bool, convoy evidence
         obls ∪= extract(Γ ⊕ (eq_t : Eq Bool c true, convoy_t), thn, expectedTy)
@@ -465,11 +471,13 @@ reconciled against `12`/`16 §1.1`:
 - **Hypotheses are at their natural levels.** A `Γ`-entry is a data binder
   (`x : A : Type ℓ`), a subset-Σ binder at
   `Type (max ℓ_A ℓ_φ)`, a checked proof argument (`p : φ : Ω_ℓ`), or a
-  path equation with a bound evidence term (`eq : Eq A s t : Ω_ℓ` for
-  `A : Type ℓ`, `16 §2.1`). The direct, Π-abstracted or structurally
-  lifted induction hypotheses (§4) are at the kernel motive's **actual
-  subset-Σ** type; `Proj2 IH` supplies an Ω proof. They are not bare
-  proposition assumptions manufactured by V2.
+  path equation with a bound evidence term for an unindexed family
+  (`eq : Eq A s t : Ω_ℓ` for `A : Type ℓ`, `16 §2.1`), or an indexed
+  family's checked index refinement without a scrutinee Eq (`34 §3.2`).
+  The direct, Π-abstracted or structurally lifted induction hypotheses
+  (§4) are at the kernel motive's **actual subset-Σ** type; `Proj2 IH`
+  supplies an Ω proof. They are not bare proposition assumptions
+  manufactured by V2.
 - **No new universes or formers.** V2 introduces none: the subset pair
   reuses kernel Σ, whose relevant carrier and Ω predicate land at
   `Type (max ℓ_A ℓ_φ)` (`13 §4`); Ω, Eq and eliminators retain their

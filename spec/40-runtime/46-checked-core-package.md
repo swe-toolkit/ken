@@ -184,8 +184,9 @@ best-effort reader mode, inferred translation, or raw-source fallback.
 `core_semantic_hash` is the canonical hash of checked-core meaning. It includes
 the package kind and version, stable symbols, checked declarations, semantic
 metadata, obligations, assumptions, `trusted_base_delta`, unsupported semantic
-entries, and dependency semantic hashes. It excludes raw source bytes,
-diagnostic-only source display data, and non-semantic annotations.
+entries, Ω erasure plans when present, and dependency semantic hashes.
+It excludes raw source bytes, diagnostic-only source display data, and
+non-semantic annotations.
 
 `artifact_hash` is the hash of the serialized package artifact/provenance
 envelope. It may include source identity, source hashes, signatures, and
@@ -234,8 +235,9 @@ hashing.
 `core_semantic_hash` is computed from the canonical semantic inputs only:
 stable-symbol bindings, checked declarations, primitive references, inductive
 metadata, class/instance metadata, recursion metadata, effects/foreign
-metadata, obligations, assumptions, `trusted_base_delta`, unsupported semantic
-entries, behavioral export references/hashes, and dependency semantic hashes.
+metadata, obligations, assumptions, `trusted_base_delta`, Ω erasure plans,
+unsupported semantic entries, behavioral export references/hashes, and
+dependency semantic hashes.
 `artifact_hash` may additionally include source identity, source hashes,
 signatures, provenance, and non-semantic annotations. Changing comments, spans,
 formatting, source spelling, producer-local allocation order, or non-semantic
@@ -256,6 +258,7 @@ section.
 | `header` | kind, version, refs | bad kind/version |
 | `symbols` | stable names | missing/duplicate/orphan |
 | `declarations` | checked graph | missing or bad reference |
+| `omega_erasure_plans` (W3) | kernel-classified plan per checked declaration body | missing plan at erasure or malformed node ids/tags |
 | `primitive_refs` | primitive metadata | primitive use gap |
 | `inductives` | family/constructor metadata | inductive use gap |
 | `classes_instances` | lookup/dictionary metadata | lookup metadata gap |
@@ -266,6 +269,30 @@ section.
 | `behavioral_export` | `71` reference/hash | temporal/export gap |
 | `hashes_provenance` | semantic/artifact hashes | hash mismatch |
 | `unsupported` | explicit unsupported entries | malformed/reachable block |
+
+**Deferred — W3 (`LANG-REFINEMENT-PROOF-ERASURE`).** The
+`omega_erasure_plans` section is not an assertion that NC4 already emits
+it. At W3, the section is a required semantic input to erasure, with one
+plan per checked declaration body in the package; a missing plan on the
+selected closure refuses before lowering. Earlier v0 packages may still be
+validated and inspected without this section but cannot silently lower
+through Ω-keyed erasure. The plan is keyed by the declaration's stable
+symbol, never by a producer-local `GlobalId`.
+
+For each checked body the plan holds three sets of **preorder node indices**
+in that body's canonical encoding: `erased_subterms` names maximal subterms
+whose inferred type has sort weak-head-normalizing to Ω; `erased_binders`
+names λ or `let` binders whose domain is classified Ω; `collapsed_sigmas`
+names `Pair` or `Proj1` nodes at a Σ whose codomain is classified Ω under
+its carrier binder. The emitter computes these in the typed context by
+kernel inference and weak-head normalization, descending under binders;
+it does not classify from serialized type spelling or a partial byte reader.
+The structural validator rejects out-of-range node ids and an
+`erased_binders` id not on λ/`let` or a `collapsed_sigmas` id not on
+`Pair`/`Proj1`. The plan participates in `core_semantic_hash` and never
+confers proof authority: a wrong plan can miscompile but cannot certify a
+Ken proof. Runtime consumers fail closed when a selected declaration lacks
+its plan (`47 §1`/§4).
 
 Unknown top-level semantic sections or unknown required features reject unless a
 selected, versioned translator explicitly handles them. Unknown entries inside
@@ -557,6 +584,9 @@ artifacts once the emitter exists, then mutate one dimension at a time:
 - a target closure reaching a missing lowerability entry rejects before
   erasure/runtime IR and names the stable symbol;
 - reachable `trusted_base_delta` omission rejects;
+- W3-deferred Ω-plan cases: a missing plan refuses erasure; out-of-range
+  ids or binder/Σ tag mismatches reject; changing a plan changes
+  `core_semantic_hash` (`§4`);
 - semantic hash mismatch rejects;
 - equal checked-core meaning with different source spelling keeps
   `core_semantic_hash`;

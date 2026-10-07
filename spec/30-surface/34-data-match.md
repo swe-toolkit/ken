@@ -661,15 +661,17 @@ recursive step is a follow-on.
 
 ### 3.3 Per-branch definitional refinement (the hypothesis)
 
-In the `cₖ` arm, after the `elim_D` split, the scrutinee is **definitionally**
-the matched constructor: `s ≡ cₖ field̄` holds by the ι-rule the branch sits
-under (`14 §3`). The verification layer turns this into a **hypothesis** — the
-scrutinee equation `(_ : Eq A s (cₖ field̄))` added to the local context `Γ`
-(`../20-verification/22 §3`) — so inside the `Circle r` arm one may *assume*
-`s ≡ Circle r`, and a dependent motive (`§3.2`) refines the **result type** of
-that arm accordingly. This per-branch refinement (a fact about the value **and**
-a refinement of the type) is what AC6 pins — the surface origin of `22 §3`'s
-path-sensitive `Γ`.
+For an **unindexed** family `A`, each `cₖ` arm binds the checked scrutinee
+hypothesis `(_ : Eq A s (cₖ field̄))` through a dependent convoy (`21 §6.3`,
+`../20-verification/22 §3`). Thus a `Circle r` arm can use a term proving
+`s ≡ Circle r`, and its dependent motive (`§3.2`) specializes the result type.
+For an **indexed** family `D ī`, the scrutinee and branch constructor may
+inhabit `D ī` and `D īₖ` respectively: no scrutinee equation is bound.
+Only the checked **index refinement** of `§3.2` specializes that branch's
+motive and path context. AC6's value-equation assertion applies to
+unindexed families; indexed-family cases pin index refinement separately.
+A packed equation over `Σ ī. D ī` is an open design item (`../90`,
+`OQ-indexed-scrutinee-evidence`), not a rule here.
 
 **Guards do not refine and do not cover.** A guarded arm `Cₖ p̄ if g => e`
 elaborates to a conditional *inside* the `cₖ` method (`39 §2` item 7); because the
@@ -679,10 +681,10 @@ not a coverage contribution.
 
 ### 3.4 Transport by a propositional equality — the `J` former
 
-Per-branch refinement (`§3.3`) rewrites the goal by an equality that holds
-**definitionally** — the scrutinee equation `s ≡ cₖ field̄` that the `elim_D`
-split makes true by the ι-rule. It does **nothing** for an equality that holds
-only **propositionally**: a proved `p : Eq A a b` that is *not* a definitional
+For an unindexed branch, `§3.3` supplies a checked scrutinee equation;
+for an indexed branch, it supplies only the checked index refinement (`§3.2`).
+Neither supplies an arbitrary propositional equality that holds
+only propositionally: a proved `p : Eq A a b` that is *not* a definitional
 convertibility (e.g. an order hypothesis `IsTrue (leq k k') = Eq Bool (leq k k')
 True` over an **abstract** key `k`, where `leq k k'` is a *stuck* redex no match
 can fire). To rewrite a goal mentioning `a` into one mentioning `b` along such a
@@ -1132,8 +1134,9 @@ unmatched pattern**, the exhaustive version accepts — verdict **and** the name
 witness flip), AC4 (reachability — a redundant arm flagged, verdict flips), AC5
 (indexed family — the impossible application **rejects** *while* the impossible
 arm may be **omitted**: a non-degenerate pair on the same `§4.3` rule), AC6
-(branch refinement = `22 §3` hypothesis — a *dependent* motive, asserted
-structurally), AC7 (refinement type — introduction emits `φ` and checks a
+(unindexed branch refinement = `22 §3` scrutinee equation — a dependent
+motive, asserted structurally; indexed branches retain only index
+refinement), AC7 (refinement type — introduction emits `φ` and checks a
 pair, forgetting inserts `Proj1` with no obligation, never `Σ ≡ A`;
 these subset-Σ shape expectations are **W5-deferred**), AC8
 (proof-returning dependent motive into `Ω`), and AC9

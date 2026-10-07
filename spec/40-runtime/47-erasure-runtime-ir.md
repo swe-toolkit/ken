@@ -25,21 +25,41 @@ assumptions, `trusted_base_delta`, behavioral/export references, dependency
 semantic hashes, and lowerability status carried by the package.
 
 `erased executable core` is an intermediate semantic artifact. Erasure is
-**type-directed on the checked core's Ω classification** (`42 §3.2`): a
-subset `Σ(x:A).φ x` with `φ x : Ω` erases `Pair(v,π)` to the relevant
-carrier `v`, makes its `Proj1` runtime identity, and removes `Proj2` only
-from proof positions. It never evaluates the Ω proof, including an open
-hole, while that hole remains in assumption/trust metadata. A relevant
-Σ whose second component is not at Ω retains its runtime pair. Thus
-removing the *subset's proof shell* can change the intermediate pair
-syntax, but not the **observable relevant** representation, branch choice,
-trap/effect behavior, data/control shape, or returned ground value. No
-kernel equality between a subset and its carrier is implied. If the
-checked package does not supply the classification needed to distinguish
-these cases, erasure refuses loudly (§4), never guesses from the term's
-constructor. Obligations, assumptions, trust metadata, runtime checks,
-capabilities, effects, and lowerability blockers remain attached as
-auditable metadata and hash inputs.
+**type-directed on the checked core's Ω classification** (`42 §3.2`), over
+**every Ω-classified position**. A maximal subterm whose inferred type has
+sort weak-head-normalizing to Ω is never evaluated, including an open
+hole or a `Proj2` proof. A λ or `let` binder with Ω-classified domain has
+no runtime slot; an application argument is erased when the **checked
+function Π domain** is Ω, never because its own spelling resembles `refl`.
+This includes an Ω motive premise (`λ e` in an unindexed match method)
+and its argument. A subset `Σ(x:A).φ x` with `φ x : Ω` erases `Pair(v,π)` to the
+relevant carrier `v` and makes `Proj1` runtime identity. A relevant Σ
+whose second component is not at Ω retains its runtime pair. Erasure can
+change intermediate proof shells and binders, but not the **observable
+relevant** representation, branch choice, trap/effect behavior,
+data/control shape, or returned ground value. No kernel equality between
+subset and carrier is implied.
+
+**Deferred — W3 (`LANG-REFINEMENT-PROOF-ERASURE`).** The package's
+per-declaration `omega_erasure_plans` section (`46 §4`) supplies one
+kernel-classified plan per checked declaration body. Its three preorder
+node-id sets identify maximal Ω-typed subterms (`erased_subterms`), Ω-domain
+λ/`let` binders (`erased_binders`), and `Pair`/`Proj1` nodes whose Σ
+codomain is Ω (`collapsed_sigmas`). The emitter infers each type in its
+checked binder context and classifies its sort by kernel weak-head
+normalization; neither native erasure nor the interpreter guesses from
+bytes or syntax. The plan is a semantic-hash input, structurally validated
+for ids in range and node tags matching binder/Σ categories (`46 §4`),
+and then consumed by erasure. Native lowering drops erased arguments and
+binder slots and collapses marked pairs/projections. The interpreter uses
+the **same classification function** on its `GlobalEnv`, replacing erased
+subterms by canonical `tt` before value-only evaluation and retaining
+erased binders with `tt` in their slots (`42 §3.2`). A selected declaration
+with no plan refuses before native lowering (§4), rather than executing
+proof arguments as data. This metadata adds **no proof authority**: an
+incorrect plan can miscompile, not prove. Obligations, assumptions, trust
+metadata, runtime checks, capabilities, effects, and lowerability
+blockers remain attached as auditable metadata and hash inputs.
 
 `Ken runtime IR` is the first operational artifact. It makes data, control,
 effects, traps, primitives, closures, ADTs, records, and calls explicit enough
@@ -95,8 +115,8 @@ checked-core closure includes:
   status other than `supported`;
 - an erasure case where proof removal could change branch choice,
   **observable relevant** representation, trap/effect behavior, data/control
-  shape, or observable result, or whose checked Ω classification is
-  unavailable;
+  shape, or observable result, or whose kernel-classified Ω erasure plan is
+  missing, malformed, or unavailable;
 - a primitive or partial operation whose result/trap behavior is not explicit in
   runtime IR;
 - an effect, foreign, capability, trust, or runtime-check path that is not

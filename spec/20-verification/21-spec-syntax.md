@@ -554,11 +554,14 @@ carrier and use the source's `Proj2` when introducing the target proof.
 A check-only λ, literal, hole or pair literal expected at a refinement first
 checks at its carrier, then introduces the checked pair **once at the check
 entry**. An `if` or `match` checked at a refinement pushes that expected type
-to its leaves; each leaf introduces under its own bound branch equation.
-A `let` equation carries `refl`, since the kernel substitutes it. A
-branch on scrutinee `s : S` binds its equation by the convoy motive
-`λ y. Eq S s y → T`, applied to `refl s`, so each branch's path fact has
-a **term**, not just a proposition in the obligation extractor (`22 §3`).
+to its leaves. For an **unindexed** scrutinee `s : S`, the convoy motive
+`λ y. Eq S s y → T`, applied to `refl s`, binds a checked branch equation;
+each leaf introduces under that term-backed fact (`22 §3`). For an indexed
+family `D ī`, no equation between `s : D ī` and a constructor at a
+potentially different index is bound. Its branches retain their checked
+**index refinement** (`34 §3.2`), not a scrutinee equality. An `if` over
+`Bool` uses the unindexed convoy. A `let` equation carries `refl`, since
+the kernel substitutes it.
 Forgetful use of a subset at its carrier inserts `Proj1` and incurs **no**
 obligation. Before an elimination inspects an inferred type head
 (application head, match scrutinee, binop operand, field projection or
@@ -711,8 +714,9 @@ consumes. The interface is four things:
    facts in scope where the obligation *arose*: written preconditions and
    refined-parameter projections (`22 §3`). V2 **extends** each `Γ` with
    path-sensitive facts **and their term evidence** (let-equations,
-   convoy-bound branch equations, Σ-result induction hypotheses —
-   `22 §3`/`§4`); V1 provides the seed context, V2 the accumulation.
+   convoy-bound unindexed branch equations, indexed-family index
+   refinements, Σ-result induction hypotheses — `22 §3`/`§4`); V1 provides
+   the seed context, V2 the accumulation.
 4. **The provenance** — source span + responsible clause per hole, for the
    diagnostics (`24`) and the protocol (`25`).
 

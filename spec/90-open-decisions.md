@@ -185,6 +185,21 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   `20-verification/22 §2.1`, `10-kernel/18a §5.9.1`, `40-runtime/42`,
   elaboration and kernel conversion.
 
+### OQ-indexed-scrutinee-evidence — Packed branch equality — **OPEN**
+- **Fork.** Should an indexed `match` expose a term-backed equation between
+  the scrutinee and a branch constructor in addition to its checked index
+  refinement (`30-surface/34 §3.2`)? Their types `D ī` and `D īₖ` can differ,
+  so `Eq (D ī) s (cₖ field̄)` is not generally well-typed.
+- **Candidate, not normative.** Pack both values with their indices and
+  consider `Eq (Σ ī. D ī) (ī, s) (īₖ, cₖ field̄)`. Its construction, branch
+  evidence, and use by dependent motives remain to be designed and checked.
+- **Current rule.** Unindexed families bind a scrutinee equation through a
+  convoy; indexed families bind none and retain only index refinement. No
+  packed equality is generated (`20-verification/21 §6.3`, `22 §3`,
+  `30-surface/34 §3.3`).
+- **Affects.** Indexed `match` elaboration, V2 path evidence and any future
+  conformance row for packed equality.
+
 ## B. Verification
 
 ### OQ-12 — SMT integration strategy — **DECIDED**

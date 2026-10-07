@@ -34,7 +34,7 @@ points, never silently:
    reached** at runtime (`42 §4`, `../20-verification/24 §2`). A hole
    in an erased subset-Σ proof stays a listed postulate and an
    `unknown` verification status but does not taint its carrier value
-   (`42 §3.2`). A fully verified program has no unaccepted open holes.
+   (`42 §3.2`). A fully verified program has no open obligation holes.
 2. **Partial primitive operations** — division by zero, fixed-width overflow
    under a non-wrapping op (`../30-surface/35 §3`), array index out of bounds.
    These either (a) carry a **refinement precondition** making them total (`{ d
