@@ -1,7 +1,7 @@
 ---
 id: LANG-NAMED-REFINEMENT-TYPE-ARGUMENT
 title: "A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six, List Char admits 55296, and so do Int → Five results, classes, aliases, data fields and expression-level type arguments. Refuse the nested introduction at the check choke point, keyed on polarity and the checked refinement identity"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1

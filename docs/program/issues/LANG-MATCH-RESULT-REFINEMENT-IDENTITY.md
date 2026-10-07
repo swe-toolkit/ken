@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-RESULT-REFINEMENT-IDENTITY
 title: "A match through the nested-pattern matrix or the indexed dependent-branch path checks its leaves against an inferred or δ-simplified substitute for the result type, so a refinement result is dropped even at the top level: fn g (n : Nat) (i : Ix n) (x : Int) : Five = match i { Z xs ↦ x; S ys ↦ 6 } checks with zero obligations and returns 6 as a Five. Check every leaf against the result type with its refinement constants kept rigid"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -174,3 +174,15 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. value checks against the unsimplified substituted goal lose structure that dependent matches rely on (a delta-exposed computed scrutinee in Map; motive beta and indices in q5) — keyed on goal reduction mode
 2. the obligation closure states the constructor path equation homogeneously — keyed on whether the constructor's indices agree with the scrutinee's
 ```
+
+## Closeout
+
+Merged `68bd8ad73` from exact `953712506` (PR #4566), a respin of
+`8cd9a94e8`, whose FULL CI went red on a Bottom-evidence first checked leaf;
+the respin plans an unreachable Bottom arm with no Eq projection. Language
+QA `evt_28tds4pt3ae64`, Architect `evt_2hrmq0vmsrnax`, Decision
+`dec_2vqr35kcrt929`. FULL CI discharged the package gate
+(`evt_171jzjwgqqks9`). A match result keeps its expected type's named
+refinements through one refinement-keeping simplifier entry, and the
+obligation closure keeps only path equations well typed in the branch
+context. The symptom inventory closes at 2.
