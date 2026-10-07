@@ -498,3 +498,85 @@ closed-term corpus its value **matches the kernel's own reduction** — on
   Pair constructor or the presence of a hole. The relevant control catches
   unconditional proof-field erasure; the subset arm catches an evaluator that
   forces an Ω proof before discarding it.
+
+## W3. Kernel-classified Ω erasure plans (`46 §4`, `47 §1`)
+
+### runtime/evaluation/omega-plan-erases-alias-hidden-proof-arguments (property)
+- spec: `46 §4`, `47 §1`, `42 §3.2`
+- status: **deferred — W3 (`LANG-REFINEMENT-PROOF-ERASURE`)**.
+- given: transparent type aliases `ProofBase = Top` and
+  `ProofAlias = ProofBase`; `fn drop (p : ProofAlias) : Int = 7`;
+  `fn hidden : Int = drop ?h`, where `?h : ProofAlias` is open; and the
+  relevant control `fn keep (n : Int) : Int = n` with
+  `fn relevantCall : Int = keep 7`.
+- expect: across these bodies, the only nonempty plan sets are `drop`'s
+  `erased_binders` containing its Ω-domain λ binder and `hidden`'s
+  `erased_subterms` containing the `?h` argument node; all other plan sets are
+  empty. The classifier follows the checked type through the aliases and the
+  checked function Π domain, not source spelling or argument syntax. Erasure
+  skips the hole and removes the proof binder and argument, so `hidden` returns
+  `7` rather than `unknown`; `keep` retains its Int binder and argument and
+  returns `7`.
+- why: a spelling-based plan misses the proof argument even though its checked
+  type has sort Ω after weak-head normalization. The Int control detects
+  over-erasure. Pair-only coverage does not exercise the application-argument
+  and binder positions.
+- pin:
+  - **MEASURED:** the plan's canonical node sets and `hidden`/`keep` results.
+  - **CLAIMED:** aliases that kernel-classify at Ω erase both the proof
+    binder and argument; the Int control remains relevant.
+  - **THE GAP:** only kernel type inference and sort WHNF distinguish the
+    alias from data; the open-hole outcome and Int control witness that path.
+
+### runtime/evaluation/omega-plan-presence-and-semantic-hash (property)
+- spec: `46 §§3.1-4`, `47 §1`/§4
+- status: **deferred — W3 (`LANG-REFINEMENT-PROOF-ERASURE`)**.
+- given: a valid W3 package with one `omega_erasure_plans` entry for every
+  checked declaration body, keyed by stable declaration symbol, and an earlier
+  v0 package without the section. For the hash probe, compare otherwise
+  identical hash inputs whose plan differs only by omitting an in-range,
+  tag-correct Ω-binder id, while all other semantic inputs are fixed.
+- expect: the complete W3 package validates and its selected closure proceeds
+  to erasure. Absence of a plan for a selected declaration refuses before
+  lowering. The earlier package may still be validated and inspected, but does
+  not lower through Ω-keyed erasure. A plan-only change changes
+  `core_semantic_hash`; after recomputing the changed artifact's
+  `artifact_hash`, retaining the original claimed core hash rejects for a
+  semantic-hash mismatch. The hash probe does not claim that the alternate plan
+  is correct or lowerable. A plan is a semantic input, not a proof certificate,
+  and is not keyed by producer-local `GlobalId`.
+- why: this separates the W3 lowering requirement from the earlier v0
+  inspection allowance and pins the plan's semantic-hash participation without
+  confusing it with source or annotation changes.
+- pin:
+  - **MEASURED:** per-body stable-symbol plan coverage, lowering refusal, and
+    the recomputed `core_semantic_hash` after a plan-only mutation.
+  - **CLAIMED:** W3 consumes complete plans and hashes their semantic content.
+  - **THE GAP:** keep other semantic inputs fixed and recompute `artifact_hash`
+    so a stale envelope hash cannot mask plan-hash participation.
+
+### runtime/evaluation/omega-plan-range-and-tag-errors-refuse (property)
+- spec: `46 §4`, `47 §1`/§4
+- status: **deferred — W3 (`LANG-REFINEMENT-PROOF-ERASURE`)**.
+- given: a complete, well-hashed W3 package with the alias-hidden hole and
+  Ω-domain binder from the preceding case plus a subset-Σ `Pair`/`Proj1` body;
+  then independently mutate one plan set at a time:
+  put an id absent from the canonical body encoding in each of
+  `erased_subterms`, `erased_binders`, and `collapsed_sigmas`; point
+  `erased_binders` at an in-range non-λ/`let` node; and point
+  `collapsed_sigmas` at an in-range node other than `Pair`/`Proj1`. Recompute
+  both package hashes for each malformed-plan variant.
+- expect: the valid plan passes package validation. Each malformed variant
+  rejects as an invalid plan before erasure; the recomputed hashes prevent a
+  stale-hash refusal from masking the range or tag check. No extra tag
+  restriction is asserted for `erased_subterms` beyond an in-range node id.
+- why: the three sets share a range rule, while binder and collapsed-Σ sets
+  have distinct node-tag rules. Separate mutations prove each stated refusal is
+  reachable without treating an unrelated hash mismatch as evidence.
+- pin:
+  - **MEASURED:** validator decisions after resolving ids to canonical body
+    nodes and checking binder/Σ node tags.
+  - **CLAIMED:** all three sets reject out-of-range ids; only binder and
+    collapsed-Σ sets have the stated tag restrictions.
+  - **THE GAP:** recompute both hashes and mutate each arm independently, so
+    malformed-plan refusal is not a stale-hash false positive.
