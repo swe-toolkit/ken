@@ -40,6 +40,15 @@ fn compile(
     )
 }
 
+fn must_refuse(
+    result: Result<ken_elaborator::compiler_driver::CompilerDriverOutput, CompilerDriverError>,
+) -> CompilerDriverError {
+    match result {
+        Err(error) => error,
+        Ok(_) => panic!("package emitter returned Ok on a dangling example reference"),
+    }
+}
+
 fn outside_reference(error: CompilerDriverError, referenced: &StableSymbol) {
     let message = error.to_string();
     match error {
@@ -69,12 +78,11 @@ fn later_source_example_reference_refuses_before_ok_for_all_target_kinds() {
         CompilerTargetKind::Executable,
     ] {
         outside_reference(
-            compile(
+            must_refuse(compile(
                 DECLARATION_SOURCE,
                 "const main : Bool = zz_ex",
                 kind.clone(),
-            )
-            .expect_err("the checked package must be closed before target selection"),
+            )),
             &decl("zz_ex"),
         );
     }
@@ -111,17 +119,32 @@ fn ordinary_predecessor_reference_still_erases_and_example_still_checks() {
         .expect("an admitted predecessor reference must erase");
 }
 
-/// Promise class: durable invariant. MEASURED: adding an example-only axiom
-/// leaves the emitted semantic input and hash unchanged, even though executing
-/// the example changes the live environment's trusted base. CLAIMED: env-wide
-/// trust projection excludes example-only roots. THE GAP: this isolates one
-/// axiom, not every kind of generated postulate.
+/// Promise class: durable invariant. MEASURED: an example-only `Axiom`
+/// expression adds a live trusted hole but leaves the emitted semantic input
+/// and hash unchanged. CLAIMED: env-wide trust projection excludes
+/// example-only roots. THE GAP: this isolates one hole, not every postulate.
 #[test]
 fn example_only_axiom_does_not_add_trust_to_the_package() {
     let plain = "```ken\nconst base : Bool = True\n```\n";
     let with_axiom =
-        "```ken\nconst base : Bool = True\n```\n```ken example\naxiom zz_ex : Top\n```\n";
+        "```ken\nconst base : Bool = True\n```\n```ken example\nconst zz_ex : Bool = Axiom\n```\n";
     let later = "const main : Bool = base";
+    let mut env = ElabEnv::new().expect("prelude");
+    let trust_before = env.env.trusted_base();
+    env.elaborate_ken_md_file_v1(with_axiom)
+        .expect("the example axiom must elaborate, not just be skipped");
+    assert!(env.globals.contains_key("zz_ex"));
+    let trust_after = env.env.trusted_base();
+    let example_holes = trust_after
+        .iter()
+        .filter(|id| !trust_before.contains(id))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        example_holes.len(),
+        1,
+        "the example creates a real trusted hole"
+    );
+
     let expected = compile(plain, later, CompilerTargetKind::NonRuntime)
         .expect("ordinary package emits")
         .package;
@@ -142,21 +165,19 @@ fn example_only_axiom_does_not_add_trust_to_the_package() {
 fn later_source_example_family_and_constructor_refs_refuse() {
     const DATA: &str = "# Package\n\n```ken\nconst base : Bool = True\n```\n\n```ken example\ndata Hidden = MkHidden\n```\n";
     outside_reference(
-        compile(
+        must_refuse(compile(
             DATA,
             "const main : Type = Hidden",
             CompilerTargetKind::NonRuntime,
-        )
-        .expect_err("example-declared data type must be unavailable to the package"),
+        )),
         &decl("Hidden"),
     );
     outside_reference(
-        compile(
+        must_refuse(compile(
             DATA,
             "const main : Bool = match MkHidden { MkHidden |-> True }",
             CompilerTargetKind::NonRuntime,
-        )
-        .expect_err("example-declared constructor must be unavailable to the package"),
+        )),
         &decl("Hidden"),
     );
 }
@@ -177,8 +198,11 @@ fn later_source_implicit_example_instance_refuses() {
         .expect("the module class and its admitted instance must resolve");
 
     let example_source = format!("```ken\n{class}```\n```ken example\n{instance}```\n");
-    let error = compile(&example_source, later, CompilerTargetKind::NonRuntime)
-        .expect_err("an implicit example dictionary must not escape package closure");
+    let error = must_refuse(compile(
+        &example_source,
+        later,
+        CompilerTargetKind::NonRuntime,
+    ));
     let message = error.to_string();
     match error {
         CompilerDriverError::PackageReferenceOutsidePackage {
