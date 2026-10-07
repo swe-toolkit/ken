@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-ORDER-COMPARE-COMPLETENESS-LAWS
 title: "Proof-backfill for Data/Numeric/Nat/Order.ken.md: compare's laws only say what each result implies, so no law fixes compare n n to Eq or a strictly smaller left side to Lt. Prove privately that compare is reflexive at Eq, returns Lt under lt_nat, and flips Lt to Gt"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2

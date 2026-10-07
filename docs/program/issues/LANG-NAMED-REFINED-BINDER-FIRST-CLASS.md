@@ -1,7 +1,7 @@
 ---
 id: LANG-NAMED-REFINED-BINDER-FIRST-CLASS
 title: "A function whose binder is a named refinement, used first-class, skips its obligation: fn take5 (x : Five) : Int = use5 x; fn apply (g : Int → Int) : Int = g six; const observed : Int = apply take5 checks with zero obligations, because the same-root reuse exemption trusts the binder as already introduced. Its literal twin emits the obligation inside take5. Introduce or refuse"
-status: ready
+status: closed
 owner: language
 size: M
 tier: T1
@@ -66,3 +66,9 @@ stop and report the mismatch.
 
 - Any kernel, `trusted_base()` or spec change.
 - A catalog, library or example program that relies on the first-class use.
+
+## Closeout
+
+Closed before release, superseded by `LANG-REFINEMENT-SUBSET-SIGMA`
+(operator 2026-10-07; Architect `evt_30frdrmj45ehg`). Subset Σ closes the
+class structurally, and this WP's rows are acceptance rows there.

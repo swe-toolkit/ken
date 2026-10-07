@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE
 title: "A match whose motive's sort depends on a bare-Type level that is solved only later in the declaration is rejected at admission: the motive's sort is inferred over a zonked context, which reads the unsolved level as Zero, so a later solve to Suc Zero leaves the stored motive at Type 0. Keep the level open or defer the query, as spec 39 requires"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
@@ -63,3 +63,15 @@ the store so a later conflicting solve is a surface diagnostic.
 
 - The repair needs a kernel change or reordering elaboration across
   declarations: stop to the Architect.
+
+## Symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. open motive-sort query met kernel universe equality on a prelude unannotated-Type level meta (resource_settle_ok_error_for, Type u0 vs Type 0) — keyed on level-meta openness at a kernel conversion site.
+2. forced-level retry solved only a bare sort mismatch; EffectfulClasses.option_traverse_composed mismatches at Π Type u0. Type u1 vs Π Type 0. Type 0 and falls through — keyed on the shape of the mismatching term.
+```
+
+Shared predicate (Architect `evt_6x9vw86s6rhfw`): open level metas reaching
+a kernel conversion site. Closure: the open query decides nothing, and the
+base decides (`evt_72vktwjwqj8rq`).

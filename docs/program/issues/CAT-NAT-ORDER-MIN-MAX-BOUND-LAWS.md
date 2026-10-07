@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-ORDER-MIN-MAX-BOUND-LAWS
 title: "Proof-backfill for Data/Numeric/Nat/Order.ken.md: min and max are proved to be bounds but not the tightest ones, so a min that always returns Zero satisfies every law. Prove privately that min is the greatest lower bound and max the least upper bound under leq_nat"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -70,8 +70,10 @@ No new import, export, operation, axiom or trust. Follow
   in the `Suc`/`Suc` arm. Restate `greatest` over `min0` and `least` over
   `max2`: each is refused at its own span. Restate `leq_left` and
   `leq_right` over `min0`: both check. For `max2`, a scratch
-  `Refl` proof of `Equal Bool (leq_nat (max2 one one) one) False` checks,
-  where `one` is `Suc Zero`. Delete the scratch package afterwards; the
+  proof of `Equal Bool (leq_nat (max2 one one) one) False` checks, where
+  `one` is `Suc Zero`. The closed equation computes to the trivial
+  proposition, so its proof is `Proved`, not `Refl` (foundation QA
+  `evt_6qzr4fmwh7xmw`). Delete the scratch package afterwards; the
   candidate's tree is unchanged.
 - **AC-4.** The loaded closure's trust ledger and Nat Order's exports are
   unchanged. Targeted builds only, through `scripts/ken-cargo`.
@@ -81,3 +83,11 @@ No new import, export, operation, axiom or trust. Follow
 
 - Any trust delta, `Axiom`, kernel, prelude or spec change, or a needed
   change to `min`, `max` or `leq_nat`.
+
+## Closeout
+
+Merged `78dc1b98d` from exact `bb82a5b95` (PR #4577). Foundation QA
+`evt_4adtjg2ckg4v4`, Architect `evt_2gzcqvwcfrqbd`, Decision
+`dec_4vf8x3a2wjqxr`. Nat Order proves privately that `min` is the
+greatest lower bound and `max` the least upper bound under `leq_nat`. The
+trust ledger and exports are unchanged.

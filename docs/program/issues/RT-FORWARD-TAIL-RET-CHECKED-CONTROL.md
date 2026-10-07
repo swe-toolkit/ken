@@ -74,21 +74,30 @@ stop and report the mismatch.
   thread follows the base-versus-candidate stack A/B of
   `evt_55wk3wj58h2wv`: a named `Builder::stack_size` constant under S1, a
   stop under S2.
-- **AC-3 (controls).** `rt_parity_native` passes 189/189 on the default
-  thread, the read and write collapsibility control passes, and the escape
-  file's six active rows pass. A population counter shows the phase B
-  disjunct true only for the escape-file target programs.
-- **AC-4 (mutation, QA).** The five mutants of `evt_617g7acwvmk4n`
-  (M-admission-off, M-base-path-capture, M-ready-forward,
-  M-assessment-split, M-marker-free-suppressed) each redden a named active
-  row.
+- **AC-3 (controls).** At QA, on the exact candidate: `rt_parity_native`
+  passes 189/189 once, together with the cap41 single-thread A/B row. The
+  read and write collapsibility control passes, and the escape file's
+  active rows pass. A population counter shows the phase B disjunct
+  *applied* to a transport-source demand only for the escape-file target
+  programs. Key presence is not the measure (`evt_3s2pr2txky2xx`).
+- **AC-4 (mutation, QA).** M-admission-off, M-authority-finish,
+  M-ready-forward, M-assessment-split and M-marker-free-suppressed each
+  redden a named active row on the targeted set of `evt_1xw2rpmaapdqy`.
+  M-authority-finish replaces the invariant-equivalent M-base-path-capture
+  (`evt_f3z3vz88wqya`).
+- **AC-5 (emission pin, `evt_xxqnpp5xyds9`).** On the buffer row, a
+  pre-filter assessment recorder and the register-time installation set
+  agree. At least one assessment is `PendingCheckedControl`, and the
+  installed origins equal the `Ready` assessments. M-assessment-split
+  reddens this pin. The pin's promise comment states the measured, claimed
+  and gap lines of that ruling.
 
 ## Stop conditions
 
 - The repair needs a kernel, trust or spec change.
 - A parity red, a dropped effect, or a trap anywhere except the pinned Nat
   guard.
-- The phase B disjunct true outside the target programs, or the
+- The phase B disjunct applied outside the target programs, or the
   transport-source population refusal (`construction.rs:1530`).
 - Default-thread stack overflow on any un-ignored row.
 
