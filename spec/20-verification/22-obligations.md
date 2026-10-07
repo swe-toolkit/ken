@@ -67,10 +67,13 @@ postulate until discharged; (3) each hole's **at-introduction `Γ`** —
 written preconditions and refined-parameter projections with term evidence;
 (4) **provenance** per hole.
 
-V2 consumes the actual `Σ(B,ψ)` result value when `ensures` is present
-(`21 §6.3`); the proof in its second component is kernel-checked or is an
-applied, visible postulate. The subset's type is `Type (max ℓ_B ℓ_ψ)` by
-`13 §4`, not an Ω-collapsed value. What V2 **adds** over V1's seed is
+V2 consumes the actual `Σ(B,ψ)` result value for an ordinary `fn`
+(`21 §6.3`); for a `space` operation it consumes
+`Σ(t:ITree F (R × S)).AllRet (ψ s) t` (`21 §6.4`). The proof in either
+second component is kernel-checked or is an applied, visible
+postulate. Each subset has type `Type (max ℓ_B ℓ_ψ)` by `13 §4`,
+where `B` is the tree carrier and `ψ` is `AllRet` in the space case;
+no relevant carrier collapses into Ω. What V2 **adds** over V1's seed is
 the **path-sensitive hypothesis accumulation** (§3) — the extraction algorithm's
 context-building, layered onto each hole's seed `Γ` as it walks the elaborated
 body — and the **body-as-motive induction plumbing** (§4). That context-building
@@ -104,9 +107,10 @@ Neither direction is kernel subtyping or a conversion of Σ to its carrier.
 
 ### 2.2 Postcondition
 
-A postcondition `ensures ψ` makes the **kernel subset-Σ result type**
-`Σ(r:B).ψ` the body's expected type and **pushes it through the body's
-structure** (§3/§4) — it is *not* a single obligation over a branchy body.
+For an ordinary `fn`, a postcondition `ensures ψ` makes the **kernel
+subset-Σ result type** `Σ(r:B).ψ` the body's expected type and
+**pushes it through the body's structure** (§3/§4) — it is *not* a single
+obligation over a branchy body.
 For multiple clauses, the second component is their Ω conjunction in one
 Σ, with each clause's obligation identity and provenance retained (`21
 §6.3`). The result type itself is the **motive** (§4), not a separate
@@ -124,7 +128,26 @@ postcondition is only provable *by induction*, which is exactly the
 per-constructor obligation-with-IH the motive yields (§4) — a single obligation
 over the whole recursive body carries no induction hypothesis and cannot be
 discharged. There is **no** separate over-the-whole-body postcondition
-obligation; the postcondition is the result-type motive, realized per path.
+obligation for an ordinary `fn`; the postcondition is the result-type
+motive, realized per path.
+
+A `space` operation with residual row `F` instead returns an **outer**
+subset-Σ whose carrier is `t : ITree F (R × S)` and whose Ω proof has
+type `AllRet (λ rs.ψ(s_pre,rs)) t` (`36 §4.3`, `21 §6.4`).
+For one clause, its one recorded obligation is
+`Γ, s_pre:S ⊢ AllRet (λ rs.ψ(s_pre,rs))
+  (run_state s_pre ⟦body⟧)`; the checked pair is
+`Pair(run_state s_pre ⟦body⟧, π)`. The `AllRet` fold reduces by ι over
+known `Ret`/`Vis` prefixes, leaving residual response quantifiers and
+return propositions for the prover or an applied typed hole. There is
+**no** pair insertion under `ITree F`, no per-user-`Ret` proof, and no
+extra verification-only motive. For `F=𝟘` the general form collapses
+to `Σ(rs:R×S).ψ(s_pre,rs)` with the ordinary one-leaf obligation.
+Written `requires` remains a separate Π proof argument (§2.3).
+With multiple written clauses, the Σ proof is
+`∧ⱼ AllRet (λ rs.ψⱼ(s_pre,rs)) t`, and **each** clause retains its
+own obligation identity, provenance, and proof term; one outer pair
+holds their conjunction (`21 §6.4`).
 
 ### 2.3 Precondition discharge at call sites
 
@@ -242,8 +265,11 @@ visible failure, never a too-strong `Γ` (which could mask a real burden):
 - **Recursive evidence.** An SCT-checked self-call `f x'` has its declared
   subset-Σ result type; `Proj2 (f x')` is its postcondition evidence.
   An eliminator method's induction hypothesis at Σ motive `M zᵢ` supplies
-  `Proj2 IHᵢ`. A recursive-call hypothesis without either term is refused,
-  not used as unchecked evidence in a result pair.
+  `Proj2 IHᵢ`. For an effectful `space` call, this term instead proves
+  `AllRet (ψ s) t` over its residual tree; an ordinary
+  `all_ret_bind` sequencing lemma (`36 §4.3`) composes it across a
+  bind, not an elaborator coercion inside `ITree`. A recursive-call
+  hypothesis without checked term evidence is refused.
 
 Each obligation is therefore discharged under **exactly** the facts with
 checked term evidence on its path. The `Γ` of an obligation emitted deep in
@@ -254,8 +280,9 @@ body's root to that site; its closed hole is applied to those terms (`21
 
 ## 4. Body-as-motive (verifying recursive and dependent functions)
 
-For a function whose correctness is *inductive* — a recursive `fn`, or one
-whose result type depends on a recursed argument — the obligation structure
+For an ordinary function whose correctness is *inductive* — a recursive
+`fn`, or one whose result type depends on a recursed argument — the
+obligation structure
 follows the **body as the motive**, recovered from the elaborator's `match →
 elim_D` compilation (`39 §2.6`); V2 does not synthesize an induction principle,
 it **reads the eliminator the elaborator already built**:
@@ -283,9 +310,13 @@ it **reads the eliminator the elaborator already built**:
 So "prove this recursive function meets its spec" becomes "discharge the
 per-constructor obligations, each with the recursive call's spec as a
 hypothesis" — generated mechanically, no manual induction principle stated by
-the user. (The eliminator's own totality is the kernel's concern — direct,
-Π-bound, and nested structural positivity plus SCT, `14 §8`/`17 §4`; V2
-consumes a well-formed eliminator, it does not re-check termination.)
+the user. An effectful `space` operation's **one** obligation instead has
+the `AllRet` proposition as its goal (§2.2); proof search may use the
+`elim_ITree` equations and `all_ret_bind`, but that decomposition does not
+mint one source obligation per user `Ret`. (The eliminator's own
+totality is the kernel's concern — direct, Π-bound, and nested
+structural positivity plus SCT, `14 §8`/`17 §4`; V2 consumes a
+well-formed eliminator, it does not re-check termination.)
 
 ## 5. The extraction algorithm
 
@@ -311,11 +342,22 @@ extract(Γ, term, expectedTy) → ObligationSet:    -- checked core + V1 site/pr
         obls ∪= extract(Γ, a, A)             -- checked first component
         requireChecked(π, φ[a/x])             -- evidence OR applied typed hole
 
-  -- (§2.2) a contracted function: the Σ result IS the motive
+  -- (§2.2) an ordinary fn: the Σ result IS the motive
   FnDef(Δ, requires φ̄, ensures ψ̄, body, B):
         Γ' := Γ ⊕ Δ ⊕ { pᵢ : φᵢ | φᵢ ∈ φ̄ }  -- Δ may contain subset-Σ binders
         resultTy := Σ(r:B).(ψ₁ ∧ … ∧ ψₙ)    -- if no ensures, use B instead
         obls ∪= extract(Γ', body, resultTy)  -- per leaf; no extra whole-body goal
+
+  -- (§2.2) a space operation: the residual tree is the Σ carrier
+  SpaceOp(Δ, requires φ̄, ensures ψ̄, body, S, R, F):
+        Γ' := Γ ⊕ Δ ⊕ (s_pre:S) ⊕ { pᵢ : φᵢ | φᵢ ∈ φ̄ }
+        t := run_state s_pre ⟦body⟧         -- t : ITree F (R × S)
+        for ψⱼ in ψ̄:
+           Pⱼ := λ rs.ψⱼ(s_pre,rs)          -- each checked at Ω
+           obls ∪= obligationAt(πⱼ, Γ' ⊢ AllRet Pⱼ t, prov(ψⱼ))
+        resultTy := Σ(t : ITree F (R × S)).(∧ⱼ AllRet Pⱼ t)
+        requireChecked(Pair(t,conjoin(π̄)), resultTy)
+        obls ∪= extract(Γ', t, ITree F (R × S))
 
   -- (§2.3) a call: written requires only; subset arguments use Intro above
   App(f, ā) when hasWrittenRequires(typeOf(f)):
@@ -365,8 +407,9 @@ extract(Γ, term, expectedTy) → ObligationSet:    -- checked core + V1 site/pr
   obligations whose discharge (plus kernel checking) suffices for the spec to
   hold (acceptance §1). The absent-clause scan (§2.5) is the audit that no
   burden-bearing position is silently skipped.
-- **Subset-Σ soundness.** `extract` reads V1's checked subset pairs and
-  per-leaf `ensures` pairs, whose carrier stays relevant at
+- **Subset-Σ soundness.** `extract` reads V1's checked subset pairs,
+  per-leaf ordinary-`fn` `ensures` pairs, and outer `space`-operation
+  pairs over residual trees. Every carrier stays relevant at
   `Type (max ℓ_A ℓ_φ)` (`13 §4`). It does not treat an Ω proof
   component as permission to collapse the carrier or skip an introduction.
 

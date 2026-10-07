@@ -204,8 +204,11 @@ still propagates `unknown` (§4). The same distinction applies in both
 checked-core lowering and interpreter evaluation; the interpreter is untyped,
 so its concrete way to carry the kernel's Ω classification is implementation
 latitude, **not** a licence to guess from the constructor spelling or to
-force an erased proof. No kernel equality `Σ(x:A).φ x ≡ A` follows from
-runtime erasure.
+force an erased proof. A `space` operation with residual effects has
+`Pair(t,π) : Σ(t:ITree F (R × S)).AllRet (ψ s) t` (`36 §4.3`): erasure
+keeps the **whole tree** `t` and never evaluates `π`, without inserting
+a pair at any `ITree` return. No kernel equality `Σ(x:A).φ x ≡ A`
+follows from runtime erasure.
 
 `construct` does not prescribe an allocation strategy. It constructs the
 extensional value; a closure-free canonical graph acquires bytes only when

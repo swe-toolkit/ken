@@ -64,9 +64,12 @@ is a core term the kernel `check`s (`../10-kernel/18 §4`). Consequences:
    `../60-security/61 §5a`); `temporal{}`/`Temporal` surface notation →
    `Temporal` inductive data (`../70-behavioral/72`); `Wrapping[T]` / `+%` →
    wrapping-arithmetic primitives (`35 §3`).
-8. **Obligation emission** — at each subset/`ensures` result leaf, record
-   the proof obligation and put a checked proof term or applied typed hole
-   in the pair; written `requires` is owed at the call (`../20-verification/22`).
+8. **Obligation emission** — at each subset or ordinary-`fn` `ensures`
+   result leaf, record the proof obligation and put a checked proof term
+   or applied typed hole in the pair. A `space` operation instead pairs
+   its residual tree with an `AllRet` proof per `ensures` clause
+   (`36 §4.3`).
+   Written `requires` is owed at the call (`../20-verification/22`).
 
 ### 2.0 Source-unit loading and module-scope construction
 

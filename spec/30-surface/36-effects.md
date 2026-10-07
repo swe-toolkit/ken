@@ -803,33 +803,79 @@ run_state s (Vis (inr o)        k) = Vis o (λ r. run_state s (k r))  -- other e
   (R × S)` — a structural fold, **total** (`14 §3`). The continuation `k` is
   invoked **exactly once, in tail position** in every clause, so it is
   tail-resumptive (§5) and no continuation is reified.
-- `run_state s₀ ⟦body⟧ : ITree F (R × S)` returns the result paired with the
-  **final** state; when `F = 𝟘` it collapses (§2.4) to the pure value `(R × S)`.
-  So a space operation's denotation is a **state transformer** `S → R × S`. The
-  kernel checks this pure term; **no mutable cell exists in the TCB**.
+- `run_state s₀ ⟦body⟧ : ITree F (R × S)` returns a residual tree whose
+  return values pair the result with the **final** state. When `F = 𝟘`,
+  it collapses (§2.4) to the pure value `(R × S)`, yielding a pure state
+  transformer `S → R × S`. The kernel checks the tree and the pure
+  collapse; **no mutable cell exists in the TCB**.
 
 ### 4.3 Bounded Hoare and `old`
 
 `requires`/`ensures` on a space operation constrain its **state-transformer
-denotation**. A bare operation denotes `S → R × S` (§4.2); with
-`ensures ψ`, its checked core result is `S → Σ(rs:R × S).ψ(s_pre,rs)`
-(`../20-verification/21 §6.4`), with an Ω proof at each result leaf:
+with residual effects**. Define the Ω-valued `AllRet` fold beside
+`run_state` (§4.2), using the delivered `elim_ITree` with an Ω motive:
 
-- `requires φ` constrains the **pre-state** `s_pre : S` (and parameters);
-- `ensures ψ` relates `s_pre`, the `result`, and the **post-state** `s_post`;
-- **`old(e)`** denotes `e` evaluated in `s_pre` (`21 §4`) — well-defined because
-  the denotation *names* the pre-state. A bare cell `cᵢ` in `ensures` is the
-  post-state value; `old(cᵢ)` is the pre-state value.
+```
+AllRet : {E : Effect} {X : Type} → (X → Ω) → ITree E X → Ω
+AllRet P (Ret x)   = P x
+AllRet P (Vis e k) = Π (r : E.Resp e). AllRet P (k r)
+```
 
-Because each space's `S` is **encapsulated and non-aliased** (shared-nothing,
-§4.4), the obligation is **local, bounded, per-space Hoare** over `S` — **no
-separation logic, no frame rule, no global `\old`** (`21 §4`, `OQ-Space`).
-Worked example: `inc`'s `ensures n == old(n) + 1` denotes to the checked
-transformer `λ s. ((tt, s with .n := s.n + 1), π)`, where `π` inhabits
-`(s with .n := s.n + 1).n == s.n + 1`. That proposition computes by
-record-β/η (`13 §3`) to `s.n + 1 == s.n + 1` and `π` is discharged by
-`refl` (`16 §2`). Forgetting to `R × S` projects the checked result's
-first component; it does not convert Σ to its carrier.
+The motive is level-checked by the predicative Π rule (`12 §2`, `13 §4`);
+its Ω level includes the return predicate and response domains, with
+explicit level alignment rather than implicit cumulativity (`12 §3`).
+For `op (p̄) : R visits [Sp,F…] requires φ ensures ψ`, the checked
+contract (suppressing the clause-wise Π telescope) is:
+
+```
+Π p̄. Π (s : S). φ(s) →
+  Σ (t : ITree F (R × S)). AllRet (λ rs. ψ(s, rs)) t
+```
+
+- Written `requires φ` is a separate Π proof argument constraining the
+  **pre-state** `s : S` (and parameters); the display's `φ(s) →` stands
+  for that proof telescope, not a generated binder for a refinement.
+- `ensures ψ` relates `s`, `result` and **post-state** through each
+  return `rs : R × S`: `result = rs.1`, and a bare cell `cᵢ` in ψ
+  denotes `proj_i(rs.2)`. `old(e)` denotes `e` at `s` (`21 §4`), where
+  the pre-state is available; `old(cᵢ)` is its pre-state value.
+- Introduction is the **outer** checked pair
+  `Pair(run_state s ⟦body⟧, π)` with
+  `π : AllRet (λ rs.ψ(s,rs)) (run_state s ⟦body⟧)`. It records one
+  obligation over the computed tree, not one pair per user `Ret`: the
+  `(r,s_post)` pair is created by `run_state`'s `Ret` clause. The
+  obligation reduces by ι on known tree prefixes, leaving any
+  `Π(r:E.Resp e)` and return goals for proof search (`22 §2.2`).
+  `Proj2` exposes `AllRet` evidence; the tree never receives an
+  elaborator-inserted proof under its `ITree` former. For several
+  `ensures ψⱼ`, the one outer pair holds the Ω conjunction
+  `∧ⱼ AllRet (λ rs.ψⱼ(s,rs)) t`, one recorded obligation and proof
+  component per clause (`21 §6.4`, `22 §2.2`). The provable
+  `all_ret_bind` sequencing lemma is ordinary Ken in W5, with no new
+  trusted rule (`21 §6.4`):
+
+```
+all_ret_bind : AllRet P t →
+  (Π(x:X). P x → AllRet Q (k x)) → AllRet Q (bind t k)
+-- t : ITree F X; k : X → ITree F Y; P : X → Ω; Q : Y → Ω
+```
+
+Both `AllRet` and `all_ret_bind` are checked Ken declarations for W5,
+not an elaborator coercion, primitive, or new `trusted_base()` entry.
+
+When `F = 𝟘`, `ITree 𝟘 X` collapses to `X` (§2.4), and `AllRet P`
+collapses to `P`. Thus the **same** rule yields
+`S → Σ(rs:R × S).ψ(s,rs)` after written proof arguments, with no
+second encoding. Because each space's `S` is **encapsulated and
+non-aliased** (shared-nothing, §4.4), the obligation is **local,
+bounded, per-space Hoare** over `S` — no separation logic, frame rule,
+or global `\old` (`21 §4`, `OQ-Space`). Worked example: `inc`'s
+`ensures n == old(n) + 1` with `F = 𝟘` gives the checked transformer
+`λ s. ((tt, s with .n := s.n + 1), π)`. Its `π` inhabits
+`(s with .n := s.n + 1).n == s.n + 1`, which computes by record-β/η
+(`13 §3`) to `s.n + 1 == s.n + 1` and is discharged by `refl`
+(`16 §2`). Forgetting to `R × S` projects the checked result's first
+component; it does not convert Σ to its carrier.
 
 ### 4.4 Concurrency & isolation — shared-nothing (`OQ-Space` DECIDED)
 
@@ -918,11 +964,16 @@ put : s   →[{State s}] Unit    put s'  ⤳  perform (inj (Put s'))  = Vis (inj
 
 `run_state` is **exactly** the state-passing `elim_ITree` fold of §4.2; §4.5 does
 **not** restate its equations. The direct surface exposes it as the
-program-callable handler that discharges `State s`:
+program-callable handler that discharges `State s`. A checked `ensures`
+over the result of a direct `[State s]` computation uses the **same**
+`AllRet` on its residual `ITree F (a × s)` as §4.3, not a coercion
+inside `ITree`:
 
 ```
 run_state : s → ITree (State s ⊕ F) a → ITree F (a × s)      -- §4.2, verbatim
 run_state s₀ m  :  a × s        when F = ∅   -- pure collapse: ITree 𝟘 (a × s) ≅ a × s (§2.4)
+Pair(run_state s₀ m, π) : Σ(t:ITree F (a × s)).AllRet P t
+  where π : AllRet P (run_state s₀ m), P : (a × s) → Ω
 ```
 
 - The result pair `a × s` is `(result, final-state)` — the **Σ-pair** `R × S`

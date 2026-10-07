@@ -88,8 +88,9 @@ Semantically, a contract **denotes** a **refined function type**
 
 i.e. **written** preconditions are extra Π proof arguments and the
 postcondition is a **kernel subset-Σ result** pairing the returned value
-with its checked proof (§6.3). Each body leaf constructs that pair, with
-an obligation for every `ensures` clause; an open hole is applied as the
+with its checked proof (§6.3). For an ordinary `fn`, each body leaf
+constructs that pair; a `space` operation instead pairs its *residual
+tree* with one `AllRet` proof (§6.4). An open hole is applied as the
 proof component and remains visible in `trusted_base()` (§6.5). The
 programmer writes `requires`/`ensures`; erasure removes the proof only
 from the runtime representation (`42 §3.2`), never from the core type.
@@ -118,8 +119,9 @@ fn head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …
   refined **at their stated type**. A refined domain remains `Σ(x:A).φ` in
   its Π type; it is not normalized to an `A` binder and an implicit proof
   binder. Explicit written `requires` still contributes a separate Π proof
-  argument; `ensures` refines the result to a kernel Σ with per-leaf
-  introduction obligations (§6.3).
+  argument; an ordinary `fn`'s `ensures` refines the result to a kernel
+  Σ with per-leaf introductions (§6.3). A `space` operation pairs its
+  residual tree with `AllRet` evidence instead (§6.4).
 
 **The core encoding (normative).** `elabType({x:A|φ}) = Σ(x:A').φ'`, with `A'`
 checked in `Type` and `φ'` in Ω under `x:A'`. A transparent named refinement
@@ -214,8 +216,9 @@ proof-decl ::= "proof" ident "for" path binder* ":" type "=" expr
   only for **`space` operations** (`../30-surface/36-effects.md §4.3`); for pure
   `fn`s the pre/post states coincide. **`OQ-Space` DECIDED:** `old(e)` is
   admitted, **scoped to a `space` operation's `ensures`** (a cell's pre-call
-  value), well-defined because a space's denotation is a state-transformer
-  `S → R × S` that *names* the pre-state (§6.4). There is **no global
+  value), well-defined because a space's denotation has an explicit
+  `s_pre:S` input and a residual `ITree F (R × S)` result; it collapses
+  to `S → R × S` when `F=𝟘` (§6.4, `36 §4.2`). There is **no global
   `\old`/heap** and **no separation logic** — a space's cells are non-aliased,
   so reasoning is bounded per-space Hoare. An `old` outside a `space`-op
   `ensures` is a scope error (§6.4). For explicitly-threaded state you simply
@@ -590,32 +593,53 @@ separate kernel class.
 
 ### 6.4 `old`-capture for `space` operations
 
-A `space` operation denotes a **state-transformer** with a bare result
-`S → R × S` (`36 §4.2`). An `ensures ψ` refines that denoted result to the
-kernel type `S → Σ(rs : R × S).ψ(s_pre, rs.1, rs.2)` (and to a conjunction in
-Ω for multiple clauses). The predicate relates the **pre-state**, result,
-and **post-state** (`36 §4.3`):
+A `space` operation denotes a **state-transformer with residual effects**:
+`run_state s ⟦body⟧ : ITree F (R × S)` (`36 §4.2`). Its `ensures ψ` is
+an Ω predicate over **every return of that tree**, not a proof attached
+to a user-written `Ret r` (the state-passing pair `(r,s_post)` is created
+*inside* `run_state`). Define `AllRet` by the Ω-motive `elim_ITree` fold
+in `36 §4.3`: `AllRet P (Ret rs) = P rs` and
+`AllRet P (Vis e k) = Π(r:E.Resp e).AllRet P (k r)`.
 
 ```
-elabSpaceEnsures(Γ, f, ψ):                    -- s_pre : S at the transformer input
+elabSpaceEnsures(Γ, f, ψ):                 -- s_pre : S at transformer input
   Γ' := extend(Γ, s_pre : S, rs : R × S)
   resolve in ψ:
-    old(e)       ↦ ⟦e⟧ at s_pre                -- pre-state value (36 §4.3)
+    old(e)       ↦ ⟦e⟧ at s_pre             -- pre-state value (36 §4.3)
     result       ↦ rs.1
-    bare cell cᵢ ↦ proj_i(rs.2)              -- post-state value
-  ψ' := check(Γ', ψ, Ω)                        -- MUST check at Ω
-  resultTy := Σ(rs : R × S).ψ'                -- Type, not an Ω conjunction
-  body' := check(Γ, s_pre : S, ⟦body⟧(s_pre), resultTy)
-                                                 -- pair introduction at each leaf
-  return λ(s_pre : S).body'
+    bare cell cᵢ ↦ proj_i(rs.2)           -- post-state value
+  ψ' := check(Γ', ψ, Ω)                     -- MUST check at Ω
+  t := run_state s_pre ⟦body⟧             -- t : ITree F (R × S)
+  target := AllRet (λ rs.ψ') t             -- target : Ω
+  π := checkedEvidenceOrHole(Γ, s_pre:S, target, t)
+  resultTy := Σ(t : ITree F (R × S)).AllRet (λ rs.ψ') t
+  return λ(s_pre : S).Pair(t,π)           -- checked at the outer Σ
 ```
 
-Every space-operation result leaf introduces its checked pair; a bare
-`R × S` consumer sees its `Proj1`, while `Proj2` holds the established
-postcondition. The same rule applies to effectful results whose denotation
-carries an `ensures`; a route unable to construct term evidence for the
-second component is refused, not admitted with a naked carrier. This
-contract concerns the checked denotation, not a new runtime proof payload.
+For multiple written `ensures ψⱼ`, the outer pair's second component
+is `∧ⱼ AllRet (λ rs.ψⱼ(s_pre,rs)) t`; each clause retains its own
+obligation identity/provenance and contributes a checked proof term.
+The single-clause form above is its one-member case. Written
+`requires φ` remains a **separate Π proof argument** at the
+space operation's call: its checked type is
+`Π p̄. Π(s_pre:S).Π(h̄:φ̄(s_pre,p̄)).resultTy`, with one proof
+argument per written `requires` clause. The outer proof `π` carries
+**one recorded obligation per written `ensures` clause** for the
+computed tree; V2 reduces each `AllRet` goal by ι over any known tree
+prefix and leaves residual `Π`-quantified responses and return goals to
+proof search (`22 §2.2`). An open hole remains an applied proof term in
+the *outer* pair. A caller receives `Proj2 : AllRet (ψ s_pre) t` and may
+compose it using `all_ret_bind` (a provable `elim_ITree` lemma in W5, not
+an elaborator coercion). A recursive call likewise supplies `Proj2` at
+`AllRet`, not at a bare leaf predicate. **No** pair is inserted under
+`ITree F`, and `ITree F (R × S)` never converts to
+`ITree F (Σ(rs:R × S).ψ)`.
+
+When `F = 𝟘`, `ITree 𝟘 X` collapses to `X` (`36 §2.4`) and
+`AllRet P` on that pure value reduces to `P`; the general result becomes
+`S → Σ(rs : R × S).ψ(s_pre,rs)` (with written `requires` arguments
+retained). This is a **consequence** of the general rule, not a second
+encoding. The Ω proof is erased at runtime, not evaluated as data.
 
 **The scope guard (discriminating, not coincidental).** `old(e)` is admitted
 **only** when the enclosing declaration is a `space` operation — the one place a
@@ -721,8 +745,12 @@ merely cited.
   result `B : Type ℓ_B`, the result is the checked core
   `Σ(result:B).ψ : Type (max ℓ_B ℓ_ψ)`. Its proof `p : ψ` is Ω-irrelevant,
   erasable at runtime and kernel-checked inside each result pair; an open
-  typed hole is a visible postulate. It is not an obligation over a
-  bare-returned B.
+  typed hole is a visible postulate. For a `space` operation,
+  `B = ITree F (R × S) : Type ℓ_T` and the Ω predicate is
+  `AllRet (ψ s) t : Ω_ℓ_All`; its outer result is
+  `Type (max ℓ_T ℓ_All)`. The `AllRet` fold's Π response domains
+  contribute to `ℓ_All` predicatively (`36 §4.3`). Neither case is a
+  separate obligation over a bare-returned carrier.
 - **`prove`/`law`.** `prove name : φ` gives `name : φ : Ω_ℓ`. A `law` of all-Ω
   fields is a conjunction — the sound `Σ`-of-Ω-into-Ω case (`16 §1.3`,
   `sort_pi_sigma` with **both** components Ω) — so the bundle is itself a
