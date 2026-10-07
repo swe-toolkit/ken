@@ -1,7 +1,7 @@
 ---
 id: CAT-VECTOR-TO-LIST-LENGTH-LAW
 title: "Prove the length/to_list bridge spec 60 §5 defers, length (to_list xs) = n for xs : Vec a n, importing length from the trust-free base list module so Vector's trust delta stays zero"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
@@ -33,13 +33,25 @@ stop and report the mismatch.
 
 Import `length` from the base module, add `to_list_length` as a private
 checked theorem, and make §5's bridge bullet name it.
+Follow `docs/program/07-catalog-style-guide.md` and
+`agent/playbooks/tools/write-ken.md`.
 
 ## Acceptance
 
-- **AC-1.** `to_list_length` checks for every `xs : Vec a n`.
-- **AC-2 (controls).** The cold Vector trust test passes unchanged.
+- **AC-1.** `to_list_length` checks for every `xs : Vec a n`, and one
+  generic client in Vector's `ken example` fence uses it at the literal
+  goal `Equal Nat (length a (to_list a n xs)) n`. Control: a same-name
+  reflexive weakening reddens the client at its own span, in `ken check`
+  and in a CI-run target.
+- **AC-2 (controls).** The cold Vector trust test passes with its trust
+  assertions unchanged. Its `expected_owned_names()` gains exactly
+  `to_list_length`, the rebaseline the test names for the next authorized
+  Vector declaration extension.
 - **AC-3 (mutation, QA).** Dropping the head element in `to_list` reddens
   AC-1.
+- **AC-4 (readability).** The proof and its prose read under the style
+  guide: local names state a proof endpoint or stage, and the formatter
+  layout is unchanged. Reviewed independently by QA.
 
 ## Stop conditions
 
