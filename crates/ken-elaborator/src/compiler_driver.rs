@@ -7967,4 +7967,57 @@ const zz_example : String = ac0_need
         assert_eq!(denotation_obligation.origin, example);
         assert_eq!(denotation_obligation.status, ObligationStatus::Unknown);
     }
+
+    /// Promise class: durable invariant. MEASURED: the example creates a
+    /// checked Primitive::Literal, but the B1 denotation package has the same
+    /// semantic inputs and core hash with or without that example. CLAIMED:
+    /// native primitive metadata excludes example-only checked literals.
+    /// THE GAP: this reaches a native String literal, not every reduction
+    /// class. The production skip mutant must turn this comparison red.
+    #[test]
+    fn denotation_excludes_example_only_checked_string_literal() {
+        let plain = "```ken\nconst main : Bool = True\n```\n";
+        let with_literal = "```ken\nconst main : Bool = True\n```\n\
+                            ```ken example\nconst zz_ex : String = \"example-only\"\n```\n";
+        let mut env = ElabEnv::new().expect("prelude");
+        let before = env.env.decls().map(Decl::id).collect::<BTreeSet<_>>();
+        env.elaborate_ken_md_file_v1(with_literal)
+            .expect("the string-literal example must elaborate");
+        assert!(env.globals.contains_key("zz_ex"));
+        let literal_ids = env
+            .env
+            .decls()
+            .filter(|decl| {
+                !before.contains(&decl.id())
+                    && matches!(
+                        decl,
+                        Decl::Primitive {
+                            reduction: ken_kernel::PrimReduction::Literal,
+                            ..
+                        }
+                    )
+            })
+            .map(Decl::id)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            literal_ids.len(),
+            1,
+            "the example owns a real literal primitive"
+        );
+        assert!(env.env.checked_literal(literal_ids[0]).is_some());
+
+        let source = |text| CompilerSource::new("literal.ken.md", text);
+        let plain = compile_checked_target_denotation(PACKAGE, source(plain), "main")
+            .expect("denotation without example emits");
+        let example = compile_checked_target_denotation(PACKAGE, source(with_literal), "main")
+            .expect("denotation with example emits");
+        assert!(
+            example.package.artifact.semantic == plain.package.artifact.semantic,
+            "example literal must not enter native primitive metadata or any other semantic lane"
+        );
+        assert_eq!(
+            example.package.core_semantic_hash,
+            plain.package.core_semantic_hash
+        );
+    }
 }
