@@ -1,7 +1,7 @@
 ---
 id: RT-FORWARD-TAIL-RET-CHECKED-CONTROL
 title: "Lowering refuses a forward Tail producer-to-Ret edge whose Ret body carries nested checked control ('the active carried frame has no installed strict Ret sink'), while the planner certifies it; installing the sink naively traps or drops an effect. Build the capability so the reached Nat fanout and the escaped-buffer fanning row run natively with interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
