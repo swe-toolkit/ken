@@ -7776,6 +7776,7 @@ mod package_route_example_declarations {
         let package_literate =
             compile_ken_source(PACKAGE, literate.clone(), selector(PACKAGE)).unwrap();
         let expected = BTreeSet::from([StableSymbol::declaration(PACKAGE, &[], "main")]);
+        let example = StableSymbol::declaration(PACKAGE, &[], "zz_example");
         assert_eq!(
             source_ids(&package_source.package.artifact.semantic),
             expected
@@ -7784,6 +7785,15 @@ mod package_route_example_declarations {
             source_ids(&package_literate.package.artifact.semantic),
             expected,
             "the example-only declaration must not enter semantic.declarations"
+        );
+        assert!(
+            !package_literate
+                .package
+                .artifact
+                .semantic
+                .symbols
+                .contains(&example),
+            "an obligation-free example must not add a package symbol"
         );
         assert_eq!(
             package_source.package.core_semantic_hash,
@@ -7812,6 +7822,15 @@ mod package_route_example_declarations {
             denotation_declarations,
             "the denotation route must preserve its source-only declaration map"
         );
+        assert!(
+            !denotation_literate
+                .package
+                .artifact
+                .semantic
+                .symbols
+                .contains(&example),
+            "an obligation-free example must not add a denotation symbol"
+        );
         assert_eq!(
             denotation_source.package.core_semantic_hash,
             0x428c_ec66_b9c0_9443
@@ -7826,10 +7845,10 @@ mod package_route_example_declarations {
     /// Promise class: durable invariant.
     ///
     /// MEASURED: an open call obligation from an example remains in both
-    /// compiler-route obligation maps, with the example as origin, while its
-    /// declaration is not admitted. CLAIMED: excluding example declarations
-    /// from semantic admission does not erase their obligation report. GAP:
-    /// this row covers one call-site `requires` obligation.
+    /// compiler-route obligation maps, with the example as origin and a
+    /// materialized semantic symbol. CLAIMED: excluding example declarations
+    /// from admission does not erase their obligation report. GAP: this row
+    /// covers one call-site `requires` obligation.
     #[test]
     fn package_and_denotation_report_open_example_obligations() {
         const SOURCE: &str = r#"# Example obligation
@@ -7850,7 +7869,7 @@ const zz_example : String = ac0_need
         let package = compile_ken_source(package_name, source.clone(), selector(package_name))
             .unwrap()
             .package;
-        assert!(!source_ids(&package.artifact.semantic).contains(&example));
+        assert!(package.artifact.semantic.symbols.contains(&example));
         assert_eq!(package.artifact.semantic.obligations.len(), 1);
         assert_eq!(package.artifact.semantic.obligation_metadata.len(), 1);
         let package_obligation = package
@@ -7864,7 +7883,12 @@ const zz_example : String = ac0_need
         assert_eq!(package_obligation.status, ObligationStatus::Unknown);
 
         let denotation = compile_checked_target_denotation(package_name, source, "main").unwrap();
-        assert!(!source_ids(&denotation.package.artifact.semantic).contains(&example));
+        assert!(denotation
+            .package
+            .artifact
+            .semantic
+            .symbols
+            .contains(&example));
         assert_eq!(denotation.package.artifact.semantic.obligations.len(), 1);
         assert_eq!(
             denotation
