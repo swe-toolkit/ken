@@ -622,6 +622,100 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
+const NAT_FANOUT_REACHED_LIVE_RESOURCE: &str =
+    include_str!("rt_nat_fanout_reached_live_resource.ken");
+
+#[cfg(target_os = "linux")]
+fn reached_nat_arm_variant(arm: &str) -> String {
+    let original = match arm {
+        "zero" => {
+            r#"Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);"#
+        }
+        "suc" => {
+            r#"Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)"#
+        }
+        _ => panic!("unknown Nat arm: {arm}"),
+    };
+    let replacement = match arm {
+        "zero" => {
+            "Zero |-> readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int));"
+        }
+        "suc" => {
+            "Suc m |-> readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int))"
+        }
+        _ => unreachable!(),
+    };
+    // Only the chosen arm changes. The shared continuation stays identical;
+    // dropping the fanout cannot satisfy the read-count discriminator.
+    let source = NAT_FANOUT_REACHED_LIVE_RESOURCE.replacen(original, replacement, 1);
+    assert_ne!(
+        source, NAT_FANOUT_REACHED_LIVE_RESOURCE,
+        "the arm mutation must land"
+    );
+    source
+}
+
+#[cfg(target_os = "linux")]
+// D0 measurement fixture, ignored until the generated-entry projection repair.
+// Promise class: transition sentinel, retired by this WP's AC-1 and AC-2.
+// MEASURED: interpreter reads on the live file, then linked native parity on
+// the same source. CLAIMED: the Nat fanout is reached on its Suc arm and the
+// additional Suc read is observed in both executors. THE GAP: the current
+// native compiler refuses before emission; this row cannot claim native parity
+// until the projection repair admits both variants.
+#[test]
+#[ignore = "RT-GENERATED-ENTRY-PROJECTION-INVARIANT D0: live Nat fanout refuses at generated-entry projection agreement before native execution"]
+fn nat_fanout_reached_live_resource_matches_interpreter() {
+    in_large_stack_thread("rt-escape-nat-reached", || {
+        for (case, source, expected_reads) in [
+            (
+                "nat-reached-base",
+                NAT_FANOUT_REACHED_LIVE_RESOURCE.to_owned(),
+                2,
+            ),
+            ("nat-reached-zero-extra", reached_nat_arm_variant("zero"), 2),
+            ("nat-reached-suc-extra", reached_nat_arm_variant("suc"), 3),
+        ] {
+            let root = output_dir(case);
+            std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
+            let mut host = ken_interp::PosixHost::new_at(root.path());
+            let interpreted = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &[],
+                &[],
+                root.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .unwrap_or_else(|error| panic!("{case}: interpreter runs: {error:?}"));
+            assert_eq!(
+                interpreted
+                    .effect_trace
+                    .iter()
+                    .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+                    .count(),
+                expected_reads,
+                "{case}: selected Nat arm must be observable"
+            );
+            let diff = differential(case, &source);
+            assert_native_matches_interpreter(case, &diff);
+            assert_eq!(
+                diff.native.stdout, diff.interpreted.stdout,
+                "{case}: stdout"
+            );
+            assert_eq!(
+                diff.native.effect_trace, diff.interpreted.effect_trace,
+                "{case}: full trace"
+            );
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
 // Promise class: durable interpreter/native differential. The bounded-Nat
 // fanout selects an escaped-resource frame in a shared continuation; compare
 // its emitted native observations to the interpreter's on the same input.
