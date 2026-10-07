@@ -1415,12 +1415,17 @@ fn validate_inductive_decl_inner(
 /// Opaque position in one [`GlobalEnv`] from which later declarations can be
 /// removed. Marks are single-use and cannot be transferred to a cloned or
 /// unrelated environment. Reusing an ID after rolling back past this boundary
-/// does not revive a mark for its former allocation prefix.
+/// does not revive a mark for its former allocation prefix. Upgrading an
+/// opaque declaration in the retained prefix also invalidates the mark.
 #[must_use]
 pub struct EnvMark {
     mark_len: usize,
     mark_next_id: GlobalId,
     prefix_generation: AllocationPrefixGeneration,
+    // Opaque declarations are the only prefix declarations that can be
+    // upgraded in place. A later transparent body may refer to the suffix;
+    // removing that suffix would invalidate the retained prefix.
+    opaque_prefix_ids: Vec<GlobalId>,
     env_instance: u64,
 }
 
@@ -1430,10 +1435,19 @@ pub fn env_mark(env: &GlobalEnv) -> EnvMark {
     let prefix_generation = env
         .allocation_prefix_generation_at(mark_next_id)
         .expect("current allocation prefix has an incarnation token");
+    let opaque_prefix_ids = env
+        .declarations()
+        .iter()
+        .filter_map(|decl| match decl {
+            Decl::Opaque { id, .. } => Some(*id),
+            _ => None,
+        })
+        .collect();
     EnvMark {
         mark_len: env.declarations().len(),
         mark_next_id,
         prefix_generation,
+        opaque_prefix_ids,
         env_instance: env.instance_id(),
     }
 }
@@ -1454,15 +1468,19 @@ fn environment_mark_prefix_valid(env: &GlobalEnv, mark: &EnvMark) -> bool {
                     .all(|constructor| constructor.id.0 < mark.mark_next_id.0),
                 _ => true,
             }
-    })
+    }) && mark
+        .opaque_prefix_ids
+        .iter()
+        .all(|id| matches!(env.lookup(*id), Some(Decl::Opaque { id: actual, .. }) if actual == id))
 }
 
 /// Remove every declaration admitted after `mark`, newest first.
 ///
-/// The mark is valid only for its originating environment and while the same
-/// allocated-ID prefix remains. Reusing an ID after rolling back past the mark
-/// invalidates it. Rollback restores the allocator and kernel-owned indexes;
-/// it never admits a declaration.
+/// The mark is valid only for its originating environment while the same
+/// allocated-ID prefix remains and its opaque declarations stay opaque.
+/// Reusing an ID after rolling back past the mark invalidates it. Rollback
+/// restores the allocator and kernel-owned indexes; it never admits a
+/// declaration.
 pub fn rollback_to_mark(env: &mut GlobalEnv, mark: EnvMark) -> KernelResult<Vec<Decl>> {
     if env.instance_id() != mark.env_instance {
         return Err(KernelError::Msg(
@@ -2377,6 +2395,7 @@ mod tests {
                 mark_len: pending.mark.mark_len,
                 mark_next_id: pending.mark.mark_next_id,
                 prefix_generation: pending.mark.prefix_generation,
+                opaque_prefix_ids: pending.mark.opaque_prefix_ids.clone(),
                 env_instance: pending.mark.env_instance,
             },
             staged_types: pending.staged_types.clone(),
