@@ -1,7 +1,7 @@
 ---
 id: CAT-VECTOR-TO-LIST-LENGTH-LAW
 title: "Prove the length/to_list bridge spec 60 §5 defers, length (to_list xs) = n for xs : Vec a n, importing length from the trust-free base list module so Vector's trust delta stays zero"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -56,3 +56,13 @@ Follow `docs/program/07-catalog-style-guide.md` and
 ## Stop conditions
 
 - Any trust delta, `Axiom`, kernel or spec change.
+
+## Closeout
+
+Merged `e1bbed2d0` from exact `3194e2f9b` (PR #4567), a respin of
+`24a488fa6`, whose CI failed in a flat harness that preloaded Vector's
+providers by hand without `Data.Collections.List`. Foundation QA
+`evt_65j1w6xhxkm29`, Architect `evt_2myzjzamhachx`, Decision
+`dec_7fhst9p05eqpd`. Vector proves `length a (to_list a n xs) = n` against
+the trust-free `Data.Collections.List.length`, and cold Vector trust stays
+109.

@@ -1,7 +1,7 @@
 ---
 id: RT-GENERATED-ENTRY-PROJECTION-INVARIANT
 title: "Native build refuses with 'source-specific inheritances at one generated entry disagree on their typed consumer projection' (aggregates.rs:8215) on the ignored escaped-buffer fanning row and on a reached Nat fanout with a pending suffix, so the NAT-FANOUT parity row only passes because its fanout never runs. Repair the projection so both execute natively with interpreter parity"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -94,3 +94,14 @@ stop and report the mismatch.
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. planner certifies a forward-Ret Tail route into a Ret body that lowering never sinks — keyed on Ret-body checked-control freedom
 ```
+
+## Closeout
+
+Merged `877fd56d6` from exact `47bcb7444` (PR #4569), under the Architect's
+recut `evt_52g57s1w4jgc1`: the projection split only. Runtime QA
+`evt_3y6j4evbppp9z`, Architect `evt_4k2zswktx8h6s`, Decision
+`dec_1z1a2fnj9qt9t`. The generated-entry projection carries only the
+class-common route, and each member's Tail plan is keyed per member and
+re-derived after its transport is selected. The Nat fanout and `:616` rows
+stay ignored on the sink refusal; `RT-FORWARD-TAIL-RET-CHECKED-CONTROL` owns
+their native parity. The symptom inventory closes at 1.
