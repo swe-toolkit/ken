@@ -1,7 +1,7 @@
 ---
 id: VERIFY-OBLIGATION-STABLE-IDENTITY
 title: "Obligation ids and hole-postulate symbols are derived from session allocation order (Obligation.id and global_<GlobalId>), and both feed core_semantic_hash, against spec 46 §3.2 and 22 §1. Derive them from stable inputs so the same source yields the same ids and hash in any session"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -78,3 +78,13 @@ symbols, a stable trust key) is the deliverable's design.
   symbol and trust-key changes: stop with the consumers listed (CHECKS 3).
   A pin that moves because of those changes is updated, with its old and
   new value listed in the handoff.
+
+## Closeout
+
+Merged `fe21d61c4` from exact `bfa17d504` (PR #4579). Verify QA
+`evt_26b1h6ydyj7gs`, Architect `evt_4z8rp48zqp4jn`, Decision
+`dec_2mwdnva3ee1vf`. Unnamed declarations are keyed by
+`{owner}#{ordinal}` from one owner scope. A declaration with neither a
+name nor an owner is an internal error, and the trust payload is keyed on
+the stable symbol. The same source yields the same symbols, obligation ids
+and hash in any session.

@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-EXAMPLE-BINDING-SCOPE
 title: "Since VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS a .ken.md source's example-fence declarations are dropped from the package but stay bound in the shared env, so a later source can reference one: the package validates with a dangling symbol and an executable entrypoint, and only erasure refuses. Close the reference before emit"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2
