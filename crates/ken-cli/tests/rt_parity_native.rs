@@ -529,14 +529,23 @@ fn differential(case: &str, entry: &str) -> Differential {
     std::fs::write(root.path().join("source"), b"ab").unwrap();
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
 
-    let output = ken_cli::build_native_program(
-        &source,
-        ken_cli::SourceFormat::Ken,
-        &format!("rt_parity_{}", case.replace('-', "_")),
-        root.path(),
-        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-    )
-    .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
+    let (output, pending_plane) = ken_runtime::with_pending_checked_ret_sink_plane_observations(
+        || {
+            ken_cli::build_native_program(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &format!("rt_parity_{}", case.replace('-', "_")),
+                root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        },
+    );
+    assert!(
+        !pending_plane.iter().any(|pending| *pending),
+        "{case}: parity control unexpectedly requires a pending checked-control Ret plane: {pending_plane:?}"
+    );
+    let output = output
+        .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {

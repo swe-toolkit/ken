@@ -990,6 +990,33 @@ pub fn static_response_context_demand_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(|slot| slot.get().is_none())
 }
 
+// A test-only per-build observation of the *installed* phase-B plane key.
+// The wrapper encloses one native build (which may plan more than once) and
+// returns each installed planner's answer, so callers assert the disjunction
+// per built program without conflating preselection with installation.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS:
+        std::cell::RefCell<Option<Vec<bool>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_pending_checked_ret_sink_plane_observations<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<bool>) {
+    PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS.with(|slot| {
+        assert!(
+            slot.borrow_mut().replace(Vec::new()).is_none(),
+            "pending checked Ret sink plane observations cannot nest"
+        );
+    });
+    let result = operation();
+    let observations = PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS.with(|slot| {
+        slot.borrow_mut().take().expect("pending plane observation window was open")
+    });
+    (result, observations)
+}
+
 // Execute-then-resume materialization control. Production specializes a
 // response whose selected caller is a checked-IH environment transport source:
 // the existing transport assembly emits a real response-owner call, so the
@@ -3246,6 +3273,26 @@ impl StaticTransitionPlan<'_> {
             .count();
         let pending_checked_ret_sink =
             super::aggregates::plane_has_pending_checked_control_ret_sink(self)?;
+        #[cfg(feature = "px8-ds-test-support")]
+        if count_install_applications {
+            PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS.with(|slot| {
+                if let Some(observations) = slot.borrow_mut().as_mut() {
+                    observations.push(pending_checked_ret_sink);
+                }
+            });
+            // Opt-in corpus observation includes test-thread identity, not a
+            // source-spelling key. The wrapper above collects per build; this
+            // log also sees existing suites that use their own build helpers.
+            if std::env::var_os("KEN_RT_RET_PLANE_CENSUS").is_some() {
+                eprintln!(
+                    "RT_RET_PLANE thread={:?} pending={} stages={} demands={}",
+                    std::thread::current().name(),
+                    pending_checked_ret_sink,
+                    ordinary_stage_count,
+                    demands.len(),
+                );
+            }
+        }
         let requires_execute_then_resume = ordinary_stage_count >= 2 || pending_checked_ret_sink;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
