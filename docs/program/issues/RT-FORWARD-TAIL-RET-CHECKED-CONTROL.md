@@ -108,6 +108,7 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. An active default-thread Nat fail-closed pin was ruled for programs only ever measured under a 256 MiB thread; it overflows. Keyed on stack provisioning of the Nat shapes.
 2. phase-B population pin read the plane key's source-occurrence presence rather than its decisive application to a transport-source demand — keyed on source-occurrence presence.
 3. the M-base-path-capture seat mutant is reached twice and leaves the buffer row green, because phase-B admission makes every value at that seat a residual — keyed on operand form.
+4. a landed mutation pin's fixture (recursive Ret) sat in the old emission filter's population but outside the unified planning predicate, so the mutation seam went unreached — keyed on predicate population.
 ```
 
 Shared predicate (Architect `evt_4wb17qsfg6k6q`): each entry is an acceptance

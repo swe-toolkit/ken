@@ -66,9 +66,11 @@ refused (point 4).
    a barrier kind reaching the node graph is `unreachable!`. A mention of a
    constructor is an edge to its owning data node, through a
    `ctor name -> data node index` map built from the segment's data nodes.
-4. **Order.** Condense with the existing `scc_membership` and process
-   dependency-first, ties broken by least textual index, so all-backward
-   edges give exact textual order. An SCC containing a `data`, `TypeAlias`
+4. **Order.** Main's `scc_dependency_order` (`modules.rs:4723` at
+   `440b216f1`) over the widened node set: textual-index node numbering,
+   ascending-index adjacency, roots in ascending order, dependencies
+   visited first (Architect `evt_4sf1qvk5cp6cs`). All-backward edges give
+   exact textual order. An SCC containing a `data`, `TypeAlias`
    or `Prop` node together with any other member is refused: "a type
    declaration cannot share a dependency cycle with another declaration". A
    `data` self-edge is not a cycle here.
@@ -99,8 +101,8 @@ here.
   blocked by a barrier kind, by kind.
 - **Mutations.** M-textual (nodes in source order) reddens AC-1(a);
   M-no-data-node (data positional) reddens AC-1(c) or (e);
-  M-export-positional reddens AC-1(d); M-no-tiebreak (arbitrary SCC order)
-  reddens AC-3.
+  M-export-positional reddens AC-1(d); M-no-tiebreak (substitute a
+  least-ready Kahn order) reddens AC-3 (measured 24/58).
 
 ## Stop conditions
 
