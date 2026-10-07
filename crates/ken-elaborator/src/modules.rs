@@ -4366,6 +4366,27 @@ fn expand_scope(
                     segment_end += 1;
                 }
                 let segment = &decls[i..segment_end];
+                // A facade never binds its exported names in the owner's
+                // body. Mark that resolution fact before resolving segment
+                // nodes, even though publication itself waits until every
+                // node is checked. Preserve genuine pre-existing body names.
+                for d in segment {
+                    if let Decl::ExportDecl {
+                        form: ExportForm::Facade { items, .. },
+                        ..
+                    } = d.unwrap_pub()
+                    {
+                        for item in items {
+                            for name in [item.name.as_str(), published_name(item)] {
+                                if !scope.bindings.contains_key(name)
+                                    && !elab.globals.contains_key(name)
+                                {
+                                    scope.facade_only.insert(name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
                 let node_decls: Vec<&Decl> = segment
                     .iter()
                     .filter(|d| {
