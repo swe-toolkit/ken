@@ -43,9 +43,13 @@ import Data.Numeric.Nat.Arithmetic (add)
 export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 ```
 
-`min` and `max` follow `leq_nat`'s recursion directly. `sub` is saturating
-natural-number subtraction; `compare` returns the three-way result
-`OrdResult`. Strict `lt_nat` recurses on its right argument so the checked
+`min` and `max` follow `leq_nat`'s recursion directly. Their private
+meet and join proofs split structural inputs before binding the order
+premises. The paired-successor branches reuse those premises at smaller
+arguments; a positive bound against `Zero` contradicts its premise.
+`sub` is saturating natural-number subtraction; `compare` returns the
+three-way result `OrdResult`. Strict `lt_nat` recurses on its right
+argument so the checked
 successor-order bridge has the same reduction order:
 
 ```ken
@@ -83,6 +87,22 @@ pub proof leq_right for min (m : Nat) (n : Nat) : IsTrue (leq_nat (min m n) n) =
       }
   }
 
+proof greatest for min
+      (k : Nat) (m : Nat) (n : Nat)
+    : IsTrue (leq_nat k m) → IsTrue (leq_nat k n) → IsTrue (leq_nat k (min m n)) =
+  match k {
+    Zero ↦ λhm. λhn. Proved;
+    Suc k2 ↦
+      match m {
+        Zero ↦ λhm. λhn. absurd hm;
+        Suc m2 ↦
+          match n {
+            Zero ↦ λhm. λhn. absurd hn;
+            Suc n2 ↦ λhm. λhn. (proof greatest for min) k2 m2 n2 hm hn
+          }
+      }
+  }
+
 pub fn max (m : Nat) (n : Nat) : Nat =
   match m {
     Zero ↦ n;
@@ -112,6 +132,26 @@ pub proof right_leq for max (m : Nat) (n : Nat) : IsTrue (leq_nat n (max m n)) =
       match n {
         Zero ↦ Proved;
         Suc n2 ↦ proof right_leq for max m2 n2
+      }
+  }
+
+proof least for max
+      (k : Nat) (m : Nat) (n : Nat)
+    : IsTrue (leq_nat m k) → IsTrue (leq_nat n k) → IsTrue (leq_nat (max m n) k) =
+  match m {
+    Zero ↦
+      match n {
+        Zero ↦ λhm. λhn. Proved;
+        Suc n2 ↦ λhm. λhn. hn
+      };
+    Suc m2 ↦
+      match n {
+        Zero ↦ λhm. λhn. hm;
+        Suc n2 ↦
+          match k {
+            Zero ↦ λhm. λhn. absurd hm;
+            Suc k2 ↦ λhm. λhn. (proof least for max) k2 m2 n2 hm hn
+          }
       }
   }
 
@@ -582,7 +622,9 @@ These conditional subtraction laws carry their Boolean hypotheses as `IsTrue`
 propositions, matching this package's order examples and letting downstream
 consumers pass canonical `leq_nat` evidence without restating the underlying
 Boolean equation.
-The four `min`/`max` bounds use the same form. The three `compare` agreements
+The four `min`/`max` bounds use the same form. The two private tightness
+proofs complete these bounds: any common lower bound lies below `min`, and
+`max` lies below every common upper bound. The three `compare` agreements
 return the forward order for `Lt`, propositional equality for `Eq`, and the
 reverse order for `Gt`. The equality proof recurses through the two `Nat`
 arguments, transports reflexivity along the tail equality to recover both
