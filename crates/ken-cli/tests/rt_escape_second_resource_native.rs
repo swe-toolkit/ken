@@ -612,7 +612,7 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-GENERATED-ENTRY-PROJECTION-INVARIANT successor: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
+#[ignore = "RT-FORWARD-TAIL-RET-CHECKED-CONTROL: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
 fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
     // Closure across resource kinds: an escaped `Buffer` is used with a live
     // file. Native parity is pending a strict Ret sink for checked-control
@@ -667,7 +667,7 @@ fn reached_nat_arm_variant(arm: &str) -> String {
 // fanout. THE GAP: native refuses at the selected frame's strict Ret sink; this
 // row cannot claim parity until the successor admits both variants.
 #[test]
-#[ignore = "RT-GENERATED-ENTRY-PROJECTION-INVARIANT successor: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
+#[ignore = "RT-FORWARD-TAIL-RET-CHECKED-CONTROL: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
 fn nat_fanout_reached_live_resource_matches_interpreter() {
     in_large_stack_thread("rt-escape-nat-reached", || {
         for (case, source, expected_reads) in [
