@@ -97,4 +97,5 @@ stop and report the mismatch.
 ```text
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. An active default-thread Nat fail-closed pin was ruled for programs only ever measured under a 256 MiB thread; it overflows. Keyed on stack provisioning of the Nat shapes.
+2. phase-B population pin read the plane key's source-occurrence presence rather than its decisive application to a transport-source demand — keyed on source-occurrence presence.
 ```
