@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-ORDER-MIN-MAX-BOUND-LAWS
 title: "Proof-backfill for Data/Numeric/Nat/Order.ken.md: min and max are proved to be bounds but not the tightest ones, so a min that always returns Zero satisfies every law. Prove privately that min is the greatest lower bound and max the least upper bound under leq_nat"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -83,3 +83,11 @@ No new import, export, operation, axiom or trust. Follow
 
 - Any trust delta, `Axiom`, kernel, prelude or spec change, or a needed
   change to `min`, `max` or `leq_nat`.
+
+## Closeout
+
+Merged `78dc1b98d` from exact `bb82a5b95` (PR #4577). Foundation QA
+`evt_4adtjg2ckg4v4`, Architect `evt_2gzcqvwcfrqbd`, Decision
+`dec_4vf8x3a2wjqxr`. Nat Order proves privately that `min` is the
+greatest lower bound and `max` the least upper bound under `leq_nat`. The
+trust ledger and exports are unchanged.
