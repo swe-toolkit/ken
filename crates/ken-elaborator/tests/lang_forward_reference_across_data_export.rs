@@ -78,6 +78,22 @@ fn earlier_definition_uses_constructor_owned_by_later_data() {
 }
 
 #[test]
+fn earlier_let_annotation_names_later_data() {
+    checked("module M { fn a (x : Int) : Int = let f : D -> Int = λd. x in x data D = MkD }");
+}
+
+#[test]
+fn earlier_ascription_names_later_data() {
+    checked("module M { fn a (x : Int) : Int = let f = ((λd. x) : D -> Int) in x data D = MkD }");
+}
+
+#[test]
+fn earlier_pi_domain_names_later_data() {
+    let env = checked("module M { const T : Type = (d : D) -> Int data D = MkD }");
+    assert!(mentions_global(&transparent_body(&env, "M.T"), env.globals["M.D"]));
+}
+
+#[test]
 fn type_declaration_cannot_share_cycle_with_a_definition() {
     let mut env = ElabEnv::new().expect("base environment");
     let error = env
