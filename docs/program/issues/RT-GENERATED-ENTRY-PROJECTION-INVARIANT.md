@@ -16,9 +16,11 @@ origin: "L1 roster item 'rt_escape :691 (generated-entry projection invariant), 
 
 ## Objective
 
-The escaped-buffer fanning row and a Nat fanout that actually executes with
-a pending suffix both run natively with interpreter parity. The
-NAT-FANOUT parity claim becomes measured rather than vacuous.
+Each member of a generated-entry class reads its own forward-Ret Tail plan,
+so the projection-disagreement refusal is gone. Recut by the Architect
+(`evt_52g57s1w4jgc1`): the reached Nat fanout and `:616` rows stay ignored
+at their next, honest refusal. `RT-FORWARD-TAIL-RET-CHECKED-CONTROL` owns
+their parity.
 
 ## Settled inputs (Adversary `evt_6dy48x09rfktx`, on `21defbec2`)
 
@@ -58,24 +60,37 @@ stop and report the mismatch.
    owners, generated entry, and each side's typed consumer projection.
    Census every other test that pins this refusal text
    (`rt_parity_native.rs:3815-3847`). The Architect rules the repair.
-2. **The ruled repair.**
+2. **The ruled repair** (`evt_25wwm2j6e35nm`, kept by `evt_52g57s1w4jgc1`):
+   class-common route in the projection, a per-member Tail plan beside each
+   member, re-derived from the member's own transport. Neither sink
+   predicate changes.
 
 ## Acceptance
 
-- **AC-1.** The reached Nat fanout row and the `:616` row are un-ignored and
-  pass native-versus-interpreter parity on stdout and the full
-  `EffectEvent` vector.
-- **AC-2 (discriminates arms).** A variant whose Suc arm reads once more
-  records one more `FsReadAt` in both engines, and the row tells it apart
-  from the as-written arms.
+- **AC-1.** Both rows stay `#[ignore]`, each reason quoting its new first
+  refusal verbatim, at `ComposedReturnRetSink` /
+  `ComposedReturnForwardRetAuthority`. Any other first refusal is a stop.
+- **AC-2 (pins).** Class-common pins keep the projection-disagreement
+  message. Tail-member pins retarget to "a member's Tail plan disagrees with
+  its transport's own derivation". `route_disagreement` becomes the
+  route-kind flip.
 - **AC-3 (controls).** The other rows in that file, `rt_parity_native` at
   4 threads, and the refusal pins the D0 census names keep their results,
   unless the ruling names a change.
-- **AC-4 (mutation, QA).** Restoring the disagreeing projection returns
-  both rows to the refusal.
+- **AC-4 (mutation, QA).** M-class-tail restores the projection refusal
+  on both rows, ahead of the sink refusal. M-wrong-member fails at the
+  re-derivation check.
 
 ## Stop conditions
 
 - The repair needs a kernel, trust or spec change.
-- The Nat route traps at runtime after the projection repair: stop to the
-  Architect with the trap site.
+- A sink predicate would need to change, or a refusal would move into the
+  planner.
+- Default-thread stack overflow on any un-ignored row.
+
+## Symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. planner certifies a forward-Ret Tail route into a Ret body that lowering never sinks — keyed on Ret-body checked-control freedom
+```
