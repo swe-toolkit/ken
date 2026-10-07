@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-ZIP-PROJECTION-LAWS
 title: "Proof-backfill for Data/Collections/Derived.ken.md: prove privately that zip's first projection is the first list truncated to the second's length, and its second projection the second list truncated to the first's, so zip's contents and not only its length are checked"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -72,3 +72,11 @@ import, export, operation, axiom or trust. Follow
 
 - Any trust delta, `Axiom`, kernel, prelude or spec change, or a needed
   change to `zip`, `map`, `take` or `length`.
+
+## Closeout
+
+Merged `e75479460` from exact `3873419c7` (PR #4572). Foundation QA
+`evt_5hvy2wd9k7270`, Architect `evt_1qkk2f40mpdmp`, Decision
+`dec_349gt48q70aha`. Derived proves `zip_fst` and `zip_snd`: mapping
+`pair_fst` or `pair_snd` over `zip a b xs ys` gives the matching `take`
+of each list. Both laws are private, and the trust id set is unchanged.

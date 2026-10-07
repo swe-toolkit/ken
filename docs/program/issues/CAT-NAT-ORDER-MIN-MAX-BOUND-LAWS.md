@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-ORDER-MIN-MAX-BOUND-LAWS
 title: "Proof-backfill for Data/Numeric/Nat/Order.ken.md: min and max are proved to be bounds but not the tightest ones, so a min that always returns Zero satisfies every law. Prove privately that min is the greatest lower bound and max the least upper bound under leq_nat"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
