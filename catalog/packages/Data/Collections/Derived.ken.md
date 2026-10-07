@@ -888,7 +888,10 @@ list from its reversed view; `reverse_snoc` remains an internal lemma.
 length-indexed `Vec` zip:
 this is ordinary non-dependent recursion carrying none of the
 sibling-convoy/dependent-match capability gate that a length-indexed zip
-would need — fully mechanical. `concat_map` retains its two structural
+would need — fully mechanical. Its projection proofs split both lists:
+when either is empty, both endpoints reduce to `Nil`; when both have heads,
+the pair projection reduces and `cong` lifts the tail proof under `Cons`.
+`concat_map` retains its two structural
 (`Nil`/`Cons`) equations and a private distributivity proof over
 `list_append`. Its step lifts the tail
 induction hypothesis through head-list append, then reverses
@@ -1004,6 +1007,58 @@ theorem zip_length
             (min (length a t) (length b t2))
             Suc
             (zip_length a b t t2)
+      }
+  }
+
+theorem zip_fst
+      (a : Type) (b : Type) (xs : List a) (ys : List b)
+    : Equal
+        (List a)
+        (map (Pair a b) a (pair_fst a b) (zip a b xs ys))
+        (take a (length b ys) xs) =
+  match xs {
+    Nil ↦
+      match ys {
+        Nil ↦ Proved;
+        Cons h2 t2 ↦ Proved
+      };
+    Cons h t ↦
+      match ys {
+        Nil ↦ Proved;
+        Cons h2 t2 ↦
+          cong
+            (List a)
+            (List a)
+            (map (Pair a b) a (pair_fst a b) (zip a b t t2))
+            (take a (length b t2) t)
+            (Cons a h)
+            (zip_fst a b t t2)
+      }
+  }
+
+theorem zip_snd
+      (a : Type) (b : Type) (xs : List a) (ys : List b)
+    : Equal
+        (List b)
+        (map (Pair a b) b (pair_snd a b) (zip a b xs ys))
+        (take b (length a xs) ys) =
+  match xs {
+    Nil ↦
+      match ys {
+        Nil ↦ Proved;
+        Cons h2 t2 ↦ Proved
+      };
+    Cons h t ↦
+      match ys {
+        Nil ↦ Proved;
+        Cons h2 t2 ↦
+          cong
+            (List b)
+            (List b)
+            (map (Pair a b) b (pair_snd a b) (zip a b t t2))
+            (take b (length a t) t2)
+            (Cons b h2)
+            (zip_snd a b t t2)
       }
   }
 
