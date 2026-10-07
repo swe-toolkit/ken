@@ -16,9 +16,11 @@ origin: "Architect recut evt_52g57s1w4jgc1 of RT-GENERATED-ENTRY-PROJECTION-INVA
 
 ## Objective
 
-The reached Nat fanout and the `:616` escaped-buffer fanning row in
-`rt_escape_second_resource_native.rs` run natively with interpreter parity.
-The NAT-FANOUT parity claim becomes measured rather than vacuous.
+The `:616` escaped-buffer fanning row in
+`rt_escape_second_resource_native.rs` runs natively with interpreter parity.
+The reached Nat fanout fails closed at the carried-match class guard. Its
+parity moves to `RT-CARRIED-NAT-MATCH-BOUNDED-IMMEDIATE` (Architect split
+`evt_617g7acwvmk4n`).
 
 ## Settled inputs (Architect `evt_52g57s1w4jgc1`, on `575baaef4`)
 
@@ -57,23 +59,32 @@ stop and report the mismatch.
      escaped `FsHandle` sibling) on the base and under the widened sink. If
      it reaches the same sink refusal, it joins AC-1, AC-2 and AC-4.
      Otherwise report its refusal and keep it out of this repair.
-2. **The ruled repair.**
+2. **The ruled repair** (`evt_617g7acwvmk4n`): the planning-owned
+   `StrictRetSinkAssessment`, the phase B execute-then-resume disjunct, and
+   the `FormedBasePath` authority outcome, with the strict sink installed
+   only for `Ready`.
 
 ## Acceptance
 
-- **AC-1.** Both rows are un-ignored and pass native-versus-interpreter
-  parity on stdout and the full `EffectEvent` vector.
-- **AC-2 (discriminates arms).** A variant whose Suc arm reads once more
-  records one more `FsReadAt` in both engines (3 against 2), and the row
-  tells it apart from the as-written arms.
-- **AC-3 (controls).** The other rows in that file, `rt_parity_native` at
-  4 threads, and the D0 (b) population keep their results, unless the
-  ruling names a change.
-- **AC-4 (mutation, QA).** Restoring the marker gate on the sink returns
-  both rows to the sink refusal.
+- **AC-1.** The `:616` row is un-ignored and passes on the default thread:
+  exit, terminal, stdout, the full `EffectEvent` vector, and one read.
+- **AC-2 (Nat fails closed).** The Nat row stays ignored, naming the
+  successor and the measured site. One active pin over the three Nat
+  variants asserts `UnclassifiedRuntimeTrap { terminal_value: -1 }`.
+- **AC-3 (controls).** `rt_parity_native` passes 189/189 on the default
+  thread, the read and write collapsibility control passes, and the escape
+  file's six active rows pass. A population counter shows the phase B
+  disjunct true only for the escape-file target programs.
+- **AC-4 (mutation, QA).** The five mutants of `evt_617g7acwvmk4n`
+  (M-admission-off, M-base-path-capture, M-ready-forward,
+  M-assessment-split, M-marker-free-suppressed) each redden a named active
+  row.
 
 ## Stop conditions
 
 - The repair needs a kernel, trust or spec change.
-- A runtime trap or a dropped effect on any row after the repair.
+- A parity red, a dropped effect, or a trap anywhere except the pinned Nat
+  guard.
+- The phase B disjunct true outside the target programs, or the
+  transport-source population refusal (`construction.rs:1530`).
 - Default-thread stack overflow on any un-ignored row.
