@@ -170,19 +170,19 @@ claim with no conformance case is a claim no one can rely on
 - `surface/numbers/seed-decimal-char-demote.md` — WP Decimal/Char DEMOTE
   (`18a §5.6.1`/`§5.9.1`/`§5.2.2`, second Phase-2 BUILTINS tranche): a **TCB
   removal by removal-not-shadowing** — native `*_decimal` ops + the `Char`
-  primitive **type** deleted, replaced by derived `(coeff:Int, exp:Int)` +
-  subset `Char = Σ(c:Int).isScalar c` over F1 bignum `Int`; `Char` is not
-  definitionally equal to `Int`. Pulls up the **`leq_int`
-  ordering arm** (ruling (A), the derived-def prerequisite) with its
-  **independent** differential oracle (never `num-bigint`'s `Ord` both-sides);
-  closes **both F4 halves** (saturating-`mul` *and* the sharp false-`True` `eq`
-  — a wrong value in the tested-not-trusted ring, not a false proof); the
-  derived `Decimal`/`Char` **ops** (the `Num`/`DecEq`/`Ord` **law**-carrying
-  instances re-home to the lawful-classes lane and use `Proj1` plus Σ-η/Ω proof
-  irrelevance, with zero new postulates); and the two **Char soundness pins** —
-  the
-  `isScalar := IsTrue(inRangeBool)` Ω-encoding (**sort-not-token**) and
-  extraction **computing** the scalar proof (runtime face deferred).
+  primitive **type** deleted, replaced at the source level by derived
+  `(coeff:Int, exp:Int)` + subset `Char = Σ(c:Int).isScalar c` over F1 bignum
+  `Int`. The checked-Char Σ/pair representation and its distinction from `Int`
+  are **deferred — W5**; current lowering remains carrier-only. Pulls up the
+  **`leq_int` ordering arm** (ruling (A), the derived-def prerequisite) with
+  its **independent** differential oracle (never `num-bigint`'s `Ord`
+  both-sides); closes **both F4 halves** (saturating-`mul` *and* the sharp
+  false-`True` `eq` — a wrong value in the tested-not-trusted ring, not a false
+  proof); the derived `Decimal`/`Char` **ops** remain live. The `Num`/`DecEq`/
+  `Ord` **law**-carrying instances re-home to the lawful-classes lane; checked-
+  Char projection/law lifting is **W5-deferred**. Char pin 1's
+  `isScalar := IsTrue(inRangeBool)` Ω-encoding is live; checked pair extraction
+  computing the scalar proof is deferred with the runtime face.
 - `surface/collections/seed-collections.md` — L3 strings & collections (`37`):
   `String` as a canonically encoded **NFC UTF-8 primitive**: byte-length ≠
   char-length through live interpreter values; `byte_length`/`char_length`

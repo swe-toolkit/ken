@@ -284,21 +284,23 @@ the netted behavior does not depend on the spelling.
 
 ### surface/numbers/char-excludes-surrogates
 - spec: `35 §2.4`, `41 §5`
+- status: scalar acceptance/rejection is live; checked-Char subset-Σ type and
+  pair representation are **deferred — W5**.
 - given: the char literals `'a'` (U+0061) and a surrogate code point
   U+D800  *(oracle: the surrogate-literal spelling, e.g. `'\u{D800}'`)*
 - expect: `'a' : Char` **accepts** (a valid Unicode scalar value); the surrogate
   U+D800 **rejects** — `Char`'s valid range is U+0000–U+10FFFF **excluding** the
   surrogate block U+D800–U+DFFF.
-- why: `Char` is the checked subset
-  `Σ(c:Int).isScalar c` (`18a §5.9.1`, `21 §2`): not every `Int` is a `Char`.
-  Verdict flips: a valid scalar accepts, a surrogate rejects — not every
-  16/32-bit code unit is a Unicode scalar.
-- note: post-**DEMOTE**, `Char = Σ(c:Int).isScalar c`; runtime erases the Ω
-  proof but the kernel type remains distinct from `Int`. The `isScalar` encoding,
-  reducing `Int.toChar`, and derived `Ord Char`/`DecEq Char` ops are pinned in
-  `seed-decimal-char-demote.md` (`18a §5.9.1`). The law-carrying instances
-  re-home to the lawful-classes lane and use `Proj1` with Σ-η and Ω proof
-  irrelevance, not type-level equality `Char ≡ Int`.
+- why: `Char` denotes the Unicode scalar subset (`18a §5.9.1`, `21 §2`): not
+  every `Int` is a `Char`. The live value verdict flips: a valid scalar accepts,
+  a surrogate rejects — not every 16/32-bit code unit is a Unicode scalar.
+- note: post-**DEMOTE**, the checked-Char subset-Σ type and pair are **deferred —
+  W5** while current lowering uses the `Int` carrier. Runtime codepoints remain
+  values; W5 makes the checked kernel type distinct from `Int`. The `isScalar`
+  encoding, reducing `Int.toChar`, and derived `Ord Char`/`DecEq Char` ops are
+  pinned in `seed-decimal-char-demote.md` (`18a §5.9.1`). The law-carrying
+  checked-Σ instances re-home to the lawful-classes lane and use `Proj1` with
+  Σ-η and Ω proof irrelevance, not type-level equality `Char ≡ Int`.
 
 ### surface/numbers/char-expected-integer-literal-scalar-boundary
 - spec: `35 §2.4`, `§4.1`, `18a §5.9.1 (1), (3)`, `31 §3`

@@ -317,49 +317,45 @@ law-less/postulated/holed instance is **rejected as unlawful** (non-empty
 ## AC-char-ord-law-lifting — `Ord Char` reuses projected assumptions
 (re-homed from the Decimal/Char DEMOTE, `docs/program/wp/lawful-classes-lane.md`)
 
-`51 §6`'s carrier axis, read for a **derived/refinement** carrier: `Char` is
-`Σ(c:Int).isScalar c` (`21 §2`), not definitionally `Int`. Its codepoint
-carrier is canonical, and `Proj1` maps it to the `Int` order; Char equality is
-lifted back by Σ-η and Ω proof irrelevance (`18a §5.9.1(3)`). The sound
-realization reuses `Ord Int`'s visible assumptions on projected codepoints and
-provides checked equality-lifting proofs, with no fresh postulate. The
-discriminator remains **HONESTY, not zero-delta**: no field is fabricated or
-silently absent.
+`51 §6`'s target carrier is the derived/refinement type
+`Σ(c:Int).isScalar c` (`21 §2`), not definitionally `Int`. The current
+elaboration path lowers a refinement to its `Int` carrier; the checked-`Char`
+Σ representation and projected `Ord Char` law-lifting realization are
+**deferred — W5**. In that future shape, `Proj1` maps codepoints to the `Int`
+order and Σ-η/Ω proof irrelevance lift Char equality (`18a §5.9.1(3)`). The
+lawful instance reuses `Ord Int`'s visible assumptions without a fresh
+postulate. Current operation/value controls remain live in
+`conformance/surface/numbers/seed-decimal-char-demote.md`. The discriminator is
+**HONESTY, not zero-delta**: no field is fabricated or silently absent.
 
 ### stdlib/classes/char-ord-laws-carried-not-stubbed (soundness)
 - spec: `51 §6` (the carrier axis), `21 §2`, `18a §5.9.1(3)`;
   `33 §5.2`/§5.3 (instance record and projections)
-- given: two `Ord Char`-shaped instances with the same
-  `leq_char a b = leq_int (Proj1 a) (Proj1 b)` field: (a) the canonical
+- status: the checked-Σ `Ord Char` law-lifting arm is **deferred — W5**;
+  the omitted-field rejection remains live. The landed operation/value control
+  is `char-eq-and-ord-on-projection` in
+  `conformance/surface/numbers/seed-decimal-char-demote.md`.
+- given: two `Ord Char`-shaped instances with the same future checked-Σ
+  operation `leq_char a b = leq_int (Proj1 a) (Proj1 b)`: (a) the canonical
   instance whose law fields use `Ord Int`'s visible assumptions on projected
   codepoints and lift equality of `Char` pairs through Σ-η and Ω proof
   irrelevance; (b) an incomplete attempt with a law field omitted from the
   `instance { … }` body (not even an honest `Axiom` written).
-- expect: **the verdict flips.** (a) **accepts** — the instance elaborates,
-  every field position is filled by a real term (grep-confirm: no
-  `declare_postulate`/hole introduced by `Ord_instance_Char`'s OWN decl —
-  `trusted_base_delta` on `Ord_instance_Char` is empty, i.e. zero-**NEW**-delta;
-  it correctly does **not** assert zero-delta outright, since `Ord Int`'s
-  pre-existing `Axiom`s are still honestly there, one projection-hop away);
-  (b) **rejected** — the record value is **uninhabited**: the class
-  machinery requires every declared field present
-  (`compute_ordered_field_values`, `ken-elaborator/src/elab.rs`) and errors
-  rather than silently defaulting a missing field to some placeholder.
-  Assert the **observable**: (a) elaborates + empty `Ord_instance_Char`-own
-  `trusted_base_delta`; (b) elaboration fails (an `Internal`/missing-field
-  error), not a message string
-- why: (soundness) the honesty-not-zero-delta discriminator (`51 §6`) applies
-  to a derived subset-Σ carrier. `Char` is not a bare alias of `Int`: the
-  operations use `Proj1`, while equality conclusions are lifted across the
-  pair using Σ-η and Ω proof irrelevance. The sound instance references the
-  visible `Ord Int` assumptions and supplies checked lifting terms; it adds no
-  new postulate. The discriminator remains whether every field is a real,
-  present term, not whether the instance is zero-delta outright. A hole,
-  fabricated false proof, or omitted field violates the contract. The
-  non-canonical Decimal carrier remains ineligible for the same equality lift;
-  its `DecEq.sound` would inhabit `Bottom`. This pins the omitted-field
-  rejection and the zero-NEW-delta acceptance without asserting
-  `Char ≡ Int`.
+- expect: **Deferred — W5:** (a) the checked-Σ instance is accepted, every
+  field position has a real term, and `Ord_instance_Char` introduces no new
+  `trusted_base_delta` entry; it does not claim zero-delta outright because
+  `Ord Int`'s pre-existing `Axiom`s remain visible. **Landed:** (b) omission of
+  a required field is rejected; the record is uninhabited, and the elaborator
+  does not silently default the field. The current operation/value row does not
+  assert this future checked-Char law-lifting shape.
+- why: (soundness) the honesty-not-zero-delta discriminator (`51 §6`) is about
+  a derived subset-Σ carrier. W5 supplies checked Char pairs, `Proj1`, and
+  Σ-η/Ω-proof-irrelevance law lifting; today's operation/value control does not
+  establish those checked-core terms. The future sound instance reuses visible
+  `Ord Int` assumptions without a new postulate. The missing-field refusal is a
+  separate live class-completeness check. The non-canonical Decimal carrier
+  remains ineligible for the same equality lift; its `DecEq.sound` would
+  inhabit `Bottom`. This does not assert `Char ≡ Int`.
 
 ---
 
@@ -407,11 +403,10 @@ silently absent.
   `primitive-carrier-declared-audited-delta` (carrier separation live on the
   live-`Eq` law `total`; declared-vs-hidden always capability-independent),
   `ord-total-law-is-omega-bool-equation`.
-- **AC-char-ord-law-lifting** (honesty-not-zero-delta on a derived
-  subset-Σ carrier):
-  `char-ord-laws-carried-not-stubbed` — `Ord Char` reuses visible `Ord Int`
-  assumptions on `Proj1` codepoints and lifts equality via Σ-η and Ω proof
-  irrelevance; the checked instance adds no new postulate.
+- **AC-char-ord-law-lifting** (checked-Σ law lift deferred — W5; honesty-not-
+  zero-delta): `char-ord-laws-carried-not-stubbed` — the future `Ord Char`
+  instance reuses visible `Ord Int` assumptions on `Proj1` codepoints and lifts
+  equality via Σ-η and Ω proof irrelevance; it adds no new postulate.
   **`Num`/`DecEq Decimal` re-defer** (Steward ruling): `Decimal`'s
   non-canonical `(coeff, exp)` carrier makes `decimalEq` an `Eq`
   (equivalence), not a `DecEq` (decision procedure for the kernel's

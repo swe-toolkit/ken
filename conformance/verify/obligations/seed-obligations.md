@@ -263,19 +263,23 @@ the W5 core-pair shape.
 
 ### verify/obligations/match-branch-gamma-carries-scrutinee-equation (soundness)
 - spec: `22 §3` (match constructor equation), `§4`; `39 §2.6` (match→elim_D)
-- status: subset-Σ result-pair expectations are **deferred — W5**.
+- status: the branch equations are live as obligation-side hypotheses; checked
+  convoy terms are **deferred — W2** (`LANG-PATH-CONDITION-EVIDENCE`). Checked
+  subset-Σ result pairs are **deferred — W5**.
 - given: `fn f (xs : List Int) : Int ensures P result = …` whose body is
   `match xs { nil → e0 ; cons y ys → e1 }` where the `cons`-branch goal
   discharges only by knowing the scrutinee shape
-- expect: in the `cons y ys` branch, the obligation's `Γ` carries the
-  **scrutinee equation** `(_ : Eq (List Int) xs (cons y ys))` with its checked
-  convoy term and binds fields `y, ys`; the nil branch carries its equation
-  with term evidence too. Each branch introduces its result as a checked pair
-  at the postcondition's subset-Σ motive.
-- why: §3 — a case split adds, per branch, the constructor equation and its
-  checked convoy evidence. The leaf's subset-Σ proof can apply its obligation
-  hole to that term. An unchecked proposition in `Γ` cannot be used as a proof;
-  dropping either the equation or its term yields a false `unknown`.
+- expect: **Landed:** in the `cons y ys` branch, the obligation's `Γ` carries
+  the **scrutinee equation** `(_ : Eq (List Int) xs (cons y ys))` as a
+  hypothesis and binds fields `y, ys`; the nil branch carries its equation too.
+  Neither equation has a corresponding program term in the emitted core today.
+  **Deferred — W2:** the checked convoy term is bound in each method and the
+  obligation hole is applied to it. **Deferred — W5:** each branch introduces
+  its result as a checked pair at the postcondition's subset-Σ motive.
+- why: §3 currently adds each constructor equation to the obligation context;
+  W2 supplies the missing checked program term. The leaf's future subset-Σ
+  proof can then apply its obligation hole to that term. Dropping the equation
+  makes `Γ` too weak today; the checked pair's result shape remains W5.
 
 ### verify/obligations/let-binding-adds-equation-to-gamma
 - spec: `22 §3` (let-equation)
@@ -291,17 +295,21 @@ the W5 core-pair shape.
 
 ### verify/obligations/conditional-branch-adds-boolean-equation
 - spec: `22 §3` (conditional)
-- status: subset-Σ result-pair expectations are **deferred — W5**.
+- status: the branch equations are live as obligation-side hypotheses; checked
+  convoy terms are **deferred — W2** (`LANG-PATH-CONDITION-EVIDENCE`). Checked
+  subset-Σ result pairs are **deferred — W5**.
 - given: `fn f (n : Int) : Int` with
   `ensures IsTrue (leq_int 0 result) = if leq_int 0 n then n else 0`
-- expect: the then-branch obligation's `Γ` carries
-  `(_ : Equal Bool (leq_int 0 n) true)` with its checked convoy term; the else
-  branch carries `(_ : Equal Bool (leq_int 0 n) false)` with its term. Each
-  branch's result is a checked pair at the postcondition subset-Σ type.
-- why: §3 — `if c` adds `Equal Bool c true` / `false` per branch (elaborated
-  `elim_Bool`) together with checked convoy terms. The `then` proof component
-  can use that term to discharge `IsTrue (leq_int 0 n)`; a proposition in `Γ`
-  without evidence cannot inhabit the subset pair's proof component.
+- expect: **Landed:** the then-branch obligation's `Γ` carries
+  `(_ : Equal Bool (leq_int 0 n) true)` as a hypothesis; the else branch
+  carries `(_ : Equal Bool (leq_int 0 n) false)`. Neither equation has a
+  corresponding program term in the emitted core today. **Deferred — W2:**
+  each branch gets its checked convoy term. **Deferred — W5:** each branch's
+  result is a checked pair at the postcondition subset-Σ type.
+- why: §3 currently adds the `if c` equations to obligation `Γ`; W2 supplies
+  checked terms through `elim_Bool`, so the future proof can apply its hole to
+  that evidence. Dropping a branch equation makes `Γ` too weak today; the
+  subset-Σ result shape remains W5.
 
 ### verify/obligations/non-direct-requires-carries-into-partialprim-telescope
 - spec: `21 §1` (requires premise); `22 §2.4` (PartialPrim); `22 §3`

@@ -13,15 +13,16 @@ amplify` → AC3, `no-ambient-authority` → AC1; retired there in this WP — s
 
 Grounding (landed `§`-bodies + landed code on this branch, content-reconciled —
 not the plan): `62 §1`–`§9`/`§H` (no-ambient, the authority lattice,
-attenuation as a checked subset-Σ pair with a direction-degenerate proof
-obligation, revocation
+attenuation's normative checked subset-Σ target, revocation
 lineage/admission/projection/settlement contract, audit, compose, trust-boundary
-table); `36 §2.5`/§3/§3.1 (capability-passing translation: `Cap E` is a value
-parameter via ordinary Π; Sec2 consumes it as authority evidence); `36 §1.4`
-(the EFFECT-ESCAPE check — a no-row `fn` is inert);
-`34 §5`/`21 §2` (attenuation uses subset Σ
+table); its checked Pair introduction is **deferred — W5**, and the current
+host mirror is described below. `36 §2.5`/§3/§3.1 (capability-passing
+translation: `Cap E` is a value parameter via ordinary Π; Sec2 consumes it as
+authority evidence); `36 §1.4` (the EFFECT-ESCAPE check — a no-row `fn` is
+inert); `34 §5`/`21 §2` (the normative attenuation target is subset Σ
 `Σ(c':Cap E).authority c' ⊑ authority c ⊓ w`, introduced by pair plus proof
-obligation); `16 §1`/`61 §2.1` (the `Ω`-valued `⊑` order the
+obligation; checked Pair introduction is W5-deferred); `16 §1`/`61 §2.1`
+  (the `Ω`-valued `⊑` order the
 `Authority` lattice rides); `61 §3.1` (`L-SINK`, the flow half of AC6); `61 §4`
 (declassify is capability-gated/audited); `25 §3`/`63` (`trusted_base_delta`).
 **Landed code pinned against:** `CapParam { name, effect }` + `cap_set`
@@ -187,20 +188,26 @@ not a capability-producing surface spelling; deferred runtime mechanisms remain
 
 ### security/capabilities/attenuate-bound-discharge-mirrors-elaborator
 - spec: `62 §3.1`/§H, `34 §5`, `21 §2`, `22 §2.1`, `23 §1`, `18 §4`
+- status: the current host Eq/Refl mirror is live; checked-core subset-Σ pair
+  introduction is **deferred — W5**. The {C1, C2} behavior remains the net for
+  the host's direction-sensitive bound.
 - given: the runner/host semantic `capabilities.rs::attenuate(c, w)` derives a
-  child `c'`; observe its checked core at the target type
-  `Σ(c':Cap E).authority c' ⊑ authority c ⊓ w`. No Ken source expression
-  constructs `c'`.
-- expect: the child is `Pair(c',π)` with introduction goal
-  `authority c' ⊑ authority c ⊓ w`. The canonical child discharges by checked
-  `⊑-refl` evidence. A too-strong child has no checked witness; its proof
-  remains open and its claim is not proved. No bare `Cap E` passes as the
-  refined type. The kernel checks the pair and proof but does not compute the
-  host's meet or `⊑` decision.
-- why: (soundness) this is a trust-boundary assertion, not an independent
-  kernel computation of the authority relation. The subset-Σ shape is checked
-  by the kernel; the non-degenerate {C1, C2} pair remains the behavioral net
-  for the host's direction-sensitive `meet`/`⊑` computation.
+  child `c'`; observe the current `discharge_attenuation` result for canonical
+  and too-strong children. The target type
+  `Σ(c':Cap E).authority c' ⊑ authority c ⊓ w` is the future checked-core
+  shape. No Ken source expression constructs `c'`.
+- expect: **Landed host mirror:** `discharge_attenuation` encodes the bound as
+  an `Eq` over opaque authority postulates and tries a `Refl` certificate. The
+  canonical case reuses one postulate and yields `Proved`; a too-strong case
+  uses distinct postulates and yields `Unknown`. This is a host mirror, not a
+  checked-core `Pair` or an independent kernel computation of `meet`/`⊑`.
+  **Deferred — W5:** checked-core introduction is `Pair(c',π)` at the target
+  subset-Σ type; the kernel checks the pair and proof, and no bare `Cap E`
+  passes as the refined type.
+- why: (soundness) the current trust boundary is the host's bound decision,
+  not the opaque Eq/Refl mirror. The subset-Σ pair is a future kernel-checked
+  shape; the non-degenerate {C1, C2} pair remains the behavioral net for the
+  host's `meet`/`⊑` computation.
 
 ### security/capabilities/no-amplifying-operation-exists
 - spec: `62 §3.2`/`§2.2`

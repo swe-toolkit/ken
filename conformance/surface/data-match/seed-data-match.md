@@ -538,29 +538,33 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 ## surface/data-match/branch-refinement-is-hypothesis (AC6)
 - spec: `spec/30-surface/34-data-match.md §3.3`, `§3.2`,
   `20-verification/22 §3`
-- status: subset-Σ result pairs are **deferred — W5**; branch-evidence
-  expectations distinguish unindexed from indexed families.
+- status: subset-Σ result pairs are **deferred — W5**. The unindexed checked
+  convoy term is **deferred — W2** (`LANG-PATH-CONDITION-EVIDENCE`); the
+  indexed index-only branch remains a current expectation.
 - given: (a) a neutral scrutinee `s : Shape` of unindexed
   `data Shape = Circle Int`, checked by a dependent match at result family
   `P : Shape → Type`; and (b) a neutral `v : Vec A (n+1)` matched at its
   `VCons` branch.
-- expect: (a) the emitted `elim_Shape` method telescope contains the checked
-  convoy argument `e : Eq Shape s (Circle r)`, available as a term in that
-  branch context. (b) the indexed `VCons` method contains only the checked
-  index refinement from `34 §3.2`;
-  no whole-scrutinee Eq binder is added. Assert the branch-context distinction
-  structurally; do not assert a subset-Σ pair shape.
+- expect: (a) **Deferred — W2:** the emitted `elim_Shape` method telescope
+  contains the checked convoy argument `e : Eq Shape s (Circle r)`, available
+  as a term in that branch context. The current baseline emits no such program
+  term; `seed-obligations.md` covers its obligation-side hypothesis. (b) the
+  indexed `VCons` method contains only the checked index refinement from
+  `34 §3.2`; no whole-scrutinee Eq binder is added. Assert the branch-context
+  distinction structurally; do not assert a subset-Σ pair shape.
 - why: `34 §3.3` permits the value-level convoy when both endpoints inhabit
-  the same unindexed family. An indexed constructor may target `D iₖ` while
-  the scrutinee has type `D i`, so only the index refinement is shared; the
-  packed Σ equation remains the open `OQ-indexed-scrutinee-evidence`. **Flip:**
-  omitting the unindexed `Eq` method argument changes the checked core
-  telescope; adding a whole-scrutinee Eq binder to the indexed method asserts a
-  rule the Spec does not provide. The subset-Σ result shape remains W5-deferred.
+  the same unindexed family. The current obligation-side equation is not yet a
+  program term; W2 supplies that checked evidence. An indexed constructor may
+  target `D iₖ` while the scrutinee has type `D i`, so only index refinement is
+  shared; the packed Σ equation remains the open
+  `OQ-indexed-scrutinee-evidence`. **Flip:** omitting the unindexed `Eq` method
+  argument changes the checked core telescope; adding a whole-scrutinee Eq
+  binder to the indexed method asserts a rule the Spec does not provide. The
+  subset-Σ result shape remains W5-deferred.
 - pin:
-  - **MEASURED:** checked method telescopes and the indexed branch's context.
-  - **CLAIMED:** unindexed branches receive a value-level Eq term; indexed
-    branches receive only index refinement.
+  - **MEASURED:** W2 method telescopes and the indexed branch's context.
+  - **CLAIMED:** W2 unindexed branches receive a value-level Eq term; indexed
+    branches receive only index refinement today.
   - **THE GAP:** verdicts alone do not expose which equation entered the
     method; assert the exact core telescope, while leaving pair output W5.
 
@@ -651,7 +655,7 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 | bad-constructor-result-target     | AC9      | target must be declared family        | soundness  |
 | explicit-signature-positivity     | AC9      | kernel positivity still gates         | soundness  |
 | gadt-coverage-possible-impossible | AC9      | omit impossible / require possible    | soundness  |
-| branch-refinement-is-hypothesis | AC6 | unindexed Eq; indexed no value Eq | |
+| branch-refinement-is-hypothesis | AC6 | unindexed W2 Eq; indexed no value Eq | |
 | proof-returning-dependent-motive  | AC8      | `Ω` proof motive + exact branches     |            |
 | refinement-obligation             | AC7      | emit-on-intro / free-on-forget        | soundness  |
 

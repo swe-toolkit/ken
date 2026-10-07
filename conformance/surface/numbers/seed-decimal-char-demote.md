@@ -353,14 +353,22 @@ corrected forward obligation re-defers *there*, **not** to a
 ### surface/numbers/char-is-isscalar-refinement  (soundness)
 - spec: `18a §5.9.1(1)`/`(2)` (subset Σ + `isScalar` encoding), `18a §5.1`,
   `21 §2`; `docs/program/wp/decimal-char-demote.md` AC-C1
+- status: the source refinement definition and scalar predicate are live;
+  checked-core `Char` as Σ and checked pair introduction are **deferred — W5**.
+  Runtime operation/value controls remain in `char-eq-and-ord-on-projection`
+  and `int-to-char-rejects-surrogate-and-oor`.
 - given: the `Char` type definition post-demote.
-- expect: `Char` is the transparent alias
-  `Σ(c:Int).isScalar c`, with `isScalar c := IsTrue (inRangeBool c)` and
-  `isScalar c : Ω`. It is not an opaque primitive type (`reg_ty!("Char")`
-  gone, AC-G), `List`/`u32`, or a type convertible to `Int`.
-- why: the relevant first component gives `Proj1 : Char → Int`; the second
-  component is the checked scalar proof. Introduction constructs a pair, and
-  only the Ω proof is erased at runtime. This is the type-level demote.
+- expect: **Landed:** `isScalar c := IsTrue (inRangeBool c)` and
+  `isScalar c : Ω`; the current checked `Char` type lowers to its `Int` carrier.
+  **Deferred — W5:** checked-core `Char` is the transparent alias
+  `Σ(c:Int).isScalar c`, not an opaque primitive (`reg_ty!("Char")` gone,
+  AC-G), `List`/`u32`, or a type convertible to `Int`; introduction is
+  `Pair(c, π)` with its scalar proof checked, and only the Ω proof is erased at
+  runtime.
+- why: the source-level refinement and `isScalar` definition are already
+  present, but `elab_type` currently lowers `RRefine` to its carrier. W5 supplies
+  the checked Σ type and pair introduction. The separate operation/value cases
+  remain live on the transitional carrier.
 
 ### surface/numbers/int-to-char-rejects-surrogate-and-oor  (soundness)
 - spec: `18a §5.9.1(3)` (`Int.toChar` face-(c), AC-C3), `35 §2.4`,
@@ -461,10 +469,12 @@ lawful-classes-lane WP — see the deferred section.
 ### surface/numbers/char-deceq-collapses-on-codepoint  (soundness, hard-AC)
 - spec: `18a §5.9.1(2)` (pin 1, Ω-encoding), `18a §5.9` pin 1, `16 §1.3`,
   `docs/program/wp/decimal-char-demote.md` AC-C1
-- given: the `isScalar` definition, and two `Char` values with the **same
-  codepoint** but (hypothetically) **distinct scalar proofs**.
-- expect (structural + value): (a) **structural (sort-not-token grep,
-  Architect's Ω-encoding-lane hazard)** — `isScalar`'s **type** is
+- status: the `isScalar` Ω-encoding is live; checked-Σ Char values and their
+  proof-component collapse are **deferred — W5**.
+- given: the `isScalar` definition, and for W5 two `Char` values with the
+  **same codepoint** but (hypothetically) **distinct scalar proofs**.
+- expect (structural + value): (a) **Landed structural** (sort-not-token
+  discriminator) — `isScalar`'s **type** is
   `IsTrue <bool-expr>` (the sub-singleton bridge):
   `isScalar c := IsTrue (inRangeBool c)`, with `inRangeBool c` =
   `(0 ≤? c && c ≤? 0xD7FF) || (0xE000 ≤? c && c ≤? 0x10FFFF)` at the
@@ -478,22 +488,21 @@ lawful-classes-lane WP — see the deferred section.
   `isScalar`** — the discriminator is the **sort** of the disjunction
   (Bool-value inside `IsTrue` = fine; Ω-prop as the predicate former = the
   trap), **not** the token. Uses **no `lt_int` primitive** (closed intervals).
-  (b) **value** — `DecEq Char` on same-codepoint, distinct-proof `Char`s reduces
-  to **equal** (by Ω-PI, since `IsTrue` is a sub-singleton → proof-irrelevant →
-  the proofs collapse; routed through `eq_int` on the projection, not through
-  `Int.toChar` construction). Under a naive `isScalar := (…) ∨ (…) : Ω` the
-  disjunction is the **proof-relevant** `A + B`, the proofs do **not** collapse
-  (distinct injection tags), the codepoint-collapse **fails**, and forcing
-  `A + B` into Ω re-opens the `Bool → Ω` inconsistency — the case **flips**.
+  (b) **Deferred — W5 value:** `DecEq Char` on same-codepoint,
+  distinct-proof checked-Σ `Char`s reduces to **equal** (by Ω-PI, since
+  `IsTrue` is a sub-singleton → proof-irrelevant → the proofs collapse; routed
+  through `eq_int` on the projection, not through `Int.toChar` construction).
+  Under a naive `isScalar := (…) ∨ (…) : Ω`, the W5 pair proofs are
+  **proof-relevant** `A + B` injections and do not collapse; the
+  codepoint-collapse fails, and forcing `A + B` into Ω re-opens the
+  `Bool → Ω` inconsistency — the W5 value arm flips.
 - why: Char pin 1 — the load-bearing `DecEq Char` soundness check. The
-  **codepoint-collapse** (`Char` equality reduces to codepoint equality — a
-  **zero-delta** Ω-PI fact) holds **only** if `isScalar` is actually
-  proof-irrelevant, which the `IsTrue`-reflection guarantees and the naive `∨`
-  does not ([[proof-relevant-inductive-cannot-be-declared-at-omega]]). The
-  structural grep (`IsTrue`, not `∨`) is the primary net; the collapse is its
-  observable consequence. (This pins the collapse fact + the `isScalar` shape,
-  **not** the `DecEq Char` law-instance, whose decidability laws over the opaque
-  `Int` projection are zero-NEW-delta and re-home to the lawful-classes lane.)
+  current checked `Char` type still lowers to `Int`, so the proof-component
+  collapse is W5. Once checked Char is Σ, equality collapses to codepoint
+  equality only if `isScalar` is proof-irrelevant, which `IsTrue` guarantees and
+  naive `∨` does not ([[proof-relevant-inductive-cannot-be-declared-at-omega]]).
+  The live structural `isScalar` assertion is distinct from the W5 value
+  consequence; the DecEq law-instance remains re-homed to lawful-classes.
 
 ### surface/numbers/char-extraction-computes-scalar-proof  (soundness, deferred)
 - spec: `18a §5.9.1(4)` (pin 2, runtime face), `18a §5.9` pin 2, `37 §2`
@@ -540,22 +549,23 @@ lawful-classes-lane WP — see the deferred section.
 - **AC-D1/D2** (exact derivation; F4 flip) —
   `decimal-mul-exact-flips-vs-saturating`,
   `decimal-eq-distinct-flips-vs-false-true` (F4 closure)
-- **AC-C1** (`Char` refinement) — `char-is-isscalar-refinement`
+- **AC-C1** (source refinement live; checked-Σ Char type deferred — W5) —
+  `char-is-isscalar-refinement`
 - **AC-C2** (derived Char eq + Ord **ops** over projection) —
   `char-eq-and-ord-on-projection`
 - **AC-C3** (surrogate/OOR reject, flips vs `inRangeBool:=True`) —
   `int-to-char-rejects-surrogate-and-oor`
 - **LANG-REFINEMENT AC-2** (guarded Some discharged; None introduces none) —
   `int-to-char-branch-obligation-status`
-- **Char pin 1** (Ω-encoding → codepoint-collapse) —
+- **Char pin 1** (Ω-encoding live; checked-Σ proof collapse deferred — W5) —
   `char-deceq-collapses-on-codepoint` (hard-AC)
 - **Char pin 2** (extraction computes the proof) —
   `char-extraction-computes-scalar-proof` (hard-AC, **runtime face deferred**)
-- **RE-HOMED (lawful-classes lane, forward obligations):** the `Ord
-  Char`/`DecEq Char` **law-carrying instance** cases (were
+- **RE-HOMED (lawful-classes lane, checked-Char law lift deferred — W5):**
+  the `Ord Char`/`DecEq Char` **law-carrying instance** cases (were
   `char-ord-laws-carried-not-stubbed`) — zero-NEW-delta via projected
-  assumptions and equality lifting on Char's canonical carrier; see the
-  deferred section.
+  assumptions and equality lifting on the checked-Σ carrier; see the deferred
+  section.
 - **RE-DEFERRED (not deliverable as specified → design call):** the
   `Num`/`DecEq Decimal` **law-carrying instance** cases (were AC-D3) —
   `decimalEq` is an `Eq`, never a `DecEq`, on the **non-canonical** carrier
