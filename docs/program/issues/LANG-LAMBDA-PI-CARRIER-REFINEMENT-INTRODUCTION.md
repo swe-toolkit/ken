@@ -45,9 +45,9 @@ stop and report the mismatch.
 ## Deliverable
 
 Per Architect `evt_7vpddt8z52k0j`, using the rigid conversion view that
-`LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` delivers: at the `RLam` check arm, take
-the expected head through `with_rigid_consts`, or read its `refinement_root`
-before any whnf. A root head is checked at the carrier and routed to
+`LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` delivers: at the `RLam` check arm, whnf
+the expected head inside the `with_rigid_consts` scope (`evt_1sh6f2ycy40yk`),
+or read its `refinement_root` before any whnf. A root head is checked at the carrier and routed to
 `emit_refinement_introduction` with the root as expected. Sweep by mechanism:
 every `check` arm that whnf's `expected`, not `RLam` alone, and report the
 arms found. The match and `if` routes inherit the fix.
