@@ -1,7 +1,7 @@
 ---
 id: RT-MATCH-MOTIVE-ADMISSION-SORT
 title: "Checked-core body-view admission classifies every elaborated Match motive as Dependent, because inspect_non_dependent_motive expects an ascribed motive the elaborator never emits. Key admission on the motive's checked sort, so the ConstantType and ProofOnly arms see their real population"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -83,3 +83,11 @@ stop and report the mismatch.
   conformance row pins: stop with the consumers listed (CHECKS 3).
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Merged `bd8bdd7af` from exact `03e8ba32b` (PR #4563). Runtime QA
+`evt_45xefsypzj25n`, Architect `evt_vhsnc4hhysad`, Decision
+`dec_1qn8adam38p48`. The one authorized `rt_parity_native` run passed
+186/186. The selected-Library missing-`Top` refusal is a labelled sentinel,
+retired by `RT-SELECTED-LIBRARY-DECLARATION-CLOSURE`.

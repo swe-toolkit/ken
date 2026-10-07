@@ -1,7 +1,7 @@
 ---
 id: RT-GENERATED-ENTRY-PROJECTION-INVARIANT
 title: "Native build refuses with 'source-specific inheritances at one generated entry disagree on their typed consumer projection' (aggregates.rs:8215) on the ignored escaped-buffer fanning row and on a reached Nat fanout with a pending suffix, so the NAT-FANOUT parity row only passes because its fanout never runs. Repair the projection so both execute natively with interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
