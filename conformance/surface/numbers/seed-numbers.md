@@ -288,31 +288,30 @@ not depend on the spelling.
 - expect: `'a' : Char` **accepts** (a valid Unicode scalar value); the surrogate
   U+D800 **rejects** — `Char`'s valid range is U+0000–U+10FFFF **excluding** the
   surrogate block U+D800–U+DFFF.
-- why: `Char` is a **refinement** on the `u32` carrier (`35 §2.4`, `41 §5`): not
-  all `u32` are `Char`. Verdict flips: valid scalar accepts, surrogate rejects —
-  the non-reproduction of the "char = any 16/32-bit code unit" model.
-- note: post-**DEMOTE** the carrier is realized as `{ c : Int | isScalar c }`
-  (`18a §5.9`) — the Int-refinement, superseding the `u32`-carrier framing for
-  the *mechanism*; the observable surrogate-exclusion above is unchanged. The
-  `isScalar := IsTrue(inRangeBool)` Ω-encoding, the *reducing* surrogate/OOR
-  rejection (`Int.toChar 0xD800 ⇒ None`), and the derived
-  `Ord Char`/`DecEq Char` **ops** are pinned in `seed-decimal-char-demote.md`
-  (`18a §5.9.1`); their **law-carrying instances** re-home to the lawful-classes
-  lane (zero-NEW-delta over the opaque `Int` projection).
+- why: `Char` is the checked subset
+  `Σ(c:Int).isScalar c` (`18a §5.9.1`, `21 §2`): not every `Int` is a `Char`.
+  Verdict flips: a valid scalar accepts, a surrogate rejects — not every
+  16/32-bit code unit is a Unicode scalar.
+- note: post-**DEMOTE**, `Char = Σ(c:Int).isScalar c`; runtime erases the Ω
+  proof but the kernel type remains distinct from `Int`. The `isScalar` encoding,
+  reducing `Int.toChar`, and derived `Ord Char`/`DecEq Char` ops are pinned in
+  `seed-decimal-char-demote.md` (`18a §5.9.1`). The law-carrying instances
+  re-home to the lawful-classes lane and use `Proj1` with Σ-η and Ω proof
+  irrelevance, not type-level equality `Char ≡ Int`.
 
 ### surface/numbers/char-expected-integer-literal-scalar-boundary
 - spec: `35 §2.4`, `§4.1`, `18a §5.9.1 (1), (3)`, `31 §3`
 - given: `const char_D7FF : Char = 55295` (U+D7FF) and
   `const char_D800 : Char = 55296` (U+D800)
-- expect: both declarations elaborate at `Char`. The U+D7FF value emits
-  `isScalar 55295` and leaves no open refinement obligation; U+D800 emits
-  `isScalar 55296` as an open, undischarged obligation. Neither is an escaped
-  character literal or a call to `Int.toChar`.
-- why: a typed numeric literal uses its expected type (`35 §4.1`). `Char`
-  carries a scalar predicate (`18a §5.9.1`), so both introductions emit its
-  obligation (`34 §5`); only the valid boundary value discharges. A missed
-  obligation on the surrogate would falsely report verification. This row
-  observes the obligation and its discharge status, not declaration rejection.
+- expect: both declarations elaborate at `Char = Σ(c:Int).isScalar c`. The
+  U+D7FF value is `Pair(55295, tt)` with no open obligation; U+D800 is
+  `Pair(55296, ?h)` with `?h : isScalar 55296` open and undischarged. Neither
+  is an escaped character literal or a call to `Int.toChar`.
+- why: a typed numeric literal uses its expected type (`35 §4.1`). Each
+  introduction constructs the subset pair and records its scalar proof
+  obligation (`34 §5`, `21 §2`); the valid boundary discharges, while the
+  surrogate leaves a visible proof hole. The carrier is not accepted as a
+  `Char` without the pair's second component.
 
 ## Coverage map (AC → cases)
 

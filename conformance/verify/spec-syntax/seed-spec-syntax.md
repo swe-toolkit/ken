@@ -2,40 +2,32 @@
 
 Format: `../../README.md`. These pin **WS-V V1**: the spec-annotation syntax
 (`requires`/`ensures`/refinements/`prove`/`law`), its **elaboration to core**,
-and the **verification status model** — the contract in
+and the **verification status model** — the W1 contract in the released
 `spec/20-verification/21-spec-syntax.md`. Expected results are grounded in the
-V1 contract amended at parent `5183c0437be3a14672c40acf5f0c969906031884`, the
-V0 elaborator (`ken-elaborator`, `spec/30-surface/39-elaboration.md §5`), and
-the `18 §4` certificate API (`check`), not the WP frame's prose (the
-perishable-frame discipline). The prototype (`yon`) is not mounted; none of
-these required it.
+current Spec body, settled decisions, and first principles. The prototype is
+not mounted, and no external reference material was consulted for this W1
+conformance revision.
 
-**The layer is ★★ (untrusted), so the cases live where the kernel cannot
-backstop.** Everything V1 emits is re-checked by the kernel (`18 §4`); a bug is
-a
-**wrong verdict or a poor diagnostic, never unsoundness**. The cases that matter
-are therefore the elaboration **shape** (the emitted core), the **honesty
-guard**
-(an `unknown` never reads `proved`), and the **scope guards** (`old`, `result`,
-Ω-typing) — exactly what a wrong-but-well-typed elaboration could get wrong
-while
-still kernel-checking.
+The layer is untrusted, so the cases pin the elaboration shape (the emitted
+core), the honesty guard (`unknown` never reads `proved`), and scope guards
+(`old`, `result`, Ω-typing). Every emitted proof is re-checked by the kernel
+(`18 §4`); an elaborator bug is a wrong term, verdict, or diagnostic, not a
+kernel soundness failure.
 
-**Two encoding facts these cases rest on (`21 §2`/§6.3, Architect-confirmed):**
+**The representation is a checked subset Σ (`21 §2`/§6.3, `34 §5`).** A
+refinement `{x:A|φ}` elaborates to `Σ(x:A).φ` at `Type (max ℓ_A ℓ_φ)`. Its
+carrier is relevant, its Ω proof is proof-irrelevant, and the Σ is not
+convertible to `A`. Introduction constructs a checked pair with either
+kernel-checked evidence or an applied typed hole; forgetting inserts `Proj1`
+without an obligation. No coercion descends under a type former or binder.
+Written `requires` remains a separate Π proof argument. The Π and Σ sort rules
+are both landed (`13 §4`): Π is codomain-keyed; Σ lands in Ω only when both
+components are Ω.
 
-- **Carrier-plus-obligation, not `Σ(B,ψ)`.** An `ensures`/refinement lowers to
-  its **carrier** value plus a **separate obligation** (a typed hole =
-  postulate, `24 §2`), never a proof-carrying `Σ` value. So the emitted core
-  body stays the bare carrier, contracts are erasable, and the encoding is
-  **independent of the `Σ`-sort erratum** (`sort_sigma → Ω` iff *both*
-  components Ω — a refinement's relevant carrier keeps it at `Type`;
-  Architect-confirmed, **in-flight on `wp/V1-sigma-sort`**, not this base —
-  `13 §4`/§5 + `../../kernel/pi-sigma/`). `requires φ → Π` proof-arg is sound
-  because `sort_pi(Ω, Type) = Type` (codomain-keyed, landed `16 §1.1`).
-- **The honesty discriminator is kernel-side.** `unknown ≢ proved` is decidable
-  from `GlobalEnv::trusted_base()` (`18 §5`) — a hole **is** a postulate
-  (appears), a checked certificate adds **nothing** (absent) — **not** a V-layer
-  flag, so the untrusted layer cannot forge `proved` (`21 §5.4`).
+**The honesty discriminator remains kernel-side.** `unknown ≢ proved` is
+decidable from `GlobalEnv::trusted_base()` (`18 §5`): an open hole is a
+postulate, while a checked certificate adds no trusted-base entry. A V-layer
+flag cannot forge `proved` (`21 §5.4`).
 
 **Deferred-tag convention.** A case may describe a settled model whose concrete
 spelling or elaboration capability has not landed. Tag only that portion
@@ -80,52 +72,36 @@ rests on (`21 §5.4`) and must never regress.
   and jointly cover the expectation; neither attachment alone establishes both.
 
 ### verify/spec-syntax/refined-domain-and-requires-higher-order-boundary
-- spec: `21 §6.3`; `22 §2.3`; `30-surface/39 §5.3`
-- given: the declarations below, plus applications `plain_slot refined_fn`,
-  `plain_slot requires_fn`, `refined_slot refined_fn`, and
-  `refined_slot requires_fn`.
-- expect: **negative pair:** `plain_slot refined_fn` and
-  `plain_slot requires_fn` are both refused because each argument type has the
-  extra precondition Π argument. **Positive type-compatibility pair:**
-  `refined_slot refined_fn` and `refined_slot requires_fn` are both accepted
-  as `f` arguments, leaving the same residual `(n : Int) → Int` type. The
-  written domain desugars to the same carrier-plus-proof telescope as both
-  functions. The body application `f n` yields exactly one call-site
-  obligation with provenance at `f n`:
-
-  ```text
-  Γ = (f : (d : Int) → (_ : Not (Equal Int d 0)) → Int), (n : Int)
-  φ = Not (Equal Int n 0)
-  ```
-
-  There is no such premise in `Γ`; the plain `f 1` call in `plain_slot` emits
-  no precondition obligation.
-- why: `21 §6.3` requires refined parameters and written refined domains to
-  retain the generated proof binder in higher-order types; `22 §2.3` makes the
-  caller establish its premise. The explicit-`requires` twin controls type
-  compatibility. A refinement-erasure bug changes the negative pair's verdict
-  parity or rejects the positive pair; a call-path bug omits the obligation.
-  **Measured:** V2 emits `φ` with provenance at `f n` and emits no
-  precondition obligation at `plain_slot`'s `f 1`. **Claimed:** applying a
-  higher-order variable with a refined domain retains the caller's burden.
-  **The gap:** `f` is a variable, not a known declaration, and `n` is plain
-  `Int` with no premise in scope; the plain slot is the no-precondition control.
-  Promise class: durable invariant. The asserted
-  behavior is type compatibility and call-site obligation, not source spelling.
+- spec: `21 §2`/§6.3; `22 §2.1`/§2.3; `39 §5.3`
+- given: the declarations below and the four applications named below.
+- expect: `refined_fn` has domain `Pos = Σ(n:Int).Not (Equal Int n 0)`;
+  `requires_fn` instead has an `Int` domain followed by a separate Π proof
+  argument. `refined_slot refined_fn n` accepts, while
+  `refined_slot requires_fn n`, `plain_slot refined_fn`, and
+  `plain_slot requires_fn` reject with type mismatch. In `refined_slot`,
+  applying variable `f` to plain `n:Int` constructs a subset pair and emits
+  exactly one call-site obligation `Not (Equal Int n 0)`; the body receives no
+  hidden proof binder. The explicit `requires` call burden remains separate.
+- why: a refined domain stays a Σ binder in a higher-order Π type; it is not
+  normalized to an `Int` binder plus an implicit proof argument. A bug that
+  erases the refinement makes the rejected function assignments type-compatible;
+  a bug that invents a hidden binder changes the accepted refined-function
+  shape and loses the caller's pair-introduction obligation.
 
 The fixture declarations are:
 
 ```ken
-fn refined_fn (d : {x:Int | Not (Equal Int x 0)}) : Int = d
+def Pos = {x:Int | Not (Equal Int x 0)}
+fn refined_fn (d : Pos) : Int = d
 fn requires_fn (d : Int) : Int requires Not (Equal Int d 0) = d
 fn plain_slot (f : (d : Int) → Int) : Int = f 1
-fn refined_slot
-  (f : (d : {x:Int | Not (Equal Int x 0)}) → Int)
-  (n : Int) : Int = f n
+fn refined_slot (f : (d : Pos) → Int) (n : Int) : Int = f n
 ```
 
-The four listed applications above are the negative and positive controls;
-`f n` in `refined_slot` is the caller-obligation site.
+The applications are `plain_slot refined_fn`, `plain_slot requires_fn`,
+`refined_slot refined_fn n`, and `refined_slot requires_fn n`. The accepted
+case is `refined_slot refined_fn n`; its body `f n` is the caller-introduction
+site.
 
 ### verify/spec-syntax/requires-on-first-param-of-two
 - spec: `21 §6.3` (preconditions become proof parameters), `39 §5.3`
@@ -153,38 +129,100 @@ The four listed applications above are the negative and positive controls;
   referring to the earlier `a`, after the proof parameter is introduced.
   The first-of-two case does not cover that interior-telescope shape.
 
-### verify/spec-syntax/ensures-emits-obligation-not-sigma
-- spec: `21 §6.3` (postcondition → obligation), `§2` (carrier-plus-obligation),
-  `§6.5`
-- given: `fn abs (n : Int) : Int` with
-  `ensures IsTrue (leq_int 0 result) = if n < 0 then -n else n`
-- expect: **accepts**; the emitted core **body** has type **`Int`** — the bare
-  carrier, **not** `(r:Int) × IsTrue (leq_int 0 r)`; a **single** obligation
-  hole `?h : IsTrue (leq_int 0 (abs n))` is emitted (goal = `ψ[body/result]`,
-  §6.3, `result` replaced by the body).
-- why: §6.3/§2 use the **carrier-plus-obligation** encoding — the postcondition
-  is a separate obligation (`24 §2`), never paired into the value, so contracts
-  are erasable and the encoding is **independent of the `Σ`-sort caveat** (the
-  Architect-confirmed erratum in-flight on `wp/V1-sigma-sort` — V1 never forms
-  that `Σ`). Structural: a bug reifying `Σ(Int, IsTrue (leq_int 0 r))` flips
-  the emitted-body type from `Int` to a `Σ`; a bug dropping the obligation
-  empties the hole set.
-  Distinct from the prover-level accept (`../seed-verify.md`
-  `verify/proved-postcondition`) — this pins the **elaboration shape**.
+### verify/spec-syntax/ensures-result-is-subset-sigma
+- spec: `21 §6.3` (ordinary `fn` result), `§2`/§6.5; `22 §2.2`
+- given: `fn inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1`
+- expect: the core result type is `Σ(r:Int).Equal Int r (n + 1)` at
+  `Type 0`; the straight-line body checks as `Pair(n + 1, π)` at that type.
+  Exactly one postcondition introduction site records the goal
+  `Equal Int (n + 1) (n + 1)` with provenance for the `ensures` clause. `π` is
+  checked evidence or the applied typed hole for that goal; it is never absent
+  from the pair.
+- why: `ensures` is the kernel subset-Σ result motive, not a bare carrier plus
+  an unrelated side obligation. A carrier-only result with the same obligation
+  would not produce `Pair(n + 1, π)` or the checked Σ type. This pins the
+  elaboration shape, not merely the prover's final status.
 
-### verify/spec-syntax/refinement-lowers-to-carrier
-- spec: `21 §6.3` (elabType refinement + introduction), `§2`, `§8` (level)
-- given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }`; the introduction
-  `(5 : Pos)`
-- expect: the core type of `Pos` is **`Int`** (the carrier — `φ` not reified),
-  at **exactly `Type 0`** (no level bump); the introduction `(5 : Pos)` emits
-  obligation `?h : IsTrue (leq_int 1 5)` and yields the core value `5 : Int`.
-- why: §6.3 `elabType({x:A|φ})` returns the carrier `A'` (predicate
-  elaborator-tracked, not a core type); `A ≤ {x:A|φ}` generates the obligation
-  on introduction (no kernel coercion). §8: the refinement stays at the
-  carrier's `Type ℓ_A` — the load-bearing choice that V1 **never forms a core
-  `Σ` over an Ω predicate**. Structural: emitted type IS `Int` at `Type 0` + one
-  obligation; a reification bug emits a `Σ` and may bump the level.
+### verify/spec-syntax/ensures-result-level-is-predicative-max
+- spec: `21 §6.3`/§8; `22 §2.2`; `13 §4`
+- given: in a context with `A : Type 0` and `P : A → Ω_1`, elaborate
+  `fn keep (x : A) : A ensures P result = x`.
+- expect: the core result type is `Σ(r:A).P r : Type 1`, since
+  `max 0 1 = 1`; the body introduces `Pair(x,π)` with a proof site at Ω_1.
+  The function result does not remain at `Type 0` merely because its carrier
+  does.
+- why: ordinary `ensures` uses the same predicative subset-Σ formation rule as
+  a named refinement. This distinguishes the W1 result type from the old
+  carrier-only result plus a separate obligation.
+
+### verify/spec-syntax/named-refinement-is-subset-sigma
+- spec: `21 §2`/§6.3/§8; `34 §5`; `13 §4`
+- given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }` and
+  `fn keep (n : Int) : Pos = n`
+- expect: `Pos` unfolds transparently to
+  `Σ(n:Int).IsTrue (leq_int 1 n)` at `Type 0`, not to `Int`. The body checks
+  as `Pair(n, ?h n) : Pos`; its open goal is
+  `IsTrue (leq_int 1 n)` in the function context, with `?h` present in
+  `trusted_base()`.
+- why: this observes the named type's kernel form and its proof-bearing
+  introduction. The carrier encoding could emit the same goal while leaving the
+  core type and value as `Int`; the asserted Sigma type and pair distinguish
+  W1. The relevant carrier keeps the result in `Type`.
+
+### verify/spec-syntax/refinement-type-level-is-predicative-max
+- spec: `21 §2`/§8; `13 §4`; `12 §2`/§3
+- given: `A : Type 0`, `P : A → Ω_1`, `a : A`, and `p : P a`; elaborate
+  `def Ref = {x:A | P x}` and check `Pair(a,p) : Ref`.
+- expect: `Ref` unfolds to `Σ(x:A).P x : Type (max 0 1) = Type 1` — not
+  `Type 0` and not Ω. The pair checks at `Ref`; `Proj1` has type `A`.
+- why: the kernel's predicative Σ formation uses both the relevant carrier and
+  the predicate level. The old carrier encoding would leave `Ref` at `Type 0`;
+  the observed sort distinguishes the W1 representation from that behavior.
+
+### verify/spec-syntax/refinement-to-refinement-uses-source-proof
+- spec: `21 §2`/§6.3; `22 §2.1`; `16 §1.3`
+- given: in a context with `P : Int → Ω`, define
+  `Positive = {n:Int | P n}` and `Strong = {n:Int | And (P n) Top}`; check
+  `fn weaken (x:Strong) : Positive = x`.
+- expect: the core body is `Pair(Proj1 x, ?h x) : Positive`. It records one
+  target-introduction obligation `P (Proj1 x)`; the closed goal's context
+  contains `Proj2 x : And (P (Proj1 x)) Top`. V3 can discharge it with
+  `Proj1 (Proj2 x)`; otherwise V1 applies the typed hole to `x`. It may not
+  erase the pair.
+- why: target-first coercion forgets the source with `Proj1` and introduces the
+  target subset under the source pair's checked `Proj2` hypothesis. This is not
+  kernel subtyping or conversion of the two subset types. A carrier-erasing
+  implementation would return `x` as an identity term instead.
+
+### verify/spec-syntax/no-coercion-under-list
+- spec: `21 §2`/§6.3; `13 §4`; `18 §3`
+- given: `def Five = { n : Int | Equal Int n 5 }`; terms
+  `xs = Cons Int 5 (Nil Int)` and
+  `ys = Cons Five (Pair(5, Refl)) (Nil Five)`. Check each at both
+  `List Int` and `List Five`.
+- expect: the cross-checks reject with kernel `TypeMismatch` at
+  `List Int` versus `List Five`; each term checks at its own list type. The
+  kernel does not coerce the element type through `List`.
+- why: W1 allows only outermost, type-directed introduction and forgetting.
+  No coercion descends through `List`; the kernel sees distinct element types.
+  The old carrier encoding would accept the mismatched list types because
+  `Five` erased to `Int`, so this is a true discriminator, not a source-shape
+  check.
+
+### verify/spec-syntax/lambda-at-refinement-introduces-proof
+- spec: `21 §2`/§6.3; `22 §2.1`
+- given: `def SevenAtZero = { f : (x:Int) → Int | Equal Int (f 0) 7 }`;
+  check the lambda `λ x. 5` at `SevenAtZero` and at the plain type
+  `(x:Int) → Int`.
+- expect: at `SevenAtZero`, the core type is a subset Σ and the checked term
+  is `Pair(λ x.5, π)` with one goal
+  `Equal Int ((λ x.5) 0) 7` (β-reducing to `Equal Int 5 7`) and its applied
+  typed hole. At the plain Pi type the lambda needs no subset pair or
+  introduction obligation.
+- why: check-only lambdas first check at the carrier and then introduce the
+  expected subset once at the check entry. The old carrier encoding accepts
+  the same lambda without a proof component; this case distinguishes that
+  behavior from the W1 pair-plus-obligation rule.
 
 ### verify/spec-syntax/non-omega-predicate-surface-error
 - spec: `21 §4` (every spec prop `: Ω`), `§6.3` (check at Ω before any
@@ -223,18 +261,42 @@ The four listed applications above are the negative and positive controls;
 ### verify/spec-syntax/old-resolves-in-space-op-ensures
 - spec: `21 §6.4` (elabSpaceEnsures), `36 §4.3`; `16 §2` (`refl`)
 - given: a **block-space** op `inc` over a cell `n : Int` with
-  `ensures Equal Int n (old(n) + 1)`
-- expect (landed): **accepts**; `old(n)` resolves to the pre-state projection
-  and bare `n` to the post-state projection. The elaborator emits the
-  postcondition obligation, and substitution plus record reduction leave a
-  reflexive equality that a kernel-checked `Refl` certificate discharges.
-- why: the block-space operation installs distinct pre-state and post-state
-  cell environments while elaborating its contracts. The landed control emits
-  three obligations using both checked and proposition-root `old`, and kernel
-  `Refl` discharges all three; changing only the promised increment from `+1`
-  to `+2` leaves the obligation open. This is specifically the block-space
-  form: modifier-form `space proc` has no cells or state environment and still
-  refuses `old` with `OldPreStateUnsupported`.
+  `ensures Equal Int n (old(n) + 1)` and residual row `F = 𝟘`
+- expect (landed): `old(n)` resolves to the pre-state projection and bare `n`
+  to the post-state projection. `run_state` returns `Ret (r, s_post)`; with
+  `F = 𝟘`, the checked result type collapses to
+  `Σ(rs:Int × S).ψ(s_pre,rs)`, and the checked body pairs the result with its
+  proof. Substitution and record reduction discharge this `inc` example.
+- why: the empty residual row collapses the general space rule to a pure
+  state-transformer subset Σ, not a bare `(result, state)` carrier. The
+  block-space operation installs distinct pre-state and post-state cell
+  environments. Modifier-form `space proc` still has no cells or state
+  environment and refuses `old` with `OldPreStateUnsupported`.
+
+### verify/spec-syntax/space-ensures-residual-tree-allret
+- spec: `21 §6.4`; `22 §2.2`; `36 §4.3`; `13 §4`
+- given: a space operation with residual row `F` and one `ensures ψ` clause;
+  its residual tree is `t : ITree F (R × S)`. Use a residual operation whose
+  response is `Bool`, with `t = Vis e (λ b. Ret (b, s_post))` and
+  `ψ(b, s_post) = Equal Bool b True`. For the level control, take
+  `P : X → Ω_0`, `x : X`, and `t_hi = Vis e_hi (λ a. Ret x)` with
+  `E.Resp e_hi : Type 1`.
+- expect: W1's checked result type is
+  `Σ(t : ITree F (R × S)).AllRet (λ rs.ψ(s_pre,rs)) t`; the proof is in one
+  outer pair and one obligation, not a pair inside `ITree F` or one proof per
+  user `Ret`. **[deferred — W5 AllRet declaration]** Its fold equations are
+  `AllRet P (Ret rs) = P rs` and
+  `AllRet P (Vis e k) = Π(r:E.Resp e).AllRet P (k r)`. On the sample tree the
+  fold is `Π(b:Bool).Equal Bool b True`, so the False response leaves the
+  obligation open; a tree whose every response returns `True` is the discharge
+  control. `AllRet P t_hi` reduces to `Π(a:E.Resp e_hi).P x` at `Ω_1`; a result
+  Σ with tree carrier at `Type ℓ_T` is at `Type (max ℓ_T 1)`. The output-type
+  shape is W1; executing the helper awaits W5.
+- why: the residual response is universal: checking only the first return
+  would discharge the mixed tree incorrectly. The result's carrier remains the
+  residual tree, and the `AllRet` proof is its outer subset-Σ component. Its
+  Π level includes the response-domain level; this is predicative formation,
+  not implicit cumulativity.
 
 ### verify/spec-syntax/old-out-of-scope-rejects (soundness)
 - spec: `21 §6.4` (scope guard), `§4`, `36 §7.3`
@@ -352,29 +414,28 @@ The four listed applications above are the negative and positive controls;
 ## E. The V1→V2 interface (`21 §7`)
 
 ### verify/spec-syntax/obligation-hole-set-exposed-to-v2
-- spec: `21 §7` (the interface), `§6.5` (obligation-hole encoding)
-- given: `fn f (n : Int) (m : {k:Int|Not (Equal Int k 0)}) : Int` with
-  `requires IsTrue (leq_int 1 n)`, postconditions
-  `ensures IsTrue (leq_int n result)` and `ensures IsTrue (leq_int 0 result)`,
-  and body `n + m`
-- expect: the elaborated form exposes exactly the four-part V1→V2 interface: (1)
-  the kernel-checkable core term (carrier result and parameters, with the
-  generated refined-parameter Π proof-argument immediately after `m`, followed
-  by the written precondition proof-argument); (2) the **obligation-hole set**
-  — exactly **2** holes here, one per `ensures`, each
-  `⟨id, Γ ⊢ φ, provenance⟩` (the refined parameter creates no definition-site
-  refinement-introduction hole); (3) each hole's `Γ` carries the generated
-  `Not (Equal Int m 0)` proof argument and the written
-  `IsTrue (leq_int 1 n)` precondition, each exactly once and in telescope
-  order; the obligation to establish each precondition is the **caller's** at
-  the call site (`22 §2.3`/§3); (4) provenance (source span + responsible
-  clause) per hole.
-- why: §7 — V1 hands V2 a kernel-checked elaborated form with obligation sites
-  marked; it does **not** generate VCs or walk the body (that is V2).
-  Structural: the two-hole count, interleaved generated proof binder, written
-  precondition, and each hole's `Γ`-contents are the asserted output; dropping a
-  hole, duplicating a premise, or losing binder order changes the structure.
-  Pins `21 §9` acceptance #4 (V2-ready).
+- spec: `21 §7` (the interface), `§6.3`/§6.5; `22 §2.1`/§2.2/§3
+- given: `def NonZero = {d:Int | Not (Equal Int d 0)}`;
+  `fn f (n : Int) (m : NonZero) : Int` with `requires IsTrue (leq_int 1 n)`,
+  postconditions `IsTrue (leq_int n result)` and `IsTrue (leq_int 0 result)`,
+  and body `n + m`; callers `fn use (n:Int) (m:Int):Int = f n m` and
+  `fn use_refined (n:Int) (m:NonZero):Int = f n m`.`
+- expect: the core telescope keeps `m` at
+  `Σ(d:Int).Not (Equal Int d 0)`; the written `requires` is a separate Π
+  proof argument. The result type is
+  `Σ(r:Int).(IsTrue (leq_int n r) ∧ IsTrue (leq_int 0 r))`, with one proof
+  component holding both per-clause proofs. Exactly two `ensures` obligations
+  are recorded at `f`; each `Γ` contains `Proj2 m` and the written precondition
+  once, in scope. The body forgets `m` through `Proj1`. At `use`, plain `m`
+  creates a pair-introduction obligation; `use_refined` reuses its checked
+  proof. Both callers separately owe the written `requires` proof for `n`.
+  The `f n m` result is a subset-Σ pair; `use` forgets it with `Proj1` to return
+  `Int`. Each site retains source provenance.
+- why: V1 hands V2 a kernel-checkable subset-Σ term with obligation sites
+  marked; V2 adds path-sensitive hypotheses and extracts each marked proof
+  site, not a carrier-only side table. The shape distinguishes a Σ domain from
+  a generated `requires` binder and keeps both `ensures` proofs in one result
+  pair. Pins `21 §9` acceptance #4 (V2-ready).
 
 ---
 
@@ -402,16 +463,11 @@ The four listed applications above are the negative and positive controls;
   field a proposition (`: Ω`)
 - expect: **accepts**; each field `check`s at Ω, and the all-Ω bundle is a
   **conjunction** landing in **Ω** (the bundle is itself a proposition) — the
-  **sound** both-components-Ω case (landed `16 §1.3`).
-- why: §8 — a `law` of all-Ω fields is `Σ`-of-Ω-into-Ω, which lands in Ω
-  **correctly** (both halves proof-irrelevant, `16 §1.3`).
-  **Internal-consistency tie:** this is the *legitimate* Ω-landing `Σ`, in
-  deliberate contrast to a **refinement** `{x:A|φ}` (relevant first component)
-  which must stay at `Type` (the in-flight `Σ`-sort erratum, `wp/V1-sigma-sort`)
-  — together they pin **both directions** of the both-components-keyed
-  `sort_sigma`, and must not contradict (a refinement is **not** a proposition;
-  a law **is**). The refinement direction is pinned by `../../kernel/pi-sigma/`
-  (the erratum's conformance third), not this file.
+  sound both-components-Ω case (`16 §1.3`).
+- why: a `law` of all-Ω fields is `Σ`-of-Ω-into-Ω, which lands in Ω because
+  both components are proof-irrelevant. Contrast the refinement subset Σ:
+  its carrier is relevant, so it stays in `Type` (`13 §4`, `21 §2`). The
+  paired conformance cases ensure the two sort rules remain distinct.
 
 ---
 
@@ -437,30 +493,31 @@ The four listed applications above are the negative and positive controls;
 
 - **#1 syntax + elaboration to core** — `requires-elaborates-to-pi-proof-arg`,
   `refined-domain-and-requires-higher-order-boundary`,
-  `ensures-emits-obligation-not-sigma`, `refinement-lowers-to-carrier`,
+  `ensures-result-is-subset-sigma`,
+  `ensures-result-level-is-predicative-max`,
+  `named-refinement-is-subset-sigma`,
+  `refinement-type-level-is-predicative-max`,
+  `refinement-to-refinement-uses-source-proof`, `no-coercion-under-list`,
+  `lambda-at-refinement-introduces-proof`,
   `non-omega-predicate-surface-error`, `result-scope`.
 - **#2 four-way status honest** —
   `proved-status-cert-checks-not-in-trusted-base`, `bogus-cert-not-proved`,
   `unknown-hole-distinct-from-proved`, `disproved-distinct-from-unknown`,
   `epistemic-projection-distinct`.
-- **#3 `old` semantics** — live verdict flip:
-  `old-out-of-scope-rejects` produces `UnboundName("old")` in pure code, while
-  `old-resolves-in-space-op-ensures` accepts the same syntax against a
-  block-space cell environment and emits a `Refl`-dischargeable obligation.
-  Modifier-form `space proc` has no cells and remains refused with
-  `OldPreStateUnsupported`.
+- **#3 space contracts** — `old-out-of-scope-rejects` produces
+  `UnboundName("old")` in pure code; `old-resolves-in-space-op-ensures` pins
+  the `F = 𝟘` collapse to a pure subset Σ.
+  `space-ensures-residual-tree-allret` pins the outer residual-tree Σ; its
+  Bool-response fold observation is deferred to W5. Modifier-form `space proc`
+  has no cells and remains refused with `OldPreStateUnsupported`.
 - **#4 V2-ready** — `obligation-hole-set-exposed-to-v2`.
 - **#5 no regression** — `v0-unchanged-for-non-spec-programs`.
 - **goals** — `prove-goal-obligation-and-postulate-binding`,
   `law-all-omega-fields-is-proposition`.
 
-Build-sequencing: V1 extends the **landed** V0 elaborator and reuses kernel
-`Term`
-constructors V0 never emits (`Pi`/`Sigma`/`Pair`/`Proj`/`Omega`/`Eq`, none
-`[K2]`-reserved) and the `18 §4`/§5 certificate API. The `Σ`-sort caveat (§2) is
-**not** on V1's path (carrier-plus-obligation never forms `Σ` over an Ω
-predicate);
-the `Σ`-sort discriminating guard rides the dedicated erratum branch
-`wp/V1-sigma-sort` (spec `13 §4`/§5 + the `../../kernel/pi-sigma/` conformance +
-kernel-leader's `sort_sigma` split, landing together per the Architect's 3-piece
-gate), not this file.
+Build-sequencing: V1 elaborates refinements and ordinary `ensures` results to
+kernel subset-Σ values, using the existing `Sigma`/`Pair`/`Proj` constructors
+and the landed `sort_sigma` rule (`13 §4`). The kernel checks each pair; the
+elaborator records and discharges the introduction obligation or applies a
+visible typed hole. These cases pin the Type-valued subset sort and its
+distinction from the carrier.

@@ -197,8 +197,9 @@ Verdicts + Ω-sort witnesses:
 | **numeric + string literals** (`elab.rs:460`/`:503`, `elab_str_lit`) | `declare_postulate` (**per literal**) | **★ HIGHEST-VOLUME hygiene — TERM (ruled §3)** | each literal *value* (`42`, `"…"`, in `num_values`) is a **per-program `trusted_base()` postulate** — an *assumed* value for a *computed* constant. Ruling: a **primitive-constant TERM** (the *type* is item-2, listed once; the value is a real core term), **out of `trusted_base()`** — not a per-literal entry at all. Verified `elab.rs:460` (Architect VAL1 catch `evt_488kj79z0wqd7`). |
 
 **Ω-sort discipline (the relevance-leak check, Architect `evt_5bedyc3zyhr`):**
-every predicate demoted to a def must land in **Ω** (proof-irrelevant), not
-`Type` — a `Type`-valued "prop" leaks content into the refinement carrier.
+every refinement predicate must land in **Ω** (proof-irrelevant), not
+`Type` — a `Type`-valued "prop" cannot be the subset-Σ proof component and
+would instead add relevant data to the pair.
 `And` ✓ (both- keyed Σ→Ω); `isSorted`/`Perm` per the forks above; `Bool` is
 correctly `Type` (matchable data, not a prop).
 

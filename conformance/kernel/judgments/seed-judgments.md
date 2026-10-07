@@ -587,3 +587,20 @@ mode-switch fallback `t ⇐ A`: infer `t ⇒ A'`, then `convert_type(A, A')` (`1
   not regress; K-api only **completes the contract** (per-entry pre/post/error,
   the admission-gate cites, the typed error, the trusted-base enumeration) over
   the unchanged typing relation. Regression gate for the kernel boundary freeze.
+
+## G. Subset-Σ is not subtyping (`21 §2`, `13 §4`, `18 §3`)
+
+### kernel/judgments/subset-sigma-stays-distinct-under-list (soundness)
+- spec: `21 §2`/§6.3 (no coercion under a type former); `13 §4` (relevant
+  Σ stays in Type); `18 §3` (kernel check by conversion)
+- given: `Five := Σ(n:Int).Eq Int n (IntLit 5)`; terms
+  `xs := Cons Int (IntLit 5) (Nil Int)` and
+  `ys := Cons Five (Pair(IntLit 5, Refl)) (Nil Five)`. Check each at
+  `List Five` and `List Int`.
+- expect: the cross-checks return `TypeMismatch`; each term checks at its own
+  declared list type. `List Five` is not convertible to `List Int` even though
+  `Five`'s first component is `Int`.
+- why: the kernel compares actual types; W1 introduces and forgets subsets
+  only at an outermost elaborator check. A carrier-erasing implementation
+  would accept both cross-checks. This is the kernel-level discriminator for
+  the no-coercion-under-`List` rule.

@@ -460,30 +460,33 @@ unrelated registered operations must not change their verdicts.
   conversion queries; an interpreter value cannot make them pass.
 
 ### conversion/string-to-list-char-checked-literal-view (soundness)
-- spec: `17 §1` (prim row), `37 §2.4`, `42 §1`
-- given: a kernel environment with checked `String` and `Char` carriers,
-  registered `string_to_list_char : String → List Char`, its installed
-  literal-view identity, and the `List Char` `Nil`/`Cons` constructors. Let
-  `s` be the admitted checked String literal `"A😀"` (scalars `U+0041` and
-  `U+1F600`), and let `xs = Cons Char (IntLit 65)
-  (Cons Char (IntLit 128512) (Nil Char))`. Query kernel `whnf` of the view
-  applied to `s` and `convert(List Char, string_to_list_char s, xs)`;
+- spec: `17 §1` (prim row), `18a §5.9.1(1)`/`(4)`, `21 §2`, `37 §2.4`,
+  `42 §1`
+- given: a kernel environment with checked `String` and
+  `Char = Σ(c:Int).isScalar c`, registered
+  `string_to_list_char : String → List Char`, its installed literal-view
+  identity, and the `List Char` `Nil`/`Cons` constructors. Let `s` be the
+  admitted checked String literal `"A😀"` (scalars `U+0041` and `U+1F600`),
+  and let `xs = Cons Char (Pair(IntLit 65, tt))
+  (Cons Char (Pair(IntLit 128512, tt)) (Nil Char))`. Query kernel `whnf` of
+  the view applied to `s` and `convert(List Char, string_to_list_char s, xs)`;
   compare also with the otherwise identical list in **reversed** order.
   Separately, use an open variable `z : String` and a closed **non-literal**
   neutral `list_char_to_string (Nil Char)` (the registered inverse, which
   has no kernel reduction rule) as view arguments. Compare the open view
   with `xs` and the closed inverse-view with `Nil Char` at `List Char`.
 - expect: `whnf(string_to_list_char s) = xs` and conversion to `xs` is
-  **true**; conversion to the reversed list is **false**. For both
-  non-literal arguments WHNF preserves the neutral application. The open
-  view does **not** convert to `xs`; the closed inverse-view does **not**
-  convert to `Nil Char`.
+  **true**; conversion to the reversed list is **false**. Each `Char` element
+  is the checked pair `Pair(IntLit c, tt)`, not the bare `IntLit c`. For both
+  non-literal arguments WHNF preserves the neutral application. The open view
+  does **not** convert to `xs`; the closed inverse-view does **not** convert
+  to `Nil Char`.
 - why: `U+1F600` occupies four UTF-8 bytes but one `Char` scalar; the exact
-  constructor list pins scalar values and order, not a byte view. The open
-  and closed non-literal controls pin the checked-literal guard. In
-  particular, interpreter `apply` can evaluate the closed inverse-view to
-  `Nil Char`, whereas kernel conversion must keep that application neutral:
-  runtime value agreement alone cannot satisfy this case.
+  constructor list pins scalar values, proof pairs, and order, not a byte view.
+  The kernel checks every pair at the subset-Σ `Char` type when admitting the
+  literal view. The open and closed non-literal controls pin the checked-literal
+  guard. The interpreter may erase `tt` at runtime, but kernel conversion keeps
+  the subset type; runtime value agreement alone cannot satisfy this case.
 
 ---
 

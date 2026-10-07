@@ -11,10 +11,10 @@ replaced by **derived Ken definitions over exact-`Int` arithmetic**:
   `add/sub/mul/eq_decimal` primitives (the **F4** bug: `mul_decimal` uses
   `saturating_mul`, `decimal_eq` saturates so two *distinct* decimals compare
   `True`).
-- **`Char → { c : Int | isScalar c }`** (`18a §5.9`) — the Unicode-scalar
-  refinement over `Int`, with derived equality/ordering/conversions and **two
+- **`Char → Σ(c:Int).isScalar c`** (`18a §5.9`) — the Unicode-scalar subset
+  Σ over `Int`, with derived equality/ordering/conversions and **two
   load-bearing soundness pins** (the `isScalar` Ω-encoding; extraction computes
-  the scalar proof).
+  the scalar proof). `Char` is not convertible to `Int`.
 
 **Ordering prerequisite (Steward ruling (A), thr_34jhda3bdrs8a; pre-demote
 baseline).** The derived `add`/`sub`/`eq_decimal` (exponent alignment) and Char
@@ -46,9 +46,9 @@ PRINCIPLES §5/§8/§12. The demote makes the soundness posture **strictly
 better**: the derived **ops** are **zero-delta computational** (no trusted
 `*_decimal`, F4 removed). The class **laws** split by **carrier canonicity**:
 the **`Ord Char`**/**`DecEq Char`** lawful instances are **zero-NEW-delta by
-transport** (Char's carrier is *canonical* — one value per codepoint — so
-`Equal Char ≡ Equal Int` and Int's `Axiom`s transport soundly, adding no new
-postulate), while the **`DecEq`/`Num Decimal`** lawful instances are **NOT
+projection** (the codepoint carrier is canonical; laws use `Proj1` and lift
+equality via Σ-η and Ω proof irrelevance, adding no new postulate), while the
+**`DecEq`/`Num Decimal`** lawful instances are **NOT
 deliverable as specified** on the demote's *non-canonical* carrier (`decimalEq`
 is an `Eq`, never a `DecEq` — `DecEq.sound` would inhabit `Bottom`; AC-D3,
 corrected) and re-defer to the Steward-owned Decimal-equality-basis design call,
@@ -345,16 +345,16 @@ corrected forward obligation re-defers *there*, **not** to a
 ## AC-C1/C2/C3 — Char refinement + derived ops (eq + Ord) + the surrogate flip
 
 ### surface/numbers/char-is-isscalar-refinement  (soundness)
-- spec: `18a §5.9.1(1)`/`(2)` (refinement + `isScalar` encoding), `18a §5.1`,
-  `docs/program/wp/decimal-char-demote.md` AC-C1
+- spec: `18a §5.9.1(1)`/`(2)` (subset Σ + `isScalar` encoding), `18a §5.1`,
+  `21 §2`; `docs/program/wp/decimal-char-demote.md` AC-C1
 - given: the `Char` type definition post-demote.
-- expect: `Char = { c : Int | isScalar c }` with
-  `isScalar c := IsTrue (inRangeBool c)` (the Ω-encoding pin below), **not** an
-  opaque primitive type (`reg_ty!("Char")` gone, AC-G) and **not**
-  `List`/`u32`-carrier.
-- why: the refinement supplies the free projection `proj : Char → Int` and the
-  decidable intro — the two things an opaque `Char` lacked, which is exactly why
-  the ops could not derive before (`18a §5.9`). AC-C1 is the type-level demote.
+- expect: `Char` is the transparent alias
+  `Σ(c:Int).isScalar c`, with `isScalar c := IsTrue (inRangeBool c)` and
+  `isScalar c : Ω`. It is not an opaque primitive type (`reg_ty!("Char")`
+  gone, AC-G), `List`/`u32`, or a type convertible to `Int`.
+- why: the relevant first component gives `Proj1 : Char → Int`; the second
+  component is the checked scalar proof. Introduction constructs a pair, and
+  only the Ω proof is erased at runtime. This is the type-level demote.
 
 ### surface/numbers/int-to-char-rejects-surrogate-and-oor  (soundness)
 - spec: `18a §5.9.1(3)` (`Int.toChar` face-(c), AC-C3), `35 §2.4`,
@@ -368,9 +368,10 @@ corrected forward obligation re-defers *there*, **not** to a
   Bool matches. At `0xD800`, both `leq 0xD800 0xD7FF` and
   `leq 0xE000 0xD800` reduce to `False`; at `0x110000`, the upper bound
   `leq 0x110000 0x10FFFF` reduces to `False`. The direct `intToChar` match
-  then selects `None Char`; it emits no rejected-value `isScalar` obligation.
-  At `0x41`, the match selects `Some Char 0x41`, whose scalar refinement can
-  discharge via `IsTrue (inRangeBool 0x41)`.
+  then selects `None Char` before constructing a subset pair; it emits no
+  rejected-value `isScalar` obligation. At `0x41`, the True arm constructs
+  `Some (Pair(0x41, tt))` in checked core; runtime erases `tt` and observes
+  `Some 'A'`.
 - why: AC-C3 — the **guarded decision** must reduce to reject both the
   surrogate and the out-of-range input while accepting a valid scalar. A
   stub `inRangeBool := True` makes both invalid inputs select `Some` and
@@ -395,14 +396,13 @@ corrected forward obligation re-defers *there*, **not** to a
   Observe the emitted refinement obligations and their status **per arm**.
   As a control, elaborate the same `Some Char n` body without the
   True-arm guard equation.
-- expect: the guarded True arm emits **exactly one**
-  `RefinementIntroduction` for `isScalar n`, under its path equation
-  `Eq Bool (inRangeBool n) True`; that equation discharges the obligation,
-  leaving **no open hole**. The False arm emits **zero** refinement
-  obligations: it returns `None Char` without introducing `Char n`.
-  Without the guard equation, the same `Some Char n` emits one
-  `isScalar n` obligation that **remains open**. These assertions concern
-  elaboration obligation status, not reporting at a caller.
+- expect: the guarded True arm emits exactly one `RefinementIntroduction`
+  for `isScalar n`, under `Eq Bool (inRangeBool n) True`; that equation
+  discharges the obligation, leaving no open hole. Its checked core value is
+  `Some (Pair(n, π))`. The False arm emits zero refinement obligations and
+  returns `None Char` without constructing a pair. Without the guard equation,
+  the same `Some (Pair(n, ?h))` leaves one `isScalar n` obligation open. These
+  assertions concern elaboration obligation status, not caller reporting.
 - why: value-level `None`/`Some` results alone cannot distinguish a
   missing or undischarged scalar obligation on the guarded Some branch.
   Requiring one closed True-arm obligation and zero False-arm obligations
@@ -434,14 +434,14 @@ corrected forward obligation re-defers *there*, **not** to a
 The `Ord Char` **law-carrying instance** is **not** delivered by this DEMOTE —
 it re-homes to the lawful-classes lane next to `Ord Int` (Architect + Steward
 ruling). **Correction (carrier-axis):** the original "antisymmetry is a real
-zero-delta proof via `proj` injectivity, never `Axiom`" was **wrong** —
-`Char ≡ Int` under refinement erasure (`21 §6.3`), so `proj` is the identity and
-`Ord Char`'s laws **are** `Ord Int`'s laws, which are honest visible `Axiom`s
-(`Int` is opaque, no induction principle to case-split — `lawful_classes.ken`).
-Antisymmetry is **zero-NEW-delta by transport** (the instance's `antisym` field
-references `Ord Int`'s existing `Axiom`, adding no new `Decl::Opaque`), NOT a
-fresh proof. The corrected discriminator is **HONESTY, not zero-delta**: the
-instance carries an **honest-visible** law (a `declare_def` that reduces on an
+zero-delta proof via `proj` injectivity, never `Axiom`" was **wrong**.
+`Char = Σ(c:Int).isScalar c` is not convertible to `Int`; `proj` is `Proj1`,
+not an identity coercion. The lawful instance must use `Ord Int`'s visible
+assumptions on projected codepoints and lift equality of projections through
+Σ-η and Ω proof irrelevance (`18a §5.9.1(3)`, `21 §2`). It remains
+zero-NEW-delta, not a fresh postulate or an independently Axiom-free proof.
+The corrected discriminator is **HONESTY, not zero-delta**: the instance
+carries an **honest-visible** law (a `declare_def` that reduces on an
 inductive carrier, OR a visible `Axiom`/transport on an opaque one) and flips
 against a **deceptive empty/false stub** (claims proved, is empty) — **never**
 against an honest visible `Axiom`. Forward conformance obligation on the
@@ -501,18 +501,18 @@ lawful-classes-lane WP — see the deferred section.
   WP (deferred section), gated then.
 - given: `String → Char` extraction (`char_at` / `string_to_list_char`) on a
   valid `String`.
-- expect (producer-grep, structural): extraction constructs `(c, w)` where the
-  `isScalar` witness `w` **reduces** from the `String`'s validity invariant —
-  `inRangeBool c` computes to `true` (via the pulled-up `leq_int`), so `w` is
-  the canonical `tt` (`IsTrue true ≡ Top`'s inhabitant). The producer
-  **discharges** the obligation by reduction; it is **never** a
+- expect (producer-grep, structural): extraction constructs the checked core
+  pair `Pair(IntLit c, w) : Char`, where the `isScalar` witness `w` reduces
+  from the String's validity invariant — `inRangeBool c` computes to `true`
+  (via the pulled-up `leq_int`), so `w` is canonical `tt` (`IsTrue true ≡ Top`).
+  The producer discharges the obligation by reduction; it is never a
   `declare_postulate` / `Axiom` / hand-fed `sorry` / `Neutral`-stub asserting a
   scalar proof it did not compute.
-- why: Char pin 2 — the **runtime face**
-  ([[soundness-AC-static-vs-runtime-face]]). The static face (refinement in the
-  type) is cheap; a trusted-not-proved hole hides in extraction *asserting* the
-  scalar proof instead of computing it. Ruling (A) is what makes this face
-  deliverable — under (B) extraction could only ship by postulating the witness
+- why: Char pin 2 — the runtime face
+  ([[soundness-AC-static-vs-runtime-face]]). The static face (the subset-Σ
+  proof component) is cheap; a trusted-not-proved hole hides in extraction
+  asserting the scalar proof instead of computing it. Ruling (A) makes the
+  face deliverable — under (B) extraction could only ship by postulating the witness
   (stuck `inRangeBool`), the exact hole this pins. The net greps the producer
   for the obligation **discharge** (a reduced `tt`), not the type signature.
   Sound because a valid-UTF-8 `String` only yields scalars, so `isScalar c`
@@ -597,15 +597,14 @@ over-reaches:
 distinct future WP; flagged so none is silently dropped):
 
 - **`Ord Char` + `DecEq Char` law-carrying instances → the lawful-classes lane
-  WP** (Steward frames post-merge). Both are **sound by transport** — Char's
-  carrier is **canonical** (one value per codepoint; `Char ≡ Int` under erasure,
-  so `Equal Char ≡ Equal Int` definitionally), so `Ord Int.antisym` /
-  `DecEq Int.sound` (true meta-theorems) transport soundly. The corrected law
-  cases pin the **HONESTY** discriminator (not zero-delta): the law field is
-  **zero-NEW-delta by transport** (references Int's visible `Axiom`, no new
-  `Decl::Opaque`), and **flips against a deceptive empty/false stub** (claims
-  proved, is empty), **never** against an honest visible `Axiom`. Homed next to
-  `Ord Int`/`DecEq Int` (subsume-don't-proliferate).
+  WP** (Steward frames post-merge). Both use the canonical codepoint carrier
+  through `Proj1`; `Char` itself is `Σ(c:Int).isScalar c`, not `Int` by
+  definitional equality. The laws specialize `Ord Int`/`DecEq Int` assumptions
+  to projected codepoints and lift equality through Σ-η and Ω proof
+  irrelevance. They are zero-NEW-delta (no new `Decl::Opaque`), not
+  type-level transport along `Char ≡ Int` and not independently Axiom-free.
+  The conformance discriminator is honesty: visible Int-law use flips against
+  a deceptive empty/false stub, never against an honest visible `Axiom`.
 - **`Num`/`DecEq Decimal` lawful instances → NOT deliverable as specified; the
   Decimal-equality-basis design call** (AC-D3, corrected). Unlike `Ord Char`,
   `Decimal`'s carrier is **non-canonical**, so `DecEq.sound` (value-eq ⊆

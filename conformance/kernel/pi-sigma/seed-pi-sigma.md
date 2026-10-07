@@ -169,11 +169,8 @@ consistency rests on (`13 §4`, `16 §1.2`) and must never regress.
 - **both η** — `pi-eta-conversion`, `sigma-eta-conversion`.
 - **K1 regression** — `k1-pi-sigma-still-green`.
 
-Build-sequencing: this guard rides `wp/V1-sigma-sort` with the `13` spec erratum
-(`8533a63`) and kernel-leader's `sort_sigma` split; all three land on one
-Decision,
-verified together on `main` per the Architect's 3-piece gate. It is **not** part
-of
-WS-V V1 (`conformance/verify/spec-syntax/`), which is independent of this fix
-(V1's carrier-plus-obligation encoding never forms a core `Σ` over an Ω
-predicate).
+The `sort_sigma` split is landed and is a prerequisite of W1's subset-Σ
+encoding: a relevant carrier with an Ω proof forms at `Type`, not Ω. This
+kernel seed pins that formation rule; the V1/V2 seeds separately pin pair
+introduction, projection, and obligation extraction. It does not assert those
+elaborator behaviors or a new kernel rule for W1.

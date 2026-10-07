@@ -478,3 +478,23 @@ closed-term corpus its value **matches the kernel's own reduction** — on
 - why: X1 conformance is **additive** over the seed-runtime anchors. Pins that
   the granular cases extend, never contradict, the merged invariants. (property;
   regression guard.)
+
+## W1. Subset-Σ proof erasure (`42 §3.2`)
+
+### runtime/evaluation/subset-proof-erased-only-at-omega (soundness)
+- spec: `42 §3.2`; `21 §2`; `13 §4`
+- status: **deferred — LANG-REFINEMENT-PROOF-ERASURE** (the runtime erasure
+  route is a separate implementation dependency)
+- given: in context `P : Int → Ω`, checked core pairs with carrier `5`:
+  (a) `Pair(5, ?h 5) : Σ(n:Int).P n`, where `?h 5 : P 5` is open; and (b) a
+  relevant `Σ(n:Int).Bool` whose second component is an open Bool hole. Also
+  query the checked subset type against `Int`.
+- expect: (a) evaluates to carrier `5` without demanding its proof hole;
+  `Proj1` also evaluates to `5`, while the checked core type remains the subset
+  Σ and is not convertible to `Int`. (b) remains a strict pair whose second
+  component evaluates to `unknown`; projecting that component yields
+  `unknown`, while the first projection remains `5`.
+- why: erasure is selected by the checked type's Ω classification, not by the
+  Pair constructor or the presence of a hole. The relevant control catches
+  unconditional proof-field erasure; the subset arm catches an evaluator that
+  forces an Ω proof before discarding it.

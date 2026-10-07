@@ -54,7 +54,8 @@ extensional identity. Durable round-trip preserves that identity and ordered
 observations; internal bytes, hashes, and deduplication outcomes are not
 observable (`../../stdlib/map/seed-map.md`); `34 §1`/`§3`
 (`List`/`Option`/`Result` inductive `data` + `elim_List`, **landed L2**);
-`34 §5` (refinement types — the `sort` carrier); `33 §4` (a type exported
+`34 §5` (refinement types — the `sort` subset-Σ result over its `List`
+carrier); `33 §4` (a type exported
 **abstractly** — name only, constructors hidden — the `Array`
 opaque-carrier surface); `33 §5` (typeclasses as subobjects: **structure classes
 `DecEq`/`Ord`**, the canonical-instance resolver convention, an unsatisfiable
@@ -126,7 +127,7 @@ not the frame):**
 - **One home per property** (`subsume-don't-proliferate`): the `String ↔ Bytes`
   partial decode and the round-trip law are **L6's** (`../bytes-io/`),
   referenced not re-pinned; the `data`/`match`/`elim_List` and
-  refinement-carrier machinery are **L2's** (`../data-match/`), referenced; L3
+  subset-Σ refinement machinery is **L2's** (`../data-match/`), referenced; L3
   pins only what is L3-specific (collection shape, persistence, the laws, the
   no-coinduction decision, proved-Map `Ord` keying, `sort`).
 
@@ -902,7 +903,7 @@ result **values** (`Lt`/`Eq`/`Gt`, not `Ordering`); the SCT check stays in its
   `reverse-roundtrip-is-not-a-law`). L3 references them for the `String ↔ Bytes`
   totalities; it does **not** re-pin the decode boundary or the round-trip.
 - **`data`/`match`/`elim_List`, indexed families, per-branch refinement, and the
-  refinement-types carrier** are **L2's** (`../data-match/seed-data-match.md`).
+  subset-Σ refinement rules** are **L2's** (`../data-match/seed-data-match.md`).
   L3 drives `elim_List` (AC2) and the `34 §5` refinement (AC6) but does **not**
   re-pin the L2 machinery.
 - **`Char` (scalar, surrogate exclusion) and numeric literals** are **L1's**

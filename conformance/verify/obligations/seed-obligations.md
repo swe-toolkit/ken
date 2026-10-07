@@ -2,13 +2,13 @@
 
 Format: `../../README.md`. These pin **WS-V V2** — the verification-condition
 extractor: turning a V1-spec'd program into the **obligation set** (each a
-triple `⟨id, Γ ⊢ φ, provenance⟩`). Grounded in the amended `21`/`22`
-contract at parent `5183c0437be3a14672c40acf5f0c969906031884` (including
-refined-parameter normalization), the `18 §4`/§5 cert API, the kernel
-eliminator (`14 §3`) and
-`match → elim_D` (`39 §2.6`), and first principles. The prototype is not
-mounted; none of these required it. (Partial-primitive grounding `35 §3`/`43
-§2` is not a forward reference.)
+triple `⟨id, Γ ⊢ φ, provenance⟩`). Grounded in the W1 `21`/`22` subset-Σ
+contract, the `18 §4`/§5 certificate API, the kernel eliminator (`14 §3`),
+`match → elim_D` (`39 §2.6`), and first principles. Refined parameters remain
+Σ domains; they are not normalized to a carrier binder plus a generated
+`requires` proof argument. No external reference material was consulted for
+this W1 conformance revision. (Partial-primitive grounding `35 §3`/`43 §2` is
+not a forward reference.)
 
 **The layer is ★★ (untrusted) — but read the backstop precisely (Architect).** A
 V2 bug never breaks **kernel** soundness: the kernel re-checks every *supplied*
@@ -28,12 +28,13 @@ absent-clause scan audits that no burden is silently skipped *and* no trivial
 clause over-skipped — the load-bearing safeguard, not a nicety) and **honest
 provenance** (each obligation traces to its source clause + has a stable id).
 
-**Decoupled from the Σ-sort erratum (`22 §1.1`).** V2 reads V1's
-**bare-carrier + separate-obligation** form — never a proof-carrying `Σ(B,ψ)`
-value (V1 emits none, `21 §2`/§6.3) — so it never forms or depends on a core `Σ`
-over an Ω predicate. The `sort_sigma` erratum (`13 §4`, on `wp/V1-sigma-sort`)
-is
-off V2's path.
+**V2 consumes the checked subset-Σ form (`22 §1.1`).** V1 emits a kernel-
+checked `Pair(a,π)` at `Σ(x:A).φ`; an open introduction hole is the applied
+proof component, not a free-standing fact detached from the value. V2 associates
+the marked proof site with its obligation and extracts it without skipping the
+pair. The existing `sort_sigma` rule places a relevant carrier with an Ω proof
+in `Type (max ℓ_A ℓ_φ)` (`13 §4`); V2 reads that checked core type rather than
+re-encoding the refinement.
 
 **Two-sided completeness (the spine of these cases).** The extractor must
 **emit**
@@ -52,39 +53,36 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 ## A. Extraction completeness — the four sources (`22 §2`)
 
 ### verify/obligations/refinement-introduction-emits-phi
-- spec: `22 §2.1`; `21 §2` (carrier encoding)
-- given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }`; the introduction
-  `(5 : Pos)` (a value `5 : Int` used where `Pos` is expected)
-- expect: emits **one** obligation
-  `⟨id, Γ ⊢ IsTrue (leq_int 1 5), prov⟩` — the goal is
-  `φ[a/x] = IsTrue (leq_int 1 5)`, at Ω; provenance points to the introduction
-  site.
-- why: §2.1 — the introduction direction `A ≤ {x:A|φ}` emits `φ[a/x]`.
-  Structural: the goal is the **substituted** proposition (not the
-  un-substituted `IsTrue (leq_int 1 n)`, not nothing). A bug emitting the free
-  `n`-goal or none flips the structure. The reverse forgetful direction emits
-  nothing (`forgetful-coercion-emits-nothing`).
+- spec: `22 §2.1`; `21 §2` (subset-Σ introduction)
+- given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }`; a function
+  `fn keep (n : Int) : Pos = n`
+- expect: the core body is `Pair(n, ?h n) : Σ(n:Int).IsTrue (leq_int 1 n)`.
+  It records **one** open introduction goal
+  `⟨id, Γ ⊢ IsTrue (leq_int 1 n), prov⟩`; the applied typed hole is the pair's
+  proof component and appears in the trusted base. Provenance points to the
+  introduction site.
+- why: §2.1 constructs a checked pair at the subset type and records the
+  substituted proposition. A carrier-only body with a detached obligation
+  misses the kernel-checkable proof component; a free `n`-goal or no goal is
+  also wrong. The reverse forgetful direction emits no obligation and uses
+  `Proj1` (`forgetful-coercion-emits-nothing`).
 
 ### verify/obligations/postcondition-emits-substituted-goal
 - spec: `22 §2.2`; `21 §6.3`
 - given: `fn inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1` —
   a **straight-line** body
-- expect: emits **one** obligation
+- expect: the core result type is `Σ(r:Int).Equal Int r (n + 1)` and the body
+  introduces `Pair(n + 1, π)`. It records **one** goal
   `⟨id, Γ,(n:Int) ⊢ Equal Int (n + 1) (n + 1), prov⟩` — `ψ[b/result]` with
-  `result` replaced by the straight-line body `b = n + 1`; at Ω; `Γ` carries
-  the parameter telescope.
-- why: §2.2 — for a **straight-line** body the postcondition is the single
-  substituted goal `ψ[b/result]` (the refined-result-type motive degenerates to
-  one). Structural: the goal mentions the **body** (`result` substituted), not a
-  free `result`; a bug leaving `result` free, or omitting the obligation, flips
-  it. **A branchy/recursive body does *not* yield a single over-the-body
-  obligation** — it pushes the motive through **per path / per constructor**
-  (`§3`/§4; cases `conditional-branch-adds-boolean-equation`,
-  `recursive-fn-per-ctor-obligation-with-ih`, the flagship), which carry the
-  path-conditions and the induction hypothesis. This illustration uses a
-  straight-line body deliberately: a single over-the-body obligation carries
-  **no** IH and cannot verify a recursive function (§2.2/§4) — the
-  internal-consistency alignment with `C`/`D1`.
+  `result` replaced by `b = n + 1`; `π` is checked evidence or the applied
+  typed hole for that introduction.
+- why: §2.2 — for a straight-line body the subset-Σ result motive degenerates
+  to one leaf introduction. The goal mentions the body, not a free `result`;
+  the checked pair carries the proof. A branchy or recursive body introduces
+  one pair per leaf under that branch's path conditions and induction
+  hypotheses, not one over-the-body obligation (`§3`/§4; see
+  `conditional-branch-adds-boolean-equation` and
+  `recursive-fn-per-ctor-obligation-with-ih`).
 
 ### verify/obligations/precondition-obligation-at-call-not-in-body (soundness)
 - spec: `22 §2.3`, `§2.5.2`
@@ -109,13 +107,14 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/partial-primitive-emits-nonzero-obligation
 - spec: `22 §2.4`; `35 §3` (Int div/mod by zero = obligation); `43 §2`
-- given: an unrefined division `n / d` on `Int` with a **possibly-zero** `d` (no
-  `requires Not (Equal Int d 0)` and no such proposition in scope)
-- expect: emits a **non-zero** side-condition obligation
-  `⟨id, Γ ⊢ Not (Equal Int d 0), prov(op)⟩` at the operation site; a divisor
-  whose refined parameter has desugared to `requires Not (Equal Int d 0)` (or
-  with that proposition in `Γ`) emits **no** new obligation (discharged by the
-  generated proof argument / assumption).
+- given: (a) an unrefined division `n / d` on `Int` with possibly-zero `d`;
+  (b) `fn f (d : {x:Int | Not (Equal Int x 0)}) : Int = 1 / d`; (c) the same
+  body with `d : Int requires Not (Equal Int d 0)`.
+- expect: (a) emits one non-zero obligation
+  `⟨id, Γ ⊢ Not (Equal Int d 0), prov(op)⟩`. In (b), the operation uses
+  `Proj1 d` and `Proj2 d` discharges its non-zero side condition; in (c), the
+  written `requires` supplies a separate Π proof argument. Neither control
+  emits a new PartialPrim obligation.
 - why: §2.4 — a partial primitive (`/`, `%` on `Int`) emits its side condition
   (`35 §3`: "possibly-zero is an obligation, not a silent trap";
   cross-referenced from `43 §2`). **Verdict-flips:** possibly-zero divisor →
@@ -140,24 +139,20 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ## B. The absent-clause scan — guarded no-emit + the counter-rule (`22 §2.5`)
 
-### verify/obligations/refined-param-desugars-to-requires (soundness)
-- spec: `21 §6.3`; `22 §2.3`, `§2.5.1`, `§3`
+### verify/obligations/refined-param-is-sigma-domain (soundness)
+- spec: `21 §2`/§6.3; `22 §2.1`/§2.3/§3
 - given: `fn head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …`
-  — a refined **parameter**
-- expect: the refined parameter desugars to the carrier binder plus a generated
-  `requires` proof argument. It emits **no** definition-site obligation; the
-  generated proposition enters the body telescope as a Π assumption. The
-  caller owes the obligation to establish
-  `Not (Equal (List A) xs (Nil A))` at each call (§2.3). There is no additional
-  refinement-specific `Γ` entry or binder beyond the generated Π proof argument.
-- why: `21 §6.3` and `22 §2.5.1` — the predicate is supplied only through the
-  generated `requires` Π proof argument. **Absence-assertion gate** — the
-  parameter binder is not a value introduction, so it emits no
-  refinement-introduction obligation. **Disconfirming:** treating the binder as
-  an introduction emits a spurious definition-site obligation; erasing the
-  refinement without adding the proof argument loses the body assumption and
-  makes the generated caller obligation disappear. Correct: no definition-site
-  obligation, with the generated proof assumption and caller-side obligation.
+  and a caller that supplies plain `xs : List A`
+- expect: the function binder is
+  `xs : Σ(l:List A).Not (Equal (List A) l (Nil A))`; its proof assumption is
+  the checked term `Proj2 xs`, not a generated Π binder. The declaration emits
+  no definition-site introduction obligation. The caller introduces a pair
+  and owes `Not (Equal (List A) xs (Nil A))` at that call. Supplying an already
+  refined value reuses its checked `Proj2` without a new proof obligation.
+- why: a refined parameter is a real Σ domain. It is not normalized to a
+  carrier binder plus an implicit `requires`; only written `requires` creates
+  a separate Π proof argument. The no-definition-site-obligation guard remains
+  because the parameter itself is not an introduction site; the call is.
 
 ### verify/obligations/body-requires-assumed-not-reobligated
 - spec: `22 §2.5.2`, `§3`
@@ -191,17 +186,15 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   the honesty guard `21 §5.4` to extraction.)
 
 ### verify/obligations/forgetful-coercion-emits-nothing
-- spec: `22 §2.5.4`, `§2.1`
-- given: a value `p : Pos` (`= {n:Int|IsTrue (leq_int 1 n)}`) used where plain `Int` is expected
-  — the forgetful direction `{x:A|φ} ≤ A`
-- expect: **no** obligation — the coercion forgets the proof and is the
-  **identity** on the carrier `Int` (V1's encoding).
-- why: §2.5.4/§2.1 — `{x:A|φ} ≤ A` is **free**. **Absence-assertion** — guard:
-  the `≤`-direction is carrier-**forgetting**, not refinement-**introducing**.
-  **Disconfirming:** would the **introduction** direction (`Int` used as `Pos`)
-  also emit nothing? **No** — that direction emits `φ[a]`
-  (`refinement-introduction-emits-phi`). The two directions flip: introduce →
-  obligation; forget → none.
+- spec: `22 §2.1`/§2.5.4; `21 §6.3`
+- given: a value `p : Pos` (`= Σ(n:Int).IsTrue (leq_int 1 n)`) used where
+  plain `Int` is expected — the forgetful direction `{x:A|φ} ≤ A`
+- expect: **no** obligation; the core coercion is `Proj1 p : Int`, not the
+  identity term. The checked proof component is forgotten without evaluation.
+- why: forgetting is free of proof obligations but preserves the fact that
+  `Pos` is a distinct Σ type. The introduction direction constructs a pair and
+  owes `φ[a]` (`refinement-introduction-emits-phi`); the two directions differ
+  by `Pair` versus `Proj1`, not by subtyping.
 
 ### verify/obligations/trivial-clause-still-emits-obligation (soundness)
 - spec: `22 §2.5` (the completeness counter-rule); acceptance `§8` / frame `§1`
@@ -262,15 +255,14 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   `match xs { nil → e0 ; cons y ys → e1 }` where the `cons`-branch goal
   discharges only by knowing the scrutinee shape
 - expect: in the `cons y ys` branch, the obligation's `Γ` carries the
-  **scrutinee equation** `(_ : Eq (List Int) xs (cons y ys))` and binds the
-  fields `y, ys`; the `nil` branch carries `(_ : Eq (List Int) xs nil)`.
-- why: §3 — a case split adds, per branch, the constructor equation identifying
-  the scrutinee ("in the `nil` branch you may assume `xs ≡ nil`").
-  **Structural/verdict flip:** an obligation needing `xs ≡ cons y ys` is
-  provable **with** the equation in `Γ`, unprovable **without** it.
-  **Disconfirming:** a bug dropping the scrutinee equation yields a too-weak `Γ`
-  → a **false `unknown`** (§3's visible failure mode) — green (provable) vs red
-  (false unknown) on the equation's presence.
+  **scrutinee equation** `(_ : Eq (List Int) xs (cons y ys))` with its checked
+  convoy term and binds fields `y, ys`; the nil branch carries its equation
+  with term evidence too. Each branch introduces its result as a checked pair
+  at the postcondition's subset-Σ motive.
+- why: §3 — a case split adds, per branch, the constructor equation and its
+  checked convoy evidence. The leaf's subset-Σ proof can apply its obligation
+  hole to that term. An unchecked proposition in `Γ` cannot be used as a proof;
+  dropping either the equation or its term yields a false `unknown`.
 
 ### verify/obligations/let-binding-adds-equation-to-gamma
 - spec: `22 §3` (let-equation)
@@ -288,13 +280,14 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 - spec: `22 §3` (conditional)
 - given: `fn f (n : Int) : Int` with
   `ensures IsTrue (leq_int 0 result) = if leq_int 0 n then n else 0`
-- expect: the `then`-branch obligation's `Γ` carries
-  `(_ : Equal Bool (leq_int 0 n) true)`; the `else` branch carries
-  `(_ : Equal Bool (leq_int 0 n) false)`.
+- expect: the then-branch obligation's `Γ` carries
+  `(_ : Equal Bool (leq_int 0 n) true)` with its checked convoy term; the else
+  branch carries `(_ : Equal Bool (leq_int 0 n) false)` with its term. Each
+  branch's result is a checked pair at the postcondition subset-Σ type.
 - why: §3 — `if c` adds `Equal Bool c true` / `false` per branch (elaborated
-  `elim_Bool`). Structural flip: the `then` obligation
-  `IsTrue (leq_int 0 n)` is provable from the branch equation in `Γ`; without
-  it, a false unknown.
+  `elim_Bool`) together with checked convoy terms. The `then` proof component
+  can use that term to discharge `IsTrue (leq_int 0 n)`; a proposition in `Γ`
+  without evidence cannot inhabit the subset pair's proof component.
 
 ### verify/obligations/non-direct-requires-carries-into-partialprim-telescope
 - spec: `21 §1` (requires premise); `22 §2.4` (PartialPrim); `22 §3`
@@ -323,32 +316,33 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   `fn sum (xs : List NonNeg) : Int` with
   `ensures IsTrue (leq_int 0 result) = …` and body
   `match xs { nil → 0 ; cons y ys → y + sum ys }`
-- expect: the extractor emits **per-constructor** obligations from the `elim_D`
-  motive `M z = { r : Int | IsTrue (leq_int 0 r) }` — the `nil` branch
-  obligation `IsTrue (leq_int 0 0)`; the `cons y ys` branch obligation
-  `IsTrue (leq_int 0 (y + sum ys))` **with the induction hypothesis**
-  `(_ : M ys) = (_ : IsTrue (leq_int 0 (sum ys)))` in `Γ`.
+- expect: the extractor emits per-constructor obligations from the `elim_D`
+  motive `M z = Σ(r:Int).IsTrue (leq_int 0 r)`. The nil branch introduces a
+  pair and records `IsTrue (leq_int 0 0)`. In the cons branch, the result pair's
+  obligation is `IsTrue (leq_int 0 (Proj1 y + Proj1 (sum ys)))`; the context
+  contains `Proj2 y` and the induction hypothesis
+  `M ys : Σ(r:Int).IsTrue (leq_int 0 r)`, whose `Proj2` is evidence for the
+  recursive result.
 - why: §4 — the dependent eliminator gives each constructor method the IH for
-  its recursive fields (`M zᵢ`); V2 **reads** these from the elaborator's
+  its recursive fields (`M zᵢ`); V2 reads these from the elaborator's
   `match → elim_D` compilation and adds them to `Γ` (it does not synthesize an
-  induction principle). **Structural/verdict flip:** the `cons` step is
-  provable **with** `IsTrue (leq_int 0 (sum ys))` in `Γ` (structural
-  induction), unprovable **without**
-  it. **Disconfirming:** would the inductive step discharge under a bug that
-  drops the IH? **No** — without `M ys` the step is a false `unknown`.
-  Structural induction, surfaced automatically.
+  induction principle). The `cons` proof can use `Proj2 y` and the proof
+  projection of `M ys`; dropping either yields a false `unknown`. The result
+  pair is the motive itself, not a carrier plus a separate postcondition.
 
 ### verify/obligations/nonrecursive-degenerate-no-induction-hypothesis
-- spec: `22 §4` (degenerate motive)
+- spec: `22 §4` (degenerate motive), `21 §2`/§6.3
 - given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; a non-recursive
   `fn double (n : NonNeg) : Int ensures IsTrue (leq_int n result) = n + n`
-- expect: the obligation `IsTrue (leq_int n (n + n))` is emitted with **no**
-  induction hypothesis in `Γ` (the degenerate motive — no recursive fields).
+- expect: the obligation `IsTrue (leq_int (Proj1 n) (Proj1 n + Proj1 n))` is
+  emitted with no induction hypothesis in `Γ`. The refined parameter binder is
+  a subset Σ, and its proof assumption is `Proj2 n`; the straight-line result
+  introduces one subset pair.
 - why: §4 — non-recursive functions are the degenerate motive (no recursive
-  fields ⇒ no IH); the same machinery covers both, no special-casing.
-  **Internal-consistency tie:** with `recursive-fn-…-with-IH`, this pins that
-  an IH appears **iff** there is a recursive field — a bug adding a spurious IH
-  here (or dropping the real one there) flips one of the pair.
+  fields ⇒ no IH); the same machinery covers both, no special-casing. The
+  explicit projections distinguish the Sigma parameter from its carrier.
+  With `recursive-fn-…-with-IH`, the pair pins that an IH appears iff there is
+  a recursive field.
 
 ---
 
@@ -389,19 +383,37 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   untouched clause's obligation is unchanged after the unrelated edit; a bug
   keying ids on global position (not clause identity) flips them.
 
-### verify/obligations/decoupled-from-sigma-sort (soundness)
-- spec: `22 §1.1`, `§5`; `21 §2`/§6.3
-- given: a function whose `ensures`/refinement would, under the naive reading,
-  be a `Σ(B,ψ)` value
-- expect: V2 reads V1's **bare-carrier + separate-obligation** form — the
-  obligation is a free-standing `Γ ⊢ ψ`; V2 **never** forms or inspects a core
-  `Σ` over an Ω predicate.
-- why: §1.1 — V2 is decoupled from the `Σ`-sort erratum (`13 §4`, on
-  `wp/V1-sigma-sort`): it consumes the carrier-plus-obligation encoding, never
-  `Σ(B,ψ)`. Structural: the obligation is a standalone triple, not a projection
-  of a `Σ`-typed body. (V1's `ensures-emits-obligation-not-sigma` pins the
-  producer side; this pins the consumer side — internal consistency across the
-  V1/V2 corpus.)
+### verify/obligations/all-ret-bind-composes-evidence
+- spec: `21 §6.4`; `22 §2.2`; `36 §4.3`
+- status: **deferred — W5 AllRet declarations**
+- given: `t : ITree F X`, `k : X → ITree F Y`, predicates
+  `P : X → Ω` and `Q : Y → Ω`, evidence `h : AllRet P t`, and a checked
+  continuation proof `step : Π(x:X).P x → AllRet Q (k x)`.
+- expect: the checked Ken lemma `all_ret_bind` produces evidence of
+  `AllRet Q (bind t k)`. A `Ret x` control reduces to `step x h`; a `Vis` case
+  retains the universal response premise. With closed proof inputs, loading the
+  declaration adds no `trusted_base()` delta.
+- why: the consumer composes the outer `AllRet` proof through residual effects;
+  it is a checked `elim_ITree` theorem in W5, not an elaborator coercion. The
+  deferred case observes its proof behavior and trust delta when the declaration
+  lands; W1's space result type is tested separately in
+  `space-ensures-residual-tree-allret`.
+
+### verify/obligations/v2-extracts-subset-sigma-proof-site (soundness)
+- spec: `22 §1.1`/§5; `21 §2`/§6.3; `13 §4`
+- given: `def Pos = {x:Int | IsTrue (leq_int 1 x)}` and
+  `fn keep (n:Int) : Pos = n`, with checked core
+  `Pair(n, ?h n) : Σ(x:Int).IsTrue (leq_int 1 x)`
+- expect: V2 associates exactly one obligation
+  `Γ ⊢ IsTrue (leq_int 1 n)` with the pair's proof site and source provenance.
+  It does not skip the `Pair`, detach the hole from its proof component, or
+  invent a second obligation. The subset type forms in
+  `Type (max ℓ_A ℓ_φ)`; the proof component's Ω sort does not collapse it.
+- why: V2 walks V1's checked core subset-Σ form. The kernel re-checks the pair;
+  V2 supplies the completeness and provenance net for the applied hole inside
+  it. The old carrier encoding could produce a free obligation with no
+  proof-bearing core pair, so the paired observation discriminates the W1
+  producer/consumer contract.
 
 ### verify/obligations/non-spec-program-empty-obligation-set (soundness)
 - spec: `22 §8` (regression), `§6`; `21 §6.2`
@@ -424,7 +436,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   `precondition-obligation-at-call-not-in-body`,
   `partial-primitive-emits-nonzero-obligation`,
   `prove-and-law-emit-one-obligation-per-goal`; the **absent-clause scan**
-  (`refined-param-desugars-to-requires`,
+  (`refined-param-is-sigma-domain`,
   `body-requires-assumed-not-reobligated`,
   `present-cert-yields-zero-new-obligations`,
   `forgetful-coercion-emits-nothing`) + the counter-rule
@@ -438,15 +450,15 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   `non-direct-requires-carries-into-partialprim-telescope`, + body-as-motive
   (`recursive-fn-per-ctor-obligation-with-ih`,
   `nonrecursive-degenerate-no-induction-hypothesis`).
-- **#3 decoupled from Σ-sort** — `decoupled-from-sigma-sort`.
+- **#3 subset-Σ extraction** — `v2-extracts-subset-sigma-proof-site`.
+- **W5-deferred** — `all-ret-bind-composes-evidence` (checked Ken theorem,
+  no kernel/trust change).
 - **#4 V2→V3 interface** — `inductive-postcond-hole-localization` (the
   obligation set → per-obligation verdict), `provenance-and-stable-ids`.
 - **#5 no regression** — `non-spec-program-empty-obligation-set`.
 
-Build-sequencing: V2 extends the **landed** V0/V1 elaborator (`39 §5`, `21 §6`),
-consumes V1's four-part interface (`21 §7`) and the `18 §4`/§5 cert API, and
-reads
-the elaborator's `match → elim_D` (`39 §2.6`) + kernel eliminator (`14 §3`). All
-sites are decoupled from the `Σ`-sort erratum (`wp/V1-sigma-sort`). The
-obligation
-goals stay in Ω by construction (`22 §7`: substitution preserves Ω, `11 §5`).
+Build-sequencing: W1's V1 contract supplies checked subset-Σ terms and marked
+proof sites; V2 consumes that interface (`21 §7`) with the `18 §4`/§5
+certificate API and the `match → elim_D` elaboration (`39 §2.6`). The kernel's
+`sort_sigma` rule is landed (`13 §4`); the obligation goals stay in Ω by
+construction (`22 §7`: substitution preserves Ω, `11 §5`).

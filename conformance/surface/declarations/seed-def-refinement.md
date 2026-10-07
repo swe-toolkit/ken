@@ -2,22 +2,26 @@
 
 Format: `../../README.md`. These pin the `SURF-def-refinement` slice: the
 `type` → `def` declaration-keyword rename (`spec/30-surface/33-declarations.md
-§1`, `32-grammar.md §1`, `31-lexical.md §4`). Semantics are unchanged — a
-`def` elaborates to exactly what `type` did (zero kernel delta); only the
-surface keyword and `type`'s reserved-word status are pinned here.
+§1`, `32-grammar.md §1`, `31-lexical.md §4`). The rename adds no semantic
+change; a refinement definition uses the W1 subset-Σ semantics in
+`21 §2`/§6.3. These rows pin the transparent Σ type and pair introduction as
+well as the surface keyword and `type`'s reserved-word status.
 
 ## surface/declarations/def-refinement-parses
 - spec: `spec/30-surface/32-grammar.md §1`, `spec/30-surface/33-declarations.md
   §1`
 - given:
   ```ken
-  def Pos = { n : Int | n > 0 }
+  def Pos = { n : Int | IsTrue (leq_int 1 n) }
+  fn keep (n : Int) : Pos = n
   ```
-- expect: accepts — parses and elaborates to the carrier `Int` plus the
-  tracked obligation `n > 0` at each introduction (`34 §5`), identically to
-  the pre-rename `type Pos = { n : Int | n > 0 }`.
-- why: the refinement-definition case of the renamed keyword terminal (frame
-  §4.2/§4.3).
+- expect: accepts — `Pos` is a transparent alias for the checked
+  `Σ(n:Int).IsTrue (leq_int 1 n)` at `Type 0`; `keep` introduces `Pair(n,π)`
+  and records the `IsTrue (leq_int 1 n)` proof obligation at that site
+  (`34 §5`, `21 §2`). The earlier `type` → `def` rename did not change the
+  refinement behavior.
+- why: the refinement-definition case of the renamed keyword terminal, with
+  its current W1 semantic form (frame §4.2/§4.3).
 
 ## surface/declarations/def-alias-parses
 - spec: `spec/30-surface/32-grammar.md §1`, `spec/30-surface/33-declarations.md

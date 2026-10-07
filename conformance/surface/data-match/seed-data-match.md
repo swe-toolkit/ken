@@ -16,9 +16,10 @@ prototype's stubbed sums and missing exhaustiveness.
 
 - **No new kernel rule.** Every case lowers to the **landed** kernel: `data` →
   inductive family + `elim_D` (`14`, K1/K1.5), `match` → `elim_D` (`39 §2.6`),
-  refinement → **carrier `A` + emitted obligation** (`21 §2`, `22 §2.1`). A case
-  that asserts a kernel *rejection* is asserting the **landed** kernel's verdict
-  (`check_positivity`, eliminator well-formedness), not a new gate.
+  refinement → checked subset `Σ(x:A).φ` (`21 §2`, `22 §2.1`). Introduction
+  constructs a pair and records its proof obligation; forgetting uses `Proj1`.
+  A case that asserts a kernel *rejection* is asserting the **landed** kernel's
+  verdict (`check_positivity`, eliminator well-formedness), not a new gate.
 - **The exhaustiveness checker is untrusted; the safety is kernel-backed**
   (`34 §4.4`). The *safety* (no silently-partial `match`) holds even against a
   buggy checker — the kernel cannot type an `elim_D` missing a method. What the
@@ -539,17 +540,18 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 - given: a **dependent** `match` whose result type depends on the scrutinee —
   e.g. `match (v : Vec a m) { VNil => … ; VCons … => … }` with an `ensures` over
   the length, so each arm's expected type is the motive at that constructor
-- expect: the emitted `elim_Vec` carries a **dependent motive** `M` (`34 §3.2`),
-  and in the `VCons` arm the obligation context `Γ` gains the **scrutinee
-  equation** `Eq (Vec a m) v (VCons …)` (`22 §3`) — usable as a hypothesis.
-- why: per-branch definitional refinement is the surface origin of `22 §3`'s
-  path-sensitive `Γ`. **Flip:** a **constant** (non-dependent) motive where a
-  dependent one is required emits a *different* core term — the `elim_Vec`
-  motive is `λ i x. T` with `x` unused, and the branch `Γ` lacks the scrutinee
-  equation. Structural: assert the motive **mentions** the scrutinee/index
-  (not a constant) and the branch hypothesis is present — verdict-independent,
-  per the untrusted-layer lesson (a constant motive can still type-check, so the
-  verdict alone is green-vs-green).
+- expect: the emitted `elim_Vec` carries a dependent motive whose result is
+  the subset-Σ postcondition (`34 §3.2`, `22 §2.2`). Each arm introduces a
+  checked pair at its specialized motive; in the `VCons` arm the obligation
+  context `Γ` gains the scrutinee equation `Eq (Vec a m) v (VCons …)` with
+  checked convoy evidence (`22 §3`) — usable to build the pair's proof.
+- why: per-branch definitional refinement supplies the path evidence used by
+  the subset-Σ proof at each leaf. **Flip:** a constant (non-dependent) motive
+  where a dependent one is required emits a different core term — the
+  `elim_Vec` motive is `λ i x. T` with `x` unused, and the branch `Γ` lacks the
+  scrutinee equation. Structural: assert the motive mentions the scrutinee/index
+  and its checked equation term is available to the pair proof; a constant
+  motive can still type-check, so the verdict alone is green-vs-green.
 
 ## surface/data-match/proof-returning-dependent-motive (AC8)
 - spec: `spec/30-surface/34-data-match.md §3.5`,
@@ -604,24 +606,23 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 
 ## surface/data-match/refinement-obligation (AC7) (soundness) — TR7
 - spec: `spec/30-surface/34-data-match.md §5`, `21 §2`, `22 §2.1`
-- given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; (a) passing a plain
-  `Int` `e` where `NonNeg` is expected (introduction); (b) passing a `NonNeg`
-  where an `Int` is expected (forgetful)
+- given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; (a) passing a
+  plain `Int` `e` where `NonNeg` is expected; (b) passing `NonNeg` where an
+  `Int` is expected; (c) `data Box = Wrap NonNeg` and constructor application
+  `Wrap e` for plain `e : Int`.
 - expect:
-  - (a) the obligation `IsTrue (leq_int 0 e)` is **emitted** at that point
-    (`22 §2.1`), discharged or left a visible hole — **never** a silent
-    coercion past `φ`; the core image of the value is the **carrier `Int`** (no
-    kernel `Σ`). **(soundness)**
-  - (b) **no** obligation — `{n:Int | IsTrue (leq_int 0 n)} ≤ Int` is **free**
-    (the identity on the carrier, `22 §2.1`/§2.5).
-- why: refinements enforce; using `A` as `{x:A|φ}` costs a proof, the reverse is
-  free. **Flip:** a missed obligation on (a) reads `proved` with **zero** proof
-  (the `22 §intro` linchpin — completeness is backstopped by nothing
-  downstream), so observe the **emitted VC** structurally (obligation
-  `IsTrue (leq_int 0 e)` is in the set), not just the final verdict. A spurious
-  obligation on (b), the forgetful direction, is the dual bug — assert the set
-  is **empty** there. The
-  pair (emit-on-intro / silent-on-forget) flips on the direction.
+  - (a) the expected type is the checked subset
+    `Σ(n:Int).IsTrue (leq_int 0 n)`. The core image is `Pair(e,π)`; one
+    introduction goal `IsTrue (leq_int 0 e)` is emitted at that point, as a
+    visible proof component or applied typed hole. **(soundness)**
+  - (b) no obligation; forgetting to `Int` emits `Proj1`, not the identity.
+  - (c) `Box`'s `Wrap` field has the subset-Σ type; the core argument is
+    `Pair(e,π)` and records the `NonNeg` proof obligation at the field site.
+- why: every introduction of a value at a refinement constructs a checked Σ
+  pair; data constructor fields are checked at their stated type. The reverse
+  direction is free but retains `Proj1`. A carrier-only elaborator could emit
+  the VC while leaving the `Box` field or core value as bare `Int`; observing
+  the pair distinguishes it.
 
 ## Coverage map
 
