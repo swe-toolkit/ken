@@ -61,10 +61,14 @@ No new import, export, operation, axiom or trust. Follow
   (compare n n)` proved by `Refl`, keeps the package loading and reddens
   that law's pin. A claim that does not mention `compare` is refused by the
   attached-proof rule (`evt_7q023c2bn93hm`).
-- **AC-3 (mutation, QA).** A scratch `compare` returning `Lt` in its `Eq`
-  arm reddens `self_eq` at its span; record whether the three existing
-  laws still check. A scratch `compare` returning `Eq` in its `Lt` arm
-  reddens `from_lt`. Restore byte-identically.
+- **AC-3 (mutation, QA).** Mutate a scratch copy, not `compare` in
+  place: existing proof bodies compute on `compare`'s arms, so an in-place
+  mutation is refused before the new laws are reached. In a scratch
+  package that imports Nat Order, define `compareA` returning `Lt` in the
+  `Eq` arm and `compareB` returning `Eq` in the `Lt` arm. Restate
+  `self_eq` over `compareA` and `from_lt` over `compareB`: each is refused
+  at its own span. Restate `lt_implies_leq` over `compareA` and record
+  whether it checks. Delete the scratch package afterwards.
 - **AC-4.** The loaded closure's trust ledger and Nat Order's exports are
   unchanged. Targeted builds only, through `scripts/ken-cargo`.
   No-regression means green in CI.
