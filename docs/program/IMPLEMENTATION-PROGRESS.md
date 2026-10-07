@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-07 08:27:49Z — from 887 issue file(s) in `docs/program/issues/`.
+2026-10-07 08:57:05Z — from 887 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -384,7 +384,7 @@ the committed file matches the generator's output.
 | `LANG-MODULE-IMPORT-SYSTEM` | Module/import capability campaign — declaration visibility (public export), a selective-import surface, and cross-package plus prelude symbol resolution, sufficient for catalog packages to reuse canonical modules instead of reimplementing them | draft | language | XL | none | — |
 | `LANG-MODULE-PATH-OWNER-GATE` | Enforce 33 §3.1's one-owner-per-module-path rule in the elaborator (a hard ModuleOwnerClash in either load order, keyed on unit-ownership records), and re-home the ~36 tests that build same-spelling collisions through the now-forbidden foreign same-path claim without losing their identity coverage | ready | language | M | architect | — |
 | `LANG-NAMED-REFINED-BINDER-FIRST-CLASS` | A function whose binder is a named refinement, used first-class, skips its obligation: fn take5 (x : Five) : Int = use5 x; fn apply (g : Int → Int) : Int = g six; const observed : Int = apply take5 checks with zero obligations, because the same-root reuse exemption trusts the binder as already introduced. Its literal twin emits the obligation inside take5. Introduce or refuse | ready | language | M | architect | — |
-| `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` | A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six, List Char admits 55296, and so do Int → Five results, classes, aliases, data fields and expression-level type arguments. Refuse the nested introduction at the check choke point, keyed on polarity and the checked refinement identity | active | language | M | architect | — |
+| `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` | A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six and List Char admits 55296. Refuse the nested introduction by running the ruled polarity guard over elaborator-recorded refined types keyed on the refinement's checked identity at each introduction site, not over the spelling of a delta-transparent Const in core terms | active | language | M | architect | — |
 | `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` | `ken-cli` native production runs `px4b_native_production` at effectively zero stack margin -- base passes with a few hundred bytes to spare, so any candidate adding a few hundred bytes aborts it, and `98e6ac51` is the trigger that exposed this rather than its cause | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
 | `LANG-NESTED-MATRIX-DERIVED-TELESCOPE` | The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or discovered first | merged | language | L | architect | — |
