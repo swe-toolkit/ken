@@ -73,8 +73,8 @@ fn differential(case: &str, source: &str) -> Differential {
                 })
             },
         );
-    let output = output
-        .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
+    let output =
+        output.unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -652,9 +652,14 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
     let diff = differential("escape-buffer-then-readat", ESCAPE_BUFFER_THEN_READAT);
     assert_native_matches_interpreter("escape-buffer-then-readat", &diff);
     assert_eq!(diff.native.stdout, diff.interpreted.stdout, "buffer stdout");
-    assert_eq!(diff.native.effect_trace, diff.interpreted.effect_trace, "buffer full events");
     assert_eq!(
-        diff.native.effect_trace.iter()
+        diff.native.effect_trace, diff.interpreted.effect_trace,
+        "buffer full events"
+    );
+    assert_eq!(
+        diff.native
+            .effect_trace
+            .iter()
             .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
             .count(),
         1,
@@ -667,14 +672,20 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
     // word to such a frame (the prior widened-install mutant had 14 reaches
     // with unchanged execution), so its runtime trap is not observed here.
     assert!(
-        diff.ret_sink_assessments.iter().any(|(_, status)| status == "PendingCheckedControl"),
+        diff.ret_sink_assessments
+            .iter()
+            .any(|(_, status)| status == "PendingCheckedControl"),
         "buffer must assess a non-Ready checked-control Ret frame"
     );
-    let ready = diff.ret_sink_assessments.iter()
+    let ready = diff
+        .ret_sink_assessments
+        .iter()
         .filter(|(_, status)| status == "Ready")
         .map(|(origin, _)| origin.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    let installed = diff.ret_sink_installs.iter()
+    let installed = diff
+        .ret_sink_installs
+        .iter()
         .map(|sink| sink.active_frame_origin.as_str())
         .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(
@@ -839,8 +850,8 @@ fn nat_fanout_live_resource_native_stops_at_unclassified_trap() {
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
                     });
-                let output = output
-                    .unwrap_or_else(|error| panic!("{case}: linked native build: {error:?}"));
+                let output =
+                    output.unwrap_or_else(|error| panic!("{case}: linked native build: {error:?}"));
                 let observed = ken_runtime::run_bound_process_effect_observation(
                     &output.artifact,
                     &ken_runtime::NativeEffectRunOptionsV1 {
