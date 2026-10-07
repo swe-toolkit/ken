@@ -188,7 +188,8 @@ The Steward is prohibited from authoring or modifying:
 - `.github/workflows/**` and scripts for publishing, routing, watchdogs, or
   workflow enforcement.
 
-The sole exception is `steward/lanes.md`, governed by §2a.
+The exceptions are `steward/lanes.md`, governed by §2a, and
+`../steward-watchdog-tick-prompt.txt`, governed by §8.
 
 When workflow is wrong, state the defect and product impact to the operator. Do
 not patch it, open a workflow WP, promote a lesson, or start a review cycle. The
@@ -200,6 +201,10 @@ looks trivial or would document a mistake the Steward just made.
 Arm the private watchdog from `../steward-watchdog-tick-prompt.txt` at session
 start and after compaction. It detects stalls and held finished work; it does
 not create nodes, edit workflow, reconcile history, or harvest lessons.
+
+Keep the tick prompt current. When a tick step is stale, misses a stall, or
+fires on a non-problem, edit the prompt in the next doc bundle and re-arm the
+watchdog from it.
 
 Team compaction happens only at a genuine new-WP boundary, never on every
 handoff. See `steward/compaction.md`.
