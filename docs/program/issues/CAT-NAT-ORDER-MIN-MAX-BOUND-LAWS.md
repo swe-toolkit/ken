@@ -57,7 +57,10 @@ No new import, export, operation, axiom or trust. Follow
 - **AC-2 (proposition pin).** A test decodes each private declaration's
   checked type and asserts its binders, both premises and the conclusion by
   global identity and de Bruijn index. Control: weakening either conclusion
-  to `IsTrue True` keeps the package loading and reddens the pin.
+  to an owner-preserving trivial claim (`IsTrue (leq_nat Zero (min m n))`,
+  `IsTrue (leq_nat Zero (max m n))`, body `λhm. λhn. Proved`) keeps the
+  package loading and reddens that law's pin. The attached-proof rule
+  refuses a claim that does not mention its subject (`evt_7q023c2bn93hm`).
 - **AC-3 (mutation, QA).** A scratch `min` returning `Zero` in every arm
   keeps `leq_left` and `leq_right` checking and reddens `greatest` at its
   span. A scratch `max` that returns a larger upper bound in the

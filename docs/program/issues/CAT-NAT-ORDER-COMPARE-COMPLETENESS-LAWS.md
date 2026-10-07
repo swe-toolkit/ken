@@ -56,8 +56,11 @@ No new import, export, operation, axiom or trust. Follow
   ones above (state them before proving).
 - **AC-2 (proposition pin).** A test decodes each private declaration's
   checked type and asserts its binders, premise and conclusion by global
-  identity and de Bruijn index. Control: weakening any conclusion to
-  `IsTrue True` keeps the package loading and reddens the pin.
+  identity and de Bruijn index. Control: weakening any conclusion to an
+  owner-preserving trivial claim, such as `Equal OrdResult (compare n n)
+  (compare n n)` proved by `Refl`, keeps the package loading and reddens
+  that law's pin. A claim that does not mention `compare` is refused by the
+  attached-proof rule (`evt_7q023c2bn93hm`).
 - **AC-3 (mutation, QA).** A scratch `compare` returning `Lt` in its `Eq`
   arm reddens `self_eq` at its span; record whether the three existing
   laws still check. A scratch `compare` returning `Eq` in its `Lt` arm
