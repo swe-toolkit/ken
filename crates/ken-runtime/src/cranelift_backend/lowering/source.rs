@@ -4378,11 +4378,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 let current_admission = match &admission {
                     CheckedIhGeneratedEntryAdmission::NonGoverned => "NonGoverned",
                     CheckedIhGeneratedEntryAdmission::Governed(projection) => {
-                        match projection.fresh_result_route() {
-                            CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                        match projection.route() {
+                            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
                                 "GovernedDirect"
                             }
-                            CheckedIhFreshResultRoute::TailProducerToRet { .. } => "GovernedTail",
+                            CheckedIhGeneratedEntryRoute::TailProducerToRet => "GovernedTail",
                         }
                     }
                 };
@@ -4710,14 +4710,14 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                                 ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
                                             }
                                             if let Some((projection, pending, callee_origin)) = &projection {
-                                                match projection.fresh_result_route() {
-                                                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                                                match projection.route() {
+                                                    CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
                                                         return Ok(this.call_direct_checked_ih_transport_from_case_environment(
                                                             builder, &transport, projection, *pending, *callee_origin,
                                                             &env,
                                                         )?.into_routed_answer().value);
                                                     }
-                                                    CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                                                    CheckedIhGeneratedEntryRoute::TailProducerToRet => {
                                                         // A labelled arm returns a value;
                                                         // no forward-Ret collapse inside the switch.
                                                         return this.call_tail_checked_ih_transport_from_case_environment(
@@ -5037,8 +5037,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     let (projection, pending, callee_origin) = current_checked_ih_projection
                         .take()
                         .expect("the governed route projection was checked above");
-                    let routed_answer = match projection.fresh_result_route() {
-                        CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+                    let routed_answer = match projection.route() {
+                        CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
                             match forward_ret_outcome {
                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {}
                                 ComposedReturnForwardRetAuthorityOutcome::Formed(_) => {
@@ -5068,7 +5068,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             )?
                             .into_routed_answer()
                         }
-                        CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                        CheckedIhGeneratedEntryRoute::TailProducerToRet => {
                             // The governed generated-entry arrival's Tail route: the
                             // Trap-checked runtime Result takes ONE certified forward
                             // SSA edge to the shared Ret block, bypassing the

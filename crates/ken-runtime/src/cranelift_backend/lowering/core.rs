@@ -8909,9 +8909,9 @@ impl<'a> Lowering<'a> {
         callee_origin: StaticOriginId,
         env: &[LoweringEnvironmentBinding],
     ) -> Result<CheckedIhApplicationResult, CraneliftBackendError> {
-        match projection.fresh_result_route() {
-            CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {}
-            CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+        match projection.route() {
+            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {}
+            CheckedIhGeneratedEntryRoute::TailProducerToRet => {
                 return Err(unsupported(
                     "CheckedIhApplicationResult",
                     "a Tail producer route reached the Direct checked-IH application emitter",

@@ -144,6 +144,7 @@ pub(super) use static_transition::{
     CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
+    CheckedIhGeneratedEntryRoute,
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
     FieldIdentity, PlannedAggregateAllocation, PlannedAggregateShape, PlannedAggregateOwnership,
