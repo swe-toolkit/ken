@@ -151,7 +151,10 @@ fn example_only_axiom_does_not_add_trust_to_the_package() {
     let actual = compile(with_axiom, later, CompilerTargetKind::NonRuntime)
         .expect("an example axiom checks but is not shipped")
         .package;
-    assert_eq!(actual.artifact.semantic, expected.artifact.semantic);
+    assert!(
+        actual.artifact.semantic == expected.artifact.semantic,
+        "an example-only trusted hole must not enter package semantic inputs"
+    );
     assert_eq!(actual.core_semantic_hash, expected.core_semantic_hash);
 }
 
