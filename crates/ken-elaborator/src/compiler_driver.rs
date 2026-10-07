@@ -506,6 +506,10 @@ pub enum CompilerDriverError {
     MissingStableSymbol {
         id: GlobalId,
     },
+    PackageReferenceOutsidePackage {
+        declaration: StableSymbol,
+        referenced: StableSymbol,
+    },
     MissingClosureMetadata {
         section: &'static str,
         symbol: StableSymbol,
@@ -557,6 +561,13 @@ impl fmt::Display for CompilerDriverError {
             CompilerDriverError::MissingStableSymbol { id } => {
                 write!(f, "missing stable symbol for admitted global {id}")
             }
+            CompilerDriverError::PackageReferenceOutsidePackage {
+                declaration,
+                referenced,
+            } => write!(
+                f,
+                "declaration {declaration} references {referenced} outside its checked-core package"
+            ),
             CompilerDriverError::MissingClosureMetadata { section, symbol } => write!(
                 f,
                 "target closure is missing required {section} metadata for {symbol}"
@@ -3362,6 +3373,7 @@ fn add_obligation_metadata(
     obligations: &[(GlobalId, ObligationTriple)],
     symbols: &BTreeMap<GlobalId, StableSymbol>,
     table: &StableSymbolTable,
+    outside: &impl Fn(&StableSymbol, crate::checked_core::CanonicalEncodingError) -> CompilerDriverError,
     semantic: &mut CheckedCoreSemanticInputs,
 ) -> Result<(), CompilerDriverError> {
     for (owner, triple) in obligations {
@@ -3370,11 +3382,8 @@ fn add_obligation_metadata(
             .cloned()
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *owner })?;
         let obligation = StableSymbol::obligation(triple.id.0.clone());
-        let goal = canonical_term_bytes(&triple.goal_closed, table).map_err(|error| match error {
-            crate::checked_core::CanonicalEncodingError::MissingStableSymbol(id) => {
-                CompilerDriverError::MissingStableSymbol { id }
-            }
-        })?;
+        let goal = canonical_term_bytes(&triple.goal_closed, table)
+            .map_err(|error| outside(&origin, error))?;
         let status = match &triple.provenance.kind {
             ProvKind::FfiRuntimeCheck => ObligationStatus::Tested,
             ProvKind::Ensures { .. }
@@ -3410,13 +3419,29 @@ fn emit_package_from_env(
     let package_identity = package_identity(&manifest.package_name);
     let mut semantic = CheckedCoreSemanticInputs::default();
     let native_primitives = native_entrypoint_plan.is_some();
-    let (symbols, table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives)?;
+    let (symbols, _table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives)?;
 
+    // Encode admitted content against exactly the package's symbol set. The
+    // shared elaboration environment can still resolve an earlier source's
+    // example-fence binding; encoding against the full table would serialize
+    // a dangling reference while validation sees only section keys.
+    let mut package_table = StableSymbolTable::new();
     for (id, symbol) in &symbols {
         if !example_ids.contains(id) {
             semantic.symbols.insert(symbol.clone());
+            package_table.insert_global(*id, symbol.clone());
         }
     }
+    let outside = |declaration: &StableSymbol, error: crate::checked_core::CanonicalEncodingError| {
+        let crate::checked_core::CanonicalEncodingError::MissingStableSymbol(referenced_id) = error;
+        match symbols.get(&referenced_id) {
+            Some(referenced) => CompilerDriverError::PackageReferenceOutsidePackage {
+                declaration: declaration.clone(),
+                referenced: referenced.clone(),
+            },
+            None => CompilerDriverError::MissingStableSymbol { id: referenced_id },
+        }
+    };
 
     for id in admitted {
         let symbol = symbols
@@ -3427,8 +3452,8 @@ fn emit_package_from_env(
             .env
             .lookup(*id)
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *id })?;
-        let bytes = canonical_decl_bytes(decl, &table)
-            .map_err(|_| CompilerDriverError::MissingStableSymbol { id: *id })?;
+        let bytes = canonical_decl_bytes(decl, &package_table)
+            .map_err(|error| outside(&symbol, error))?;
         semantic.declarations.insert(symbol.clone(), bytes);
         semantic
             .lowerability
@@ -3466,11 +3491,17 @@ fn emit_package_from_env(
         &mut semantic,
     );
     if native_primitives {
-        add_native_primitive_metadata(env, &symbols, &mut semantic);
+        add_native_primitive_metadata(env, &symbols, example_ids, &mut semantic);
     }
     apply_manifest_target_metadata(manifest, &mut semantic);
-    add_trusted_base_metadata(env, &symbols, &mut semantic);
-    add_obligation_metadata(obligations, &symbols, &table, &mut semantic)?;
+    add_trusted_base_metadata(env, &symbols, example_ids, &mut semantic);
+    add_obligation_metadata(
+        obligations,
+        &symbols,
+        &package_table,
+        &outside,
+        &mut semantic,
+    )?;
     if let Some(plan) = native_entrypoint_plan {
         let symbol = StableSymbol::new(
             SymbolNamespace::Metadata,
@@ -4222,12 +4253,16 @@ fn literal_native_symbol(env: &ElabEnv, id: GlobalId) -> Option<String> {
 fn add_native_primitive_metadata(
     env: &ElabEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
+    example_ids: &BTreeSet<GlobalId>,
     semantic: &mut CheckedCoreSemanticInputs,
 ) {
     for decl in env.env.decls() {
         let Decl::Primitive { id, reduction, .. } = decl else {
             continue;
         };
+        if example_ids.contains(id) {
+            continue;
+        }
         let (registry_symbol, reduction) = match reduction {
             ken_kernel::PrimReduction::Op { symbol } => {
                 ((*symbol).to_string(), PrimitiveReductionMetadata::Op)
@@ -4370,9 +4405,13 @@ fn is_recursive_constructor_arg(arg: &Term, family: GlobalId) -> bool {
 fn add_trusted_base_metadata(
     env: &ElabEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
+    example_ids: &BTreeSet<GlobalId>,
     semantic: &mut CheckedCoreSemanticInputs,
 ) {
     for id in env.env.trusted_base() {
+        if example_ids.contains(&id) {
+            continue;
+        }
         let Some(target) = symbols.get(&id).cloned() else {
             continue;
         };
