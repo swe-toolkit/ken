@@ -53,7 +53,7 @@ fn differential(case: &str, source: &str) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
 
-    let (output, pending_plane) = ken_runtime::with_pending_checked_ret_sink_plane_observations(
+    let (output, applications) = ken_runtime::with_pending_checked_ret_sink_applications(
         || {
             ken_cli::build_native_program(
                 source,
@@ -64,14 +64,10 @@ fn differential(case: &str, source: &str) -> Differential {
             )
         },
     );
-    assert!(
-        !pending_plane.is_empty(),
-        "{case}: a built program must install at least one response plane"
-    );
     assert_eq!(
-        pending_plane.iter().any(|pending| *pending),
+        !applications.is_empty(),
         case == "escape-buffer-then-readat",
-        "{case}: checked-control Ret admission population {pending_plane:?}"
+        "{case}: decisive checked-control Ret applications {applications:?}"
     );
     let output = output
         .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
@@ -787,8 +783,8 @@ fn nat_fanout_live_resource_native_stops_at_unclassified_trap() {
                     expected_reads,
                     "{case}: the interpreter must select the measured Nat arm"
                 );
-                let (output, pending_plane) =
-                    ken_runtime::with_pending_checked_ret_sink_plane_observations(|| {
+                let (output, applications) =
+                    ken_runtime::with_pending_checked_ret_sink_applications(|| {
                         ken_cli::build_native_program(
                             &source,
                             ken_cli::SourceFormat::Ken,
@@ -798,8 +794,8 @@ fn nat_fanout_live_resource_native_stops_at_unclassified_trap() {
                         )
                     });
                 assert!(
-                    pending_plane.iter().any(|pending| *pending),
-                    "{case}: expected checked-control Ret plane, got {pending_plane:?}"
+                    !applications.is_empty(),
+                    "{case}: expected a decisive checked-control Ret application"
                 );
                 let output = output
                     .unwrap_or_else(|error| panic!("{case}: linked native build: {error:?}"));

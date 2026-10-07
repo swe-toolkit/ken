@@ -990,31 +990,31 @@ pub fn static_response_context_demand_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(|slot| slot.get().is_none())
 }
 
-// A test-only per-build observation of the *installed* phase-B plane key.
-// The wrapper encloses one native build (which may plan more than once) and
-// returns each installed planner's answer, so callers assert the disjunction
-// per built program without conflating preselection with installation.
+// Test-only decisive applications of the installed phase-B Ret key. A build
+// may plan repeatedly; the wrapper gathers every response demand whose route
+// changes solely because the pending checked-control Ret disjunct is true.
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
-    static PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS:
-        std::cell::RefCell<Option<Vec<bool>>> = const { std::cell::RefCell::new(None) };
+    static PENDING_CHECKED_RET_SINK_APPLICATIONS:
+        std::cell::RefCell<Option<Vec<(u32, u32, HostOpV1)>>> =
+            const { std::cell::RefCell::new(None) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn with_pending_checked_ret_sink_plane_observations<T>(
+pub fn with_pending_checked_ret_sink_applications<T>(
     operation: impl FnOnce() -> T,
-) -> (T, Vec<bool>) {
-    PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS.with(|slot| {
+) -> (T, Vec<(u32, u32, HostOpV1)>) {
+    PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
         assert!(
             slot.borrow_mut().replace(Vec::new()).is_none(),
-            "pending checked Ret sink plane observations cannot nest"
+            "pending checked Ret sink applications cannot nest"
         );
     });
     let result = operation();
-    let observations = PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS.with(|slot| {
-        slot.borrow_mut().take().expect("pending plane observation window was open")
+    let applications = PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
+        slot.borrow_mut().take().expect("pending application window was open")
     });
-    (result, observations)
+    (result, applications)
 }
 
 // Execute-then-resume materialization control. Production specializes a
@@ -3275,14 +3275,9 @@ impl StaticTransitionPlan<'_> {
             super::aggregates::plane_has_pending_checked_control_ret_sink(self)?;
         #[cfg(feature = "px8-ds-test-support")]
         if count_install_applications {
-            PENDING_CHECKED_RET_SINK_PLANE_OBSERVATIONS.with(|slot| {
-                if let Some(observations) = slot.borrow_mut().as_mut() {
-                    observations.push(pending_checked_ret_sink);
-                }
-            });
-            // Opt-in corpus observation includes test-thread identity, not a
-            // source-spelling key. The wrapper above collects per build; this
-            // log also sees existing suites that use their own build helpers.
+            // The plane key's presence may be inert if no transport-source
+            // demand reaches the decision below. The application recorder
+            // inside the demand loop is the population acceptance oracle.
             if std::env::var_os("KEN_RT_RET_PLANE_CENSUS").is_some() {
                 eprintln!(
                     "RT_RET_PLANE thread={:?} pending={} stages={} demands={}",
@@ -3310,6 +3305,36 @@ impl StaticTransitionPlan<'_> {
             let exclusively_predeclared_stage = transport_producer_owners
                 .get(&demand.producer_call_origin)
                 .is_some_and(|owners| *owners == (true, false));
+            #[cfg(feature = "px8-ds-test-support")]
+            let ret_key_decisive = transport_source
+                && pending_checked_ret_sink
+                && ordinary_stage_count < 2
+                && !suppress_execute
+                && !(has_unitless_response
+                    && !exclusively_predeclared_stage
+                    && !overpromote_mixed);
+            #[cfg(feature = "px8-ds-test-support")]
+            if count_install_applications && ret_key_decisive {
+                let row = (
+                    demand.vis_origin.0,
+                    demand.producer_call_origin.0,
+                    demand.operation,
+                );
+                PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
+                    if let Some(rows) = slot.borrow_mut().as_mut() {
+                        rows.push(row);
+                    }
+                });
+                if std::env::var_os("KEN_RT_RET_PLANE_CENSUS").is_some() {
+                    eprintln!(
+                        "RT_RET_APP thread={:?} vis={} producer={} operation={:?}",
+                        std::thread::current().name(),
+                        row.0,
+                        row.1,
+                        row.2,
+                    );
+                }
+            }
             #[cfg(feature = "px8-ds-test-support")]
             if count_install_applications
                 && overpromote_mixed

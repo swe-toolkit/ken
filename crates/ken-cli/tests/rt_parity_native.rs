@@ -529,7 +529,7 @@ fn differential(case: &str, entry: &str) -> Differential {
     std::fs::write(root.path().join("source"), b"ab").unwrap();
     let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
 
-    let (output, pending_plane) = ken_runtime::with_pending_checked_ret_sink_plane_observations(
+    let (output, applications) = ken_runtime::with_pending_checked_ret_sink_applications(
         || {
             ken_cli::build_native_program(
                 &source,
@@ -541,8 +541,8 @@ fn differential(case: &str, entry: &str) -> Differential {
         },
     );
     assert!(
-        !pending_plane.iter().any(|pending| *pending),
-        "{case}: parity control unexpectedly requires a pending checked-control Ret plane: {pending_plane:?}"
+        applications.is_empty(),
+        "{case}: unexpected checked-control Ret applications: {applications:?}"
     );
     let output = output
         .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
