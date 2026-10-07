@@ -16857,12 +16857,14 @@ pub(crate) fn elaborate_mutual_group(
     refinement_facts: &mut RefinementFacts,
     declared_fixities: &[Option<(Fixity, Span)>],
     members: &[RDecl],
+    record_member: &mut impl FnMut(&GlobalEnv, usize, &str),
 ) -> Result<Vec<ElabResult>, ElabError> {
     // 1. Elaborate every member's declared type FIRST (the signature
     // pre-pass) — none of these need a sibling's id, only their own params.
     let mut ty_cores: Vec<Term> = Vec::with_capacity(members.len());
     let mut parameter_facts: Vec<Vec<Option<Term>>> = Vec::with_capacity(members.len());
     for rdecl in members {
+        let before = env.decls().count();
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
             .with_preconditions(preconditions, PremiseHoles::Refused);
         let ty = rdecl.ty.as_ref().ok_or_else(|| {
@@ -16874,6 +16876,7 @@ pub(crate) fn elaborate_mutual_group(
         let (ty_c, params) = elab_signature(&mut cx, ty, false)?;
         ty_cores.push(cx.metas.zonk_term(&ty_c));
         parameter_facts.push(params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect());
+        record_member(cx.env, before, &rdecl.name);
     }
 
     // 2. Pre-admit ALL members as Opaque, binding every name in `globals`
@@ -16989,6 +16992,7 @@ pub(crate) fn elaborate_mutual_group(
     let mut all_obligations: Vec<Vec<Obligation>> = Vec::with_capacity(members.len());
     let elab_err = (|| -> Result<(), ElabError> {
         for (rdecl, ty_core) in members.iter().zip(&ty_cores) {
+            let before = env.decls().count();
             let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
                 .with_classes(class_env, provenance, standard_operators)
 
@@ -16998,6 +17002,7 @@ pub(crate) fn elaborate_mutual_group(
             let obligations = std::mem::take(&mut cx.obligations);
             bodies.push(cx.metas.zonk_term(&body_c));
             all_obligations.push(obligations);
+            record_member(cx.env, before, &rdecl.name);
         }
         Ok(())
     })();

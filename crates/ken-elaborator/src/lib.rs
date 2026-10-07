@@ -148,7 +148,7 @@ pub struct ElabEnv {
     /// Elaborator-side ownership of kernel declarations without a source name.
     /// A qualified declaration or fixed prelude stage owns each allocation.
     pub(crate) decl_owner: BTreeMap<GlobalId, (String, u32)>,
-    owner_ordinals: HashMap<String, u32>,
+    pub(crate) owner_ordinals: HashMap<String, u32>,
     /// Caller-visible `requires` arities keyed by checked declaration identity.
     pub(crate) preconditions: HashMap<GlobalId, (usize, usize)>,
     /// Numeric literal values keyed by their opaque-postulate GlobalId.
@@ -273,7 +273,7 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
 // GlobalEnv appends declarations in dependency order (`decls()`), and mark
 // rollback removes a suffix. Count the live suffix rather than numeric IDs:
 // constructor IDs share the allocator but are not standalone Decl entries.
-fn record_decl_owners(
+pub(crate) fn record_decl_owners(
     env: &GlobalEnv,
     before: usize,
     owner: &str,

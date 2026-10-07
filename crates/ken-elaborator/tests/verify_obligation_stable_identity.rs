@@ -161,6 +161,31 @@ fn two_open_calls_in_one_owner_have_distinct_stable_ids() {
     }
 }
 
+/// Promise class: durable invariant. MEASURED: two members of a real recursive
+/// SCC each allocate an unnamed string literal under their OWN qualified
+/// declaration name. CLAIMED: shared SCC staging cannot collapse unrelated
+/// member ownership into a single group/session key. THE GAP: this reaches
+/// both body passes but not every possible multi-phase type signature.
+#[test]
+fn mutual_members_own_their_literal_allocations_separately() {
+    let source = "fn isEven (n : Nat) : String = match n { Zero |-> \"even\" ; Suc m |-> isOdd m }\n\
+                  fn isOdd (n : Nat) : String = match n { Zero |-> \"odd\" ; Suc m |-> isEven m }\n";
+    let package = compile_ken_package_sources(
+        &CompilerManifest::new(PKG, Vec::new()),
+        vec![CompilerSource::new("src/mutual.ken", source)],
+        TargetSelector::StableSymbol {
+            package_identity: StableSymbol::new(SymbolNamespace::Module, vec![PKG.to_string()]),
+            symbol: decl("isEven"),
+            kind: CompilerTargetKind::NonRuntime,
+        },
+    )
+    .expect("mutually recursive literal-bearing declarations elaborate")
+    .package;
+    let symbols = &package.artifact.semantic.symbols;
+    assert!(symbols.contains(&decl("isEven#0")));
+    assert!(symbols.contains(&decl("isOdd#0")));
+}
+
 /// Promise class: durable invariant. MEASURED: the same obligation-free source
 /// compiled twice carries the same hash and no obligations. CLAIMED: identity
 /// stabilization cannot inject obligations into unrelated files. THE GAP:
