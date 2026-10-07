@@ -246,6 +246,44 @@ pub fn lt_nat (a : Nat) (b : Nat) : Bool =
       }
   }
 
+proof self_eq for compare (n : Nat) : Equal OrdResult (compare n n) Eq =
+  match n {
+    Zero ↦ Proved;
+    Suc n2 ↦ proof self_eq for compare n2
+  }
+
+proof from_lt for compare
+      (a : Nat) (b : Nat)
+    : Equal Bool (lt_nat a b) True → Equal OrdResult (compare a b) Lt =
+  match a {
+    Zero ↦
+      match b {
+        Zero ↦ λh. absurd h;
+        Suc b2 ↦ λh. Proved
+      };
+    Suc a2 ↦
+      match b {
+        Zero ↦ λh. absurd h;
+        Suc b2 ↦ λh. (proof from_lt for compare) a2 b2 h
+      }
+  }
+
+proof flip_lt for compare
+      (a : Nat) (b : Nat)
+    : Equal OrdResult (compare a b) Lt → Equal OrdResult (compare b a) Gt =
+  match a {
+    Zero ↦
+      match b {
+        Zero ↦ λh. absurd h;
+        Suc b2 ↦ λh. Proved
+      };
+    Suc a2 ↦
+      match b {
+        Zero ↦ λh. absurd h;
+        Suc b2 ↦ λh. (proof flip_lt for compare) a2 b2 h
+      }
+  }
+
 pub proof lt_implies_leq for compare
       (a : Nat)
     : (b : Nat) → Equal OrdResult (compare a b) Lt → IsTrue (leq_nat a b) =
@@ -485,6 +523,11 @@ pub proof zero_not_empty for lt_nat
           (cong Nat Bool n Zero (lt_nat Zero) empty))
 ```
 
+Self-comparison reduces structurally to the same comparison on predecessor
+arguments. The other two private proofs split both arguments: equal and
+reversed zero cases contradict the supplied premise, while paired successors
+reuse the premise at smaller arguments.
+
 The attached strict-order laws connect `lt_nat` to `leq_nat`, prove
 transitivity and successor bounds, and exclude impossible zero and empty
 cases. The successor and right-weakening laws make the elementary steps of the
@@ -624,11 +667,13 @@ consumers pass canonical `leq_nat` evidence without restating the underlying
 Boolean equation.
 The four `min`/`max` bounds use the same form. The two private tightness
 proofs complete these bounds: any common lower bound lies below `min`, and
-`max` lies below every common upper bound. The three `compare` agreements
-return the forward order for `Lt`, propositional equality for `Eq`, and the
-reverse order for `Gt`. The equality proof recurses through the two `Nat`
-arguments, transports reflexivity along the tail equality to recover both
-order directions, and applies `leq_nat::antisym` at each step.
+`max` lies below every common upper bound. The private `compare` proofs
+establish the missing result directions: self-comparison is `Eq`, a strict
+left side gives `Lt`, and `Lt` reverses to `Gt`. The three public `compare`
+agreements return the forward order for `Lt`, propositional equality for `Eq`,
+and the reverse order for `Gt`. The equality proof recurses through the two
+`Nat` arguments, transports reflexivity along the tail equality to recover
+both order directions, and applies `leq_nat::antisym` at each step.
 
 `self_is_zero` needs its induction: `sub`'s structural recursion does not reduce
 for an abstract `n` matched against itself, so `Refl` alone cannot close the
