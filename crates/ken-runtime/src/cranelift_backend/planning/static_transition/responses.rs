@@ -3306,36 +3306,6 @@ impl StaticTransitionPlan<'_> {
                 .get(&demand.producer_call_origin)
                 .is_some_and(|owners| *owners == (true, false));
             #[cfg(feature = "px8-ds-test-support")]
-            let ret_key_decisive = transport_source
-                && pending_checked_ret_sink
-                && ordinary_stage_count < 2
-                && !suppress_execute
-                && !(has_unitless_response
-                    && !exclusively_predeclared_stage
-                    && !overpromote_mixed);
-            #[cfg(feature = "px8-ds-test-support")]
-            if count_install_applications && ret_key_decisive {
-                let row = (
-                    demand.vis_origin.0,
-                    demand.producer_call_origin.0,
-                    demand.operation,
-                );
-                PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
-                    if let Some(rows) = slot.borrow_mut().as_mut() {
-                        rows.push(row);
-                    }
-                });
-                if std::env::var_os("KEN_RT_RET_PLANE_CENSUS").is_some() {
-                    eprintln!(
-                        "RT_RET_APP thread={:?} vis={} producer={} operation={:?}",
-                        std::thread::current().name(),
-                        row.0,
-                        row.1,
-                        row.2,
-                    );
-                }
-            }
-            #[cfg(feature = "px8-ds-test-support")]
             if count_install_applications
                 && overpromote_mixed
                 && has_unitless_response
@@ -3379,6 +3349,40 @@ impl StaticTransitionPlan<'_> {
                 // owner performs the host effect, calls the exact K context once,
                 // and returns its existing Result word before the caller resumes.
                 specialized.push(demand);
+                #[cfg(feature = "px8-ds-test-support")]
+                if count_install_applications
+                    && transport_source
+                    && pending_checked_ret_sink
+                    && ordinary_stage_count < 2
+                {
+                    // This demand was actually placed in Specialized. For a
+                    // transport source below two ordinary stages, reaching
+                    // here also proves the suppress and mixed-owner deferrals
+                    // did not fire; only the pending-checked-Ret disjunct
+                    // admitted it.
+                    let placed = specialized
+                        .last()
+                        .expect("just specialized a response demand");
+                    let row = (
+                        placed.vis_origin.0,
+                        placed.producer_call_origin.0,
+                        placed.operation,
+                    );
+                    PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
+                        if let Some(rows) = slot.borrow_mut().as_mut() {
+                            rows.push(row);
+                        }
+                    });
+                    if std::env::var_os("KEN_RT_RET_PLANE_CENSUS").is_some() {
+                        eprintln!(
+                            "RT_RET_APP thread={:?} vis={} producer={} operation={:?}",
+                            std::thread::current().name(),
+                            row.0,
+                            row.1,
+                            row.2,
+                        );
+                    }
+                }
             }
         }
         specialized.sort_by_key(|demand| {
