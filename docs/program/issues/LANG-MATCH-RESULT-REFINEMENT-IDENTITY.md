@@ -144,7 +144,10 @@ Every row with `ken check`, base versus candidate.
 - **AC-3 (mutation, QA).**
   - M-first-leaf (infer the first leaf again) returns q4 and pa to 0.
   - M-goal-whnf (the keeping entry calls the unguarded simplifier) returns
-    q5, pb and r0 to r3 to their base counts.
+    q5 and pb to their base count of 0, and drops each of r0 to r3 below
+    its candidate count. r0 to r3 do not return to base, because the
+    settled closure (`evt_6f7syasn73j1y`) also deletes the base's bare-value
+    rescue (`elab.rs:7153`); measured 0 each.
   - M-path-keep-all (no omission) returns q5, b4 and m1 to the
     `TypeMismatch`.
   - M-path-drop-indexed (omit every indexed-family equation) reddens the
