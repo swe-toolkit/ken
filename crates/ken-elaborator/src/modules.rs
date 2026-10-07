@@ -20,7 +20,7 @@
 //! unit-local collision admission) → rewrite (qualify free `RCon`/pattern-ctor
 //! references via the active import scope) → `elaborate_rdecl_v1` (unchanged).
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::ast::{
@@ -4795,42 +4795,39 @@ fn scc_membership(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
 /// `a -> b` means that `a`'s body uses `b`, so `b` must be elaborated first.
 /// Members of an SCC are still elaborated together by the SCT path.
 fn scc_dependency_order(adj: &[Vec<usize>], sccs: &[Vec<usize>]) -> Vec<usize> {
-    let representatives: Vec<usize> = (0..adj.len())
-        .filter(|&node| sccs[node][0] == node)
-        .collect();
-    let mut dependencies = vec![BTreeSet::new(); adj.len()];
-    let mut dependents = vec![BTreeSet::new(); adj.len()];
-    for &rep in &representatives {
+    let mut representatives = Vec::new();
+    for (node, scc) in sccs.iter().enumerate() {
+        if scc[0] == node {
+            representatives.push(node);
+        }
+    }
+    let mut order = Vec::new();
+    let mut seen = vec![false; adj.len()];
+    fn visit(
+        node: usize,
+        adj: &[Vec<usize>],
+        sccs: &[Vec<usize>],
+        seen: &mut [bool],
+        order: &mut Vec<usize>,
+    ) {
+        let rep = sccs[node][0];
+        if seen[rep] {
+            return;
+        }
+        seen[rep] = true;
+        // Condensation edges are the union of every member's edges. Looking
+        // only at the representative skips a dependency named by a later
+        // member of a mutual SCC.
         for &member in &sccs[rep] {
             for &dep in &adj[member] {
-                let dep_rep = sccs[dep][0];
-                if dep_rep != rep && dependencies[rep].insert(dep_rep) {
-                    dependents[dep_rep].insert(rep);
-                }
+                visit(dep, adj, sccs, seen, order);
             }
         }
-    }
-    let mut ready: BTreeSet<usize> = representatives
-        .iter()
-        .copied()
-        .filter(|&rep| dependencies[rep].is_empty())
-        .collect();
-    let mut order = Vec::with_capacity(representatives.len());
-    while let Some(&rep) = ready.first() {
-        ready.remove(&rep);
         order.push(rep);
-        for &user in &dependents[rep] {
-            dependencies[user].remove(&rep);
-            if dependencies[user].is_empty() {
-                ready.insert(user);
-            }
-        }
     }
-    debug_assert_eq!(
-        order.len(),
-        representatives.len(),
-        "SCC condensation is acyclic"
-    );
+    for node in representatives {
+        visit(node, adj, sccs, &mut seen, &mut order);
+    }
     order
 }
 
