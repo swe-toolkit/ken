@@ -1,22 +1,23 @@
 -- C5 UNSOUND/STUB arm — `const Nil` claiming the verified-sort subset-Σ.
--- It elaborates with an open Perm proof hole; it must never be reported proved.
+-- The open Perm hole remains the C5 oracle; the checked Pair output is deferred
+-- until W5 while carrier-only lowering is current.
 --
--- `sortBad` discards its input and returns Nil, but claims the SAME subset-Σ
--- result type as the real sort. Its checked result would pair Nil with the
--- proof component. `isSorted leq Nil` holds vacuously (the empty list is sorted)
--- — so an isSorted-ONLY obligation would pass. `Perm Nil xs` is FALSE for
--- non-empty xs — this is the conjunct that makes it a real sort.
+-- `sortBad` discards its input and returns Nil, but claims the SAME W1
+-- subset-Σ result type as the real sort. Its checked Pair is the W5 target.
+-- `isSorted leq Nil` holds vacuously (the empty list is sorted) — so an
+-- isSorted-ONLY obligation would pass. `Perm Nil xs` is FALSE for non-empty
+-- xs — this is the conjunct that makes it a real sort.
 
 fn sortBad (a : Type) (leq : a → a → Bool) (xs : List a)
   : { ys : List a | And (isSorted a leq ys) (Perm a ys xs) } =
   Nil a
 
--- Expected correct behavior: elaboration succeeds with an outer subset-Σ pair
--- whose proof component has both conjuncts. The `Perm a (Nil a) xs` obligation
--- stays open for non-empty `xs` (the multiset counts differ; no permutation
--- witness). `isSorted` is satisfiable, but the conjunction is not proved.
+-- Expected current C5 behavior: the `Perm a (Nil a) xs` obligation stays open
+-- for non-empty `xs` (the multiset counts differ; no permutation witness).
+-- `isSorted` is satisfiable, but the conjunction is not proved. The W5 target
+-- pairs Nil with proof evidence for both conjuncts.
 --
--- If ACCEPTED: the finding — either `Perm` was dropped from the emitted
+-- If reported proved: the finding — either `Perm` was dropped from the emitted
 -- obligation (a never-generated conjunct reads `proved`-by-default, the
 -- untrusted-layer omission the kernel does not catch) or the refinement
 -- obligation is not enforced. This is the discriminator: a sort verified only

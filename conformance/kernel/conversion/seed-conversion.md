@@ -462,6 +462,8 @@ unrelated registered operations must not change their verdicts.
 ### conversion/string-to-list-char-checked-literal-view (soundness)
 - spec: `17 §1` (prim row), `18a §5.9.1(1)`/`(4)`, `21 §2`, `37 §2.4`,
   `42 §1`
+- status: **deferred — W5 K-a Char subset-pair view**. Until then the
+  transitional checked-literal view constructs bare `IntLit` elements.
 - given: a kernel environment with checked `String` and
   `Char = Σ(c:Int).isScalar c`, registered
   `string_to_list_char : String → List Char`, its installed literal-view

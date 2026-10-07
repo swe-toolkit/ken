@@ -314,7 +314,7 @@ law-less/postulated/holed instance is **rejected as unlawful** (non-empty
 
 ---
 
-## AC-transport — `Ord Char` carries its laws via transport, not a stub
+## AC-char-ord-law-lifting — `Ord Char` reuses projected assumptions
 (re-homed from the Decimal/Char DEMOTE, `docs/program/wp/lawful-classes-lane.md`)
 
 `51 §6`'s carrier axis, read for a **derived/refinement** carrier: `Char` is
@@ -356,7 +356,7 @@ silently absent.
   new postulate. The discriminator remains whether every field is a real,
   present term, not whether the instance is zero-delta outright. A hole,
   fabricated false proof, or omitted field violates the contract. The
-  non-canonical Decimal carrier remains ineligible for the same transport;
+  non-canonical Decimal carrier remains ineligible for the same equality lift;
   its `DecEq.sound` would inhabit `Bottom`. This pins the omitted-field
   rejection and the zero-NEW-delta acceptance without asserting
   `Char ≡ Int`.
@@ -407,7 +407,8 @@ silently absent.
   `primitive-carrier-declared-audited-delta` (carrier separation live on the
   live-`Eq` law `total`; declared-vs-hidden always capability-independent),
   `ord-total-law-is-omega-bool-equation`.
-- **AC-transport** (honesty-not-zero-delta, a derived subset-Σ carrier):
+- **AC-char-ord-law-lifting** (honesty-not-zero-delta on a derived
+  subset-Σ carrier):
   `char-ord-laws-carried-not-stubbed` — `Ord Char` reuses visible `Ord Int`
   assumptions on `Proj1` codepoints and lifts equality via Σ-η and Ω proof
   irrelevance; the checked instance adds no new postulate.

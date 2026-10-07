@@ -3,13 +3,14 @@
 Format: `../../README.md`. These pin the `SURF-def-refinement` slice: the
 `type` → `def` declaration-keyword rename (`spec/30-surface/33-declarations.md
 §1`, `32-grammar.md §1`, `31-lexical.md §4`). The rename adds no semantic
-change; a refinement definition uses the W1 subset-Σ semantics in
-`21 §2`/§6.3. These rows pin the transparent Σ type and pair introduction as
-well as the surface keyword and `type`'s reserved-word status.
+change. The W1 subset-Σ semantics in `21 §2`/§6.3 are the target; transparent
+Σ lowering and pair introduction are **deferred — W5**. These rows also pin the
+surface keyword and `type`'s reserved-word status.
 
 ## surface/declarations/def-refinement-parses
 - spec: `spec/30-surface/32-grammar.md §1`, `spec/30-surface/33-declarations.md
   §1`
+- status: declaration parse is live; checked subset-Σ core is **deferred — W5**.
 - given:
   ```ken
   def Pos = { n : Int | IsTrue (leq_int 1 n) }

@@ -54,10 +54,11 @@ conformance discipline (`35 §7`).
 **Tags.** **(soundness)** here = a correctness / TCB commitment that must never
 regress: the f64 non-reproduction (exactness), the **no-silent-wrap** seal, the
 **no-missed-obligation** untrusted-layer net, and the **no-new-kernel-rules**
-boundary (laws stay prelude propositions). **(oracle)** = a surface token /
-diagnostic spelling pinned to the spec's reference form, to be confirmed against
-Ken's reference interpreter / the harness once fixed; the netted behavior does
-not depend on the spelling.
+boundary (laws stay prelude propositions). **[deferred — W5]** marks subset-Σ
+literal introduction while carrier-only lowering remains current. **(oracle)**
+= a surface token / diagnostic spelling pinned to the spec's reference form,
+to be confirmed against Ken's reference interpreter / the harness once fixed;
+the netted behavior does not depend on the spelling.
 
 ## AC1 — `Int` exactness above 2⁵³
 
@@ -301,6 +302,7 @@ not depend on the spelling.
 
 ### surface/numbers/char-expected-integer-literal-scalar-boundary
 - spec: `35 §2.4`, `§4.1`, `18a §5.9.1 (1), (3)`, `31 §3`
+- status: **deferred — W5 subset-Σ literal introduction**
 - given: `const char_D7FF : Char = 55295` (U+D7FF) and
   `const char_D800 : Char = 55296` (U+D800)
 - expect: both declarations elaborate at `Char = Σ(c:Int).isScalar c`. The

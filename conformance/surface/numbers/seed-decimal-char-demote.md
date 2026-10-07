@@ -61,6 +61,11 @@ proof — `Eq Decimal` is kernel-neutral and `eq_decimal : … → Bool` has no
 "refl-inhabits" reading is **over-classified**, §4 F4). The demote removes the
 wrong-value path because no trusted `eq_decimal` exists to be wrong.
 
+**Staging:** the Char scalar set and the `intToChar` branch-obligation
+partition are covered now. Checked subset-pair core output is **deferred — W5**
+while carrier-only lowering remains current; this does not defer the value or
+obligation-status assertions.
+
 ## Relationship to `seed-numbers.md` (single-home discipline)
 
 `seed-numbers.md` pins the **surface semantics** — AC6
@@ -69,9 +74,9 @@ wrong-value path because no trusted `eq_decimal` exists to be wrong.
 authoritative for the *observable numeric model*. **This seed** pins the
 **DEMOTE mechanism** — that the derivation genuinely computes (the F4 flip), the
 TCB actually shrinks (removal, not shadowing), the derived ops are zero-delta
-computational (the **Char** laws are zero-NEW-delta by transport; the
-**Decimal** `DecEq`/`Num` laws are **not deliverable** on the non-canonical
-carrier — AC-D3;
+computational (the **Char** laws reuse projected `Ord Int` assumptions and
+lift equality at zero new delta; the **Decimal** `DecEq`/`Num` laws are **not
+deliverable** on the non-canonical carrier — AC-D3;
 both re-home/re-defer to the lawful-classes lane), and the `Char` refinement is
 sound (Ω-encoding + computed extraction proof). The `leq_int` reduce-arm oracle
 (**AC-L**) homes here (this WP delivers it), extending F1's `eq_int` oracle
@@ -183,7 +188,8 @@ home each; a one-line cross-reference is added to `seed-numbers.md` AC6 +
 regress: the F4 flip (AC-D2), the TCB removal (AC-G), the `leq_int` independent
 oracle (AC-L), the `isScalar` Ω-encoding + computed extraction proof (Char pins
 1/2), the surrogate/OOR rejection (AC-C3). The `Ord Char`/`DecEq Char` **law**
-cases (zero-NEW-delta by transport, canonical carrier) re-home, and the
+cases (zero-NEW-delta via projected assumptions and equality lifting) re-home,
+and the
 `Num`/`DecEq Decimal` **law** cases (**not deliverable** on the non-canonical
 carrier — AC-D3) re-defer to the design call — both in the deferred section;
 Char pin 2's runtime face rides the extraction feature.
@@ -359,6 +365,7 @@ corrected forward obligation re-defers *there*, **not** to a
 ### surface/numbers/int-to-char-rejects-surrogate-and-oor  (soundness)
 - spec: `18a §5.9.1(3)` (`Int.toChar` face-(c), AC-C3), `35 §2.4`,
   `docs/program/wp/decimal-char-demote.md` AC-C3
+- status: guard verdicts are live; the checked `Char` pair is **deferred — W5**.
 - given: `Int.toChar` applied to `0xD800` (a surrogate), `0x110000`
   (out-of-range, `> 0x10FFFF`), and `0x41` (valid, `'A'`).
 - expect: `Int.toChar 0xD800 ⇒ None`, `Int.toChar 0x110000 ⇒ None`,
@@ -369,8 +376,8 @@ corrected forward obligation re-defers *there*, **not** to a
   `leq 0xE000 0xD800` reduce to `False`; at `0x110000`, the upper bound
   `leq 0x110000 0x10FFFF` reduces to `False`. The direct `intToChar` match
   then selects `None Char` before constructing a subset pair; it emits no
-  rejected-value `isScalar` obligation. At `0x41`, the True arm constructs
-  `Some (Pair(0x41, tt))` in checked core; runtime erases `tt` and observes
+  rejected-value `isScalar` obligation. At `0x41`, the True arm's checked
+  `Some (Pair(0x41, tt))` core shape is **deferred — W5**; runtime observes
   `Some 'A'`.
 - why: AC-C3 — the **guarded decision** must reduce to reject both the
   surrogate and the out-of-range input while accepting a valid scalar. A
@@ -385,6 +392,8 @@ corrected forward obligation re-defers *there*, **not** to a
 ### surface/numbers/int-to-char-branch-obligation-status  (soundness)
 - spec: `18a §5.9.1(3)` (guarded refinement introduction), `34 §5`,
   `22 §2.1`; `LANG-REFINEMENT-INTRODUCTION-OBLIGATION` AC-2
+- status: branch-obligation partition is live; subset-pair output is
+  **deferred — W5**.
 - given: elaborate the installed `intToChar : Int → Option Char` definition
   at a symbolic `n : Int`:
   ```ken
@@ -398,11 +407,12 @@ corrected forward obligation re-defers *there*, **not** to a
   True-arm guard equation.
 - expect: the guarded True arm emits exactly one `RefinementIntroduction`
   for `isScalar n`, under `Eq Bool (inRangeBool n) True`; that equation
-  discharges the obligation, leaving no open hole. Its checked core value is
-  `Some (Pair(n, π))`. The False arm emits zero refinement obligations and
-  returns `None Char` without constructing a pair. Without the guard equation,
-  the same `Some (Pair(n, ?h))` leaves one `isScalar n` obligation open. These
-  assertions concern elaboration obligation status, not caller reporting.
+  discharges the obligation, leaving no open hole. **Deferred — W5:** its
+  checked core value is `Some (Pair(n, π))`. The False arm emits zero
+  refinement obligations and returns `None Char` without constructing a pair.
+  Without the guard equation, the same `Some` leaves one `isScalar n`
+  obligation open; its pair encoding is W5-deferred. These assertions concern
+  elaboration obligation status, not caller reporting.
 - why: value-level `None`/`Some` results alone cannot distinguish a
   missing or undischarged scalar obligation on the guarded Some branch.
   Requiring one closed True-arm obligation and zero False-arm obligations
@@ -442,7 +452,8 @@ assumptions on projected codepoints and lift equality of projections through
 zero-NEW-delta, not a fresh postulate or an independently Axiom-free proof.
 The corrected discriminator is **HONESTY, not zero-delta**: the instance
 carries an **honest-visible** law (a `declare_def` that reduces on an
-inductive carrier, OR a visible `Axiom`/transport on an opaque one) and flips
+inductive carrier, OR a visible checked derivation from audited assumptions on
+an opaque one) and flips
 against a **deceptive empty/false stub** (claims proved, is empty) — **never**
 against an honest visible `Axiom`. Forward conformance obligation on the
 lawful-classes-lane WP — see the deferred section.
@@ -487,23 +498,24 @@ lawful-classes-lane WP — see the deferred section.
 ### surface/numbers/char-extraction-computes-scalar-proof  (soundness, deferred)
 - spec: `18a §5.9.1(4)` (pin 2, runtime face), `18a §5.9` pin 2, `37 §2`
   (`String` is NFC UTF-8), `docs/program/wp/decimal-char-demote.md` (Char pin 2)
-- status: **RUNTIME FACE DEFERRED** — the registered
-  `string_to_list_char` operation is **not** an overall `Neutral` stub.
+- status: **W5 pair shape and runtime face deferred** — the checked subset
+  pair is not claimed as current, and the `string_to_list_char` operation is
+  **not** an overall `Neutral` stub.
   Saturated interpreter `apply` uses `build_list_char` with installed
   `List Char` constructor identities to build the scalar view; the direct,
   environment-free `prim_reduce` fallback returns `Neutral` because it lacks
   those identities (`42 §1`). The separate checked-literal kernel-WHNF view
   is specified at `17 §1`. None of these facts alone discharges this case's
   **computed `isScalar` proof** obligation for the deferred `char_at` /
-  `String → Char` extraction runtime face. The **static face** (the
-  requirement below + no-postulate) stands now; the runtime face (extraction
-  *computes* the `tt`) remains a forward obligation of the extraction-feature
-  WP (deferred section), gated then.
+  `String → Char` extraction runtime face. Its checked pair is **deferred —
+  W5**; runtime extraction that computes `tt` remains a separate forward
+  obligation of the extraction-feature WP (deferred section), gated then.
 - given: `String → Char` extraction (`char_at` / `string_to_list_char`) on a
   valid `String`.
-- expect (producer-grep, structural): extraction constructs the checked core
-  pair `Pair(IntLit c, w) : Char`, where the `isScalar` witness `w` reduces
-  from the String's validity invariant — `inRangeBool c` computes to `true`
+- expect (deferred — W5 pair shape; runtime extraction feature): extraction
+  constructs the checked core pair `Pair(IntLit c, w) : Char`, where the
+  `isScalar` witness `w` reduces from the String's validity invariant —
+  `inRangeBool c` computes to `true`
   (via the pulled-up `leq_int`), so `w` is canonical `tt` (`IsTrue true ≡ Top`).
   The producer discharges the obligation by reduction; it is never a
   `declare_postulate` / `Axiom` / hand-fed `sorry` / `Neutral`-stub asserting a
@@ -541,8 +553,8 @@ lawful-classes-lane WP — see the deferred section.
   `char-extraction-computes-scalar-proof` (hard-AC, **runtime face deferred**)
 - **RE-HOMED (lawful-classes lane, forward obligations):** the `Ord
   Char`/`DecEq Char` **law-carrying instance** cases (were
-  `char-ord-laws-carried-not-stubbed`) — **zero-NEW-delta by transport** on
-  Char's canonical carrier, honesty discriminator (not zero-delta); see the
+  `char-ord-laws-carried-not-stubbed`) — zero-NEW-delta via projected
+  assumptions and equality lifting on Char's canonical carrier; see the
   deferred section.
 - **RE-DEFERRED (not deliverable as specified → design call):** the
   `Num`/`DecEq Decimal` **law-carrying instance** cases (were AC-D3) —

@@ -13,28 +13,28 @@ not a forward reference.)
 **The layer is ★★ (untrusted) — but read the backstop precisely (Architect).** A
 V2 bug never breaks **kernel** soundness: the kernel re-checks every *supplied*
 certificate (`18 §4`), so a **spurious** obligation is over-conservatism (a
-false
-`unknown`) and a *bad* cert is kernel-rejected. But a **missed** obligation — a
-burden the extractor **never emits** — is **not** caught downstream: the V1 §5.4
-honesty guard (`trusted_base()`) catches **generated-but-undischarged** holes,
-not
-sites that were never turned into holes, so a never-emitted burden reads as
-`proved` though unproven. **Completeness-of-extraction is therefore the
-*verification*-soundness linchpin, backstopped by nothing but the absent-clause
-scan (§2.5)** — "all obligations discharged ⇒ correct" is only as strong as the
-guarantee that **no burden was silently skipped**. So these cases pin
-**completeness of extraction** (every burden site → its obligation; the
-absent-clause scan audits that no burden is silently skipped *and* no trivial
-clause over-skipped — the load-bearing safeguard, not a nicety) and **honest
-provenance** (each obligation traces to its source clause + has a stable id).
+false `unknown`) and a *bad* cert is kernel-rejected. But a **missed** obligation
+— a burden the extractor **never emits** — is **not** caught downstream. The
+W4 `postulates_reachable` query prevents a checked certificate that reaches a
+generated open hole from reading `proved`; each such hole also appears in
+`trusted_base()`. The query cannot catch sites that were never turned into
+holes, so a never-emitted burden reads as `proved` though unproven.
+**Completeness-of-extraction is therefore the *verification*-soundness linchpin,
+backstopped by nothing but the absent-clause scan (§2.5)** — "all obligations
+discharged ⇒ correct" is only as strong as the guarantee that **no burden was
+silently skipped**. So these cases pin **completeness of extraction** (every
+burden site → its obligation; the absent-clause scan audits that no burden is
+silently skipped *and* no trivial clause over-skipped — the load-bearing
+safeguard, not a nicety) and **honest provenance** (each obligation traces to
+its source clause + has a stable id).
 
-**V2 consumes the checked subset-Σ form (`22 §1.1`).** V1 emits a kernel-
-checked `Pair(a,π)` at `Σ(x:A).φ`; an open introduction hole is the applied
-proof component, not a free-standing fact detached from the value. V2 associates
-the marked proof site with its obligation and extracts it without skipping the
-pair. The existing `sort_sigma` rule places a relevant carrier with an Ω proof
-in `Type (max ℓ_A ℓ_φ)` (`13 §4`); V2 reads that checked core type rather than
-re-encoding the refinement.
+**W1 target and staging.** V2 consumes the checked subset-Σ form
+(`22 §1.1`): V1's target is `Pair(a,π)` at `Σ(x:A).φ`, with an open
+introduction hole as the applied proof component. These subset-Σ core-shape
+expectations are **[deferred — W5]** while the transitional carrier-only
+implementation remains. The kernel `sort_sigma` rule is already live
+(`13 §4`); the deferred portion is surface elaboration and V2 consumption of
+its proof site, not kernel formation.
 
 **Two-sided completeness (the spine of these cases).** The extractor must
 **emit**
@@ -48,12 +48,18 @@ appear / vanish here under the targeted bug?").
 Cases tagged **(soundness)** encode the completeness/honesty commitments the
 verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
+**Staging:** subset-Σ pair/projection expectations are **deferred — W5** while
+carrier-only lowering remains current; transitive honesty-query expectations
+are **deferred — W4**. The obligation-emission property is kept distinct from
+the W5 core-pair shape.
+
 ---
 
 ## A. Extraction completeness — the four sources (`22 §2`)
 
 ### verify/obligations/refinement-introduction-emits-phi
 - spec: `22 §2.1`; `21 §2` (subset-Σ introduction)
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }`; a function
   `fn keep (n : Int) : Pos = n`
 - expect: the core body is `Pair(n, ?h n) : Σ(n:Int).IsTrue (leq_int 1 n)`.
@@ -69,6 +75,8 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/postcondition-emits-substituted-goal
 - spec: `22 §2.2`; `21 §6.3`
+- status: obligation target is unchanged; the subset-Σ result and pair are
+  **deferred — W5**.
 - given: `fn inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1` —
   a **straight-line** body
 - expect: the core result type is `Σ(r:Int).Equal Int r (n + 1)` and the body
@@ -107,6 +115,8 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/partial-primitive-emits-nonzero-obligation
 - spec: `22 §2.4`; `35 §3` (Int div/mod by zero = obligation); `43 §2`
+- status: refined-parameter `Proj1`/`Proj2` is **deferred — W5**; the explicit
+  `requires` control is not.
 - given: (a) an unrefined division `n / d` on `Int` with possibly-zero `d`;
   (b) `fn f (d : {x:Int | Not (Equal Int x 0)}) : Int = 1 / d`; (c) the same
   body with `d : Int requires Not (Equal Int d 0)`.
@@ -141,6 +151,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/refined-param-is-sigma-domain (soundness)
 - spec: `21 §2`/§6.3; `22 §2.1`/§2.3/§3
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `fn head (xs : { l : List A | Not (Equal (List A) l (Nil A)) }) : A = …`
   and a caller that supplies plain `xs : List A`
 - expect: the function binder is
@@ -187,6 +198,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/forgetful-coercion-emits-nothing
 - spec: `22 §2.1`/§2.5.4; `21 §6.3`
+- status: **deferred — W5 subset-Σ elaboration**
 - given: a value `p : Pos` (`= Σ(n:Int).IsTrue (leq_int 1 n)`) used where
   plain `Int` is expected — the forgetful direction `{x:A|φ} ≤ A`
 - expect: **no** obligation; the core coercion is `Proj1 p : Int`, not the
@@ -251,6 +263,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/match-branch-gamma-carries-scrutinee-equation (soundness)
 - spec: `22 §3` (match constructor equation), `§4`; `39 §2.6` (match→elim_D)
+- status: subset-Σ result-pair expectations are **deferred — W5**.
 - given: `fn f (xs : List Int) : Int ensures P result = …` whose body is
   `match xs { nil → e0 ; cons y ys → e1 }` where the `cons`-branch goal
   discharges only by knowing the scrutinee shape
@@ -278,6 +291,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/conditional-branch-adds-boolean-equation
 - spec: `22 §3` (conditional)
+- status: subset-Σ result-pair expectations are **deferred — W5**.
 - given: `fn f (n : Int) : Int` with
   `ensures IsTrue (leq_int 0 result) = if leq_int 0 n then n else 0`
 - expect: the then-branch obligation's `Γ` carries
@@ -312,6 +326,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/recursive-fn-per-ctor-obligation-with-ih (soundness)
 - spec: `22 §4`; `14 §3` (eliminator); `39 §2.6`
+- status: **deferred — W5 subset-Σ result and refined-parameter elaboration**
 - given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; a recursive
   `fn sum (xs : List NonNeg) : Int` with
   `ensures IsTrue (leq_int 0 result) = …` and body
@@ -321,8 +336,8 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
   pair and records `IsTrue (leq_int 0 0)`. In the cons branch, the result pair's
   obligation is `IsTrue (leq_int 0 (Proj1 y + Proj1 (sum ys)))`; the context
   contains `Proj2 y` and the induction hypothesis
-  `M ys : Σ(r:Int).IsTrue (leq_int 0 r)`, whose `Proj2` is evidence for the
-  recursive result.
+  `M ys : Σ(r:Int).IsTrue (leq_int 0 r)`, whose `Proj2` is checked IH
+  evidence; `Proj2 (sum ys)` is the corresponding checked self-call evidence.
 - why: §4 — the dependent eliminator gives each constructor method the IH for
   its recursive fields (`M zᵢ`); V2 reads these from the elaborator's
   `match → elim_D` compilation and adds them to `Γ` (it does not synthesize an
@@ -332,6 +347,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/nonrecursive-degenerate-no-induction-hypothesis
 - spec: `22 §4` (degenerate motive), `21 §2`/§6.3
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; a non-recursive
   `fn double (n : NonNeg) : Int ensures IsTrue (leq_int n result) = n + n`
 - expect: the obligation `IsTrue (leq_int (Proj1 n) (Proj1 n + Proj1 n))` is
@@ -350,22 +366,23 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/inductive-postcond-hole-localization (soundness)
 - spec: `22 §8` (acceptance), `§5`, `§6`; `18 §4.5`; `21 §5.4`
+- status: subset-Σ shape is **deferred — W5**; transitive honesty is
+  **deferred — W4**.
 - given: the recursive `sum` (above) with its per-constructor obligations
   **supplied with valid proofs**; then the **same** with the `cons`-branch proof
   **removed**
 - expect: (a) with all proofs — every obligation's certificate `check`s in the
-  kernel (`18 §4.5`); the definition is **fully verified** (empty open set;
-  nothing from it in `trusted_base()`). (b) with the `cons` proof removed — a
-  **single, precisely-located** open hole at the `cons`-branch obligation
-  `IsTrue (leq_int 0 (y + sum ys))` (status `unknown`); its goal **appears** in
-  `trusted_base()`; the other obligations stay `proved`.
-- why: §8 — the flagship end-to-end. **Structural/verdict flip:** all-proofs →
-  fully verified; one-proof-removed → exactly **one** localized hole (its
-  `Γ ⊢ φ` identity + provenance pin *which*), the rest unaffected.
-  **Disconfirming:** does removing a needed proof leave a vague/global failure,
-  or a precisely-located hole? §8 requires the latter — the hole carries its
-  `Γ ⊢ φ` and provenance, and only that obligation flips to `unknown`. Pins the
-  honesty guard (`21 §5.4`) end-to-end at the obligation grain.
+  kernel (`18 §4.5`). **Deferred — W4:** no certificate's transitive
+  dependencies contain an open obligation hole. (b) with the `cons` proof
+  removed — a **single, precisely-located** open hole at the `cons`-branch
+  obligation `IsTrue (leq_int 0 (y + sum ys))`; its `GlobalId` appears in
+  `trusted_base()` and is reachable from its applied certificate; the other
+  obligations remain proved under W4.
+- why: §8 — the flagship end-to-end. **Structural/verdict flip:** all proofs
+  check; removing one leaves exactly **one** localized reachable hole (its
+  `Γ ⊢ φ` identity + provenance pins *which*), with the rest unaffected. The
+  query is W4-deferred; the obligation location and direct hole visibility are
+  pinned now.
 
 ---
 
@@ -401,6 +418,7 @@ verdict model rests on (`22 §2.5`, `21 §5.4`) and must never regress.
 
 ### verify/obligations/v2-extracts-subset-sigma-proof-site (soundness)
 - spec: `22 §1.1`/§5; `21 §2`/§6.3; `13 §4`
+- status: **deferred — W5 subset-Σ elaboration and V2 proof-site consumption**
 - given: `def Pos = {x:Int | IsTrue (leq_int 1 x)}` and
   `fn keep (n:Int) : Pos = n`, with checked core
   `Pair(n, ?h n) : Σ(x:Int).IsTrue (leq_int 1 x)`

@@ -14,12 +14,12 @@ prototype's stubbed sums and missing exhaustiveness.
 
 ## Reading disciplines (how to read every case below)
 
-- **No new kernel rule.** Every case lowers to the **landed** kernel: `data` →
-  inductive family + `elim_D` (`14`, K1/K1.5), `match` → `elim_D` (`39 §2.6`),
-  refinement → checked subset `Σ(x:A).φ` (`21 §2`, `22 §2.1`). Introduction
-  constructs a pair and records its proof obligation; forgetting uses `Proj1`.
-  A case that asserts a kernel *rejection* is asserting the **landed** kernel's
-  verdict (`check_positivity`, eliminator well-formedness), not a new gate.
+- **No new kernel rule.** `data` lowers to the **landed** kernel's inductive
+  family + `elim_D` (`14`, K1/K1.5), and `match` to `elim_D` (`39 §2.6`). A
+  refinement's kernel target is checked subset `Σ(x:A).φ` (`21 §2`, `22 §2.1`),
+  but surface pair/projection elaboration is **deferred — W5** while
+  carrier-only lowering remains current. A case that asserts a kernel
+  *rejection* uses the **landed** kernel verdict, not a new gate.
 - **The exhaustiveness checker is untrusted; the safety is kernel-backed**
   (`34 §4.4`). The *safety* (no silently-partial `match`) holds even against a
   buggy checker — the kernel cannot type an `elim_D` missing a method. What the
@@ -537,6 +537,7 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 
 ## surface/data-match/branch-refinement-is-hypothesis (AC6)
 - spec: `spec/30-surface/34-data-match.md §3.3`, `20-verification/22 §3`
+- status: subset-Σ result pairs are **deferred — W5**; branch equations remain.
 - given: a **dependent** `match` whose result type depends on the scrutinee —
   e.g. `match (v : Vec a m) { VNil => … ; VCons … => … }` with an `ensures` over
   the length, so each arm's expected type is the motive at that constructor
@@ -606,6 +607,7 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 
 ## surface/data-match/refinement-obligation (AC7) (soundness) — TR7
 - spec: `spec/30-surface/34-data-match.md §5`, `21 §2`, `22 §2.1`
+- status: **deferred — W5 subset-Σ elaboration** for pair/projection core shapes.
 - given: `def NonNeg = { n : Int | IsTrue (leq_int 0 n) }`; (a) passing a
   plain `Int` `e` where `NonNeg` is expected; (b) passing `NonNeg` where an
   `Int` is expected; (c) `data Box = Wrap NonNeg` and constructor application

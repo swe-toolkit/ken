@@ -574,6 +574,26 @@ mode-switch fallback `t ⇐ A`: infer `t ⇒ A'`, then `convert_type(A, A')` (`1
 
 ---
 
+### kernel/judgments/postulates-reachable-through-refined-proj2 (soundness)
+- spec: `18 §5` (`postulates_reachable`); `21 §5.4`
+- status: **deferred — W4 read-only dependency query**
+- given: a designated audited contract axiom `audit_top : Top` and an open
+  obligation hole `?h : Top`; transparent constants
+  `clean : Σ(n:Int).Top = Pair(0, audit_top)` and
+  `refined : Σ(n:Int).Top = Pair(0, ?h)`. Let
+  `p_clean = λ (_:Top).Proj2 clean` and
+  `p_refined = λ (_:Top).Proj2 refined`.
+- expect: `check` accepts both certificates at `Top → Top`.
+  `postulates_reachable(env, p_clean) = {id_audit}` and
+  `postulates_reachable(env, p_refined) = {id_h}`. The query follows each
+  transparent body and projection. Both identities remain in `trusted_base()`;
+  the query reports dependencies but does not classify them.
+- why: the query inspects transitive dependencies of a checked term, not the
+  environment's global postulate population. The hole goal `Top` differs from
+  the certificates' goal `Top → Top`, so a same-goal lookup misses it. The two
+  terms differ only in the proof component reached through the refined
+  constant's `Proj2`, giving the W4 positive/negative control pair.
+
 ## F. Regression — K1/K2/K2c-series-1 judgments unchanged
 
 ### kernel/judgments/k1-k2-judgments-still-green (soundness)

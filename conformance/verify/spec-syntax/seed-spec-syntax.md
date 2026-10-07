@@ -14,27 +14,28 @@ core), the honesty guard (`unknown` never reads `proved`), and scope guards
 (`18 §4`); an elaborator bug is a wrong term, verdict, or diagnostic, not a
 kernel soundness failure.
 
-**The representation is a checked subset Σ (`21 §2`/§6.3, `34 §5`).** A
-refinement `{x:A|φ}` elaborates to `Σ(x:A).φ` at `Type (max ℓ_A ℓ_φ)`. Its
+**W1 representation target.** A refinement `{x:A|φ}` elaborates to the checked
+subset `Σ(x:A).φ` at `Type (max ℓ_A ℓ_φ)` (`21 §2`/§6.3, `34 §5`). Its
 carrier is relevant, its Ω proof is proof-irrelevant, and the Σ is not
-convertible to `A`. Introduction constructs a checked pair with either
-kernel-checked evidence or an applied typed hole; forgetting inserts `Proj1`
-without an obligation. No coercion descends under a type former or binder.
-Written `requires` remains a separate Π proof argument. The Π and Σ sort rules
-are both landed (`13 §4`): Π is codomain-keyed; Σ lands in Ω only when both
-components are Ω.
+convertible to `A`. Introduction constructs a checked pair; forgetting inserts
+`Proj1` without an obligation. No coercion descends under a type former or
+binder. Written `requires` remains a separate Π proof argument. The Π and Σ
+sort rules are landed (`13 §4`); **subset-Σ elaboration expectations are
+[deferred — W5]** while the transitional carrier-only implementation remains.
 
-**The honesty discriminator remains kernel-side.** `unknown ≢ proved` is
-decidable from `GlobalEnv::trusted_base()` (`18 §5`): an open hole is a
-postulate, while a checked certificate adds no trusted-base entry. A V-layer
-flag cannot forge `proved` (`21 §5.4`).
+**W1 honesty target.** `unknown ≢ proved` requires a checked certificate and
+no reachable open obligation hole (`21 §5.4`). `postulates_reachable(env, p)`
+traverses transparent dependencies; an audited contract axiom can remain visible
+without demoting a checked proof. **The transitive-query expectation is
+[deferred — W4]**; `trusted_base()` membership alone is not the honesty test.
 
 **Deferred-tag convention.** A case may describe a settled model whose concrete
 spelling or elaboration capability has not landed. Tag only that portion
 `[deferred — <named capability or section>]`, state the landed behavior
-separately, and never present the deferred portion as currently accepted. The
-tag names implementation availability, not whether the governing design
-decision is open.
+separately, and never present the deferred portion as currently accepted. Here
+`[deferred — W5]` names the subset-Σ elaboration target and `[deferred — W4]`
+names the read-only reachability query. The tag names implementation
+availability, not whether the governing design decision is open.
 
 The first instance is disposition-tag spelling (`21 §5.5`): V1 delivers the
 status **model** and concrete grammar for
@@ -73,6 +74,8 @@ rests on (`21 §5.4`) and must never regress.
 
 ### verify/spec-syntax/refined-domain-and-requires-higher-order-boundary
 - spec: `21 §2`/§6.3; `22 §2.1`/§2.3; `39 §5.3`
+- status: refined-domain and pair-introduction behavior is **deferred — W5**;
+  `requires`-as-Π behavior is the landed portion.
 - given: the declarations below and the four applications named below.
 - expect: `refined_fn` has domain `Pos = Σ(n:Int).Not (Equal Int n 0)`;
   `requires_fn` instead has an `Int` domain followed by a separate Π proof
@@ -131,6 +134,7 @@ site.
 
 ### verify/spec-syntax/ensures-result-is-subset-sigma
 - spec: `21 §6.3` (ordinary `fn` result), `§2`/§6.5; `22 §2.2`
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `fn inc (n : Int) : Int ensures Equal Int result (n + 1) = n + 1`
 - expect: the core result type is `Σ(r:Int).Equal Int r (n + 1)` at
   `Type 0`; the straight-line body checks as `Pair(n + 1, π)` at that type.
@@ -145,6 +149,8 @@ site.
 
 ### verify/spec-syntax/ensures-result-level-is-predicative-max
 - spec: `21 §6.3`/§8; `22 §2.2`; `13 §4`
+- status: surface refinement formation is **deferred — W5**. Kernel Σ sort
+  formation remains live through `kernel/pi-sigma/`.
 - given: in a context with `A : Type 0` and `P : A → Ω_1`, elaborate
   `fn keep (x : A) : A ensures P result = x`.
 - expect: the core result type is `Σ(r:A).P r : Type 1`, since
@@ -157,6 +163,7 @@ site.
 
 ### verify/spec-syntax/named-refinement-is-subset-sigma
 - spec: `21 §2`/§6.3/§8; `34 §5`; `13 §4`
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `def Pos = { n : Int | IsTrue (leq_int 1 n) }` and
   `fn keep (n : Int) : Pos = n`
 - expect: `Pos` unfolds transparently to
@@ -171,6 +178,7 @@ site.
 
 ### verify/spec-syntax/refinement-type-level-is-predicative-max
 - spec: `21 §2`/§8; `13 §4`; `12 §2`/§3
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `A : Type 0`, `P : A → Ω_1`, `a : A`, and `p : P a`; elaborate
   `def Ref = {x:A | P x}` and check `Pair(a,p) : Ref`.
 - expect: `Ref` unfolds to `Σ(x:A).P x : Type (max 0 1) = Type 1` — not
@@ -181,14 +189,15 @@ site.
 
 ### verify/spec-syntax/refinement-to-refinement-uses-source-proof
 - spec: `21 §2`/§6.3; `22 §2.1`; `16 §1.3`
-- given: in a context with `P : Int → Ω`, define
-  `Positive = {n:Int | P n}` and `Strong = {n:Int | And (P n) Top}`; check
-  `fn weaken (x:Strong) : Positive = x`.
-- expect: the core body is `Pair(Proj1 x, ?h x) : Positive`. It records one
+- status: **deferred — W5 subset-Σ elaboration**
+- given: in context `Γ₀ = (P : Int → Ω)`, define
+  `Positive = {n:Int | P n}` and `Strong = {n:Int | And (P n) Top}`; check the
+  expression `x` at `Positive` under `Γ = Γ₀, (x : Strong)`.
+- expect: the core body is `Pair(Proj1 x, ?h P x) : Positive`. It records one
   target-introduction obligation `P (Proj1 x)`; the closed goal's context
-  contains `Proj2 x : And (P (Proj1 x)) Top`. V3 can discharge it with
-  `Proj1 (Proj2 x)`; otherwise V1 applies the typed hole to `x`. It may not
-  erase the pair.
+  contains `P` and `Proj2 x : And (P (Proj1 x)) Top`. V3 can discharge it with
+  `Proj1 (Proj2 x)`; otherwise the typed hole, closed over all of Γ, is applied
+  to `P` and `x`. It may not erase the pair.
 - why: target-first coercion forgets the source with `Proj1` and introduces the
   target subset under the source pair's checked `Proj2` hypothesis. This is not
   kernel subtyping or conversion of the two subset types. A carrier-erasing
@@ -196,6 +205,7 @@ site.
 
 ### verify/spec-syntax/no-coercion-under-list
 - spec: `21 §2`/§6.3; `13 §4`; `18 §3`
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `def Five = { n : Int | Equal Int n 5 }`; terms
   `xs = Cons Int 5 (Nil Int)` and
   `ys = Cons Five (Pair(5, Refl)) (Nil Five)`. Check each at both
@@ -211,6 +221,7 @@ site.
 
 ### verify/spec-syntax/lambda-at-refinement-introduces-proof
 - spec: `21 §2`/§6.3; `22 §2.1`
+- status: **deferred — W5 subset-Σ elaboration**
 - given: `def SevenAtZero = { f : (x:Int) → Int | Equal Int (f 0) 7 }`;
   check the lambda `λ x. 5` at `SevenAtZero` and at the plain type
   `(x:Int) → Int`.
@@ -260,13 +271,14 @@ site.
 
 ### verify/spec-syntax/old-resolves-in-space-op-ensures
 - spec: `21 §6.4` (elabSpaceEnsures), `36 §4.3`; `16 §2` (`refl`)
+- status: `old` resolution is landed; the result pair is **deferred — W5**.
 - given: a **block-space** op `inc` over a cell `n : Int` with
   `ensures Equal Int n (old(n) + 1)` and residual row `F = 𝟘`
 - expect (landed): `old(n)` resolves to the pre-state projection and bare `n`
-  to the post-state projection. `run_state` returns `Ret (r, s_post)`; with
-  `F = 𝟘`, the checked result type collapses to
-  `Σ(rs:Int × S).ψ(s_pre,rs)`, and the checked body pairs the result with its
-  proof. Substitution and record reduction discharge this `inc` example.
+  to the post-state projection. `run_state` returns `Ret (r, s_post)`.
+- expect (deferred — W5): with `F = 𝟘`, elaboration collapses the whole result
+  type to `Σ(rs:Int × S).ψ(s_pre,rs)` and pairs the result with its proof.
+  Substitution and record reduction discharge this `inc` example.
 - why: the empty residual row collapses the general space rule to a pure
   state-transformer subset Σ, not a bare `(result, state)` carrier. The
   block-space operation installs distinct pre-state and post-state cell
@@ -275,16 +287,17 @@ site.
 
 ### verify/spec-syntax/space-ensures-residual-tree-allret
 - spec: `21 §6.4`; `22 §2.2`; `36 §4.3`; `13 §4`
+- status: **deferred — W5 subset-Σ space-result elaboration and AllRet**
 - given: a space operation with residual row `F` and one `ensures ψ` clause;
   its residual tree is `t : ITree F (R × S)`. Use a residual operation whose
   response is `Bool`, with `t = Vis e (λ b. Ret (b, s_post))` and
   `ψ(b, s_post) = Equal Bool b True`. For the level control, take
   `P : X → Ω_0`, `x : X`, and `t_hi = Vis e_hi (λ a. Ret x)` with
   `E.Resp e_hi : Type 1`.
-- expect: W1's checked result type is
+- expect (deferred — W5): the checked result type is
   `Σ(t : ITree F (R × S)).AllRet (λ rs.ψ(s_pre,rs)) t`; the proof is in one
   outer pair and one obligation, not a pair inside `ITree F` or one proof per
-  user `Ret`. **[deferred — W5 AllRet declaration]** Its fold equations are
+  user `Ret`. Its fold equations are
   `AllRet P (Ret rs) = P rs` and
   `AllRet P (Vis e k) = Π(r:E.Resp e).AllRet P (k r)`. On the sample tree the
   fold is `Π(b:Bool).Equal Bool b True`, so the False response leaves the
@@ -320,17 +333,21 @@ site.
 
 ## C. The verification status model + honesty guard (`21 §5`)
 
-### verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base (soundness)
+### verify/spec-syntax/proved-status-cert-checks-no-reachable-open-hole (soundness)
 - spec: `21 §5.1` (verdict `proved`), `§5.4` (discriminator); `18 §4.5`/§5
+- status: **deferred — W4 `postulates_reachable`**; certificate checking
+  remains live.
 - given: an `ensures` obligation `?h : φ` discharged by a certificate `p` with
   `Γ ⊢ p : φ` (a closed core proof term)
-- expect: verdict **`proved`** — `check(env, Γ, p, φ)` **accepts**, **and** the
-  goal `φ` does **not** appear in `GlobalEnv::trusted_base()` (the postulate is
-  retired on discharge).
-- why: §5.1/§5.4 — a `proved` certificate is a closed core term `check`
-  validates; it adds **nothing** to the trusted base (`18 §5`). The `proved`
-  side of the kernel-side discriminator. (The cert is given, not
-  prover-generated — V1 fixes the **status model**; the prover is V3.)
+- expect: `check(env, Γ, p, φ)` accepts. **Deferred — W4:** the claim is
+  `proved` only when `postulates_reachable(env, p)` reaches no open obligation
+  hole. Audited contract axioms may remain visible in `trusted_base()` without
+  demoting the checked proof.
+- why: §5.1/§5.4 — a `proved` certificate is a core term that `check`
+  validates and whose transitive dependencies contain no open obligation hole.
+  This is the clean-certificate side; the refined-constant contrast follows.
+  The cert is given, not prover-generated — V1 fixes the status model; the
+  prover is V3.
 
 ### verify/spec-syntax/bogus-cert-not-proved (soundness)
 - spec: `21 §5.1`, `§5.4`; `18 §4.5` (de Bruijn re-check); `../seed-verify.md`
@@ -340,33 +357,45 @@ site.
   obligation stays an open hole (`unknown`), `φ` **remains** in
   `trusted_base()`.
 - why: the kernel re-check is the soundness firewall around the untrusted prover
-  (`18 §4`) — a wrong certificate cannot make `φ` `proved`. **Verdict-flips**
-  with the case above: valid cert → `proved` + `φ ∉ trusted_base()`; bogus cert
-  → not-proved + `φ ∈ trusted_base()`. The de Bruijn criterion at the
-  status-model level.
+  (`18 §4`) — a wrong certificate cannot make `φ` `proved`. It contrasts with
+  the clean-certificate case on the exact `check` result; transitive dependency
+  honesty is tested separately by the W4 pair below.
 
 ### verify/spec-syntax/unknown-hole-distinct-from-proved (soundness)
 - spec: `21 §5.4` (the honesty guard), `§5.1` (`unknown` = postulate); `18 §5`;
   `24 §2`
+- status: the direct hole is a visible postulate; transitive status is
+  **deferred — W4 `postulates_reachable`**.
 - given: an `fn` with an `ensures φ` left **undischarged** — admitted with a
   typed hole `?h : φ`; the program type-checks and runs
-- expect: the goal `φ` **appears** in `GlobalEnv::trusted_base()` (the hole
-  **is** a postulate of `φ`), whereas a `proved` claim's goal does **not**. So
-  `unknown ≢ proved` is decidable **kernel-side**: a claim is `proved` **iff**
-  its certificate `check`s **and** no postulate carrying its goal sits in
-  `trusted_base()`.
-- why: §5.4 — the discriminator is **structural and kernel-side**, not a V-layer
-  flag, so a bug in the untrusted layer **cannot forge** `proved`.
-  **Absence-assertion gate** — guard named: **`trusted_base()` membership**
-  (`18 §5` enumerates exactly postulates + primitives). **Disconfirming check:**
-  would an `unknown` claim read `proved` under the bug this targets (conflating
-  the statuses)? **Only** if the discriminator were a self-reported flag;
-  because it is the kernel's own `trusted_base()` membership, the hole-postulate
-  is **structurally present** — green-vs-red on membership, never
-  green-vs-green. The load-bearing ★★ honesty property: an `incomplete` never
-  masquerades as `proved`. (Pins `21 §9` acceptance #2; grounds the same
-  `trusted_base()` enumerated by `../../kernel/judgments/seed-judgments.md`
-  `judgments/trusted-base-enumerate`.)
+- expect: the open hole's `GlobalId` appears in `trusted_base()`.
+  **Deferred — W4:** it is reachable from the applied hole certificate and
+  makes the claim `unknown`; a checked certificate with no reachable open
+  obligation hole is `proved`. This own-hole case is only one arm of the
+  transitive rule.
+- why: §5.4 — the honesty discriminator is the checked certificate plus the
+  kernel-side dependency query, not a V-layer flag. Membership of the goal
+  itself is not a dependency test; the next case supplies the disconfirming
+  transitive contrast. The read-only query is W4-deferred.
+
+### verify/spec-syntax/proved-status-rejects-transitive-proj2-hole (soundness)
+- spec: `21 §5.4`; `18 §5`; `24 §2`
+- status: **deferred — W4 `postulates_reachable` query**
+- given: a designated audited contract axiom `audit_top : Top` and an open
+  obligation hole `?h : Top`. Define transparent
+  `clean : Σ(n:Int).Top = Pair(0, audit_top)` and
+  `refined : Σ(n:Int).Top = Pair(0, ?h)`. Let
+  `p_clean = λ (_:Top).Proj2 clean` and
+  `p_refined = λ (_:Top).Proj2 refined`; both target `Top → Top`.
+- expect: both certificates pass `check`.
+  `postulates_reachable(env, p_clean) = {id_audit}` and reaches no open hole,
+  so `p_clean` is `proved`; the query for `p_refined` returns `{id_h}`, so
+  `p_refined` is `unknown`. Both identities remain visible in `trusted_base()`.
+- why: both certificates conclude `Top → Top`; the open hole has the distinct
+  goal `Top` and is reached through the transparent constant's `Proj2`. No
+  postulate carries the target goal, so a goal-local lookup misses the hole;
+  demoting every reachable postulate misclassifies the audited-axiom control.
+  This is the W4 discriminator for transitive proof honesty.
 
 ### verify/spec-syntax/disproved-distinct-from-unknown
 - spec: `21 §5.1` (`disproved` = verification error), `§5.3` (projection),
@@ -391,16 +420,17 @@ site.
 
 ### verify/spec-syntax/epistemic-projection-distinct
 - spec: `21 §5.2`/§5.3 (the projection), `§5.5` (deferred tag grammar)
+- status: the transitive `proved`/`unknown` discriminator is **deferred — W4**.
 - given: the four epistemic statuses of `21 §5.2`, each by carried evidence
-- expect (model, landed): the projection (`§5.3`) pins them **distinct** —
-  prove+`proved` → **proved** (certificate, kernel-checked, `∉ trusted_base()`);
-  prove+`unknown` → **unknown** (typed hole = postulate, `∈ trusted_base()`);
+- expect (model): the projection (`§5.3`) pins them **distinct** —
+  prove+`proved` → **proved** (checked certificate, no reachable open hole;
+  W4); prove+`unknown` → **unknown** (reachable typed hole; W4);
   `test`/`assume` → **tested** (runtime/test + generator obligation); `delegate`
   → **delegated** (temporal-logic export, model-checking obligation). The
   verifier **never returns** `tested` or `delegated` — they are author-chosen
   annotations that **bypass the prover** (`§5.3`).
-- expect (deferred): the `proved` vs `unknown` distinction is pinned
-  **structurally** here and now (via `trusted_base()`, group C); the
+- expect (deferred): the transitive `proved` vs `unknown` distinction is
+  **[deferred — W4]** (via the query cases in group C); the
   **`tested`/`delegated` clause spelling** is **`[deferred — §5.5, OQ-syntax]`**
   (`assume`/`test` reserved, grammar downstream of `../70-behavioral/`) — this
   case asserts the **model**, not un-landed grammar.
@@ -415,11 +445,12 @@ site.
 
 ### verify/spec-syntax/obligation-hole-set-exposed-to-v2
 - spec: `21 §7` (the interface), `§6.3`/§6.5; `22 §2.1`/§2.2/§3
+- status: subset-Σ telescope/result shapes are **deferred — W5**.
 - given: `def NonZero = {d:Int | Not (Equal Int d 0)}`;
   `fn f (n : Int) (m : NonZero) : Int` with `requires IsTrue (leq_int 1 n)`,
   postconditions `IsTrue (leq_int n result)` and `IsTrue (leq_int 0 result)`,
   and body `n + m`; callers `fn use (n:Int) (m:Int):Int = f n m` and
-  `fn use_refined (n:Int) (m:NonZero):Int = f n m`.`
+  `fn use_refined (n:Int) (m:NonZero):Int = f n m`.
 - expect: the core telescope keeps `m` at
   `Σ(d:Int).Not (Equal Int d 0)`; the written `requires` is a separate Π
   proof argument. The result type is
@@ -449,13 +480,13 @@ site.
   emitted; `add_comm` is bound as a **postulate** of `φ` (usable as a proof
   term), and `φ` **appears** in `trusted_base()` (status `unknown`). **After
   discharge** by a certificate `p` with `Γ ⊢ p : φ` that `check`s — the
-  postulate is **retired**, `add_comm ↦ p`, status `proved`, `φ` **leaves**
-  `trusted_base()`.
+  postulate is **retired**, `add_comm ↦ p`, and `φ` leaves `trusted_base()`.
+  **Deferred — W4:** `add_comm` is `proved` only if
+  `postulates_reachable(env, p)` reaches no open obligation hole.
 - why: §6.3/§5.4 — `prove` is the degenerate (no function-body) obligation;
-  proving is
-  hole-filling, and the honesty guard applies identically (a goal is a visible
-  postulate until its certificate checks). Verdict/structural flip on
-  **`trusted_base()` membership** across discharge.
+  proving is hole-filling, and the goal's own postulate is retired on discharge.
+  The transitive dependency check for `proved` is W4-deferred and is covered by
+  the `postulates_reachable` contrast above.
 
 ### verify/spec-syntax/law-all-omega-fields-is-proposition
 - spec: `21 §3` (`law`), `§8`; `16 §1.3` (conjunction in Ω)
@@ -501,12 +532,14 @@ site.
   `lambda-at-refinement-introduces-proof`,
   `non-omega-predicate-surface-error`, `result-scope`.
 - **#2 four-way status honest** —
-  `proved-status-cert-checks-not-in-trusted-base`, `bogus-cert-not-proved`,
-  `unknown-hole-distinct-from-proved`, `disproved-distinct-from-unknown`,
-  `epistemic-projection-distinct`.
+  `proved-status-cert-checks-no-reachable-open-hole`, `bogus-cert-not-proved`,
+  `unknown-hole-distinct-from-proved`,
+  `proved-status-rejects-transitive-proj2-hole`,
+  `disproved-distinct-from-unknown`, `epistemic-projection-distinct`.
 - **#3 space contracts** — `old-out-of-scope-rejects` produces
   `UnboundName("old")` in pure code; `old-resolves-in-space-op-ensures` pins
-  the `F = 𝟘` collapse to a pure subset Σ.
+  pre/post-state resolution now and the `F = 𝟘` subset-Σ collapse
+  **deferred — W5**.
   `space-ensures-residual-tree-allret` pins the outer residual-tree Σ; its
   Bool-response fold observation is deferred to W5. Modifier-form `space proc`
   has no cells and remains refused with `OldPreStateUnsupported`.
@@ -515,9 +548,9 @@ site.
 - **goals** — `prove-goal-obligation-and-postulate-binding`,
   `law-all-omega-fields-is-proposition`.
 
-Build-sequencing: V1 elaborates refinements and ordinary `ensures` results to
-kernel subset-Σ values, using the existing `Sigma`/`Pair`/`Proj` constructors
-and the landed `sort_sigma` rule (`13 §4`). The kernel checks each pair; the
-elaborator records and discharges the introduction obligation or applies a
-visible typed hole. These cases pin the Type-valued subset sort and its
-distinction from the carrier.
+Build-sequencing: the W1/W5 target elaborates refinements and ordinary
+`ensures` results to kernel subset-Σ values, using the existing
+`Sigma`/`Pair`/`Proj` constructors and landed `sort_sigma` (`13 §4`). The
+kernel checks each pair; the elaborator records and discharges the introduction
+obligation or applies a visible typed hole. W5-deferred cases pin this target;
+they do not claim that transitional carrier-only lowering already emits pairs.
