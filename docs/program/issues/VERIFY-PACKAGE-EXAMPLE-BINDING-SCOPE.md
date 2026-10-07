@@ -39,24 +39,37 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-The repro is refused before the driver returns Ok, by one of two
-closures: example bindings are not visible to later sources, or emit or
-validation refuses a dangling reference. **The Architect picks one at
-AC-0**, before any edit. The single-source fix of the predecessor is kept.
+Emit refuses a dangling reference before Ok: admitted content is encoded
+against the package's own symbol set (Architect AC-0 `evt_1se89bhmwwwht`,
+closure (2), spec 46 §1.1). In `emit_package_from_env`, a `package_table`
+holds only non-example symbols; admitted declarations and obligation
+metadata encode through it, and a `MissingStableSymbol` for a symbol the
+package drops maps to `PackageReferenceOutsidePackage { declaration,
+referenced }`, whose `Display` names both. Every other section built by
+walking `env` rather than `admitted` either skips `example_ids` or encodes
+through `package_table`; the handoff lists each one. The single-source fix
+of the predecessor is kept.
 
 ## Acceptance
 
-- **AC-0.** The Architect's choice, with the spec section it rests on.
-- **AC-1.** The repro is refused before Ok on all three package kinds,
-  with a diagnostic naming `zz_ex`.
+- **AC-0.** Done: closure (2), spec 46 §1.1 (`evt_1se89bhmwwwht`).
+- **AC-1.** The repro is refused before Ok on NonRuntime, Library and
+  Executable, with `PackageReferenceOutsidePackage` naming `zz_ex`.
 - **AC-2 (controls).** `const main : Bool = base` still compiles and
   erases Ok. The predecessor's literate-versus-`.ken` hash equality
   (`1e355da83ed6da8f`) is unchanged. A same-source example still executes.
-- **AC-3 (mutation).** Reverting the closure makes the repro return Ok
-  again, which reddens AC-1, while the AC-2 controls stay green.
-- **AC-4.** A later source naming an example-declared inductive or
-  constructor is refused the same way. The Adversary did not measure this
-  case.
+- **AC-3 (mutation, M-full-table).** Encoding admitted declarations with
+  the full `table` returns Ok on the repro, which reddens AC-1, while the
+  AC-2 controls stay green.
+- **AC-4.** A later source naming an example `data` type, and one naming
+  its constructor, are each refused, naming the type or the constructor.
+- **AC-4b.** An example fence declares an `instance` of a module class,
+  and a later source's call resolves to it without naming it. It is
+  refused the same way. This row measures reach that does not go through
+  a name.
+- **Census.** Before any source edit, report the catalog and corpus
+  multi-source packages whose later source references an example
+  declaration (expected none; any hit is the stop below).
 
 ## Stop conditions
 
