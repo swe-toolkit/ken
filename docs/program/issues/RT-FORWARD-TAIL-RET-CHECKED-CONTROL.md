@@ -98,4 +98,12 @@ stop and report the mismatch.
 SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 1. An active default-thread Nat fail-closed pin was ruled for programs only ever measured under a 256 MiB thread; it overflows. Keyed on stack provisioning of the Nat shapes.
 2. phase-B population pin read the plane key's source-occurrence presence rather than its decisive application to a transport-source demand — keyed on source-occurrence presence.
+3. the M-base-path-capture seat mutant is reached twice and leaves the buffer row green, because phase-B admission makes every value at that seat a residual — keyed on operand form.
 ```
+
+Shared predicate (Architect `evt_4wb17qsfg6k6q`): each entry is an acceptance
+gate specified from the design's intended mechanism without first measuring
+what the candidate produces at that gate. The product held each time. The
+remaining gates are ruled only from a measured discrimination table: each
+candidate mutant run against the current WIP, with its reach count and
+observation. No product recut.

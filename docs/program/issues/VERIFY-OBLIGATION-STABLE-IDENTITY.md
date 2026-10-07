@@ -1,7 +1,7 @@
 ---
 id: VERIFY-OBLIGATION-STABLE-IDENTITY
 title: "Obligation ids and hole-postulate symbols are derived from session allocation order (Obligation.id and global_<GlobalId>), and both feed core_semantic_hash, against spec 46 §3.2 and 22 §1. Derive them from stable inputs so the same source yields the same ids and hash in any session"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1

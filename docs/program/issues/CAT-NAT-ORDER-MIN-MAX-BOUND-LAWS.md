@@ -28,7 +28,10 @@ Nat Order proves that `min` and `max` compute the meet and join of
   `Equal Bool b True`.
 - The `min` laws are `zero_left`, `leq_left` and `leq_right`. The `max`
   laws are `zero_left`, `left_leq` and `right_leq`. A `min` that returns
-  `Zero` in every arm still satisfies all three `min` laws as written.
+  `Zero` in every arm still satisfies all three `min` propositions, but
+  their existing proof bodies compute on `min`'s arms, so an in-place
+  mutation is refused at `leq_left` before any new law is reached
+  (foundation QA, `evt_5wnn8jwfr31xd`).
 - `sub` already has `self_is_zero`, `saturates`, `suc_decreases` and
   `add_cancel`. `compare` has its three result-to-order laws.
 
@@ -57,11 +60,19 @@ No new import, export, operation, axiom or trust. Follow
 - **AC-2 (proposition pin).** A test decodes each private declaration's
   checked type and asserts its binders, both premises and the conclusion by
   global identity and de Bruijn index. Control: weakening either conclusion
-  to `IsTrue True` keeps the package loading and reddens the pin.
-- **AC-3 (mutation, QA).** A scratch `min` returning `Zero` in every arm
-  keeps `leq_left` and `leq_right` checking and reddens `greatest` at its
-  span. A scratch `max` that returns a larger upper bound in the
-  `Suc`/`Suc` arm reddens `least` at its span. Restore byte-identically.
+  to an owner-preserving trivial claim (`IsTrue (leq_nat Zero (min m n))`,
+  `IsTrue (leq_nat Zero (max m n))`, body `λhm. λhn. Proved`) keeps the
+  package loading and reddens that law's pin. The attached-proof rule
+  refuses a claim that does not mention its subject (`evt_7q023c2bn93hm`).
+- **AC-3 (mutation, QA).** Mutate a scratch copy, not `min` or `max`
+  in place. In a scratch package that imports Nat Order, define `min0`
+  returning `Zero` in every arm and `max2` returning `Suc (Suc (max a b))`
+  in the `Suc`/`Suc` arm. Restate `greatest` over `min0` and `least` over
+  `max2`: each is refused at its own span. Restate `leq_left` and
+  `leq_right` over `min0`: both check. For `max2`, a scratch
+  `Refl` proof of `Equal Bool (leq_nat (max2 one one) one) False` checks,
+  where `one` is `Suc Zero`. Delete the scratch package afterwards; the
+  candidate's tree is unchanged.
 - **AC-4.** The loaded closure's trust ledger and Nat Order's exports are
   unchanged. Targeted builds only, through `scripts/ken-cargo`.
   No-regression means green in CI.

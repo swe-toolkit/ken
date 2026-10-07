@@ -20,7 +20,9 @@ read roster history; none belongs in that file.
 
 4. DROPPED DELIVERY. A kicked seat idle at the composer is stalled. Reuse the
 existing WP anchor, repair transport once, and confirm Working. Rouse the leader
-before a worker.
+before a worker. A seat that went idle to wait for the build lock is stalled
+once `lsof /tmp/ken-build-locks/build.lock` shows the lock free: tell it in
+its WP thread and confirm Working.
 
 5. WIP AUDIT. At 60 minutes since kickoff, hard stop, ruling, audit, or handoff,
 request the Architect audit from `steward/escalation.md`. Routine progress does
