@@ -52,6 +52,11 @@ stop and report the mismatch.
      the PX8 suites, and how many of them lowering actually requests.
    - (c) With (b) known, propose one planning-owned sink predicate that
      replaces both. The Architect rules the repair.
+   - (d) Record the current first refusal of `:584`
+     (`escaped_resource_used_by_fanning_host_op_matches_interpreter`, the
+     escaped `FsHandle` sibling) on the base and under the widened sink. If
+     it reaches the same sink refusal, it joins AC-1, AC-2 and AC-4.
+     Otherwise report its refusal and keep it out of this repair.
 2. **The ruled repair.**
 
 ## Acceptance
