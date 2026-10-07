@@ -149,6 +149,31 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
 
 ---
 
+### OQ-refinement-representation — Refinement representation — **DECIDED**
+- **Fork.** Keep refinements as carrier types with elaborator-tracked
+  predicates, or represent a refinement as a core subset Σ:
+  `{x:A|φ} ⇒ Σ x:A. φ`, with an Ω second component.
+- **Options.** Keep the carrier encoding and track refined types in the
+  elaborator, or use the core subset Σ representation. With the latter,
+  forgery such as `List Int` being accepted as `List Char` becomes a kernel
+  type mismatch. Lean `Subtype`, Agda records/Σ, Coq `sig`, and F* refinements
+  exemplify core representations; this is the prior-art majority reported in
+  the research advisory.
+- **Grounds.** The former kernel blocker in `21 §2` is resolved: `sort_sigma`
+  gives Ω when both components are Ω (`crates/ken-kernel/src/check.rs`). The
+  Ω second component is computationally irrelevant, meeting the
+  erasure-faithfulness concern. The subset representation requires explicit
+  introduction and elimination, with coercion insertion, and normative edits
+  to `34 §5` and `21 §2`. Existing normative text still describes the carrier
+  encoding; this register entry makes no normative edit.
+- **Decision (operator, 2026-10-07).** Refinements are real kernel types,
+  represented as core subset Σ: `{x:A|φ} ⇒ Σ x:A. φ` with an Ω second
+  component. Replace the carrier encoding. The decision selects this
+  representation; introduction, elimination, coercion insertion, and any
+  kernel changes remain to be designed and framed.
+- **Affects.** `30-surface/34 §5`, `20-verification/21 §2`, elaboration and
+  kernel conversion.
+
 ## B. Verification
 
 ### OQ-12 — SMT integration strategy — **DECIDED**
