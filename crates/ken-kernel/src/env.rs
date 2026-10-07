@@ -294,6 +294,14 @@ impl Clone for EnvInstance {
     }
 }
 
+/// Allocation history at an environment prefix boundary, used to refuse marks
+/// whose GlobalIds were removed and later reallocated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AllocationPrefixGeneration {
+    Empty,
+    Allocated(u64),
+}
+
 /// The global environment `Σ` — checked declarations plus SCT-admitted
 /// recursive bodies (`11 §4`, `17 §4`).
 #[derive(Clone, Debug, Default)]
@@ -301,6 +309,10 @@ pub struct GlobalEnv {
     instance: EnvInstance,
     decls: Vec<Decl>,
     by_id: HashMap<GlobalId, usize>,
+    /// Incarnation token for each allocated GlobalId, in allocation order.
+    /// Truncated with the allocator; the token source itself is never rewound.
+    prefix_generations: Vec<u64>,
+    next_prefix_generation: u64,
     /// Only staged placeholders and checked postulate assumptions may receive
     /// a body. Recorded by identity at creation, never inferred from a name,
     /// `Decl::Opaque`, or the derived trusted-base inventory.
@@ -369,10 +381,11 @@ pub struct GlobalEnv {
     checked_literals: HashMap<GlobalId, CheckedStringLiteral>,
 }
 
-// Value equality is the pre-existing structural environment comparison. The
-// ownership token is deliberately excluded: cloning preserves every checked
-// declaration/index while minting a different transaction owner. Destructuring
-// every field makes a newly added state field a compile-time review point.
+// Value equality compares checked declarations and indexes, not transaction
+// capabilities. The ownership token and allocation-history tokens are
+// deliberately excluded: cloning preserves the checked environment while it
+// mints a different owner. Destructuring every field makes additions a review
+// point.
 impl PartialEq for GlobalEnv {
     fn eq(&self, other: &Self) -> bool {
         let Self {
@@ -386,6 +399,8 @@ impl PartialEq for GlobalEnv {
             body_refs,
             ctor_index,
             next_id,
+            prefix_generations: _,
+            next_prefix_generation: _,
             all_supports,
             terminal_supports,
             support_edges,
@@ -562,9 +577,32 @@ impl GlobalEnv {
     /// Allocate a fresh, unused [`GlobalId`]. Used during admission so a
     /// family's constructors can reference the family before it is committed.
     pub fn fresh_id(&mut self) -> GlobalId {
+        debug_assert_eq!(self.prefix_generations.len(), self.next_id as usize);
+        let generation = self.next_prefix_generation;
+        let next_generation = generation
+            .checked_add(1)
+            .expect("environment allocation generations exhausted");
         let id = GlobalId(self.next_id);
         self.next_id += 1;
+        self.next_prefix_generation = next_generation;
+        self.prefix_generations.push(generation);
         id
+    }
+
+    /// Allocation incarnation at one prefix boundary. `None` means the
+    /// requested nonempty prefix is not present in this environment.
+    pub(crate) fn allocation_prefix_generation_at(
+        &self,
+        boundary: GlobalId,
+    ) -> Option<AllocationPrefixGeneration> {
+        match boundary.0.checked_sub(1) {
+            None => Some(AllocationPrefixGeneration::Empty),
+            Some(last_id) => self
+                .prefix_generations
+                .get(last_id as usize)
+                .copied()
+                .map(AllocationPrefixGeneration::Allocated),
+        }
     }
 
     /// Commit an already-checked declaration. The caller is responsible for
@@ -678,10 +716,9 @@ impl GlobalEnv {
         self.by_id.get(&id).map(|&i| &self.decls[i])
     }
 
-    /// Remove the most-recently added declaration (provisional admission
-    /// rollback: an inductive whose signature fails checking is withdrawn so
-    /// its not-yet-finalized id is not left dangling). Reindexes the lookup
-    /// maps; the popped [`GlobalId`]s become free for re-use.
+    /// Remove the most-recently added declaration. Reindexes lookup maps and
+    /// removes registry entries that refer to the popped [`GlobalId`], so the
+    /// id and every kernel-owned index are safe to reuse.
     ///
     /// ```compile_fail
     /// use ken_kernel::GlobalEnv;
@@ -702,11 +739,47 @@ impl GlobalEnv {
         // so provisional admission rollback restores the allocator as well as
         // the lookup tables.
         self.next_id = self.next_id.min(decl.id().0);
+        self.prefix_generations.truncate(self.next_id as usize);
+        self.top_id = self.top_id.filter(|id| *id != decl.id());
+        self.bottom_id = self.bottom_id.filter(|id| *id != decl.id());
+        self.tt_id = self.tt_id.filter(|id| *id != decl.id());
+        self.deceq_certs.retain(|prim_ty, cert| {
+            *prim_ty != decl.id()
+                && cert.eq_op != decl.id()
+                && cert.sound != decl.id()
+                && cert.complete != decl.id()
+        });
+        if self.int_lit_ty == Some(decl.id()) {
+            self.int_lit_ty = None;
+        }
+        if self.unit_type == Some(decl.id()) {
+            self.unit_type = None;
+        }
+        self.literal_char_view = self.literal_char_view.take().filter(|view| {
+            view.char_type != decl.id()
+                && view.operation != decl.id()
+                && view.nil != decl.id()
+                && view.cons != decl.id()
+        });
+        self.checked_string_carrier = self
+            .checked_string_carrier
+            .filter(|carrier| *carrier != decl.id());
+        self.checked_char_carrier = self
+            .checked_char_carrier
+            .filter(|carrier| *carrier != decl.id());
         self.terminal_supports.remove(&decl.id());
-        self.support_edges.remove(&decl.id());
-        self.all_supports.retain(|_, family| *family != decl.id());
+        self.support_edges.retain(|host, supports| {
+            if *host == decl.id() {
+                return false;
+            }
+            supports.retain(|family| *family != decl.id());
+            true
+        });
+        self.all_supports
+            .retain(|(host, _, _), family| *host != decl.id() && *family != decl.id());
         self.checked_literals.remove(&decl.id());
         self.sct_decreasing.remove(&decl.id());
+        self.referrers.remove(&decl.id());
         if let Decl::Transparent { id, .. } = &decl {
             let refs = self
                 .body_refs
@@ -720,9 +793,6 @@ impl GlobalEnv {
                     }
                 }
             }
-            // The popped id will be reusable; no referrer edge to its former
-            // declaration may survive into the next admission at that id.
-            self.referrers.remove(id);
         }
         if self.recursive_transparent.remove(&decl.id()) {
             self.recompute_transparent_cycles();
@@ -735,6 +805,7 @@ impl GlobalEnv {
     pub(crate) fn release_unused_id(&mut self, mark: GlobalId) {
         debug_assert!(self.by_id.keys().all(|id| id.0 < mark.0));
         self.next_id = mark.0;
+        self.prefix_generations.truncate(mark.0 as usize);
     }
 
     /// The (level_params, type) of a const/former/primitive use, for `infer`.

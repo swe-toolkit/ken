@@ -67,6 +67,22 @@ impl RefinementFacts {
         self.refinement_root(id)
             .and_then(|root| self.refinement_predicates.get(&root))
     }
+
+    pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<GlobalId>) {
+        let Self {
+            refinement_predicates,
+            refinement_aliases,
+            refined_params,
+            constructor_field_predicates,
+            record_field_predicates,
+        } = self;
+        refinement_predicates.retain(|id, _| !removed.contains(id));
+        refinement_aliases
+            .retain(|alias, root| !removed.contains(alias) && !removed.contains(root));
+        refined_params.retain(|id, _| !removed.contains(id));
+        constructor_field_predicates.retain(|id, _| !removed.contains(id));
+        record_field_predicates.retain(|id, _| !removed.contains(id));
+    }
 }
 
 /// Source clause kind for a V1 obligation hole (`22 §1`, §2).
@@ -14741,12 +14757,15 @@ fn elab_record_decl(
             env, globals, preconditions, num_values, numeric_env, class_env, facts, rdecl, fields,
         );
     }
-    let snapshot = (env.clone(), globals.clone(), num_values.clone(), facts.clone());
+    let snapshot = (globals.clone(), num_values.clone(), facts.clone());
     let result = elab_record_decl_checked(
         env, globals, preconditions, num_values, numeric_env, class_env, facts, rdecl, fields,
     );
     if result.is_err() {
-        (*env, *globals, *num_values, *facts) = snapshot;
+        // The enclosing declaration transaction owns GlobalEnv rollback and
+        // scrubs every ElabEnv plane from the removed declarations. Replacing
+        // env with a clone here would invalidate its EnvMark owner.
+        (*globals, *num_values, *facts) = snapshot;
     }
     result
 }
@@ -15684,8 +15703,10 @@ fn elaborate_data_with_refinements(
         return data::elab_data_decl(env, globals, ctor_decl_spans, name, type_params, ctors, span);
     }
     let snapshot = (
-        env.clone(), globals.clone(), num_values.clone(),
-        ctor_decl_spans.clone(), facts.clone(),
+        globals.clone(),
+        num_values.clone(),
+        ctor_decl_spans.clone(),
+        facts.clone(),
     );
     let result = (|| {
         let id = data::elab_data_decl(env, globals, ctor_decl_spans, name, type_params, ctors, span)?;
@@ -15696,7 +15717,10 @@ fn elaborate_data_with_refinements(
         Ok(id)
     })();
     if result.is_err() {
-        (*env, *globals, *num_values, *ctor_decl_spans, *facts) = snapshot;
+        // The enclosing declaration transaction owns GlobalEnv rollback and
+        // scrubs every ElabEnv plane from the removed declarations. Replacing
+        // env with a clone here would invalidate its EnvMark owner.
+        (*globals, *num_values, *ctor_decl_spans, *facts) = snapshot;
     }
     result
 }
@@ -15727,8 +15751,10 @@ fn elaborate_explicit_data_with_refinements(
         );
     }
     let snapshot = (
-        env.clone(), globals.clone(), num_values.clone(),
-        ctor_decl_spans.clone(), facts.clone(),
+        globals.clone(),
+        num_values.clone(),
+        ctor_decl_spans.clone(),
+        facts.clone(),
     );
     let result = (|| {
         let id = data::elab_explicit_data_decl(
@@ -15740,7 +15766,10 @@ fn elaborate_explicit_data_with_refinements(
         Ok(id)
     })();
     if result.is_err() {
-        (*env, *globals, *num_values, *ctor_decl_spans, *facts) = snapshot;
+        // The enclosing declaration transaction owns GlobalEnv rollback and
+        // scrubs every ElabEnv plane from the removed declarations. Replacing
+        // env with a clone here would invalidate its EnvMark owner.
+        (*globals, *num_values, *ctor_decl_spans, *facts) = snapshot;
     }
     result
 }

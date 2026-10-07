@@ -13,8 +13,8 @@
 
 use crate::conv::{convert_type, level_eq, whnf};
 use crate::env::{
-    telescope_to_pi, AllSupportSort, CheckedStringLiteral, Context, Decl, GlobalEnv, InductiveDecl,
-    PrimReduction,
+    telescope_to_pi, AllSupportSort, AllocationPrefixGeneration, CheckedStringLiteral, Context,
+    Decl, GlobalEnv, InductiveDecl, PrimReduction,
 };
 use crate::error::{KernelError, KernelResult};
 use crate::inductive::{
@@ -1412,15 +1412,91 @@ fn validate_inductive_decl_inner(
     Ok(())
 }
 
+/// Opaque position in one [`GlobalEnv`] from which later declarations can be
+/// removed. Marks are single-use and cannot be transferred to a cloned or
+/// unrelated environment. Reusing an ID after rolling back past this boundary
+/// does not revive a mark for its former allocation prefix.
+#[must_use]
+pub struct EnvMark {
+    mark_len: usize,
+    mark_next_id: GlobalId,
+    prefix_generation: AllocationPrefixGeneration,
+    env_instance: u64,
+}
+
+/// Record the current declaration boundary of `env`.
+pub fn env_mark(env: &GlobalEnv) -> EnvMark {
+    let mark_next_id = env.next_global_id();
+    let prefix_generation = env
+        .allocation_prefix_generation_at(mark_next_id)
+        .expect("current allocation prefix has an incarnation token");
+    EnvMark {
+        mark_len: env.declarations().len(),
+        mark_next_id,
+        prefix_generation,
+        env_instance: env.instance_id(),
+    }
+}
+
+fn environment_mark_prefix_valid(env: &GlobalEnv, mark: &EnvMark) -> bool {
+    if env.allocation_prefix_generation_at(mark.mark_next_id) != Some(mark.prefix_generation) {
+        return false;
+    }
+    let Some(prefix) = env.declarations().get(..mark.mark_len) else {
+        return false;
+    };
+    prefix.iter().all(|decl| {
+        decl.id().0 < mark.mark_next_id.0
+            && match decl {
+                Decl::Inductive(ind) => ind
+                    .constructors
+                    .iter()
+                    .all(|constructor| constructor.id.0 < mark.mark_next_id.0),
+                _ => true,
+            }
+    })
+}
+
+/// Remove every declaration admitted after `mark`, newest first.
+///
+/// The mark is valid only for its originating environment and while the same
+/// allocated-ID prefix remains. Reusing an ID after rolling back past the mark
+/// invalidates it. Rollback restores the allocator and kernel-owned indexes;
+/// it never admits a declaration.
+pub fn rollback_to_mark(env: &mut GlobalEnv, mark: EnvMark) -> KernelResult<Vec<Decl>> {
+    if env.instance_id() != mark.env_instance {
+        return Err(KernelError::Msg(
+            "environment mark belongs to another environment".into(),
+        ));
+    }
+    if env.declarations().len() < mark.mark_len
+        || env.next_global_id().0 < mark.mark_next_id.0
+        || !environment_mark_prefix_valid(env, &mark)
+    {
+        return Err(KernelError::IllFormedDecl(
+            "environment mark is not a prefix of the current environment".into(),
+        ));
+    }
+
+    let mut removed = Vec::new();
+    while env.declarations().len() > mark.mark_len {
+        removed.push(
+            env.remove_last()
+                .expect("declarations exceed environment mark"),
+        );
+    }
+    env.release_unused_id(mark.mark_next_id);
+    debug_assert_eq!(env.next_global_id(), mark.mark_next_id);
+    Ok(removed)
+}
+
 /// Kernel-owned opaque placeholders awaiting one checked group admission.
 /// The stored mark bounds rollback to this transaction and its subsequent
 /// literal postulates; external callers cannot construct or alter it.
 #[must_use]
 pub struct PendingAdmission {
     ids: Vec<GlobalId>,
-    mark_len: usize,
-    mark_next_id: GlobalId,
-    env_instance: u64,
+    mark: EnvMark,
     staged_types: Vec<Term>,
 }
 
@@ -1434,16 +1510,16 @@ impl PendingAdmission {
 /// declarations. Later literal postulates may follow this prefix; they are
 /// removed only by a valid rollback on the staging environment itself.
 fn pending_tail_intact(env: &GlobalEnv, pending: &PendingAdmission) -> bool {
-    if pending.ids.first().copied() != Some(pending.mark_next_id)
+    if pending.ids.first().copied() != Some(pending.mark.mark_next_id)
         || pending.ids.len() != pending.staged_types.len()
     {
         return false;
     }
-    let Some(end) = pending.mark_len.checked_add(pending.ids.len()) else {
+    let Some(end) = pending.mark.mark_len.checked_add(pending.ids.len()) else {
         return false;
     };
     env.declarations()
-        .get(pending.mark_len..end)
+        .get(pending.mark.mark_len..end)
         .is_some_and(|tail| {
             tail.iter()
                 .zip(pending.ids.iter().zip(&pending.staged_types))
@@ -1471,9 +1547,7 @@ pub fn stage_placeholders(
         check_level_closure(level_params, [ty])?;
         classify(env, &empty, ty)?;
     }
-    let mark_len = env.declarations().len();
-    let mark_next_id = env.next_global_id();
-    let env_instance = env.instance_id();
+    let mark = env_mark(env);
     let mut ids = Vec::with_capacity(specs.len());
     let mut staged_types = Vec::with_capacity(specs.len());
     for (name, level_params, ty) in specs {
@@ -1490,9 +1564,7 @@ pub fn stage_placeholders(
     }
     Ok(PendingAdmission {
         ids,
-        mark_len,
-        mark_next_id,
-        env_instance,
+        mark,
         staged_types,
     })
 }
@@ -1500,7 +1572,7 @@ pub fn stage_placeholders(
 /// Remove only this transaction's declarations, newest first, including
 /// literal postulates added after staging. Refuse a handle from another env.
 pub fn rollback_pending(env: &mut GlobalEnv, pending: PendingAdmission) -> KernelResult<Vec<Decl>> {
-    if env.instance_id() != pending.env_instance {
+    if env.instance_id() != pending.mark.env_instance {
         return Err(KernelError::Msg(
             "admission handle belongs to another environment".into(),
         ));
@@ -1510,15 +1582,7 @@ pub fn rollback_pending(env: &mut GlobalEnv, pending: PendingAdmission) -> Kerne
             "pending admission staged tail is no longer intact".into(),
         ));
     }
-    let mut removed = Vec::new();
-    while env.declarations().len() > pending.mark_len {
-        removed.push(
-            env.remove_last()
-                .expect("declarations exceed admission mark"),
-        );
-    }
-    debug_assert_eq!(env.next_global_id(), pending.mark_next_id);
-    Ok(removed)
+    rollback_to_mark(env, pending.mark)
 }
 
 /// Check all pending bodies as one SCT group. Failure consumes and rolls back
@@ -1528,7 +1592,7 @@ pub fn admit_pending(
     pending: PendingAdmission,
     bodies: Vec<Term>,
 ) -> Result<Vec<GlobalId>, (KernelError, Vec<Decl>)> {
-    if env.instance_id() != pending.env_instance {
+    if env.instance_id() != pending.mark.env_instance {
         return Err((
             KernelError::Msg("admission handle belongs to another environment".into()),
             Vec::new(),
@@ -2309,9 +2373,12 @@ mod tests {
         let staged_id = pending.ids()[0];
         let test_handle_copy = PendingAdmission {
             ids: pending.ids.clone(),
-            mark_len: pending.mark_len,
-            mark_next_id: pending.mark_next_id,
-            env_instance: pending.env_instance,
+            mark: EnvMark {
+                mark_len: pending.mark.mark_len,
+                mark_next_id: pending.mark.mark_next_id,
+                prefix_generation: pending.mark.prefix_generation,
+                env_instance: pending.mark.env_instance,
+            },
             staged_types: pending.staged_types.clone(),
         };
         let mut clone = a.clone();
