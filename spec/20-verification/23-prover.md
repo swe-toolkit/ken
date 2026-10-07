@@ -32,7 +32,7 @@ it actionable and (for `proved`) re-checkable:
 |---|---|---|
 | `proved` | a **certificate** — a core term `p` with `Γ ⊢ p : φ` | `check(env, Γ, p, φ)` accepts (`18 §4.5`) — the de Bruijn criterion; the *sole* reason `proved` is believed |
 | `disproved` | a **countermodel** — a finite Kripke model forcing `¬φ` at some world (`24 §1`); where the backend yields a proof of `¬φ`, the cert `q : ¬φ` is `check`ed too | proof of `¬φ`: `check(env, Γ, q, ¬φ)`; bare countermodel: prover-asserted refutation — untrusted, a concrete falsifying witness (`21 §5.1`) |
-| `unknown` | a **typed hole** `?id : φ` in `Γ`, admitted as a **postulate** of `φ` (`22 §1`, `24 §2`) | none — the hole is *assumed*; its goal appears in `trusted_base()` (§1.3) |
+| `unknown` | a **typed hole** `?id : φ` in `Γ`, admitted as a **postulate** of `φ` (`22 §1`, `24 §2`) | none — the hole is *assumed*; its identity appears in `trusted_base()` (§1.3) |
 
 There is **no fourth verdict and no `failure` catch-all**: a search that neither
 closes nor refutes `φ` is `unknown`-with-hole (honest — the program still runs,
@@ -46,8 +46,9 @@ claim is fixed, an open one is left running.)
 The prover **cannot mark** an obligation `proved`. Per the V1 honesty guard
 (`21 §5.4`, `18 §5`): `Γ ⊢ φ` is `proved` only when its certificate `p`
 **checks** and the kernel's read-only `postulates_reachable(env,p)` query
-finds **no open obligation hole or unaccepted postulate** through the
-certificate's δ-closed transparent dependencies. An undischarged obligation
+finds **no open obligation hole** through the certificate's δ-closed
+transparent dependencies. Audited contract axioms remain visible in the
+assumption boundary without demoting a checked proof. An undischarged obligation
 is a visible `declare_postulate` in `trusted_base()`; discharging retires
 that postulate. **Same-goal membership alone is insufficient**: a checked
 certificate may use `Proj2 c` for a refined constant `c` whose proof depends

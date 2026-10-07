@@ -863,13 +863,15 @@ all_ret_bind : AllRet P t →
 Both `AllRet` and `all_ret_bind` are checked Ken declarations for W5,
 not an elaborator coercion, primitive, or new `trusted_base()` entry.
 
-When `F = 𝟘`, `ITree 𝟘 X` collapses to `X` (§2.4), and `AllRet P`
-collapses to `P`. Thus the **same** rule yields
-`S → Σ(rs:R × S).ψ(s,rs)` after written proof arguments, with no
-second encoding. Because each space's `S` is **encapsulated and
-non-aliased** (shared-nothing, §4.4), the obligation is **local,
-bounded, per-space Hoare** over `S` — no separation logic, frame rule,
-or global `\old` (`21 §4`, `OQ-Space`). Worked example: `inc`'s
+When `F = 𝟘`, **elaboration collapses the whole result type** by the
+`ITree 𝟘 X ≅ X` equivalence (§2.4), yielding
+`S → Σ(rs:R × S).ψ(s,rs)` after written proof arguments. This is not
+a kernel conversion `ITree 𝟘 X ≡ X`, and `AllRet P` is never applied to
+a bare `X`; the single general rule has no second encoding. Because
+each space's `S` is **encapsulated and non-aliased** (shared-nothing,
+§4.4), the obligation is **local, bounded, per-space Hoare** over `S` —
+no separation logic, frame rule, or global `\old` (`21 §4`,
+`OQ-Space`). Worked example: `inc`'s
 `ensures n == old(n) + 1` with `F = 𝟘` gives the checked transformer
 `λ s. ((tt, s with .n := s.n + 1), π)`. Its `π` inhabits
 `(s with .n := s.n + 1).n == s.n + 1`, which computes by record-β/η

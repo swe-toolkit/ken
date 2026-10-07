@@ -715,7 +715,9 @@ closure-free canonical data, callable-bearing results by
 selected closure-free ground observations, short-circuit / branch laziness
 (untaken arm not forced), and `unknown` propagation (a computationally
 reached hole flips to `unknown`; an erased subset proof hole leaves a
-carrier value with an `unknown` verification status). Each discriminating
-case **flips** on its
+carrier value with an `unknown` verification status). The type-directed
+subset proof-erasure row is **deferred to W3** (`LANG-REFINEMENT-PROOF-ERASURE`)
+until that runtime path lands; it is not a current interpreter claim.
+Each discriminating case **flips** on its
 targeted bug or asserts a structural output (constructor head or durable bytes),
 per COORDINATION §7.

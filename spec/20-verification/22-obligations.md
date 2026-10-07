@@ -214,8 +214,9 @@ no-emitted — it has no guarded-skip rule, so it fails loudly until one is adde
    name : φ` given a term, or a refinement introduction supplied with a
    kernel-checked proof — yields **zero new open** obligations: its proof is
    the discharge (`18 §4.5`), not a silent skip of the clause. *Guard:* its
-   certificate checks, and it reaches no open hole or unaccepted postulate
-   through a transparent dependency (`21 §5.4`). A trivially true
+   certificate checks, and it reaches no **open obligation hole** through
+   a transparent dependency (`21 §5.4`). Audited contract axioms remain
+   visible assumptions, not a demotion of a checked proof. A trivially true
    introduction is still recorded and discharged, never discarded by a
    triviality heuristic.
 4. **The forgetful coercion** `{x:A|φ} ≤ A` is `Proj1` with **no new
@@ -268,8 +269,9 @@ visible failure, never a too-strong `Γ` (which could mask a real burden):
   `Proj2 IHᵢ`. For an effectful `space` call, this term instead proves
   `AllRet (ψ s) t` over its residual tree; an ordinary
   `all_ret_bind` sequencing lemma (`36 §4.3`) composes it across a
-  bind, not an elaborator coercion inside `ITree`. A recursive-call
-  hypothesis without checked term evidence is refused.
+  bind, not an elaborator coercion inside `ITree`. Both direct
+  `Proj2 (f x')` and eliminator `Proj2 IHᵢ` **are** checked term
+  evidence; only a Γ-only assertion with neither term is refused.
 
 Each obligation is therefore discharged under **exactly** the facts with
 checked term evidence on its path. The `Γ` of an obligation emitted deep in
@@ -436,9 +438,10 @@ flowchart LR
   per-claim **epistemic status** (`21 §5.2`/§5.3) projects from its obligations'
   verdicts.
 - A definition with an **empty** obligation set (or all discharged) is
-  fully verified only if the checked proof terms also reach **no** open hole
-  or unaccepted postulate through transparent dependencies (`21 §5.4`). One
-  with open obligations is partially verified and carries typed holes in
+  fully verified only if the checked proof terms also reach **no open
+  obligation hole** through transparent dependencies (`21 §5.4`). Audited
+  contract axioms remain visible without demoting the proof. One with
+  open obligations is partially verified and carries typed holes in
   `trusted_base()`; another claim's `Proj2` may reach them transitively.
 - The set's **serialization** is part of the protocol (`25`); V2 fixes the set's
   *shape* (the triple + ordering + provenance), `25` fixes its wire form.
@@ -493,4 +496,7 @@ a checked `Proj2` hypothesis with no spurious definition-site
 obligation (§2.5), while its caller supplies a checked subset argument; and
 non-spec programs yield
 the **empty** obligation set with V1/V0 elaboration unchanged. Conformance:
-`../../conformance/verify/obligations/`.
+`../../conformance/verify/obligations/`. Subset-Σ pair/projection and
+refined-binder expectations are **W5-deferred** while carrier-only
+elaboration remains current (`21 §intro`); the read-only honesty query
+is W4-deferred.

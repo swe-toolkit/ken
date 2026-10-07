@@ -36,8 +36,15 @@ the following reductions and the η rules (§2):
 | **ζ** | `let x := u : A in t → t[u/x]` (non-recursive) | `11 §1` |
 | **ι** | `elim_D M m̄ … (cₖ ā) → mₖ …` (structural) | `14 §3` |
 | **δ** | `c → t` for `(c : A := t) ∈ Σ` (transparent) | `11 §4` |
-| **prim** | registered `leq_int (IntLit m) (IntLit n)` → `True` if `m <= n`, else `False`; registered `string_to_list_char s` → the `cons`/`nil` list of `s`'s scalars as `IntLit`, for a checked `String` literal `s` | `16 §2.2`, ADR 0013; KERNEL-LITERAL-CHAR-VIEW |
+| **prim** | registered `leq_int (IntLit m) (IntLit n)` → `True` if `m <= n`, else `False`; registered `string_to_list_char s` → a `Cons Char` list of checked `Pair(IntLit c, tt)` scalar elements, ending in `Nil Char`, for a checked `String` literal `s` (`18a §5.9.1`) | `16 §2.2`, ADR 0013; KERNEL-LITERAL-CHAR-VIEW |
 | **obs** | `Eq`-by-type; `cast A A refl a → a` + `cast`-by-type; quotient elim | `16` |
+
+The prim-row `Pair(IntLit c, tt)` view is the **K-a/W5 normative target**
+(`18a §5.9.1`); until W5, the existing checked-literal view still
+constructs bare `IntLit` elements under the transitional carrier-only
+`Char` implementation. This is a staged shape change, not an additional
+conversion rule; the kernel checks every generated pair at `Char` on
+checked-literal admission when K-a lands.
 
 - δ (constant unfolding) is **controlled**: the conversion algorithm unfolds a
   definition only when needed to make progress (§3), never eagerly. Opaque
@@ -150,7 +157,8 @@ function whnf(env, ctx, t):
         if f is Const(c), c the installed literal char view:
           s := whnf(env, ctx, u)
           if s is Const(l), l a checked String literal:
-            t := cons-list of l's scalars as IntLit, ending in nil; continue
+            t := Cons Char (Pair(IntLit c, tt)) for each scalar c,
+                 ending in Nil Char; continue  // each pair checked at Char on admission (18a §5.9.1)
         return App(f, u)                 // neutral application
 
       // Σ-β  (13 §2)

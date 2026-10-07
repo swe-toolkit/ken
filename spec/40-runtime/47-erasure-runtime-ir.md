@@ -24,12 +24,22 @@ by the checked declarations, stable symbols, semantic metadata, obligations,
 assumptions, `trusted_base_delta`, behavioral/export references, dependency
 semantic hashes, and lowerability status carried by the package.
 
-`erased executable core` is an intermediate semantic artifact. It removes only
-proof-irrelevant `Omega` payload that cannot affect control, representation,
-trap behavior, effects, data/control shape, or the observable returned ground
-value. Obligations, assumptions, trust metadata, runtime checks, capabilities,
-effects, and lowerability blockers remain attached as auditable metadata and
-hash inputs.
+`erased executable core` is an intermediate semantic artifact. Erasure is
+**type-directed on the checked core's Ω classification** (`42 §3.2`): a
+subset `Σ(x:A).φ x` with `φ x : Ω` erases `Pair(v,π)` to the relevant
+carrier `v`, makes its `Proj1` runtime identity, and removes `Proj2` only
+from proof positions. It never evaluates the Ω proof, including an open
+hole, while that hole remains in assumption/trust metadata. A relevant
+Σ whose second component is not at Ω retains its runtime pair. Thus
+removing the *subset's proof shell* can change the intermediate pair
+syntax, but not the **observable relevant** representation, branch choice,
+trap/effect behavior, data/control shape, or returned ground value. No
+kernel equality between a subset and its carrier is implied. If the
+checked package does not supply the classification needed to distinguish
+these cases, erasure refuses loudly (§4), never guesses from the term's
+constructor. Obligations, assumptions, trust metadata, runtime checks,
+capabilities, effects, and lowerability blockers remain attached as
+auditable metadata and hash inputs.
 
 `Ken runtime IR` is the first operational artifact. It makes data, control,
 effects, traps, primitives, closures, ADTs, records, and calls explicit enough
@@ -84,8 +94,9 @@ checked-core closure includes:
 - an unsupported package entry, missing lowerability metadata, or a lowerability
   status other than `supported`;
 - an erasure case where proof removal could change branch choice,
-  representation, trap/effect behavior, data/control shape, or observable
-  result;
+  **observable relevant** representation, trap/effect behavior, data/control
+  shape, or observable result, or whose checked Ω classification is
+  unavailable;
 - a primitive or partial operation whose result/trap behavior is not explicit in
   runtime IR;
 - an effect, foreign, capability, trust, or runtime-check path that is not

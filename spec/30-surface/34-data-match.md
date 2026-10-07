@@ -1133,11 +1133,12 @@ witness flip), AC4 (reachability — a redundant arm flagged, verdict flips), AC
 (indexed family — the impossible application **rejects** *while* the impossible
 arm may be **omitted**: a non-degenerate pair on the same `§4.3` rule), AC6
 (branch refinement = `22 §3` hypothesis — a *dependent* motive, asserted
-structurally), AC7 (refinement type — the obligation `φ` is **emitted** on
-introduction (observe the VC structurally), the forgetful direction free, no
-silent coercion), AC8 (proof-returning dependent motive into `Ω`), and AC9
-(dependent-constructor syntax: positive `Vec`/proof-carrying declarations, bad
-result target, positivity rejection through the kernel gate, and omitted
+structurally), AC7 (refinement type — introduction emits `φ` and checks a
+pair, forgetting inserts `Proj1` with no obligation, never `Σ ≡ A`;
+these subset-Σ shape expectations are **W5-deferred**), AC8
+(proof-returning dependent motive into `Ω`), and AC9
+(dependent-constructor syntax: positive `Vec`/proof-carrying declarations,
+bad result target, positivity rejection through the kernel gate, and omitted
 possible-vs-impossible coverage). Per-case verdict/structural-flip + the
 **cross-case sweep**: the exhaustiveness/coverage class (`§4.1`/§4.3`) agrees:
 "type-possible at the index ⇒ required; index-impossible ⇒

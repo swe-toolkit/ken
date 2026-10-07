@@ -99,8 +99,10 @@ One per verified target (definition, `prove`, or module). Reference shape:
   agent reads separately.)
 - **`trusted_base_delta`** lists every postulate/open-hole this target
   introduces (`18 §5`; holes are postulates, `24 §2`) — so an agent or reviewer
-  sees exactly what is *assumed*. A genuinely-verified artifact has an **empty**
-  delta (the honesty guard, `21 §5.4`).
+  sees exactly what is *assumed*. An **assumption-free** artifact has an
+  empty delta. A checked `proved` claim may depend on an audited contract
+  axiom recorded there; the honesty guard instead excludes **reachable
+  open obligation holes** via `postulates_reachable` (`21 §5.4`).
 
 ## 4. Obligation objects
 

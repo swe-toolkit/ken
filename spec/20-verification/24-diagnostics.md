@@ -126,9 +126,9 @@ A V3 `unknown` verdict's evidence is a **typed hole** (`23 §1.2`):
   reads `unknown`, never silently `proved`: the discriminator is the
   kernel-checked certificate plus transitive postulate reachability
   (`21 §5.4`), not merely same-goal membership or a V-layer flag.
-  Shipping a verified artifact means **zero** spec-induced postulates in
-  `trusted_base()` (or an explicit, recorded acceptance of the listed ones,
-  `21 §5.4`).
+  Shipping a verified artifact means **no reachable open obligation hole**
+  on its exported proofs; audited contract axioms remain recorded in the
+  assumption boundary (`21 §5.4`, `18 §5`).
 - **`unknown` propagation (runtime).** Evaluating an expression that
   **computationally** depends on an open hole yields the runtime third
   value `unknown` (`41 §6`, `42 §4`): the program runs, and the value marks

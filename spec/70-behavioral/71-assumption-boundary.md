@@ -68,7 +68,7 @@ are a separate **ITF** layer (§3).
 | Part | Carries | Status | Downstream use |
 |---|---|---|---|
 | **`guarantees` (Q)** | proved postconditions & per-space invariants | `proved` | invariants the model may *assume*, not re-prove → smaller state space |
-| **`assumptions` (P)** | the assumption boundary: `trusted_base_delta`, explicit `assume`s, boundary labels | `tested` | the nondeterministic *environment*; the generator's input domain |
+| **`assumptions` (P)** | the assumption boundary: `trusted_base_delta`, explicit `assume`s, boundary labels | claim entries `tested`/`unknown`; audited axioms retain their declaration identity | the nondeterministic *environment*; the generator's input domain |
 | **`alphabet` (Σ)** | the interaction-tree perform-node signatures (`OQ-8`) | — | the behavioral state machine's **event alphabet**; the monitor's alphabet |
 | **`obligations` (T)** | `Temporal` data (`72`) and structured correlated resource lifetimes (§2.2–§2.3) | `delegated` | behavioral properties to model-check and monitor |
 | **`generators` (G)** | refinement/dependent-type **support structure** (§4) | derived | the *territory map* for spec-driven test generation |
@@ -107,9 +107,10 @@ relates to it by the projection of `21 §5.3`. The export map is total over
   `Q`.** An open hole is a *postulate* of its goal (`24 §2`) — an honest
   assumption the downstream must treat as environment, exactly like an explicit
   `assume`. It therefore lands in `P` (tagged `unknown`), beside the `tested`
-  entries. A shippable artifact has an **empty `trusted_base_delta`** (`25 §3`,
-  the honesty guard) — i.e. **no** `unknown` entries — or an explicit recorded
-  acceptance of the listed ones; either way they are never silently promoted.
+  entries. A shippable **proved claim** has no reachable open
+  obligation hole (`21 §5.4`); an audited contract axiom may remain in
+  `trusted_base_delta` as a visible `P` premise while a claim it supports
+  stays `proved`. No open hole is silently promoted by recording an axiom.
 - **A `disproved` claim never exports.** A refuted claim is a verification error
   to *fix*, not a guarantee to ship (`21 §5.3`, `24 §3`); it has no epistemic
   status and no export field. The emitter that finds a `disproved` verdict emits
@@ -120,13 +121,15 @@ relates to it by the projection of `21 §5.3`. The export map is total over
 
 **The discriminator is kernel-side, not a self-reported label (`21 §5.4`).**
 What puts a claim in `Q` rather than `P` is **structural**, decided from the
-kernel's own state: a claim is a **guarantee iff** its certificate `check`s
-**and** its goal is **not** a postulate in `GlobalEnv::trusted_base()`
-(`18 §4`/`§5`); otherwise it is an **assumption**. The emitter never trusts the
-(untrusted) verification layer's status string — it reads `trusted_base()`
-membership + certificate presence. This is the load-bearing **no-over-claim**
-invariant (AC2): the *same* proposition emits under `Q` when proved and under
-`P`/`T` when its proof is a hole or a delegation — the field **flips** with
+kernel's checked certificate and its read-only dependency query: the
+certificate must `check` **and** `postulates_reachable(env,p)` must reach
+**no open obligation hole** (`18 §4`/`§5`, `21 §5.4`). An audited contract
+axiom reached by that query remains listed as a `P` trust premise but does
+not demote the checked claim. The emitter never trusts an untrusted status
+string or checks only whether the claim's *own* goal is postulated. This is
+the load-bearing **no-over-claim** invariant (AC2): the *same*
+proposition emits under `Q` when proved and under `P`/`T` when its proof
+is a hole or a delegation — the field **flips** with
 the kernel state, a structural signal, not a green-vs-green string compare.
 
 **Per-field source of truth and projection.** Each field names the landed
@@ -139,10 +142,12 @@ artifact it reads and the function that projects it (no field invents content):
 - **`P` (assumptions)** ← assumption boundary: `trusted_base_delta` (`25 §3`,
   the postulates/holes this target adds) ∪ explicit `assume`/`test` clauses ∪
   boundary labels (FFI / untrusted-input / IFC labels, `../60-security/61`).
-  Each entry tagged `tested` or `unknown` per the table. Boundary-`Q`/`P`
-  producers such as Sec1ct's CT-in-parameter promise (`../60-security/61 §5a.4`)
-  feed this channel — coordinate the boundary obligation's shape via spec, do
-  **not** pre-bind field names across WPs (§3.1).
+  Claim entries are tagged `tested` or `unknown` per the table; audited
+  axioms retain their declaration identity as trust metadata, not a new
+  claim status. Boundary-`Q`/`P` producers such as Sec1ct's CT-in-parameter
+  promise (`../60-security/61 §5a.4`) feed this channel — coordinate the
+  boundary obligation's shape via spec, do **not** pre-bind field names
+  across WPs (§3.1).
 - **`Σ` (alphabet)** ← interaction-tree perform-node signatures, **verbatim**
   (`OQ-8`, `../30-surface/36 §2`: the `Effect` container `Op`/`Resp`, the `Vis`
   nodes; admitted as of K1.5, `f037451`). Emit exactly the signatures the
@@ -427,10 +432,11 @@ locked-granularity`).
 
 **Cross-field invariants (the consistency net — conformance asserts each):**
 
-- **I1 — no over-claim (honesty).** Every `Q` entry traces to a `proved` verdict
-  whose goal is **absent** from `trusted_base()`; **no** `Q` entry's goal is a
-  postulate. Equivalently: nothing in `Q` carries status `tested`/`unknown`/
-  `delegated`. (AC2; the §2.1 discriminator.)
+- **I1 — no over-claim (honesty).** Every `Q` entry traces to a checked
+  certificate whose dependency closure contains **no open obligation hole**
+  (`postulates_reachable`, `21 §5.4`). An audited axiom on that closure is
+  a visible `P` premise, not a `Q` demotion; nothing in `Q` carries
+  status `tested`/`unknown`/`delegated`. (AC2; the §2.1 discriminator.)
 - **I2 — assumption visibility.** Every postulate in this target's
   `trusted_base_delta` (`25 §3`) appears as a `P` entry; removing an `assume` or
   shrinking the delta **removes** the matching `P` entry (and changes the hash,
@@ -664,9 +670,11 @@ trusted base and proves nothing new. The implementable deliverables:
 
 - **AC1 (reproducible).** Same program → **same export hash** (structural
   assertion on the hash, §3.3), not merely "an export is produced".
-- **AC2 (no over-claim).** Every `Q` entry traces to a `proved` result with no
-  postulate of its goal in `trusted_base()`; an **unproved** postcondition emits
-  under `P`/`assume` (tagged `unknown`/`tested`), **never** `Q`. *Flips*
+- **AC2 (no over-claim).** Every `Q` entry traces to a checked certificate
+  with **no reachable open obligation hole**; a certificate that checks but
+  reaches another hole through a transparent refined constant's `Proj2`
+  must keep its claim in `P`, never `Q`. Audited contract axioms remain
+  visible as `P` premises without demoting the proof. *Flips*
   proved→`Q` vs unknown→`P` on the **same** postcondition (invariant I1).
 - **AC3 (assumption visibility).** Removing an `assume` / shrinking the
   `trusted_base_delta` shows up as a changed `P` (and a changed hash, I2).

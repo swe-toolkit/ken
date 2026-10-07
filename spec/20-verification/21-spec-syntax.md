@@ -255,10 +255,10 @@ actionable and (for `proved`) re-checkable:
 | `disproved` | the proposition is refuted | a **countermodel**: a finite Kripke model forcing `¬φ` at some world (`24 §1`) | where the prover yields a proof of `¬φ`, `check(env, Γ, p, ¬φ)` certifies it; else the countermodel is a prover-asserted refutation (untrusted, but a concrete falsifying witness) |
 | `unknown` | undecided / not discharged | a **typed hole** `?h : φ` in `Γ`, admitted as a **postulate** of `φ` (`24 §2`) | none — the hole is *assumed*; it appears in `trusted_base()` (§5.4) |
 
-- A **`proved`** verdict adds **no unaccepted postulate** to the trusted
-  dependencies of the claim: `check` validates the certificate and the
-  transitive reachability guard (§5.4) excludes open holes hidden in its
-  referenced definitions. A wrong certificate fails kernel checking (`18 §5`).
+- A **`proved`** verdict has **no reachable open obligation hole** in the
+  checked certificate's dependency closure (§5.4). Audited contract axioms
+  remain visible assumptions without demoting the verdict; a wrong
+  certificate fails kernel checking (`18 §5`).
 - A **`disproved`** verdict is a hard **verification error** (`24 §3`, the
   `S_{¬φ}` region: *fix the code or the spec*). It is **never** an exported
   guarantee — you do not ship a known-false claim — so it has *no* epistemic
@@ -277,10 +277,11 @@ programming language: a reader sees, per claim, whether it is *proved*, merely
 *tested*, *delegated* to behavioral checking, or still *open*.
 
 - **`proved`** — the obligation (`22`) was discharged, the kernel re-checked
-  the certificate (`23`, `../10-kernel/18 §4`), and no open hole or
-  unaccepted postulate is reachable through its dependencies (§5.4). The
-  default for a contract that goes through. No annotation; it holds relative
-  to any explicitly accepted and recorded assumptions.
+  the certificate (`23`, `../10-kernel/18 §4`), and no **open obligation
+  hole** is reachable through its dependencies (§5.4). The default for
+  a contract that goes through. No annotation; the claim remains relative
+  to any audited contract axioms on its dependency closure, which stay
+  visible in the assumption boundary.
 - **`tested`** — a property that **cannot (yet) be proven** but is **asserted
   with a runtime/test obligation**: an `assume`/`test`-tagged clause (the
   keywords are reserved, `../30-surface/31 §4`; the exact clause grammar is
@@ -308,10 +309,14 @@ programming language: a reader sees, per claim, whether it is *proved*, merely
 
 By default `proved` specs are static-only (erased); `tested` adds runtime code
 by construction; `delegated` adds none to Ken (it is exported); `unknown` adds
-none. The **assumption boundary** (`../70-behavioral/`) is precisely the
-`tested` + `delegated` + open-`assume` set — what Ken could not guarantee
-statically, handed to the sibling as the exact specification of what to model,
-test, and monitor.
+none. The **assumption boundary** (`../70-behavioral/`) carries the
+`tested`/`delegated`/open-`assume` claims **and** the audited
+`trusted_base_delta` of contract axioms and open holes, with trusted
+primitive dependencies visible through `trusted_base()` (`18 §5`).
+A checked proof may be `proved` relative to a recorded contract axiom;
+that axiom remains an assumption entry, not a demotion of the claim.
+The boundary tells the sibling what must be modelled, tested, monitored,
+or accepted as an explicit trust premise.
 
 ### 5.3 How the verdict and the status relate (the projection)
 
@@ -354,9 +359,10 @@ assumptions**, not a V-layer status string:
   the postulate identities it actually relies on. It is off the kernel's
   checking and conversion paths: dependency inspection adds no reduction or
   equality rule. A claim is `proved` only if this set contains **no open
-  obligation hole and no unaccepted postulate**. An explicitly accepted
-  postulate remains visible in the assumption boundary; accepting one does
-  not erase its trusted-base entry.
+  obligation hole**. Audited contract axioms (`Ord Int`, StringBijection)
+  and trusted primitives on the dependency closure remain visible in the
+  assumption boundary; they do **not** by themselves demote a checked
+  certificate.
 - The same rule applies to prover certificates and term proofs (`theorem` and
   attached `proof`). A valid term using the second projection of a refined
   constant with an open proof component is **not** unconditionally `proved`.
@@ -365,12 +371,12 @@ assumptions**, not a V-layer status string:
 An open hole is still a postulate in `trusted_base()` (`24 §2`); retiring it
 requires a checked certificate. But a postulate's membership alone is not a
 proof-dependency test — reachability from the **claim's term** decides whether
-it contaminates that claim. "Shipping a verified artifact" requires zero
-unaccepted spec-induced postulates on each exported proof's dependency closure,
-or a recorded acceptance of the listed assumptions. Conformance must
-contrast a certificate with no such reachable postulate against a certificate
-that checks yet reaches an open hole through a transparent refined constant;
-checking the goal's own hole only cannot distinguish that pair.
+an **open obligation hole** contaminates that claim. "Shipping a verified
+artifact" requires no such reachable open holes on each exported proof's
+dependency closure, while every audited contract axiom remains listed in the
+assumption boundary. Conformance must contrast a certificate with no reachable
+open hole against one that checks yet reaches an open hole through a transparent
+refined constant; checking the goal's own hole only cannot distinguish them.
 
 ### 5.5 Scope ruling — disposition-tag syntax is deferred
 
@@ -635,11 +641,12 @@ an elaborator coercion). A recursive call likewise supplies `Proj2` at
 `ITree F`, and `ITree F (R × S)` never converts to
 `ITree F (Σ(rs:R × S).ψ)`.
 
-When `F = 𝟘`, `ITree 𝟘 X` collapses to `X` (`36 §2.4`) and
-`AllRet P` on that pure value reduces to `P`; the general result becomes
+When `F = 𝟘`, **elaboration collapses the whole result type** using
+`ITree 𝟘 X ≅ X` (`36 §2.4`), yielding
 `S → Σ(rs : R × S).ψ(s_pre,rs)` (with written `requires` arguments
-retained). This is a **consequence** of the general rule, not a second
-encoding. The Ω proof is erased at runtime, not evaluated as data.
+retained). This is a consequence of the general rule, not a kernel
+conversion `ITree 𝟘 X ≡ X` or an ill-typed `AllRet P` applied to a bare
+`X`. The Ω proof is erased at runtime, not evaluated as data.
 
 **The scope guard (discriminating, not coincidental).** `old(e)` is admitted
 **only** when the enclosing declaration is a `space` operation — the one place a
@@ -671,8 +678,8 @@ representation that unifies "obligation," "typed hole," and "visible postulate":
   proof-only hole does not make the carrier value `unknown`.
 - **Discharging** a hole means a certificate `p` with `Γ ⊢ p : φ` that the
   kernel `check`s (`18 §4.5`); its postulate is retired and the pair remains
-  unchanged. The claim turns `proved` only if no other open hole or
-  unaccepted postulate is reachable through `p` (§5.4).
+  unchanged. The claim turns `proved` only if no other open obligation
+  hole is reachable through `p` (§5.4); audited axioms remain visible.
 - The holes are **precisely located** (provenance) and independent — provable in
   any order / in parallel (`22 §5`).
 
@@ -781,7 +788,11 @@ Acceptance ties to **G2**: a real function with an `ensures` whose correct proof
 is accepted (verdict `proved`, certificate kernel-`check`ed) and whose wrong
 proof is rejected (verdict `not proved` — `disproved` or `unknown`, the
 verdict-flip); a refinement introduction emits its obligation; an `incomplete`
-claim is distinguishable from `proved` by `trusted_base()` membership (§5.4);
-`old` resolves in a `space`-op `ensures` and is rejected out of scope (§6.4);
-and V0's behavior is unchanged for non-spec programs (§6.2). Conformance:
-`../../conformance/verify/spec-syntax/`.
+claim is distinguishable from `proved` by a checked certificate **and**
+`postulates_reachable` with no open obligation hole, including a hole reached
+through another refined constant's `Proj2` (§5.4); `old` resolves in a
+`space`-op `ensures` and is rejected out of scope (§6.4); and V0's behavior
+is unchanged for non-spec programs (§6.2). Conformance:
+`../../conformance/verify/spec-syntax/`. Subset-Σ core-shape expectations
+remain W5-deferred while the carrier-only implementation is current;
+transitive-honesty query expectations are W4-deferred (§intro).
