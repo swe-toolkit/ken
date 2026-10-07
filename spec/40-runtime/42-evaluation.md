@@ -11,7 +11,8 @@
 > stays effect-free.
 
 The interpreter defines **the meaning of a Ken program**. It evaluates **core
-terms** (`../10-kernel/11`) — the elaborator's output — to **values** (`41`).
+terms** (`../10-kernel/11`) — the elaborator's output, with Ω proof
+components erased in computational positions — to **values** (`41`).
 Everything downstream (a native backend, X3) is judged correct by agreement with
 it (`../00-overview.md §3`).
 
@@ -83,8 +84,10 @@ to favor predictability.
 required or annotated.**
 
 - **Strict CBV is the default** — application arguments, `let` bindings,
-  constructor arguments, and pair components are evaluated **eagerly,
-  left-to-right**. A bound result is evaluated once and reused; whether equal
+  constructor arguments, and **computationally relevant** pair components
+  are evaluated eagerly, left-to-right. A subset-Σ pair's Ω proof is the
+  exception: it is erased **before evaluation**, never forced (§3.2).
+  A bound result is evaluated once and reused; whether equal
   values also share physical storage is private (`41`, `44`). Ordinary closures
   and graphs containing them remain runtime-local (`41 §2.1`).
   Chosen because, the choice being meaning-preserving, strict is the most
@@ -95,7 +98,8 @@ required or annotated.**
   worst-case bounds need a non-data-dependent
   "when"; lazy-by-default would undermine them.
 - **Laziness where semantically required — the eliminator's branches.** The
-  **one** non-strict position is an **eliminator's methods**: `elim_D M m̄ ī s`
+  **one** non-strict position among **computational** terms is an
+  **eliminator's methods**: `elim_D M m̄ ī s`
   forces the **scrutinee** `s` (CBV), then evaluates **only** the method `mₖ`
   selected by `s`'s head constructor (§3.3); the other methods are **never
   evaluated**. Since `if`/`match`/`&&`/`||` all elaborate to `elim_D` (`14 §3`,
@@ -104,6 +108,8 @@ required or annotated.**
   special rule. (An `elim` whose methods were evaluated strictly *before*
   selection would force every branch — the interpreter MUST hold methods
   unevaluated and force the selected one. This is the AC3 property, §3.6.)
+  Erasure of an Ω proof in a subset-Σ (§3.2) is **not** a scheduling or
+  branch-laziness exception: that component has no runtime computation.
 - **Laziness by explicit annotation** — an opt-in **`Lazy a`** (thunk) type
   defers an expensive, possibly-unused computation, **forced** on demand and
   memoized (call-by-need *locally*). Laziness is **visible in the type**, never
@@ -137,7 +143,7 @@ A **value** `v` (the inhabitants of `41`'s model):
 ```
 v ::= n                          -- typed scalar: Int, Bool, Char, Float, Decimal (41 §1)
     | cₖ v̄                        -- constructor application, saturated (data)
-    | (v₁ , v₂)                   -- pair (Σ); a record is a right-nested pair (13 §3)
+    | (v₁ , v₂)                   -- relevant Σ pair; a record nests pairs (13 §3)
     | ⟨ λ(x:A).t ; ρ ⟩            -- ordinary closure: runtime-local and opaque (41 §2.1)
     | Type ℓ | (x:A)→B | (x:A)×B  -- type values (types ARE values; canonical type formers)
     | str | bytes | array | map | set   -- collection values (41 §2)
@@ -163,8 +169,8 @@ eval ρ (Const c)        = eval ρ∅ (body c)            -- δ: c has a body (t
 eval ρ (λ(x:A).t)       = ⟨ λ(x:A).t ; ρ ⟩            -- closure; NO reduction under the binder (WHNF, §3.5)
 eval ρ (App f u)        = apply (eval ρ f) (eval ρ u)              -- CBV: force operator, then argument
 eval ρ (cₖ ā)           = construct (cₖ (map (eval ρ) ā))         -- strict constructor args
-eval ρ (a , b)          = construct (eval ρ a , eval ρ b)         -- strict pair
-eval ρ (p.1)            = fst (eval ρ p)             ;   eval ρ (p.2) = snd (eval ρ p)   -- Σ-β
+eval ρ (a , b)          = construct (eval ρ a , eval ρ b)         -- relevant Σ: strict pair
+eval ρ (p.1)            = fst (eval ρ p)             ;   eval ρ (p.2) = snd (eval ρ p)   -- relevant Σ-β
 eval ρ (let x = e₁ in e₂) = eval (ρ , eval ρ e₁) e₂              -- strict let; e₁ forced once, shared
 eval ρ (Type ℓ)         = Type ℓ                                   -- type value, level carried verbatim (12 §4)
 eval ρ ((x:A)→B)        = (x : eval ρ A) → ⟨B ; ρ⟩  ;  eval ρ ((x:A)×B) = (x : eval ρ A) × ⟨B ; ρ⟩
@@ -178,6 +184,28 @@ apply ⟨ λ(x:A).t ; ρ' ⟩ u = eval (ρ' , u) t                       -- β b
 apply ⟨neutral n⟩       u = ⟨neutral (n · u)⟩                      -- stuck (open terms only)
 apply unknown           u = unknown                                -- strict (§4)
 ```
+
+The pair clauses above apply to **computationally relevant** Σ components.
+A refinement `{x:A|φ}` is a checked kernel `Σ(x:A).φ x : Type`, with
+`φ x : Ω` (`../20-verification/21 §2`, `13 §4`). Its runtime semantics is
+**type-directed erasure**:
+
+```
+eval ρ (Pair(a,π) : Σ(x:A).φ x) = eval ρ a       -- never evaluate π
+eval ρ (Proj1 p : A)            = eval ρ p       -- p has subset-Σ type
+Proj2 p : φ(Proj1 p)            = erased         -- only proof positions
+```
+
+The proof component may contain an **open hole** that evaluates to
+`unknown` if demanded as data, but here it is **not demanded**; a refined
+value still evaluates to its carrier. A relevant Σ whose second component
+is not classified at Ω remains a strict pair; an open hole in that component
+still propagates `unknown` (§4). The same distinction applies in both
+checked-core lowering and interpreter evaluation; the interpreter is untyped,
+so its concrete way to carry the kernel's Ω classification is implementation
+latitude, **not** a licence to guess from the constructor spelling or to
+force an erased proof. No kernel equality `Σ(x:A).φ x ≡ A` follows from
+runtime erasure.
 
 `construct` does not prescribe an allocation strategy. It constructs the
 extensional value; a closure-free canonical graph acquires bytes only when
@@ -265,9 +293,10 @@ The interpreter forces every step to weak-head form and, by CBV, forces
 arguments fully — so the **boundary** is:
 
 - **Data → full normal form.** A closed, ground value of an inductive/record
-  type is a constructor (or pair) applied to **fully-evaluated** argument
-  values, recursively all the way down. This is the "run to completion, to full
-  values" of `§1`.
+  type is a constructor (or relevant pair) applied to fully evaluated
+  **computational** arguments. A subset-Σ value is represented by its
+  fully evaluated carrier; its Ω proof is not evaluated (§3.2). This is
+  the "run to completion, to full values" of `§1`.
 - **Functions → WHNF (a closure).** Evaluation does **not** reduce under a λ — a
   function value is `⟨λ(x:A).t ; ρ⟩`, its body unevaluated until applied. The
   interpreter does **not** η-expand or normalize function bodies.
@@ -346,11 +375,13 @@ bytes. It deliberately ignores private sharing and allocation identity.
 
 ## 4. `unknown` propagation
 
-Evaluating a term that depends on an **open verification hole** (`41 §6`,
-`../20-verification/24 §2`) yields **`unknown`** — the operational face of
-partial verification: the program runs, and `unknown` marks exactly where an
-unproven property bears on a result. A **hole-free** program **never** yields
-`unknown` (it has no holes — `43 §2, case 1`).
+Evaluating a term that **computationally depends** on an open verification
+hole (`41 §6`, `../20-verification/24 §2`) yields `unknown`: it marks where
+an unproven property bears on a runtime result. An open hole **only in a
+subset-Σ's Ω proof** is erased and never evaluated (§3.2); it does **not**
+make the carrier result `unknown`, but the claim remains `unknown` in the
+verification status and trusted-base export (`21 §5.4`). A hole-free
+program never yields runtime `unknown` (`43 §2, case 1`).
 
 **Propagation (the Kleene/Heyting rules, `41 §6`).** `unknown` is the third
 truth value and the "result not determined" marker:
@@ -362,6 +393,7 @@ strict elimination on unknown → unknown:
   primReduce op (… unknown …) = unknown   -- any strict primitive with an unknown operand
   cast/Eq on unknown     = unknown
   (a , unknown).2        = unknown ;  fst/snd of unknown = unknown
+  -- only for relevant Σ pairs; an Ω proof component is erased before this
 
 absorbing connectives (do NOT force the other operand past the absorber):
   unknown ∧ false = false        false ∧ unknown = false
@@ -373,8 +405,11 @@ The connectives are the eliminator-branch rule (§2) in disguise: `∧`/`∨` ar
 `if` on `Bool`, so an `unknown` **scrutinee** propagates, but an `unknown` in an
 **untaken** arm is discarded (the absorbing cases `∧false`/`∨true` are decided
 by the *other*, known operand without forcing the `unknown` one). The
-discriminating test (AC4) flips on **hole-present → `unknown`** vs **hole-absent
-→ a definite value**.
+discriminating test (AC4) flips on a **computationally reached** hole →
+`unknown` versus the same computation with the hole discharged → a definite
+value. A proof-only hole in an erased subset component is a distinct case:
+same carrier result, **different verified status**, never an `unknown`
+payload merely because the proof was open.
 
 ## 5. The interpreter as oracle (and the REPL)
 
@@ -675,7 +710,9 @@ inductive/observational computations (constructor form; `cast`-refl → `a`;
 `Eq`-by-type; quotient elim), deterministic extensional observations for
 closure-free canonical data, callable-bearing results by
 selected closure-free ground observations, short-circuit / branch laziness
-(untaken arm not forced), and `unknown` propagation (hole-present flips to
-`unknown`, hole-free never does). Each discriminating case **flips** on its
+(untaken arm not forced), and `unknown` propagation (a computationally
+reached hole flips to `unknown`; an erased subset proof hole leaves a
+carrier value with an `unknown` verification status). Each discriminating
+case **flips** on its
 targeted bug or asserts a structural output (constructor head or durable bytes),
 per COORDINATION §7.

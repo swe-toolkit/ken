@@ -7,13 +7,16 @@
 > declaration lowers to a genuine inductive type with real constructors and a
 > real eliminator, never an opaque base.
 >
-> **No new kernel rule for the landed L2 surface.** Its direct and Π-bound forms
+> **No new kernel former for the L2 surface.** Its direct and Π-bound forms
 > lower to the **landed** kernel: a `data` decl elaborates to a kernel inductive
 > family + its generated `elim_D` (`../10-kernel/14`, K1 and **K1.5**); `match`
 > elaborates to `elim_D`
-> (`39 §2.6`); a refinement `{x:A|φ}` elaborates to its **carrier `A` plus an
-> emitted obligation** (`../20-verification/21 §2`, `22 §2.1`), never a kernel
-> type former. The elaborator and the exhaustiveness/reachability checker are
+> (`39 §2.6`); a refinement `{x:A|φ}` elaborates to the existing kernel
+> **subset Σ** `Σ(x:A).φ` with an Ω-typed proof component and a checked
+> introduction obligation (`../20-verification/21 §2`, `22 §2.1`). This
+> subset-Σ rule is the normative **W1 target**; the current carrier-only
+> elaboration remains a transitional implementation until W5 replaces it.
+> The elaborator and the exhaustiveness/reachability checker are
 > **untrusted** (`39 §1`): a bug yields a rejected valid program or a poor
 > diagnostic, **never** an unsound acceptance — the kernel re-checks the emitted
 > `elim_D` (`§4.4`). The nested-positive work named below is **partially
@@ -1019,26 +1022,30 @@ def NonEmpty a    = { xs : List a | Not (Equal (List a) xs (Nil a)) }
 fn head {a} (xs : NonEmpty a) : a = match xs { Cons x _ => x }
 ```
 
-**The encoding — carrier plus obligation (normative, `21 §2`).** A refinement
-`{x:A|φ}` is **not** a kernel type former. It elaborates to its **carrier `A`**;
-the predicate `φ` is tracked by the (untrusted) elaborator and **every
-introduction** of a value at the refinement — using an `A` where `{x:A|φ}` is
-expected — **emits the obligation** `φ a` (`22 §2.1`), discharged by the prover
-or surfaced as a typed hole (`24 §2`). Consequences, each grounded:
+**The encoding — a kernel-checked subset Σ (normative, `21 §2`).** A
+refinement `{x:A|φ}` elaborates to the existing core `Σ(x:A').φ'`, where `A'`
+is a type and `φ'` checks at Ω under `x:A'`. It is **not** a new kernel former
+and is **not** definitionally equal to its carrier. Introduction of an `A`
+where this Σ is expected constructs a pair `(a', π)` whose second component
+must check at `φ[a'/x]`; the scalar/refinement obligation is discharged by
+kernel-checked evidence or stays as a visible typed hole (`22 §2.1`, `24 §2`).
+Consequences, each grounded:
 
-- **No implicit subset coercion past `φ`.** `A ≤ {x:A|φ}` (the introduction
-  direction) costs the obligation `φ`; it is never a silent coercion. The
-  **forgetful** direction `{x:A|φ} ≤ A` is **free** — in the carrier encoding it
-  is the identity on `A` — and emits **no** obligation (`22 §2.1`/§2.5).
-- **No runtime payload.** The proof component is a **mere proposition** (`16
-  §1.2`) — proof-irrelevant and computationally irrelevant — so a refined value
-  behaves as a bare `A` at runtime; refinements are **zero-cost** and pure
-  compile-time enforcement.
-- **Not a core `Σ` over Ω.** The naive reification `{x:A|φ}=Σ(A,φ)` is **not**
-  used — it is collapsed by Ω-proof-irrelevance when the carrier is relevant
-  (the landed `sort_pi_sigma` Σ-sort caveat, `21 §2`, `13 §4`/§5). The
-  carrier-plus-obligation form is **independent** of that kernel erratum (it
-  never forms a core `Σ` over an Ω predicate), so L2 builds on it as-is.
+- **No implicit subset proof.** `A ≤ {x:A|φ}` costs the proof of `φ a` and
+  never fabricates one. Forgetting `{x:A|φ} ≤ A` emits `Proj1` with **no new
+  obligation** (`22 §2.1`/§2.5). From one subset to another, forgetting then
+  introducing the target may use the source's checked `Proj2` as evidence;
+  no coercion is inserted under a type former or binder. `List {x:A|φ}` is
+  not `List A`, nor is a function accepting a subset a function accepting A.
+- **No runtime proof payload.** The second component inhabits Ω and is
+  proof-irrelevant (`16 §1.2`), while the carrier stays relevant (`13 §4`).
+  Type-directed runtime erasure represents `(a,π)` by `a`, projects `Proj1`
+  without work, and never evaluates `π` (`42`); this is a runtime property,
+  **not** a kernel conversion identifying Σ with A.
+- **Same-carrier equality.** Two well-typed pairs with convertible first
+  components and different proofs are equal by Σ-η and Ω
+  proof-irrelevance; pairs with distinct first components do not collapse.
+  `Σ(Type ℓ_A, Ω_ℓ_φ)` lands in `Type (max ℓ_A ℓ_φ)`, not Ω (`13 §4`).
 
 Refinements compose with `data`, records, and function arguments/results, and
 are how `requires`/`ensures` desugar (`21 §1`/§2). Pushing a property into a
@@ -1076,11 +1083,13 @@ universe computation — each is an instance of a landed kernel rule.
   may have codomain `Ω_l` rather than `Type ℓ'` (`§3.5`, `14 §3`). This is the
   same predicative Π-into-Ω rule as other propositions (`16 §1.1`); it adds no
   universe coercion and does not turn the proof target into a `Type`.
-- **Refinement `{x:A|φ}`.** `φ : Ω` (proof-irrelevant, `12 §5`/`16 §1`); the
-  refinement's **core image is its carrier `A`** (`§5`), so it sits at `A`'s
-  level `l` (`A : Type l`) — a *subtype at the same level*, predicative, **no
-  universe bump** (`12 §2`/§3, non-cumulative). The obligation `φ a` is an Ω
-  proposition discharged in V3 (`22`); it introduces no new universe (`22 §7`).
+- **Refinement `{x:A|φ}`.** Given `A : Type ℓ_A` and `φ x : Ω_ℓ_φ` under
+  `x:A`, the subset `Σ(x:A).φ x : Type (max ℓ_A ℓ_φ)` (`13 §4`, `12 §2`).
+  The Ω-sorted second component is proof-irrelevant, but the relevant
+  carrier keeps the Σ in `Type`; no cumulative inclusion or implicit level
+  lowering occurs (`12 §3`). The introduction goal `φ a` is an Ω
+  proposition (`22 §2.1`); if its level differs, the predicative max, not
+  the carrier level alone, determines the resulting type.
 
 ## 8. What WS-L must deliver here
 

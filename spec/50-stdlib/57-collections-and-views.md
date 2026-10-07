@@ -299,7 +299,7 @@ against landed machinery, not hand-waved:
 |---|---|---|
 | **projection (lens)** | `Σ`-record `{ get; set; get_set; set_get; set_set }` over a concrete carrier (`class` landed) | now (D3 mandate) |
 | **representation (iso)** | `Σ`-record `{ to; from; to_from; from_to }`, concrete | now (fast-follow) |
-| **refinement** | rides landed refinement types `{x:A|φ}` (`ast.rs TRefine`, parser `parse_refinement_type`, `21 §6.1`; lowers to carrier + kernel-re-checked obligation, `21 §6.3`/`22`). A refinement view is a projection whose focus is `{x:A|P x}` | now |
+| **refinement** | the surface `{x:A|φ}` syntax is landed (`ast.rs TRefine`, parser `parse_refinement_type`, `21 §6.1`); the target core focus is `Σ(x:A).φ` with a checked proof component (`21 §6.3`, `22`). The current carrier-only lowering is superseded by the subset-Σ cut, not a second permanent form. A refinement view projects a focus of `{x:A|P x}` | syntax now; subset-Σ at W5 |
 | **indexed** | a key/position view `Key → Option A` / a lens family; plain Ken (full maps are CAT-4) | now |
 | **quotient-respecting** | **setoid-morphism form** `{ project : A→B; respects : (x y : A) → R x y → Equal B (project x) (project y) }` — a plain `Σ`-record, **no quotient type needed** (the field remains `project`; retiring the `view` keyword frees `view` for ordinary identifier use — `§4.1`); **quotient-carrier form** (a view *out of* `A/R`) needs a surface path the parser lacks (`§4.3`) | setoid now; carrier later |
 | **obligation-producing** | the Ward / L12 / L14 seam — rides landed refinement-obligation machinery (`capabilities.rs attenuate` already emits a kernel-re-checked refinement obligation). **Boundary only** per frame — state the seam, coordinate Lane B / L12 / L14, do not fully specify | seam stated, deferred |
@@ -397,8 +397,10 @@ path stated (the catalog discipline, `README §intro`):
   any shipped law (the `List Bool` carrier is what makes this achievable —
   `§3.4`).
 - **D3** — the view records and their coherence proofs are Ken `Σ`-records +
-  Ken proofs; refinement rides landed `{x:A|φ}`. **Zero kernel diff, no new
-  `Term`/`Decl`.** The two design-now/build-later extensions (multi-param
+  Ken proofs; the view uses the landed `{x:A|φ}` **surface syntax**. D3
+  itself has **zero kernel diff and no new `Term`/`Decl`**; the separate
+  subset-Σ replacement of that surface type's core representation is W5
+  (`21 §2`, `34 §5`). The two design-now/build-later extensions (multi-param
   `class`, surface quotient-intro) are outer-ring (`ken-elaborator`-only) and
   re-fork to the Steward when built.
 

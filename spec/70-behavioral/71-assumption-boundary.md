@@ -692,8 +692,11 @@ honesty direction, AC2/I1) and **no `Ward` result ever lands in `proved`** (the
 one-way direction, AC6/I4). *Worked flip (AC2):* a function with
 `ensures result > 0` emits that postcondition under `Q` (status `proved`) when
 its obligation discharges, and under `P` (status `unknown`) when the proof is
-left an open hole — the field flips with `trusted_base()` membership, a
-structural signal, the same program under the two kernel states.
+left an open hole — the field flips with kernel-checked proof and
+`postulates_reachable` over its transparent dependencies (`21 §5.4`).
+Own-hole `trusted_base()` membership is one witness; a different open hole
+reachable through a refined constant's `Proj2` must also keep the claim
+out of `Q`, even if no postulate carries the claim's goal.
 
 **PX8-X incremental acceptance.** A full positive case carries the canonical
 `File`/`Buffer` pair on a positioned transfer and is accepted by both complete

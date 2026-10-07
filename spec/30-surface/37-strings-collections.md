@@ -184,14 +184,15 @@ that `l2s`, `eqChar`, or another registered Op computes there.
   byte-offset slice could split a multi-byte scalar (`§2.2`, ADR 0010).
 - **`eq` is codepoint-wise and rides the landed `eqChar`.** `eq a b` decides
   equality of the two scalar sequences via `list_eq` threading the landed
-  `eqChar : Char → Char → Bool` (`= eq_int` under `Char`'s `Int` erasure,
-  `decimal_char.rs`). This is the **normative default** (ADR 0010 §2):
-  `l2s (s2l s) ≡ s` is the landed String-side retraction, so `s2l` is
-  injective and `String` is **canonical** w.r.t. `List Char`; therefore
-  codepoint-wise `eq` is sound. **NFC-normalization equality is OUT** (`§6`,
-  ADR 0010 §3): it identifies distinct scalar sequences, so over the codepoint
-  carrier it is *non-canonical* — a lawful `DecEq` for it would inhabit
-  `Bottom`; if ever wanted it is a separately-named `Eq`/setoid in a later WP,
+  `eqChar : Char → Char → Bool` (compares `Int` codepoint projections;
+  runtime erasure stores only those projections, `18a §5.9.1`). This is
+  the **normative default** (ADR 0010 §2): `l2s (s2l s) ≡ s` is the
+  landed String-side retraction, so `s2l` is injective and `String` is
+  **canonical** w.r.t. `List Char`; therefore codepoint-wise `eq` is
+  sound. **NFC-normalization equality is OUT** (`§6`, ADR 0010 §3): it
+  identifies distinct scalar sequences, so over the codepoint carrier
+  it is *non-canonical* — a lawful `DecEq` for it would inhabit `Bottom`;
+  if ever wanted it is a separately-named `Eq`/setoid in a later WP,
   **never** a `DecEq`/`Ord` here.
 - **`compare` is 3-way, codepoint-wise (`§2.5.1`).** `compare a b : OrdResult`
   (`Lt` / `Eq` / `Gt`) is the lexicographic order of the two scalar sequences
@@ -664,7 +665,8 @@ defining shapes:
   through the **bridge** `IsTrue (leq x y) := Eq Bool (leq x y) True : Ω` — a
   proof-irrelevant proposition (both `Bool` as real `data Bool = True | False`
   and `Eq _ : Ω` are landed by ES2). It **must** land in `Ω` (proof-irrelevant);
-  a `Type`-sorted "predicate" leaks content into the refinement carrier
+  a `Type`-sorted "predicate" makes the second Σ component relevant,
+  invalidating subset-Σ proof irrelevance and runtime erasure
   (`13 §4` / `16 §8.2`). (With the lawful `Ord a` class,
   `../50-stdlib/51-lawful-classes.md`, `where Ord a` supplies this **same**
   `leq : a → a → Bool` from the dictionary — the `IsTrue` bridge is
@@ -742,9 +744,11 @@ with its level, and none adds a universe computation:
   rule** (`34 §7`).
 - **`Array a` / `Set a`** — abstract types at `level a`; `Map k v` at `max(level
   k, level v)`. Abstract carriers over `41`'s heap, no universe bump.
-- **Refinement `{ ys : List a | is_sorted leq ys ∧ Perm ys xs }`** — carrier
-  `List a` at its level; the predicate is `Ω`-valued (`12 §5`/`16 §1`),
-  discharged as a V3 obligation, **no** universe bump (`34 §5`/§7).
+- **Refinement `{ ys : List a | is_sorted leq ys ∧ Perm ys xs }`** — a
+  subset-Σ over `List a : Type ℓ_a`, with its checked predicate in
+  `Ω_ℓ_P` (`12 §5`/`16 §1`). The pair lands in
+  `Type (max ℓ_a ℓ_P)` (`13 §4`, `34 §5`/§7); its Ω proof is
+  discharged as an obligation and erased only at runtime.
 
 **Pinned here (do not reopen).** `String` = canonically encoded NFC UTF-8
 primitive (not `List Char`); byte-length ≠ char-length; the four

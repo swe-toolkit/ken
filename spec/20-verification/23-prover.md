@@ -44,15 +44,17 @@ claim is fixed, an open one is left running.)
 ### 1.3 The honesty guard — `proved` is kernel-structural, not a prover flag
 
 The prover **cannot mark** an obligation `proved`. Per the V1 honesty guard
-(`21 §5.4`, `18 §5`): `Γ ⊢ φ` is `proved` **iff** a certificate `p` `check`s
-**and** no postulate carrying `φ` sits in `GlobalEnv::trusted_base()`
-(`18 §4.1`/§5). An undischarged obligation *is* a `declare_postulate` of `φ`, so
-its goal is enumerated by `trusted_base()`; discharging retires the postulate
-(the certificate replaces the assumption). The verdict is therefore decidable
-from the **kernel's own state**, with **no side-channel / parallel "proved"
-store** the prover could write — a prover bug can leave a hole (`unknown`) or
-emit a cert the kernel rejects, but can **never** forge `proved`. This is the
-V1-build kernel-structural-status carry, preserved.
+(`21 §5.4`, `18 §5`): `Γ ⊢ φ` is `proved` only when its certificate `p`
+**checks** and the kernel's read-only `postulates_reachable(env,p)` query
+finds **no open obligation hole or unaccepted postulate** through the
+certificate's δ-closed transparent dependencies. An undischarged obligation
+is a visible `declare_postulate` in `trusted_base()`; discharging retires
+that postulate. **Same-goal membership alone is insufficient**: a checked
+certificate may use `Proj2 c` for a refined constant `c` whose proof depends
+on another hole. This transitive discriminator is kernel-side, not a
+side-channel or parallel prover-owned "proved" store. A prover bug may
+leave a hole (`unknown`) or emit a certificate the kernel rejects, but
+cannot forge an unconditional `proved` merely by proving a different goal.
 
 ### 1.4 Projection to V1's four-way epistemic status (the reconcile)
 
@@ -131,12 +133,14 @@ classify(⟨id, Γ ⊢ φ, _⟩) → Route:
 *wrong* route is harmless: a misclassified-downward `φ` either yields a
 certificate the kernel **re-checks** (still sound) or fails and becomes an
 honest `unknown` — wasted work, never a false `proved`. But a **never-routed**
-obligation is **not** backstopped: it supplies *no* certificate and leaves *no*
-hole, so its goal never enters `trusted_base()` and the claim reads as
-discharged though never attempted — a silent verification-soundness gap (the
-exact V2 *omission* hazard, `22`). The kernel re-checks what the prover
-*supplies*; it cannot see what the classifier *omits*. So **exhaustiveness of
-routing is the sole safeguard against a dropped obligation**, asserted
+source obligation may leave no certificate or recorded hole and read as
+discharged though never attempted — a verification-soundness gap (`22`).
+A missing subset-Σ proof term itself fails core checking, and an inserted
+postulate remains visible to the transitive guard; this **does not**
+backstop a different source obligation omitted before it reached the core.
+The kernel checks what the prover supplies, not the completeness of the
+classifier. Thus exhaustive routing remains required to catch dropped
+obligations outside the checked pair gate, asserted
 **structurally** (a total `case` with a default arm, no `_ ⇒ skip`) — the
 discriminating conformance case drives an obligation of *every* shape through
 `classify` and asserts each receives a route (no silent unrouting), the
@@ -709,7 +713,8 @@ universe**, so the reconcile is mostly accounting that nothing bumps a level:
 
 The per-obligation contract emitting the **verdict trichotomy** (§1.2) keyed by
 `id` for V1's status projection (`21 §5.3`), with the honesty guard
-kernel-structural via `trusted_base()` (§1.3); the **exhaustive** classifier
+kernel-structural via checked terms and `postulates_reachable` against
+`trusted_base()` (§1.3); the **exhaustive** classifier
 (D/FO/HO with HO the default, §2.1); reflective decision for D + SMT
 search/reconstruction; the Kripke embedding + the **reflective certificate route
 (a)** — the closed theory, mechanized adequacy, and a verified `check_cert`
@@ -718,12 +723,15 @@ tactic and the core induction/rewrite tactics with **per-branch sub-obligation
 descent + certificate composition** (§5); generalization beyond the naturality
 domain; and the documented guarantee (G3) that the classical solver cannot yield
 a false `proved`. Acceptance ties to **G3**. Conformance:
-`../../conformance/verify/prover/` — a decidable arithmetic goal (reflective);
-an FO-intuitionistic goal via the embedding (re-checked certificate); an IPC
-propositional goal; an `unknown` goal whose typed hole is `trusted_base()`-
-distinct from `proved` (the absence-assertion, §1.3, naming its guard —
-postulate membership); an **exhaustive-classifier** case driving an obligation
-of each shape through `classify` with none silently unrouted (§2.1, structural);
-and a **soundness regression** in which Z3 "proves" a classically-valid-but-
-topos-invalid `φ` whose certificate the kernel **rejects** — the verdict-flip
-(`proved` → not `proved`) showing the de Bruijn criterion is load-bearing.
+`../../conformance/verify/prover/` — a decidable arithmetic goal
+(reflective); an FO-intuitionistic goal via the embedding (re-checked
+certificate); an IPC propositional goal; an `unknown` goal with its own
+open hole in `trusted_base()`, contrasted with a checked certificate
+that reaches an open hole through a different refined constant's `Proj2`
+and one with no such dependency (the **transitive** absence assertion,
+§1.3); an **exhaustive-classifier** case driving an obligation of each
+shape through `classify` with none silently unrouted (§2.1,
+structural); and a **soundness regression** in which Z3 "proves" a
+classically-valid-but-topos-invalid `φ` whose certificate the kernel
+**rejects** — the verdict-flip (`proved` → not `proved`) showing the de
+Bruijn criterion is load-bearing.

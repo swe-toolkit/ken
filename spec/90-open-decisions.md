@@ -133,12 +133,16 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   Neither is free: even honest `Eq Decimal` bottoms on missing `Int` arithmetic
   lemmas
   (`refl` needs `sub_int e e = 0`, `mul_int c 1 = c`).
-- **Contrast — `Char` is unaffected.** `Char = { c : Int | isScalar c }` is
-  **canonical** (one carrier value per codepoint, `proj` identity, `isScalar`
-  Ω-irrelevant), so `Equal Char x y ≡ Equal Int (proj x) (proj y)`
-  definitionally and `Ord Char`/`DecEq Char` transport `Int`'s **true**
-  meta-theorem `Axiom` soundly. Canonical-vs-non-canonical is the whole
-  discriminator.
+- **Contrast — `Char` is unaffected.** `Char = { c : Int | isScalar c }`
+  is the checked subset-Σ with a **relevant** codepoint and an
+  Ω-irrelevant proof (`13 §4`), not a core type convertible to `Int`.
+  Its projection is `Proj1`. Σ-η and Ω proof irrelevance make checked
+  Char values with convertible codepoints equal despite differing scalar
+  proofs; `Ord Char`/`DecEq Char` derive their laws from the visible
+  audited `Int` assumptions via that projection, with no new Char
+  postulate (`18a §5.9.1`). Decimal instead has distinct carrier pairs
+  for equal decimal values. Canonical-vs-non-canonical remains the
+  discriminator, not a claim of `Char ≡ Int`.
 - **Status.** **OPEN** — the single gate for the future `class Num` +
   `Decimal`-equality lane. The `Decimal` DEMOTE ships only its **computational**
   ops (exact base-10 arithmetic + primitive removal, `18a §5.6`), which are

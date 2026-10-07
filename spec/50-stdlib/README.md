@@ -32,9 +32,10 @@ two lower tiers of the surface taxonomy (`../30-surface/30`):
   primitive ops (`../10-kernel/14 §5`), the effect/FFI boundary
   (`../30-surface/38`), and the base elaborator syntax.
 - **Prelude (Ken-defined, always-present, `30 §4`)** — the **closed** union of
-  the primitive-signature arm (`Auth`, `Bool`, `Char`, `List`, `Option`,
-  `ResourceKind`, `Result`, `Utf8Error`) and the internal-provision arm
-  (`Nat`, kernel origin; `Pair`, compiler-bootstrap origin; `Equal`, `Prop`,
+  the checked type/signature arm (`Auth`, `Bool`, `List`, `Option`,
+  `ResourceKind`, `Result`, `Utf8Error`), the checked transparent
+  subset-Σ definition `Char` (`18a §5.9.1`), and the internal-provision
+  arm (`Nat`, kernel origin; `Pair`, compiler-bootstrap origin; `Equal`, `Prop`,
   `Proved`, `Top`, `Bottom`, keyed by kernel machinery). Its exact fifteen-name
   floor is `{Auth, Bool, Bottom, Char, Equal, List, Nat, Option, Pair, Prop,
   Proved, ResourceKind, Result, Top, Utf8Error}`. `Proved : Top` is a checked

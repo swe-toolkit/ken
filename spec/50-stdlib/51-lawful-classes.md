@@ -319,8 +319,14 @@ defect — is **live**
 ([[soundness-ac-static-vs-runtime-face]]). The design is unchanged throughout;
 only the gate states and build-time availability move.
 
-**Primitive carriers (`Int`/`Float`/`String`/`Char`) fail the carrier axis — so
-their lawful instances are NOT zero-delta.** A K1 primitive is **opaque to δ**
+**Primitive carriers (`Int`/`Float`/`String`) fail the carrier axis — so
+their lawful instances are NOT zero-delta.** `Char` is **not** a primitive
+carrier: it is the subset-Σ over opaque `Int` (`18a §5.9.1`). Its derived
+`Ord`/`DecEq` laws use `Int`'s visible audited assumptions on the `Proj1`
+codepoints, then lift equality by Σ-η and Ω proof irrelevance. This is
+**zero-NEW-delta**, not an independently axiom-free `Char` instance, and
+not type-level transport along `Char ≡ Int`. A K1 primitive is
+**opaque to δ**
 (`int_leq x x` does not reduce under conversion, even at literal arguments;
 the corresponding `Op` evaluates only at runtime) and has **no induction
 principle**, so its total-order laws are **not kernel-provable**; the only

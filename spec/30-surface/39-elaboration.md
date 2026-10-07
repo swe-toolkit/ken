@@ -54,7 +54,8 @@ is a core term the kernel `check`s (`../10-kernel/18 §4`). Consequences:
    (`../10-kernel/14 §3`) with the recovered **dependent motive**, and run
    **exhaustiveness + reachability** checking (`34 §4`).
 7. **Sugar expansion** — telescopes (`../10-kernel/13 §3`), records → Σ (`33
-   §2`), `if` → `elim_Bool`, contracts/refinements → the obligation encoding
+   §2`), `if` → `elim_Bool`, refinements and `ensures` → checked
+   subset-Σ pairs with obligations, written `requires` → Π proof arguments
    (`../20-verification/21 §6`, `22`), proof-claim forms (`prop` / `theorem` /
    attached `proof`) → ordinary checked proof terms over `Ω`, `do`/
    comprehensions (if any) → combinators, numeric literals →
@@ -63,8 +64,9 @@ is a core term the kernel `check`s (`../10-kernel/18 §4`). Consequences:
    `../60-security/61 §5a`); `temporal{}`/`Temporal` surface notation →
    `Temporal` inductive data (`../70-behavioral/72`); `Wrapping[T]` / `+%` →
    wrapping-arithmetic primitives (`35 §3`).
-8. **Obligation emission** — where a refinement/contract is introduced, emit the
-   proof obligation (`../20-verification/22`) and leave a hole/`prove` slot.
+8. **Obligation emission** — at each subset/`ensures` result leaf, record
+   the proof obligation and put a checked proof term or applied typed hole
+   in the pair; written `requires` is owed at the call (`../20-verification/22`).
 
 ### 2.0 Source-unit loading and module-scope construction
 

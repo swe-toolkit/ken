@@ -155,11 +155,13 @@ This relation is **not** a Ken declaration or callable signature.
 
 ### 3.1 The encoding — a kernel-re-checked refinement obligation
 
-The child exposed through an existing privileged capability path carries the
-**landed refinement** (`34 §5`, `21 §2`): the **carrier `Cap E`** with predicate
-`authority c' ⊑ authority c ⊓ w`. Supplying the child emits the obligation
-`authority c' ⊑ authority c ⊓ w` (`22 §2.1`), discharged by the prover and
-**re-checked by the kernel** (`23 §1`, `18 §4`). The trusted action establishes
+The child exposed through an existing privileged capability path carries
+`{ c' : Cap E | authority c' ⊑ authority c ⊓ w }` (`34 §5`, `21 §2`),
+whose **target core type** is the checked subset-Σ over `Cap E`, not
+`Cap E` itself. Supplying the child introduces the pair
+`(c', π)` with an obligation `authority c' ⊑ authority c ⊓ w`
+(`22 §2.1`), discharged by the prover and re-checked by the kernel
+(`23 §1`, `18 §4`). The trusted action establishes
 `authority c' = authority c ⊓ w`, so the obligation is `(authority c ⊓ w) ⊑
 (authority c ⊓ w)` — discharged by `⊑-refl`. This does not introduce a public
 capability-producing wrapper (§4, `38 §1.3.1`).
@@ -615,7 +617,7 @@ formation (`36 §7.4`, `61 §9`):
 | `Cap E` (capability token) | `Type ℓ_op` | a value type (`36 §2.5`); opaque (§2.2), no new former |
 | `Authority` (carrier + ops record) | `Type (suc ℓ)` | record / Σ-Form (`13 §2`), laws at `Ω` — a `61 §2.1` lattice value |
 | `authority : Cap E → Authority` | ordinary Π | a projection; no new rule |
-| `{ c' : Cap E \| authority c' ⊑ authority c ⊓ w }` | `level(Cap E) = ℓ_op` | refinement = carrier + obligation (`21 §2`, `34 §5`); **predicative** (`12 §2`), **non-cumulative** (`12 §3`), same level as the carrier — adds no Σ over `Ω` |
+| `{ c' : Cap E \| authority c' ⊑ authority c ⊓ w }` | `Type (max ℓ_op ℓ_bound)` for `Cap E : Type ℓ_op` and predicate `: Ω_ℓ_bound` | subset-Σ (`21 §2`, `34 §5`, `13 §4`); **predicative**, **non-cumulative**, with an Ω proof erased only at runtime |
 | `authority c' ⊑ authority c ⊓ w` | `Ω` | an ordinary `Ω`-valued obligation (`22 §1`, `16 §1`) |
 | raw attenuation/revocation identity | non-Ken-visible runtime state | no source former, global, constructor, producer, or new kernel rule (§4) |
 
