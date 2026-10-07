@@ -60,9 +60,11 @@ Architect. Repair it only if ruled.
 
 ## Acceptance
 
-- **AC-1.** The repro above is a kernel test: step 5 is refused, and after
-  the refusal `p`'s body checks against its type and `p` is in
-  `trusted_base()` exactly as before step 4. The `rollback_pending`
+- **AC-1.** The repro above is a kernel test: step 5 returns the existing
+  prefix error, and the environment is unchanged from immediately before
+  step 5. `p` stays `Transparent { body: Const d }`, `d` stays present,
+  `p`'s body checks against its type, and `trusted_base()` is equal across
+  the refusal (`p` is absent from it since step 4). The `rollback_pending`
   variant is refused the same way.
 - **AC-2 (controls).** The existing `env_mark` and rollback tests, and the
   elaborator rollback suites from `VERIFY-REUSED-ENV-TRUST-RESIDUE`, keep
