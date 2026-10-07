@@ -2,13 +2,14 @@
 //! Spec: `spec/30-surface/39-elaboration.md §5.7`.
 //! Promise class: durable invariant. Measured: the checked match motive carries
 //! `Type 1`, the later conflicting use is rejected at declaration admission,
-//! and the prelude's open-query retry permits construction. Claimed: a motive
-//! query never stores the premature `Type 0` default in checked core. The gap:
-//! these fixtures cover the Nat/Bool/ascribed and nested shapes, not every
-//! possible producer of a stored sort; the caller census remains review-owned.
+//! and the prelude and catalog root remain admitted under fallback. Claimed:
+//! every accept/reject decision equals the defaulted base query's. The gap:
+//! a late-solved sort that also needs rigid level conversion falls back to
+//! the early default, as base did; that shape is not repaired here.
 
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::{Decl, KernelError, Level, Term};
+use std::path::PathBuf;
 
 const TWO: &str = "fn two (y : Nat) (c : Type 1) : Nat = y";
 const REPRO: &str = "fn m1 (a : Type) (n : Nat) (x : a) (h : a → Nat) : Nat = \
@@ -69,7 +70,20 @@ fn motive_has_sort(term: &Term, level: &Level) -> bool {
 
 #[test]
 fn prelude_initializes_with_open_motive_query() {
-    ElabEnv::new().expect("forced-zero prelude query must retry, not reject Type u0");
+    ElabEnv::new().expect("open-query fallback must preserve prelude admission");
+}
+
+#[test]
+fn effectful_classes_roots_loader_preserves_defaulted_match_admission() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("catalog/packages");
+    env.elaborate_module_from_roots(&[root], "Core.Classes.EffectfulClasses")
+        .expect("EffectfulClasses option_traverse_composed must still be admitted");
+    assert!(env
+        .globals
+        .contains_key("Core.Classes.EffectfulClasses.option_traverse_composed"));
 }
 
 #[test]
