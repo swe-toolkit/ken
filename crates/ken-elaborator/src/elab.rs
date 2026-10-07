@@ -4013,8 +4013,10 @@ fn ordinary_coherent_frame_plan(
 }
 
 #[inline(never)]
-fn boxed_simplify_branch_goal(env: &GlobalEnv, ctx: &Context, term: &Term) -> Box<Term> {
-    Box::new(simplify_branch_goal(env, ctx, term))
+fn boxed_simplify_branch_goal(
+    env: &GlobalEnv, facts: &RefinementFacts, ctx: &Context, term: &Term,
+) -> Box<Term> {
+    Box::new(simplify_branch_goal_keeping_refinements(env, facts, ctx, term))
 }
 
 #[inline(never)]
@@ -4056,7 +4058,9 @@ fn plan_coherent_frame_motive(
             frame,
         );
     }
-    let expanded_expected = boxed_simplify_branch_goal(cx.env, &zonked_ctx, original_expected);
+    let expanded_expected = boxed_simplify_branch_goal(
+        cx.env, cx.refinement_facts, &zonked_ctx, original_expected,
+    );
     let has_nontrivial_coupled_sides = matches!(original_expected, Term::Eq(_, _, _))
         || matches!(expanded_expected.as_ref(), Term::Eq(_, _, _));
     let probe_context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
@@ -4266,49 +4270,92 @@ fn compute_context_convoy(
 /// eliminator methods. Full normalisation can chase recursive transparent defs
 /// indefinitely under neutral scrutinees; this deliberately stops at stuck
 /// `Elim` nodes.
-fn simplify_branch_goal(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
+fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
     match whnf(env, ctx, term) {
         Term::Pi(a, b) => {
-            let a_s = simplify_branch_goal(env, ctx, &a);
+            let a_s = simplify_branch_goal_unguarded(env, ctx, &a);
             let mut ctx2 = ctx.clone();
             ctx2.push(a_s.clone());
-            Term::pi(a_s, simplify_branch_goal(env, &ctx2, &b))
+            Term::pi(a_s, simplify_branch_goal_unguarded(env, &ctx2, &b))
         }
         Term::Sigma(a, b) => {
-            let a_s = simplify_branch_goal(env, ctx, &a);
+            let a_s = simplify_branch_goal_unguarded(env, ctx, &a);
             let mut ctx2 = ctx.clone();
             ctx2.push(a_s.clone());
-            Term::sigma(a_s, simplify_branch_goal(env, &ctx2, &b))
+            Term::sigma(a_s, simplify_branch_goal_unguarded(env, &ctx2, &b))
         }
         Term::Eq(a, x, y) => Term::Eq(
-            Box::new(simplify_branch_goal(env, ctx, &a)),
-            Box::new(simplify_branch_goal(env, ctx, &x)),
-            Box::new(simplify_branch_goal(env, ctx, &y)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &x)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &y)),
         ),
         Term::App(f, a) => Term::app(
-            simplify_branch_goal(env, ctx, &f),
-            simplify_branch_goal(env, ctx, &a),
+            simplify_branch_goal_unguarded(env, ctx, &f),
+            simplify_branch_goal_unguarded(env, ctx, &a),
         ),
         Term::Ascript(t, a) => Term::Ascript(
-            Box::new(simplify_branch_goal(env, ctx, &t)),
-            Box::new(simplify_branch_goal(env, ctx, &a)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &t)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
         ),
         Term::Cast(a, b, e, t) => Term::Cast(
-            Box::new(simplify_branch_goal(env, ctx, &a)),
-            Box::new(simplify_branch_goal(env, ctx, &b)),
-            Box::new(simplify_branch_goal(env, ctx, &e)),
-            Box::new(simplify_branch_goal(env, ctx, &t)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &b)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &e)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &t)),
         ),
         Term::J(motive, base, eq) => Term::J(
-            Box::new(simplify_branch_goal(env, ctx, &motive)),
-            Box::new(simplify_branch_goal(env, ctx, &base)),
-            Box::new(simplify_branch_goal(env, ctx, &eq)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &motive)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &base)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &eq)),
         ),
         Term::Absurd(motive, proof) => Term::Absurd(
-            Box::new(simplify_branch_goal(env, ctx, &motive)),
-            Box::new(simplify_branch_goal(env, ctx, &proof)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &motive)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, &proof)),
         ),
         other => other,
+    }
+}
+
+/// Keep checked refinement identities rigid while exposing beta/iota and
+/// ordinary transparent heads needed by dependent branch goals.
+#[inline(never)]
+fn simplify_branch_goal_keeping_refinements(
+    env: &GlobalEnv, facts: &RefinementFacts, ctx: &Context, term: &Term,
+) -> Term {
+    let mut roots = Vec::new();
+    collect_refinement_consts(facts, term, &mut roots);
+    if roots.is_empty() {
+        return simplify_branch_goal_unguarded(env, ctx, term);
+    }
+    let k = roots.len();
+    let mut extended = ctx.clone();
+    for root in &roots {
+        let Term::Const { id, level_args } = root else { unreachable!("collected Const") };
+        let (params, ty) = env.const_type(*id).expect("refinement constant is declared");
+        extended.push(subst_levels(&ty, params, level_args));
+    }
+    let substitutions: Vec<(Term, Term)> = roots.iter().enumerate()
+        .map(|(i, root)| (root.clone(), Term::var(k - 1 - i)))
+        .collect();
+    let abstracted = subst_term_generalize_many(&weaken(term, k as i64), &substitutions);
+    let mut out = simplify_branch_goal_unguarded(env, &extended, &abstracted);
+    for root in roots.iter().rev() {
+        out = subst0(&out, root);
+    }
+    out
+}
+
+/// Enumerate distinct checked Const uses, including those below binders and
+/// applications. `children()` covers every kernel Term form without a default.
+fn collect_refinement_consts(facts: &RefinementFacts, term: &Term, roots: &mut Vec<Term>) {
+    let mut pending = vec![term];
+    while let Some(node) = pending.pop() {
+        if let Term::Const { id, .. } = node {
+            if facts.refinement_root(*id).is_some() && !roots.contains(node) {
+                roots.push(node.clone());
+            }
+        }
+        pending.extend(node.children());
     }
 }
 
@@ -5424,14 +5471,13 @@ fn check_match_with_lift_with_predicates(
         for position in 0..host_ctor.args.len() {
             concrete = Term::app(concrete, Term::var(total - 1 - position));
         }
-        let expected_here = simplify_branch_goal(
-            cx.env,
-            &cx.ctx,
-            &subst_term_generalize(
-                &weaken(expected, total as i64),
-                &weaken(scrut_core, total as i64),
-                &concrete,
-            ),
+        let source_expected = subst_term_generalize(
+            &weaken(expected, total as i64),
+            &weaken(scrut_core, total as i64),
+            &concrete,
+        );
+        let expected_here = simplify_branch_goal_keeping_refinements(
+            cx.env, cx.refinement_facts, &cx.ctx, &source_expected,
         );
         cx.match_frames.last_mut().expect("lifted arm frame").refined_target = Some(expected_here.clone());
         let mut scrut_ty = Term::indformer(host.id, host_level_args.to_vec());
@@ -5596,14 +5642,13 @@ fn check_structured_constructor_method(
     for position in 0..field_count {
         concrete = Term::app(concrete, Term::var(total - 1 - position));
     }
-    let expected_here = simplify_branch_goal(
-        cx.env,
-        &cx.ctx,
-        &subst_term_generalize(
-            &weaken(expected, total as i64),
-            &weaken(scrut_core, total as i64),
-            &concrete,
-        ),
+    let source_expected = subst_term_generalize(
+        &weaken(expected, total as i64),
+        &weaken(scrut_core, total as i64),
+        &concrete,
+    );
+    let expected_here = simplify_branch_goal_keeping_refinements(
+        cx.env, cx.refinement_facts, &cx.ctx, &source_expected,
     );
     cx.match_frames.last_mut().expect("structured arm frame").refined_target = Some(expected_here.clone());
     let mut scrut_ty = Term::indformer(ind.id, level_args.to_vec());
@@ -5735,7 +5780,9 @@ fn check_generalized_branch_goal(
         let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
             goal_refined
         } else {
-            simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
+            simplify_branch_goal_keeping_refinements(
+                cx.env, cx.refinement_facts, &cx.ctx, &goal_refined,
+            )
         };
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         for restoration in restorations.into_iter().rev() {
@@ -5805,7 +5852,9 @@ fn check_generalized_branch_goal(
         let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
             inner_goal
         } else {
-            simplify_branch_goal(cx.env, &cx.ctx, &inner_goal)
+            simplify_branch_goal_keeping_refinements(
+                cx.env, cx.refinement_facts, &cx.ctx, &inner_goal,
+            )
         };
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         kernel_check_current(cx, &body, &expected).map_err(|error| match error {
@@ -7107,7 +7156,9 @@ fn check_dependent_branch_body(
         {
                 expected_here.clone()
             } else {
-                simplify_branch_goal(cx.env, &cx.ctx, expected_here)
+                simplify_branch_goal_keeping_refinements(
+                    cx.env, cx.refinement_facts, &cx.ctx, expected_here,
+                )
             };
         cx.match_frames.last_mut().ok_or_else(|| {
             ElabError::Internal("dependent arm has no owning match frame".into())
@@ -7147,15 +7198,9 @@ fn check_dependent_branch_body(
                 });
         }
         let obligation_base = cx.obligations.len();
-        // Kernel conversion may expose a named refinement's carrier while
-        // shaping the branch motive. Its source identity must survive at the
-        // introduction check so each arm leaves its own predicate obligation.
-        let source_expected = if names_source_refinement(cx, expected_here) {
-            expected_here
-        } else {
-            &expected_unrefined
-        };
-        let attempt = check_match_arm_result(cx, arm, source_expected, &arm.span).and_then(|checked| {
+        // The simplified goal retains every refinement root while exposing
+        // ordinary heads needed by dependent matches and their index convoy.
+        let attempt = check_match_arm_result(cx, arm, &expected_unrefined, &arm.span).and_then(|checked| {
             kernel_check_current(cx, &checked, &expected_unrefined)
                 .map(|()| checked)
                 .map_err(|error| match error {
@@ -7222,17 +7267,6 @@ fn push_branch_path_condition(
     // are entered; the proposition already names those future binders.
     cx.path_conditions.push((path_eq, cx.ctx.len() + future_fields));
     path_base
-}
-
-/// Whether the arm's expected type is a named source refinement whose
-/// identity the introduction check keeps. Outlined for the same reason.
-#[inline(never)]
-fn names_source_refinement(cx: &ElabCtx, expected: &Term) -> bool {
-    matches!(
-        cx.metas.zonk_term(expected),
-        Term::Const { id, .. }
-            if cx.refinement_facts.refinement_root(id).is_some()
-    )
 }
 
 #[inline(never)]
@@ -7788,7 +7822,9 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 ))
             }
         } else {
-            let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
+            let expected_here = simplify_branch_goal_keeping_refinements(
+                cx.env, cx.refinement_facts, &cx.ctx, &expected_here,
+            );
             let missing = missing_pattern_witness(cx, ctor.id);
             frame_try!(synthesize_omitted_index_method(
                 cx,
@@ -8040,6 +8076,38 @@ fn ctor_target_indices(
             )
         })
         .collect()
+}
+
+/// Extract the complete Eq-leaf plan for a constructor's index premises.
+/// A contradictory index reduces to Bottom: that method is unreachable and
+/// has no Eq leaves to transport. Discard the entire plan, not just that
+/// index's leaves. Every other unsupported evidence shape still rejects.
+fn project_method_index_premises(
+    cx: &ElabCtx<'_>,
+    zonked_ctx: &Context,
+    pairs: &[(Term, Term, Term)],
+    sentinel_region: usize,
+) -> Result<Option<Vec<IndexEqualityLeaf>>, ElabError> {
+    let mut leaves = Vec::new();
+    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
+        let raw_eq = Term::Eq(
+            Box::new(cx.metas.zonk_term(idx_ty)),
+            Box::new(cx.metas.zonk_term(target)),
+            Box::new(cx.metas.zonk_term(scrut)),
+        );
+        if matches!(whnf(cx.env, zonked_ctx, &raw_eq),
+            Term::Const { id, .. } if id == cx.env.bottom_id())
+        {
+            return Ok(None);
+        }
+        leaves.extend(project_generated_index_equality_leaves(
+            cx.env,
+            zonked_ctx,
+            &raw_eq,
+            index_refinement_sentinel(sentinel_region, slot),
+        )?);
+    }
+    Ok(Some(leaves))
 }
 
 /// Per-index `(index_ty, target_index, actual_index)` triples for a
@@ -8388,23 +8456,13 @@ fn refine_branch_goal(
     let sentinel_region = cx.match_frames.last().ok_or_else(|| {
         ElabError::Internal("goal refinement has no owning match frame".into())
     })?.sentinel_region;
-    // Complete every evidence walk before refining the goal. An unsupported
-    // child therefore rejects the whole plan, even when an earlier declared
-    // index or Sigma child had usable Eq leaves.
-    let mut leaves = Vec::new();
-    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
-        let raw_eq = Term::Eq(
-            Box::new(cx.metas.zonk_term(idx_ty)),
-            Box::new(cx.metas.zonk_term(target)),
-            Box::new(cx.metas.zonk_term(scrut)),
-        );
-        leaves.extend(project_generated_index_equality_leaves(
-            cx.env,
-            &zonked_ctx,
-            &raw_eq,
-            index_refinement_sentinel(sentinel_region, slot),
-        )?);
-    }
+    // Contradictory index evidence makes this branch unreachable; do not
+    // refine the goal with a partial plan from another index position.
+    let Some(leaves) = project_method_index_premises(
+        cx, &zonked_ctx, &pairs, sentinel_region,
+    )? else {
+        return Ok((expected_here.clone(), Vec::new()));
+    };
 
     // No equality leaf can refine this goal. Preserve the old no-op path:
     // constructing an expanded kernel view here would prematurely classify
@@ -8666,23 +8724,13 @@ fn install_index_refinements(
         ElabError::Internal("index refinement has no owning match frame".into())
     })?.sentinel_region;
 
-    // Build the complete leaf plan before mutating `var_refinements`. This is
-    // atomic across every declared-index premise: an unsupported child cannot
-    // leave earlier Eq components installed in the live elaboration context.
-    let mut leaves = Vec::new();
-    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
-        let raw_eq = Term::Eq(
-            Box::new(cx.metas.zonk_term(idx_ty)),
-            Box::new(cx.metas.zonk_term(target)),
-            Box::new(cx.metas.zonk_term(scrut)),
-        );
-        leaves.extend(project_generated_index_equality_leaves(
-            cx.env,
-            &zonked_ctx,
-            &raw_eq,
-            index_refinement_sentinel(sentinel_region, slot),
-        )?);
-    }
+    // Build the complete leaf plan before mutating `var_refinements`. An
+    // impossible constructor cannot donate a partial plan to any field.
+    let Some(leaves) = project_method_index_premises(
+        cx, &zonked_ctx, &pairs, sentinel_region,
+    )? else {
+        return Ok(Vec::new());
+    };
 
     // Capability 2's per-binding sibling-Cast retyping is replaced by the
     // context-telescope convoy. What remains here is its decision-5 fail-closed
@@ -11588,6 +11636,27 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
     }
 }
 
+/// A constructor equation can state `Eq (Ix n) i (Z xs)` even though
+/// `Z xs : Ix Zero`. It is no proposition in the branch context, so it cannot
+/// be an obligation hypothesis. Dropping only such ill-typed indexed-family
+/// equations strengthens the goal; other path conditions remain unchanged.
+fn admissible_path_conditions(cx: &ElabCtx<'_>) -> Vec<Term> {
+    cx.path_conditions.iter().filter_map(|(condition, install_depth)| {
+        let growth = cx.ctx.len().checked_sub(*install_depth)
+            .expect("path condition consumed before its field binders were entered");
+        let here = weaken(condition, growth as i64);
+        let heterogeneous = is_indexed_family_equation(cx.env, &here)
+            && kernel_infer_raw(cx.env, &cx.ctx, &here).is_err();
+        (!heterogeneous).then_some(here)
+    }).collect()
+}
+
+fn is_indexed_family_equation(env: &GlobalEnv, condition: &Term) -> bool {
+    let Term::Eq(carrier, _, _) = condition else { return false };
+    matches!(peel_app(carrier).0, Term::IndFormer { id, .. }
+        if env.inductive(id).is_some_and(|ind| !ind.indices.is_empty()))
+}
+
 /// Close a logical refinement goal over ordinary binders followed by branch
 /// equations and refined-parameter assumptions. The latter are assumptions
 /// only in the obligation, never unchecked evidence in an emitted program.
@@ -11595,9 +11664,10 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
 /// neither is evidence introduced into the emitted definition.
 #[inline(never)]
 fn close_refinement_goal_with(
-    cx: &ElabCtx<'_>, goal: Term, hypotheses: &[Term], proof: Option<Term>,
+    cx: &ElabCtx<'_>, conditions: &[Term], goal: Term,
+    hypotheses: &[Term], proof: Option<Term>,
 ) -> (Term, Option<Term>) {
-    let count = cx.path_conditions.len();
+    let count = conditions.len();
     let mut closed = weaken(&goal, (count + hypotheses.len()) as i64);
     let mut certificate = proof;
     for (index, hypothesis) in hypotheses.iter().enumerate().rev() {
@@ -11605,10 +11675,8 @@ fn close_refinement_goal_with(
         closed = Term::pi(domain.clone(), closed);
         certificate = certificate.map(|term| Term::lam(domain, term));
     }
-    for (index, (condition, install_depth)) in cx.path_conditions.iter().enumerate().rev() {
-        let growth = cx.ctx.len().checked_sub(*install_depth)
-            .expect("path condition consumed before its field binders were entered");
-        let domain = weaken(condition, (growth + index) as i64);
+    for (index, condition) in conditions.iter().enumerate().rev() {
+        let domain = weaken(condition, index as i64);
         closed = Term::pi(domain.clone(), closed);
         certificate = certificate.map(|term| Term::lam(domain, term));
     }
@@ -11691,13 +11759,14 @@ fn emit_refinement_predicate_with(
     cx: &mut ElabCtx<'_>, goal: Term, hypotheses: &[Term],
     span: &Span, kind: ObligationKind,
 ) -> Result<(), ElabError> {
-    let (closed, _) = close_refinement_goal_with(cx, goal.clone(), hypotheses, None);
-    let proof = (0..hypotheses.len() + cx.path_conditions.len())
+    let conditions = admissible_path_conditions(cx);
+    let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, None);
+    let proof = (0..hypotheses.len() + conditions.len())
         .map(Term::var)
         .chain(std::iter::once(Term::const_(cx.env.tt_id(), vec![])))
         .find_map(|candidate| {
             let (_, certificate) =
-                close_refinement_goal_with(cx, goal.clone(), hypotheses, Some(candidate));
+                close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, Some(candidate));
             let certificate = certificate?;
             kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
                 .ok().map(|_| certificate)
@@ -20353,9 +20422,10 @@ fn compile_match_leaf(
     }
     let first_occurrences = first_row.leaf_binding_occurrences().to_vec();
     let first_arm = &arms[first_row.arm_idx];
-    let has_result_predicate = cx.match_frames.last()
-        .is_some_and(|frame| !frame.result_predicates.is_empty());
-    let (first_guard, first_body, body_ty_ctx) = if has_result_predicate {
+    // A known result belongs to the source match, even at its first leaf.
+    // Inferring that leaf instead silently replaces a named refinement result
+    // with its carrier before any leaf is checked against the predicate.
+    let (first_guard, first_body, body_ty_ctx) = if ret_ty_slot.is_some() {
         check_matrix_first_result_leaf(
             cx, first_arm, first_row, &first_occurrences, real_depth_so_far,
             owner, ret_ty_slot,
