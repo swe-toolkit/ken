@@ -32,7 +32,7 @@ const CONFLICT: &str = "fn m1 (a : Type) (n : Nat) (x : a) (h : a → Nat) : Nat
     two (three (h (match n { Zero ↦ x; Suc k ↦ x })) a) a";
 
 fn env_with_two() -> ElabEnv {
-    let mut env = ElabEnv::new().expect("prelude including forced-level match sorts");
+    let mut env = ElabEnv::new().expect("prelude including defaulted match sorts");
     env.elaborate_decl(TWO).expect("Type 1 consumer");
     env
 }
