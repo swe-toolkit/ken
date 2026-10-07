@@ -1,7 +1,7 @@
 ---
 id: KERNEL-ENV-MARK-PREFIX-MUTATION-REFUSAL
 title: "rollback_to_mark and rollback_pending succeed after a prefix declaration was upgraded to a body that references the removed suffix, leaving a Transparent declaration whose body dangles and then aliases a reused GlobalId of another type. Refuse rollback when the prefix changed after the mark, so the EnvMark contract holds"
-status: ready
+status: merged
 owner: kernel
 size: S
 tier: T1
@@ -77,3 +77,14 @@ Architect. Repair it only if ruled.
 - Any trust growth, spec change or new kernel entry point beyond the
   refusal.
 - An elaborator path that the refusal would newly break.
+
+## Closeout
+
+Merged `26e7dce3f` from exact `1b0b55acf` (PR #4568). Kernel QA
+`evt_f9t54y7c25z3`, Architect `evt_5qpyaa2jw7dmq`, Decision
+`dec_3yfarp0frhr9d`. The mark records the prefix's opaque ids, and both
+rollbacks refuse before removing anything when one was upgraded. The
+refusal also covers an upgrade whose body references only the prefix, and
+no production path hits it. Residuals: a post-mark index registration on
+a prefix id is cleared rather than restored on rollback; it fails closed,
+and no elaborator rollback reaches it. `env_mark` now costs O(decls).
