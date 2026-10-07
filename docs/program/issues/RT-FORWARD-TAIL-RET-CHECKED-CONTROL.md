@@ -70,7 +70,10 @@ stop and report the mismatch.
   exit, terminal, stdout, the full `EffectEvent` vector, and one read.
 - **AC-2 (Nat fails closed).** The Nat row stays ignored, naming the
   successor and the measured site. One active pin over the three Nat
-  variants asserts `UnclassifiedRuntimeTrap { terminal_value: -1 }`.
+  variants asserts `UnclassifiedRuntimeTrap { terminal_value: -1 }`. Its
+  thread follows the base-versus-candidate stack A/B of
+  `evt_55wk3wj58h2wv`: a named `Builder::stack_size` constant under S1, a
+  stop under S2.
 - **AC-3 (controls).** `rt_parity_native` passes 189/189 on the default
   thread, the read and write collapsibility control passes, and the escape
   file's six active rows pass. A population counter shows the phase B
@@ -88,3 +91,10 @@ stop and report the mismatch.
 - The phase B disjunct true outside the target programs, or the
   transport-source population refusal (`construction.rs:1530`).
 - Default-thread stack overflow on any un-ignored row.
+
+## Symptom inventory
+
+```text
+SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
+1. An active default-thread Nat fail-closed pin was ruled for programs only ever measured under a 256 MiB thread; it overflows. Keyed on stack provisioning of the Nat shapes.
+```
