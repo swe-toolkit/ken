@@ -657,7 +657,7 @@ pub fn compile_checked_target_denotation(
 
     // The exact host-operation decoder is part of this producer artifact.  Its
     // stable primitive identities must match the checked package it consumes.
-    let (symbols, _) = stable_symbols_for_env(package_name, &env, true);
+    let (symbols, _) = stable_symbols_for_env(package_name, &env, true)?;
     let target_symbol = symbols
         .get(&target_id)
         .cloned()
@@ -2165,7 +2165,8 @@ pub fn prepare_native_target_sources(
         ));
     }
     let root = closure.target.symbol.clone();
-    let (symbols, symbol_table) = stable_symbols_for_env(&manifest.package_name, &env, false);
+    let (symbols, symbol_table) = stable_symbols_for_env(&manifest.package_name, &env, false)
+        .map_err(NativeProgramBuildError::Driver)?;
     let mut bodies = BTreeMap::new();
     for symbol in &closure.reachable_declarations {
         if !output
@@ -2317,7 +2318,8 @@ pub fn prepare_native_program_sources(
     // empty effect row is still a HostIO computation (`Ret`), so it must use
     // the same finite checked-host producer boundary as effectful programs.
     let main_has_host_effect = true;
-    let (symbols, symbol_table) = stable_symbols_for_env(package_name, &env, true);
+    let (symbols, symbol_table) = stable_symbols_for_env(package_name, &env, true)
+        .map_err(NativeProgramBuildError::Driver)?;
     let plan =
         native_entrypoint_plan(&checked, &symbols).map_err(NativeProgramBuildError::Driver)?;
     let plan_bytes = canonical_native_entrypoint_plan_bytes(&plan);
@@ -3408,7 +3410,7 @@ fn emit_package_from_env(
     let package_identity = package_identity(&manifest.package_name);
     let mut semantic = CheckedCoreSemanticInputs::default();
     let native_primitives = native_entrypoint_plan.is_some();
-    let (symbols, table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives);
+    let (symbols, table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives)?;
 
     for (id, symbol) in &symbols {
         if !example_ids.contains(id) {
@@ -4145,25 +4147,12 @@ fn stable_symbols_for_env(
     package_name: &str,
     env: &ElabEnv,
     native_primitives: bool,
-) -> (BTreeMap<GlobalId, StableSymbol>, StableSymbolTable) {
+) -> Result<(BTreeMap<GlobalId, StableSymbol>, StableSymbolTable), CompilerDriverError> {
     let mut names_by_id = BTreeMap::<GlobalId, String>::new();
     let mut global_names = env.globals.iter().collect::<Vec<_>>();
     global_names.sort_by(|(left, _), (right, _)| left.cmp(right));
     for (name, id) in global_names {
         names_by_id.entry(*id).or_insert_with(|| name.clone());
-    }
-
-    for decl in env.env.decls() {
-        names_by_id
-            .entry(decl.id())
-            .or_insert_with(|| format!("global_{}", decl.id().0));
-        if let Decl::Inductive(ind) = decl {
-            for ctor in &ind.constructors {
-                names_by_id
-                    .entry(ctor.id)
-                    .or_insert_with(|| format!("ctor_{}", ctor.id.0));
-            }
-        }
     }
 
     let mut symbols = BTreeMap::new();
@@ -4181,10 +4170,16 @@ fn stable_symbols_for_env(
                 }
             }
         }
-        let name = names_by_id
-            .get(&decl.id())
-            .cloned()
-            .unwrap_or_else(|| format!("global_{}", decl.id().0));
+        let name = match names_by_id.get(&decl.id()) {
+            Some(name) => name.clone(),
+            None => {
+                let (owner, ordinal) = env
+                    .decl_owner
+                    .get(&decl.id())
+                    .ok_or(CompilerDriverError::MissingStableSymbol { id: decl.id() })?;
+                format!("{owner}#{ordinal}")
+            }
+        };
         symbols.insert(decl.id(), declaration_symbol(package_name, &name));
     }
 
@@ -4193,11 +4188,11 @@ fn stable_symbols_for_env(
             let Some(parent) = symbols.get(&ind.id).cloned() else {
                 continue;
             };
-            for ctor in &ind.constructors {
+            for (index, ctor) in ind.constructors.iter().enumerate() {
                 let name = names_by_id
                     .get(&ctor.id)
                     .cloned()
-                    .unwrap_or_else(|| format!("ctor_{}", ctor.id.0));
+                    .unwrap_or_else(|| format!("ctor_{index}"));
                 symbols.insert(ctor.id, StableSymbol::constructor(&parent, name));
             }
         }
@@ -4207,7 +4202,7 @@ fn stable_symbols_for_env(
     for (id, symbol) in &symbols {
         table.insert_global(*id, symbol.clone());
     }
-    (symbols, table)
+    Ok((symbols, table))
 }
 
 // Kernel-checked String payload is the single authority for native lowering;
@@ -4396,9 +4391,10 @@ fn add_trusted_base_metadata(
                 affects_runtime_meaning: true,
             },
         );
-        semantic
-            .trusted_base_delta
-            .insert(target, format!("trusted-base global {id}").into_bytes());
+        semantic.trusted_base_delta.insert(
+            target.clone(),
+            format!("trusted-base {target}").into_bytes(),
+        );
     }
 }
 
@@ -5446,6 +5442,27 @@ mod tests {
         ObligationStatus, emit_checked_core_package,
     };
     use crate::erasure::erase_checked_core_package_for_target;
+
+    /// Promise class: durable invariant. MEASURED: an unscoped kernel
+    /// declaration makes stable-symbol projection fail with its exact ID.
+    /// CLAIMED: a newly reachable unnamed declaration cannot silently fall
+    /// back to producer-local allocation. THE GAP: the kernel environment is
+    /// public to direct clients; this row proves refusal at the emitter seam.
+    #[test]
+    fn stable_symbol_projection_refuses_an_unowned_declaration() {
+        let mut env = ElabEnv::new().expect("prelude");
+        stable_symbols_for_env("unowned_control", &env, false).expect("owned prelude");
+        let raw = ken_kernel::declare_postulate(
+            &mut env.env,
+            "unscoped".into(),
+            vec![],
+            ken_kernel::Term::omega(ken_kernel::Level::Zero),
+        )
+        .expect("unowned control declaration");
+        let error = stable_symbols_for_env("unowned_control", &env, false)
+            .expect_err("an unnamed declaration without an owner must refuse");
+        assert!(matches!(error, CompilerDriverError::MissingStableSymbol { id } if id == raw));
+    }
 
     const CALLER_OPEN_SOURCE: &str = r#"program capabilities FS APartial
 const ac0_need : String requires Equal Int 0 0 = "ac0-run"
@@ -7400,7 +7417,7 @@ mod d1b_role_c1_roster_identity {
         env.elaborate_file("const two : Nat = Suc (Suc Zero)\n")
             .expect("package source elaborates");
 
-        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false);
+        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false).unwrap();
         let record = checked_runtime_symbols_v1(&env.prelude_env, &symbols)
             .expect("the record builds from the canonical roster");
 
@@ -7691,7 +7708,7 @@ mod d1b_role_c1_roster_projection_is_fail_closed {
         env.elaborate_file("const two : Nat = Suc (Suc Zero)\n")
             .expect("package source elaborates");
 
-        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false);
+        let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false).unwrap();
 
         // POSITIVE CONTROL: with the table intact the projection succeeds, and
         // it names every captured id. Without this, the refusal below could be
@@ -7797,7 +7814,7 @@ mod package_route_example_declarations {
         );
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0x5833_0955_0530_c391
+            0x5ed0_ae5b_69b5_41df
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -7833,7 +7850,7 @@ mod package_route_example_declarations {
         );
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0x428c_ec66_b9c0_9443
+            0xa102_7073_c2a9_9b86
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,
