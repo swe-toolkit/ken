@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS
 title: "Since VERIFY-CALLER-OBLIGATION-REPORTING the compiler driver builds a .ken.md package's admitted list from elaborate_ken_md_file_v1, which also returns ken example fence declarations, so an obligation-free literate package gains example declarations and a new core_semantic_hash. Admit only the source's declarations"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -64,3 +64,11 @@ wrappers.
 - An example-fence obligation whose recorded origin names a declaration
   that is no longer admitted: stop to the Architect for where it belongs.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `1153a9fc6` from exact `4b07319ad` (PR #4575). Verify QA
+`evt_3akdke44bqg8j`, Architect `evt_39hch2dwrbp86`, Decision
+`dec_7mje2xa5eatgp`. The compiler driver admits only a literate package's
+own declarations on the package route, so an obligation-free `.ken.md`
+package keeps its `core_semantic_hash`.
