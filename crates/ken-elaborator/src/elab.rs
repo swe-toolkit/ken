@@ -8078,6 +8078,38 @@ fn ctor_target_indices(
         .collect()
 }
 
+/// Extract the complete Eq-leaf plan for a constructor's index premises.
+/// A contradictory index reduces to Bottom: that method is unreachable and
+/// has no Eq leaves to transport. Discard the entire plan, not just that
+/// index's leaves. Every other unsupported evidence shape still rejects.
+fn project_method_index_premises(
+    cx: &ElabCtx<'_>,
+    zonked_ctx: &Context,
+    pairs: &[(Term, Term, Term)],
+    sentinel_region: usize,
+) -> Result<Option<Vec<IndexEqualityLeaf>>, ElabError> {
+    let mut leaves = Vec::new();
+    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
+        let raw_eq = Term::Eq(
+            Box::new(cx.metas.zonk_term(idx_ty)),
+            Box::new(cx.metas.zonk_term(target)),
+            Box::new(cx.metas.zonk_term(scrut)),
+        );
+        if matches!(whnf(cx.env, zonked_ctx, &raw_eq),
+            Term::Const { id, .. } if id == cx.env.bottom_id())
+        {
+            return Ok(None);
+        }
+        leaves.extend(project_generated_index_equality_leaves(
+            cx.env,
+            zonked_ctx,
+            &raw_eq,
+            index_refinement_sentinel(sentinel_region, slot),
+        )?);
+    }
+    Ok(Some(leaves))
+}
+
 /// Per-index `(index_ty, target_index, actual_index)` triples for a
 /// constructor method — the same filter `method_index_premises` uses to
 /// build `Eq` premises, exposed separately so the injectivity / convoy pass
@@ -8424,23 +8456,13 @@ fn refine_branch_goal(
     let sentinel_region = cx.match_frames.last().ok_or_else(|| {
         ElabError::Internal("goal refinement has no owning match frame".into())
     })?.sentinel_region;
-    // Complete every evidence walk before refining the goal. An unsupported
-    // child therefore rejects the whole plan, even when an earlier declared
-    // index or Sigma child had usable Eq leaves.
-    let mut leaves = Vec::new();
-    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
-        let raw_eq = Term::Eq(
-            Box::new(cx.metas.zonk_term(idx_ty)),
-            Box::new(cx.metas.zonk_term(target)),
-            Box::new(cx.metas.zonk_term(scrut)),
-        );
-        leaves.extend(project_generated_index_equality_leaves(
-            cx.env,
-            &zonked_ctx,
-            &raw_eq,
-            index_refinement_sentinel(sentinel_region, slot),
-        )?);
-    }
+    // Contradictory index evidence makes this branch unreachable; do not
+    // refine the goal with a partial plan from another index position.
+    let Some(leaves) = project_method_index_premises(
+        cx, &zonked_ctx, &pairs, sentinel_region,
+    )? else {
+        return Ok((expected_here.clone(), Vec::new()));
+    };
 
     // No equality leaf can refine this goal. Preserve the old no-op path:
     // constructing an expanded kernel view here would prematurely classify
@@ -8702,23 +8724,13 @@ fn install_index_refinements(
         ElabError::Internal("index refinement has no owning match frame".into())
     })?.sentinel_region;
 
-    // Build the complete leaf plan before mutating `var_refinements`. This is
-    // atomic across every declared-index premise: an unsupported child cannot
-    // leave earlier Eq components installed in the live elaboration context.
-    let mut leaves = Vec::new();
-    for (slot, (idx_ty, target, scrut)) in pairs.iter().enumerate() {
-        let raw_eq = Term::Eq(
-            Box::new(cx.metas.zonk_term(idx_ty)),
-            Box::new(cx.metas.zonk_term(target)),
-            Box::new(cx.metas.zonk_term(scrut)),
-        );
-        leaves.extend(project_generated_index_equality_leaves(
-            cx.env,
-            &zonked_ctx,
-            &raw_eq,
-            index_refinement_sentinel(sentinel_region, slot),
-        )?);
-    }
+    // Build the complete leaf plan before mutating `var_refinements`. An
+    // impossible constructor cannot donate a partial plan to any field.
+    let Some(leaves) = project_method_index_premises(
+        cx, &zonked_ctx, &pairs, sentinel_region,
+    )? else {
+        return Ok(Vec::new());
+    };
 
     // Capability 2's per-binding sibling-Cast retyping is replaced by the
     // context-telescope convoy. What remains here is its decision-5 fail-closed

@@ -5,7 +5,7 @@
 //! Each checked arm introduces the source result's predicate, not its carrier.
 
 use ken_elaborator::{ElabEnv, ElabResult, ObligationKind};
-use ken_kernel::{GlobalId, Term};
+use ken_kernel::{normalize, Context, GlobalId, Term};
 
 const FIVE: &str = "def Five = { n : Int | Equal Int n 5 }\n";
 const INDEX: &str =
@@ -211,6 +211,36 @@ fn indexed_branch_requires_remains_a_live_obligation() {
         result.obligations[0].kind,
         ObligationKind::Requires
     ));
+}
+
+/// MEASURED: a seeded result admits an index-impossible constructor branch
+/// and the enclosing alias still normalizes to 3. CLAIMED: checking the first
+/// matrix leaf does not demand Eq evidence from a contradictory index. GAP:
+/// the inferred let sibling alone cannot reach that checked path, so both
+/// routes are exercised with the same source value and branch structure.
+#[test]
+fn seeded_leaf_preserves_alias_through_index_impossible_inner_match() {
+    let vec = "data Vec (a : Type) : Nat → Type where {\n\
+        VNil : Vec a Zero; VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)\n}\n";
+    for body in [
+        "match xs { VNil ↦ saved; VCons m e tl ↦ saved }",
+        "let r = match xs { VNil ↦ saved; VCons m e tl ↦ saved } in r",
+    ] {
+        let source = format!(
+            "{vec}\n\
+            fn f (n : Nat) (xs : Vec Nat Zero) (x : Nat) : Nat =\n\
+            match x {{ Zero ↦ Zero; (Suc j) as saved ↦ {body} }}\n\
+            const observed : Nat = f Zero (VNil Nat) (Suc (Suc (Suc Zero)))\n\
+            const expected : Nat = Suc (Suc (Suc Zero))"
+        );
+        let (env, _) = checked(&source, 0);
+        let normal = |name: &str| {
+            let id = env.globals[name];
+            let term = env.env.transparent_body(id).expect("checked value").1;
+            normalize(&env.env, &Context::new(), &term)
+        };
+        assert_eq!(normal("observed"), normal("expected"));
+    }
 }
 
 fn contains_constructor(term: &Term, constructor: GlobalId) -> bool {
