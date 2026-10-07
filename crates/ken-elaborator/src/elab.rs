@@ -17094,11 +17094,30 @@ pub(crate) fn elaborate_mutual_group(
     }
 }
 
-/// Does `expr` mention the global name `name` (as an `RCon`)? Used to detect
-/// whether a view/let definition is self-recursive — the body references its
-/// own name, which the resolver emits as `RCon(name)` on a scope miss. Pattern
-/// positions are not scanned: a def name is a view/function, never a
-/// constructor, so it cannot appear in a pattern.
+/// Does `expr` mention the global name `name` (as an `RCon`)? This walks
+/// annotations and patterns as well as value expressions: the scope graph
+/// also orders constructor-owning data nodes and type dependencies.
+fn rpattern_mentions_name(pat: &crate::resolve::RPattern, name: &str) -> bool {
+    match &pat.kind {
+        RPatKind::Ctor(ctor, fields) => {
+            ctor == name
+                || fields
+                    .iter()
+                    .any(|field| rpattern_mentions_name(field, name))
+        }
+        RPatKind::CheckedCtor(_, _, fields) | RPatKind::Tuple(fields) | RPatKind::Or(fields) => {
+            fields
+                .iter()
+                .any(|field| rpattern_mentions_name(field, name))
+        }
+        RPatKind::Record(fields) => fields
+            .iter()
+            .any(|field| rpattern_mentions_name(&field.pattern, name)),
+        RPatKind::As(inner, _, _) => rpattern_mentions_name(inner, name),
+        RPatKind::Wild | RPatKind::Var(_, _) | RPatKind::Literal(_, _) => false,
+    }
+}
+
 pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
     match expr {
         RExpr::RCon(n, _) => n == name,
@@ -17114,10 +17133,16 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         | RExpr::RByteStr(_, _) => false,
         RExpr::RApp(f, a, _) => rexpr_mentions_name(f, name) || rexpr_mentions_name(a, name),
         RExpr::RLam(_, b, _) => rexpr_mentions_name(b, name),
-        RExpr::RLet(_, _, rhs, body, _) => {
-            rexpr_mentions_name(rhs, name) || rexpr_mentions_name(body, name)
+        RExpr::RLet(_, annotation, rhs, body, _) => {
+            annotation
+                .as_ref()
+                .is_some_and(|ty| rtype_mentions_name(ty, name))
+                || rexpr_mentions_name(rhs, name)
+                || rexpr_mentions_name(body, name)
         }
-        RExpr::RAsc(e, _, _) => rexpr_mentions_name(e, name),
+        RExpr::RAsc(e, ty, _) => {
+            rexpr_mentions_name(e, name) || rtype_mentions_name(ty, name)
+        }
         RExpr::ROld(e, _) => rexpr_mentions_name(e, name),
         RExpr::RBecomes(_, _, e, _) => rexpr_mentions_name(e, name),
         RExpr::RStandardOp { lhs, rhs, .. } => {
@@ -17139,7 +17164,8 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         RExpr::RMatch { scrut, arms, .. } => {
             rexpr_mentions_name(scrut, name)
                 || arms.iter().any(|arm| {
-                    arm.guard
+                    rpattern_mentions_name(&arm.pat, name)
+                        || arm.guard
                         .as_ref()
                         .is_some_and(|guard| rexpr_mentions_name(guard, name))
                         || rexpr_mentions_name(&arm.body, name)
@@ -17167,10 +17193,9 @@ pub(crate) fn rexpr_mentions_name(expr: &RExpr, name: &str) -> bool {
         }
         RExpr::RPosProj(e, _, _) => rexpr_mentions_name(e, name),
         RExpr::RProj(e, _, _) => rexpr_mentions_name(e, name),
-        // The domain is a `type`, not an `RExpr` — a mutual-recursion call
-        // graph only cares about VALUE-level (expr) references, so only
-        // the codomain (an `RExpr`) is scanned.
-        RExpr::RPi(_, _, b, _) => rexpr_mentions_name(b, name),
+        RExpr::RPi(_, domain, codomain, _) => {
+            rtype_mentions_name(domain, name) || rexpr_mentions_name(codomain, name)
+        }
         RExpr::RArrow(a, b, _) => rexpr_mentions_name(a, name) || rexpr_mentions_name(b, name),
         RExpr::RAttachedProofRef { .. } => false,
         RExpr::RTrunc(e, _) => rexpr_mentions_name(e, name),
