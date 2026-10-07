@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS
 title: "Since VERIFY-CALLER-OBLIGATION-REPORTING the compiler driver builds a .ken.md package's admitted list from elaborate_ken_md_file_v1, which also returns ken example fence declarations, so an obligation-free literate package gains example declarations and a new core_semantic_hash. Admit only the source's declarations"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2

@@ -1,7 +1,7 @@
 ---
 id: VERIFY-REUSED-ENV-TRUST-RESIDUE
 title: "A reusable elaboration environment keeps a trusted-base entry nobody reports: a declaration that fails after minting a premise hole leaves an orphan postulate in the REPL, expand_and_elaborate, load_unit and a reused ElabEnv. Roll the environment back to a mark taken before each declaration"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -94,6 +94,18 @@ diff** alongside verify QA, and the Architect gate stands.
 - Any kernel change beyond the removal-only `EnvMark` API.
 - A catalog, conformance or test consumer relies on the residue: stop to the
   Architect with the consumer (CHECKS 3).
+
+## Closeout
+
+Merged `174904b18` from exact `8b14fcdae` (PR #4564). Verify QA
+`evt_1qe21petmbzjq`, kernel QA `evt_60cb6t651x4n5`, Architect
+`evt_5ys8gfxac7jwt`, Decision `dec_32vazakrphj3q`. Residuals: the nested
+scrubs are field-by-field rather than exhaustively destructured
+(COORDINATION 7b), and unit-level bookkeeping after a successful
+declaration is outside this WP. Adversary `evt_4b2mzf1x5erza`: a prefix
+declaration upgraded after the mark survives rollback with a dangling
+body, at the public kernel API only; repaired by
+`KERNEL-ENV-MARK-PREFIX-MUTATION-REFUSAL`.
 
 ## Symptom inventory
 
