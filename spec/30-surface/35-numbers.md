@@ -117,9 +117,11 @@ universal value carrier and **not** the default for integer literals (§4). ℝ
 does not embed faithfully in `Float` — `Float` equality is the usual IEEE
 minefield (NaN ≠ NaN, ±0, rounding) and Ken does not pretend otherwise. Proofs
 about reals use `Decimal`/rationals or an explicit error-bound discipline, never
-`Float ==`. `Bool` lowers to `i1`; `Char` is a **Unicode scalar value** lowering
-to `u32` — its valid range is U+0000–U+10FFFF **excluding the surrogate block**
-U+D800–U+DFFF (a refinement on the carrier, not all `u32` are `Char`).
+`Float ==`. `Bool` lowers to `i1`; `Char` is a **Unicode scalar value**,
+the checked core `Σ(c:Int).isScalar c` (`18a §5.9.1`). Its runtime codepoint
+may lower to `u32` after erasing the Ω proof. The valid range is
+U+0000–U+10FFFF **excluding the surrogate block** U+D800–U+DFFF;
+not every `u32` or `Int` is a `Char`.
 
 ## 3. Overflow and partiality
 

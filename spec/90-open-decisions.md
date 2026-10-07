@@ -163,20 +163,27 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   type mismatch. Lean `Subtype`, Agda records/Σ, Coq `sig`, and F* refinements
   exemplify core representations; this is the prior-art majority reported in
   the research advisory.
-- **Grounds.** The former kernel blocker in `21 §2` is resolved: `sort_sigma`
-  gives Ω when both components are Ω (`crates/ken-kernel/src/check.rs`). The
-  Ω second component is computationally irrelevant, meeting the
-  erasure-faithfulness concern. The subset representation requires explicit
-  introduction and elimination, with coercion insertion, and normative edits
-  to `34 §5` and `21 §2`. Existing normative text still describes the carrier
-  encoding; this register entry makes no normative edit.
+- **Grounds.** The former kernel blocker in `21 §2` is resolved:
+  `sort_sigma` classifies `Σ(x:A).φ` in `Type (max ℓ_A ℓ_φ)` when
+  `A : Type ℓ_A` and `φ : Ω_ℓ_φ` (`13 §4`,
+  `crates/ken-kernel/src/check.rs`). The Ω proof component is
+  computationally irrelevant, while the carrier and its Σ type remain
+  relevant. The checked Σ is distinct from `A` in kernel conversion.
+  The Architect's design `evt_30frdrmj45ehg` settles introduction by a
+  checked pair, forgetting by `Proj1`, outermost-only coercions, and
+  transitive proof honesty; `evt_3yj3x9zf1m833` settles `ensures` as
+  a real Σ result. Normative rules are in `34 §5`, `21 §§2, 5.4, 6.3`,
+  `22 §2.1` and their dependent consumers. The W5 elaboration/kernel
+  migration and W4 reachability-query implementation remain staged;
+  this record does not claim they have landed.
 - **Decision (operator, 2026-10-07).** Refinements are real kernel types,
   represented as core subset Σ: `{x:A|φ} ⇒ Σ x:A. φ` with an Ω second
   component. Replace the carrier encoding. The decision selects this
-  representation; introduction, elimination, coercion insertion, and any
-  kernel changes remain to be designed and framed.
-- **Affects.** `30-surface/34 §5`, `20-verification/21 §2`, elaboration and
-  kernel conversion.
+  representation; the cited Architect rulings specify the introduction,
+  elimination, coercion, and honesty contracts for the staged build.
+- **Affects.** `30-surface/34 §5`, `20-verification/21 §§2, 5.4, 6.3`,
+  `20-verification/22 §2.1`, `10-kernel/18a §5.9.1`, `40-runtime/42`,
+  elaboration and kernel conversion.
 
 ## B. Verification
 
@@ -312,8 +319,10 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
   unconditional), reusing the landed `preserves_ordered` wholesale. Enclave
   sub-rulings: set laws are **membership-extensional** (never `Equal (Set K)`);
   the discriminator carrier is **`Nat`** with the landed `Axiom`-free
-  `leq_nat` plus four order results (the `Axiom`-holed `Ord Int`/`Ord Char` would
-  make the accept-arm vacuous). Kernel-untouched, outer-ring, zero
+  `leq_nat` plus four order results (`Ord Int` uses audited postulates;
+  `Ord Char` derives its laws through `Proj1` from the same assumptions,
+  so neither gives an assumption-free accept arm). Kernel-untouched,
+  outer-ring, zero
   `trusted_base()` delta.
 - **Landed computation + deferred follow-on (CAT-4 Fork B / C-scope, updated
   2026-09-12) — public transitive-closure computation, then general relation

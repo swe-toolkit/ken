@@ -810,9 +810,10 @@ run_state s (Vis (inr o)        k) = Vis o (λ r. run_state s (k r))  -- other e
 
 ### 4.3 Bounded Hoare and `old`
 
-`requires`/`ensures` on a space operation are **predicates over its
-state-transformer denotation** `S → R × S` (`../20-verification/21 §1`, §2 layer
-3):
+`requires`/`ensures` on a space operation constrain its **state-transformer
+denotation**. A bare operation denotes `S → R × S` (§4.2); with
+`ensures ψ`, its checked core result is `S → Σ(rs:R × S).ψ(s_pre,rs)`
+(`../20-verification/21 §6.4`), with an Ω proof at each result leaf:
 
 - `requires φ` constrains the **pre-state** `s_pre : S` (and parameters);
 - `ensures ψ` relates `s_pre`, the `result`, and the **post-state** `s_post`;
@@ -823,10 +824,12 @@ state-transformer denotation** `S → R × S` (`../20-verification/21 §1`, §2 
 Because each space's `S` is **encapsulated and non-aliased** (shared-nothing,
 §4.4), the obligation is **local, bounded, per-space Hoare** over `S` — **no
 separation logic, no frame rule, no global `\old`** (`21 §4`, `OQ-Space`).
-Worked example: `inc`'s `ensures n == old(n) + 1` denotes to the transformer `λ
-s. (tt, s with .n := s.n + 1)` and the obligation `(s with .n := s.n + 1).n ==
-s.n + 1`, which computes (record-β / η, `13 §3`) to `s.n + 1 == s.n + 1` —
-discharged by `refl` (`16 §2`).
+Worked example: `inc`'s `ensures n == old(n) + 1` denotes to the checked
+transformer `λ s. ((tt, s with .n := s.n + 1), π)`, where `π` inhabits
+`(s with .n := s.n + 1).n == s.n + 1`. That proposition computes by
+record-β/η (`13 §3`) to `s.n + 1 == s.n + 1` and `π` is discharged by
+`refl` (`16 §2`). Forgetting to `R × S` projects the checked result's
+first component; it does not convert Σ to its carrier.
 
 ### 4.4 Concurrency & isolation — shared-nothing (`OQ-Space` DECIDED)
 

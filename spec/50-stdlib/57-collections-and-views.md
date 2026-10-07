@@ -202,8 +202,9 @@ sort (a : Type) (le : a → a → Bool) (xs : List a) : List a   -- total, SCT-t
 
 **Proved carrier is `List Bool`, not `List Int`.** `DecEq Int`/`Ord Int` are
 `Axiom`-holed (the `Int` primitive's laws are honest visible postulates), and
-`Ord Char` transports those same `Axiom`s — **only `Bool` has a real, `Axiom`-
-free `DecEq`+`Ord`** on `main` (K7 wired `Ord Bool`/`DecEq Bool` as
+`Ord Char` derives from their audited assumptions via `Proj1` without a
+new Char postulate (`18a §5.9.1`). **Among these three carriers, only `Bool`
+has an `Axiom`-free `DecEq`+`Ord`** on `main` (K7 wired `Ord Bool`/`DecEq Bool` as
 kernel-checked zero-delta proofs). On `List Int` the honest-sort proof cannot be
 discharged `Axiom`-free, and the verdict-flip would degenerate to
 reject-vs-reject (green-vs-green vacuity). So **D2's proof obligations and D4's
