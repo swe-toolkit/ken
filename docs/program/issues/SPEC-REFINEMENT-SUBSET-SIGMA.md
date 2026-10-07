@@ -1,7 +1,7 @@
 ---
 id: SPEC-REFINEMENT-SUBSET-SIGMA
 title: "The spec describes refinements as carrier types with elaborator-tracked predicates; the operator selected the core subset Σ. Make the normative text say a refinement is Σ x:A. φ with an Ω second component, introduced by a pair plus obligation and forgotten by Proj1, with no subtyping under type formers"
-status: ready
+status: merged
 owner: spec-enclave
 size: M
 tier: T1
@@ -65,3 +65,16 @@ Normative edits, plus conformance rows for each behavioral claim:
 
 - A design point the note leaves open, or one that conflicts with another
   normative section: stop to the Architect.
+
+## Closeout
+
+Merged `28d8845fb` from exact `606ad9ef4` (PR #4587). Architect
+`evt_62x3jjgahgjq7`, CV `evt_78rkg6a0b24na`, spec-author
+`evt_7k495ehkghng7`, Decision `dec_28c0da72cthqe`. The spec now states a
+refinement as a subset Σ, with Ω-keyed erasure and the per-declaration
+`omega_erasure_plans` package section (`46 §4`). Conformance rows are
+staged Landed or Deferred to W2-W5. The first candidate `3044ec1a9` went
+CI red because it renamed five headings that live tests claim (Architect
+`evt_3t2jfn2bt8n3e`, §1a 1). Those rows stay as current behaviour, and W4
+and W5 flip their tests and retire them. Carry to W5: the `AC-transport`
+comment at `es4_classes_acceptance.rs:683`.
