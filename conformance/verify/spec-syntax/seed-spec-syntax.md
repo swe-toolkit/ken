@@ -132,6 +132,19 @@ site.
   referring to the earlier `a`, after the proof parameter is introduced.
   The first-of-two case does not cover that interior-telescope shape.
 
+### verify/spec-syntax/ensures-emits-obligation-not-sigma
+- spec: `21 §6.3` (current carrier-plus-obligation behavior)
+- status: Landed; superseded by `ensures-result-is-subset-sigma` at W5
+  (`LANG-REFINEMENT-SUBSET-SIGMA`).
+- given: with `NonNeg : Nat → Ω`, elaborate
+  `fn abs (n : Nat) : Nat ensures NonNeg n = n`.
+- expect: **Landed:** the core type is `Pi(Nat, Nat)` and the body is
+  `Lam(Nat, Var 0)`. Exactly one obligation is emitted, and its generated
+  hole is open.
+- why: This matches the current V1 test's emitted type and body, obligation
+  count, and open-hole assertion. The checked subset-Σ result belongs to the
+  W5 successor, not this Landed row.
+
 ### verify/spec-syntax/ensures-result-is-subset-sigma
 - spec: `21 §6.3` (ordinary `fn` result), `§2`/§6.5; `22 §2.2`
 - status: **deferred — W5 subset-Σ elaboration**
@@ -160,6 +173,17 @@ site.
 - why: ordinary `ensures` uses the same predicative subset-Σ formation rule as
   a named refinement. This distinguishes the W1 result type from the old
   carrier-only result plus a separate obligation.
+
+### verify/spec-syntax/refinement-lowers-to-carrier
+- spec: `21 §6.3` (current refinement type elaboration)
+- status: Landed; superseded by `named-refinement-is-subset-sigma` at W5
+  (`LANG-REFINEMENT-SUBSET-SIGMA`).
+- given: with `NonNeg : Nat → Ω`, elaborate
+  `fn mkPos (n : Nat) : { k : Nat | NonNeg k } = n`.
+- expect: **Landed:** the declaration is accepted and its core type is exactly
+  `Pi(Nat, Nat)`, not a Pi returning `Sigma(Nat, NonNeg)`.
+- why: The current test pins carrier lowering in the function signature. The
+  named checked-Σ form belongs to the W5 successor.
 
 ### verify/spec-syntax/named-refinement-is-subset-sigma
 - spec: `21 §2`/§6.3/§8; `34 §5`; `13 §4`
@@ -332,6 +356,21 @@ site.
 ---
 
 ## C. The verification status model + honesty guard (`21 §5`)
+
+### verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base
+- spec: `21 §5.1`/§5.4; `18 §4.5`/§5
+- status: Landed; superseded by
+  `proved-status-cert-checks-no-reachable-open-hole` at W4
+  (`VERIFY-TRANSITIVE-HONESTY`).
+- given: discharge the `ensures` obligation for
+  `fn tst (n : Nat) : Nat ensures TrueProp n = n` using a separate postulate
+  `wit` of the obligation's closed goal type.
+- expect: **Landed:** `discharge_hole` accepts the certificate and the
+  generated obligation hole is no longer open. The test does not assert an
+  empty trusted base; `wit` remains a separate postulate.
+- why: The current test pins retirement of this obligation's own hole, not
+  transitive proof-dependency honesty. The W4 successor replaces that direct
+  hole check with reachability.
 
 ### verify/spec-syntax/proved-status-cert-checks-no-reachable-open-hole (soundness)
 - spec: `21 §5.1` (verdict `proved`), `§5.4` (discriminator); `18 §4.5`/§5

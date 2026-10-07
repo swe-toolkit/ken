@@ -149,6 +149,18 @@ the W5 core-pair shape.
 
 ## B. The absent-clause scan — guarded no-emit + the counter-rule (`22 §2.5`)
 
+### verify/obligations/refined-param-desugars-to-requires
+- spec: `22 §2.5.1`/§3; `21 §6.3`
+- status: Landed; superseded by `refined-param-is-sigma-domain` at W5
+  (`LANG-REFINEMENT-SUBSET-SIGMA`).
+- given: with `IsNonNeg : Nat → Ω`, elaborate and extract V2 obligations for
+  `fn f (n : { k : Nat | IsNonNeg k }) : Nat = n`.
+- expect: **Landed:** the declaration elaborates and V2 emits no
+  definition-site obligations for the refined parameter.
+- why: The current test asserts no definition-site obligation. Its Γ-hypothesis
+  note is not a reified proof assertion; the checked Σ domain is the W5
+  successor behavior.
+
 ### verify/obligations/refined-param-is-sigma-domain (soundness)
 - spec: `21 §2`/§6.3; `22 §2.1`/§2.3/§3
 - status: **deferred — W5 subset-Σ elaboration**
@@ -423,6 +435,17 @@ the W5 core-pair shape.
   deferred case observes its proof behavior and trust delta when the declaration
   lands; W1's space result type is tested separately in
   `space-ensures-residual-tree-allret`.
+
+### verify/obligations/decoupled-from-sigma-sort
+- spec: `22 §1.1`/§5; `21 §2`/§6.3
+- status: Landed; superseded by `v2-extracts-subset-sigma-proof-site` at W5
+  (`LANG-REFINEMENT-SUBSET-SIGMA`).
+- given: with `PostCond : Nat → Ω`, extract V2 obligations for
+  `fn f_sigma (n : Nat) : Nat ensures PostCond result = n`.
+- expect: **Landed:** V2 emits one obligation; its `phi` is not a `Proj1` or
+  `Proj2`, and `goal_closed` is not a `Sigma`.
+- why: The current test pins extraction from V1's bare-carrier form. The W5
+  successor covers extraction from the checked subset-Σ proof site.
 
 ### verify/obligations/v2-extracts-subset-sigma-proof-site (soundness)
 - spec: `22 §1.1`/§5; `21 §2`/§6.3; `13 §4`
