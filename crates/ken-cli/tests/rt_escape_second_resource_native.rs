@@ -612,13 +612,20 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-FORWARD-TAIL-RET-CHECKED-CONTROL: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
 fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
-    // Closure across resource kinds: an escaped `Buffer` is used with a live
-    // file. Native parity is pending a strict Ret sink for checked-control
-    // markers; the old "consumed more than once" refusal is no longer first.
+    // The escaped Buffer remains live through the nested checked Ret body.
+    // Execute-then-resume must perform its read before releasing the bracket.
     let diff = differential("escape-buffer-then-readat", ESCAPE_BUFFER_THEN_READAT);
     assert_native_matches_interpreter("escape-buffer-then-readat", &diff);
+    assert_eq!(diff.native.stdout, diff.interpreted.stdout, "buffer stdout");
+    assert_eq!(diff.native.effect_trace, diff.interpreted.effect_trace, "buffer full events");
+    assert_eq!(
+        diff.native.effect_trace.iter()
+            .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+            .count(),
+        1,
+        "escaped buffer must perform one FsReadAt"
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -712,6 +719,66 @@ fn nat_fanout_reached_live_resource_matches_interpreter() {
             );
         }
     });
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: transition sentinel, retired by the bounded-Nat structural
+// match successor. MEASURED: each live-handle variant builds and executes,
+// then the native runner reports exactly an unclassified -1 trap, while its
+// interpreter reaches the selected arm's expected read count. CLAIMED: these
+// Nat shapes stay fail-closed rather than exit successfully with wrong effects.
+// THE GAP: the terminal alone does not identify the guard; D6 localized its
+// Int-versus-Constructor class site, but this pin does not establish parity.
+#[test]
+fn nat_fanout_live_resource_native_stops_at_unclassified_trap() {
+    for (case, source, expected_reads) in [
+        ("nat-reached-base-guard", NAT_FANOUT_REACHED_LIVE_RESOURCE.to_owned(), 2),
+        ("nat-reached-zero-guard", reached_nat_arm_variant("zero"), 2),
+        ("nat-reached-suc-guard", reached_nat_arm_variant("suc"), 3),
+    ] {
+        let root = output_dir(case);
+        std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
+        let mut host = ken_interp::PosixHost::new_at(root.path());
+        let interpreted = ken_cli::run_program_effect_observation(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            &[],
+            &[],
+            root.path().as_os_str().as_encoded_bytes(),
+            &mut host,
+        )
+        .unwrap_or_else(|error| panic!("{case}: interpreter runs: {error:?}"));
+        assert_eq!(
+            interpreted.effect_trace.iter()
+                .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+                .count(),
+            expected_reads,
+            "{case}: the interpreter must select the measured Nat arm"
+        );
+        let output = ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            &format!("rt_escape_{}", case.replace('-', "_")),
+            root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+        .unwrap_or_else(|error| panic!("{case}: linked native build: {error:?}"));
+        let observed = ken_runtime::run_bound_process_effect_observation(
+            &output.artifact,
+            &ken_runtime::NativeEffectRunOptionsV1 {
+                arguments: Vec::new(),
+                environment: Vec::new(),
+                cwd: root.path().to_owned(),
+                plan_hash: output.plan_transport_hash,
+            },
+        );
+        assert!(
+            matches!(observed, Err(ken_runtime::NativeEffectRunErrorV1::UnclassifiedRuntimeTrap {
+                terminal_value: -1,
+            })),
+            "{case}: expected the measured fail-closed native trap, got {observed:?}"
+        );
+    }
 }
 
 #[cfg(target_os = "linux")]

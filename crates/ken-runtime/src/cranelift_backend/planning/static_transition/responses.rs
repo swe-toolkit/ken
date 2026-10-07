@@ -3244,7 +3244,9 @@ impl StaticTransitionPlan<'_> {
             .values()
             .filter(|(predeclared, specialization)| *predeclared && !*specialization)
             .count();
-        let requires_execute_then_resume = ordinary_stage_count >= 2;
+        let pending_checked_ret_sink =
+            super::aggregates::plane_has_pending_checked_control_ret_sink(self)?;
+        let requires_execute_then_resume = ordinary_stage_count >= 2 || pending_checked_ret_sink;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {

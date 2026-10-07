@@ -429,7 +429,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     CaptureRun, MaterializationKind, PerEmitterCaptureClaim,
     BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
     CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof,
+    CheckedIhForwardRetPlanProof, StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
     CheckedIhGeneratedEntryRoute,
@@ -3035,6 +3035,9 @@ struct ComposedReturnForwardRetAuthority {
 enum ComposedReturnForwardRetAuthorityOutcome {
     NonApplicable,
     Formed(ComposedReturnForwardRetAuthority),
+    /// The exact Tail plan formed, but the Ret body has no Ready strict sink.
+    /// Keep its checked control on the base call-tail continuation path.
+    FormedBasePath(CheckedIhForwardRetPlanProof),
     #[cfg(feature = "px8-ds-test-support")]
     MissingRequired,
     #[cfg(feature = "px8-ds-test-support")]

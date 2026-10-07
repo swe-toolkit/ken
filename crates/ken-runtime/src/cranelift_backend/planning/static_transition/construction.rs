@@ -1479,8 +1479,10 @@ impl<'src> Planner<'src> {
         // transport groups when at least two such groups compose. In a P1-
         // bearing plane, P1 remains on main lowering and mixed-owner groups keep
         // their existing paths; P1-free composed planes preserve their prior
-        // promotion. Single-stage groups keep the forward-Ret path. The
-        // suppression control restores P2. Phase A entries remain untouched.
+        // promotion. Single-stage groups keep the forward-Ret path only when
+        // every Ret sink is Ready; a pending checked-control Ret body requires
+        // execute-then-resume. The suppression control restores P2. Phase A
+        // entries remain untouched.
         // HS10: continuation identities, source occurrences, and transports are
         // now final. Classify the immediate bridge population once before
         // response phase B can decide whether an owner exists.

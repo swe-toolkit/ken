@@ -225,6 +225,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
     CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    StrictRetSinkAssessment, StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,
     CheckedIhGeneratedEntryProjection, CheckedIhGeneratedEntryRoute,
