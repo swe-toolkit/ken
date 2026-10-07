@@ -62,9 +62,11 @@ fn earlier_type_names_later_data_family() {
 
 #[test]
 fn export_before_later_definition_publishes_checked_identity() {
-    let env = checked("module M { export b fn b (x : Int) : Int = x } import M (b) fn consumer (x : Int) : Int = b x");
-    let body = transparent_body(&env, "consumer");
-    assert!(mentions_global(&body, env.globals["M.b"]));
+    let env = checked("module M { fn a (x : Int) : Int = b x export b fn b (x : Int) : Int = x } import M (b) fn consumer (x : Int) : Int = b x");
+    let earlier = transparent_body(&env, "M.a");
+    let client = transparent_body(&env, "consumer");
+    assert!(mentions_global(&earlier, env.globals["M.b"]));
+    assert!(mentions_global(&client, env.globals["M.b"]));
 }
 
 #[test]
