@@ -1,0 +1,78 @@
+program capabilities FS AFull
+proc second_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
+    (\r2. Ret (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
+
+proc after_read (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  (outcome : Result ResourceError ReadProgress)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  match outcome {
+    Err error |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+    Ok progress |-> match progress {
+      ReadEof |-> second_read file buffer;
+      ReadSome span count |->
+        bind (Coproduct (FSOp AFull) AmbientOp)
+          (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+          (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+          (match buffer_span_budget span {
+            Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);
+            Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)
+          })
+          (\_ignored. second_read file buffer)
+    }
+  }
+
+proc read_body (file : Resource ResourceKind.FsHandle) (buffer : BufferHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError ReadProgress) (ResourceBodyResult Unit Unit)
+    (readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int)))
+    (\outcome. after_read file buffer outcome)
+
+proc file_body (file : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError (ResourceBracketResult Unit Unit))
+    (ResourceBodyResult Unit Unit)
+    (withBuffer AFull Unit Unit (6 : Int) (read_body file))
+    (\outcome. Ret (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit))
+
+proc finish (outcome : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode visits [FS] =
+  match outcome {
+    Err open_error |-> host_exit AFull (Failure 96);
+    Ok bracket |-> match bracket {
+      ResourceBracketOk value |-> host_exit AFull Success;
+      ResourceBracketBodyError error |-> host_exit AFull (Failure 93);
+      ResourceBracketReleaseError error |-> host_exit AFull (Failure 94);
+      ResourceBracketBodyAndReleaseError body_error release_error |-> host_exit AFull (Failure 95)
+    }
+  }
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+        (withResource AFull Unit Unit
+          cap (bytes_encode "held.bin") ResourceRead file_body)
+        (\outcome. finish outcome)
+  }

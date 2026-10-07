@@ -612,25 +612,117 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE AC-0 at 310bf4f21: source-specific inheritances at one generated entry disagree on their typed consumer projection, including the fresh-result route; first refusal, not the older eliminated-recursive-hypothesis prediction"]
+#[ignore = "RT-FORWARD-TAIL-RET-CHECKED-CONTROL: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
 fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
-    // Closure across resource kinds: same fan-out defect with an escaped
-    // `Buffer` rather than an escaped `FsHandle`. Also pre-fix "consumed more
-    // than once"; now interpreter-equivalent.
+    // Closure across resource kinds: an escaped `Buffer` is used with a live
+    // file. Native parity is pending a strict Ret sink for checked-control
+    // markers; the old "consumed more than once" refusal is no longer first.
     let diff = differential("escape-buffer-then-readat", ESCAPE_BUFFER_THEN_READAT);
     assert_native_matches_interpreter("escape-buffer-then-readat", &diff);
 }
 
 #[cfg(target_os = "linux")]
-// Promise class: durable interpreter/native differential. The bounded-Nat
-// fanout selects an escaped-resource frame in a shared continuation; compare
-// its emitted native observations to the interpreter's on the same input.
-// MEASURED: the fixture's stdout, complete effect trace, and terminal
-// observation on both engines. CLAIMED: the composed producer result and
-// pending eliminators preserve the selected effects and terminal result.
-// THE GAP: this one fixture does not cover all recursively composed Nat or
-// resource shapes. Unlike the shared operation-only helper, the full trace
-// comparison catches changes to outcomes and resource bindings as well.
+const NAT_FANOUT_REACHED_LIVE_RESOURCE: &str =
+    include_str!("rt_nat_fanout_reached_live_resource.ken");
+
+#[cfg(target_os = "linux")]
+fn reached_nat_arm_variant(arm: &str) -> String {
+    let original = match arm {
+        "zero" => {
+            r#"Zero |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof);"#
+        }
+        "suc" => {
+            r#"Suc m |-> Ret (Coproduct (FSOp AFull) AmbientOp)
+              (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+              (Result ResourceError ReadProgress) (Ok ResourceError ReadProgress ReadEof)"#
+        }
+        _ => panic!("unknown Nat arm: {arm}"),
+    };
+    let replacement = match arm {
+        "zero" => {
+            "Zero |-> readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int));"
+        }
+        "suc" => {
+            "Suc m |-> readAt AFull file (0 : Int) buffer (MkBufferWindow (0 : Int) (6 : Int))"
+        }
+        _ => unreachable!(),
+    };
+    // Only the chosen arm changes. The shared continuation stays identical;
+    // dropping the fanout cannot satisfy the read-count discriminator.
+    let source = NAT_FANOUT_REACHED_LIVE_RESOURCE.replacen(original, replacement, 1);
+    assert_ne!(
+        source, NAT_FANOUT_REACHED_LIVE_RESOURCE,
+        "the arm mutation must land"
+    );
+    source
+}
+
+#[cfg(target_os = "linux")]
+// D0 measurement fixture, ignored until the marker-bearing Ret-body successor.
+// Promise class: transition sentinel, retired when the successor meets AC-1/AC-2.
+// MEASURED: the live-file interpreter's two reads, or three on the extra Suc
+// arm. CLAIMED: both executors agree on stdout and full effects for a reached
+// fanout. THE GAP: native refuses at the selected frame's strict Ret sink; this
+// row cannot claim parity until the successor admits both variants.
+#[test]
+#[ignore = "RT-FORWARD-TAIL-RET-CHECKED-CONTROL: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
+fn nat_fanout_reached_live_resource_matches_interpreter() {
+    in_large_stack_thread("rt-escape-nat-reached", || {
+        for (case, source, expected_reads) in [
+            (
+                "nat-reached-base",
+                NAT_FANOUT_REACHED_LIVE_RESOURCE.to_owned(),
+                2,
+            ),
+            ("nat-reached-zero-extra", reached_nat_arm_variant("zero"), 2),
+            ("nat-reached-suc-extra", reached_nat_arm_variant("suc"), 3),
+        ] {
+            let root = output_dir(case);
+            std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
+            let mut host = ken_interp::PosixHost::new_at(root.path());
+            let interpreted = ken_cli::run_program_effect_observation(
+                &source,
+                ken_cli::SourceFormat::Ken,
+                &[],
+                &[],
+                root.path().as_os_str().as_encoded_bytes(),
+                &mut host,
+            )
+            .unwrap_or_else(|error| panic!("{case}: interpreter runs: {error:?}"));
+            assert_eq!(
+                interpreted
+                    .effect_trace
+                    .iter()
+                    .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+                    .count(),
+                expected_reads,
+                "{case}: selected Nat arm must be observable"
+            );
+            let diff = differential(case, &source);
+            assert_native_matches_interpreter(case, &diff);
+            assert_eq!(
+                diff.native.stdout, diff.interpreted.stdout,
+                "{case}: stdout"
+            );
+            assert_eq!(
+                diff.native.effect_trace, diff.interpreted.effect_trace,
+                "{case}: full trace"
+            );
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: durable differential for the reached prefix only. The
+// escaped file is already closed, so readAt returns Closed and the Nat match
+// is never reached; this active row cannot claim bounded-Nat fanout parity.
+// MEASURED: stdout, full effect trace, and terminal observation on both
+// engines through the closed-file Err path. CLAIMED: this prefix preserves
+// effects and terminal results. THE GAP: the live-handle fixture above is
+// ignored until the marker-bearing Ret-body successor; this row is not its
+// substitute.
 #[test]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     in_large_stack_thread("rt-escape-nat-fanout", || {

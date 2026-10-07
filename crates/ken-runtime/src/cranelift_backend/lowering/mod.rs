@@ -432,6 +432,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     CheckedIhForwardRetPlanProof,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
+    CheckedIhGeneratedEntryRoute,
     CheckedIhKAvailabilityDomain,
     CheckedIhTransportInputDestination,
     CheckedOrientedMarkerSets, ConstructorIdentity, ContinuationCallIdentity, ContinuationCallView,

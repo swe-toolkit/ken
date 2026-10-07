@@ -227,7 +227,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,
-    CheckedIhGeneratedEntryProjection,
+    CheckedIhGeneratedEntryProjection, CheckedIhGeneratedEntryRoute,
     CheckedIhImmediateKBindingLocator,
     CheckedIhKAvailabilityDomain, CheckedIhTransportInputDestination,
     PlannedAggregateAllocation, PlannedAggregateOwnership, RecursiveResidualDisposition,

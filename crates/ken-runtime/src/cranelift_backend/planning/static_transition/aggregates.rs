@@ -766,17 +766,83 @@ pub(super) struct CheckedIhGeneratedEntryCoordinate {
     callee_origin: StaticOriginId,
 }
 
-/// The complete typed authority common to every source-specific member of one
-/// generated-entry quotient class.
-///
-/// It carries no source identity, transport, or derivation ancestry. Equality
-/// disagreement is a planner error; it must never create another class.
+/// Only the route authority shared at generated entry. A Direct source is the
+/// common arrival; a Tail source belongs to the selected transport member.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum CheckedIhGeneratedEntryRoute {
+    DirectInvocationReturn {
+        source: CheckedIhFreshResultSource,
+        destination: CheckedIhFreshResultDestination,
+    },
+    TailProducerToRet,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+impl CheckedIhGeneratedEntryRoute {
+    fn destination_mut(&mut self) -> Option<&mut CheckedIhFreshResultDestination> {
+        match self {
+            Self::DirectInvocationReturn { destination, .. } => Some(destination),
+            Self::TailProducerToRet => None,
+        }
+    }
+}
+
+/// One producer's Tail plan, selected by its source-call identity only after
+/// the transport has been chosen. It is never published in the access map.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct CheckedIhTailProducerRoute {
+    source: CheckedIhFreshResultSource,
+    selected_case_body_origin: StaticOriginId,
+    active_frame_origin: StaticOriginId,
+    direction: CheckedIhFreshResultDirection,
+    ret_case_body_origin: StaticOriginId,
+    ret_input_binder: CheckedBinderProvenance,
+    ret_input_delivery: CheckedIhFreshResultRetInputDelivery,
+    fresh_result_capture_ordinal: u32,
+}
+
+fn split_fresh_result_route(
+    route: CheckedIhFreshResultRoute,
+) -> (CheckedIhGeneratedEntryRoute, Option<CheckedIhTailProducerRoute>) {
+    match route {
+        CheckedIhFreshResultRoute::DirectInvocationReturn { source, destination } => (
+            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { source, destination },
+            None,
+        ),
+        CheckedIhFreshResultRoute::TailProducerToRet {
+            source,
+            selected_case_body_origin,
+            active_frame_origin,
+            direction,
+            ret_case_body_origin,
+            ret_input_binder,
+            ret_input_delivery,
+            fresh_result_capture_ordinal,
+        } => (
+            CheckedIhGeneratedEntryRoute::TailProducerToRet,
+            Some(CheckedIhTailProducerRoute {
+                source,
+                selected_case_body_origin,
+                active_frame_origin,
+                direction,
+                ret_case_body_origin,
+                ret_input_binder,
+                ret_input_delivery,
+                fresh_result_capture_ordinal,
+            }),
+        ),
+    }
+}
+
+/// The typed authority common to every source-specific member of one
+/// generated-entry quotient class. No source-specific Tail plan, transport, or
+/// derivation ancestry lives here: equality disagreement is a planner error.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct CheckedIhGeneratedEntryProjection {
     destination_owner: ContinuationEmissionOwner,
     destination_body_origin: StaticOriginId,
     arrival: CheckedIhGeneratedEntryArrival,
-    pub(in crate::cranelift_backend) fresh_result_route: CheckedIhFreshResultRoute,
+    pub(in crate::cranelift_backend) route: CheckedIhGeneratedEntryRoute,
     /// Test-support coordinates for the still-emitted pre-D3
     /// header/fallback path. This is observation metadata only, absent from
     /// production and from every lowering authority type.
@@ -798,7 +864,7 @@ struct CheckedIhPreD3EmissionObservationCoordinate {
 /// generated entry agree on the consumer authority lowering needs there.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct CheckedIhGeneratedEntryConfluence {
-    members: BTreeSet<ContinuationCallIdentity>,
+    members: BTreeMap<ContinuationCallIdentity, Option<CheckedIhTailProducerRoute>>,
     retarget_caller: ContinuationCallIdentity,
     projection: CheckedIhGeneratedEntryProjection,
 }
@@ -893,11 +959,11 @@ impl CheckedIhGeneratedEntryAccess {
             let CheckedIhGeneratedEntryAdmission::Governed(projection) = admission else {
                 continue;
             };
-            let projection_layer = match projection.fresh_result_route() {
-                CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => {
+            let projection_layer = match projection.route() {
+                CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
                     CheckedIhPublishedProjectionControlLayer::Direct
                 }
-                CheckedIhFreshResultRoute::TailProducerToRet { .. } => {
+                CheckedIhGeneratedEntryRoute::TailProducerToRet => {
                     CheckedIhPublishedProjectionControlLayer::Tail
                 }
             };
@@ -1124,26 +1190,31 @@ impl CheckedIhGeneratedEntryProjection {
     /// generated-entry arrival validated by lowering. Tail intentionally
     /// answers false because its producer source is an earlier application.
     pub(in crate::cranelift_backend) fn direct_source_matches_governed_arrival(&self) -> bool {
-        match &self.fresh_result_route {
-            CheckedIhFreshResultRoute::DirectInvocationReturn { source, .. } => {
+        match &self.route {
+            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { source, .. } => {
                 source.invocation_origin == self.arrival.invocation_origin
                     && source.call_origin == self.arrival.call_origin
                     && source.callee_origin == self.arrival.callee_origin
                     && source.binding == self.arrival.binding
                     && source.immediate_k_locator == self.arrival.immediate_k_locator
             }
-            CheckedIhFreshResultRoute::TailProducerToRet { .. } => false,
+            CheckedIhGeneratedEntryRoute::TailProducerToRet => false,
         }
     }
 
-    pub(in crate::cranelift_backend) fn fresh_result_route(&self) -> &CheckedIhFreshResultRoute {
-        &self.fresh_result_route
+    pub(in crate::cranelift_backend) fn route(&self) -> &CheckedIhGeneratedEntryRoute {
+        &self.route
     }
 
     pub(in crate::cranelift_backend) fn fresh_result_destination(
         &self,
     ) -> Option<&CheckedIhFreshResultDestination> {
-        self.fresh_result_route.destination()
+        match &self.route {
+            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { destination, .. } => {
+                Some(destination)
+            }
+            CheckedIhGeneratedEntryRoute::TailProducerToRet => None,
+        }
     }
 
     #[cfg(feature = "px8-ds-test-support")]
@@ -1689,6 +1760,9 @@ pub enum CheckedIhGeneratedEntryConfluenceMutation {
     RouteWrongDelivery,
     RouteReversed,
     RouteDisagreement,
+    TailMemberSource,
+    TailMemberRetBody,
+    TailMemberCaptureOrdinal,
     RemoveFirstMember,
     DuplicateFirstMember,
     FilterCollidingMember,
@@ -2167,7 +2241,7 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                 invocation_origin: coordinate.invocation_origin.0,
                 call_origin: coordinate.call_origin.0,
                 callee_origin: coordinate.callee_origin.0,
-                members: confluence.members.iter().map(|member| format!("{member:?}")).collect(),
+                members: confluence.members.keys().map(|member| format!("{member:?}")).collect(),
                 retarget_caller: format!("{:?}", confluence.retarget_caller),
                 destination_owner: format!("{:?}", confluence.projection.destination_owner),
                 destination_body_origin: confluence.projection.destination_body_origin.0,
@@ -2196,53 +2270,32 @@ pub(super) fn record_checked_ih_generated_entry_confluences(
                     .arrival
                     .immediate_k_locator
                     .environment_index,
-                fresh_result_route: format!("{:?}", confluence.projection.fresh_result_route),
-                forward_ret_coordinates: match &confluence.projection.fresh_result_route {
-                    CheckedIhFreshResultRoute::DirectInvocationReturn { .. } => Vec::new(),
-                    CheckedIhFreshResultRoute::TailProducerToRet {
-                        source,
-                        selected_case_body_origin,
-                        active_frame_origin,
-                        direction,
-                        ret_case_body_origin,
-                        ret_input_binder,
-                        ret_input_delivery,
-                        fresh_result_capture_ordinal: _,
-                    } => confluence
+                fresh_result_route: format!("{:?}", confluence.projection.route),
+                forward_ret_coordinates: match &confluence.projection.route {
+                    CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => Vec::new(),
+                    CheckedIhGeneratedEntryRoute::TailProducerToRet => confluence
                         .members
                         .iter()
-                        .map(|member| ComposedReturnForwardRetCoordinateObservation {
-                            source_call_identity: format!("{member:?}"),
-                            entry_invocation_origin: format!(
-                                "{:?}",
-                                confluence.projection.arrival.invocation_origin
-                            ),
-                            entry_call_origin: format!(
-                                "{:?}",
-                                confluence.projection.arrival.call_origin
-                            ),
-                            entry_callee_origin: format!(
-                                "{:?}",
-                                confluence.projection.arrival.callee_origin
-                            ),
-                            entry_binding: format!(
-                                "{:?}",
-                                confluence.projection.arrival.binding
-                            ),
-                            entry_immediate_k_locator: format!(
-                                "{:?}",
-                                confluence.projection.arrival.immediate_k_locator
-                            ),
-                            invocation_origin: format!("{:?}", source.invocation_origin),
-                            call_origin: format!("{:?}", source.call_origin),
-                            callee_origin: format!("{:?}", source.callee_origin),
-                            binding: format!("{:?}", source.binding),
-                            selected_case_body_origin: format!("{:?}", selected_case_body_origin),
-                            active_frame_origin: format!("{:?}", active_frame_origin),
-                            ret_case_body_origin: format!("{:?}", ret_case_body_origin),
-                            ret_input_binder: format!("{:?}", ret_input_binder),
-                            direction: format!("{:?}", direction),
-                            delivery: format!("{:?}", ret_input_delivery),
+                        .map(|(member, tail)| {
+                            let tail = tail.as_ref().expect("Tail class has one plan per member");
+                            ComposedReturnForwardRetCoordinateObservation {
+                                source_call_identity: format!("{member:?}"),
+                                entry_invocation_origin: format!("{:?}", confluence.projection.arrival.invocation_origin),
+                                entry_call_origin: format!("{:?}", confluence.projection.arrival.call_origin),
+                                entry_callee_origin: format!("{:?}", confluence.projection.arrival.callee_origin),
+                                entry_binding: format!("{:?}", confluence.projection.arrival.binding),
+                                entry_immediate_k_locator: format!("{:?}", confluence.projection.arrival.immediate_k_locator),
+                                invocation_origin: format!("{:?}", tail.source.invocation_origin),
+                                call_origin: format!("{:?}", tail.source.call_origin),
+                                callee_origin: format!("{:?}", tail.source.callee_origin),
+                                binding: format!("{:?}", tail.source.binding),
+                                selected_case_body_origin: format!("{:?}", tail.selected_case_body_origin),
+                                active_frame_origin: format!("{:?}", tail.active_frame_origin),
+                                ret_case_body_origin: format!("{:?}", tail.ret_case_body_origin),
+                                ret_input_binder: format!("{:?}", tail.ret_input_binder),
+                                direction: format!("{:?}", tail.direction),
+                                delivery: format!("{:?}", tail.ret_input_delivery),
+                            }
                         })
                         .collect(),
                 },
@@ -7870,6 +7923,7 @@ fn checked_ih_generated_entry_row(
         ContinuationCallIdentity,
         ContinuationCallIdentity,
         CheckedIhGeneratedEntryProjection,
+        Option<CheckedIhTailProducerRoute>,
     )>,
     CraneliftBackendError,
 > {
@@ -7942,11 +7996,12 @@ fn checked_ih_generated_entry_row(
         active_frame_origin: final_step.active_frame_origin,
         ret_case_body_origin: inheritance.fresh_result_destination.ret_case_body_origin,
     });
+    let (route, tail) = split_fresh_result_route(fresh_result_route);
     let projection = CheckedIhGeneratedEntryProjection {
         destination_owner: inheritance.capability.destination_owner,
         destination_body_origin: inheritance.capability.destination_body_origin,
         arrival,
-        fresh_result_route,
+        route,
         #[cfg(feature = "px8-ds-test-support")]
         pre_d3_emission_observation,
     };
@@ -7956,6 +8011,7 @@ fn checked_ih_generated_entry_row(
         inheritance.transport.source_call_identity.clone(),
         retarget_caller,
         projection,
+        tail,
     )))
 }
 
@@ -8006,25 +8062,25 @@ fn mutate_checked_ih_generated_entry_projection(
             locator.environment_index = locator.environment_index.wrapping_add(1)
         }
         Mutation::FreshActiveFrame => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.active_frame_origin = shifted(destination.active_frame_origin)
         }
         Mutation::FreshRetBody => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.ret_case_body_origin = shifted(destination.ret_case_body_origin)
         }
         Mutation::FreshConstructorRole => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.constructor_child = CheckedBinderProvenance::Ordinary
         }
         Mutation::FreshConstructorCoordinate => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             if let CheckedBinderProvenance::ConstructorChild {
@@ -8037,45 +8093,45 @@ fn mutate_checked_ih_generated_entry_projection(
             }
         }
         Mutation::FreshClosureRecord => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.closure_environment_record =
                 AggregateOccurrenceId(destination.closure_environment_record.0.wrapping_add(1))
         }
         Mutation::FreshClosureOrigin => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.closure_origin = shifted(destination.closure_origin)
         }
         Mutation::FreshClosureBody => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.closure_body_origin = shifted(destination.closure_body_origin)
         }
         Mutation::FreshClosureParameterCount => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.closure_parameter_count =
                 destination.closure_parameter_count.wrapping_add(1)
         }
         Mutation::FreshCaptureOrdinal => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.capture_ordinal = destination.capture_ordinal.wrapping_add(1)
         }
         Mutation::FreshCaptureOccurrence => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             destination.capture_occurrence = shifted(destination.capture_occurrence)
         }
         Mutation::FreshBodyReadMembership => {
-            let Some(destination) = projection.fresh_result_route.destination_mut() else {
+            let Some(destination) = projection.route.destination_mut() else {
                 return;
             };
             if destination.body_capture_reads.pop().is_none() {
@@ -8099,6 +8155,9 @@ fn mutate_checked_ih_generated_entry_projection(
         | Mutation::RouteWrongDelivery
         | Mutation::RouteReversed
         | Mutation::RouteDisagreement
+        | Mutation::TailMemberSource
+        | Mutation::TailMemberRetBody
+        | Mutation::TailMemberCaptureOrdinal
         | Mutation::RemoveFirstMember
         | Mutation::DuplicateFirstMember
         | Mutation::FilterCollidingMember
@@ -8149,15 +8208,41 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
     > = BTreeMap::new();
     for inheritance in inheritance_order {
         #[allow(unused_mut)]
-        let Some((mut coordinate, mut member, retarget_caller, mut projection)) =
+        let Some((mut coordinate, mut member, retarget_caller, mut projection, tail)) =
             checked_ih_generated_entry_row(plan, inheritance)?
         else {
             continue;
         };
+        if matches!(&projection.route, CheckedIhGeneratedEntryRoute::TailProducerToRet)
+            != tail.is_some()
+        {
+            return Err(planner_error(
+                "a generated-entry member Tail plan disagrees with its class route kind",
+            ));
+        }
+        #[allow(unused_mut)]
+        let mut tail = tail;
         #[cfg(feature = "px8-ds-test-support")]
         {
             use CheckedIhGeneratedEntryConfluenceMutation as Mutation;
             let mutation = GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get);
+            if let Some(ref mut member_plan) = tail {
+                match mutation {
+                    Mutation::TailMemberSource => {
+                        member_plan.source.invocation_origin.0 =
+                            member_plan.source.invocation_origin.0.wrapping_add(1);
+                    }
+                    Mutation::TailMemberRetBody => {
+                        member_plan.ret_case_body_origin.0 =
+                            member_plan.ret_case_body_origin.0.wrapping_add(1);
+                    }
+                    Mutation::TailMemberCaptureOrdinal => {
+                        member_plan.fresh_result_capture_ordinal =
+                            member_plan.fresh_result_capture_ordinal.wrapping_add(1);
+                    }
+                    _ => {}
+                }
+            }
             if mutation == Mutation::ContextOnlyKey {
                 match first_coordinate_by_context.get(&coordinate.context) {
                     Some(first) => coordinate = first.clone(),
@@ -8184,14 +8269,32 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                     Mutation::DuplicateFirstMember => {
                         member = confluences
                             .get(&coordinate)
-                            .and_then(|class| class.members.first())
+                            .and_then(|class| class.members.keys().next())
                             .expect("a colliding class has one prior member")
                             .clone();
                     }
                     Mutation::FilterCollidingMember => continue,
                     Mutation::RouteDisagreement => {
-                        let source = projection.fresh_result_route.source_mut();
-                        source.invocation_origin.0 = source.invocation_origin.0.wrapping_add(1);
+                        // The colliding write fixture is Direct. A difference
+                        // in Tail sources is lawful, but Direct-vs-Tail kind at
+                        // one generated entry cannot be selected.
+                        projection.route = match projection.route {
+                            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
+                                CheckedIhGeneratedEntryRoute::TailProducerToRet
+                            }
+                            CheckedIhGeneratedEntryRoute::TailProducerToRet => {
+                                CheckedIhGeneratedEntryRoute::DirectInvocationReturn {
+                                    source: CheckedIhFreshResultSource {
+                                        invocation_origin: projection.arrival.invocation_origin,
+                                        call_origin: projection.arrival.call_origin,
+                                        callee_origin: projection.arrival.callee_origin,
+                                        binding: projection.arrival.binding,
+                                        immediate_k_locator: projection.arrival.immediate_k_locator.clone(),
+                                    },
+                                    destination: inheritance.fresh_result_destination.clone(),
+                                }
+                            }
+                        };
                     }
                     _ => mutate_checked_ih_generated_entry_projection(
                         &mut projection,
@@ -8220,7 +8323,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                         "source-specific inheritances at one generated entry disagree on the audited retarget caller",
                     ));
                 }
-                if !confluence.members.insert(member) {
+                if confluence.members.insert(member, tail).is_some() {
                     return Err(planner_error(
                         "one source-call identity was inserted twice into one generated-entry class",
                     ));
@@ -8230,7 +8333,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                 confluences.insert(
                     coordinate,
                     CheckedIhGeneratedEntryConfluence {
-                        members: BTreeSet::from([member]),
+                        members: BTreeMap::from([(member, tail)]),
                         retarget_caller,
                         projection,
                     },
@@ -8248,7 +8351,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
         {
             let member = class
                 .members
-                .first()
+                .keys()
+                .next()
                 .expect("a nonempty class has a first member")
                 .clone();
             class.members.remove(&member);
@@ -8645,7 +8749,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
     // that validator the SOLE reader of the stored field.
     let mut governed_pairs = BTreeSet::new();
     for inheritance in &build_checked_ih_continuation_inheritances(plan)? {
-        if let Some((coordinate, member, _, _)) =
+        if let Some((coordinate, member, _, _, _)) =
             checked_ih_generated_entry_row(plan, inheritance)?
         {
             governed_pairs.insert((coordinate, member));
@@ -8656,7 +8760,7 @@ pub(in crate::cranelift_backend::planning::static_transition) fn validate_checke
         .flat_map(|(coordinate, confluence)| {
             confluence
                 .members
-                .iter()
+                .keys()
                 .cloned()
                 .map(|member| (coordinate.clone(), member))
         })
@@ -8996,7 +9100,7 @@ impl StaticTransitionPlan<'_> {
                 coordinate.context == access.context
                     && coordinate.enclosing_specialization == access.enclosing_specialization
                     && coordinate.worker_body_origin == access.worker_body_origin
-                    && class.members.contains(transport.source_call_identity())
+                    && class.members.contains_key(transport.source_call_identity())
             })
             .collect::<Vec<_>>();
         let (coordinate, confluence) = match classes.as_slice() {
@@ -9049,7 +9153,37 @@ impl StaticTransitionPlan<'_> {
             ));
         }
 
-        let CheckedIhFreshResultRoute::TailProducerToRet {
+        if !matches!(selected_projection.route(), CheckedIhGeneratedEntryRoute::TailProducerToRet) {
+            // A Direct access projection is not a forward-Ret route.
+            return Ok(None);
+        }
+        // The selected transport names the source member. Tail details never
+        // enter the generated-entry access; the map is keyed by this identity.
+        let tail = confluence
+            .members
+            .get(transport.source_call_identity())
+            .and_then(Option::as_ref)
+            .ok_or_else(|| planner_error("a selected Tail transport has no member Tail plan"))?;
+        // Independently rederive the transport's route from the inert canonical
+        // inheritance, not the stored member plan or the mutable certificate.
+        let inheritances = build_checked_ih_continuation_inheritances(self)?;
+        let mut own = inheritances.iter().filter(|inheritance| inheritance.transport == *transport);
+        let inheritance = own.next().ok_or_else(|| {
+            planner_error("a selected Tail transport has no canonical inheritance")
+        })?;
+        if own.next().is_some() {
+            return Err(planner_error("one selected Tail transport has more than one canonical inheritance"));
+        }
+        let final_step = inheritance.capability.self_resumption_steps.last().ok_or_else(|| {
+            planner_error("a selected Tail transport's canonical inheritance has no final step")
+        })?;
+        let (_, derived_tail) = split_fresh_result_route(
+            checked_ih_fresh_result_route(self, inheritance, final_step)?
+        );
+        if derived_tail.as_ref() != Some(tail) {
+            return Err(planner_error("a member's Tail plan disagrees with its transport's own derivation"));
+        }
+        let CheckedIhTailProducerRoute {
             source,
             selected_case_body_origin,
             active_frame_origin,
@@ -9058,12 +9192,7 @@ impl StaticTransitionPlan<'_> {
             ret_input_binder,
             ret_input_delivery,
             fresh_result_capture_ordinal,
-            ..
-        } = selected_projection.fresh_result_route()
-        else {
-            // Inert gate: a Direct access projection is not a forward-Ret route => None.
-            return Ok(None);
-        };
+        } = tail;
         #[cfg(feature = "px8-ds-test-support")]
         record_composed_return_forward_ret_authority_application();
         #[cfg(feature = "px8-ds-test-support")]
@@ -9126,7 +9255,7 @@ impl StaticTransitionPlan<'_> {
                     projection.destination_owner != access_projection.destination_owner
                         || projection.destination_body_origin
                             != access_projection.destination_body_origin
-                        || projection.fresh_result_route != access_projection.fresh_result_route
+                        || projection.route != access_projection.route
                 })
                 .cloned()
                 .ok_or_else(|| {
@@ -9151,7 +9280,7 @@ impl StaticTransitionPlan<'_> {
         {
             self.checked_ih_generated_entry_confluences
                 .values()
-                .flat_map(|class| class.members.iter())
+                .flat_map(|class| class.members.keys())
                 .find(|member| *member != transport.source_call_identity())
                 .cloned()
                 .ok_or_else(|| {
@@ -9174,8 +9303,8 @@ impl StaticTransitionPlan<'_> {
         {
             self.checked_ih_generated_entry_confluences
                 .values()
-                .flat_map(|class| class.members.iter())
-                .find(|member| !confluence.members.contains(*member))
+                .flat_map(|class| class.members.keys())
+                .find(|member| !confluence.members.contains_key(*member))
                 .cloned()
                 .ok_or_else(|| {
                     planner_error("the wrong-member control found no neighboring member")
@@ -9185,7 +9314,7 @@ impl StaticTransitionPlan<'_> {
         };
         #[cfg(not(feature = "px8-ds-test-support"))]
         let member = transport.source_call_identity().clone();
-        if !confluence.members.contains(&member) {
+        if !confluence.members.contains_key(&member) {
             return Err(planner_error(
                 "the selected transport's source-call identity is not a member of the exact forward Ret confluence class",
             ));
