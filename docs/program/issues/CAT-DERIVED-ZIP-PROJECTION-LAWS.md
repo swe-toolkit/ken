@@ -1,7 +1,7 @@
 ---
 id: CAT-DERIVED-ZIP-PROJECTION-LAWS
 title: "Proof-backfill for Data/Collections/Derived.ken.md: prove privately that zip's first projection is the first list truncated to the second's length, and its second projection the second list truncated to the first's, so zip's contents and not only its length are checked"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
