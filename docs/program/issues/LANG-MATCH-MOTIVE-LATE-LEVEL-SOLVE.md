@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE
 title: "A match whose motive's sort depends on a bare-Type level that is solved only later in the declaration is rejected at admission: the motive's sort is inferred over a zonked context, which reads the unsolved level as Zero, so a later solve to Suc Zero leaves the stored motive at Type 0. Keep the level open or defer the query, as spec 39 requires"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -75,3 +75,13 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 Shared predicate (Architect `evt_6x9vw86s6rhfw`): open level metas reaching
 a kernel conversion site. Closure: the open query decides nothing, and the
 base decides (`evt_72vktwjwqj8rq`).
+
+## Closeout
+
+Merged `440b216f1` from exact `453e9ad3d` (PR #4582). Language QA
+`evt_p6xv3j5n5ep9`, Architect `evt_6009epx8k4rfg`, Decision
+`dec_wrpgey0jkyma`. A match motive's sort is queried open, falling back to
+the defaulted query, so a later level solve no longer meets a motive fixed
+at `Type 0`. Carry: the stored queries at `elab.rs:3498/3515/3565` keep the
+defaulted query; a late-solve case reaching one is a new WP with its own
+AC-0.
