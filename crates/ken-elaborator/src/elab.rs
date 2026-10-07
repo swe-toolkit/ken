@@ -7395,14 +7395,6 @@ fn finish_checked_dependent_motive<const MAY_REFINE_GROUP_RESULT: bool>(
 ) -> Result<(Box<Term>, bool), ElabError> {
     let mut motive_user_body =
         std::mem::replace(&mut plan.motive_user_body, Term::Type(Level::Zero));
-    let zonked_ctx = Context {
-        types: cx
-            .ctx
-            .types
-            .iter()
-            .map(|term| cx.metas.zonk_term(term))
-            .collect(),
-    };
     let motive_ctx = motive_context(&cx.ctx, ind, params);
     // The context convoy and embedded methods share one finalized telescope.
     motive_user_body = wrap_dependent_motive_convoy(
