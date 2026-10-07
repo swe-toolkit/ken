@@ -6,7 +6,7 @@ owner: language
 size: S
 tier: T1
 gate: architect
-depends_on: []
+depends_on: [LANG-NAMED-REFINEMENT-TYPE-ARGUMENT]
 blocks: []
 github: null
 origin: "Adversary hunt evt_2zc1nvkwwy0sg on 68bd8ad73 (LANG-MATCH-RESULT-REFINEMENT-IDENTITY): fail-open on the verification layer, kernel unaffected, pre-existing on the direct route. Named by that WP's stop condition (a structural read through a refinement whose carrier is a Pi). Violates 22 §2.1. Steward-filed per COORDINATION section 2."
@@ -44,10 +44,13 @@ stop and report the mismatch.
 
 ## Deliverable
 
-At the `RLam` check arm, when the expected type is a named refinement over a
-Pi carrier, emit its introduction obligation for the lambda, keyed on the
-refinement's checked identity, then check the lambda against the carrier. The
-match and `if` routes inherit it.
+Per Architect `evt_7vpddt8z52k0j`, using the rigid conversion view that
+`LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` delivers: at the `RLam` check arm, take
+the expected head through `with_rigid_consts`, or read its `refinement_root`
+before any whnf. A root head is checked at the carrier and routed to
+`emit_refinement_introduction` with the root as expected. Sweep by mechanism:
+every `check` arm that whnf's `expected`, not `RLam` alone, and report the
+arms found. The match and `if` routes inherit the fix.
 
 ## Acceptance
 
