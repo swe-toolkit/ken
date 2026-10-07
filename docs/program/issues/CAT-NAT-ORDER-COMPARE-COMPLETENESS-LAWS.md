@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-ORDER-COMPARE-COMPLETENESS-LAWS
 title: "Proof-backfill for Data/Numeric/Nat/Order.ken.md: compare's laws only say what each result implies, so no law fixes compare n n to Eq or a strictly smaller left side to Lt. Prove privately that compare is reflexive at Eq, returns Lt under lt_nat, and flips Lt to Gt"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -77,3 +77,11 @@ No new import, export, operation, axiom or trust. Follow
 
 - Any trust delta, `Axiom`, kernel, prelude or spec change, or a needed
   change to `compare`, `lt_nat` or `leq_nat`.
+
+## Closeout
+
+Merged `be52bdfca` from exact `9a65a994a` (PR #4580). Foundation QA
+`evt_6s2k6m4s26g4v`, Architect `evt_1kc8j3n0kmp6k`, Decision
+`dec_6z15yc2wr1cmw`. Nat Order proves privately that `compare n n` is
+`Eq`, that `lt_nat a b` gives `Lt`, and that swapping the arguments flips
+`Lt` to `Gt`. The trust ledger and exports are unchanged.
