@@ -629,6 +629,13 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
 fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
+    // Promise class: durable differential for the escaped-buffer effects.
+    // MEASURED: full native/interpreter parity and one read on this row.
+    // CLAIMED: the checked-control Ret admission performs the effect before
+    // releasing the bracket. M-admission-off makes this observation red.
+    // GAP: PendingTopology FormedBasePath frames reach the base-path seat 0
+    // times with a non-residual value in escape/parity/PX8; the call_tail form
+    // is unpinned there and carried as unknown outside that measured corpus.
     // The escaped Buffer remains live through the nested checked Ret body.
     // Execute-then-resume must perform its read before releasing the bracket.
     let diff = differential("escape-buffer-then-readat", ESCAPE_BUFFER_THEN_READAT);

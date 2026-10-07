@@ -9311,6 +9311,38 @@ impl<'a> Lowering<'a> {
         Ok(result)
     }
 
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(super) fn formed_base_path_selected_value_kind(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+    ) -> &'static str {
+        // Read the exact selected binding that call_tail reads below, without
+        // changing its production behavior or turning a diagnostic miss into
+        // a new build refusal.
+        let Ok(units) = self.static_transition_plan.continuation_units() else {
+            return "UnknownUnit";
+        };
+        let Some(unit) = units.into_iter().find(|unit| unit.id() == transport.source_specialization())
+        else {
+            return "UnknownUnit";
+        };
+        let Some(index) = unit
+            .recursive_positions()
+            .len()
+            .checked_add(unit.recursive_position() as usize)
+        else {
+            return "UnknownIndex";
+        };
+        match env.get(index) {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Residual(_))) => "Residual",
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_))) => "Carried",
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) => "Specialized",
+            Some(LoweringEnvironmentBinding::StaticWorker(_)) => "StaticWorker",
+            None => "MissingBinding",
+        }
+    }
+
     pub(super) fn call_tail_checked_ih_transport_from_case_environment(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -14926,6 +14958,15 @@ impl<'a> Lowering<'a> {
             ));
         }
         if assessment.status != StrictRetSinkStatus::Ready {
+            #[cfg(feature = "px8-ds-test-support")]
+            if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                eprintln!(
+                    "RT_BASE_CONSTRUCT thread={:?} frame={} status={:?}",
+                    std::thread::current().name(),
+                    proof.active_frame_origin().ticket_body_ordinal(),
+                    assessment.status,
+                );
+            }
             return Ok(ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof));
         }
         Ok(ComposedReturnForwardRetAuthorityOutcome::Formed(

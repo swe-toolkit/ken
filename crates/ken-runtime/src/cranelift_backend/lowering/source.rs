@@ -4997,7 +4997,28 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     )?,
                                 ));
                             }
-                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_) => {
+                            // MUTANT NOTE: replacing call_tail by a captured
+                            // environment is invariant-equivalent on admitted
+                            // checked-control values: they arrive as residuals,
+                            // and call_tail inlines them. The buffer mutant
+                            // reached this seat twice and preserved full parity;
+                            // M-admission-off pins the upstream admission.
+                            // The measured escape/parity/PX8 corpus has zero
+                            // PendingTopology non-residual seat reaches; the
+                            // unobserved population remains unknown.
+                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
+                                #[cfg(feature = "px8-ds-test-support")]
+                                if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                                    let status = self.static_transition_plan
+                                        .strict_ret_sink_assessment(_proof.active_frame_origin())?
+                                        .map(|assessment| assessment.status);
+                                    eprintln!(
+                                        "RT_BASE_SEAT thread={:?} seat=non_governed frame={} status={status:?} kind={}",
+                                        std::thread::current().name(),
+                                        _proof.active_frame_origin().ticket_body_ordinal(),
+                                        self.formed_base_path_selected_value_kind(&transport, &env),
+                                    );
+                                }
                                 self.pending_computational_ih_call.take();
                                 let result = self
                                     .call_tail_checked_ih_transport_from_case_environment(
@@ -5143,7 +5164,19 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         )?,
                                     ));
                                 }
-                                ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_) => {
+                                ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                                        let status = self.static_transition_plan
+                                            .strict_ret_sink_assessment(_proof.active_frame_origin())?
+                                            .map(|assessment| assessment.status);
+                                        eprintln!(
+                                            "RT_BASE_SEAT thread={:?} seat=governed frame={} status={status:?} kind={}",
+                                            std::thread::current().name(),
+                                            _proof.active_frame_origin().ticket_body_ordinal(),
+                                            self.formed_base_path_selected_value_kind(&transport, &env),
+                                        );
+                                    }
                                     self.pending_computational_ih_call.take();
                                     let result = self
                                         .call_tail_checked_ih_transport_from_case_environment(
