@@ -1339,11 +1339,11 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
 /// call relationships, context partition, and exact-capsule reach.
 ///
 /// **MEASURED:** the two fixed products' complete governed certificate classes,
-/// installation state, typed direct/tail fresh-result routes, and successful
-/// terminal validation observations.
-/// **CLAIMED:** W0/W1 share one typed projection while context-sharing siblings
-/// remain separate, every governed key is reached, and both route variants
-/// retain their source, intermediate edge, and sink relationships.
+/// installation state, class-common route kinds, per-member Tail coordinates,
+/// and successful terminal validation observations.
+/// **CLAIMED:** W0/W1 share one typed Direct projection while context-sharing
+/// siblings remain separate, every governed key is reached, and each selected
+/// Tail member retains its own source, intermediate edge and sink relationships.
 /// **THE GAP:** the fixed cardinalities and relative origin relationships are
 /// independent of the certificate builder and are paired with population-side
 /// disagreement mutations below; numeric origins are deliberately not authority.
@@ -1506,21 +1506,16 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
                     ),
                     "Tail generated-entry E and producer source S must remain distinct"
                 );
-                for route_coordinate in [
-                    format!("invocation_origin: {}", coordinate.invocation_origin),
-                    format!("call_origin: {}", coordinate.call_origin),
-                    format!("callee_origin: {}", coordinate.callee_origin),
-                    format!("active_frame_origin: {}", coordinate.active_frame_origin),
-                    "direction: Forward".to_string(),
-                    format!("ret_case_body_origin: {}", coordinate.ret_case_body_origin),
-                    format!("ret_input_binder: {}", coordinate.ret_input_binder),
-                    "ret_input_delivery: ProducerResultDirect".to_string(),
-                ] {
-                    assert!(
-                        row.fresh_result_route.contains(&route_coordinate),
-                        "each real Tail route must retain {route_coordinate}: {row:?}"
-                    );
-                }
+                assert_eq!(coordinate.direction, "Forward", "member Tail direction");
+                assert_eq!(coordinate.delivery, "ProducerResultDirect", "member Tail delivery");
+                assert!(
+                    coordinate.ret_input_binder.starts_with("ConstructorChild"),
+                    "member Tail sink binder: {coordinate:?}"
+                );
+                assert_ne!(
+                    coordinate.binding, coordinate.entry_binding,
+                    "Tail producer binding must differ from generated-entry binding"
+                );
             }
         }
         for row in all_rows {
@@ -3775,6 +3770,9 @@ fn assert_generated_entry_mutation_child() {
         "route-wrong-delivery" => Mutation::RouteWrongDelivery,
         "route-reversed" => Mutation::RouteReversed,
         "route-disagreement" => Mutation::RouteDisagreement,
+        "tail-member-source" => Mutation::TailMemberSource,
+        "tail-member-ret-body" => Mutation::TailMemberRetBody,
+        "tail-member-capture-ordinal" => Mutation::TailMemberCaptureOrdinal,
         "remove-member" => Mutation::RemoveFirstMember,
         "duplicate-member" => Mutation::DuplicateFirstMember,
         "filter-member" => Mutation::FilterCollidingMember,
@@ -4077,6 +4075,38 @@ generated_entry_checked_case!(
     assert_generated_entry_mutation_child,
     "route-disagreement",
     "disagree on their typed consumer projection"
+);
+// Promise class: durable invariant. These three producer-member mutations
+// change stored Tail facts after the class-common entry is formed, while the
+// independent canonical-transport derivation is unchanged. The exact refusal
+// proves a member cannot borrow another source, Ret body, or capture ordinal.
+// MEASURED: each field's own mutation reaches the post-selection derivation
+// check. CLAIMED: source-specific Tail coordinates remain selected-member
+// authority. THE GAP: these are rejection controls, not parity for the
+// marker-bearing Ret-body cases, which remain ignored above.
+generated_entry_checked_case!(
+    generated_entry_confluence_tail_member_source,
+    GENERATED_ENTRY_MUTATION_CHILD,
+    in_generated_entry_stack_thread,
+    assert_generated_entry_mutation_child,
+    "tail-member-source",
+    "a member's Tail plan disagrees with its transport's own derivation"
+);
+generated_entry_checked_case!(
+    generated_entry_confluence_tail_member_ret_body,
+    GENERATED_ENTRY_MUTATION_CHILD,
+    in_generated_entry_stack_thread,
+    assert_generated_entry_mutation_child,
+    "tail-member-ret-body",
+    "a member's Tail plan disagrees with its transport's own derivation"
+);
+generated_entry_checked_case!(
+    generated_entry_confluence_tail_member_capture_ordinal,
+    GENERATED_ENTRY_MUTATION_CHILD,
+    in_generated_entry_stack_thread,
+    assert_generated_entry_mutation_child,
+    "tail-member-capture-ordinal",
+    "a member's Tail plan disagrees with its transport's own derivation"
 );
 generated_entry_checked_case!(
     generated_entry_confluence_remove_member,

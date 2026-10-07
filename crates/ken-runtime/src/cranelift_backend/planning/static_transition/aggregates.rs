@@ -1760,6 +1760,9 @@ pub enum CheckedIhGeneratedEntryConfluenceMutation {
     RouteWrongDelivery,
     RouteReversed,
     RouteDisagreement,
+    TailMemberSource,
+    TailMemberRetBody,
+    TailMemberCaptureOrdinal,
     RemoveFirstMember,
     DuplicateFirstMember,
     FilterCollidingMember,
@@ -8152,6 +8155,9 @@ fn mutate_checked_ih_generated_entry_projection(
         | Mutation::RouteWrongDelivery
         | Mutation::RouteReversed
         | Mutation::RouteDisagreement
+        | Mutation::TailMemberSource
+        | Mutation::TailMemberRetBody
+        | Mutation::TailMemberCaptureOrdinal
         | Mutation::RemoveFirstMember
         | Mutation::DuplicateFirstMember
         | Mutation::FilterCollidingMember
@@ -8214,10 +8220,29 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                 "a generated-entry member Tail plan disagrees with its class route kind",
             ));
         }
+        #[allow(unused_mut)]
+        let mut tail = tail;
         #[cfg(feature = "px8-ds-test-support")]
         {
             use CheckedIhGeneratedEntryConfluenceMutation as Mutation;
             let mutation = GENERATED_ENTRY_CONFLUENCE_MUTATION.with(Cell::get);
+            if let Some(ref mut member_plan) = tail {
+                match mutation {
+                    Mutation::TailMemberSource => {
+                        member_plan.source.invocation_origin.0 =
+                            member_plan.source.invocation_origin.0.wrapping_add(1);
+                    }
+                    Mutation::TailMemberRetBody => {
+                        member_plan.ret_case_body_origin.0 =
+                            member_plan.ret_case_body_origin.0.wrapping_add(1);
+                    }
+                    Mutation::TailMemberCaptureOrdinal => {
+                        member_plan.fresh_result_capture_ordinal =
+                            member_plan.fresh_result_capture_ordinal.wrapping_add(1);
+                    }
+                    _ => {}
+                }
+            }
             if mutation == Mutation::ContextOnlyKey {
                 match first_coordinate_by_context.get(&coordinate.context) {
                     Some(first) => coordinate = first.clone(),
@@ -8250,18 +8275,25 @@ pub(in crate::cranelift_backend::planning::static_transition) fn build_checked_i
                     }
                     Mutation::FilterCollidingMember => continue,
                     Mutation::RouteDisagreement => {
-                        // A different Tail source is lawful between members.
-                        // Flip the colliding member's *kind* instead: the
-                        // generated entry cannot select Direct versus Tail.
-                        projection.route = CheckedIhGeneratedEntryRoute::DirectInvocationReturn {
-                            source: CheckedIhFreshResultSource {
-                                invocation_origin: projection.arrival.invocation_origin,
-                                call_origin: projection.arrival.call_origin,
-                                callee_origin: projection.arrival.callee_origin,
-                                binding: projection.arrival.binding,
-                                immediate_k_locator: projection.arrival.immediate_k_locator.clone(),
-                            },
-                            destination: inheritance.fresh_result_destination.clone(),
+                        // The colliding write fixture is Direct. A difference
+                        // in Tail sources is lawful, but Direct-vs-Tail kind at
+                        // one generated entry cannot be selected.
+                        projection.route = match projection.route {
+                            CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
+                                CheckedIhGeneratedEntryRoute::TailProducerToRet
+                            }
+                            CheckedIhGeneratedEntryRoute::TailProducerToRet => {
+                                CheckedIhGeneratedEntryRoute::DirectInvocationReturn {
+                                    source: CheckedIhFreshResultSource {
+                                        invocation_origin: projection.arrival.invocation_origin,
+                                        call_origin: projection.arrival.call_origin,
+                                        callee_origin: projection.arrival.callee_origin,
+                                        binding: projection.arrival.binding,
+                                        immediate_k_locator: projection.arrival.immediate_k_locator.clone(),
+                                    },
+                                    destination: inheritance.fresh_result_destination.clone(),
+                                }
+                            }
                         };
                     }
                     _ => mutate_checked_ih_generated_entry_projection(

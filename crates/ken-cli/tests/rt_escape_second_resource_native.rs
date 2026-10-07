@@ -612,11 +612,11 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE AC-0 at 310bf4f21: source-specific inheritances at one generated entry disagree on their typed consumer projection, including the fresh-result route; first refusal, not the older eliminated-recursive-hypothesis prediction"]
+#[ignore = "RT-GENERATED-ENTRY-PROJECTION-INVARIANT successor: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
 fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
-    // Closure across resource kinds: same fan-out defect with an escaped
-    // `Buffer` rather than an escaped `FsHandle`. Also pre-fix "consumed more
-    // than once"; now interpreter-equivalent.
+    // Closure across resource kinds: an escaped `Buffer` is used with a live
+    // file. Native parity is pending a strict Ret sink for checked-control
+    // markers; the old "consumed more than once" refusal is no longer first.
     let diff = differential("escape-buffer-then-readat", ESCAPE_BUFFER_THEN_READAT);
     assert_native_matches_interpreter("escape-buffer-then-readat", &diff);
 }
@@ -660,15 +660,14 @@ fn reached_nat_arm_variant(arm: &str) -> String {
 }
 
 #[cfg(target_os = "linux")]
-// D0 measurement fixture, ignored until the generated-entry projection repair.
-// Promise class: transition sentinel, retired by this WP's AC-1 and AC-2.
-// MEASURED: interpreter reads on the live file, then linked native parity on
-// the same source. CLAIMED: the Nat fanout is reached on its Suc arm and the
-// additional Suc read is observed in both executors. THE GAP: the current
-// native compiler refuses before emission; this row cannot claim native parity
-// until the projection repair admits both variants.
+// D0 measurement fixture, ignored until the marker-bearing Ret-body successor.
+// Promise class: transition sentinel, retired when the successor meets AC-1/AC-2.
+// MEASURED: the live-file interpreter's two reads, or three on the extra Suc
+// arm. CLAIMED: both executors agree on stdout and full effects for a reached
+// fanout. THE GAP: native refuses at the selected frame's strict Ret sink; this
+// row cannot claim parity until the successor admits both variants.
 #[test]
-#[ignore = "RT-GENERATED-ENTRY-PROJECTION-INVARIANT D0: live Nat fanout refuses at generated-entry projection agreement before native execution"]
+#[ignore = "RT-GENERATED-ENTRY-PROJECTION-INVARIANT successor: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
 fn nat_fanout_reached_live_resource_matches_interpreter() {
     in_large_stack_thread("rt-escape-nat-reached", || {
         for (case, source, expected_reads) in [
@@ -716,15 +715,14 @@ fn nat_fanout_reached_live_resource_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
-// Promise class: durable interpreter/native differential. The bounded-Nat
-// fanout selects an escaped-resource frame in a shared continuation; compare
-// its emitted native observations to the interpreter's on the same input.
-// MEASURED: the fixture's stdout, complete effect trace, and terminal
-// observation on both engines. CLAIMED: the composed producer result and
-// pending eliminators preserve the selected effects and terminal result.
-// THE GAP: this one fixture does not cover all recursively composed Nat or
-// resource shapes. Unlike the shared operation-only helper, the full trace
-// comparison catches changes to outcomes and resource bindings as well.
+// Promise class: durable differential for the reached prefix only. The
+// escaped file is already closed, so readAt returns Closed and the Nat match
+// is never reached; this active row cannot claim bounded-Nat fanout parity.
+// MEASURED: stdout, full effect trace, and terminal observation on both
+// engines through the closed-file Err path. CLAIMED: this prefix preserves
+// effects and terminal results. THE GAP: the live-handle fixture above is
+// ignored until the marker-bearing Ret-body successor; this row is not its
+// substitute.
 #[test]
 fn nat_fanout_escaped_resource_matches_interpreter() {
     in_large_stack_thread("rt-escape-nat-fanout", || {
