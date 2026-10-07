@@ -38,6 +38,8 @@ struct Differential {
     interpreted: ken_runtime::EffectObservation,
     native: ken_runtime::EffectObservation,
     ret_key_applications: Vec<(u32, u32, ken_runtime::HostOpV1)>,
+    ret_sink_assessments: Vec<(String, String)>,
+    ret_sink_installs: Vec<ken_runtime::ComposedReturnRetSinkObservation>,
 }
 
 #[cfg(target_os = "linux")]
@@ -54,17 +56,23 @@ fn differential(case: &str, source: &str) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
 
-    let (output, applications) = ken_runtime::with_pending_checked_ret_sink_applications(
-        || {
-            ken_cli::build_native_program(
-                source,
-                ken_cli::SourceFormat::Ken,
-                &format!("rt_escape_{}", case.replace('-', "_")),
-                root.path(),
-                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            )
-        },
-    );
+    let (((output, applications), assessments), installs, _) =
+        ken_runtime::with_composed_return_ret_sink_mutation(
+            ken_runtime::ComposedReturnRetSinkMutation::Exact,
+            || {
+                ken_runtime::with_composed_return_ret_assessments(|| {
+                    ken_runtime::with_pending_checked_ret_sink_applications(|| {
+                        ken_cli::build_native_program(
+                            source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_escape_{}", case.replace('-', "_")),
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    })
+                })
+            },
+        );
     let output = output
         .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(
@@ -93,6 +101,8 @@ fn differential(case: &str, source: &str) -> Differential {
         interpreted,
         native,
         ret_key_applications: applications,
+        ret_sink_assessments: assessments,
+        ret_sink_installs: installs,
     }
 }
 
@@ -104,6 +114,7 @@ fn assert_native_matches_interpreter(case: &str, diff: &Differential) {
         interpreted,
         native,
         ret_key_applications,
+        ..
     } = diff;
     assert_eq!(
         native.exit_status, interpreted.exit_status,
@@ -648,6 +659,28 @@ fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
             .count(),
         1,
         "escaped buffer must perform one FsReadAt"
+    );
+    // Promise class: durable emission invariant. MEASURED: a pre-filter
+    // assessment recorder and the independent register-time sink recorder.
+    // CLAIMED: non-Ready frames have no installed sink or D6a checked-answer
+    // edge. THE GAP: the corpus never delivers an untagged checked-control
+    // word to such a frame (the prior widened-install mutant had 14 reaches
+    // with unchanged execution), so its runtime trap is not observed here.
+    assert!(
+        diff.ret_sink_assessments.iter().any(|(_, status)| status == "PendingCheckedControl"),
+        "buffer must assess a non-Ready checked-control Ret frame"
+    );
+    let ready = diff.ret_sink_assessments.iter()
+        .filter(|(_, status)| status == "Ready")
+        .map(|(origin, _)| origin.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let installed = diff.ret_sink_installs.iter()
+        .map(|sink| sink.active_frame_origin.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        installed, ready,
+        "only Ready Ret frames install sinks: assessments={:?} installs={:?}",
+        diff.ret_sink_assessments, diff.ret_sink_installs
     );
 }
 

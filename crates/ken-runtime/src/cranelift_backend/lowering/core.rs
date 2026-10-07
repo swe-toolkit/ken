@@ -15266,8 +15266,13 @@ impl<'a> Lowering<'a> {
         // formation, authority selection, and response admission. Only Ready
         // installs the shared Ret block; other logical Ret inputs still form.
         let return_case = if px8tr_deforested_answer_route_enabled() {
-            self.static_transition_plan
-                .strict_ret_sink_assessment(eliminator.static_origin)?
+            let assessment = self.static_transition_plan
+                .strict_ret_sink_assessment(eliminator.static_origin)?;
+            #[cfg(feature = "px8-ds-test-support")]
+            if let Some(assessment) = assessment {
+                record_composed_return_ret_assessment(eliminator.static_origin, assessment.status);
+            }
+            assessment
                 .filter(|assessment| assessment.status == StrictRetSinkStatus::Ready)
                 .map(|assessment| {
                     let return_case = eliminator.cases.get(assessment.ret_case_index).ok_or_else(|| {
