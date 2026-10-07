@@ -64,7 +64,7 @@ mod r_layer_tests;
 #[cfg(test)]
 mod seal2_tests;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 use ken_kernel::{
@@ -145,6 +145,10 @@ pub struct SpaceElaborationMetadata {
 pub struct ElabEnv {
     pub env: GlobalEnv,
     pub globals: HashMap<String, GlobalId>,
+    /// Elaborator-side ownership of kernel declarations without a source name.
+    /// A qualified declaration or fixed prelude stage owns each allocation.
+    pub(crate) decl_owner: BTreeMap<GlobalId, (String, u32)>,
+    pub(crate) owner_ordinals: HashMap<String, u32>,
     /// Caller-visible `requires` arities keyed by checked declaration identity.
     pub(crate) preconditions: HashMap<GlobalId, (usize, usize)>,
     /// Numeric literal values keyed by their opaque-postulate GlobalId.
@@ -244,6 +248,8 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
     let ElabEnv {
         env: _,
         globals: _,
+        decl_owner: _,
+        owner_ordinals: _,
         preconditions: _,
         num_values: _,
         fixities: _,
@@ -264,11 +270,33 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
     } = env;
 }
 
+// GlobalEnv appends declarations in dependency order (`decls()`), and mark
+// rollback removes a suffix. Count the live suffix rather than numeric IDs:
+// constructor IDs share the allocator but are not standalone Decl entries.
+pub(crate) fn record_decl_owners(
+    env: &GlobalEnv,
+    before: usize,
+    owner: &str,
+    owners: &mut BTreeMap<GlobalId, (String, u32)>,
+    ordinals: &mut HashMap<String, u32>,
+) {
+    for decl in env.decls().skip(before) {
+        if owners.contains_key(&decl.id()) {
+            continue;
+        }
+        let ordinal = ordinals.entry(owner.to_owned()).or_insert(0);
+        owners.insert(decl.id(), (owner.to_owned(), *ordinal));
+        *ordinal = ordinal.checked_add(1).expect("owner ordinal exhausted");
+    }
+}
+
 impl ElabEnv {
     pub fn empty() -> Result<Self, ElabError> {
         let mut env = GlobalEnv::new();
         let mut globals = HashMap::new();
         let mut ctor_decl_spans = HashMap::new();
+        let mut decl_owner = BTreeMap::new();
+        let mut owner_ordinals = HashMap::new();
         // `Bool` is pre-registered here (real `data Bool = True | False`, ES2 —
         // demotes the former opaque `declare_postulate` so `Bool` is
         // matchable data; `reg_ty!("Bool")` in `register_numeric_env` reuses
@@ -297,10 +325,33 @@ impl ElabEnv {
             &[true_ctor, false_ctor],
             &Span::zero(),
         )?;
+        record_decl_owners(
+            &env,
+            0,
+            "prelude::bool",
+            &mut decl_owner,
+            &mut owner_ordinals,
+        );
+        let before_numeric = env.decls().count();
         let numeric_env = numbers::register_numeric_env(&mut env, &mut globals)
             .map_err(|e| ElabError::Internal(format!("numeric tower init failed: {}", e)))?;
+        record_decl_owners(
+            &env,
+            before_numeric,
+            "prelude::numeric",
+            &mut decl_owner,
+            &mut owner_ordinals,
+        );
+        let before_bytes = env.decls().count();
         let bytes_env = bytes::register_bytes_env(&mut env, &mut globals)
             .map_err(|e| ElabError::Internal(format!("bytes layer init failed: {}", e)))?;
+        record_decl_owners(
+            &env,
+            before_bytes,
+            "prelude::bytes",
+            &mut decl_owner,
+            &mut owner_ordinals,
+        );
         // Effect rows are populated only from elaborated declarations. An
         // independent seed would let producer-binding tests stay green after
         // the real declaration lost its `visits` row.
@@ -308,6 +359,8 @@ impl ElabEnv {
         let mut elab = Self {
             env,
             globals,
+            decl_owner,
+            owner_ordinals,
             preconditions: HashMap::new(),
             num_values: HashMap::new(),
             fixities: HashMap::new(),
@@ -331,12 +384,19 @@ impl ElabEnv {
         // L3 prelude: Peano `Nat` (replaces the placeholder postulate) + the
         // collection inductives + Ω constants (`37`). Registered via the landed
         // `data` / postulate machinery — no new kernel rule.
-        elab.prelude_env = prelude::register_prelude(&mut elab)?;
+        let registered_prelude =
+            elab.with_owner("prelude::register".into(), prelude::register_prelude)?;
+        elab.prelude_env = registered_prelude;
         // Safe Bytes ops return the prelude's `Option`/`Result` sums, so their
         // primitive signatures are installed only after those sums exist.
-        bytes::register_safe_bytes_ops(&mut elab.env, &mut elab.globals, &mut elab.bytes_env)?;
+        elab.with_owner("prelude::safe_bytes".into(), |elab| {
+            bytes::register_safe_bytes_ops(&mut elab.env, &mut elab.globals, &mut elab.bytes_env)
+        })?;
         // Lc typeclass env: pre-declare RecordNil + record_nil_val (`33 §5`).
-        elab.class_env = elab::init_class_env(&mut elab.env, &mut elab.globals)?;
+        let class_env = elab.with_owner("prelude::classes".into(), |elab| {
+            elab::init_class_env(&mut elab.env, &mut elab.globals)
+        })?;
+        elab.class_env = class_env;
         // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — capture the immutable
         // pre-source trusted base.
         //
@@ -372,6 +432,21 @@ impl ElabEnv {
             &elab.prelude_env.native_trusted_base,
         )?;
         Ok(elab)
+    }
+
+    /// Attribute every surviving kernel declaration admitted in this scope to
+    /// its qualified source owner. A nested scope keeps its own attribution.
+    pub(crate) fn with_owner<T>(&mut self, owner: String, f: impl FnOnce(&mut Self) -> T) -> T {
+        let before = self.env.decls().count();
+        let result = f(self);
+        record_decl_owners(
+            &self.env,
+            before,
+            &owner,
+            &mut self.decl_owner,
+            &mut self.owner_ordinals,
+        );
+        result
     }
 
     /// Create an environment with pre-declared `Nat`, `Bool`, and the full numeric tower.
@@ -701,6 +776,8 @@ impl ElabEnv {
         let ElabEnv {
             env: _,
             globals,
+            decl_owner,
+            owner_ordinals,
             preconditions,
             num_values,
             fixities,
@@ -725,6 +802,12 @@ impl ElabEnv {
                 .filter_map(|(name, id)| removed_ids.contains(id).then_some(name.clone())),
         );
         globals.retain(|_, id| !removed_ids.contains(id));
+        decl_owner.retain(|id, _| !removed_ids.contains(id));
+        owner_ordinals.clear();
+        for (_, (owner, ordinal)) in decl_owner.iter() {
+            let next = owner_ordinals.entry(owner.clone()).or_insert(0);
+            *next = (*next).max(ordinal.checked_add(1).expect("owner ordinal exhausted"));
+        }
         preconditions.retain(|id, _| !removed_ids.contains(id));
         num_values.retain(|id, _| !removed_ids.contains(id));
         fixities.retain(|id, _| !removed_ids.contains(id));
@@ -756,17 +839,19 @@ impl ElabEnv {
         let expr = parser::parse_expr(src)?;
         let rexpr = resolve::resolve_expr_standalone(&expr)?;
         let owner_label = owner_label.into();
-        self.with_env_mark_rollback(|env| {
-            elab::elaborate_rexpr(
-                &mut env.env,
-                &env.globals,
-                &env.preconditions,
-                &mut env.num_values,
-                &env.numeric_env,
-                &env.refinement_facts,
-                owner_label,
-                &rexpr,
-            )
+        self.with_owner(owner_label.clone(), |env| {
+            env.with_env_mark_rollback(|env| {
+                elab::elaborate_rexpr(
+                    &mut env.env,
+                    &env.globals,
+                    &env.preconditions,
+                    &mut env.num_values,
+                    &env.numeric_env,
+                    &env.refinement_facts,
+                    owner_label,
+                    &rexpr,
+                )
+            })
         })
     }
 

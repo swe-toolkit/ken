@@ -106,6 +106,8 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         env: global_env,
         globals,
         class_env,
+        decl_owner: _, // GlobalId -> owner/ordinal; no carrier-bearing Term
+        owner_ordinals: _, // owner -> next ordinal; no Term
         // Predicate templates are Ω-valued obligations, not independently
         // source-reachable value producers. Their owning GlobalIds and carrier
         // domains are reached through globals/global_env or class_env above.

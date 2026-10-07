@@ -3099,12 +3099,14 @@ fn elaborate_checked(
     rdecl: &crate::resolve::RDecl,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    elab.with_env_mark_rollback(|elab| {
-        if declared_fixity.is_none() && !rdecl.contains_infix_spine {
-            elaborate_checked_spine_free(elab, rdecl)
-        } else {
-            elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
-        }
+    elab.with_owner(rdecl.name.clone(), |elab| {
+        elab.with_env_mark_rollback(|elab| {
+            if declared_fixity.is_none() && !rdecl.contains_infix_spine {
+                elaborate_checked_spine_free(elab, rdecl)
+            } else {
+                elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
+            }
+        })
     })
 }
 
@@ -3885,6 +3887,15 @@ fn elaborate_mutual_group_with_fixities(
     // Snapshot: the call borrows `elab.env`/`elab.globals` mutably, so the
     // certified map cannot be handed over as a live field borrow.
     let standard_operators_for_group = elab.standard_operators.clone();
+    let mut record_member = |env: &ken_kernel::GlobalEnv, before, name: &str| {
+        crate::record_decl_owners(
+            env,
+            before,
+            name,
+            &mut elab.decl_owner,
+            &mut elab.owner_ordinals,
+        );
+    };
     crate::elab::elaborate_mutual_group(
         &mut elab.env,
         &mut elab.globals,
@@ -3899,6 +3910,7 @@ fn elaborate_mutual_group_with_fixities(
         &mut elab.refinement_facts,
         &member_fixities,
         members,
+        &mut record_member,
     )
 }
 
@@ -4187,8 +4199,9 @@ fn expand_scope(
                 }
                 let resolved =
                     resolve::resolve_space_decl(&qualified_name, cells, operations, span)?;
-                let space_results =
-                    elab.with_env_mark_rollback(|elab| elaborate_resolved_space(elab, &resolved))?;
+                let space_results = elab.with_owner(qualified_name, |elab| {
+                    elab.with_env_mark_rollback(|elab| elaborate_resolved_space(elab, &resolved))
+                })?;
                 ids.extend(space_results);
                 i += 1;
             }
@@ -4356,8 +4369,23 @@ fn expand_scope(
                                 &elab.class_env,
                             )?;
                         }
-                        let results = elab.with_env_mark_rollback(|elab| {
-                            elaborate_mutual_group_with_fixities(elab, &members, &declared_fixities)
+                        let mut group_names = members
+                            .iter()
+                            .map(|member| member.name.clone())
+                            .collect::<Vec<_>>();
+                        group_names.sort();
+                        // The outer scope covers only shared, named SCC staging.
+                        // Per-member signature/body allocations are attributed
+                        // to each member's qualified name inside the group.
+                        let group_owner = format!("mutual::{}", group_names.join("+"));
+                        let results = elab.with_owner(group_owner, |elab| {
+                            elab.with_env_mark_rollback(|elab| {
+                                elaborate_mutual_group_with_fixities(
+                                    elab,
+                                    &members,
+                                    &declared_fixities,
+                                )
+                            })
                         })?;
                         for (rdecl, result) in members.iter().zip(results) {
                             register_effect_row(elab, &result);
