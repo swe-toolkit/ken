@@ -1,6 +1,6 @@
 ---
 id: LANG-NAMED-REFINEMENT-TYPE-ARGUMENT
-title: "A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six and List Char admits 55296. Refuse the nested introduction by running the ruled polarity guard over elaborator-recorded refined types keyed on the refinement's checked identity at each introduction site, not over the spelling of a delta-transparent Const in core terms"
+title: "A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six and List Char admits 55296. Keep the ruled polarity guard, and decide whether alignment needs a refinement unfold by kernel conversion in which predicate-owning refinement roots never unfold, after substituting let-bound values"
 status: active
 owner: language
 size: M
@@ -21,84 +21,80 @@ where nothing introduces its predicate, is refused. A value that really has
 the refined type, such as the prelude's `List Char`, stays legal, and the
 corpus keeps its base results.
 
-## Settled inputs (Architect recut `evt_5rpfj17mr3n9n`, research `evt_629xjmwz1wd5z`)
+## Settled inputs (Architect S-c ruling `evt_7vpddt8z52k0j`)
 
-- **The shared predicate.** All three stops read refinement presence off the
-  spelling of a delta-transparent `Const` head (`def Char = {c:Int |
-  isScalar c}`). Under the carrier encoding (`34-data-match.md:14-16`),
-  `Char` is `Int` in core after delta, so unfolding or substitution creates
-  or erases the spelling independently of the checked type. The guard's
-  algorithm is right; its input is the wrong representation.
-- **Retained as proved.** The safety rule: safe iff the last step is
-  `EqCarrier`, or no `Arg`/`Sig` and an odd `Dom` count (ruling
-  `evt_2f9avjknr1xga`, census `evt_1t4qxd37d8a06`). The forgery refusals,
-  the Char instance transports (`Dom`, `cod.dom`, the `Equal` carrier), the
-  `RefinementView.project` and `countOf` introductions, LANG-MATCH's checked
-  leaves, the ten integration tests and the WIP pins.
-- **The WIP.** `b76c4f278` on `68bd8ad73` is held, not a candidate. Its pins
-  and tests carry forward; its spelling guard at the conversion choke point
-  (`unaligned expected-side named refinement ...`, `elab.rs` ~11807 on the
-  WIP) is what gets replaced. It refuses 23 accepted files in each
-  population (`evt_15fxy29zfx7n`), which become the regression set.
-- **Fan-in.** The seven non-test `emit_refinement_introduction` callers and
-  the `unify_types` callers (`evt_50b544fv42ney`), plus LANG-MATCH's
-  checked-leaf route.
-- Kernel conversion stays pure core. `forgets` (F-H) is out of scope:
-  `LANG-NAMED-REFINED-BINDER-FIRST-CLASS`.
+- **The shared predicate** (recut `evt_5rpfj17mr3n9n`, research
+  `evt_629xjmwz1wd5z`). All three stops read refinement presence off the
+  spelling of a delta-transparent `Const` head. The guard's algorithm is
+  right; its input was the wrong representation.
+- **S-a is withdrawn.** D0 measured that at `elab.rs:1897` neither the
+  expected nor the inferred refined type exists; `cong` and `J` results come
+  only from `infer` as core terms.
+- **S-c, probed by the Architect** on `b76c4f278`
+  (`/workspaces/ken/tmp/arch-rigid-probe/probe.diff`): regressions 23 to 1,
+  the ten NAMED tests 10/10, the rigid-set-empty mutant fails 9/10, and ζ
+  only in the fallback admits a let-bound alias forgery.
+- **Retained as proved.** The walk, the safety rule, the Char instance
+  transports, LANG-MATCH's checked leaves, the residual arm, the ten
+  integration tests and the WIP pins. WIP `b76c4f278` is the base of the
+  repair.
+- **The remaining row.** `Application/CommandLine/ArgParse.ken.md`
+  62912..63209, the `cong` in the `Cons` arm of `positional_schema_fields_map`:
+  the expected side carries `Cons Int 60 (...)` where the source wrote `Char`.
+  Its producer is unknown.
 
 Treat anchors as perishable. If a settled input is false on the landed base,
 stop and report the mismatch.
 
 ## Deliverable
 
-1. **D0 (measure only, at the start of the repair).** The language
-   implementer's pending diagnostic (`evt_6dd42xpajec4n`) is its first input.
-   - (a) At each fan-in site, whether the elaborator still holds the resolved
-     surface type (`RRefine`, `RApp`, `RCon`) or only the kernel `Term`.
-   - (b) For each site lacking it, the minimal carriage: a side table over
-     binders and terms keyed by checked identity, never by spelling.
-   - The Architect rules the representation at D0.
-2. **The closure.** The `ConvStep { Dom, Cod, Arg, Sig, EqCarrier }` walk
-   runs over elaborator-recorded refined types, with the named refinement
-   carried as the refinement definition's `GlobalId` through
-   `refinement_root`, never as a `Const` in a core term. It compares expected
-   and actual refined types at each introduction site, before core
-   conversion.
+1. **S-c exactly as ruled in `evt_7vpddt8z52k0j`.**
+   - Kernel: `GlobalEnv.rigid_consts` with its `PartialEq` entry,
+     `with_rigid_consts` and `is_rigid` in `ken-kernel/src/env.rs`, and the
+     `is_rigid` early return at the top of `unfold_const` in `conv.rs`. The
+     set is empty in every checking environment.
+   - Elaborator: `ElabCtx.let_values`, populated at both let-binder pushes
+     (`check_let` and `infer`'s `RLet` arm). `refuse_unsafe_nested_introduction`
+     applies ζ to both sides before the walk, and on a would-be refusal
+     accepts when conversion with every predicate-owning root rigid succeeds.
+2. **D1 (logs only, after S-c builds).** Trace where the expected type at the
+   ArgParse span acquires `Cons Int 60`. The outcomes R1 (an elaborator
+   producer unfolds `Char`), R2 (a source value elaborates to the carrier) and
+   R3 (the kernel builds it) are each a stop to the Architect.
 
 ## Acceptance
 
 Base is current `origin/main`; compare every row against it.
 
-- **AC-1 (refused; base accepts with 0 open).** The `List Five` row and its
-  `5` twin; `probe`'s argument; `Option Five`; `record Bag { xs = Cons Int
-  six .. }`; P1, P2, P3's tail `t`, P8, P9, P10, P11, P12; `List (G Five)`
-  with `const G : Type → Type = λa. List a` and value `Nil (List Int)`; `M.Five`;
-  forged `List Char` (`Cons Int 55296 (Nil Int)`) and forged `Option Char`;
-  the indexed-match branch variable and the non-dependent `match` rows of
-  stop 2.
+- **AC-1 (refused; base accepts with 0 open).** The forgery rows of the ten
+  NAMED tests, plus the let-bound alias forgery `fn forge (u : Int) : List
+  Five = let T = Five; ys : List T = Cons Int six (Nil Int) in ys`, refused
+  at the inner `Cons`, and the let-bound value forgery `xs = Cons Int six
+  (Nil Int); ys : List Five = xs`.
 - **AC-2 (controls; accepted, obligation counts unchanged).**
-  - `ElabEnv::new()` and `intToChar`; `LawfulClasses` `Ord.Char` and
-    `DecEq.Char`; Derived's `RefinementView`;
-    `examples/rosetta/letter-frequency`.
-  - P13 gives 1; `use5 six` gives 1; `record Box { value = six }` gives 1;
-    `Cons Five five (Nil Five)` gives 1; `const c : Char = 55296` gives 1;
-    `Some Char n` under `inRangeBool` is unchanged.
-  - **Corpus parity is the gate.** The 81 roots (76 accepted, 32 open) and
-    the 55 packages (55 accepted, 20 open) match base file by file, with
-    zero newly refused files. The 23 files of `evt_15fxy29zfx7n` pass.
-- **AC-3 (mutation, QA).** Re-pointed at the new input: M-arg (treat `Arg`
-  as safe) re-admits `List Five`; M-polarity (treat an even `Dom` count as
-  safe) re-admits P1; M-carrier (drop the `EqCarrier` exemption) refuses
-  `LawfulClasses`; M-transport (skip the transported return) needs a
-  reaching row, or records "not expressible" with the attempt.
+  - The admitted rows of the ten NAMED tests, and one minimal admitted row
+    per D0 shape: a let variable against its inlined value inside an
+    `Equal` endpoint over `length Char`, and the `J`-motive shape. Each is
+    red at `b76c4f278`.
+  - **Corpus parity is the gate.** The 81 roots and the 55 packages match
+    base file by file with zero newly refused files, including the 23 files
+    of `evt_15fxy29zfx7n`, once the ArgParse row is ruled.
+  - A kernel unit test: the view blocks δ of exactly the listed ids, and an
+    empty view converts like the base environment.
+- **AC-3 (mutation, QA).** M-rigid-empty admits the forgery rows.
+  M-zeta-off refuses the let-endpoint row. M-zeta-fallback-only admits the
+  let-alias forgery.
+- **AC-4 (review).** Language QA reviews the candidate. Kernel QA reviews the
+  `ken-kernel` hunk on the same exact SHA, and the Architect reviews both.
 
 ## Stop conditions
 
 - Any newly refused corpus, catalog, prelude or example program: stop with
   the row. Do not respell.
-- A fan-in site whose refined type cannot be carried by checked identity.
-- Any kernel, `trusted_base()` or spec change. The core-subset-Σ alternative
-  is an open decision outside this WP.
+- Any D1 outcome (R1, R2 or R3).
+- Any kernel change beyond the ruled hunk, any change to checking results,
+  or any `trusted_base()` or spec change. The core-subset-Σ alternative is
+  the open decision `OQ-refinement-representation`, outside this WP.
 
 ## Symptom inventory
 

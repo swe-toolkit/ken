@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-07 09:16:13Z — from 889 issue file(s) in `docs/program/issues/`.
+2026-10-07 09:25:39Z — from 889 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -386,7 +386,7 @@ the committed file matches the generator's output.
 | `LANG-MODULE-IMPORT-SYSTEM` | Module/import capability campaign — declaration visibility (public export), a selective-import surface, and cross-package plus prelude symbol resolution, sufficient for catalog packages to reuse canonical modules instead of reimplementing them | draft | language | XL | none | — |
 | `LANG-MODULE-PATH-OWNER-GATE` | Enforce 33 §3.1's one-owner-per-module-path rule in the elaborator (a hard ModuleOwnerClash in either load order, keyed on unit-ownership records), and re-home the ~36 tests that build same-spelling collisions through the now-forbidden foreign same-path claim without losing their identity coverage | ready | language | M | architect | — |
 | `LANG-NAMED-REFINED-BINDER-FIRST-CLASS` | A function whose binder is a named refinement, used first-class, skips its obligation: fn take5 (x : Five) : Int = use5 x; fn apply (g : Int → Int) : Int = g six; const observed : Int = apply take5 checks with zero obligations, because the same-root reuse exemption trusts the binder as already introduced. Its literal twin emits the obligation inside take5. Introduce or refuse | ready | language | M | architect | — |
-| `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` | A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six and List Char admits 55296. Refuse the nested introduction by running the ruled polarity guard over elaborator-recorded refined types keyed on the refinement's checked identity at each introduction site, not over the spelling of a delta-transparent Const in core terms | active | language | M | architect | — |
+| `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` | A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six and List Char admits 55296. Keep the ruled polarity guard, and decide whether alignment needs a refinement unfold by kernel conversion in which predicate-owning refinement roots never unfold, after substituting let-bound values | active | language | M | architect | — |
 | `LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT` | `ken-cli` native production runs `px4b_native_production` at effectively zero stack margin -- base passes with a few hundred bytes to spare, so any candidate adding a few hundred bytes aborts it, and `98e6ac51` is the trigger that exposed this rather than its cause | merged | language | M | none | — |
 | `LANG-NESTED-MATCH-LIFT-ALIGNMENT` | the generated-All aligned check path is lost when the lifted match is nested under an outer contribution, so a residual-Bag fold cannot type-check | closed | language | M | none | — |
 | `LANG-NESTED-MATRIX-DERIVED-TELESCOPE` | The match matrix weaves split and IH binders that are not in the elaboration context while it builds, so every nested producer reconciles two coordinate systems by de Bruijn arithmetic, and a second split inside a bucket still fails with VarOutOfScope. Build each nested bucket inside the telescope its eliminator derives, with woven binders as real context pushes and the result type seeded or discovered first | merged | language | L | architect | — |
@@ -934,7 +934,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-ELAB-RECURSIVE-FRAME-BUDGET` — Logic inlined into the elaborator's recursive cycle (check, infer, check_dependent_branch_body) regressed the stack three times on 2026-10-04, and each regression surfaced only as overflowing CI shards. Reduce the prelude's stack floor and guard the cycle's frame budget with a test that fails at review
 - `LANG-FACADE-EXPORT-LOAD-ORDER` — A facade export M (…) must select the same provider whatever the caller loaded first: when the unit also declares an inline module M, the facade today fails cold but is admitted, publishing the file M's names, when a caller imported M earlier; route the facade edge through the same order-independent identity as import
 - `LANG-FORWARD-REFERENCE-ACROSS-DATA-EXPORT` — Spec 33 §8.4 delivers forward references across all top-level declarations in a scope, but the module loader groups definitions only within a maximal run that any export or data declaration ends, so a definition cannot name a sibling defined after an intervening data or export. Deliver scope-wide forward references
-- `LANG-LAMBDA-PI-CARRIER-REFINEMENT-INTRODUCTION` — A lambda checked against a named refinement whose carrier is a function type emits no obligation: const c : Fn5 = \\y. 6 with def Fn5 = { f : Int -> Int | Equal Int (f 0) 5 } gives 0 obligations, while the literal refinement gives 1. Check's lambda arm whnf's the expected type to the Pi carrier and never reaches the refinement introduction. Emit the introduction obligation there
 - `LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE` — A match whose motive's sort depends on a bare-Type level that is solved only later in the declaration is rejected at admission: the motive's sort is inferred over a zonked context, which reads the unsolved level as Zero, so a later solve to Suc Zero leaves the stored motive at Type 0. Keep the level open or defer the query, as spec 39 requires
 - `LANG-OBLIGATION-HOLE-LEVEL-META-CLOSURE` — A refinement obligation emitted while an unannotated Type parameter's level metavariable is unsolved closes over LevelVar(0) and is declared with no level parameters, so fn k (A : Type) (n : Int) : Int = use5 n is rejected by the kernel. Declare the hole over a level-closed context
 - `LANG-REFINED-PARAM-REQUIRES-DESUGAR` — A refined parameter lowers to its bare carrier, so its predicate is neither available in the body nor carried in the function's type. Desugar a refined parameter, and a refined domain in a written function type, to the carrier plus a requires premise, as spec 21 now defines
@@ -988,6 +987,7 @@ is itself not yet `merged`/`closed`:
 - `CAT-NAT-ORDER-COMPARE-COMPLETENESS-LAWS` blocked by `CAT-NAT-ORDER-MIN-MAX-BOUND-LAWS` (status: active)
 - `F4` blocked by `A3` (status: draft)
 - `LANG-CLASS-IDENTITY-BY-CHECKED-ID` blocked by `LANG-SESSION-SCOPE` (status: active)
+- `LANG-LAMBDA-PI-CARRIER-REFINEMENT-INTRODUCTION` blocked by `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` (status: active)
 - `LANG-MODULE-PATH-OWNER-GATE` blocked by `LANG-SESSION-SCOPE` (status: active)
 - `LANG-NAMED-REFINED-BINDER-FIRST-CLASS` blocked by `LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` (status: active)
 - `PX10` blocked by `ABI-S5` (status: draft)
