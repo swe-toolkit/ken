@@ -1,7 +1,7 @@
 ---
 id: LANG-NAMED-REFINEMENT-TYPE-ARGUMENT
 title: "A conversion that holds only by unfolding a named refinement to its carrier is accepted with zero obligations: List Five admits Cons Int six and List Char admits 55296. Keep the ruled polarity guard, and decide whether alignment needs a refinement unfold by kernel conversion in which predicate-owning refinement roots never unfold, after substituting let-bound values"
-status: active
+status: closed
 owner: language
 size: M
 tier: T1
@@ -119,3 +119,12 @@ SYMPTOM INVENTORY (append one line per hard-stop; never rewrite history)
 2. nested-introduction guard keyed on elaborator check routes; match compilation checks leaves against an inferred or δ-simplified substitute, so the refinement never reaches `check` — keyed on the type a leaf is checked against
 3. after leaves are checked against the as-written result, the conversion guard sees an expected-side `Char` at Arg with no aligned value-side refinement. Keyed on which side of a conversion still spells the refinement-rooted `Const`.
 ```
+
+## Closeout
+
+Closed without merge, superseded by `LANG-REFINEMENT-SUBSET-SIGMA`
+(operator 2026-10-07, refinements are real kernel types; Architect
+`evt_30frdrmj45ehg`). Under subset Σ the forgery is a kernel type
+mismatch, and this WP's kernel hunk would have entered the trust root only
+to be deleted. WIP `b76c4f278` and its R1 successor stay unmerged as
+evidence. Their rows are acceptance rows of `LANG-REFINEMENT-SUBSET-SIGMA`.

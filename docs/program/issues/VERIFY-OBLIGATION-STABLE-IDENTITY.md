@@ -52,15 +52,29 @@ stop and report the mismatch.
 
 ## Acceptance
 
-- **AC-1.** The two AC-0 runs produce identical ids, symbols and hash. The
-  pins of `VERIFY-CALLER-OBLIGATION-REPORTING` can assert the full id.
+Oracle as amended by the Architect's AC-0 ruling (`evt_3m4webpynsece`).
+Obligation ids were measured allocation-independent. The defect is the
+`global_{id}` / `ctor_{id}` symbol fallback and the raw id in the trust
+payload. The ruling's key (owner scope at one choke point, fail-closed
+symbols, a stable trust key) is the deliverable's design.
+
+- **AC-1(i), package level.** The same two files, in both orders, give
+  identical package `core_semantic_hash`, obligation ids and hole symbols.
+- **AC-1(ii), declaration level.** The target file alone and with the
+  unrelated file gives identical obligation ids, hole symbols and semantic
+  entries for the target's declarations. Compare entries, not the package
+  hash.
 - **AC-2 (controls).** Two distinct obligations in one declaration keep
   distinct ids. Files without obligations keep their hash.
-- **AC-3 (falsifier).** Restoring the session counter in the id turns AC-1
-  red.
+- **AC-3 (falsifiers, tabulated).** M-global-fallback (restore
+  `global_{id}` for owner-scoped declarations) and M-raw-trust-id (restore
+  `trusted-base global {id}`) each turn AC-1(i) red. Restoring the session
+  counter in the id is recorded as invariant-equivalent, not as a pin.
 
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change.
-- A pinned hash or conformance row changes: stop with the consumers listed
-  (CHECKS 3).
+- A pinned hash or id that moves for any reason other than the ruled
+  symbol and trust-key changes: stop with the consumers listed (CHECKS 3).
+  A pin that moves because of those changes is updated, with its old and
+  new value listed in the handoff.

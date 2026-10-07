@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE
 title: "A match whose motive's sort depends on a bare-Type level that is solved only later in the declaration is rejected at admission: the motive's sort is inferred over a zonked context, which reads the unsolved level as Zero, so a later solve to Suc Zero leaves the stored motive at Type 0. Keep the level open or defer the query, as spec 39 requires"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1

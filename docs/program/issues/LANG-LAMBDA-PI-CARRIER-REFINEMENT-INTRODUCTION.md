@@ -1,7 +1,7 @@
 ---
 id: LANG-LAMBDA-PI-CARRIER-REFINEMENT-INTRODUCTION
 title: "A lambda checked against a named refinement whose carrier is a function type emits no obligation: const c : Fn5 = \\y. 6 with def Fn5 = { f : Int -> Int | Equal Int (f 0) 5 } gives 0 obligations, while the literal refinement gives 1. Check's lambda arm whnf's the expected type to the Pi carrier and never reaches the refinement introduction. Emit the introduction obligation there"
-status: ready
+status: closed
 owner: language
 size: S
 tier: T1
@@ -70,3 +70,9 @@ arms found. The match and `if` routes inherit the fix.
 - The site reads refinement presence off a `Const` spelling instead of the
   refinement's checked identity (`LANG-NAMED-REFINEMENT-TYPE-ARGUMENT` recut,
   `evt_5rpfj17mr3n9n`).
+
+## Closeout
+
+Closed before release, superseded by `LANG-REFINEMENT-SUBSET-SIGMA`
+(operator 2026-10-07; Architect `evt_30frdrmj45ehg`). Subset Σ closes the
+class structurally, and this WP's rows are acceptance rows there.
