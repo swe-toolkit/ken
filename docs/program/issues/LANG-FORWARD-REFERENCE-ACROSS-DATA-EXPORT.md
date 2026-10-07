@@ -1,7 +1,7 @@
 ---
 id: LANG-FORWARD-REFERENCE-ACROSS-DATA-EXPORT
 title: "Spec 33 §8.4 delivers forward references across all top-level declarations in a scope, but the module loader groups definitions only within a maximal run that any export or data declaration ends, so a definition cannot name a sibling defined after an intervening data or export. Deliver scope-wide forward references"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
