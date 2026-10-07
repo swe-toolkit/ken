@@ -37,6 +37,7 @@
 struct Differential {
     interpreted: ken_runtime::EffectObservation,
     native: ken_runtime::EffectObservation,
+    ret_key_applications: Vec<(u32, u32, ken_runtime::HostOpV1)>,
 }
 
 #[cfg(target_os = "linux")]
@@ -63,11 +64,6 @@ fn differential(case: &str, source: &str) -> Differential {
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         },
-    );
-    assert_eq!(
-        !applications.is_empty(),
-        case == "escape-buffer-then-readat",
-        "{case}: decisive checked-control Ret applications {applications:?}"
     );
     let output = output
         .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
@@ -96,6 +92,7 @@ fn differential(case: &str, source: &str) -> Differential {
     Differential {
         interpreted,
         native,
+        ret_key_applications: applications,
     }
 }
 
@@ -106,6 +103,7 @@ fn assert_native_matches_interpreter(case: &str, diff: &Differential) {
     let Differential {
         interpreted,
         native,
+        ret_key_applications,
     } = diff;
     assert_eq!(
         native.exit_status, interpreted.exit_status,
@@ -132,6 +130,14 @@ fn assert_native_matches_interpreter(case: &str, diff: &Differential) {
     assert_eq!(
         native_ops, interp_ops,
         "{case}: canonical effect-operation sequence must agree across executors"
+    );
+    // Check the population after the behavioral discriminator. A mutation
+    // that breaks build, execution or effects must fail for that reason, not
+    // because its changed key also empties this diagnostic observation.
+    assert_eq!(
+        !ret_key_applications.is_empty(),
+        case == "escape-buffer-then-readat" || case.starts_with("nat-reached-"),
+        "{case}: decisive checked-control Ret applications {ret_key_applications:?}"
     );
 }
 
@@ -793,10 +799,6 @@ fn nat_fanout_live_resource_native_stops_at_unclassified_trap() {
                             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                         )
                     });
-                assert!(
-                    !applications.is_empty(),
-                    "{case}: expected a decisive checked-control Ret application"
-                );
                 let output = output
                     .unwrap_or_else(|error| panic!("{case}: linked native build: {error:?}"));
                 let observed = ken_runtime::run_bound_process_effect_observation(
@@ -818,6 +820,10 @@ fn nat_fanout_live_resource_native_stops_at_unclassified_trap() {
                         )
                     ),
                     "{case}: expected the measured fail-closed native trap, got {observed:?}"
+                );
+                assert!(
+                    !applications.is_empty(),
+                    "{case}: expected a decisive checked-control Ret application"
                 );
             }
         })
