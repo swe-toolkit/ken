@@ -56,8 +56,12 @@ of the predecessor is kept.
 - **AC-1.** The repro is refused before Ok on NonRuntime, Library and
   Executable, with `PackageReferenceOutsidePackage` naming `zz_ex`.
 - **AC-2 (controls).** `const main : Bool = base` still compiles and
-  erases Ok. The predecessor's literate-versus-`.ken` hash equality
-  (`1e355da83ed6da8f`) is unchanged. A same-source example still executes.
+  erases Ok. A same-source example still executes. The landed
+  `compiler_driver.rs` test
+  `package_and_denotation_exclude_example_declarations_from_admission`
+  stays green with its assertions unedited: package hash
+  `0x5ed0_ae5b_69b5_41df`, denotation hash `0xa102_7073_c2a9_9b86`, and
+  literate equal to `.ken` for both.
 - **AC-3 (mutation, M-full-table).** Encoding admitted declarations with
   the full `table` returns Ok on the repro, which reddens AC-1, while the
   AC-2 controls stay green.
