@@ -166,7 +166,7 @@ impl ElabResult {
 
 // ----- level meta context -----
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct MetaCtx {
     metas: Vec<Option<Level>>,
     defaulted: Cell<bool>,
@@ -9407,11 +9407,12 @@ fn active_premise_kernel_view_for_context(
     cx: &ElabCtx<'_>,
     original_context: &Context,
 ) -> Result<Option<ActivePremiseKernelView>, ElabError> {
-    active_premise_kernel_view_for_context_with(cx, original_context, true)
+    active_premise_kernel_view_for_context_with(cx, &cx.metas, original_context, true)
 }
 
 fn active_premise_kernel_view_for_context_with(
     cx: &ElabCtx<'_>,
+    metas: &MetaCtx,
     original_context: &Context,
     default: bool,
 ) -> Result<Option<ActivePremiseKernelView>, ElabError> {
@@ -9578,7 +9579,7 @@ fn active_premise_kernel_view_for_context_with(
                     })?,
             ),
         };
-        let zonked_domain = cx.metas.zonk_term_with(&raw_domain, default);
+        let zonked_domain = metas.zonk_term_with(&raw_domain, default);
         let relocated_domain = embedding.translate_from_original(
             &zonked_domain,
             original_prefix_len,
@@ -9612,15 +9613,15 @@ fn active_premise_kernel_view(
 
 /// The ordinary query route has no expanded frame to zonk its own context.
 fn zonked_kernel_query_context(cx: &ElabCtx<'_>, context: &Context) -> Context {
-    zonked_kernel_query_context_with(cx, context, true)
+    zonked_kernel_query_context_with(&cx.metas, context, true)
 }
 
-fn zonked_kernel_query_context_with(cx: &ElabCtx<'_>, context: &Context, default: bool) -> Context {
+fn zonked_kernel_query_context_with(metas: &MetaCtx, context: &Context, default: bool) -> Context {
     Context {
         types: context
             .types
             .iter()
-            .map(|ty| cx.metas.zonk_term_with(ty, default))
+            .map(|ty| metas.zonk_term_with(ty, default))
             .collect(),
     }
 }
@@ -9685,7 +9686,7 @@ fn kernel_infer_in_context_current(
     original_context: &Context,
     inferred: &Term,
 ) -> Result<Term, CurrentKernelQueryError> {
-    kernel_infer_in_context_with(cx, original_context, inferred, true)
+    kernel_infer_in_context_with(cx, &cx.metas, original_context, inferred, true)
 }
 
 /// Infer a sort that will be stored in core: an unresolved level must survive
@@ -9695,25 +9696,68 @@ fn kernel_infer_in_context_open(
     original_context: &Context,
     inferred: &Term,
 ) -> Result<Term, CurrentKernelQueryError> {
-    kernel_infer_in_context_with(cx, original_context, inferred, false)
+    let mut local = cx.metas.clone();
+    loop {
+        match kernel_infer_in_context_with(cx, &local, original_context, inferred, false) {
+            Ok(ty) => return Ok(local.zonk_term_with(&ty, false)),
+            Err(CurrentKernelQueryError::Kernel(ken_kernel::KernelError::TypeMismatch {
+                expected,
+                found,
+            })) if solve_forced_level(&mut local, &expected, &found) => continue,
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+/// Non-cumulative universe equality forces a bare open meta to equal the
+/// opposite level. Other mismatch shapes remain kernel errors.
+fn solve_forced_level(metas: &mut MetaCtx, expected: &Term, found: &Term) -> bool {
+    let (e, f) = match (expected, found) {
+        (Term::Type(e), Term::Type(f)) | (Term::Omega(e), Term::Omega(f)) => (e, f),
+        _ => return false,
+    };
+    let e = metas.zonk_level_with(e, false);
+    let f = metas.zonk_level_with(f, false);
+    let bare_open = |l: &Level| match l {
+        Level::Var(LevelVar(m)) if metas.metas[*m as usize].is_none() => Some(*m),
+        _ => None,
+    };
+    let (m, value) = match (bare_open(&f), bare_open(&e)) {
+        (Some(m), _) if !level_mentions_meta(&e, m) => (m, e),
+        (_, Some(m)) if !level_mentions_meta(&f, m) => (m, f),
+        _ => return false,
+    };
+    metas.metas[m as usize] = Some(value);
+    true
+}
+
+fn level_mentions_meta(l: &Level, m: u32) -> bool {
+    match l {
+        Level::Zero => false,
+        Level::Suc(i) => level_mentions_meta(i, m),
+        Level::Max(a, b) => level_mentions_meta(a, m) || level_mentions_meta(b, m),
+        Level::Var(LevelVar(v)) => *v == m,
+    }
 }
 
 #[inline(never)]
 fn kernel_infer_in_context_with(
     cx: &ElabCtx<'_>,
+    metas: &MetaCtx,
     original_context: &Context,
     inferred: &Term,
     default: bool,
 ) -> Result<Term, CurrentKernelQueryError> {
-    let Some(view) = active_premise_kernel_view_for_context_with(cx, original_context, default)
-        .map_err(CurrentKernelQueryError::View)?
+    let Some(view) =
+        active_premise_kernel_view_for_context_with(cx, metas, original_context, default)
+            .map_err(CurrentKernelQueryError::View)?
     else {
-        let context = zonked_kernel_query_context_with(cx, original_context, default);
-        let inferred = cx.metas.zonk_term_with(inferred, default);
+        let context = zonked_kernel_query_context_with(metas, original_context, default);
+        let inferred = metas.zonk_term_with(inferred, default);
         return kernel_infer_raw(cx.env, &context, &inferred)
             .map_err(CurrentKernelQueryError::Kernel);
     };
-    let inferred = cx.metas.zonk_term_with(inferred, default);
+    let inferred = metas.zonk_term_with(inferred, default);
     let inferred = view
         .embedding
         .translate_from_original(
