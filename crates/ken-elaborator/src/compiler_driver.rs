@@ -13,7 +13,8 @@ use std::path::Path;
 use ken_kernel::{Context, Decl, GlobalEnv, GlobalId, Term};
 
 use crate::checked_core::{
-    AssumptionTrustKind, AssumptionTrustMetadata, CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
+    AssumptionTrustKind, AssumptionTrustMetadata, CanonicalEncodingError,
+    CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
     CheckedCoreBodyViewError, CheckedCoreBodyViewSelection, CheckedCorePackage,
     CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
     ConstructorMetadata, DataMetadata, LowerabilityStatus, ObligationMetadata, ObligationStatus,
@@ -3373,7 +3374,7 @@ fn add_obligation_metadata(
     obligations: &[(GlobalId, ObligationTriple)],
     symbols: &BTreeMap<GlobalId, StableSymbol>,
     table: &StableSymbolTable,
-    outside: &impl Fn(&StableSymbol, crate::checked_core::CanonicalEncodingError) -> CompilerDriverError,
+    outside: &impl Fn(&StableSymbol, CanonicalEncodingError) -> CompilerDriverError,
     semantic: &mut CheckedCoreSemanticInputs,
 ) -> Result<(), CompilerDriverError> {
     for (owner, triple) in obligations {
@@ -3432,8 +3433,8 @@ fn emit_package_from_env(
             package_table.insert_global(*id, symbol.clone());
         }
     }
-    let outside = |declaration: &StableSymbol, error: crate::checked_core::CanonicalEncodingError| {
-        let crate::checked_core::CanonicalEncodingError::MissingStableSymbol(referenced_id) = error;
+    let outside = |declaration: &StableSymbol, error: CanonicalEncodingError| {
+        let CanonicalEncodingError::MissingStableSymbol(referenced_id) = error;
         match symbols.get(&referenced_id) {
             Some(referenced) => CompilerDriverError::PackageReferenceOutsidePackage {
                 declaration: declaration.clone(),
