@@ -42,6 +42,15 @@ then.
 - Retire `walk_nested_introduction`, the same-root reuse exemption,
   RefinementFacts as a guard input, and the root abstraction in
   `simplify_branch_goal_keeping_refinements`.
+- **Conformance flip** (Architect `evt_3t2jfn2bt8n3e`). In the same
+  candidate, flip each test that claims a current-behaviour row W1 kept,
+  and retire that row: `v1_acceptance.rs:97`
+  (`ensures-emits-obligation-not-sigma`), `:134`
+  (`refinement-lowers-to-carrier`), and `v2_acceptance.rs:262`
+  (`refined-param-desugars-to-requires`), `:672`
+  (`decoupled-from-sigma-sort`). Each flipped test claims its successor
+  row. Update the `AC-transport` comment at
+  `es4_classes_acceptance.rs:683` to `AC-char-ord-law-lifting`.
 
 ## Acceptance
 

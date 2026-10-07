@@ -36,6 +36,12 @@ base, stop and report the mismatch.
 - The status computation for prover certificates and term proofs
   (`theorem`, `proof`) reads `proved` only when that set contains no
   open obligation hole and no unaccepted postulate.
+- **Conformance flip** (Architect `evt_3t2jfn2bt8n3e`). In the same
+  candidate, flip `v1_acceptance.rs:276`
+  (`proved_status_cert_checks_not_in_trusted_base`) to claim
+  `verify/spec-syntax/proved-status-cert-checks-no-reachable-open-hole`,
+  and retire the current-behaviour row
+  `verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base`.
 
 ## Acceptance
 
