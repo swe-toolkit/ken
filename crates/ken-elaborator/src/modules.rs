@@ -3375,6 +3375,16 @@ fn resolve_scoped_decl(
     exports: &HashMap<String, HashMap<String, String>>,
     unit_definitions: &mut HashSet<String>,
 ) -> Result<RDecl, ElabError> {
+    let rdecl = resolve_raw_scoped_decl(decl, scope, exports, unit_definitions)?;
+    rewrite_rdecl(scope, exports, rdecl)
+}
+
+fn resolve_raw_scoped_decl(
+    decl: &Decl,
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    unit_definitions: &mut HashSet<String>,
+) -> Result<RDecl, ElabError> {
     let attached_name = if let Decl::AttachedProofDecl {
         subject,
         proof_name,
@@ -3389,8 +3399,7 @@ fn resolve_scoped_decl(
     } else {
         None
     };
-    let rdecl = resolve::resolve_decl_in_unit(decl, unit_definitions, attached_name.as_deref())?;
-    rewrite_rdecl(scope, exports, rdecl)
+    resolve::resolve_decl_in_unit(decl, unit_definitions, attached_name.as_deref())
 }
 
 fn reject_prelude_binding(
@@ -4444,37 +4453,48 @@ fn expand_scope(
                         )
                     })
                     .collect();
-                // Resolution is stable throughout a segment; prebind has
-                // already bound every local name and constructor in the scope.
+                // Name binding is stable throughout a segment (prebind bound
+                // every local name and constructor), but `rewrite_rdecl`
+                // selects a local `T.C` only after `T` is checked. The
+                // pre-pass rewrite feeds the dependency graph only; each node
+                // is rewritten again at its dependency-ordered check.
+                let mut raw_rdecls = Vec::with_capacity(node_decls.len());
                 let mut rdecls = Vec::with_capacity(node_decls.len());
                 let mut node_names = HashMap::new();
                 for (index, d) in node_decls.iter().enumerate() {
                     let inner = d.unwrap_pub();
                     let renamed = qualify_decl_name(inner, prefix);
-                    let rdecl = resolve_scoped_decl(
+                    let raw = resolve_raw_scoped_decl(
                         &renamed,
                         scope,
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
+                    let rdecl = rewrite_rdecl(scope, &elab.module_state.exports, raw.clone())?;
                     node_names.insert(rdecl.name.clone(), index);
-                    match inner {
+                    let ctor_names: Vec<&str> = match inner {
                         Decl::DataDecl { ctors, .. } => {
-                            for ctor in ctors {
-                                node_names.insert(qualify(prefix, &ctor.name), index);
-                            }
+                            ctors.iter().map(|ctor| ctor.name.as_str()).collect()
                         }
-                        Decl::ExplicitDataDecl { ctors, .. } => {
-                            for ctor in ctors {
-                                let name = match ctor {
-                                    ExplicitDataCtor::Simple(ctor) => &ctor.name,
-                                    ExplicitDataCtor::Signature { name, .. } => name,
-                                };
-                                node_names.insert(qualify(prefix, name), index);
-                            }
+                        Decl::ExplicitDataDecl { ctors, .. } => ctors
+                            .iter()
+                            .map(|ctor| match ctor {
+                                ExplicitDataCtor::Simple(ctor) => ctor.name.as_str(),
+                                ExplicitDataCtor::Signature { name, .. } => name.as_str(),
+                            })
+                            .collect(),
+                        _ => Vec::new(),
+                    };
+                    // A local `T.C` selector resolves (unchecked) to the
+                    // family binding plus the leaf; key that spelling too.
+                    let family = scope.bindings.get(inner.name()).cloned();
+                    for ctor in ctor_names {
+                        node_names.insert(qualify(prefix, ctor), index);
+                        if let Some(family) = &family {
+                            node_names.insert(format!("{family}.{ctor}"), index);
                         }
-                        _ => {}
                     }
+                    raw_rdecls.push(raw);
                     rdecls.push(rdecl);
                 }
 
@@ -4523,7 +4543,11 @@ fn expand_scope(
                                 RDeclKind::Theorem | RDeclKind::AttachedProof { .. }
                             ));
                     if !recursive {
-                        let rdecl = &rdecls[k];
+                        let rdecl = &rewrite_rdecl(
+                            scope,
+                            &elab.module_state.exports,
+                            raw_rdecls[k].clone(),
+                        )?;
                         let result = elaborate_checked(
                             elab,
                             rdecl,
@@ -4547,8 +4571,12 @@ fn expand_scope(
                         }
                         ids.push(result);
                     } else {
-                        let members: Vec<crate::resolve::RDecl> =
-                            scc.iter().map(|&m| rdecls[m].clone()).collect();
+                        let members = scc
+                            .iter()
+                            .map(|&m| {
+                                rewrite_rdecl(scope, &elab.module_state.exports, raw_rdecls[m].clone())
+                            })
+                            .collect::<Result<Vec<crate::resolve::RDecl>, ElabError>>()?;
                         let has_proof = members.iter().any(|rdecl| {
                             matches!(
                                 rdecl.kind,

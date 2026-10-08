@@ -77,6 +77,30 @@ fn earlier_definition_uses_constructor_owned_by_later_data() {
     );
 }
 
+/// Promise class: durable invariant (spec 33 §8.4).
+/// MEASURED: a sole qualified constructor selector resolves to the later
+/// data family's checked constructor identity at both module and file root.
+/// CLAIMED: this selector creates a dependency edge to its own family.
+/// THE GAP: other qualified import and privacy routes have their own gates.
+#[test]
+fn earlier_definition_names_later_family_only_by_qualified_selector() {
+    for (source, f, red) in [
+        (
+            "module M { fn f (u : Nat) : Nat = match Colour.Red { Colour.Red |-> Zero ; Colour.Blue |-> u } data Colour = Red | Blue }",
+            "M.f",
+            "M.Red",
+        ),
+        (
+            "fn f (u : Nat) : Nat = match Colour.Red { Colour.Red |-> Zero ; Colour.Blue |-> u }\ndata Colour = Red | Blue",
+            "f",
+            "Red",
+        ),
+    ] {
+        let env = checked(source);
+        assert!(mentions_global(&transparent_body(&env, f), env.globals[red]));
+    }
+}
+
 #[test]
 fn earlier_let_annotation_names_later_data() {
     checked("module M { fn a (x : Int) : Int = let f : D -> Int = λd. x in x data D = MkD }");
