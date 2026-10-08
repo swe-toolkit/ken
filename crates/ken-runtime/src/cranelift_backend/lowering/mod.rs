@@ -429,7 +429,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     CaptureRun, MaterializationKind, PerEmitterCaptureClaim,
     BoolMatchCaseOrdinals, BoundaryClosureEnvironment, CheckedCaseBinderLayout,
     CheckedCaseBinderRole, CheckedIhBinding, CheckedIhEnvironmentTransport,
-    CheckedIhForwardRetPlanProof,
+    CheckedIhForwardRetPlanProof, StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryProjection,
     CheckedIhGeneratedEntryRoute,
@@ -3035,6 +3035,9 @@ struct ComposedReturnForwardRetAuthority {
 enum ComposedReturnForwardRetAuthorityOutcome {
     NonApplicable,
     Formed(ComposedReturnForwardRetAuthority),
+    /// The exact Tail plan formed, but the Ret body has no Ready strict sink.
+    /// Keep its checked control on the base call-tail continuation path.
+    FormedBasePath(CheckedIhForwardRetPlanProof),
     #[cfg(feature = "px8-ds-test-support")]
     MissingRequired,
     #[cfg(feature = "px8-ds-test-support")]
@@ -3044,6 +3047,52 @@ enum ComposedReturnForwardRetAuthorityOutcome {
         ComposedReturnForwardRetAuthority,
         ComposedReturnForwardRetAuthority,
     ),
+}
+
+// A pre-filter assessment observer independent of the register-time strict
+// Ret sink observer below. Only emission can record here; it never predicts
+// installation from the filter's own expression.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static COMPOSED_RETURN_RET_ASSESSMENTS:
+        std::cell::RefCell<Option<Vec<(String, String)>>> =
+            const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_composed_return_ret_assessments<T>(
+    run: impl FnOnce() -> T,
+) -> (T, Vec<(String, String)>) {
+    struct Restore;
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            COMPOSED_RETURN_RET_ASSESSMENTS.with(|slot| {
+                slot.borrow_mut().take();
+            });
+        }
+    }
+    COMPOSED_RETURN_RET_ASSESSMENTS.with(|slot| {
+        assert!(
+            slot.borrow_mut().replace(Vec::new()).is_none(),
+            "composed-return Ret assessments cannot nest"
+        );
+    });
+    let restore = Restore;
+    let result = run();
+    let assessments = COMPOSED_RETURN_RET_ASSESSMENTS.with(|slot| {
+        slot.borrow_mut().take().expect("Ret assessment observation was open")
+    });
+    drop(restore);
+    (result, assessments)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_composed_return_ret_assessment(origin: StaticOriginId, status: StrictRetSinkStatus) {
+    COMPOSED_RETURN_RET_ASSESSMENTS.with(|slot| {
+        if let Some(rows) = slot.borrow_mut().as_mut() {
+            rows.push((format!("{origin:?}"), format!("{status:?}")));
+        }
+    });
 }
 
 /// Compile-preserving controls for the compiler-only composed-return `Ret`
@@ -14661,8 +14710,6 @@ thread_local! {
     pub(super) static PX8TR_TRAP_PROVENANCE: std::cell::RefCell<Vec<Px8trTrapProvenanceEvent>> =
         const { std::cell::RefCell::new(Vec::new()) };
     pub(super) static PX8TR_DISABLE_DEFORESTED_ANSWER_ROUTE: std::cell::Cell<bool> =
-        const { std::cell::Cell::new(false) };
-    pub(super) static CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
 }
 #[cfg(test)]

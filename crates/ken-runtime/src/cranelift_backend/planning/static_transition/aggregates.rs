@@ -6630,10 +6630,27 @@ fn fresh_result_destination(
     }
 }
 
-fn checked_ih_strict_ret_sink(
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum StrictRetSinkStatus {
+    Ready,
+    PendingTopology,
+    PendingCheckedControl,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct StrictRetSinkAssessment {
+    pub ret_case_index: usize,
+    pub ret_case_body_origin: StaticOriginId,
+    pub ret_input_binder: CheckedBinderProvenance,
+    pub status: StrictRetSinkStatus,
+}
+
+/// A logical unary Ret input forms its Tail descriptor irrespective of whether
+/// lowering can install a strict sink. Only Ready authorizes the forward edge.
+fn strict_ret_sink_assessment(
     plan: &StaticTransitionPlan<'_>,
     active_frame: StaticOriginId,
-) -> Result<Option<(StaticOriginId, CheckedBinderProvenance)>, CraneliftBackendError> {
+) -> Result<Option<StrictRetSinkAssessment>, CraneliftBackendError> {
     let RuntimeExpr::ComputationalMatch { cases, .. } =
         plan.planned_occurrence_expr(active_frame)?
     else {
@@ -6655,21 +6672,84 @@ fn checked_ih_strict_ret_sink(
                 "a forward Ret producer case does not bind ConstructorChild field zero",
             ));
         }
-        sinks.push((
-            plan.semantic.child_origin(active_frame, 1 + alternative)?,
-            CheckedBinderProvenance::ConstructorChild {
-                frame_origin: active_frame,
-                field_position: 0,
-            },
-        ));
+        sinks.push((alternative, case));
     }
-    match sinks.as_slice() {
-        [] => Ok(None),
-        [sink] => Ok(Some(*sink)),
-        _ => Err(planner_error(
+    let (ret_case_index, return_case) = match sinks.as_slice() {
+        [] => return Ok(None),
+        [sink] => *sink,
+        _ => return Err(planner_error(
             "one forward Ret producer frame has more than one strict Ret sink",
         )),
+    };
+    let exact_visible = cases.len() == 2
+        && cases
+            .iter()
+            .filter(|case| case.constructor.ends_with("::ITree::Vis"))
+            .count() == 1;
+    let status = if !exact_visible {
+        StrictRetSinkStatus::PendingTopology
+    } else {
+        // These are the same four marker populations previously checked by
+        // the carried lowering sink filter. Collection failure is not Ready.
+        let mut frames = BTreeMap::new();
+        let no_frames = super::super::collect_checked_subcontinuation_frames(
+            &return_case.body, &mut frames,
+        ).is_ok() && frames.is_empty();
+        let mut markers = super::super::CheckedOrientedMarkerSets::default();
+        let no_oriented_markers = super::super::collect_checked_oriented_markers(
+            &return_case.body, &mut markers, "<source-case>", &mut Vec::new(),
+        ).is_ok()
+            && markers.recursive_calls.is_empty()
+            && markers.computational_ih_slots.is_empty()
+            && markers.computational_ih_calls.is_empty();
+        if no_frames && no_oriented_markers {
+            StrictRetSinkStatus::Ready
+        } else {
+            StrictRetSinkStatus::PendingCheckedControl
+        }
+    };
+    Ok(Some(StrictRetSinkAssessment {
+        ret_case_index,
+        ret_case_body_origin: plan.semantic.child_origin(active_frame, 1 + ret_case_index)?,
+        ret_input_binder: CheckedBinderProvenance::ConstructorChild {
+            frame_origin: active_frame,
+            field_position: 0,
+        },
+        status,
+    }))
+}
+
+impl StaticTransitionPlan<'_> {
+    pub(in crate::cranelift_backend) fn strict_ret_sink_assessment(
+        &self,
+        active_frame: StaticOriginId,
+    ) -> Result<Option<StrictRetSinkAssessment>, CraneliftBackendError> {
+        strict_ret_sink_assessment(self, active_frame)
     }
+}
+
+pub(in crate::cranelift_backend) fn plane_has_pending_checked_control_ret_sink(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<bool, CraneliftBackendError> {
+    for occurrence in plan.source_occurrences.iter().flatten() {
+        if !matches!(occurrence.expr, RuntimeExpr::ComputationalMatch { .. }) {
+            continue;
+        }
+        if strict_ret_sink_assessment(plan, occurrence.static_origin)?
+            .is_some_and(|assessment| assessment.status == StrictRetSinkStatus::PendingCheckedControl)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn checked_ih_strict_ret_sink(
+    plan: &StaticTransitionPlan<'_>,
+    active_frame: StaticOriginId,
+) -> Result<Option<(StaticOriginId, CheckedBinderProvenance)>, CraneliftBackendError> {
+    Ok(strict_ret_sink_assessment(plan, active_frame)?
+        .map(|assessment| (assessment.ret_case_body_origin, assessment.ret_input_binder)))
 }
 
 fn validate_fresh_result_disjointness(

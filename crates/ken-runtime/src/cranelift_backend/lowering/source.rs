@@ -4705,7 +4705,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                                         "a validated Tail producer-to-Ret route formed more than one post-selection authority"));
                                                 }
                                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable
-                                                | ComposedReturnForwardRetAuthorityOutcome::Formed(_) => {}
+                                                | ComposedReturnForwardRetAuthorityOutcome::Formed(_)
+                                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_) => {}
                                                 #[cfg(feature = "px8-ds-test-support")]
                                                 ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness => {}
                                             }
@@ -4823,17 +4824,25 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     // classification is pinned even where it flips no arm on today's
                     // programs. Test-support observation only; no emitted-byte change.
                     #[cfg(feature = "px8-ds-test-support")]
-                    if let ComposedReturnForwardRetAuthorityOutcome::Formed(authority) =
-                        &forward_ret_outcome
                     {
-                        let collapsible = self.tail_route_is_forward_edge_collapsible(&transport)?;
-                        let candidate_body_purities =
-                            self.tail_route_forward_edge_body_purities(&transport)?;
-                        record_composed_return_forward_edge_collapsibility(
-                            authority._plan.active_frame_origin(),
-                            collapsible,
-                            candidate_body_purities,
-                        );
+                        let frame = match &forward_ret_outcome {
+                            ComposedReturnForwardRetAuthorityOutcome::Formed(authority) =>
+                                Some(authority._plan.active_frame_origin()),
+                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) =>
+                                Some(proof.active_frame_origin()),
+                            ComposedReturnForwardRetAuthorityOutcome::NonApplicable
+                            | ComposedReturnForwardRetAuthorityOutcome::MissingRequired
+                            | ComposedReturnForwardRetAuthorityOutcome::SuppressedForInertness
+                            | ComposedReturnForwardRetAuthorityOutcome::Duplicated(_, _) => None,
+                        };
+                        if let Some(frame) = frame {
+                            let collapsible = self.tail_route_is_forward_edge_collapsible(&transport)?;
+                            let candidate_body_purities =
+                                self.tail_route_forward_edge_body_purities(&transport)?;
+                            record_composed_return_forward_edge_collapsibility(
+                                frame, collapsible, candidate_body_purities,
+                            );
+                        }
                     }
                     #[cfg(feature = "px8-ds-test-support")]
                     if let Some((
@@ -4849,6 +4858,9 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             }
                             ComposedReturnForwardRetAuthorityOutcome::Formed(authority) => {
                                 ("Formed", Some(&authority._plan))
+                            }
+                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof) => {
+                                ("FormedBasePath", Some(proof))
                             }
                             ComposedReturnForwardRetAuthorityOutcome::MissingRequired => {
                                 ("MissingRequired", None)
@@ -4985,6 +4997,40 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                     )?,
                                 ));
                             }
+                            // MUTANT NOTE: replacing call_tail by a captured
+                            // environment is invariant-equivalent on admitted
+                            // checked-control values: they arrive as residuals,
+                            // and call_tail inlines them. The buffer mutant
+                            // reached this seat twice and preserved full parity;
+                            // M-admission-off pins the upstream admission.
+                            // The measured escape/parity/PX8 corpus has zero
+                            // PendingTopology non-residual seat reaches; the
+                            // unobserved population remains unknown.
+                            ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
+                                #[cfg(feature = "px8-ds-test-support")]
+                                if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                                    let status = self.static_transition_plan
+                                        .strict_ret_sink_assessment(_proof.active_frame_origin())?
+                                        .map(|assessment| assessment.status);
+                                    eprintln!(
+                                        "RT_BASE_SEAT thread={:?} seat=non_governed frame={} status={status:?} kind={}",
+                                        std::thread::current().name(),
+                                        _proof.active_frame_origin().ticket_body_ordinal(),
+                                        self.formed_base_path_selected_value_kind(&transport, &env),
+                                    );
+                                }
+                                self.pending_computational_ih_call.take();
+                                let result = self
+                                    .call_tail_checked_ih_transport_from_case_environment(
+                                        builder, &transport, &env,
+                                    )?;
+                                return Ok(SourceCallOutcome::Continue(
+                                    SourceMachineState::Value {
+                                        value: RoutedAnswer::checked(result),
+                                        control,
+                                    },
+                                ));
+                            }
                             ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {
                                 self.pending_computational_ih_call.take();
                                 let environment = self
@@ -5041,7 +5087,8 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                         CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {
                             match forward_ret_outcome {
                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {}
-                                ComposedReturnForwardRetAuthorityOutcome::Formed(_) => {
+                                ComposedReturnForwardRetAuthorityOutcome::Formed(_)
+                                | ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_) => {
                                     return Err(unsupported(
                                         "CheckedIhApplicationResult",
                                         "a Direct route unexpectedly formed Tail forward-Ret authority",
@@ -5115,6 +5162,31 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                         self.emit_composed_return_ret_kmatch_closeout(
                                             builder, authority, &transport, &env,
                                         )?,
+                                    ));
+                                }
+                                ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(_proof) => {
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                                        let status = self.static_transition_plan
+                                            .strict_ret_sink_assessment(_proof.active_frame_origin())?
+                                            .map(|assessment| assessment.status);
+                                        eprintln!(
+                                            "RT_BASE_SEAT thread={:?} seat=governed frame={} status={status:?} kind={}",
+                                            std::thread::current().name(),
+                                            _proof.active_frame_origin().ticket_body_ordinal(),
+                                            self.formed_base_path_selected_value_kind(&transport, &env),
+                                        );
+                                    }
+                                    self.pending_computational_ih_call.take();
+                                    let result = self
+                                        .call_tail_checked_ih_transport_from_case_environment(
+                                            builder, &transport, &env,
+                                        )?;
+                                    return Ok(SourceCallOutcome::Continue(
+                                        SourceMachineState::Value {
+                                            value: RoutedAnswer::checked(result),
+                                            control,
+                                        },
                                     ));
                                 }
                                 ComposedReturnForwardRetAuthorityOutcome::NonApplicable => {

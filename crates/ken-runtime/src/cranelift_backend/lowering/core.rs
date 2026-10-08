@@ -9311,6 +9311,38 @@ impl<'a> Lowering<'a> {
         Ok(result)
     }
 
+    #[cfg(feature = "px8-ds-test-support")]
+    pub(super) fn formed_base_path_selected_value_kind(
+        &self,
+        transport: &CheckedIhEnvironmentTransport,
+        env: &[LoweringEnvironmentBinding],
+    ) -> &'static str {
+        // Read the exact selected binding that call_tail reads below, without
+        // changing its production behavior or turning a diagnostic miss into
+        // a new build refusal.
+        let Ok(units) = self.static_transition_plan.continuation_units() else {
+            return "UnknownUnit";
+        };
+        let Some(unit) = units.into_iter().find(|unit| unit.id() == transport.source_specialization())
+        else {
+            return "UnknownUnit";
+        };
+        let Some(index) = unit
+            .recursive_positions()
+            .len()
+            .checked_add(unit.recursive_position() as usize)
+        else {
+            return "UnknownIndex";
+        };
+        match env.get(index) {
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Residual(_))) => "Residual",
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Carried(_))) => "Carried",
+            Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_))) => "Specialized",
+            Some(LoweringEnvironmentBinding::StaticWorker(_)) => "StaticWorker",
+            None => "MissingBinding",
+        }
+    }
+
     pub(super) fn call_tail_checked_ih_transport_from_case_environment(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -14913,6 +14945,30 @@ impl<'a> Lowering<'a> {
                 }
             }
         }
+        let assessment = self.static_transition_plan
+            .strict_ret_sink_assessment(proof.active_frame_origin())?
+            .ok_or_else(|| unsupported(
+                "ComposedReturnForwardRetAuthority",
+                "a formed Tail plan has no logical Ret input assessment",
+            ))?;
+        if assessment.ret_case_body_origin != proof.ret_case_body_origin() {
+            return Err(unsupported(
+                "ComposedReturnForwardRetAuthority",
+                "the selected Tail plan disagrees with its assessed Ret body",
+            ));
+        }
+        if assessment.status != StrictRetSinkStatus::Ready {
+            #[cfg(feature = "px8-ds-test-support")]
+            if std::env::var_os("KEN_RT_RET_BASE_CENSUS").is_some() {
+                eprintln!(
+                    "RT_BASE_CONSTRUCT thread={:?} frame={} status={:?}",
+                    std::thread::current().name(),
+                    proof.active_frame_origin().ticket_body_ordinal(),
+                    assessment.status,
+                );
+            }
+            return Ok(ComposedReturnForwardRetAuthorityOutcome::FormedBasePath(proof));
+        }
         Ok(ComposedReturnForwardRetAuthorityOutcome::Formed(
             self.finish_composed_return_forward_ret_authority(proof)?,
         ))
@@ -15206,33 +15262,42 @@ impl<'a> Lowering<'a> {
         let merge = builder.create_block();
         builder.append_block_param(merge, types::I64);
 
-        // The strict existing topology, re-derived exactly as the specialized
-        // arm derives it: one `Ret` case with one binder, one `Vis` case, two
-        // cases total, and no checked control markers in the return body.
+        // The planning-owned assessment is the same predicate used by Tail
+        // formation, authority selection, and response admission. Only Ready
+        // installs the shared Ret block; other logical Ret inputs still form.
         let return_case = if px8tr_deforested_answer_route_enabled() {
-            let mut returns = eliminator.cases.iter().enumerate().filter(|(_, case)| {
-                case.argument_binders == 1 && case.constructor.ends_with("::ITree::Ret")
-            });
-            let return_case = returns.next();
-            let exact_return = returns.next().is_none();
-            let mut visible = eliminator
-                .cases
-                .iter()
-                .filter(|case| case.constructor.ends_with("::ITree::Vis"));
-            let exact_visible =
-                visible.next().is_some() && visible.next().is_none() && eliminator.cases.len() == 2;
-            return_case.filter(|(_, return_case)| {
-                exact_return
-                    && exact_visible
-                    && source_case_has_no_checked_control_markers(&return_case.body)
-            })
+            let assessment = self.static_transition_plan
+                .strict_ret_sink_assessment(eliminator.static_origin)?;
+            #[cfg(feature = "px8-ds-test-support")]
+            if let Some(assessment) = assessment {
+                record_composed_return_ret_assessment(eliminator.static_origin, assessment.status);
+            }
+            assessment
+                .filter(|assessment| assessment.status == StrictRetSinkStatus::Ready)
+                .map(|assessment| {
+                    let return_case = eliminator.cases.get(assessment.ret_case_index).ok_or_else(|| {
+                        unsupported("ComposedReturnRetSink", "the Ready Ret case index is absent at emission")
+                    })?;
+                    Ok((assessment, return_case))
+                })
+                .transpose()?
         } else {
             None
         };
-        let return_body = if let Some((return_index, return_case)) = return_case {
+        let return_body = if let Some((assessment, return_case)) = return_case {
             let ret_case_body_origin = self
-                .case_body_occurrence(eliminator.static_origin, return_index, &return_case.body)?
+                .case_body_occurrence(
+                    eliminator.static_origin,
+                    assessment.ret_case_index,
+                    &return_case.body,
+                )?
                 .static_origin;
+            if ret_case_body_origin != assessment.ret_case_body_origin {
+                return Err(unsupported(
+                    "ComposedReturnRetSink",
+                    "the Ready Ret body disagrees with the planned strict sink",
+                ));
+            }
             let block = builder.create_block();
             builder.append_block_param(block, types::I64);
             self.install_and_validate_composed_return_ret_sink(
@@ -15342,7 +15407,7 @@ impl<'a> Lowering<'a> {
             // lowering with a different environment shape.
             if return_case
                 .as_ref()
-                .is_some_and(|(return_index, _)| *return_index == index)
+                .is_some_and(|(assessment, _)| assessment.ret_case_index == index)
             {
                 let return_body =
                     return_body.expect("a strict return case has a shared return-body block");
@@ -15618,7 +15683,7 @@ impl<'a> Lowering<'a> {
         // constructor is matched by name. The guard is a compile-time property
         // of the case *topology*, identical to the specialized arm's, and the
         // word never participates in it.
-        if let Some((_return_index, _return_case)) = return_case {
+        if let Some((_return_assessment, _return_case)) = return_case {
             let checked_route = builder.create_block();
             let default_route = builder.create_block();
             let route_is_checked = builder.ins().icmp_imm(
@@ -15657,10 +15722,10 @@ impl<'a> Lowering<'a> {
             // child; that block already owns the only lowering of the Ret body.
             let return_body =
                 return_body.expect("a strict return case has a shared return-body block");
-            #[cfg(any(test, feature = "px8-ds-test-support"))]
+            #[cfg(feature = "px8-ds-test-support")]
             let body = self.case_body_occurrence(
                 eliminator.static_origin,
-                _return_index,
+                _return_assessment.ret_case_index,
                 &_return_case.body,
             )?;
             #[cfg(feature = "px8-ds-test-support")]
@@ -15692,44 +15757,7 @@ impl<'a> Lowering<'a> {
                     observed_order,
                 );
             }
-            #[cfg(test)]
-            let lowered_separately =
-                CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(std::cell::Cell::get);
-            #[cfg(not(test))]
-            let lowered_separately = false;
-            #[cfg(test)]
-            if lowered_separately {
-                let mut case_env = vec![LoweringEnvironmentBinding::Value(
-                    LoweringOperand::Carried(scrutinee),
-                )];
-                case_env.extend(eliminator.env.to_vec());
-                let lowered = if remaining_eliminators.is_empty() {
-                    self.lower_expr(builder, body, &case_env)?
-                } else {
-                    self.lower_computational_producer_expr(
-                        builder,
-                        body,
-                        &case_env,
-                        remaining_eliminators,
-                    )?
-                };
-                if !matches!(
-                    lowered,
-                    LoweringOperand::Specialized(Lowered::RecursiveBackedge)
-                ) {
-                    let word = self.carried_join_arm(
-                        builder,
-                        body.static_origin,
-                        lowered,
-                        None,
-                        "a test-mutated separately lowered checked-answer arm",
-                    )?;
-                    builder.ins().jump(merge, &[word.word.into()]);
-                }
-            }
-            if !lowered_separately {
-                builder.ins().jump(return_body, &[scrutinee.word.into()]);
-            }
+            builder.ins().jump(return_body, &[scrutinee.word.into()]);
 
             builder.switch_to_block(default_route);
             #[cfg(test)]

@@ -139,7 +139,7 @@ pub use responses::{
     suppressed_execute_then_resume_response_is_exact,
     with_mixed_owner_execute_then_resume_overpromotion,
     with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
-    StaticResponseContextDemandMutation,
+    with_pending_checked_ret_sink_applications, StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
@@ -225,6 +225,7 @@ pub(in crate::cranelift_backend) use aggregates::{
     CheckedIhCapabilityInheritance, CheckedIhContinuationInheritance,
     CheckedIhContinuationInheritanceView, CheckedIhEnvironmentTransport,
     CheckedIhForwardRetPlanProof, CheckedIhFreshResultDestination,
+    StrictRetSinkAssessment, StrictRetSinkStatus,
     CheckedIhFreshResultRoute, CheckedIhGeneratedEntryAccess,
     CheckedIhGeneratedEntryAdmission, CheckedIhGeneratedEntryCallCoordinate,
     CheckedIhGeneratedEntryProjection, CheckedIhGeneratedEntryRoute,

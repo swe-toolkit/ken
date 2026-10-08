@@ -990,6 +990,33 @@ pub fn static_response_context_demand_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(|slot| slot.get().is_none())
 }
 
+// Test-only decisive applications of the installed phase-B Ret key. A build
+// may plan repeatedly; the wrapper gathers every response demand whose route
+// changes solely because the pending checked-control Ret disjunct is true.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static PENDING_CHECKED_RET_SINK_APPLICATIONS:
+        std::cell::RefCell<Option<Vec<(u32, u32, HostOpV1)>>> =
+            const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_pending_checked_ret_sink_applications<T>(
+    operation: impl FnOnce() -> T,
+) -> (T, Vec<(u32, u32, HostOpV1)>) {
+    PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
+        assert!(
+            slot.borrow_mut().replace(Vec::new()).is_none(),
+            "pending checked Ret sink applications cannot nest"
+        );
+    });
+    let result = operation();
+    let applications = PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
+        slot.borrow_mut().take().expect("pending application window was open")
+    });
+    (result, applications)
+}
+
 // Execute-then-resume materialization control. Production specializes a
 // response whose selected caller is a checked-IH environment transport source:
 // the existing transport assembly emits a real response-owner call, so the
@@ -3244,7 +3271,24 @@ impl StaticTransitionPlan<'_> {
             .values()
             .filter(|(predeclared, specialization)| *predeclared && !*specialization)
             .count();
-        let requires_execute_then_resume = ordinary_stage_count >= 2;
+        let pending_checked_ret_sink =
+            super::aggregates::plane_has_pending_checked_control_ret_sink(self)?;
+        #[cfg(feature = "px8-ds-test-support")]
+        if count_install_applications {
+            // The plane key's presence may be inert if no transport-source
+            // demand reaches the decision below. The application recorder
+            // inside the demand loop is the population acceptance oracle.
+            if std::env::var_os("KEN_RT_RET_PLANE_CENSUS").is_some() {
+                eprintln!(
+                    "RT_RET_PLANE thread={:?} pending={} stages={} demands={}",
+                    std::thread::current().name(),
+                    pending_checked_ret_sink,
+                    ordinary_stage_count,
+                    demands.len(),
+                );
+            }
+        }
+        let requires_execute_then_resume = ordinary_stage_count >= 2 || pending_checked_ret_sink;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {
@@ -3305,6 +3349,40 @@ impl StaticTransitionPlan<'_> {
                 // owner performs the host effect, calls the exact K context once,
                 // and returns its existing Result word before the caller resumes.
                 specialized.push(demand);
+                #[cfg(feature = "px8-ds-test-support")]
+                if count_install_applications
+                    && transport_source
+                    && pending_checked_ret_sink
+                    && ordinary_stage_count < 2
+                {
+                    // This demand was actually placed in Specialized. For a
+                    // transport source below two ordinary stages, reaching
+                    // here also proves the suppress and mixed-owner deferrals
+                    // did not fire; only the pending-checked-Ret disjunct
+                    // admitted it.
+                    let placed = specialized
+                        .last()
+                        .expect("just specialized a response demand");
+                    let row = (
+                        placed.vis_origin.0,
+                        placed.producer_call_origin.0,
+                        placed.operation,
+                    );
+                    PENDING_CHECKED_RET_SINK_APPLICATIONS.with(|slot| {
+                        if let Some(rows) = slot.borrow_mut().as_mut() {
+                            rows.push(row);
+                        }
+                    });
+                    if std::env::var_os("KEN_RT_RET_PLANE_CENSUS").is_some() {
+                        eprintln!(
+                            "RT_RET_APP thread={:?} vis={} producer={} operation={:?}",
+                            std::thread::current().name(),
+                            row.0,
+                            row.1,
+                            row.2,
+                        );
+                    }
+                }
             }
         }
         specialized.sort_by_key(|demand| {

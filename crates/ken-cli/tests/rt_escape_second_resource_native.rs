@@ -37,6 +37,9 @@
 struct Differential {
     interpreted: ken_runtime::EffectObservation,
     native: ken_runtime::EffectObservation,
+    ret_key_applications: Vec<(u32, u32, ken_runtime::HostOpV1)>,
+    ret_sink_assessments: Vec<(String, String)>,
+    ret_sink_installs: Vec<ken_runtime::ComposedReturnRetSinkObservation>,
 }
 
 #[cfg(target_os = "linux")]
@@ -53,14 +56,25 @@ fn differential(case: &str, source: &str) -> Differential {
     let root = output_dir(case);
     std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
 
-    let output = ken_cli::build_native_program(
-        source,
-        ken_cli::SourceFormat::Ken,
-        &format!("rt_escape_{}", case.replace('-', "_")),
-        root.path(),
-        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-    )
-    .unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
+    let (((output, applications), assessments), installs, _) =
+        ken_runtime::with_composed_return_ret_sink_mutation(
+            ken_runtime::ComposedReturnRetSinkMutation::Exact,
+            || {
+                ken_runtime::with_composed_return_ret_assessments(|| {
+                    ken_runtime::with_pending_checked_ret_sink_applications(|| {
+                        ken_cli::build_native_program(
+                            source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_escape_{}", case.replace('-', "_")),
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    })
+                })
+            },
+        );
+    let output =
+        output.unwrap_or_else(|error| panic!("{case}: reaches linked native lowering: {error:?}"));
     let native = ken_runtime::run_bound_process_effect_observation(
         &output.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -86,6 +100,9 @@ fn differential(case: &str, source: &str) -> Differential {
     Differential {
         interpreted,
         native,
+        ret_key_applications: applications,
+        ret_sink_assessments: assessments,
+        ret_sink_installs: installs,
     }
 }
 
@@ -96,6 +113,8 @@ fn assert_native_matches_interpreter(case: &str, diff: &Differential) {
     let Differential {
         interpreted,
         native,
+        ret_key_applications,
+        ..
     } = diff;
     assert_eq!(
         native.exit_status, interpreted.exit_status,
@@ -122,6 +141,14 @@ fn assert_native_matches_interpreter(case: &str, diff: &Differential) {
     assert_eq!(
         native_ops, interp_ops,
         "{case}: canonical effect-operation sequence must agree across executors"
+    );
+    // Check the population after the behavioral discriminator. A mutation
+    // that breaks build, execution or effects must fail for that reason, not
+    // because its changed key also empties this diagnostic observation.
+    assert_eq!(
+        !ret_key_applications.is_empty(),
+        case == "escape-buffer-then-readat" || case.starts_with("nat-reached-"),
+        "{case}: decisive checked-control Ret applications {ret_key_applications:?}"
     );
 }
 
@@ -612,13 +639,60 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-FORWARD-TAIL-RET-CHECKED-CONTROL: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
 fn escaped_buffer_used_by_fanning_host_op_matches_interpreter() {
-    // Closure across resource kinds: an escaped `Buffer` is used with a live
-    // file. Native parity is pending a strict Ret sink for checked-control
-    // markers; the old "consumed more than once" refusal is no longer first.
+    // Promise class: durable differential for the escaped-buffer effects.
+    // MEASURED: full native/interpreter parity and one read on this row.
+    // CLAIMED: the checked-control Ret admission performs the effect before
+    // releasing the bracket. M-admission-off makes this observation red.
+    // GAP: PendingTopology FormedBasePath frames reach the base-path seat 0
+    // times with a non-residual value in escape/parity/PX8; the call_tail form
+    // is unpinned there and carried as unknown outside that measured corpus.
+    // The escaped Buffer remains live through the nested checked Ret body.
+    // Execute-then-resume must perform its read before releasing the bracket.
     let diff = differential("escape-buffer-then-readat", ESCAPE_BUFFER_THEN_READAT);
     assert_native_matches_interpreter("escape-buffer-then-readat", &diff);
+    assert_eq!(diff.native.stdout, diff.interpreted.stdout, "buffer stdout");
+    assert_eq!(
+        diff.native.effect_trace, diff.interpreted.effect_trace,
+        "buffer full events"
+    );
+    assert_eq!(
+        diff.native
+            .effect_trace
+            .iter()
+            .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+            .count(),
+        1,
+        "escaped buffer must perform one FsReadAt"
+    );
+    // Promise class: durable emission invariant. MEASURED: a pre-filter
+    // assessment recorder and the independent register-time sink recorder.
+    // CLAIMED: non-Ready frames have no installed sink or D6a checked-answer
+    // edge. THE GAP: the corpus never delivers an untagged checked-control
+    // word to such a frame (the prior widened-install mutant had 14 reaches
+    // with unchanged execution), so its runtime trap is not observed here.
+    assert!(
+        diff.ret_sink_assessments
+            .iter()
+            .any(|(_, status)| status == "PendingCheckedControl"),
+        "buffer must assess a non-Ready checked-control Ret frame"
+    );
+    let ready = diff
+        .ret_sink_assessments
+        .iter()
+        .filter(|(_, status)| status == "Ready")
+        .map(|(origin, _)| origin.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let installed = diff
+        .ret_sink_installs
+        .iter()
+        .map(|sink| sink.active_frame_origin.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        installed, ready,
+        "only Ready Ret frames install sinks: assessments={:?} installs={:?}",
+        diff.ret_sink_assessments, diff.ret_sink_installs
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -660,14 +734,15 @@ fn reached_nat_arm_variant(arm: &str) -> String {
 }
 
 #[cfg(target_os = "linux")]
-// D0 measurement fixture, ignored until the marker-bearing Ret-body successor.
-// Promise class: transition sentinel, retired when the successor meets AC-1/AC-2.
-// MEASURED: the live-file interpreter's two reads, or three on the extra Suc
-// arm. CLAIMED: both executors agree on stdout and full effects for a reached
-// fanout. THE GAP: native refuses at the selected frame's strict Ret sink; this
-// row cannot claim parity until the successor admits both variants.
+// Promise class: transition sentinel, retired by the bounded-Nat structural
+// match successor after all three variants demonstrate full native parity.
+// MEASURED: the interpreter's 2/2/3 reads and the native fail-closed -1 pin.
+// CLAIMED: full stdout and effect-vector parity on the reached Nat fanout.
+// THE GAP: the host-produced Int-class BoundedNat from BufferSpan reaches a
+// carried structural Nat Match that admits only Constructor; D6 measured the
+// class guard trap after one read, not native parity for any variant.
 #[test]
-#[ignore = "RT-FORWARD-TAIL-RET-CHECKED-CONTROL: ComposedReturnForwardRetAuthority: the selected forward Ret plan does not match the unique emission sink; ComposedReturnRetSink: the active carried frame has no installed strict Ret sink"]
+#[ignore = "RT-CARRIED-NAT-MATCH-BOUNDED-IMMEDIATE: an Int-class BoundedNat from BufferSpan reaches a carried Nat Match's Constructor-class guard and traps -1 after the first FsReadAt; the active fail-closed pin owns this boundary until native parity"]
 fn nat_fanout_reached_live_resource_matches_interpreter() {
     in_large_stack_thread("rt-escape-nat-reached", || {
         for (case, source, expected_reads) in [
@@ -712,6 +787,100 @@ fn nat_fanout_reached_live_resource_matches_interpreter() {
             );
         }
     });
+}
+
+#[cfg(target_os = "linux")]
+// Promise class: transition sentinel, retired by the bounded-Nat structural
+// match successor. MEASURED: each live-handle variant builds and executes,
+// then the native runner reports exactly an unclassified -1 trap, while its
+// interpreter reaches the selected arm's expected read count. CLAIMED: these
+// Nat shapes stay fail-closed rather than exit successfully with wrong effects.
+// THE GAP: the terminal alone does not identify the guard; D6 localized its
+// Int-versus-Constructor class site, but this pin does not establish parity.
+#[test]
+fn nat_fanout_live_resource_native_stops_at_unclassified_trap() {
+    // Nat's native build overflows the default thread on origin/main 52dd8640
+    // and on candidate 3cd909fd3, both after interpreter completion. On the
+    // candidate all three variants pass with a stated 16 MiB stack, the first
+    // and least of the ruled 16/32/64/128/256 MiB sizes; 2 x 16 = 32 MiB provides
+    // numeric headroom for this pre-existing Nat build demand. The spawned
+    // thread states its size directly; RUST_MIN_STACK is not a test input.
+    const NAT_PIN_STACK_BYTES: usize = 32 * 1024 * 1024;
+    std::thread::Builder::new()
+        .name("rt-escape-nat-fail-closed".to_owned())
+        .stack_size(NAT_PIN_STACK_BYTES)
+        .spawn(|| {
+            for (case, source, expected_reads) in [
+                (
+                    "nat-reached-base-guard",
+                    NAT_FANOUT_REACHED_LIVE_RESOURCE.to_owned(),
+                    2,
+                ),
+                ("nat-reached-zero-guard", reached_nat_arm_variant("zero"), 2),
+                ("nat-reached-suc-guard", reached_nat_arm_variant("suc"), 3),
+            ] {
+                let root = output_dir(case);
+                std::fs::write(root.path().join("held.bin"), b"held resource").unwrap();
+                let mut host = ken_interp::PosixHost::new_at(root.path());
+                let interpreted = ken_cli::run_program_effect_observation(
+                    &source,
+                    ken_cli::SourceFormat::Ken,
+                    &[],
+                    &[],
+                    root.path().as_os_str().as_encoded_bytes(),
+                    &mut host,
+                )
+                .unwrap_or_else(|error| panic!("{case}: interpreter runs: {error:?}"));
+                assert_eq!(
+                    interpreted
+                        .effect_trace
+                        .iter()
+                        .filter(|event| event.operation == ken_runtime::HostOpV1::FsReadAt)
+                        .count(),
+                    expected_reads,
+                    "{case}: the interpreter must select the measured Nat arm"
+                );
+                let (output, applications) =
+                    ken_runtime::with_pending_checked_ret_sink_applications(|| {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_escape_{}", case.replace('-', "_")),
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    });
+                let output =
+                    output.unwrap_or_else(|error| panic!("{case}: linked native build: {error:?}"));
+                let observed = ken_runtime::run_bound_process_effect_observation(
+                    &output.artifact,
+                    &ken_runtime::NativeEffectRunOptionsV1 {
+                        arguments: Vec::new(),
+                        environment: Vec::new(),
+                        cwd: root.path().to_owned(),
+                        plan_hash: output.plan_transport_hash,
+                    },
+                );
+                assert!(
+                    matches!(
+                        observed,
+                        Err(
+                            ken_runtime::NativeEffectRunErrorV1::UnclassifiedRuntimeTrap {
+                                terminal_value: -1,
+                            }
+                        )
+                    ),
+                    "{case}: expected the measured fail-closed native trap, got {observed:?}"
+                );
+                assert!(
+                    !applications.is_empty(),
+                    "{case}: expected a decisive checked-control Ret application"
+                );
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
 }
 
 #[cfg(target_os = "linux")]

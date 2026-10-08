@@ -4971,17 +4971,22 @@ fn direct_none_frame_recursive_ret_vis_compile() -> Result<(), CraneliftBackendE
             default: ac_c7_trap(),
         }),
     };
+    compile_ret_vis_fixture(&fixture)
+}
+
+fn compile_ret_vis_fixture(fixture: &RuntimeExpr) -> Result<(), CraneliftBackendError> {
     let RuntimeExpr::Let {
         body: match_expr, ..
-    } = &fixture
+    } = fixture
     else {
         unreachable!()
     };
-    let (plan, root) = planned_root_occurrence(&fixture);
+    let (plan, root) = planned_root_occurrence(fixture);
     let scrutinee_origin = plan.child_static_origin(root, 0).unwrap();
     let match_origin = plan.child_static_origin(root, 1).unwrap();
     let lowered = ac_c7_lowered_wrap(&plan, scrutinee_origin, "Absent", "Gamma");
-    let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let seed_env =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     ac_c7_try_compile_edge(&seed_env, plan, move |compiler, builder| {
         let word = compiler.transfer_into_carrier(builder, scrutinee_origin, &lowered)?;
         let eliminated = compiler.lower_expr(
@@ -5002,10 +5007,10 @@ fn direct_none_frame_recursive_ret_vis_compile() -> Result<(), CraneliftBackendE
     .map(|_| ())
 }
 
-/// **Promise class: durable invariant.** A Direct/None strict Ret+Vis topology
-/// lowers its recursive Ret body once through the ordinary payload path. The
-/// `Var(2)` body is the discriminator: separately lowering the runtime-dead
-/// checked successor supplies no IH and returns the exact error pinned below.
+/// Promise class: durable invariant. This artificial recursive Ret fixture
+/// lies outside the strict-sink predicate and lowers through the ordinary IH
+/// path, so its `Var(2)` body compiles without emitting a checked-answer
+/// fallback. A real `ITree::Ret` does not have a recursive position.
 #[test]
 fn architect_probe_direct_none_frame_ret_vis_carried_match_compiles() {
     PX8TR_TRAP_PROVENANCE.with(|trace| trace.borrow_mut().clear());
@@ -5021,31 +5026,76 @@ fn architect_probe_direct_none_frame_ret_vis_carried_match_compiles() {
     );
 }
 
-/// **Promise class: durable invariant.** The test-only mutation restores the
-/// pre-repair separate checked-body lowering at the changed seam. It must
-/// recreate the original `Unsupported(Var, ...)` failure, then clearing it must
-/// return the same fixture to `Ok` in this process.
-#[test]
-fn unconditionally_separate_checked_successor_lowering_recreates_the_regression() {
-    struct Reset;
-    impl Drop for Reset {
-        fn drop(&mut self) {
-            CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(|armed| armed.set(false));
-        }
+fn ret_vis_fixture(recursive: bool) -> RuntimeExpr {
+    RuntimeExpr::Let {
+        value: Box::new(ac_c7_wrap("Absent", "Gamma")),
+        body: Box::new(RuntimeExpr::ComputationalMatch {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            cases: vec![
+                crate::RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::ITree::Ret".to_string(),
+                    argument_binders: 1,
+                    recursive_positions: if recursive { vec![0] } else { Vec::new() },
+                    body: RuntimeExpr::Var(1),
+                },
+                crate::RuntimeComputationalMatchCase {
+                    constructor: "ctor:fixture::ITree::Vis".to_string(),
+                    argument_binders: 2,
+                    recursive_positions: Vec::new(),
+                    body: ac_c7_ctor("Sentinel"),
+                },
+            ],
+            default: ac_c7_trap(),
+        }),
     }
-    let _reset = Reset;
-    CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(|armed| armed.set(true));
-    assert_eq!(
-        direct_none_frame_recursive_ret_vis_compile(),
-        Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "Var",
-            reason: "no runtime binding for index 2".to_string(),
-        })),
-        "the mutation must recreate the exact pre-repair failure"
-    );
-    CHECKED_SUCCESSOR_UNCONDITIONAL_SEPARATE_LOWERING.with(|armed| armed.set(false));
-    direct_none_frame_recursive_ret_vis_compile()
-        .expect("clearing the mutation must restore the repaired lowering");
+}
+
+/// Promise class: durable invariant. MEASURED: one shared-input Ret+Vis fixture
+/// differing only in recursive positions has no strict sink and emits no
+/// checked-answer fallback; its non-recursive counterpart is Ready and emits
+/// exactly one. CLAIMED: the planner predicate alone authorizes that emission.
+/// THE GAP: this pins the emitted route, not dynamic execution of either arm.
+#[test]
+fn strict_ret_sink_excludes_recursive_ret_case() {
+    for (recursive, expected_status, expected_fallbacks) in [
+        (true, None, 0usize),
+        (false, Some(StrictRetSinkStatus::Ready), 1usize),
+    ] {
+        let fixture = ret_vis_fixture(recursive);
+        let plan =
+            plan_static_transition_graph(&fixture, &BTreeMap::new()).expect("both fixtures plan");
+        let root = plan.root_static_origin().expect("the fixture has a root");
+        let match_origin = plan
+            .child_static_origin(root, 1)
+            .expect("the Let body's computational match has an origin");
+        assert_eq!(
+            plan.strict_ret_sink_assessment(match_origin)
+                .expect("the strict Ret predicate evaluates")
+                .map(|assessment| assessment.status),
+            expected_status,
+            "recursive={recursive}: the strict Ret predicate must classify this fixture"
+        );
+        let fallback_count = || {
+            d6a_route_trace()
+                .iter()
+                .filter(|event| {
+                    matches!(
+                        event,
+                        D6aRouteEvent::CarriedFallbackEmitted { static_origin }
+                            if *static_origin == match_origin
+                    )
+                })
+                .count()
+        };
+        let before = fallback_count();
+        compile_ret_vis_fixture(&fixture)
+            .unwrap_or_else(|error| panic!("recursive={recursive}: fixture compiles: {error:?}"));
+        assert_eq!(
+            fallback_count() - before,
+            expected_fallbacks,
+            "recursive={recursive}: checked-answer fallback emission count"
+        );
+    }
 }
 
 /// ⭐⭐ **`AC-C7` ROW 3 OF 3 — `ComputationalMatch`.** Its own row; ⛔ never
