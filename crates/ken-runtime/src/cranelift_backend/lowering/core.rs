@@ -6740,6 +6740,95 @@ impl<'a> Lowering<'a> {
                 "ComputationalMatch",
             );
         }
+        if let LoweringOperand::Specialized(Lowered::BorrowedOption {
+            present,
+            value,
+            none,
+            some,
+        }) = selected
+        {
+            // Same branch selection as the ordinary chain's
+            // `lower_borrowed_option_match`, but each arm continues through the
+            // pending eliminators instead of joining at this Match.
+            let join_plan = self.consumed_join_plan_token(static_origin)?;
+            let some_block = builder.create_block();
+            let none_block = builder.create_block();
+            let merge = join_plan
+                .has_continuing_predecessor
+                .then(|| builder.create_block());
+            if let Some(merge) = merge {
+                self.append_planned_join_params(builder, merge, &join_plan);
+            }
+            builder.ins().brif(present, some_block, &[], none_block, &[]);
+            let mut merge_kind = None;
+            for (block, constructor, fields) in [
+                (some_block, some.as_str(), vec![Lowered::Int { value, known: None }]),
+                (none_block, none.as_str(), Vec::new()),
+            ] {
+                builder.switch_to_block(block);
+                let case = producer_cases
+                    .iter()
+                    .enumerate()
+                    .find(|(_, case)| case.constructor == constructor);
+                let (arm_origin, lowered) = match case {
+                    Some((index, producer_case)) => {
+                        if producer_case.binders != fields.len() {
+                            return Err(unsupported(
+                                "ComputationalMatch",
+                                "borrowed Option producer arity mismatch",
+                            ));
+                        }
+                        let case_env = env_with(fields, producer_env);
+                        let body =
+                            self.case_body_occurrence(static_origin, index, &producer_case.body)?;
+                        let lowered = self.lower_computational_producer_expr(
+                            builder,
+                            body,
+                            &case_env,
+                            eliminators,
+                        )?;
+                        (body.static_origin, lowered)
+                    }
+                    None => (
+                        static_origin,
+                        LoweringOperand::Specialized(Lowered::Trap(producer_default.clone())),
+                    ),
+                };
+                if self.seal_source_trap_branch(builder, &lowered)? {
+                    continue;
+                }
+                let merge = merge.ok_or_else(|| {
+                    backend_module(
+                        "join plan omitted a producer BorrowedOption merge despite a \
+                         continuing predecessor"
+                            .to_string(),
+                    )
+                })?;
+                self.jump_planned_join_arm(
+                    builder,
+                    merge,
+                    &join_plan,
+                    arm_origin,
+                    lowered,
+                    &mut merge_kind,
+                    "ComputationalMatch",
+                )?;
+            }
+            let Some(merge) = merge else {
+                let unreachable = builder.create_block();
+                builder.switch_to_block(unreachable);
+                return Ok(LoweringOperand::Specialized(Lowered::Trap(
+                    producer_default.clone(),
+                )));
+            };
+            return self.finish_planned_join(
+                builder,
+                merge,
+                &join_plan,
+                merge_kind,
+                "ComputationalMatch",
+            );
+        }
         if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = selected {
             return self.lower_dynamic_constructor_match(
                 builder,
