@@ -50,7 +50,8 @@ un-ignored and pass on both engines.
   `Excluded{Relay|Underived}`) with no planning refusal: `Excluded` owners
   keep the baseline Ret-only arm, and every native row keeps its
   `c7c05d4e6` result. Its handoff carries a per-member census (relay,
-  installed, successor, drive coverage) for every `Excluded` owner.
+  installed, successor, drive coverage) for 9 measured suites; the rest is
+  this WP's D0.
 
 - **The r2 population** (from `RT-SOURCE-IH-RELAY-K-VALUE`, Architect
   `evt_1j5qaw2d9sqe7`). r2's owners 2 and 3 are `Excluded{Relay}`
@@ -68,7 +69,11 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-1. **D0 (Architect design; measurement only).** Measure:
+1. **D0 (Architect design; measurement only).** First, complete the
+   per-member census over the native suites the predecessor did not
+   measure (its 9 measured suites are in
+   `local/rt-nested-response-owner-caller/census-a/`; Architect
+   `evt_1kq6h67jzp7ae`). Then measure:
    - (i) the closed provenance set of static `Effect`/Vis occurrences
      whose operation can flow into each relay's `Var`;
    - (ii) the relay IH K's capture and environment layout at the return,

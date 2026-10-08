@@ -153,15 +153,15 @@ retained.
 - **AC-R2.** `build_pending_vis_settlements` is called only at the builder
   site and by the validator. `returned_vis_protocol` keeps its diagnostics
   caller (`:1354`).
-- **AC-R6 (behaviour preservation and stop).** Across all 39 native
-  suites, every row's result equals `c7c05d4e6`: pass, fail, ignored, or
-  refusal text. **Stop** on any difference. SEQUENTIAL and
-  `one_bracket_retains_native_parity` are among them.
-- **Census (input to the successor's D0, not a gate).** Per owner: its
-  class. Per `Excluded` owner, its member count. Per member: `relay`,
-  `installed`, successor id, whether `deferred_response_at_vis(origin)` is
-  present, and whether `bounded_deferred_response_handler_owner` is
-  present and equal to the K's emission owner. Reported in the handoff.
+- **AC-R6 (behaviour preservation and stop; narrowed on WIP audit
+  `evt_1kq6h67jzp7ae`).** The candidate's test sources equal `c7c05d4e6`
+  except the added span diagnostics row, and no `#[ignore]` changes, so a
+  green CI run is every non-ignored row equal to `c7c05d4e6`. The local
+  serial sweep stops after the px4b umask-022 rerun. The 9 measured
+  suites' logs and census are kept as the successor's D0 input. The
+  disposable census observer (`KEN_RCHAIN_CENSUS` / `KEN_RCHAIN_AC6`) is
+  removed before release. **Any red native row in CI on the candidate is
+  a stop to the Architect, never fixed forward.**
 - **AC-4 (controls).** The five sibling rows stay green, the px8ta rows keep
   their labelled failures, and the `units.rs:7831` coverage gate is not
   relaxed.
