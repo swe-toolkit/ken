@@ -1450,6 +1450,47 @@ fn published_name(item: &ImportItem) -> &str {
     item.rename.as_deref().unwrap_or(&item.name)
 }
 
+/// Select an in-scope export without publishing it. A current local may be
+/// checked later in this segment; every other selected identity must exist
+/// already. Preflight and publication share this exact readiness check.
+fn select_in_scope_export(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+    item: &ImportItem,
+    span: &Span,
+) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
+    let had_scope_binding = scope.bindings.contains_key(&item.name);
+    let canonical = resolve_ref(scope, exports, &item.name, span)?;
+    if !had_scope_binding && !globals.contains_key(&canonical) {
+        return Err(ElabError::UnboundName {
+            name: item.name.clone(),
+            span: span.clone(),
+        });
+    }
+    if scope.current_local_names.contains(&item.name) {
+        return Ok((canonical, None));
+    }
+    let selected_id = scope
+        .qualified_ids
+        .get(&item.name)
+        .or_else(|| scope.binding_ids.get(&item.name))
+        .copied()
+        .or_else(|| {
+            // Locals checked earlier in this unit have their ID in globals.
+            // An imported binding must already have its selected ID.
+            (scope.locals.contains(&item.name)
+                || (!had_scope_binding && !item.name.contains('.')))
+                .then(|| globals.get(&canonical).copied())
+                .flatten()
+        })
+        .ok_or_else(|| ElabError::UnboundName {
+            name: item.name.clone(),
+            span: span.clone(),
+        })?;
+    Ok((canonical, Some(selected_id)))
+}
+
 fn apply_export(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
@@ -1514,43 +1555,18 @@ fn apply_export(
         }
         ExportForm::InScope { items } => {
             for item in items {
-                let had_scope_binding = scope.bindings.contains_key(&item.name);
-                let canonical = resolve_ref(scope, exports, &item.name, span)?;
-                if !had_scope_binding && !globals.contains_key(&canonical) {
-                    return Err(ElabError::UnboundName {
-                        name: item.name.clone(),
-                        span: span.clone(),
-                    });
-                }
+                let (canonical, selected_id) =
+                    select_in_scope_export(scope, exports, globals, item, span)?;
                 let surface = published_name(item);
-                if scope.current_local_names.contains(&item.name) {
-                    // The same unit can export a local before it is checked.
-                    // Even if another unit already owns this canonical name,
-                    // that ambient ID is not the forward local's identity.
+                let Some(selected_id) = selected_id else {
+                    // A forward local owns its checked ID, not an ambient
+                    // same-spelled declaration from another unit.
                     publish_identity(exports_here, surface, &canonical, span)?;
                     scope.pending_local_exports.insert(
                         surface.to_string(), (canonical, span.clone()),
                     );
                     continue;
-                }
-                let selected_id = scope
-                    .qualified_ids
-                    .get(&item.name)
-                    .or_else(|| scope.binding_ids.get(&item.name))
-                    .copied()
-                    .or_else(|| {
-                        // Locals checked earlier in this unit have their ID
-                        // in `globals`. An imported binding must already have
-                        // its selected ID; the mutable table is not evidence.
-                        (scope.locals.contains(&item.name)
-                            || (!had_scope_binding && !item.name.contains('.')))
-                            .then(|| globals.get(&canonical).copied())
-                            .flatten()
-                    })
-                    .ok_or_else(|| ElabError::UnboundName {
-                        name: item.name.clone(),
-                        span: span.clone(),
-                    })?;
+                };
                 publish_checked_identity(
                     scope, exports_here, surface, &canonical, selected_id, span,
                 )?;
@@ -3068,6 +3084,168 @@ fn is_recursive_candidate(decl: &Decl) -> bool {
             | Decl::AttachedProofDecl { .. }
     )
 }
+/// A segment contains declarations that do not change resolution state or
+/// side-table ownership. Fixities are collected for the whole scope already;
+/// exports are applied after all segment nodes are checked.
+fn is_segment_member(decl: &Decl) -> bool {
+    is_recursive_candidate(decl)
+        || matches!(
+            decl,
+            Decl::DataDecl { .. }
+                | Decl::ExplicitDataDecl { .. }
+                | Decl::TypeAlias { .. }
+                | Decl::PropDecl { .. }
+                | Decl::ExportDecl { .. }
+                | Decl::FixityDecl { .. }
+        )
+}
+
+fn is_type_node(kind: &RDeclKind) -> bool {
+    matches!(
+        kind,
+        RDeclKind::DataDecl { .. }
+            | RDeclKind::ExplicitDataDecl { .. }
+            | RDeclKind::TypeAlias { .. }
+            | RDeclKind::Prop { .. }
+    )
+}
+
+/// `33 §8.4` edge: A's body or type mentions B. The declaration-kind match
+/// is exhaustive, so extending a graph node cannot silently omit its types.
+fn rdecl_mentions_name(rdecl: &crate::resolve::RDecl, name: &str) -> bool {
+    use crate::elab::{rexpr_dependency_mentions_name, rtype_dependency_mentions_name};
+    rexpr_dependency_mentions_name(&rdecl.body, name)
+        || rdecl
+            .ty
+            .as_ref()
+            .is_some_and(|ty| rtype_dependency_mentions_name(ty, name))
+        || rdecl
+            .requires
+            .iter()
+            .chain(&rdecl.ensures)
+            .any(|expr| rexpr_dependency_mentions_name(expr, name))
+        || match &rdecl.kind {
+            RDeclKind::View { constraints, .. } => constraints
+                .iter()
+                .any(|constraint| rtype_dependency_mentions_name(&constraint.head_type, name)),
+            RDeclKind::DataDecl { ctors, .. } => ctors
+                .iter()
+                .any(|ctor| ctor.args.iter().any(|ty| rtype_dependency_mentions_name(ty, name))),
+            RDeclKind::ExplicitDataDecl {
+                params,
+                indices,
+                ctors,
+                ..
+            } => {
+                params
+                    .iter()
+                    .chain(indices)
+                    .any(|entry| rtype_dependency_mentions_name(&entry.ty, name))
+                    || ctors.iter().any(|ctor| {
+                        ctor.args
+                            .iter()
+                            .any(|entry| rtype_dependency_mentions_name(&entry.ty, name))
+                            || ctor
+                                .result
+                                .as_ref()
+                                .is_some_and(|ty| rtype_dependency_mentions_name(ty, name))
+                    })
+            }
+            RDeclKind::TypeAlias { ty } => rtype_dependency_mentions_name(ty, name),
+            RDeclKind::Prop { intros } => intros
+                .iter()
+                .any(|intro| rtype_dependency_mentions_name(&intro.ty, name)),
+            RDeclKind::Let | RDeclKind::Theorem | RDeclKind::AttachedProof { .. } => false,
+            RDeclKind::Prove
+            | RDeclKind::Law { .. }
+            | RDeclKind::Foreign { .. }
+            | RDeclKind::Temporal { .. }
+            | RDeclKind::RecordDecl { .. }
+            | RDeclKind::ClassDecl { .. }
+            | RDeclKind::InstanceDecl { .. }
+            | RDeclKind::DeriveDecl { .. } => {
+                unreachable!("barrier kind reached the segment graph: {:?}", rdecl.kind)
+            }
+        }
+}
+
+/// Keep data/prop registration on the existing checked declaration path even
+/// when dependency ordering moves the declaration ahead of its source index.
+fn register_checked_type_node(
+    elab: &mut ElabEnv,
+    scope: &mut Scope,
+    inner: &Decl,
+    prefix: &str,
+    result: &crate::elab::ElabResult,
+) -> Result<(), ElabError> {
+    let bare = inner.name();
+    record_checked_local(scope, bare, &result.name, result.def_id);
+    let constructor_names: Option<Vec<&str>> = match inner {
+        Decl::DataDecl { ctors, .. } => Some(ctors.iter().map(|ctor| ctor.name.as_str()).collect()),
+        Decl::ExplicitDataDecl { ctors, .. } => Some(
+            ctors
+                .iter()
+                .map(|ctor| match ctor {
+                    ExplicitDataCtor::Simple(ctor) => ctor.name.as_str(),
+                    ExplicitDataCtor::Signature { name, .. } => name.as_str(),
+                })
+                .collect(),
+        ),
+        _ => None,
+    };
+    if let Some(names) = constructor_names {
+        let mut members = HashMap::new();
+        for name in names {
+            let canonical = qualify(prefix, name);
+            let id = *elab.globals.get(&canonical).ok_or_else(|| {
+                ElabError::Internal(format!("checked constructor `{canonical}` has no binding"))
+            })?;
+            if elab
+                .env
+                .constructor(id)
+                .is_none_or(|(parent, _)| parent.id != result.def_id)
+            {
+                return Err(ElabError::Internal(format!(
+                    "checked constructor `{canonical}` has a foreign parent"
+                )));
+            }
+            members.insert(name.to_string(), id);
+            record_checked_local(scope, name, &canonical, id);
+        }
+        if elab
+            .env
+            .inductive(result.def_id)
+            .is_none_or(|family| family.constructors.len() != members.len())
+        {
+            return Err(ElabError::Internal(format!(
+                "checked family `{bare}` has incomplete constructor names"
+            )));
+        }
+        scope
+            .constructor_members
+            .insert(result.def_id, members.clone());
+        elab.module_state
+            .constructor_members
+            .insert(result.def_id, members);
+    }
+    if let Decl::PropDecl { intros, .. } = inner {
+        let mut checked_intros = Vec::with_capacity(intros.len());
+        for intro in intros {
+            let canonical_intro = format!("{}.{}", result.name, intro.name);
+            if !elab.globals.contains_key(&canonical_intro) {
+                return Err(ElabError::Internal(format!(
+                    "prop intro '{canonical_intro}' did not elaborate"
+                )));
+            }
+            checked_intros.push(intro.name.clone());
+        }
+        elab.module_state
+            .prop_intros
+            .insert(result.name.clone(), checked_intros);
+    }
+    Ok(())
+}
+
 
 fn register_effect_row(elab: &mut ElabEnv, result: &crate::elab::ElabResult) {
     if let Some(row) = &result.effect_row_type {
@@ -3197,6 +3375,16 @@ fn resolve_scoped_decl(
     exports: &HashMap<String, HashMap<String, String>>,
     unit_definitions: &mut HashSet<String>,
 ) -> Result<RDecl, ElabError> {
+    let rdecl = resolve_raw_scoped_decl(decl, scope, exports, unit_definitions)?;
+    rewrite_rdecl(scope, exports, rdecl)
+}
+
+fn resolve_raw_scoped_decl(
+    decl: &Decl,
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    unit_definitions: &mut HashSet<String>,
+) -> Result<RDecl, ElabError> {
     let attached_name = if let Decl::AttachedProofDecl {
         subject,
         proof_name,
@@ -3211,8 +3399,7 @@ fn resolve_scoped_decl(
     } else {
         None
     };
-    let rdecl = resolve::resolve_decl_in_unit(decl, unit_definitions, attached_name.as_deref())?;
-    rewrite_rdecl(scope, exports, rdecl)
+    resolve::resolve_decl_in_unit(decl, unit_definitions, attached_name.as_deref())
 }
 
 fn reject_prelude_binding(
@@ -4031,27 +4218,6 @@ fn expand_scope(
                 )?;
                 i += 1;
             }
-            Decl::ExportDecl { form, span } => {
-                apply_export(
-                    scope,
-                    &elab.module_state.exports,
-                    &elab.module_state.inline_children,
-                    &elab.module_state.file_inline_paths,
-                    &elab.module_state.file_export_tables,
-                    &elab.module_state.file_export_ids,
-                    &elab.module_state.export_provenance,
-                    prefix,
-                    elab.module_state.active_imports.last().map(String::as_str),
-                    unit_inline_modules,
-                    ordered_inline_modules,
-                    &elab.module_state.prop_intros,
-                    &elab.globals,
-                    &mut exports_here,
-                    form,
-                    span,
-                )?;
-                i += 1;
-            }
             Decl::ModuleDecl {
                 name,
                 decls: inner,
@@ -4214,67 +4380,137 @@ fn expand_scope(
                 ids.extend(space_results);
                 i += 1;
             }
-            // A maximal run of non-`pub` definitions — auto-grouped by
-            // call-graph SCC (`33 §1`: "All
-            // top-level definitions are mutually recursive within a module
-            // if the SCT check accepts the group"). A run with no actual
-            // cycle degenerates to today's one-decl-at-a-time path, member
-            // by member, byte-identical (AC3).
-            _ if is_recursive_candidate(decl.unwrap_pub()) => {
-                let run_end = {
-                    let mut e = i;
-                    while e < decls.len()
-                        && (is_recursive_candidate(decls[e].unwrap_pub())
-                            || matches!(decls[e].unwrap_pub(), Decl::FixityDecl { .. }))
-                    {
-                        e += 1;
-                    }
-                    e
-                };
-                let run = &decls[i..run_end];
-                let run_member_count = run
-                    .iter()
-                    .filter(|candidate| is_recursive_candidate(candidate.unwrap_pub()))
-                    .count();
-
-                // Resolve + rewrite every run member up front — safe because
-                // a run contains no import/module, so `scope`/`exports`
-                // don't change across it; each member sees exactly the
-                // state it would have seen processed alone at its position.
-                let mut bare_names: Vec<String> = Vec::with_capacity(run_member_count);
-                let mut rdecls: Vec<crate::resolve::RDecl> = Vec::with_capacity(run_member_count);
-                for d in run
-                    .iter()
-                    .filter(|candidate| is_recursive_candidate(candidate.unwrap_pub()))
+            // Only declarations that change resolution state or own side
+            // tables end a segment. Data, aliases and prop are nodes, while
+            // exports are deferred until its dependency-ordered nodes finish.
+            _ if is_segment_member(decl.unwrap_pub()) => {
+                let mut segment_end = i;
+                while segment_end < decls.len()
+                    && is_segment_member(decls[segment_end].unwrap_pub())
                 {
+                    segment_end += 1;
+                }
+                let segment = &decls[i..segment_end];
+                // Dry-run publication in textual order before any node is
+                // checked. A current local takes the pending path both here
+                // and at publication, and node checking changes no input
+                // apply_export reads for it, so the dry run refuses exactly
+                // where publication would. On refusal, elaborate only the
+                // textual prefix before the refused export.
+                let mut export_error = None;
+                if segment
+                    .iter()
+                    .any(|d| matches!(d.unwrap_pub(), Decl::ExportDecl { .. }))
+                {
+                    let mut dry_scope = scope.clone();
+                    let mut dry_exports_here = exports_here.clone();
+                    for (offset, d) in segment.iter().enumerate() {
+                        let Decl::ExportDecl { form, span } = d.unwrap_pub() else {
+                            continue;
+                        };
+                        if let Err(error) = apply_export(
+                            &mut dry_scope,
+                            &elab.module_state.exports,
+                            &elab.module_state.inline_children,
+                            &elab.module_state.file_inline_paths,
+                            &elab.module_state.file_export_tables,
+                            &elab.module_state.file_export_ids,
+                            &elab.module_state.export_provenance,
+                            prefix,
+                            elab.module_state.active_imports.last().map(String::as_str),
+                            unit_inline_modules,
+                            ordered_inline_modules,
+                            &elab.module_state.prop_intros,
+                            &elab.globals,
+                            &mut dry_exports_here,
+                            form,
+                            span,
+                        ) {
+                            segment_end = i + offset;
+                            export_error = Some(error);
+                            break;
+                        }
+                        if let ExportForm::Facade { items, .. } = form {
+                            for item in items {
+                                for name in [item.name.as_str(), published_name(item)] {
+                                    if !scope.bindings.contains_key(name)
+                                        && !elab.globals.contains_key(name)
+                                    {
+                                        scope.facade_only.insert(name.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                let segment = &decls[i..segment_end];
+                let node_decls: Vec<&Decl> = segment
+                    .iter()
+                    .filter(|d| {
+                        !matches!(
+                            d.unwrap_pub(),
+                            Decl::ExportDecl { .. } | Decl::FixityDecl { .. }
+                        )
+                    })
+                    .collect();
+                // Name binding is stable throughout a segment (prebind bound
+                // every local name and constructor), but `rewrite_rdecl`
+                // selects a local `T.C` only after `T` is checked. The
+                // pre-pass rewrite feeds the dependency graph only; each node
+                // is rewritten again at its dependency-ordered check.
+                let mut raw_rdecls = Vec::with_capacity(node_decls.len());
+                let mut rdecls = Vec::with_capacity(node_decls.len());
+                let mut node_names = HashMap::new();
+                for (index, d) in node_decls.iter().enumerate() {
                     let inner = d.unwrap_pub();
                     let renamed = qualify_decl_name(inner, prefix);
-                    let rdecl = resolve_scoped_decl(
+                    let raw = resolve_raw_scoped_decl(
                         &renamed,
                         scope,
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
-                    bare_names.push(rdecl.name.clone());
+                    let rdecl = rewrite_rdecl(scope, &elab.module_state.exports, raw.clone())?;
+                    node_names.insert(rdecl.name.clone(), index);
+                    let ctor_names: Vec<&str> = match inner {
+                        Decl::DataDecl { ctors, .. } => {
+                            ctors.iter().map(|ctor| ctor.name.as_str()).collect()
+                        }
+                        Decl::ExplicitDataDecl { ctors, .. } => ctors
+                            .iter()
+                            .map(|ctor| match ctor {
+                                ExplicitDataCtor::Simple(ctor) => ctor.name.as_str(),
+                                ExplicitDataCtor::Signature { name, .. } => name.as_str(),
+                            })
+                            .collect(),
+                        _ => Vec::new(),
+                    };
+                    // A local `T.C` selector resolves (unchecked) to the
+                    // family binding plus the leaf; key that spelling too.
+                    let family = scope.bindings.get(inner.name()).cloned();
+                    for ctor in ctor_names {
+                        node_names.insert(qualify(prefix, ctor), index);
+                        if let Some(family) = &family {
+                            node_names.insert(format!("{family}.{ctor}"), index);
+                        }
+                    }
+                    raw_rdecls.push(raw);
                     rdecls.push(rdecl);
                 }
 
-                // Call graph: edge a -> b iff a's body mentions b's bare
-                // name (over-approximates on shadowing — safe, only ever
-                // makes an SCC too LARGE, never misses a real cycle).
+                // Dependency edges include mentions in declaration types,
+                // contracts, and data/prop constructor telescopes. A mention
+                // of a constructor targets the data node that registers it.
                 let n = rdecls.len();
-                let adj: Vec<Vec<usize>> = (0..n)
-                    .map(|a| {
-                        (0..n)
-                            .filter(|&b| {
-                                crate::elab::rexpr_mentions_name(&rdecls[a].body, &bare_names[b])
-                                    || rdecls[a].ty.as_ref().is_some_and(|ty| {
-                                        crate::elab::rtype_mentions_name(ty, &bare_names[b])
-                                    })
-                            })
-                            .collect()
-                    })
-                    .collect();
+                let mut adj = vec![Vec::new(); n];
+                for (a, rdecl) in rdecls.iter().enumerate() {
+                    for (name, &b) in &node_names {
+                        if rdecl_mentions_name(rdecl, name) && !adj[a].contains(&b) {
+                            adj[a].push(b);
+                        }
+                    }
+                    adj[a].sort_unstable();
+                }
                 let sccs = scc_membership(&adj);
 
                 // Process the SCC condensation dependency-first: a caller's
@@ -4290,6 +4526,12 @@ fn expand_scope(
                     for &m in scc {
                         consumed[m] = true;
                     }
+                    if scc.len() > 1 && scc.iter().any(|&m| is_type_node(&rdecls[m].kind)) {
+                        return Err(ElabError::TypeMismatch {
+                            span: rdecls[k].span.clone(),
+                            reason: "a type declaration cannot share a dependency cycle with another declaration".to_string(),
+                        });
+                    }
                     // Existing singleton view/let recursion has its own
                     // spec-aware elaboration path.  Self edges are newly
                     // routed through the group/SCT seam only for proof
@@ -4301,19 +4543,40 @@ fn expand_scope(
                                 RDeclKind::Theorem | RDeclKind::AttachedProof { .. }
                             ));
                     if !recursive {
-                        let rdecl = &rdecls[k];
+                        let rdecl = &rewrite_rdecl(
+                            scope,
+                            &elab.module_state.exports,
+                            raw_rdecls[k].clone(),
+                        )?;
                         let result = elaborate_checked(
                             elab,
                             rdecl,
                             pending_fixity_for(&declared_fixities, &rdecl.name),
                         )?;
-                        record_checked_local(
-                            scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
-                        );
+                        if is_type_node(&rdecl.kind) {
+                            register_checked_type_node(
+                                elab,
+                                scope,
+                                node_decls[k].unwrap_pub(),
+                                prefix,
+                                &result,
+                            )?;
+                        } else {
+                            record_checked_local(
+                                scope,
+                                canonical_leaf(&rdecl.name),
+                                &rdecl.name,
+                                result.def_id,
+                            );
+                        }
                         ids.push(result);
                     } else {
-                        let members: Vec<crate::resolve::RDecl> =
-                            scc.iter().map(|&m| rdecls[m].clone()).collect();
+                        let members = scc
+                            .iter()
+                            .map(|&m| {
+                                rewrite_rdecl(scope, &elab.module_state.exports, raw_rdecls[m].clone())
+                            })
+                            .collect::<Result<Vec<crate::resolve::RDecl>, ElabError>>()?;
                         let has_proof = members.iter().any(|rdecl| {
                             matches!(
                                 rdecl.kind,
@@ -4400,21 +4663,41 @@ fn expand_scope(
                             register_effect_row(elab, &result);
                             register_declared_effect_row(elab, rdecl)?;
                             record_checked_local(
-                                scope, canonical_leaf(&rdecl.name), &rdecl.name, result.def_id,
+                                scope,
+                                canonical_leaf(&rdecl.name),
+                                &rdecl.name,
+                                result.def_id,
                             );
                             ids.push(result);
                         }
                     }
                 }
-                // Public definitions participate in the same scope-wide
-                // admission run; publish their already-elaborated canonical
-                // names only after the run succeeds, preserving the module
-                // export boundary while allowing forward references.
-                for (d, rdecl) in run
-                    .iter()
-                    .filter(|candidate| is_recursive_candidate(candidate.unwrap_pub()))
-                    .zip(&rdecls)
-                {
+                // Export in textual order after every segment node has a
+                // checked identity; before the pub loop so attached proofs
+                // see the entire segment's public subjects.
+                for d in segment {
+                    if let Decl::ExportDecl { form, span } = d.unwrap_pub() {
+                        apply_export(
+                            scope,
+                            &elab.module_state.exports,
+                            &elab.module_state.inline_children,
+                            &elab.module_state.file_inline_paths,
+                            &elab.module_state.file_export_tables,
+                            &elab.module_state.file_export_ids,
+                            &elab.module_state.export_provenance,
+                            prefix,
+                            elab.module_state.active_imports.last().map(String::as_str),
+                            unit_inline_modules,
+                            ordered_inline_modules,
+                            &elab.module_state.prop_intros,
+                            &elab.globals,
+                            &mut exports_here,
+                            form,
+                            span,
+                        )?;
+                    }
+                }
+                for (d, rdecl) in node_decls.iter().zip(&rdecls) {
                     if !d.is_pub() {
                         continue;
                     }
@@ -4426,26 +4709,22 @@ fn expand_scope(
                     } = inner
                     {
                         let subject_is_public = exports_here.contains_key(subject)
-                            || run
-                                .iter()
-                                .filter(|candidate| {
-                                    is_recursive_candidate(candidate.unwrap_pub())
-                                })
-                                .any(|candidate| {
-                                    candidate.is_pub() && candidate.unwrap_pub().name() == subject
-                                });
+                            || node_decls.iter().any(|candidate| {
+                                candidate.is_pub() && candidate.unwrap_pub().name() == subject
+                            });
                         if !subject_is_public {
                             return Err(ElabError::UnboundName {
                                 name: subject.clone(),
                                 span: inner.span().clone(),
                             });
                         }
-                        let checked_id = elab.globals.get(&rdecl.name).copied().ok_or_else(|| {
-                            ElabError::Internal(format!(
-                                "recursive public proof '{}' has no checked ID",
-                                rdecl.name
-                            ))
-                        })?;
+                        let checked_id =
+                            elab.globals.get(&rdecl.name).copied().ok_or_else(|| {
+                                ElabError::Internal(format!(
+                                    "recursive public proof '{}' has no checked ID",
+                                    rdecl.name
+                                ))
+                            })?;
                         publish_checked_identity(
                             scope,
                             &mut exports_here,
@@ -4455,12 +4734,13 @@ fn expand_scope(
                             inner.span(),
                         )?;
                     } else {
-                        let checked_id = elab.globals.get(&rdecl.name).copied().ok_or_else(|| {
-                            ElabError::Internal(format!(
-                                "recursive public declaration '{}' has no checked ID",
-                                rdecl.name
-                            ))
-                        })?;
+                        let checked_id =
+                            elab.globals.get(&rdecl.name).copied().ok_or_else(|| {
+                                ElabError::Internal(format!(
+                                    "recursive public declaration '{}' has no checked ID",
+                                    rdecl.name
+                                ))
+                            })?;
                         publish_checked_identity(
                             scope,
                             &mut exports_here,
@@ -4469,161 +4749,37 @@ fn expand_scope(
                             checked_id,
                             inner.span(),
                         )?;
+                        publish_family_intros(
+                            scope,
+                            &mut exports_here,
+                            &elab.module_state.prop_intros,
+                            inner.name(),
+                            &rdecl.name,
+                            inner.name(),
+                            None,
+                            &elab.globals,
+                            inner.span(),
+                        )?;
                     }
                 }
-                i = run_end;
+                if let Some(error) = export_error {
+                    return Err(error);
+                }
+                i = segment_end;
             }
             other => {
                 let is_pub = other.is_pub();
                 let inner = other.unwrap_pub();
+                // All qualifiable declarations are segment nodes; barriers
+                // remain on their original unqualified elaboration path.
                 if is_qualifiable(inner) {
-                    let bare = inner.name().to_string();
-                    if is_pub {
-                        if let Decl::AttachedProofDecl {
-                            subject,
-                            proof_name,
-                            ..
-                        } = inner
-                        {
-                            if !exports_here.contains_key(subject) {
-                                return Err(ElabError::UnboundName {
-                                    name: subject.clone(),
-                                    span: inner.span().clone(),
-                                });
-                            }
-                            if exports_here.contains_key(&format!("{subject}::{proof_name}")) {
-                                return Err(ElabError::TypeMismatch {
-                                    span: inner.span().clone(),
-                                    reason: format!(
-                                        "duplicate public attached proof '{}::{}'",
-                                        subject, proof_name
-                                    ),
-                                });
-                            }
-                        }
-                    }
-                    let renamed = qualify_decl_name(inner, prefix);
-                    let rdecl = resolve_scoped_decl(
-                        &renamed,
-                        scope,
-                        &elab.module_state.exports,
-                        unit_definitions,
-                    )?;
-                    let result = elaborate_checked(
-                        elab,
-                        &rdecl,
-                        pending_fixity_for(&declared_fixities, &rdecl.name),
-                    )?;
-                    record_checked_local(scope, &bare, &result.name, result.def_id);
-                    let constructor_names: Option<Vec<&str>> = match inner {
-                        Decl::DataDecl { ctors, .. } => {
-                            Some(ctors.iter().map(|ctor| ctor.name.as_str()).collect())
-                        }
-                        Decl::ExplicitDataDecl { ctors, .. } => Some(
-                            ctors
-                                .iter()
-                                .map(|ctor| match ctor {
-                                    ExplicitDataCtor::Simple(ctor) => ctor.name.as_str(),
-                                    ExplicitDataCtor::Signature { name, .. } => name.as_str(),
-                                })
-                                .collect(),
-                        ),
-                        _ => None,
-                    };
-                    if let Some(names) = constructor_names {
-                        let mut members = HashMap::new();
-                        for name in names {
-                            let canonical = qualify(prefix, name);
-                            let id = *elab.globals.get(&canonical).ok_or_else(|| {
-                                ElabError::Internal(format!(
-                                    "checked constructor `{canonical}` has no binding"
-                                ))
-                            })?;
-                            if elab
-                                .env
-                                .constructor(id)
-                                .is_none_or(|(parent, _)| parent.id != result.def_id)
-                            {
-                                return Err(ElabError::Internal(format!(
-                                    "checked constructor `{canonical}` has a foreign parent"
-                                )));
-                            }
-                            members.insert(name.to_string(), id);
-                            record_checked_local(scope, name, &canonical, id);
-                        }
-                        if elab
-                            .env
-                            .inductive(result.def_id)
-                            .is_none_or(|family| family.constructors.len() != members.len())
-                        {
-                            return Err(ElabError::Internal(format!(
-                                "checked family `{bare}` has incomplete constructor names"
-                            )));
-                        }
-                        scope
-                            .constructor_members
-                            .insert(result.def_id, members.clone());
-                        elab.module_state
-                            .constructor_members
-                            .insert(result.def_id, members);
-                    }
-                    if let Decl::PropDecl { intros, .. } = inner {
-                        let mut checked_intros = Vec::with_capacity(intros.len());
-                        for intro in intros {
-                            let canonical_intro = format!("{}.{}", result.name, intro.name);
-                            if !elab.globals.contains_key(&canonical_intro) {
-                                return Err(ElabError::Internal(format!(
-                                    "prop intro '{canonical_intro}' did not elaborate"
-                                )));
-                            }
-                            checked_intros.push(intro.name.clone());
-                        }
-                        elab.module_state
-                            .prop_intros
-                            .insert(result.name.clone(), checked_intros);
-                    }
-                    if is_pub {
-                        if let Decl::AttachedProofDecl {
-                            subject,
-                            proof_name,
-                            ..
-                        } = inner
-                        {
-                            publish_checked_identity(
-                                scope,
-                                &mut exports_here,
-                                &format!("{subject}::{proof_name}"),
-                                &result.name,
-                                result.def_id,
-                                inner.span(),
-                            )?;
-                        } else {
-                            // Only the decl's own qualified name is exported —
-                            // never a `DataDecl`'s constructors (`33 §4.2`,
-                            // abstract export: ctors are simply never entered
-                            // into any export table, so a client can't bring
-                            // them into scope by any import form).
-                            publish_checked_identity(
-                                scope, &mut exports_here, &bare, &result.name,
-                                result.def_id, inner.span(),
-                            )?;
-                            publish_family_intros(
-                                scope,
-                                &mut exports_here,
-                                &elab.module_state.prop_intros,
-                                &bare,
-                                &result.name,
-                                &bare,
-                                None,
-                                &elab.globals,
-                                inner.span(),
-                            )?;
-                        }
-                    }
-                    ids.push(result);
-                } else {
-                    // Not module-qualifiable (class/instance/law/foreign/
-                    // temporal/prove) — elaborate unchanged, unqualified.
+                    return Err(ElabError::Internal(format!(
+                        "qualifiable declaration {:?} reached the barrier path",
+                        inner.name()
+                    )));
+                }
+                {
+                    // Class/instance/law/foreign/temporal/prove barriers.
                     let rdecl = resolve_scoped_decl(
                         inner,
                         scope,
@@ -4663,12 +4819,18 @@ fn expand_scope(
                         // declaration is checked, pin later constraints and
                         // instances in THIS scope to its ID, including private
                         // classes that never enter an export table.
-                        scope.binding_ids.insert(inner.name().to_string(), result.def_id);
+                        scope
+                            .binding_ids
+                            .insert(inner.name().to_string(), result.def_id);
                     }
                     if is_pub && matches!(inner, Decl::ClassDecl { .. }) {
                         publish_checked_identity(
-                            scope, &mut exports_here, inner.name(),
-                            &result.name, result.def_id, inner.span(),
+                            scope,
+                            &mut exports_here,
+                            inner.name(),
+                            &result.name,
+                            result.def_id,
+                            inner.span(),
                         )?;
                     }
                     ids.push(result);
@@ -4758,9 +4920,9 @@ fn scc_dependency_order(adj: &[Vec<usize>], sccs: &[Vec<usize>]) -> Vec<usize> {
             return;
         }
         seen[rep] = true;
-        // Condensation edges are the union of every member's edges.  Looking
-        // only at the representative skips dependencies mentioned solely by
-        // a later member of a mutual SCC.
+        // Condensation edges are the union of every member's edges. Looking
+        // only at the representative skips a dependency named by a later
+        // member of a mutual SCC.
         for &member in &sccs[rep] {
             for &dep in &adj[member] {
                 visit(dep, adj, sccs, seen, order);
@@ -6926,6 +7088,100 @@ mod namespace_effect_tests {
             other => panic!("forward export cannot enable self facade: {other:?}"),
         }
         assert_eq!(old, env.globals["A.leak"], "the later local never elaborated");
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    /// MEASURED: a checked provider A is present, B.before survives an invalid
+    /// facade leaf, and B.after is absent after that refusal. CLAIMED: export
+    /// failure preserves the textual prefix but admits no later local. THE
+    /// GAP: this row covers a missing selected member; the self-facade row
+    /// separately guards unavailable provider selection.
+    #[test]
+    fn unavailable_facade_member_does_not_admit_later_local() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let provider_id = env.globals["A.leak"];
+        let source = "module B { pub const before : Nat = Zero export A (missing) pub const after : Nat = Suc Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "A.missing");
+                assert_eq!(span.start, source.find("export A (missing)").unwrap());
+            }
+            other => panic!("unavailable facade member must refuse: {other:?}"),
+        }
+        assert_eq!(provider_id, env.globals["A.leak"]);
+        assert!(env.globals.contains_key("B.before"));
+        assert!(!env.globals.contains_key("B.after"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    /// MEASURED: an unknown in-scope export refuses at its own span; an
+    /// earlier local is checked and a later local is absent. CLAIMED: the
+    /// first unavailable export ends admission at its textual position.
+    /// THE GAP: this row does not cover checked-ID collisions or effects of
+    /// a valid export; the corresponding facade and forward-export rows do.
+    #[test]
+    fn unavailable_in_scope_export_does_not_admit_later_local() {
+        let mut env = ElabEnv::new().expect("base environment");
+        let source = "module A { const before : Nat = Zero export missing const leak : Nat = Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "missing");
+                assert_eq!(span.start, source.find("export missing").unwrap());
+            }
+            other => panic!("unavailable in-scope export must refuse: {other:?}"),
+        }
+        assert!(env.globals.contains_key("A.before"));
+        assert!(!env.globals.contains_key("A.leak"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3, §4.3).
+    /// MEASURED: competing in-scope exports under one surface refuse at the
+    /// second export; A.p survives while the provider's A.leak ID stays put.
+    /// CLAIMED: a collision does not admit a later local. THE GAP: facade
+    /// versus in-scope checked-ID collisions have their own sibling below.
+    #[test]
+    fn in_scope_export_collision_does_not_admit_later_local() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let provider_id = env.globals["A.leak"];
+        let source = "module A { const p : Nat = Zero const q : Nat = Suc Zero export p as y export q as y const leak : Nat = Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::ReExportCollision { surface_name, span, .. }) => {
+                assert_eq!(surface_name, "y");
+                assert_eq!(span.start, source.find("export q as y").unwrap());
+            }
+            other => panic!("two exports under y must collide: {other:?}"),
+        }
+        assert_eq!(env.globals["A.leak"], provider_id);
+        assert!(env.globals.contains_key("A.p"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3, §4.3).
+    /// MEASURED: a facade selects A.leak, then B exports its p under leak;
+    /// the second export collides while B.p survives and B.leak stays absent.
+    /// CLAIMED: collision cannot admit the later same-named local. THE GAP:
+    /// unavailable providers/members use the two separate refusal rows.
+    #[test]
+    fn facade_in_scope_collision_does_not_admit_later_local() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let source = "module B { const p : Nat = Zero export A (leak) export p as leak const leak : Nat = Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::ReExportCollision { surface_name, span, .. }) => {
+                assert_eq!(surface_name, "leak");
+                assert_eq!(span.start, source.find("export p as leak").unwrap());
+            }
+            other => panic!("facade and in-scope export must collide: {other:?}"),
+        }
+        assert!(env.globals.contains_key("B.p"));
+        assert!(!env.globals.contains_key("B.leak"));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
