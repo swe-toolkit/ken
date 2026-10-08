@@ -3035,6 +3035,16 @@ impl<'a> CanonicalCursor<'a> {
         self.read_str()
     }
 
+    fn read_tag_ref(&mut self) -> Result<&'a str, String> {
+        self.read_str_ref()
+    }
+
+    fn read_str_ref(&mut self) -> Result<&'a str, String> {
+        let len = self.read_len()?;
+        std::str::from_utf8(self.read_exact(len)?)
+            .map_err(|err| format!("invalid UTF-8 string: {err}"))
+    }
+
     fn expect_tag(&mut self, expected: &'static str) -> Result<(), String> {
         let found = self.read_tag()?;
         if found == expected {
@@ -5050,18 +5060,57 @@ fn decode_level_view(cursor: &mut CanonicalCursor<'_>) -> Result<CheckedCoreLeve
     }
 }
 
+/// Only four node tags are inspected by plan validation; the other known
+/// canonical terms still take a preorder slot without allocating a String.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BodyNodeTag {
+    Lambda,
+    Let,
+    Pair,
+    FirstProjection,
+    Other,
+}
+
+fn skip_stable_symbol(cursor: &mut CanonicalCursor<'_>) -> Result<(), String> {
+    if cursor.read_tag_ref()? != "symbol" {
+        return Err("expected canonical stable symbol".into());
+    }
+    match cursor.read_str_ref()? {
+        "decl" | "ctor" | "prim" | "module" | "meta" | "obl" | "assume" | "dep" | "unsupported" => {
+        }
+        other => return Err(format!("unknown stable symbol namespace {other:?}")),
+    }
+    let count = cursor.read_len()?;
+    for _ in 0..count {
+        cursor.read_str_ref()?;
+    }
+    Ok(())
+}
+
 /// Enumerate the preorder of a canonical body. The cursor's byte offset also
 /// binds the native decoder to the plan without guessing which decoded nodes
 /// represent an application, a primitive spine, or an erased type payload.
 fn collect_canonical_term_nodes(
     cursor: &mut CanonicalCursor<'_>,
-    nodes: &mut Vec<(usize, String, usize)>,
+    nodes: &mut Vec<(usize, BodyNodeTag, usize)>,
 ) -> Result<(), String> {
     let offset = cursor.pos;
-    let tag = cursor.read_tag()?;
+    let tag = cursor.read_tag_ref()?;
+    let kind = match tag {
+        "lam" => BodyNodeTag::Lambda,
+        "let" => BodyNodeTag::Let,
+        "pair" => BodyNodeTag::Pair,
+        "proj1" => BodyNodeTag::FirstProjection,
+        "type" | "omega" | "var" | "int_lit" | "const" | "ind_former" | "constructor_ref"
+        | "elim" | "pi" | "app" | "sigma" | "ascript" | "absurd" | "quot" | "eq" | "j" | "cast"
+        | "quot_elim" | "proj2" | "refl" | "quot_class" | "trunc" | "trunc_proj" => {
+            BodyNodeTag::Other
+        }
+        other => return Err(format!("unsupported canonical term tag {other:?}")),
+    };
     let index = nodes.len();
-    nodes.push((offset, tag.clone(), offset));
-    let result = match tag.as_str() {
+    nodes.push((offset, kind, offset));
+    let result = match tag {
         "type" | "omega" => skip_level(cursor),
         "var" => {
             cursor.read_u64()?;
@@ -5073,11 +5122,11 @@ fn collect_canonical_term_nodes(
             Ok(())
         }
         "const" | "ind_former" | "constructor_ref" => {
-            decode_stable_symbol(cursor)?;
+            skip_stable_symbol(cursor)?;
             skip_levels(cursor)
         }
         "elim" => {
-            decode_stable_symbol(cursor)?;
+            skip_stable_symbol(cursor)?;
             skip_levels(cursor)?;
             collect_canonical_terms(cursor, nodes)?;
             collect_canonical_term_nodes(cursor, nodes)?;
@@ -5113,7 +5162,7 @@ fn collect_canonical_term_nodes(
 
 fn collect_canonical_terms(
     cursor: &mut CanonicalCursor<'_>,
-    nodes: &mut Vec<(usize, String, usize)>,
+    nodes: &mut Vec<(usize, BodyNodeTag, usize)>,
 ) -> Result<(), String> {
     let len = cursor.read_len()?;
     for _ in 0..len {
@@ -5126,7 +5175,7 @@ pub(crate) fn canonical_body_node_count(declaration: &[u8]) -> Result<usize, Str
     canonical_body_nodes(declaration).map(|nodes| nodes.len())
 }
 
-fn canonical_body_nodes(declaration: &[u8]) -> Result<Vec<(usize, String, usize)>, String> {
+fn canonical_body_nodes(declaration: &[u8]) -> Result<Vec<(usize, BodyNodeTag, usize)>, String> {
     let mut cursor = CanonicalCursor::new(declaration);
     let kind = cursor.read_tag()?;
     if kind != "transparent" {
@@ -5137,7 +5186,7 @@ fn canonical_body_nodes(declaration: &[u8]) -> Result<Vec<(usize, String, usize)
     decode_stable_symbol(&mut cursor)?;
     decode_level_params(&mut cursor)?;
     skip_term(&mut cursor)?; // the checked type is outside the body preorder
-    let mut nodes = Vec::new();
+    let mut nodes = Vec::with_capacity((declaration.len() / 24).min(4096));
     collect_canonical_term_nodes(&mut cursor, &mut nodes)?;
     if cursor.remaining() != 0 {
         return Err(format!("{} trailing declaration bytes", cursor.remaining()));
@@ -5171,10 +5220,12 @@ fn validate_omega_erasure_plan(
                     nodes.len()
                 ))
             })?;
-            if name == "erased_binders" && tag != "lam" && tag != "let" {
+            if name == "erased_binders" && !matches!(tag, BodyNodeTag::Lambda | BodyNodeTag::Let) {
                 return Err(fail(format!("erased binder id {id} has tag {tag:?}")));
             }
-            if name == "collapsed_sigmas" && tag != "pair" && tag != "proj1" {
+            if name == "collapsed_sigmas"
+                && !matches!(tag, BodyNodeTag::Pair | BodyNodeTag::FirstProjection)
+            {
                 return Err(fail(format!("collapsed Σ id {id} has tag {tag:?}")));
             }
         }
@@ -5277,7 +5328,7 @@ fn skip_levels(cursor: &mut CanonicalCursor<'_>) -> Result<(), String> {
 }
 
 fn skip_level(cursor: &mut CanonicalCursor<'_>) -> Result<(), String> {
-    match cursor.read_tag()?.as_str() {
+    match cursor.read_tag_ref()? {
         "level_zero" => Ok(()),
         "level_suc" => skip_level(cursor),
         "level_max" => {

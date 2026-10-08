@@ -3504,6 +3504,7 @@ fn emit_package_from_env(
         }
     };
 
+    let mut omega_memo = crate::omega_erasure::ClassifyMemo::new();
     for id in admitted {
         let symbol = symbols
             .get(id)
@@ -3517,8 +3518,11 @@ fn emit_package_from_env(
             canonical_decl_bytes(decl, &package_table).map_err(|error| outside(&symbol, error))?;
         semantic.declarations.insert(symbol.clone(), bytes);
         if let Decl::Transparent { ty, body, .. } = decl {
-            let (plan, term_nodes) = crate::omega_erasure::omega_erasure_plan_with_count(
-                &env.env, body, ty,
+            let (plan, term_nodes) = crate::omega_erasure::omega_erasure_plan_with_memo(
+                &env.env,
+                body,
+                ty,
+                &mut omega_memo,
             )
             .map_err(|error| CompilerDriverError::OmegaErasurePlan {
                 symbol: symbol.clone(),

@@ -1,7 +1,8 @@
 //! Kernel-classified runtime erasure of checked core. This is an untrusted
 //! compilation plan, not a new kernel admission rule.
 
-use std::collections::BTreeSet;
+use std::borrow::Cow;
+use std::collections::{BTreeSet, HashMap};
 
 use ken_kernel::subst::{subst0, weaken};
 use ken_kernel::{infer, whnf, Context, GlobalEnv, KernelError, Term};
@@ -13,6 +14,70 @@ pub struct OmegaErasurePlan {
     pub erased_subterms: BTreeSet<u32>,
     pub erased_binders: BTreeSet<u32>,
     pub collapsed_sigmas: BTreeSet<u32>,
+}
+
+/// Memoized kernel sort classifications for exactly one immutable GlobalEnv.
+/// Scoped entries are dropped at each context pop, so sibling binders cannot
+/// share a result merely because they have the same de Bruijn depth.
+#[derive(Default)]
+pub(crate) struct ClassifyMemo {
+    closed: HashMap<Term, bool>,
+    scoped: Vec<HashMap<Term, bool>>,
+    application_types: HashMap<usize, (Term, Term)>,
+}
+
+fn has_free_var(term: &Term, bound: usize) -> bool {
+    match term {
+        Term::Var(index) => *index >= bound,
+        Term::Lam(domain, body) | Term::Pi(domain, body) | Term::Sigma(domain, body) => {
+            has_free_var(domain, bound) || has_free_var(body, bound + 1)
+        }
+        Term::Let { ty, val, body } => {
+            has_free_var(ty, bound) || has_free_var(val, bound) || has_free_var(body, bound + 1)
+        }
+        _ => term
+            .children()
+            .into_iter()
+            .any(|child| has_free_var(child, bound)),
+    }
+}
+
+impl ClassifyMemo {
+    pub(crate) fn new() -> Self {
+        Self {
+            scoped: vec![HashMap::new()],
+            ..Self::default()
+        }
+    }
+
+    fn classify(&mut self, env: &GlobalEnv, ctx: &Context, ty: &Term) -> Result<bool, KernelError> {
+        let is_closed = !has_free_var(ty, 0);
+        let table = if is_closed {
+            &mut self.closed
+        } else {
+            &mut self.scoped[ctx.len()]
+        };
+        if let Some(&hit) = table.get(ty) {
+            return Ok(hit);
+        }
+        let value = is_omega_classified(env, ctx, ty)?;
+        table.insert(ty.clone(), value);
+        Ok(value)
+    }
+
+    fn under_binding<T>(
+        &mut self,
+        ctx: &mut Context,
+        domain: Term,
+        f: impl FnOnce(&mut Context, &mut Self) -> Result<T, KernelError>,
+    ) -> Result<T, KernelError> {
+        ctx.push(domain);
+        self.scoped.push(HashMap::new());
+        let result = f(ctx, self);
+        self.scoped.pop();
+        ctx.pop();
+        result
+    }
 }
 
 /// A type is erasable exactly when the kernel infers an Ω sort for that type.
@@ -53,15 +118,26 @@ pub(crate) fn omega_erasure_plan_with_count(
     body: &Term,
     checked_type: &Term,
 ) -> Result<(OmegaErasurePlan, u32), KernelError> {
+    omega_erasure_plan_with_memo(env, body, checked_type, &mut ClassifyMemo::new())
+}
+
+pub(crate) fn omega_erasure_plan_with_memo(
+    env: &GlobalEnv,
+    body: &Term,
+    checked_type: &Term,
+    memo: &mut ClassifyMemo,
+) -> Result<(OmegaErasurePlan, u32), KernelError> {
     let mut plan = OmegaErasurePlan::default();
     let mut next = 0u32;
+    let mut ctx = Context::new();
     visit(
         env,
-        &Context::new(),
+        &mut ctx,
         body,
         Some(checked_type),
         &mut next,
         &mut plan,
+        memo,
     )?;
     Ok((plan, next))
 }
@@ -78,11 +154,12 @@ fn skipped_nodes(node: &Term, next: &mut u32) -> Result<(), KernelError> {
 
 fn visit(
     env: &GlobalEnv,
-    ctx: &Context,
+    ctx: &mut Context,
     node: &Term,
     expected: Option<&Term>,
     next: &mut u32,
     plan: &mut OmegaErasurePlan,
+    memo: &mut ClassifyMemo,
 ) -> Result<(), KernelError> {
     let here = *next;
     *next = next
@@ -90,11 +167,11 @@ fn visit(
         .ok_or_else(|| KernelError::Msg("erasure plan node index overflow".into()))?;
     // The checked expectation, when present, is the sort plane for
     // non-inferable introduction forms; otherwise use the kernel's inference.
-    let inferred = if let Some(ty) = expected {
-        Some(ty.clone())
+    let inferred: Option<Cow<'_, Term>> = if let Some(ty) = expected {
+        Some(Cow::Borrowed(ty))
     } else {
         match infer(env, ctx, node) {
-            Ok(ty) => Some(ty),
+            Ok(ty) => Some(Cow::Owned(ty)),
             Err(_) if matches!(node, Term::Lam(..)) => None,
             Err(error) => {
                 return Err(KernelError::Msg(format!(
@@ -105,9 +182,9 @@ fn visit(
         }
     };
     if inferred
-        .as_ref()
+        .as_deref()
         .map(|ty| {
-            is_omega_classified(env, ctx, ty).map_err(|error| {
+            memo.classify(env, ctx, ty).map_err(|error| {
                 KernelError::Msg(format!(
                     "Ω erasure sort at node {here} ({:?}): {error}",
                     std::mem::discriminant(ty)
@@ -126,48 +203,69 @@ fn visit(
     }
     match node {
         Term::Lam(dom, body) => {
-            visit(env, ctx, dom, None, next, plan)?;
-            if is_omega_classified(env, ctx, dom)? {
+            visit(env, ctx, dom, None, next, plan, memo)?;
+            if memo.classify(env, ctx, dom)? {
                 plan.erased_binders.insert(here);
             }
-            let expected_body = inferred.as_ref().and_then(|ty| match whnf(env, ctx, ty) {
+            let expected_body = inferred.as_deref().and_then(|ty| match whnf(env, ctx, ty) {
                 Term::Pi(_, cod) => Some(*cod),
                 _ => None,
             });
-            let mut inside = ctx.clone();
-            inside.push((**dom).clone());
-            visit(env, &inside, body, expected_body.as_ref(), next, plan)
+            memo.under_binding(ctx, (**dom).clone(), |ctx, memo| {
+                visit(env, ctx, body, expected_body.as_ref(), next, plan, memo)
+            })
         }
         Term::Pi(dom, cod) | Term::Sigma(dom, cod) => {
-            visit(env, ctx, dom, None, next, plan)?;
-            let mut inside = ctx.clone();
-            inside.push((**dom).clone());
-            visit(env, &inside, cod, None, next, plan)
+            visit(env, ctx, dom, None, next, plan, memo)?;
+            memo.under_binding(ctx, (**dom).clone(), |ctx, memo| {
+                visit(env, ctx, cod, None, next, plan, memo)
+            })
         }
         Term::Let { ty, val, body } => {
-            visit(env, ctx, ty, None, next, plan)?;
-            if is_omega_classified(env, ctx, ty)? {
+            visit(env, ctx, ty, None, next, plan, memo)?;
+            if memo.classify(env, ctx, ty)? {
                 plan.erased_binders.insert(here);
             }
-            visit(env, ctx, val, Some(ty), next, plan)?;
-            let mut inside = ctx.clone();
-            inside.push((**ty).clone());
-            let expected_body = inferred.as_ref().map(|t| weaken(t, 1));
-            visit(env, &inside, body, expected_body.as_ref(), next, plan)
+            visit(env, ctx, val, Some(ty), next, plan, memo)?;
+            let expected_body = inferred.as_deref().map(|t| weaken(t, 1));
+            memo.under_binding(ctx, (**ty).clone(), |ctx, memo| {
+                visit(env, ctx, body, expected_body.as_ref(), next, plan, memo)
+            })
         }
         Term::App(function, argument) => {
-            let function_type = infer(env, ctx, function).map_err(|error| {
-                KernelError::Msg(format!(
-                    "Ω erasure application function at node {here}: {error}"
-                ))
-            })?;
-            let Term::Pi(domain, _) = whnf(env, ctx, &function_type) else {
-                return Err(KernelError::Msg(
-                    "checked application has no Pi domain for erasure".into(),
-                ));
-            };
-            visit(env, ctx, function, Some(&function_type), next, plan)?;
-            visit(env, ctx, argument, Some(&domain), next, plan)
+            let key = node as *const Term as usize;
+            if !memo.application_types.contains_key(&key) {
+                // One head inference and one Π instantiation per argument.
+                // Cache each partial application's immediate function type
+                // while descending the same checked AST spine in preorder.
+                let mut nodes = Vec::new();
+                let mut head = node;
+                while let Term::App(f, a) = head {
+                    nodes.push((head as *const Term as usize, a.as_ref()));
+                    head = f;
+                }
+                let mut ty = infer(env, ctx, head).map_err(|error| {
+                    KernelError::Msg(format!(
+                        "Ω erasure application head at node {here}: {error}"
+                    ))
+                })?;
+                for (app, argument) in nodes.into_iter().rev() {
+                    let Term::Pi(domain, codomain) = whnf(env, ctx, &ty) else {
+                        return Err(KernelError::Msg(
+                            "checked application has no Pi domain for erasure".into(),
+                        ));
+                    };
+                    let next_type = subst0(&codomain, argument);
+                    memo.application_types.insert(app, (ty, *domain));
+                    ty = next_type;
+                }
+            }
+            let (function_type, domain) = memo
+                .application_types
+                .remove(&key)
+                .expect("a checked application spine has an inferred Π at every node");
+            visit(env, ctx, function, Some(&function_type), next, plan, memo)?;
+            visit(env, ctx, argument, Some(&domain), next, plan, memo)
         }
         Term::Pair(first, second) => {
             let Some(ty) = inferred else {
@@ -180,14 +278,15 @@ fn visit(
                     "checked pair has no Sigma type for erasure".into(),
                 ));
             };
-            let mut inside = ctx.clone();
-            inside.push((*domain).clone());
-            if is_omega_classified(env, &inside, &codomain)? {
+            let collapsed = memo.under_binding(ctx, (*domain).clone(), |ctx, memo| {
+                memo.classify(env, ctx, &codomain)
+            })?;
+            if collapsed {
                 plan.collapsed_sigmas.insert(here);
             }
-            visit(env, ctx, first, Some(&domain), next, plan)?;
+            visit(env, ctx, first, Some(&domain), next, plan, memo)?;
             let second_type = subst0(&codomain, first);
-            visit(env, ctx, second, Some(&second_type), next, plan)
+            visit(env, ctx, second, Some(&second_type), next, plan, memo)
         }
         Term::Proj1(pair) => {
             let pair_type = infer(env, ctx, pair)?;
@@ -196,16 +295,17 @@ fn visit(
                     "checked projection has no Sigma type for erasure".into(),
                 ));
             };
-            let mut inside = ctx.clone();
-            inside.push((*domain).clone());
-            if is_omega_classified(env, &inside, &codomain)? {
+            let collapsed = memo.under_binding(ctx, (*domain).clone(), |ctx, memo| {
+                memo.classify(env, ctx, &codomain)
+            })?;
+            if collapsed {
                 plan.collapsed_sigmas.insert(here);
             }
-            visit(env, ctx, pair, Some(&pair_type), next, plan)
+            visit(env, ctx, pair, Some(&pair_type), next, plan, memo)
         }
         Term::Ascript(term, ty) => {
-            visit(env, ctx, term, Some(ty), next, plan)?;
-            visit(env, ctx, ty, None, next, plan)
+            visit(env, ctx, term, Some(ty), next, plan, memo)?;
+            visit(env, ctx, ty, None, next, plan, memo)
         }
         Term::Elim {
             fam,
@@ -222,9 +322,9 @@ fn visit(
                 KernelError::Msg(format!("erasure plan has unknown family {fam:?}"))
             })?;
             for param in params {
-                visit(env, ctx, param, None, next, plan)?;
+                visit(env, ctx, param, None, next, plan, memo)?;
             }
-            visit(env, ctx, motive, None, next, plan).map_err(|error| {
+            visit(env, ctx, motive, None, next, plan, memo).map_err(|error| {
                 KernelError::Msg(format!("Ω erasure eliminator motive: {error}"))
             })?;
             for (k, method) in methods.iter().enumerate() {
@@ -233,18 +333,18 @@ fn visit(
                         .map_err(|error| {
                             KernelError::Msg(format!("Ω erasure method type {k}: {error}"))
                         })?;
-                visit(env, ctx, method, Some(&method_ty), next, plan).map_err(|error| {
+                visit(env, ctx, method, Some(&method_ty), next, plan, memo).map_err(|error| {
                     KernelError::Msg(format!("Ω erasure eliminator method {k}: {error}"))
                 })?;
             }
             for index in indices {
-                visit(env, ctx, index, None, next, plan)?;
+                visit(env, ctx, index, None, next, plan, memo)?;
             }
-            visit(env, ctx, scrut, None, next, plan)
+            visit(env, ctx, scrut, None, next, plan, memo)
         }
         _ => {
             for child in node.children() {
-                visit(env, ctx, child, None, next, plan)?;
+                visit(env, ctx, child, None, next, plan, memo)?;
             }
             Ok(())
         }
@@ -371,6 +471,44 @@ fn rewrite(
 mod tests {
     use super::*;
     use crate::ElabEnv;
+
+    /// Promise class: durable invariant (11 §5). MEASURED: the non-allocating
+    /// free-variable walker agrees with kernel weakening on open and closed
+    /// terms, including binding and eliminator shapes. CLAIMED: memoizing a
+    /// closed classification cannot reuse a context-dependent type result.
+    /// THE GAP: a newly added Term variant must be recursed by children().
+    #[test]
+    fn memo_closedness_matches_kernel_weakening() {
+        let int = Term::IntLit(0.into());
+        let terms = [
+            Term::var(0),
+            Term::lam(int.clone(), Term::var(0)),
+            Term::lam(int.clone(), Term::var(1)),
+            Term::pi(int.clone(), Term::sigma(int.clone(), Term::var(1))),
+            Term::Let {
+                ty: Box::new(int.clone()),
+                val: Box::new(int.clone()),
+                body: Box::new(Term::var(0)),
+            },
+            Term::app(int.clone(), Term::var(0)),
+            Term::Elim {
+                fam: ken_kernel::GlobalId(0),
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(int.clone()),
+                methods: vec![Term::var(0)],
+                indices: vec![],
+                scrut: Box::new(int),
+            },
+        ];
+        for term in terms {
+            assert_eq!(
+                !has_free_var(&term, 0),
+                weaken(&term, 1) == term,
+                "{term:?}"
+            );
+        }
+    }
 
     /// Promise class: transition sentinel for the kernel's current
     /// introduction-inference diagnostic. MEASURED: a reducible checked
