@@ -3099,7 +3099,16 @@ fn elaborate_checked(
     rdecl: &crate::resolve::RDecl,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    elab.with_owner(rdecl.name.clone(), |elab| {
+    elaborate_checked_as(elab, rdecl, rdecl.name.clone(), declared_fixity)
+}
+
+fn elaborate_checked_as(
+    elab: &mut ElabEnv,
+    rdecl: &crate::resolve::RDecl,
+    owner: String,
+    declared_fixity: Option<&PendingFixity>,
+) -> Result<crate::elab::ElabResult, ElabError> {
+    elab.with_owner(owner, |elab| {
         elab.with_env_mark_rollback(|elab| {
             if declared_fixity.is_none() && !rdecl.contains_infix_spine {
                 elaborate_checked_spine_free(elab, rdecl)
@@ -4621,24 +4630,32 @@ fn expand_scope(
                         &elab.module_state.exports,
                         unit_definitions,
                     )?;
-                    let result = elaborate_checked(
+                    // An instance or derived dictionary owns its allocations
+                    // and obligation IDs under its own canonical dictionary
+                    // identity, never the class name all its instances share.
+                    let dictionary = match decl_namespace_effect(inner) {
+                        DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
+                            class_name, head_name, span,
+                        } => synthesized_dictionary_name(
+                            scope, &elab.module_state.exports, class_name, head_name, span,
+                        )
+                        .ok(),
+                        _ => None,
+                    };
+                    let owner = dictionary
+                        .as_ref()
+                        .map_or_else(|| rdecl.name.clone(), |name| name.canonical.clone());
+                    let mut result = elaborate_checked_as(
                         elab,
                         &rdecl,
+                        owner,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
-                    if let DeclNamespaceEffect::ReferenceWithSynthesizedDictionary {
-                        class_name, head_name, span,
-                    } = decl_namespace_effect(inner) {
-                        // The declaration result names the class, not its
-                        // synthesized dictionary. Reuse the prebind planner's
-                        // canonical/surface pair for the admitted dictionary.
-                        if let Ok(name) = synthesized_dictionary_name(
-                            scope, &elab.module_state.exports, class_name, head_name, span,
-                        ) {
-                            record_checked_local(
-                                scope, &name.surface, &name.canonical, result.def_id,
-                            );
-                        }
+                    if let Some(name) = &dictionary {
+                        result.name = name.canonical.clone();
+                        record_checked_local(
+                            scope, &name.surface, &name.canonical, result.def_id,
+                        );
                     }
                     if matches!(inner, Decl::ClassDecl { .. }) {
                         record_checked_local(scope, inner.name(), &result.name, result.def_id);
