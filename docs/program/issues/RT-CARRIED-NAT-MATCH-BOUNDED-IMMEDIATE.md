@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-NAT-MATCH-BOUNDED-IMMEDIATE
 title: "A host-produced ImmediateBoundedNat (PrivateBufferSpan field 3, spill class Int) observed by a carried structural Nat Match traps at the Constructor-class guard, so the reached Nat fanout aborts natively after the interpreter's own effect prefix. Decide and build structural Nat observation of a bounded immediate, or a static refusal, so the three Nat variants run with interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1

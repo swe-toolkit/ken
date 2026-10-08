@@ -1,7 +1,7 @@
 ---
 id: RT-ESCAPE-FSHANDLE-FANNING-UNIGNORE
 title: "The ignored escaped-FsHandle fanning row (rt_escape_second_resource_native.rs:584) no longer refuses: on landed main it passes native-versus-interpreter parity under a 256 MiB stack, so its BoundaryCarrier ignore is stale. Un-ignore it with a measured stack provision and full parity"
-status: active
+status: merged
 owner: runtime
 size: S
 tier: T2
@@ -56,3 +56,11 @@ justifies that provision in the row's comment. No production change.
 
 - Any refusal or trap on landed main, which contradicts D0(d).
 - An overflow at 256 MiB, or any need for a production change.
+
+## Closeout
+
+Merged `e7260a1cd` from exact `541ea07c1` (PR #4590). Runtime QA
+`evt_40dqe35g0rvg1` (on `215883add`, comment-only delta), Architect
+`evt_7hh4dhwyh478z`, Decision `dec_63nw58wh0yekr`. The `:584` row
+`escaped_resource_used_by_fanning_host_op_matches_interpreter` runs at
+stdout and effect-event parity and is un-ignored.
