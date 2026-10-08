@@ -3283,7 +3283,7 @@ fn elaborate_checked(
     rdecl: &crate::resolve::RDecl,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    elaborate_checked_as(elab, rdecl, rdecl.name.clone(), declared_fixity)
+    elaborate_checked_as(elab, rdecl, rdecl.name.clone(), false, declared_fixity)
 }
 
 fn describe_instance_head(ty: &RType) -> String {
@@ -3353,9 +3353,12 @@ fn elaborate_checked_as(
     elab: &mut ElabEnv,
     rdecl: &crate::resolve::RDecl,
     owner: String,
+    minted_identity: bool,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    let previous = elab.globals.get(&owner).copied();
+    // A later source unit may lawfully rebind a user-spelled name. Only an
+    // elaborator-minted identity promises exclusive ownership of this key.
+    let previous = minted_identity.then(|| elab.globals.get(&owner).copied()).flatten();
     let previous_instance_key = previous.and_then(|id| {
         elab.class_env
             .instances_by_id
@@ -4919,10 +4922,12 @@ fn expand_scope(
                         || structural.clone().unwrap_or_else(|| rdecl.name.clone()),
                         |name| name.canonical.clone(),
                     );
+                    let minted_identity = dictionary.is_some() || structural.is_some();
                     let mut result = elaborate_checked_as(
                         elab,
                         &rdecl,
                         owner,
+                        minted_identity,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
                     if let Some(name) = &structural {
