@@ -1322,19 +1322,25 @@ pub fn canonical_semantic_bytes(inputs: &CheckedCoreSemanticInputs) -> Vec<u8> {
     out.u64(0);
     encode_symbol_set("symbols", &inputs.symbols, &mut out);
     encode_bytes_map("declarations", &inputs.declarations, &mut out);
-    out.tag("omega_erasure_plans");
-    out.seq_len(inputs.omega_erasure_plans.len());
-    for (symbol, plan) in &inputs.omega_erasure_plans {
-        symbol.encode(&mut out);
-        for (tag, indices) in [
-            ("erased_subterms", &plan.erased_subterms),
-            ("erased_binders", &plan.erased_binders),
-            ("collapsed_sigmas", &plan.collapsed_sigmas),
-        ] {
-            out.tag(tag);
-            out.seq_len(indices.len());
-            for index in indices {
-                out.u64(u64::from(*index));
+    // An empty plan map is the earlier v0 semantic encoding, which remains
+    // valid for inspection but cannot lower a checked body through Ω erasure.
+    // Nonempty W3 maps are a semantic hash input; do not encode an empty tag
+    // that would silently change the identity of every earlier v0 package.
+    if !inputs.omega_erasure_plans.is_empty() {
+        out.tag("omega_erasure_plans");
+        out.seq_len(inputs.omega_erasure_plans.len());
+        for (symbol, plan) in &inputs.omega_erasure_plans {
+            symbol.encode(&mut out);
+            for (tag, indices) in [
+                ("erased_subterms", &plan.erased_subterms),
+                ("erased_binders", &plan.erased_binders),
+                ("collapsed_sigmas", &plan.collapsed_sigmas),
+            ] {
+                out.tag(tag);
+                out.seq_len(indices.len());
+                for index in indices {
+                    out.u64(u64::from(*index));
+                }
             }
         }
     }
@@ -5346,7 +5352,7 @@ fn skip_level(cursor: &mut CanonicalCursor<'_>) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use ken_kernel::env::{Decl, PrimReduction};
-    use ken_kernel::{GlobalId, Level, LevelVar, Term};
+    use ken_kernel::{declare_def, GlobalId, Level, LevelVar, Term};
     use num_bigint::BigInt;
 
     use super::*;
@@ -8283,6 +8289,126 @@ mod tests {
             consumed.symbols.contains(&target),
             "consume path should read the checked-core artifact symbol table, not surface source"
         );
+    }
+
+    /// Promise class: normative compatibility vector (46 §§3.1, 4).
+    /// MEASURED: the pre-W3 v0 fixture keeps both stored fingerprints from
+    /// the earlier emitter and admits inspection with no plan section.
+    /// CLAIMED: an older v0 artifact need not be rehashed to validate.
+    /// THE GAP: a selected transparent body still needs its plan to lower.
+    #[test]
+    fn earlier_v0_package_keeps_its_stored_hashes_and_inspection() {
+        let package = representative_checked_core_fixtures()
+            .expect("earlier v0 fixture")
+            .pop()
+            .unwrap()
+            .package;
+        assert!(package.artifact.semantic.omega_erasure_plans.is_empty());
+        // Captured from the pre-W3 v0 emitter on origin/main 337faba62.
+        assert_eq!(package.core_semantic_hash, 0x3c35_abb3_d8de_b8ea);
+        assert_eq!(package.artifact_hash, 0x23d4_d551_775c_12cd);
+        validate_checked_core_package(&package).expect("stored v0 hashes validate");
+        let target = StableSymbol::declaration("fixture", &["Core"], "Bool");
+        consume_checked_core_package_for_target(&package, [&target])
+            .expect("earlier v0 remains inspectable without raw source");
+    }
+
+    /// Promise class: durable invariant (46 §§3.1, 4; W3 hash case).
+    /// MEASURED: removing one valid Ω binder id, with every other semantic
+    /// input held fixed, changes the core hash. Keeping its old claimed hash
+    /// while recomputing the envelope hash fails at the semantic-hash gate.
+    /// CLAIMED: plans are part of checked-core meaning, not mere annotations.
+    /// THE GAP: structural validation cannot certify that either plan is the
+    /// correct erasure; it establishes hash participation and tag admission.
+    #[test]
+    fn changing_only_a_valid_omega_binder_changes_core_hash() {
+        let mut env = crate::ElabEnv::new().expect("prelude");
+        let int_id = env.globals["Int"];
+        let int_ty = Term::const_(int_id, Vec::new());
+        let seven = Term::IntLit(BigInt::from(7));
+        let proposition = Term::Eq(
+            Box::new(int_ty.clone()),
+            Box::new(seven.clone()),
+            Box::new(seven.clone()),
+        );
+        let alias_id = declare_def(
+            &mut env.env,
+            Vec::new(),
+            Term::Omega(Level::zero()),
+            proposition,
+        )
+        .expect("checked proof alias");
+        let alias_ty = Term::const_(alias_id, Vec::new());
+        let body = Term::lam(alias_ty.clone(), seven);
+        let function_ty = Term::pi(alias_ty, int_ty.clone());
+        let function_id = declare_def(&mut env.env, Vec::new(), function_ty.clone(), body.clone())
+            .expect("checked Ω-binder function");
+        let int_symbol = StableSymbol::primitive("int");
+        let alias_symbol = decl_symbol("alias_proof");
+        let function_symbol = decl_symbol("erases_binder");
+        let table = table_many(&[
+            (int_id, int_symbol.clone()),
+            (alias_id, alias_symbol.clone()),
+            (function_id, function_symbol.clone()),
+        ]);
+        let mut semantic = CheckedCoreSemanticInputs::default();
+        semantic
+            .symbols
+            .extend([int_symbol, alias_symbol.clone(), function_symbol.clone()]);
+        for (id, symbol) in [
+            (alias_id, alias_symbol),
+            (function_id, function_symbol.clone()),
+        ] {
+            let decl = env.env.lookup(id).expect("admitted declaration");
+            let Decl::Transparent { ty, body, .. } = decl else {
+                panic!("both declarations must be checked bodies")
+            };
+            semantic.declarations.insert(
+                symbol.clone(),
+                canonical_decl_bytes(decl, &table).expect("canonical declaration"),
+            );
+            semantic.omega_erasure_plans.insert(
+                symbol.clone(),
+                crate::omega_erasure::omega_erasure_plan(&env.env, body, ty)
+                    .expect("kernel-classified plan"),
+            );
+            semantic
+                .lowerability
+                .insert(symbol, LowerabilityStatus::Supported);
+        }
+        let original = emit_checked_core_package(
+            body_view_header(),
+            CheckedCoreArtifactInputs {
+                semantic,
+                source_identity: BTreeMap::new(),
+                annotations: BTreeMap::new(),
+            },
+        )
+        .expect("complete W3 package");
+        let mut altered = original.artifact.clone();
+        assert!(altered.semantic.omega_erasure_plans[&function_symbol]
+            .erased_binders
+            .contains(&0));
+        altered
+            .semantic
+            .omega_erasure_plans
+            .get_mut(&function_symbol)
+            .unwrap()
+            .erased_binders
+            .remove(&0);
+        let mut changed = emit_checked_core_package(original.header.clone(), altered)
+            .expect("omitting a binder id remains structurally well formed");
+        assert_ne!(original.core_semantic_hash, changed.core_semantic_hash);
+        changed.core_semantic_hash = original.core_semantic_hash;
+        changed.artifact_hash = package_artifact_fingerprint(
+            &changed.header,
+            &changed.artifact,
+            changed.core_semantic_hash,
+        );
+        assert!(matches!(
+            validate_checked_core_package(&changed),
+            Err(CheckedCorePackageError::SemanticHashMismatch { .. })
+        ));
     }
 
     #[test]

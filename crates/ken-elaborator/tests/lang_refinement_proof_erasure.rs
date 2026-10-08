@@ -178,9 +178,17 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
         matches!(erase_checked_core_package_for_target(&missing, [&target]), Err(ErasureError::UnsupportedErasure { symbol, reason }) if symbol == target && reason.contains("missing kernel-classified Ω erasure plan"))
     );
 
-    // AC-5 structural refusal: invalid ids, wrong binder tags, and an
-    // extra marker inside a maximal erased node cannot enter a valid package.
-    for (label, variant) in [("outside", 0), ("binder_tag", 1), ("not_maximal", 2)] {
+    // AC-5 structural refusal, one arm at a time. The emitter recomputes
+    // both hashes for each mutated plan, so a stale hash cannot mask the
+    // intended range, tag, or maximal-subtree validator arm.
+    for (label, variant, reason) in [
+        ("subterm_range", 0, "erased_subterms id 999 outside"),
+        ("binder_range", 1, "erased_binders id 999 outside"),
+        ("sigma_range", 2, "collapsed_sigmas id 999 outside"),
+        ("binder_tag", 3, "erased binder id 1 has tag"),
+        ("sigma_tag", 4, "collapsed Σ id 1 has tag"),
+        ("not_maximal", 5, "inside maximal erased subtree"),
+    ] {
         let mut invalid = package.clone();
         let plan = invalid
             .artifact
@@ -193,9 +201,18 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
                 plan.erased_subterms.insert(999);
             }
             1 => {
-                plan.erased_binders.insert(1);
+                plan.erased_binders.insert(999);
             }
             2 => {
+                plan.collapsed_sigmas.insert(999);
+            }
+            3 => {
+                plan.erased_binders.insert(1);
+            }
+            4 => {
+                plan.collapsed_sigmas.insert(1);
+            }
+            5 => {
                 plan.erased_subterms.insert(0);
             }
             _ => unreachable!(),
@@ -203,7 +220,8 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
         let err = emit_checked_core_package(invalid.header, invalid.artifact)
             .expect_err("malformed plan must not validate");
         assert!(
-            matches!(&err, CheckedCorePackageError::MalformedOmegaErasurePlan { symbol, .. } if symbol == &target),
+            matches!(&err, CheckedCorePackageError::MalformedOmegaErasurePlan { symbol, reason: why }
+                if symbol == &target && why.contains(reason)),
             "{label}: {err:?}"
         );
     }
