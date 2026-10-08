@@ -783,12 +783,14 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 
 /// Every emission owner under which an inline synthesized aggregate is built.
 ///
-/// A seat is emitted by its own predeclared unit. It is also emitted under each
-/// continuation specialization whose exact selected case body contains it.
-/// Those specialization bodies are the population lowering actually enters
-/// under `defining_emission_owner = Specialization(unit.id())`; generated
-/// continuation contexts are a narrower, post-hoc population and therefore
-/// cannot authorize these records.
+/// The five sources are (a) predeclared units containing the seat, (b)
+/// continuation specializations whose selected case body contains it, (c)
+/// Specialized response rows under their base owner, (d) Deferred responses
+/// handled by another owner, and (e) returned-Vis successors performed by the
+/// pending-Vis loop under each successor row's base owner. Those are the
+/// emission populations lowering enters, not a reconstruction from response
+/// disposition alone. Generated continuation contexts are a narrower,
+/// post-hoc population and cannot authorize the records by themselves.
 ///
 /// This authority applies to synthesized aggregates constructed inline at
 /// `seat`: host-result constructors and unit-boundary environments. A checked-IH
@@ -866,6 +868,19 @@ fn inline_synthesized_seat_emission_owners(
                 continue;
             };
             owners.push(owner);
+        }
+        // (e) A Vis returned by a K context is performed by its response
+        // owner's pending-Vis loop under the successor row's base owner
+        // (units.rs emit_pending_vis_owner_loop: AmbientBodyAuthority::bind(
+        // row.base_owner(), ..)). Read the same rows lowering reads.
+        if let Some(protocol) = plan.pending_vis_record_protocol()? {
+            owners.extend(
+                protocol
+                    .members
+                    .values()
+                    .filter(|row| row.effect_origin() == seat)
+                    .map(|row| row.base_owner()),
+            );
         }
     }
     owners.sort();
