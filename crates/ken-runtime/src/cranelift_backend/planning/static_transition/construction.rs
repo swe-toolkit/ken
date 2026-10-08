@@ -1445,6 +1445,16 @@ impl<'src> Planner<'src> {
             self.plan.preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
         self.plan.recursive_residual_dispositions = build_recursive_residual_dispositions(&self.plan)?;
         self.plan.recursive_carrier_boxed_stores = build_recursive_carrier_boxed_stores(&self.plan)?;
+        // The host effect seat plane reads only `source_occurrences` (fixed at
+        // scheduling) and `occurrence_authorities` (written once, above), so it
+        // is final here. It must precede the aggregate ownership plan: ownership
+        // source (e) reads the pending-Vis protocol, whose successor gate reads
+        // this plane. Installed after phase B, ownership was derived against an
+        // empty seat plane and the whole-plan closure re-derived 48 more records.
+        // It stays after `join_results`: a seat's consumer phase is a fact about
+        // the child's planned result representation.
+        self.plan.host_effect_seats = build_host_effect_seat_plan(&self.plan)?;
+        validate_host_effect_seat_plan(&self.plan, &self.plan.host_effect_seats)?;
         // `D7` — the aggregate occurrence population is built HERE, last, and
         // deliberately not beside the occurrence authorities it also reads.
         //
@@ -1589,11 +1599,6 @@ impl<'src> Planner<'src> {
                 &self.plan.checked_ih_continuation_inheritances,
             );
         }
-        // ⛔ After `join_results` for the same reason the ownership plan is: a
-        // seat's consumer phase is a fact about the child's planned result
-        // representation, which does not exist until that line.
-        self.plan.host_effect_seats = build_host_effect_seat_plan(&self.plan)?;
-        validate_host_effect_seat_plan(&self.plan, &self.plan.host_effect_seats)?;
         // This compiler-generated residual is authorized by the same catalog as
         // source traps. Append it only after every source-derived entry so
         // existing planned identities remain stable; lowering can then replace
