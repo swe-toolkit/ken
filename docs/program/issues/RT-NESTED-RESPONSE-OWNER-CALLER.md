@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-RESPONSE-OWNER-CALLER
 title: "The ignored rt_span_prov_native:355 row refuses at ObjectEmission: a forward-declared response owner (the second BufferFreeze) has no verified selected incoming call, because its selected caller is planned inside the first BufferFreeze's specialization and lowering records no disposition for it. Measure where that caller site is lowered, then repair so the caller carries a recorded disposition and the row passes on both engines"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1

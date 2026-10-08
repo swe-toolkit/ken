@@ -1,7 +1,7 @@
 ---
 id: RT-PRODUCER-MATCH-BORROWED-OPTION
 title: "A tree-producing Match whose scrutinee lowers to a BorrowedOption (an Option match on bytes_at inside read_byte) dispatches natively, as the ordinary Match chain already does, instead of refusing in the producer operand chain for want of a BorrowedOption arm"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: architect
@@ -67,3 +67,14 @@ other operand class keeps its current dispatch or refusal.
   WP to land: report it and stop.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40` or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+
+## Closeout
+
+Merged `cc0e6f2b6` from exact `054932299` (PR #4602). Runtime QA
+`evt_6k3sn999hevmb` (AC-2 as amended `evt_1baz5z4ebt7vf`), Architect
+`evt_2fj5q8ta83mnf`, Decision `dec_4nsfd82jkxzyc`. A dedicated
+BorrowedOption arm in the producer Match dispatch lowers each selected arm
+through the computational producer path. The `read_byte` Option witness
+runs natively on both arms at interpreter parity in
+`rt_producer_match_borrowed_option.rs`. The full parity population was gated
+by CI.
