@@ -52,9 +52,13 @@ other operand class keeps its current dispatch or refusal.
 - **AC-1.** The witness runs natively on both of its Option arms, with inputs
   that select each arm, and matches the interpreter's output and exit code.
 - **AC-2 (control).** Removing the new arm brings back the AC-0 refusal at
-  origin 367 with BorrowedOption selected. The ProcessExitStatus population at
-  `:6610` keeps its refusal, and the targeted runtime and ken-cli suites stay
-  green.
+  origin 371 with BorrowedOption selected (re-keyed from the discarded WIP
+  fixture's 367, Architect `evt_6w6dn563hddtx`). The new arm matches only
+  `Lowered::BorrowedOption`. The two rt_escape ProcessExitStatus rows and the
+  targeted runtime and ken-cli suites stay green. On the current base no
+  ProcessExitStatus population reaches the producer fall-through (both rows
+  select HostResult), so that refusal is not a control here (Steward
+  `evt_xj1pg26866sx` reply).
 
 ## Stop conditions
 

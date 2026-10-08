@@ -25,8 +25,15 @@ origin: "Measured by runtime-implementer under RT-SUBCONTINUATION-LIFO-RELEASE-O
 > -> typed-K-context path, whose own claim, body and closeout checks all stay
 > live.
 >
-> **Status: `draft` until that repair LANDS, then `closed` in the SAME
-> candidate.** Closure is conditional on landing, and this node **must not
+> **The vehicle is now the `RT-BRACKET-CONTROL-REGION-IR` umbrella.**
+> RELEASE-ORDER-PARITY's two-arm repair stopped. The Architect re-measured
+> on `ff0a35f24` (`evt_v7p1c6t7kmw6`): the failing claim's producer construct
+> is 737, the middle bracket's own Deferred release, issued under
+> Specialization(1) and resolved inside Specialization(3). The subsumption
+> stands on that reason.
+>
+> **Status: `draft` until the umbrella's repair LANDS, then `closed` in the
+> SAME candidate.** Closure is conditional on landing, and this node **must not
 > receive a separate implementation** — not a fallback, not a lookup widening,
 > not a new declaration lane, not a `Fusion` owner. The two prohibitions under
 > WHAT MUST NOT HAPPEN below are unchanged and are now also the ruling's own
