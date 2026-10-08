@@ -1,7 +1,7 @@
 ---
 id: VERIFY-STRUCTURAL-HEAD-INSTANCE-IDENTITY
 title: "An instance whose head is structural (arrow, Pi, Sigma, Univ, Trunc, Proj) gets no synthesized dictionary identity, so two such instances of one class share the declaration symbol {class}_instance_->: the second overwrites globals, the first falls back to {owner}#{n}, and their owner and obligation ids stay order-dependent. Give a structural-head instance a canonical, injective identity"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
