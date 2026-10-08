@@ -1450,6 +1450,47 @@ fn published_name(item: &ImportItem) -> &str {
     item.rename.as_deref().unwrap_or(&item.name)
 }
 
+/// Select an in-scope export without publishing it. A current local may be
+/// checked later in this segment; every other selected identity must exist
+/// already. Preflight and publication share this exact readiness check.
+fn select_in_scope_export(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    globals: &HashMap<String, ken_kernel::GlobalId>,
+    item: &ImportItem,
+    span: &Span,
+) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
+    let had_scope_binding = scope.bindings.contains_key(&item.name);
+    let canonical = resolve_ref(scope, exports, &item.name, span)?;
+    if !had_scope_binding && !globals.contains_key(&canonical) {
+        return Err(ElabError::UnboundName {
+            name: item.name.clone(),
+            span: span.clone(),
+        });
+    }
+    if scope.current_local_names.contains(&item.name) {
+        return Ok((canonical, None));
+    }
+    let selected_id = scope
+        .qualified_ids
+        .get(&item.name)
+        .or_else(|| scope.binding_ids.get(&item.name))
+        .copied()
+        .or_else(|| {
+            // Locals checked earlier in this unit have their ID in globals.
+            // An imported binding must already have its selected ID.
+            (scope.locals.contains(&item.name)
+                || (!had_scope_binding && !item.name.contains('.')))
+                .then(|| globals.get(&canonical).copied())
+                .flatten()
+        })
+        .ok_or_else(|| ElabError::UnboundName {
+            name: item.name.clone(),
+            span: span.clone(),
+        })?;
+    Ok((canonical, Some(selected_id)))
+}
+
 fn apply_export(
     scope: &mut Scope,
     exports: &HashMap<String, HashMap<String, String>>,
@@ -1514,43 +1555,18 @@ fn apply_export(
         }
         ExportForm::InScope { items } => {
             for item in items {
-                let had_scope_binding = scope.bindings.contains_key(&item.name);
-                let canonical = resolve_ref(scope, exports, &item.name, span)?;
-                if !had_scope_binding && !globals.contains_key(&canonical) {
-                    return Err(ElabError::UnboundName {
-                        name: item.name.clone(),
-                        span: span.clone(),
-                    });
-                }
+                let (canonical, selected_id) =
+                    select_in_scope_export(scope, exports, globals, item, span)?;
                 let surface = published_name(item);
-                if scope.current_local_names.contains(&item.name) {
-                    // The same unit can export a local before it is checked.
-                    // Even if another unit already owns this canonical name,
-                    // that ambient ID is not the forward local's identity.
+                let Some(selected_id) = selected_id else {
+                    // A forward local owns its checked ID, not an ambient
+                    // same-spelled declaration from another unit.
                     publish_identity(exports_here, surface, &canonical, span)?;
                     scope.pending_local_exports.insert(
                         surface.to_string(), (canonical, span.clone()),
                     );
                     continue;
-                }
-                let selected_id = scope
-                    .qualified_ids
-                    .get(&item.name)
-                    .or_else(|| scope.binding_ids.get(&item.name))
-                    .copied()
-                    .or_else(|| {
-                        // Locals checked earlier in this unit have their ID
-                        // in `globals`. An imported binding must already have
-                        // its selected ID; the mutable table is not evidence.
-                        (scope.locals.contains(&item.name)
-                            || (!had_scope_binding && !item.name.contains('.')))
-                            .then(|| globals.get(&canonical).copied())
-                            .flatten()
-                    })
-                    .ok_or_else(|| ElabError::UnboundName {
-                        name: item.name.clone(),
-                        span: span.clone(),
-                    })?;
+                };
                 publish_checked_identity(
                     scope, exports_here, surface, &canonical, selected_id, span,
                 )?;
@@ -4366,54 +4382,64 @@ fn expand_scope(
                     segment_end += 1;
                 }
                 let segment = &decls[i..segment_end];
-                // A facade never binds its exported names in the owner's
-                // body. Preflight its provider and leaves without publishing.
-                // If one fails, admit only the textual prefix before it:
-                // earlier locals keep their checked identities, while later
-                // locals cannot mutate the environment after that refusal.
-                let mut facade_error = None;
+                // Preflight exports without publishing. If an export is
+                // unavailable, elaborate only the textual prefix before it:
+                // earlier checked locals survive, but no later local can
+                // mutate the environment after that refusal. A facade never
+                // binds its exported names in the owner's body.
+                let mut export_error = None;
                 for (offset, d) in segment.iter().enumerate() {
-                    if let Decl::ExportDecl {
-                        form: ExportForm::Facade { module, items },
-                        span,
-                    } = d.unwrap_pub()
-                    {
-                        let provider = select_module_provider(
-                            &elab.module_state.exports,
-                            &elab.module_state.inline_children,
-                            &elab.module_state.file_inline_paths,
-                            &elab.module_state.file_export_tables,
-                            &elab.module_state.file_export_ids,
-                            &elab.module_state.export_provenance,
-                            prefix,
-                            elab.module_state.active_imports.last().map(String::as_str),
-                            unit_inline_modules,
-                            ordered_inline_modules,
-                            module,
-                            span,
-                        );
-                        let preflight = provider.and_then(|provider| {
-                            for item in items {
-                                if !provider.pubmap.contains_key(&item.name) {
-                                    return Err(ElabError::UnboundName {
-                                        name: format!("{module}.{}", item.name),
-                                        span: span.clone(),
-                                    });
+                    if let Decl::ExportDecl { form, span } = d.unwrap_pub() {
+                        let preflight = match form {
+                            ExportForm::Facade { module, items } => select_module_provider(
+                                &elab.module_state.exports,
+                                &elab.module_state.inline_children,
+                                &elab.module_state.file_inline_paths,
+                                &elab.module_state.file_export_tables,
+                                &elab.module_state.file_export_ids,
+                                &elab.module_state.export_provenance,
+                                prefix,
+                                elab.module_state.active_imports.last().map(String::as_str),
+                                unit_inline_modules,
+                                ordered_inline_modules,
+                                module,
+                                span,
+                            )
+                            .and_then(|provider| {
+                                for item in items {
+                                    if !provider.pubmap.contains_key(&item.name) {
+                                        return Err(ElabError::UnboundName {
+                                            name: format!("{module}.{}", item.name),
+                                            span: span.clone(),
+                                        });
+                                    }
                                 }
-                            }
-                            Ok(())
-                        });
+                                Ok(())
+                            }),
+                            ExportForm::InScope { items } => items.iter().try_for_each(|item| {
+                                select_in_scope_export(
+                                    scope,
+                                    &elab.module_state.exports,
+                                    &elab.globals,
+                                    item,
+                                    span,
+                                )
+                                .map(|_| ())
+                            }),
+                        };
                         if let Err(error) = preflight {
                             segment_end = i + offset;
-                            facade_error = Some(error);
+                            export_error = Some(error);
                             break;
                         }
-                        for item in items {
-                            for name in [item.name.as_str(), published_name(item)] {
-                                if !scope.bindings.contains_key(name)
-                                    && !elab.globals.contains_key(name)
-                                {
-                                    scope.facade_only.insert(name.to_string());
+                        if let ExportForm::Facade { items, .. } = form {
+                            for item in items {
+                                for name in [item.name.as_str(), published_name(item)] {
+                                    if !scope.bindings.contains_key(name)
+                                        && !elab.globals.contains_key(name)
+                                    {
+                                        scope.facade_only.insert(name.to_string());
+                                    }
                                 }
                             }
                         }
@@ -4719,7 +4745,7 @@ fn expand_scope(
                         )?;
                     }
                 }
-                if let Some(error) = facade_error {
+                if let Some(error) = export_error {
                     return Err(error);
                 }
                 i = segment_end;
@@ -7071,6 +7097,27 @@ mod namespace_effect_tests {
         assert_eq!(provider_id, env.globals["A.leak"]);
         assert!(env.globals.contains_key("B.before"));
         assert!(!env.globals.contains_key("B.after"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    /// MEASURED: an unknown in-scope export refuses at its own span; an
+    /// earlier local is checked and a later local is absent. CLAIMED: the
+    /// first unavailable export ends admission at its textual position.
+    /// THE GAP: this row does not cover checked-ID collisions or effects of
+    /// a valid export; the corresponding facade and forward-export rows do.
+    #[test]
+    fn unavailable_in_scope_export_does_not_admit_later_local() {
+        let mut env = ElabEnv::new().expect("base environment");
+        let source = "module A { const before : Nat = Zero export missing const leak : Nat = Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "missing");
+                assert_eq!(span.start, source.find("export missing").unwrap());
+            }
+            other => panic!("unavailable in-scope export must refuse: {other:?}"),
+        }
+        assert!(env.globals.contains_key("A.before"));
+        assert!(!env.globals.contains_key("A.leak"));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
