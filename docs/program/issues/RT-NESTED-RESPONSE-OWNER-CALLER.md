@@ -72,32 +72,41 @@ retained.
    funcid61/block673. Its K, Context(2), which is also owner 0's K, returns
    a tag that is not the planned Ret word `0x101d_0000_002a`. Owner 0's
    successor is entered and its unknown-member exit is not taken.
-2. **D1g (measurement only, on `b135b25b5`, probes restored).** Report:
-   - the actual carrier tag at funcid61/block673, decoded: a Ret identity
-     (of which K) or a Vis constructor (of which origin: 528, 1079 or
-     another), and the pending-frame discriminant if a frame is live;
-   - the emitter (file:line) of that guard: `emit_pending_vis_owner_loop`
-     (`units.rs:3256`) or a Ret-only response path;
-   - from the protocol value at `core.rs:2879`: whether owner 4 is in
-     `owners`, the `frames` keys for ResponseOwner(4) and Context(2), and
-     each owner listing Context(2) with its members and returning units;
-   - row 4's planned K-Ret identity (`k_ret_identity().tag_abi_word()`)
-     and the Ret identity Context(2) emits on each return path.
+2. **D1g: done, G3** (`evt_37n0bngpgej4s`, ruled `evt_7yy6d7gkm48xy`).
+   Owner 4's K is Context(1)/funcid66, not Context(2), so G1 and G2 are
+   void. Owner 4's Ret-only body receives the installed Vis 528 (row 5)
+   from its K. One relay member, Vis 361, excluded the whole owner:
+   `returned_vis_protocol(Vis1496)` is Ok with members, but
+   `pending_vis_record_protocol` skips owner 4 at `returned_vis.rs:129`
+   (`excluded_by_relay ... continue`). The emitter (`units.rs:4572-4625`)
+   reads the absence as Ret-only and emits the `require_i64` that returns
+   `-1`. Lowering has no relay arm, so the planner fails open.
+3. **D1h (measurement only, on `b135b25b5`, probes restored).** Report:
+   - **the reference semantics:** the interpreter alone on the span row,
+     through a probe that skips the native-first ordering. For each
+     invocation of owner 4's K, which returned Vis occurs (361, 528 or
+     both), and how the interpreter settles each one: the handler or row,
+     and the owner the result flows to;
+   - **Context(1)'s census:** each member with its relay flag, successor
+     row and k_context; the context-to-funcid map for Contexts 1 and 6; and
+     which binder relay Vis 361's operation `Var` forwards;
+   - **the whole-owner rule's provenance:** the commit and ruling event
+     that introduced "A relay makes the WHOLE owner ineligible"
+     (`returned_vis.rs:326`), from `git log -S`.
 
    Outcomes, ruled in advance:
-   - **G1.** The tag is a Vis or pending carrier, and owner 4 is in the
-     protocol but has a Ret-only guard. R-CHAIN-1 then gains the owner-loop
-     clause in item 3.
-   - **G2.** The tag is a Ret of a different K identity, so Context(2)
-     serves two rows with distinct Ret identities. **Stop**; the Architect
-     rules on the data.
-   - **G3.** Anything else. **Stop.**
+   - **H1.** The interpreter reaches only 528 for owner 4; 361 is present
+     but not reached. R-CHAIN-1 gains clause (c) below, and the Architect
+     rules its exact code once the provenance item shows the whole-owner
+     rule's rationale does not forbid it.
+   - **H2.** The interpreter reaches relay 361 through owner 4. Relay
+     settlement is a new mechanism. **Stop**; the Steward decides the
+     scope.
+   - **H3.** Anything else. **Stop.**
 
-   Neither outcome edits the `0x101d_0000_002a` word, and no guard is
-   relaxed.
-3. **R-CHAIN-1 (production; its edits wait for D1g).** It closes inventory
-   entries 1 and 2. It changes no emitted code by itself: lowering already
-   reads the same derivation on the final plan.
+   No guard is relaxed, and the `0x101d_0000_002a` word is not edited.
+4. **R-CHAIN-1 (production; its edits wait for D1h and the Architect's
+   ruling on it).** It closes all three inventory entries.
    - A stored, validated plane, `plan.pending_vis_settlements`. It is
      built once, after phase B's owner check and before the `:1520`
      rebuild.
@@ -111,8 +120,20 @@ retained.
      the arm that reads it, both come from the stored row id. A discriminant
      that matches no arm becomes a catalogued, fail-closed trap, never
      `UnclassifiedRuntimeTrap { -1 }`.
-   - **On G1 only:** every response guard whose owner is in the stored
-     plane is emitted through the owner loop, keyed on the stored plane.
+   - **(a) No silent drop.** The stored plane holds a classification for
+     every response owner, as an enum with no `_` arm: `Protocol(..)`,
+     `RetOnly` (the K census has zero returned-Vis members) and
+     `Excluded { reason }` (a relay, or a swallowed Err with its text).
+     The emitter selects its arm from this classification only.
+   - **(b) Fail closed at planning.** An `Excluded` owner whose census has
+     any non-relay installed member is refused at planning with "response
+     owner K returns an installed Vis outside a pending-Vis protocol". It
+     is never emitted Ret-only.
+   - **(c) Mixed owners, on H1 only.** Non-relay members enter the
+     pending-Vis record path as owner 0's do. Each relay member gets an
+     explicit planned arm in the owner loop that traps through a
+     planner-catalogued trap ("relay Vis returned to a pending-Vis
+     owner"), interned like `malformed_dynamic_constructor_trap`.
 
 ## Acceptance
 
@@ -131,8 +152,8 @@ retained.
   builder, the validator and the diagnostics.
 - **AC-R4 (mutation).** A discriminant mutation yields the catalogued trap,
   not `-1`.
-- **AC-R5 (mutation, on G1).** Mutating owner 4's stored membership yields
-  a catalogued refusal at planning, not `-1`.
+- **AC-R5.** On `b135b25b5`'s plan with clause (c) disabled, the span row
+  gets the exact (b) planner refusal, not `-1`.
 - **AC-4 (controls).** The five sibling rows, SEQUENTIAL with its
   plan-row pins, and `one_bracket_retains_native_parity` stay green. The
   px8ta rows keep their labelled failures. The `units.rs:7831` coverage gate
@@ -152,13 +173,14 @@ settlement chain (`evt_1fvvjj40kk6s9`, `evt_1dynjvvkh7mnf`,
 2. Source (e)'s protocol gate was keyed on the host-effect seat plane,
    which was installed after ownership. Fixed by reordering the seat
    install.
-3. After the planner closes, the linked native run traps `-1`. Narrowed:
-   it is owner 4's Ret-only guard over the shared K Context(2), not owner
-   0's discriminant. D1g decides the cause.
+3. After the planner closes, the linked native run traps `-1`. Measured
+   (D1g): one relay member excludes owner 4 from the protocol silently,
+   and the emitter reads the gap as Ret-only.
 
-Shared predicate (1 and 2; 3 provisional until D1g): owner 0's settlement is a
-cross-owner chained settlement that no plan object names, so each
-consumer re-derives the owner of seat 162 from its own plane.
+Shared predicate (all three, Architect `evt_7yy6d7gkm48xy`): the chained
+settlement has no single plan object, so each consumer derives it from its
+own plane, and a settlement one consumer discards silently reads to the
+next as a different answer.
 
 ## Stop conditions
 
