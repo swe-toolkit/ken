@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-DFA
 title: "The catalog has no automata. Land Algorithm.FormalLanguages.Dfa: a deterministic automaton over any state carrier and alphabet, with run, accepts, complement and a general product, and its law set fully proved and Axiom-free"
-status: draft
+status: active
 owner: foundation
 size: M
 tier: T2

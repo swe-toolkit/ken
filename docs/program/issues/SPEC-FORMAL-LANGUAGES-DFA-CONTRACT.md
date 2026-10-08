@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-DFA-CONTRACT
 title: "No automaton or formal-language contract exists in spec/50-stdlib, so the catalog's automata layer has nothing to build against. Author spec/50-stdlib/61-formal-languages.md with its first section: a deterministic automaton over any state carrier and any alphabet, its operations, its proved law set and its trust boundary"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -64,3 +64,10 @@ chapter in `spec/50-stdlib/README.md` and `spec/SPEC-PROGRESS.md`.
 ## Stop conditions
 
 - The contract needs a kernel, trust or surface-syntax change.
+
+## Closeout
+
+Merged `e5ec530dc` from exact `cdc4bb734` (PR #4593). Architect
+`evt_4vdc9t01e5tb2`, CV `evt_3r8dccx1g7as2`, Decision `dec_1p1bvwjy5ft2x`.
+`spec/50-stdlib/61-formal-languages.md` §1 is the contract for
+`CAT-FORMAL-LANGUAGES-DFA`, which is now unblocked.

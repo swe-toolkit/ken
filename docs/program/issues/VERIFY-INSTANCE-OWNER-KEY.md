@@ -1,7 +1,7 @@
 ---
 id: VERIFY-INSTANCE-OWNER-KEY
 title: "Since VERIFY-OBLIGATION-STABLE-IDENTITY an instance's unnamed declarations are owned by the class name, which every instance of the class shares, so instance literal and hole symbols {class}#{n} and the package hash depend on source order. Key each instance's owner on its own stable identity"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -66,3 +66,13 @@ That covers literals and `requires` holes opened inside instance methods.
 - Any kernel, `trusted_base()` or spec change.
 - A pinned hash or id that moves for any reason other than the instance
   owner key: stop with the consumers listed.
+
+## Closeout
+
+Merged `06c037f92` from exact `31ca84fb9` (PR #4594). Verify QA
+`evt_3d56jqzacd1ha`, Architect `evt_219gwwa5dahbj` on ruling
+`evt_7ndy6vqxw51w5`, Decision `dec_1k6f6jpgyk27q`. Named-head instances
+and `derive` own allocations and obligation ids under their canonical
+dictionary identity. Structural-head instances moved to
+`VERIFY-STRUCTURAL-HEAD-INSTANCE-IDENTITY` (scope ruling
+`evt_3g9ejwbbs54hp`).
