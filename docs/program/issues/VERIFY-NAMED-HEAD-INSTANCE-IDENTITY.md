@@ -143,7 +143,10 @@ spelling, is the residual of `VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT`.
   - a `where Pick Foo` search on the new `Foo` selects the new
     dictionary.
 - **AC-8 (mutation, QA).** Passing a minted spelling at the user-spelled
-  caller reddens AC-6.
+  caller only for a rebind whose prior binding is unminted reddens AC-6's
+  rebind rows. A mutant that gives every user-spelled call the same pair is
+  green by design, because equal pairs are the lawful rebind, so it is not
+  evidence either way (verify-implementer `evt_14dt5r6b2f72h`).
 - **AC-9 (mutation, QA).** Forcing `rebound_spelling = false` reddens
   exactly the four AC-6c rows and AC-7, while AC-1 stays green.
 
