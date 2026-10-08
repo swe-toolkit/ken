@@ -37,6 +37,10 @@ use crate::ElabEnv;
 /// Persistent cross-call module bookkeeping (lives on `ElabEnv`).
 #[derive(Default, Clone)]
 pub struct ModuleState {
+    /// Checked source-declaration descriptions by ID, retained for an
+    /// order-independent diagnostic when another declaration takes the same
+    /// canonical globals key. Unlike a spelling lookup this survives rebinds.
+    declaration_descriptions: HashMap<ken_kernel::GlobalId, String>,
     /// The anonymous boundary parsed from the active root source unit. This is
     /// the shared reader seam: admission consumes `admits`; the runner may
     /// independently consume `capabilities` after elaboration.
@@ -136,6 +140,8 @@ struct ExportProvenance {
 
 impl ModuleState {
     pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
+        self.declaration_descriptions
+            .retain(|id, _| !removed.contains(id));
         self.root_scope.scrub_global_ids(removed);
         for scope in self.loaded_unit_scopes.values_mut() {
             scope.scrub_global_ids(removed);
@@ -3280,19 +3286,124 @@ fn elaborate_checked(
     elaborate_checked_as(elab, rdecl, rdecl.name.clone(), declared_fixity)
 }
 
+fn describe_instance_head(ty: &RType) -> String {
+    match ty {
+        RType::RCon(name, _)
+        | RType::RCheckedGlobal { name, .. }
+        | RType::RVarTy(_, name, _)
+        | RType::RPatternAliasTy(_, name, _) => name.clone(),
+        RType::RApp(function, argument, _) => format!(
+            "({} {})",
+            describe_instance_head(function),
+            describe_instance_head(argument)
+        ),
+        RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _) => format!(
+            "({} -> {})",
+            describe_instance_head(a),
+            describe_instance_head(b)
+        ),
+        RType::RPi(binder, a, b, _) => format!(
+            "({binder} : {}) -> {}",
+            describe_instance_head(a),
+            describe_instance_head(b)
+        ),
+        RType::RSigma(binder, a, b, _) => format!(
+            "({binder} : {}) × {}",
+            describe_instance_head(a),
+            describe_instance_head(b)
+        ),
+        RType::RUniv(None, _) => "Type".to_string(),
+        RType::RUniv(Some(level), _) => format!("Type {level}"),
+        RType::RTrunc(inner, _) => format!("‖{}‖", describe_instance_head(inner)),
+        RType::RRefine(_, carrier, _, _) => describe_instance_head(carrier),
+        RType::RProj(_, field, _) => format!("projection .{field}"),
+    }
+}
+
+fn describe_checked_declaration(rdecl: &RDecl) -> String {
+    match &rdecl.kind {
+        RDeclKind::InstanceDecl { head_type, .. } => {
+            format!(
+                "instance {} {}",
+                rdecl.name,
+                describe_instance_head(head_type)
+            )
+        }
+        RDeclKind::DeriveDecl { data_name, .. } => {
+            format!("derive {} for {data_name}", rdecl.name)
+        }
+        RDeclKind::View { keyword, .. } => {
+            let kind = match keyword {
+                crate::ast::DefKeyword::Const => "const",
+                crate::ast::DefKeyword::Fn => "fn",
+                crate::ast::DefKeyword::Proc => "proc",
+            };
+            format!("{kind} {}", rdecl.name)
+        }
+        RDeclKind::ClassDecl { .. } => format!("class {}", rdecl.name),
+        RDeclKind::DataDecl { .. } | RDeclKind::ExplicitDataDecl { .. } => {
+            format!("data {}", rdecl.name)
+        }
+        RDeclKind::TypeAlias { .. } => format!("def {}", rdecl.name),
+        _ => format!("declaration {}", rdecl.name),
+    }
+}
+
 fn elaborate_checked_as(
     elab: &mut ElabEnv,
     rdecl: &crate::resolve::RDecl,
     owner: String,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    elab.with_owner(owner, |elab| {
+    let previous = elab.globals.get(&owner).copied();
+    let previous_instance_key = previous.and_then(|id| {
+        elab.class_env
+            .instances_by_id
+            .iter()
+            .find_map(|(key, info)| (info.instance_id == id).then(|| key.clone()))
+    });
+    let previous_description = previous.map(|id| {
+        elab.module_state
+            .declaration_descriptions
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| format!("declaration {owner}"))
+    });
+    elab.with_owner(owner.clone(), |elab| {
         elab.with_env_mark_rollback(|elab| {
-            if declared_fixity.is_none() && !rdecl.contains_infix_spine {
+            let result = if declared_fixity.is_none() && !rdecl.contains_infix_spine {
                 elaborate_checked_spine_free(elab, rdecl)
             } else {
                 elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
+            }?;
+            if let Some(previous) = previous {
+                let same_instance_key = matches!(
+                    rdecl.kind,
+                    RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. }
+                ) && previous_instance_key.as_ref().is_some_and(|key| {
+                    elab.class_env
+                        .instances_by_id
+                        .get(key)
+                        .is_some_and(|info| info.instance_id == result.def_id)
+                });
+                if previous != result.def_id && !same_instance_key {
+                    let mut declarations = [
+                        previous_description.expect("description captured with previous ID"),
+                        describe_checked_declaration(rdecl),
+                    ];
+                    declarations.sort();
+                    return Err(ElabError::DeclarationIdentityCollision {
+                        identity: owner.clone(),
+                        first: declarations[0].clone(),
+                        second: declarations[1].clone(),
+                        span: rdecl.span.clone(),
+                    });
+                }
             }
+            elab.module_state
+                .declaration_descriptions
+                .insert(result.def_id, describe_checked_declaration(rdecl));
+            Ok(result)
         })
     })
 }
