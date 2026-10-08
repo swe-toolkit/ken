@@ -105,7 +105,16 @@ pub fn bool_or (a : Bool) (b : Bool) : Bool =
     True ↦ True;
     False ↦ b
   }
+
+pub fn bool_not (b : Bool) : Bool =
+  match b {
+    True ↦ False;
+    False ↦ True
+  }
 ```
+
+`bool_not` is transparent Boolean negation. It is shared with collection and
+automaton packages rather than redefined separately in each consumer.
 
 `Ord a` is a total order, supplying the comparator the verified `sort`/
 `is_sorted` thread explicitly (`51 §2.3`/`§4`, ES2-remainder `2358b4d`).
@@ -2765,7 +2774,7 @@ Ken-native; no external reference implementation informed its source.
 2. **Public API.** `IsTrue`, `class DecEq`, `bool_eq`, `bool_and`,
    `bool_and::intro`, `bool_and::comm`, `bool_and::assoc`,
    `bool_and::idempotent`, `bool_and::left_identity`,
-   `bool_and::right_identity`, `bool_or`, `class Ord`, `leq_nat`,
+   `bool_and::right_identity`, `bool_or`, `bool_not`, `class Ord`, `leq_nat`,
    `leq_nat::refl`, `leq_nat::trans`,
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,
