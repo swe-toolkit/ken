@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-08 06:52:36Z — from 905 issue file(s) in `docs/program/issues/`.
+2026-10-08 07:41:54Z — from 905 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -932,7 +932,7 @@ the committed file matches the generator's output.
 | `VERIFY-PACKAGE-EXAMPLE-BINDING-SCOPE` | Since VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS a .ken.md source's example-fence declarations are dropped from the package but stay bound in the shared env, so a later source can reference one: the package validates with a dangling symbol and an executable entrypoint, and only erasure refuses. Close the reference before emit | merged | verify | S | architect | — |
 | `VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS` | Since VERIFY-CALLER-OBLIGATION-REPORTING the compiler driver builds a .ken.md package's admitted list from elaborate_ken_md_file_v1, which also returns ken example fence declarations, so an obligation-free literate package gains example declarations and a new core_semantic_hash. Admit only the source's declarations | merged | verify | S | architect | — |
 | `VERIFY-REUSED-ENV-TRUST-RESIDUE` | A reusable elaboration environment keeps a trusted-base entry nobody reports: a declaration that fails after minting a premise hole leaves an orphan postulate in the REPL, expand_and_elaborate, load_unit and a reused ElabEnv. Roll the environment back to a mark taken before each declaration | merged | verify | M | architect | — |
-| `VERIFY-STRUCTURAL-HEAD-INSTANCE-IDENTITY` | An instance whose head is structural (arrow, Pi, Sigma, Univ, Trunc, Proj) gets no synthesized dictionary identity, so two such instances of one class share the declaration symbol {class}_instance_->: the second overwrites globals, the first falls back to {owner}#{n}, and their owner and obligation ids stay order-dependent. Give a structural-head instance a canonical, injective identity | active | verify | M | architect | — |
+| `VERIFY-STRUCTURAL-HEAD-INSTANCE-IDENTITY` | An instance's dictionary identity {class}_instance_{head} is not injective: a structural head (arrow, Pi, Sigma, Univ, Trunc, Proj) gets no identity at all, and since VERIFY-INSTANCE-OWNER-KEY two distinct named-head instances, or an instance and a user declaration, can share one spelling, so one requires premise drops out of the package's obligations and the hash depends on order. Give every admitted instance a canonical, injective identity that no user declaration can spell | active | verify | M | architect | — |
 | `VERIFY-TRANSITIVE-HONESTY` | A claim reads proved when its own certificate checks and its own hole is outside trusted_base(); nothing computes reachability. Under subset Σ a certificate using the proof of a constant whose obligation is open would read proved. Add a read-only kernel reachability query and require it to find no open hole or unaccepted postulate | ready | verify | M | architect | — |
 | `VIS-BR-LITERAL` | visibility walk: raw-string prefixes br and cr are unrecognized by the literal scanner | merged | runtime | XS | none | — |
 
