@@ -230,11 +230,11 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
 #[test]
 fn relevant_sigma_pair_keeps_both_components() {
     // Promise class: durable invariant (42 §3.2, 47 §1).
-    // MEASURED: a computational codomain preserves both pair fields in
-    // native and interpreter evaluation, including when the first domain is
-    // Ω-classified. CLAIMED: only the codomain decides Σ collapse.
-    // THE GAP: an erased first proof must retain a pair slot without being
-    // evaluated; two Int components alone cannot discriminate that case.
+    // MEASURED: Σ Int Int remains a pair on both runtime paths; a proof-first
+    // Σ with computational codomain remains a pair in the plan and interpreter.
+    // CLAIMED: only the codomain decides Σ collapse, not the first domain.
+    // THE GAP: native has no representation for an erased first field in a
+    // retained pair; its fail-closed boundary is pinned below.
     let mut elaborated = ElabEnv::new().expect("prelude admits");
     let int_id = elaborated.globals["Int"];
     let int_ty = Term::const_(int_id, vec![]);
@@ -303,6 +303,7 @@ fn relevant_sigma_pair_keeps_both_components() {
         &[proof_pair_id],
     );
     let target = sym("proof_pair");
+    let lowered = erase_checked_core_package_for_target(&proof_package, [&target]);
     let plan = &proof_package.artifact.semantic.omega_erasure_plans[&target];
     assert!(
         plan.collapsed_sigmas.is_empty(),
@@ -318,19 +319,14 @@ fn relevant_sigma_pair_keeps_both_components() {
             && matches!(&**snd, EvalVal::Int(8))),
         "observed: {result:?}"
     );
-    let RuntimeObservation::Returned(RuntimeGroundValue::Record { fields }) =
-        observed(&native_body(&proof_package, &target, &[target.clone()]))
-    else {
-        panic!("proof-first relevant Σ must remain a runtime pair")
-    };
-    assert_eq!(fields.len(), 2);
-    assert!(
-        matches!(&fields[0], (name, RuntimeGroundValue::Constructor { .. }) if name == "first")
-    );
-    assert_eq!(
-        fields[1],
-        ("second".into(), RuntimeGroundValue::Int(8.into()))
-    );
+    // MEASURED: native lowering refuses a relevant Σ whose first field is
+    // an erased Ω subterm at the exact erased-field lane.
+    // CLAIMED: fail-closed, never a collapsed or partial native value.
+    // THE GAP: a retained Σ slot has no native erased-field representation;
+    // successor LANG-NATIVE-SIGMA-ERASED-FIELD owns that upgrade.
+    assert!(matches!(&lowered,
+        Err(ErasureError::ExpressionLowering { symbol, lane, .. })
+            if symbol == &target && *lane == "erased_omega_subterm_reached_computation"));
 }
 
 #[test]
