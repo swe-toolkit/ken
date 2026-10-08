@@ -13,7 +13,8 @@ use std::path::Path;
 use ken_kernel::{Context, Decl, GlobalEnv, GlobalId, Term};
 
 use crate::checked_core::{
-    AssumptionTrustKind, AssumptionTrustMetadata, CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
+    AssumptionTrustKind, AssumptionTrustMetadata, CanonicalEncodingError,
+    CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
     CheckedCoreBodyViewError, CheckedCoreBodyViewSelection, CheckedCorePackage,
     CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
     ConstructorMetadata, DataMetadata, LowerabilityStatus, ObligationMetadata, ObligationStatus,
@@ -506,6 +507,10 @@ pub enum CompilerDriverError {
     MissingStableSymbol {
         id: GlobalId,
     },
+    PackageReferenceOutsidePackage {
+        declaration: StableSymbol,
+        referenced: StableSymbol,
+    },
     MissingClosureMetadata {
         section: &'static str,
         symbol: StableSymbol,
@@ -557,6 +562,13 @@ impl fmt::Display for CompilerDriverError {
             CompilerDriverError::MissingStableSymbol { id } => {
                 write!(f, "missing stable symbol for admitted global {id}")
             }
+            CompilerDriverError::PackageReferenceOutsidePackage {
+                declaration,
+                referenced,
+            } => write!(
+                f,
+                "declaration {declaration} references {referenced} outside its checked-core package"
+            ),
             CompilerDriverError::MissingClosureMetadata { section, symbol } => write!(
                 f,
                 "target closure is missing required {section} metadata for {symbol}"
@@ -3361,7 +3373,10 @@ fn owned_v2_obligations(results: &[ElabResult]) -> Vec<(GlobalId, ObligationTrip
 fn add_obligation_metadata(
     obligations: &[(GlobalId, ObligationTriple)],
     symbols: &BTreeMap<GlobalId, StableSymbol>,
-    table: &StableSymbolTable,
+    package_table: &StableSymbolTable,
+    example_table: &StableSymbolTable,
+    example_ids: &BTreeSet<GlobalId>,
+    outside: &impl Fn(&StableSymbol, CanonicalEncodingError) -> CompilerDriverError,
     semantic: &mut CheckedCoreSemanticInputs,
 ) -> Result<(), CompilerDriverError> {
     for (owner, triple) in obligations {
@@ -3370,11 +3385,18 @@ fn add_obligation_metadata(
             .cloned()
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *owner })?;
         let obligation = StableSymbol::obligation(triple.id.0.clone());
-        let goal = canonical_term_bytes(&triple.goal_closed, table).map_err(|error| match error {
-            crate::checked_core::CanonicalEncodingError::MissingStableSymbol(id) => {
+        // An example's own obligation report is not admitted content. Its
+        // checked goal may mention earlier example bindings; admitted owners
+        // still close over the package's symbols.
+        let goal = if example_ids.contains(owner) {
+            canonical_term_bytes(&triple.goal_closed, example_table).map_err(|error| {
+                let CanonicalEncodingError::MissingStableSymbol(id) = error;
                 CompilerDriverError::MissingStableSymbol { id }
-            }
-        })?;
+            })?
+        } else {
+            canonical_term_bytes(&triple.goal_closed, package_table)
+                .map_err(|error| outside(&origin, error))?
+        };
         let status = match &triple.provenance.kind {
             ProvKind::FfiRuntimeCheck => ObligationStatus::Tested,
             ProvKind::Ensures { .. }
@@ -3412,11 +3434,27 @@ fn emit_package_from_env(
     let native_primitives = native_entrypoint_plan.is_some();
     let (symbols, table) = stable_symbols_for_env(&manifest.package_name, env, native_primitives)?;
 
+    // Encode admitted content against exactly the package's symbol set. The
+    // shared elaboration environment can still resolve an earlier source's
+    // example-fence binding; encoding against the full table would serialize
+    // a dangling reference while validation sees only section keys.
+    let mut package_table = StableSymbolTable::new();
     for (id, symbol) in &symbols {
         if !example_ids.contains(id) {
             semantic.symbols.insert(symbol.clone());
+            package_table.insert_global(*id, symbol.clone());
         }
     }
+    let outside = |declaration: &StableSymbol, error: CanonicalEncodingError| {
+        let CanonicalEncodingError::MissingStableSymbol(referenced_id) = error;
+        match symbols.get(&referenced_id) {
+            Some(referenced) => CompilerDriverError::PackageReferenceOutsidePackage {
+                declaration: declaration.clone(),
+                referenced: referenced.clone(),
+            },
+            None => CompilerDriverError::MissingStableSymbol { id: referenced_id },
+        }
+    };
 
     for id in admitted {
         let symbol = symbols
@@ -3427,8 +3465,8 @@ fn emit_package_from_env(
             .env
             .lookup(*id)
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *id })?;
-        let bytes = canonical_decl_bytes(decl, &table)
-            .map_err(|_| CompilerDriverError::MissingStableSymbol { id: *id })?;
+        let bytes = canonical_decl_bytes(decl, &package_table)
+            .map_err(|error| outside(&symbol, error))?;
         semantic.declarations.insert(symbol.clone(), bytes);
         semantic
             .lowerability
@@ -3466,11 +3504,19 @@ fn emit_package_from_env(
         &mut semantic,
     );
     if native_primitives {
-        add_native_primitive_metadata(env, &symbols, &mut semantic);
+        add_native_primitive_metadata(env, &symbols, example_ids, &mut semantic);
     }
     apply_manifest_target_metadata(manifest, &mut semantic);
-    add_trusted_base_metadata(env, &symbols, &mut semantic);
-    add_obligation_metadata(obligations, &symbols, &table, &mut semantic)?;
+    add_trusted_base_metadata(env, &symbols, example_ids, &mut semantic);
+    add_obligation_metadata(
+        obligations,
+        &symbols,
+        &package_table,
+        &table,
+        example_ids,
+        &outside,
+        &mut semantic,
+    )?;
     if let Some(plan) = native_entrypoint_plan {
         let symbol = StableSymbol::new(
             SymbolNamespace::Metadata,
@@ -4222,12 +4268,16 @@ fn literal_native_symbol(env: &ElabEnv, id: GlobalId) -> Option<String> {
 fn add_native_primitive_metadata(
     env: &ElabEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
+    example_ids: &BTreeSet<GlobalId>,
     semantic: &mut CheckedCoreSemanticInputs,
 ) {
     for decl in env.env.decls() {
         let Decl::Primitive { id, reduction, .. } = decl else {
             continue;
         };
+        if example_ids.contains(id) {
+            continue;
+        }
         let (registry_symbol, reduction) = match reduction {
             ken_kernel::PrimReduction::Op { symbol } => {
                 ((*symbol).to_string(), PrimitiveReductionMetadata::Op)
@@ -4370,9 +4420,13 @@ fn is_recursive_constructor_arg(arg: &Term, family: GlobalId) -> bool {
 fn add_trusted_base_metadata(
     env: &ElabEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
+    example_ids: &BTreeSet<GlobalId>,
     semantic: &mut CheckedCoreSemanticInputs,
 ) {
     for id in env.env.trusted_base() {
+        if example_ids.contains(&id) {
+            continue;
+        }
         let Some(target) = symbols.get(&id).cloned() else {
             continue;
         };
@@ -7926,5 +7980,58 @@ const zz_example : String = ac0_need
             .unwrap();
         assert_eq!(denotation_obligation.origin, example);
         assert_eq!(denotation_obligation.status, ObligationStatus::Unknown);
+    }
+
+    /// Promise class: durable invariant. MEASURED: the example creates a
+    /// checked Primitive::Literal, but the B1 denotation package has the same
+    /// semantic inputs and core hash with or without that example. CLAIMED:
+    /// native primitive metadata excludes example-only checked literals.
+    /// THE GAP: this reaches a native String literal, not every reduction
+    /// class. The production skip mutant must turn this comparison red.
+    #[test]
+    fn denotation_excludes_example_only_checked_string_literal() {
+        let plain = "```ken\nconst main : Bool = True\n```\n";
+        let with_literal = "```ken\nconst main : Bool = True\n```\n\
+                            ```ken example\nconst zz_ex : String = \"example-only\"\n```\n";
+        let mut env = ElabEnv::new().expect("prelude");
+        let before = env.env.decls().map(Decl::id).collect::<BTreeSet<_>>();
+        env.elaborate_ken_md_file_v1(with_literal)
+            .expect("the string-literal example must elaborate");
+        assert!(env.globals.contains_key("zz_ex"));
+        let literal_ids = env
+            .env
+            .decls()
+            .filter(|decl| {
+                !before.contains(&decl.id())
+                    && matches!(
+                        decl,
+                        Decl::Primitive {
+                            reduction: ken_kernel::PrimReduction::Literal,
+                            ..
+                        }
+                    )
+            })
+            .map(Decl::id)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            literal_ids.len(),
+            1,
+            "the example owns a real literal primitive"
+        );
+        assert!(env.env.checked_literal(literal_ids[0]).is_some());
+
+        let source = |text| CompilerSource::new("literal.ken.md", text);
+        let plain = compile_checked_target_denotation(PACKAGE, source(plain), "main")
+            .expect("denotation without example emits");
+        let example = compile_checked_target_denotation(PACKAGE, source(with_literal), "main")
+            .expect("denotation with example emits");
+        assert!(
+            example.package.artifact.semantic == plain.package.artifact.semantic,
+            "example literal must not enter native primitive metadata or any other semantic lane"
+        );
+        assert_eq!(
+            example.package.core_semantic_hash,
+            plain.package.core_semantic_hash
+        );
     }
 }
