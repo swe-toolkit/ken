@@ -83,7 +83,14 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
 - **AC-1.** A hand-built core row with a pair at `Σ Int φ` whose proof is
   an open hole lowers and evaluates to the carrier value on every path.
 - **AC-2.** A hand-built relevant Σ (second component not at Ω) stays a
-  pair on every path.
+  pair on every path. `Σ Int Int` is the native evidence. A proof-first
+  relevant Σ (`Σ(p : Eq Int 7 7).Int`) keeps its pair in the plan
+  (`collapsed_sigmas` empty, `erased_subterms = {1}`) and on the
+  interpreter (`Pair { fst: Neutral, snd: Int(8) }`). Its native leg pins
+  the current fail-closed refusal by its
+  `erased_omega_subterm_reached_computation` lane, not by prose, with a
+  MEASURED/CLAIMED/THE GAP comment naming `LANG-NATIVE-SIGMA-ERASED-FIELD`
+  (Architect `evt_55gdejjrzap0p`).
 - **AC-2b.** A hand-built `λ (e : P). body` applied to a proof argument
   runs on both paths, where the argument is (i) a variable, (ii) an open
   hole, and (iii) at a `P` that is a transparent alias of an `Eq`. The
@@ -94,7 +101,10 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
   parity with their unconvoyed forms, on both paths.
 - **AC-3.** Runtime parity is unchanged.
 - **AC-4 (mutation).** Keying erasure on the first component alone
-  reddens AC-2.
+  reddens AC-2 first at the proof-first plan assertion ("a computational
+  codomain retains its Σ pair"). Report the native leg's result under the
+  mutant separately; if it is the same refusal, it is a boundary pin, not
+  AC-4 evidence. No production edit.
 - **AC-4b (mutation).** Classifying by spelling (an `eq`/`refl` tag, or
   `delivered_sort_kind`) instead of `is_omega_classified` reddens
   AC-2b(iii).
