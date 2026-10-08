@@ -1341,11 +1341,7 @@ pub fn canonical_semantic_bytes(inputs: &CheckedCoreSemanticInputs) -> Vec<u8> {
     encode_string_map("primitive_refs", &inputs.primitive_refs, &mut out);
     encode_primitive_metadata_map("primitive_metadata", &inputs.primitive_metadata, &mut out);
     encode_data_metadata_map("data_metadata", &inputs.data_metadata, &mut out);
-    encode_symbol_map(
-        "all_support_origins",
-        &inputs.all_support_origins,
-        &mut out,
-    );
+    encode_symbol_map("all_support_origins", &inputs.all_support_origins, &mut out);
     encode_record_sigma_metadata_map(
         "record_sigma_metadata",
         &inputs.record_sigma_metadata,
@@ -1804,14 +1800,22 @@ fn decode_declaration_body_view(
         decode_level_params(&mut cursor).map_err(|reason| malformed_body(symbol, reason))?;
     let checked_type =
         capture_canonical_term(&mut cursor).map_err(|reason| malformed_body(symbol, reason))?;
-    let decode_plan = semantic.omega_erasure_plans.get(symbol).map(|plan| {
-        let nodes = canonical_body_nodes(bytes)
-            .map_err(|reason| malformed_body(symbol, reason))?;
-        Ok::<_, CheckedCoreBodyViewError>(ErasureDecodeContext {
-            plan,
-            indices: nodes.into_iter().enumerate().map(|(i, (offset, _, _))| (offset, i as u32)).collect(),
+    let decode_plan = semantic
+        .omega_erasure_plans
+        .get(symbol)
+        .map(|plan| {
+            let nodes =
+                canonical_body_nodes(bytes).map_err(|reason| malformed_body(symbol, reason))?;
+            Ok::<_, CheckedCoreBodyViewError>(ErasureDecodeContext {
+                plan,
+                indices: nodes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (offset, _, _))| (offset, i as u32))
+                    .collect(),
+            })
         })
-    }).transpose()?;
+        .transpose()?;
     let body = decode_supported_body_term(
         &mut cursor,
         semantic,
@@ -3137,8 +3141,15 @@ fn decode_supported_body_term(
         .read_tag()
         .map_err(|reason| malformed_body(owner, reason))?;
     decode_supported_body_term_after_tag(
-        tag, cursor, semantic, selection, owner, type_context,
-        expected_type, plan, start,
+        tag,
+        cursor,
+        semantic,
+        selection,
+        owner,
+        type_context,
+        expected_type,
+        plan,
+        start,
     )
 }
 
@@ -3153,9 +3164,16 @@ fn decode_supported_body_term_after_tag(
     plan: Option<&ErasureDecodeContext<'_>>,
     start: usize,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
-    let node_id = plan.map(|ctx| ctx.indices.get(&start).copied().ok_or_else(|| {
-        malformed_body(owner, format!("Ω erasure plan has no body node at byte offset {start}"))
-    })).transpose()?;
+    let node_id = plan
+        .map(|ctx| {
+            ctx.indices.get(&start).copied().ok_or_else(|| {
+                malformed_body(
+                    owner,
+                    format!("Ω erasure plan has no body node at byte offset {start}"),
+                )
+            })
+        })
+        .transpose()?;
     if node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.erased_subterms.contains(&id))) {
         // The bytes remain checked and hash-covered, but an Ω subterm must
         // never enter the executable decoder (refl/proj2 are not runtime IR).
@@ -3165,12 +3183,28 @@ fn decode_supported_body_term_after_tag(
     }
     if node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.collapsed_sigmas.contains(&id))) {
         if tag == "pair" {
-            let first = decode_supported_body_term(cursor, semantic, selection, owner, type_context, None, plan)?;
+            let first = decode_supported_body_term(
+                cursor,
+                semantic,
+                selection,
+                owner,
+                type_context,
+                None,
+                plan,
+            )?;
             capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
             return Ok(first);
         }
         if tag == "proj1" {
-            return decode_supported_body_term(cursor, semantic, selection, owner, type_context, None, plan);
+            return decode_supported_body_term(
+                cursor,
+                semantic,
+                selection,
+                owner,
+                type_context,
+                None,
+                plan,
+            );
         }
     }
     match tag.as_str() {
@@ -3263,7 +3297,9 @@ fn decode_supported_body_term_after_tag(
                 checked_constructor_view(semantic, owner, &symbol, level_args)?,
             ))
         }
-        "elim" => decode_supported_match_view(cursor, semantic, selection, owner, type_context, plan),
+        "elim" => {
+            decode_supported_match_view(cursor, semantic, selection, owner, type_context, plan)
+        }
         "lam" => {
             let parameter_type =
                 capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
@@ -3286,7 +3322,9 @@ fn decode_supported_body_term_after_tag(
             )?);
             Ok(CheckedCoreBodyTerm::Lambda {
                 parameter_type,
-                erased_parameter: node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.erased_binders.contains(&id))),
+                erased_parameter: node_id.is_some_and(|id| {
+                    plan.is_some_and(|ctx| ctx.plan.erased_binders.contains(&id))
+                }),
                 body,
             })
         }
@@ -3348,7 +3386,9 @@ fn decode_supported_body_term_after_tag(
             )?);
             Ok(CheckedCoreBodyTerm::Let {
                 value_type,
-                erased_value: node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.erased_binders.contains(&id))),
+                erased_value: node_id.is_some_and(|id| {
+                    plan.is_some_and(|ctx| ctx.plan.erased_binders.contains(&id))
+                }),
                 value,
                 body,
             })
@@ -3794,7 +3834,15 @@ fn decode_supported_record_sigma_projection(
     }
 
     let base = decode_supported_body_term_after_tag(
-        base_tag, cursor, semantic, selection, owner, type_context, None, plan, base_start,
+        base_tag,
+        cursor,
+        semantic,
+        selection,
+        owner,
+        type_context,
+        None,
+        plan,
+        base_start,
     )?;
     let record_symbol = record_symbol_for_projection_base(semantic, owner, &base, type_context)?;
     let record = checked_record_sigma_view(semantic, owner, &record_symbol)?;
@@ -4023,19 +4071,33 @@ fn decode_supported_pair_construction(
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
     if let Some(expected_type) = expected_type {
         let mut expected = CanonicalCursor::new(expected_type);
-        let head = expected.read_tag().map_err(|reason| malformed_body(owner, reason))?;
+        let head = expected
+            .read_tag()
+            .map_err(|reason| malformed_body(owner, reason))?;
         if head == "sigma" && plan.is_some() {
             let first_expected = capture_canonical_term(&mut expected)
                 .map_err(|reason| malformed_body(owner, reason))?;
             let first = decode_supported_body_term(
-                cursor, semantic, selection, owner, type_context,
-                Some(&first_expected), plan,
+                cursor,
+                semantic,
+                selection,
+                owner,
+                type_context,
+                Some(&first_expected),
+                plan,
             )?;
             let second = decode_supported_body_term(
-                cursor, semantic, selection, owner, type_context, None, plan,
+                cursor,
+                semantic,
+                selection,
+                owner,
+                type_context,
+                None,
+                plan,
             )?;
             return Ok(CheckedCoreBodyTerm::StructuralPair {
-                first: Box::new(first), second: Box::new(second),
+                first: Box::new(first),
+                second: Box::new(second),
             });
         }
         if let Some(symbol) = record_head_symbol_from_type(expected_type)
@@ -4369,21 +4431,36 @@ fn decode_supported_match_view(
                         constructor,
                     },
                 )?;
-        let method =
-            decode_supported_body_term(cursor, semantic, selection, owner, type_context, None, plan)?;
+        let method = decode_supported_body_term(
+            cursor,
+            semantic,
+            selection,
+            owner,
+            type_context,
+            None,
+            plan,
+        )?;
         if convoy_erased_proof_binder {
             let mut trailing = &method;
             for _ in 0..constructor.argument_count + constructor.recursive_positions.len() {
                 let CheckedCoreBodyTerm::Lambda { body, .. } = trailing else {
                     return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
-                        symbol: owner.clone(), family: family_symbol.clone(),
+                        symbol: owner.clone(),
+                        family: family_symbol.clone(),
                     });
                 };
                 trailing = body;
             }
-            if !matches!(trailing, CheckedCoreBodyTerm::Lambda { erased_parameter: true, .. }) {
+            if !matches!(
+                trailing,
+                CheckedCoreBodyTerm::Lambda {
+                    erased_parameter: true,
+                    ..
+                }
+            ) {
                 return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
-                    symbol: owner.clone(), family: family_symbol.clone(),
+                    symbol: owner.clone(),
+                    family: family_symbol.clone(),
                 });
             }
         }
@@ -4600,7 +4677,7 @@ fn inspect_non_dependent_motive(
     let erased_only_dependency = if kind == Some(SortKind::Type) && dependent {
         let mut pi = CanonicalCursor::new(&body);
         if pi.read_tag()? == "pi" {
-            skip_term(&mut pi)?; // the candidate proof domain
+            skip_term(&mut pi)?; // syntactic candidate; the method's plan marker is authority
             let codomain = capture_canonical_term(&mut pi)?;
             pi.remaining() == 0
                 && !canonical_term_contains_free_var(&codomain, 0)?
@@ -4986,8 +5063,15 @@ fn collect_canonical_term_nodes(
     nodes.push((offset, tag.clone(), offset));
     let result = match tag.as_str() {
         "type" | "omega" => skip_level(cursor),
-        "var" => { cursor.read_u64()?; Ok(()) }
-        "int_lit" => { let len = cursor.read_len()?; cursor.read_exact(len)?; Ok(()) }
+        "var" => {
+            cursor.read_u64()?;
+            Ok(())
+        }
+        "int_lit" => {
+            let len = cursor.read_len()?;
+            cursor.read_exact(len)?;
+            Ok(())
+        }
         "const" | "ind_former" | "constructor_ref" => {
             decode_stable_symbol(cursor)?;
             skip_levels(cursor)
@@ -5006,11 +5090,15 @@ fn collect_canonical_term_nodes(
             collect_canonical_term_nodes(cursor, nodes)
         }
         "quot" | "let" | "eq" | "j" => {
-            for _ in 0..3 { collect_canonical_term_nodes(cursor, nodes)?; }
+            for _ in 0..3 {
+                collect_canonical_term_nodes(cursor, nodes)?;
+            }
             Ok(())
         }
         "cast" | "quot_elim" => {
-            for _ in 0..4 { collect_canonical_term_nodes(cursor, nodes)?; }
+            for _ in 0..4 {
+                collect_canonical_term_nodes(cursor, nodes)?;
+            }
             Ok(())
         }
         "proj1" | "proj2" | "refl" | "quot_class" | "trunc" | "trunc_proj" => {
@@ -5034,11 +5122,17 @@ fn collect_canonical_terms(
     Ok(())
 }
 
+pub(crate) fn canonical_body_node_count(declaration: &[u8]) -> Result<usize, String> {
+    canonical_body_nodes(declaration).map(|nodes| nodes.len())
+}
+
 fn canonical_body_nodes(declaration: &[u8]) -> Result<Vec<(usize, String, usize)>, String> {
     let mut cursor = CanonicalCursor::new(declaration);
     let kind = cursor.read_tag()?;
     if kind != "transparent" {
-        return Err(format!("an Ω plan requires a transparent declaration, got {kind:?}"));
+        return Err(format!(
+            "an Ω plan requires a transparent declaration, got {kind:?}"
+        ));
     }
     decode_stable_symbol(&mut cursor)?;
     decode_level_params(&mut cursor)?;
@@ -5057,9 +5151,12 @@ fn validate_omega_erasure_plan(
     plan: &crate::omega_erasure::OmegaErasurePlan,
 ) -> Result<(), CheckedCorePackageError> {
     let fail = |reason: String| CheckedCorePackageError::MalformedOmegaErasurePlan {
-        symbol: symbol.clone(), reason,
+        symbol: symbol.clone(),
+        reason,
     };
-    let declaration = semantic.declarations.get(symbol)
+    let declaration = semantic
+        .declarations
+        .get(symbol)
         .ok_or_else(|| fail("plan has no checked declaration".into()))?;
     let nodes = canonical_body_nodes(declaration).map_err(&fail)?;
     for (name, ids) in [
@@ -5068,8 +5165,12 @@ fn validate_omega_erasure_plan(
         ("collapsed_sigmas", &plan.collapsed_sigmas),
     ] {
         for id in ids {
-            let (_, tag, _) = nodes.get(*id as usize)
-                .ok_or_else(|| fail(format!("{name} id {id} outside body preorder of {} nodes", nodes.len())))?;
+            let (_, tag, _) = nodes.get(*id as usize).ok_or_else(|| {
+                fail(format!(
+                    "{name} id {id} outside body preorder of {} nodes",
+                    nodes.len()
+                ))
+            })?;
             if name == "erased_binders" && tag != "lam" && tag != "let" {
                 return Err(fail(format!("erased binder id {id} has tag {tag:?}")));
             }
@@ -5081,7 +5182,9 @@ fn validate_omega_erasure_plan(
     for id in &plan.erased_subterms {
         let (_, _, byte_end) = &nodes[*id as usize];
         let after = nodes.partition_point(|(offset, _, _)| offset < byte_end);
-        let start = id.checked_add(1).ok_or_else(|| fail("body preorder overflow".into()))?;
+        let start = id
+            .checked_add(1)
+            .ok_or_else(|| fail("body preorder overflow".into()))?;
         let end = u32::try_from(after).map_err(|_| fail("body preorder overflow".into()))?;
         for (name, ids) in [
             ("erased_subterms", &plan.erased_subterms),
@@ -5089,7 +5192,9 @@ fn validate_omega_erasure_plan(
             ("collapsed_sigmas", &plan.collapsed_sigmas),
         ] {
             if let Some(nested) = ids.range(start..end).next() {
-                return Err(fail(format!("{name} id {nested} is inside maximal erased subtree {id}")));
+                return Err(fail(format!(
+                    "{name} id {nested} is inside maximal erased subtree {id}"
+                )));
             }
         }
     }
@@ -5512,7 +5617,9 @@ mod tests {
                 &canonical_term_bytes(&dependent_type, &table).unwrap(),
             )
             .unwrap(),
-            Some(MotiveShape::Dependent)
+            // A dependent Pi with a constant codomain is only a candidate:
+            // the checked per-method plan must prove its binder is erased.
+            Some(MotiveShape::Convoyed)
         );
         let sigma = Term::Sigma(Box::new(ty), Box::new(result));
         assert_eq!(

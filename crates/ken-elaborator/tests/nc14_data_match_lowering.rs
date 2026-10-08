@@ -365,14 +365,15 @@ fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
     let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &runtime,
-        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
+        &ken_runtime::NativeSeedEnvironment::empty(
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        ),
         "ken_nested_ih_backedge_forward_frontier",
     );
     let observations = realization_scope.finish();
     let scalar_merge_arrivals = scalar_merge_scope.finish();
-    let artifact = native.expect(
-        "nested checked IH emits after per-emission join and closure ownership",
-    );
+    let artifact =
+        native.expect("nested checked IH emits after per-emission join and closure ownership");
     // This is the runnable real-checked-source replacement for the carried
     // RT-BODY-OCCURRENCE-PROVENANCE control. The old disposable projection's
     // owner 2 / four-join coordinates predated the realized recursor partition;
@@ -577,21 +578,19 @@ fn liftrose_synthetic_witness_closes_owner_two_required_joins() {
         .collect::<Vec<_>>();
     assert_eq!(
         forwards,
-        vec![(
-            "DirectScrutinee",
-            "Scrutinee",
-            vec!["TerminalResumeOuter"],
-        )],
+        vec![("DirectScrutinee", "Scrutinee", vec!["TerminalResumeOuter"],)],
         "the ordinary Match must preserve the exact route, role, and next continuation it \
          received: {observations:#?}"
     );
     let entered_backedges = observations
         .iter()
-        .filter_map(|event| match event {
+        .filter_map(|event| {
+            match event {
             ken_runtime::CheckedIhRealizationObservation::SourceMatchOccurrencePlanEntryAttempt {
                 operand_kind,
             } if *operand_kind == "RecursiveBackedge" => Some(*operand_kind),
             _ => None,
+        }
         })
         .collect::<Vec<_>>();
     assert!(
@@ -658,7 +657,9 @@ fn checked_ih_abi_and_match_refusal_site_are_discriminated_before_authority() {
     let native = ken_runtime::emit_runtime_ir_object_with_cranelift(
         &program,
         &runtime,
-        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
+        &ken_runtime::NativeSeedEnvironment::empty(
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        ),
         "ken_checked_ih_unplanned_control",
     );
     let observations = scope.finish();
@@ -755,16 +756,15 @@ fn scalar_merge_observations_for_program(
     entry_symbol: &str,
 ) -> Vec<ken_runtime::DasmC2ScalarMergeObservation> {
     program.examples = vec![example.clone()];
-    let runtime = runtime_ir_report_for_example(
-        program,
-        &example,
-        "RT-DYNAMIC-ARM-SCALAR-MERGE c2 control",
-    );
+    let runtime =
+        runtime_ir_report_for_example(program, &example, "RT-DYNAMIC-ARM-SCALAR-MERGE c2 control");
     let scope = ken_runtime::dasm_c2_scalar_merge_observation_scope();
     let _later_native_result = ken_runtime::emit_runtime_ir_object_with_cranelift(
         program,
         &runtime,
-        &ken_runtime::NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()),
+        &ken_runtime::NativeSeedEnvironment::empty(
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        ),
         entry_symbol,
     );
     scope.finish()
@@ -840,11 +840,7 @@ fn d5_native_scalar_merge_admits_checked_structural_nat() {
         }\n\
         const liftSizeResult : Nat = liftSize \
           (LiftNode (Join LiftRose LiftLeaf (LiftNode (Empty LiftRose))))";
-    let mut program = nested_checked_runtime_program_for_source(
-        package,
-        target_name,
-        source,
-    );
+    let mut program = nested_checked_runtime_program_for_source(package, target_name, source);
     let rose = decl_symbol(package, "LiftRose");
     let bag = decl_symbol(package, "Bag");
     let leaf = RuntimeExpr::Construct {
@@ -887,11 +883,8 @@ fn d5_native_scalar_merge_admits_checked_structural_nat() {
             args: vec![],
         }),
     };
-    let observations = scalar_merge_observations_for_program(
-        &mut program,
-        example,
-        "ken_dasm_c2_structural_nat",
-    );
+    let observations =
+        scalar_merge_observations_for_program(&mut program, example, "ken_dasm_c2_structural_nat");
     let d5_arrivals = observations
         .iter()
         .filter(|observation| {
@@ -934,9 +927,9 @@ fn peano_shaped_user_data_remains_an_exact_constructor() {
           Hit |-> PSuc PZero ; Miss |-> PZero \
         }";
     let mut program = nested_checked_runtime_program_for_source(package, "target", source);
-    program.declarations.retain(|declaration| {
-        declaration.symbol == decl_symbol(package, "target").to_string()
-    });
+    program
+        .declarations
+        .retain(|declaration| declaration.symbol == decl_symbol(package, "target").to_string());
     let switch = decl_symbol(package, "Switch");
     let peanoish = decl_symbol(package, "Peanoish");
     let psuc = StableSymbol::constructor(&peanoish, "PSuc").to_string();
@@ -957,11 +950,8 @@ fn peano_shaped_user_data_remains_an_exact_constructor() {
             args: Vec::new(),
         }),
     };
-    let observations = scalar_merge_observations_for_program(
-        &mut program,
-        example,
-        "ken_dasm_c2_user_data",
-    );
+    let observations =
+        scalar_merge_observations_for_program(&mut program, example, "ken_dasm_c2_user_data");
     let psuc_arrivals = observations
         .iter()
         .filter(|observation| observation.constructor.as_deref() == Some(psuc.as_str()))

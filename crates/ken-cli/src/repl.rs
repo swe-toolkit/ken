@@ -16,11 +16,10 @@ use std::io::{self, BufRead, Write};
 
 use ken_elaborator::{
     extract::v2_extract,
-    render_open_obligations,
     prover::{attempt_obligation, Countermodel, Verdict},
-    ElabEnv, ElabError,
+    render_open_obligations, ElabEnv, ElabError,
 };
-use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::Term;
 
 // ── Session ───────────────────────────────────────────────────────────────────
@@ -183,12 +182,16 @@ fn do_check(session: &mut Session, goal_src: &str) {
 
 /// Evaluate an expression through `ken-interp` (X1).
 fn do_eval(session: &mut Session, expr_src: &str) {
+    println!("{}", eval_line(session, expr_src));
+}
+
+fn eval_line(session: &mut Session, expr_src: &str) -> String {
     match session.env.elaborate_expr("ken repl eval", expr_src.trim()) {
-        Ok((term, ty)) => {
-            let val = eval(&[], &term, &session.env.env, &mut session.store);
-            println!("  {} : {}", show_val(&val), show_term(&ty));
-        }
-        Err(e) => println!("  error: {}", e),
+        Ok((term, ty)) => match eval_checked(&term, &ty, &session.env.env, &mut session.store) {
+            Ok(val) => format!("  {} : {}", show_val(&val), show_term(&ty)),
+            Err(e) => format!("  error: {}", e),
+        },
+        Err(e) => format!("  error: {}", e),
     }
 }
 
@@ -396,5 +399,48 @@ mod reused_env_rollback_tests {
             .filter_map(|(name, candidate)| (*candidate == id).then_some(name.as_str()))
             .collect();
         assert_eq!(aliases, ["ac0_after"]);
+    }
+}
+
+#[cfg(test)]
+mod omega_erasure_repl_tests {
+    use super::{eval_line, Session};
+    use ken_interp::eval::{eval, EvalVal};
+    use ken_kernel::{whnf, Context, Term};
+
+    /// Promise class: durable invariant (42 §3.2, 46 §4). MEASURED: a
+    /// surface expression introducing a checked subset pair prints its
+    /// computational carrier at the real REPL evaluation seam. CLAIMED:
+    /// user-visible evaluation erases the proof component, not just native
+    /// lowering or a test-only interpreter entry. THE GAP: the raw evaluator
+    /// must distinguish this fixture from the typed evaluator.
+    #[test]
+    fn repl_eval_erases_refinement_proof_and_prints_carrier() {
+        let source = "((0, Axiom) : (z : Int) × (Equal Int zero zero))";
+        let mut session = Session::new().expect("prelude");
+        session
+            .env
+            .elaborate_decl("const zero : Int = 0")
+            .expect("carrier");
+        let (term, ty) = session
+            .env
+            .elaborate_expr("repl pin", source)
+            .expect("checked subset");
+        assert!(
+            matches!(
+                whnf(&session.env.env, &Context::new(), &ty),
+                Term::Sigma(_, _)
+            ),
+            "type={ty:?}, term={term:?}"
+        );
+        assert!(
+            matches!(
+                eval(&[], &term, &session.env.env, &mut session.store),
+                EvalVal::Unknown
+            ),
+            "fixture must differ from raw evaluation to pin the REPL caller"
+        );
+        let output = eval_line(&mut session, source);
+        assert!(output.starts_with("  0 : "), "{output}");
     }
 }

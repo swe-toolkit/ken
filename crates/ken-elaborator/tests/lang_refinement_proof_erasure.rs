@@ -145,7 +145,7 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
         projection.clone(),
     )
     .expect("checked first projection");
-    let projected = package(
+    let projected = crate::package(
         &elaborated.env,
         &[
             (int_id, "Int"),

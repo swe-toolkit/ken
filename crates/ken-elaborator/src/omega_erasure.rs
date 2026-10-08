@@ -43,6 +43,16 @@ pub fn omega_erasure_plan(
     body: &Term,
     checked_type: &Term,
 ) -> Result<OmegaErasurePlan, KernelError> {
+    omega_erasure_plan_with_count(env, body, checked_type).map(|(plan, _)| plan)
+}
+
+/// The visited count includes descendants skipped by maximal erasure, so it
+/// can be compared with the separately parsed canonical-body preorder.
+pub(crate) fn omega_erasure_plan_with_count(
+    env: &GlobalEnv,
+    body: &Term,
+    checked_type: &Term,
+) -> Result<(OmegaErasurePlan, u32), KernelError> {
     let mut plan = OmegaErasurePlan::default();
     let mut next = 0u32;
     visit(
@@ -53,7 +63,7 @@ pub fn omega_erasure_plan(
         &mut next,
         &mut plan,
     )?;
-    Ok(plan)
+    Ok((plan, next))
 }
 
 fn skipped_nodes(node: &Term, next: &mut u32) -> Result<(), KernelError> {
@@ -347,6 +357,47 @@ fn rewrite(
             Box::new(child(motive)?),
             Box::new(child(proof)?),
         )),
-        _ => Ok(node.clone()),
+        Term::Type(_)
+        | Term::Omega(_)
+        | Term::Var(_)
+        | Term::Const { .. }
+        | Term::IndFormer { .. }
+        | Term::Constructor { .. }
+        | Term::IntLit(_) => Ok(node.clone()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ElabEnv;
+
+    /// Promise class: transition sentinel for the kernel's current
+    /// introduction-inference diagnostic. MEASURED: a reducible checked
+    /// type whose unreduced head is a lambda cannot be synthesized, while
+    /// its normal form classifies at Ω. CLAIMED: the narrow fallback keeps
+    /// eliminator method codomains classifiable. THE GAP: if the kernel's
+    /// diagnostic changes, this row must redden until the gate is revisited.
+    #[test]
+    fn normalized_introduction_type_uses_kernel_omega_fallback() {
+        let env = ElabEnv::new().expect("prelude");
+        let int = Term::const_(env.globals["Int"], Vec::new());
+        let zero = Term::IntLit(0.into());
+        let proposition = Term::Eq(
+            Box::new(int.clone()),
+            Box::new(zero.clone()),
+            Box::new(zero.clone()),
+        );
+        let reduced_type = Term::app(Term::lam(int, proposition), zero);
+        let ctx = Context::new();
+        assert!(
+            matches!(
+                infer(&env.env, &ctx, &reduced_type),
+                Err(KernelError::Msg(reason)) if reason.contains("cannot infer an introduction form")
+            ),
+            "fallback must be reached by the expected kernel diagnostic"
+        );
+        assert!(is_omega_classified(&env.env, &ctx, &reduced_type)
+            .expect("kernel normal form of the checked type is Ω"));
     }
 }
