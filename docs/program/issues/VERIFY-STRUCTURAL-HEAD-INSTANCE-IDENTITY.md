@@ -1,7 +1,7 @@
 ---
 id: VERIFY-STRUCTURAL-HEAD-INSTANCE-IDENTITY
 title: "An instance whose head is structural (arrow, Pi, Sigma, Univ, Trunc, Proj) gets no synthesized dictionary identity, so two such instances of one class share the declaration symbol {class}_instance_->: the second overwrites globals, the first falls back to {owner}#{n}, and their owner and obligation ids stay order-dependent. Give a structural-head instance a canonical, injective identity"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -71,3 +71,14 @@ symbol that moves, with the reason for each.
 - A pinned hash or symbol moves for a reason other than structural-head
   identity.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `b5ba6619c` from exact `61fe43409` (PR #4603). Verify QA
+`evt_5nx7hkwq346yb`, Architect `evt_7yz2sn8xbbd89`, Decision
+`dec_4g2btvmwaxcg`. A structural-head instance with no synthesized
+dictionary name gets a tagged canonical owner from
+`structural_instance_symbol`, applied to its owner and `result.name` in
+`expand_scope` and `elab_instance_decl`. The rows in
+`verify_instance_owner_key.rs` pin distinct symbols, owners and obligation
+ids in both declaration orders.

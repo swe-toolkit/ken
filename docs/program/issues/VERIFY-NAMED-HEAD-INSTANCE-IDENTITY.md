@@ -1,7 +1,7 @@
 ---
 id: VERIFY-NAMED-HEAD-INSTANCE-IDENTITY
 title: "Since VERIFY-INSTANCE-OWNER-KEY a named-head instance's owner is its synthesized dictionary name {class}_instance_{head}, which is not injective and which a user declaration can spell, so two distinct instances (or an instance and a const) share one owner: one requires premise drops out of the package's obligations, the second falls to a #n fallback, and the hash depends on order. Give named-head instances an identity no other instance or declaration can take"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
