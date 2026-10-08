@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-DFA
 title: "The catalog has no automata. Land Algorithm.FormalLanguages.Dfa: a deterministic automaton over any state carrier and alphabet, with run, accepts, complement and a general product, and its law set fully proved and Axiom-free"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -73,3 +73,16 @@ base, stop and report the mismatch.
 
 - A law needs an Axiom, a primitive, or a kernel or trust change.
 - The spec section requires something outside the Architect's ruling.
+
+## Closeout
+
+Merged `b34da79d1` from exact `6984b71a1` (PR #4600). QA
+`evt_6etmq1qsdvxnc`, Architect `evt_62yzj8djyhxr0`, Decision
+`dec_1ackjnqzejxj3`. `Algorithm.FormalLanguages.Dfa` lands with `run`,
+`accepts`, `complement`, `product`, `intersection` and `union`, and their
+`accepts_*` laws proved at zero trust. `bool_not` is public in
+`Core.Classes.LawfulClasses` and Map imports it. The `run_product` `Nil`
+arm stays a named helper, `run_product_nil`. The first candidate,
+`0d515dbeb`, was red in CI on the strict-resolution ambient-census
+sentinel, which lacked the Dfa row (`evt_4ztb6e983p467`); the respin added
+the row.

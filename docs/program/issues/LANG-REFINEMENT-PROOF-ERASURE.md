@@ -100,8 +100,15 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
   AC-2b(iii).
 - **AC-5.** A package with the plan section removed refuses at erasure; it
   does not lower relevantly.
-- **AC-6.** Catalog emit timing is within 10% of base. The walk may go
-  bidirectional, but AC-4b must still pass.
+- **AC-6.** On `Capability.Parsing.Parsing` and
+  `Core.Classes.LawfulClasses` (three hot runs each), the summed time of
+  `emit_package_from_env`, one `validate_checked_core_package` and
+  `declaration_dependency_index` is no greater than base. The
+  `emit_package_from_env` seam alone is reported, not gated (Steward frame
+  decision on Architect `evt_1ha06r87d1ccp`: after R1-R5 the residual is
+  the kernel classifier's own cost). The R1-R5 reductions leave the
+  `omega_erasure_plans` bytes and the `core_semantic_hash` pins unchanged,
+  and AC-4b still passes.
 
 ## Stop conditions
 
