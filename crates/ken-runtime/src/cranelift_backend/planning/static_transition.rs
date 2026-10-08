@@ -1054,6 +1054,10 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]
     per_emitter_availability::record_per_emitter_availability_diagnostic(&plan);
+    // Admission follows the test-support recorders so that a refused plan's
+    // validated planes stay observable; without the feature it runs directly
+    // after finish.
+    plan.admit_response_owner_settlements()?;
     Ok(plan)
 }
 

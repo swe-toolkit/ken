@@ -1613,7 +1613,6 @@ impl<'src> Planner<'src> {
         #[cfg(test)]
         apply_static_worker_member_mutation(&mut self.plan);
         self.plan.validate()?;
-        self.plan.admit_response_owner_settlements()?;
         #[cfg(feature = "px8-ds-test-support")]
         run_checked_ih_intervening_binder_population_control(&self.plan)?;
         Ok(self.plan)

@@ -223,19 +223,26 @@ impl StaticTransitionPlan<'_> {
     }
 
     /// A relay or underived returned Vis has no native representation. Refuse
-    /// every such owner at planning after the closed plan has been validated.
+    /// every such owner at planning, naming the complete excluded set.
     pub(super) fn admit_response_owner_settlements(&self) -> Result<(), CraneliftBackendError> {
-        for (owner, settlement) in &self.pending_vis_settlements.owners {
-            match settlement {
-                ResponseOwnerSettlement::Protocol | ResponseOwnerSettlement::RetOnly => {}
+        let excluded = self
+            .pending_vis_settlements
+            .owners
+            .iter()
+            .filter_map(|(owner, settlement)| match settlement {
+                ResponseOwnerSettlement::Protocol | ResponseOwnerSettlement::RetOnly => None,
                 ResponseOwnerSettlement::Excluded { reason } => {
-                    return Err(super::planner_capacity_error(format!(
-                        "response owner {owner:?} K returns a Vis outside the pending-Vis protocol ({reason:?})"
-                    )));
+                    Some(format!("{owner:?} ({reason:?})"))
                 }
-            }
+            })
+            .collect::<Vec<_>>();
+        if excluded.is_empty() {
+            return Ok(());
         }
-        Ok(())
+        Err(super::planner_capacity_error(format!(
+            "response owners K return a Vis outside the pending-Vis protocol: {}",
+            excluded.join(", ")
+        )))
     }
 
     /// The only permitted case exclusion: the *same* planned-result traversal
