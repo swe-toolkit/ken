@@ -1,7 +1,7 @@
 ---
 id: RT-SOURCE-IH-RELAY-K-VALUE
 title: "Give the source machine a value for a relay Vis whose K is a zero-argument functional-IH reference, so the owner return protocol can carry it and clear r2; first settle whether ConstructArgument's backedge propagation is sound for such a constructor field"
-status: ready
+status: closed
 owner: runtime
 size: M
 gate: architect
@@ -75,3 +75,12 @@ Architect, that lets owner 1298 join the return protocol and un-ignores r2.
   `dec_6xffebwj4s347`) is an Architect stop.
 - **Held work:** never move `4b4c8565c`, `21c039918`, `7f1a04a40`,
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or the child-2 checkpoint.
+
+## Closeout
+
+Closed without a candidate, superseded by
+`RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT` (Architect `evt_59xpt6t02wdpq`). On
+that node's predecessor, r2's owners 2 and 3 are refused at planning as
+`Relay`, the same classification as the span row's owners 3 and 4. One
+D0 covers both populations, and its AC-1b un-ignores r2. The settled inputs
+and the AC-0a answer above carry into that frame.

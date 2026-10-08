@@ -1,7 +1,7 @@
 ---
 id: VERIFY-NAMED-HEAD-INSTANCE-IDENTITY
 title: "Since VERIFY-INSTANCE-OWNER-KEY a named-head instance's owner is its synthesized dictionary name {class}_instance_{head}, which is not injective and which a user declaration can spell, so two distinct instances (or an instance and a const) share one owner: one requires premise drops out of the package's obligations, the second falls to a #n fallback, and the hash depends on order. Give named-head instances an identity no other instance or declaration can take"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -155,3 +155,19 @@ spelling, is the residual of `VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT`.
 - A catalog or corpus package is newly refused or changes hash: stop with
   the list.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `176646c5f` from exact `6c6cb4fbd` (PR #4605). Verify QA
+`evt_3pz5s5e2vjx4z`, Architect `evt_21f1s4jdrrc7k`, Decision
+`dec_6jh248cs4w9ws`. An elaborator-minted identity key already bound in
+`elab.globals` to a different checked GlobalId is refused with
+`DeclarationIdentityCollision` at `elaborate_checked_as`, naming both
+declarations. Each minted identity records its canonical `(class, head)`
+spelling pair, so a later owner rebinding the same pair is admitted. The
+first candidate, `9a6e77e11`, was red in CI on four
+`modules::namespace_effect_tests` rebind rows (`evt_hvjt8b4k4nfj`). The
+ruling `evt_210gpmk42hsys` added the rebind exemption, AC-6c, a replaced
+AC-7 and AC-9. Residuals: a user declaration arriving after a minted
+identity at its spelling, and a constructor spelled like a dictionary, both
+in `VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT`.
