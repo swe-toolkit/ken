@@ -211,20 +211,21 @@ bounded index's *use* are gated on the dependent-`match` refinement enhancement
 landing this run as `DS-5b` (Kernel ring). Zero `Axiom`, zero `trusted_base()`
 delta — `Vec` is an ordinary inductive with a real eliminator.
 
-The **deterministic-automaton contract** is pinned in
-**`61-formal-languages.md`** (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT). An ordinary
-`Dfa q a` has a total transition, a start state, and a Boolean acceptance
-function over **any** state carrier `q` and alphabet `a`; it requires neither
-finiteness nor `DecEq`. The `Algorithm.FormalLanguages.Dfa` package must supply
-`run`/`accepts`, complement, general Boolean-combining product and its
-intersection/union instances with seven checked laws and zero trust delta.
-Section 2 now specifies `Data.Finite.Finite`'s explicit Ω-membership
-certificate, the `fin_finite` and `pair_finite` values, and
-`Algorithm.FormalLanguages.Reachability`'s certificate-returning decision
-with four checked soundness/completeness laws. No `DecEq` or complexity
-promise is added. These two package contracts do not claim their builds
-landed; NFA, regex, equivalence/minimisation and the lexer byte bridge
-remain deferred.
+The **formal-languages contract** is pinned in
+**`61-formal-languages.md`**. Section 1 specifies an ordinary `Dfa q a`
+with a total transition, a start state, and Boolean acceptance over any
+state carrier or alphabet. Its `run`/`accepts`, complement, general
+Boolean-combining product and intersection/union obey seven checked laws.
+Section 2 specifies `Finite q` as an explicit Ω-membership certificate
+and `Algorithm.FormalLanguages.Reachability` as a complete finite-state
+decision with four checked laws. Section 3 specifies a relation-valued
+`Nfa q a`, Ω path acceptance, finite-mask determinization with checked
+language equality in both directions, and decidable emptiness through
+section 2. The ordinary `Core.Logic.And` and `unit_finite`/`bool_finite`
+values are generic catalog dependencies, not new trusted rules. Neither
+`DecEq q` nor `DecEq a` is needed in sections 1–3; no complexity promise
+is made. The §3 package contract does not claim its build has landed.
+Regex, equivalence/minimisation and the lexer byte bridge remain deferred.
 
 ## 4. I/O, effects, serialization
 

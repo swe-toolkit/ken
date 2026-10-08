@@ -1,16 +1,19 @@
-# Formal languages: deterministic automata
+# Formal languages: finite automata
 
 > Status: **DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT;
-> SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT).** Section 1 specifies
-> ordinary Dfa; section 2 specifies finite evidence and the reachability
-> decision. Sections 3–6 remain deferred. Neither the section 2 packages nor
-> their proofs are claimed landed here. No kernel, trust, or surface-syntax
-> change is introduced.
+> SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT;
+> SPEC-FORMAL-LANGUAGES-NFA-CONTRACT).** Section 1 specifies ordinary Dfa;
+> section 2 specifies finite evidence and reachability; section 3 specifies
+> Nfa and checked determinization. Sections 4–6 remain deferred. Specifying
+> the new packages does not claim their implementation is landed here. No
+> kernel, trust, or surface-syntax change is introduced.
 
 A deterministic automaton describes a transition for every state and input
 symbol and a Boolean acceptance test. Its state carrier need not be finite:
 finite input words make `run` a terminating fold, but say nothing about how
-many states the automaton can occupy.
+many states the automaton can occupy. Nondeterministic automata (§3) use
+Boolean edge tests but describe acceptance by a truncated path proposition;
+a finite-state certificate permits an equivalent deterministic Boolean view.
 
 ## 1. Deterministic automata (`Algorithm.FormalLanguages.Dfa`)
 
@@ -399,16 +402,225 @@ kind/form, reduction rule, or `trusted_base()` entry**. None is a built-in,
 a prelude addition, or a surface-syntax change. This section specifies a
 contract, not an assertion that either package or its proofs has landed.
 
-## 3. Nondeterministic automata (deferred)
+## 3. Nondeterministic automata and subset construction
 
-A later contract will add NFA and subset construction with a
-language-equality law. Section 1 neither supplies nondeterminism nor
-postulates the subset-construction law.
+`Algorithm.FormalLanguages.Nfa` is an optional, explicitly imported catalog
+package. Its nondeterministic semantics is independent of finiteness:
+`Nfa q a` can describe any `q : Type` and `a : Type`. Finiteness enters
+only when determinizing a particular `q`, and alphabet finiteness enters
+only when deciding emptiness of the resulting Dfa (§2).
+
+### 3.1 Carrier, path and acceptance
+
+The public carrier has a **Boolean transition relation**, an initial-state
+predicate, and a final-state predicate, in that order. There may be several
+initial states or outgoing successors, including none. The three public
+projections expose the fields without requiring either state or symbol
+equality:
+
+```ken
+pub data Nfa q a = MkNfa (q → a → q → Bool) (q → Bool) (q → Bool)
+export MkNfa
+
+pub fn nfa_step (q : Type) (a : Type) (n : Nfa q a) :
+  q → a → q → Bool
+pub fn nfa_initial (q : Type) (a : Type) (n : Nfa q a) :
+  q → Bool
+pub fn nfa_final (q : Type) (a : Type) (n : Nfa q a) :
+  q → Bool
+```
+
+For `n = MkNfa transition initial accepting`, the projections are
+`nfa_step q a n s x t = transition s x t`,
+`nfa_initial q a n s = initial s`, and
+`nfa_final q a n s = accepting s`. `nfa_step s x t` tests an edge from
+`s` **to** `t` on `x`; it is not the reversed relation. A successor-list
+field would require a decision about whether `t` occurs among successors
+of `s`, reintroducing the forbidden `DecEq q` requirement. A Boolean
+relation gives the subset construction an executable edge test directly.
+
+A path records the state **after each symbol**. For a word and path of
+unequal lengths `path_accepts` returns `Bottom`. On the empty word and
+empty path, the current state must be final. On matching nonempty lists,
+the first path state must be an edge successor, and the remainder must
+accept from that successor. This definition uses generic proof-relevant
+conjunction from the **separate** `Core.Logic.And` package:
+
+```ken
+pub data And (left : Omega) (right : Omega) : Type where {
+  Both : left → right → And left right
+}
+export Both
+```
+
+`And`/`Both` are generic public data alongside `Core.Logic.Or`, not
+Nfa-private machinery. `Pair` cannot replace `And` here: a pair of two
+Ω propositions is not a `Pair` of `Type` fields. The ordinary `Type`
+family records evidence for both Ω propositions; truncation converts
+that proof-relevant conjunction into an Ω proposition at each path step.
+The public path contract is:
+
+```ken
+pub fn path_accepts
+  (q : Type) (a : Type) (n : Nfa q a)
+  (s : q) (w : List a) (path : List q) : Omega =
+  match w {
+    Nil ↦ match path {
+      Nil ↦ Equal Bool (nfa_final q a n s) True;
+      Cons t ts ↦ Bottom
+    };
+    Cons x rest ↦ match path {
+      Nil ↦ Bottom;
+      Cons t ts ↦ ‖ And
+        (Equal Bool (nfa_step q a n s x t) True)
+        (path_accepts q a n t rest ts) ‖
+    }
+  }
+
+pub data NfaAcceptance
+  (q : Type) (a : Type) (n : Nfa q a) (w : List a) : Type where {
+  Accepted : (s : q) → (path : List q) →
+    Equal Bool (nfa_initial q a n s) True →
+    path_accepts q a n s w path → NfaAcceptance q a n w
+}
+export Accepted
+
+pub fn nfa_accepts
+  (q : Type) (a : Type) (n : Nfa q a) (w : List a) : Omega =
+  ‖ NfaAcceptance q a n w ‖
+```
+
+`NfaAcceptance` retains the starting state and complete path as
+`Type`-sorted evidence; `Accepted` must carry the initial-state and path
+proofs. `nfa_accepts` truncates their existence to Ω. For level-zero
+`q, a : Type`, `Equal Bool ... True : Omega`, `And` and
+`NfaAcceptance : Type`, and their truncations are in `Omega`. The Π
+implications in §3.3 also land in Ω by the predicative maximum of their
+level-zero domains and Ω codomains. Only **proofs of propositions** are
+proof-irrelevant; `NfaAcceptance` and `And` do not erase their witnesses
+merely because their constructor fields include propositions. NFA
+acceptance is not a Boolean decision on an arbitrary carrier. It requires
+no `Finite q`, `Finite a`, `DecEq q` or `DecEq a`, and has no ε-transition.
+
+### 3.2 Subset construction and finite evidence
+
+Given explicit `fq : Finite q` (§2), the public `subset_state q fq` is a
+mask with one Boolean bit per **position** of `elements q fq`. Its ordinary
+level-zero `Type` carrier is recursively shaped as `Unit` for `Nil` and
+`Pair Bool (mask q rest)` for `Cons`; it is not an indexed family or a
+published `Vec`. Duplicate listed states yield duplicate positions and
+do not invalidate coverage or force deduplication. The private `mask`
+representation and its helpers are not an additional public data API.
+
+```ken
+pub fn subset_state (q : Type) (fq : Finite q) : Type
+pub fn determinize
+  (q : Type) (a : Type) (fq : Finite q) (n : Nfa q a) :
+  Dfa (subset_state q fq) a
+pub fn subset_finite (q : Type) (fq : Finite q) :
+  Finite (subset_state q fq)
+```
+
+`subset_state q fq` computes to `mask q (elements q fq)` with that shape.
+`determinize q a fq n` starts with bit `s` set when
+`nfa_initial q a n s` is `True`. For each input `x`, its next-state bit
+at position `t` is set exactly when some currently set position `s` has
+`nfa_step q a n s x t = True`. Its final test is `True` exactly when some
+set position `s` has `nfa_final q a n s = True`. The Boolean tests use
+the supplied list and `Core.Classes.LawfulClasses.bool_or`/`bool_and`;
+these operations do not inspect equality of states or symbols. `Finite q`
+supplies both the bit positions and `covers q fq s` for **every** state in
+an accepting path. It is required for `determinize`, but `Finite a` is
+not: a given transition consumes one supplied symbol at a time.
+
+Two generic, **public values** belong in `Data.Finite.Finite`, beside
+`fin_finite` and `pair_finite`, rather than inside Nfa:
+
+```ken
+pub const unit_finite : Finite Unit
+pub const bool_finite : Finite Bool
+```
+
+They certify the ordinary `Unit` and `Bool` carriers with checked
+coverage. `subset_finite` recursively uses `unit_finite` for the empty
+mask and `pair_finite` on `Bool` (with `bool_finite`) and the recursively
+certified tail mask for a nonempty mask. It is an explicit **value**, not
+a class instance or inference rule, and it does not produce `DecEq q`.
+Because every mask position has a Boolean value, §2's decision applies
+to the constructed Dfa, even if
+`elements q fq` has duplicates.
+
+### 3.3 Checked language equality and emptiness
+
+These three **public proved theorem types** bind the exported definitions.
+The first two are the language-equality law, stated in both directions
+between the Dfa's Boolean acceptance and the Nfa's Ω acceptance; no new
+`Iff` or judgment is needed. Their conclusions are Ω propositions, not
+proof-relevant path-returning algorithms.
+
+```ken
+pub theorem determinize_sound
+  (q : Type) (a : Type) (fq : Finite q)
+  (n : Nfa q a) (w : List a) :
+  Equal Bool
+    (accepts (subset_state q fq) a (determinize q a fq n) w) True →
+  nfa_accepts q a n w
+
+pub theorem determinize_complete
+  (q : Type) (a : Type) (fq : Finite q)
+  (n : Nfa q a) (w : List a) :
+  nfa_accepts q a n w →
+  Equal Bool
+    (accepts (subset_state q fq) a (determinize q a fq n) w) True
+
+pub fn nfa_is_empty
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (n : Nfa q a) : Bool =
+  is_empty (subset_state q fq) a (subset_finite q fq) fa
+    (determinize q a fq n)
+
+pub theorem nfa_is_empty_rejects
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (n : Nfa q a) (w : List a) :
+  Equal Bool (nfa_is_empty q a fq fa n) True →
+  nfa_accepts q a n w → Bottom
+```
+
+`determinize_sound` traces a set final-state bit back through each input
+transition to an initial state and constructs the path; the result is
+truncated into Ω. `determinize_complete` walks each accepting path
+forward, using `covers` to keep the corresponding bit set. Both
+arguments generalise the mask for induction over the word and use the
+same exported `determinize`, `accepts`, `path_accepts` and `nfa_accepts`
+as the contract. They do not assert that an arbitrary subset mask is a
+list of distinct states. A tested sample, unproved lemma or second
+specification-only automaton cannot discharge either direction.
+
+`nfa_is_empty` reuses §2's `is_empty` with `subset_finite q fq` and
+`fa : Finite a`. `True` means no word is accepted; the displayed
+`nfa_is_empty_rejects` is checked using §2's `is_empty_rejects` and
+`determinize_complete`. `False` need not return a public NFA witness in
+this contract. This is decidable emptiness for **finite certified states
+and alphabet**, not a Boolean NFA acceptance procedure for an arbitrary
+carrier. No bound on time or space is promised.
+
+The Nfa package imports §1's Dfa and §2's Finite/Reachability APIs,
+`Core.Logic.And`/`Core.Logic.Or`, checked transport, Boolean operations
+and `Data.Collections.Derived`'s Ω-membership tools. `mask`, `mask_any`,
+`mask_build`, `holds`, `mask_finite`, `subset_next` and the induction
+lemmas remain private; the package is free to reorganize these internals
+while proving the same public laws. All required definitions and proof
+terms are checked by Ken's **existing** inductive, recursive and judgment
+machinery. No `Axiom`, postulate, primitive, foreign value, new kernel
+declaration kind/form or reduction rule, prelude addition, surface-syntax
+change, or `trusted_base()` entry is introduced.
+The checked development in the Architect's D0 ruling establishes this
+contract's feasibility, not that any §3 package or theorem has landed.
 
 ## 4. Regular expressions (deferred)
 
 A later contract will add regex and a derivative matcher. `DecEq a` enters
-there; it is not a prerequisite for §1's alphabet.
+there; it is not a prerequisite for §§1–3's alphabet.
 
 ## 5. Equivalence and minimisation (deferred)
 
@@ -419,5 +631,5 @@ for arbitrary states nor equivalence or minimisation procedures.
 ## 6. Lexer input bridge (deferred)
 
 A later `Bytes`/`Cursor` runner bridge for `Capability.Parsing` lexers will
-relate byte-runner results to `run` over the corresponding byte list. Section
-1 and 2 use `List a` only and make no byte/lexer claim.
+relate byte-runner results to `run` over the corresponding byte list.
+Sections 1–3 use `List a` only and make no byte/lexer claim.
