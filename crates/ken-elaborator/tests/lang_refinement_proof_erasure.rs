@@ -230,9 +230,11 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
 #[test]
 fn relevant_sigma_pair_keeps_both_components() {
     // Promise class: durable invariant (42 §3.2, 47 §1).
-    // MEASURED: two relevant Ints survive as a two-field runtime pair and
-    // interpreter pair. CLAIMED: Ω erasure never collapses a relevant Σ.
-    // THE GAP: the codomain, not the first component, decides collapse.
+    // MEASURED: a computational codomain preserves both pair fields in
+    // native and interpreter evaluation, including when the first domain is
+    // Ω-classified. CLAIMED: only the codomain decides Σ collapse.
+    // THE GAP: an erased first proof must retain a pair slot without being
+    // evaluated; two Int components alone cannot discriminate that case.
     let mut elaborated = ElabEnv::new().expect("prelude admits");
     let int_id = elaborated.globals["Int"];
     let int_ty = Term::const_(int_id, vec![]);
@@ -263,6 +265,71 @@ fn relevant_sigma_pair_keeps_both_components() {
         eval_checked(&pair, &sigma, &elaborated.env, &mut store).expect("typed interpreter");
     assert!(
         matches!(result, EvalVal::Pair { fst, snd, .. } if matches!(*fst, EvalVal::Int(7)) && matches!(*snd, EvalVal::Int(8)))
+    );
+
+    // The first domain is itself Ω-classified, but the codomain remains Int.
+    // Changing Σ-collapse classification to the first domain would collapse
+    // this pair even though its second component is computational.
+    let proof_ty = Term::Eq(
+        Box::new(Term::const_(int_id, vec![])),
+        Box::new(int(7)),
+        Box::new(int(7)),
+    );
+    let hole = declare_postulate(
+        &mut elaborated.env,
+        "relevant_first_proof".into(),
+        vec![],
+        proof_ty.clone(),
+    )
+    .expect("open proof admits");
+    let proof_sigma = Term::sigma(proof_ty, Term::const_(int_id, vec![]));
+    let proof_pair = Term::pair(Term::const_(hole, vec![]), int(8));
+    ken_kernel::check(&elaborated.env, &Context::new(), &proof_pair, &proof_sigma)
+        .expect("kernel checks proof-first relevant pair");
+    let proof_pair_id = declare_def(
+        &mut elaborated.env,
+        vec![],
+        proof_sigma.clone(),
+        proof_pair.clone(),
+    )
+    .expect("proof-first pair admits");
+    let proof_package = crate::package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (hole, "proof"),
+            (proof_pair_id, "proof_pair"),
+        ],
+        &[proof_pair_id],
+    );
+    let target = sym("proof_pair");
+    let plan = &proof_package.artifact.semantic.omega_erasure_plans[&target];
+    assert!(
+        plan.collapsed_sigmas.is_empty(),
+        "a computational codomain retains its Σ pair"
+    );
+    assert_eq!(plan.erased_subterms, BTreeSet::from([1]));
+    let mut store = EvalStore::new();
+    let result = eval_checked(&proof_pair, &proof_sigma, &elaborated.env, &mut store)
+        .expect("interpreter retains proof-first relevant pair");
+    assert!(
+        matches!(&result, EvalVal::Pair { fst, snd, .. }
+        if matches!(&**fst, EvalVal::Neutral)
+            && matches!(&**snd, EvalVal::Int(8))),
+        "observed: {result:?}"
+    );
+    let RuntimeObservation::Returned(RuntimeGroundValue::Record { fields }) =
+        observed(&native_body(&proof_package, &target, &[target.clone()]))
+    else {
+        panic!("proof-first relevant Σ must remain a runtime pair")
+    };
+    assert_eq!(fields.len(), 2);
+    assert!(
+        matches!(&fields[0], (name, RuntimeGroundValue::Constructor { .. }) if name == "first")
+    );
+    assert_eq!(
+        fields[1],
+        ("second".into(), RuntimeGroundValue::Int(8.into()))
     );
 }
 
