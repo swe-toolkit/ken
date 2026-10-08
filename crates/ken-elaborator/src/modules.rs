@@ -4798,15 +4798,25 @@ fn expand_scope(
                         .ok(),
                         _ => None,
                     };
-                    let owner = dictionary
-                        .as_ref()
-                        .map_or_else(|| rdecl.name.clone(), |name| name.canonical.clone());
+                    let structural = match (&dictionary, &rdecl.kind) {
+                        (None, RDeclKind::InstanceDecl { head_type, .. }) => {
+                            crate::elab::structural_instance_symbol(&rdecl.name, head_type)
+                        }
+                        _ => None,
+                    };
+                    let owner = dictionary.as_ref().map_or_else(
+                        || structural.clone().unwrap_or_else(|| rdecl.name.clone()),
+                        |name| name.canonical.clone(),
+                    );
                     let mut result = elaborate_checked_as(
                         elab,
                         &rdecl,
                         owner,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
+                    if let Some(name) = &structural {
+                        result.name = name.clone();
+                    }
                     if let Some(name) = &dictionary {
                         result.name = name.canonical.clone();
                         record_checked_local(

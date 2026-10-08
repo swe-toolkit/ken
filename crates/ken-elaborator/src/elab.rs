@@ -14951,6 +14951,70 @@ fn elab_record_decl_checked(
     })
 }
 
+/// A structural instance's declaration symbol: the canonical class name
+/// followed by a tagged rendering of the whole resolved head. Binder names,
+/// spans, and effect rows do not distinguish coherence keys; bound variables
+/// use de Bruijn indices. Refused and named heads have no structural symbol.
+pub(crate) fn structural_instance_symbol(class_name: &str, head: &RType) -> Option<String> {
+    fn render(ty: &RType, out: &mut String) -> Option<()> {
+        match ty {
+            RType::RCon(name, _) | RType::RCheckedGlobal { name, .. } => out.push_str(name),
+            RType::RVarTy(index, _, _) => out.push_str(&format!("(var {index})")),
+            RType::RUniv(None, _) => out.push_str("(type)"),
+            RType::RUniv(Some(level), _) => out.push_str(&format!("(type {level})")),
+            RType::RApp(f, a, _) => {
+                out.push_str("(app ");
+                render(f, out)?;
+                out.push(' ');
+                render(a, out)?;
+                out.push(')');
+            }
+            RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _) => {
+                out.push_str("(arr ");
+                render(a, out)?;
+                out.push(' ');
+                render(b, out)?;
+                out.push(')');
+            }
+            RType::RPi(_, a, b, _) => {
+                out.push_str("(pi ");
+                render(a, out)?;
+                out.push(' ');
+                render(b, out)?;
+                out.push(')');
+            }
+            RType::RSigma(_, a, b, _) => {
+                out.push_str("(sigma ");
+                render(a, out)?;
+                out.push(' ');
+                render(b, out)?;
+                out.push(')');
+            }
+            RType::RTrunc(inner, _) => {
+                out.push_str("(trunc ");
+                render(inner, out)?;
+                out.push(')');
+            }
+            RType::RRefine(..) | RType::RProj(..) | RType::RPatternAliasTy(..) => return None,
+        }
+        Some(())
+    }
+    if !matches!(
+        head,
+        RType::RArr(..)
+            | RType::REffectArr(..)
+            | RType::RPi(..)
+            | RType::RSigma(..)
+            | RType::RUniv(..)
+            | RType::RTrunc(..)
+    ) {
+        return None;
+    }
+    let mut out = format!("{class_name}_instance_");
+    render(head, &mut out)?;
+    Some(out)
+}
+
 /// Extract the outermost type constructor name from a resolved type.
 fn head_type_name(ty: &RType) -> String {
     match ty {
@@ -15578,7 +15642,24 @@ fn elab_instance_decl(
     };
 
     // ---- register instance ----------------------------------------------
-    let inst_name = format!("{}_instance_{}", class_name, head_name);
+    let structural_name = structural_instance_symbol(class_name, head_type);
+    if let Some(name) = &structural_name {
+        // A distinct structural head must not overwrite another head's key;
+        // same-key property duplicates retain the named-head behavior.
+        if let Some(previous) = globals.get(name) {
+            let same_key = class_env
+                .instances_by_id
+                .get(&instance_key)
+                .is_some_and(|info| info.instance_id == *previous);
+            if !same_key {
+                return Err(ElabError::Internal(format!(
+                    "instance symbol `{name}` already names a different instance head"
+                )));
+            }
+        }
+    }
+    let inst_name =
+        structural_name.unwrap_or_else(|| format!("{}_instance_{}", class_name, head_name));
     globals.insert(inst_name, instance_id);
     class_env
         .global_modules
