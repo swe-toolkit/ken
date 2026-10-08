@@ -54,27 +54,40 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-The Architect rules at D0:
-- the identity of a named-head instance, injective over class and head and
-  disjoint from user-spellable names;
-- what happens to the importable dictionary binding when its spelling
-  collides with an existing class, type or declaration name (refuse, or
-  separate the binding from the identity).
+**D0 ruling (Architect `evt_2wbp7vr08k3pf`, at `b5ba6619c`): refuse the
+collision.** The identity stays `{resolved_class}_instance_{resolved_head}`,
+which is also the importable binding (10 catalog files depend on it). A
+declaration whose identity key is already bound in `elab.globals` to a
+different checked GlobalId is refused with a new typed
+`DeclarationIdentityCollision`. The error names both declarations, sorted,
+so the message does not depend on declaration order. The guard sits at the
+module-path choke point `elaborate_checked_as`. The structural WP's
+same-instance-key predicate is the only exemption.
 
-The repair applies it to the globals key, owner and `result.name`.
+1. **AC-0 (measure and report before building).**
+   - For named `instance`, `derive` and `const`, the key each inserts into
+     `elab.globals` equals the `owner` passed to `elaborate_checked_as`.
+   - R1 and R2 refuse in all 12 layouts and orders with the guard in
+     place.
+   - A data constructor spelled like a dictionary
+     (`data D : Type where { Lbl_instance_A : D }`), in both orders.
+     Constructors enter globals by another path. Report the result; if
+     it collapses too, it goes to the Steward as a residual and is not
+     folded in.
+2. **The guard and its typed error.**
 
 ## Acceptance
 
-- **AC-1.** R1 and R2, each in one file and across two files in both
-  orders, give two obligations, two declaration symbols without a `#n`
-  fallback, and an order-independent hash. If the ruling refuses the
-  collision, each row is refused with a typed error naming both
-  declarations instead.
+- **AC-1.** Each R1 and R2 row (one-, two- and three-file layouts, both
+  orders) is refused with the typed error naming both declarations. The
+  non-colliding controls give one obligation per live premise, no `#n`
+  fallback and an order-independent hash.
 - **AC-2 (control).** The predecessor's named-head and `derive` rows and
-  the structural-head rows keep distinct owners and obligation ids. List
-  any symbol or hash that moves, with its cause.
-- **AC-3 (mutation, QA).** Restoring the bare `_instance_` concatenation as
-  the owner reddens AC-1.
+  the structural-head rows keep their owners and obligation ids, and no
+  catalog package is refused or changes hash.
+- **AC-3 (mutation, QA).** Deleting the guard reddens AC-1: R1 and R2
+  admit again with one obligation, a `#1` fallback and order-dependent
+  hashes.
 
 ## Stop conditions
 
