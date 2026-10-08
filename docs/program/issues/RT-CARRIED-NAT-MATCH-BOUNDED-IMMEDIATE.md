@@ -1,7 +1,7 @@
 ---
 id: RT-CARRIED-NAT-MATCH-BOUNDED-IMMEDIATE
 title: "A host-produced ImmediateBoundedNat (PrivateBufferSpan field 3, spill class Int) observed by a carried structural Nat Match traps at the Constructor-class guard, so the reached Nat fanout aborts natively after the interpreter's own effect prefix. Decide and build structural Nat observation of a bounded immediate, or a static refusal, so the three Nat variants run with interpreter parity"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -72,3 +72,12 @@ stop and report the mismatch.
   an un-ignored row.
 - The D0 (a) population reaches a scrutinee whose class the repair cannot
   name.
+
+## Closeout
+
+Merged `e18f9a2cc` from exact `38f3d4691` (PR #4597). Runtime QA
+`evt_1m9fcv29pat53`, Architect `evt_5myvjj1h1t0xt`, Decision
+`dec_2shemr38s3t6a`. The composed suffix is threaded into
+`lower_bounded_nat_match_with_plan`, and the Nat fanout row of
+`rt_escape_second_resource_native` runs at interpreter parity and is
+un-ignored. The full `rt_parity_native` population was gated by CI.

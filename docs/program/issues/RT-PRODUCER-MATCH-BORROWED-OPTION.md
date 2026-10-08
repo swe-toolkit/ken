@@ -1,7 +1,7 @@
 ---
 id: RT-PRODUCER-MATCH-BORROWED-OPTION
 title: "A tree-producing Match whose scrutinee lowers to a BorrowedOption (an Option match on bytes_at inside read_byte) dispatches natively, as the ordinary Match chain already does, instead of refusing in the producer operand chain for want of a BorrowedOption arm"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: architect
