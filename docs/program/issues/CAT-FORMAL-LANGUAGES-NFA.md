@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-NFA
 title: "The catalog has no nondeterministic automaton. Deliver Algorithm.FormalLanguages.Nfa (a Bool-relation Nfa with Omega path acceptance, the bit-mask subset construction into Dfa, its sound and complete laws, and NFA emptiness through section 2), with Core.Logic.And and public unit_finite/bool_finite, fully proved at zero trust"
-status: draft
+status: ready
 owner: foundation
 size: M
 tier: T2
