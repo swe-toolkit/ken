@@ -510,8 +510,7 @@ impl<'a> Lowering<'a> {
                 })
                 && cases.iter().any(|case| {
                     case.constructor == self.process_symbols.nat_suc && case.binders == 1
-                })
-                && composed_suffix.is_none_or(<[_]>::is_empty);
+                });
             #[cfg(test)]
             let exact_nat_family = exact_nat_family
                 && !carried_match_dispatch_mutation_applies(
@@ -569,6 +568,7 @@ impl<'a> Lowering<'a> {
                     static_origin,
                     env,
                     &join_plan,
+                    composed_suffix,
                 )?;
                 if !self.seal_source_trap_branch(builder, &bounded_result)? {
                     let merge = merge.ok_or_else(|| {
@@ -622,6 +622,7 @@ impl<'a> Lowering<'a> {
                     static_origin,
                     env,
                     &join_plan,
+                    composed_suffix,
                 )?;
                 if !self.seal_source_trap_branch(builder, &structural_result)? {
                     let merge = merge.ok_or_else(|| {
@@ -1648,6 +1649,7 @@ impl<'a> Lowering<'a> {
                 static_origin,
                 env,
                 &join_plan,
+                None,
             )
         }
 
@@ -1662,6 +1664,7 @@ impl<'a> Lowering<'a> {
             static_origin: StaticOriginId,
             env: &[LoweringEnvironmentBinding],
             join_plan: &JoinPlanToken,
+            composed_suffix: Option<&[EliminatorFrame<'_>]>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
             let zero = cases.iter().enumerate().find(|(_, case)| {
                 case.constructor == self.process_symbols.nat_zero && case.binders == 0
@@ -1710,7 +1713,12 @@ impl<'a> Lowering<'a> {
                 let mut arm_env = env_with(arm_env, &[]);
                 arm_env.extend_from_slice(env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
-                let lowered = self.lower_expr(builder, body, &arm_env)?;
+                let lowered = match composed_suffix {
+                    Some(suffix) if !suffix.is_empty() => {
+                        self.lower_computational_producer_expr(builder, body, &arm_env, suffix)?
+                    }
+                    Some(_) | None => self.lower_expr(builder, body, &arm_env)?,
+                };
                 match &lowered {
                     LoweringOperand::Specialized(Lowered::Trap(trap)) => {
                         terminal_trap.get_or_insert_with(|| trap.clone());
