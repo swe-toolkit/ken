@@ -10,6 +10,8 @@
 //! their subjects.
 //! The generic `Perm`, `insert`, `sort` and their four checked laws are
 //! exported; their proof helpers and the `List Bool` sort carrier remain private.
+//! Generic Ω-list membership and its seven checked lift/transport laws are
+//! public beside their Derived-owned providers.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -266,7 +268,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// complete loader-visible export surface is exactly the authorized
 /// collection operations, two `nth` bound proofs, four `list_append` attached
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
-/// operations (`Perm`, `insert`, `sort`), and their four attached sort proofs.
+/// operations (`Perm`, `insert`, `sort`), their four attached sort proofs,
+/// and generic Ω-list membership with seven public checked lemmas.
 /// THE GAP: none
 /// within the loader's publication forms represented by Derived's parsed
 /// declarations.
@@ -315,6 +318,14 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "list_append::left_unit".to_owned(),
             "list_append::length".to_owned(),
             "list_append::right_unit".to_owned(),
+            "list_elem".to_owned(),
+            "list_elem_append_left".to_owned(),
+            "list_elem_append_right".to_owned(),
+            "list_elem_concat_map".to_owned(),
+            "list_elem_head".to_owned(),
+            "list_elem_later".to_owned(),
+            "list_elem_map".to_owned(),
+            "list_elem_transport".to_owned(),
             "map".to_owned(),
             "map::append".to_owned(),
             "map::fusion".to_owned(),
@@ -333,6 +344,6 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "reverse::involutive".to_owned(),
         ]),
         "the roots loader must publish exactly Derived's authorized export surface: \
-         collection operations, their existing attached proofs and four generic sort proofs"
+         collection operations, attached proofs, sort laws and eight membership names"
     );
 }
