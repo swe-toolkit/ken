@@ -210,7 +210,8 @@ provided. The word `[a, b]` is read in that order.
 - spec: `spec/50-stdlib/61-formal-languages.md` §3.2–§3.3.
 - promise class: durable invariant.
 - given: `q = Fin 3`, `a = Bool`, `fq = fin_finite 3`,
-  `fa = bool_finite`, edge set `{(0, a, 1), (1, b, 2)}`, and `I = {0}`.
+  `fa = bool_finite`, edge set `{(0, a, 1), (1, b, 2)}`,
+  `I = {0}`, and `F = {}`.
   This is the empty-language member of the pair: the nonempty case below uses
   the same carrier, certificates, edges, and initial predicate, changing only
   `F`.
