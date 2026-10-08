@@ -211,6 +211,17 @@ bounded index's *use* are gated on the dependent-`match` refinement enhancement
 landing this run as `DS-5b` (Kernel ring). Zero `Axiom`, zero `trusted_base()`
 delta — `Vec` is an ordinary inductive with a real eliminator.
 
+The **deterministic-automaton contract** is pinned in
+**`61-formal-languages.md`** (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT). An ordinary
+`Dfa q a` has a total transition, a start state, and a Boolean acceptance
+function over **any** state carrier `q` and alphabet `a`; it requires neither
+finiteness nor `DecEq`. The `Algorithm.FormalLanguages.Dfa` package must supply
+`run`/`accepts`, complement, general Boolean-combining product and its
+intersection/union instances with seven checked laws and zero trust delta.
+A `Finite q` certificate and decision procedures belong to later work, as do
+NFA, regex, equivalence/minimisation, and the lexer byte bridge. The contract
+is specified here; its package implementation has not yet landed.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):

@@ -7,7 +7,7 @@ readers use those declarations and their stated scope; this index does not
 invent a separate maturity judgment.
 
 The chapters remain authoritative for their own declarations. This index is a
-measured view of all 64 Markdown files under `spec/` at the reconciliation
+measured view of all 67 Markdown files under `spec/` at the reconciliation
 point. It is not a build tracker, a next-action queue, or a substitute for the
 work-package nodes under `docs/program/issues/`.
 
@@ -82,6 +82,7 @@ to that same declaration, including its qualifications.
 | `20-verification/25-protocol.md` | `T1 elaborated; implementation-ready` | Normative for message shape, verdict cross-walk, and stability; exact JSON names remain a finalization surface. |
 | `20-verification/README.md` | `DRAFT v0` | Normative for the verification interface and soundness obligations; named prover internals remain team work. |
 | `30-surface/30-taxonomy.md` | not declared | Normative for the built-in/prelude/package boundary and minimality invariant; membership grows through its derivation process. |
+| `30-surface/30-intrinsic-ledger.md` | not declared | Open evidence ledger, not a floor-admission authority; the normative floor remains in `30-taxonomy §4`. |
 | `30-surface/31-lexical.md` | `DRAFT v0`; reserved-infix admission contract-pinned | Settled for `OQ-syntax` principles; the exact six-name reserved-infix admission binds, while the remaining concrete token table is a revisable starter. |
 | `30-surface/32-grammar.md` | `DRAFT v0`; reserved-infix grammar contract-pinned | Normative intent for which productions exist; the six-name operator-name spellings bind, while other exact spelling remains proposal-level. |
 | `30-surface/33-declarations.md` | not declared | Normative for features and the named module, visibility, and class contracts; concrete spelling remains proposal-level. |
@@ -110,8 +111,10 @@ to that same declaration, including its qualifications.
 | `50-stdlib/57-collections-and-views.md` | `DRAFT v0 (CAT-3)` | Binding CAT-3 contract for collection laws and views; build work remains staged as declared. |
 | `50-stdlib/58-maps-sets-relations.md` | `DRAFT v0 (CAT-4)` | Binding CAT-4 contract for keyed collections, sets, and the relations frontier; build scope remains split as declared. |
 | `50-stdlib/58a-priority-queues.md` | `LANDED COMPUTATION + GENERAL LAWS (CAT-PRIORITY-QUEUE and CAT-PRIORITY-QUEUE-LAWS)` | Normative for the abstract six-name interface, priority-queue semantics, validity obligations, and structural cost account; the computational implementation and private general semantic proof suite are landed, while machine-checked complexity remains separate. |
+| `50-stdlib/58b-membership.md` | `DRAFT v0 (SPEC-MEMBERSHIP-CLASS-CONTRACT)` | Binding contract for the `Membership` class, standard providers and law model; `∈` spelling and completion policy are specified elsewhere. |
 | `50-stdlib/59-parsing-syntax-diagnostics.md` | `DRAFT v0 (CAT-5)` | Binding CAT-5 package contract with the stated compiler/reflection exclusions. |
 | `50-stdlib/60-length-indexed-vectors.md` | not declared | Normative for the Vec family and landed operations; `zip` and `lookup` remain gated on `DS-5c`. |
+| `50-stdlib/61-formal-languages.md` | `DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT)` | Section 1 binds the Dfa record, nine operations, seven checked laws, finiteness and trust boundaries; §§2–6 are deferred and no package delivery is claimed. |
 | `50-stdlib/README.md` | `DRAFT v0` | Binding standard-package-tier boundary and derivation-path requirement. |
 | `60-security/61-information-flow.md` | `Sec1 + Sec1ct elaborated; implementation-ready for WS-Sec` | Normative for the declared IFC and constant-time discipline; surface spelling remains proposal-level. |
 | `60-security/62-authority.md` | `Sec2 elaborated; implementation-ready for Team Verify (WS-Sec)` | Normative for authority, attenuation, revocation contract, and audit points; spelling and named runtime mechanisms remain qualified. |
@@ -140,7 +143,7 @@ inferred axis value:
   chapter.
 - `_notes/analysis-digest.md` — the background design note declares no status.
 
-The other 61 inputs are classifiable by the operative rule. This report does
+The other 64 inputs are classifiable by the operative rule. This report does
 not repair or add chapter declarations; those declarations are inputs to this
 reconciliation.
 
