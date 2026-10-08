@@ -30,14 +30,36 @@ fn unbound_lowercase_constructor_argument_is_unresolved() {
     );
 }
 
+/// Promise class: durable invariant (spec 33 §§1, 8.4).
+/// MEASURED: a constructor's argument can name a checked data family in
+/// either textual order, and both constructors belong to their own families.
+/// CLAIMED: dependency order admits forward data references without losing
+/// the identities of the two checked families. THE GAP: cycles and missing
+/// names are rejected by separate forward-reference acceptance rows.
 #[test]
-fn data_type_references_follow_declaration_order() {
-    let later_error = env()
+fn data_type_references_follow_dependency_order() {
+    let mut later_env = env();
+    let ids = later_env
         .elaborate_file("data D = C Later\ndata Later = MkLater")
-        .expect_err("a later type declaration must not be visible early");
-    assert!(
-        matches!(later_error, ElabError::UnresolvedCon { ref name, .. } if name == "Later"),
-        "expected the later declaration to be unresolved, got {later_error:?}"
+        .expect("a later data family must be checked before its earlier dependent");
+    assert_eq!(ids.len(), 2, "both declarations must elaborate");
+    assert_eq!(
+        later_env
+            .env
+            .constructor(later_env.globals["C"])
+            .expect("checked C")
+            .0
+            .id,
+        later_env.globals["D"]
+    );
+    assert_eq!(
+        later_env
+            .env
+            .constructor(later_env.globals["MkLater"])
+            .expect("checked MkLater")
+            .0
+            .id,
+        later_env.globals["Later"]
     );
 
     let mut earlier_env = env();
@@ -45,6 +67,24 @@ fn data_type_references_follow_declaration_order() {
         .elaborate_file("data Earlier = MkEarlier\ndata D = C Earlier")
         .expect("an earlier type declaration must remain available");
     assert_eq!(ids.len(), 2, "both ordered declarations must elaborate");
+    assert_eq!(
+        earlier_env
+            .env
+            .constructor(earlier_env.globals["MkEarlier"])
+            .expect("checked MkEarlier")
+            .0
+            .id,
+        earlier_env.globals["Earlier"]
+    );
+    assert_eq!(
+        earlier_env
+            .env
+            .constructor(earlier_env.globals["C"])
+            .expect("checked C")
+            .0
+            .id,
+        earlier_env.globals["D"]
+    );
 }
 
 #[test]
