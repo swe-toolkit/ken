@@ -43,30 +43,69 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-1. **D0 (census, first act).** Classify every `globals.insert` site as
-   (a) an identity binding, (b) an intentional rebind of the same
-   GlobalId, or (c) an intentional shadow or overwrite, with the reason it
-   is lawful (prelude confinement, property-class duplicates, retain or
-   rollback). The Architect rules the classification.
-2. **The repair.** A single checked insert used by every (a) site, with (b)
-   and (c) left explicit. No `_` or default arm decides the class.
+1. **D0 census: done** (verify-leader `evt_1gk40emxp4jpj`,
+   `evt_6vzwnjdvav2mw`; ruled `evt_5tabgdgdagjcz` on `48f4bacb2`). The
+   census found 94 production sites and 59 test-only sites. A physical
+   insert can be lawful on one input and colliding on another, so the class
+   belongs to the (prior binding, new binding) pair, not to the line. Every
+   production source declaration passes one of three windows,
+   `with_owner(.., with_env_mark_rollback(..))`, at `modules.rs:3386`,
+   `:4526` (spaces) and `:4802` (mutual groups). Prelude-phase sites,
+   `modules.rs:318`, `declare_postulate_raw` and the 59 test writes stay
+   unrouted, as classified.
+2. **The repair, in `modules.rs`** (the code is in `evt_5tabgdgdagjcz`).
+   - One helper, `with_declaration_identities`, replaces the three window
+     compositions. No `globals` signature changes.
+   - `MintedSpelling` becomes an enum: `Dictionary`, `LawField` and
+     `SpaceOperation`. Each binding carries an `IdentityProvenance` of
+     `Source` or `Minted(..)`.
+   - An exhaustive enumerator, `declared_identities(rdecl, owner, minted)`,
+     with no `_` arm, lists the keys each declaration binds: constructors
+     as Source, law fields and space operations as Minted.
+   - The window refuses with `DeclarationIdentityCollision` when a
+     displacement is not lawful: Source over Source and an equal Minted
+     pair are lawful, a mixed pair is not, and `same_instance_key` is kept
+     unchanged. It refuses any undeclared new key or unbound declared key
+     with a typed Internal error. On failure it restores a displaced
+     predecessor.
+   - NAMED-HEAD's owner-only guard and its restore at `:3410` are deleted;
+     the window subsumes them.
+   - **The completeness check is the authority on the enumerator.** If a
+     row refuses with "undeclared identity keys" or "was not bound", stop
+     and report the key, the `RDeclKind` and the inserting site; the
+     Architect rules that arm's provenance. Never add a key to an arm on
+     your own.
 
 ## Acceptance
 
 - **AC-1.** The witness is refused in both orders with the typed error
-  naming the instance and the constructor. So are the rows that
-  VERIFY-NAMED-HEAD leaves admitted (Architect `evt_7r6p7bj8wj22y`): R2
-  with `instance Lbl A` before `const Lbl_instance_A`, in one-, two- and
-  three-file layouts, and a class, data or const declared after a minted
-  dictionary at its spelling.
-- **AC-2 (control).** VERIFY-NAMED-HEAD's R1 and R2 rows still refuse, its
-  non-colliding controls keep their results, and no catalog package is
-  refused or changes hash.
-- **AC-3 (mutation, QA).** Routing the constructor site around the checked
-  insert returns the witness to admitting with the overwritten key.
+  naming the instance and the constructor. So are:
+  - R2 with `instance Lbl A` before `const Lbl_instance_A`, in one-, two-
+    and three-file layouts;
+  - a class, data or const declared after a minted dictionary at its
+    spelling;
+  - `law Foo { a : .. }` against `const Foo_a`, in both orders;
+  - a space operation against a same-spelled const, in both orders.
+- **AC-2 (control).** VERIFY-NAMED-HEAD's suite stays 7/7, along with
+  `modules::namespace_effect_tests` and `lang_instance_registry_identity_key`
+  (5/5). The full `scripts/ken-cargo test -p ken-elaborator --lib` passes
+  and is part of the QA gate. No catalog package is refused or changes hash.
+- **AC-3 (mutation, QA).** Making `(Minted(_), Source)` lawful returns the
+  constructor-after-instance witness to admitting with the key overwritten,
+  and reddens AC-1.
+- **AC-4.** A declaration that displaces a key and then fails kernel
+  checking leaves its predecessor bound. Mutation: deleting the restore loop
+  reddens AC-4.
+- **AC-5 (mutation, QA).** Dropping the constructor keys from the DataDecl
+  arm makes every data declaration with constructors refuse with exactly
+  "declaration bound undeclared identity keys", never a silent admit.
+- **AC-6 (cost).** Report base-against-candidate wall time on the two
+  largest catalog package targets. **Stop** above +5%; the Architect then
+  rules whether to narrow the scan.
 
 ## Stop conditions
 
 - A catalog or corpus package is newly refused or changes hash: stop with
   the list.
+- The enumerator stop in Deliverable item 2, or the AC-6 cost stop.
 - Any kernel, `trusted_base()` or spec change.
