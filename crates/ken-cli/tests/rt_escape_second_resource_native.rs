@@ -569,53 +569,38 @@ fn escape_resource_plus_plain_matches_interpreter() {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-CLOSURE-BOUNDARY-LANE.
-//
-// Observed signature, exactly:
-//   Closure: a closure cannot cross the boundary: it is runtime-local and live-domain only, and it has no durable lane
-//
-// Owner node: RT-CLOSURE-BOUNDARY-LANE.
-// Pre-existing base debt, NOT a bind-order regression: measured failing at
-// the frozen base 21fd46dc by the D10 differential, before any
-// RT-SRCBODY-BIND-ORDER commit.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-//
-// RT-CLOSURE-BOUNDARY-LANE D1 measured the refusing caller separately. The
-// specialized-child screen in `transfer_constructor_operands` is building the
-// source `ITree::Vis` constructor directly in the carrier because a sibling is
-// already carried. Its planned allocation is `InvocationAggregate`, not
-// `PersistentGround`, so this row is a live-domain exchange governed by
-// `41-values.md:76-83`, not durable publication under `:72-75`.
-//
-// The repair attempt stops at B2F's closed carrier language. Generated-unit
-// values cross as one `BoundaryWord`; its only `Closure` tag/class row is the
-// explicitly retired persistent lane, and the invocation-owned aggregate row
-// admits only constructors and records. B2F can directly call a statically
-// selected closure body, but it cannot carry this first-class closure while
-// checking defining-owner/artifact liveness, same-domain use, and checked
-// dispatch. Adding that representation and authority would be a new carrier,
-// not wiring the existing one, so this row remains conservatively refused.
-//
-// D3 removes this ignore only with that live-domain validation in place and a
-// passing native/interpreter differential. Re-labelling the refusal without
-// executing the row does not discharge the skip.
-// Annotation only -- test body and expectations are unchanged.
 #[test]
-// RT-NATIVE-TREE-MATCH D1, 2026-09-28: this ignored row overflows its libtest
-// default thread; a scratch-only stated 256 MiB diagnostic (RUST_MIN_STACK
-// removed) instead reaches continuation origin 329 under PredeclaredFunctionId(4).
-// D2 terminated at 16, 64 and 256 MiB; 16 MiB is a termination bound, not a
-// measured peak. No candidate stack is provisioned without a measured peak
-// and numeric headroom. This refusal is not a native-execution observation.
-#[ignore = "RT-NATIVE-TREE-MATCH D1: first ObjectEmission refusal is BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1; continuation origin 329, PredeclaredFunctionId(4); RT-NATIVE-SEQUENTIAL-BRACKETS AC-0 owns this witness, pending site-identity check"]
+// Promise class: durable native/interpreter differential. MEASURED: equal
+// stdout and full effect events for the escaped FsHandle fanning source.
+// CLAIMED: the linked native execution retains its observable host effects.
+// THE GAP: one fixture cannot establish parity for every escaped-resource
+// program; it guards this reached, effect-bearing source.
+// The default libtest thread overflowed on landed main 79f44eecb with
+// RUST_MIN_STACK removed. On the passing 256 MiB helper thread, a disposable
+// mincore low-water probe measured 3028 KiB of touched stack (3028 KiB RSS,
+// zero swap) after this row: the provision is 86.6 times that measured depth.
+// This provisions the baseline, not a claim that the default stack is adequate.
 fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
-    // Pre-fix: this panicked in `build_native_program` with
-    // "checked Runtime frame marker was consumed more than once". The fork/union
-    // of `consumed_subcontinuation_frames` per mutually-exclusive arm makes it
-    // reach native execution; the assertion below pins interpreter equivalence.
-    let diff = differential("escape-file-then-readat", ESCAPE_FILE_THEN_READAT);
-    assert_native_matches_interpreter("escape-file-then-readat", &diff);
+    in_large_stack_thread("rt-escape-fshandle-fanning", || {
+        // Pre-fix: this panicked in `build_native_program` with
+        // "checked Runtime frame marker was consumed more than once". The fork/union
+        // of `consumed_subcontinuation_frames` per mutually-exclusive arm makes it
+        // reach native execution; the assertion below pins interpreter equivalence.
+        let diff = differential("escape-file-then-readat", ESCAPE_FILE_THEN_READAT);
+        assert_native_matches_interpreter("escape-file-then-readat", &diff);
+        assert!(
+            !diff.interpreted.effect_trace.is_empty(),
+            "escaped FsHandle must reach a host effect before comparing vectors"
+        );
+        assert_eq!(
+            diff.native.stdout, diff.interpreted.stdout,
+            "FsHandle stdout"
+        );
+        assert_eq!(
+            diff.native.effect_trace, diff.interpreted.effect_trace,
+            "FsHandle full effect events"
+        );
+    });
 }
 
 #[cfg(target_os = "linux")]
