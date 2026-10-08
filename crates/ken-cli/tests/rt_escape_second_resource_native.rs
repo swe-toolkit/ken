@@ -624,7 +624,10 @@ fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
             !diff.interpreted.effect_trace.is_empty(),
             "escaped FsHandle must reach a host effect before comparing vectors"
         );
-        assert_eq!(diff.native.stdout, diff.interpreted.stdout, "FsHandle stdout");
+        assert_eq!(
+            diff.native.stdout, diff.interpreted.stdout,
+            "FsHandle stdout"
+        );
         assert_eq!(
             diff.native.effect_trace, diff.interpreted.effect_trace,
             "FsHandle full effect events"
