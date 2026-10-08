@@ -1,6 +1,6 @@
 ---
 id: RT-NESTED-RESPONSE-OWNER-CALLER
-title: "The ignored rt_span_prov_native:355 row refuses at ObjectEmission: a forward-declared response owner (the second BufferFreeze) has no verified selected incoming call, because its selected caller is planned inside the first BufferFreeze's specialization and lowering records no disposition for it. Measure where that caller site is lowered, then repair so the caller carries a recorded disposition and the row passes on both engines"
+title: "The ignored rt_span_prov_native:355 row refuses at ObjectEmission and, once planned, traps -1 natively, because response owners whose K returns a Vis outside the pending-Vis record protocol are dropped from it silently and emitted Ret-only. Classify every response owner in one stored, validated settlement plane and refuse at planning every owner the protocol cannot settle; the relay settlement that un-ignores the row is RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT"
 status: active
 owner: runtime
 size: M
@@ -16,9 +16,13 @@ origin: "Architect fresh-D0 boundary ruling evt_v7p1c6t7kmw6 on main ff0a35f24 (
 
 ## Objective
 
-`sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines`
-(`crates/ken-cli/tests/rt_span_prov_native.rs:355`) is un-ignored and passes
-on both engines.
+Every response owner's settlement route is classified once, in a stored and
+validated plane. An owner the pending-Vis protocol cannot settle is refused
+at planning with a typed error instead of trapping `-1` natively. The span
+row `sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines`
+(`crates/ken-cli/tests/rt_span_prov_native.rs:355`) stays ignored, with
+that refusal as its reason. `RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT`
+un-ignores it.
 
 ## Settled inputs (Architect `evt_v7p1c6t7kmw6`, at `ff0a35f24`)
 
@@ -81,83 +85,72 @@ retained.
    (`excluded_by_relay ... continue`). The emitter (`units.rs:4572-4625`)
    reads the absence as Ret-only and emits the `require_i64` that returns
    `-1`. Lowering has no relay arm, so the planner fails open.
-3. **D1h (measurement only, on `b135b25b5`, probes restored).** Report:
-   - **the reference semantics:** the interpreter alone on the span row,
-     through a probe that skips the native-first ordering. For each
-     invocation of owner 4's K, which returned Vis occurs (361, 528 or
-     both), and how the interpreter settles each one: the handler or row,
-     and the owner the result flows to;
-   - **Context(1)'s census:** each member with its relay flag, successor
-     row and k_context; the context-to-funcid map for Contexts 1 and 6; and
-     which binder relay Vis 361's operation `Var` forwards;
-   - **the whole-owner rule's provenance:** the commit and ruling event
-     that introduced "A relay makes the WHOLE owner ineligible"
-     (`returned_vis.rs:326`), from `git log -S`.
-
-   Outcomes, ruled in advance:
-   - **H1.** The interpreter reaches only 528 for owner 4; 361 is present
-     but not reached. R-CHAIN-1 gains clause (c) below, and the Architect
-     rules its exact code once the provenance item shows the whole-owner
-     rule's rationale does not forbid it.
-   - **H2.** The interpreter reaches relay 361 through owner 4. Relay
-     settlement is a new mechanism. **Stop**; the Steward decides the
-     scope.
-   - **H3.** Anything else. **Stop.**
-
-   No guard is relaxed, and the `0x101d_0000_002a` word is not edited.
-4. **R-CHAIN-1 (production; its edits wait for D1h and the Architect's
-   ruling on it).** It closes all three inventory entries.
-   - A stored, validated plane, `plan.pending_vis_settlements`. It is
-     built once, after phase B's owner check and before the `:1520`
-     rebuild.
-   - It is validated by rebuild-equality at install and in the whole-plan
-     closure. The error reads "pending-Vis settlement plane is not the
-     exact closed protocol derivation".
-   - Ownership source (e) and the lowering seed (`core.rs:2879`) read that
-     field. `pending_vis_record_protocol()` keeps only three callers: the
-     builder, the validator and the diagnostics.
-   - The frame discriminant that `emit_pending_vis_owner_loop` writes, and
-     the arm that reads it, both come from the stored row id. A discriminant
-     that matches no arm becomes a catalogued, fail-closed trap, never
-     `UnclassifiedRuntimeTrap { -1 }`.
-   - **(a) No silent drop.** The stored plane holds a classification for
-     every response owner, as an enum with no `_` arm: `Protocol(..)`,
-     `RetOnly` (the K census has zero returned-Vis members) and
-     `Excluded { reason }` (a relay, or a swallowed Err with its text).
-     The emitter selects its arm from this classification only.
-   - **(b) Fail closed at planning.** An `Excluded` owner whose census has
-     any non-relay installed member is refused at planning with "response
-     owner K returns an installed Vis outside a pending-Vis protocol". It
-     is never emitted Ret-only.
-   - **(c) Mixed owners, on H1 only.** Non-relay members enter the
-     pending-Vis record path as owner 0's do. Each relay member gets an
-     explicit planned arm in the owner loop that traps through a
-     planner-catalogued trap ("relay Vis returned to a pending-Vis
-     owner"), interned like `malformed_dynamic_constructor_trap`.
+3. **D1h: done, H2** (`evt_nzs10vn3w8t0`, `evt_6vzphntgv506e`). The
+   interpreter reaches relay Vis 361 through owner 4: Context(1)'s K
+   returns it forwarding the pattern-bound operation `Var(1)` (FsReadAt),
+   the driver dispatches it and resumes the IH, and the K later reaches
+   installed Vis 528 by row 5 / Context(6). Steward scope decision
+   `evt_2kmfzsvqj53zg`, ruled `evt_14w6eh1d2hwk4`: split. This WP lands
+   (a) and (b); relay settlement is the successor.
+4. **R-CHAIN-1 (production).** The exact code is in Architect
+   `evt_14w6eh1d2hwk4`.
+   - **(a) Stored classification.** `ResponseOwnerSettlement` (`Protocol`,
+     `RetOnly`, `Excluded { reason: Relay | Underived(text) }`) for every
+     installed response owner, in `plan.pending_vis_settlements`
+     (`PendingVisSettlements { protocol, owners }`).
+     `pending_vis_record_protocol()` becomes
+     `build_pending_vis_settlements()`, and its two silent drops
+     (`returned_vis.rs:125`, `:129`) become classifications. It is built
+     once, immediately after phase B's owner check and before the `:1520`
+     rebuild. It is validated by rebuild-equality in closure, beside
+     `:2070`, with "pending-Vis settlement plane is not the exact closed
+     protocol derivation".
+   - **Consumers.** Source (e) (`static_transition.rs:876`) and the
+     lowering seed (`core.rs:2879`) read the field. Lowering gains
+     `response_owner_settlements`. The emitter (`units.rs` ~4572) selects
+     its arm from the classification alone, and any other combination is a
+     backend error, not a Ret-only body.
+   - **(b) Refusal at planning.** `admit_response_owner_settlements()`, run
+     in `finish` right after `self.plan.validate()?`, refuses every
+     `Excluded` owner, mixed or not, with "response owner .. K returns a
+     Vis outside the pending-Vis protocol (..)". It runs after closure, so
+     every plane is built and validated first.
 
 ## Acceptance
 
-- **AC-1.** `sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines`
-  is un-ignored and green: both engines exit 0 with the exact freeze
-  sequence it asserts.
+The implementer confirms each pin can be observed through the existing
+test-support hooks. A pin that cannot be observed before `finish` returns
+Err moves to the successor and is reported.
+
 - **AC-2 (plan pins).** 8 Specialized rows plus Vis 1079 Deferred with
-  `ContinuationBodyTail`, and owner 6 still Specialized.
+  `ContinuationBodyTail`, and owner 6 still Specialized, through the
+  feasibility diagnostics.
 - **AC-3 (mutation, QA).** Removing the D1 predicate brings back the exact D0
-  refusal (owner 0, context 2, `disposition=None`).
-- **AC-5, AC-5b, AC-6 and AC-6b.** As ruled in `evt_38ayfhrhqq8q3` and
-  later, retained.
+  refusal (owner 0, context 2, `disposition=None`), distinct from (b).
+- **AC-5b (mutation, QA).** Moving the seat install back yields the
+  `closure.rs:2055` refusal, distinct from (b).
+- **AC-6 and AC-6b.** The seat-162 record set gains exactly the 48 S2
+  tuples, and the seat-plane bytes are unchanged against `c7c05d4e6`,
+  observed through a planner hook.
 - **AC-R1 (mutation).** Perturbing one stored member's `base_owner` reddens
   the closure validator.
-- **AC-R2.** `pending_vis_record_protocol()` has no caller outside the
-  builder, the validator and the diagnostics.
-- **AC-R4 (mutation).** A discriminant mutation yields the catalogued trap,
-  not `-1`.
-- **AC-R5.** On `b135b25b5`'s plan with clause (c) disabled, the span row
-  gets the exact (b) planner refusal, not `-1`.
-- **AC-4 (controls).** The five sibling rows, SEQUENTIAL with its
-  plan-row pins, and `one_bracket_retains_native_parity` stay green. The
-  px8ta rows keep their labelled failures. The `units.rs:7831` coverage gate
-  is not relaxed.
+- **AC-R2.** `build_pending_vis_settlements` is called only at the builder
+  site and by the validator. `returned_vis_protocol` keeps its diagnostics
+  caller (`:1354`).
+- **AC-R5.** The span row gets exactly the (b) refusal, naming owner 4 with
+  `Relay`, and its ignore reason is that text.
+- **AC-R6 (census and stop).** A classification census (counts of
+  `Protocol`, `RetOnly`, `Excluded{Relay}` and `Excluded{Underived}`) over
+  the native suites run locally. SEQUENTIAL, `one_bracket_retains_native_parity`
+  and every native row green on `c7c05d4e6` stay green. **If a previously
+  green row newly refuses under (b), stop** and report the row and its
+  classification.
+- **AC-4 (controls).** The five sibling rows stay green, the px8ta rows keep
+  their labelled failures, and the `units.rs:7831` coverage gate is not
+  relaxed.
+
+AC-1 (span-row parity), AC-5 and AC-R3 move to the successor. AC-R4 is
+dropped with clause (c).
 
 ## SYMPTOM INVENTORY
 
@@ -175,7 +168,8 @@ settlement chain (`evt_1fvvjj40kk6s9`, `evt_1dynjvvkh7mnf`,
    install.
 3. After the planner closes, the linked native run traps `-1`. Measured
    (D1g): one relay member excludes owner 4 from the protocol silently,
-   and the emitter reads the gap as Ret-only.
+   and the emitter reads the gap as Ret-only. Closed by (a) and (b) as a
+   typed refusal; parity is the successor's.
 
 Shared predicate (all three, Architect `evt_7yy6d7gkm48xy`): the chained
 settlement has no single plan object, so each consumer derives it from its
