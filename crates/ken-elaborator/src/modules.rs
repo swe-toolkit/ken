@@ -4382,52 +4382,41 @@ fn expand_scope(
                     segment_end += 1;
                 }
                 let segment = &decls[i..segment_end];
-                // Preflight exports without publishing. If an export is
-                // unavailable, elaborate only the textual prefix before it:
-                // earlier checked locals survive, but no later local can
-                // mutate the environment after that refusal. A facade never
-                // binds its exported names in the owner's body.
+                // Dry-run publication in textual order before any node is
+                // checked. A current local takes the pending path both here
+                // and at publication, and node checking changes no input
+                // apply_export reads for it, so the dry run refuses exactly
+                // where publication would. On refusal, elaborate only the
+                // textual prefix before the refused export.
                 let mut export_error = None;
-                for (offset, d) in segment.iter().enumerate() {
-                    if let Decl::ExportDecl { form, span } = d.unwrap_pub() {
-                        let preflight = match form {
-                            ExportForm::Facade { module, items } => select_module_provider(
-                                &elab.module_state.exports,
-                                &elab.module_state.inline_children,
-                                &elab.module_state.file_inline_paths,
-                                &elab.module_state.file_export_tables,
-                                &elab.module_state.file_export_ids,
-                                &elab.module_state.export_provenance,
-                                prefix,
-                                elab.module_state.active_imports.last().map(String::as_str),
-                                unit_inline_modules,
-                                ordered_inline_modules,
-                                module,
-                                span,
-                            )
-                            .and_then(|provider| {
-                                for item in items {
-                                    if !provider.pubmap.contains_key(&item.name) {
-                                        return Err(ElabError::UnboundName {
-                                            name: format!("{module}.{}", item.name),
-                                            span: span.clone(),
-                                        });
-                                    }
-                                }
-                                Ok(())
-                            }),
-                            ExportForm::InScope { items } => items.iter().try_for_each(|item| {
-                                select_in_scope_export(
-                                    scope,
-                                    &elab.module_state.exports,
-                                    &elab.globals,
-                                    item,
-                                    span,
-                                )
-                                .map(|_| ())
-                            }),
+                if segment
+                    .iter()
+                    .any(|d| matches!(d.unwrap_pub(), Decl::ExportDecl { .. }))
+                {
+                    let mut dry_scope = scope.clone();
+                    let mut dry_exports_here = exports_here.clone();
+                    for (offset, d) in segment.iter().enumerate() {
+                        let Decl::ExportDecl { form, span } = d.unwrap_pub() else {
+                            continue;
                         };
-                        if let Err(error) = preflight {
+                        if let Err(error) = apply_export(
+                            &mut dry_scope,
+                            &elab.module_state.exports,
+                            &elab.module_state.inline_children,
+                            &elab.module_state.file_inline_paths,
+                            &elab.module_state.file_export_tables,
+                            &elab.module_state.file_export_ids,
+                            &elab.module_state.export_provenance,
+                            prefix,
+                            elab.module_state.active_imports.last().map(String::as_str),
+                            unit_inline_modules,
+                            ordered_inline_modules,
+                            &elab.module_state.prop_intros,
+                            &elab.globals,
+                            &mut dry_exports_here,
+                            form,
+                            span,
+                        ) {
                             segment_end = i + offset;
                             export_error = Some(error);
                             break;
@@ -7118,6 +7107,53 @@ mod namespace_effect_tests {
         }
         assert!(env.globals.contains_key("A.before"));
         assert!(!env.globals.contains_key("A.leak"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3, §4.3).
+    /// MEASURED: competing in-scope exports under one surface refuse at the
+    /// second export; A.p survives while the provider's A.leak ID stays put.
+    /// CLAIMED: a collision does not admit a later local. THE GAP: facade
+    /// versus in-scope checked-ID collisions have their own sibling below.
+    #[test]
+    fn in_scope_export_collision_does_not_admit_later_local() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let provider_id = env.globals["A.leak"];
+        let source = "module A { const p : Nat = Zero const q : Nat = Suc Zero export p as y export q as y const leak : Nat = Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::ReExportCollision { surface_name, span, .. }) => {
+                assert_eq!(surface_name, "y");
+                assert_eq!(span.start, source.find("export q as y").unwrap());
+            }
+            other => panic!("two exports under y must collide: {other:?}"),
+        }
+        assert_eq!(env.globals["A.leak"], provider_id);
+        assert!(env.globals.contains_key("A.p"));
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3, §4.3).
+    /// MEASURED: a facade selects A.leak, then B exports its p under leak;
+    /// the second export collides while B.p survives and B.leak stays absent.
+    /// CLAIMED: collision cannot admit the later same-named local. THE GAP:
+    /// unavailable providers/members use the two separate refusal rows.
+    #[test]
+    fn facade_in_scope_collision_does_not_admit_later_local() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let source = "module B { const p : Nat = Zero export A (leak) export p as leak const leak : Nat = Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::ReExportCollision { surface_name, span, .. }) => {
+                assert_eq!(surface_name, "leak");
+                assert_eq!(span.start, source.find("export p as leak").unwrap());
+            }
+            other => panic!("facade and in-scope export must collide: {other:?}"),
+        }
+        assert!(env.globals.contains_key("B.p"));
+        assert!(!env.globals.contains_key("B.leak"));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
