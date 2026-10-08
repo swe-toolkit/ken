@@ -34,18 +34,22 @@ un-ignored and pass on both engines.
   installed 528 (row 5, Context(6) = funcid71/body515, which is empty).
 - **Why the owner is excluded today.** The whole-owner relay exclusion
   (`returned_vis.rs:326`) is keyed on the relay IH K having no native
-  value or environment representation. Lowering has no relay arm.
+  value or environment representation. A pure-relay owner (`RelayOnly`)
+  is emitted at baseline and can settle through the handler-owned local
+  continuation drive (`core.rs` ~6918-6950); the mixed owners here
+  (`MixedRelay`) cannot (Architect `evt_cv76gfj95f8a`).
 - **The seat plane has no relay seat.** `build_host_effect_seat_plan`
   (`effects.rs:658`) iterates static `RuntimeExpr::Effect` occurrences, so
   a forwarded operation has no seat of its own.
 - **The predecessor's state.** RT-NESTED-RESPONSE-OWNER-CALLER stores each
   owner's `ResponseOwnerSettlement`, and its planning refusal names owner 4
-  with `Relay`. This WP turns that `Relay` classification into a settled
-  route; it does not relax the refusal for any other `Excluded` owner.
+  with `MixedRelay`. This WP turns that `MixedRelay` classification into a
+  settled route; it does not relax the refusal for any other `Excluded`
+  owner.
 
 - **The r2 population** (from `RT-SOURCE-IH-RELAY-K-VALUE`, Architect
   `evt_1j5qaw2d9sqe7`). The predecessor refuses r2's owners 2 and 3
-  (Relay). The relay's K operand is `CheckedComputationalIHInvocation {
+  (`MixedRelay`). The relay's K operand is `CheckedComputationalIHInvocation {
   body: Call { callee: Var(0), args: [] } }`, which lowers to
   `Specialized(RecursiveBackedge)` because `ConstructArgument`
   (`source.rs:1643-1655`) propagates a backedge past the constructor, so
@@ -65,16 +69,22 @@ base, stop and report the mismatch.
    - (ii) the relay IH K's capture and environment layout at the return,
      against the existing pending-Vis frame region;
 
-   over both populations: the span's owners 3 and 4, and r2's owners 2 and
-   3. If one design cannot settle both, the D0 says so and the Architect
-   rules whether to split.
+   - (iii) for each `RelayOnly` owner in the predecessor's AC-R6 census,
+     whether the handler-owned drive settles it: whether
+     `deferred_response_at_vis` and `bounded_deferred_response_handler_owner`
+     cover every forwarded Vis's construct site (Architect
+     `evt_cv76gfj95f8a`);
+
+   over both populations: the span's owner 4 and r2's owners 2 and 3. If
+   one design cannot settle both, the D0 says so and the Architect rules
+   whether to split.
 
    Pre-ruled (Architect `evt_14w6eh1d2hwk4`): if (i) is closed and
    finite, the relay arm dispatches over the planned seats of exactly
    that set, and the node proceeds. If (i) is open, **stop**: a precursor
    node for dynamic host-effect dispatch comes first.
-2. **The ruled relay arm,** with `Relay` admitted at planning only for an
-   owner whose relay provenance set is planned.
+2. **The ruled relay arm,** with `MixedRelay` admitted at planning only for
+   an owner whose relay provenance set is planned.
 
 ## Acceptance
 
@@ -93,7 +103,7 @@ base, stop and report the mismatch.
   provenance set is not planned, keep the predecessor's typed planning
   refusal.
 - **AC-3 (mutation, QA).** Removing the relay arm returns the span row and
-  r2 to the predecessor's `Relay` refusal, never to `-1`.
+  r2 to the predecessor's `MixedRelay` refusal, never to `-1`.
 - **AC-4 (controls).** SEQUENTIAL, `one_bracket_retains_native_parity`,
   the five sibling rows and the predecessor's AC-R6 census population stay
   green; px8ta keeps its labelled failures.
