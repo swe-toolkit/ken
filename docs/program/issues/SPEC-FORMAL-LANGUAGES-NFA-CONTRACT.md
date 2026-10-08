@@ -1,13 +1,13 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-NFA-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 3 is a deferred placeholder, so the catalog has no contract for nondeterministic automata or subset construction. Specify the Nfa carrier, its acceptance, the subset construction into section 1's Dfa, and its language-equality law, at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
 gate: architect
 depends_on: [SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT]
-blocks: []
+blocks: [CAT-FORMAL-LANGUAGES-NFA]
 github: null
 origin: "Operator 2026-10-08: \"start l3 on the establish catalog program\". The ruled automata order (NFA, regex, minimisation, Bytes/Cursor lexer bridge) after CAT-FORMAL-LANGUAGES-FINITE-REACHABILITY. Same shape as SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT (Architect boundary ruling, then contract, then CAT node). Steward-filed per COORDINATION section 2."
 ---
@@ -47,14 +47,33 @@ contract that the NFA catalog node builds against.
    stated as a proved theorem, with the trust boundary (no Axiom,
    primitive, kernel form or `trusted_base()` entry). Update
    `spec/SPEC-PROGRESS.md` if the chapter set changes.
+3. **A §3 conformance seed** under `conformance/stdlib/` (Steward scope
+   amendment on CV `evt_1b55d8xs5saa4`), authored by the CV in the existing
+   seed shape. It covers path acceptance (the length and finality
+   conventions), both determinization directions, and finite emptiness.
+   Sections 1 and 2 are not backfilled here.
 
 ## Acceptance
 
 - **AC-1.** Every declaration and law the CAT node must deliver is named
   with its type, and nothing required is outside the Architect's ruling.
-- **AC-2.** Conformance-validator vote on the exact SHA.
+- **AC-2.** Conformance-validator vote on the exact SHA of the assembled
+  scope: the three spec paths plus the seed.
 
 ## Stop conditions
 
 - The contract needs a kernel, trust or surface-syntax change, or
   `DecEq q` for the subset construction (state equality is section 5's).
+
+## Closeout
+
+Merged `3a949dd8f` from exact `a90173eef` (PR #4611). Architect D0
+`evt_j3gq9c7y5ya5` (a checked 39-declaration development, rc=0), Architect
+`evt_35q2xp7s50m3c`, CV `evt_631wqp3car0jq`, Decision
+`dec_2kar6smjnpwh3`. Section 3 specifies the Bool-relation `Nfa`, Ω path
+acceptance, the finite bit-mask subset construction with
+`determinize_sound` and `determinize_complete`, NFA emptiness through
+section 2, `Core.Logic.And`, and public `unit_finite` and `bool_finite`. It
+requires `Finite q`, never `DecEq q`. The 10-case seed
+`conformance/stdlib/formal-languages/seed-nfa.md` was added by scope
+amendment `evt_4ymzbcbrn09dm`.

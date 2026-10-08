@@ -116,9 +116,12 @@ base, stop and report the mismatch.
 - **AC-5b (mutation, QA).** Moving the Prop arm back into the `source()`
   group reddens the three namespace rows with exactly `declaration bound
   undeclared identity keys ["A.HasProof.intro"]`.
-- **AC-6 (cost).** Report base-against-candidate wall time on the two
-  largest catalog package targets. **Stop** above +5%; the Architect then
-  rules whether to narrow the scan.
+- **AC-6 (cost; Architect `evt_46s0nyx1j09sg`).** The added elaboration
+  work (`WINDOW_NS + ENUM_NS`, measured instrumented on
+  `map_build_acceptance`) is at most 5% of the base median wall (7.90s of
+  158.01s). The interleaved base and candidate walls are recorded, not
+  gating; their base-only spread (16.3%) cannot resolve 5%. **Stop** above
+  the bound. The scan's O(declarations × globals) cost is a recorded carry.
 
 ## Stop conditions
 
