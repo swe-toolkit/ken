@@ -47,12 +47,18 @@ contract that the NFA catalog node builds against.
    stated as a proved theorem, with the trust boundary (no Axiom,
    primitive, kernel form or `trusted_base()` entry). Update
    `spec/SPEC-PROGRESS.md` if the chapter set changes.
+3. **A §3 conformance seed** under `conformance/stdlib/` (Steward scope
+   amendment on CV `evt_1b55d8xs5saa4`), authored by the CV in the existing
+   seed shape. It covers path acceptance (the length and finality
+   conventions), both determinization directions, and finite emptiness.
+   Sections 1 and 2 are not backfilled here.
 
 ## Acceptance
 
 - **AC-1.** Every declaration and law the CAT node must deliver is named
   with its type, and nothing required is outside the Architect's ruling.
-- **AC-2.** Conformance-validator vote on the exact SHA.
+- **AC-2.** Conformance-validator vote on the exact SHA of the assembled
+  scope: the three spec paths plus the seed.
 
 ## Stop conditions
 
