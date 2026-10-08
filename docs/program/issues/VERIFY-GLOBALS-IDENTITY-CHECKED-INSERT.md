@@ -54,7 +54,11 @@ base, stop and report the mismatch.
 ## Acceptance
 
 - **AC-1.** The witness is refused in both orders with the typed error
-  naming the instance and the constructor.
+  naming the instance and the constructor. So are the rows that
+  VERIFY-NAMED-HEAD leaves admitted (Architect `evt_7r6p7bj8wj22y`): R2
+  with `instance Lbl A` before `const Lbl_instance_A`, in one-, two- and
+  three-file layouts, and a class, data or const declared after a minted
+  dictionary at its spelling.
 - **AC-2 (control).** VERIFY-NAMED-HEAD's R1 and R2 rows still refuse, its
   non-colliding controls keep their results, and no catalog package is
   refused or changes hash.

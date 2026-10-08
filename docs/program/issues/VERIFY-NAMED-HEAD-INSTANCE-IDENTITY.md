@@ -78,16 +78,33 @@ same-instance-key predicate is the only exemption.
 
 ## Acceptance
 
-- **AC-1.** Each R1 and R2 row (one-, two- and three-file layouts, both
-  orders) is refused with the typed error naming both declarations. The
-  non-colliding controls give one obligation per live premise, no `#n`
-  fallback and an order-independent hash.
+Scope narrowed by Architect `evt_7r6p7bj8wj22y`: the guard reads `prior`
+only for an identity the elaborator mints (a dictionary canonical or a
+structural symbol). A user-spelled key that a later unit rebinds is lawful
+shadowing. A user declaration arriving after a minted identity, at its
+spelling, is the residual of `VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT`.
+
+- **AC-1.** These nine rows, across one-, two- and three-file layouts, are
+  refused with the typed error naming both declarations: R1 in both
+  orders, and R2 with the const before the instance. R2 with the instance
+  before the const still admits with one obligation, a `#1` fallback and
+  order-dependent hashes, as do a class, data or const declared after a
+  minted dictionary. Those rows are recorded as the successor's residual,
+  not as passes. The non-colliding controls give one obligation per live
+  premise, no `#n` fallback and an order-independent hash.
 - **AC-2 (control).** The predecessor's named-head and `derive` rows and
   the structural-head rows keep their owners and obligation ids, and no
   catalog package is refused or changes hash.
-- **AC-3 (mutation, QA).** Deleting the guard reddens AC-1: R1 and R2
-  admit again with one obligation, a `#1` fallback and order-dependent
-  hashes.
+- **AC-3 (mutation, QA).** Deleting the guard reddens the nine AC-1
+  refusal rows: they admit again with one obligation, a `#1` fallback and
+  order-dependent hashes.
+- **AC-6 (control).** `lang_instance_registry_identity_key` passes 5/5
+  with no changes to the test.
+- **AC-7.** On one shared environment, a second `data Foo` admits, and a
+  second `instance Pick Foo` whose head is the rebound `Foo` refuses with
+  `DeclarationIdentityCollision`.
+- **AC-8 (mutation, QA).** Forcing `minted_identity = true` at the
+  user-spelled caller reddens AC-6.
 
 ## Stop conditions
 
