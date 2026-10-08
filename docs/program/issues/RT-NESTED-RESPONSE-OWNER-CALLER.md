@@ -83,6 +83,27 @@ a planning selection defect.**
   classification moves is listed with its cause. The `units.rs:7831`
   coverage gate is not relaxed.
 
+## SYMPTOM INVENTORY
+
+From Architect `evt_6d7m1z6sy31h4`: three hard stops in the owner-0
+settlement chain (`evt_1fvvjj40kk6s9`, `evt_1dynjvvkh7mnf`,
+`evt_5v223fdev9eq7`). Clean checkpoint `b135b25b5`. A research advisory
+and D1f are pending, and the recut scope follows them.
+
+1. The ownership authority (`inline_synthesized_seat_emission_owners`)
+   was keyed on response disposition, while emission was keyed on unit
+   and target selection. Fixed by source (e) from the pending-Vis
+   protocol.
+2. Source (e)'s protocol gate was keyed on the host-effect seat plane,
+   which was installed after ownership. Fixed by reordering the seat
+   install.
+3. After the planner closes, the linked native run traps `-1`, a
+   malformed token. The cause is not yet localized.
+
+Shared predicate (1 and 2; 3 provisional): owner 0's settlement is a
+cross-owner chained settlement that no plan object names, so each
+consumer re-derives the owner of seat 162 from its own plane.
+
 ## Stop conditions
 
 - The repair touches the bracket tree, moves a held ref
