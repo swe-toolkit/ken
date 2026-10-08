@@ -602,20 +602,34 @@ fn escape_resource_plus_plain_matches_interpreter() {
 // executing the row does not discharge the skip.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-// RT-NATIVE-TREE-MATCH D1, 2026-09-28: this ignored row overflows its libtest
-// default thread; a scratch-only stated 256 MiB diagnostic (RUST_MIN_STACK
-// removed) instead reaches continuation origin 329 under PredeclaredFunctionId(4).
-// D2 terminated at 16, 64 and 256 MiB; 16 MiB is a termination bound, not a
-// measured peak. No candidate stack is provisioned without a measured peak
-// and numeric headroom. This refusal is not a native-execution observation.
-#[ignore = "RT-NATIVE-TREE-MATCH D1: first ObjectEmission refusal is BoundaryCarrier: a carried recursive hypothesis is an eliminated value, not a callable, so it takes no arguments, but the call provides 1; continuation origin 329, PredeclaredFunctionId(4); RT-NATIVE-SEQUENTIAL-BRACKETS AC-0 owns this witness, pending site-identity check"]
+// Promise class: durable native/interpreter differential. MEASURED: equal
+// stdout and full effect events for the escaped FsHandle fanning source.
+// CLAIMED: the linked native execution retains its observable host effects.
+// THE GAP: one fixture cannot establish parity for every escaped-resource
+// program; it guards this reached, effect-bearing source.
+// The default libtest thread overflowed on landed main 79f44eecb with
+// RUST_MIN_STACK removed. On the passing 256 MiB helper thread, a disposable
+// mincore low-water probe measured 3028 KiB of touched stack (3028 KiB RSS,
+// zero swap) after this row: the provision is 86.6 times that measured depth.
+// This provisions the baseline, not a claim that the default stack is adequate.
 fn escaped_resource_used_by_fanning_host_op_matches_interpreter() {
-    // Pre-fix: this panicked in `build_native_program` with
-    // "checked Runtime frame marker was consumed more than once". The fork/union
-    // of `consumed_subcontinuation_frames` per mutually-exclusive arm makes it
-    // reach native execution; the assertion below pins interpreter equivalence.
-    let diff = differential("escape-file-then-readat", ESCAPE_FILE_THEN_READAT);
-    assert_native_matches_interpreter("escape-file-then-readat", &diff);
+    in_large_stack_thread("rt-escape-fshandle-fanning", || {
+        // Pre-fix: this panicked in `build_native_program` with
+        // "checked Runtime frame marker was consumed more than once". The fork/union
+        // of `consumed_subcontinuation_frames` per mutually-exclusive arm makes it
+        // reach native execution; the assertion below pins interpreter equivalence.
+        let diff = differential("escape-file-then-readat", ESCAPE_FILE_THEN_READAT);
+        assert_native_matches_interpreter("escape-file-then-readat", &diff);
+        assert!(
+            !diff.interpreted.effect_trace.is_empty(),
+            "escaped FsHandle must reach a host effect before comparing vectors"
+        );
+        assert_eq!(diff.native.stdout, diff.interpreted.stdout, "FsHandle stdout");
+        assert_eq!(
+            diff.native.effect_trace, diff.interpreted.effect_trace,
+            "FsHandle full effect events"
+        );
+    });
 }
 
 #[cfg(target_os = "linux")]
