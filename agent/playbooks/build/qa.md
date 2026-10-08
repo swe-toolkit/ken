@@ -24,6 +24,14 @@ load and follow it after this generic archetype.
 > verdict rests on the targeted areas being green plus the change's blast radius
 > being covered by CI — do **not** reproduce CI locally.
 
+**The build lock is a queue, not a signal.** `scripts/ken-cargo` waits on
+the shared lock itself (`flock -w`, `KEN_BUILD_WAIT`, default 1800s). When
+another seat holds it, start your run anyway and keep your turn active until
+it reports. No seat sends a lock-release notice. If the wrapper times out
+waiting for the lock, requeue once with `KEN_BUILD_WAIT=7200`. You will be tempted
+to post "waiting for the lock" and go idle; that stalls the lane until the
+watchdog notices.
+
 > ### A TARGETED GREEN IS UNMEASURED ON A FEATURE-GATED DIFF. DERIVE THE UNION.
 >
 > **`-p <crate>` builds that crate's DEFAULT features.** When a package declares
