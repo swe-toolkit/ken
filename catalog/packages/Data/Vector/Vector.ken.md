@@ -47,10 +47,12 @@ data Vec (a : Type) : Nat → Type where {
   VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)
 }
 
-data Fin : Nat → Type where {
+pub data Fin : Nat → Type where {
   FZero : (n : Nat) → Fin (Suc n);
   FSuc : (n : Nat) → Fin n → Fin (Suc n)
 }
+
+export FZero, FSuc
 
 fn head (a : Type) (n : Nat) (xs : Vec a (Suc n)) : a =
   match xs {
@@ -651,19 +653,22 @@ surfaces. The private map and naturality laws reuse
 ordinary `Pair` projections, `J`, and Sigma eta, with a checked index-computed
 motive for the empty vector's uniqueness.
 
-The `Vec` and `Fin` families, their constructors, all operations including
-`to_list`, `zip`, and `unzip`, and all theorems remain private to this package.
-Eight computation theorems, map composition, lookup after map and after
-`zip_with`, pointwise `zip_with`/map naturality, `unzip_zip`, and `zip_unzip`
-are checked laws. The private `to_list_length` theorem relates the structural
-`List` length to the vector's index.
+The `Fin` family and its constructors `FZero` and `FSuc` are public as the
+bounded-index provider for `Data.Finite.Finite`. The `Vec` family, its
+constructors, all operations including `to_list`, `zip`, and `unzip`, and all
+theorems remain private to this package. Eight computation theorems, map
+composition, lookup after map and after `zip_with`, pointwise `zip_with`/map
+naturality, `unzip_zip`, and `zip_unzip` are checked laws. The private
+`to_list_length` theorem relates the structural `List` length to the vector's
+index.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
 adds no axiom, postulate, primitive, foreign declaration, or unresolved hole.
 Its cold roots-loaded `trusted_base()` set equals a separately fresh compiler
 base set. The imported combinator, congruence, and `Data.Collections.List` length
-providers contribute no trusted items, and Vector adds none.
+providers contribute no trusted items, and making `Fin` public adds no
+`trusted_base()` entry or other trust.
 
 Targeted validation checks the package through the roots-based module loader,
 the exact family indices and constructor targets, generic operation and

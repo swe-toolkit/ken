@@ -129,6 +129,149 @@ fn drop (a : Type) (n : Nat) (xs : List a) : List a =
   }
 ```
 
+Membership in a generic list is an Ω proposition rather than a Boolean test
+or a position. Its truncated disjunction permits proofs about members without
+supplying an equality decision or extracting a list index. These lemmas lift
+membership through mapping, append, concatenated mapping, and equality.
+
+```ken
+pub fn list_elem (a : Type) (x : a) (xs : List a) : Omega =
+  match xs {
+    Nil ↦ Bottom;
+    Cons y rest ↦ ‖ Or (Equal a x y) (list_elem a x rest) ‖
+  }
+
+pub theorem list_elem_head (a : Type) (x : a) (rest : List a) : list_elem a x (Cons a x rest) =
+  trunc_intro (Inl (Equal a x x) (list_elem a x rest) Refl)
+
+pub theorem list_elem_later
+      (a : Type) (x : a) (y : a) (rest : List a)
+    : list_elem a x rest → list_elem a x (Cons a y rest) =
+  λlater. trunc_intro (Inr (Equal a x y) (list_elem a x rest) later)
+
+pub theorem list_elem_map
+      (a : Type) (b : Type) (f : a → b) (x : a) (xs : List a)
+    : list_elem a x xs → list_elem b (f x) (map a b f xs) =
+  match xs {
+    Nil ↦ λmember. absurd member;
+    Cons y rest ↦
+      λmember.
+        elim_trunc
+          (list_elem b (f x) (map a b f (Cons a y rest)))
+          (λcase.
+            match case {
+              Inl same ↦
+                trunc_intro
+                  (Inl
+                    (Equal b (f x) (f y))
+                    (list_elem b (f x) (map a b f rest))
+                    (cong a b x y f same));
+              Inr later ↦
+                trunc_intro
+                  (Inr
+                    (Equal b (f x) (f y))
+                    (list_elem b (f x) (map a b f rest))
+                    (list_elem_map a b f x rest later))
+            })
+          member
+  }
+
+pub theorem list_elem_append_left
+      (a : Type) (x : a) (xs : List a) (ys : List a)
+    : list_elem a x xs → list_elem a x (list_append a xs ys) =
+  match xs {
+    Nil ↦ λmember. absurd member;
+    Cons y rest ↦
+      λmember.
+        elim_trunc
+          (list_elem a x (list_append a (Cons a y rest) ys))
+          (λcase.
+            match case {
+              Inl same ↦
+                trunc_intro (Inl (Equal a x y) (list_elem a x (list_append a rest ys)) same);
+              Inr later ↦
+                trunc_intro
+                  (Inr
+                    (Equal a x y)
+                    (list_elem a x (list_append a rest ys))
+                    (list_elem_append_left a x rest ys later))
+            })
+          member
+  }
+
+pub theorem list_elem_append_right
+      (a : Type) (x : a) (xs : List a) (ys : List a)
+    : list_elem a x ys → list_elem a x (list_append a xs ys) =
+  match xs {
+    Nil ↦ λmember. member;
+    Cons y rest ↦
+      λmember.
+        list_elem_later
+          a
+          x
+          y
+          (list_append a rest ys)
+          (list_elem_append_right a x rest ys member)
+  }
+
+pub theorem list_elem_concat_map
+      (a : Type) (b : Type) (f : a → List b) (y : b) (x : a) (xs : List a)
+    : list_elem a x xs → list_elem b y (f x) → list_elem b y (concat_map a b f xs) =
+  match xs {
+    Nil ↦ λmember. λinner. absurd member;
+    Cons z rest ↦
+      λmember.
+        λinner.
+          elim_trunc
+            (list_elem b y (concat_map a b f (Cons a z rest)))
+            (λcase.
+              match case {
+                Inl same ↦
+                  list_elem_append_left
+                    b
+                    y
+                    (f z)
+                    (concat_map a b f rest)
+                    (J (λw _. list_elem b y (f w)) inner same);
+                Inr later ↦
+                  list_elem_append_right
+                    b
+                    y
+                    (f z)
+                    (concat_map a b f rest)
+                    (list_elem_concat_map a b f y x rest later inner)
+              })
+            member
+  }
+
+pub theorem list_elem_transport
+      (a : Type) (x : a) (y : a) (same : Equal a x y) (xs : List a)
+    : list_elem a x xs → list_elem a y xs =
+  match xs {
+    Nil ↦ λmember. absurd member;
+    Cons z rest ↦
+      λmember.
+        elim_trunc
+          (list_elem a y (Cons a z rest))
+          (λcase.
+            match case {
+              Inl here ↦
+                trunc_intro
+                  (Inl
+                    (Equal a y z)
+                    (list_elem a y rest)
+                    (trans a y x z (sym a x y same) here));
+              Inr later ↦
+                trunc_intro
+                  (Inr
+                    (Equal a y z)
+                    (list_elem a y rest)
+                    (list_elem_transport a x y same rest later))
+            })
+          member
+  }
+```
+
 ## 3. Using it
 
 This package builds up in four layers, each riding the one before: the

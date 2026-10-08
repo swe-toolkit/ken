@@ -1,7 +1,8 @@
 //! CAT-MIGRATE-TIER-C-DATA-VALUE Vector closeout controls.
 //!
 //! Vector owns checked indexed families, operations, computation theorems,
-//! and private map, lookup, and round-trip laws. Its checked providers include
+//! and private map, lookup, and round-trip laws. Only Fin, FZero, and FSuc
+//! are public. Its checked providers include
 //! Combinators and Transport; the new private functions add no trust beyond
 //! those providers.
 //! `cat_vec_acceptance` retains the family-index, computation, and
@@ -296,13 +297,15 @@ fn vector_uses_canonical_checked_provider_identities() {
     );
 }
 
-/// MEASURED: a known public Transport item succeeds through the same selective
-/// import path, while every direct Vector name (including the three new
-/// operations) rejects with its exact qualified `UnboundName`. CLAIMED:
-/// Vector's loader-visible catalog inventory remains private. THE GAP: none;
-/// the exact owned inventory supplies the complete direct-name population.
+/// Promise class: transition sentinel for Vector's exported-name boundary.
+/// MEASURED: the three public Fin names import through the roots loader and
+/// checked clients refer to Vector's exact family and constructor IDs; every
+/// other name in the complete owned inventory rejects with qualified
+/// `UnboundName`. CLAIMED: only the bounded-index provider is publicly
+/// accessible. THE GAP: the owned-name inventory must be rebaselined for any
+/// future separately authorized Vector declaration extension.
 #[test]
-fn vector_loader_visible_inventory_is_empty() {
+fn vector_exports_only_checked_fin_family_and_constructors() {
     let mut positive = ElabEnv::new().expect("base environment");
     positive
         .elaborate_module_from_roots(&[catalog_root()], TRANSPORT)
@@ -311,10 +314,42 @@ fn vector_loader_visible_inventory_is_empty() {
         .elaborate_file(&format!(
             "import {TRANSPORT} (cong as vector_closeout_public_control)"
         ))
-        .expect("the selective-import positive control must succeed");
+        .expect("the independent selective-import control must succeed");
 
     let (mut env, _) = load(VECTOR);
-    for (index, surface) in expected_owned_names().iter().enumerate() {
+    let owned = expected_owned_names();
+    let public = BTreeSet::from(["Fin", "FZero", "FSuc"].map(str::to_owned));
+    assert!(
+        public.is_subset(&owned),
+        "the public names must be in Vector's complete owned inventory"
+    );
+    env.elaborate_file(&format!(
+        "import {VECTOR} (Fin as bounded_index, FZero as first_index, FSuc as later_index)"
+    ))
+    .expect("all three bounded-index names must import together");
+    env.elaborate_file(
+        "const checked_first : bounded_index (Suc Zero) = first_index Zero
+         const checked_later : bounded_index (Suc (Suc Zero)) =
+           later_index (Suc Zero) (first_index Zero)",
+    )
+    .expect("a fresh client must use all three imported names");
+    let first = declaration_references(
+        env.env
+            .lookup(env.globals["checked_first"])
+            .expect("checked first-index client"),
+    );
+    let later = declaration_references(
+        env.env
+            .lookup(env.globals["checked_later"])
+            .expect("checked successor-index client"),
+    );
+    for (surface, references) in [("Fin", &first), ("FZero", &first), ("FSuc", &later)] {
+        assert!(
+            references.contains(&env.globals[&format!("{VECTOR}.{surface}")]),
+            "{surface} must refer to Vector's checked identity"
+        );
+    }
+    for (index, surface) in owned.difference(&public).enumerate() {
         let source = format!("import {VECTOR} ({surface} as vector_private_{index})");
         match env.elaborate_file(&source) {
             Err(ElabError::UnboundName { name, .. }) => {

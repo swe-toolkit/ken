@@ -434,6 +434,22 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            "Algorithm.FormalLanguages.Reachability".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Algorithm.Numeric.Gcd".to_string(),
             ["And", "and_fst", "and_intro", "and_snd"]
                 .into_iter()
@@ -1048,6 +1064,22 @@ fn catalog_ambient_passthrough_migration_census() {
             // Its ordinary package boundary loads while this transition
             // sentinel records the providers' compiler-convenience aliases.
             "Data.Collections.PriorityQueue".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
+            "Data.Finite.Finite".to_string(),
             [
                 "And",
                 "Unit",
