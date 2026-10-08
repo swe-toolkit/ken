@@ -749,8 +749,8 @@ pub(in crate::cranelift_backend) enum ResponseDisposition {
 }
 
 /// Which residual sub-case a `Deferred` response is, kept for congruence
-/// evidence (AC-1) and control fixtures — never a routing key (both sub-cases
-/// route identically to main's pre-WP lowering).
+/// evidence (AC-1) and control fixtures — never a routing key (all three
+/// sub-cases retain the ordinary Construct lowering unless separately handled).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// P1 — no continuation unit for this `Vis` (`matching.is_empty()`): the
@@ -763,6 +763,10 @@ pub(in crate::cranelift_backend) enum DeferredResponseSubCase {
     /// groups are promoted; mixed-owner and single-stage groups remain here. The
     /// suppression control also restores this disposition.
     UnconsumedTransportCaller,
+    /// The selected producer construct is the emitting continuation worker's
+    /// body root. It returns a Vis without an enclosing consumer seat, so no
+    /// selected response-owner call can be recorded in that function.
+    ContinuationBodyTail,
 }
 
 /// One response `Vis` classified `Deferred` (recut amendment
@@ -3289,9 +3293,42 @@ impl StaticTransitionPlan<'_> {
             }
         }
         let requires_execute_then_resume = ordinary_stage_count >= 2 || pending_checked_ret_sink;
+        let units = self.continuation_units()?;
         let mut specialized = Vec::new();
         let mut deferred = Vec::new();
         for demand in demands {
+            // A construct returned as the emitting worker's body root has no
+            // enclosing eliminator in that Function: neither the direct claim
+            // nor the bypassed-candidate bridge can settle its selected call.
+            // Predeclared and fusion owners do not name a continuation worker.
+            let continuation_body_tail = match demand.k_identity.emission_owner() {
+                ContinuationEmissionOwner::Specialization(owner) => {
+                    let worker = units
+                        .iter()
+                        .find(|unit| unit.id() == owner)
+                        .ok_or_else(|| {
+                            planner_error(
+                                "a response caller's emission specialization has no worker unit",
+                            )
+                        })?;
+                    demand.k_identity.producer_construct_origin() == worker.worker_body_origin()
+                }
+                ContinuationEmissionOwner::Predeclared(_)
+                | ContinuationEmissionOwner::Fusion(_) => false,
+            };
+            if continuation_body_tail {
+                deferred.push(DeferredResponseRow {
+                    vis_origin: demand.vis_origin,
+                    producer_call_origin: demand.producer_call_origin,
+                    operation_root_origin: demand.operation_root_origin,
+                    effect_origin: demand.effect_origin,
+                    operation: demand.operation,
+                    sub_case: DeferredResponseSubCase::ContinuationBodyTail,
+                    capture_count: demand.captures.len(),
+                    continuation_input_count: demand.continuation_inputs.len(),
+                });
+                continue;
+            }
             #[cfg(feature = "px8-ds-test-support")]
             let suppress_execute = SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
             #[cfg(not(feature = "px8-ds-test-support"))]
@@ -3787,8 +3824,10 @@ impl StaticTransitionPlan<'_> {
             let Some(row) = self.deferred_response_at_vis(vis)? else {
                 return Ok(Vec::new());
             };
-            if row.sub_case == DeferredResponseSubCase::NoContinuationUnit {
-                continue;
+            match row.sub_case {
+                DeferredResponseSubCase::NoContinuationUnit
+                | DeferredResponseSubCase::ContinuationBodyTail => continue,
+                DeferredResponseSubCase::UnconsumedTransportCaller => {}
             }
             if !visited.insert(row.vis_origin()) {
                 return Ok(Vec::new());
@@ -3842,8 +3881,10 @@ impl StaticTransitionPlan<'_> {
         &self,
         row: &DeferredResponseRow,
     ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
-        if row.sub_case != DeferredResponseSubCase::UnconsumedTransportCaller {
-            return Ok(None);
+        match row.sub_case {
+            DeferredResponseSubCase::UnconsumedTransportCaller => {}
+            DeferredResponseSubCase::NoContinuationUnit
+            | DeferredResponseSubCase::ContinuationBodyTail => return Ok(None),
         }
         let mut owners = Vec::new();
         for response in &self.static_response_continuations {
@@ -3880,6 +3921,11 @@ impl StaticTransitionPlan<'_> {
         &self,
         row: &DeferredResponseRow,
     ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        // A continuation-body-root Vis has no selected incoming owner call to
+        // borrow from an enclosing handler: keep its ordinary Construct route.
+        if row.sub_case == DeferredResponseSubCase::ContinuationBodyTail {
+            return Ok(None);
+        }
         if let Some(owner) = self.bounded_deferred_response_handler_owner(row)? {
             return Ok(Some(owner));
         }

@@ -849,13 +849,15 @@ fn inline_synthesized_seat_emission_owners(
             let k_body = plan.deferred_response_k_body(row)?;
             let owns_seat = if row.effect_origin() == seat {
                 true
-            } else if row.sub_case() == DeferredResponseSubCase::UnconsumedTransportCaller {
-                match k_body {
-                    Some(body) => occurrence_subtree_contains(plan, body, seat)?,
-                    None => false,
-                }
             } else {
-                false
+                match row.sub_case() {
+                    DeferredResponseSubCase::UnconsumedTransportCaller => match k_body {
+                        Some(body) => occurrence_subtree_contains(plan, body, seat)?,
+                        None => false,
+                    },
+                    DeferredResponseSubCase::NoContinuationUnit
+                    | DeferredResponseSubCase::ContinuationBodyTail => false,
+                }
             };
             if !owns_seat {
                 continue;
@@ -1109,8 +1111,8 @@ pub struct DeferredResponseObservation {
     pub operation_root_origin: u32,
     pub effect_origin: u32,
     pub operation: String,
-    /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (ineligible
-    /// or test-suppressed P2).
+    /// "NoContinuationUnit" (P1), "UnconsumedTransportCaller" (ineligible
+    /// or test-suppressed P2), or "ContinuationBodyTail" (no consumer seat).
     pub sub_case: String,
     /// The K's capture / continuation-input counts (P2 from the demand, P1
     /// zero). Eligible-plane has-K census comes from Specialized rows.
