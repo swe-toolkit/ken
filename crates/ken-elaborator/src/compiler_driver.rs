@@ -6101,13 +6101,16 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
                 constructor: constructor_view,
                 method: CheckedCoreBodyTerm::Lambda {
                     parameter_type: Vec::new(),
+                    erased_parameter: false,
                     body: Box::new(CheckedCoreBodyTerm::Lambda {
                         parameter_type: Vec::new(),
+                        erased_parameter: false,
                         body: Box::new(body),
                     }),
                 },
             }],
             computational_recursive_hypotheses: true,
+            convoy_erased_proof_binder: false,
         }
     }
 
@@ -6117,6 +6120,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             .expect("a variable has no global symbol dependency");
         let erased_only = px8ta_match_fixture(CheckedCoreBodyTerm::Lambda {
             parameter_type: erased_ih_reference,
+            erased_parameter: false,
             body: Box::new(CheckedCoreBodyTerm::IntegerLiteral {
                 value: num_bigint::BigInt::from(0),
             }),
@@ -6124,6 +6128,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let genuine = px8ta_match_fixture(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 });
         let runtime_body = CheckedCoreBodyTerm::Let {
             value_type: Vec::new(),
+            erased_value: false,
             value: Box::new(CheckedCoreBodyTerm::Match(erased_only)),
             body: Box::new(CheckedCoreBodyTerm::Match(genuine)),
         };
@@ -6255,18 +6260,22 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
                     constructor: step_view,
                     method: CheckedCoreBodyTerm::Lambda {
                         parameter_type: tree_type_bytes.clone(),
+                        erased_parameter: false,
                         body: Box::new(CheckedCoreBodyTerm::Lambda {
                             parameter_type: tree_type_bytes,
+                            erased_parameter: false,
                             body: Box::new(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 }),
                         }),
                     },
                 },
             ],
             computational_recursive_hypotheses: true,
+            convoy_erased_proof_binder: false,
         };
         let runtime_body = CheckedCoreBodyTerm::Let {
             value_type: canonical_term_bytes(&erased_whole_match, &symbol_table)
                 .expect("the erased whole eliminator has canonical checked bytes"),
+            erased_value: false,
             value: Box::new(CheckedCoreBodyTerm::Match(genuine_runtime_match)),
             body: Box::new(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 }),
         };
@@ -8155,6 +8164,162 @@ const zz_example : String = ac0_need
             example.package.core_semantic_hash,
             plain.package.core_semantic_hash
         );
+    }
+
+    /// Promise class: durable invariant (42 §3.2, 46 §4). A kernel-checked
+    /// Bool convoy may depend on the scrutinee only in its erased Eq domain.
+    /// MEASURED: both backend paths return the same Int as an unconvoyed if.
+    /// CLAIMED: the motive dependency adds no runtime parameter or argument.
+    /// THE GAP: the package's typed erasure plan must feed the method decoder.
+    #[test]
+    fn kernel_bool_convoy_matches_unconvoyed_runtime_value() {
+        use ken_kernel::{declare_def, Level};
+        use ken_runtime::{evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeGroundValue,
+            RuntimeIrSeedEnvironment, RuntimeObservation};
+        for convoy in [false, true] {
+            let mut env = ElabEnv::new().expect("closed prelude");
+            let bool_id = env.globals["Bool"];
+            let true_id = env.globals["True"];
+            let false_id = env.globals["False"];
+            let int_ty = Term::const_(env.globals["Int"], vec![]);
+            let bool_ty = Term::indformer(bool_id, vec![]);
+            let scrut = Term::Constructor { id: true_id, level_args: vec![] };
+            let proposition = |ctor: Term| Term::Eq(
+                Box::new(bool_ty.clone()), Box::new(scrut.clone()), Box::new(ctor),
+            );
+            let motive_body = if convoy {
+                Term::pi(
+                    Term::Eq(
+                        Box::new(bool_ty.clone()), Box::new(scrut.clone()),
+                        Box::new(Term::var(0)),
+                    ),
+                    int_ty.clone(),
+                )
+            } else {
+                int_ty.clone()
+            };
+            let motive = Term::Ascript(
+                Box::new(Term::lam(bool_ty.clone(), motive_body)),
+                Box::new(Term::pi(bool_ty.clone(), Term::ty(Level::zero()))),
+            );
+            let method = |ctor: Term, value: i64| {
+                let result = Term::IntLit(num_bigint::BigInt::from(value));
+                if convoy { Term::lam(proposition(ctor), result) } else { result }
+            };
+            let elimination = Term::Elim {
+                fam: bool_id, level_args: vec![], params: vec![], motive: Box::new(motive),
+                methods: vec![method(scrut.clone(), 7), method(Term::Constructor {
+                    id: false_id, level_args: vec![],
+                }, 8)],
+                indices: vec![], scrut: Box::new(scrut.clone()),
+            };
+            let body = if convoy {
+                Term::app(elimination, Term::Refl(Box::new(scrut)))
+            } else { elimination };
+            let id = declare_def(&mut env.env, vec![], int_ty.clone(), body.clone())
+                .expect("kernel admits the convoy");
+            env.globals.insert("convoy_bool".into(), id);
+            let name = if convoy { "bool_convoy" } else { "bool_plain" };
+            let target = declaration_symbol(name, "convoy_bool");
+            let manifest = CompilerManifest::new(name, vec![ManifestTarget::executable(target.clone())]);
+            let package = emit_package_from_env(&manifest, &[], &env, &[id], &[], &BTreeSet::new(), None)
+                .expect("producer emits the checked Ω plan");
+            let program = crate::erasure::erase_checked_core_package_for_target(&package, [&target])
+                .expect("native lowering consumes the checked plan");
+            let lowered = program.declarations.iter().find(|declaration| declaration.symbol == target.to_string())
+                .expect("runtime target selected");
+            let RuntimeDeclarationKind::Transparent { body: native } = &lowered.kind else { panic!("transparent target required") };
+            assert_eq!(
+                evaluate_runtime_ir_expr(&native, &RuntimeIrSeedEnvironment::empty()).expect("native eval"),
+                RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into())),
+            );
+            let mut store = ken_interp::eval::EvalStore::new();
+            assert!(matches!(
+                ken_interp::eval::eval_checked(&body, &int_ty, &env.env, &mut store).expect("checked eval"),
+                ken_interp::eval::EvalVal::Int(7)
+            ));
+        }
+    }
+
+    /// Promise class: durable invariant (42 §3.2, 46 §4). Unlike Bool, the
+    /// Suc method carries an actual recursive IH binder before its proof.
+    /// MEASURED: convoyed and plain Nat cases run at native/interp parity.
+    /// CLAIMED: the extra proof slot does not shift n or its IH at runtime.
+    /// THE GAP: the runtime match remapper must extend the source telescope.
+    #[test]
+    fn kernel_nat_match_convoy_keeps_recursive_binders_and_erases_proof() {
+        use ken_kernel::{declare_def, whnf, Context, Level};
+        use ken_runtime::{evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeGroundValue,
+            RuntimeIrSeedEnvironment, RuntimeObservation};
+        fn pi_parts(env: &ken_kernel::GlobalEnv, ctx: &Context, ty: &Term) -> (Term, Term) {
+            let Term::Pi(dom, cod) = whnf(env, ctx, ty) else { panic!("kernel method type must be a Π") };
+            (*dom, *cod)
+        }
+        for convoy in [false, true] {
+            let mut env = ElabEnv::new().expect("closed prelude");
+            let nat_id = env.globals["Nat"];
+            let nat_ty = Term::indformer(nat_id, vec![]);
+            let int_ty = Term::const_(env.globals["Int"], vec![]);
+            let zero = Term::Constructor { id: env.globals["Zero"], level_args: vec![] };
+            let suc = Term::Constructor { id: env.globals["Suc"], level_args: vec![] };
+            let scrut = Term::app(suc, zero);
+            let motive_body = if convoy {
+                Term::pi(Term::Eq(Box::new(nat_ty.clone()), Box::new(scrut.clone()),
+                    Box::new(Term::var(0))), int_ty.clone())
+            } else { int_ty.clone() };
+            let motive = Term::Ascript(
+                Box::new(Term::lam(nat_ty.clone(), motive_body)),
+                Box::new(Term::pi(nat_ty, Term::ty(Level::zero()))),
+            );
+            let family = env.env.inductive(nat_id).expect("Nat family");
+            let zero_ty = ken_kernel::inductive::method_type(&env.env, family, 0, &motive, &[], &[])
+                .expect("kernel zero method type");
+            let zero_method = if convoy {
+                let (proof_ty, _) = pi_parts(&env.env, &Context::new(), &zero_ty);
+                Term::lam(proof_ty, Term::IntLit(8.into()))
+            } else { Term::IntLit(8.into()) };
+            let suc_ty = ken_kernel::inductive::method_type(&env.env, family, 1, &motive, &[], &[])
+                .expect("kernel suc method type");
+            let mut context = Context::new();
+            let (n_ty, ih_pi) = pi_parts(&env.env, &context, &suc_ty);
+            context.push(n_ty.clone());
+            let (ih_ty, proof_pi) = pi_parts(&env.env, &context, &ih_pi);
+            context.push(ih_ty.clone());
+            let result = if convoy {
+                let (proof_ty, _) = pi_parts(&env.env, &context, &proof_pi);
+                Term::lam(proof_ty, Term::IntLit(7.into()))
+            } else { Term::IntLit(7.into()) };
+            let suc_method = Term::lam(n_ty, Term::lam(ih_ty, result));
+            let elimination = Term::Elim {
+                fam: nat_id, level_args: vec![], params: vec![], motive: Box::new(motive),
+                methods: vec![zero_method, suc_method], indices: vec![],
+                scrut: Box::new(scrut.clone()),
+            };
+            let body = if convoy { Term::app(elimination, Term::Refl(Box::new(scrut))) }
+                else { elimination };
+            let id = declare_def(&mut env.env, vec![], int_ty.clone(), body.clone())
+                .expect("kernel admits Nat match");
+            env.globals.insert("convoy_nat".into(), id);
+            let name = if convoy { "nat_convoy" } else { "nat_plain" };
+            let target = declaration_symbol(name, "convoy_nat");
+            let manifest = CompilerManifest::new(name, vec![ManifestTarget::executable(target.clone())]);
+            let package = emit_package_from_env(&manifest, &[], &env, &[id], &[], &BTreeSet::new(), None)
+                .expect("producer emits Nat plan");
+            let program = crate::erasure::erase_checked_core_package_for_target(&package, [&target])
+                .expect("native Nat match lowers");
+            let lowered = program.declarations.iter().find(|declaration| declaration.symbol == target.to_string())
+                .expect("runtime Nat target selected");
+            let RuntimeDeclarationKind::Transparent { body: native } = &lowered.kind else { panic!("transparent target required") };
+            assert_eq!(
+                evaluate_runtime_ir_expr(&native, &RuntimeIrSeedEnvironment::empty()).expect("native eval"),
+                RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into())),
+            );
+            let mut store = ken_interp::eval::EvalStore::new();
+            assert!(matches!(
+                ken_interp::eval::eval_checked(&body, &int_ty, &env.env, &mut store).expect("checked eval"),
+                ken_interp::eval::EvalVal::Int(7)
+            ));
+        }
     }
 }
 

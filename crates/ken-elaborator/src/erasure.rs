@@ -2751,6 +2751,17 @@ fn lower_body_term_with_plans(
         CheckedCoreBodyTerm::Application { function, argument } => {
             let mut function_path = path.to_vec();
             function_path.push(15);
+            if matches!(function.as_ref(), CheckedCoreBodyTerm::Match(view) if view.convoy_erased_proof_binder)
+                && matches!(argument.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm)
+            {
+                // The match already selects the branch with its classified
+                // proof binder removed. A zero-argument call would try to
+                // apply its resulting value as a closure.
+                return lower_body_term_with_plans(
+                    function, declarations, semantic, stack, root, context_depth,
+                    branch_remap, &function_path, native_plans, parent_oriented_frame,
+                );
+            }
             let mut argument_path = path.to_vec();
             argument_path.push(16);
             let args = if matches!(argument.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm) {
@@ -2878,6 +2889,9 @@ fn lower_body_term_with_plans(
                     root,
                     &constructor.symbol,
                 )?;
+                let (method, convoy_binders) = peel_convoy_proof_method(
+                    method, view.convoy_erased_proof_binder, root, &constructor.symbol,
+                )?;
                 let slot_markers = branch_slot_templates[branch_index].clone();
                 let slot_templates = slot_markers
                     .iter()
@@ -2887,21 +2901,27 @@ fn lower_body_term_with_plans(
                     .into_iter()
                     .map(|(_, path)| path)
                     .collect::<Vec<_>>();
-                let remap = branch_remap.cloned().unwrap_or_default().enter_match(
+                let mut remap = branch_remap.cloned().unwrap_or_default().enter_match(
                     constructor.argument_count,
                     erased_count,
                     computational,
                     slot_templates.clone(),
                 );
+                if convoy_binders != 0 {
+                    remap = remap.enter_binding(true);
+                }
                 let mut branch_path = path.to_vec();
                 branch_path.extend([20, branch_index as u64]);
+                if convoy_binders != 0 {
+                    branch_path.push(14);
+                }
                 let body = lower_body_term_with_plans(
                     method,
                     declarations,
                     semantic,
                     stack,
                     root,
-                    context_depth + source_binders,
+                    context_depth + source_binders + convoy_binders,
                     Some(&remap),
                     &branch_path,
                     native_plans,
@@ -4902,6 +4922,14 @@ fn lower_body_term_inner(
             })
         }
         CheckedCoreBodyTerm::Application { function, argument } => {
+            if matches!(function.as_ref(), CheckedCoreBodyTerm::Match(view) if view.convoy_erased_proof_binder)
+                && matches!(argument.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm)
+            {
+                return lower_body_term_inner(
+                    function, declarations, semantic, stack, root_symbol,
+                    context_depth, branch_remap,
+                );
+            }
             let args = if matches!(argument.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm) {
                 Vec::new()
             } else {
@@ -6065,12 +6093,18 @@ fn lower_match_view(
             root_symbol,
             &constructor.symbol,
         )?;
-        let remap = branch_remap.cloned().unwrap_or_default().enter_match(
+        let (body, convoy_binders) = peel_convoy_proof_method(
+            body, view.convoy_erased_proof_binder, root_symbol, &constructor.symbol,
+        )?;
+        let mut remap = branch_remap.cloned().unwrap_or_default().enter_match(
             constructor.argument_count,
             erased_count,
             computational,
             Vec::new(),
         );
+        if convoy_binders != 0 {
+            remap = remap.enter_binding(true);
+        }
         cases.push((
             constructor,
             lower_body_term_inner(
@@ -6079,7 +6113,7 @@ fn lower_match_view(
                 semantic,
                 stack,
                 root_symbol,
-                context_depth + source_binder_count,
+                context_depth + source_binder_count + convoy_binders,
                 Some(&remap),
             )?,
         ));
@@ -6135,6 +6169,24 @@ fn reject_level_args_for_family(
         Ok(())
     } else {
         reject_level_args(root, level_args)
+    }
+}
+
+fn peel_convoy_proof_method<'a>(
+    method: &'a CheckedCoreBodyTerm,
+    convoy: bool,
+    root: &StableSymbol,
+    constructor: &StableSymbol,
+) -> Result<(&'a CheckedCoreBodyTerm, usize), ErasureError> {
+    if !convoy {
+        return Ok((method, 0));
+    }
+    match method {
+        CheckedCoreBodyTerm::Lambda { body, erased_parameter: true, .. } => Ok((body, 1)),
+        _ => Err(expression_lowering_error(
+            root, "convoy_proof_not_erased",
+            format!("branch for {constructor} lacks a classified Ω proof binder"),
+        )),
     }
 }
 
@@ -7990,6 +8042,7 @@ mod px7l_tests {
             scrutinee: Box::new(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 }),
             branches: Vec::new(),
             computational_recursive_hypotheses: true,
+            convoy_erased_proof_binder: false,
         }
     }
 

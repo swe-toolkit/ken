@@ -18,7 +18,19 @@ pub struct OmegaErasurePlan {
 /// A type is erasable exactly when the kernel infers an Ω sort for that type.
 /// In particular, the spelling of the type and of its inhabitant is irrelevant.
 pub fn is_omega_classified(env: &GlobalEnv, ctx: &Context, ty: &Term) -> Result<bool, KernelError> {
-    let sort = infer(env, ctx, ty)?;
+    let sort = match infer(env, ctx, ty) {
+        Ok(sort) => sort,
+        Err(KernelError::Msg(reason)) if reason.contains("cannot infer an introduction form") => {
+            // Eliminator method types are constructed by the kernel as Π
+            // telescopes whose codomain can contain an unapplied motive λ.
+            // Kernel checking reduces that codomain at use, whereas raw
+            // inference of the unreduced telescope cannot synthesize λ.
+            // Normalize only this already-checked type, then ask the kernel
+            // for its sort; this preserves its Ω/Type classification.
+            infer(env, ctx, &ken_kernel::normalize(env, ctx, ty))?
+        }
+        Err(error) => return Err(error),
+    };
     Ok(matches!(whnf(env, ctx, &sort), Term::Omega(_)))
 }
 
@@ -74,12 +86,24 @@ fn visit(
         match infer(env, ctx, node) {
             Ok(ty) => Some(ty),
             Err(_) if matches!(node, Term::Lam(..)) => None,
-            Err(error) => return Err(error),
+            Err(error) => {
+                return Err(KernelError::Msg(format!(
+                    "Ω erasure plan at preorder node {here} ({:?}): {error}",
+                    std::mem::discriminant(node)
+                )))
+            }
         }
     };
     if inferred
         .as_ref()
-        .map(|ty| is_omega_classified(env, ctx, ty))
+        .map(|ty| {
+            is_omega_classified(env, ctx, ty).map_err(|error| {
+                KernelError::Msg(format!(
+                    "Ω erasure sort at node {here} ({:?}): {error}",
+                    std::mem::discriminant(ty)
+                ))
+            })
+        })
         .transpose()?
         .unwrap_or(false)
     {
@@ -122,7 +146,11 @@ fn visit(
             visit(env, &inside, body, expected_body.as_ref(), next, plan)
         }
         Term::App(function, argument) => {
-            let function_type = infer(env, ctx, function)?;
+            let function_type = infer(env, ctx, function).map_err(|error| {
+                KernelError::Msg(format!(
+                    "Ω erasure application function at node {here}: {error}"
+                ))
+            })?;
             let Term::Pi(domain, _) = whnf(env, ctx, &function_type) else {
                 return Err(KernelError::Msg(
                     "checked application has no Pi domain for erasure".into(),
@@ -168,6 +196,41 @@ fn visit(
         Term::Ascript(term, ty) => {
             visit(env, ctx, term, Some(ty), next, plan)?;
             visit(env, ctx, ty, None, next, plan)
+        }
+        Term::Elim {
+            fam,
+            level_args,
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+        } => {
+            // The kernel checks methods against these dependent Π types;
+            // bare method lambdas cannot synthesize them by inference.
+            let ind = env.inductive(*fam).ok_or_else(|| {
+                KernelError::Msg(format!("erasure plan has unknown family {fam:?}"))
+            })?;
+            for param in params {
+                visit(env, ctx, param, None, next, plan)?;
+            }
+            visit(env, ctx, motive, None, next, plan).map_err(|error| {
+                KernelError::Msg(format!("Ω erasure eliminator motive: {error}"))
+            })?;
+            for (k, method) in methods.iter().enumerate() {
+                let method_ty =
+                    ken_kernel::inductive::method_type(env, ind, k, motive, params, level_args)
+                        .map_err(|error| {
+                            KernelError::Msg(format!("Ω erasure method type {k}: {error}"))
+                        })?;
+                visit(env, ctx, method, Some(&method_ty), next, plan).map_err(|error| {
+                    KernelError::Msg(format!("Ω erasure eliminator method {k}: {error}"))
+                })?;
+            }
+            for index in indices {
+                visit(env, ctx, index, None, next, plan)?;
+            }
+            visit(env, ctx, scrut, None, next, plan)
         }
         _ => {
             for child in node.children() {

@@ -10,6 +10,7 @@ use ken_elaborator::compiler_driver::{
     CompilerTargetKind, TargetSelector,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
+use ken_elaborator::omega_erasure::OmegaErasurePlan;
 use ken_elaborator::{ElabEnv, ElabError};
 use ken_interp::eval::{eval, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, Level, Term};
@@ -1185,6 +1186,11 @@ fn data_match_package(package_name: &str) -> (CheckedCorePackage, StableSymbol) 
     semantic
         .declarations
         .insert(target.clone(), canonical_decl_bytes(&decl, &table).unwrap());
+    // Synthetic package-view refusal fixtures do not carry a typed GlobalEnv.
+    // An explicit empty plan keeps their non-erasure failure lane reachable.
+    semantic
+        .omega_erasure_plans
+        .insert(target.clone(), OmegaErasurePlan::default());
     semantic.data_metadata.insert(
         bool_ty.clone(),
         DataMetadata {

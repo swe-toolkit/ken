@@ -319,6 +319,9 @@ pub struct CheckedCoreMatchView {
     /// The eliminator motive is classified in `Type`, so recursive induction
     /// hypotheses are computational runtime values rather than erased proofs.
     pub computational_recursive_hypotheses: bool,
+    /// A motive dependent only through one erased proof domain; its branch
+    /// methods carry an extra Ω binder after the constructor telescope.
+    pub convoy_erased_proof_binder: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1806,7 +1809,7 @@ fn decode_declaration_body_view(
             .map_err(|reason| malformed_body(symbol, reason))?;
         Ok::<_, CheckedCoreBodyViewError>(ErasureDecodeContext {
             plan,
-            indices: nodes.into_iter().enumerate().map(|(i, (offset, _))| (offset, i as u32)).collect(),
+            indices: nodes.into_iter().enumerate().map(|(i, (offset, _, _))| (offset, i as u32)).collect(),
         })
     }).transpose()?;
     let body = decode_supported_body_term(
@@ -4339,6 +4342,11 @@ fn decode_supported_match_view(
     let motive = capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
     let computational_recursive_hypotheses =
         validate_supported_match_motive(semantic, owner, &family_symbol, data, &motive)?;
+    let convoy_erased_proof_binder = matches!(
+        inspect_non_dependent_motive(semantic, &motive)
+            .map_err(|reason| malformed_body(owner, reason))?,
+        Some(MotiveShape::Convoyed)
+    );
 
     let method_count = cursor
         .read_len()
@@ -4363,6 +4371,22 @@ fn decode_supported_match_view(
                 )?;
         let method =
             decode_supported_body_term(cursor, semantic, selection, owner, type_context, None, plan)?;
+        if convoy_erased_proof_binder {
+            let mut trailing = &method;
+            for _ in 0..constructor.argument_count + constructor.recursive_positions.len() {
+                let CheckedCoreBodyTerm::Lambda { body, .. } = trailing else {
+                    return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
+                        symbol: owner.clone(), family: family_symbol.clone(),
+                    });
+                };
+                trailing = body;
+            }
+            if !matches!(trailing, CheckedCoreBodyTerm::Lambda { erased_parameter: true, .. }) {
+                return Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
+                    symbol: owner.clone(), family: family_symbol.clone(),
+                });
+            }
+        }
         branches.push(CheckedCoreMatchBranchView {
             constructor,
             method,
@@ -4407,6 +4431,7 @@ fn decode_supported_match_view(
         scrutinee,
         branches,
         computational_recursive_hypotheses,
+        convoy_erased_proof_binder,
     }))
 }
 
@@ -4492,7 +4517,7 @@ fn validate_supported_match_motive(
     match inspect_non_dependent_motive(semantic, motive)
         .map_err(|reason| malformed_body(owner, reason))?
     {
-        Some(MotiveShape::ConstantType) => Ok(true),
+        Some(MotiveShape::ConstantType | MotiveShape::Convoyed) => Ok(true),
         Some(MotiveShape::Dependent) => Err(CheckedCoreBodyViewError::UnsupportedDependentMotive {
             symbol: owner.clone(),
             family: family.clone(),
@@ -4526,6 +4551,9 @@ fn validate_supported_match_motive(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum MotiveShape {
     ConstantType,
+    /// Any dependence on the scrutinee is confined to the domain of a
+    /// trailing Π whose branch binder and call argument the plan erases.
+    Convoyed,
     Dependent,
     ProofOnly,
 }
@@ -4569,8 +4597,23 @@ fn inspect_non_dependent_motive(
             cursor.remaining()
         ));
     }
+    let erased_only_dependency = if kind == Some(SortKind::Type) && dependent {
+        let mut pi = CanonicalCursor::new(&body);
+        if pi.read_tag()? == "pi" {
+            skip_term(&mut pi)?; // the candidate proof domain
+            let codomain = capture_canonical_term(&mut pi)?;
+            pi.remaining() == 0
+                && !canonical_term_contains_free_var(&codomain, 0)?
+                && !canonical_term_contains_free_var(&codomain, 1)?
+        } else {
+            false
+        }
+    } else {
+        false
+    };
     Ok(match kind {
         Some(SortKind::Omega) => Some(MotiveShape::ProofOnly),
+        Some(SortKind::Type) if dependent && erased_only_dependency => Some(MotiveShape::Convoyed),
         Some(SortKind::Type) if dependent => Some(MotiveShape::Dependent),
         Some(SortKind::Type) => Some(MotiveShape::ConstantType),
         None => None,
@@ -4935,12 +4978,13 @@ fn decode_level_view(cursor: &mut CanonicalCursor<'_>) -> Result<CheckedCoreLeve
 /// represent an application, a primitive spine, or an erased type payload.
 fn collect_canonical_term_nodes(
     cursor: &mut CanonicalCursor<'_>,
-    nodes: &mut Vec<(usize, String)>,
+    nodes: &mut Vec<(usize, String, usize)>,
 ) -> Result<(), String> {
     let offset = cursor.pos;
     let tag = cursor.read_tag()?;
-    nodes.push((offset, tag.clone()));
-    match tag.as_str() {
+    let index = nodes.len();
+    nodes.push((offset, tag.clone(), offset));
+    let result = match tag.as_str() {
         "type" | "omega" => skip_level(cursor),
         "var" => { cursor.read_u64()?; Ok(()) }
         "int_lit" => { let len = cursor.read_len()?; cursor.read_exact(len)?; Ok(()) }
@@ -4973,12 +5017,15 @@ fn collect_canonical_term_nodes(
             collect_canonical_term_nodes(cursor, nodes)
         }
         other => Err(format!("unsupported canonical term tag {other:?}")),
-    }
+    };
+    result?;
+    nodes[index].2 = cursor.pos;
+    Ok(())
 }
 
 fn collect_canonical_terms(
     cursor: &mut CanonicalCursor<'_>,
-    nodes: &mut Vec<(usize, String)>,
+    nodes: &mut Vec<(usize, String, usize)>,
 ) -> Result<(), String> {
     let len = cursor.read_len()?;
     for _ in 0..len {
@@ -4987,7 +5034,7 @@ fn collect_canonical_terms(
     Ok(())
 }
 
-fn canonical_body_nodes(declaration: &[u8]) -> Result<Vec<(usize, String)>, String> {
+fn canonical_body_nodes(declaration: &[u8]) -> Result<Vec<(usize, String, usize)>, String> {
     let mut cursor = CanonicalCursor::new(declaration);
     let kind = cursor.read_tag()?;
     if kind != "transparent" {
@@ -5021,13 +5068,28 @@ fn validate_omega_erasure_plan(
         ("collapsed_sigmas", &plan.collapsed_sigmas),
     ] {
         for id in ids {
-            let (_, tag) = nodes.get(*id as usize)
+            let (_, tag, _) = nodes.get(*id as usize)
                 .ok_or_else(|| fail(format!("{name} id {id} outside body preorder of {} nodes", nodes.len())))?;
             if name == "erased_binders" && tag != "lam" && tag != "let" {
                 return Err(fail(format!("erased binder id {id} has tag {tag:?}")));
             }
             if name == "collapsed_sigmas" && tag != "pair" && tag != "proj1" {
                 return Err(fail(format!("collapsed Σ id {id} has tag {tag:?}")));
+            }
+        }
+    }
+    for id in &plan.erased_subterms {
+        let (_, _, byte_end) = &nodes[*id as usize];
+        let after = nodes.partition_point(|(offset, _, _)| offset < byte_end);
+        let start = id.checked_add(1).ok_or_else(|| fail("body preorder overflow".into()))?;
+        let end = u32::try_from(after).map_err(|_| fail("body preorder overflow".into()))?;
+        for (name, ids) in [
+            ("erased_subterms", &plan.erased_subterms),
+            ("erased_binders", &plan.erased_binders),
+            ("collapsed_sigmas", &plan.collapsed_sigmas),
+        ] {
+            if let Some(nested) = ids.range(start..end).next() {
+                return Err(fail(format!("{name} id {nested} is inside maximal erased subtree {id}")));
             }
         }
     }

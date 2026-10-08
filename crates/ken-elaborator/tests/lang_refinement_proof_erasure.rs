@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::checked_core::{
     canonical_decl_bytes, emit_checked_core_package, CheckedCoreArtifactInputs, CheckedCorePackage,
-    CheckedCorePackageHeader, CheckedCoreSemanticInputs, LowerabilityStatus, StableSymbol,
-    StableSymbolTable, SymbolNamespace,
+    CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
+    LowerabilityStatus, StableSymbol, StableSymbolTable, SymbolNamespace,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
 use ken_elaborator::omega_erasure::omega_erasure_plan;
@@ -135,6 +135,37 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
         EvalVal::Int(7)
     ));
 
+    // Projection of that checked subset pair is the identity, not a runtime
+    // field read; the deferred source proof remains an admitted assumption.
+    let projection = Term::proj1(Term::const_(pair_id, vec![]));
+    let projection_id = declare_def(
+        &mut elaborated.env,
+        vec![],
+        int_ty.clone(),
+        projection.clone(),
+    )
+    .expect("checked first projection");
+    let projected = package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (hole, "hole"),
+            (pair_id, "pair"),
+            (projection_id, "project"),
+        ],
+        &[pair_id, projection_id],
+    );
+    let selected = vec![sym("project"), sym("pair")];
+    assert_eq!(
+        observed(&native_body(&projected, &sym("project"), &selected)),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into()))
+    );
+    assert!(matches!(
+        eval_checked(&projection, &int_ty, &elaborated.env, &mut store)
+            .expect("interpreter first projection"),
+        EvalVal::Int(7)
+    ));
+
     let mut missing = package.clone();
     missing
         .artifact
@@ -146,6 +177,36 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
     assert!(
         matches!(erase_checked_core_package_for_target(&missing, [&target]), Err(ErasureError::UnsupportedErasure { symbol, reason }) if symbol == target && reason.contains("missing kernel-classified Ω erasure plan"))
     );
+
+    // AC-5 structural refusal: invalid ids, wrong binder tags, and an
+    // extra marker inside a maximal erased node cannot enter a valid package.
+    for (label, variant) in [("outside", 0), ("binder_tag", 1), ("not_maximal", 2)] {
+        let mut invalid = package.clone();
+        let plan = invalid
+            .artifact
+            .semantic
+            .omega_erasure_plans
+            .get_mut(&target)
+            .unwrap();
+        match variant {
+            0 => {
+                plan.erased_subterms.insert(999);
+            }
+            1 => {
+                plan.erased_binders.insert(1);
+            }
+            2 => {
+                plan.erased_subterms.insert(0);
+            }
+            _ => unreachable!(),
+        }
+        let err = emit_checked_core_package(invalid.header, invalid.artifact)
+            .expect_err("malformed plan must not validate");
+        assert!(
+            matches!(&err, CheckedCorePackageError::MalformedOmegaErasurePlan { symbol, .. } if symbol == &target),
+            "{label}: {err:?}"
+        );
+    }
 }
 
 #[test]
