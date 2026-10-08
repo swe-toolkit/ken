@@ -254,22 +254,27 @@ fn assert_import_mutation_fails(source: &str, label: &str) {
     }
 }
 
-/// MEASURED: withdrawing Map's LC import or binding the canonical subject under
-/// the wrong local spelling makes the real Map source fail specifically at
-/// `bool_and`, while the fixture retains every unrelated legacy dependency.
+/// MEASURED: withdrawing Map's LC `bool_and` selection or binding that
+/// canonical subject under the wrong local spelling makes the real Map
+/// source fail specifically at `bool_and`, while the `bool_not` selection and
+/// every unrelated legacy dependency remain intact.
 /// CLAIMED: the LC edge is load-bearing and cannot be replaced by fixture
 /// ambient resolution. THE GAP: the provider's exact public inventory is owned
 /// by `cat_bool_pub_export`; this is the consumer-side control.
 #[test]
 fn map_bool_and_import_withdrawal_and_wrong_name_fail() {
-    let import = "import Core.Classes.LawfulClasses (bool_and)\n\n";
-    let withdrawn = replace_exactly_once(MAP_KEN_MD, import, "");
-    assert_import_mutation_fails(&withdrawn, "withdrawn LC import");
+    let import = "import Core.Classes.LawfulClasses (bool_and, bool_not)\n\n";
+    let withdrawn = replace_exactly_once(
+        MAP_KEN_MD,
+        import,
+        "import Core.Classes.LawfulClasses (bool_not)\n\n",
+    );
+    assert_import_mutation_fails(&withdrawn, "withdrawn LC bool_and selection");
 
     let wrong_name = replace_exactly_once(
         MAP_KEN_MD,
         import,
-        "import Core.Classes.LawfulClasses (bool_and as not_bool_and)\n\n",
+        "import Core.Classes.LawfulClasses (bool_and as not_bool_and, bool_not)\n\n",
     );
-    assert_import_mutation_fails(&wrong_name, "wrong-name LC import");
+    assert_import_mutation_fails(&wrong_name, "wrong-name LC bool_and selection");
 }

@@ -498,6 +498,7 @@ fn class_owner_provider_loader_visible_inventories_are_exact() {
             "bool_cases".to_owned(),
             "bool_eq".to_owned(),
             "bool_leq".to_owned(),
+            "bool_not".to_owned(),
             "bool_or".to_owned(),
             "bool_or::eq_true_of_or".to_owned(),
             "bool_or::left_false_elim".to_owned(),

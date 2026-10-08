@@ -85,7 +85,7 @@ and closes with `Proved` — the same non-inductive shape as
 immediate since `empty = Leaf`. Neither needs induction or a comparison.
 
 ```ken
-import Core.Classes.LawfulClasses (bool_and)
+import Core.Classes.LawfulClasses (bool_and, bool_not)
 
 import Core.Classes.LawfulClasses (Ord)
 
@@ -5710,9 +5710,9 @@ library.
 
 #### 4.7.1 Bool algebra and the Boolean order-equivalence test
 
-The canonical `bool_and` algebra and its laws come from
-`Core.Classes.LawfulClasses`; this package keeps only its local `bool_not` and
-`cat4_bool_or` helpers. The `Nat` comparator `leq_nat` and its laws belong to
+The canonical `bool_and` and `bool_not` operations come from
+`Core.Classes.LawfulClasses`; this package keeps only its local `cat4_bool_or`
+helper. The `Nat` comparator `leq_nat` and its laws belong to
 `Core.Classes.LawfulClasses`; clients needing a Nat order import them there.
 Map defines no Nat comparator or totality witness. The Boolean operations
 support later sections, followed by `order_equiv_key` — a `Bool`-valued
@@ -5721,12 +5721,6 @@ correspondence lemmas to the `Prop`-valued `order_equiv` from
 [§4.6](#46-law-5--lookup_assoc_agree-dictionary-agreement-with-the-ordered-list-lookup).
 
 ```ken
-fn bool_not (b : Bool) : Bool =
-  match b {
-    True ↦ False;
-    False ↦ True
-  }
-
 fn cat4_bool_or (a : Bool) (b : Bool) : Bool =
   match a {
     True ↦ True;

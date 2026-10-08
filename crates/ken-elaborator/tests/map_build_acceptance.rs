@@ -1494,8 +1494,8 @@ fn cat4_new_api_is_derived_and_axiom_free() {
             (&checked, checked_map_id(&checked, &owned, name))
         } else {
             assert!(
-                name == "bool_and" || name.starts_with("bool_and::"),
-                "only the imported LC bool_and family may lack a Map-owned identity"
+                name == "bool_not" || name == "bool_and" || name.starts_with("bool_and::"),
+                "only the imported LC Boolean helpers may lack Map-owned identities"
             );
             (
                 &env,
