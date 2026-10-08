@@ -15,7 +15,7 @@ use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit, Predecla
 use super::{planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::RuntimeExpr;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct ReturnedVisMember {
     pub(in crate::cranelift_backend) origin: StaticOriginId,
     pub(in crate::cranelift_backend) successor: Option<StaticResponseContinuation>,
@@ -23,7 +23,7 @@ pub(in crate::cranelift_backend) struct ReturnedVisMember {
     pub(in crate::cranelift_backend) relay: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct ReturnedVisContext {
     pub(in crate::cranelift_backend) context: ContinuationContextId,
     pub(in crate::cranelift_backend) members: Vec<ReturnedVisMember>,
@@ -32,7 +32,7 @@ pub(in crate::cranelift_backend) struct ReturnedVisContext {
     pub(in crate::cranelift_backend) returning_units: BTreeSet<PredeclaredFunctionId>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
     pub(in crate::cranelift_backend) owner: StaticOriginId,
     pub(in crate::cranelift_backend) contexts: Vec<ReturnedVisContext>,
@@ -44,7 +44,7 @@ pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
 /// *existing response row* as its only identity/ABI/effect authority. The
 /// discriminant is the row id plus one; zero is never a Vis member. No record
 /// exists for an owner with a relay or an unknown returned-result endpoint.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
     pub(in crate::cranelift_backend) owners:
         BTreeMap<StaticResponseContinuationId, ReturnedVisProtocol>,
@@ -53,6 +53,33 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
     /// Each function's maximum over only the owner protocols whose return
     /// paths pass through that exact generated function. Absent means no tail.
     pub(in crate::cranelift_backend) frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth>,
+}
+
+/// Every installed response owner's settlement route, built once from the
+/// final plan. No owner is absent; no consumer reads it through a `_` arm.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
+    /// A member of the pending-Vis record protocol.
+    Protocol,
+    /// The K route returns no Vis member, so a Ret-only body is exact.
+    RetOnly,
+    /// The K route returns a Vis the record protocol cannot settle.
+    Excluded { reason: ExcludedSettlement },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum ExcludedSettlement {
+    /// At least one returned member forwards a pattern-bound operation.
+    Relay,
+    /// The census errored while deriving a returned member (its text).
+    Underived(String),
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct PendingVisSettlements {
+    pub(in crate::cranelift_backend) protocol: Option<PendingVisRecordProtocol>,
+    pub(in crate::cranelift_backend) owners:
+        BTreeMap<StaticResponseContinuationId, ResponseOwnerSettlement>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -112,21 +139,34 @@ impl PendingVisRecordProtocol {
 }
 
 impl StaticTransitionPlan<'_> {
-    /// Only a complete, non-relay closed fixpoint may activate the record.
-    /// Every other owner retains the existing Ret-only refusal; an unknown
-    /// generated endpoint never becomes an invented member of a partial set.
-    pub(in crate::cranelift_backend) fn pending_vis_record_protocol(
+    /// Classify every installed response owner. Only a complete, non-relay
+    /// closed fixpoint may activate the record; missing or relay-bearing
+    /// fixpoints are retained as explicit exclusions for planning admission.
+    pub(in crate::cranelift_backend) fn build_pending_vis_settlements(
         &self,
-    ) -> Result<Option<PendingVisRecordProtocol>, CraneliftBackendError> {
+    ) -> Result<PendingVisSettlements, CraneliftBackendError> {
+        let mut settlements = BTreeMap::new();
         let mut owners = BTreeMap::new();
         let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
         let mut frames: BTreeMap<PendingVisFrameOwner, PendingVisFrameWidth> = BTreeMap::new();
         for owner in &self.static_response_continuations {
-            let Ok(protocol) = self.returned_vis_protocol(owner.vis_origin()) else {
-                // No partial protocol: the existing Ret-only owner stays intact.
-                continue;
+            let protocol = match self.returned_vis_protocol(owner.vis_origin()) {
+                Ok(protocol) => protocol,
+                Err(error) => {
+                    settlements.insert(owner.id(), ResponseOwnerSettlement::Excluded {
+                        reason: ExcludedSettlement::Underived(error.to_string()),
+                    });
+                    continue;
+                }
             };
-            if protocol.excluded_by_relay || protocol.contexts.iter().all(|ctx| ctx.members.is_empty()) {
+            if protocol.contexts.iter().all(|ctx| ctx.members.is_empty()) {
+                settlements.insert(owner.id(), ResponseOwnerSettlement::RetOnly);
+                continue;
+            }
+            if protocol.excluded_by_relay {
+                settlements.insert(owner.id(), ResponseOwnerSettlement::Excluded {
+                    reason: ExcludedSettlement::Relay,
+                });
                 continue;
             }
             let mut width = PendingVisFrameWidth {
@@ -169,13 +209,33 @@ impl StaticTransitionPlan<'_> {
                 entry.captures = entry.captures.max(width.captures);
                 entry.continuation_inputs = entry.continuation_inputs.max(width.continuation_inputs);
             }
+            settlements.insert(owner.id(), ResponseOwnerSettlement::Protocol);
             owners.insert(owner.id(), protocol);
         }
-        Ok((!owners.is_empty()).then_some(PendingVisRecordProtocol {
-            owners,
-            members,
-            frames,
-        }))
+        Ok(PendingVisSettlements {
+            protocol: (!owners.is_empty()).then_some(PendingVisRecordProtocol {
+                owners,
+                members,
+                frames,
+            }),
+            owners: settlements,
+        })
+    }
+
+    /// A relay or underived returned Vis has no native representation. Refuse
+    /// every such owner at planning after the closed plan has been validated.
+    pub(super) fn admit_response_owner_settlements(&self) -> Result<(), CraneliftBackendError> {
+        for (owner, settlement) in &self.pending_vis_settlements.owners {
+            match settlement {
+                ResponseOwnerSettlement::Protocol | ResponseOwnerSettlement::RetOnly => {}
+                ResponseOwnerSettlement::Excluded { reason } => {
+                    return Err(super::planner_capacity_error(format!(
+                        "response owner {owner:?} K returns a Vis outside the pending-Vis protocol ({reason:?})"
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// The only permitted case exclusion: the *same* planned-result traversal

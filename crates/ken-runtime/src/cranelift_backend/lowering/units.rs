@@ -4548,7 +4548,15 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             } else {
                 returned
             };
-            if !emission.successors.is_empty() {
+            let pending_vis_owner = match compiler.response_owner_settlements.get(&emission.row.id()) {
+                Some(ResponseOwnerSettlement::Protocol) if !emission.successors.is_empty() => true,
+                Some(ResponseOwnerSettlement::RetOnly) if emission.successors.is_empty() => false,
+                other => return Err(backend_module(format!(
+                    "response owner {:?} reached emission with settlement {other:?} and {} successors",
+                    emission.row.id(), emission.successors.len(),
+                ))),
+            };
+            if pending_vis_owner {
                 let pending = compiler.function_local.pending_vis_frame.ok_or_else(||
                     backend_module("a pending-Vis owner has no caller-owned record".to_string()))?;
                 let initial_call = *context_calls.first().ok_or_else(||

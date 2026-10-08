@@ -127,7 +127,7 @@ use super::semantic_ir::{
 use super::{
     planner_capacity_error, planner_error, CraneliftBackendError, DeclarationCallTargetClass,
     DynamicActivationFrame, EdgeEvidence, EdgeKind, PersistentNodeId, PersistentStoreNode,
-    PlanContext, PlannedEntryBody, PlannedHelperKey, StaticEdge, StaticEdgeId, StaticNode,
+    PendingVisSettlements, PlanContext, PlannedEntryBody, PlannedHelperKey, StaticEdge, StaticEdgeId, StaticNode,
     StaticNodeId, StaticSourceId, StaticTransitionPlan, StoreKind, TransitionKind,
 };
 use crate::RuntimeExpr;
@@ -317,6 +317,7 @@ impl<'src> Planner<'src> {
                 static_response_infeasible: None,
                 static_response_deferred: Vec::new(),
                 static_response_phase_a: None,
+                pending_vis_settlements: PendingVisSettlements::default(),
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
@@ -1519,6 +1520,10 @@ impl<'src> Planner<'src> {
                 }
             }
         }
+        // Phase B has installed the final response-owner population and its
+        // selected calls. Close the returned-Vis settlement exactly once before
+        // ownership source (e) reads its successor rows.
+        self.plan.pending_vis_settlements = self.plan.build_pending_vis_settlements()?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing
@@ -1608,6 +1613,7 @@ impl<'src> Planner<'src> {
         #[cfg(test)]
         apply_static_worker_member_mutation(&mut self.plan);
         self.plan.validate()?;
+        self.plan.admit_response_owner_settlements()?;
         #[cfg(feature = "px8-ds-test-support")]
         run_checked_ih_intervening_binder_population_control(&self.plan)?;
         Ok(self.plan)

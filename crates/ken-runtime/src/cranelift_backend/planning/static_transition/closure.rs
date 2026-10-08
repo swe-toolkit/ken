@@ -2076,6 +2076,11 @@ impl<'src> StaticTransitionPlan<'src> {
         self.abi
             .validate_continuation_specializations(&self.continuation_specializations)?;
         self.validate_join_result_plan()?;
+        if self.pending_vis_settlements != self.build_pending_vis_settlements()? {
+            return Err(planner_error(
+                "pending-Vis settlement plane is not the exact closed protocol derivation",
+            ));
+        }
         Ok(())
     }
 

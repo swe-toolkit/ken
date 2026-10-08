@@ -2876,9 +2876,11 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 .map(|row| (row.vis_origin(), row.producer_call_origin())),
         )
         .collect::<BTreeSet<_>>();
-    let pending_vis_record_protocol = static_transition_plan.pending_vis_record_protocol()?;
+    let pending_vis_record_protocol = static_transition_plan.pending_vis_settlements.protocol.clone();
+    let response_owner_settlements = static_transition_plan.pending_vis_settlements.owners.clone();
     let mut compiler = Lowering {
         pending_vis_record_protocol,
+        response_owner_settlements,
         continuation_claims: None,
         fusion_compositions: None,
         static_worker_fields: StaticWorkerFieldLedger::default(),

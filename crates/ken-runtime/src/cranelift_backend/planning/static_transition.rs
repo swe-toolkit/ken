@@ -34,7 +34,9 @@ mod responses;
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
+    ResponseOwnerSettlement,
 };
+use returned_vis::PendingVisSettlements;
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
 pub use selected_pending_calls::{
@@ -662,6 +664,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// phase A on a feasible plane; `None` before phase A, after phase B (taken),
     /// or on an opaque-K refusal (which sets `static_response_infeasible` instead).
     static_response_phase_a: Option<StaticResponsePhaseA>,
+    /// Complete closed return settlement for every installed response owner.
+    /// Built once after phase B, validated by exact re-derivation at closure.
+    pub(in crate::cranelift_backend) pending_vis_settlements: PendingVisSettlements,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///
@@ -873,7 +878,7 @@ fn inline_synthesized_seat_emission_owners(
         // owner's pending-Vis loop under the successor row's base owner
         // (units.rs emit_pending_vis_owner_loop: AmbientBodyAuthority::bind(
         // row.base_owner(), ..)). Read the same rows lowering reads.
-        if let Some(protocol) = plan.pending_vis_record_protocol()? {
+        if let Some(protocol) = plan.pending_vis_settlements.protocol.as_ref() {
             owners.extend(
                 protocol
                     .members
