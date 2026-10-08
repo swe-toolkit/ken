@@ -1,7 +1,7 @@
 ---
 id: VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT
 title: "A data constructor spelled like an instance dictionary (data D where { Lbl_instance_A : D } beside instance Lbl A) is admitted in both orders, and the later one overwrites the other in the flat elab.globals key, because constructors enter globals outside the elaborate_checked_as identity guard. Bind every declaration-identity key to at most one checked GlobalId through one checked insert that refuses with DeclarationIdentityCollision"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
