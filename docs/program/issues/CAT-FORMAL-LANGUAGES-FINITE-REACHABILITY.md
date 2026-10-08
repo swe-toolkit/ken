@@ -32,6 +32,9 @@ with every law proved.
 - **Completeness is by counting stabilisation.** `reach k` is monotone in
   `k`; its count over the state enumeration is at most N; each unstable
   step raises the count. It needs both certificates and no `DecEq`.
+- **`Fin` is private on `337faba62`.** The implementer measured
+  `UnboundName` for the import (`evt_6f8kdn9px2bf7`); the Vector exposure
+  in the Deliverable is the enabler.
 - **Placement.**
   - Public in `Data.Collections.Derived`: `list_elem`, `list_elem_head`,
     `list_elem_later`, `list_elem_map`, `list_elem_append_left`,
@@ -64,6 +67,22 @@ base, stop and report the mismatch.
 
 - **The two packages and the Derived promotions**, from the development,
   with every stand-in replaced by its import.
+- **Vector publishes `Fin`, `FZero` and `FSuc`, and nothing else**
+  (Architect `evt_7e5s9thdrf4v4`). In the Definition fence of
+  `Data/Vector/Vector.ken.md`, `pub data Fin` followed by
+  `export FZero, FSuc` (spec 33 §4.1: `pub data` publishes only the type
+  former). Do not inline or move `Fin`. The Trust & derivation sentence
+  says the `Fin` family and its constructors are public as the
+  bounded-index provider for `Data.Finite.Finite`, everything else stays
+  private, and no trust or `trusted_base()` changes. In
+  `cat_vector_closeout.rs`, split and rename
+  `vector_loader_visible_inventory_is_empty`: the three names import and
+  resolve to Vector's checked ids, and every other owned name still
+  rejects with the exact qualified `UnboundName`.
+- **Census rows.** `Data.Finite.Finite` and
+  `Algorithm.FormalLanguages.Reachability` get their
+  `lang_mod_strict_resolution_d0` rows in this candidate, and Vector's
+  rows stay green.
 - **Arrangement.** Reachability leads with `is_empty`, `accepted_word` and
   their laws, then the `find_word` laws, then `search`, with the counting
   proof last.
@@ -83,6 +102,10 @@ base, stop and report the mismatch.
 - **AC-4 (mutation, QA).** Each of the ruling's three rejected mutants
   reddens: fuel bound 0 in the completeness statement, stability claimed at
   0, and `is_empty` without its `bool_not`.
+
+- **AC-5.** `import Data.Vector.Vector (Fin, FZero, FSuc)` resolves to
+  Vector's checked ids, every other Vector name still rejects with
+  `UnboundName`, and Vector's acceptance and closeout suites stay green.
 
 ## Stop conditions
 
