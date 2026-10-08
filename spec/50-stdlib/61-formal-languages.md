@@ -146,13 +146,13 @@ final-state test (for example, with the ordinary checked `cong`), not a bare
 `Refl` assertion on the neutral computation.
 
 `run_product` follows induction on `w` **from arbitrary `s1` and `s2`**, not
-only from the two start states. The checked proof uses a separate private
-helper `run_product_nil` for its pair-valued empty-word case; it states the
-`run_product` equality at `w = []` and is not an eighth public law. This
-avoids relying on the match arm to reduce a pair-typed goal to an
-`Equal`-shaped goal before checking `Refl`. `accepts_product` transports the
-state-pair equality
-through the product's final-state test. The intersection and union laws are
+only from the two start states. The checked proof may state its pair-valued
+empty-word case as a separate private helper (for example,
+`run_product_nil`); such a helper is not an eighth public law. This proof
+layout avoids relying on the match arm to reduce a pair-typed goal to an
+`Equal`-shaped goal before checking `Refl`, but the helper's existence is
+not required. `accepts_product` transports the state-pair equality through
+the product's final-state test. The intersection and union laws are
 instances of this single general law with `combine = bool_and` and
 `combine = bool_or`, respectively. These proof obligations concern the
 actual functions exported by the package: a second specification-only
@@ -161,13 +161,16 @@ product or a tested finite sample does not discharge them.
 ### 1.4 Trust and delivery boundary
 
 `Algorithm.FormalLanguages.Dfa` is an optional, explicitly imported
-standard package, not a built-in or a prelude extension (`README §1`). The
-record and operations are ordinary checked Ken; all seven public laws must
-have kernel-checked proof terms over those same definitions. Their
-propositions are proof-irrelevant `Ω` inhabitants over the stated `Type`
-carriers, not proof-relevant data smuggled into `Ω`. The package adds **no
-`Axiom`, primitive, kernel declaration or reduction rule, or
-`trusted_base()` entry**. It must not treat an unchecked test, a table
+standard package, not a built-in or a prelude extension (`README §1`). Its
+ordinary `data Dfa` declaration uses the existing checked inductive
+machinery (`../10-kernel/14-inductive.md`,
+`../10-kernel/18-judgments.md §4`). Its functions and theorems use existing
+checked declaration machinery too. All seven
+public laws must have kernel-checked proof terms over those same definitions.
+Their propositions are proof-irrelevant `Ω` inhabitants over the stated
+`Type` carriers, not proof-relevant data smuggled into `Ω`. The package adds
+**no `Axiom`, primitive, new kernel declaration kind/form or reduction rule,
+or `trusted_base()` entry**. It must not treat an unchecked test, a table
 implementation, or a finiteness assumption as proof of any law.
 
 This chapter fixes the contract first; it does not claim that the catalog
