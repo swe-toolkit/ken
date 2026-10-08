@@ -9,7 +9,7 @@ gate: architect
 depends_on: [VERIFY-INSTANCE-OWNER-KEY]
 blocks: []
 github: null
-origin: "Architect ruling evt_7ndy6vqxw51w5 on VERIFY-INSTANCE-OWNER-KEY: the structural-head population is reachable and out of that WP's scope, because fixing it moves instance declaration symbols. Steward chose a successor WP over an amendment. Steward-filed per COORDINATION section 2."
+origin: "Architect ruling evt_7ndy6vqxw51w5 on VERIFY-INSTANCE-OWNER-KEY: the structural-head population is reachable and out of that WP's scope, because fixing it moves instance declaration symbols. Steward chose a successor WP over an amendment. D0 ruled evt_407cerfqyf2yn. Steward-filed per COORDINATION section 2."
 ---
 
 # A structural-head instance has its own identity
@@ -41,11 +41,16 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-The Architect rules the canonical rendering of a structural head at D0.
-`synthesized_dictionary_name` then returns an injective identity for every
-admitted instance head, and the owner and `result.name` use it as for
-named heads. List every pinned hash or symbol that moves, with the reason
-for each.
+As ruled at D0 (Architect `evt_407cerfqyf2yn`, exact code there): one
+function in `elab.rs`, `structural_instance_symbol(class, head)`, renders
+`{class}_instance_` plus the resolved head as a tagged prefix tree. It is
+`None` for named heads and for refused forms. Both consumers call it on
+the same `rdecl`: the elab globals key, with a guard that refuses a reused
+symbol for a different head, and the owner and `result.name` in the
+`modules.rs` else-arm. Structural heads keep
+`DeclNamespaceEffect::ReferenceOnly`, so no importable binding is minted
+and `synthesized_dictionary_name` is unchanged. List every pinned hash or
+symbol that moves, with the reason for each.
 
 ## Acceptance
 
@@ -53,10 +58,13 @@ for each.
   `#n` fallback, in both declaration orders.
 - **AC-2.** The same pair with a `requires` hole in each method gives two
   distinct obligation ids and two metadata entries, in both orders.
-- **AC-3 (control).** Named-head and `derive` identities and their pins
-  are unchanged.
-- **AC-4 (mutation, QA).** Returning `None` for the arrow head again
-  reddens AC-1 and AC-2.
+- **AC-3 (control).** Named-head and `derive` rows of
+  `verify_instance_owner_key` keep their results. The retired sentinel
+  `structural_head_instances_keep_their_existing_symbols` is replaced by
+  the AC-1 and AC-2 rows. Named-head collisions are
+  `VERIFY-NAMED-HEAD-INSTANCE-IDENTITY`, not this WP.
+- **AC-4 (mutation, QA).** Removing `RType::RArr(..)` from the top-level
+  match reddens AC-1 and AC-2.
 
 ## Stop conditions
 
