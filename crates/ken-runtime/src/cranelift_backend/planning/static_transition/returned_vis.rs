@@ -63,19 +63,14 @@ pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
     Protocol,
     /// The K route returns no Vis member, so a Ret-only body is exact.
     RetOnly,
-    /// Every returned member forwards a pattern-bound operation. Emission
-    /// retains the baseline Ret-only arm; the record protocol does not settle
-    /// these members, and this class does not claim that it does.
-    RelayOnly,
     /// The K route returns a Vis the record protocol cannot settle.
     Excluded { reason: ExcludedSettlement },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ExcludedSettlement {
-    /// Relay and non-relay returned members share one owner. Neither the
-    /// pending-Vis record nor a Ret-only body can settle the whole owner.
-    MixedRelay,
+    /// At least one returned member forwards a pattern-bound operation.
+    Relay,
     /// The census errored while deriving a returned member (its text).
     Underived(String),
 }
@@ -146,7 +141,7 @@ impl PendingVisRecordProtocol {
 impl StaticTransitionPlan<'_> {
     /// Classify every installed response owner. Only a complete, non-relay
     /// closed fixpoint may activate the record; missing or relay-bearing
-    /// fixpoints are retained as explicit exclusions for planning admission.
+    /// fixpoints remain explicit exclusions and keep baseline emission.
     pub(in crate::cranelift_backend) fn build_pending_vis_settlements(
         &self,
     ) -> Result<PendingVisSettlements, CraneliftBackendError> {
@@ -169,16 +164,8 @@ impl StaticTransitionPlan<'_> {
                 continue;
             }
             if protocol.excluded_by_relay {
-                let all_relay = protocol
-                    .contexts
-                    .iter()
-                    .flat_map(|context| &context.members)
-                    .all(|member| member.relay);
-                settlements.insert(owner.id(), match all_relay {
-                    true => ResponseOwnerSettlement::RelayOnly,
-                    false => ResponseOwnerSettlement::Excluded {
-                        reason: ExcludedSettlement::MixedRelay,
-                    },
+                settlements.insert(owner.id(), ResponseOwnerSettlement::Excluded {
+                    reason: ExcludedSettlement::Relay,
                 });
                 continue;
             }
@@ -233,31 +220,6 @@ impl StaticTransitionPlan<'_> {
             }),
             owners: settlements,
         })
-    }
-
-    /// A relay or underived returned Vis has no native representation. Refuse
-    /// every such owner at planning, naming the complete excluded set.
-    pub(super) fn admit_response_owner_settlements(&self) -> Result<(), CraneliftBackendError> {
-        let excluded = self
-            .pending_vis_settlements
-            .owners
-            .iter()
-            .filter_map(|(owner, settlement)| match settlement {
-                ResponseOwnerSettlement::Protocol
-                | ResponseOwnerSettlement::RetOnly
-                | ResponseOwnerSettlement::RelayOnly => None,
-                ResponseOwnerSettlement::Excluded { reason } => {
-                    Some(format!("{owner:?} ({reason:?})"))
-                }
-            })
-            .collect::<Vec<_>>();
-        if excluded.is_empty() {
-            return Ok(());
-        }
-        Err(super::planner_capacity_error(format!(
-            "response owners K return a Vis outside the pending-Vis protocol: {}",
-            excluded.join(", ")
-        )))
     }
 
     /// The only permitted case exclusion: the *same* planned-result traversal

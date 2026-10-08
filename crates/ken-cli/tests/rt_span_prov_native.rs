@@ -352,7 +352,7 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
 // its five siblings pass. It fits none of the effect-seat owners.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(4) (MixedRelay)"]
+#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE D1: paired BufferFreeze carried start/length seat repair now passes AC-0 refusal; next first failure at lowering/units.rs:6823 is forward-declared response owner lacking a verified selected incoming call. Caller producer construct StaticOriginId(1079), alternative 1, target specialization 2 has no emitted generated-function call. Remains ignored pending that independent owner repair; AC-0 at 310bf4f21 was BufferFreeze Argument(1) ExactIntU64 unavailable in CarriedWord"]
 fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
     in_large_stack_thread("sp-a-freeze", || {
         let diff = differential("sp-a-freeze", SP_A_FREEZE);
@@ -376,16 +376,15 @@ fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
     });
 }
 
-/// Promise class: transition sentinel. The span fixture's exact refused plan
-/// still records eight installed Specialized rows and its one deferred Vis;
-/// the refusal identifies both relay owners, not whichever sorts first.
-/// MEASURED: the planner diagnostics on a real refused build and its exact
-/// Display error. CLAIMED: admission follows validation/diagnostic recording
-/// and no mixed owner silently falls through as Ret-only. THE GAP: this does
-/// not establish native execution, which remains ignored for the successor.
+/// Promise class: transition sentinel. The span fixture's completed plan
+/// records eight installed Specialized rows and its one deferred Vis.
+/// MEASURED: the real build produces a linked artifact and planner diagnostics.
+/// CLAIMED: owner 6 and Vis1079 keep their distinct planning dispositions.
+/// THE GAP: compilation does not prove native execution; the native row remains
+/// ignored until the successor settles its returned-Vis route.
 #[cfg(target_os = "linux")]
 #[test]
-fn span_plan_diagnostics_survive_complete_relay_refusal() {
+fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
     in_large_stack_thread("rchain-span-diagnostic", || {
         let root = output_dir("sp-a-freeze");
         std::fs::write(root.path().join("spanseed.bin"), b"AAAABBBB").unwrap();
@@ -396,9 +395,8 @@ fn span_plan_diagnostics_survive_complete_relay_refusal() {
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         });
-        let error = built.expect_err("both excluded response owners must refuse");
-        assert_eq!(error.to_string(), "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(4) (MixedRelay)");
-        assert_eq!(diagnostics.len(), 1, "a refused plan records its diagnostics");
+        let _output = built.expect("the completed span plan must compile");
+        assert_eq!(diagnostics.len(), 1, "the completed plan records its diagnostics");
         let plan = &diagnostics[0];
         assert_eq!(plan.all_static_response_rows.len(), 8, "all specialized rows remain recorded");
         assert_eq!(plan.static_response_owners.len(), 8, "every installed owner remains recorded");

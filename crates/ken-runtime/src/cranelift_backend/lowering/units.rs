@@ -4551,7 +4551,11 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             let pending_vis_owner = match compiler.response_owner_settlements.get(&emission.row.id()) {
                 Some(ResponseOwnerSettlement::Protocol) if !emission.successors.is_empty() => true,
                 Some(ResponseOwnerSettlement::RetOnly) if emission.successors.is_empty() => false,
-                Some(ResponseOwnerSettlement::RelayOnly) if emission.successors.is_empty() => false,
+                // Baseline emission: the former pending-Vis protocol dropped
+                // excluded owners, so these took the Ret-only arm. The
+                // successor determines whether the handler-owned drive settles
+                // a returned Vis or this route traps.
+                Some(ResponseOwnerSettlement::Excluded { .. }) if emission.successors.is_empty() => false,
                 other => return Err(backend_module(format!(
                     "response owner {:?} reached emission with settlement {other:?} and {} successors",
                     emission.row.id(), emission.successors.len(),

@@ -849,19 +849,13 @@ fn buffer_freeze_outcome(
 // which carries no signature of its own. The signature above is the
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
-// NativeProgramBuildError::Packaging delegates Display to the packaging
-// error, including its stage/field prefix; all three inspection rows assert
-// that exact boundary and keep their planner diagnostics independently.
-#[cfg(target_os = "linux")]
-const R2_RELAY_ADMISSION_DISPLAY: &str = "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(2) (MixedRelay), StaticResponseContinuationId(3) (MixedRelay)";
-
 /// Promise class: transition sentinel. The fixture's planner-issued origins
 /// are rechecked if its compiler shape changes. MEASURED: exactly two
 /// error-free, relay-excluded protocols each have one returned relay without
 /// a successor and one non-relay member with a static successor.
 /// CLAIMED: the pending-Vis protocol must never run partially on either owner.
-/// THE GAP: r2 now refuses at planning under the all-Excluded settlement gate;
-/// the diagnostics are recorded before admission, not proof of native parity.
+/// THE GAP: emission is not installed yet; the ignored native row separately
+/// preserves today's exact -1 Ret-tag failure until the successor repairs K.
 /// Architect evt_1jnjtntg7wej: the shape-match count, not owner order, is the gate.
 #[test]
 fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
@@ -874,9 +868,7 @@ fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         });
-        let error = compiled.expect_err("r2 relay owners must refuse before native emission");
-        eprintln!("RT-NESTED R2 ADMISSION {error}");
-        assert_eq!(error.to_string(), R2_RELAY_ADMISSION_DISPLAY);
+        let _output = compiled.expect("r2 compiles to the current fail-closed artifact");
         let protocols = diagnostics.iter().flat_map(|plan| &plan.returned_vis_protocols)
             .filter(|protocol| {
                 if !protocol.excluded_by_relay || protocol.error.is_some() {
@@ -931,8 +923,7 @@ fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
                     ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                 )
             });
-        let error = compiled.expect_err("r2 relay owners must refuse before native emission");
-        assert_eq!(error.to_string(), R2_RELAY_ADMISSION_DISPLAY);
+        compiled.expect("r2 compiles to an artifact before inspecting its owner plan");
         assert_eq!(
             diagnostics.len(),
             1,
@@ -973,9 +964,8 @@ fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
 /// the r2 S5→S6 call selected by the installed owner-4 plan.
 /// CLAIMED: the representation-independent source stratum retains the exact
 /// call whose loss the subsequent residual-issuance increment must repair.
-/// THE GAP: this does not show the call is emitted; r2 refuses at planning
-/// under the all-Excluded settlement gate. Its native execution row is ignored
-/// until the relay representation successor supplies a settled route.
+/// THE GAP: this does not show the call is emitted; the existing r2 execution
+/// test is the separate emission gate, still expected to refuse until I-2.
 #[test]
 fn r2_pre_schema_response_selection_retains_selected_transport() {
     in_large_stack_thread("rt-escape-r2-pre-schema", || {
@@ -987,10 +977,12 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
                 ken_runtime::boundary_resource_profile::starter_smoke_profile(),
             )
         });
-        // A typed relay refusal follows completed plan recording; an
-        // unrelated failure cannot prove pre-schema selection.
-        let error = compiled.expect_err("r2 relay owners must refuse before native emission");
-        assert_eq!(error.to_string(), R2_RELAY_ADMISSION_DISPLAY);
+        // I-1 does not change lowering. The existing object-emission refusal
+        // remains lawful until I-2; no unrelated failure can pass this pin.
+        if let Err(error) = compiled {
+            assert!(format!("{error:?}").contains("no verified selected incoming call"),
+                "an unrelated failure cannot prove pre-schema selection: {error:?}");
+        }
         assert_eq!(diagnostics.len(), 1, "one planner must publish one stratum");
         let plan = &diagnostics[0];
         let owner = plan.static_response_owners.iter()
@@ -1019,7 +1011,7 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
 }
 
 #[test]
-#[ignore = "RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT: ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(2) (MixedRelay), StaticResponseContinuationId(3) (MixedRelay)"]
+#[ignore = "RT-SOURCE-IH-RELAY-K-VALUE: BufferFreeze carried-seat repair passes its earlier refusal; owner 1298 still reaches the unchanged Ret-tag trap (-1). Its Vis577 relay K is RecursiveBackedge, not a transferable value; this row stays ignored under the successor after RT-OWNER-VIS-RETURN-PROTOCOL descoped it."]
 fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds() {
     in_large_stack_thread("rt-escape-r2", || {
         // R2 reaching lane: two nested buffer resources compile and run; a span
