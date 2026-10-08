@@ -86,37 +86,49 @@ fn named_head_requires_holes_keep_both_obligations_and_trust_keys() {
         ("src/a.ken", A_HOLE),
     ]);
     let b = package(&[("src/c.ken", C_HOLE), ("src/b.ken", B_HOLE)]);
+    for (order, semantic) in [
+        ("c,a,b", &ab.artifact.semantic),
+        ("c,b,a", &ba.artifact.semantic),
+    ] {
+        assert_eq!(
+            semantic.obligations.len(),
+            2,
+            "{order}: both live obligations"
+        );
+        assert_eq!(
+            semantic.obligation_metadata.len(),
+            2,
+            "{order}: both origins"
+        );
+        for head in ["A", "B"] {
+            let owner = format!("Lbl_instance_{head}");
+            let obligation = StableSymbol::obligation(format!("{owner}.requires.0"));
+            let hole = decl(&format!("{owner}#1"));
+            assert!(semantic.obligations.contains_key(&obligation));
+            assert_eq!(
+                semantic.obligation_metadata[&obligation].origin,
+                decl(&owner)
+            );
+            assert!(semantic.trusted_base_delta.contains_key(&hole));
+        }
+    }
     assert_eq!(ab.artifact.semantic, ba.artifact.semantic);
     assert_eq!(ab.core_semantic_hash, ba.core_semantic_hash);
     let semantic = &ab.artifact.semantic;
-    assert_eq!(semantic.obligations.len(), 2);
-    assert_eq!(semantic.obligation_metadata.len(), 2);
-    for head in ["A", "B"] {
-        let owner = format!("Lbl_instance_{head}");
-        let obligation = StableSymbol::obligation(format!("{owner}.requires.0"));
-        let hole = decl(&format!("{owner}#1"));
-        assert!(semantic.obligations.contains_key(&obligation));
-        assert_eq!(
-            semantic.obligation_metadata[&obligation].origin,
-            decl(&owner)
-        );
-        assert!(semantic.trusted_base_delta.contains_key(&hole));
-        assert!(ba.artifact.semantic.trusted_base_delta.contains_key(&hole));
-        if head == "B" {
-            assert_eq!(
-                semantic.obligations.get(&obligation),
-                b.artifact.semantic.obligations.get(&obligation)
-            );
-            assert_eq!(
-                semantic.obligation_metadata.get(&obligation),
-                b.artifact.semantic.obligation_metadata.get(&obligation)
-            );
-            assert_eq!(
-                semantic.trusted_base_delta.get(&hole),
-                b.artifact.semantic.trusted_base_delta.get(&hole)
-            );
-        }
-    }
+    let obligation = StableSymbol::obligation("Lbl_instance_B.requires.0");
+    let hole = decl("Lbl_instance_B#1");
+    assert_eq!(
+        semantic.obligations.get(&obligation),
+        b.artifact.semantic.obligations.get(&obligation)
+    );
+    assert_eq!(
+        semantic.obligation_metadata.get(&obligation),
+        b.artifact.semantic.obligation_metadata.get(&obligation)
+    );
+    assert_eq!(
+        semantic.trusted_base_delta.get(&hole),
+        b.artifact.semantic.trusted_base_delta.get(&hole)
+    );
 }
 
 /// Promise class: durable invariant. MEASURED: `derive E for A` and an
