@@ -349,6 +349,15 @@ fn checked_host_declaration_closure(
         if declarations.contains_key(&symbol) {
             continue;
         }
+        // Only the actual executable body closure, not metadata-only package
+        // declarations, requires a plan. Inspecting an older valid package
+        // without one remains legal; lowering such a body never does.
+        if !semantic.omega_erasure_plans.contains_key(&symbol) {
+            return Err(ErasureError::UnsupportedErasure {
+                symbol,
+                reason: "missing kernel-classified Ω erasure plan".into(),
+            });
+        }
         let mut declaration_selection = selection.clone();
         declaration_selection.target_symbol = symbol.clone();
         let declaration = checked_core::checked_core_declaration_body_view(
@@ -401,6 +410,13 @@ fn collect_checked_body_declaration_refs(
                 collect_checked_body_declaration_refs(argument, output);
             }
         }
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            collect_checked_body_declaration_refs(first, output);
+            collect_checked_body_declaration_refs(second, output);
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            collect_checked_body_declaration_refs(pair, output);
+        }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
             for field in &view.fields {
                 if let checked_core::CheckedCoreRecordSigmaFieldValue::Runtime { value, .. } = field
@@ -425,7 +441,8 @@ fn collect_checked_body_declaration_refs(
         | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
-        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => {}
+        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
     }
 }
 
@@ -2337,11 +2354,11 @@ fn lower_checked_host_value(
     if let Some(native_plans) = native_plans {
         let mut trial_plans = native_plans.clone();
         let (candidate, candidate_depth, entered_remap, is_lambda) =
-            if let CheckedCoreBodyTerm::Lambda { body, .. } = term {
+            if let CheckedCoreBodyTerm::Lambda { body, erased_parameter, .. } = term {
                 (
                     body.as_ref(),
                     context_depth + 1,
-                    branch_remap.map(BranchBinderRemap::enter_binding),
+                    Some(branch_remap.cloned().unwrap_or_default().enter_binding(*erased_parameter)),
                     true,
                 )
             } else {
@@ -2534,12 +2551,12 @@ fn lower_body_term_with_plans(
         reject_level_args(root, level_args)?;
         if let Some(declaration) = declarations.get(symbol) {
             let mut body = &declaration.body;
-            let mut parameter_count = 0usize;
-            while parameter_count < arguments.len() {
-                let CheckedCoreBodyTerm::Lambda { body: inner, .. } = body else {
+            let mut erased_parameters = Vec::new();
+            while erased_parameters.len() < arguments.len() {
+                let CheckedCoreBodyTerm::Lambda { body: inner, erased_parameter, .. } = body else {
                     break;
                 };
-                parameter_count += 1;
+                erased_parameters.push(*erased_parameter);
                 body = inner;
             }
             // A checked-IH template is bound to its declaring symbol and its
@@ -2548,11 +2565,17 @@ fn lower_body_term_with_plans(
             // standalone declaration is also emitted, giving one affine
             // template two declaration owners. Keep the complete application
             // as a declaration call; no operand or call identity is inferred.
-            if parameter_count == arguments.len()
+            if erased_parameters.len() == arguments.len()
                 && native_plans.owner_has_computational_ih(symbol)
             {
                 let mut args = Vec::with_capacity(arguments.len());
-                for (index, argument) in arguments.iter().enumerate() {
+                for (index, (argument, erased)) in arguments.iter().zip(&erased_parameters).enumerate() {
+                    if *erased {
+                        if !matches!(*argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                            return Err(expression_lowering_error(root, "erased_argument_not_omega", "erased binder has an executable argument"));
+                        }
+                        continue;
+                    }
                     let mut child_path = path.to_vec();
                     child_path.extend([11, index as u64]);
                     args.push(lower_body_term_with_plans(
@@ -2575,7 +2598,7 @@ fn lower_body_term_with_plans(
                     args,
                 });
             }
-            if parameter_count == arguments.len() && !admitted_recursive_member(semantic, symbol) {
+            if erased_parameters.len() == arguments.len() && !admitted_recursive_member(semantic, symbol) {
                 if stack.contains(symbol) {
                     return Err(expression_lowering_error(
                         root,
@@ -2584,7 +2607,13 @@ fn lower_body_term_with_plans(
                     ));
                 }
                 let mut values = Vec::with_capacity(arguments.len());
-                for (index, argument) in arguments.iter().enumerate() {
+                for (index, (argument, erased)) in arguments.iter().zip(&erased_parameters).enumerate() {
+                    if *erased {
+                        if !matches!(*argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                            return Err(expression_lowering_error(root, "erased_argument_not_omega", "erased binder has an executable argument"));
+                        }
+                        continue;
+                    }
                     let mut child_path = path.to_vec();
                     child_path.extend([11, index as u64]);
                     values.push(lower_body_term_with_plans(
@@ -2600,9 +2629,9 @@ fn lower_body_term_with_plans(
                         parent_oriented_frame,
                     )?);
                 }
-                let mut inner_remap = branch_remap.cloned();
-                for _ in 0..parameter_count {
-                    inner_remap = inner_remap.map(|remap| remap.enter_binding());
+                let mut inner_remap = branch_remap.cloned().unwrap_or_default();
+                for erased in &erased_parameters {
+                    inner_remap = inner_remap.enter_binding(*erased);
                 }
                 stack.push(symbol.clone());
                 let mut child_path = path.to_vec();
@@ -2613,8 +2642,8 @@ fn lower_body_term_with_plans(
                     semantic,
                     stack,
                     root,
-                    context_depth + parameter_count,
-                    inner_remap.as_ref(),
+                    context_depth + erased_parameters.len(),
+                    Some(&inner_remap),
                     &child_path,
                     native_plans,
                     parent_oriented_frame,
@@ -2701,28 +2730,21 @@ fn lower_body_term_with_plans(
     }
 
     match term {
-        CheckedCoreBodyTerm::Lambda { body, .. } => {
+        CheckedCoreBodyTerm::Lambda { body, erased_parameter, .. } => {
             let runtime_depth = branch_remap
                 .map(|remap| remap.runtime_depth(context_depth))
                 .unwrap_or(context_depth);
             let mut child_path = path.to_vec();
             child_path.push(14);
+            let inner_remap = branch_remap.cloned().unwrap_or_default().enter_binding(*erased_parameter);
             Ok(RuntimeExpr::LexicalClosure {
                 captures: (0..runtime_depth)
                     .map(|index| RuntimeExpr::Var(index as u32))
                     .collect(),
-                params: vec!["arg0".to_string()],
+                params: if *erased_parameter { Vec::new() } else { vec!["arg0".to_string()] },
                 body: Box::new(lower_body_term_with_plans(
-                    body,
-                    declarations,
-                    semantic,
-                    stack,
-                    root,
-                    context_depth + 1,
-                    branch_remap.map(BranchBinderRemap::enter_binding).as_ref(),
-                    &child_path,
-                    native_plans,
-                    parent_oriented_frame,
+                    body, declarations, semantic, stack, root, context_depth + 1,
+                    Some(&inner_remap), &child_path, native_plans, parent_oriented_frame,
                 )?),
             })
         }
@@ -2731,64 +2753,46 @@ fn lower_body_term_with_plans(
             function_path.push(15);
             let mut argument_path = path.to_vec();
             argument_path.push(16);
+            let args = if matches!(argument.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                Vec::new()
+            } else {
+                vec![lower_body_term_with_plans(
+                    argument, declarations, semantic, stack, root, context_depth,
+                    branch_remap, &argument_path, native_plans, parent_oriented_frame,
+                )?]
+            };
             Ok(RuntimeExpr::Call {
                 callee: Box::new(lower_body_term_with_plans(
-                    function,
-                    declarations,
-                    semantic,
-                    stack,
-                    root,
-                    context_depth,
-                    branch_remap,
-                    &function_path,
-                    native_plans,
-                    parent_oriented_frame,
+                    function, declarations, semantic, stack, root, context_depth,
+                    branch_remap, &function_path, native_plans, parent_oriented_frame,
                 )?),
-                args: vec![lower_body_term_with_plans(
-                    argument,
-                    declarations,
-                    semantic,
-                    stack,
-                    root,
-                    context_depth,
-                    branch_remap,
-                    &argument_path,
-                    native_plans,
-                    parent_oriented_frame,
-                )?],
+                args,
             })
         }
-        CheckedCoreBodyTerm::Let { value, body, .. } => {
+        CheckedCoreBodyTerm::Let { value, body, erased_value, .. } => {
             let mut value_path = path.to_vec();
             value_path.push(17);
             let mut body_path = path.to_vec();
             body_path.push(18);
-            Ok(RuntimeExpr::Let {
-                value: Box::new(lower_body_term_with_plans(
-                    value,
-                    declarations,
-                    semantic,
-                    stack,
-                    root,
-                    context_depth,
-                    branch_remap,
-                    &value_path,
-                    native_plans,
-                    parent_oriented_frame,
-                )?),
-                body: Box::new(lower_body_term_with_plans(
-                    body,
-                    declarations,
-                    semantic,
-                    stack,
-                    root,
-                    context_depth + 1,
-                    branch_remap.map(BranchBinderRemap::enter_binding).as_ref(),
-                    &body_path,
-                    native_plans,
-                    parent_oriented_frame,
-                )?),
-            })
+            let inner_remap = branch_remap.cloned().unwrap_or_default().enter_binding(*erased_value);
+            let lowered_body = lower_body_term_with_plans(
+                body, declarations, semantic, stack, root, context_depth + 1,
+                Some(&inner_remap), &body_path, native_plans, parent_oriented_frame,
+            )?;
+            if *erased_value {
+                if !matches!(value.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                    return Err(expression_lowering_error(root, "erased_let_value_not_omega", "Ω let binder has an executable value"));
+                }
+                Ok(lowered_body)
+            } else {
+                Ok(RuntimeExpr::Let {
+                    value: Box::new(lower_body_term_with_plans(
+                        value, declarations, semantic, stack, root, context_depth,
+                        branch_remap, &value_path, native_plans, parent_oriented_frame,
+                    )?),
+                    body: Box::new(lowered_body),
+                })
+            }
         }
         CheckedCoreBodyTerm::Match(view) => {
             reject_level_args_for_family(root, &view.level_args, semantic, &view.family_symbol)?;
@@ -3275,42 +3279,37 @@ fn lower_checked_host_computation(
         reject_level_args(root, level_args)?;
         if let Some(declaration) = declarations.get(symbol) {
             let mut declaration_body = &declaration.body;
-            let mut parameter_count = 0usize;
-            while parameter_count < arguments.len() {
-                let CheckedCoreBodyTerm::Lambda { body, .. } = declaration_body else {
+            let mut erased_parameters = Vec::new();
+            while erased_parameters.len() < arguments.len() {
+                let CheckedCoreBodyTerm::Lambda { body, erased_parameter, .. } = declaration_body else {
                     break;
                 };
-                parameter_count += 1;
+                erased_parameters.push(*erased_parameter);
                 declaration_body = body;
             }
-            if parameter_count == arguments.len()
+            if erased_parameters.len() == arguments.len()
                 && !stack.contains(symbol)
                 && !admitted_recursive_member(semantic, symbol)
             {
-                let values = arguments
-                    .iter()
-                    .enumerate()
-                    .map(|(argument_index, argument)| {
-                        let mut argument_path = path.to_vec();
-                        argument_path.extend([4, argument_index as u64]);
-                        lower_checked_host_value(
-                            argument,
-                            declarations,
-                            semantic,
-                            stack,
-                            root,
-                            context_depth,
-                            spine,
-                            branch_remap,
-                            &argument_path,
-                            native_plans.as_deref_mut(),
-                            parent_oriented_frame,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                let mut inner_remap = branch_remap.cloned();
-                for _ in 0..parameter_count {
-                    inner_remap = inner_remap.map(|remap| remap.enter_binding());
+                let mut values = Vec::new();
+                for (argument_index, (argument, erased)) in arguments.iter().zip(&erased_parameters).enumerate() {
+                    if *erased {
+                        if !matches!(*argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                            return Err(expression_lowering_error(root, "erased_argument_not_omega", "erased binder has an executable argument"));
+                        }
+                        continue;
+                    }
+                    let mut argument_path = path.to_vec();
+                    argument_path.extend([4, argument_index as u64]);
+                    values.push(lower_checked_host_value(
+                        argument, declarations, semantic, stack, root, context_depth,
+                        spine, branch_remap, &argument_path,
+                        native_plans.as_deref_mut(), parent_oriented_frame,
+                    )?);
+                }
+                let mut inner_remap = branch_remap.cloned().unwrap_or_default();
+                for erased in &erased_parameters {
+                    inner_remap = inner_remap.enter_binding(*erased);
                 }
                 stack.push(symbol.clone());
                 let lowered = lower_checked_host_computation(
@@ -3319,9 +3318,9 @@ fn lower_checked_host_computation(
                     semantic,
                     stack,
                     root,
-                    context_depth + parameter_count,
+                    context_depth + erased_parameters.len(),
                     spine,
-                    inner_remap.as_ref(),
+                    Some(&inner_remap),
                     &{
                         let mut p = path.to_vec();
                         p.extend([2, ken_runtime::fnv1a_64(symbol.to_string().as_bytes())]);
@@ -3412,7 +3411,7 @@ fn lower_checked_host_computation(
                     root,
                     context_depth + 1,
                     spine,
-                    branch_remap.map(BranchBinderRemap::enter_binding).as_ref(),
+                    branch_remap.map(|remap| remap.enter_binding(false)).as_ref(),
                     &{
                         let mut p = path.to_vec();
                         p.push(3);
@@ -4347,12 +4346,13 @@ fn lower_top_level_body(
     stack: &mut Vec<StableSymbol>,
     root_symbol: &StableSymbol,
 ) -> Result<RuntimeExpr, ErasureError> {
-    let mut parameter_count = 0usize;
+    let mut erased_parameters = Vec::new();
     let mut body = term;
-    while let CheckedCoreBodyTerm::Lambda { body: inner, .. } = body {
-        parameter_count += 1;
+    while let CheckedCoreBodyTerm::Lambda { body: inner, erased_parameter, .. } = body {
+        erased_parameters.push(*erased_parameter);
         body = inner;
     }
+    let parameter_count = erased_parameters.len();
     if parameter_count == 0 {
         return lower_body_term(body, declarations, semantic, stack, root_symbol, 0);
     }
@@ -4363,19 +4363,17 @@ fn lower_top_level_body(
             "top-level lambda body references a de Bruijn binding outside its explicit parameter list",
         ));
     }
-    let body = lower_body_term(
-        body,
-        declarations,
-        semantic,
-        stack,
-        root_symbol,
-        parameter_count,
+    let remap = erased_parameters.iter().fold(BranchBinderRemap::default(), |map, erased| {
+        map.enter_binding(*erased)
+    });
+    let body = lower_body_term_inner(
+        body, declarations, semantic, stack, root_symbol, parameter_count,
+        Some(&remap),
     )?;
+    let runtime_count = erased_parameters.iter().filter(|erased| !**erased).count();
     Ok(RuntimeExpr::Closure {
         captures: Vec::new(),
-        params: (0..parameter_count)
-            .map(|index| format!("arg{index}"))
-            .collect(),
+        params: (0..runtime_count).map(|index| format!("arg{index}")).collect(),
         body: Box::new(body),
     })
 }
@@ -4412,14 +4410,15 @@ fn lower_transparent_declaration_with_plans(
             "body view did not return the selected transparent declaration",
         )
     })?;
-    let mut parameter_count = 0usize;
+    let mut erased_parameters = Vec::new();
     let mut body = &declaration.body;
     let mut path = Vec::new();
-    while let CheckedCoreBodyTerm::Lambda { body: inner, .. } = body {
-        parameter_count += 1;
+    while let CheckedCoreBodyTerm::Lambda { body: inner, erased_parameter, .. } = body {
+        erased_parameters.push(*erased_parameter);
         path.push(14);
         body = inner;
     }
+    let parameter_count = erased_parameters.len();
     if has_free_variable_at_or_above(body, parameter_count) {
         return Err(expression_lowering_error(
             symbol,
@@ -4428,28 +4427,22 @@ fn lower_transparent_declaration_with_plans(
              parameter list",
         ));
     }
+    let remap = erased_parameters.iter().fold(BranchBinderRemap::default(), |map, erased| {
+        map.enter_binding(*erased)
+    });
     let mut stack = vec![symbol.clone()];
     let body = lower_body_term_with_plans(
-        body,
-        &declarations,
-        semantic,
-        &mut stack,
-        symbol,
-        parameter_count,
-        None,
-        &path,
-        native_plans,
-        None,
+        body, &declarations, semantic, &mut stack, symbol, parameter_count,
+        Some(&remap), &path, native_plans, None,
     )?;
     if parameter_count == 0 {
         Ok(RuntimeDeclarationKind::Transparent { body })
     } else {
+        let runtime_count = erased_parameters.iter().filter(|erased| !**erased).count();
         Ok(RuntimeDeclarationKind::Transparent {
             body: RuntimeExpr::Closure {
                 captures: Vec::new(),
-                params: (0..parameter_count)
-                    .map(|index| format!("arg{index}"))
-                    .collect(),
+                params: (0..runtime_count).map(|index| format!("arg{index}")).collect(),
                 body: Box::new(body),
             },
         })
@@ -4495,6 +4488,30 @@ fn external_declaration_symbols(
         .collect()
 }
 
+fn checked_erased_argument_flags(
+    symbol: &StableSymbol,
+    arguments: &[&CheckedCoreBodyTerm],
+    declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
+    root: &StableSymbol,
+) -> Result<Vec<bool>, ErasureError> {
+    let declaration = declarations.get(symbol).ok_or_else(|| {
+        expression_lowering_error(root, "missing_omega_callee", format!("missing body for {symbol}"))
+    })?;
+    let mut body = &declaration.body;
+    let mut flags = Vec::with_capacity(arguments.len());
+    for argument in arguments {
+        let CheckedCoreBodyTerm::Lambda { erased_parameter, body: inner, .. } = body else {
+            return Err(expression_lowering_error(root, "omega_callee_arity", format!("{symbol} has fewer binders than the call")));
+        };
+        if *erased_parameter != matches!(*argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+            return Err(expression_lowering_error(root, "omega_call_mismatch", format!("{symbol} Ω binder/argument classification disagrees")));
+        }
+        flags.push(*erased_parameter);
+        body = inner;
+    }
+    Ok(flags)
+}
+
 fn lower_body_term(
     term: &CheckedCoreBodyTerm,
     declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
@@ -4517,6 +4534,7 @@ fn lower_body_term(
 #[derive(Clone, Default)]
 struct BranchBinderRemap {
     groups: Vec<BranchBinderGroup>,
+    erased_binders: Vec<usize>,
 }
 
 #[derive(Clone)]
@@ -4530,11 +4548,17 @@ struct BranchBinderGroup {
 }
 
 impl BranchBinderRemap {
-    fn enter_binding(&self) -> Self {
+    fn enter_binding(&self, erased: bool) -> Self {
         let mut remap = self.clone();
         for group in &mut remap.groups {
             group.source_start += 1;
-            group.runtime_start += 1;
+            group.runtime_start += usize::from(!erased);
+        }
+        for position in &mut remap.erased_binders {
+            *position += 1;
+        }
+        if erased {
+            remap.erased_binders.push(0);
         }
         remap
     }
@@ -4556,6 +4580,9 @@ impl BranchBinderRemap {
                     0
                 };
         }
+        for position in &mut remap.erased_binders {
+            *position += argument_count + recursive_count;
+        }
         remap.groups.push(BranchBinderGroup {
             source_start: 0,
             runtime_start: 0,
@@ -4568,6 +4595,9 @@ impl BranchBinderRemap {
     }
 
     fn runtime_index(&self, de_bruijn_index: usize) -> Option<usize> {
+        if self.erased_binders.contains(&de_bruijn_index) {
+            return None;
+        }
         for group in &self.groups {
             let recursive_end = group.source_start + group.recursive_count;
             let group_end = recursive_end + group.argument_count;
@@ -4602,7 +4632,9 @@ impl BranchBinderRemap {
                 }
             })
             .sum::<usize>();
-        Some(de_bruijn_index - erased_below)
+        let erased_proofs = self.erased_binders.iter()
+            .filter(|position| **position < de_bruijn_index).count();
+        Some(de_bruijn_index - erased_below - erased_proofs)
     }
 
     fn computational_ih_slot(&self, de_bruijn_index: usize) -> Option<u64> {
@@ -4705,15 +4737,15 @@ fn lower_body_term_inner(
         reject_level_args(root_symbol, level_args)?;
         if let Some(declaration) = declarations.get(symbol) {
             let mut body = &declaration.body;
-            let mut parameter_count = 0usize;
-            while parameter_count < arguments.len() {
-                let CheckedCoreBodyTerm::Lambda { body: inner, .. } = body else {
+            let mut erased_parameters = Vec::new();
+            while erased_parameters.len() < arguments.len() {
+                let CheckedCoreBodyTerm::Lambda { body: inner, erased_parameter, .. } = body else {
                     break;
                 };
-                parameter_count += 1;
+                erased_parameters.push(*erased_parameter);
                 body = inner;
             }
-            if parameter_count == arguments.len() {
+            if erased_parameters.len() == arguments.len() {
                 if stack.contains(symbol) {
                     return Err(expression_lowering_error(
                         root_symbol,
@@ -4721,33 +4753,27 @@ fn lower_body_term_inner(
                         format!("direct declaration call cycle from {owner} reaches {symbol}"),
                     ));
                 }
-                let values = arguments
-                    .iter()
-                    .map(|argument| {
-                        lower_body_term_inner(
-                            argument,
-                            declarations,
-                            semantic,
-                            stack,
-                            root_symbol,
-                            context_depth,
-                            branch_remap,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
-                let mut inner_remap = branch_remap.cloned();
-                for _ in 0..parameter_count {
-                    inner_remap = inner_remap.map(|remap| remap.enter_binding());
+                let mut values = Vec::new();
+                for (argument, erased) in arguments.iter().zip(&erased_parameters) {
+                    if *erased {
+                        if !matches!(*argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                            return Err(expression_lowering_error(root_symbol, "erased_argument_not_omega", "erased binder has an executable argument"));
+                        }
+                    } else {
+                        values.push(lower_body_term_inner(
+                            argument, declarations, semantic, stack, root_symbol,
+                            context_depth, branch_remap,
+                        )?);
+                    }
+                }
+                let mut inner_remap = branch_remap.cloned().unwrap_or_default();
+                for erased in &erased_parameters {
+                    inner_remap = inner_remap.enter_binding(*erased);
                 }
                 stack.push(symbol.clone());
                 let lowered = lower_body_term_inner(
-                    body,
-                    declarations,
-                    semantic,
-                    stack,
-                    root_symbol,
-                    context_depth + parameter_count,
-                    inner_remap.as_ref(),
+                    body, declarations, semantic, stack, root_symbol,
+                    context_depth + erased_parameters.len(), Some(&inner_remap),
                 );
                 stack.pop();
                 let mut lowered = lowered?;
@@ -4853,15 +4879,17 @@ fn lower_body_term_inner(
             context_depth,
             branch_remap,
         ),
-        CheckedCoreBodyTerm::Lambda { body, .. } => {
+        CheckedCoreBodyTerm::Lambda { body, erased_parameter, .. } => {
             let runtime_depth = branch_remap
                 .map(|remap| remap.runtime_depth(context_depth))
                 .unwrap_or(context_depth);
+            let inner_remap = branch_remap.cloned().unwrap_or_default()
+                .enter_binding(*erased_parameter);
             Ok(RuntimeExpr::LexicalClosure {
                 captures: (0..runtime_depth)
                     .map(|index| RuntimeExpr::Var(index as u32))
                     .collect(),
-                params: vec!["arg0".to_string()],
+                params: if *erased_parameter { Vec::new() } else { vec!["arg0".to_string()] },
                 body: Box::new(lower_body_term_inner(
                     body,
                     declarations,
@@ -4869,50 +4897,49 @@ fn lower_body_term_inner(
                     stack,
                     root_symbol,
                     context_depth + 1,
-                    branch_remap.map(BranchBinderRemap::enter_binding).as_ref(),
+                    Some(&inner_remap),
                 )?),
             })
         }
-        CheckedCoreBodyTerm::Application { function, argument } => Ok(RuntimeExpr::Call {
-            callee: Box::new(lower_body_term_inner(
-                function,
-                declarations,
-                semantic,
-                stack,
-                root_symbol,
-                context_depth,
-                branch_remap,
-            )?),
-            args: vec![lower_body_term_inner(
-                argument,
-                declarations,
-                semantic,
-                stack,
-                root_symbol,
-                context_depth,
-                branch_remap,
-            )?],
-        }),
-        CheckedCoreBodyTerm::Let { value, body, .. } => Ok(RuntimeExpr::Let {
-            value: Box::new(lower_body_term_inner(
-                value,
-                declarations,
-                semantic,
-                stack,
-                root_symbol,
-                context_depth,
-                branch_remap,
-            )?),
-            body: Box::new(lower_body_term_inner(
-                body,
-                declarations,
-                semantic,
-                stack,
-                root_symbol,
-                context_depth + 1,
-                branch_remap.map(BranchBinderRemap::enter_binding).as_ref(),
-            )?),
-        }),
+        CheckedCoreBodyTerm::Application { function, argument } => {
+            let args = if matches!(argument.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                Vec::new()
+            } else {
+                vec![lower_body_term_inner(
+                    argument, declarations, semantic, stack, root_symbol,
+                    context_depth, branch_remap,
+                )?]
+            };
+            Ok(RuntimeExpr::Call {
+                callee: Box::new(lower_body_term_inner(
+                    function, declarations, semantic, stack, root_symbol,
+                    context_depth, branch_remap,
+                )?),
+                args,
+            })
+        },
+        CheckedCoreBodyTerm::Let { value, body, erased_value, .. } => {
+            let inner_remap = branch_remap.cloned().unwrap_or_default()
+                .enter_binding(*erased_value);
+            let lowered_body = lower_body_term_inner(
+                body, declarations, semantic, stack, root_symbol,
+                context_depth + 1, Some(&inner_remap),
+            )?;
+            if *erased_value {
+                if !matches!(value.as_ref(), CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                    return Err(expression_lowering_error(root_symbol, "erased_let_value_not_omega", "Ω let binder has an executable value"));
+                }
+                Ok(lowered_body)
+            } else {
+                Ok(RuntimeExpr::Let {
+                    value: Box::new(lower_body_term_inner(
+                        value, declarations, semantic, stack, root_symbol,
+                        context_depth, branch_remap,
+                    )?),
+                    body: Box::new(lowered_body),
+                })
+            }
+        },
         CheckedCoreBodyTerm::ConstructorReference(_) => {
             unreachable!("constructor references are handled by constructor_application_spine")
         }
@@ -4920,6 +4947,11 @@ fn lower_body_term_inner(
             root_symbol,
             "erased_constructor_argument_outside_constructor",
             "constructor family parameters are erased and cannot appear as runtime expressions",
+        )),
+        CheckedCoreBodyTerm::ErasedOmegaSubterm => Err(expression_lowering_error(
+            root_symbol,
+            "erased_omega_subterm_reached_computation",
+            "an Ω subterm cannot be lowered as a runtime expression",
         )),
         CheckedCoreBodyTerm::Match(view) => lower_match_view(
             view,
@@ -4930,6 +4962,16 @@ fn lower_body_term_inner(
             context_depth,
             branch_remap,
         ),
+        CheckedCoreBodyTerm::StructuralPair { first, second } => Ok(RuntimeExpr::Record {
+            fields: vec![
+                ("first".into(), lower_body_term_inner(first, declarations, semantic, stack, root_symbol, context_depth, branch_remap)?),
+                ("second".into(), lower_body_term_inner(second, declarations, semantic, stack, root_symbol, context_depth, branch_remap)?),
+            ],
+        }),
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => Ok(RuntimeExpr::Project {
+            record: Box::new(lower_body_term_inner(pair, declarations, semantic, stack, root_symbol, context_depth, branch_remap)?),
+            field: "first".into(),
+        }),
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => lower_record_sigma_construction(
             view,
             declarations,
@@ -6178,7 +6220,8 @@ fn has_free_variable_at_or_above(term: &CheckedCoreBodyTerm, bound: usize) -> bo
             .iter()
             .any(|argument| has_free_variable_at_or_above(argument, bound)),
         CheckedCoreBodyTerm::ConstructorReference(_) => false,
-        CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => false,
+        CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => false,
         CheckedCoreBodyTerm::Lambda { body, .. } => has_free_variable_at_or_above(body, bound + 1),
         CheckedCoreBodyTerm::Application { function, argument } => {
             has_free_variable_at_or_above(function, bound)
@@ -6194,6 +6237,13 @@ fn has_free_variable_at_or_above(term: &CheckedCoreBodyTerm, bound: usize) -> bo
                     .branches
                     .iter()
                     .any(|branch| has_free_variable_at_or_above(&branch.method, bound))
+        }
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            has_free_variable_at_or_above(first, bound)
+                || has_free_variable_at_or_above(second, bound)
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            has_free_variable_at_or_above(pair, bound)
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
             view.fields.iter().any(|field| match field {
@@ -8327,7 +8377,7 @@ mod px7l_tests {
             "erased_induction_hypothesis_reached_runtime"
         );
 
-        let under_lambda = preserved.enter_binding();
+        let under_lambda = preserved.enter_binding(false);
         assert_eq!(under_lambda.runtime_index(0), Some(0), "lambda parameter");
         assert_eq!(under_lambda.runtime_index(1), Some(1), "captured IH");
         assert_eq!(
@@ -8347,7 +8397,7 @@ mod px7l_tests {
     fn checked_ih_morphism_preserves_the_plan_ordinal_and_maps_it_to_runtime_four() {
         let mut remap = BranchBinderRemap::default().enter_match(2, 1, true, vec![77]);
         for _ in 0..4 {
-            remap = remap.enter_binding();
+            remap = remap.enter_binding(false);
         }
         let (ordinal, morphism) = remap
             .computational_ih_binder_morphism(77)

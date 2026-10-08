@@ -2212,7 +2212,22 @@ pub fn derived_lt_int(a: &EvalVal, b: &EvalVal) -> EvalVal {
 
 // ── eval / apply ─────────────────────────────────────────────────────────────
 
-/// `eval ρ t` — evaluate a core term in environment `ρ` (`42 §3.2`).
+/// Evaluate an admitted closed body after the elaborator's kernel-classified
+/// Ω plan has erased maximal proof subterms and collapsed subset Σ pairs.
+/// This is the typed interpreter entrypoint; `eval` below is the value-only
+/// reduction engine used after erasure and by intentionally raw diagnostic rows.
+pub fn eval_checked(
+    term: &Term,
+    checked_type: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Result<EvalVal, ken_kernel::KernelError> {
+    let plan = ken_elaborator::omega_erasure::omega_erasure_plan(globals, term, checked_type)?;
+    let computational = ken_elaborator::omega_erasure::apply_omega_erasure(globals, term, &plan)?;
+    Ok(eval(&[], &computational, globals, store))
+}
+
+/// `eval ρ t` — value-only evaluation in environment `ρ` (`42 §3.2`).
 pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalStore) -> EvalVal {
     match term {
         // --- Var: environment lookup ---
@@ -2288,6 +2303,11 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
             if *id == globals.top_id() || *id == globals.bottom_id() {
                 return EvalVal::IndFormerVal { id: *id };
             }
+            if *id == globals.tt_id() {
+                // Canonical erasure witness. Its Ω binder slot is retained by
+                // the interpreter but its proof cannot become Unknown.
+                return EvalVal::Neutral;
+            }
             // The checked String payload is authoritative even if an
             // independent evaluation-side table disagrees. Char literals
             // are already core IntLit values, not Const-backed side entries.
@@ -2299,7 +2319,15 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
                 return v.clone();
             }
             match globals.lookup(*id) {
-                Some(Decl::Transparent { body, .. }) => eval(&Vec::new(), body, globals, store),
+                Some(Decl::Transparent { body, ty, .. }) => {
+                    let Ok(plan) = ken_elaborator::omega_erasure::omega_erasure_plan(globals, body, ty) else {
+                        return EvalVal::Unknown;
+                    };
+                    let Ok(computational) = ken_elaborator::omega_erasure::apply_omega_erasure(globals, body, &plan) else {
+                        return EvalVal::Unknown;
+                    };
+                    eval(&[], &computational, globals, store)
+                },
                 Some(Decl::Primitive { reduction, .. }) => match reduction {
                     PrimReduction::OpaqueType => EvalVal::OpaquePrimType {
                         id: *id,

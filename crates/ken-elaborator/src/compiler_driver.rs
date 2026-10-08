@@ -489,6 +489,7 @@ pub enum CompilerDriverError {
     Io(String),
     Elaboration(ElabError),
     Package(CheckedCorePackageError),
+    OmegaErasurePlan { symbol: StableSymbol, reason: String },
     MissingTarget {
         symbol: StableSymbol,
     },
@@ -540,6 +541,9 @@ impl fmt::Display for CompilerDriverError {
             CompilerDriverError::Io(err) => write!(f, "compiler input I/O failed: {err}"),
             CompilerDriverError::Elaboration(err) => write!(f, "elaboration failed: {err:?}"),
             CompilerDriverError::Package(err) => err.fmt(f),
+            CompilerDriverError::OmegaErasurePlan { symbol, reason } => {
+                write!(f, "checked Ω erasure plan for {symbol} failed: {reason}")
+            }
             CompilerDriverError::MissingTarget { symbol } => {
                 write!(
                     f,
@@ -3312,7 +3316,8 @@ fn collect_runtime_support_from_term(
         | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
-        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => {}
+        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
         CheckedCoreBodyTerm::RecursiveDeclarationCall(_) => {
             support.insert(ExecutableRuntimeSupport::Recursion);
         }
@@ -3341,6 +3346,15 @@ fn collect_runtime_support_from_term(
             for branch in &view.branches {
                 collect_runtime_support_from_term(&branch.method, support);
             }
+        }
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            support.insert(ExecutableRuntimeSupport::RecordsSigma);
+            collect_runtime_support_from_term(first, support);
+            collect_runtime_support_from_term(second, support);
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            support.insert(ExecutableRuntimeSupport::RecordsSigma);
+            collect_runtime_support_from_term(pair, support);
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
             support.insert(ExecutableRuntimeSupport::RecordsSigma);
@@ -3502,6 +3516,15 @@ fn emit_package_from_env(
         let bytes = canonical_decl_bytes(decl, &package_table)
             .map_err(|error| outside(&symbol, error))?;
         semantic.declarations.insert(symbol.clone(), bytes);
+        if let Decl::Transparent { ty, body, .. } = decl {
+            let plan = crate::omega_erasure::omega_erasure_plan(&env.env, body, ty).map_err(
+                |error| CompilerDriverError::OmegaErasurePlan {
+                    symbol: symbol.clone(),
+                    reason: error.to_string(),
+                },
+            )?;
+            semantic.omega_erasure_plans.insert(symbol.clone(), plan);
+        }
         semantic
             .lowerability
             .insert(symbol, LowerabilityStatus::Supported);
@@ -4900,6 +4923,13 @@ fn collect_runtime_declaration_dependencies(
                 collect_runtime_declaration_dependencies(&branch.method, dependencies);
             }
         }
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            collect_runtime_declaration_dependencies(first, dependencies);
+            collect_runtime_declaration_dependencies(second, dependencies);
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            collect_runtime_declaration_dependencies(pair, dependencies);
+        }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
             for field in &view.fields {
                 if let crate::checked_core::CheckedCoreRecordSigmaFieldValue::Runtime {
@@ -4929,7 +4959,8 @@ fn collect_runtime_declaration_dependencies(
         | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
-        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => {}
+        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
     }
 }
 

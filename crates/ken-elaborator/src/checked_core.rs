@@ -169,6 +169,8 @@ impl std::error::Error for CanonicalEncodingError {}
 pub struct CheckedCoreSemanticInputs {
     pub symbols: BTreeSet<StableSymbol>,
     pub declarations: BTreeMap<StableSymbol, Vec<u8>>,
+    /// Kernel-classified, preorder body plans; absent plans block erasure.
+    pub omega_erasure_plans: BTreeMap<StableSymbol, crate::omega_erasure::OmegaErasurePlan>,
     pub primitive_refs: BTreeMap<StableSymbol, String>,
     pub primitive_metadata: BTreeMap<StableSymbol, PrimitiveMetadata>,
     pub data_metadata: BTreeMap<StableSymbol, DataMetadata>,
@@ -465,8 +467,10 @@ pub enum CheckedCoreBodyTerm {
     ErasedConstructorArgument {
         term: Vec<u8>,
     },
+    ErasedOmegaSubterm,
     Lambda {
         parameter_type: Vec<u8>,
+        erased_parameter: bool,
         body: Box<CheckedCoreBodyTerm>,
     },
     Application {
@@ -475,10 +479,17 @@ pub enum CheckedCoreBodyTerm {
     },
     Let {
         value_type: Vec<u8>,
+        erased_value: bool,
         value: Box<CheckedCoreBodyTerm>,
         body: Box<CheckedCoreBodyTerm>,
     },
     Match(CheckedCoreMatchView),
+    /// A relevant kernel Σ with no named record metadata retains both fields.
+    StructuralPair {
+        first: Box<CheckedCoreBodyTerm>,
+        second: Box<CheckedCoreBodyTerm>,
+    },
+    StructuralFirstProjection(Box<CheckedCoreBodyTerm>),
     RecordSigmaConstruction(CheckedCoreRecordSigmaConstructionView),
     RecordSigmaProjection(CheckedCoreRecordSigmaProjectionView),
     DictionaryConstruction(CheckedCoreDictionaryConstructionView),
@@ -969,6 +980,10 @@ pub enum CheckedCorePackageError {
     UnsupportedEntryNotBlocking {
         symbol: StableSymbol,
     },
+    MalformedOmegaErasurePlan {
+        symbol: StableSymbol,
+        reason: String,
+    },
     DependencySemanticHashesMismatch,
     SemanticHashMismatch {
         expected: u64,
@@ -1006,6 +1021,9 @@ impl fmt::Display for CheckedCorePackageError {
                 f,
                 "unsupported entry for {symbol} must also have blocking lowerability"
             ),
+            CheckedCorePackageError::MalformedOmegaErasurePlan { symbol, reason } => {
+                write!(f, "malformed Ω erasure plan for {symbol}: {reason}")
+            }
             CheckedCorePackageError::DependencySemanticHashesMismatch => write!(
                 f,
                 "header dependency semantic hashes must match semantic dependency hashes"
@@ -1301,6 +1319,22 @@ pub fn canonical_semantic_bytes(inputs: &CheckedCoreSemanticInputs) -> Vec<u8> {
     out.u64(0);
     encode_symbol_set("symbols", &inputs.symbols, &mut out);
     encode_bytes_map("declarations", &inputs.declarations, &mut out);
+    out.tag("omega_erasure_plans");
+    out.seq_len(inputs.omega_erasure_plans.len());
+    for (symbol, plan) in &inputs.omega_erasure_plans {
+        symbol.encode(&mut out);
+        for (tag, indices) in [
+            ("erased_subterms", &plan.erased_subterms),
+            ("erased_binders", &plan.erased_binders),
+            ("collapsed_sigmas", &plan.collapsed_sigmas),
+        ] {
+            out.tag(tag);
+            out.seq_len(indices.len());
+            for index in indices {
+                out.u64(u64::from(*index));
+            }
+        }
+    }
     encode_string_map("primitive_refs", &inputs.primitive_refs, &mut out);
     encode_primitive_metadata_map("primitive_metadata", &inputs.primitive_metadata, &mut out);
     encode_data_metadata_map("data_metadata", &inputs.data_metadata, &mut out);
@@ -1559,7 +1593,8 @@ pub(crate) fn checked_runtime_match_census(
             | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
             | CheckedCoreBodyTerm::PrimitiveLiteral(_)
             | CheckedCoreBodyTerm::ConstructorReference(_)
-            | CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => {}
+            | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+            | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
             CheckedCoreBodyTerm::PrimitiveApplication(view) => {
                 for argument in &view.arguments {
                     visit(argument, next_computational_ordinal, occurrences)?;
@@ -1592,6 +1627,13 @@ pub(crate) fn checked_runtime_match_census(
                 for branch in &view.branches {
                     visit(&branch.method, next_computational_ordinal, occurrences)?;
                 }
+            }
+            CheckedCoreBodyTerm::StructuralPair { first, second } => {
+                visit(first, next_computational_ordinal, occurrences)?;
+                visit(second, next_computational_ordinal, occurrences)?;
+            }
+            CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+                visit(pair, next_computational_ordinal, occurrences)?;
             }
             CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
                 for field in &view.fields {
@@ -1636,7 +1678,8 @@ fn runtime_body_references_outer_binder_range(
         | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
-        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => false,
+        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => false,
         CheckedCoreBodyTerm::PrimitiveApplication(view) => view.arguments.iter().any(|child| {
             runtime_body_references_outer_binder_range(child, start, end, local_depth)
         }),
@@ -1661,6 +1704,13 @@ fn runtime_body_references_outer_binder_range(
                         local_depth,
                     )
                 })
+        }
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            runtime_body_references_outer_binder_range(first, start, end, local_depth)
+                || runtime_body_references_outer_binder_range(second, start, end, local_depth)
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            runtime_body_references_outer_binder_range(pair, start, end, local_depth)
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
             view.fields.iter().any(|field| match field {
@@ -1751,6 +1801,14 @@ fn decode_declaration_body_view(
         decode_level_params(&mut cursor).map_err(|reason| malformed_body(symbol, reason))?;
     let checked_type =
         capture_canonical_term(&mut cursor).map_err(|reason| malformed_body(symbol, reason))?;
+    let decode_plan = semantic.omega_erasure_plans.get(symbol).map(|plan| {
+        let nodes = canonical_body_nodes(bytes)
+            .map_err(|reason| malformed_body(symbol, reason))?;
+        Ok::<_, CheckedCoreBodyViewError>(ErasureDecodeContext {
+            plan,
+            indices: nodes.into_iter().enumerate().map(|(i, (offset, _))| (offset, i as u32)).collect(),
+        })
+    }).transpose()?;
     let body = decode_supported_body_term(
         &mut cursor,
         semantic,
@@ -1758,6 +1816,7 @@ fn decode_declaration_body_view(
         symbol,
         &[],
         Some(&checked_type),
+        decode_plan.as_ref(),
     )?;
     if cursor.remaining() != 0 {
         return Err(CheckedCoreBodyViewError::TrailingCanonicalBytes {
@@ -1833,6 +1892,10 @@ fn validate_semantic_contract(
         if !semantic.lowerability.contains_key(&symbol) {
             return Err(CheckedCorePackageError::MissingLowerability { symbol });
         }
+    }
+
+    for (symbol, plan) in &semantic.omega_erasure_plans {
+        validate_omega_erasure_plan(semantic, symbol, plan)?;
     }
 
     for symbol in semantic.unsupported.keys() {
@@ -3052,6 +3115,11 @@ fn capture_canonical_term(cursor: &mut CanonicalCursor<'_>) -> Result<Vec<u8>, S
     Ok(cursor.bytes[start..cursor.pos].to_vec())
 }
 
+struct ErasureDecodeContext<'a> {
+    plan: &'a crate::omega_erasure::OmegaErasurePlan,
+    indices: BTreeMap<usize, u32>,
+}
+
 fn decode_supported_body_term(
     cursor: &mut CanonicalCursor<'_>,
     semantic: &CheckedCoreSemanticInputs,
@@ -3059,18 +3127,15 @@ fn decode_supported_body_term(
     owner: &StableSymbol,
     type_context: &[Vec<u8>],
     expected_type: Option<&[u8]>,
+    plan: Option<&ErasureDecodeContext<'_>>,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
+    let start = cursor.pos;
     let tag = cursor
         .read_tag()
         .map_err(|reason| malformed_body(owner, reason))?;
     decode_supported_body_term_after_tag(
-        tag,
-        cursor,
-        semantic,
-        selection,
-        owner,
-        type_context,
-        expected_type,
+        tag, cursor, semantic, selection, owner, type_context,
+        expected_type, plan, start,
     )
 }
 
@@ -3082,7 +3147,29 @@ fn decode_supported_body_term_after_tag(
     owner: &StableSymbol,
     type_context: &[Vec<u8>],
     expected_type: Option<&[u8]>,
+    plan: Option<&ErasureDecodeContext<'_>>,
+    start: usize,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
+    let node_id = plan.map(|ctx| ctx.indices.get(&start).copied().ok_or_else(|| {
+        malformed_body(owner, format!("Ω erasure plan has no body node at byte offset {start}"))
+    })).transpose()?;
+    if node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.erased_subterms.contains(&id))) {
+        // The bytes remain checked and hash-covered, but an Ω subterm must
+        // never enter the executable decoder (refl/proj2 are not runtime IR).
+        cursor.pos = start;
+        capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
+        return Ok(CheckedCoreBodyTerm::ErasedOmegaSubterm);
+    }
+    if node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.collapsed_sigmas.contains(&id))) {
+        if tag == "pair" {
+            let first = decode_supported_body_term(cursor, semantic, selection, owner, type_context, None, plan)?;
+            capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
+            return Ok(first);
+        }
+        if tag == "proj1" {
+            return decode_supported_body_term(cursor, semantic, selection, owner, type_context, None, plan);
+        }
+    }
     match tag.as_str() {
         "var" => {
             let raw = cursor
@@ -3173,7 +3260,7 @@ fn decode_supported_body_term_after_tag(
                 checked_constructor_view(semantic, owner, &symbol, level_args)?,
             ))
         }
-        "elim" => decode_supported_match_view(cursor, semantic, selection, owner, type_context),
+        "elim" => decode_supported_match_view(cursor, semantic, selection, owner, type_context, plan),
         "lam" => {
             let parameter_type =
                 capture_canonical_term(cursor).map_err(|reason| malformed_body(owner, reason))?;
@@ -3192,9 +3279,11 @@ fn decode_supported_body_term_after_tag(
                 owner,
                 &inner_context,
                 body_expected.as_deref(),
+                plan,
             )?);
             Ok(CheckedCoreBodyTerm::Lambda {
                 parameter_type,
+                erased_parameter: node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.erased_binders.contains(&id))),
                 body,
             })
         }
@@ -3206,6 +3295,7 @@ fn decode_supported_body_term_after_tag(
                 owner,
                 type_context,
                 None,
+                plan,
             )?);
             let argument = if constructor_spine_needs_erased_family_argument(&function) {
                 Box::new(CheckedCoreBodyTerm::ErasedConstructorArgument {
@@ -3220,6 +3310,7 @@ fn decode_supported_body_term_after_tag(
                     owner,
                     type_context,
                     None,
+                    plan,
                 )?)
             };
             if let CheckedCoreBodyTerm::PrimitiveApplication(mut view) = *function {
@@ -3238,6 +3329,7 @@ fn decode_supported_body_term_after_tag(
                 owner,
                 type_context,
                 Some(&value_type),
+                plan,
             )?);
             let mut inner_context = Vec::with_capacity(type_context.len() + 1);
             inner_context.push(value_type.clone());
@@ -3249,9 +3341,11 @@ fn decode_supported_body_term_after_tag(
                 owner,
                 &inner_context,
                 expected_type,
+                plan,
             )?);
             Ok(CheckedCoreBodyTerm::Let {
                 value_type,
+                erased_value: node_id.is_some_and(|id| plan.is_some_and(|ctx| ctx.plan.erased_binders.contains(&id))),
                 value,
                 body,
             })
@@ -3266,6 +3360,7 @@ fn decode_supported_body_term_after_tag(
             owner,
             type_context,
             expected_type,
+            plan,
         ),
         "proj1" | "proj2" => decode_supported_record_sigma_projection(
             tag,
@@ -3274,6 +3369,7 @@ fn decode_supported_body_term_after_tag(
             selection,
             owner,
             type_context,
+            plan,
         ),
         _ => Err(CheckedCoreBodyViewError::UnsupportedTermShape {
             symbol: owner.clone(),
@@ -3567,6 +3663,7 @@ fn decode_supported_record_sigma_construction(
     owner: &StableSymbol,
     type_context: &[Vec<u8>],
     expected_type: Option<&[u8]>,
+    plan: Option<&ErasureDecodeContext<'_>>,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
     let Some(expected_type) = expected_type else {
         return Err(CheckedCoreBodyViewError::StaleFieldIdentityOrder {
@@ -3622,6 +3719,7 @@ fn decode_supported_record_sigma_construction(
                     owner,
                     type_context,
                     None,
+                    plan,
                 )?);
                 fields.push(CheckedCoreRecordSigmaFieldValue::Runtime {
                     field: field.clone(),
@@ -3670,6 +3768,7 @@ fn decode_supported_record_sigma_projection(
     selection: &CheckedCoreBodyViewSelection,
     owner: &StableSymbol,
     type_context: &[Vec<u8>],
+    plan: Option<&ErasureDecodeContext<'_>>,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
     if first_tag == "proj2" {
         return Err(CheckedCoreBodyViewError::UnsupportedRecordProjectionShape {
@@ -3679,24 +3778,20 @@ fn decode_supported_record_sigma_projection(
     }
 
     let mut skipped_count = 0usize;
+    let mut base_start = cursor.pos;
     let mut base_tag = cursor
         .read_tag()
         .map_err(|reason| malformed_body(owner, reason))?;
     while base_tag == "proj2" {
         skipped_count += 1;
+        base_start = cursor.pos;
         base_tag = cursor
             .read_tag()
             .map_err(|reason| malformed_body(owner, reason))?;
     }
 
     let base = decode_supported_body_term_after_tag(
-        base_tag,
-        cursor,
-        semantic,
-        selection,
-        owner,
-        type_context,
-        None,
+        base_tag, cursor, semantic, selection, owner, type_context, None, plan, base_start,
     )?;
     let record_symbol = record_symbol_for_projection_base(semantic, owner, &base, type_context)?;
     let record = checked_record_sigma_view(semantic, owner, &record_symbol)?;
@@ -3921,8 +4016,25 @@ fn decode_supported_pair_construction(
     owner: &StableSymbol,
     type_context: &[Vec<u8>],
     expected_type: Option<&[u8]>,
+    plan: Option<&ErasureDecodeContext<'_>>,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
     if let Some(expected_type) = expected_type {
+        let mut expected = CanonicalCursor::new(expected_type);
+        let head = expected.read_tag().map_err(|reason| malformed_body(owner, reason))?;
+        if head == "sigma" && plan.is_some() {
+            let first_expected = capture_canonical_term(&mut expected)
+                .map_err(|reason| malformed_body(owner, reason))?;
+            let first = decode_supported_body_term(
+                cursor, semantic, selection, owner, type_context,
+                Some(&first_expected), plan,
+            )?;
+            let second = decode_supported_body_term(
+                cursor, semantic, selection, owner, type_context, None, plan,
+            )?;
+            return Ok(CheckedCoreBodyTerm::StructuralPair {
+                first: Box::new(first), second: Box::new(second),
+            });
+        }
         if let Some(symbol) = record_head_symbol_from_type(expected_type)
             .map_err(|reason| malformed_body(owner, reason))?
         {
@@ -3935,6 +4047,7 @@ fn decode_supported_pair_construction(
                     type_context,
                     expected_type,
                     symbol,
+                    plan,
                 );
             }
         }
@@ -3946,6 +4059,7 @@ fn decode_supported_pair_construction(
         owner,
         type_context,
         expected_type,
+        plan,
     )
 }
 
@@ -3957,6 +4071,7 @@ fn decode_supported_dictionary_construction(
     type_context: &[Vec<u8>],
     expected_type: &[u8],
     dictionary_symbol: StableSymbol,
+    plan: Option<&ErasureDecodeContext<'_>>,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
     if type_has_dependent_sigma(expected_type).map_err(|reason| malformed_body(owner, reason))? {
         return Err(CheckedCoreBodyViewError::StaleDictionaryFieldSelection {
@@ -3998,6 +4113,7 @@ fn decode_supported_dictionary_construction(
                     owner,
                     type_context,
                     None,
+                    plan,
                 )?);
                 fields.push(CheckedCoreDictionaryFieldValue::Runtime {
                     field: field.clone(),
@@ -4186,6 +4302,7 @@ fn decode_supported_match_view(
     selection: &CheckedCoreBodyViewSelection,
     owner: &StableSymbol,
     type_context: &[Vec<u8>],
+    plan: Option<&ErasureDecodeContext<'_>>,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
     let family_symbol =
         decode_stable_symbol(cursor).map_err(|reason| malformed_body(owner, reason))?;
@@ -4245,7 +4362,7 @@ fn decode_supported_match_view(
                     },
                 )?;
         let method =
-            decode_supported_body_term(cursor, semantic, selection, owner, type_context, None)?;
+            decode_supported_body_term(cursor, semantic, selection, owner, type_context, None, plan)?;
         branches.push(CheckedCoreMatchBranchView {
             constructor,
             method,
@@ -4279,6 +4396,7 @@ fn decode_supported_match_view(
         owner,
         type_context,
         None,
+        plan,
     )?);
     Ok(CheckedCoreBodyTerm::Match(CheckedCoreMatchView {
         family_symbol,
@@ -4810,6 +4928,110 @@ fn decode_level_view(cursor: &mut CanonicalCursor<'_>) -> Result<CheckedCoreLeve
         "level_var" => Ok(CheckedCoreLevelView::Var(cursor.read_u64()?)),
         other => Err(format!("unsupported level tag {other:?}")),
     }
+}
+
+/// Enumerate the preorder of a canonical body. The cursor's byte offset also
+/// binds the native decoder to the plan without guessing which decoded nodes
+/// represent an application, a primitive spine, or an erased type payload.
+fn collect_canonical_term_nodes(
+    cursor: &mut CanonicalCursor<'_>,
+    nodes: &mut Vec<(usize, String)>,
+) -> Result<(), String> {
+    let offset = cursor.pos;
+    let tag = cursor.read_tag()?;
+    nodes.push((offset, tag.clone()));
+    match tag.as_str() {
+        "type" | "omega" => skip_level(cursor),
+        "var" => { cursor.read_u64()?; Ok(()) }
+        "int_lit" => { let len = cursor.read_len()?; cursor.read_exact(len)?; Ok(()) }
+        "const" | "ind_former" | "constructor_ref" => {
+            decode_stable_symbol(cursor)?;
+            skip_levels(cursor)
+        }
+        "elim" => {
+            decode_stable_symbol(cursor)?;
+            skip_levels(cursor)?;
+            collect_canonical_terms(cursor, nodes)?;
+            collect_canonical_term_nodes(cursor, nodes)?;
+            collect_canonical_terms(cursor, nodes)?;
+            collect_canonical_terms(cursor, nodes)?;
+            collect_canonical_term_nodes(cursor, nodes)
+        }
+        "pi" | "lam" | "app" | "sigma" | "pair" | "ascript" | "absurd" => {
+            collect_canonical_term_nodes(cursor, nodes)?;
+            collect_canonical_term_nodes(cursor, nodes)
+        }
+        "quot" | "let" | "eq" | "j" => {
+            for _ in 0..3 { collect_canonical_term_nodes(cursor, nodes)?; }
+            Ok(())
+        }
+        "cast" | "quot_elim" => {
+            for _ in 0..4 { collect_canonical_term_nodes(cursor, nodes)?; }
+            Ok(())
+        }
+        "proj1" | "proj2" | "refl" | "quot_class" | "trunc" | "trunc_proj" => {
+            collect_canonical_term_nodes(cursor, nodes)
+        }
+        other => Err(format!("unsupported canonical term tag {other:?}")),
+    }
+}
+
+fn collect_canonical_terms(
+    cursor: &mut CanonicalCursor<'_>,
+    nodes: &mut Vec<(usize, String)>,
+) -> Result<(), String> {
+    let len = cursor.read_len()?;
+    for _ in 0..len {
+        collect_canonical_term_nodes(cursor, nodes)?;
+    }
+    Ok(())
+}
+
+fn canonical_body_nodes(declaration: &[u8]) -> Result<Vec<(usize, String)>, String> {
+    let mut cursor = CanonicalCursor::new(declaration);
+    let kind = cursor.read_tag()?;
+    if kind != "transparent" {
+        return Err(format!("an Ω plan requires a transparent declaration, got {kind:?}"));
+    }
+    decode_stable_symbol(&mut cursor)?;
+    decode_level_params(&mut cursor)?;
+    skip_term(&mut cursor)?; // the checked type is outside the body preorder
+    let mut nodes = Vec::new();
+    collect_canonical_term_nodes(&mut cursor, &mut nodes)?;
+    if cursor.remaining() != 0 {
+        return Err(format!("{} trailing declaration bytes", cursor.remaining()));
+    }
+    Ok(nodes)
+}
+
+fn validate_omega_erasure_plan(
+    semantic: &CheckedCoreSemanticInputs,
+    symbol: &StableSymbol,
+    plan: &crate::omega_erasure::OmegaErasurePlan,
+) -> Result<(), CheckedCorePackageError> {
+    let fail = |reason: String| CheckedCorePackageError::MalformedOmegaErasurePlan {
+        symbol: symbol.clone(), reason,
+    };
+    let declaration = semantic.declarations.get(symbol)
+        .ok_or_else(|| fail("plan has no checked declaration".into()))?;
+    let nodes = canonical_body_nodes(declaration).map_err(&fail)?;
+    for (name, ids) in [
+        ("erased_subterms", &plan.erased_subterms),
+        ("erased_binders", &plan.erased_binders),
+        ("collapsed_sigmas", &plan.collapsed_sigmas),
+    ] {
+        for id in ids {
+            let (_, tag) = nodes.get(*id as usize)
+                .ok_or_else(|| fail(format!("{name} id {id} outside body preorder of {} nodes", nodes.len())))?;
+            if name == "erased_binders" && tag != "lam" && tag != "let" {
+                return Err(fail(format!("erased binder id {id} has tag {tag:?}")));
+            }
+            if name == "collapsed_sigmas" && tag != "pair" && tag != "proj1" {
+                return Err(fail(format!("collapsed Σ id {id} has tag {tag:?}")));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn skip_term(cursor: &mut CanonicalCursor<'_>) -> Result<(), String> {
