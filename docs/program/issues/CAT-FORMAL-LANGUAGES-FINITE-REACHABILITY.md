@@ -52,9 +52,10 @@ with every law proved.
     as arrows after the match.
   - A lambda in a type-position application does not parse: name it.
   - An Ω-valued result must be a `theorem`.
-  - `data Finite` before `list_elem` gives `UnresolvedCon list_elem` until
-    `LANG-FORWARD-REFERENCE-ACROSS-DATA-EXPORT` lands; keep data
-    declarations before their use.
+  - On `e1b609597`, `data Finite` placed before `list_elem` gave
+    `UnresolvedCon list_elem`. `LANG-FORWARD-REFERENCE-ACROSS-DATA-EXPORT`
+    has since landed (`6f3b0aceb`); re-measure before arranging, and keep
+    data declarations before their use if it still fails.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.

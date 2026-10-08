@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-PROOF-ERASURE
 title: "The interpreter is strict in Unknown on pairs, the checked-core pair view rejects dependent Σ, and the native decoder has no refl and decodes a λ over an equation as relevant, so neither a subset-Σ proof nor a path-condition convoy can run. Erase every Ω-classified position (binder, argument, refinement pair forms), keyed on the classification, in lowering and in the interpreter"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
