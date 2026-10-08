@@ -75,6 +75,32 @@ same-instance-key predicate is the only exemption.
      it collapses too, it goes to the Steward as a residual and is not
      folded in.
 2. **The guard and its typed error.**
+3. **The rebind exemption (Architect `evt_210gpmk42hsys`, after CI red on
+   `9a6e77e11`).** A minted name is a function of the canonical
+   `(class, head)` spelling pair (`modules.rs:3602`). Record that pair for
+   each minted identity and compare it:
+   - **same pair, new checked ids:** a later owner lawfully rebinding the
+     spelling. **Admit.** The `globals` key moves; the old dictionary stays
+     reachable through `instances_by_id` and the provider's
+     `file_export_ids`;
+   - **different pairs minting one key (R1):** **refuse**;
+   - **a prior binding that was never minted** (R2 const before instance,
+     or a class, data or const prior): **refuse**, as now;
+   - **the same instance key:** the existing exemption.
+
+   The edit is the Architect's sketch:
+   - `head_canonical` on `SynthesizedDictionaryName`;
+   - a `MintedSpelling { class, head }` type;
+   - `ModuleState.minted_spellings: HashMap<GlobalId, MintedSpelling>`,
+     scrubbed in `scrub_global_ids`;
+   - `minted: Option<MintedSpelling>` in place of `minted_identity` at the
+     `expand_scope` caller. `elaborate_checked` passes `None`;
+   - `rebound_spelling = previous_minted.is_some() && previous_minted ==
+     minted` added to the refusal condition, and the spelling recorded on
+     admission.
+
+   No further exemption is added here. Any later over-refusal of a lawful
+   rebind is closed by `VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT`.
 
 ## Acceptance
 
@@ -100,11 +126,26 @@ spelling, is the residual of `VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT`.
   order-dependent hashes.
 - **AC-6 (control).** `lang_instance_registry_identity_key` passes 5/5
   with no changes to the test.
-- **AC-7.** On one shared environment, a second `data Foo` admits, and a
-  second `instance Pick Foo` whose head is the rebound `Foo` refuses with
-  `DeclarationIdentityCollision`.
-- **AC-8 (mutation, QA).** Forcing `minted_identity = true` at the
-  user-spelled caller reddens AC-6.
+- **AC-6c (control).** `modules::namespace_effect_tests` passes with no
+  changes to the test, including the four rebind rows that reddened
+  `9a6e77e11` in CI:
+  `generated_instance_import_refuses_stale_provider_in_either_order`,
+  `generated_derive_import_refuses_stale_provider_in_either_order`,
+  `same_head_class_instances_search_by_selected_provider_identity` and
+  `derive_keeps_selected_class_and_data_ids_after_shadow`. The full
+  `scripts/ken-cargo test -p ken-elaborator --lib` passes and is part of
+  the QA gate.
+- **AC-7.** On one shared environment, a second `data Foo` admits, and
+  `instance Pick Foo` on the rebound `Foo` also admits:
+  - `globals["Pick_instance_Foo"]` is the new id;
+  - the old dictionary is still in `instances_by_id` under its checked
+    (Pick, old Foo) key;
+  - a `where Pick Foo` search on the new `Foo` selects the new
+    dictionary.
+- **AC-8 (mutation, QA).** Passing a minted spelling at the user-spelled
+  caller reddens AC-6.
+- **AC-9 (mutation, QA).** Forcing `rebound_spelling = false` reddens
+  exactly the four AC-6c rows and AC-7, while AC-1 stays green.
 
 ## Stop conditions
 
