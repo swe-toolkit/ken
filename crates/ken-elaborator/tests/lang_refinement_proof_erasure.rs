@@ -344,3 +344,65 @@ fn alias_hidden_proof_argument_erases_binder_and_application_slot() {
         EvalVal::Int(7)
     ));
 }
+
+#[test]
+fn interpreter_projection_paths_use_erased_transparent_bodies() {
+    // Promise class: durable invariant (42 §3.2, 46 §4).
+    // MEASURED: a nested checked subset carrier survives both a transparent
+    // accessor through an identity call and a direct projection of a global.
+    // CLAIMED: projection fast paths inspect the same cached erased bodies as
+    // ordinary Const unfolding. THE GAP: the caller and the callee must both
+    // use the same checked environment; the two arms are pinned separately.
+    let mut elaborated = ElabEnv::new().expect("prelude admits");
+    let int_ty = Term::const_(elaborated.globals["Int"], vec![]);
+    let proof_ty = Term::Eq(Box::new(int_ty.clone()), Box::new(int(7)), Box::new(int(7)));
+    let hole = declare_postulate(&mut elaborated.env, "nested_proof".into(), vec![], proof_ty)
+        .expect("open proof is checked");
+    let subset = Term::sigma(
+        int_ty.clone(),
+        Term::Eq(
+            Box::new(int_ty.clone()),
+            Box::new(Term::var(0)),
+            Box::new(Term::var(0)),
+        ),
+    );
+    let source_ty = Term::sigma(int_ty.clone(), subset);
+    let source = declare_def(
+        &mut elaborated.env,
+        vec![],
+        source_ty.clone(),
+        Term::pair(int(1), Term::pair(int(7), Term::const_(hole, vec![]))),
+    )
+    .expect("nested subset source admits");
+    let identity = declare_def(
+        &mut elaborated.env,
+        vec![],
+        Term::pi(source_ty.clone(), source_ty.clone()),
+        Term::lam(source_ty.clone(), Term::var(0)),
+    )
+    .expect("checked wrapper admits");
+    let accessor = declare_def(
+        &mut elaborated.env,
+        vec![],
+        Term::pi(source_ty.clone(), int_ty.clone()),
+        Term::lam(source_ty, Term::proj1(Term::proj2(Term::var(0)))),
+    )
+    .expect("nested carrier accessor admits");
+    let source_ref = Term::const_(source, vec![]);
+    let wrapped = Term::app(
+        Term::const_(accessor, vec![]),
+        Term::app(Term::const_(identity, vec![]), source_ref.clone()),
+    );
+    let directly_projected = Term::proj1(Term::proj2(source_ref));
+    let mut store = EvalStore::new();
+    assert!(matches!(
+        eval_checked(&wrapped, &int_ty, &elaborated.env, &mut store)
+            .expect("checked accessor through wrapper"),
+        EvalVal::Int(7)
+    ));
+    assert!(matches!(
+        eval_checked(&directly_projected, &int_ty, &elaborated.env, &mut store)
+            .expect("checked projection of global"),
+        EvalVal::Int(7)
+    ));
+}

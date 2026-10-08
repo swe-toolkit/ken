@@ -555,6 +555,27 @@ fn project_value(mut val: EvalVal, path: &[Projection]) -> EvalVal {
     val
 }
 
+// A transparent body can also be read through the projection fast path.
+// Both that path and ordinary Const unfolding must see the same checked
+// erasure; otherwise a collapsed subset pair is projected with stale offsets.
+fn erased_transparent_body(
+    id: GlobalId,
+    body: &Term,
+    ty: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Term {
+    if let Some(cached) = store.erased_bodies.get(&id) {
+        return cached.clone();
+    }
+    let plan = ken_elaborator::omega_erasure::omega_erasure_plan(globals, body, ty)
+        .unwrap_or_else(|error| panic!("checked Ω plan failed at {id:?}: {error}"));
+    let erased = ken_elaborator::omega_erasure::apply_omega_erasure(globals, body, &plan)
+        .unwrap_or_else(|error| panic!("checked Ω erasure failed at {id:?}: {error}"));
+    store.erased_bodies.insert(id, erased.clone());
+    erased
+}
+
 fn eval_projection_path(
     env: &[EvalVal],
     term: &Term,
@@ -592,8 +613,9 @@ fn eval_projection_path(
             }
         }
         Term::Const { id, .. } => {
-            if let Some(Decl::Transparent { body, .. }) = globals.lookup(*id) {
-                eval_projection_path(&[], body, globals, store, path)
+            if let Some(Decl::Transparent { body, ty, .. }) = globals.lookup(*id) {
+                let computational = erased_transparent_body(*id, body, ty, globals, store);
+                eval_projection_path(&[], &computational, globals, store, path)
             } else {
                 project_value(eval(env, term, globals, store), path)
             }
@@ -620,7 +642,11 @@ fn projection_path_from_var0(term: &Term) -> Option<Vec<Projection>> {
     }
 }
 
-fn projection_accessor_path(term: &Term, globals: &GlobalEnv) -> Option<Vec<Projection>> {
+fn projection_accessor_path(
+    term: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Option<Vec<Projection>> {
     match term {
         Term::Lam(_, body) => {
             let path = projection_path_from_var0(body)?;
@@ -630,9 +656,12 @@ fn projection_accessor_path(term: &Term, globals: &GlobalEnv) -> Option<Vec<Proj
                 Some(path)
             }
         }
-        Term::Ascript(inner, _) => projection_accessor_path(inner, globals),
+        Term::Ascript(inner, _) => projection_accessor_path(inner, globals, store),
         Term::Const { id, .. } => match globals.lookup(*id) {
-            Some(Decl::Transparent { body, .. }) => projection_accessor_path(body, globals),
+            Some(Decl::Transparent { body, ty, .. }) => {
+                let computational = erased_transparent_body(*id, body, ty, globals, store);
+                projection_accessor_path(&computational, globals, store)
+            }
             _ => None,
         },
         _ => None,
@@ -646,7 +675,7 @@ fn eval_projection_accessor_app(
     globals: &GlobalEnv,
     store: &mut EvalStore,
 ) -> Option<EvalVal> {
-    let path = projection_accessor_path(fun, globals)?;
+    let path = projection_accessor_path(fun, globals, store)?;
     Some(eval_projection_path(env, arg, globals, store, &path))
 }
 
@@ -2402,23 +2431,7 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
             }
             match globals.lookup(*id) {
                 Some(Decl::Transparent { body, ty, .. }) => {
-                    let computational = if let Some(cached) = store.erased_bodies.get(id) {
-                        cached.clone()
-                    } else {
-                        let plan =
-                            ken_elaborator::omega_erasure::omega_erasure_plan(globals, body, ty)
-                                .unwrap_or_else(|error| {
-                                    panic!("checked Ω plan failed at {id:?}: {error}")
-                                });
-                        let erased = ken_elaborator::omega_erasure::apply_omega_erasure(
-                            globals, body, &plan,
-                        )
-                        .unwrap_or_else(|error| {
-                            panic!("checked Ω erasure failed at {id:?}: {error}")
-                        });
-                        store.erased_bodies.insert(*id, erased.clone());
-                        erased
-                    };
+                    let computational = erased_transparent_body(*id, body, ty, globals, store);
                     eval(&[], &computational, globals, store)
                 }
                 Some(Decl::Primitive { reduction, .. }) => match reduction {
