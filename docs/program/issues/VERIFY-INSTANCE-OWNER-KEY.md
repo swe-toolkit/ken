@@ -1,7 +1,7 @@
 ---
 id: VERIFY-INSTANCE-OWNER-KEY
 title: "Since VERIFY-OBLIGATION-STABLE-IDENTITY an instance's unnamed declarations are owned by the class name, which every instance of the class shares, so instance literal and hole symbols {class}#{n} and the package hash depend on source order. Key each instance's owner on its own stable identity"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2

@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-EXAMPLE-BINDING-SCOPE
 title: "Since VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS a .ken.md source's example-fence declarations are dropped from the package but stay bound in the shared env, so a later source can reference one: the package validates with a dangling symbol and an executable entrypoint, and only erasure refuses. Close the reference before emit"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -80,3 +80,12 @@ of the predecessor is kept.
 - Any kernel, `trusted_base()` or spec change.
 - A catalog or corpus package whose later source references an example
   declaration: stop with the list.
+
+## Closeout
+
+Merged `e1b609597` from exact `e5f6a86e9` (PR #4591). Verify QA
+`evt_2x4vh4nbapt4e`, Architect re-review after changes requested
+`evt_6qc2akyd4457c`, Decision `dec_1ce408cxz57hf`. Obligations route by
+owner, and a later source naming an earlier source's example declaration
+is refused before emit. Carry: the native-program route still ships
+example declarations, filed as `VERIFY-NATIVE-PROGRAM-EXAMPLE-EXCLUSION`.
