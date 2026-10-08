@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-NFA-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 3 is a deferred placeholder, so the catalog has no contract for nondeterministic automata or subset construction. Specify the Nfa carrier, its acceptance, the subset construction into section 1's Dfa, and its language-equality law, at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
