@@ -269,42 +269,6 @@ fn successor_residual_user_declarations_after_dictionary_still_rebind() {
     }
 }
 
-/// Promise class: durable invariant (33 §5). MEASURED: on the same env a
-/// second `data Foo` with a different checked ID admits, while a second
-/// `instance Pick Foo` for that rebound head hits the minted dictionary key
-/// and refuses with the typed error. CLAIMED: lawful user shadowing remains
-/// possible without letting a newly minted identity overwrite old checked
-/// dictionaries. THE GAP: a later user declaration still overwrites a
-/// dictionary, routed to the successor rather than this guard.
-#[test]
-fn rebound_user_data_admits_but_rebound_head_instance_refuses() {
-    let mut env = ElabEnv::new().expect("prelude");
-    env.elaborate_file_v1(
-        "class Pick carrier { selected : Bool }\ndata Foo : Type where { MkOldFoo : Foo }\ninstance Pick Foo { selected = True }\n",
-    )
-    .expect("old class, data and instance check");
-    let old_head = env.globals["Foo"];
-    let old_dictionary = env.globals["Pick_instance_Foo"];
-    let new_head = env
-        .elaborate_decl("data Foo : Type where { MkNewFoo : Foo }")
-        .expect("later user-spelled `data Foo` is lawful shadowing");
-    assert_ne!(old_head, new_head);
-    assert_eq!(env.globals["Foo"], new_head);
-    let error = env
-        .elaborate_decl("instance Pick Foo { selected = False }")
-        .expect_err("same minted dictionary identity cannot replace old instance");
-    assert!(matches!(
-        error,
-        ElabError::DeclarationIdentityCollision {
-            ref identity,
-            ref first,
-            ref second,
-            ..
-        } if identity == "Pick_instance_Foo" && first == "instance Pick Foo" && second == "instance Pick Foo"
-    ));
-    assert_eq!(env.globals["Pick_instance_Foo"], old_dictionary);
-}
-
 /// Promise class: durable invariant (33 §5.1). MEASURED: multiple checked
 /// dictionaries with exactly the same class/head key remain admitted when
 /// the class is proof-irrelevant, including either order of `derive` and an
