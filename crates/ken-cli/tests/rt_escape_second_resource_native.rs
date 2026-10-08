@@ -853,7 +853,7 @@ fn buffer_freeze_outcome(
 // error, including its stage/field prefix; all three inspection rows assert
 // that exact boundary and keep their planner diagnostics independently.
 #[cfg(target_os = "linux")]
-const R2_RELAY_ADMISSION_DISPLAY: &str = "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(2) (Relay), StaticResponseContinuationId(3) (Relay)";
+const R2_RELAY_ADMISSION_DISPLAY: &str = "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(2) (MixedRelay), StaticResponseContinuationId(3) (MixedRelay)";
 
 /// Promise class: transition sentinel. The fixture's planner-issued origins
 /// are rechecked if its compiler shape changes. MEASURED: exactly two
@@ -1019,7 +1019,7 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
 }
 
 #[test]
-#[ignore = "RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT: ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(2) (Relay), StaticResponseContinuationId(3) (Relay)"]
+#[ignore = "RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT: ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(2) (MixedRelay), StaticResponseContinuationId(3) (MixedRelay)"]
 fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds() {
     in_large_stack_thread("rt-escape-r2", || {
         // R2 reaching lane: two nested buffer resources compile and run; a span

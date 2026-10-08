@@ -352,7 +352,7 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
 // its five siblings pass. It fits none of the effect-seat owners.
 // Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(3) (Relay), StaticResponseContinuationId(4) (Relay)"]
+#[ignore = "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(4) (MixedRelay)"]
 fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
     in_large_stack_thread("sp-a-freeze", || {
         let diff = differential("sp-a-freeze", SP_A_FREEZE);
@@ -397,7 +397,7 @@ fn span_plan_diagnostics_survive_complete_relay_refusal() {
             )
         });
         let error = built.expect_err("both excluded response owners must refuse");
-        assert_eq!(error.to_string(), "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(3) (Relay), StaticResponseContinuationId(4) (Relay)");
+        assert_eq!(error.to_string(), "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: NativeStaticTransitionPlanner: response owners K return a Vis outside the pending-Vis protocol: StaticResponseContinuationId(4) (MixedRelay)");
         assert_eq!(diagnostics.len(), 1, "a refused plan records its diagnostics");
         let plan = &diagnostics[0];
         assert_eq!(plan.all_static_response_rows.len(), 8, "all specialized rows remain recorded");

@@ -4551,6 +4551,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             let pending_vis_owner = match compiler.response_owner_settlements.get(&emission.row.id()) {
                 Some(ResponseOwnerSettlement::Protocol) if !emission.successors.is_empty() => true,
                 Some(ResponseOwnerSettlement::RetOnly) if emission.successors.is_empty() => false,
+                Some(ResponseOwnerSettlement::RelayOnly) if emission.successors.is_empty() => false,
                 other => return Err(backend_module(format!(
                     "response owner {:?} reached emission with settlement {other:?} and {} successors",
                     emission.row.id(), emission.successors.len(),

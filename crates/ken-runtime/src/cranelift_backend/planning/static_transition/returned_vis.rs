@@ -63,14 +63,19 @@ pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
     Protocol,
     /// The K route returns no Vis member, so a Ret-only body is exact.
     RetOnly,
+    /// Every returned member forwards a pattern-bound operation. Emission
+    /// retains the baseline Ret-only arm; the record protocol does not settle
+    /// these members, and this class does not claim that it does.
+    RelayOnly,
     /// The K route returns a Vis the record protocol cannot settle.
     Excluded { reason: ExcludedSettlement },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ExcludedSettlement {
-    /// At least one returned member forwards a pattern-bound operation.
-    Relay,
+    /// Relay and non-relay returned members share one owner. Neither the
+    /// pending-Vis record nor a Ret-only body can settle the whole owner.
+    MixedRelay,
     /// The census errored while deriving a returned member (its text).
     Underived(String),
 }
@@ -164,8 +169,16 @@ impl StaticTransitionPlan<'_> {
                 continue;
             }
             if protocol.excluded_by_relay {
-                settlements.insert(owner.id(), ResponseOwnerSettlement::Excluded {
-                    reason: ExcludedSettlement::Relay,
+                let all_relay = protocol
+                    .contexts
+                    .iter()
+                    .flat_map(|context| &context.members)
+                    .all(|member| member.relay);
+                settlements.insert(owner.id(), match all_relay {
+                    true => ResponseOwnerSettlement::RelayOnly,
+                    false => ResponseOwnerSettlement::Excluded {
+                        reason: ExcludedSettlement::MixedRelay,
+                    },
                 });
                 continue;
             }
@@ -230,7 +243,9 @@ impl StaticTransitionPlan<'_> {
             .owners
             .iter()
             .filter_map(|(owner, settlement)| match settlement {
-                ResponseOwnerSettlement::Protocol | ResponseOwnerSettlement::RetOnly => None,
+                ResponseOwnerSettlement::Protocol
+                | ResponseOwnerSettlement::RetOnly
+                | ResponseOwnerSettlement::RelayOnly => None,
                 ResponseOwnerSettlement::Excluded { reason } => {
                     Some(format!("{owner:?} ({reason:?})"))
                 }
