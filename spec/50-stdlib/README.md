@@ -218,9 +218,13 @@ function over **any** state carrier `q` and alphabet `a`; it requires neither
 finiteness nor `DecEq`. The `Algorithm.FormalLanguages.Dfa` package must supply
 `run`/`accepts`, complement, general Boolean-combining product and its
 intersection/union instances with seven checked laws and zero trust delta.
-A `Finite q` certificate and decision procedures belong to later work, as do
-NFA, regex, equivalence/minimisation, and the lexer byte bridge. The contract
-is specified here; its package implementation has not yet landed.
+Section 2 now specifies `Data.Finite.Finite`'s explicit Ω-membership
+certificate, the `fin_finite` and `pair_finite` values, and
+`Algorithm.FormalLanguages.Reachability`'s certificate-returning decision
+with four checked soundness/completeness laws. No `DecEq` or complexity
+promise is added. These two package contracts do not claim their builds
+landed; NFA, regex, equivalence/minimisation and the lexer byte bridge
+remain deferred.
 
 ## 4. I/O, effects, serialization
 

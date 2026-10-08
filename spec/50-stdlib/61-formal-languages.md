@@ -1,10 +1,11 @@
 # Formal languages: deterministic automata
 
-> Status: **DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT).** Section 1 is
-> normative for the `Algorithm.FormalLanguages.Dfa` package's record,
-> operations, checked laws, finiteness boundary, and trust boundary. Sections
-> 2–6 name later work but do not specify or deliver it. This chapter introduces
-> no kernel, trust, or surface-syntax change.
+> Status: **DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT;
+> SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT).** Section 1 specifies
+> ordinary Dfa; section 2 specifies finite evidence and the reachability
+> decision. Sections 3–6 remain deferred. Neither the section 2 packages nor
+> their proofs are claimed landed here. No kernel, trust, or surface-syntax
+> change is introduced.
 
 A deterministic automaton describes a transition for every state and input
 symbol and a Boolean acceptance test. Its state carrier need not be finite:
@@ -178,12 +179,225 @@ package or these proofs are landed. `CAT-FORMAL-LANGUAGES-DFA` must deliver
 both the computational definitions and their seven checked law proofs before
 the package is complete. A partial tested build is not a proved package.
 
-## 2. Finite-state evidence (deferred)
+## 2. Finite evidence and decidable reachability
 
-A later contract will give a `Finite q` certificate consisting of an
-enumeration and membership proof, with decidable emptiness and reachability;
-`Fin n` then receives an instance. No such certificate, decision procedure,
-or finite-state guarantee is part of §1.
+Section 1 permits any state and alphabet types. This section specifies two
+**optional, explicitly imported** packages for the case where both are
+certified finite: `Data.Finite.Finite` supplies reusable evidence, and
+`Algorithm.FormalLanguages.Reachability` supplies the decision. Neither
+package changes the type of `Dfa` or requires state equality.
+
+### 2.1 Certificate (`Data.Finite.Finite`)
+
+`list_elem` belongs to the general `Data.Collections.Derived` package, not
+to automata. Its element and list arguments are type-valued, but its result
+is a proposition. The public definitions and certificate contract are:
+
+```ken
+pub fn list_elem (a : Type) (x : a) (xs : List a) : Omega =
+  match xs {
+    Nil ↦ Bottom;
+    Cons y rest ↦ ‖ Or (Equal a x y) (list_elem a x rest) ‖
+  }
+
+pub data Finite (q : Type) : Type where {
+  MkFinite : (listed : List q) →
+             ((x : q) → list_elem q x listed) → Finite q
+}
+
+pub fn elements (q : Type) (fq : Finite q) : List q
+pub theorem covers (q : Type) (fq : Finite q) :
+  (x : q) → list_elem q x (elements q fq)
+pub fn fin_finite (n : Nat) : Finite (Fin n)
+pub fn pair_finite (q : Type) (r : Type) :
+  Finite q → Finite r → Finite (Pair q r)
+```
+
+`Finite q` is a **record value**, not a class or an inferred instance. Its
+`listed` field may include duplicates; its `covers` evidence applies to
+**every** `x : q`. Empty carriers admit an empty list. `list_elem`'s `Nil`
+case is `Bottom`; its `Cons` case truncates the proof-relevant `Or`, so
+membership resides in `Omega`, not in an index-bearing `Type` family. For
+`a, q : Type` at level zero, `Equal a x y : Omega` and the recursive
+membership is in `Omega`; truncation returns `Omega`, while `Finite q` is
+an ordinary `Type` record with a proof-irrelevant coverage field. Its
+certificate does **not** construct `DecEq q`, prohibit duplicates, or
+promise an efficiently searchable representation. Decidable equality of
+states remains a separate prerequisite for state-to-state reachability
+and equivalence (§5).
+
+`elements q fq` projects the supplied list; `covers q fq x` projects its
+checked coverage proof. `fin_finite n` constructs a value covering every
+inhabitant of `Fin n`, including the empty case at `n = Zero`; it is **not**
+an automatically resolved instance. `pair_finite q r fq fr` enumerates
+pairs of entries from both lists and proves coverage from both certificates
+using Pair's checked projections and η. This value can certify the state
+carrier of §1's `product`, `intersection` and `union`. No condition of
+unique entries, fixed enumeration order, or `DecEq` is added by either
+constructor.
+
+The public generic Ω-membership lemmas belong with `list_elem` in
+`Data.Collections.Derived`. Their contracts support the certificate without
+requiring decidable equality:
+
+```ken
+pub theorem list_elem_head (a : Type) (x : a) (rest : List a) :
+  list_elem a x (Cons a x rest)
+pub theorem list_elem_later (a : Type) (x : a) (y : a) (rest : List a) :
+  list_elem a x rest → list_elem a x (Cons a y rest)
+pub theorem list_elem_map
+  (a : Type) (b : Type) (f : a → b) (x : a) (xs : List a) :
+  list_elem a x xs → list_elem b (f x) (map a b f xs)
+pub theorem list_elem_append_left
+  (a : Type) (x : a) (xs : List a) (ys : List a) :
+  list_elem a x xs → list_elem a x (list_append a xs ys)
+pub theorem list_elem_append_right
+  (a : Type) (x : a) (xs : List a) (ys : List a) :
+  list_elem a x ys → list_elem a x (list_append a xs ys)
+pub theorem list_elem_concat_map
+  (a : Type) (b : Type) (f : a → List b)
+  (y : b) (x : a) (xs : List a) :
+  list_elem a x xs → list_elem b y (f x) →
+  list_elem b y (concat_map a b f xs)
+pub theorem list_elem_transport
+  (a : Type) (x : a) (y : a) (same : Equal a x y) (xs : List a) :
+  list_elem a x xs → list_elem a y xs
+```
+
+The certificate package also supplies an enumeration and its checked
+coverage lemma for `Fin`; they are the construction behind `fin_finite`:
+
+```ken
+pub fn fin_elements (n : Nat) : List (Fin n)
+theorem fin_elements_cover (n : Nat) (i : Fin n) :
+  list_elem (Fin n) i (fin_elements n)
+```
+
+The certificate package imports those list tools,
+`Fin`/`FZero`/`FSuc` from `Data.Vector.Vector`, and the existing `Or` and
+checked equality transport. The certificate lives in `Data.Finite.Finite`,
+**not** in `Data.Vector.Vector`, and Vector does not import it. None of
+these proof helpers introduces a new trusted rule or a second notion of
+membership.
+
+### 2.2 Decision (`Algorithm.FormalLanguages.Reachability`)
+
+The public operations have the following types. The certificate for the
+alphabet is explicit: searching all next symbols needs coverage for `a`
+as well as coverage for `q`. A target is a **Boolean predicate on states**,
+and the initial state is supplied by the caller except in the two accepted-
+language operations.
+
+```ken
+pub fn find_word
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (target : q → Bool) (s : q) : Option (List a)
+pub fn reachable
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (target : q → Bool) (s : q) : Bool
+pub fn accepted_word
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) : Option (List a)
+pub fn is_empty
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) : Bool
+```
+
+`find_word fq fa d target s` returns `Some w` **only if** `w` takes `s` to
+a target state. It returns `None` exactly if there is no finite word that
+reaches a target state. It need not choose a shortest or unique witness.
+The other three operations are fixed views of this result:
+
+```ken
+reachable q a fq fa d target s =
+  is_some (List a) (find_word q a fq fa d target s)
+accepted_word q a fq fa d =
+  find_word q a fq fa d (final q a d) (start q a d)
+is_empty q a fq fa d =
+  bool_not (reachable q a fq fa d (final q a d) (start q a d))
+```
+
+Here `is_some` is the existing `Data.Sums.Combinators` function, and
+`bool_not` is the public Boolean function promised by §1's Dfa package
+build; it is not assumed landed on this Spec base. A
+`True` emptiness result means no accepted word exists; a `False` result
+permits extracting an accepted `Some w` by case analysis on
+`accepted_word`, not by assuming a word from a bare Boolean. The decision
+is about **reachability of a predicate**; reaching a named state by
+comparison is not supplied without `DecEq q` (§5).
+
+### 2.3 Checked laws and completeness boundary
+
+These four public laws have kernel-checked proofs over the **exported**
+functions, not postulates or tests. Their types quantify over any finite
+certificates, automaton, predicate, starting state and word; the proof
+terms introduce no special property of `q` or `a` beyond the certificates.
+Every `Equal Bool` proposition and each `Equal (Option (List a))` premise
+inhabits `Omega`; each implication is a proposition.
+
+```ken
+pub theorem find_word_sound
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (target : q → Bool) (s : q) (w : List a) :
+  Equal (Option (List a)) (find_word q a fq fa d target s)
+    (Some (List a) w) →
+  Equal Bool (target (run q a d s w)) True
+
+pub theorem find_word_complete
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (target : q → Bool) (s : q) (w : List a) :
+  Equal Bool (target (run q a d s w)) True →
+  Equal Bool (reachable q a fq fa d target s) True
+
+pub theorem accepted_word_accepts
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (w : List a) :
+  Equal (Option (List a)) (accepted_word q a fq fa d)
+    (Some (List a) w) →
+  Equal Bool (accepts q a d w) True
+
+pub theorem is_empty_rejects
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (w : List a) :
+  Equal Bool (is_empty q a fq fa d) True →
+  Equal Bool (accepts q a d w) False
+```
+
+Completeness is **in this contract**: `find_word_complete` applies to
+**every** witness word, however long. A valid proof route uses a finite
+symbol list and fuel bounded by `length q (elements q fq)` for the primary
+search. A fuel-limited reachability predicate is monotone with fuel.
+Counting its true entries over the possibly duplicate-containing state
+list never exceeds that list's length; whenever the predicate has not
+stabilised, the count strictly grows. Coverage lifts agreement on list
+entries to all states by eliminating Ω membership **only into a
+proposition**. Consequently reachability stabilises by the list-length
+bound and stays stable; a word of arbitrary length yields reachability at
+its length and hence at the bound. Alphabet coverage ensures that each
+symbol in that word is considered by the search. This argument requires
+neither `DecEq q` nor distinct enumeration elements, and does **not**
+promise a time or space bound. A later table or BFS implementation must
+prove the same four laws, not introduce an axiom to replace completeness.
+
+The decision package imports `Data.Finite.Finite`, §1's Dfa API,
+`Data.Sums.Combinators.is_some`, `bool_or`/`leq_nat` and the §1-promoted
+`bool_not` plus `proof trans for leq_nat` from
+`Core.Classes.LawfulClasses`,
+`leq_nat_weaken_right` from `Data.Numeric.Nat.Order`,
+`Data.Collections.List.length`; `map`, `concat_map` and the `list_elem`
+tools from `Data.Collections.Derived`; and checked equality transport.
+Private search, reach, stability, counting
+and auxiliary proofs do not expand the public contract. For a
+human-readable catalog package, lead with `is_empty`/`accepted_word` and
+their laws, then the general `find_word` laws, followed by search and its
+counting proof. The necessary data declarations precede their uses.
+
+Both packages are ordinary checked Ken: they may declare the `Finite`
+record, definitions and theorem terms through existing inductive and
+judgment machinery, but add **no `Axiom`, primitive, new kernel declaration
+kind/form, reduction rule, or `trusted_base()` entry**. None is a built-in,
+a prelude addition, or a surface-syntax change. This section specifies a
+contract, not an assertion that either package or its proofs has landed.
 
 ## 3. Nondeterministic automata (deferred)
 
@@ -198,11 +412,12 @@ there; it is not a prerequisite for §1's alphabet.
 
 ## 5. Equivalence and minimisation (deferred)
 
-Equivalence and minimisation require the later finite-state evidence and
-decidable state equality. Section 1 has no such decision procedure.
+Equivalence and minimisation require §2's finite evidence **and**
+decidable state equality. Section 2 supplies neither an equality decision
+for arbitrary states nor equivalence or minimisation procedures.
 
 ## 6. Lexer input bridge (deferred)
 
 A later `Bytes`/`Cursor` runner bridge for `Capability.Parsing` lexers will
 relate byte-runner results to `run` over the corresponding byte list. Section
-1 runs over `List a` only and makes no byte/lexer claim.
+1 and 2 use `List a` only and make no byte/lexer claim.
