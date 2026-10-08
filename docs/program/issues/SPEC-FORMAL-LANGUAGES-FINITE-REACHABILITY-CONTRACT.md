@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 2 is a deferred placeholder, so the catalog has no contract for finite-state evidence or for deciding reachability and emptiness of a Dfa. Specify the Finite certificate (an enumeration with an Omega membership proof, no DecEq, no dedup), fin_finite and pair_finite, and the certificate-returning reachability decision with its sound and complete laws"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -66,3 +66,14 @@ Update `spec/SPEC-PROGRESS.md` if the chapter set changes.
 ## Stop conditions
 
 - The contract needs a kernel, trust or surface-syntax change.
+
+## Closeout
+
+Merged `c7c05d4e6` from exact `d840592ae` (PR #4604). Conformance-validator
+`evt_4yxcktk4cs60b`, Architect `evt_22k52472gn6r7`, Decision
+`dec_2pxwjr54qn006`. Section 2 of `spec/50-stdlib/61-formal-languages.md`
+specifies the `Finite q` certificate (Ω list membership, no `DecEq`, no
+duplicate-free condition), `fin_finite` and `pair_finite`, and the
+certificate-returning `find_word` with `reachable`, `accepted_word`,
+`is_empty` and the four laws, at zero trust. No complexity bound is
+promised.
