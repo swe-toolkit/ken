@@ -4367,15 +4367,47 @@ fn expand_scope(
                 }
                 let segment = &decls[i..segment_end];
                 // A facade never binds its exported names in the owner's
-                // body. Mark that resolution fact before resolving segment
-                // nodes, even though publication itself waits until every
-                // node is checked. Preserve genuine pre-existing body names.
-                for d in segment {
+                // body. Preflight its provider and leaves without publishing.
+                // If one fails, admit only the textual prefix before it:
+                // earlier locals keep their checked identities, while later
+                // locals cannot mutate the environment after that refusal.
+                let mut facade_error = None;
+                for (offset, d) in segment.iter().enumerate() {
                     if let Decl::ExportDecl {
-                        form: ExportForm::Facade { items, .. },
-                        ..
+                        form: ExportForm::Facade { module, items },
+                        span,
                     } = d.unwrap_pub()
                     {
+                        let provider = select_module_provider(
+                            &elab.module_state.exports,
+                            &elab.module_state.inline_children,
+                            &elab.module_state.file_inline_paths,
+                            &elab.module_state.file_export_tables,
+                            &elab.module_state.file_export_ids,
+                            &elab.module_state.export_provenance,
+                            prefix,
+                            elab.module_state.active_imports.last().map(String::as_str),
+                            unit_inline_modules,
+                            ordered_inline_modules,
+                            module,
+                            span,
+                        );
+                        let preflight = provider.and_then(|provider| {
+                            for item in items {
+                                if !provider.pubmap.contains_key(&item.name) {
+                                    return Err(ElabError::UnboundName {
+                                        name: format!("{module}.{}", item.name),
+                                        span: span.clone(),
+                                    });
+                                }
+                            }
+                            Ok(())
+                        });
+                        if let Err(error) = preflight {
+                            segment_end = i + offset;
+                            facade_error = Some(error);
+                            break;
+                        }
                         for item in items {
                             for name in [item.name.as_str(), published_name(item)] {
                                 if !scope.bindings.contains_key(name)
@@ -4387,6 +4419,7 @@ fn expand_scope(
                         }
                     }
                 }
+                let segment = &decls[i..segment_end];
                 let node_decls: Vec<&Decl> = segment
                     .iter()
                     .filter(|d| {
@@ -4685,6 +4718,9 @@ fn expand_scope(
                             inner.span(),
                         )?;
                     }
+                }
+                if let Some(error) = facade_error {
+                    return Err(error);
                 }
                 i = segment_end;
             }
@@ -7009,6 +7045,32 @@ mod namespace_effect_tests {
             other => panic!("forward export cannot enable self facade: {other:?}"),
         }
         assert_eq!(old, env.globals["A.leak"], "the later local never elaborated");
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.1–3.3).
+    /// MEASURED: a checked provider A is present, B.before survives an invalid
+    /// facade leaf, and B.after is absent after that refusal. CLAIMED: export
+    /// failure preserves the textual prefix but admits no later local. THE
+    /// GAP: this row covers a missing selected member; the self-facade row
+    /// separately guards unavailable provider selection.
+    #[test]
+    fn unavailable_facade_member_does_not_admit_later_local() {
+        let root = inline_owner_root("pub const leak : Nat = Zero\n");
+        let mut env = ElabEnv::new().expect("base environment");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "A")
+            .expect("file provider checked");
+        let provider_id = env.globals["A.leak"];
+        let source = "module B { pub const before : Nat = Zero export A (missing) pub const after : Nat = Suc Zero }";
+        match env.elaborate_file(source) {
+            Err(ElabError::UnboundName { name, span }) => {
+                assert_eq!(name, "A.missing");
+                assert_eq!(span.start, source.find("export A (missing)").unwrap());
+            }
+            other => panic!("unavailable facade member must refuse: {other:?}"),
+        }
+        assert_eq!(provider_id, env.globals["A.leak"]);
+        assert!(env.globals.contains_key("B.before"));
+        assert!(!env.globals.contains_key("B.after"));
     }
 
     /// Promise class: durable invariant (spec 33 §§3.1–3.3).
