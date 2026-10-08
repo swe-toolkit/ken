@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-FINITE-REACHABILITY
 title: "A Dfa's emptiness and reachability cannot be decided in the catalog, because there is no finite-state evidence. Land Data.Finite.Finite (an Omega-membership enumeration certificate, fin_finite, pair_finite) and Algorithm.FormalLanguages.Reachability (a certificate-returning search with sound and complete laws, is_empty, accepted_word), fully proved and Axiom-free"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2
