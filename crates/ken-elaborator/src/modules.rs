@@ -3358,7 +3358,11 @@ fn elaborate_checked_as(
 ) -> Result<crate::elab::ElabResult, ElabError> {
     // A later source unit may lawfully rebind a user-spelled name. Only an
     // elaborator-minted identity promises exclusive ownership of this key.
-    let previous = minted_identity.then(|| elab.globals.get(&owner).copied()).flatten();
+    let previous = if minted_identity {
+        elab.globals.get(&owner).copied()
+    } else {
+        None
+    };
     let previous_instance_key = previous.and_then(|id| {
         elab.class_env
             .instances_by_id
@@ -3390,6 +3394,10 @@ fn elaborate_checked_as(
                         .is_some_and(|info| info.instance_id == result.def_id)
                 });
                 if previous != result.def_id && !same_instance_key {
+                    // Elaboration has already inserted the new dictionary at
+                    // this key. Restore the checked predecessor before the
+                    // environment mark rolls back the new GlobalId.
+                    elab.globals.insert(owner.clone(), previous);
                     let mut declarations = [
                         previous_description.expect("description captured with previous ID"),
                         describe_checked_declaration(rdecl),

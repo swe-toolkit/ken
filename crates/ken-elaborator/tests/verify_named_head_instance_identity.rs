@@ -1,12 +1,12 @@
 //! Checked-core identity collision at a named instance's importable dictionary
 //! name (spec/30-surface/33-declarations.md §5, 46-checked-core-package §3.2).
 
-use ken_elaborator::ElabError;
 use ken_elaborator::checked_core::{CheckedCorePackage, StableSymbol, SymbolNamespace};
 use ken_elaborator::compiler_driver::{
     CompilerDriverError, CompilerManifest, CompilerSource, CompilerTargetKind, TargetSelector,
     compile_ken_package_sources,
 };
+use ken_elaborator::{ElabEnv, ElabError};
 
 const PKG: &str = "zz_adv_ownerkey";
 const R1_PRE: &str = "class A carrier { la : carrier -> Int }\nclass A_instance_B carrier { lb : carrier -> Int }\ndata B_instance_C : Type where { MkBC : B_instance_C }\ndata C : Type where { MkC : C }\nconst need : Int requires Equal Int 0 1 = 0\nconst k : Nat = Zero\n";
@@ -55,15 +55,15 @@ fn sources(pre: &str, first: &str, second: &str, layout: u8) -> Vec<(&'static st
 }
 
 /// Promise class: durable invariant (33 §5; checked-core §3.2). MEASURED:
-/// each of the two distinct-instance or instance/user-declaration collisions
-/// is refused as `DeclarationIdentityCollision` in all six layout/order rows,
-/// with the same sorted descriptions and canonical binding key. CLAIMED:
-/// a second checked declaration cannot silently share a named dictionary
-/// symbol/owner or drop the first instance's live premise. THE GAP: these
-/// probes cover source instances, a user const and three file layouts; a
-/// constructor is on a separate registration path and is not claimed here.
+/// six R1 rows and three const-before-instance R2 rows refuse with the same
+/// typed, sorted declaration descriptions across three file layouts. CLAIMED:
+/// an elaborator-minted name cannot replace an unrelated checked identity
+/// without a loud error. THE GAP: a later user-spelled or constructor binding
+/// is outside this guard; successor residual rows below make that explicit.
 #[test]
-fn colliding_named_identity_refuses_in_all_twelve_layout_and_order_rows() {
+fn minted_named_identity_refuses_all_nine_collision_rows() {
+    let mut failures = Vec::new();
+    let mut checked = 0;
     for (case, pre, a, b, identity, expected_first, expected_second) in [
         (
             "R1",
@@ -86,27 +86,71 @@ fn colliding_named_identity_refuses_in_all_twelve_layout_and_order_rows() {
     ] {
         for layout in 1..=3 {
             for (order, first_source, second_source) in [("ab", a, b), ("ba", b, a)] {
+                if case == "R2" && order == "ab" {
+                    continue; // Later user-spelled const: successor residual, not a refusal.
+                }
+                checked += 1;
                 let label = format!("{case}: {layout} file(s), {order}");
-                let error = compile(&sources(pre, first_source, second_source, layout))
-                    .expect_err(&format!("{label} must refuse instead of losing a premise"));
-                match error {
-                    CompilerDriverError::Elaboration(ElabError::DeclarationIdentityCollision {
-                        identity: found,
-                        first,
-                        second,
-                        ..
-                    }) => {
-                        assert_eq!(found, identity, "{label}: checked collision key");
-                        assert_eq!(first, expected_first, "{label}: sorted first declaration");
-                        assert_eq!(
-                            second, expected_second,
-                            "{label}: sorted second declaration"
-                        );
-                    }
-                    other => panic!("{label}: wrong error {other:?}"),
+                match compile(&sources(pre, first_source, second_source, layout)) {
+                    Err(CompilerDriverError::Elaboration(
+                        ElabError::DeclarationIdentityCollision {
+                            identity: found,
+                            first,
+                            second,
+                            ..
+                        },
+                    )) if found == identity
+                        && first == expected_first
+                        && second == expected_second => {}
+                    Ok(package) => failures.push(format!(
+                        "{label}: admitted with {} obligations, #1 fallback={}, hash={:#x}",
+                        package.artifact.semantic.obligations.len(),
+                        package
+                            .artifact
+                            .semantic
+                            .declarations
+                            .contains_key(&decl(identity))
+                            && package
+                                .artifact
+                                .semantic
+                                .declarations
+                                .contains_key(&decl(&format!("{identity}#1"))),
+                        package.core_semantic_hash
+                    )),
+                    Err(error) => failures.push(format!("{label}: wrong error {error:?}")),
                 }
             }
         }
+    }
+    assert_eq!(
+        checked, 9,
+        "six R1 rows and three R2 rows must be exercised"
+    );
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Promise class: transition sentinel until VERIFY-GLOBALS-IDENTITY-CHECKED-
+/// INSERT changes user-spelled insertion. MEASURED: the reverse R2 order is
+/// still admitted in each file layout with only one obligation, an ordinal
+/// dictionary fallback, and the pre-guard core hash. CLAIMED: this residual
+/// is visible, not a success of the minted-key guard. THE GAP: the other
+/// order now refuses and has no post-repair hash to compare; the historical
+/// `ba` hash differs (evt_15k31thzp9j03). Retire at successor landing.
+#[test]
+fn successor_residual_user_const_after_minted_dictionary_still_overwrites() {
+    for layout in 1..=3 {
+        let package = compile(&sources(R2_PRE, R2_A, R2_B, layout))
+            .expect("later user-spelled const still overwrites minted binding");
+        let semantic = &package.artifact.semantic;
+        assert_eq!(semantic.obligations.len(), 1, "{layout} file(s)");
+        assert_eq!(semantic.obligation_metadata.len(), 1, "{layout} file(s)");
+        assert!(semantic.declarations.contains_key(&decl("Lbl_instance_A")));
+        assert!(
+            semantic
+                .declarations
+                .contains_key(&decl("Lbl_instance_A#1"))
+        );
+        assert_eq!(package.core_semantic_hash, 0x6329_57b6_b846_ba73);
     }
 }
 
@@ -147,14 +191,13 @@ fn distinct_named_instance_identities_keep_both_obligations_and_hash() {
     assert_eq!(ab.core_semantic_hash, ba.core_semantic_hash);
 }
 
-/// Promise class: durable invariant (33 §5). MEASURED: a named dictionary
-/// clashes with a class, data declaration or const regardless of which was
-/// checked first; `derive` uses the same protected identity as `instance`.
-/// CLAIMED: imported dictionary names cannot silently replace another
-/// admitted declaration kind. THE GAP: constructors are inserted through a
-/// separate path and remain the independently reported AC-0 residual.
+/// Promise class: durable invariant (33 §5). MEASURED: an instance or
+/// `derive` cannot mint its dictionary identity onto a preexisting class,
+/// data declaration or const. CLAIMED: the canonical importable binding is
+/// exclusive when minted. THE GAP: the reverse order (user-spelled binding
+/// second) is the separate successor residual, not a protected path.
 #[test]
-fn named_dictionary_refuses_class_type_and_derive_collisions_in_both_orders() {
+fn minted_dictionary_refuses_a_prior_class_type_or_const_identity() {
     let pre = "class E a { }\ndata A = MkA\n";
     for (dictionary, other, expected_other) in [
         (
@@ -180,28 +223,86 @@ fn named_dictionary_refuses_class_type_and_derive_collisions_in_both_orders() {
         };
         let mut expected = [expected_dictionary, expected_other];
         expected.sort();
-        for (order, first, second) in [
-            ("dictionary first", dictionary, other),
-            ("other first", other, dictionary),
-        ] {
-            let mut env = ken_elaborator::ElabEnv::new().expect("prelude");
-            let error = env
-                .elaborate_file_v1(&format!("{pre}{first}{second}"))
-                .expect_err("the second declaration must refuse a shared dictionary key");
-            match error {
-                ElabError::DeclarationIdentityCollision {
-                    identity,
-                    first,
-                    second,
-                    ..
-                } => {
-                    assert_eq!(identity, "E_instance_A", "{order}");
-                    assert_eq!([first.as_str(), second.as_str()], expected, "{order}");
-                }
-                other => panic!("{order}: wrong error {other:?}"),
+        let mut env = ElabEnv::new().expect("prelude");
+        let error = env
+            .elaborate_file_v1(&format!("{pre}{other}{dictionary}"))
+            .expect_err("the minted dictionary cannot replace a checked user binding");
+        match error {
+            ElabError::DeclarationIdentityCollision {
+                identity,
+                first,
+                second,
+                ..
+            } => {
+                assert_eq!(identity, "E_instance_A");
+                assert_eq!([first.as_str(), second.as_str()], expected);
             }
+            other => panic!("wrong error {other:?}"),
         }
     }
+}
+
+/// Promise class: transition sentinel until VERIFY-GLOBALS-IDENTITY-CHECKED-
+/// INSERT routes later user-spelled insertions. MEASURED: a class, data
+/// declaration or const checked after a named dictionary still replaces that
+/// flat globals key. CLAIMED: this is the remaining insertion-side defect.
+/// THE GAP: same-spelling constructors were measured separately in AC-0.
+#[test]
+fn successor_residual_user_declarations_after_dictionary_still_rebind() {
+    let pre = "class E a { }\ndata A = MkA\n";
+    for (dictionary, other) in [
+        ("instance E A { }", "class E_instance_A b { }"),
+        ("instance E A { }", "data E_instance_A = MkE"),
+        ("derive E for A", "const E_instance_A : Int = 0"),
+    ] {
+        let mut env = ElabEnv::new().expect("prelude");
+        let first = env
+            .elaborate_file_v1(&format!("{pre}{dictionary}\n"))
+            .expect("dictionary initially admitted");
+        let old_id = first.last().expect("dictionary result").def_id;
+        assert_eq!(env.globals["E_instance_A"], old_id);
+        let later = env
+            .elaborate_decl_v1(other)
+            .expect("later user-spelled declaration currently admits");
+        assert_ne!(later.def_id, old_id);
+        assert_eq!(env.globals["E_instance_A"], later.def_id);
+    }
+}
+
+/// Promise class: durable invariant (33 §5). MEASURED: on the same env a
+/// second `data Foo` with a different checked ID admits, while a second
+/// `instance Pick Foo` for that rebound head hits the minted dictionary key
+/// and refuses with the typed error. CLAIMED: lawful user shadowing remains
+/// possible without letting a newly minted identity overwrite old checked
+/// dictionaries. THE GAP: a later user declaration still overwrites a
+/// dictionary, routed to the successor rather than this guard.
+#[test]
+fn rebound_user_data_admits_but_rebound_head_instance_refuses() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_file_v1(
+        "class Pick carrier { selected : Bool }\ndata Foo : Type where { MkOldFoo : Foo }\ninstance Pick Foo { selected = True }\n",
+    )
+    .expect("old class, data and instance check");
+    let old_head = env.globals["Foo"];
+    let old_dictionary = env.globals["Pick_instance_Foo"];
+    let new_head = env
+        .elaborate_decl("data Foo : Type where { MkNewFoo : Foo }")
+        .expect("later user-spelled `data Foo` is lawful shadowing");
+    assert_ne!(old_head, new_head);
+    assert_eq!(env.globals["Foo"], new_head);
+    let error = env
+        .elaborate_decl("instance Pick Foo { selected = False }")
+        .expect_err("same minted dictionary identity cannot replace old instance");
+    assert!(matches!(
+        error,
+        ElabError::DeclarationIdentityCollision {
+            ref identity,
+            ref first,
+            ref second,
+            ..
+        } if identity == "Pick_instance_Foo" && first == "instance Pick Foo" && second == "instance Pick Foo"
+    ));
+    assert_eq!(env.globals["Pick_instance_Foo"], old_dictionary);
 }
 
 /// Promise class: durable invariant (33 §5.1). MEASURED: multiple checked
