@@ -65,7 +65,39 @@ retained.
 
    **Stop** if any of those inputs is written after phase B's owner check
    (`construction.rs` around 1497-1515).
-2. **R-CHAIN-1 (production).**
+
+   **Passed** (Architect `evt_46qkytaf6tx33`, on `evt_4rp1njqq3fvs5`): no
+   input is written after the check, and the keyed census matched 48/48.
+   The `-1` is owner 4's guard: Response(4) for Vis 1496 in
+   funcid61/block673. Its K, Context(2), which is also owner 0's K, returns
+   a tag that is not the planned Ret word `0x101d_0000_002a`. Owner 0's
+   successor is entered and its unknown-member exit is not taken.
+2. **D1g (measurement only, on `b135b25b5`, probes restored).** Report:
+   - the actual carrier tag at funcid61/block673, decoded: a Ret identity
+     (of which K) or a Vis constructor (of which origin: 528, 1079 or
+     another), and the pending-frame discriminant if a frame is live;
+   - the emitter (file:line) of that guard: `emit_pending_vis_owner_loop`
+     (`units.rs:3256`) or a Ret-only response path;
+   - from the protocol value at `core.rs:2879`: whether owner 4 is in
+     `owners`, the `frames` keys for ResponseOwner(4) and Context(2), and
+     each owner listing Context(2) with its members and returning units;
+   - row 4's planned K-Ret identity (`k_ret_identity().tag_abi_word()`)
+     and the Ret identity Context(2) emits on each return path.
+
+   Outcomes, ruled in advance:
+   - **G1.** The tag is a Vis or pending carrier, and owner 4 is in the
+     protocol but has a Ret-only guard. R-CHAIN-1 then gains the owner-loop
+     clause in item 3.
+   - **G2.** The tag is a Ret of a different K identity, so Context(2)
+     serves two rows with distinct Ret identities. **Stop**; the Architect
+     rules on the data.
+   - **G3.** Anything else. **Stop.**
+
+   Neither outcome edits the `0x101d_0000_002a` word, and no guard is
+   relaxed.
+3. **R-CHAIN-1 (production; its edits wait for D1g).** It closes inventory
+   entries 1 and 2. It changes no emitted code by itself: lowering already
+   reads the same derivation on the final plan.
    - A stored, validated plane, `plan.pending_vis_settlements`. It is
      built once, after phase B's owner check and before the `:1520`
      rebuild.
@@ -78,8 +110,9 @@ retained.
    - The frame discriminant that `emit_pending_vis_owner_loop` writes, and
      the arm that reads it, both come from the stored row id. A discriminant
      that matches no arm becomes a catalogued, fail-closed trap, never
-     `UnclassifiedRuntimeTrap { -1 }`. The Architect rules the site on
-     R-CHAIN-0.
+     `UnclassifiedRuntimeTrap { -1 }`.
+   - **On G1 only:** every response guard whose owner is in the stored
+     plane is emitted through the owner loop, keyed on the stored plane.
 
 ## Acceptance
 
@@ -98,6 +131,8 @@ retained.
   builder, the validator and the diagnostics.
 - **AC-R4 (mutation).** A discriminant mutation yields the catalogued trap,
   not `-1`.
+- **AC-R5 (mutation, on G1).** Mutating owner 4's stored membership yields
+  a catalogued refusal at planning, not `-1`.
 - **AC-4 (controls).** The five sibling rows, SEQUENTIAL with its
   plan-row pins, and `one_bracket_retains_native_parity` stay green. The
   px8ta rows keep their labelled failures. The `units.rs:7831` coverage gate
@@ -107,8 +142,8 @@ retained.
 
 From Architect `evt_6d7m1z6sy31h4`: three hard stops in the owner-0
 settlement chain (`evt_1fvvjj40kk6s9`, `evt_1dynjvvkh7mnf`,
-`evt_5v223fdev9eq7`). Clean checkpoint `b135b25b5`. A research advisory
-and D1f are pending, and the recut scope follows them.
+`evt_5v223fdev9eq7`). Clean checkpoint `b135b25b5`. Research advisory
+`evt_1834zja7bes7c`; D1f ruled `evt_46qkytaf6tx33`.
 
 1. The ownership authority (`inline_synthesized_seat_emission_owners`)
    was keyed on response disposition, while emission was keyed on unit
@@ -117,10 +152,11 @@ and D1f are pending, and the recut scope follows them.
 2. Source (e)'s protocol gate was keyed on the host-effect seat plane,
    which was installed after ownership. Fixed by reordering the seat
    install.
-3. After the planner closes, the linked native run traps `-1`, a
-   malformed token. The cause is not yet localized.
+3. After the planner closes, the linked native run traps `-1`. Narrowed:
+   it is owner 4's Ret-only guard over the shared K Context(2), not owner
+   0's discriminant. D1g decides the cause.
 
-Shared predicate (1 and 2; 3 provisional): owner 0's settlement is a
+Shared predicate (1 and 2; 3 provisional until D1g): owner 0's settlement is a
 cross-owner chained settlement that no plan object names, so each
 consumer re-derives the owner of seat 162 from its own plane.
 
