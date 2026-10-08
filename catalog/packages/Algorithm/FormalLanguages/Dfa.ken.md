@@ -44,32 +44,16 @@ pub data Dfa q a = MkDfa (q → a → q) q (q → Bool)
 
 export MkDfa
 
-pub fn step (q : Type) (a : Type) (d : Dfa q a) (s : q) (x : a) : q =
-  match d {
-    MkDfa transition initial accepting ↦ transition s x
-  }
-
-pub fn start (q : Type) (a : Type) (d : Dfa q a) : q =
-  match d {
-    MkDfa transition initial accepting ↦ initial
-  }
-
-pub fn final (q : Type) (a : Type) (d : Dfa q a) (s : q) : Bool =
-  match d {
-    MkDfa transition initial accepting ↦ accepting s
-  }
-
-pub fn run (q : Type) (a : Type) (d : Dfa q a) (s : q) (w : List a) : q =
-  match w {
-    Nil ↦ s;
-    Cons x rest ↦ run q a d (step q a d s x) rest
-  }
-
-pub fn accepts (q : Type) (a : Type) (d : Dfa q a) (w : List a) : Bool =
-  final q a d (run q a d (start q a d) w)
-
 pub fn complement (q : Type) (a : Type) (d : Dfa q a) : Dfa q a =
   MkDfa q a (step q a d) (start q a d) (λs. bool_not (final q a d s))
+
+pub fn intersection
+      (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a)
+    : Dfa (Pair q r) a =
+  product q r a bool_and d e
+
+pub fn union (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a) : Dfa (Pair q r) a =
+  product q r a bool_or d e
 
 pub fn product
       (q : Type)
@@ -86,13 +70,29 @@ pub fn product
     (mk_pair q r (start q a d) (start r a e))
     (λp. combine (final q a d (pair_fst q r p)) (final r a e (pair_snd q r p)))
 
-pub fn intersection
-      (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a)
-    : Dfa (Pair q r) a =
-  product q r a bool_and d e
+pub fn accepts (q : Type) (a : Type) (d : Dfa q a) (w : List a) : Bool =
+  final q a d (run q a d (start q a d) w)
 
-pub fn union (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a) : Dfa (Pair q r) a =
-  product q r a bool_or d e
+pub fn run (q : Type) (a : Type) (d : Dfa q a) (s : q) (w : List a) : q =
+  match w {
+    Nil ↦ s;
+    Cons x rest ↦ run q a d (step q a d s x) rest
+  }
+
+pub fn step (q : Type) (a : Type) (d : Dfa q a) (s : q) (x : a) : q =
+  match d {
+    MkDfa transition initial accepting ↦ transition s x
+  }
+
+pub fn start (q : Type) (a : Type) (d : Dfa q a) : q =
+  match d {
+    MkDfa transition initial accepting ↦ initial
+  }
+
+pub fn final (q : Type) (a : Type) (d : Dfa q a) (s : q) : Bool =
+  match d {
+    MkDfa transition initial accepting ↦ accepting s
+  }
 ```
 
 ## 3. Using it
@@ -129,36 +129,21 @@ theorem true_is_accepted
 
 ## 4. Laws & proofs
 
-`run_append` is an induction over the first word from any initial state.
-`run_complement` is an induction over the word: the record changes its final
-predicate but retains its transition. That equality is transported through
-the final predicate with `cong` for `accepts_complement`; it is not generally
-an equality that can be closed by reflexivity on an abstract record.
+`accepts_complement` transports run-state equality through the negated final
+predicate with `cong`; that equality is not generally reflexive on an abstract
+record. `accepts_intersection` and `accepts_union` instantiate the general
+`accepts_product` law, which transports a pair-of-runs equality through the
+product's Boolean final predicate. Neither named operation needs its own
+product recursion.
 
-`run_product` inducts from arbitrary component states, preserving the pair of
-runs for the *same* word. Its private empty-word lemma exposes the pair-valued
-equality so that reflexivity checks without relying on a dependent match arm's
-goal reduction. `accepts_product` transports that pair equality through the
-product's Boolean final predicate. The two named acceptance laws instantiate
-this general result; neither has its own product recursion.
+`run_complement` inducts over the word: complement changes the final predicate
+but retains the transition. `run_product` inducts from arbitrary component
+states, preserving the pair of runs for the *same* word. Its private empty-word
+lemma exposes the pair-valued equality so that reflexivity checks without
+relying on a dependent match arm's goal reduction. `run_append` inducts over
+the first word from any initial state.
 
 ```ken
-pub theorem run_append
-      (q : Type) (a : Type) (d : Dfa q a) (s : q) (u : List a) (v : List a)
-    : Equal q (run q a d s (list_append a u v)) (run q a d (run q a d s u) v) =
-  match u {
-    Nil ↦ Refl;
-    Cons x rest ↦ run_append q a d (step q a d s x) rest v
-  }
-
-pub theorem run_complement
-      (q : Type) (a : Type) (d : Dfa q a) (s : q) (w : List a)
-    : Equal q (run q a (complement q a d) s w) (run q a d s w) =
-  match w {
-    Nil ↦ Refl;
-    Cons x rest ↦ run_complement q a d (step q a d s x) rest
-  }
-
 pub theorem accepts_complement
       (q : Type) (a : Type) (d : Dfa q a) (w : List a)
     : Equal Bool (accepts q a (complement q a d) w) (bool_not (accepts q a d w)) =
@@ -170,39 +155,19 @@ pub theorem accepts_complement
     (λs. bool_not (final q a d s))
     (run_complement q a d (start q a d) w)
 
-theorem run_product_nil
-      (q : Type)
-      (r : Type)
-      (a : Type)
-      (combine : Bool → Bool → Bool)
-      (d : Dfa q a)
-      (e : Dfa r a)
-      (s1 : q)
-      (s2 : r)
-    : Equal
-        (Pair q r)
-        (run (Pair q r) a (product q r a combine d e) (mk_pair q r s1 s2) (Nil a))
-        (mk_pair q r s1 s2) =
-  Refl
+pub theorem accepts_intersection
+      (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a) (w : List a)
+    : Equal Bool
+        (accepts (Pair q r) a (intersection q r a d e) w)
+        (bool_and (accepts q a d w) (accepts r a e w)) =
+  accepts_product q r a bool_and d e w
 
-pub theorem run_product
-      (q : Type)
-      (r : Type)
-      (a : Type)
-      (combine : Bool → Bool → Bool)
-      (d : Dfa q a)
-      (e : Dfa r a)
-      (s1 : q)
-      (s2 : r)
-      (w : List a)
-    : Equal
-        (Pair q r)
-        (run (Pair q r) a (product q r a combine d e) (mk_pair q r s1 s2) w)
-        (mk_pair q r (run q a d s1 w) (run r a e s2 w)) =
-  match w {
-    Nil ↦ run_product_nil q r a combine d e s1 s2;
-    Cons x rest ↦ run_product q r a combine d e (step q a d s1 x) (step r a e s2 x) rest
-  }
+pub theorem accepts_union
+      (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a) (w : List a)
+    : Equal Bool
+        (accepts (Pair q r) a (union q r a d e) w)
+        (bool_or (accepts q a d w) (accepts r a e w)) =
+  accepts_product q r a bool_or d e w
 
 pub theorem accepts_product
       (q : Type)
@@ -223,19 +188,55 @@ pub theorem accepts_product
     (final (Pair q r) a (product q r a combine d e))
     (run_product q r a combine d e (start q a d) (start r a e) w)
 
-pub theorem accepts_intersection
-      (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a) (w : List a)
-    : Equal Bool
-        (accepts (Pair q r) a (intersection q r a d e) w)
-        (bool_and (accepts q a d w) (accepts r a e w)) =
-  accepts_product q r a bool_and d e w
+pub theorem run_complement
+      (q : Type) (a : Type) (d : Dfa q a) (s : q) (w : List a)
+    : Equal q (run q a (complement q a d) s w) (run q a d s w) =
+  match w {
+    Nil ↦ Refl;
+    Cons x rest ↦ run_complement q a d (step q a d s x) rest
+  }
 
-pub theorem accepts_union
-      (q : Type) (r : Type) (a : Type) (d : Dfa q a) (e : Dfa r a) (w : List a)
-    : Equal Bool
-        (accepts (Pair q r) a (union q r a d e) w)
-        (bool_or (accepts q a d w) (accepts r a e w)) =
-  accepts_product q r a bool_or d e w
+pub theorem run_product
+      (q : Type)
+      (r : Type)
+      (a : Type)
+      (combine : Bool → Bool → Bool)
+      (d : Dfa q a)
+      (e : Dfa r a)
+      (s1 : q)
+      (s2 : r)
+      (w : List a)
+    : Equal
+        (Pair q r)
+        (run (Pair q r) a (product q r a combine d e) (mk_pair q r s1 s2) w)
+        (mk_pair q r (run q a d s1 w) (run r a e s2 w)) =
+  match w {
+    Nil ↦ run_product_nil q r a combine d e s1 s2;
+    Cons x rest ↦ run_product q r a combine d e (step q a d s1 x) (step r a e s2 x) rest
+  }
+
+theorem run_product_nil
+      (q : Type)
+      (r : Type)
+      (a : Type)
+      (combine : Bool → Bool → Bool)
+      (d : Dfa q a)
+      (e : Dfa r a)
+      (s1 : q)
+      (s2 : r)
+    : Equal
+        (Pair q r)
+        (run (Pair q r) a (product q r a combine d e) (mk_pair q r s1 s2) (Nil a))
+        (mk_pair q r s1 s2) =
+  Refl
+
+pub theorem run_append
+      (q : Type) (a : Type) (d : Dfa q a) (s : q) (u : List a) (v : List a)
+    : Equal q (run q a d s (list_append a u v)) (run q a d (run q a d s u) v) =
+  match u {
+    Nil ↦ Refl;
+    Cons x rest ↦ run_append q a d (step q a d s x) rest v
+  }
 ```
 
 ## 5. Design notes
