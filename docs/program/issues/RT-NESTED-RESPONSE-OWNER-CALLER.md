@@ -42,27 +42,46 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-1. **D0 (measure only, no repair).** Instrument the Specialization(1) body
-   lowering. Report verbatim whether the producer construct at origin 1079
-   is visited there, and under which `defining_owner`. If it is visited
-   elsewhere, report the owner and whether the claim path or an inline path
-   takes it. A visit under another owner is a planned-versus-lowering
-   emission-owner mismatch on the Specialized route; no visit means the
-   specialization body omits the site. The Architect rules the repair from
-   the D0.
-2. **The ruled repair.**
+**D1 ruling (Architect `evt_1qzcc8q84xk0w`, on D0c `evt_49wn8cq76k0f3`):
+a planning selection defect.**
+- **What D0c showed.** Eight of nine owners settle at a consumer seat in
+  their emission Function: by direct claim (owner 5) or at a producer
+  match's bypassed-candidate bridge (owners 1-4 and 6-8). Owner 0's
+  producer, Vis 1079, is the body root of the continuation worker
+  (funcid66), so it has no seat.
+- **The predicate.** In `planning/static_transition/responses.rs` (phase
+  B), a row whose selected caller has
+  `producer_construct_origin == worker_body_origin(emission_owner)` is not
+  Specialized.
+- **The classification.** It goes to the Deferred residual under a new
+  `DeferredResponseSubCase::ContinuationBodyTail`. Every total match over
+  that enum is updated explicitly, with no `_` arm.
+- **The fences.** No lowering change. The coverage gate, the license, the
+  effect guard and the escaped-K guard are unchanged.
+- **Measure in order.**
+  - D1a: the plan has 8 Specialized rows plus Vis 1079 Deferred, and
+    owners 1-8 are unchanged.
+  - D1b: the row builds and runs at parity.
+  - If D1b refuses elsewhere or diverges, stop and report it verbatim. The
+    alternative, owner chaining, is ruled only on that evidence.
 
 ## Acceptance
 
-- **AC-1.** Owner 0's selected caller carries a recorded DirectCall or
-  ComposedCall disposition, and the row is un-ignored and passes on both
-  engines with the exact freeze sequence it asserts.
-- **AC-2 (controls).** The five sibling rows in `rt_span_prov_native.rs`,
+- **AC-1.** `sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines`
+  is un-ignored and green: both engines exit 0 with the exact freeze
+  sequence it asserts.
+- **AC-2 (plan pins).** The test asserts 8 Specialized rows plus Vis 1079
+  Deferred with `ContinuationBodyTail`, and owner 6 (a Specialization
+  emission owner) still Specialized.
+- **AC-3 (mutation, QA).** Removing the predicate brings back owner 0 and
+  the exact D0 refusal (`owner=StaticResponseOwnerId(0)`,
+  `context=ContinuationContextId(2)`, `disposition=None`).
+- **AC-4 (controls).** The five sibling rows in `rt_span_prov_native.rs`,
   the SEQUENTIAL distinguishable witness and its plan-row pins, and
-  `one_bracket_retains_native_parity` stay green. The `units.rs:7831`
+  `one_bracket_retains_native_parity` stay green. The px8ta rows keep
+  their labelled failures. Any other row whose Specialized or Deferred
+  classification moves is listed with its cause. The `units.rs:7831`
   coverage gate is not relaxed.
-- **AC-3 (mutation, QA).** Reverting the repair returns the row to the
-  ObjectEmission refusal with `disposition=None`.
 
 ## Stop conditions
 
