@@ -727,10 +727,11 @@ fn reached_nat_arm_variant(arm: &str) -> String {
 // THE GAP: these fixtures do not cover every future host-derived Nat source
 // or scalar representation; non-Nat carried constructor families remain
 // subject to their original class guard.
-// The landed pre-repair Nat build overflowed the default test thread. This
-// row keeps the existing 256 MiB helper; a disposable mincore probe after all
-// three passing variants touched 3260 KiB (3260 KiB RSS, zero swap). The
-// provision is 80.4 times that measured depth, not default-stack adequacy.
+// Earlier baseline 52dd8640 and candidate 3cd909fd3 Nat builds overflowed
+// the default test thread. This row keeps the existing 256 MiB helper; a
+// disposable mincore probe after all three passing variants touched 3260 KiB
+// (3260 KiB RSS, zero swap). The provision is 80.4 times that measured depth,
+// not a claim of default-stack adequacy on the current candidate.
 #[test]
 fn nat_fanout_reached_live_resource_matches_interpreter() {
     in_large_stack_thread("rt-escape-nat-reached", || {
