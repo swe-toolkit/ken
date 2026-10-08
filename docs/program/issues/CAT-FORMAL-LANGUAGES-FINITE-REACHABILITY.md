@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-FINITE-REACHABILITY
 title: "A Dfa's emptiness and reachability cannot be decided in the catalog, because there is no finite-state evidence. Land Data.Finite.Finite (an Omega-membership enumeration certificate, fin_finite, pair_finite) and Algorithm.FormalLanguages.Reachability (a certificate-returning search with sound and complete laws, is_empty, accepted_word), fully proved and Axiom-free"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -112,3 +112,14 @@ base, stop and report the mismatch.
 - A law needs an Axiom, a primitive, or a kernel or trust change.
 - An import's delivered form does not fit where the stand-in was used and
   the proof needs more than an argument reorder.
+
+## Closeout
+
+Merged `48c333620` from exact `b953a1496` (PR #4609). QA
+`evt_2t1x7173y1re9`, Architect `evt_4xyn6ae06nd6t`, Decision
+`dec_rmzvv4q5zb8m`. `Data.Finite.Finite` lands with `Finite`, `elements`,
+`covers`, `fin_finite` and `pair_finite`, and
+`Algorithm.FormalLanguages.Reachability` with `find_word`, `reachable`,
+`accepted_word` and `is_empty` and their sound and complete laws, at zero
+trust. Vector publishes `pub data Fin` and `export FZero, FSuc` as the
+bounded-index provider; Derived gains the Ω-valued `list_elem` family.

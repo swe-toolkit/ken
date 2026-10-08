@@ -1,6 +1,6 @@
 ---
 id: RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT
-title: "Native lowering has no representation for a relay Vis (a K that forwards a pattern-bound operation, or a functional-IH reference) returned to a response owner, so after RT-NESTED-RESPONSE-OWNER-CALLER every such owner is refused at planning, and the ignored rt_span_prov_native:355 and r2 (rt_escape_second_resource_native:1015) rows stay ignored. Give the relay a planned native arm that settles it at interpreter parity"
+title: "Native lowering has no representation for a relay Vis (a K that forwards a pattern-bound operation, or a functional-IH reference) returned to a response owner beside a non-relay member, so such an owner is emitted Ret-only and traps -1 (or is unplanned), and the ignored rt_span_prov_native:355 and r2 (rt_escape_second_resource_native:1015) rows stay ignored. Refuse at planning, on a discriminant read from the settling plane, every owner native lowering cannot settle, and give the relay a planned native arm that settles it at interpreter parity"
 status: ready
 owner: runtime
 size: L
@@ -34,18 +34,27 @@ un-ignored and pass on both engines.
   installed 528 (row 5, Context(6) = funcid71/body515, which is empty).
 - **Why the owner is excluded today.** The whole-owner relay exclusion
   (`returned_vis.rs:326`) is keyed on the relay IH K having no native
-  value or environment representation. Lowering has no relay arm.
+  value or environment representation.
+- **Member shape does not separate them** (Architect `evt_ak61svpj64m6`).
+  ABI-S6 owner 0 (`abi_s6_mapping_surface_native`, 6 rows) is a mixed
+  relay owner and runs green at baseline. Span owner 4 and r2 owners 2 and
+  3 are mixed and trap. Non-relay members are settled natively by the
+  owner loop (`units.rs:3256`) or the handler-owned drive (`core.rs`
+  ~6918-6950, gated on `deferred_response_at_vis` and
+  `bounded_deferred_response_handler_owner`).
 - **The seat plane has no relay seat.** `build_host_effect_seat_plan`
   (`effects.rs:658`) iterates static `RuntimeExpr::Effect` occurrences, so
   a forwarded operation has no seat of its own.
 - **The predecessor's state.** RT-NESTED-RESPONSE-OWNER-CALLER stores each
-  owner's `ResponseOwnerSettlement`, and its planning refusal names owner 4
-  with `Relay`. This WP turns that `Relay` classification into a settled
-  route; it does not relax the refusal for any other `Excluded` owner.
+  owner's `ResponseOwnerSettlement` (`Protocol`, `RetOnly`,
+  `Excluded{Relay|Underived}`) with no planning refusal: `Excluded` owners
+  keep the baseline Ret-only arm, and every native row keeps its
+  `c7c05d4e6` result. Its handoff carries a per-member census (relay,
+  installed, successor, drive coverage) for every `Excluded` owner.
 
 - **The r2 population** (from `RT-SOURCE-IH-RELAY-K-VALUE`, Architect
-  `evt_1j5qaw2d9sqe7`). The predecessor refuses r2's owners 2 and 3
-  (Relay). The relay's K operand is `CheckedComputationalIHInvocation {
+  `evt_1j5qaw2d9sqe7`). r2's owners 2 and 3 are `Excluded{Relay}`
+  and mixed. The relay's K operand is `CheckedComputationalIHInvocation {
   body: Call { callee: Var(0), args: [] } }`, which lowers to
   `Specialized(RecursiveBackedge)` because `ConstructArgument`
   (`source.rs:1643-1655`) propagates a backedge past the constructor, so
@@ -64,17 +73,31 @@ base, stop and report the mismatch.
      whose operation can flow into each relay's `Var`;
    - (ii) the relay IH K's capture and environment layout at the return,
      against the existing pending-Vis frame region;
+   - (iii) from the predecessor's census, for each `Excluded` owner,
+     whether the handler-owned drive settles it: whether
+     `deferred_response_at_vis` and `bounded_deferred_response_handler_owner`
+     cover every forwarded Vis's construct site;
 
-   over both populations: the span's owners 3 and 4, and r2's owners 2 and
-   3. If one design cannot settle both, the D0 says so and the Architect
-   rules whether to split.
+   over both populations: the span's owner 4 and r2's owners 2 and 3. If
+   one design cannot settle both, the D0 says so and the Architect rules
+   whether to split.
+
+   From (iii) the Architect rules the **planning-refusal discriminant**
+   (`evt_ak61svpj64m6`). It is read from the settling plane, separates span
+   owner 4 and r2 owners 2 and 3 (which trap) from ABI-S6 owner 0
+   (settled), and is checked against every `Excluded` owner in the census
+   before any refusal is written. If no discriminant on the planned data
+   separates them, **stop** to the Steward.
 
    Pre-ruled (Architect `evt_14w6eh1d2hwk4`): if (i) is closed and
    finite, the relay arm dispatches over the planned seats of exactly
    that set, and the node proceeds. If (i) is open, **stop**: a precursor
    node for dynamic host-effect dispatch comes first.
-2. **The ruled relay arm,** with `Relay` admitted at planning only for an
-   owner whose relay provenance set is planned.
+2. **The ruled planning refusal,** naming every refused owner, placed at
+   `planner.finish(`'s single caller after the cfg'd recorders
+   (`evt_59xpt6t02wdpq`).
+3. **The ruled relay arm,** with an owner admitted at planning only when
+   its relay provenance set is planned.
 
 ## Acceptance
 
@@ -82,25 +105,27 @@ base, stop and report the mismatch.
   the exact freeze sequence it asserts.
 - **AC-1b.** r2 (`:1015`) is un-ignored and green, with the full 42 §6.4
   envelope and the terminal result agreeing on both engines. The three r2
-  compile-or-inspect rows pinned to the predecessor's refusal move to the
-  admitted plan.
+  compile-or-inspect rows (:861, :913, :970) pin the admitted plan.
 - **AC-5 (mutation, QA).** Deleting source (e) yields the ObjectEmission
   refusal (owner 0, context 2) on the span row. This is carried from the
   predecessor, where lowering is not reached.
 - **AC-R3.** As listed in the recut `evt_2091hd1wtkhs5`; moved here by
   `evt_14w6eh1d2hwk4`.
 - **AC-2 (control).** An `Excluded{Underived}` owner, and a relay whose
-  provenance set is not planned, keep the predecessor's typed planning
-  refusal.
+  provenance set is not planned, are refused at planning with the exact
+  typed text. ABI-S6 is 12/12.
 - **AC-3 (mutation, QA).** Removing the relay arm returns the span row and
-  r2 to the predecessor's `Relay` refusal, never to `-1`.
+  r2 to the planning refusal, never to `-1`.
+- **AC-6 (mutation, QA).** Classifying ABI-S6 owner 0 as refused reddens
+  its six rows at the refusal, so the discriminant is load-bearing.
 - **AC-4 (controls).** SEQUENTIAL, `one_bracket_retains_native_parity`,
   the five sibling rows and the predecessor's AC-R6 census population stay
   green; px8ta keeps its labelled failures.
 
 ## Stop conditions
 
-- D0 (i) is open.
+- D0 (i) is open, or no planning-refusal discriminant separates the
+  trapping owners from ABI-S6 owner 0.
 - The repair touches the bracket tree, moves a held ref
   (`wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, `wp/RT-BRACKET-SETTLEMENT-PLANE`,
   `4b4c8565c`, `21c039918`, `7f1a04a40`), or relaxes the `units.rs:7831`
