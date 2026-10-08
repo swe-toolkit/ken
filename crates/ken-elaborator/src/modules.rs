@@ -37,6 +37,13 @@ use crate::ElabEnv;
 /// Persistent cross-call module bookkeeping (lives on `ElabEnv`).
 #[derive(Default, Clone)]
 pub struct ModuleState {
+    /// Checked source-declaration descriptions by ID, retained for an
+    /// order-independent diagnostic when another declaration takes the same
+    /// canonical globals key. Unlike a spelling lookup this survives rebinds.
+    declaration_descriptions: HashMap<ken_kernel::GlobalId, String>,
+    /// Provenance of each elaborator-minted symbol, keyed by the checked
+    /// declaration rather than the replaceable entry in `globals`.
+    minted_spellings: HashMap<ken_kernel::GlobalId, MintedSpelling>,
     /// The anonymous boundary parsed from the active root source unit. This is
     /// the shared reader seam: admission consumes `admits`; the runner may
     /// independently consume `capabilities` after elaboration.
@@ -136,6 +143,9 @@ struct ExportProvenance {
 
 impl ModuleState {
     pub(crate) fn scrub_global_ids(&mut self, removed: &HashSet<ken_kernel::GlobalId>) {
+        self.declaration_descriptions
+            .retain(|id, _| !removed.contains(id));
+        self.minted_spellings.retain(|id, _| !removed.contains(id));
         self.root_scope.scrub_global_ids(removed);
         for scope in self.loaded_unit_scopes.values_mut() {
             scope.scrub_global_ids(removed);
@@ -3277,22 +3287,149 @@ fn elaborate_checked(
     rdecl: &crate::resolve::RDecl,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    elaborate_checked_as(elab, rdecl, rdecl.name.clone(), declared_fixity)
+    elaborate_checked_as(elab, rdecl, rdecl.name.clone(), None, declared_fixity)
+}
+
+fn describe_instance_head(ty: &RType) -> String {
+    match ty {
+        RType::RCon(name, _)
+        | RType::RCheckedGlobal { name, .. }
+        | RType::RVarTy(_, name, _)
+        | RType::RPatternAliasTy(_, name, _) => name.clone(),
+        RType::RApp(function, argument, _) => format!(
+            "({} {})",
+            describe_instance_head(function),
+            describe_instance_head(argument)
+        ),
+        RType::RArr(a, b, _) | RType::REffectArr(a, _, b, _) => format!(
+            "({} -> {})",
+            describe_instance_head(a),
+            describe_instance_head(b)
+        ),
+        RType::RPi(binder, a, b, _) => format!(
+            "({binder} : {}) -> {}",
+            describe_instance_head(a),
+            describe_instance_head(b)
+        ),
+        RType::RSigma(binder, a, b, _) => format!(
+            "({binder} : {}) × {}",
+            describe_instance_head(a),
+            describe_instance_head(b)
+        ),
+        RType::RUniv(None, _) => "Type".to_string(),
+        RType::RUniv(Some(level), _) => format!("Type {level}"),
+        RType::RTrunc(inner, _) => format!("‖{}‖", describe_instance_head(inner)),
+        RType::RRefine(_, carrier, _, _) => describe_instance_head(carrier),
+        RType::RProj(_, field, _) => format!("projection .{field}"),
+    }
+}
+
+fn describe_checked_declaration(rdecl: &RDecl) -> String {
+    match &rdecl.kind {
+        RDeclKind::InstanceDecl { head_type, .. } => {
+            format!(
+                "instance {} {}",
+                rdecl.name,
+                describe_instance_head(head_type)
+            )
+        }
+        RDeclKind::DeriveDecl { data_name, .. } => {
+            format!("derive {} for {data_name}", rdecl.name)
+        }
+        RDeclKind::View { keyword, .. } => {
+            let kind = match keyword {
+                crate::ast::DefKeyword::Const => "const",
+                crate::ast::DefKeyword::Fn => "fn",
+                crate::ast::DefKeyword::Proc => "proc",
+            };
+            format!("{kind} {}", rdecl.name)
+        }
+        RDeclKind::ClassDecl { .. } => format!("class {}", rdecl.name),
+        RDeclKind::DataDecl { .. } | RDeclKind::ExplicitDataDecl { .. } => {
+            format!("data {}", rdecl.name)
+        }
+        RDeclKind::TypeAlias { .. } => format!("def {}", rdecl.name),
+        _ => format!("declaration {}", rdecl.name),
+    }
 }
 
 fn elaborate_checked_as(
     elab: &mut ElabEnv,
     rdecl: &crate::resolve::RDecl,
     owner: String,
+    minted: Option<MintedSpelling>,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    elab.with_owner(owner, |elab| {
+    // A later source unit may lawfully rebind a user-spelled name. A minted
+    // identity checks the prior provider's derivation, not just its spelling.
+    let previous = if minted.is_some() {
+        elab.globals.get(&owner).copied()
+    } else {
+        None
+    };
+    let previous_minted =
+        previous.and_then(|id| elab.module_state.minted_spellings.get(&id).cloned());
+    let previous_instance_key = previous.and_then(|id| {
+        elab.class_env
+            .instances_by_id
+            .iter()
+            .find_map(|(key, info)| (info.instance_id == id).then(|| key.clone()))
+    });
+    let previous_description = previous.map(|id| {
+        elab.module_state
+            .declaration_descriptions
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| format!("declaration {owner}"))
+    });
+    elab.with_owner(owner.clone(), |elab| {
         elab.with_env_mark_rollback(|elab| {
-            if declared_fixity.is_none() && !rdecl.contains_infix_spine {
+            let result = if declared_fixity.is_none() && !rdecl.contains_infix_spine {
                 elaborate_checked_spine_free(elab, rdecl)
             } else {
                 elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
+            }?;
+            if let Some(previous) = previous {
+                let same_instance_key = matches!(
+                    rdecl.kind,
+                    RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. }
+                ) && previous_instance_key.as_ref().is_some_and(|key| {
+                    elab.class_env
+                        .instances_by_id
+                        .get(key)
+                        .is_some_and(|info| info.instance_id == result.def_id)
+                });
+                // A later owner may replace a minted key if both names came
+                // from the same canonical class/head spelling pair. The old
+                // checked dictionary remains in the identity-keyed registry.
+                let rebound_spelling = previous_minted.is_some() && previous_minted == minted;
+                if previous != result.def_id && !same_instance_key && !rebound_spelling {
+                    // Elaboration has already inserted the new dictionary at
+                    // this key. Restore the checked predecessor before the
+                    // environment mark rolls back the new GlobalId.
+                    elab.globals.insert(owner.clone(), previous);
+                    let mut declarations = [
+                        previous_description.expect("description captured with previous ID"),
+                        describe_checked_declaration(rdecl),
+                    ];
+                    declarations.sort();
+                    return Err(ElabError::DeclarationIdentityCollision {
+                        identity: owner.clone(),
+                        first: declarations[0].clone(),
+                        second: declarations[1].clone(),
+                        span: rdecl.span.clone(),
+                    });
+                }
             }
+            elab.module_state
+                .declaration_descriptions
+                .insert(result.def_id, describe_checked_declaration(rdecl));
+            if let Some(spelling) = minted {
+                elab.module_state
+                    .minted_spellings
+                    .insert(result.def_id, spelling);
+            }
+            Ok(result)
         })
     })
 }
@@ -3470,11 +3607,21 @@ fn canonical_leaf(name: &str) -> &str {
     name.rsplit('.').next().unwrap_or(name)
 }
 
+/// The canonical spelling pair an elaborator-minted identity was derived
+/// from. Equal pairs with distinct checked IDs are a later owner rebinding
+/// the same spelling; distinct pairs minting one key are a collision.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MintedSpelling {
+    class: String,
+    head: String,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct SynthesizedDictionaryName {
     surface: String,
     canonical: String,
     class_canonical: String,
+    head_canonical: String,
 }
 
 fn synthesized_dictionary_name(
@@ -3494,6 +3641,7 @@ fn synthesized_dictionary_name(
         ),
         canonical: format!("{resolved_class}_instance_{resolved_head}"),
         class_canonical: resolved_class,
+        head_canonical: resolved_head,
     })
 }
 
@@ -4808,10 +4956,22 @@ fn expand_scope(
                         || structural.clone().unwrap_or_else(|| rdecl.name.clone()),
                         |name| name.canonical.clone(),
                     );
+                    let minted = match (&dictionary, &structural) {
+                        (Some(name), _) => Some(MintedSpelling {
+                            class: name.class_canonical.clone(),
+                            head: name.head_canonical.clone(),
+                        }),
+                        (None, Some(symbol)) => Some(MintedSpelling {
+                            class: rdecl.name.clone(),
+                            head: symbol.clone(),
+                        }),
+                        (None, None) => None,
+                    };
                     let mut result = elaborate_checked_as(
                         elab,
                         &rdecl,
                         owner,
+                        minted,
                         pending_fixity_for(&declared_fixities, &rdecl.name),
                     )?;
                     if let Some(name) = &structural {
@@ -7381,6 +7541,64 @@ mod namespace_effect_tests {
                 error: ken_kernel::KernelError::TypeMismatch { .. }, ..
             })
         ), "memory-selected Nat telescope must refuse file-only True");
+    }
+
+    /// Promise class: durable invariant (spec 33 §§3.3, 5.3–5.5, 39 §6).
+    /// MEASURED: a user-spelled data rebind and its same-spelling minted
+    /// dictionary both admit; the old/new checked-head registry keys retain
+    /// their own dictionaries and a use of the new head selects the new one.
+    /// CLAIMED: a later provider of the same canonical spelling pair does
+    /// not erase the earlier provider's checked identity. THE GAP: a later
+    /// user declaration replacing a dictionary is a separate successor WP.
+    #[test]
+    fn rebound_head_instances_keep_both_checked_providers() {
+        let root = inline_owner_root(
+            "pub class Pick carrier { selected : Bool }\npub data Foo = MkOldFoo\ninstance Pick Foo { selected = True }\n",
+        );
+        fs::write(
+            root.path().join("P.ken"),
+            "export A (Pick, Foo, Pick_instance_Foo)\n",
+        ).expect("write provider facade");
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_module_from_roots_strict(&[root.path().to_path_buf()], "P")
+            .expect("file provider and its dictionary export");
+        let class_id = env.globals["Pick"];
+        let old_head = env.globals["A.Foo"];
+        let old_dictionary = env.globals["Pick_instance_A.Foo"];
+        assert_eq!(
+            env.module_state.file_export_ids["P"]["P"]["Pick_instance_Foo"],
+            old_dictionary,
+            "provider's checked export must retain the old dictionary ID"
+        );
+        env.resolution_provenance.clear();
+        let results = env.elaborate_file_v1(
+            "module A { import P (Pick) pub data Foo = MkNewFoo instance Pick Foo { selected = False } const selected : Bool where Pick Foo = d.selected }",
+        ).expect("new checked head, dictionary and use in the same provider scope");
+        let new_head = env.globals["A.Foo"];
+        let new_dictionary = env.globals["Pick_instance_A.Foo"];
+        assert_ne!(old_head, new_head);
+        assert_ne!(old_dictionary, new_dictionary);
+        assert!(results.iter().any(|result| result.def_id == new_head));
+        assert!(results.iter().any(|result| result.def_id == new_dictionary));
+        assert_eq!(
+            env.module_state.file_export_ids["P"]["P"]["Pick_instance_Foo"],
+            old_dictionary,
+            "the file provider keeps its immutable checked export"
+        );
+        use crate::classes::InstanceHeadKey;
+        assert_eq!(
+            env.class_env.instances_by_id[&(class_id, InstanceHeadKey::Global(old_head))].instance_id,
+            old_dictionary
+        );
+        assert_eq!(
+            env.class_env.instances_by_id[&(class_id, InstanceHeadKey::Global(new_head))].instance_id,
+            new_dictionary
+        );
+        assert_eq!(
+            env.resolution_provenance.last().map(|entry| entry.instance_id),
+            Some(new_dictionary),
+            "where Pick Foo on the new Foo selects the rebound dictionary"
+        );
     }
 
     /// Promise class: durable invariant (spec 33 §§5.3–5.5, 39 §6).

@@ -192,6 +192,15 @@ pub enum ElabError {
     UnsupportedSpacePlacement { placement: String, span: Span },
     /// A `ConId` with no global declaration.
     UnresolvedCon { name: String, span: Span },
+    /// Two distinct checked declarations occupy one canonical identity key.
+    /// The two source descriptions are sorted so either declaration order
+    /// produces the same diagnostic; `span` identifies the later admission.
+    DeclarationIdentityCollision {
+        identity: String,
+        first: String,
+        second: String,
+        span: Span,
+    },
     /// A second top-level definition of a name already defined in the same
     /// compilation unit (`33 §3`, ADR 0014 MRES-5/MRES-7).
     DuplicateDefinition { name: String, span: Span },
@@ -650,6 +659,15 @@ impl fmt::Display for ElabError {
             ElabError::UnresolvedCon { name, span } => {
                 write!(f, "unresolved type '{}' at {}-{}", name, span.start, span.end)
             }
+            ElabError::DeclarationIdentityCollision {
+                identity,
+                first,
+                second,
+                ..
+            } => write!(
+                f,
+                "declaration identity collision for `{identity}`: `{first}` and `{second}`",
+            ),
             ElabError::DuplicateDefinition { name, span } => write!(
                 f,
                 "duplicate definition '{}' at {}-{}: name already defined in this compilation unit",
