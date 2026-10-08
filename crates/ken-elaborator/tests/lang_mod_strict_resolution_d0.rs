@@ -418,6 +418,22 @@ fn catalog_ambient_passthrough_migration_census() {
 
     let expected = vec![
         (
+            "Algorithm.FormalLanguages.Dfa".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Algorithm.Numeric.Gcd".to_string(),
             ["And", "and_fst", "and_intro", "and_snd"]
                 .into_iter()
