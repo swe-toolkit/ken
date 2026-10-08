@@ -110,17 +110,30 @@ retained.
      `response_owner_settlements`. The emitter (`units.rs` ~4572) selects
      its arm from the classification alone, and any other combination is a
      backend error, not a Ret-only body.
-   - **(b) Refusal at planning.** `admit_response_owner_settlements()`, run
-     in `finish` right after `self.plan.validate()?`, refuses every
-     `Excluded` owner, mixed or not, with "response owner .. K returns a
-     Vis outside the pending-Vis protocol (..)". It runs after closure, so
-     every plane is built and validated first.
+   - **(b) Refusal at planning** (placement and text per Architect
+     `evt_59xpt6t02wdpq`). `admit_response_owner_settlements()` refuses
+     when any owner is `Excluded`, mixed or not, and names every excluded
+     owner: "response owners K return a Vis outside the pending-Vis
+     protocol: <owner> (<reason>), ...". It is called at
+     `planner.finish(`'s single caller (`static_transition.rs:1052`), after
+     the cfg'd test-support recorders, not inside `finish`. A refused plan's
+     validated planes therefore stay observable, and production builds are
+     unchanged.
+   - **The r2 rows** (`rt_escape_second_resource_native.rs`) are re-pinned
+     to (b), whose text names owners 2 and 3 (Relay):
+     - `r2_relay_owner_is_excluded_from_pending_vis_protocol` (:861) and
+       `r2_process_carrier_domain_keeps_persistent_match_child_owners`
+       (:913): `expect_err` on the exact measured Display text, with every
+       diagnostics assertion unchanged;
+     - `r2_pre_schema_response_selection_retains_selected_transport` (:970):
+       the tolerant `if let Err` arm becomes the same exact required `Err`;
+     - the doc comments at :852-859 and :962-968 say r2 refuses at planning
+       under (b);
+     - :1015 stays ignored. Its reason becomes
+       `RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT: ` followed by the measured
+       (b) text.
 
 ## Acceptance
-
-The implementer confirms each pin can be observed through the existing
-test-support hooks. A pin that cannot be observed before `finish` returns
-Err moves to the successor and is reported.
 
 - **AC-2 (plan pins).** 8 Specialized rows plus Vis 1079 Deferred with
   `ContinuationBodyTail`, and owner 6 still Specialized, through the
@@ -137,14 +150,20 @@ Err moves to the successor and is reported.
 - **AC-R2.** `build_pending_vis_settlements` is called only at the builder
   site and by the validator. `returned_vis_protocol` keeps its diagnostics
   caller (`:1354`).
-- **AC-R5.** The span row gets exactly the (b) refusal, naming owner 4 with
-  `Relay`, and its ignore reason is that text.
+- **AC-R5.** The span row's refusal names exactly
+  `StaticResponseContinuationId(3) (Relay), StaticResponseContinuationId(4)
+  (Relay)`, and its ignore reason is the full measured Display text.
 - **AC-R6 (census and stop).** A classification census (counts of
   `Protocol`, `RetOnly`, `Excluded{Relay}` and `Excluded{Underived}`) over
-  the native suites run locally. SEQUENTIAL, `one_bracket_retains_native_parity`
-  and every native row green on `c7c05d4e6` stay green. **If a previously
-  green row newly refuses under (b), stop** and report the row and its
-  classification.
+  **all** native suites. SEQUENTIAL and `one_bracket_retains_native_parity`
+  stay green. **Stop** if a row whose program executes natively (a
+  differential or run row) and is green on `c7c05d4e6` newly refuses. A
+  compile-or-inspect row that newly refuses is re-pinned to the exact (b)
+  text only if its program's execution row is ignored or red at baseline,
+  measured per row and listed in the handoff; otherwise stop.
+- **AC-R7 (mutation, QA).** Deleting the
+  `plan.admit_response_owner_settlements()?` call reddens the three r2
+  rows at their `expect_err`. They are the un-ignored in-suite pin of (b).
 - **AC-4 (controls).** The five sibling rows stay green, the px8ta rows keep
   their labelled failures, and the `units.rs:7831` coverage gate is not
   relaxed.
