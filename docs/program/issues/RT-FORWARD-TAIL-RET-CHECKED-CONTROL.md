@@ -1,7 +1,7 @@
 ---
 id: RT-FORWARD-TAIL-RET-CHECKED-CONTROL
 title: "Lowering refuses a forward Tail producer-to-Ret edge whose Ret body carries nested checked control ('the active carried frame has no installed strict Ret sink'), while the planner certifies it; installing the sink naively traps or drops an effect. Build the capability so the reached Nat fanout and the escaped-buffer fanning row run natively with interpreter parity"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -117,3 +117,12 @@ what the candidate produces at that gate. The product held each time. The
 remaining gates are ruled only from a measured discrimination table: each
 candidate mutant run against the current WIP, with its reach count and
 observation. No product recut.
+
+## Closeout
+
+Merged `79f44eecb` from exact `1c9e4cb01` (PR #4583). Runtime QA
+`evt_10q8j2zkkx02x`, Architect `evt_2qypjh9c1yws3`, Decision
+`dec_1vawdh62wvnt2`. The forward-tail `Ret` lowers under checked control
+with `:616` at parity, and Nat fails closed. The first route `d6751ad0f` went
+CI red on an obsolete mutation pin. The respin retired that pin and pins the
+strict `Ret` predicate instead (Architect `evt_6k649fkg7a054`, §1a 4).

@@ -1,7 +1,7 @@
 ---
 id: RT-ESCAPE-FSHANDLE-FANNING-UNIGNORE
 title: "The ignored escaped-FsHandle fanning row (rt_escape_second_resource_native.rs:584) no longer refuses: on landed main it passes native-versus-interpreter parity under a 256 MiB stack, so its BoundaryCarrier ignore is stale. Un-ignore it with a measured stack provision and full parity"
-status: ready
+status: active
 owner: runtime
 size: S
 tier: T2
