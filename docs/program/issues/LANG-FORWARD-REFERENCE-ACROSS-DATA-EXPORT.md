@@ -1,7 +1,7 @@
 ---
 id: LANG-FORWARD-REFERENCE-ACROSS-DATA-EXPORT
 title: "Spec 33 §8.4 delivers forward references across all top-level declarations in a scope, but the module loader groups definitions only within a maximal run that any export or data declaration ends, so a definition cannot name a sibling defined after an intervening data or export. Deliver scope-wide forward references"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -109,3 +109,15 @@ here.
 - The mechanism needs a spec change (for example, a forward reference to a
   `data` constructor is not well-defined under §8.4). Stop to the Architect.
 - Any kernel change.
+
+## Closeout
+
+Merged `6f3b0aceb` from exact `3a93893c3` (PR #4589). Language QA
+`evt_5d9b46rgv3mm3`, Architect `evt_198jsh51szdfy`, Decision
+`dec_4p874jmbj8xnk`. A declaration may refer forward across a `data`
+declaration or an `export` in the same module; a local family-qualified
+`T.C` selects the checked constructor identity. The superseded KTR2
+forward-data refusal pin is replaced by a both-orders admission row. The
+earlier routes `3d47d5534` and `34bf5caeb` were CI-red and withdrawn.
+Carried, out of scope: the pre-existing later pub-loop collision the
+Architect noted at review.

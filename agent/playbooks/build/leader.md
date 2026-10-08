@@ -218,6 +218,14 @@ GitHub workspace checks before merging. If a frame's AC literally says "run
 `cargo test --workspace`," it is mis-authored; validate targeted and flag it to
 the Steward, don't push a full local build onto your implementer/QA.
 
+## Never tell your ring to wait for the build lock
+
+`scripts/ken-cargo` queues on the shared build lock itself, and no seat sends
+a lock-release notice. Never tell a ring member to pause, hold off queueing,
+or wait for a lock signal. Tell it to run through `scripts/ken-cargo` now and
+keep its turn active until the run reports, requeuing once with
+`KEN_BUILD_WAIT=7200` if it times out waiting for the lock.
+
 ## External interface (you are the front desk)
 
 **You do not touch GitHub or CI** — that is the publisher path's
