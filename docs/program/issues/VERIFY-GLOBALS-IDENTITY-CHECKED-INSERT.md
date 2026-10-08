@@ -56,12 +56,16 @@ base, stop and report the mismatch.
 2. **The repair, in `modules.rs`** (the code is in `evt_5tabgdgdagjcz`).
    - One helper, `with_declaration_identities`, replaces the three window
      compositions. No `globals` signature changes.
-   - `MintedSpelling` becomes an enum: `Dictionary`, `LawField` and
-     `SpaceOperation`. Each binding carries an `IdentityProvenance` of
-     `Source` or `Minted(..)`.
+   - `MintedSpelling` becomes an enum: `Dictionary`, `LawField`,
+     `SpaceOperation` and `PropIntro` (Architect `evt_38anft9epcv9e`). Every
+     `match` over it is exhaustive, with no wildcard. Each binding carries
+     an `IdentityProvenance` of `Source` or `Minted(..)`.
    - An exhaustive enumerator, `declared_identities(rdecl, owner, minted)`,
      with no `_` arm, lists the keys each declaration binds: constructors
-     as Source, law fields and space operations as Minted.
+     as Source; law fields, space operations and each prop intro helper
+     (`format!("{}.{}", rdecl.name, intro.name)`, byte-identical to the
+     key at `elab.rs:17827`) as Minted. The Architect's sweep on
+     `c51e9351f` found no other undeclared key family.
    - The window refuses with `DeclarationIdentityCollision` when a
      displacement is not lawful: Source over Source and an equal Minted
      pair are lawful, a mixed pair is not, and `same_instance_key` is kept
@@ -86,10 +90,16 @@ base, stop and report the mismatch.
     spelling;
   - `law Foo { a : .. }` against `const Foo_a`, in both orders;
   - a space operation against a same-spelled const, in both orders.
+
+  A prop with one intro elaborates: its helper key is bound to the
+  theorem's GlobalId, and `minted_spellings` records `PropIntro{prop,
+  intro}`. A helper arriving over an existing key keeps the baseline
+  "duplicate proof name" refusal.
 - **AC-2 (control).** VERIFY-NAMED-HEAD's suite stays 7/7, along with
   `modules::namespace_effect_tests` and `lang_instance_registry_identity_key`
-  (5/5). The full `scripts/ken-cargo test -p ken-elaborator --lib` passes
-  and is part of the QA gate. No catalog package is refused or changes hash.
+  (5/5). The three namespace rows that tripped the enumerator stop
+  (`evt_1ewt40dwws32v`) pass unmodified. The full `scripts/ken-cargo test
+  -p ken-elaborator --lib` passes and is part of the QA gate. No catalog package is refused or changes hash.
 - **AC-3 (mutation, QA).** Making `(Minted(_), Source)` lawful returns the
   constructor-after-instance witness to admitting with the key overwritten,
   and reddens AC-1.
@@ -99,6 +109,9 @@ base, stop and report the mismatch.
 - **AC-5 (mutation, QA).** Dropping the constructor keys from the DataDecl
   arm makes every data declaration with constructors refuse with exactly
   "declaration bound undeclared identity keys", never a silent admit.
+- **AC-5b (mutation, QA).** Moving the Prop arm back into the `source()`
+  group reddens the three namespace rows with exactly `declaration bound
+  undeclared identity keys ["A.HasProof.intro"]`.
 - **AC-6 (cost).** Report base-against-candidate wall time on the two
   largest catalog package targets. **Stop** above +5%; the Architect then
   rules whether to narrow the scan.
