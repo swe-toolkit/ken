@@ -42,46 +42,66 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-**D1 ruling (Architect `evt_1qzcc8q84xk0w`, on D0c `evt_49wn8cq76k0f3`):
-a planning selection defect.**
-- **What D0c showed.** Eight of nine owners settle at a consumer seat in
-  their emission Function: by direct claim (owner 5) or at a producer
-  match's bypassed-candidate bridge (owners 1-4 and 6-8). Owner 0's
-  producer, Vis 1079, is the body root of the continuation worker
-  (funcid66), so it has no seat.
-- **The predicate.** In `planning/static_transition/responses.rs` (phase
-  B), a row whose selected caller has
-  `producer_construct_origin == worker_body_origin(emission_owner)` is not
-  Specialized.
-- **The classification.** It goes to the Deferred residual under a new
-  `DeferredResponseSubCase::ContinuationBodyTail`. Every total match over
-  that enum is updated explicitly, with no `_` arm.
-- **The fences.** No lowering change. The coverage gate, the license, the
-  effect guard and the escaped-K guard are unchanged.
-- **Measure in order.**
-  - D1a: the plan has 8 Specialized rows plus Vis 1079 Deferred, and
-    owners 1-8 are unchanged.
-  - D1b: the row builds and runs at parity.
-  - If D1b refuses elsewhere or diverges, stop and report it verbatim. The
-    alternative, owner chaining, is ruled only on that evidence.
+**Recut (Architect `evt_2091hd1wtkhs5`, on Research `evt_1834zja7bes7c`;
+§1a at 3).** The WP id is kept. One thing is replaced: each consumer's own
+derivation of the chained settlement. Everything already proved is
+retained.
+- **Retained:** the D1 `ContinuationBodyTail` predicate
+  (`evt_1qzcc8q84xk0w`); source (e) (`evt_38ayfhrhqq8q3`), which changes
+  only what it reads; the seat-install move from `b135b25b5`.
+
+1. **R-CHAIN-0 (D0, measurement only, on `b135b25b5`).** This folds in
+   D1f (`evt_6d7m1z6sy31h4`):
+   - the keyed census of S2/seat-162 records at `:1520` and at closure,
+     against the D1e TSV;
+   - where the `-1` comes from: the function, owner and block, the source
+     of the dispatch token, the last effect, and whether funcid67 and the
+     owner-0 pending loop are entered;
+   - the SEQUENTIAL and one_bracket controls;
+   - the single writer (file:line) of each protocol input:
+     `static_response_continuations`, the return-protocol candidate rows,
+     the continuation contexts, the emittable units and call edges, and
+     `host_effect_seats`.
+
+   **Stop** if any of those inputs is written after phase B's owner check
+   (`construction.rs` around 1497-1515).
+2. **R-CHAIN-1 (production).**
+   - A stored, validated plane, `plan.pending_vis_settlements`. It is
+     built once, after phase B's owner check and before the `:1520`
+     rebuild.
+   - It is validated by rebuild-equality at install and in the whole-plan
+     closure. The error reads "pending-Vis settlement plane is not the
+     exact closed protocol derivation".
+   - Ownership source (e) and the lowering seed (`core.rs:2879`) read that
+     field. `pending_vis_record_protocol()` keeps only three callers: the
+     builder, the validator and the diagnostics.
+   - The frame discriminant that `emit_pending_vis_owner_loop` writes, and
+     the arm that reads it, both come from the stored row id. A discriminant
+     that matches no arm becomes a catalogued, fail-closed trap, never
+     `UnclassifiedRuntimeTrap { -1 }`. The Architect rules the site on
+     R-CHAIN-0.
 
 ## Acceptance
 
 - **AC-1.** `sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines`
   is un-ignored and green: both engines exit 0 with the exact freeze
   sequence it asserts.
-- **AC-2 (plan pins).** The test asserts 8 Specialized rows plus Vis 1079
-  Deferred with `ContinuationBodyTail`, and owner 6 (a Specialization
-  emission owner) still Specialized.
-- **AC-3 (mutation, QA).** Removing the predicate brings back owner 0 and
-  the exact D0 refusal (`owner=StaticResponseOwnerId(0)`,
-  `context=ContinuationContextId(2)`, `disposition=None`).
-- **AC-4 (controls).** The five sibling rows in `rt_span_prov_native.rs`,
-  the SEQUENTIAL distinguishable witness and its plan-row pins, and
-  `one_bracket_retains_native_parity` stay green. The px8ta rows keep
-  their labelled failures. Any other row whose Specialized or Deferred
-  classification moves is listed with its cause. The `units.rs:7831`
-  coverage gate is not relaxed.
+- **AC-2 (plan pins).** 8 Specialized rows plus Vis 1079 Deferred with
+  `ContinuationBodyTail`, and owner 6 still Specialized.
+- **AC-3 (mutation, QA).** Removing the D1 predicate brings back the exact D0
+  refusal (owner 0, context 2, `disposition=None`).
+- **AC-5, AC-5b, AC-6 and AC-6b.** As ruled in `evt_38ayfhrhqq8q3` and
+  later, retained.
+- **AC-R1 (mutation).** Perturbing one stored member's `base_owner` reddens
+  the closure validator.
+- **AC-R2.** `pending_vis_record_protocol()` has no caller outside the
+  builder, the validator and the diagnostics.
+- **AC-R4 (mutation).** A discriminant mutation yields the catalogued trap,
+  not `-1`.
+- **AC-4 (controls).** The five sibling rows, SEQUENTIAL with its
+  plan-row pins, and `one_bracket_retains_native_parity` stay green. The
+  px8ta rows keep their labelled failures. The `units.rs:7831` coverage gate
+  is not relaxed.
 
 ## SYMPTOM INVENTORY
 
