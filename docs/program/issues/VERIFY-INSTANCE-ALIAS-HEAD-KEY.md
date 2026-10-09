@@ -86,8 +86,10 @@ base, stop and report the mismatch.
   - (c) Module A has `class E`, `data T`, `def T2 = T` and
     `instance E T2`. In module B, which imports `(E, T)` from A, a
     `where E T` use resolves to A's dictionary.
-  - (d) `module B { import A (E, T) def T2 = T instance E T2 }`, where A
-    has no `E T`, refuses with `OrphanInstance`.
+  - (d) The owner spells its own instance through its own alias: module C
+    has `pub class E`, and module A, which imports `E` from C, has
+    `pub data T = MkT`, `def T2 = T` and `instance E T2`. A admits.
+    Base refuses it with `OrphanInstance` (Architect `evt_5endccp1f2j94`).
 - **AC-2 (control).** Instances at distinct heads, the structural-head and
   named-head rows, and every catalog package keep their results; any moved
   dictionary name, owner or hash is a stop to the Architect. Also:
@@ -95,7 +97,11 @@ base, stop and report the mismatch.
     missing field;
   - lang_refinement_introduction_coverage `Pick Char` and `Pick Int` both
     still admit;
-  - C1 `sound-deceq-char` is unaffected.
+  - C1 `sound-deceq-char` is unaffected;
+  - (d') `imported_alias_cannot_evade_orphan_rule`:
+    `module B { import A (E, T) def T2 = T instance E T2 }`, where A has
+    no `E T`, still refuses with `OrphanInstance`. An alias registers no
+    owner, so this is green at base too.
 - **AC-3 (mutations, QA).** Each reddens and is restored:
   - keying on the head before whnf reddens AC-1 (a);
   - deleting the `refinement_root` stop in both `instance_head_key` and
@@ -123,7 +129,11 @@ To the W5 Σ demote, not built here:
 - `resolve_instance_dictionary_by_head_id` (the comparison operators and
   the core-path sub-constraint) keys on the head of `whnf(carrier)`. It
   agrees for plain aliases, and for Char it selects `Ord Int` as base
-  does. Re-keying it moves catalog hashes.
+  does. Re-keying it moves catalog hashes;
+- a named refinement's root has no owner, because the TypeAlias arm
+  registers none, so `def C2 = {x:Int | …}` with `instance E C2` for an
+  imported `E` refuses with `OrphanInstance`. Base refuses it too, and
+  the catalog's `Ord Char` and `DecEq Char` admit on the class-owner arm.
 
 These disappear once Char's core is the subset Σ, and then the
 refinement stop can be deleted.
