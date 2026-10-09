@@ -71,7 +71,7 @@ import Core.Logic.Compare (list_compare, list_eq)
 
 import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)
 
-import Core.Logic.And as Conj
+import Core.Logic.And (And as Conj)
 
 import Core.Logic.Or (Or, Inl, Inr)
 
@@ -109,7 +109,7 @@ pub fn list_concat (a : Type) (ws : List (List a)) : List a =
 pub fn list_all (t : Type) (p : t → Omega) (xs : List t) : Omega =
   match xs {
     Nil ↦ Equal Bool True True;
-    Cons y rest ↦ (‖ Conj.And (p y) (list_all t p rest) ‖)
+    Cons y rest ↦ (‖ Conj (p y) (list_all t p rest) ‖)
   }
 
 pub fn nth (a : Type) (n : Nat) (xs : List a) : Option a =
