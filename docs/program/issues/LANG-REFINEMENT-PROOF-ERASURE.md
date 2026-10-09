@@ -173,6 +173,21 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
     to the Architect, not a fix-forward.
   - No change to the kernel, `conv.rs` or the stored native body.
 
+## Symptom inventory
+
+Append one entry per Architect hard stop; never rewrite history.
+
+1. The plan was keyed on preorder position and not bound to the body
+   version it was computed on: the zipPrimitive plan from the 387-node body
+   was applied to the 303-node normalized body -- keyed on symbol plus
+   position (`evt_4ajjj60nhpqze`).
+2. The normalized body lost the motive ascriptions the classifier needs:
+   normalize strips `Ascript`, and the kernel infers motives -- keyed on the
+   elaborated body version's annotations (`evt_eq3kbx5fa9b5`).
+3. The normalized package inherits the original version's plans through
+   `let mut normalized = package.clone()`, so a stale in-range plan
+   survives a skipped write -- keyed on symbol (`evt_3brrb9b5a14hh`).
+
 ## Stop conditions
 
 - `SPEC-REFINEMENT-SUBSET-SIGMA` lands without the plan's package
