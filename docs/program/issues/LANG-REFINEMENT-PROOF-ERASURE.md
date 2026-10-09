@@ -85,6 +85,12 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
   checks the canonical preorder count independently. A classification or
   count error refuses the declaration. Package slicing filters
   `omega_erasure_plans` by the same reachable declaration set.
+- **No plan is inherited across body versions** (Architect
+  `evt_29hrvjmzm3vs8`). Right after `let mut normalized = package.clone()`
+  in `prepare_native_program_sources`, before the rewrite loop, remove the
+  plan of every `executable_declarations` symbol. A skipped write is then
+  refused as a missing plan (erasure.rs:350), never read as a stale one.
+  No fallback, schema field or test API.
 - **Synthetic test packages.** Two test files are in scope:
   `crates/ken-elaborator/tests/nc16_primitive_value_lowering.rs` and
   `crates/ken-elaborator/tests/nc17_recursion_dictionaries_modules.rs`.
@@ -146,9 +152,18 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
     and `dictionary_construction_lowers_only_runtime_fields_to_record_values`.
   - `rt_c5_primitive_type_native_gate::indexed_int_convoy_native_refusal_waits_for_compared_native_rows`
     returns to `UnsupportedDependentMotive { family: Vec }`.
-  - A compile-preserving mutation that skips plan recomputation on the
-    normalized path reddens at count validation or at that row, and is
-    restored. An in-range stale plan must also be caught.
+  - **Out of range:** skipping plan recomputation on the normalized path
+    reddens the B row at zipPrimitive id 334 against 303 nodes, and is
+    restored.
+  - **In range** (`evt_29hrvjmzm3vs8`; B is not the witness, since main's
+    normalized plan is never read before its refusal): skipping main's
+    plan write while still writing its bytes takes px7n
+    `nested_ok_payload_reaches_both_real_executors` and
+    `nested_err_payload_reaches_both_real_executors` to 0/2, each with
+    `UnsupportedErasure { symbol: ..::main, reason: "missing
+    kernel-classified Ω erasure plan" }`. The control, the same mutant
+    without the inheritance removal, stays 2/2. Report both and restore
+    byte-identically.
   - The handoff enumerates every production writer of
     `semantic.declarations` or `omega_erasure_plans` under `crates/*/src`,
     with its disposition (including `checked_core.rs:1506` and `:2250`).
