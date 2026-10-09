@@ -8,8 +8,9 @@ That checked development measured feasibility, not execution of this seed
 or delivery of `Algorithm.FormalLanguages.Minimisation`. No Ken check,
 Cargo test, CI result, catalog implementation, or publication is claimed
 for these cases. Every case has promise class **durable invariant**: it
-pins accepted words, equivalence decisions, or equality of reached
-states, never which representative `canonical` chooses.
+pins accepted words, equivalence decisions, future-language agreement,
+or equality of reached or canonical states, never which representative
+`canonical` chooses.
 
 ## Shared closed fixtures
 
@@ -226,15 +227,74 @@ argument to any §5 operation.
   representative passes the twin-equality oracle but violates these
   contrasting acceptance results.
 
+## Canonicalisation laws without a chosen representative
+
+### stdlib/formal-languages/canonical-same-future-only-empty
+
+- spec: `spec/50-stdlib/61-formal-languages.md` §5.2.
+- promise class: durable invariant.
+- given: `d = only_empty`, `q = a = Bool`, `fq = fa = bool_finite`,
+  `s = True`, and `c = canonical Bool Bool fq fa d s`. Compare the
+  future acceptance from `c` and `s` on suffixes `[]`, `[False]`, and
+  `[False, True]` without assigning a Bool value to `c`.
+- expect: `same_future Bool Bool Bool d d c s` is inhabited, as
+  `canonical_same_future` requires. In particular, the final results
+  after `[]` agree and are `True`; the results after `[False]` and
+  `[False, True]` agree and are `False`. The original future from
+  `s` is independently known from `only_empty`'s transition and final
+  test, not from the chosen canonical value.
+- measured: equality of the canonical and original future results on
+  one accepting and two rejecting suffixes, with the public all-words
+  Ω guarantee as the law's expected conclusion.
+- claimed: canonicalising a state preserves its entire future
+  language, not only acceptance from the Dfa's initial state.
+- the gap: three suffixes do not prove the universal statement;
+  `canonical_same_future` must be checked for all words and states.
+  This fixture asserts no particular representative, only its
+  observable equality with the original state's future.
+- why: mapping the accepting empty-word state to a state that rejects
+  `[]` changes the first result even if later nonempty words still
+  agree. The accepting and rejecting suffixes prevent a vacuous
+  positive claim.
+
+### stdlib/formal-languages/canonical-unique-twin-states
+
+- spec: `spec/50-stdlib/61-formal-languages.md` §5.2.
+- promise class: durable invariant.
+- given: `d = twin`, `q = a = Bool`, `fq = fa = bool_finite`,
+  `s = True`, `t = False`,
+  `c_s = canonical Bool Bool fq fa d s`, and
+  `c_t = canonical Bool Bool fq fa d t`. Both original states accept
+  every suffix because `twin`'s final predicate is constantly `True`.
+- expect: the independently grounded proposition
+  `same_future Bool Bool Bool d d s t` is inhabited, including at
+  `[]` and `[False]`. The positive instance of `canonical_unique`
+  then concludes `Equal Bool c_s c_t`. No expectation says whether
+  either canonical result is `True` or `False`.
+- measured: a nonvacuous all-words premise and equality of the two
+  canonical results for distinct original states.
+- claimed: equal future languages normalise to one equal state in
+  the same carrier, without deciding state equality as an input.
+- the gap: a single equal-future state pair does not prove the
+  universally quantified checked theorem or state-count minimality.
+  Its expected equality is about the two results, not a selected
+  enumeration entry.
+- why: `canonical := identity` leaves `c_s = True` and `c_t = False`
+  on this pair, violating their equality while preserving each
+  state's accepted language; the fixture separates uniqueness from
+  mere future preservation.
+
 ## Coverage boundary
 
 The seed distinguishes constant acceptance, empty-word disagreement,
 nonempty disagreement, same and different state futures, preserved
 acceptance, and collapsing **only** redundant reached states. A positive
 premise for each of the four equivalence laws and for
-`minimise_reduced` is explicitly given. `canonical_same_future` and
-`canonical_unique` are required checked laws in §5, not claims that a
-fixed canonical element must be returned by these fixtures.
+`minimise_reduced` is explicitly given. `canonical_same_future` now has
+an accepting/rejecting-suffix instance, and `canonical_unique` has an
+independently inhabited same-future premise on distinct twin states.
+All eight laws have positive seed instances; none selects a fixed
+canonical element.
 
 There is no `DecEq q` argument, shortest-word promise, chosen state
 representative, quotient carrier, state-count claim, exhaustive local
