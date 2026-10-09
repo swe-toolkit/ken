@@ -155,13 +155,40 @@ retained.
   caller (`:1354`).
 - **AC-R6 (behaviour preservation and stop; narrowed on WIP audit
   `evt_1kq6h67jzp7ae`).** The candidate's test sources equal `c7c05d4e6`
-  except the added span diagnostics row, and no `#[ignore]` changes, so a
-  green CI run is every non-ignored row equal to `c7c05d4e6`. The local
+  except the added span diagnostics row and the AC-R9 pin migrations, so a
+  green CI run is every other non-ignored row equal to `c7c05d4e6`. The local
   serial sweep stops after the px4b umask-022 rerun. The 9 measured
   suites' logs and census are kept as the successor's D0 input. The
   disposable census observer (`KEN_RCHAIN_CENSUS` / `KEN_RCHAIN_AC6`) is
   removed before release. **Any red native row in CI on the candidate is
   a stop to the Architect, never fixed forward.**
+- **AC-R9 (the `4671402d1` CI red, Architect `evt_65qa0p2vax8gh`).** The
+  two red rows are stale refusal pins. A `ContinuationBodyTail` row has no
+  deferred handler owner, so `selected_pending_calls.rs:723` skips
+  admission E. Two test files enter scope:
+  - `crates/ken-cli/tests/rt_selected_pending_call_admission.rs`: the
+    two-print sentinel becomes a compared row. Admission is
+    `ValidatedResponseOwner` with no Refused rows, and
+    `assert_native_interpreted_route(&source, "rt-pending-two-print",
+    b"captured\nsecond\n", &[ConsoleIsTerminal, ConsoleWrite,
+    ConsoleWrite, ConsoleFlush])`. The comment names the promise class
+    (durable parity) and why.
+  - `crates/ken-cli/tests/px7m_hostresult_computational_match.rs`: the
+    ERR row is re-pinned to `[SelectedPendingLeafRelocatesUnaccountedJoins]`
+    with its user text, keeping the "no ValidatedResponseOwner" and "no
+    ICE" assertions. The test is renamed so it no longer claims E before
+    J. The `#[ignore]` reason on
+    `dynamic_err_payload_selects_a_multistep_tree_across_real_executors`
+    names the J refusal.
+  - **The E-guard witness.** Make one bounded attempt at a ken-cli source
+    that still reaches `RelocatedWorkMissingLoweringBinding` at
+    `selected_pending_calls.rs:769`, and pin it if found. If not, report
+    whether deleting the E return reddens any row. The guard is not
+    deleted. If nothing reddens, the closeout records "admission E
+    unwitnessed after ContinuationBodyTail" as a successor obligation.
+  - Gates: both files, one suite per invocation, plus the R-CHAIN-1
+    targeted gates. A mutation reverting the `ContinuationBodyTail` push
+    reddens the new two-print parity row. CI is AC-R6's gate again.
 - **AC-4 (controls).** The five sibling rows stay green, the px8ta rows keep
   their labelled failures, and the `units.rs:7831` coverage gate is not
   relaxed.

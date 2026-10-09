@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-NFA
 title: "The catalog has no nondeterministic automaton. Deliver Algorithm.FormalLanguages.Nfa (a Bool-relation Nfa with Omega path acceptance, the bit-mask subset construction into Dfa, its sound and complete laws, and NFA emptiness through section 2), with Core.Logic.And and public unit_finite/bool_finite, fully proved at zero trust"
-status: ready
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -73,3 +73,19 @@ CI red was the missing Dfa row.
 - A law needs an Axiom, a kernel or surface-syntax change, or `DecEq q`.
 - The merged section 3 differs from the ruling in a way the development
   cannot meet.
+
+## Closeout
+
+Merged `89ac3d285` from exact `18d7024ae` (PR #4617). Foundation QA
+`evt_60bdfz09ejp15`, Architect `evt_73gqeaxc0bx91`, Decision
+`dec_5qfky2dz8sps6`. `Algorithm.FormalLanguages.Nfa` delivers the
+`Bool`-relation Nfa with Ω path acceptance, the bit-mask subset
+construction into `Dfa` with its sound and complete laws, and NFA
+emptiness through section 2. `Core.Logic.And` and public
+`unit_finite`/`bool_finite` ship with it. `trusted_base()` is unchanged,
+and M1, M2 and M3 are each kernel-rejected. The prelude `And` keeps its
+binding (g233 before and after loading Nfa).
+Carry (Architect): the private `Bool` truth lemmas (`or_left`, `or_right`,
+`and_true`, `or_cases`, `and_cases`) are duplicated in Reachability, Map
+and Nfa. They could be published beside `bool_or`/`bool_and` in
+`Core.Classes.LawfulClasses`; not scheduled.
