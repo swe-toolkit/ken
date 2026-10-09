@@ -1,7 +1,7 @@
 ---
 id: VERIFY-NATIVE-PROGRAM-EXAMPLE-EXCLUSION
 title: "prepare_native_program_sources elaborates .ken.md example fences into the shared env, then admits every env declaration and passes an empty example set to emit_package_from_env, so a native-program package ships example declarations. Exclude example declarations on the native-program route as the package routes do"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2
