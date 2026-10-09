@@ -1,7 +1,7 @@
 ---
 id: VERIFY-INSTANCE-ALIAS-HEAD-KEY
 title: "An instance declared at a transparent def alias (def N2 = Nat; instance E N2) is keyed on the alias's own global id, not on head(A) after unfolding, so instance E N2 and instance E Nat are both admitted with no OverlappingInstances, and where E Nat misses the alias instance with NoInstance. Key instance registration, overlap and resolution on the unfolded head"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -137,3 +137,16 @@ To the W5 Σ demote, not built here:
 
 These disappear once Char's core is the subset Σ, and then the
 refinement stop can be deleted.
+
+## Closeout
+
+Merged `6d5eeb9b7` from exact `72c634a40` (PR #4629). QA
+`evt_2pdyvbm6wve4x`, Architect `evt_1aa1026q3ys29`, Decision
+`dec_471mf1khxa8sm`. Instance registration, the overlap check and
+resolution key on the semantic head after transparent aliases unfold, so
+`instance E N2` beside `instance E Nat` is refused as overlapping and `E
+Nat` resolves the alias instance. A head that does not elaborate keeps
+base's `named_head_id` orphan refusal ahead of the elaboration error: the
+first candidate inverted that order, and the Architect's change request
+`evt_735y1br6ga2sv` restored it. AC-1 7/7 against 1/7 at base; elaborator
+`--lib` 613/613. §1a: 1. The Carry list above stays with the W5 Σ demote.

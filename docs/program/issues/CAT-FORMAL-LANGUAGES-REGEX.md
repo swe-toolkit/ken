@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-REGEX
 title: "The catalog has no regular expressions. Deliver Algorithm.FormalLanguages.Regex (the six-constructor carrier, its independent Omega denotation, a DecEq derivative matcher and its six sound and complete laws), with list_concat/list_all in Data.Collections.Derived and the five Bool truth lemmas published once in Core.Classes.LawfulClasses, fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -96,3 +96,24 @@ base, stop and report the mismatch.
 - The merged section 4 differs from the development in a way it cannot
   meet.
 - Publishing a lemma collides with an existing name in any importer.
+
+## Closeout
+
+Merged `4598faaf8` from exact `99af342bd` (PR #4623). QA
+`evt_24009n06m9m56`, Architect `evt_3r9m7wr1mq8x1`, Decision
+`dec_3nvpxhcqxsdmc`. `Algorithm.FormalLanguages.Regex` lands with the
+six-constructor carrier, its Ω denotation through `Split` and `Pieces`,
+`nullable`, `deriv`, `regex_matches` and six laws proved at zero trust.
+`list_concat` and `list_all` are public in `Data.Collections.Derived`, the
+five Bool lemmas are public in `Core.Classes.LawfulClasses`, and Nfa and
+Reachability import them in place of their private copies.
+
+Two heads were red in CI, both on consumers outside the name sweep:
+- `aa72cc7a0`: Derived's aliased whole-module import of `Core.Logic.And`
+  failed SEAL-2 closed and broke the Rosetta runner's flattened Derived
+  (`evt_7c7p0b6rgkpn7`). Repaired by an item import and a Rosetta cut.
+- `02ee546e2`: the exact LawfulClasses loader-visible inventory pin in
+  `r_layer_tests/cat_bool_pub_export.rs` lacked the five new theorems
+  (run 37950411696). Repaired by adding them to the authorized set.
+
+§1a: 0. AC-3 now sweeps consumers by mechanism and by exact-surface pin.

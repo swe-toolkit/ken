@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-MINIMISATION
 title: "The catalog cannot decide DFA equivalence or minimise a DFA. Deliver Algorithm.FormalLanguages.Minimisation (equivalent and equivalent_states through the product's disagreement language and section 2 reachability, canonical and minimise on the original carrier, and the eight laws of spec section 5) fully proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2
