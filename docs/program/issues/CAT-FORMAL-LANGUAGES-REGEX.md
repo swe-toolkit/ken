@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-REGEX
 title: "The catalog has no regular expressions. Deliver Algorithm.FormalLanguages.Regex (the six-constructor carrier, its independent Omega denotation, a DecEq derivative matcher and its six sound and complete laws), with list_concat/list_all in Data.Collections.Derived and the five Bool truth lemmas published once in Core.Classes.LawfulClasses, fully proved at zero trust"
-status: draft
+status: active
 owner: foundation
 size: M
 tier: T2
