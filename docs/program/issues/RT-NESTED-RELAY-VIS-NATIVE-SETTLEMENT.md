@@ -97,9 +97,12 @@ base, stop and report the mismatch.
      with its continuation replaced by `(\_. match terminal { False |->
      host_console APartial Unit (print_line "second") ; True |->
      host_console APartial Unit (print_line "third") })`. Pin it, census
-     the arm-tail shape in both populations, and do not delete E. The
-     Architect rules whether the relay arm or a widened tail predicate
-     settles it;
+     the arm-tail shape in both populations, and do not delete E. **Ruled
+     out of this WP** (`evt_5sah7xb9543hp`): E is an environment-binding
+     gap in the handler-owned path (`effect_free {0,1}` against
+     `effect_fields 1` at `selected_pending_calls.rs:745`), not a CBT
+     classification. It stays a typed planning refusal and goes to
+     `RT-PENDING-CALL-ERR-PAYLOAD-ADMISSION`;
 
    over both populations: the span's owner 4 and r2's owners 2 and 3. If
    one design cannot settle both, the D0 says so and the Architect rules
@@ -121,16 +124,17 @@ base, stop and report the mismatch.
      of span owner 4 and r2 owners 2 and 3 lower with
      `defining_emission_owner == O.base_owner()`.
    - **Record-only recorder.** The first commit is a cfg'd recorder,
-     emitting for each `Excluded` owner and each source F:
-     - `closed`, `drive_settled` and `relay_drivable` (a)-(d), each
-       separately, and the verdict;
-     - each row that would move from `UnconsumedTransportCaller` to
-       `ContinuationBodyTail`, with its handler owner.
-   - **Population.** Run the recorder over the 38 complete suites. For
-     `rt_parity_native`, either run one test per invocation or name CI as
-     the check, and say which.
-   - **Enable gate.** Neither the refusal nor the widening is enabled
-     until the census clears the stops below.
+     emitting for each `Excluded` owner and each source F `closed`,
+     `drive_settled` and `relay_drivable` (a)-(d), each separately, and
+     the verdict. It records nothing about `ContinuationBodyTail`.
+   - **Population** (`evt_50wnhmgt00rfc`, `evt_5sah7xb9543hp`). The 38
+     complete suites, run locally. The eight already run stand (12
+     `Excluded` owners, all admitted). For `rt_parity_native`, run its 20
+     named `checked_ih_*` and `composed_return_forward_ret_authority_*`
+     tests from the D0 owner census locally; CI owns the rest of that
+     suite, and the handoff says so.
+   - **Enable gate.** The refusal is not enabled until the census clears
+     the stops below.
 3. **The ruled planning refusal**, at `planner.finish(`'s single caller,
    after the cfg'd recorders:
    - `drive_settled(F, O)` is `deferred_response_at_vis(F) == Some(row)`
@@ -158,10 +162,6 @@ base, stop and report the mismatch.
      typed planner-invariant error, never `-1`.
    - Admitted relay members leave O's returned set: span owner 4 becomes
      {528} Protocol, r2 owner 2 {746}, and r2 owner 3 {528}.
-5. **Admission E, in a separate commit.** `ContinuationBodyTail` holds
-   when the walk up `response_parents` from the producer construct to
-   `worker_body_origin()` crosses only `response_tail_edge` edges. This
-   replaces root equality. The E guard stays.
 
 ## Acceptance
 
@@ -182,13 +182,6 @@ base, stop and report the mismatch.
   r2 to the planning refusal, never to `-1`.
 - **AC-6 (mutation, QA).** Classifying ABI-S6 owner 0 as refused reddens
   its six rows at the refusal, so the discriminant is load-bearing.
-- **AC-7.** The two-print arm-tail witness from D0 (iv) becomes a
-  compared parity row: native and interpreter both exit 0 with stdout
-  `captured\nsecond\n`. Landing at a planning refusal instead is a stop,
-  not a pass.
-- **AC-8 (mutation, QA).** Restoring the root-equality
-  `ContinuationBodyTail` test returns AC-7's row to the typed E refusal
-  `RelocatedWorkMissingLoweringBinding`.
 - **AC-4 (controls).** SEQUENTIAL, `one_bracket_retains_native_parity`,
   the five sibling rows and the predecessor's AC-R6 census population stay
   green; px8ta keeps its labelled failures.
@@ -200,11 +193,22 @@ base, stop and report the mismatch.
 - D1's emission-owner checkpoint measures an owner other than
   `O.base_owner()`: stop with the measured owner, and do not substitute
   another key.
-- The census shows a refused owner in a row that is green today, or a
-  row moving to `ContinuationBodyTail` with a handler owner in a green
-  row: stop to the Architect, naming the owner and row.
+- The census shows a refused owner in a row that is green today: stop to
+  the Architect, naming the owner and row. In the CI-owned
+  `rt_parity_native` tail, the same refusal is a stop once the refusal is
+  enabled.
+- `ContinuationBodyTail`, admission E or `selected_pending_calls.rs`
+  needs a change.
 - The repair touches the bracket tree, moves a held ref
   (`wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, `wp/RT-BRACKET-SETTLEMENT-PLANE`,
   `4b4c8565c`, `21c039918`, `7f1a04a40`), or relaxes the `units.rs:7831`
   coverage gate or the `0x101d_0000_002a` guard.
 - Any kernel, trust or spec change.
+
+## Hard-stop inventory
+
+- **§1a.** Question (4), E disposition: 1 (`evt_5sah7xb9543hp`).
+  Questions (1)-(3): 0.
+- **1.** CBT widening by tail walk would strip handler ownership from
+  handler-owned P2 rows (ABI-S6 Vis548/549; witness Vis342/364), keyed on
+  producer-construct position instead of handler ownership.

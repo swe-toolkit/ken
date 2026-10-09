@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-MINIMISATION-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 5 is a deferred placeholder, so the catalog has no contract for automaton equivalence or minimisation. Specify DFA language equivalence and a minimisation construction over Finite evidence and DecEq state equality, with their laws, at zero trust"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -69,3 +69,21 @@ contract that the minimisation catalog node builds against.
 - The contract needs a kernel, trust or surface-syntax change.
 - A minimality law cannot be stated at zero trust: the D0 rules what is
   stated instead, and nothing unprovable is specified.
+
+## Closeout
+
+Merged `d107f7633` from exact `b4cc5acf0` (PR #4625). Architect D0
+`evt_30hjxcgryy66c`, Architect `evt_5way7m3d9m1g1`, CV `evt_1ynxb2w5jefk2`,
+Decision `dec_7wv274zpcxqn7`. Section 5 specifies:
+- `same_future`, `equivalent` and `equivalent_states`, decided as the
+  emptiness of the product's disagreement language through section 2
+  reachability, with no `DecEq` on states;
+- `canonical` and `minimise` on the original carrier `q`, with
+  `minimise_reduced` as the zero-trust minimality law for reached states;
+- eight checked laws, and a ten-case seed that pins no representative.
+
+The DecEq-for-section-5 premise is removed from sections 2.1 and 4.4. The
+title's "DecEq state equality" was the frame's premise, and the D0 refuted
+it. Deferred: state-count minimality, a Fin-indexed carrier, trimming,
+named-state reachability, complexity bounds and Nfa/Regex equivalence. The
+package is `CAT-FORMAL-LANGUAGES-MINIMISATION`. §1a count: 0.
