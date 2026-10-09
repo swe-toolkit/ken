@@ -7,6 +7,164 @@ use std::collections::{BTreeSet, HashMap};
 use ken_kernel::subst::{subst0, weaken};
 use ken_kernel::{infer, whnf, Context, GlobalEnv, KernelError, Term};
 
+/// Kernel inference over a normalized body. `ken_kernel::normalize` drops the
+/// ascriptions the elaborator places on motives, while the kernel infers
+/// motives. Retry on a copy whose bare-λ motives are re-ascribed; the kernel
+/// checks each λ against its ascription, so the hint can refuse but never
+/// admit. The copy is never stored, visited, or counted.
+fn infer_node(env: &GlobalEnv, ctx: &Context, t: &Term) -> Result<Term, KernelError> {
+    match infer(env, ctx, t) {
+        Err(KernelError::Msg(reason)) if reason.contains("cannot infer an introduction form") => {
+            let hinted = reascribe_motives(env, &mut ctx.clone(), t)?;
+            infer(env, ctx, &hinted)
+        }
+        other => other,
+    }
+}
+
+fn ascribe_motive(env: &GlobalEnv, ctx: &mut Context, motive: Term) -> Result<Term, KernelError> {
+    if !matches!(motive, Term::Lam(..)) {
+        return Ok(motive);
+    }
+    let mut domains = Vec::new();
+    let mut cur = &motive;
+    while let Term::Lam(domain, body) = cur {
+        domains.push((**domain).clone());
+        ctx.push((**domain).clone());
+        cur = body;
+    }
+    let sort = infer(env, ctx, cur).map(|sort| whnf(env, ctx, &sort));
+    for _ in &domains {
+        ctx.pop();
+    }
+    let mut ty = sort?;
+    for domain in domains.into_iter().rev() {
+        ty = Term::pi(domain, ty);
+    }
+    Ok(Term::Ascript(Box::new(motive), Box::new(ty)))
+}
+
+fn reascribe_motives(env: &GlobalEnv, ctx: &mut Context, t: &Term) -> Result<Term, KernelError> {
+    let mut rebuild = |child: &Term, ctx: &mut Context| reascribe_motives(env, ctx, child);
+    Ok(match t {
+        Term::Type(_)
+        | Term::Omega(_)
+        | Term::Var(_)
+        | Term::Const { .. }
+        | Term::IntLit(_)
+        | Term::IndFormer { .. }
+        | Term::Constructor { .. } => t.clone(),
+        Term::Lam(domain, body) | Term::Pi(domain, body) | Term::Sigma(domain, body) => {
+            let domain2 = rebuild(domain, ctx)?;
+            ctx.push((**domain).clone());
+            let body2 = rebuild(body, ctx);
+            ctx.pop();
+            let body2 = body2?;
+            match t {
+                Term::Lam(..) => Term::lam(domain2, body2),
+                Term::Pi(..) => Term::pi(domain2, body2),
+                _ => Term::sigma(domain2, body2),
+            }
+        }
+        Term::Let { ty, val, body } => {
+            let ty2 = rebuild(ty, ctx)?;
+            let val2 = rebuild(val, ctx)?;
+            ctx.push((**ty).clone());
+            let body2 = rebuild(body, ctx);
+            ctx.pop();
+            Term::Let {
+                ty: Box::new(ty2),
+                val: Box::new(val2),
+                body: Box::new(body2?),
+            }
+        }
+        Term::App(function, argument) => {
+            Term::app(rebuild(function, ctx)?, rebuild(argument, ctx)?)
+        }
+        Term::Pair(first, second) => Term::pair(rebuild(first, ctx)?, rebuild(second, ctx)?),
+        Term::Proj1(pair) => Term::proj1(rebuild(pair, ctx)?),
+        Term::Proj2(pair) => Term::proj2(rebuild(pair, ctx)?),
+        Term::Ascript(term, ty) => {
+            Term::Ascript(Box::new(rebuild(term, ctx)?), Box::new(rebuild(ty, ctx)?))
+        }
+        Term::Eq(ty, lhs, rhs) => Term::Eq(
+            Box::new(rebuild(ty, ctx)?),
+            Box::new(rebuild(lhs, ctx)?),
+            Box::new(rebuild(rhs, ctx)?),
+        ),
+        Term::Refl(term) => Term::Refl(Box::new(rebuild(term, ctx)?)),
+        Term::Cast(ty, lhs, equality, term) => Term::Cast(
+            Box::new(rebuild(ty, ctx)?),
+            Box::new(rebuild(lhs, ctx)?),
+            Box::new(rebuild(equality, ctx)?),
+            Box::new(rebuild(term, ctx)?),
+        ),
+        Term::J(motive, method, equality) => {
+            let motive2 = rebuild(motive, ctx)?;
+            Term::J(
+                Box::new(ascribe_motive(env, ctx, motive2)?),
+                Box::new(rebuild(method, ctx)?),
+                Box::new(rebuild(equality, ctx)?),
+            )
+        }
+        Term::Quot(ty, relation, equivalence) => Term::Quot(
+            Box::new(rebuild(ty, ctx)?),
+            Box::new(rebuild(relation, ctx)?),
+            Box::new(rebuild(equivalence, ctx)?),
+        ),
+        Term::QuotClass(term) => Term::QuotClass(Box::new(rebuild(term, ctx)?)),
+        Term::QuotElim {
+            motive,
+            method,
+            respect,
+            scrut,
+        } => {
+            let motive2 = rebuild(motive, ctx)?;
+            Term::QuotElim {
+                motive: Box::new(ascribe_motive(env, ctx, motive2)?),
+                method: Box::new(rebuild(method, ctx)?),
+                respect: Box::new(rebuild(respect, ctx)?),
+                scrut: Box::new(rebuild(scrut, ctx)?),
+            }
+        }
+        Term::Trunc(term) => Term::Trunc(Box::new(rebuild(term, ctx)?)),
+        Term::TruncProj(term) => Term::TruncProj(Box::new(rebuild(term, ctx)?)),
+        Term::Absurd(motive, proof) => Term::Absurd(
+            Box::new(rebuild(motive, ctx)?),
+            Box::new(rebuild(proof, ctx)?),
+        ),
+        Term::Elim {
+            fam,
+            level_args,
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+        } => {
+            let motive2 = rebuild(motive, ctx)?;
+            Term::Elim {
+                fam: *fam,
+                level_args: level_args.clone(),
+                params: params
+                    .iter()
+                    .map(|param| rebuild(param, ctx))
+                    .collect::<Result<_, _>>()?,
+                motive: Box::new(ascribe_motive(env, ctx, motive2)?),
+                methods: methods
+                    .iter()
+                    .map(|method| rebuild(method, ctx))
+                    .collect::<Result<_, _>>()?,
+                indices: indices
+                    .iter()
+                    .map(|index| rebuild(index, ctx))
+                    .collect::<Result<_, _>>()?,
+                scrut: Box::new(rebuild(scrut, ctx)?),
+            }
+        }
+    })
+}
+
 /// Preorder indices include every term in the canonical checked body, including
 /// type terms and descendants of a maximal erased subterm.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -92,7 +250,7 @@ pub fn is_omega_classified(env: &GlobalEnv, ctx: &Context, ty: &Term) -> Result<
             // inference of the unreduced telescope cannot synthesize λ.
             // Normalize only this already-checked type, then ask the kernel
             // for its sort; this preserves its Ω/Type classification.
-            infer(env, ctx, &ken_kernel::normalize(env, ctx, ty))?
+            infer_node(env, ctx, &ken_kernel::normalize(env, ctx, ty))?
         }
         Err(error) => return Err(error),
     };
@@ -170,7 +328,7 @@ fn visit(
     let inferred: Option<Cow<'_, Term>> = if let Some(ty) = expected {
         Some(Cow::Borrowed(ty))
     } else {
-        match infer(env, ctx, node) {
+        match infer_node(env, ctx, node) {
             Ok(ty) => Some(Cow::Owned(ty)),
             Err(_) if matches!(node, Term::Lam(..)) => None,
             Err(error) => {
@@ -244,7 +402,7 @@ fn visit(
                     nodes.push((head as *const Term as usize, a.as_ref()));
                     head = f;
                 }
-                let mut ty = infer(env, ctx, head).map_err(|error| {
+                let mut ty = infer_node(env, ctx, head).map_err(|error| {
                     KernelError::Msg(format!(
                         "Ω erasure application head at node {here}: {error}"
                     ))
@@ -289,7 +447,7 @@ fn visit(
             visit(env, ctx, second, Some(&second_type), next, plan, memo)
         }
         Term::Proj1(pair) => {
-            let pair_type = infer(env, ctx, pair)?;
+            let pair_type = infer_node(env, ctx, pair)?;
             let Term::Sigma(domain, codomain) = whnf(env, ctx, &pair_type) else {
                 return Err(KernelError::Msg(
                     "checked projection has no Sigma type for erasure".into(),
