@@ -154,6 +154,24 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
     with its disposition (including `checked_core.rs:1506` and `:2250`).
     It also lists every `crates/ken-cli/tests` suite that calls
     `build_native_program`, with its result.
+- **AC-8 (normalized-body inference, Architect `evt_eq3kbx5fa9b5`).**
+  `ken_kernel::normalize` drops the elaborator's motive ascriptions, so
+  kernel inference fails on a normalized body's eliminators. The four
+  `omega_erasure.rs` inference sites retry through `infer_node`. It
+  re-ascribes bare-λ motives on a copy that is never stored, visited or
+  counted.
+  - Reverting site 1 alone to plain `infer` reddens the AC-7 row above and
+    `px7n_nested_computational_eliminator` with the "Ω erasure eliminator
+    motive" refusal, and is restored.
+  - Local evidence is the targeted set, one suite per invocation (WIP
+    audit `evt_2sqhv28v8nnqm`): `rt_c5_primitive_type_native_gate`,
+    `px7n_nested_computational_eliminator`,
+    `px7o_heterogeneous_eliminator_frames`, `nc16`, `nc17`,
+    `lang_refinement_proof_erasure`, and the two mutations. The handoff
+    lists the 38 `build_native_program` suites by name, and CI runs them.
+    A suite green at `1b68dfd45` and red in the candidate's CI is a stop
+    to the Architect, not a fix-forward.
+  - No change to the kernel, `conv.rs` or the stored native body.
 
 ## Stop conditions
 
