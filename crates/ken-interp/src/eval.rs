@@ -75,6 +75,18 @@ use num_traits::ToPrimitive;
 pub type SlotId = u64;
 const NULL_SLOT: SlotId = 0;
 
+/// Erased transparent bodies classified during one outermost [`eval`].
+///
+/// A `GlobalId` names a declaration only for one allocation prefix: rollback
+/// can free it and a later declaration can reuse it. The outermost call holds
+/// `&GlobalEnv` for its whole duration, so no rollback can happen while this
+/// scope is live; the scope is dropped when that call returns or unwinds, and
+/// it is consulted only for the environment it was opened on.
+struct ErasureScope {
+    env: usize,
+    bodies: HashMap<GlobalId, Term>,
+}
+
 /// Evaluation-time store: wraps the K3 content-addressed heap with a
 /// `code_id` side table so distinct closure bodies get distinct, collision-free
 /// integer ids.
@@ -93,9 +105,8 @@ pub struct EvalStore {
     /// Same body Term → same code_id; distinct bodies → distinct ids, no collisions.
     code_ids: HashMap<Term, u64>,
     next_code_id: u64,
-    /// A checked transparent body is classified once per evaluation store,
-    /// including when its recursive calls revisit the same GlobalId.
-    erased_bodies: HashMap<GlobalId, Term>,
+    /// Checked erased bodies, live only inside one outermost [`eval`].
+    erasure_scope: Option<ErasureScope>,
     /// Numeric literal values registered by the elaborator.
     /// Maps opaque postulate GlobalId → the EvalVal it represents.
     /// Filled by tests/driver that have access to ElabEnv.num_values.
@@ -116,7 +127,7 @@ impl EvalStore {
             k3: Store::new(),
             code_ids: HashMap::new(),
             next_code_id: 1,
-            erased_bodies: HashMap::new(),
+            erasure_scope: None,
             num_values: HashMap::new(),
             capacity_error: None,
             list_char_ids: None,
@@ -129,7 +140,7 @@ impl EvalStore {
             k3: Store::with_capacity_limit(limit),
             code_ids: HashMap::new(),
             next_code_id: 1,
-            erased_bodies: HashMap::new(),
+            erasure_scope: None,
             num_values: HashMap::new(),
             capacity_error: None,
             list_char_ids: None,
@@ -565,14 +576,25 @@ fn erased_transparent_body(
     globals: &GlobalEnv,
     store: &mut EvalStore,
 ) -> Term {
-    if let Some(cached) = store.erased_bodies.get(&id) {
+    let env = globals as *const GlobalEnv as usize;
+    let scope = store
+        .erasure_scope
+        .as_mut()
+        .filter(|scope| scope.env == env);
+    if let Some(cached) = scope.as_ref().and_then(|scope| scope.bodies.get(&id)) {
         return cached.clone();
     }
     let plan = ken_elaborator::omega_erasure::omega_erasure_plan(globals, body, ty)
         .unwrap_or_else(|error| panic!("checked Ω plan failed at {id:?}: {error}"));
     let erased = ken_elaborator::omega_erasure::apply_omega_erasure(globals, body, &plan)
         .unwrap_or_else(|error| panic!("checked Ω erasure failed at {id:?}: {error}"));
-    store.erased_bodies.insert(id, erased.clone());
+    if let Some(scope) = store
+        .erasure_scope
+        .as_mut()
+        .filter(|scope| scope.env == env)
+    {
+        scope.bodies.insert(id, erased.clone());
+    }
     erased
 }
 
@@ -2340,6 +2362,26 @@ pub fn eval_checked(
 
 /// `eval ρ t` — value-only evaluation in environment `ρ` (`42 §3.2`).
 pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalStore) -> EvalVal {
+    if store.erasure_scope.is_some() {
+        return eval_in_erasure_scope(env, term, globals, store);
+    }
+    store.erasure_scope = Some(ErasureScope {
+        env: globals as *const GlobalEnv as usize,
+        bodies: HashMap::new(),
+    });
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        eval_in_erasure_scope(env, term, globals, store)
+    }));
+    store.erasure_scope = None;
+    result.unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+}
+
+fn eval_in_erasure_scope(
+    env: &[EvalVal],
+    term: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
     match term {
         // --- Var: environment lookup ---
         Term::Var(i) => env_lookup(env, *i),
