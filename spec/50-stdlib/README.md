@@ -224,8 +224,13 @@ language equality in both directions, and decidable emptiness through
 section 2. The ordinary `Core.Logic.And` and `unit_finite`/`bool_finite`
 values are generic catalog dependencies, not new trusted rules. Neither
 `DecEq q` nor `DecEq a` is needed in sections 1–3; no complexity promise
-is made. The §3 package contract does not claim its build has landed.
-Regex, equivalence/minimisation and the lexer byte bridge remain deferred.
+is made. Section 4 defines `Regex a`, its independent Ω language predicate,
+finite repetition evidence, a derivative matcher using an explicit
+`DecEq a`, and six checked soundness/completeness laws. It depends on shared
+list concatenation/all-elements tools and Bool-truth lemmas in their owning
+packages, with no automaton conversion in this contract. Specifying §4
+does not claim its catalog build has landed. Equivalence/minimisation and
+the lexer byte bridge remain deferred.
 
 ## 4. I/O, effects, serialization
 
