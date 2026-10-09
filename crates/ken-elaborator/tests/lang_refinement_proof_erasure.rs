@@ -286,6 +286,67 @@ fn omega_let_binder_is_erased_without_a_runtime_binding() {
 }
 
 #[test]
+fn omega_let_erasure_preserves_outer_runtime_variable() {
+    // Promise class: durable invariant (42 §3.2, 46 §4, 47 §1).
+    // MEASURED: within λ x:Int, erasing the proof-bound Let removes its
+    // binder while the body's outer x remains a live runtime variable.
+    // CLAIMED: de Bruijn remapping skips the erased binder, not x.
+    // THE GAP: this covers one outer binder; nested outer contexts and
+    // other runtime-expression constructors need their own controls.
+    let mut elaborated = ElabEnv::new().expect("prelude admits");
+    let int_id = elaborated.globals["Int"];
+    let int_ty = Term::const_(int_id, vec![]);
+    let proof_ty = Term::Eq(
+        Box::new(int_ty.clone()),
+        Box::new(Term::var(0)),
+        Box::new(Term::var(0)),
+    );
+    let proof_let = Term::Let {
+        ty: Box::new(proof_ty),
+        val: Box::new(Term::Refl(Box::new(Term::var(0)))),
+        body: Box::new(Term::var(1)),
+    };
+    let function_ty = Term::pi(int_ty.clone(), int_ty.clone());
+    let function = Term::lam(int_ty.clone(), proof_let);
+    ken_kernel::check(&elaborated.env, &Context::new(), &function, &function_ty)
+        .expect("kernel checks proof-bound Let under an outer runtime binder");
+    let function_id = declare_def(&mut elaborated.env, vec![], function_ty, function)
+        .expect("checked function admits");
+    let call = Term::app(Term::const_(function_id, vec![]), int(7));
+    let target_id = declare_def(&mut elaborated.env, vec![], int_ty.clone(), call.clone())
+        .expect("checked call admits");
+    let package = package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (function_id, "proof_let_function"),
+            (target_id, "proof_let_call"),
+        ],
+        &[function_id, target_id],
+    );
+    let function_symbol = sym("proof_let_function");
+    let plan = &package.artifact.semantic.omega_erasure_plans[&function_symbol];
+    assert_eq!(
+        plan.erased_binders,
+        BTreeSet::from([2]),
+        "only the proof Let binder is erased, not the outer λ"
+    );
+    let target = sym("proof_let_call");
+    let lowered = native_body(&package, &target, &[target.clone(), function_symbol]);
+    assert_eq!(
+        observed(&lowered),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into())),
+        "outer x survives native Let-binder remapping"
+    );
+    let mut store = EvalStore::new();
+    assert!(matches!(
+        eval_checked(&call, &int_ty, &elaborated.env, &mut store)
+            .expect("interpreter evaluates the checked open-context Let"),
+        EvalVal::Int(7)
+    ));
+}
+
+#[test]
 fn relevant_sigma_pair_keeps_both_components() {
     // Promise class: durable invariant (42 §3.2, 47 §1).
     // MEASURED: Σ Int Int remains a pair on both runtime paths; a proof-first
