@@ -1,7 +1,7 @@
 ---
 id: VERIFY-OBLIGATION-ID-SHADOWED-OWNER
 title: "A package obligation id is built from its owner's spelling ({def_name}.requires.{n}), so when a later file shadows or lawfully rebinds that spelling (a user const x over x, or a second Pick_instance_Foo on a rebound Foo), the two owners mint one id and semantic.obligations.insert silently drops one owner's requires premise, in a source-order-dependent way. Key obligation ids on the owner's stable checked identity so every live premise survives"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
