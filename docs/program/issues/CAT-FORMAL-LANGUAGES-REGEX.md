@@ -50,6 +50,12 @@ base, stop and report the mismatch.
    strict-resolution ambient-census row for Regex.
 2. Nfa and Reachability import the five lemmas from LawfulClasses, and
    their private copies are deleted.
+3. **CI-red repair (Architect `evt_2v7zfzpzxwjk`).** Derived imports
+   `Core.Logic.And (And as Conj)` and spells the use `Conj`; an aliased
+   whole-module import fails SEAL-2 closed by design. The Rosetta runner
+   (`crates/ken-cli/tests/rosetta.rs`, the ninth path) removes that import
+   directive and cuts `pub fn list_all` from its flattened Derived, as it
+   already excludes Nat.Order exports outside its allowlist.
 
 ## Acceptance
 
@@ -65,7 +71,8 @@ base, stop and report the mismatch.
   lemmas) over `catalog/`, `crates/*/tests`, `r_layer_tests`, `examples/`,
   `conformance/` and the CLI fixtures finds no collision. The existing
   Nfa and Reachability acceptance targets and the strict-resolution D0
-  census pass.
+  census pass. By mechanism: `seal2_tests::producer_closure` is 20/20 and
+  `rosetta` is 2/2, with `rosetta_examples_match_their_oracles` green.
 - **AC-4 (mutation, QA).** Each of these definition mutants makes a law's
   proof kernel-reject, and is restored: `d.eq` replaced by constant
   `True` in the `Sym` arm; the `Cat` derivative ignoring `nullable r1`;
