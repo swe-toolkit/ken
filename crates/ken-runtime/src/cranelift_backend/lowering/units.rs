@@ -5919,7 +5919,26 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
             });
 
             let body = compiler.retained_body_occurrence(context.worker_body_origin)?;
+            // Disposable D1 observation: read the live lowering owner at the
+            // exact generated K-context body seam, before lowering that body.
+            #[cfg(feature = "px8-ds-test-support")]
+            if std::env::var_os("KEN_RELAY_D1_OWNER").is_some() {
+                let thread = std::thread::current().name().unwrap_or("unnamed").to_owned();
+                let matched = compiler.static_transition_plan.static_response_owner_specializations()
+                    .map(|rows| rows.map(|rows| rows.into_iter()
+                        .filter(|row| row.k_context() == context.id)
+                        .map(|row| (row.response(), row.base_owner()))
+                        .collect::<Vec<_>>()));
+                eprintln!("RELAY_D1_K_CONTEXT thread={thread:?} context={:?} body={:?} funcid={id:?} live_owner={:?} raw_unit={:?} matched_owners={matched:?}",
+                    context.id, context.worker_body_origin, compiler.defining_emission_owner, compiler.defining_unit);
+            }
             let lowered = compiler.lower_expr(&mut builder, body, &env)?;
+            #[cfg(feature = "px8-ds-test-support")]
+            if std::env::var_os("KEN_RELAY_D1_OWNER").is_some() {
+                let thread = std::thread::current().name().unwrap_or("unnamed").to_owned();
+                eprintln!("RELAY_D1_K_LOWERED thread={thread:?} context={:?} body={:?} funcid={id:?} live_owner={:?}",
+                    context.id, context.worker_body_origin, compiler.defining_emission_owner);
+            }
             // The detached-result seat, live in this context. Every operand its
             // capture projection names is reachable from `env` above.
             let lowered = compiler.eliminate_detached_producer_continuation(

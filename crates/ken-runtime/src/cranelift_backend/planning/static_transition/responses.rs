@@ -1294,6 +1294,14 @@ fn checked_host_response_call(
 type ResponseParents = BTreeMap<StaticOriginId, (StaticOriginId, usize)>;
 type HostResponseRoutes = BTreeMap<StaticOriginId, BTreeMap<RuntimeSymbol, HostResponseRoute>>;
 
+#[cfg(feature = "px8-ds-test-support")]
+mod relay_d1_observer;
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn relay_d1_record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
+    relay_d1_observer::record(plan)
+}
+
 fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
     let mut parents = BTreeMap::new();
     for occurrence in plan.source_occurrences.iter().flatten() {

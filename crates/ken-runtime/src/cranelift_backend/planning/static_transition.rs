@@ -763,6 +763,32 @@ fn planner_capacity_error(detail: impl Into<String>) -> CraneliftBackendError {
     unsupported("NativeStaticTransitionPlanner", detail)
 }
 
+// Disposable test-support diagnostic only: no production admission is changed.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static RELAY_REFUSAL_SUPPRESSED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Test-only: keep recording a hypothetical refusal while allowing a
+/// lowering-time negative control to reach its own guard. Restore on unwind.
+#[cfg(feature = "px8-ds-test-support")]
+#[doc(hidden)]
+pub fn with_relay_settlement_refusal_suppressed<R>(run: impl FnOnce() -> R) -> R {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RELAY_REFUSAL_SUPPRESSED.with(|suppressed| suppressed.set(self.0));
+        }
+    }
+    let _restore = Restore(RELAY_REFUSAL_SUPPRESSED.with(|s| s.replace(true)));
+    run()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn relay_settlement_refusal_suppressed() -> bool {
+    RELAY_REFUSAL_SUPPRESSED.with(std::cell::Cell::get)
+}
+
 fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetime {
     use crate::RuntimeValue;
     match value {
@@ -1050,6 +1076,20 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
     }
     planner.connect_declaration_calls(&declaration_entries)?;
     let plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
+    #[cfg(feature = "px8-ds-test-support")]
+    {
+        let test_refusal = std::env::var_os("KEN_RELAY_D1_TEST_REFUSAL").is_some();
+        if test_refusal || std::env::var_os("KEN_RELAY_D1_RECORD").is_some() {
+            let refused = responses::relay_d1_record(&plan);
+            // D1 is record-only. The explicit test-only env opt-in exercises
+            // the prospective typed error for the retired-flat switch control;
+            // it is never set for the census or a production build.
+            if test_refusal && !refused.is_empty() && !relay_settlement_refusal_suppressed() {
+                return Err(planner_capacity_error(format!(
+                    "response owner relay settlement refused: {}", refused.join("; "))));
+            }
+        }
+    }
     #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]

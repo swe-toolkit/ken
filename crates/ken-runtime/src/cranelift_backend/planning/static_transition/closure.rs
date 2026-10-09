@@ -1058,6 +1058,19 @@ impl<'src> StaticTransitionPlan<'src> {
         &self,
         root: StaticOriginId,
     ) -> Result<BTreeSet<StaticOriginId>, CraneliftBackendError> {
+        self.source_result_origins_with_omissions(root)
+            .map(|(results, _)| results)
+    }
+
+    /// The same result-position traversal, also returning every position it
+    /// omitted because its owner is not the root's function. A consumer that
+    /// reads an empty result population as absence must refuse a non-empty
+    /// omission set: the omitted position was never classified.
+    pub(in crate::cranelift_backend) fn source_result_origins_with_omissions(
+        &self,
+        root: StaticOriginId,
+    ) -> Result<(BTreeSet<StaticOriginId>, BTreeSet<StaticOriginId>), CraneliftBackendError> {
+        let mut omitted = BTreeSet::new();
         let owner = self
             .semantic
             .function_owner(root)?
@@ -1070,6 +1083,7 @@ impl<'src> StaticTransitionPlan<'src> {
             }
             if self.semantic.function_owner(origin)? != Some(owner) {
                 results.remove(&origin);
+                omitted.insert(origin);
                 continue;
             }
             let occurrence = self
@@ -1124,7 +1138,7 @@ impl<'src> StaticTransitionPlan<'src> {
                 | RuntimeExpr::Trap(_) => {}
             }
         }
-        Ok(results)
+        Ok((results, omitted))
     }
 
     /// The case-body roots of a source `Match` occurrence.
