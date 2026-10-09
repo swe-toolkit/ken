@@ -318,6 +318,7 @@ impl<'src> Planner<'src> {
                 static_response_deferred: Vec::new(),
                 static_response_phase_a: None,
                 pending_vis_settlements: PendingVisSettlements::default(),
+                relay_drive_pairs: BTreeMap::new(),
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
@@ -1523,6 +1524,7 @@ impl<'src> Planner<'src> {
         // Phase B has installed the final response-owner population and its
         // selected calls. Close the returned-Vis settlement exactly once before
         // ownership source (e) reads its successor rows.
+        self.plan.relay_drive_pairs = self.plan.build_relay_drive_pairs()?;
         self.plan.pending_vis_settlements = self.plan.build_pending_vis_settlements()?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure

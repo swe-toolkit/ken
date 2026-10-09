@@ -1296,6 +1296,67 @@ type HostResponseRoutes = BTreeMap<StaticOriginId, BTreeMap<RuntimeSymbol, HostR
 
 mod relay_settlement;
 
+/// A source Vis and the response owner whose emitted K drives its operation.
+/// Issued only after a uniquely seated source response row is found.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RelayDrivePair {
+    pub(in crate::cranelift_backend) source: StaticOriginId,
+    pub(in crate::cranelift_backend) owner: ContinuationEmissionOwner,
+    pub(in crate::cranelift_backend) operation_root_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) effect_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) operation: HostOpV1,
+}
+
+impl StaticTransitionPlan<'_> {
+    pub(in crate::cranelift_backend) fn build_relay_drive_pairs(
+        &self,
+    ) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner), RelayDrivePair>, CraneliftBackendError> {
+        relay_settlement::build_drive_pairs(self)
+    }
+
+    /// The sole authority for the drive-at-source lowering arm and its (d)
+    /// admission condition. Absence never means a key can be invented locally.
+    pub(in crate::cranelift_backend) fn relay_drive_pair(
+        &self,
+        source: StaticOriginId,
+        owner: ContinuationEmissionOwner,
+    ) -> Result<Option<RelayDrivePair>, CraneliftBackendError> {
+        let Some(pair) = self.relay_drive_pairs.get(&(source, owner)).copied() else {
+            return Ok(None);
+        };
+        if pair.source != source || pair.owner != owner
+            || self.child_static_origin(source, 0)? != pair.operation_root_origin
+        {
+            return Err(planner_error("a relay drive pair disagrees with its source and owner"));
+        }
+        Ok(Some(pair))
+    }
+
+    /// An installed response's operation root is source material, not a
+    /// deferred placeholder, while its relay pair is driven in this owner.
+    pub(in crate::cranelift_backend) fn relay_drive_operation_root(
+        &self,
+        root: StaticOriginId,
+        owner: Option<ContinuationEmissionOwner>,
+    ) -> Result<bool, CraneliftBackendError> {
+        let Some(owner) = owner else { return Ok(false); };
+        for (&(source, pair_owner), pair) in &self.relay_drive_pairs {
+            if pair_owner == owner && pair.operation_root_origin == root {
+                return Ok(self.relay_drive_pair(source, owner)?.is_some());
+            }
+        }
+        Ok(false)
+    }
+}
+
+/// The same classifier supplies pending-Vis settlement before emission:
+/// admitted relay members are driven at their source and never returned.
+pub(in crate::cranelift_backend) fn settled_relay_owners(
+    plan: &StaticTransitionPlan<'_>,
+) -> BTreeSet<StaticResponseContinuationId> {
+    relay_settlement::settled_relay_owners(plan)
+}
+
 /// Fail closed only for Excluded owners whose settled relay-source inventory
 /// cannot be driven at the planned owner. The recorder calls this same walk.
 pub(super) fn relay_settlement_refusals(plan: &StaticTransitionPlan<'_>) -> Vec<String> {

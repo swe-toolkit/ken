@@ -849,16 +849,15 @@ fn buffer_freeze_outcome(
 // which carries no signature of its own. The signature above is the
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
-/// Promise class: transition sentinel. The fixture's planner-issued origins
-/// are rechecked if its compiler shape changes. MEASURED: exactly two
-/// error-free, relay-excluded protocols each have one returned relay without
-/// a successor and one non-relay member with a static successor.
-/// CLAIMED: the pending-Vis protocol must never run partially on either owner.
-/// THE GAP: emission is not installed yet; the ignored native row separately
-/// preserves today's exact -1 Ret-tag failure until the successor repairs K.
-/// Architect evt_1jnjtntg7wej: the shape-match count, not owner order, is the gate.
+/// Promise class: durable relation between raw returned-Vis provenance and
+/// the installed pending-Vis protocol. MEASURED: both r2 relay-bearing owners
+/// have one static successor and one source-driven relay; their actual returned
+/// sets retain only those static successors. CLAIMED: no emitted owner waits
+/// for the forwarded relay's unrepresentable K. THE GAP: this planned member
+/// relation alone does not prove the source drive executes; the native parity
+/// row separately observes the effect sequence and terminal result.
 #[test]
-fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
+fn r2_relay_owners_return_only_source_independent_successors() {
     in_large_stack_thread("rt-escape-r2-protocol-exclusion", || {
         let root = output_dir("r2-protocol-exclusion");
         let (compiled, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
@@ -882,14 +881,32 @@ fn r2_relay_owner_is_excluded_from_pending_vis_protocol() {
                     && members.iter().filter(|member| !member.relay
                         && member.successor_id.is_some()).count() == 1
             }).collect::<Vec<_>>();
-        assert_eq!(protocols.len(), 2, "exactly two relay-excluded response owners have the r2 shape");
+        assert_eq!(protocols.len(), 2, "exactly two relay-bearing response owners have the r2 shape");
+        let plan = diagnostics.first().expect("one r2 response plan");
+        let mut returned = Vec::new();
+        for protocol in &protocols {
+            let members = protocol.contexts.iter().flat_map(|(_, members)| members)
+                .collect::<Vec<_>>();
+            let expected = members.iter().find(|member| !member.relay)
+                .expect("each r2 relay owner has its independent successor").origin;
+            let actual = plan.settled_returned_vis_protocols.iter()
+                .find(|(owner, _)| *owner == protocol.owner_origin)
+                .map(|(_, members)| members.as_slice())
+                .expect("a driven relay owner retains an installed pending-Vis protocol");
+            assert_eq!(actual, &[expected],
+                "only the source-independent successor may return from a driven relay owner");
+            returned.push(expected);
+        }
+        returned.sort_unstable();
+        assert_eq!(returned, [528, 746], "r2's two surviving successor Vis origins");
         let mut owners = protocols.iter().map(|protocol| protocol.owner_origin)
             .collect::<Vec<_>>();
         owners.sort_unstable();
-        eprintln!("RT-OWNER-VIS EXCLUDED R2 owners={owners:?}");
+        eprintln!("RT-OWNER-VIS SOURCE-DRIVEN R2 owners={owners:?}");
         for protocol in protocols {
             assert!(protocol.error.is_none(), "r2 return analysis refused: {:?}", protocol.error);
-            assert!(protocol.excluded_by_relay, "r2 cannot take the partial pending-Vis route");
+            assert!(protocol.excluded_by_relay,
+                "raw relay provenance must remain visible after planned source drive");
             let members = protocol.contexts.iter().flat_map(|(_, members)| members)
                 .collect::<Vec<_>>();
             assert!(members.iter().any(|member| member.relay
@@ -1011,7 +1028,6 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
 }
 
 #[test]
-#[ignore = "RT-SOURCE-IH-RELAY-K-VALUE: BufferFreeze carried-seat repair passes its earlier refusal; owner 1298 still reaches the unchanged Ret-tag trap (-1). Its Vis577 relay K is RecursiveBackedge, not a transferable value; this row stays ignored under the successor after RT-OWNER-VIS-RETURN-PROTOCOL descoped it."]
 fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds() {
     in_large_stack_thread("rt-escape-r2", || {
         // R2 reaching lane: two nested buffer resources compile and run; a span

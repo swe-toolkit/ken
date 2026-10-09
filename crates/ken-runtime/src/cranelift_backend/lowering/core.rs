@@ -5837,6 +5837,25 @@ impl<'a> Lowering<'a> {
                 "a handler-owned response row names a different source Vis",
             ));
         }
+        self.drive_response_at_source(
+            builder, vis_origin, lowered_args, row.operation_root_origin(),
+            row.effect_origin(), row.operation(), producer_eliminators,
+        )
+    }
+
+    /// Perform one planned response at its Construct-Vis source and resume its
+    /// exact lexical K through the active eliminators. Deferred handler rows
+    /// and source/owner relay pairs share this operation and its identity checks.
+    fn drive_response_at_source(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        vis_origin: StaticOriginId,
+        lowered_args: &[LoweringOperand],
+        operation_root_origin: StaticOriginId,
+        effect_origin: StaticOriginId,
+        planned_operation: ken_host::HostOpV1,
+        producer_eliminators: Option<&[EliminatorFrame<'_>]>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
         let [operation, k] = lowered_args else {
             return Err(unsupported(
                 "StaticResponseDeferred",
@@ -5860,7 +5879,7 @@ impl<'a> Lowering<'a> {
         let operation_origin = self
             .static_transition_plan
             .child_static_origin(vis_origin, 0)?;
-        if operation_origin != row.operation_root_origin() {
+        if operation_origin != operation_root_origin {
             return Err(unsupported(
                 "StaticResponseDeferred",
                 "a handler-owned response row disagrees with its operation root",
@@ -6042,7 +6061,7 @@ impl<'a> Lowering<'a> {
             ));
         }
 
-        let effect = self.retained_body_occurrence(row.effect_origin())?;
+        let effect = self.retained_body_occurrence(effect_origin)?;
         let RuntimeExpr::Effect {
             family,
             operation,
@@ -6055,10 +6074,10 @@ impl<'a> Lowering<'a> {
                 "a handler-owned response row names no host effect",
             ));
         };
-        if *operation != row.operation() {
+        if *operation != planned_operation {
             return Err(unsupported(
                 "StaticResponseDeferred",
-                "a handler-owned response row disagrees with its host effect",
+                "a driven response row disagrees with its host effect",
             ));
         }
         let effect_env = selected_fields
@@ -6901,7 +6920,11 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
+        self.static_transition_plan.reject_reached_admitted_relay(
+            static_origin, self.defining_emission_owner,
+        )?;
         let eliminator = eliminators[0];
+        let mut deferred_drive_available = false;
         if let Some(row) = self
             .static_transition_plan
             .deferred_response_at_vis(static_origin)?
@@ -6910,6 +6933,7 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .bounded_deferred_response_handler_owner(&row)?
                 .is_some_and(|owner| self.defining_emission_owner == Some(owner));
+            deferred_drive_available = current_owns_response;
             if current_owns_response
                 && !handler_owned_deferred_response_mutation_applies(
                     HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
@@ -6931,6 +6955,28 @@ impl<'a> Lowering<'a> {
                     Some(eliminators),
                 )?;
                 return Ok(ProducerTrampolineStep::ordinary(resumed));
+            }
+        }
+        // The handler-owned route above is authoritative for its own source.
+        // A relay source without that route is driven under the *response*
+        // owner's emission identity, never solely under its own Vis identity.
+        if !deferred_drive_available {
+            if let Some(owner) = self.defining_emission_owner {
+                if let Some(pair) = self.static_transition_plan.relay_drive_pair(static_origin, owner)? {
+                    if pair.source != static_origin || pair.owner != owner {
+                        return Err(unsupported("RelayDrive", "a planned source/owner pair changed identity"));
+                    }
+                    let lowered_args = args.iter().enumerate().map(|(position, arg)| {
+                        let arg = self.child_occurrence(static_origin, position, arg)?;
+                        self.lower_expr(builder, arg, producer_env)
+                    }).collect::<Result<Vec<_>, _>>()?;
+                    let resumed = self.drive_response_at_source(
+                        builder, static_origin, &lowered_args,
+                        pair.operation_root_origin, pair.effect_origin, pair.operation,
+                        Some(eliminators),
+                    )?;
+                    return Ok(ProducerTrampolineStep::ordinary(resumed));
+                }
             }
         }
         let terminal_exit = constructor == &self.process_symbols.exit_success
@@ -16572,6 +16618,9 @@ impl<'a> Lowering<'a> {
                 self.finish_planned_join(builder, merge, &join_plan, merge_kind, "If")
             }
             RuntimeExpr::Construct { constructor, args } => {
+                self.static_transition_plan.reject_reached_admitted_relay(
+                    static_origin, self.defining_emission_owner,
+                )?;
                 // Recut §7 total match (AC-2) over the response classify verdict.
                 // No catch-all: adding a ResponseDisposition variant reddens the
                 // build here.
@@ -16591,7 +16640,11 @@ impl<'a> Lowering<'a> {
                         })?;
                         let site = StaticResponseSite::OperationRoot(static_origin);
                         if self.static_transition_plan
-                            .static_response_placeholder_licensed(site, scope)? {
+                            .static_response_placeholder_licensed(site, scope)?
+                            && !self.static_transition_plan.relay_drive_operation_root(
+                                static_origin, self.defining_emission_owner,
+                            )?
+                        {
                             return Ok(LoweringOperand::Specialized(
                                 Lowered::StaticResponseDeferred { site },
                             ));

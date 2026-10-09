@@ -307,52 +307,7 @@ fn in_large_stack_thread(name: &'static str, body: fn()) {
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-COMPMATCH-TREE-SCRUTINEE.
-//
-// Observed signature, exactly, measured at 742bf929a with this candidate's
-// pair_detached_required_consumer worker_return descent in place:
-//   unsupported runtime-IR lowering: StaticResponseDeferred: a deferred host
-//     response is compiler control and can only enter its exact response owner
-//
-// WHERE THAT WAS CAPTURED FROM: the helper thread 'sp-a-freeze', not the test
-// thread. The test thread reports only the wrapper
-//   called `Result::unwrap()` on an `Err` value: Any { .. }
-// which carries no signature of its own and is compatible with every refusal
-// in the planner. A run that reports the wrapper has measured nothing.
-//
-// SUPERSEDED SIGNATURES -- both measured, neither is what this row now
-// produces. Kept for provenance so a later reader can tell drift from
-// disagreement.
-//
-//   (1) At 742bf929a WITHOUT this candidate's descent, the first refusal was
-//       the planner invariant
-//         an exact detached required consumer has no computational occurrence
-//       raised by pair_detached_required_consumer. Superseded because that
-//       function now finds the consumer it was failing to see: for this row
-//       the outer projection carries zero steps and an empty caller_suffix,
-//       and the ComputationalMatchCase sits one level down behind
-//       worker_return.caller_context().
-//
-//   (2) Earlier still, this block recorded
-//         ComputationalMatch: tree-producing match scrutinee is not Bool or a
-//           constructor
-//       measured at base 21fd46dc. RT-COMPMATCH-TREE-SCRUTINEE D0 forced past
-//       (1) at 742bf929a and the next observation was the CURRENT signature,
-//       not this one. So (2) is not the layer behind (1). Whether it lies
-//       deeper than the current refusal is UNMEASURED -- D0 is one forcing
-//       step and forbids forcing again.
-//
-// Owner node: RT-COMPMATCH-TREE-SCRUTINEE.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// A refusal class of its own, and the only failing row in this file --
-// its five siblings pass. It fits none of the effect-seat owners.
-// Annotation only -- test body and expectations are unchanged.
 #[test]
-#[ignore = "RT-COMPMATCH-TREE-SCRUTINEE D1: paired BufferFreeze carried start/length seat repair now passes AC-0 refusal; next first failure at lowering/units.rs:6823 is forward-declared response owner lacking a verified selected incoming call. Caller producer construct StaticOriginId(1079), alternative 1, target specialization 2 has no emitted generated-function call. Remains ignored pending that independent owner repair; AC-0 at 310bf4f21 was BufferFreeze Argument(1) ExactIntU64 unavailable in CarriedWord"]
 fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
     in_large_stack_thread("sp-a-freeze", || {
         let diff = differential("sp-a-freeze", SP_A_FREEZE);
@@ -400,6 +355,15 @@ fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
         let plan = &diagnostics[0];
         assert_eq!(plan.all_static_response_rows.len(), 8, "all specialized rows remain recorded");
         assert_eq!(plan.static_response_owners.len(), 8, "every installed owner remains recorded");
+        let owner_four = plan.static_response_owners.iter().find(|owner| owner.owner == 4)
+            .expect("span's relay-bearing response owner remains installed");
+        let owner_four_origin = plan.all_static_response_rows.get(owner_four.response as usize)
+            .expect("span owner 4 has its exact installed response row").vis_origin;
+        let returned = plan.settled_returned_vis_protocols.iter()
+            .find(|(owner, _)| *owner == owner_four_origin)
+            .map(|(_, members)| members.as_slice())
+            .expect("span owner 4 retains a pending-Vis protocol after source drive");
+        assert_eq!(returned, &[528], "span owner 4 returns only its non-relay Vis");
         let owner_six = plan.static_response_owners.iter().find(|owner| owner.owner == 6)
             .expect("owner 6 stays specialized");
         let owner_six_row = plan.all_static_response_rows.get(owner_six.response as usize)
