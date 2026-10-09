@@ -228,6 +228,64 @@ fn subset_pair_with_open_proof_is_only_its_carrier() {
 }
 
 #[test]
+fn omega_let_binder_is_erased_without_a_runtime_binding() {
+    // Promise class: durable invariant (42 §3.2, 46 §4, 47 §1).
+    // MEASURED: the kernel-checked Let proof binder is in erased_binders;
+    // native IR contains no Let binding and both evaluators return Int 9.
+    // CLAIMED: Ω classification, not the spelling of the proof, removes the
+    // bound value from runtime computation. THE GAP: this checks a closed
+    // proof-bound Let; open uses of its de Bruijn variable need separate pins.
+    let mut elaborated = ElabEnv::new().expect("prelude admits");
+    let int_id = elaborated.globals["Int"];
+    let int_ty = Term::const_(int_id, vec![]);
+    let proof_ty = Term::Eq(Box::new(int_ty.clone()), Box::new(int(9)), Box::new(int(9)));
+    let hole = declare_postulate(
+        &mut elaborated.env,
+        "opaque_let_proof".into(),
+        vec![],
+        proof_ty.clone(),
+    )
+    .expect("typed opaque proof admits");
+    let body = Term::Let {
+        ty: Box::new(proof_ty),
+        val: Box::new(Term::const_(hole, vec![])),
+        body: Box::new(int(9)),
+    };
+    ken_kernel::check(&elaborated.env, &Context::new(), &body, &int_ty)
+        .expect("kernel checks proof-bound Let");
+    let let_id = declare_def(&mut elaborated.env, vec![], int_ty.clone(), body.clone())
+        .expect("checked Let definition admits");
+    let package = package(
+        &elaborated.env,
+        &[(int_id, "Int"), (hole, "hole"), (let_id, "proof_let")],
+        &[let_id],
+    );
+    let target = sym("proof_let");
+    let plan = &package.artifact.semantic.omega_erasure_plans[&target];
+    assert_eq!(
+        plan.erased_binders,
+        BTreeSet::from([0]),
+        "kernel-Ω-classified Let binder is erased"
+    );
+    assert_eq!(plan.erased_subterms, BTreeSet::from([5]));
+    let lowered = native_body(&package, &target, &[target.clone()]);
+    assert!(
+        !matches!(lowered, RuntimeExpr::Let { .. }),
+        "erased Let binder leaves no runtime binding"
+    );
+    assert_eq!(
+        observed(&lowered),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(9.into()))
+    );
+    let mut store = EvalStore::new();
+    assert!(matches!(
+        eval_checked(&body, &int_ty, &elaborated.env, &mut store)
+            .expect("interpreter evaluates the checked Let"),
+        EvalVal::Int(9)
+    ));
+}
+
+#[test]
 fn relevant_sigma_pair_keeps_both_components() {
     // Promise class: durable invariant (42 §3.2, 47 §1).
     // MEASURED: Σ Int Int remains a pair on both runtime paths; a proof-first
