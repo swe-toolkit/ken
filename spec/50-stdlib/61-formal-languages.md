@@ -1,12 +1,13 @@
-# Formal languages: finite automata
+# Formal languages: automata and regular expressions
 
 > Status: **DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT;
 > SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT;
-> SPEC-FORMAL-LANGUAGES-NFA-CONTRACT).** Section 1 specifies ordinary Dfa;
-> section 2 specifies finite evidence and reachability; section 3 specifies
-> Nfa and checked determinization. Sections 4–6 remain deferred. Specifying
-> the new packages does not claim their implementation is landed here. No
-> kernel, trust, or surface-syntax change is introduced.
+> SPEC-FORMAL-LANGUAGES-NFA-CONTRACT;
+> SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT).** Sections 1–3 specify Dfa, finite
+> reachability, and Nfa; section 4 specifies regular-expression denotation
+> and a checked derivative matcher. Sections 5–6 remain deferred. A contract
+> does not itself claim package delivery. No kernel, trust, or surface-syntax
+> change is introduced.
 
 A deterministic automaton describes a transition for every state and input
 symbol and a Boolean acceptance test. Its state carrier need not be finite:
@@ -617,10 +618,228 @@ change, or `trusted_base()` entry is introduced.
 The checked development in the Architect's D0 ruling establishes this
 contract's feasibility, not that any §3 package or theorem has landed.
 
-## 4. Regular expressions (deferred)
+## 4. Regular expressions and derivative matching
 
-A later contract will add regex and a derivative matcher. `DecEq a` enters
-there; it is not a prerequisite for §§1–3's alphabet.
+`Algorithm.FormalLanguages.Regex` is an optional, explicitly imported
+package. A regular expression denotes a language of finite `List a` words
+without deciding equality of alphabet symbols. A separate matcher decides
+membership when the caller supplies `DecEq a`; no finite alphabet, finite
+state certificate, or state equality is required. The denotation is defined
+independently of the matcher, so the checked laws compare two distinct
+constructions rather than validating a computation against itself.
+
+### 4.1 Carrier and independent Ω denotation
+
+The public carrier and its six exported constructors are ordinary checked
+inductive data. `Fail` denotes no word, `Eps` only the empty word, `Sym c`
+only the one-symbol word containing `c`, `Alt` either language, `Cat` word
+concatenation, and `Star` finite repetition, including zero repetitions.
+`Fail` avoids reusing the `Empty` spelling already owned by
+`Core.Logic.EmptyDec` for a different type (`../30-surface/30 §4`).
+Forming `Regex a` imposes no `DecEq a`, `Finite a`, or ordering constraint.
+
+```ken
+pub data Regex a =
+  Fail | Eps | Sym a | Alt (Regex a) (Regex a)
+  | Cat (Regex a) (Regex a) | Star (Regex a)
+export Fail, Eps, Sym, Alt, Cat, Star
+```
+
+Two public, `Type`-sorted evidence families make concatenation and finite
+repetition inspectable before truncation. `Split` witnesses a particular
+factorisation `w = u ++ v` with a proof for each side. `Pieces` witnesses a
+finite list of words whose concatenation is `w`, with a proof that each word
+satisfies `p`. Their constructors are exported because they occur in the
+reduct of the public language predicate.
+
+```ken
+pub data Split
+  (a : Type) (p : List a → Omega) (r : List a → Omega)
+  (w : List a) : Type where {
+  MkSplit : (u : List a) → (v : List a) →
+    Equal (List a) (list_append a u v) w →
+    p u → r v → Split a p r w
+}
+export MkSplit
+
+pub data Pieces
+  (a : Type) (p : List a → Omega) (w : List a) : Type where {
+  MkPieces : (ws : List (List a)) →
+    Equal (List a) (list_concat a ws) w →
+    list_all (List a) p ws → Pieces a p w
+}
+export MkPieces
+
+pub fn regex_lang (a : Type) (r : Regex a) : List a → Omega
+```
+
+`regex_lang a r w` is structurally defined by `r`; the following equations
+fix its result. `Fail` gives `Bottom` on every word. `Eps` gives
+`Equal (List a) w (Nil a)`. `Sym c` gives `Bottom` on `Nil`, and on
+`Cons a x rest` gives
+`‖ And (Equal a x c) (Equal (List a) rest (Nil a)) ‖`.
+`Alt r1 r2` gives
+`‖ Or (regex_lang a r1 w) (regex_lang a r2 w) ‖`;
+`Cat r1 r2` gives
+`‖ Split a (regex_lang a r1) (regex_lang a r2) w ‖`;
+`Star r1` gives `‖ Pieces a (regex_lang a r1) w ‖`.
+The `Nil` list of pieces witnesses the empty word for every `Star`, even
+when `r1 = Fail`; empty pieces do not force a nonempty match.
+
+The two reusable list operations in those evidence types belong in
+`Data.Collections.Derived`, beside `list_append`, **not** inside Regex:
+
+```ken
+pub fn list_concat (a : Type) (ws : List (List a)) : List a
+pub fn list_all (t : Type) (p : t → Omega) (xs : List t) : Omega
+```
+
+`list_concat a [] = []` and
+`list_concat a (u :: us) = list_append a u (list_concat a us)`.
+`list_all t p [] = Equal Bool True True`, and
+`list_all t p (y :: ys) = ‖ And (p y) (list_all t p ys) ‖`.
+Thus `list_all` is an Ω predicate, not a Boolean decision or a product
+of propositions stored in `Pair`. For level-zero `a : Type`, the equalities
+in `Split` and `Pieces` inhabit `Omega`; the families themselves are
+ordinary `Type`. `Or` and `And` are proof-relevant `Type` families whose
+truncations inhabit `Omega`. Only their truncated propositions, and proofs
+of propositions, are proof-irrelevant; no witness or list of pieces is
+smuggled into Ω. The `List a → Omega` predicates and the theorem
+implications below land at the predicative maximum of their level-zero
+domains and Ω codomains.
+
+### 4.2 Nullability, derivative, and finite-word decision
+
+The three public operations have these types and behavior:
+
+```ken
+pub fn nullable (a : Type) (r : Regex a) : Bool
+pub fn deriv (a : Type) (d : DecEq a) (x : a) (r : Regex a) : Regex a
+pub fn regex_matches
+  (a : Type) (d : DecEq a) (r : Regex a) (w : List a) : Bool
+```
+
+`nullable` is `False` on `Fail` and `Sym`, `True` on `Eps` and `Star`,
+`bool_or` of its operands on `Alt`, and `bool_and` of its operands on
+`Cat`. It is a structural Boolean computation; it uses no alphabet
+equality. Write `guard b r = r` when `b = True` and `Fail` otherwise;
+this is a private abbreviation, not a public operation.
+
+`deriv d x` computes the left quotient by symbol `x`. Its `Fail` and
+`Eps` cases produce `Fail`. Its `Sym c` case produces
+`guard (d.eq x c) Eps`. Its `Alt r1 r2` case is the alternation of
+`deriv d x r1` and `deriv d x r2`. Its `Cat r1 r2` case is the alternation
+of `Cat (deriv d x r1) r2` and
+`guard (nullable r1) (deriv d x r2)`; the second alternative exists only
+when the left expression accepts the empty word. Its `Star r1` case is
+`Cat (deriv d x r1) (Star r1)`. These equations specify the language of
+the returned expression; no simplification or canonical syntax is promised.
+
+`regex_matches d r [] = nullable r` and
+`regex_matches d r (x :: xs) = regex_matches d (deriv d x r) xs`.
+The word's structural descent makes the matcher total on finite inputs;
+this is not a claim that repeatedly generated derivative expressions have
+a finite quotient or bounded representation. `DecEq a` is an explicit
+**value**, not an inferred constraint: it is needed by `deriv`'s `Sym`
+case and consequently by `regex_matches`, but neither the carrier,
+`regex_lang`, nor `nullable` requires it. Symbol matching uses both
+`d.sound` and `d.complete`; an `Eq a` Boolean equivalence alone does
+not connect its result to Ken's `Equal a` proposition.
+
+### 4.3 Six checked laws
+
+The following six public laws are proved theorems over the **same exported**
+definitions. `Equal Bool ... True` is a checked Ω proposition, not an
+informal true result. For `a : Type` at level zero, each implication
+below inhabits Ω. None is an `Axiom`, an unfilled obligation, a test result,
+or a theorem about a second specification-only matcher.
+
+```ken
+pub theorem nullable_sound (a : Type) (r : Regex a) :
+  Equal Bool (nullable a r) True → regex_lang a r (Nil a)
+
+pub theorem nullable_complete (a : Type) (r : Regex a) :
+  regex_lang a r (Nil a) → Equal Bool (nullable a r) True
+
+pub theorem deriv_sound (a : Type) (d : DecEq a) (x : a) (r : Regex a) :
+  (w : List a) →
+  regex_lang a (deriv a d x r) w → regex_lang a r (Cons a x w)
+
+pub theorem deriv_complete (a : Type) (d : DecEq a) (x : a) (r : Regex a) :
+  (w : List a) →
+  regex_lang a r (Cons a x w) → regex_lang a (deriv a d x r) w
+
+pub theorem regex_matches_sound
+  (a : Type) (d : DecEq a) (r : Regex a) (w : List a) :
+  Equal Bool (regex_matches a d r w) True → regex_lang a r w
+
+pub theorem regex_matches_complete
+  (a : Type) (d : DecEq a) (r : Regex a) (w : List a) :
+  regex_lang a r w → Equal Bool (regex_matches a d r w) True
+```
+
+`nullable_sound` and `nullable_complete` equate empty-word denotation with
+nullability. `deriv_sound` and `deriv_complete` equate acceptance of
+`x :: w` with acceptance of `w` by the derivative, in **both**
+directions. `regex_matches_sound` and `regex_matches_complete` lift these
+facts by induction on the supplied word. A law whose premise is false
+vacuously proves nothing about a positive instance; acceptance examples
+must instantiate these laws with inhabited antecedents.
+
+A proof of `Cat` completeness must handle both splits where the left word
+is empty and where it starts with the input symbol. A proof of `Star`
+completeness must handle an empty piece list, leading empty pieces, and
+a first nonempty piece without assuming any bound on repetitions. The
+proofs may use private structural lemmas; no private lemma names or proof
+body layout is part of this contract. The checked equality interface
+supplies `cong`/`trans`; the Boolean calculations use the existing public
+`bool_or`/`bool_and`. Five generic Bool-truth lemmas needed by the proof
+belong once in `Core.Classes.LawfulClasses`, not as another copy in Regex.
+Their D0-checked types, to be exposed there by the catalog build, are:
+
+```ken
+pub theorem or_left (b : Bool) (c : Bool) :
+  Equal Bool b True → Equal Bool (bool_or b c) True
+pub theorem or_right (b : Bool) (c : Bool) :
+  Equal Bool c True → Equal Bool (bool_or b c) True
+pub theorem or_cases (b : Bool) (c : Bool) (g : Omega) :
+  Equal Bool (bool_or b c) True →
+  (Equal Bool b True → g) → (Equal Bool c True → g) → g
+pub theorem and_true (b : Bool) (c : Bool) :
+  Equal Bool b True → Equal Bool c True →
+  Equal Bool (bool_and b c) True
+pub theorem and_cases (b : Bool) (c : Bool) (g : Omega) :
+  Equal Bool (bool_and b c) True →
+  (Equal Bool b True → Equal Bool c True → g) → g
+```
+
+The Regex catalog build therefore depends on the **shared**
+`Data.Collections.Derived.list_concat`/`list_all` and these five
+`Core.Classes.LawfulClasses` proof helpers. They are catalog delivery
+items, not declarations already landed on this Spec base and not an
+invitation to extend this Spec WP into `catalog/`.
+
+### 4.4 Trust, scope, and later automata links
+
+The Regex package uses existing `List`, `Bool`, `Equal`, truncation,
+structural induction, `Core.Logic.Or`/`And`, the public `DecEq` dictionary,
+and the two shared list operations. All six laws require kernel-checked
+proof terms. The Architect's checked D0 development demonstrates
+feasibility with rc=0 and no `Axiom`; it does not establish that §4's
+package, its shared dependencies, or these laws have landed. This
+contract introduces **no `Axiom`, postulate, primitive, new kernel form or
+reduction rule, prelude name, surface-syntax change, or `trusted_base()`
+entry**. A tested matcher without these checked proofs is a partial
+increment, not a completed proved package.
+
+No conversion to a Dfa or Nfa, automaton language-equality theorem,
+finite-derivative-quotient proof, or decidable state-equality law is in
+§4. The Nfa of §3 has no ε-transitions; an ε-free position construction
+would need its own finite-position certificate and language proof. A Dfa
+from derivatives would additionally need a finite quotient of derivative
+states. Those contracts, if introduced, belong after this section; §5
+retains state equality and equivalence/minimisation. No automaton package
+is imported by Regex.
 
 ## 5. Equivalence and minimisation (deferred)
 
@@ -632,4 +851,4 @@ for arbitrary states nor equivalence or minimisation procedures.
 
 A later `Bytes`/`Cursor` runner bridge for `Capability.Parsing` lexers will
 relate byte-runner results to `run` over the corresponding byte list.
-Sections 1–3 use `List a` only and make no byte/lexer claim.
+Sections 1–4 use `List a` only and make no byte/lexer claim.
