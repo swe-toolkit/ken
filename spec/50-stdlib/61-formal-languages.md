@@ -3,11 +3,12 @@
 > Status: **DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT;
 > SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT;
 > SPEC-FORMAL-LANGUAGES-NFA-CONTRACT;
-> SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT).** Sections 1–3 specify Dfa, finite
-> reachability, and Nfa; section 4 specifies regular-expression denotation
-> and a checked derivative matcher. Sections 5–6 remain deferred. A contract
-> does not itself claim package delivery. No kernel, trust, or surface-syntax
-> change is introduced.
+> SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT;
+> SPEC-FORMAL-LANGUAGES-MINIMISATION-CONTRACT).** Sections 1–3 specify Dfa,
+> finite reachability, and Nfa; section 4 specifies Regex; section 5
+> specifies Dfa equivalence and canonical-representative minimisation.
+> Section 6 remains deferred. A contract does not itself claim package
+> delivery. No kernel, trust, or surface-syntax change is introduced.
 
 A deterministic automaton describes a transition for every state and input
 symbol and a Boolean acceptance test. Its state carrier need not be finite:
@@ -227,8 +228,9 @@ membership is in `Omega`; truncation returns `Omega`, while `Finite q` is
 an ordinary `Type` record with a proof-irrelevant coverage field. Its
 certificate does **not** construct `DecEq q`, prohibit duplicates, or
 promise an efficiently searchable representation. Decidable equality of
-states remains a separate prerequisite for state-to-state reachability
-and equivalence (§5).
+states remains a separate prerequisite for reaching a **named** state by
+comparing it with the current state, not for Dfa language equivalence or
+minimisation (§5).
 
 `elements q fq` projects the supplied list; `covers q fq x` projects its
 checked coverage proof. `fin_finite n` constructs a value covering every
@@ -837,18 +839,240 @@ finite-derivative-quotient proof, or decidable state-equality law is in
 §4. The Nfa of §3 has no ε-transitions; an ε-free position construction
 would need its own finite-position certificate and language proof. A Dfa
 from derivatives would additionally need a finite quotient of derivative
-states. Those contracts, if introduced, belong after this section; §5
-retains state equality and equivalence/minimisation. No automaton package
-is imported by Regex.
+states. Those contracts, if introduced, belong after this section. Section 5
+specifies Dfa equivalence and minimisation **without** `DecEq q`; it does
+not link Regex to an automaton. No automaton package is imported by Regex.
 
-## 5. Equivalence and minimisation (deferred)
+## 5. Equivalence and minimisation
 
-Equivalence and minimisation require §2's finite evidence **and**
-decidable state equality. Section 2 supplies neither an equality decision
-for arbitrary states nor equivalence or minimisation procedures.
+`Algorithm.FormalLanguages.Minimisation` is an optional, explicitly
+imported, ordinary Ken package over §§1–2. It compares the languages of
+two Dfa machines, or the futures of two particular states, using explicit
+finite certificates for both state carriers and the shared alphabet. It
+also normalises a Dfa to canonical representatives **within its original
+carrier `q`**. Neither operation compares states for equality, so neither
+requires `DecEq q`. `Finite q` remains a duplicate-permitting coverage
+certificate, not an inferred equality decision. This section declares
+five public operations and **eight public checked laws**; proof helpers
+and a particular canonical-representative choice remain private.
+
+### 5.1 Equality of future languages and its decision
+
+The public proposition `same_future` describes language equality from
+arbitrary states, even without finite certificates. For all finite words,
+the two machines' Boolean final tests agree after independently running
+that **same** word from their specified states. The state carriers may
+differ (`q` and `r`); the alphabet `a` must be shared.
+
+```ken
+pub fn same_future
+  (q : Type) (r : Type) (a : Type)
+  (d : Dfa q a) (e : Dfa r a) (s : q) (t : r) : Omega =
+  (w : List a) →
+    Equal Bool (final q a d (run q a d s w))
+               (final r a e (run r a e t w))
+
+pub fn equivalent
+  (q : Type) (r : Type) (a : Type)
+  (fq : Finite q) (fr : Finite r) (fa : Finite a)
+  (d : Dfa q a) (e : Dfa r a) : Bool
+
+pub fn equivalent_states
+  (q : Type) (r : Type) (a : Type)
+  (fq : Finite q) (fr : Finite r) (fa : Finite a)
+  (d : Dfa q a) (e : Dfa r a) (s : q) (t : r) : Bool
+```
+
+The two decisions use §1's `product` and §2's `reachable`. Define the
+private Boolean discriminator `disagree b c = bool_not (bool_eq b c)`:
+`disagree True True = False`, `disagree False False = False`, and each
+mixed pair gives `True`. The public `bool_eq` and `bool_not` come from
+`Core.Classes.LawfulClasses`. The product's paired state is final
+exactly when the component final tests **differ**. With
+`p = product q r a disagree d e` and
+`fp = pair_finite q r fq fr`, the fixed decision is
+
+```ken
+equivalent_states q r a fq fr fa d e s t =
+  bool_not (reachable (Pair q r) a fp fa p
+            (final (Pair q r) a p) (mk_pair q r s t))
+equivalent q r a fq fr fa d e =
+  equivalent_states q r a fq fr fa d e
+    (start q a d) (start r a e)
+```
+
+Thus `equivalent` is also the `is_empty` view of this disagreement
+product at the product's start. A `True` result means that **no** word
+reaches a disagreement; `False` means a disagreement word exists, but
+the decision does not promise which one `find_word` returns. Both state
+certificates compose via §2's `pair_finite`; the input certificate is
+required to search all possible symbols. Neither certificate decides
+`Equal q` or `Equal r`.
+
+Four public theorems relate this Boolean decision to the independent
+future-language proposition. The first two quantify over the machines'
+start states, the last two over any specified states. All binder lists
+are explicit; in particular, `same_future` needs no `Finite` value,
+while deciding it does.
+
+```ken
+pub theorem equivalent_sound
+  (q : Type) (r : Type) (a : Type)
+  (fq : Finite q) (fr : Finite r) (fa : Finite a)
+  (d : Dfa q a) (e : Dfa r a) :
+  Equal Bool (equivalent q r a fq fr fa d e) True →
+  (w : List a) → Equal Bool (accepts q a d w) (accepts r a e w)
+
+pub theorem equivalent_complete
+  (q : Type) (r : Type) (a : Type)
+  (fq : Finite q) (fr : Finite r) (fa : Finite a)
+  (d : Dfa q a) (e : Dfa r a) :
+  ((w : List a) → Equal Bool (accepts q a d w) (accepts r a e w)) →
+  Equal Bool (equivalent q r a fq fr fa d e) True
+
+pub theorem equivalent_states_sound
+  (q : Type) (r : Type) (a : Type)
+  (fq : Finite q) (fr : Finite r) (fa : Finite a)
+  (d : Dfa q a) (e : Dfa r a) (s : q) (t : r) :
+  Equal Bool (equivalent_states q r a fq fr fa d e s t) True →
+  same_future q r a d e s t
+
+pub theorem equivalent_states_complete
+  (q : Type) (r : Type) (a : Type)
+  (fq : Finite q) (fr : Finite r) (fa : Finite a)
+  (d : Dfa q a) (e : Dfa r a) (s : q) (t : r) :
+  same_future q r a d e s t →
+  Equal Bool (equivalent_states q r a fq fr fa d e s t) True
+```
+
+The checked `run_product` law relates a word's product state to the
+pair of component runs. For soundness, a reachable disagreement would
+contradict the decision's `True` result via `find_word_complete`; when
+the product's final test is `False`, the two finals agree. For
+completeness, a returned `Some w` would supply a `True` disagreement
+through `find_word_sound`, contradicting the all-words agreement. These
+are proofs against the **exported** product and decision, not tests of
+a second specification-only decision. There is no state comparison:
+only the two Boolean final results are compared.
+
+### 5.2 Canonical representatives in the same carrier
+
+`canonical` maps any state to a representative with the same future
+language. Equal future languages map to **equal states** under this
+map. These two laws fix what is observable about canonicalisation;
+no particular element or order of `elements q fq` is promised. The
+checked D0 construction can choose the first equivalent element of
+the supplied finite list, but that is one private implementation, not
+an additional contract, public choice, or state-equality decision.
+
+```ken
+pub fn canonical
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (s : q) : q
+
+pub theorem canonical_same_future
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (s : q) :
+  same_future q q a d d (canonical q a fq fa d s) s
+
+pub theorem canonical_unique
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (s : q) (t : q) :
+  same_future q q a d d s t →
+  Equal q (canonical q a fq fa d s) (canonical q a fq fa d t)
+
+pub fn minimise
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) : Dfa q a
+```
+
+The `minimise` machine has exactly carrier `q`. Its initial state is
+`canonical q a fq fa d (start q a d)`. Its transition from state `s`
+on symbol `x` is `canonical q a fq fa d (step q a d s x)`; its final test
+is the original `final q a d`. All reachable states from its start are
+canonical fixed points; states outside that reachable subgraph remain
+in `q` and need not be distinct or reachable. There is no fresh
+quotient type, `Fin`-indexed table, state count, or `DecEq q` argument.
+
+Two further checked public laws state the behavioral guarantee and its
+zero-trust minimality form. `accepts_minimise` preserves the accepted
+language on **every** input word. `minimise_reduced` compares only the
+states reached by words `u` and `v` from the minimised start: if their
+future accepted languages agree for **every suffix** `w`, the reached
+states are equal in `q`. It neither asserts that `q` contains the fewest
+possible elements nor equates arbitrary unreachable states. All four
+minimisation-side laws are statements about this same exported
+`canonical` and `minimise`.
+
+```ken
+pub theorem accepts_minimise
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (w : List a) :
+  Equal Bool (accepts q a (minimise q a fq fa d) w)
+             (accepts q a d w)
+
+pub theorem minimise_reduced
+  (q : Type) (a : Type) (fq : Finite q) (fa : Finite a)
+  (d : Dfa q a) (u : List a) (v : List a) :
+  ((w : List a) →
+    Equal Bool
+      (accepts q a (minimise q a fq fa d) (list_append a u w))
+      (accepts q a (minimise q a fq fa d) (list_append a v w))) →
+  Equal q
+    (run q a (minimise q a fq fa d)
+      (start q a (minimise q a fq fa d)) u)
+    (run q a (minimise q a fq fa d)
+      (start q a (minimise q a fq fa d)) v)
+```
+
+The `canonical_same_future` proof relates the result of canonicalising
+to its input; `canonical_unique` uses the `Finite q` coverage proof and
+§5.1's sound and complete decision, not a Boolean decision on `Equal q`.
+`run_append` and induction on the supplied words relate the futures of
+two reached states to suffix acceptance. The laws together establish
+that canonicalising twice is idempotent, that minimised runs stay in
+canonical states, and that equal reached futures collapse as
+`minimise_reduced` states. These are consequences, not further named
+public laws or complexity bounds.
+
+### 5.3 Trust boundary and exclusions
+
+For `q`, `r`, `a : Type` at level zero, `Pair q r` and `List a` are
+ordinary `Type` carriers, whereas their checked `Equal Bool` and
+`Equal q` propositions are in `Omega`. The dependent product over
+`List a` of `Equal Bool` propositions — `same_future` — also lands
+in `Omega` by the predicative maximum. The law implications and
+proofs of these propositions do not expose a proof-relevant witness or
+require an impredicative elimination. `Finite` certificates, Boolean
+comparison, products, and checked induction are existing library/
+kernel machinery; no extra axiom proves a semantic property of
+`canonical` or of `minimise`.
+
+All eight public laws must be kernel-checked proofs over the delivered
+package; `Axiom`, an open obligation, or green tests alone cannot
+complete it. The Architect's D0 development checked at rc=0 with no
+`Axiom`/postulate and demonstrated the eight laws' feasibility, not
+that this §5 package or its seed has landed. The contract introduces
+**no new kernel declaration kind/form, primitive, reduction rule,
+prelude identity, surface syntax, or `trusted_base()` entry**. Ordinary
+declarations use the existing checked machinery. The package may use
+private lemmas but does not export a ninth law.
+
+A cardinality-minimal DFA against any equivalent machine is **not**
+claimed: `Finite q` permits duplicate enumeration and alone supplies
+no decidable equality or distinct-state count, and such a theorem needs
+additional cardinality and pigeonhole machinery. A quotient on a new
+`Fin` carrier, trimming unreachable states, named-state reachability
+by `DecEq q`, complexity bounds or a partition-refinement algorithm,
+and Nfa/Regex equivalence remain outside §5. An Nfa decision could
+compose with §3's `determinize`; a Regex-to-automaton decision would
+first need §4.4's separately proved finite derivative quotient. Neither
+is silently provided by this package. A future implementation of a
+faster algorithm must still prove the **same eight laws**.
+
 
 ## 6. Lexer input bridge (deferred)
 
 A later `Bytes`/`Cursor` runner bridge for `Capability.Parsing` lexers will
 relate byte-runner results to `run` over the corresponding byte list.
-Sections 1–4 use `List a` only and make no byte/lexer claim.
+Sections 1–5 use `List a` only and make no byte/lexer claim.
