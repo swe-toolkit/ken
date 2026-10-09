@@ -826,29 +826,9 @@ fn buffer_freeze_outcome(
 }
 
 #[cfg(target_os = "linux")]
-// Ignored pending RT-PROCESS-EXIT-STATUS.
-//
-// Observed signature, exactly:
-//   ProcessExitStatus: child 0 is held with a Persistent referent
-//     lifetime and can be owned by PersistentStore, which its own
-//     producer occurrence's ownership record did not plan for that
-//     position (planned Persistent over [NoReferent])
-//
-// Owner node: RT-PROCESS-EXIT-STATUS.
-// Pre-existing base debt, NOT a bind-order regression: this row fails at
-// base 21fd46dc as well, measured by the D12 two-way differential over the
-// complete --no-fail-fast surface of both packages.
-// It refuses at object emission, so the program never executes and no
-// binding order is observable in it.
-// A refusal class of its own: it fits none of the effect-seat, frame-
-// marker or closure-lane owners, so it was given its own node rather
-// than forced into a nearest fit.
-// The refusal surfaces on the helper thread 'rt-escape-r2'; this
-// test thread then fails only with the wrapper
-//   called `Result::unwrap()` on an `Err` value: Any { .. }
-// which carries no signature of its own. The signature above is the
-// real cause.
-// Annotation only -- test body and expectations are unchanged.
+// The protocol diagnostic and the unignored native row exercise the same
+// r2 fixture. Raw relay provenance stays visible, but admitted relay members
+// must leave the projected returned set before native emission.
 /// Promise class: transition sentinel for this r2 fixture's owner/Vis origins.
 /// MEASURED: both relay-bearing owners have one static successor and one
 /// source-driven relay; each retains only its independent successor (owner 2:
