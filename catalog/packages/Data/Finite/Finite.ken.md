@@ -2,7 +2,8 @@
 
 A finite certificate lists values of a carrier and proves that every value
 occurs in that list. Duplicates are permitted, and neither membership nor
-coverage requires decidable equality. `fin_finite` certifies bounded indices;
+coverage requires decidable equality. `unit_finite` and `bool_finite` certify
+the built-in carriers, `fin_finite` certifies bounded indices, and
 `pair_finite` composes certificates for paired state carriers.
 
 ## Contents
@@ -57,6 +58,31 @@ pub theorem covers (q : Type) (fq : Finite q) : (x : q) → list_elem q x (eleme
 
 pub fn fin_finite (n : Nat) : Finite (Fin n) =
   MkFinite (Fin n) (fin_elements n) (fin_elements_cover n)
+
+pub const unit_finite : Finite Unit =
+  MkFinite
+    Unit
+    (Cons Unit MkUnit (Nil Unit))
+    (λu.
+      match u {
+        MkUnit ↦ list_elem_head Unit MkUnit (Nil Unit)
+      })
+
+pub const bool_finite : Finite Bool =
+  MkFinite
+    Bool
+    (Cons Bool True (Cons Bool False (Nil Bool)))
+    (λb.
+      match b {
+        True ↦ list_elem_head Bool True (Cons Bool False (Nil Bool));
+        False ↦
+          list_elem_later
+            Bool
+            False
+            True
+            (Cons Bool False (Nil Bool))
+            (list_elem_head Bool False (Nil Bool))
+      })
 
 pub fn fin_elements (n : Nat) : List (Fin n) =
   match n {
@@ -130,24 +156,28 @@ theorem pair_eta
 
 ## 3. Using it
 
-`fin_finite n` supplies a certificate for `Fin n`, including the empty
-carrier `Fin Zero`. For product or intersection automata, `pair_finite`
-combines certificates for the two component state types.
+`unit_finite` covers the sole value of `Unit`; `bool_finite` lists both Boolean
+values. `fin_finite n` certifies `Fin n`, including the empty carrier
+`Fin Zero`. For product or intersection automata, `pair_finite` combines
+certificates for the two component state types.
 
 ```ken example
 const one_index : Finite (Fin (Suc Zero)) = fin_finite (Suc Zero)
 
 const two_indices : Finite (Pair (Fin (Suc Zero)) (Fin (Suc Zero))) =
   pair_finite (Fin (Suc Zero)) (Fin (Suc Zero)) one_index one_index
+
+const bool_and_unit : Finite (Pair Bool Unit) = pair_finite Bool Unit bool_finite unit_finite
 ```
 
 ## 4. Laws & proofs
 
 `covers` projects the checked evidence stored in the certificate.
-`fin_elements_cover` proceeds by induction on bounded indices, lifting
-membership through a mapped successor list. `pair_cover` uses membership
-of each component and transports through pair η; it does not need a pair
-equality decision.
+`unit_finite` covers `MkUnit` by head membership; `bool_finite` covers both
+constructors by head or later membership. `fin_elements_cover` proceeds by
+induction on bounded indices, lifting membership through a mapped successor
+list. `pair_cover` uses membership of each component and transports through
+pair η; it does not need a pair equality decision.
 
 ## 5. Design notes
 
@@ -167,7 +197,8 @@ The private pair enumeration and coverage lemmas are implementation details.
 The contract is
 [formal languages §2](../../../../spec/50-stdlib/61-formal-languages.md).
 The public surface comprises `Finite`, `MkFinite`, `elements`, `covers`,
-`fin_finite`, `fin_elements`, `fin_elements_cover`, and `pair_finite`.
+`fin_finite`, `unit_finite`, `bool_finite`, `fin_elements`,
+`fin_elements_cover`, and `pair_finite`.
 
 | Reader task | Section |
 |---|---|
@@ -179,4 +210,5 @@ The derivation is ordinary checked `List`, `Fin`, `Pair`, and truncation, with
 public imports from Vector and Derived. The component coverage is inherited
 from its input certificates. It adds no primitive, Axiom, or local
 `trusted_base()` entry; inherited assumptions from a provider are not erased.
-The finite-state reachability package consumes these certificates.
+Finite-state reachability consumes these certificates; NFA subset
+construction reuses the Unit and Bool certificates for its mask carrier.

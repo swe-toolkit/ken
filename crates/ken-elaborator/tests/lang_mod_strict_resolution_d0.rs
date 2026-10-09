@@ -434,9 +434,27 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            "Algorithm.FormalLanguages.Nfa".to_string(),
+            [
+                "And",
+                "MkUnit",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Algorithm.FormalLanguages.Reachability".to_string(),
             [
                 "And",
+                "MkUnit",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1082,6 +1100,7 @@ fn catalog_ambient_passthrough_migration_census() {
             "Data.Finite.Finite".to_string(),
             [
                 "And",
+                "MkUnit",
                 "Unit",
                 "and_fst",
                 "and_intro",
@@ -1183,6 +1202,7 @@ fn catalog_ambient_passthrough_migration_census() {
         .collect::<BTreeSet<_>>();
     let expected_clean = [
         "Core.Function.Combinators",
+        "Core.Logic.And",
         "Core.Logic.Not",
         "Data.Collections.List",
         "Data.Numeric.Nat.Arithmetic",
