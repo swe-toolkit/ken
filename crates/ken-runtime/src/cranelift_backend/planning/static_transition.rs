@@ -1077,23 +1077,29 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
     planner.connect_declaration_calls(&declaration_entries)?;
     let plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
     #[cfg(feature = "px8-ds-test-support")]
+    if std::env::var_os("KEN_RELAY_D1_TEST_REFUSAL").is_some()
+        || std::env::var_os("KEN_RELAY_D1_RECORD").is_some()
     {
-        let test_refusal = std::env::var_os("KEN_RELAY_D1_TEST_REFUSAL").is_some();
-        if test_refusal || std::env::var_os("KEN_RELAY_D1_RECORD").is_some() {
-            let refused = responses::relay_d1_record(&plan);
-            // D1 is record-only. The explicit test-only env opt-in exercises
-            // the prospective typed error for the retired-flat switch control;
-            // it is never set for the census or a production build.
-            if test_refusal && !refused.is_empty() && !relay_settlement_refusal_suppressed() {
-                return Err(planner_capacity_error(format!(
-                    "response owner relay settlement refused: {}", refused.join("; "))));
-            }
-        }
+        // This diagnostic reads the same classifier as the ordinary refusal.
+        let _ = responses::relay_d1_record(&plan);
     }
     #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]
     per_emitter_availability::record_per_emitter_availability_diagnostic(&plan);
+
+    // Refuse only after the cfg-gated recorders, at planner.finish's sole
+    // caller. The test-only suppression preserves a negative control's older
+    // lowering refusal; no ordinary build can select that suppression.
+    let refused = responses::relay_settlement_refusals(&plan);
+    #[cfg(feature = "px8-ds-test-support")]
+    if relay_settlement_refusal_suppressed() {
+        return Ok(plan);
+    }
+    if !refused.is_empty() {
+        return Err(planner_capacity_error(format!(
+            "response owner relay settlement refused: {}", refused.join("; "))));
+    }
     Ok(plan)
 }
 

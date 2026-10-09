@@ -418,33 +418,31 @@ fn run_px8ds_retired_flat_control() {
         "the retired plan must report one exact closure refusal: {retired}"
     );
 
-    // The disposable test-only refusal probe is opt-in: the ordinary build
-    // keeps its original behavior. This same-thread sibling proves the
-    // suppression scope restored and the unsuppressed verdict is not Closure.
-    if std::env::var_os("KEN_RELAY_D1_TEST_REFUSAL").is_some() {
-        const TYPED: &str = "response owner relay settlement refused: owner StaticResponseContinuationId(0) at Vis StaticOriginId(676) excluded Relay: relay [StaticOriginId(370)] not settled (base Specialization(ContinuationSpecializationId(0)))";
-        let unsuppressed_dir = output_dir("px8ds-retired-flat-unsuppressed");
-        let unsuppressed = ken_runtime::with_px8ds_retired_flat_order(|| {
-            ken_cli::build_native_program(
-                PX8DS_SIBLING_RECURSION_PROGRAM,
-                ken_cli::SourceFormat::Ken,
-                "px8ds-retired-flat-unsuppressed",
-                unsuppressed_dir.path(),
-                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            )
-        })
-        .expect_err("an unsuppressed retired-flat build must have the typed relay refusal");
-        let unsuppressed = format!("{unsuppressed:?}");
-        assert!(
-            unsuppressed.contains(TYPED) && !unsuppressed.contains(REFUSAL),
-            "the unsuppressed plan must refuse owner 0 / relay 370 before lowering: {unsuppressed}"
-        );
-        assert_eq!(
-            unsuppressed.matches(TYPED).count(),
-            1,
-            "the unsuppressed plan must report one exact typed refusal: {unsuppressed}"
-        );
-    }
+    // The same-thread sibling proves the test-only suppression scope was
+    // restored: ordinary unsuppressed planning now raises the typed refusal,
+    // before the older Closure-boundary negative control can be reached.
+    const TYPED: &str = "response owner relay settlement refused: owner StaticResponseContinuationId(0) at Vis StaticOriginId(676) excluded Relay: relay [StaticOriginId(370)] not settled (base Specialization(ContinuationSpecializationId(0)))";
+    let unsuppressed_dir = output_dir("px8ds-retired-flat-unsuppressed");
+    let unsuppressed = ken_runtime::with_px8ds_retired_flat_order(|| {
+        ken_cli::build_native_program(
+            PX8DS_SIBLING_RECURSION_PROGRAM,
+            ken_cli::SourceFormat::Ken,
+            "px8ds-retired-flat-unsuppressed",
+            unsuppressed_dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    })
+    .expect_err("an unsuppressed retired-flat build must have the typed relay refusal");
+    let unsuppressed = format!("{unsuppressed:?}");
+    assert!(
+        unsuppressed.contains(TYPED) && !unsuppressed.contains(REFUSAL),
+        "the unsuppressed plan must refuse owner 0 / relay 370 before lowering: {unsuppressed}"
+    );
+    assert_eq!(
+        unsuppressed.matches(TYPED).count(),
+        1,
+        "the unsuppressed plan must report one exact typed refusal: {unsuppressed}"
+    );
 }
 
 #[cfg(target_os = "linux")]

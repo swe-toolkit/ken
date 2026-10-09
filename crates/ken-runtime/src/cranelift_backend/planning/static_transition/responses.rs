@@ -1294,12 +1294,17 @@ fn checked_host_response_call(
 type ResponseParents = BTreeMap<StaticOriginId, (StaticOriginId, usize)>;
 type HostResponseRoutes = BTreeMap<StaticOriginId, BTreeMap<RuntimeSymbol, HostResponseRoute>>;
 
-#[cfg(feature = "px8-ds-test-support")]
-mod relay_d1_observer;
+mod relay_settlement;
+
+/// Fail closed only for Excluded owners whose settled relay-source inventory
+/// cannot be driven at the planned owner. The recorder calls this same walk.
+pub(super) fn relay_settlement_refusals(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
+    relay_settlement::refusals(plan)
+}
 
 #[cfg(feature = "px8-ds-test-support")]
 pub(super) fn relay_d1_record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
-    relay_d1_observer::record(plan)
+    relay_settlement::record(plan)
 }
 
 fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
@@ -3912,6 +3917,24 @@ impl StaticTransitionPlan<'_> {
                 "one bounded Deferred response suffix has more than one static handler owner",
             )),
         }
+    }
+
+    /// The same admitted Deferred handler authority used by lowering and
+    /// relay settlement. A selected pending response fixes its owner once;
+    /// otherwise the existing response-plan lookup determines the owner.
+    pub(in crate::cranelift_backend) fn admitted_deferred_handler_owner(
+        &self,
+        row: &DeferredResponseRow,
+    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if let Some(witness) = self.selected_pending_response_at_vis(row.vis_origin())? {
+            if witness.disposition() != Some(ResponseDisposition::Deferred) {
+                return Err(planner_error(
+                    "an admitted pending response disagrees with its Deferred disposition",
+                ));
+            }
+            return Ok(witness.owner());
+        }
+        self.deferred_response_handler_owner(row)
     }
 
     /// The specialized handler that consumes one Deferred response.

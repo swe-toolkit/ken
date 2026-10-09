@@ -1,4 +1,5 @@
-//! Disposable D1-only observer. Never installed as an admission or lowering path.
+//! Closed relay-source settlement shared by the planning refusal and D1 recorder.
+//! The D4 lowering arm remains uninstalled; its proposed pair is a separate gate.
 use super::*;
 use crate::cranelift_backend::planning::static_transition::returned_vis::{
     ExcludedSettlement, ResponseOwnerSettlement,
@@ -221,35 +222,25 @@ fn source_shape(plan: &StaticTransitionPlan<'_>, vis: StaticOriginId) -> Result<
     Ok(matches!(&args[1], RuntimeExpr::LexicalClosure { params, .. } if params.len() == 1))
 }
 
-// Disposable, cfg-gated copy of the existing lowering authority query at
-// core.rs:5800-5819. D1 does not move or change production lowering.
-fn admitted_deferred_handler_owner(
-    plan: &StaticTransitionPlan<'_>,
-    row: &DeferredResponseRow,
-) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
-    if let Some(witness) = plan.selected_pending_response_at_vis(row.vis_origin())? {
-        if witness.disposition()
-            != Some(crate::cranelift_backend::planning::ResponseDisposition::Deferred)
-        {
-            return Err(planner_error(
-                "an admitted pending response disagrees with its Deferred disposition",
-            ));
-        }
-        return Ok(witness.owner());
+fn classify(plan: &StaticTransitionPlan<'_>, emit_records: bool) -> Vec<String> {
+    if !emit_records && !plan.pending_vis_settlements.owners.values()
+        .any(|class| matches!(class, ResponseOwnerSettlement::Excluded { .. }))
+    {
+        return Vec::new();
     }
-    plan.deferred_response_handler_owner(row)
-}
-
-pub(super) fn record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
     let mut hypothetical_refusals = Vec::new();
     let thread = std::thread::current().name().unwrap_or("unnamed").to_owned();
-    eprintln!("RELAY_D1_BEGIN thread={thread:?} owners={}",
-        plan.static_response_continuations.len());
+    if emit_records {
+        eprintln!("RELAY_D1_BEGIN thread={thread:?} owners={}",
+            plan.static_response_continuations.len());
+    }
     let parents = response_parents(plan);
     let candidates = plan.return_protocol_candidate_rows();
     let contexts = plan.continuation_contexts();
-    eprintln!("RELAY_D1_INPUT thread={thread:?} parents={:?} candidates={:?} contexts={:?}",
-        parents.as_ref().map(BTreeMap::len), candidates.as_ref().map(Vec::len), contexts.as_ref().map(Vec::len));
+    if emit_records {
+        eprintln!("RELAY_D1_INPUT thread={thread:?} parents={:?} candidates={:?} contexts={:?}",
+            parents.as_ref().map(BTreeMap::len), candidates.as_ref().map(Vec::len), contexts.as_ref().map(Vec::len));
+    }
     for owner in &plan.static_response_continuations {
         let class = plan.pending_vis_settlements.owners.get(&owner.id());
         let Some(ResponseOwnerSettlement::Excluded { reason }) = class else { continue; };
@@ -271,10 +262,12 @@ pub(super) fn record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
                             .and_then(|root| source_for_relay(plan, parents, member.origin, root,
                                 &mut BTreeSet::new(), &mut omissions));
                         let closed = traced.is_ok();
-                        eprintln!("RELAY_D1_RELAY thread={thread:?} owner={:?} relay={:?} context={:?} root={root:?} closed={closed} sources={:?} open={:?}",
-                            owner.id(), member.origin, context.context,
-                            traced.as_ref().map(|sources| sources.iter().map(|s| s.vis).collect::<Vec<_>>()),
-                            traced.as_ref().err());
+                        if emit_records {
+                            eprintln!("RELAY_D1_RELAY thread={thread:?} owner={:?} relay={:?} context={:?} root={root:?} closed={closed} sources={:?} open={:?}",
+                                owner.id(), member.origin, context.context,
+                                traced.as_ref().map(|sources| sources.iter().map(|s| s.vis).collect::<Vec<_>>()),
+                                traced.as_ref().err());
+                        }
                         if !closed { owner_admitted = false; }
                         match traced {
                             Err(error) => errors.push(error),
@@ -300,7 +293,7 @@ pub(super) fn record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
                                 let unitless_row = source.redex_body
                                     .map(|body| plan.deferred_no_unit_response_in_body(body));
                                 let admitted_handler = deferred.as_ref().ok().and_then(Option::as_ref)
-                                    .map(|row| admitted_deferred_handler_owner(plan, row));
+                                    .map(|row| plan.admitted_deferred_handler_owner(row));
                                 let unitless_matches = matches!(
                                     (&unitless_row, &deferred),
                                     (Some(Ok(Some(unitless))), Ok(Some(row))) if unitless == row
@@ -323,8 +316,10 @@ pub(super) fn record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
                                     && c_tail_forward_only && d_pair_proposed;
                                 let source_ok = drive_settled || relay_drivable_if_keyed;
                                 owner_admitted &= source_ok;
-                                eprintln!("RELAY_D1_SOURCE thread={thread:?} owner={:?} relay={:?} source={:?} via={:?} redex_body={:?} closed={closed} drive_settled={drive_settled} deferred={deferred:?} bounded_handler={bounded_handler:?} unitless_row={unitless_row:?} unitless_matches={unitless_matches} admitted_handler={admitted_handler:?} a_unique_row_and_seat={a_unique_row_and_seat} a_row_count={} a_seat_count={seats} b_construct_closure={b_construct_closure:?} c_tail_forward_only={c_tail_forward_only} d_pair_key={d_pair_key:?} d_pair_proposed={d_pair_proposed} d_gate_installed={d_gate_installed} relay_drivable_if_keyed={relay_drivable_if_keyed} source_ok={source_ok}",
-                                    owner.id(), member.origin, source.vis, source.via, source.redex_body, rows.len());
+                                if emit_records {
+                                    eprintln!("RELAY_D1_SOURCE thread={thread:?} owner={:?} relay={:?} source={:?} via={:?} redex_body={:?} closed={closed} drive_settled={drive_settled} deferred={deferred:?} bounded_handler={bounded_handler:?} unitless_row={unitless_row:?} unitless_matches={unitless_matches} admitted_handler={admitted_handler:?} a_unique_row_and_seat={a_unique_row_and_seat} a_row_count={} a_seat_count={seats} b_construct_closure={b_construct_closure:?} c_tail_forward_only={c_tail_forward_only} d_pair_key={d_pair_key:?} d_pair_proposed={d_pair_proposed} d_gate_installed={d_gate_installed} relay_drivable_if_keyed={relay_drivable_if_keyed} source_ok={source_ok}",
+                                        owner.id(), member.origin, source.vis, source.via, source.redex_body, rows.len());
+                                }
                                 if let Err(error) = b_construct_closure { errors.push(error); }
                                 if let Err(error) = deferred { errors.push(error.to_string()); }
                                 if let Some(Err(error)) = bounded_handler { errors.push(error.to_string()); }
@@ -344,8 +339,10 @@ pub(super) fn record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
         }
         if relay_count == 0 { owner_admitted = false; }
         if !errors.is_empty() { owner_admitted = false; }
-        eprintln!("RELAY_D1_OWNER thread={thread:?} owner={:?} vis={:?} base={:?} exclusion={reason:?} relays={relay_count} sources={source_count} omissions={omissions:?} would_admit_if_pair_keyed={owner_admitted} would_refuse_if_pair_keyed={} errors={errors:?}",
-            owner.id(), owner.vis_origin(), owner.base_owner(), !owner_admitted);
+        if emit_records {
+            eprintln!("RELAY_D1_OWNER thread={thread:?} owner={:?} vis={:?} base={:?} exclusion={reason:?} relays={relay_count} sources={source_count} omissions={omissions:?} would_admit_if_pair_keyed={owner_admitted} would_refuse_if_pair_keyed={} errors={errors:?}",
+                owner.id(), owner.vis_origin(), owner.base_owner(), !owner_admitted);
+        }
         if !owner_admitted {
             let relays = protocol.as_ref().ok().map(|protocol| protocol.contexts.iter()
                 .flat_map(|context| context.members.iter())
@@ -357,6 +354,17 @@ pub(super) fn record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
                 owner.id(), owner.vis_origin(), relays.join(", "), owner.base_owner()));
         }
     }
-    eprintln!("RELAY_D1_END thread={thread:?}");
+    if emit_records {
+        eprintln!("RELAY_D1_END thread={thread:?}");
+    }
     hypothetical_refusals
+}
+
+pub(super) fn refusals(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
+    classify(plan, false)
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub(super) fn record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
+    classify(plan, true)
 }
