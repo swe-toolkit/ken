@@ -56,6 +56,13 @@ base, stop and report the mismatch.
    (`crates/ken-cli/tests/rosetta.rs`, the ninth path) removes that import
    directive and cuts `pub fn list_all` from its flattened Derived, as it
    already excludes Nat.Order exports outside its allowlist.
+4. **Second CI-red repair** (PR #4623 run `37950411696`, shard 3).
+   `r_layer_tests::cat_bool_pub_export::class_owner_provider_loader_visible_inventories_are_exact`
+   (`crates/ken-elaborator/src/r_layer_tests/cat_bool_pub_export.rs:479`,
+   the tenth path) pins LawfulClasses' loader-visible surface to a literal
+   authorized set, which lacks the five published lemmas. Add them to the
+   authorized set, and the same for any other exact-surface pin of
+   LawfulClasses or Derived the sweep below finds.
 
 ## Acceptance
 
@@ -73,6 +80,10 @@ base, stop and report the mismatch.
   Nfa and Reachability acceptance targets and the strict-resolution D0
   census pass. By mechanism: `seal2_tests::producer_closure` is 20/20 and
   `rosetta` is 2/2, with `rosetta_examples_match_their_oracles` green.
+  Every test that pins a changed package's exact public or loader-visible
+  surface (grep the roots for `LawfulClasses`, `Derived`, `Nfa` and
+  `Reachability` beside a literal name set) is listed in the handoff and
+  passes.
 - **AC-4 (mutation, QA).** Each of these definition mutants makes a law's
   proof kernel-reject, and is restored: `d.eq` replaced by constant
   `True` in the `Sym` arm; the `Cat` derivative ignoring `nullable r1`;
