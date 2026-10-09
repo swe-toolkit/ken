@@ -83,13 +83,20 @@ base, stop and report the mismatch.
      `deferred_response_at_vis` and `bounded_deferred_response_handler_owner`
      cover every forwarded Vis's construct site;
 
-   - (iv) **the predecessor's successor obligation, "admission E
-     unwitnessed after ContinuationBodyTail"** (Architect
-     `evt_3tkas7ea7k50f`): whether any source in either population
-     reaches `RelocatedWorkMissingLoweringBinding`
-     (`selected_pending_calls.rs:769`). Production checks E before J, the
-     bounded attempt at `9f5b430b5` reached J, and no test pins E. The
-     Architect rules whether E stays as a guard, with a witness, or goes;
+   - (iv) **admission E is live** (Adversary `evt_4kf7fa50c58ph`, at
+     `2260b91cc`). `ContinuationBodyTail` (`responses.rs:3304-3319`) is
+     keyed on the producer construct being `worker_body_origin()`. A Vis
+     in a Bool `match` arm tail inside the K body misses it, is classified
+     `UnconsumedTransportCaller` with a handler owner, and is refused at
+     `RelocatedWorkMissingLoweringBinding` (`selected_pending_calls.rs:769`)
+     while the interpreter exits 0 with `captured\nsecond\n`. The witness
+     is the two-print fixture in `rt_selected_pending_call_admission.rs`
+     with its continuation replaced by `(\_. match terminal { False |->
+     host_console APartial Unit (print_line "second") ; True |->
+     host_console APartial Unit (print_line "third") })`. Pin it, census
+     the arm-tail shape in both populations, and do not delete E. The
+     Architect rules whether the relay arm or a widened tail predicate
+     settles it;
 
    over both populations: the span's owner 4 and r2's owners 2 and 3. If
    one design cannot settle both, the D0 says so and the Architect rules

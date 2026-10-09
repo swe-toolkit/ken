@@ -250,7 +250,8 @@ Merged `2260b91cc` from exact `9f5b430b5` (PR #4614; the held
 - AC-R9 made the two-print row a native-against-interpreter parity row,
   and re-pinned px7m ERR to the J refusal. AC-R6 is this CI.
 - §1a stays at 5.
-- Successor obligation: "admission E unwitnessed after
-  ContinuationBodyTail", now D0 (iv) of
+- Successor obligation, admission E: the WP's bounded attempt did not
+  reach it, but the Adversary then witnessed it on main through a Bool
+  `match` arm tail (`evt_4kf7fa50c58ph`). It is D0 (iv) of
   `RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT`. The census in
   `local/rt-nested-response-owner-caller/census-a/` is that D0's input.
