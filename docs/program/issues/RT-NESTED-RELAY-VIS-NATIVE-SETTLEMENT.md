@@ -140,6 +140,13 @@ base, stop and report the mismatch.
      re-run `px8f_buffer_native` (6/6) first. The first eight suites and
      the six non-px8f resumed suites stand, because the walk changes only
      at Call terminals and none of them hit one.
+   - **Expected refusals** (`evt_62wab4peq1htm`). px8ta owner 0 (base
+     Spec(0), relay Vis370; P1 sources 647/600, admitted handler None) is
+     an expected refusal: native lowering already fails that program at
+     `ObjectEmission`. A green negative control whose expected first
+     refusal would change is recorded and added to the switch-wrapped set
+     below. It is a stop only if the control's program is admitted on the
+     unsuppressed path.
    - **Enable gate.** The refusal is not enabled until the census clears
      the stops below.
 3. **The ruled planning refusal**, at `planner.finish(`'s single caller,
@@ -170,6 +177,17 @@ base, stop and report the mismatch.
      closed and every source F is `drive_settled` or `relay_drivable`;
    - `Excluded{Underived}` and non-admitted `Excluded{Relay}` owners are
      refused.
+   - **Test-only suppression switch** (`evt_62wab4peq1htm`, whose code is
+     the reference). `with_relay_settlement_refusal_suppressed` in
+     `planning/static_transition.rs`, feature-gated beside the D1
+     recorder and exported next to `with_px8ds_retired_flat_order`
+     (`cranelift_backend.rs:110`, `lib.rs`). Under it the refusal is
+     recorded but not raised, so a lowering-time control still reaches its
+     own guard. The ordinary build never selects it. The retired-flat
+     control in `crates/ken-cli/tests/px8ta_oriented_subcontinuation.rs`
+     (a new path) wraps its build in both switches, and a sibling
+     assertion without suppression expects the exact typed relay refusal
+     naming owner 0 / relay 370, not the closure text.
 4. **The ruled relay arm: drive at the source, never carry the relay.**
    - `relay_drivable(F, R, O)` holds when all four hold:
      - (a) F has exactly one installed or candidate response row with a
@@ -205,7 +223,8 @@ base, stop and report the mismatch.
   `evt_14w6eh1d2hwk4`.
 - **AC-2 (control).** An `Excluded{Underived}` owner, and a relay whose
   provenance set is not planned, are refused at planning with the exact
-  typed text. ABI-S6 is 12/12.
+  typed text. px8ta owner 0 (relay 370) is the second refusal witness, with
+  the exact typed text. ABI-S6 is 12/12.
 - **AC-3 (mutation, QA).** Removing the relay arm returns the span row and
   r2 to the planning refusal, never to `-1`.
 - **AC-6 (mutation, QA).** Classifying ABI-S6 owner 0 as refused reddens
@@ -214,6 +233,8 @@ base, stop and report the mismatch.
   the five sibling rows and the predecessor's AC-R6 census population stay
   green; px8ta keeps its labelled failures. `px8f_buffer_native` is 6/6
   after enable, because admission changes px8f owner 1's lowering.
+  `px8ds_retired_flat_order_does_not_gain_m4_representation` is green with
+  both assertions, and the switch is restored after its scope.
 
 ## Stop conditions
 
@@ -224,8 +245,8 @@ base, stop and report the mismatch.
   another key. The same holds for any owner admitted only through (R2).
 - `deferred_no_unit_response_in_body(1176)` is not px8f row 1169, so px8f
   owner 1 stays refused.
-- The census shows a refused owner in a row that is green today: stop to
-  the Architect, naming the owner and row. In the CI-owned
+- The census shows a refused owner in a green execution row: stop to the
+  Architect, naming the owner and row. In the CI-owned
   `rt_parity_native` tail, the same refusal is a stop once the refusal is
   enabled.
 - `ContinuationBodyTail`, admission E or `selected_pending_calls.rs`
@@ -239,7 +260,8 @@ base, stop and report the mismatch.
 ## Hard-stop inventory
 
 - **§1a.** Question (4), E disposition: 1 (`evt_5sah7xb9543hp`).
-  Question (2), the refusal discriminant: 1 (`evt_12az6njpj0wyy`).
+  Question (2), the refusal discriminant: 2 (`evt_12az6njpj0wyy`,
+  `evt_62wab4peq1htm`); the research hold comes at the third.
   Questions (1) and (3): 0.
 - **1.** CBT widening by tail walk would strip handler ownership from
   handler-owned P2 rows (ABI-S6 Vis548/549; witness Vis342/364), keyed on
@@ -249,3 +271,23 @@ base, stop and report the mismatch.
   call; the bounded P2 handler only), not on the fan-in of lowering gates
   that settle a source (curried call → `call_declared_unit` → unit-less
   drive). The §1b predicate question fires at entry 3.
+- **3.** The planning refusal pre-empts a lowering-time negative control
+  (px8ds retired-flat). It is worked around by a test-only suppression
+  switch, keyed on refusal order (planning before lowering).
+- **§1b at entry 3** (`evt_62wab4peq1htm`). Entries 1 and 2 share a
+  predicate: a planning classification re-derived a lowering decision from
+  a different plane than the gate lowering reads. The closure is that
+  admission calls the lowering gates' own functions, as R2 does. Any
+  further drive or handler predicate must call the gate's own function,
+  not re-derive it. Entry 3 is independent.
+
+## Finding outside this WP
+
+`px8ds_real_same_depth_path_runs_exact_edges`
+(`px8ta_oriented_subcontinuation.rs:452`) is red at base: `ObjectEmission`,
+"a specialized response owner did not materialize an exact HostResult", for
+the same owner 0, while the interpreter exits 0. Its exemption in
+`.github/ignored-test-exemptions.toml` classes it `policy-cost` and calls it
+runnable. This WP leaves it ignored, and its failure becomes the typed
+refusal. Its successor gives these P1 sources a handler, un-ignores the row
+and corrects the exemption.
