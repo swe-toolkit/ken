@@ -169,6 +169,10 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
     with its disposition (including `checked_core.rs:1506` and `:2250`).
     It also lists every `crates/ken-cli/tests` suite that calls
     `build_native_program`, with its result.
+- **AC-7b (Let binder, QA `evt_1k9mwwzpj2h64`).** A permanent test row
+  exercises a `Let` whose domain is classified Ω. It shows the binder in
+  `erased_binders` and no runtime binding after lowering. Removing the
+  `Let` case from the binder classification reddens it, and is restored.
 - **AC-8 (normalized-body inference, Architect `evt_eq3kbx5fa9b5`).**
   `ken_kernel::normalize` drops the elaborator's motive ascriptions, so
   kernel inference fails on a normalized body's eliminators. The four
@@ -183,7 +187,9 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
     `px7n_nested_computational_eliminator`,
     `px7o_heterogeneous_eliminator_frames`, `nc16`, `nc17`,
     `lang_refinement_proof_erasure`, and the two mutations. The handoff
-    lists the 38 `build_native_program` suites by name, and CI runs them.
+    lists the 39 `build_native_program` suites by name, including
+    `verify_caller_obligation_reporting` (the CLI child-command caller),
+    with each one's disposition, and CI runs them.
     A suite green at `1b68dfd45` and red in the candidate's CI is a stop
     to the Architect, not a fix-forward.
   - No change to the kernel, `conv.rs` or the stored native body.

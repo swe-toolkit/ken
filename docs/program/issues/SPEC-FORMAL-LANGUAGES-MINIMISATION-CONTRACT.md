@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-MINIMISATION-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 5 is a deferred placeholder, so the catalog has no contract for automaton equivalence or minimisation. Specify DFA language equivalence and a minimisation construction over Finite evidence and DecEq state equality, with their laws, at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
