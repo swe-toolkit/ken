@@ -47,8 +47,12 @@ base, stop and report the mismatch.
 
 1. **D0 (measure only).** Done: `evt_53ymgk8e23mra`, at `85e651a44`. The
    catalog has one alias-headed instance family, Char's.
-2. **The ruled repair** (Architect `evt_2e19wfx773mxv`). The rule:
-   - A plain transparent alias unfolds to the head it names.
+2. **The ruled repair** (Architect `evt_2e19wfx773mxv`, key mechanism
+   corrected by `evt_4w9d7wbnr4gw9`). The rule (39 §6.1):
+   - A bare nullary alias names its whole body.
+   - An applied head keeps its own outermost constructor, following only
+     renaming aliases (`alias_head_root`). `(Ord, Pair)` keys on `Pair`;
+     a type function is never reduced.
    - A named refinement stops the unfolding and keys on its
      `RefinementFacts::refinement_root`, since 18a §5.9.1 makes `Char`
      distinct from `Int`.
@@ -60,12 +64,15 @@ base, stop and report the mismatch.
    head-identity sites:
    - registration and overlap;
    - resolution;
-   - sub-constraint resolution;
+   - sub-constraint resolution, keyed on the constraint's own unreduced
+     head (`InstanceConstraintInfo::head_core`), not the class-applied
+     carrier;
    - the orphan check, which tests the owner module of the key's Global
      id;
    - the projection-purity lookup `constraint_instance_id`;
-   - fixed-argument matching in `match_instance_head_core`, by the same
-     normalization and never by bare conversion.
+   - fixed-head matching in `match_instance_head_core`: equal keys, then
+     an alias's body compared by conversion, and any other fixed head
+     requested bare, so `List` never matches `List Nat`.
 
 ## Acceptance
 
@@ -91,7 +98,8 @@ base, stop and report the mismatch.
   - C1 `sound-deceq-char` is unaffected.
 - **AC-3 (mutations, QA).** Each reddens and is restored:
   - keying on the head before whnf reddens AC-1 (a);
-  - deleting the `refinement_root` stop refuses row (b) and the catalog's
+  - deleting the `refinement_root` stop in both `instance_head_key` and
+    `alias_head_root` refuses row (b) and the catalog's
     `Ord Char` and `DecEq Char` against `Ord Int` and `DecEq Int`.
 
 ## Stop conditions
@@ -106,8 +114,16 @@ To the W5 Σ demote, not built here:
   `E (Char -> Int)` overlaps `E (Int -> Int)`, which refuses rather than
   admits;
 - two refinement aliases with identical predicates key separately;
-- a transparent type function whose result is a refinement unfolds
-  through it by whnf.
+- a transparent type function whose result is a refinement keys by the
+  rule above, not by the refinement root;
+- `where Pick PIB` (`def PIB = Pair Int Bool`) against
+  `instance Pick (Pair a b)` refuses with `NoInstance`, because the
+  surface matcher does not see through the alias spelling; base refuses
+  it too;
+- `resolve_instance_dictionary_by_head_id` (the comparison operators and
+  the core-path sub-constraint) keys on the head of `whnf(carrier)`. It
+  agrees for plain aliases, and for Char it selects `Ord Int` as base
+  does. Re-keying it moves catalog hashes.
 
-All three disappear once Char's core is the subset Σ, and then the
+These disappear once Char's core is the subset Σ, and then the
 refinement stop can be deleted.
