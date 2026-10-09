@@ -121,29 +121,73 @@ base, stop and report the mismatch.
    node for dynamic host-effect dispatch comes first.
 2. **D1 first checkpoint and census before enable** (`evt_3hcpdavtb0r50`).
    - **Emission owner.** Before any arm, measure that the K-context bodies
-     of span owner 4 and r2 owners 2 and 3 lower with
-     `defining_emission_owner == O.base_owner()`.
+     of span owner 4, r2 owners 2 and 3, and px8f owner 1 Context0 lower
+     with `defining_emission_owner == O.base_owner()` (px8f owner 1:
+     Spec(2)).
    - **Record-only recorder.** The first commit is a cfg'd recorder,
      emitting for each `Excluded` owner and each source F `closed`,
      `drive_settled` and `relay_drivable` (a)-(d), each separately, and
-     the verdict. It records nothing about `ContinuationBodyTail`.
+     the verdict, plus, each separately, the redex body,
+     `deferred_no_unit_response_in_body(redex)` and
+     `admitted_deferred_handler_owner` (`evt_12az6njpj0wyy`). It records
+     nothing about `ContinuationBodyTail`.
    - **Population** (`evt_50wnhmgt00rfc`, `evt_5sah7xb9543hp`). The 38
      complete suites, run locally. The eight already run stand (12
      `Excluded` owners, all admitted). For `rt_parity_native`, run its 20
      named `checked_ih_*` and `composed_return_forward_ret_authority_*`
      tests from the D0 owner census locally; CI owns the rest of that
-     suite, and the handoff says so.
+     suite, and the handoff says so. After the (R1)/(R2) amendment,
+     re-run `px8f_buffer_native` (6/6) first. The first eight suites and
+     the six non-px8f resumed suites stand, because the walk changes only
+     at Call terminals and none of them hit one.
+   - **Expected refusals** (`evt_62wab4peq1htm`). px8ta owner 0 (base
+     Spec(0), relay Vis370; P1 sources 647/600, admitted handler None) is
+     an expected refusal: native lowering already fails that program at
+     `ObjectEmission`. A green negative control whose expected first
+     refusal would change is recorded and added to the switch-wrapped set
+     below. It is a stop only if the control's program is admitted on the
+     unsuppressed path.
    - **Enable gate.** The refusal is not enabled until the census clears
      the stops below.
 3. **The ruled planning refusal**, at `planner.finish(`'s single caller,
-   after the cfg'd recorders:
-   - `drive_settled(F, O)` is `deferred_response_at_vis(F) == Some(row)`
-     and `bounded_deferred_response_handler_owner(&row) ==
-     Some(O.base_owner())`;
+   after the cfg'd recorders. As amended by `evt_12az6njpj0wyy`, whose
+   code is the reference:
+   - **(R1) Provenance passes through a curried closure call.** In
+     `source_for_relay`, a `Call` terminal of shape `Call^n(LexicalClosure)`
+     over n one-parameter closures (`curried_redex_body`) contributes the
+     innermost body as a further scope, remembered as that scope's redex
+     body. Any other `Call` (generated or unknown endpoint) is open, so
+     the owner is refused. A revisited relay contributes nothing (least
+     fixpoint). Path condition (c) is still measured by `tail_to`.
+   - **(R2) `drive_settled(F, O, redex)` reads both lowering gates,** with
+     no `_ =>` arm, over `deferred_response_at_vis(F) == Some(row)`:
+     - `UnconsumedTransportCaller`: the construct-site gate (`core.rs:6926`),
+       `bounded_deferred_response_handler_owner(&row) ==
+       Some(O.base_owner())`;
+     - `NoContinuationUnit`: the retained-call gate (`core.rs:6217-6222`),
+       with a redex body, `deferred_no_unit_response_in_body(body) ==
+       Some(row)` and `admitted_deferred_handler_owner(&row) ==
+       Some(O.base_owner())`; false without a redex;
+     - `ContinuationBodyTail`: false.
+   - **One handler authority.** `admitted_deferred_handler_owner` moves
+     unchanged from lowering (`core.rs:5800-5819`) into the plan, so the
+     recorder, the refusal and the lowering read one function. Lowering
+     keeps its planner-invariant mapping of the disagreement error.
    - an `Excluded{Relay}` owner is admitted when every relay member is
      closed and every source F is `drive_settled` or `relay_drivable`;
    - `Excluded{Underived}` and non-admitted `Excluded{Relay}` owners are
      refused.
+   - **Test-only suppression switch** (`evt_62wab4peq1htm`, whose code is
+     the reference). `with_relay_settlement_refusal_suppressed` in
+     `planning/static_transition.rs`, feature-gated beside the D1
+     recorder and exported next to `with_px8ds_retired_flat_order`
+     (`cranelift_backend.rs:110`, `lib.rs`). Under it the refusal is
+     recorded but not raised, so a lowering-time control still reaches its
+     own guard. The ordinary build never selects it. The retired-flat
+     control in `crates/ken-cli/tests/px8ta_oriented_subcontinuation.rs`
+     (a new path) wraps its build in both switches, and a sibling
+     assertion without suppression expects the exact typed relay refusal
+     naming owner 0 / relay 370, not the closure text.
 4. **The ruled relay arm: drive at the source, never carry the relay.**
    - `relay_drivable(F, R, O)` holds when all four hold:
      - (a) F has exactly one installed or candidate response row with a
@@ -152,12 +196,14 @@ base, stop and report the mismatch.
        its K is a one-parameter `LexicalClosure`;
      - (c) the walk from F to R crosses only `response_tail_edge` edges
        and `ComputationalMatch` scrutinees whose single Vis case
-       satisfies `response_forwards_vis`, with no generated Call edge;
+       satisfies `response_forwards_vis`, with no generated Call edge (a
+       curried redex under (R1) is not one);
      - (d) the key is the pair (F, `O.base_owner()`), never F alone.
    - A second gate in `lower_computational_producer_construct`, after
-     the deferred one, calls the same drive. The drive is refactored to
-     take (vis_origin, operation_root_origin, effect_origin, operation),
-     so there is one drive with two row sources.
+     the deferred one, calls the same drive, for `relay_drivable` sources
+     only; a `drive_settled` source keeps its existing gate. The drive is
+     refactored to take (vis_origin, operation_root_origin, effect_origin,
+     operation), so there is one drive with two row sources.
    - A relay construct of an admitted owner that is still reached is a
      typed planner-invariant error, never `-1`.
    - Admitted relay members leave O's returned set: span owner 4 becomes
@@ -177,14 +223,18 @@ base, stop and report the mismatch.
   `evt_14w6eh1d2hwk4`.
 - **AC-2 (control).** An `Excluded{Underived}` owner, and a relay whose
   provenance set is not planned, are refused at planning with the exact
-  typed text. ABI-S6 is 12/12.
+  typed text. px8ta owner 0 (relay 370) is the second refusal witness, with
+  the exact typed text. ABI-S6 is 12/12.
 - **AC-3 (mutation, QA).** Removing the relay arm returns the span row and
   r2 to the planning refusal, never to `-1`.
 - **AC-6 (mutation, QA).** Classifying ABI-S6 owner 0 as refused reddens
   its six rows at the refusal, so the discriminant is load-bearing.
 - **AC-4 (controls).** SEQUENTIAL, `one_bracket_retains_native_parity`,
   the five sibling rows and the predecessor's AC-R6 census population stay
-  green; px8ta keeps its labelled failures.
+  green; px8ta keeps its labelled failures. `px8f_buffer_native` is 6/6
+  after enable, because admission changes px8f owner 1's lowering.
+  `px8ds_retired_flat_order_does_not_gain_m4_representation` is green with
+  both assertions, and the switch is restored after its scope.
 
 ## Stop conditions
 
@@ -192,9 +242,11 @@ base, stop and report the mismatch.
   trapping owners from ABI-S6 owner 0.
 - D1's emission-owner checkpoint measures an owner other than
   `O.base_owner()`: stop with the measured owner, and do not substitute
-  another key.
-- The census shows a refused owner in a row that is green today: stop to
-  the Architect, naming the owner and row. In the CI-owned
+  another key. The same holds for any owner admitted only through (R2).
+- `deferred_no_unit_response_in_body(1176)` is not px8f row 1169, so px8f
+  owner 1 stays refused.
+- The census shows a refused owner in a green execution row: stop to the
+  Architect, naming the owner and row. In the CI-owned
   `rt_parity_native` tail, the same refusal is a stop once the refusal is
   enabled.
 - `ContinuationBodyTail`, admission E or `selected_pending_calls.rs`
@@ -208,7 +260,34 @@ base, stop and report the mismatch.
 ## Hard-stop inventory
 
 - **§1a.** Question (4), E disposition: 1 (`evt_5sah7xb9543hp`).
-  Questions (1)-(3): 0.
+  Question (2), the refusal discriminant: 2 (`evt_12az6njpj0wyy`,
+  `evt_62wab4peq1htm`); the research hold comes at the third.
+  Questions (1) and (3): 0.
 - **1.** CBT widening by tail walk would strip handler ownership from
   handler-owned P2 rows (ABI-S6 Vis548/549; witness Vis342/364), keyed on
   producer-construct position instead of handler ownership.
+- **2.** Relay closure and `drive_settled` were each keyed on one
+  settlement route (an owner-local subtree that stops at a curried closure
+  call; the bounded P2 handler only), not on the fan-in of lowering gates
+  that settle a source (curried call → `call_declared_unit` → unit-less
+  drive). The §1b predicate question fires at entry 3.
+- **3.** The planning refusal pre-empts a lowering-time negative control
+  (px8ds retired-flat). It is worked around by a test-only suppression
+  switch, keyed on refusal order (planning before lowering).
+- **§1b at entry 3** (`evt_62wab4peq1htm`). Entries 1 and 2 share a
+  predicate: a planning classification re-derived a lowering decision from
+  a different plane than the gate lowering reads. The closure is that
+  admission calls the lowering gates' own functions, as R2 does. Any
+  further drive or handler predicate must call the gate's own function,
+  not re-derive it. Entry 3 is independent.
+
+## Finding outside this WP
+
+`px8ds_real_same_depth_path_runs_exact_edges`
+(`px8ta_oriented_subcontinuation.rs:452`) is red at base: `ObjectEmission`,
+"a specialized response owner did not materialize an exact HostResult", for
+the same owner 0, while the interpreter exits 0. Its exemption in
+`.github/ignored-test-exemptions.toml` classes it `policy-cost` and calls it
+runnable. This WP leaves it ignored, and its failure becomes the typed
+refusal. Its successor gives these P1 sources a handler, un-ignores the row
+and corrects the exemption.
