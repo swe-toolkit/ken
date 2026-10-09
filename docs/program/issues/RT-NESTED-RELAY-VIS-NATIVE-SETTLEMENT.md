@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT
 title: "Native lowering has no representation for a relay Vis (a K that forwards a pattern-bound operation, or a functional-IH reference) returned to a response owner beside a non-relay member, so such an owner is emitted Ret-only and traps -1 (or is unplanned), and the ignored rt_span_prov_native:355 and r2 (rt_escape_second_resource_native:1015) rows stay ignored. Refuse at planning, on a discriminant read from the settling plane, every owner native lowering cannot settle, and give the relay a planned native arm that settles it at interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
@@ -82,6 +82,21 @@ base, stop and report the mismatch.
      whether the handler-owned drive settles it: whether
      `deferred_response_at_vis` and `bounded_deferred_response_handler_owner`
      cover every forwarded Vis's construct site;
+
+   - (iv) **admission E is live** (Adversary `evt_4kf7fa50c58ph`, at
+     `2260b91cc`). `ContinuationBodyTail` (`responses.rs:3304-3319`) is
+     keyed on the producer construct being `worker_body_origin()`. A Vis
+     in a Bool `match` arm tail inside the K body misses it, is classified
+     `UnconsumedTransportCaller` with a handler owner, and is refused at
+     `RelocatedWorkMissingLoweringBinding` (`selected_pending_calls.rs:769`)
+     while the interpreter exits 0 with `captured\nsecond\n`. The witness
+     is the two-print fixture in `rt_selected_pending_call_admission.rs`
+     with its continuation replaced by `(\_. match terminal { False |->
+     host_console APartial Unit (print_line "second") ; True |->
+     host_console APartial Unit (print_line "third") })`. Pin it, census
+     the arm-tail shape in both populations, and do not delete E. The
+     Architect rules whether the relay arm or a widened tail predicate
+     settles it;
 
    over both populations: the span's owner 4 and r2's owners 2 and 3. If
    one design cannot settle both, the D0 says so and the Architect rules

@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-RESPONSE-OWNER-CALLER
 title: "The ignored rt_span_prov_native:355 row refuses at ObjectEmission and, once planned, traps -1 natively, because response owners whose K returns a Vis outside the pending-Vis record protocol are dropped from it silently and emitted Ret-only. Classify every response owner in one stored, validated settlement plane with no silent drops, behaviour-preserving; the planning refusal and the relay settlement that un-ignores the row are RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -236,3 +236,22 @@ next as a different answer.
   `4b4c8565c`, `21c039918`, `7f1a04a40`), or widens the lookup at
   `core.rs:11695`.
 - Any kernel, trust or spec change.
+
+## Closeout
+
+Merged `2260b91cc` from exact `9f5b430b5` (PR #4614; the held
+`4671402d1` did not land). Runtime QA `evt_3jp2shdzq3eda`, Architect
+`evt_3tkas7ea7k50f`, Decision `dec_70x6z07qeh42t`.
+- R-CHAIN-1 (a) stores one validated settlement classification per
+  response owner (`Protocol`, `RetOnly`, `Excluded { Relay | Underived }`),
+  built at construction, rebuilt and compared at closure, and read by
+  lowering.
+- No planning refusal was added. The span row stays ignored.
+- AC-R9 made the two-print row a native-against-interpreter parity row,
+  and re-pinned px7m ERR to the J refusal. AC-R6 is this CI.
+- §1a stays at 5.
+- Successor obligation, admission E: the WP's bounded attempt did not
+  reach it, but the Adversary then witnessed it on main through a Bool
+  `match` arm tail (`evt_4kf7fa50c58ph`). It is D0 (iv) of
+  `RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT`. The census in
+  `local/rt-nested-response-owner-caller/census-a/` is that D0's input.
