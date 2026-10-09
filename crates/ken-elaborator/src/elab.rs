@@ -15514,7 +15514,7 @@ fn elab_instance_decl(
     let head_name = head_type_name(head_type);
     // Compute the key in the same context that elaborates the head, so
     // orphan ownership and overlap cannot disagree about alias identity.
-    let (head_core, head_key) = {
+    let elaborated = {
         let mut cx = ElabCtx::new(
             env,
             globals,
@@ -15525,17 +15525,24 @@ fn elab_instance_decl(
         )
         .with_preconditions(preconditions, PremiseHoles::Refused);
         push_type0_params(&mut cx, head_params.len());
-        let h = elab_type(&mut cx, head_type)?;
-        let h = cx.metas.zonk_term(&h);
-        let key = instance_head_key(cx.env, &cx.ctx, refinement_facts, head_type, &h);
-        (h, key)
+        elab_type(&mut cx, head_type).map(|h| {
+            let h = cx.metas.zonk_term(&h);
+            let key = instance_head_key(cx.env, &cx.ctx, refinement_facts, head_type, &h);
+            (h, key)
+        })
     };
     // An imported alias does not make this module the owner of its target.
+    // A head that does not elaborate keeps the declaration-site spelling test,
+    // so an unresolvable head is still refused as an orphan before its error.
     let in_class_module = class_module == class_env.current_module;
-    let in_head_module = match &head_key {
-        InstanceHeadKey::Global(id) => class_env.global_modules.get(id)
-            .is_some_and(|module| *module == class_env.current_module),
-        _ => false,
+    let owned_here = |id: Option<GlobalId>| {
+        id.and_then(|id| class_env.global_modules.get(&id))
+            .is_some_and(|module| *module == class_env.current_module)
+    };
+    let in_head_module = match &elaborated {
+        Ok((_, InstanceHeadKey::Global(id))) => owned_here(Some(*id)),
+        Ok(_) => false,
+        Err(_) => owned_here(named_head_id(head_type, globals)),
     };
     if !in_class_module && !in_head_module {
         return Err(ElabError::OrphanInstance {
@@ -15544,6 +15551,7 @@ fn elab_instance_decl(
             span: span.clone(),
         });
     }
+    let (head_core, head_key) = elaborated?;
     let instance_key = (class_type_id, head_key);
     if class_kind == ClassKind::Structure {
         if let Some(existing) = class_env.instances_by_id.get(&instance_key) {
