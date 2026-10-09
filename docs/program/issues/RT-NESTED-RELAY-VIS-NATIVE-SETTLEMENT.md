@@ -69,7 +69,10 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-1. **D0 (Architect design; measurement only).** First, complete the
+1. **D0 (Architect design; measurement only).** Done: handoff
+   `evt_5gtgjrrppexvw`, ruled `evt_3hcpdavtb0r50`. Provenance (i) is
+   closed and finite for all four owners. The text below is the D0 as
+   framed. First, complete the
    per-member census over the native suites the predecessor did not
    measure (its 9 measured suites are in
    `local/rt-nested-response-owner-caller/census-a/`; Architect
@@ -113,11 +116,52 @@ base, stop and report the mismatch.
    finite, the relay arm dispatches over the planned seats of exactly
    that set, and the node proceeds. If (i) is open, **stop**: a precursor
    node for dynamic host-effect dispatch comes first.
-2. **The ruled planning refusal,** naming every refused owner, placed at
-   `planner.finish(`'s single caller after the cfg'd recorders
-   (`evt_59xpt6t02wdpq`).
-3. **The ruled relay arm,** with an owner admitted at planning only when
-   its relay provenance set is planned.
+2. **D1 first checkpoint and census before enable** (`evt_3hcpdavtb0r50`).
+   - **Emission owner.** Before any arm, measure that the K-context bodies
+     of span owner 4 and r2 owners 2 and 3 lower with
+     `defining_emission_owner == O.base_owner()`.
+   - **Record-only recorder.** The first commit is a cfg'd recorder,
+     emitting for each `Excluded` owner and each source F:
+     - `closed`, `drive_settled` and `relay_drivable` (a)-(d), each
+       separately, and the verdict;
+     - each row that would move from `UnconsumedTransportCaller` to
+       `ContinuationBodyTail`, with its handler owner.
+   - **Population.** Run the recorder over the 38 complete suites. For
+     `rt_parity_native`, either run one test per invocation or name CI as
+     the check, and say which.
+   - **Enable gate.** Neither the refusal nor the widening is enabled
+     until the census clears the stops below.
+3. **The ruled planning refusal**, at `planner.finish(`'s single caller,
+   after the cfg'd recorders:
+   - `drive_settled(F, O)` is `deferred_response_at_vis(F) == Some(row)`
+     and `bounded_deferred_response_handler_owner(&row) ==
+     Some(O.base_owner())`;
+   - an `Excluded{Relay}` owner is admitted when every relay member is
+     closed and every source F is `drive_settled` or `relay_drivable`;
+   - `Excluded{Underived}` and non-admitted `Excluded{Relay}` owners are
+     refused.
+4. **The ruled relay arm: drive at the source, never carry the relay.**
+   - `relay_drivable(F, R, O)` holds when all four hold:
+     - (a) F has exactly one installed or candidate response row with a
+       planned seat;
+     - (b) F's operation is a `Construct(coproduct, [Construct(..)])` and
+       its K is a one-parameter `LexicalClosure`;
+     - (c) the walk from F to R crosses only `response_tail_edge` edges
+       and `ComputationalMatch` scrutinees whose single Vis case
+       satisfies `response_forwards_vis`, with no generated Call edge;
+     - (d) the key is the pair (F, `O.base_owner()`), never F alone.
+   - A second gate in `lower_computational_producer_construct`, after
+     the deferred one, calls the same drive. The drive is refactored to
+     take (vis_origin, operation_root_origin, effect_origin, operation),
+     so there is one drive with two row sources.
+   - A relay construct of an admitted owner that is still reached is a
+     typed planner-invariant error, never `-1`.
+   - Admitted relay members leave O's returned set: span owner 4 becomes
+     {528} Protocol, r2 owner 2 {746}, and r2 owner 3 {528}.
+5. **Admission E, in a separate commit.** `ContinuationBodyTail` holds
+   when the walk up `response_parents` from the producer construct to
+   `worker_body_origin()` crosses only `response_tail_edge` edges. This
+   replaces root equality. The E guard stays.
 
 ## Acceptance
 
@@ -138,6 +182,13 @@ base, stop and report the mismatch.
   r2 to the planning refusal, never to `-1`.
 - **AC-6 (mutation, QA).** Classifying ABI-S6 owner 0 as refused reddens
   its six rows at the refusal, so the discriminant is load-bearing.
+- **AC-7.** The two-print arm-tail witness from D0 (iv) becomes a
+  compared parity row: native and interpreter both exit 0 with stdout
+  `captured\nsecond\n`. Landing at a planning refusal instead is a stop,
+  not a pass.
+- **AC-8 (mutation, QA).** Restoring the root-equality
+  `ContinuationBodyTail` test returns AC-7's row to the typed E refusal
+  `RelocatedWorkMissingLoweringBinding`.
 - **AC-4 (controls).** SEQUENTIAL, `one_bracket_retains_native_parity`,
   the five sibling rows and the predecessor's AC-R6 census population stay
   green; px8ta keeps its labelled failures.
@@ -146,6 +197,12 @@ base, stop and report the mismatch.
 
 - D0 (i) is open, or no planning-refusal discriminant separates the
   trapping owners from ABI-S6 owner 0.
+- D1's emission-owner checkpoint measures an owner other than
+  `O.base_owner()`: stop with the measured owner, and do not substitute
+  another key.
+- The census shows a refused owner in a row that is green today, or a
+  row moving to `ContinuationBodyTail` with a handler owner in a green
+  row: stop to the Architect, naming the owner and row.
 - The repair touches the bracket tree, moves a held ref
   (`wp/RT-BRACKET-PRODUCER-AUTHENTICITY`, `wp/RT-BRACKET-SETTLEMENT-PLANE`,
   `4b4c8565c`, `21c039918`, `7f1a04a40`), or relaxes the `units.rs:7831`
