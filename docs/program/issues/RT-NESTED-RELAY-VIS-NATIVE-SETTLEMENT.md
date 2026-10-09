@@ -136,10 +136,13 @@ base, stop and report the mismatch.
      `Excluded` owners, all admitted). For `rt_parity_native`, run its 20
      named `checked_ih_*` and `composed_return_forward_ret_authority_*`
      tests from the D0 owner census locally; CI owns the rest of that
-     suite, and the handoff says so. After the (R1)/(R2) amendment,
-     re-run `px8f_buffer_native` (6/6) first. The first eight suites and
-     the six non-px8f resumed suites stand, because the walk changes only
-     at Call terminals and none of them hit one.
+     suite, and the handoff says so. **Under (R3) the walk's semantics
+     changed, so no earlier census record stands** (`evt_5mgw5cwr993nd`):
+     re-run all 38 complete suites and the 20 named parity tests, except
+     the four rows the Architect measured under R3
+     (`rt_cold_lowering_path_enumeration` 14/14, the cap41 parity test,
+     `px8f_buffer_native` 6/6, `abi_s6_mapping_surface_native` 12/12).
+     Record omissions per owner.
    - **Expected refusals** (`evt_62wab4peq1htm`). px8ta owner 0 (base
      Spec(0), relay Vis370; P1 sources 647/600, admitted handler None) is
      an expected refusal: native lowering already fails that program at
@@ -169,6 +172,20 @@ base, stop and report the mismatch.
        Some(row)` and `admitted_deferred_handler_owner(&row) ==
        Some(O.base_owner())`; false without a redex;
      - `ContinuationBodyTail`: false.
+   - **(R3) `closed(R)` answers "can a Vis arrive" exhaustively**
+     (`evt_5mgw5cwr993nd`, whose code is the reference):
+     - (a) `source_result_origins_with_omissions` in `closure.rs` returns
+       the result positions and every position omitted because its owner
+       is another function unit. `source_result_origins_in_owner_subtree`
+       keeps byte-identical behaviour by delegating to it.
+     - (b) the relay source walk (`source_results_in_scope`) errs on any
+       omitted position;
+     - (c) `source_for_relay` returns an exhaustively classified empty set
+       as `Ok` (the relay's arm is unreachable and contributes no source),
+       not as an error that aborts the parent relay's whole source set;
+     - (d) a relay is closed iff its trace is `Ok`. An owner whose relays
+       are all closed with zero live sources is admitted; `relay_count ==
+       0` still does not admit.
    - **One handler authority.** `admitted_deferred_handler_owner` moves
      unchanged from lowering (`core.rs:5800-5819`) into the plan, so the
      recorder, the refusal and the lowering read one function. Lowering
@@ -245,8 +262,10 @@ base, stop and report the mismatch.
   another key. The same holds for any owner admitted only through (R2).
 - `deferred_no_unit_response_in_body(1176)` is not px8f row 1169, so px8f
   owner 1 stays refused.
-- The census shows a refused owner in a green execution row: stop to the
-  Architect, naming the owner and row. In the CI-owned
+- The census shows a refused owner in a green execution row or a positive
+  build row (its parity twin may execute), or an omission that refuses an
+  owner in a green execution row: stop to the Architect, naming the owner
+  and row. px8ta owner 0 flipping to admitted is also a stop. In the CI-owned
   `rt_parity_native` tail, the same refusal is a stop once the refusal is
   enabled.
 - `ContinuationBodyTail`, admission E or `selected_pending_calls.rs`
@@ -260,8 +279,10 @@ base, stop and report the mismatch.
 ## Hard-stop inventory
 
 - **§1a.** Question (4), E disposition: 1 (`evt_5sah7xb9543hp`).
-  Question (2), the refusal discriminant: 2 (`evt_12az6njpj0wyy`,
-  `evt_62wab4peq1htm`); the research hold comes at the third.
+  Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
+  `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
+  research's advisory (`evt_4wcce8z24a4c9`, ruling `evt_5mgw5cwr993nd`);
+  the next research re-trigger is the sixth.
   Questions (1) and (3): 0.
 - **1.** CBT widening by tail walk would strip handler ownership from
   handler-owned P2 rows (ABI-S6 Vis548/549; witness Vis342/364), keyed on
@@ -280,6 +301,12 @@ base, stop and report the mismatch.
   admission calls the lowering gates' own functions, as R2 does. Any
   further drive or handler predicate must call the gate's own function,
   not re-derive it. Entry 3 is independent.
+- **4.** closed(R) read an exhaustively classified empty source set
+  (scrutinee yields only Ret) as open and let one dead upstream relay abort
+  its parent's whole source set; the walk also silently omitted result
+  positions owned by another function unit — keyed on "a Construct-Vis
+  exists" rather than "can a Vis arrive at the Ret-only arm". §1b next
+  fires at entry 6.
 
 ## Finding outside this WP
 
