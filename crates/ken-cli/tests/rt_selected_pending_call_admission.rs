@@ -269,11 +269,11 @@ fn selected_pending_write_arm_controls_agree_across_executors() {
     );
 }
 
-// Transition sentinel: two prints in the selected arm still lack a binding
-// for deferred relocated work. Refusal must be classified to the user; a
-// planner invariant is a backend defect, not the admitted-route boundary.
+// Promise class: durable parity. The selected Vis is a ContinuationBodyTail,
+// lowered by the ordinary Construct route rather than relocated work; both
+// prints must reach native and interpreter with the same effect sequence.
 #[test]
-fn selected_pending_two_print_route_surfaces_its_admission_refusal() {
+fn selected_pending_two_print_route_has_native_interpreter_parity() {
     const OLD_ARM: &str = "False |-> host_console APartial Unit (print_line message)";
     const TWO_PRINTS: &str = r#"False |-> bind (Coproduct (FSOp APartial) AmbientOp)
       (resp_coproduct (FSOp APartial) AmbientOp (fs_resp APartial) ambient_resp)
@@ -289,16 +289,20 @@ fn selected_pending_two_print_route_surfaces_its_admission_refusal() {
             dir.path(), ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
-    let refused = rows.iter().filter_map(|row| match row.outcome {
-        ken_runtime::SelectedPendingCallOutcomeObservation::Refused(reason) => Some(reason),
-        _ => None,
-    }).collect::<Vec<_>>();
-    assert_eq!(refused, [ken_runtime::PendingRefusal::RelocatedWorkMissingLoweringBinding],
-        "the source must reach this exact admission refusal: {rows:#?}");
-    let error = outcome.expect_err("a refused route cannot emit an artifact");
-    let text = error.to_string();
-    assert!(text.contains("unsupported runtime-IR lowering: PendingCallAdmission: refused pending call: RelocatedWorkMissingLoweringBinding"),
-        "the user must see the classified admission reason: {text}");
-    assert!(!text.contains("planner invariant") && !text.contains("compiler bug"),
-        "the admission refusal is not a compiler ICE: {text}");
+    assert!(rows.iter().any(|row| matches!(
+        row.outcome,
+        ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner { .. }
+    )), "the selected two-print route must validate a response owner: {rows:#?}");
+    assert!(!rows.iter().any(|row| matches!(
+        row.outcome,
+        ken_runtime::SelectedPendingCallOutcomeObservation::Refused(_)
+    )), "no selected leaf may be refused: {rows:#?}");
+    outcome.expect("the validated selected route must emit an artifact");
+    assert_native_interpreted_route(
+        &source, "rt-pending-two-print", b"captured\nsecond\n",
+        &[ken_runtime::HostOpV1::ConsoleIsTerminal,
+          ken_runtime::HostOpV1::ConsoleWrite,
+          ken_runtime::HostOpV1::ConsoleWrite,
+          ken_runtime::HostOpV1::ConsoleFlush],
+    );
 }
