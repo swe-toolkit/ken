@@ -7,6 +7,7 @@ use ken_elaborator::checked_core::{
     RecursionAdmission, RecursionMetadata, StableSymbol, StableSymbolTable, SymbolNamespace,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
+use ken_elaborator::omega_erasure::OmegaErasurePlan;
 use ken_kernel::{Decl, GlobalId, Level, Term};
 use ken_runtime::{
     evaluate_runtime_ir_example, run_example_with_seed_observation, NativeSeedEnvironment,
@@ -90,6 +91,13 @@ fn recursive_package() -> (CheckedCorePackage, StableSymbol, StableSymbol) {
         )
         .expect("canonical recursive declaration"),
     );
+    // MEASURED: the recursive reference lowers without a proof-erasure slot.
+    // CLAIMED: this synthetic body has no Ω position to erase.
+    // THE GAP: its mock Type(0) is not kernel-admitted; the empty plan is
+    // a fixture assumption, not a production classification.
+    semantic
+        .omega_erasure_plans
+        .insert(target.clone(), OmegaErasurePlan::default());
     semantic.recursion_metadata.insert(
         group.clone(),
         RecursionMetadata {
@@ -153,6 +161,13 @@ fn imported_package() -> (
         )
         .expect("canonical import declaration"),
     );
+    // MEASURED: the imported value crosses a checked package reference.
+    // CLAIMED: this synthetic reference has no Ω position to erase.
+    // THE GAP: its mock Type(0) is not kernel-admitted; the empty plan is
+    // a fixture assumption, not a production classification.
+    semantic
+        .omega_erasure_plans
+        .insert(target.clone(), OmegaErasurePlan::default());
     semantic
         .dependency_semantic_hashes
         .insert(dependency.clone(), dependency_hash.clone());
@@ -219,6 +234,14 @@ fn dictionary_package() -> (CheckedCorePackage, StableSymbol, StableSymbol) {
         )
         .expect("canonical dictionary declaration"),
     );
+    // MEASURED: only the dictionary's declared runtime fields lower.
+    // CLAIMED: the mock-typed body has no Ω position requiring W3 erasure;
+    // dictionary law-field selection belongs to its separate metadata.
+    // THE GAP: its dictionary type is not kernel-admitted; the empty plan
+    // is a fixture assumption, not a production classification.
+    semantic
+        .omega_erasure_plans
+        .insert(target.clone(), OmegaErasurePlan::default());
     semantic
         .primitive_refs
         .insert(literal.clone(), "primitive-registry:lit_int_7".to_string());
@@ -546,8 +569,7 @@ fn checked_core_imported_value_crosses_an_accepted_var_capture() {
     let example = RuntimeExample {
         name: "checked-core-imported-var-capture".to_string(),
         checked_core_shape:
-            "let captured = dep-pkg.Dep.answer in (lambda ignored. captured) captured"
-                .to_string(),
+            "let captured = dep-pkg.Dep.answer in (lambda ignored. captured) captured".to_string(),
         ir: body,
         observation: RuntimeObservation::Returned(RuntimeGroundValue::Int((9).into())),
     };
@@ -563,10 +585,14 @@ fn checked_core_imported_value_crosses_an_accepted_var_capture() {
         .expect("the imported value crosses the ordinary Var capture");
     assert_eq!(interpreted.observation.observation, example.observation);
 
-    let native = run_example_with_seed_observation(&example, &NativeSeedEnvironment::empty(ken_runtime::boundary_resource_profile::starter_smoke_profile()));
-    let error = native.expect_err(
-        "the representable capture reaches the separate dependency-linking gap",
+    let native = run_example_with_seed_observation(
+        &example,
+        &NativeSeedEnvironment::empty(
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        ),
     );
+    let error =
+        native.expect_err("the representable capture reaches the separate dependency-linking gap");
     let ken_runtime::CraneliftBackendError::Unsupported(unsupported) = error else {
         panic!("the checked-Ken capture reached the wrong native failure: {error:?}");
     };

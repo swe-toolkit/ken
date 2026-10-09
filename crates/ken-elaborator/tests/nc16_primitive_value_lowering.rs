@@ -7,6 +7,7 @@ use ken_elaborator::checked_core::{
     SymbolNamespace,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
+use ken_elaborator::omega_erasure::OmegaErasurePlan;
 use ken_interp::{eval, EvalStore, EvalVal};
 use ken_kernel::{declare_primitive, Decl, GlobalEnv, GlobalId, Level, PrimReduction, Term};
 use ken_runtime::{
@@ -114,6 +115,13 @@ fn primitive_package(
         canonical_decl_bytes(&transparent(GlobalId(1), body), table)
             .expect("canonical primitive test declaration"),
     );
+    // MEASURED: synthetic primitive value lowering with no proof-position
+    // erasure. CLAIMED: this mock-typed body has no Ω position to erase.
+    // THE GAP: its Type(0) test type is not kernel-admitted; the empty plan
+    // is a fixture assumption, never a production classifier result.
+    semantic
+        .omega_erasure_plans
+        .insert(target.clone(), OmegaErasurePlan::default());
     for (registry_symbol, reduction, partiality, lowerability) in primitives {
         add_primitive(
             &mut semantic,

@@ -2474,6 +2474,8 @@ pub fn prepare_native_program_sources(
     })?;
     let mut normalized = package.clone();
     let mut normalized_bodies = BTreeMap::new();
+    // Recursive barriers give this normalization its own immutable environment.
+    let mut normalized_omega_memo = crate::omega_erasure::ClassifyMemo::new();
     for symbol in &executable_declarations {
         let id = symbols
             .iter()
@@ -2509,14 +2511,21 @@ pub fn prepare_native_program_sources(
             ty: ty.clone(),
             body: normalized_body,
         };
-        let bytes = canonical_decl_bytes(&normalized_declaration, &symbol_table).map_err(|_| {
-            NativeProgramBuildError::Driver(CompilerDriverError::MissingStableSymbol { id: *id })
-        })?;
-        normalized
-            .artifact
-            .semantic
-            .declarations
-            .insert(symbol.clone(), bytes);
+        let Decl::Transparent { ty, body, .. } = &normalized_declaration else {
+            unreachable!("normalized executable declaration remains transparent")
+        };
+        write_checked_transparent_declaration(
+            &mut normalized.artifact.semantic,
+            symbol,
+            &normalized_declaration,
+            body,
+            ty,
+            &normalization_env,
+            &symbol_table,
+            &mut normalized_omega_memo,
+            |_| CompilerDriverError::MissingStableSymbol { id: *id },
+        )
+        .map_err(NativeProgramBuildError::Driver)?;
     }
     let normalized_host_package =
         emit_checked_core_package(normalized.header.clone(), normalized.artifact.clone())
@@ -3468,6 +3477,57 @@ fn add_obligation_metadata(
     Ok(())
 }
 
+/// Store one checked transparent body and its plan as a single body-version
+/// write. The plan is classified over the exact Term encoded into `bytes`;
+/// the independent canonical-byte traversal must agree before either entry
+/// replaces the previous version in the semantic package.
+fn write_checked_transparent_declaration(
+    semantic: &mut CheckedCoreSemanticInputs,
+    symbol: &StableSymbol,
+    decl: &Decl,
+    body: &Term,
+    ty: &Term,
+    env: &GlobalEnv,
+    table: &StableSymbolTable,
+    memo: &mut crate::omega_erasure::ClassifyMemo,
+    encode_error: impl FnOnce(CanonicalEncodingError) -> CompilerDriverError,
+) -> Result<(), CompilerDriverError> {
+    if !matches!(decl, Decl::Transparent { body: stored_body, ty: stored_ty, .. }
+        if std::ptr::eq(stored_body, body) && std::ptr::eq(stored_ty, ty))
+    {
+        return Err(CompilerDriverError::OmegaErasurePlan {
+            symbol: symbol.clone(),
+            reason: "plan source is not the declaration body and type".into(),
+        });
+    }
+    let bytes = canonical_decl_bytes(decl, table).map_err(encode_error)?;
+    let (plan, term_nodes) = crate::omega_erasure::omega_erasure_plan_with_memo(
+        env, body, ty, memo,
+    )
+    .map_err(|error| CompilerDriverError::OmegaErasurePlan {
+        symbol: symbol.clone(),
+        reason: error.to_string(),
+    })?;
+    let encoded_nodes =
+        crate::checked_core::canonical_body_node_count(&bytes).map_err(|reason| {
+            CompilerDriverError::OmegaErasurePlan {
+                symbol: symbol.clone(),
+                reason,
+            }
+        })?;
+    if usize::try_from(term_nodes).ok() != Some(encoded_nodes) {
+        return Err(CompilerDriverError::OmegaErasurePlan {
+            symbol: symbol.clone(),
+            reason: format!(
+                "kernel Term preorder has {term_nodes} nodes but canonical body has {encoded_nodes}"
+            ),
+        });
+    }
+    semantic.declarations.insert(symbol.clone(), bytes);
+    semantic.omega_erasure_plans.insert(symbol.clone(), plan);
+    Ok(())
+}
+
 fn emit_package_from_env(
     manifest: &CompilerManifest,
     sources: &[CompilerSource],
@@ -3514,33 +3574,22 @@ fn emit_package_from_env(
             .env
             .lookup(*id)
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *id })?;
-        let bytes =
-            canonical_decl_bytes(decl, &package_table).map_err(|error| outside(&symbol, error))?;
-        semantic.declarations.insert(symbol.clone(), bytes);
         if let Decl::Transparent { ty, body, .. } = decl {
-            let (plan, term_nodes) = crate::omega_erasure::omega_erasure_plan_with_memo(
-                &env.env,
+            write_checked_transparent_declaration(
+                &mut semantic,
+                &symbol,
+                decl,
                 body,
                 ty,
+                &env.env,
+                &package_table,
                 &mut omega_memo,
-            )
-            .map_err(|error| CompilerDriverError::OmegaErasurePlan {
-                symbol: symbol.clone(),
-                reason: error.to_string(),
-            })?;
-            let encoded_nodes =
-                crate::checked_core::canonical_body_node_count(&semantic.declarations[&symbol])
-                    .map_err(|reason| CompilerDriverError::OmegaErasurePlan {
-                        symbol: symbol.clone(),
-                        reason,
-                    })?;
-            if usize::try_from(term_nodes).ok() != Some(encoded_nodes) {
-                return Err(CompilerDriverError::OmegaErasurePlan {
-                    symbol: symbol.clone(),
-                    reason: format!("kernel Term preorder has {term_nodes} nodes but canonical body has {encoded_nodes}"),
-                });
-            }
-            semantic.omega_erasure_plans.insert(symbol.clone(), plan);
+                |error| outside(&symbol, error),
+            )?;
+        } else {
+            let bytes = canonical_decl_bytes(decl, &package_table)
+                .map_err(|error| outside(&symbol, error))?;
+            semantic.declarations.insert(symbol.clone(), bytes);
         }
         semantic
             .lowerability
@@ -5096,6 +5145,8 @@ fn slice_closure_semantic(
     let mut sliced = CheckedCoreSemanticInputs::default();
     sliced.symbols.extend(closure_symbols.iter().cloned());
     sliced.declarations = filter_map_by_keys(&semantic.declarations, reachable_declarations);
+    sliced.omega_erasure_plans =
+        filter_map_by_keys(&semantic.omega_erasure_plans, reachable_declarations);
     sliced.primitive_refs = filter_map_by_keys(&semantic.primitive_refs, closure_symbols);
     sliced.primitive_metadata = filter_map_by_keys(&semantic.primitive_metadata, closure_symbols);
     sliced.data_metadata = filter_map_by_keys(&semantic.data_metadata, closure_symbols);
