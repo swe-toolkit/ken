@@ -260,8 +260,9 @@ base, stop and report the mismatch.
 ## Hard-stop inventory
 
 - **§1a.** Question (4), E disposition: 1 (`evt_5sah7xb9543hp`).
-  Question (2), the refusal discriminant: 2 (`evt_12az6njpj0wyy`,
-  `evt_62wab4peq1htm`); the research hold comes at the third.
+  Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
+  `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The Architect holds the third
+  ruling for a research prior-art advisory; the census stays stopped.
   Questions (1) and (3): 0.
 - **1.** CBT widening by tail walk would strip handler ownership from
   handler-owned P2 rows (ABI-S6 Vis548/549; witness Vis342/364), keyed on
@@ -280,6 +281,15 @@ base, stop and report the mismatch.
   admission calls the lowering gates' own functions, as R2 does. Any
   further drive or handler predicate must call the gate's own function,
   not re-derive it. Entry 3 is independent.
+- **4.** `closed(R)` requires every relay's provenance to end at a
+  Construct-Vis source; a relay whose response arrives through a
+  computational-match scrutinee with no constructed op (relay746,
+  scrutinees 839/829, `rt_cap41_*_out_of_range_stage`) yields an empty
+  source set and is treated as open, though lowering settles it — keyed on
+  the syntactic source vocabulary (Construct-Vis) rather than on what
+  lowering settles. The entry-3 predicate recurs: the closure was applied
+  to `drive_settled` only, and `closed(R)` is still a separate syntactic
+  re-derivation. §1b fires next at entry 6.
 
 ## Finding outside this WP
 
