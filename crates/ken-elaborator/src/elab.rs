@@ -12101,6 +12101,7 @@ fn core_type_head_id(ty: &Term) -> Option<GlobalId> {
 /// surface spelling retained in the registry.
 fn match_instance_head_core(
     env: &GlobalEnv,
+    facts: &RefinementFacts,
     globals: &HashMap<String, GlobalId>,
     ctx: &Context,
     pattern: &RType,
@@ -12126,16 +12127,24 @@ fn match_instance_head_core(
             }) else {
                 return false;
             };
-            matches!(
-                requested,
-                Term::Const { id, .. } | Term::IndFormer { id, .. }
-                    if *id == pattern_id
-            )
+            // The key separates a refinement from its carrier. An alias's
+            // body is then compared by conversion; any other fixed head must
+            // be requested bare, so `List` never matches `List Nat`.
+            let pattern_core = Term::const_(pattern_id, vec![]);
+            instance_head_key(env, ctx, facts, pattern, &pattern_core)
+                == instance_head_key(env, ctx, facts, pattern, requested)
+                && match env.transparent_body(pattern_id) {
+                    Some((levels, body)) if levels.is_empty() => {
+                        convert_type(env, ctx, &body, requested)
+                    }
+                    _ => matches!(requested, Term::Const { .. } | Term::IndFormer { .. }),
+                }
         }
         RType::RApp(pattern_f, pattern_a, _) => match requested {
             Term::App(requested_f, requested_a) => {
                 match_instance_head_core(
                     env,
+                    facts,
                     globals,
                     ctx,
                     pattern_f,
@@ -12144,6 +12153,7 @@ fn match_instance_head_core(
                     args,
                 ) && match_instance_head_core(
                     env,
+                    facts,
                     globals,
                     ctx,
                     pattern_a,
@@ -12270,6 +12280,7 @@ fn resolve_instance_dictionary(
     }
     let carrier = elab_type(&mut cx, requested)?;
     let carrier = cx.metas.zonk_term(&carrier);
+    let head_key = instance_head_key(cx.env, &cx.ctx, refinement_facts, requested, &carrier);
     let expected_carrier = class_env.class_by_id(class_id)
         .is_some_and(|class| class.projection.head_param.is_some())
         .then_some(carrier.clone());
@@ -12285,7 +12296,7 @@ fn resolve_instance_dictionary(
         ctx,
         class_name,
         class_id,
-        instance_head_key(requested, &carrier),
+        head_key,
         &rtype_head_name(requested),
         InstanceHeadRequest::Surface {
             requested,
@@ -12513,6 +12524,7 @@ fn resolve_instance_dictionary_inner(
                 let mut matched = vec![None; info.head_param_count];
                 if !match_instance_head_core(
                     env,
+                    refinement_facts,
                     globals,
                     ctx,
                     pattern,
@@ -12582,7 +12594,10 @@ fn resolve_instance_dictionary_inner(
                 ctx,
                 &constraint.class_name,
                 constraint.class_id,
-                instance_head_key(&required_head, required_carrier.as_ref().unwrap_or(&required_type)),
+                instance_head_key(
+                    env, ctx, refinement_facts, &required_head,
+                    &ken_kernel::subst::subst_tel(&constraint.head_core, &core_args),
+                ),
                 &rtype_head_name(&required_head),
                 InstanceHeadRequest::Surface {
                     requested: &required_head,
@@ -12950,6 +12965,8 @@ fn decl_eval_body(expr: &RExpr) -> &RExpr {
 }
 
 struct ProjectionPurityCtx<'a> {
+    env: &'a GlobalEnv,
+    refinement_facts: &'a RefinementFacts,
     globals: &'a HashMap<String, GlobalId>,
     class_env: &'a ClassEnv,
     local_constraints: &'a [RInstanceConstraint],
@@ -12963,6 +12980,28 @@ fn instance_class_for_global(
     class_env.instances_by_id.values().find(|inst| inst.instance_id == instance_id)
 }
 
+/// The purity view has no elaborated head. A nullary alias is followed through
+/// its body as `instance_head_key` does; a structural body has no id here.
+fn instance_head_id_only(
+    env: &GlobalEnv,
+    facts: &RefinementFacts,
+    mut id: GlobalId,
+) -> Option<GlobalId> {
+    loop {
+        if let Some(root) = facts.refinement_root(id) {
+            return Some(root);
+        }
+        match env.transparent_body(id) {
+            Some((levels, body)) if levels.is_empty() => match (&body, core_type_head_id(&body)) {
+                (Term::Const { .. } | Term::IndFormer { .. }, Some(next)) => id = next,
+                (_, Some(next)) => return Some(alias_head_root(env, facts, next)),
+                (_, None) => return None,
+            },
+            _ => return Some(alias_head_root(env, facts, id)),
+        }
+    }
+}
+
 fn constraint_instance_id(
     constraint: &RInstanceConstraint,
     ctx: &ProjectionPurityCtx<'_>,
@@ -12972,11 +13011,16 @@ fn constraint_instance_id(
     })?;
     let head_key = match &constraint.head_type {
         RType::RVarTy(_, name, _) => InstanceHeadKey::Parameter(name.clone()),
-        RType::RCheckedGlobal { id, .. } => InstanceHeadKey::Global(*id),
-        RType::RCon(name, _) => InstanceHeadKey::Global(*ctx.globals.get(name)?),
-        RType::RApp(..) => InstanceHeadKey::Global(
-            named_head_id(&constraint.head_type, ctx.globals)?
+        RType::RCheckedGlobal { id, .. } => InstanceHeadKey::Global(
+            instance_head_id_only(ctx.env, ctx.refinement_facts, *id)?
         ),
+        RType::RCon(name, _) => InstanceHeadKey::Global(
+            instance_head_id_only(ctx.env, ctx.refinement_facts, *ctx.globals.get(name)?)?
+        ),
+        RType::RApp(..) => InstanceHeadKey::Global(alias_head_root(
+            ctx.env, ctx.refinement_facts,
+            named_head_id(&constraint.head_type, ctx.globals)?,
+        )),
         _ => return None, // no inferred core type in this purity-only view
     };
     ctx.class_env.instances_by_id.get(&(class_id, head_key)).map(|info| info.instance_id)
@@ -13254,6 +13298,8 @@ pub(crate) fn check_surface_purity(
     rdecl: &RDecl,
     effect_rows: &HashMap<String, crate::effects::RowType>,
     effect_rows_by_id: &HashMap<GlobalId, crate::effects::RowType>,
+    env: &GlobalEnv,
+    refinement_facts: &RefinementFacts,
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
 ) -> Result<(), ElabError> {
@@ -13271,6 +13317,8 @@ pub(crate) fn check_surface_purity(
     let declared = surface_declared_row_type(rdecl)?.unwrap_or_else(crate::effects::RowType::empty);
     let bound_dict_classes = collect_bound_dictionary_params(rdecl.ty.as_ref(), class_env);
     let projection_ctx = ProjectionPurityCtx {
+        env,
+        refinement_facts,
         globals,
         class_env,
         local_constraints: constraints,
@@ -15224,6 +15272,8 @@ fn compute_ordered_field_values(
         args.extend(values.iter().cloned());
         let expected = ken_kernel::subst::subst_tel(&field_types[i], &args);
         let projection_ctx = ProjectionPurityCtx {
+            env: cx.env,
+            refinement_facts: cx.refinement_facts,
             globals: cx.globals,
             class_env,
             local_constraints: constraints,
@@ -15237,6 +15287,8 @@ fn compute_ordered_field_values(
                 fname,
                 &fields[pos].1,
                 effect_rows,
+                cx.env,
+                cx.refinement_facts,
                 cx.globals,
                 class_env,
                 constraints,
@@ -15257,6 +15309,8 @@ fn check_instance_field_purity(
     field_name: &str,
     expr: &RExpr,
     effect_rows: &CheckedEffectRows<'_>,
+    env: &GlobalEnv,
+    refinement_facts: &RefinementFacts,
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
     constraints: &[RInstanceConstraint],
@@ -15264,6 +15318,8 @@ fn check_instance_field_purity(
     span: &Span,
 ) -> Result<(), ElabError> {
     let projection_ctx = ProjectionPurityCtx {
+        env,
+        refinement_facts,
         globals,
         class_env,
         local_constraints: constraints,
@@ -15379,16 +15435,47 @@ fn named_head_id(ty: &RType, globals: &HashMap<String, GlobalId>) -> Option<Glob
     }
 }
 
-fn instance_head_key(ty: &RType, core: &Term) -> InstanceHeadKey {
-    match ty {
-        RType::RVarTy(_, name, _) => InstanceHeadKey::Parameter(name.clone()),
-        RType::RCheckedGlobal { id, .. } => InstanceHeadKey::Global(*id),
-        RType::RApp(f, _, _) if matches!(instance_head_key(f, core), InstanceHeadKey::Global(_)) =>
-            instance_head_key(f, core),
-        _ => match core_type_head_id(core) {
-            Some(id) => InstanceHeadKey::Global(id),
-            None => InstanceHeadKey::Structural(core.clone()),
-        },
+/// A named refinement owns a distinct head despite its erased kernel carrier.
+/// A bare nullary alias names its whole body. An applied head keeps its own
+/// outermost constructor (39 §6.1 keys `(Ord, Pair)` on `Pair` itself) and
+/// follows only renaming aliases, so a type function is never reduced.
+fn instance_head_key(
+    env: &GlobalEnv,
+    ctx: &Context,
+    facts: &RefinementFacts,
+    ty: &RType,
+    core: &Term,
+) -> InstanceHeadKey {
+    if let RType::RVarTy(_, name, _) = ty {
+        return InstanceHeadKey::Parameter(name.clone());
+    }
+    let mut head = core.clone();
+    loop {
+        let Some(id) = core_type_head_id(&head) else {
+            return InstanceHeadKey::Structural(ken_kernel::normalize(env, ctx, &head));
+        };
+        if let Some(root) = facts.refinement_root(id) {
+            return InstanceHeadKey::Global(root);
+        }
+        match (&head, env.transparent_body(id)) {
+            (Term::Const { .. }, Some((levels, body))) if levels.is_empty() => head = body,
+            _ => return InstanceHeadKey::Global(alias_head_root(env, facts, id)),
+        }
+    }
+}
+
+/// Follows a head constant through aliases whose body is itself a bare head
+/// constant. Any other body (a type function such as `Pair`) is its own head.
+fn alias_head_root(env: &GlobalEnv, facts: &RefinementFacts, mut id: GlobalId) -> GlobalId {
+    loop {
+        if let Some(root) = facts.refinement_root(id) {
+            return root;
+        }
+        match env.transparent_body(id) {
+            Some((levels, Term::Const { id: next, .. } | Term::IndFormer { id: next, .. }))
+                if levels.is_empty() => id = next,
+            _ => return id,
+        }
     }
 }
 
@@ -15425,22 +15512,9 @@ fn elab_instance_decl(
         (ci.module_id, ci.kind.clone())
     };
     let head_name = head_type_name(head_type);
-    // Orphan ownership is checked at the declaration, even for an unbound
-    // head; imported heads carry their selected ID independently of globals.
-    let in_class_module = class_module == class_env.current_module;
-    let in_head_module = named_head_id(head_type, globals)
-        .and_then(|id| class_env.global_modules.get(&id))
-        .is_some_and(|module| *module == class_env.current_module);
-    if !in_class_module && !in_head_module {
-        return Err(ElabError::OrphanInstance {
-            class: class_name.to_string(),
-            head_type: head_name.clone(),
-            span: span.clone(),
-        });
-    }
-
-    // ---- elaborate head type before identity-keyed overlap test ----------
-    let head_core = {
+    // Compute the key in the same context that elaborates the head, so
+    // orphan ownership and overlap cannot disagree about alias identity.
+    let (head_core, head_key) = {
         let mut cx = ElabCtx::new(
             env,
             globals,
@@ -15452,9 +15526,25 @@ fn elab_instance_decl(
         .with_preconditions(preconditions, PremiseHoles::Refused);
         push_type0_params(&mut cx, head_params.len());
         let h = elab_type(&mut cx, head_type)?;
-        cx.metas.zonk_term(&h)
+        let h = cx.metas.zonk_term(&h);
+        let key = instance_head_key(cx.env, &cx.ctx, refinement_facts, head_type, &h);
+        (h, key)
     };
-    let instance_key = (class_type_id, instance_head_key(head_type, &head_core));
+    // An imported alias does not make this module the owner of its target.
+    let in_class_module = class_module == class_env.current_module;
+    let in_head_module = match &head_key {
+        InstanceHeadKey::Global(id) => class_env.global_modules.get(id)
+            .is_some_and(|module| *module == class_env.current_module),
+        _ => false,
+    };
+    if !in_class_module && !in_head_module {
+        return Err(ElabError::OrphanInstance {
+            class: class_name.to_string(),
+            head_type: head_name.clone(),
+            span: span.clone(),
+        });
+    }
+    let instance_key = (class_type_id, head_key);
     if class_kind == ClassKind::Structure {
         if let Some(existing) = class_env.instances_by_id.get(&instance_key) {
             return Err(ElabError::OverlappingInstances {
@@ -15476,7 +15566,7 @@ fn elab_instance_decl(
     } else {
         Term::const_(class_type_id, vec![])
     };
-    let constraint_core_types = {
+    let (constraint_core_types, constraint_head_cores): (Vec<_>, Vec<_>) = {
         let mut cx = ElabCtx::new(
             env,
             globals,
@@ -15493,13 +15583,16 @@ fn elab_instance_decl(
                 let id = checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)?;
                 let class = class_env.class_by_id(id).expect("selected constraint was checked");
                 let head = elab_type(&mut cx, &constraint.head_type)?;
-                Ok(if class.projection.head_param.is_some() {
-                    Term::app(Term::const_(class.projection.type_id, vec![]), head)
+                let core_type = if class.projection.head_param.is_some() {
+                    Term::app(Term::const_(class.projection.type_id, vec![]), head.clone())
                 } else {
                     Term::const_(class.projection.type_id, vec![])
-                })
+                };
+                Ok((core_type, head))
             })
-            .collect::<Result<Vec<_>, _>>()?
+            .collect::<Result<Vec<_>, ElabError>>()?
+            .into_iter()
+            .unzip()
     };
     let closed_instance_ty = close_type0_pis(
         wrap_premise_pis(instance_ty.clone(), &constraint_core_types),
@@ -15676,13 +15769,14 @@ fn elab_instance_decl(
         head_type: Some(freeze_instance_pattern(head_type, globals)),
         constraints: constraints
             .iter()
-            .zip(&constraint_core_types)
-            .map(|(constraint, core_type)| InstanceConstraintInfo {
+            .zip(constraint_core_types.iter().zip(&constraint_head_cores))
+            .map(|(constraint, (core_type, head_core))| InstanceConstraintInfo {
                 class_name: constraint.class_name.clone(),
                 class_id: checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
                     .expect("constraint checked before instance admission"),
                 head_type: freeze_instance_pattern(&constraint.head_type, globals),
                 core_type: core_type.clone(),
+                head_core: head_core.clone(),
             })
             .collect(),
         defining_package: class_env
