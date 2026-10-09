@@ -849,13 +849,13 @@ fn buffer_freeze_outcome(
 // which carries no signature of its own. The signature above is the
 // real cause.
 // Annotation only -- test body and expectations are unchanged.
-/// Promise class: durable relation between raw returned-Vis provenance and
-/// the installed pending-Vis protocol. MEASURED: both r2 relay-bearing owners
-/// have one static successor and one source-driven relay; their actual returned
-/// sets retain only those static successors. CLAIMED: no emitted owner waits
-/// for the forwarded relay's unrepresentable K. THE GAP: this planned member
-/// relation alone does not prove the source drive executes; the native parity
-/// row separately observes the effect sequence and terminal result.
+/// Promise class: transition sentinel for this r2 fixture's owner/Vis origins.
+/// MEASURED: both relay-bearing owners have one static successor and one
+/// source-driven relay; each retains only its independent successor (owner 2:
+/// 746, owner 3: 528). CLAIMED: neither emitted owner waits for the forwarded
+/// relay's unrepresentable K. THE GAP: this planned member relation alone
+/// does not prove source drive executes; the native parity row separately
+/// observes the effect sequence and terminal result.
 #[test]
 fn r2_relay_owners_return_only_source_independent_successors() {
     in_large_stack_thread("rt-escape-r2-protocol-exclusion", || {
@@ -893,8 +893,15 @@ fn r2_relay_owners_return_only_source_independent_successors() {
                 .find(|(owner, _)| *owner == protocol.owner_origin)
                 .map(|(_, members)| members.as_slice())
                 .expect("a driven relay owner retains an installed pending-Vis protocol");
-            assert_eq!(actual, &[expected],
-                "only the source-independent successor may return from a driven relay owner");
+            let ruled_successor = match protocol.owner_origin {
+                1264 => 746, // owner 2, Vis 1264
+                1283 => 528, // owner 3, Vis 1283
+                other => panic!("unexpected r2 relay owner at Vis {other}"),
+            };
+            assert_eq!(expected, ruled_successor,
+                "the raw provenance must retain each owner's independent successor");
+            assert_eq!(actual, &[ruled_successor],
+                "only the source-independent successor may return from this driven relay owner");
             returned.push(expected);
         }
         returned.sort_unstable();

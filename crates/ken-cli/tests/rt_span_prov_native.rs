@@ -334,9 +334,9 @@ fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
 /// Promise class: transition sentinel. The span fixture's completed plan
 /// records eight installed Specialized rows and its one deferred Vis.
 /// MEASURED: the real build produces a linked artifact and planner diagnostics.
-/// CLAIMED: owner 6 and Vis1079 keep their distinct planning dispositions.
-/// THE GAP: compilation does not prove native execution; the native row remains
-/// ignored until the successor settles its returned-Vis route.
+/// CLAIMED: owner 4 retains only returned Vis528; owner 6 and Vis1079 keep
+/// their distinct planning dispositions. THE GAP: compilation alone does not
+/// prove source-drive execution; the separately unignored native row does.
 #[cfg(target_os = "linux")]
 #[test]
 fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
