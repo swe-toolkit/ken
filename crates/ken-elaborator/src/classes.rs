@@ -201,6 +201,8 @@ pub(crate) struct InstanceConstraintInfo {
     /// Kernel type in the instance-head parameter context, used to close the
     /// instance Pi/lambda telescope and to kernel-check applications.
     pub core_type: Term,
+    /// The constraint's own unreduced head in the same parameter context.
+    pub head_core: Term,
 }
 
 /// The typeclass environment: class registry, canonical instance registry,

@@ -3578,6 +3578,8 @@ fn elaborate_checked_spine_free(
         rdecl,
         &elab.effect_rows,
         &elab.effect_rows_by_id,
+        &elab.env,
+        &elab.refinement_facts,
         &elab.globals,
         &elab.class_env,
     )?;
@@ -3613,6 +3615,8 @@ fn elaborate_checked_with_fixity(
         rdecl,
         &elab.effect_rows,
         &elab.effect_rows_by_id,
+        &elab.env,
+        &elab.refinement_facts,
         &elab.globals,
         &elab.class_env,
     )?;
@@ -4957,6 +4961,8 @@ fn expand_scope(
                                 rdecl,
                                 &group_effect_rows,
                                 &elab.effect_rows_by_id,
+                                &elab.env,
+                                &elab.refinement_facts,
                                 &elab.globals,
                                 &elab.class_env,
                             )?;
