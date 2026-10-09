@@ -464,7 +464,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
+    ResponseOwnerSettlement, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 #[cfg(test)]
@@ -3275,6 +3275,7 @@ struct Lowering<'a> {
     /// Present on every module compile; direct inert test fixtures use None.
     refused_scalar_join: Option<&'a std::cell::Cell<Option<StaticOriginId>>>,
     pending_vis_record_protocol: Option<PendingVisRecordProtocol>,
+    response_owner_settlements: BTreeMap<StaticResponseContinuationId, ResponseOwnerSettlement>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,

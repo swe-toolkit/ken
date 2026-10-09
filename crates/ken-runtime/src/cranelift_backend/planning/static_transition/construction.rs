@@ -127,7 +127,7 @@ use super::semantic_ir::{
 use super::{
     planner_capacity_error, planner_error, CraneliftBackendError, DeclarationCallTargetClass,
     DynamicActivationFrame, EdgeEvidence, EdgeKind, PersistentNodeId, PersistentStoreNode,
-    PlanContext, PlannedEntryBody, PlannedHelperKey, StaticEdge, StaticEdgeId, StaticNode,
+    PendingVisSettlements, PlanContext, PlannedEntryBody, PlannedHelperKey, StaticEdge, StaticEdgeId, StaticNode,
     StaticNodeId, StaticSourceId, StaticTransitionPlan, StoreKind, TransitionKind,
 };
 use crate::RuntimeExpr;
@@ -317,6 +317,7 @@ impl<'src> Planner<'src> {
                 static_response_infeasible: None,
                 static_response_deferred: Vec::new(),
                 static_response_phase_a: None,
+                pending_vis_settlements: PendingVisSettlements::default(),
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
@@ -1445,6 +1446,16 @@ impl<'src> Planner<'src> {
             self.plan.preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
         self.plan.recursive_residual_dispositions = build_recursive_residual_dispositions(&self.plan)?;
         self.plan.recursive_carrier_boxed_stores = build_recursive_carrier_boxed_stores(&self.plan)?;
+        // The host effect seat plane reads only `source_occurrences` (fixed at
+        // scheduling) and `occurrence_authorities` (written once, above), so it
+        // is final here. It must precede the aggregate ownership plan: ownership
+        // source (e) reads the pending-Vis protocol, whose successor gate reads
+        // this plane. Installed after phase B, ownership was derived against an
+        // empty seat plane and the whole-plan closure re-derived 48 more records.
+        // It stays after `join_results`: a seat's consumer phase is a fact about
+        // the child's planned result representation.
+        self.plan.host_effect_seats = build_host_effect_seat_plan(&self.plan)?;
+        validate_host_effect_seat_plan(&self.plan, &self.plan.host_effect_seats)?;
         // `D7` — the aggregate occurrence population is built HERE, last, and
         // deliberately not beside the occurrence authorities it also reads.
         //
@@ -1509,6 +1520,10 @@ impl<'src> Planner<'src> {
                 }
             }
         }
+        // Phase B has installed the final response-owner population and its
+        // selected calls. Close the returned-Vis settlement exactly once before
+        // ownership source (e) reads its successor rows.
+        self.plan.pending_vis_settlements = self.plan.build_pending_vis_settlements()?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing
@@ -1589,11 +1604,6 @@ impl<'src> Planner<'src> {
                 &self.plan.checked_ih_continuation_inheritances,
             );
         }
-        // ⛔ After `join_results` for the same reason the ownership plan is: a
-        // seat's consumer phase is a fact about the child's planned result
-        // representation, which does not exist until that line.
-        self.plan.host_effect_seats = build_host_effect_seat_plan(&self.plan)?;
-        validate_host_effect_seat_plan(&self.plan, &self.plan.host_effect_seats)?;
         // This compiler-generated residual is authorized by the same catalog as
         // source traps. Append it only after every source-derived entry so
         // existing planned identities remain stable; lowering can then replace

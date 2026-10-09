@@ -387,7 +387,7 @@ fn owner_nonmember_refuses_at_the_loop_before_c2() {
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SELECTED-PENDING-CALL-BUILD increment 2 refuses this selected pending route at admission E: the deferred Effect has free Var(1) but its selected operation supplies one field. No native dynamic-error execution is claimed; the separate admission test pins the exact refusal reason."]
+#[ignore = "RT-SELECTED-PENDING-CALL-BUILD: the selected ERR route refuses at admission J (SelectedPendingLeafRelocatesUnaccountedJoins). No native dynamic-error execution is claimed; the separate admission test pins the exact refusal reason."]
 fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
     assert_agreement(
         ERR_PROGRAM,
@@ -401,11 +401,11 @@ fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
     );
 }
 
-// Transition sentinel: if response-owner environment extension plus J-a
-// accounting later admits this route, this reason pin intentionally reddens.
-// It does not infer native execution from checked-source planning.
+// Transition sentinel: the selected ERR route still relocates unaccounted
+// joins. If J-a accounting later admits it, this exact-refusal pin reddens;
+// checked-source planning alone does not establish native execution.
 #[test]
-fn dynamic_err_pending_route_refuses_missing_effect_binding_before_join_accounting() {
+fn dynamic_err_pending_route_refuses_unaccounted_relocated_joins() {
     let dir = output_dir("err-admission");
     let (result, admissions) = ken_runtime::with_selected_pending_call_admissions(|| {
         ken_cli::build_native_program(
@@ -420,16 +420,16 @@ fn dynamic_err_pending_route_refuses_missing_effect_binding_before_join_accounti
         ken_runtime::SelectedPendingCallOutcomeObservation::Refused(reason) => Some(reason),
         _ => None,
     }).collect();
-    assert_eq!(relevant, [ken_runtime::PendingRefusal::RelocatedWorkMissingLoweringBinding],
-        "the checked ERR source must reach one pending producer, refused first by E: {admissions:#?}");
+    assert_eq!(relevant, [ken_runtime::PendingRefusal::SelectedPendingLeafRelocatesUnaccountedJoins],
+        "the checked ERR source must reach J's unaccounted-join refusal: {admissions:#?}");
     assert!(!admissions.iter().any(|row| matches!(
         row.outcome,
         ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner { .. }
     )), "one refused producer must not gain an owner-validated route: {admissions:#?}");
     let error = result.expect_err("a refused pending route cannot emit an artifact");
     let text = error.to_string();
-    assert!(text.contains("unsupported runtime-IR lowering: PendingCallAdmission: refused pending call: RelocatedWorkMissingLoweringBinding"),
-        "the user must see the admission-E reason rather than a compiler ICE: {text}");
+    assert!(text.contains("unsupported runtime-IR lowering: PendingCallAdmission: refused pending call: SelectedPendingLeafRelocatesUnaccountedJoins"),
+        "the user must see the admission-J reason rather than a compiler ICE: {text}");
     assert!(!text.contains("planner invariant") && !text.contains("compiler bug"),
         "a classified admission refusal is not a compiler ICE: {text}");
 }

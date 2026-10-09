@@ -34,7 +34,9 @@ mod responses;
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
+    ResponseOwnerSettlement,
 };
+use returned_vis::PendingVisSettlements;
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
 pub use selected_pending_calls::{
@@ -662,6 +664,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// phase A on a feasible plane; `None` before phase A, after phase B (taken),
     /// or on an opaque-K refusal (which sets `static_response_infeasible` instead).
     static_response_phase_a: Option<StaticResponsePhaseA>,
+    /// Complete closed return settlement for every installed response owner.
+    /// Built once after phase B, validated by exact re-derivation at closure.
+    pub(in crate::cranelift_backend) pending_vis_settlements: PendingVisSettlements,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///
@@ -783,12 +788,14 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 
 /// Every emission owner under which an inline synthesized aggregate is built.
 ///
-/// A seat is emitted by its own predeclared unit. It is also emitted under each
-/// continuation specialization whose exact selected case body contains it.
-/// Those specialization bodies are the population lowering actually enters
-/// under `defining_emission_owner = Specialization(unit.id())`; generated
-/// continuation contexts are a narrower, post-hoc population and therefore
-/// cannot authorize these records.
+/// The five sources are (a) predeclared units containing the seat, (b)
+/// continuation specializations whose selected case body contains it, (c)
+/// Specialized response rows under their base owner, (d) Deferred responses
+/// handled by another owner, and (e) returned-Vis successors performed by the
+/// pending-Vis loop under each successor row's base owner. Those are the
+/// emission populations lowering enters, not a reconstruction from response
+/// disposition alone. Generated continuation contexts are a narrower,
+/// post-hoc population and cannot authorize the records by themselves.
 ///
 /// This authority applies to synthesized aggregates constructed inline at
 /// `seat`: host-result constructors and unit-boundary environments. A checked-IH
@@ -849,13 +856,15 @@ fn inline_synthesized_seat_emission_owners(
             let k_body = plan.deferred_response_k_body(row)?;
             let owns_seat = if row.effect_origin() == seat {
                 true
-            } else if row.sub_case() == DeferredResponseSubCase::UnconsumedTransportCaller {
-                match k_body {
-                    Some(body) => occurrence_subtree_contains(plan, body, seat)?,
-                    None => false,
-                }
             } else {
-                false
+                match row.sub_case() {
+                    DeferredResponseSubCase::UnconsumedTransportCaller => match k_body {
+                        Some(body) => occurrence_subtree_contains(plan, body, seat)?,
+                        None => false,
+                    },
+                    DeferredResponseSubCase::NoContinuationUnit
+                    | DeferredResponseSubCase::ContinuationBodyTail => false,
+                }
             };
             if !owns_seat {
                 continue;
@@ -864,6 +873,19 @@ fn inline_synthesized_seat_emission_owners(
                 continue;
             };
             owners.push(owner);
+        }
+        // (e) A Vis returned by a K context is performed by its response
+        // owner's pending-Vis loop under the successor row's base owner
+        // (units.rs emit_pending_vis_owner_loop: AmbientBodyAuthority::bind(
+        // row.base_owner(), ..)). Read the same rows lowering reads.
+        if let Some(protocol) = plan.pending_vis_settlements.protocol.as_ref() {
+            owners.extend(
+                protocol
+                    .members
+                    .values()
+                    .filter(|row| row.effect_origin() == seat)
+                    .map(|row| row.base_owner()),
+            );
         }
     }
     owners.sort();
@@ -1109,8 +1131,8 @@ pub struct DeferredResponseObservation {
     pub operation_root_origin: u32,
     pub effect_origin: u32,
     pub operation: String,
-    /// "NoContinuationUnit" (P1) or "UnconsumedTransportCaller" (ineligible
-    /// or test-suppressed P2).
+    /// "NoContinuationUnit" (P1), "UnconsumedTransportCaller" (ineligible
+    /// or test-suppressed P2), or "ContinuationBodyTail" (no consumer seat).
     pub sub_case: String,
     /// The K's capture / continuation-input counts (P2 from the demand, P1
     /// zero). Eligible-plane has-K census comes from Specialized rows.

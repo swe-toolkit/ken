@@ -376,6 +376,44 @@ fn sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines() {
     });
 }
 
+/// Promise class: transition sentinel. The span fixture's completed plan
+/// records eight installed Specialized rows and its one deferred Vis.
+/// MEASURED: the real build produces a linked artifact and planner diagnostics.
+/// CLAIMED: owner 6 and Vis1079 keep their distinct planning dispositions.
+/// THE GAP: compilation does not prove native execution; the native row remains
+/// ignored until the successor settles its returned-Vis route.
+#[cfg(target_os = "linux")]
+#[test]
+fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
+    in_large_stack_thread("rchain-span-diagnostic", || {
+        let root = output_dir("sp-a-freeze");
+        std::fs::write(root.path().join("spanseed.bin"), b"AAAABBBB").unwrap();
+        let (built, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+            ken_cli::build_native_program(
+                SP_A_FREEZE, ken_cli::SourceFormat::Ken,
+                "rt_span_prov_sp_a_freeze", root.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        });
+        let _output = built.expect("the completed span plan must compile");
+        assert_eq!(diagnostics.len(), 1, "the completed plan records its diagnostics");
+        let plan = &diagnostics[0];
+        assert_eq!(plan.all_static_response_rows.len(), 8, "all specialized rows remain recorded");
+        assert_eq!(plan.static_response_owners.len(), 8, "every installed owner remains recorded");
+        let owner_six = plan.static_response_owners.iter().find(|owner| owner.owner == 6)
+            .expect("owner 6 stays specialized");
+        let owner_six_row = plan.all_static_response_rows.get(owner_six.response as usize)
+            .expect("owner 6 must name an installed response row");
+        assert_eq!(owner_six_row.vis_origin, 744, "fixture-local owner 6 Vis");
+        assert_eq!(owner_six_row.base_owner, owner_six.base_owner,
+            "owner 6 must match its specialized response row");
+        assert!(matches!(plan.static_response_deferred.as_slice(), [row]
+            if row.vis_origin == 1079 && row.sub_case == "ContinuationBodyTail"
+                && row.handler_owner.is_none()),
+            "Vis1079 stays Deferred with no handler owner: {:?}", plan.static_response_deferred);
+    });
+}
+
 // SP-A write consumer (foreign arm). A minimal 4-bracket program: read span_a
 // from buffer A, then `writeAt dest B span_a` — a foreign-acquisition span on
 // target B. B is never read: a foreign write is rejected on the shared-host
