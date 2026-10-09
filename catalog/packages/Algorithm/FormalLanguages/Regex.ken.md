@@ -32,9 +32,10 @@ enters Ω. The shared `list_concat` and `list_all` operations are imported
 from `Data.Collections.Derived`; the Boolean truth lemmas are imported from
 `Core.Classes.LawfulClasses`, not redefined for this matcher.
 
-`nullable` checks the empty word structurally. `deriv` returns an expression
-whose language is the left quotient by a supplied symbol. Only it and
-`regex_matches` require an explicit decidable equality dictionary.
+`regex_matches` decides a finite word by deriving for each symbol, then
+checking nullability. `deriv` returns an expression for a left quotient;
+`nullable` checks the empty word structurally. The matcher and derivative
+require an explicit decidable equality dictionary; nullability does not.
 
 ```ken
 import Data.Collections.Derived (list_append, list_concat, list_all)
@@ -95,6 +96,22 @@ pub fn regex_lang (a : Type) (r : Regex a) : List a → Omega =
     Star r1 ↦ λw. (‖ Pieces a (regex_lang a r1) w ‖)
   }
 
+pub fn regex_matches (a : Type) (d : DecEq a) (r : Regex a) (w : List a) : Bool =
+  match w {
+    Nil ↦ nullable a r;
+    Cons x rest ↦ regex_matches a d (deriv a d x r) rest
+  }
+
+pub fn deriv (a : Type) (d : DecEq a) (x : a) (r : Regex a) : Regex a =
+  match r {
+    Fail ↦ Fail a;
+    Eps ↦ Fail a;
+    Sym c ↦ guard a (d.eq x c) (Eps a);
+    Alt r1 r2 ↦ Alt a (deriv a d x r1) (deriv a d x r2);
+    Cat r1 r2 ↦ Alt a (Cat a (deriv a d x r1) r2) (guard a (nullable a r1) (deriv a d x r2));
+    Star r1 ↦ Cat a (deriv a d x r1) (Star a r1)
+  }
+
 pub fn nullable (a : Type) (r : Regex a) : Bool =
   match r {
     Fail ↦ False;
@@ -109,22 +126,6 @@ fn guard (a : Type) (b : Bool) (t : Regex a) : Regex a =
   match b {
     True ↦ t;
     False ↦ Fail a
-  }
-
-pub fn deriv (a : Type) (d : DecEq a) (x : a) (r : Regex a) : Regex a =
-  match r {
-    Fail ↦ Fail a;
-    Eps ↦ Fail a;
-    Sym c ↦ guard a (d.eq x c) (Eps a);
-    Alt r1 r2 ↦ Alt a (deriv a d x r1) (deriv a d x r2);
-    Cat r1 r2 ↦ Alt a (Cat a (deriv a d x r1) r2) (guard a (nullable a r1) (deriv a d x r2));
-    Star r1 ↦ Cat a (deriv a d x r1) (Star a r1)
-  }
-
-pub fn regex_matches (a : Type) (d : DecEq a) (r : Regex a) (w : List a) : Bool =
-  match w {
-    Nil ↦ nullable a r;
-    Cons x rest ↦ regex_matches a d (deriv a d x r) rest
   }
 ```
 
@@ -182,26 +183,6 @@ fn list_tail (a : Type) (l : List a) : List a =
     Nil ↦ Nil a;
     Cons y ys ↦ ys
   }
-
-theorem head_cong
-      (a : Type) (dflt : a) (l1 : List a) (l2 : List a) (e : Equal (List a) l1 l2)
-    : Equal a (list_head_or a dflt l1) (list_head_or a dflt l2) =
-  J (λl _. Equal a (list_head_or a dflt l1) (list_head_or a dflt l)) Refl e
-
-theorem tail_cong
-      (a : Type) (l1 : List a) (l2 : List a) (e : Equal (List a) l1 l2)
-    : Equal (List a) (list_tail a l1) (list_tail a l2) =
-  J (λl _. Equal (List a) (list_tail a l1) (list_tail a l)) Refl e
-
-theorem transport_lang
-      (a : Type)
-      (p : List a → Omega)
-      (u : List a)
-      (v : List a)
-      (e : Equal (List a) u v)
-      (pu : p u)
-    : p v =
-  J (λv2 _. p v2) pu e
 
 theorem guard_intro
       (a : Type) (b : Bool) (t : Regex a) (w : List a)
@@ -315,12 +296,18 @@ pub theorem nullable_complete
                   (nullable_complete
                     a
                     r1
-                    (transport_lang a (regex_lang a r1) u (Nil a) (append_nil_left a u v e) pu))
+                    (transport_any
+                      (List a)
+                      (regex_lang a r1)
+                      u
+                      (Nil a)
+                      (append_nil_left a u v e)
+                      pu))
                   (nullable_complete
                     a
                     r2
-                    (transport_lang
-                      a
+                    (transport_any
+                      (List a)
                       (regex_lang a r2)
                       v
                       (Nil a)
@@ -525,7 +512,13 @@ theorem cat_split
                       w
                       u2
                       v
-                      (tail_cong a (Cons a y (list_append a u2 v)) (Cons a x w) e)
+                      (cong
+                        (List a)
+                        (List a)
+                        (Cons a y (list_append a u2 v))
+                        (Cons a x w)
+                        (list_tail a)
+                        e)
                       (ih1
                         u2
                         (transport_any
@@ -533,7 +526,13 @@ theorem cat_split
                           (λz. regex_lang a r1 (Cons a z u2))
                           y
                           x
-                          (head_cong a y (Cons a y (list_append a u2 v)) (Cons a x w) e)
+                          (cong
+                            (List a)
+                            a
+                            (Cons a y (list_append a u2 v))
+                            (Cons a x w)
+                            (list_head_or a y)
+                            e)
                           p))
                       q)))
   }
@@ -581,10 +580,12 @@ theorem star_split
                             w
                             u2
                             (list_concat a rest)
-                            (tail_cong
-                              a
+                            (cong
+                              (List a)
+                              (List a)
                               (Cons a y (list_append a u2 (list_concat a rest)))
                               (Cons a x w)
+                              (list_tail a)
                               e)
                             (ih1
                               u2
@@ -593,11 +594,12 @@ theorem star_split
                                 (λz. regex_lang a r1 (Cons a z u2))
                                 y
                                 x
-                                (head_cong
+                                (cong
+                                  (List a)
                                   a
-                                  y
                                   (Cons a y (list_append a u2 (list_concat a rest)))
                                   (Cons a x w)
+                                  (list_head_or a y)
                                   e)
                                 p))
                             (trunc_intro
