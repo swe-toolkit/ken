@@ -671,6 +671,9 @@ home with the `DecEq` class. Both lift the supplied element dictionaries
 directly: their comparisons remain neutral at abstract elements, and their
 proofs therefore route through the supplied `sound` and `complete` fields
 rather than treating a dictionary operation as if it reduced by itself.
+The five public `or_left`, `or_right`, `or_cases`, `and_true`, and
+`and_cases` lemmas expose Boolean truth introduction and elimination for
+clients that use these ordinary `bool_or` and `bool_and` functions.
 
 ```ken
 pub fn bool_and (a : Bool) (b : Bool) : Bool =
@@ -757,6 +760,42 @@ pub proof right_identity for bool_and (a : Bool) : Equal Bool (bool_and a True) 
   match a {
     True ↦ Proved;
     False ↦ Proved
+  }
+
+pub theorem or_left (b : Bool) (c : Bool) : Equal Bool b True → Equal Bool (bool_or b c) True =
+  match b {
+    True ↦ λhb. Proved;
+    False ↦ λhb. absurd hb
+  }
+
+pub theorem or_right (b : Bool) (c : Bool) : Equal Bool c True → Equal Bool (bool_or b c) True =
+  match b {
+    True ↦ λhc. Proved;
+    False ↦ λhc. hc
+  }
+
+pub theorem or_cases
+      (b : Bool) (c : Bool) (g : Omega)
+    : Equal Bool (bool_or b c) True → (Equal Bool b True → g) → (Equal Bool c True → g) → g =
+  match b {
+    True ↦ λh. λl. λr. l Proved;
+    False ↦ λh. λl. λr. r h
+  }
+
+pub theorem and_true
+      (b : Bool) (c : Bool)
+    : Equal Bool b True → Equal Bool c True → Equal Bool (bool_and b c) True =
+  match b {
+    True ↦ λhb. λhc. hc;
+    False ↦ λhb. λhc. absurd hb
+  }
+
+pub theorem and_cases
+      (b : Bool) (c : Bool) (g : Omega)
+    : Equal Bool (bool_and b c) True → (Equal Bool b True → Equal Bool c True → g) → g =
+  match b {
+    True ↦ λh. λk. k Proved h;
+    False ↦ λh. λk. absurd h
   }
 
 fn compare_second_result (b : Bool) : OrdResult =
@@ -2774,7 +2813,8 @@ Ken-native; no external reference implementation informed its source.
 2. **Public API.** `IsTrue`, `class DecEq`, `bool_eq`, `bool_and`,
    `bool_and::intro`, `bool_and::comm`, `bool_and::assoc`,
    `bool_and::idempotent`, `bool_and::left_identity`,
-   `bool_and::right_identity`, `bool_or`, `bool_not`, `class Ord`, `leq_nat`,
+   `bool_and::right_identity`, `bool_or`, `bool_not`, `or_left`, `or_right`,
+   `or_cases`, `and_true`, `and_cases`, `class Ord`, `leq_nat`,
    `leq_nat::refl`, `leq_nat::trans`,
    `leq_nat::antisym`, `bool_or::eq_true_of_or`, `instance Ord Nat`,
    `instance DecEq Int`, `instance Ord Int`, `instance Ord Bool`,

@@ -71,6 +71,8 @@ import Core.Logic.Compare (list_compare, list_eq)
 
 import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)
 
+import Core.Logic.And as Conj
+
 import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.OrdResult
@@ -96,6 +98,18 @@ pub fn list_append (a : Type) (xs : List a) (ys : List a) : List a =
   match xs {
     Nil ↦ ys;
     Cons x xs2 ↦ Cons a x (list_append a xs2 ys)
+  }
+
+pub fn list_concat (a : Type) (ws : List (List a)) : List a =
+  match ws {
+    Nil ↦ Nil a;
+    Cons u rest ↦ list_append a u (list_concat a rest)
+  }
+
+pub fn list_all (t : Type) (p : t → Omega) (xs : List t) : Omega =
+  match xs {
+    Nil ↦ Equal Bool True True;
+    Cons y rest ↦ (‖ Conj.And (p y) (list_all t p rest) ‖)
   }
 
 pub fn nth (a : Type) (n : Nat) (xs : List a) : Option a =
@@ -128,6 +142,11 @@ fn drop (a : Type) (n : Nat) (xs : List a) : List a =
       }
   }
 ```
+
+`list_concat` flattens a list of lists without choosing a special element
+or altering their order. `list_all` demands a proposition for every element,
+with truncated conjunction preserving its Ω result. Both support finite-word
+regular-expression denotation without deciding element equality.
 
 Membership in a generic list is an Ω proposition rather than a Boolean test
 or a position. Its truncated disjunction permits proofs about members without
@@ -2833,7 +2852,8 @@ reference implementation.
    §2.5.1/§4.1`; WP `L3-strings-surface` (this package, slice 2/2);
    `L3-strings-roundtrip` (slice 1, the native round trip this rides).
 2. **Public API.** Operations: `bytes_nat_length`, `concat_map`, `count`,
-   `eq_from_ord`, `filter`, `length`, `list_append`, `map`, `nth`, `reverse`.
+   `eq_from_ord`, `filter`, `length`, `list_append`, `list_concat`, `list_all`,
+   `map`, `nth`, `reverse`.
    Attached proofs: `list_append::assoc`, `list_append::left_unit`,
    `list_append::right_unit`, `list_append::length`, `map::append`,
    `map::fusion`, `map::id`, `nth::at_or_beyond_is_none`,
@@ -2880,10 +2900,12 @@ reference implementation.
    splits the bound and the list. The two conditional string count laws lift
    their view equalities with `cong` and compose the corresponding generic
    append/take/drop length laws; the view lemmas pass their explicit list
-   round-trip premises through the transparent string definitions. Private
-   `concat_map_append` lifts the IH under `list_append` and uses
-   `list_append::assoc` in reverse. The `nth` bounds proofs split the list
-   before the index so lookup, length, and order reduce together. `§4.3`:
+   round-trip premises through the transparent string definitions.
+   `list_concat` folds nested lists with `list_append`; `list_all` builds an
+   Ω-valued conjunction through `Core.Logic.And`. `concat_map_append` lifts
+   the IH under `list_append` and uses `list_append::assoc` in reverse.
+   The `nth` bounds proofs split the list before the index so lookup,
+   length, and order reduce together. `§4.3`:
    generic `insert::count` preserves every count with any comparator and
    `sort::perm` composes the tail and insertion equalities. The generic
    `insert::sorted` and `sort::sorted` use only comparator totality; private
@@ -2901,9 +2923,11 @@ reference implementation.
    these and `map::append` through a qualified alias, while
    `Capability.Parsing.Parsing` uses `map::append` for byte-code lists.
    Derived's `map_length` and filter-membership laws use its structural
-   operations locally. `Application.Configuration.Decoder`
-   imports this module wholesale. `catalog/packages/Data/Collections/Map.ken`
-   (the proved `Map`/`Set` BST) depends on its `list_append`.
+   operations locally. `Algorithm.FormalLanguages.Regex` imports
+   `list_concat` and `list_all` for concatenation and repetition evidence.
+   `Application.Configuration.Decoder` imports this module wholesale.
+   `catalog/packages/Data/Collections/Map.ken` (the proved `Map`/`Set`
+   BST) depends on its `list_append`.
    `crates/ken-elaborator/tests/cat1_lawful_functors_package.rs`,
    `ds3_sum_combinators_acceptance.rs`, `ds4_list_combinators_acceptance.rs`,
    `ds7_applicative_monad_acceptance.rs`, `ds8_traversable_acceptance.rs`,
