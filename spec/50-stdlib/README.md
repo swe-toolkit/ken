@@ -229,8 +229,13 @@ finite repetition evidence, a derivative matcher using an explicit
 `DecEq a`, and six checked soundness/completeness laws. It depends on shared
 list concatenation/all-elements tools and Bool-truth lemmas in their owning
 packages, with no automaton conversion in this contract. Specifying §4
-does not claim its catalog build has landed. Equivalence/minimisation and
-the lexer byte bridge remain deferred.
+does not claim its catalog build has landed. Section 5 specifies Dfa
+language equivalence via a finite disagreement product and minimisation
+by canonical representatives **within `q`**, with eight checked laws.
+Neither decision requires `DecEq q`; only the named-state reachability
+and stronger state-count constructions remain deferred. The lexer byte
+bridge remains deferred. Specifying §5 does not claim its catalog build
+has landed.
 
 ## 4. I/O, effects, serialization
 
