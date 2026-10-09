@@ -58,8 +58,8 @@ fn sources(pre: &str, first: &str, second: &str, layout: u8) -> Vec<(&'static st
 /// six R1 rows and three const-before-instance R2 rows refuse with the same
 /// typed, sorted declaration descriptions across three file layouts. CLAIMED:
 /// an elaborator-minted name cannot replace an unrelated checked identity
-/// without a loud error. THE GAP: a later user-spelled or constructor binding
-/// is outside this guard; successor residual rows below make that explicit.
+/// without a loud error. THE GAP: reverse-order user-spelled insertions and
+/// constructors have separate controls in this suite and the successor.
 #[test]
 fn minted_named_identity_refuses_all_nine_collision_rows() {
     let mut failures = Vec::new();
@@ -87,7 +87,7 @@ fn minted_named_identity_refuses_all_nine_collision_rows() {
         for layout in 1..=3 {
             for (order, first_source, second_source) in [("ab", a, b), ("ba", b, a)] {
                 if case == "R2" && order == "ab" {
-                    continue; // Later user-spelled const: successor residual, not a refusal.
+                    continue; // The opposite R2 order is tested separately below.
                 }
                 checked += 1;
                 let label = format!("{case}: {layout} file(s), {order}");
@@ -129,28 +129,25 @@ fn minted_named_identity_refuses_all_nine_collision_rows() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
-/// Promise class: transition sentinel until VERIFY-GLOBALS-IDENTITY-CHECKED-
-/// INSERT changes user-spelled insertion. MEASURED: the reverse R2 order is
-/// still admitted in each file layout with only one obligation, an ordinal
-/// dictionary fallback, and the pre-guard core hash. CLAIMED: this residual
-/// is visible, not a success of the minted-key guard. THE GAP: the other
-/// order now refuses and has no post-repair hash to compare; the historical
-/// `ba` hash differs (evt_15k31thzp9j03). Retire at successor landing.
+/// Promise class: durable invariant (33 §5; checked-core §3.2). MEASURED:
+/// a user-spelled const following a checked dictionary refuses in one-, two-
+/// and three-file layouts, naming both identities. CLAIMED: reversing R2
+/// cannot silently displace the dictionary's flat key. THE GAP: only the
+/// const-after-instance direction is tested here; the predecessor's nine
+/// rows separately cover the opposite direction and R1.
 #[test]
-fn successor_residual_user_const_after_minted_dictionary_still_overwrites() {
+fn user_const_after_minted_dictionary_refuses_in_every_layout() {
     for layout in 1..=3 {
-        let package = compile(&sources(R2_PRE, R2_A, R2_B, layout))
-            .expect("later user-spelled const still overwrites minted binding");
-        let semantic = &package.artifact.semantic;
-        assert_eq!(semantic.obligations.len(), 1, "{layout} file(s)");
-        assert_eq!(semantic.obligation_metadata.len(), 1, "{layout} file(s)");
-        assert!(semantic.declarations.contains_key(&decl("Lbl_instance_A")));
-        assert!(
-            semantic
-                .declarations
-                .contains_key(&decl("Lbl_instance_A#1"))
-        );
-        assert_eq!(package.core_semantic_hash, 0x6329_57b6_b846_ba73);
+        match compile(&sources(R2_PRE, R2_A, R2_B, layout)) {
+            Err(CompilerDriverError::Elaboration(
+                ElabError::DeclarationIdentityCollision { identity, first, second, .. },
+            )) => {
+                assert_eq!(identity, "Lbl_instance_A", "{layout} file(s)");
+                assert_eq!(first, "const Lbl_instance_A", "{layout} file(s)");
+                assert_eq!(second, "instance Lbl A", "{layout} file(s)");
+            }
+            other => panic!("{layout} file(s): wrong result {other:?}"),
+        }
     }
 }
 
@@ -195,7 +192,7 @@ fn distinct_named_instance_identities_keep_both_obligations_and_hash() {
 /// `derive` cannot mint its dictionary identity onto a preexisting class,
 /// data declaration or const. CLAIMED: the canonical importable binding is
 /// exclusive when minted. THE GAP: the reverse order (user-spelled binding
-/// second) is the separate successor residual, not a protected path.
+/// second) is asserted in a separate test below.
 #[test]
 fn minted_dictionary_refuses_a_prior_class_type_or_const_identity() {
     let pre = "class E a { }\ndata A = MkA\n";
@@ -242,18 +239,18 @@ fn minted_dictionary_refuses_a_prior_class_type_or_const_identity() {
     }
 }
 
-/// Promise class: transition sentinel until VERIFY-GLOBALS-IDENTITY-CHECKED-
-/// INSERT routes later user-spelled insertions. MEASURED: a class, data
-/// declaration or const checked after a named dictionary still replaces that
-/// flat globals key. CLAIMED: this is the remaining insertion-side defect.
-/// THE GAP: same-spelling constructors were measured separately in AC-0.
+/// Promise class: durable invariant (33 §5). MEASURED: a later class, data
+/// former or const cannot displace a minted dictionary and leaves the prior
+/// checked key bound. CLAIMED: declaration identity is independent of which
+/// source kind comes second. THE GAP: constructor, law-field and space-op
+/// collisions are exercised by the successor's independent suite.
 #[test]
-fn successor_residual_user_declarations_after_dictionary_still_rebind() {
+fn user_declarations_after_dictionary_refuse_and_preserve_prior_key() {
     let pre = "class E a { }\ndata A = MkA\n";
-    for (dictionary, other) in [
-        ("instance E A { }", "class E_instance_A b { }"),
-        ("instance E A { }", "data E_instance_A = MkE"),
-        ("derive E for A", "const E_instance_A : Int = 0"),
+    for (dictionary, other, expected_dictionary, expected_other) in [
+        ("instance E A { }", "class E_instance_A b { }", "instance E A", "class E_instance_A"),
+        ("instance E A { }", "data E_instance_A = MkE", "instance E A", "data E_instance_A"),
+        ("derive E for A", "const E_instance_A : Int = 0", "derive E for A", "const E_instance_A"),
     ] {
         let mut env = ElabEnv::new().expect("prelude");
         let first = env
@@ -261,11 +258,18 @@ fn successor_residual_user_declarations_after_dictionary_still_rebind() {
             .expect("dictionary initially admitted");
         let old_id = first.last().expect("dictionary result").def_id;
         assert_eq!(env.globals["E_instance_A"], old_id);
-        let later = env
-            .elaborate_decl_v1(other)
-            .expect("later user-spelled declaration currently admits");
-        assert_ne!(later.def_id, old_id);
-        assert_eq!(env.globals["E_instance_A"], later.def_id);
+        let error = env.elaborate_decl_v1(other)
+            .expect_err("a user-spelled declaration may not replace a minted dictionary");
+        let mut expected = [expected_dictionary, expected_other];
+        expected.sort();
+        match error {
+            ElabError::DeclarationIdentityCollision { identity, first, second, .. } => {
+                assert_eq!(identity, "E_instance_A");
+                assert_eq!([first.as_str(), second.as_str()], expected);
+            }
+            other => panic!("wrong error {other:?}"),
+        }
+        assert_eq!(env.globals["E_instance_A"], old_id);
     }
 }
 

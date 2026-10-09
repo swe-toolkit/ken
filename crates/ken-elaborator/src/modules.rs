@@ -3353,84 +3353,219 @@ fn describe_checked_declaration(rdecl: &RDecl) -> String {
     }
 }
 
+fn declared_identities(
+    rdecl: &RDecl,
+    owner: &str,
+    minted: Option<MintedSpelling>,
+) -> Vec<DeclaredIdentity> {
+    let source = || DeclaredIdentity {
+        key: rdecl.name.clone(),
+        provenance: IdentityProvenance::Source,
+        description: describe_checked_declaration(rdecl),
+    };
+    match &rdecl.kind {
+        RDeclKind::View { .. }
+        | RDeclKind::Let
+        | RDeclKind::Prove
+        | RDeclKind::Theorem
+        | RDeclKind::AttachedProof { .. }
+        | RDeclKind::TypeAlias { .. }
+        | RDeclKind::Foreign { .. }
+        | RDeclKind::Temporal { .. }
+        | RDeclKind::RecordDecl { .. }
+        | RDeclKind::ClassDecl { .. } => vec![source()],
+        RDeclKind::Prop { intros } => std::iter::once(source())
+            .chain(intros.iter().map(|intro| DeclaredIdentity {
+                key: format!("{}.{}", rdecl.name, intro.name),
+                provenance: IdentityProvenance::Source,
+                description: format!("introduction {} of prop {}", intro.name, rdecl.name),
+            }))
+            .collect(),
+        RDeclKind::DataDecl { ctors, .. } => std::iter::once(source())
+            .chain(ctors.iter().map(|ctor| DeclaredIdentity {
+                key: ctor.name.clone(),
+                provenance: IdentityProvenance::Source,
+                description: format!("constructor {} of data {}", ctor.name, rdecl.name),
+            }))
+            .collect(),
+        RDeclKind::ExplicitDataDecl { ctors, .. } => std::iter::once(source())
+            .chain(ctors.iter().map(|ctor| DeclaredIdentity {
+                key: ctor.name.clone(),
+                provenance: IdentityProvenance::Source,
+                description: format!("constructor {} of data {}", ctor.name, rdecl.name),
+            }))
+            .collect(),
+        RDeclKind::Law { fields, .. } => std::iter::once(source())
+            .chain(fields.iter().map(|(field, _)| DeclaredIdentity {
+                key: format!("{}_{}", rdecl.name, field),
+                provenance: IdentityProvenance::Minted(MintedSpelling::LawField {
+                    law: rdecl.name.clone(),
+                    field: field.clone(),
+                }),
+                description: format!("law field {}.{}", rdecl.name, field),
+            }))
+            .collect(),
+        RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. } => {
+            vec![DeclaredIdentity {
+                key: owner.to_string(),
+                provenance: minted.map_or(IdentityProvenance::Source, IdentityProvenance::Minted),
+                description: describe_checked_declaration(rdecl),
+            }]
+        }
+    }
+}
+
+fn displacement_lawful(prior: &IdentityProvenance, new: &IdentityProvenance) -> bool {
+    match (prior, new) {
+        (IdentityProvenance::Source, IdentityProvenance::Source) => true,
+        (IdentityProvenance::Minted(a), IdentityProvenance::Minted(b)) => a == b,
+        (IdentityProvenance::Source, IdentityProvenance::Minted(_))
+        | (IdentityProvenance::Minted(_), IdentityProvenance::Source) => false,
+    }
+}
+
+fn same_instance_key(
+    elab: &ElabEnv,
+    provenance: &IdentityProvenance,
+    previous: &PreviousIdentity,
+    current: ken_kernel::GlobalId,
+) -> bool {
+    matches!(provenance, IdentityProvenance::Minted(MintedSpelling::Dictionary { .. }))
+        && previous.instance_key.as_ref().is_some_and(|key| {
+            elab.class_env
+                .instances_by_id
+                .get(key)
+                .is_some_and(|info| info.instance_id == current)
+        })
+}
+
+fn check_declared_identities(
+    elab: &mut ElabEnv,
+    first_new: ken_kernel::GlobalId,
+    span: &Span,
+    previous: &[PreviousIdentity],
+) -> Result<(), ElabError> {
+    let mut undeclared = elab
+        .globals
+        .iter()
+        .filter(|(key, id)| {
+            id.0 >= first_new.0 && !previous.iter().any(|entry| &entry.declared.key == *key)
+        })
+        .map(|(key, _)| key.clone())
+        .collect::<Vec<_>>();
+    if !undeclared.is_empty() {
+        undeclared.sort();
+        return Err(ElabError::Internal(format!(
+            "declaration bound undeclared identity keys {undeclared:?}"
+        )));
+    }
+    for entry in previous {
+        let identity = &entry.declared;
+        match (entry.id, elab.globals.get(&identity.key).copied()) {
+            (_, None) => {
+                return Err(ElabError::Internal(format!(
+                    "declared identity `{}` was not bound", identity.key
+                )));
+            }
+            (None, Some(_)) => {}
+            (Some(prior), Some(current)) if prior == current => {}
+            (Some(prior), Some(current)) => {
+                let prior_provenance = match elab.module_state.minted_spellings.get(&prior) {
+                    Some(spelling) => IdentityProvenance::Minted(spelling.clone()),
+                    None => IdentityProvenance::Source,
+                };
+                if !displacement_lawful(&prior_provenance, &identity.provenance)
+                    && !same_instance_key(elab, &identity.provenance, entry, current)
+                {
+                    let mut declarations = [
+                        elab.module_state.declaration_descriptions.get(&prior).cloned()
+                            .unwrap_or_else(|| format!("declaration {}", identity.key)),
+                        identity.description.clone(),
+                    ];
+                    declarations.sort();
+                    return Err(ElabError::DeclarationIdentityCollision {
+                        identity: identity.key.clone(),
+                        first: declarations[0].clone(),
+                        second: declarations[1].clone(),
+                        span: span.clone(),
+                    });
+                }
+            }
+        }
+    }
+    for entry in previous {
+        let identity = &entry.declared;
+        let id = elab.globals[&identity.key];
+        elab.module_state
+            .declaration_descriptions
+            .insert(id, identity.description.clone());
+        if let IdentityProvenance::Minted(spelling) = &identity.provenance {
+            elab.module_state.minted_spellings.insert(id, spelling.clone());
+        }
+    }
+    Ok(())
+}
+
+/// One declaration window checks the complete set of keys its operation bound.
+/// Failed elaboration restores any earlier checked provider displaced at a
+/// declared key, including failures that occur before identity checking.
+fn with_declaration_identities<T>(
+    elab: &mut ElabEnv,
+    owner: String,
+    span: Span,
+    declared: Vec<DeclaredIdentity>,
+    operation: impl FnOnce(&mut ElabEnv) -> Result<T, ElabError>,
+) -> Result<T, ElabError> {
+    let first_new = elab.env.next_global_id();
+    let previous = declared
+        .into_iter()
+        .map(|identity| {
+            let id = elab.globals.get(&identity.key).copied();
+            let instance_key = id.and_then(|id| {
+                elab.class_env.instances_by_id.iter().find_map(|(key, info)| {
+                    (info.instance_id == id).then(|| key.clone())
+                })
+            });
+            PreviousIdentity { declared: identity, id, instance_key }
+        })
+        .collect::<Vec<_>>();
+    let result = elab.with_owner(owner, |elab| {
+        elab.with_env_mark_rollback(|elab| {
+            let value = operation(elab)?;
+            check_declared_identities(elab, first_new, &span, &previous)?;
+            Ok(value)
+        })
+    });
+    if result.is_err() {
+        // Rollback removes freshly checked IDs, but cannot recreate an old
+        // overwritten key or scrub a fresh ID never committed to the kernel.
+        for entry in &previous {
+            let current = elab.globals.get(&entry.declared.key).copied();
+            if current.is_none_or(|id| id.0 >= first_new.0) {
+                match entry.id {
+                    Some(prior) => { elab.globals.insert(entry.declared.key.clone(), prior); }
+                    None => { elab.globals.remove(&entry.declared.key); }
+                }
+            }
+        }
+    }
+    result
+}
+
 fn elaborate_checked_as(
     elab: &mut ElabEnv,
-    rdecl: &crate::resolve::RDecl,
+    rdecl: &RDecl,
     owner: String,
     minted: Option<MintedSpelling>,
     declared_fixity: Option<&PendingFixity>,
 ) -> Result<crate::elab::ElabResult, ElabError> {
-    // A later source unit may lawfully rebind a user-spelled name. A minted
-    // identity checks the prior provider's derivation, not just its spelling.
-    let previous = if minted.is_some() {
-        elab.globals.get(&owner).copied()
-    } else {
-        None
-    };
-    let previous_minted =
-        previous.and_then(|id| elab.module_state.minted_spellings.get(&id).cloned());
-    let previous_instance_key = previous.and_then(|id| {
-        elab.class_env
-            .instances_by_id
-            .iter()
-            .find_map(|(key, info)| (info.instance_id == id).then(|| key.clone()))
-    });
-    let previous_description = previous.map(|id| {
-        elab.module_state
-            .declaration_descriptions
-            .get(&id)
-            .cloned()
-            .unwrap_or_else(|| format!("declaration {owner}"))
-    });
-    elab.with_owner(owner.clone(), |elab| {
-        elab.with_env_mark_rollback(|elab| {
-            let result = if declared_fixity.is_none() && !rdecl.contains_infix_spine {
-                elaborate_checked_spine_free(elab, rdecl)
-            } else {
-                elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
-            }?;
-            if let Some(previous) = previous {
-                let same_instance_key = matches!(
-                    rdecl.kind,
-                    RDeclKind::InstanceDecl { .. } | RDeclKind::DeriveDecl { .. }
-                ) && previous_instance_key.as_ref().is_some_and(|key| {
-                    elab.class_env
-                        .instances_by_id
-                        .get(key)
-                        .is_some_and(|info| info.instance_id == result.def_id)
-                });
-                // A later owner may replace a minted key if both names came
-                // from the same canonical class/head spelling pair. The old
-                // checked dictionary remains in the identity-keyed registry.
-                let rebound_spelling = previous_minted.is_some() && previous_minted == minted;
-                if previous != result.def_id && !same_instance_key && !rebound_spelling {
-                    // Elaboration has already inserted the new dictionary at
-                    // this key. Restore the checked predecessor before the
-                    // environment mark rolls back the new GlobalId.
-                    elab.globals.insert(owner.clone(), previous);
-                    let mut declarations = [
-                        previous_description.expect("description captured with previous ID"),
-                        describe_checked_declaration(rdecl),
-                    ];
-                    declarations.sort();
-                    return Err(ElabError::DeclarationIdentityCollision {
-                        identity: owner.clone(),
-                        first: declarations[0].clone(),
-                        second: declarations[1].clone(),
-                        span: rdecl.span.clone(),
-                    });
-                }
-            }
-            elab.module_state
-                .declaration_descriptions
-                .insert(result.def_id, describe_checked_declaration(rdecl));
-            if let Some(spelling) = minted {
-                elab.module_state
-                    .minted_spellings
-                    .insert(result.def_id, spelling);
-            }
-            Ok(result)
-        })
+    let declared = declared_identities(rdecl, &owner, minted);
+    with_declaration_identities(elab, owner, rdecl.span.clone(), declared, |elab| {
+        if declared_fixity.is_none() && !rdecl.contains_infix_spine {
+            elaborate_checked_spine_free(elab, rdecl)
+        } else {
+            elaborate_checked_with_fixity(elab, rdecl, declared_fixity)
+        }
     })
 }
 
@@ -3607,13 +3742,36 @@ fn canonical_leaf(name: &str) -> &str {
     name.rsplit('.').next().unwrap_or(name)
 }
 
-/// The canonical spelling pair an elaborator-minted identity was derived
-/// from. Equal pairs with distinct checked IDs are a later owner rebinding
-/// the same spelling; distinct pairs minting one key are a collision.
+/// Provenance of a name constructed by elaboration rather than spelled by a
+/// source declaration. Only equal constructors with equal fields may rebind.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct MintedSpelling {
-    class: String,
-    head: String,
+enum MintedSpelling {
+    Dictionary { class: String, head: String },
+    LawField { law: String, field: String },
+    SpaceOperation { space: String, operation: String },
+}
+
+/// Minted: a consumer resolves the key by flat spelling. Source: every
+/// consumer reaches it through an owner's interface (spec 33 §3.1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum IdentityProvenance {
+    Source,
+    Minted(MintedSpelling),
+}
+
+/// One identity key a source declaration promises to bind in its window.
+struct DeclaredIdentity {
+    key: String,
+    provenance: IdentityProvenance,
+    description: String,
+}
+
+/// The instance key must be captured before elaboration replaces its registry
+/// entry; afterwards a property-class duplicate may point only to the new ID.
+struct PreviousIdentity {
+    declared: DeclaredIdentity,
+    id: Option<ken_kernel::GlobalId>,
+    instance_key: Option<(ken_kernel::GlobalId, crate::classes::InstanceHeadKey)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -4522,9 +4680,23 @@ fn expand_scope(
                 }
                 let resolved =
                     resolve::resolve_space_decl(&qualified_name, cells, operations, span)?;
-                let space_results = elab.with_owner(qualified_name, |elab| {
-                    elab.with_env_mark_rollback(|elab| elaborate_resolved_space(elab, &resolved))
-                })?;
+                let mut declared = vec![DeclaredIdentity {
+                    key: resolved.name.clone(),
+                    provenance: IdentityProvenance::Source,
+                    description: format!("space {}", resolved.name),
+                }];
+                declared.extend(resolved.operations.iter().map(|operation| DeclaredIdentity {
+                    key: format!("{}.{}", resolved.name, operation.name),
+                    provenance: IdentityProvenance::Minted(MintedSpelling::SpaceOperation {
+                        space: resolved.name.clone(),
+                        operation: operation.name.clone(),
+                    }),
+                    description: format!("space operation {}.{}", resolved.name, operation.name),
+                }));
+                let space_results = with_declaration_identities(
+                    elab, qualified_name, resolved.span.clone(), declared,
+                    |elab| elaborate_resolved_space(elab, &resolved),
+                )?;
                 ids.extend(space_results);
                 i += 1;
             }
@@ -4798,15 +4970,15 @@ fn expand_scope(
                         // Per-member signature/body allocations are attributed
                         // to each member's qualified name inside the group.
                         let group_owner = format!("mutual::{}", group_names.join("+"));
-                        let results = elab.with_owner(group_owner, |elab| {
-                            elab.with_env_mark_rollback(|elab| {
-                                elaborate_mutual_group_with_fixities(
-                                    elab,
-                                    &members,
-                                    &declared_fixities,
-                                )
-                            })
-                        })?;
+                        let declared = members.iter()
+                            .flat_map(|member| declared_identities(member, &member.name, None))
+                            .collect();
+                        let results = with_declaration_identities(
+                            elab, group_owner, members[0].span.clone(), declared,
+                            |elab| elaborate_mutual_group_with_fixities(
+                                elab, &members, &declared_fixities,
+                            ),
+                        )?;
                         for (rdecl, result) in members.iter().zip(results) {
                             register_effect_row(elab, &result);
                             register_declared_effect_row(elab, rdecl)?;
@@ -4957,11 +5129,11 @@ fn expand_scope(
                         |name| name.canonical.clone(),
                     );
                     let minted = match (&dictionary, &structural) {
-                        (Some(name), _) => Some(MintedSpelling {
+                        (Some(name), _) => Some(MintedSpelling::Dictionary {
                             class: name.class_canonical.clone(),
                             head: name.head_canonical.clone(),
                         }),
-                        (None, Some(symbol)) => Some(MintedSpelling {
+                        (None, Some(symbol)) => Some(MintedSpelling::Dictionary {
                             class: rdecl.name.clone(),
                             head: symbol.clone(),
                         }),
@@ -5188,6 +5360,35 @@ pub fn expand_and_elaborate(
     }
     elab.module_state.root_scope = scope;
     Ok(results)
+}
+
+#[cfg(test)]
+mod prop_intro_identity_tests {
+    use crate::ElabEnv;
+
+    /// Promise class: durable invariant. MEASURED: the checked Prop intro
+    /// helper is bound at its generated key with checked source provenance.
+    /// CLAIMED: the declaration window counts every helper as an identity,
+    /// not just its Prop parent. THE GAP: namespace and package gates exercise
+    /// reexport, duplicate-proof refusal, and other source-owner paths.
+    #[test]
+    fn prop_intro_helper_has_checked_minted_identity() {
+        let mut elab = ElabEnv::new().expect("prelude");
+        let family = elab
+            .elaborate_decl_v1("prop HasProof (a : Type) : Omega where { intro : HasProof a }")
+            .expect("Prop and intro are checked");
+        let helper = elab.globals["HasProof.intro"];
+        assert_ne!(family.def_id, helper);
+        assert!(elab.env.lookup(helper).is_some());
+        assert!(
+            !elab.module_state.minted_spellings.contains_key(&helper),
+            "a source helper resolves through its owner's interface",
+        );
+        assert_eq!(
+            elab.module_state.declaration_descriptions.get(&helper).map(String::as_str),
+            Some("introduction intro of prop HasProof"),
+        );
+    }
 }
 
 #[cfg(test)]
