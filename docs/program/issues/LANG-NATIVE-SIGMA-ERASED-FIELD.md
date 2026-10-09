@@ -50,6 +50,14 @@ base, stop and report the mismatch.
    Architect rules the representation from the D0.
 2. **The ruled representation** in relevant-Σ native lowering, for an
    erased field in either slot.
+3. **The predecessor's carries** (Architect `evt_5gxf52f58g5c7`), in the
+   same `erasure.rs` region:
+   - `checked_erased_argument_flags` (`erasure.rs:4659`) is defined and
+     never called. Wire its Ω binder and argument cross-check into
+     lowering, or delete it.
+   - The `omega_erasure_plan` doc says an unavailable expected type "is a
+     refusal". A bare `Lam` with no expectation is kept relevant instead;
+     correct the comment to say so.
 
 ## Acceptance
 

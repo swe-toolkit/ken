@@ -1,7 +1,7 @@
 ---
 id: VERIFY-GLOBALS-IDENTITY-CHECKED-INSERT
 title: "A data constructor spelled like an instance dictionary (data D where { Lbl_instance_A : D } beside instance Lbl A) is admitted in both orders, and the later one overwrites the other in the flat elab.globals key, because constructors enter globals outside the elaborate_checked_as identity guard. Bind every declaration-identity key to at most one checked GlobalId through one checked insert that refuses with DeclarationIdentityCollision"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -129,3 +129,16 @@ base, stop and report the mismatch.
   the list.
 - The enumerator stop in Deliverable item 2, or the AC-6 cost stop.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `d5a522d7f` from exact `99aea8de8` (PR #4615). Verify
+QA `evt_6swzhf9wv5v3v`, Architect `evt_3h2cjdz1x5k70`, Decision
+`dec_wst3r6ahj3nj`. One checked identity window covers ordinary, space and
+mutual source declarations. Constructors and Prop intros are Source;
+dictionary, law-field and space-operation spellings are Minted. A mixed
+collision refuses, and the declared keys are restored on error. AC-6 was
+discharged at 2.956s of attributed work, 1.871% of the 158.01s Map base.
+Carry (Architect): the completeness scan is linear in `|globals|` per
+window. If SCAN_NS ever passes 5%, the closure is a globals insert
+journal.
