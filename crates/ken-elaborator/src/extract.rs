@@ -5,7 +5,7 @@
 //! set keyed for the V3 prover (`22 §6`).
 //!
 //! **Absent-clause scan / exhaustiveness property (`22 §2.5`):** the `match` in
-//! `lift_obligation` has **no catch-all `_ ⇒ skip` arm** — every `ObligationKind`
+//! `obligation_id_suffix` has **no catch-all `_ ⇒ skip` arm** — every `ObligationKind`
 //! variant is handled explicitly. Adding a new variant without an arm is a
 //! **compile error**, not a silent miss. This is what makes "a missing clause is
 //! a visible gap, not a silent drop" concrete.
@@ -112,6 +112,21 @@ pub fn v2_extract(elab_result: &ElabResult) -> ExtractionResult {
     ExtractionResult { obligations }
 }
 
+/// Pair V2 triples with their owner-free id tails for checked-core emission.
+/// Diagnostic IDs remain the spelling-based V2 IDs made by `lift_obligation`.
+pub fn v2_extract_with_suffixes(elab_result: &ElabResult) -> Vec<(String, ObligationTriple)> {
+    elab_result
+        .obligations
+        .iter()
+        .map(|obl| {
+            (
+                obligation_id_suffix(obl).0,
+                lift_obligation(&elab_result.name, obl),
+            )
+        })
+        .collect()
+}
+
 /// Render every open proof obligation as an `unknown` diagnostic line.
 ///
 /// Foreign runtime checks have status `tested`, not `unknown`, and are not
@@ -125,10 +140,7 @@ pub fn render_open_obligations(results: &[ElabResult]) -> Vec<String> {
             }
             lines.push(format!(
                 "unknown {} at {}..{}: {:?}",
-                triple.id.0,
-                triple.provenance.span.start,
-                triple.provenance.span.end,
-                triple.phi,
+                triple.id.0, triple.provenance.span.start, triple.provenance.span.end, triple.phi,
             ));
         }
     }
@@ -137,52 +149,53 @@ pub fn render_open_obligations(results: &[ElabResult]) -> Vec<String> {
 
 /// Lift a V1 `Obligation` to a V2 `ObligationTriple`.
 ///
-/// Every `ObligationKind` arm is explicit — NO catch-all — satisfying the
-/// §2.5 exhaustiveness property. Adding a new variant without an arm is a
-/// compile error, making a silently-missed obligation kind impossible.
-fn lift_obligation(def_name: &str, obl: &Obligation) -> ObligationTriple {
-    let (context, phi) = unclose_goal(&obl.goal_closed);
-
-    // Exhaustive match over ObligationKind — NO `_ =>` arm (§2.5).
-    let (id_str, prov_kind) = match &obl.kind {
+/// `obligation_id_suffix` handles every `ObligationKind` without a catch-all,
+/// so adding a variant without its id tail is a compile error.
+/// Owner-free id tail: kind plus owner-local ordinal or law field.
+/// Exhaustive over `ObligationKind` — no catch-all arm (`22 §2.5`).
+pub fn obligation_id_suffix(obl: &Obligation) -> (String, ProvKind) {
+    match &obl.kind {
         ObligationKind::Ensures => (
-            format!("{}.ensures.{}", def_name, obl.id),
-            ProvKind::Ensures { index: obl.id as usize },
+            format!("ensures.{}", obl.id),
+            ProvKind::Ensures {
+                index: obl.id as usize,
+            },
         ),
-        ObligationKind::Prove => (
-            format!("{}.prove", def_name),
-            ProvKind::Prove,
-        ),
+        ObligationKind::Prove => ("prove".to_string(), ProvKind::Prove),
         ObligationKind::LawField(field) => (
-            format!("{}.law.{}", def_name, field),
-            ProvKind::LawField { field_name: field.clone() },
+            format!("law.{}", field),
+            ProvKind::LawField {
+                field_name: field.clone(),
+            },
         ),
-        ObligationKind::PartialPrim => (
-            format!("{}.prim.{}", def_name, obl.id),
-            ProvKind::PartialPrim,
-        ),
-        ObligationKind::Requires => (
-            format!("{}.requires.{}", def_name, obl.id),
-            ProvKind::CallRequires,
-        ),
+        ObligationKind::PartialPrim => (format!("prim.{}", obl.id), ProvKind::PartialPrim),
+        ObligationKind::Requires => (format!("requires.{}", obl.id), ProvKind::CallRequires),
         ObligationKind::RefinementIntroduction => (
-            format!("{}.refinement.{}", def_name, obl.id),
+            format!("refinement.{}", obl.id),
             ProvKind::RefinementIntroduction,
         ),
         // A `foreign` runtime-check slot: tested status (`21 §5.2`, `38 §3.3`).
         ObligationKind::FfiRuntimeCheck => (
-            format!("{}.ffi_runtime_check.{}", def_name, obl.id),
+            format!("ffi_runtime_check.{}", obl.id),
             ProvKind::FfiRuntimeCheck,
         ),
-    };
+    }
+}
+
+fn lift_obligation(def_name: &str, obl: &Obligation) -> ObligationTriple {
+    let (context, phi) = unclose_goal(&obl.goal_closed);
+    let (suffix, prov_kind) = obligation_id_suffix(obl);
 
     ObligationTriple {
-        id: ObligationId(id_str),
+        id: ObligationId(format!("{}.{}", def_name, suffix)),
         hole_id: obl.hole_id,
         context,
         phi,
         goal_closed: obl.goal_closed.clone(),
-        provenance: Provenance { kind: prov_kind, span: obl.span.clone() },
+        provenance: Provenance {
+            kind: prov_kind,
+            span: obl.span.clone(),
+        },
     }
 }
 

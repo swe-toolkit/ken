@@ -24,7 +24,7 @@ use crate::checked_core::{
     canonical_term_bytes, checked_core_declaration_body_view, emit_checked_core_package,
     semantic_fingerprint, validate_checked_core_package,
 };
-use crate::extract::{v2_extract, ObligationTriple, ProvKind};
+use crate::extract::{v2_extract_with_suffixes, ObligationTriple, ProvKind};
 use crate::program_admission::{CheckedMainDescriptor, ProgramAdmissionError, admit_checked_main};
 use crate::{ElabEnv, ElabError, ElabResult};
 
@@ -507,6 +507,11 @@ pub enum CompilerDriverError {
     MissingStableSymbol {
         id: GlobalId,
     },
+    DuplicateObligationId {
+        obligation: StableSymbol,
+        first_owner: StableSymbol,
+        second_owner: StableSymbol,
+    },
     PackageReferenceOutsidePackage {
         declaration: StableSymbol,
         referenced: StableSymbol,
@@ -562,6 +567,14 @@ impl fmt::Display for CompilerDriverError {
             CompilerDriverError::MissingStableSymbol { id } => {
                 write!(f, "missing stable symbol for admitted global {id}")
             }
+            CompilerDriverError::DuplicateObligationId {
+                obligation,
+                first_owner,
+                second_owner,
+            } => write!(
+                f,
+                "obligation {obligation} already belongs to {first_owner}; cannot bind {second_owner}"
+            ),
             CompilerDriverError::PackageReferenceOutsidePackage {
                 declaration,
                 referenced,
@@ -3357,21 +3370,20 @@ fn flatten_lanes(lanes: &BTreeMap<StableSymbol, Vec<UnavailableLane>>) -> Vec<Un
         .collect()
 }
 
-fn owned_v2_obligations(results: &[ElabResult]) -> Vec<(GlobalId, ObligationTriple)> {
+fn owned_v2_obligations(results: &[ElabResult]) -> Vec<(GlobalId, String, ObligationTriple)> {
     results
         .iter()
         .flat_map(|result| {
             let owner = result.def_id;
-            v2_extract(result)
-                .obligations
+            v2_extract_with_suffixes(result)
                 .into_iter()
-                .map(move |triple| (owner, triple))
+                .map(move |(suffix, triple)| (owner, suffix, triple))
         })
         .collect()
 }
 
 fn add_obligation_metadata(
-    obligations: &[(GlobalId, ObligationTriple)],
+    obligations: &[(GlobalId, String, ObligationTriple)],
     symbols: &BTreeMap<GlobalId, StableSymbol>,
     package_table: &StableSymbolTable,
     example_table: &StableSymbolTable,
@@ -3379,12 +3391,25 @@ fn add_obligation_metadata(
     outside: &impl Fn(&StableSymbol, CanonicalEncodingError) -> CompilerDriverError,
     semantic: &mut CheckedCoreSemanticInputs,
 ) -> Result<(), CompilerDriverError> {
-    for (owner, triple) in obligations {
+    for (owner, suffix, triple) in obligations {
         let origin = symbols
             .get(owner)
             .cloned()
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *owner })?;
-        let obligation = StableSymbol::obligation(triple.id.0.clone());
+        // The owner can be shadowed in `globals`; the checked stable symbol
+        // retains its distinct `#n` identity independently of that spelling.
+        let obligation = StableSymbol::obligation(format!(
+            "{}.{}",
+            origin.components[1..].join("."),
+            suffix
+        ));
+        if let Some(prior) = semantic.obligation_metadata.get(&obligation) {
+            return Err(CompilerDriverError::DuplicateObligationId {
+                obligation,
+                first_owner: prior.origin.clone(),
+                second_owner: origin,
+            });
+        }
         // An example's own obligation report is not admitted content. Its
         // checked goal may mention earlier example bindings; admitted owners
         // still close over the package's symbols.
@@ -3425,7 +3450,7 @@ fn emit_package_from_env(
     sources: &[CompilerSource],
     env: &ElabEnv,
     admitted: &[GlobalId],
-    obligations: &[(GlobalId, ObligationTriple)],
+    obligations: &[(GlobalId, String, ObligationTriple)],
     example_ids: &BTreeSet<GlobalId>,
     native_entrypoint_plan: Option<Vec<u8>>,
 ) -> Result<CheckedCorePackage, CompilerDriverError> {
@@ -5516,6 +5541,63 @@ mod tests {
         let error = stable_symbols_for_env("unowned_control", &env, false)
             .expect_err("an unnamed declaration without an owner must refuse");
         assert!(matches!(error, CompilerDriverError::MissingStableSymbol { id } if id == raw));
+    }
+
+    /// Promise class: durable invariant (`46` §3.2). MEASURED: two checked
+    /// owners presenting the same package obligation key refuse at the one
+    /// emitter insertion point, even when their goal and symbol agree.
+    /// CLAIMED: no owned obligation is silently displaced in the semantic map.
+    /// THE GAP: source-level collisions are independently exercised by the
+    /// package witness suite; this private test reaches the otherwise
+    /// unreachable same-stable-symbol collision arm of the shared emitter.
+    #[test]
+    fn obligation_metadata_refuses_duplicate_stable_owner_and_same_goal() {
+        use crate::extract::{ObligationId, Provenance};
+
+        let first = GlobalId(901);
+        let second = GlobalId(902);
+        let owner = StableSymbol::declaration("duplicate_probe", &[], "x");
+        let triple = ObligationTriple {
+            id: ObligationId("x.requires.0".into()),
+            hole_id: GlobalId(903),
+            context: vec![],
+            phi: Term::IntLit(1.into()),
+            goal_closed: Term::IntLit(1.into()),
+            provenance: Provenance {
+                kind: ProvKind::CallRequires,
+                span: crate::error::Span::zero(),
+            },
+        };
+        let table = StableSymbolTable::new();
+        for later in [second, first] {
+            let symbols = BTreeMap::from([(first, owner.clone()), (later, owner.clone())]);
+            let rows = vec![
+                (first, "requires.0".to_string(), triple.clone()),
+                (later, "requires.0".to_string(), triple.clone()),
+            ];
+            let mut semantic = CheckedCoreSemanticInputs::default();
+            let error = add_obligation_metadata(
+                &rows,
+                &symbols,
+                &table,
+                &table,
+                &BTreeSet::new(),
+                &|_, _| panic!("closed goal needs no external symbol"),
+                &mut semantic,
+            )
+            .expect_err("a second owner must not replace the first goal");
+            let obligation = StableSymbol::obligation("x.requires.0");
+            assert!(matches!(
+                error,
+                CompilerDriverError::DuplicateObligationId {
+                    obligation: found,
+                    first_owner,
+                    second_owner,
+                } if found == obligation && first_owner == owner && second_owner == owner
+            ));
+            assert_eq!(semantic.obligations.len(), 1);
+            assert_eq!(semantic.obligation_metadata[&obligation].origin, owner);
+        }
     }
 
     const CALLER_OPEN_SOURCE: &str = r#"program capabilities FS APartial
