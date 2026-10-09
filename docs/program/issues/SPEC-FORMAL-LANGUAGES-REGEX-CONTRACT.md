@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 4 is a deferred placeholder, so the catalog has no contract for regular expressions. Specify the regex carrier, its denotation as a language, a derivative matcher, and the matcher's soundness and completeness laws, at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -63,3 +63,18 @@ contract that the regex catalog node builds against.
 
 - The contract needs a kernel, trust or surface-syntax change.
 - A law cannot be stated without decidable state equality (section 5's).
+
+## Closeout
+
+Merged `b4030dbcd` from exact `b3242eacc` (PR #4619). Architect D0
+`evt_3bf35x1gz9evy`, Architect `evt_5p54ndqe1raej`, CV `evt_4q7pffrz147kc`,
+Decision `dec_5mw1tdtkg0pff`. Section 4 specifies:
+- the six-constructor `Regex a` carrier, with no `DecEq`;
+- an independent Ω denotation through public `Split` and `Pieces`;
+- `nullable`, `deriv` and `regex_matches`, with `DecEq a` explicit only
+  for the derivative and matcher;
+- six checked laws;
+- a seven-case conformance seed.
+`list_concat`/`list_all` and five shared Bool truth lemmas are catalog
+delivery items, carried by `CAT-FORMAL-LANGUAGES-REGEX`. No automaton link
+is in section 4.

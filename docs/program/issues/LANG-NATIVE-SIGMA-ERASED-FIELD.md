@@ -48,6 +48,12 @@ base, stop and report the mismatch.
    stores and projects it today: every `Project` on a relevant Σ, every
    record consumer of the pair layout, and the package's family set. The
    Architect rules the representation from the D0.
+   - **Design note for the ruling** (Architect `evt_29hrvjmzm3vs8`,
+     research `evt_6mes4a0e6gc8m`): a body-positional plan table still
+     sits between classification and erasure. Lean LCNF and Coq
+     extraction close that window by materializing erased nodes in the
+     lowering IR. Any future pass that rewrites declarations between the
+     plan writer and erasure reopens the plan/body binding.
 2. **The ruled representation** in relevant-Σ native lowering, for an
    erased field in either slot.
 3. **The predecessor's carries** (Architect `evt_5gxf52f58g5c7`), in the
