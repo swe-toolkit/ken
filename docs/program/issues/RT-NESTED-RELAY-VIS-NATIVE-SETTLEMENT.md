@@ -83,6 +83,14 @@ base, stop and report the mismatch.
      `deferred_response_at_vis` and `bounded_deferred_response_handler_owner`
      cover every forwarded Vis's construct site;
 
+   - (iv) **the predecessor's successor obligation, "admission E
+     unwitnessed after ContinuationBodyTail"** (Architect
+     `evt_3tkas7ea7k50f`): whether any source in either population
+     reaches `RelocatedWorkMissingLoweringBinding`
+     (`selected_pending_calls.rs:769`). Production checks E before J, the
+     bounded attempt at `9f5b430b5` reached J, and no test pins E. The
+     Architect rules whether E stays as a guard, with a witness, or goes;
+
    over both populations: the span's owner 4 and r2's owners 2 and 3. If
    one design cannot settle both, the D0 says so and the Architect rules
    whether to split.
