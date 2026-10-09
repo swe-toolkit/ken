@@ -76,6 +76,24 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
   `GlobalEnv`, and `apply_omega_erasure(term, &plan)` rewrites an erased
   subterm to `Const tt`, a collapsed `Pair(a, _)` to `a` and a collapsed
   `Proj1 p` to `p`. Erased binders are kept and receive `tt`.
+- **One writer for body and plan** (Architect `evt_4ajjj60nhpqze`, on the
+  `7843729eb` CI red). Native preparation replaced executable bodies with
+  normalized ones but kept the plan of the original body. A single writer
+  now stores a declaration's body bytes and its plan together. Both
+  original emission and normalized native preparation call it. It
+  derives the plan from that exact body in its producing environment and
+  checks the canonical preorder count independently. A classification or
+  count error refuses the declaration. Package slicing filters
+  `omega_erasure_plans` by the same reachable declaration set.
+- **Synthetic test packages.** Two test files are in scope:
+  `crates/ken-elaborator/tests/nc16_primitive_value_lowering.rs` and
+  `crates/ken-elaborator/tests/nc17_recursion_dictionaries_modules.rs`.
+  Their hand-built, mock-typed builders may insert only
+  `OmegaErasurePlan::default()`, each with a MEASURED/CLAIMED/THE GAP
+  comment. A non-empty hand-written plan, a production helper and a
+  `cfg(test)` export are all out. A row that needs Ω erasure is rebuilt
+  as a kernel-admitted environment and gets its plan from
+  `omega_erasure_plan`. The production missing-plan refusal is unchanged.
 
 ## Acceptance
 
@@ -119,6 +137,23 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
   the kernel classifier's own cost). The R1-R5 reductions leave the
   `omega_erasure_plans` bytes and the `core_semantic_hash` pins unchanged,
   and AC-4b still passes.
+- **AC-7 (the `7843729eb` CI red).**
+  - All six missing-plan rows from CI pass: four in nc16, plus nc17's
+    `recursive_body_view_lowers_to_explicit_runtime_declaration_ref` and
+    `checked_core_imported_value_crosses_an_accepted_var_capture`. So do
+    the two nc17 siblings reproduced locally,
+    `imported_declaration_ref_requires_exact_dependency_seed_identity`
+    and `dictionary_construction_lowers_only_runtime_fields_to_record_values`.
+  - `rt_c5_primitive_type_native_gate::indexed_int_convoy_native_refusal_waits_for_compared_native_rows`
+    returns to `UnsupportedDependentMotive { family: Vec }`.
+  - A compile-preserving mutation that skips plan recomputation on the
+    normalized path reddens at count validation or at that row, and is
+    restored. An in-range stale plan must also be caught.
+  - The handoff enumerates every production writer of
+    `semantic.declarations` or `omega_erasure_plans` under `crates/*/src`,
+    with its disposition (including `checked_core.rs:1506` and `:2250`).
+    It also lists every `crates/ken-cli/tests` suite that calls
+    `build_native_program`, with its result.
 
 ## Stop conditions
 
