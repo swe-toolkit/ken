@@ -76,6 +76,16 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
   `GlobalEnv`, and `apply_omega_erasure(term, &plan)` rewrites an erased
   subterm to `Const tt`, a collapsed `Pair(a, _)` to `a` and a collapsed
   `Proj1 p` to `p`. Erased binders are kept and receive `tt`.
+- **Erased-body cache scope** (Architect `evt_41pfdmjgjydz6`, QA
+  `evt_btx8aq633hqn`). A `GlobalId` names a declaration only for one
+  allocation prefix: a supported `EnvMark` rollback frees it and a later
+  declaration can reuse it. The interpreter's erased-body cache therefore
+  lives only inside one outermost `eval` call, which borrows `&GlobalEnv`
+  for its whole duration, and is consulted only for the environment it was
+  opened on. The store keeps no cache across calls. `eval` opens and clears
+  the scope, including on unwind, and the existing body moves unchanged
+  into an inner function. No kernel API and no generation key. The ruled
+  hunk is in the Architect's post.
 - **One writer for body and plan** (Architect `evt_4ajjj60nhpqze`, on the
   `7843729eb` CI red). Native preparation replaced executable bodies with
   normalized ones but kept the plan of the original body. A single writer
@@ -193,6 +203,17 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
     A suite green at `1b68dfd45` and red in the candidate's CI is a stop
     to the Architect, not a fix-forward.
   - No change to the kernel, `conv.rs` or the stored native body.
+- **AC-9 (cache after rollback, QA `evt_btx8aq633hqn`).** The new test
+  `crates/ken-interp/tests/omega_erasure_cache_rollback.rs` is QA's
+  counterexample, kernel-admitted: one `EvalStore` evaluates a checked
+  `Int` 7 constant, a supported rollback removes it, a checked `Int` 8
+  constant reuses its id (asserted equal), and the same store returns
+  `Int(8)`.
+  - Deleting the scope clear, so the cache persists across calls keyed on
+    the id alone, reddens it at `Int(7)`, and is restored.
+  - The timing of `cc3_parsing_cursor_decoder_acceptance`,
+    `cat_formal_languages_nfa`, `rosetta` and `ken-interp --tests` stays at
+    parity with the persistent cache, one suite per invocation.
 
 ## Symptom inventory
 
@@ -208,6 +229,11 @@ Append one entry per Architect hard stop; never rewrite history.
 3. The normalized package inherits the original version's plans through
    `let mut normalized = package.clone()`, so a stale in-range plan
    survives a skipped write -- keyed on symbol (`evt_3brrb9b5a14hh`).
+4. The ken-interp erased-body cache was keyed on `GlobalId` and kept for
+   the store's lifetime, so it outlived the allocation prefix it was
+   classified under: stale `Int(7)` after rollback and id reuse -- keyed on
+   the id rather than on a borrow of the exact environment version
+   (`evt_41pfdmjgjydz6`).
 
 ## Stop conditions
 
