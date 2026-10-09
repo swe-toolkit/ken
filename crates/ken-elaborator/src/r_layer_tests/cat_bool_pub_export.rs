@@ -482,6 +482,8 @@ fn class_owner_provider_loader_visible_inventories_are_exact() {
             "DecEq".to_owned(),
             "IsTrue".to_owned(),
             "Ord".to_owned(),
+            "and_cases".to_owned(),
+            "and_true".to_owned(),
             "bytes_deceq_eq".to_owned(),
             "bytes_deceq_eq::complete".to_owned(),
             "bytes_deceq_eq::sound".to_owned(),
@@ -507,6 +509,9 @@ fn class_owner_provider_loader_visible_inventories_are_exact() {
             "leq_nat::refl".to_owned(),
             "leq_nat::total".to_owned(),
             "leq_nat::trans".to_owned(),
+            "or_cases".to_owned(),
+            "or_left".to_owned(),
+            "or_right".to_owned(),
             // `ord_geq_at` joins the authorized surface with FI-2b: the
             // Architect ruled it is defined HERE beside `ord_leq_at`,
             // because it is fully generic and `33 §2a` puts only

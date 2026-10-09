@@ -50,7 +50,8 @@ import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.Transport (sym)
 
-import Core.Classes.LawfulClasses (bool_or, bool_and)
+import Core.Classes.LawfulClasses
+  (bool_or, bool_and, or_left, or_right, or_cases, and_true, and_cases)
 
 pub data Nfa q a = MkNfa (q → a → q → Bool) (q → Bool) (q → Bool)
 
@@ -152,7 +153,9 @@ law with finite DFA emptiness: an accepting NFA path would contradict a
 `True` emptiness decision.
 
 Private mask operations and induction helpers below carry the same proofs;
-none is another public language-equality or path representation.
+`any_intro` and `any_elim` reuse public Boolean truth lemmas from
+`Core.Classes.LawfulClasses`. None is another public language-equality or
+path representation.
 
 ```ken
 pub theorem determinize_sound
@@ -452,42 +455,6 @@ fn mask_finite (q : Type) (xs : List q) : Finite (mask q xs) =
   match xs {
     Nil ↦ unit_finite;
     Cons h t ↦ pair_finite Bool (mask q t) bool_finite (mask_finite q t)
-  }
-
-theorem and_true
-      (b : Bool) (c : Bool)
-    : Equal Bool b True → Equal Bool c True → Equal Bool (bool_and b c) True =
-  match b {
-    True ↦ λhb. λhc. hc;
-    False ↦ λhb. λhc. absurd hb
-  }
-
-theorem or_left (b : Bool) (c : Bool) : Equal Bool b True → Equal Bool (bool_or b c) True =
-  match b {
-    True ↦ λhb. Proved;
-    False ↦ λhb. absurd hb
-  }
-
-theorem or_right (b : Bool) (c : Bool) : Equal Bool c True → Equal Bool (bool_or b c) True =
-  match b {
-    True ↦ λhc. Proved;
-    False ↦ λhc. hc
-  }
-
-theorem or_cases
-      (b : Bool) (c : Bool) (g : Omega)
-    : Equal Bool (bool_or b c) True → (Equal Bool b True → g) → (Equal Bool c True → g) → g =
-  match b {
-    True ↦ λh. λl. λr. l Proved;
-    False ↦ λh. λl. λr. r h
-  }
-
-theorem and_cases
-      (b : Bool) (c : Bool) (g : Omega)
-    : Equal Bool (bool_and b c) True → (Equal Bool b True → Equal Bool c True → g) → g =
-  match b {
-    True ↦ λh. λk. k Proved h;
-    False ↦ λh. λk. absurd h
   }
 
 theorem any_intro

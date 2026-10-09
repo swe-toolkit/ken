@@ -11,7 +11,8 @@
 //! The generic `Perm`, `insert`, `sort` and their four checked laws are
 //! exported; their proof helpers and the `List Bool` sort carrier remain private.
 //! Generic Ω-list membership and its seven checked lift/transport laws are
-//! public beside their Derived-owned providers.
+//! public beside their Derived-owned providers. List concatenation and Ω-valued
+//! all-elements membership are public for finite-word language evidence.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -80,6 +81,8 @@ fn derived_exports_all_authorized_operation_identities() {
         ("map::append", "cat_derived_pub_map_append"),
         ("filter", "cat_derived_pub_filter"),
         ("list_append", "cat_derived_pub_list_append"),
+        ("list_concat", "cat_derived_pub_list_concat"),
+        ("list_all", "cat_derived_pub_list_all"),
         ("nth", "cat_derived_pub_nth"),
         ("length", "cat_derived_pub_length"),
         ("reverse", "cat_derived_pub_reverse"),
@@ -107,7 +110,7 @@ fn derived_exports_all_authorized_operation_identities() {
 
     env.elaborate_file(
         "import Data.Collections.Derived \
-           (map, filter, list_append, nth, length, reverse, concat_map, eq_from_ord, count, Perm, insert, sort, bytes_nat_length)\n\
+           (map, filter, list_append, list_concat, list_all, nth, length, reverse, concat_map, eq_from_ord, count, Perm, insert, sort, bytes_nat_length)\n\
          import Core.Function.Combinators (comp, idf)\n\
          fn cat_derived_pub_map (xs : List Bool) : List Bool = \
            map Bool Bool (\\x. x) xs\n\
@@ -127,6 +130,10 @@ fn derived_exports_all_authorized_operation_identities() {
            filter Bool (\\x. x) xs\n\
          fn cat_derived_pub_list_append (xs : List Bool) (ys : List Bool) : List Bool = \
            list_append Bool xs ys\n\
+         fn cat_derived_pub_list_concat (xs : List (List Bool)) : List Bool = \
+           list_concat Bool xs\n\
+         fn cat_derived_pub_list_all (p : Bool → Omega) (xs : List Bool) : Omega = \
+           list_all Bool p xs\n\
          fn cat_derived_pub_nth (n : Nat) (xs : List Bool) : Option Bool = nth Bool n xs\n\
          fn cat_derived_pub_length (xs : List Bool) : Nat = length Bool xs\n\
          fn cat_derived_pub_reverse (xs : List Bool) : List Bool = reverse Bool xs\n\
@@ -266,7 +273,8 @@ fn top_level_publication_queries() -> Vec<PublicationQuery> {
 /// including attached proofs via their imported subjects; the successful set is
 /// compared with an independent literal contract set. CLAIMED: Derived's
 /// complete loader-visible export surface is exactly the authorized
-/// collection operations, two `nth` bound proofs, four `list_append` attached
+/// collection operations (including list_concat and list_all), two `nth`
+/// bound proofs, four `list_append` attached
 /// proofs, three `map` proofs, `reverse::involutive`, three generic sort
 /// operations (`Perm`, `insert`, `sort`), their four attached sort proofs,
 /// and generic Ω-list membership with seven public checked lemmas.
@@ -314,6 +322,8 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "filter".to_owned(),
             "length".to_owned(),
             "list_append".to_owned(),
+            "list_concat".to_owned(),
+            "list_all".to_owned(),
             "list_append::assoc".to_owned(),
             "list_append::left_unit".to_owned(),
             "list_append::length".to_owned(),

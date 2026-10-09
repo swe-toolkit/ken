@@ -42,7 +42,7 @@ import Core.Logic.Or (Or, Inl, Inr)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Core.Classes.LawfulClasses (bool_or, bool_not, leq_nat)
+import Core.Classes.LawfulClasses (bool_or, bool_not, leq_nat, or_left, or_right)
 
 import Data.Numeric.Nat.Order (leq_nat_weaken_right)
 
@@ -114,7 +114,9 @@ follows the word returned by the search. Completeness counts Boolean
 reachability over the certified state enumeration: without a stable step the
 count grows, yet it cannot exceed the enumeration length even with duplicates.
 Alphabet coverage relates an arbitrary witness word to the symbols visited by
-search. The helpers remain private to the package.
+search. Boolean reachability steps reuse the public `or_left` and
+`or_right` lemmas from `Core.Classes.LawfulClasses`; the search helpers remain
+private to the package.
 
 ```ken
 pub theorem is_empty_rejects
@@ -1102,18 +1104,6 @@ theorem or_mono
   match b {
     True ↦ λmb. λmc. λh. or_left b2 c2 (mb Proved);
     False ↦ λmb. λmc. λh. or_right b2 c2 (mc h)
-  }
-
-theorem or_right (b : Bool) (c : Bool) : Equal Bool c True → Equal Bool (bool_or b c) True =
-  match b {
-    True ↦ λh. Proved;
-    False ↦ λh. h
-  }
-
-theorem or_left (b : Bool) (c : Bool) : Equal Bool b True → Equal Bool (bool_or b c) True =
-  match b {
-    True ↦ λh. Proved;
-    False ↦ λh. absurd h
   }
 
 theorem not_leq_gives_lt

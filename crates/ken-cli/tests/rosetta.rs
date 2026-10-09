@@ -276,6 +276,7 @@ fn collections_prelude() -> String {
         "import Core.Logic.Compare (list_compare, list_eq)",
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
+        "import Core.Logic.And (And as Conj)",
         "import Core.Logic.Transport (cong, sym, trans)",
         "import Data.Numeric.Nat.Order (min, sub)",
         "import Data.Numeric.Nat.Arithmetic (add)",
@@ -284,6 +285,12 @@ fn collections_prelude() -> String {
     ] {
         remove_flattened_directive(&mut collections, "Derived", import);
     }
+    // `list_all` is the one Derived export whose provider this runner does not
+    // flatten: `Core.Logic.And`'s `And` would shadow the prelude Ω `And` that
+    // Derived's own proofs use. No example uses it, so it is excluded like the
+    // Nat.Order exports outside the allowlist above.
+    let list_all = flattened_braced_declaration(&collections, "Derived", "pub fn list_all");
+    collections.replace_range(list_all, "");
 
     format!(
         "{transport}\n{or_source}\n{ord_result}\n{compare}\n{canonical_lawful_ops}\n{nat_order}\n{nat_arithmetic}\n{combinators}\n{list}\n{collections}"
