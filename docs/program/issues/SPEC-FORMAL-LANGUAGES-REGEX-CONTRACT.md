@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 4 is a deferred placeholder, so the catalog has no contract for regular expressions. Specify the regex carrier, its denotation as a language, a derivative matcher, and the matcher's soundness and completeness laws, at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
