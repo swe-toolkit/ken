@@ -1,7 +1,7 @@
 ---
 id: VERIFY-INSTANCE-ALIAS-HEAD-KEY
 title: "An instance declared at a transparent def alias (def N2 = Nat; instance E N2) is keyed on the alias's own global id, not on head(A) after unfolding, so instance E N2 and instance E Nat are both admitted with no OverlappingInstances, and where E Nat misses the alias instance with NoInstance. Key instance registration, overlap and resolution on the unfolded head"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1

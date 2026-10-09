@@ -1,7 +1,7 @@
 ---
 id: VERIFY-OBLIGATION-ID-SHADOWED-OWNER
 title: "A package obligation id is built from its owner's spelling ({def_name}.requires.{n}), so when a later file shadows or lawfully rebinds that spelling (a user const x over x, or a second Pick_instance_Foo on a rebound Foo), the two owners mint one id and semantic.obligations.insert silently drops one owner's requires premise, in a source-order-dependent way. Key obligation ids on the owner's stable checked identity so every live premise survives"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -115,3 +115,18 @@ base, stop and report the mismatch.
 Declaration stable symbols depend on declaration order for a shadowed name
 (`stable_symbols_for_env`), and obligation ids inherit that. A
 source-independent declaration identity is a separate redesign.
+
+## Closeout
+
+Merged `85e651a44` from exact `87f1f07bf` (PR #4621). Verify QA
+`evt_76njytj9dg37j`, Architect `evt_55e9vps692n56`, Decision
+`dec_49kydg6gcwvy`.
+- Key K2: an obligation id is minted at the emitter from the owner's
+  stable symbol, so a shadowed or rebound owner's premise keeps its own
+  id (`X#1.<suffix>` beside `X.<suffix>`) in either declaration order.
+- `add_obligation_metadata` refuses every re-insert with
+  `DuplicateObligationId`. Both AC-3 mutants reddened and were restored.
+- The 61 ruled catalog images, and 63 fresh ones, kept their obligation-id
+  sets and core hashes.
+- The Carry above stands: the stable symbols of a shadowed name still
+  depend on declaration order.
