@@ -24,7 +24,7 @@ use crate::checked_core::{
     RecursionMetadata, StableSymbol, StableSymbolTable, SymbolNamespace,
 };
 use crate::extract::{v2_extract_with_suffixes, ObligationTriple, ProvKind};
-use crate::program_admission::{CheckedMainDescriptor, ProgramAdmissionError, admit_checked_main};
+use crate::program_admission::{admit_checked_main, CheckedMainDescriptor, ProgramAdmissionError};
 use crate::{ElabEnv, ElabError, ElabResult};
 
 const PRODUCER: &str = "ken-elaborator:compiler-driver:nc10";
@@ -3442,11 +3442,8 @@ fn add_obligation_metadata(
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *owner })?;
         // The owner can be shadowed in `globals`; the checked stable symbol
         // retains its distinct `#n` identity independently of that spelling.
-        let obligation = StableSymbol::obligation(format!(
-            "{}.{}",
-            origin.components[1..].join("."),
-            suffix
-        ));
+        let obligation =
+            StableSymbol::obligation(format!("{}.{}", origin.components[1..].join("."), suffix));
         if let Some(prior) = semantic.obligation_metadata.get(&obligation) {
             return Err(CompilerDriverError::DuplicateObligationId {
                 obligation,
