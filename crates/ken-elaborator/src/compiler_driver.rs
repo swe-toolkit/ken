@@ -2473,6 +2473,18 @@ pub fn prepare_native_program_sources(
         })
     })?;
     let mut normalized = package.clone();
+    // A body version owns only the plan written with it. Drop the original
+    // version's plans for rewritten declarations: a skipped write must refuse
+    // as missing, never consume a stale plan keyed to old preorder positions.
+    // This is the only body-positional semantic field, and no declaration is
+    // rewritten between the writer below and native erasure.
+    for symbol in &executable_declarations {
+        normalized
+            .artifact
+            .semantic
+            .omega_erasure_plans
+            .remove(symbol);
+    }
     let mut normalized_bodies = BTreeMap::new();
     // Recursive barriers give this normalization its own immutable environment.
     let mut normalized_omega_memo = crate::omega_erasure::ClassifyMemo::new();
