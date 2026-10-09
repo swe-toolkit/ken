@@ -434,6 +434,23 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            "Algorithm.FormalLanguages.Minimisation".to_string(),
+            [
+                "And",
+                "MkUnit",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Algorithm.FormalLanguages.Nfa".to_string(),
             [
                 "And",
