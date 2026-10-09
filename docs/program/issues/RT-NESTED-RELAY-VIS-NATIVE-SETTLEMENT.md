@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT
 title: "Native lowering has no representation for a relay Vis (a K that forwards a pattern-bound operation, or a functional-IH reference) returned to a response owner beside a non-relay member, so such an owner is emitted Ret-only and traps -1 (or is unplanned), and the ignored rt_span_prov_native:355 and r2 (rt_escape_second_resource_native:1015) rows stay ignored. Refuse at planning, on a discriminant read from the settling plane, every owner native lowering cannot settle, and give the relay a planned native arm that settles it at interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
