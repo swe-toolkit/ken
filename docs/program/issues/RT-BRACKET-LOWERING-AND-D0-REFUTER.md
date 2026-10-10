@@ -59,6 +59,19 @@ and do not compare release vectors alone.
 5. one acquisition-failure case and one body-error/release-error discriminator,
    which observe the OUTCOME MERGE and not merely order.
 
+**Further measured members** (RT-NESTED-RELAY D0, `evt_3y63h26apw108`,
+folded in at `evt_5q52byr2tg4x2`). They join the D0 comparison as depth-2
+rows, beside the five above:
+
+- out-of-bounds `BRANCHED_SCRUTINEE` on main `c87de89d3`: rc 72 in both
+  engines; native releases FsHandle 1 before Buffer 2, interp Buffer 2 first
+  (log SHA-256 `ce265ee4`);
+- `rt_parity_native` row 01 builds 0 and 2, rows 14 and 17, and
+  `abi_s6_mapping_surface_native` row 34 builds 0 and 1, which flip the same
+  way (42-unit inventory SHA-256 `3acfab1a`);
+- the order-excluding assertions these rows pass through today:
+  `rt_parity_native.rs:597-677` and `abi_s6_mapping_surface_native.rs:575-597`.
+
 **Three compile-preserving mutations, each with an unmutated positive sibling
 and a POSITIVE executed-count assertion:**
 

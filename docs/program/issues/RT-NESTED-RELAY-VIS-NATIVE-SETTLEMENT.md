@@ -328,21 +328,19 @@ base, stop and report the mismatch.
      any of the three, is a stop to the Architect; no visit falsifies the
      seat-keyed design. Rows 25-36 follow, with pairs whose emitted
      handler is none reported separately.
-   - **Owed before the candidate** (`evt_2228y4p1zwgkg` item 5,
-     `evt_3qn9d87abajsc`). The unfiltered probe on the 16 pending
-     pair-builds (rows 33, 35, 36): another owner or `None`, or a seat
-     outside the three, is a stop; `not lowered` is recorded. Fill pair
-     707 as "op names differ only by the 768 drop; the release identity
-     order flips independently". For each executed row 01-36 and both
-     BRANCHED variants, whether full EffectEvent traces (operation,
-     resource bindings, order) agree, citing the test's own assert where
-     it has one; and out-of-bounds BRANCHED full traces on current main.
-   - **The release-order flip is not this increment.** Native releases
-     FsHandle before Buffer where the interpreter releases LIFO, already
-     without the drop (`ac7-extra-branched.log`). Increment (i) neither
-     causes nor fixes it and must not claim to. The Steward decides its
-     scope from the full-trace measurement; the Architect rules its
-     design after it.
+   - **D0 complete and accepted** (`evt_3y63h26apw108`,
+     `evt_6jxckz0adhrbm`; table SHA-256 `c2b23461`). Rows 33 builds 1, 2
+     and 7 and row 35 build 5 are not lowered. The 11 row-36 pair-builds
+     leave by `deferred_handler_owned`, a performing route
+     (`drive_response_at_source` emits the planned op or refuses typed), so
+     they leave the refusal population and the seat list stays at three.
+   - **Release order is not this WP.** The depth-2 release flip on rows 01,
+     14, 17, 34 and both BRANCHED variants is the tracked
+     `RT-BRACKET-RELEASE-ORDER-PARITY` defect, owned by
+     `RT-BRACKET-CONTROL-REGION-IR` (`evt_5q52byr2tg4x2`); its rows are
+     recorded in `RT-BRACKET-LOWERING-AND-D0-REFUTER`. Parity here follows the
+     fleet rule: non-release events in order, release events as a set,
+     through the shared helpers in `rt_parity_native.rs`.
    - **This WP's landing cut is increment (i):** D1-D3, `relay_drive_pair`
      and the errors, the plan fact `relay_route`, and the planned
      no-route trap at the three seats, with AC-MAIN, its mutant and the
@@ -429,21 +427,20 @@ base, stop and report the mismatch.
     admitted pair must be above 0; a sum of 0 is a stop, because the gate
     never executed a relay source.
 - **AC-MAIN (`evt_3s45p56abgg27`, `evt_2228y4p1zwgkg`,
-  `evt_45f92kn90453r`, `evt_3qn9d87abajsc`).** A permanent test,
+  `evt_6jxckz0adhrbm`).** A permanent test,
   `branched_scrutinee_forwarded_read_is_performed_or_refused` in
   `crates/ken-cli/tests/rt_branched_scrutinee_unit_body_port.rs`, runs
   the in-bounds variant. Native stops with exactly the planned relay trap
-  identity; its full EffectEvent trace before the trap (operation,
-  resource bindings, order) equals the interpreter's prefix before
-  `FsReadAt`; `FsReadAt` does not appear natively. Host ops after the
-  trap on the abort path are measured and recorded in the handoff, not
-  pinned. Main (rc 72, no `FsReadAt`) cannot pass it. Increment (ii)
-  turns it into equal full traces with `FsReadAt` performed.
+  identity; its non-release events before the trap equal, in order, the
+  interpreter's non-release prefix before `FsReadAt`; `FsReadAt` does not
+  appear natively. Releases after the trap are compared as a set through
+  the shared helpers, never ordered. Main (rc 72, no `FsReadAt`) cannot
+  pass it. Increment (ii) turns it into parity with `FsReadAt` performed.
   - **Mutant (QA).** Deleting the trap emission returns the run to rc 72
     with no `FsReadAt`, and AC-MAIN reddens.
   - **Controls.** The four executed green tests whose source is not
-    reached (row 01 builds 0 and 2, rows 14 and 17) keep identical full
-    traces before and after the change.
+    reached (row 01 builds 0 and 2, rows 14 and 17) compare equal before
+    and after the change through the same shared helpers.
 - **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
   census pair (span owner 4, source 1374) fires the typed refusal for that
   owner and reddens AC-1, and is restored byte-identically.
