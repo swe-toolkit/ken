@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-LEXER-BRIDGE
 title: "No catalog lexer can claim that a DFA driven over a cursor agrees with run over the cursor's elements. Deliver section 6 of the formal-languages spec: Cursor's element-list view (cursor_take, cursor_elements and their two peek laws) and the new Capability.Parsing.Lexer (dfa_cursor_run, dfa_cursor_accepts and the two bridge laws), fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -81,3 +81,15 @@ base, stop and report the mismatch.
   or a kernel or surface-syntax change.
 - An import cycle, or an `Algorithm/` package needing `Capability.*`.
 - A seed case fails at runtime on the delivered packages.
+
+## Closeout
+
+Merged `7a890f13d` from exact `260e102ea` (PR #4639). QA
+`evt_6b6p59614zzzc`, with the three AC-4 mutants kernel-rejected and
+restored; Architect `evt_52d0kk06byw42`; Decision `dec_1c3ejamt2g35f`.
+Cursor gains `cursor_take`, `cursor_elements` and the two peek laws, and
+its pin moves from 17 to 21 names. `Capability.Parsing.Lexer` delivers
+`dfa_cursor_run`, `dfa_cursor_accepts` and the two bridge laws for any
+`CursorOps`, importing Dfa and Cursor only. Acceptance is 8/8 with the
+seven runtime seeds; the strict-resolution census row, Rosetta and SEAL-2
+pass. No new trust. §1a: 0.
