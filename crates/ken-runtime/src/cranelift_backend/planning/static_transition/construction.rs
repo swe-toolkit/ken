@@ -319,6 +319,7 @@ impl<'src> Planner<'src> {
                 static_response_phase_a: None,
                 pending_vis_settlements: PendingVisSettlements::default(),
                 relay_drive_pairs: BTreeMap::new(),
+                relay_routes: BTreeMap::new(),
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
@@ -1526,6 +1527,13 @@ impl<'src> Planner<'src> {
         // ownership source (e) reads its successor rows.
         self.plan.relay_drive_pairs = self.plan.build_relay_drive_pairs()?;
         self.plan.pending_vis_settlements = self.plan.build_pending_vis_settlements()?;
+        self.plan.relay_routes = self.plan.build_relay_routes()?;
+        let relay_traps = self.plan.relay_routes.values()
+            .filter_map(|route| route.no_route_trap.as_ref().cloned())
+            .collect::<Vec<_>>();
+        for trap in &relay_traps {
+            self.intern_trap(trap)?;
+        }
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing

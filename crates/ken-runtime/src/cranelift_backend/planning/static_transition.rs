@@ -670,6 +670,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// The exact source/response-owner pairs driven before a forwarded Vis can
     /// reach an excluded owner's K. Both admission and lowering read this map.
     relay_drive_pairs: BTreeMap<(StaticOriginId, ContinuationEmissionOwner), responses::RelayDrivePair>,
+    /// An admitted pair's exact emitted member, or its planned no-route trap.
+    /// Installed after the returned-Vis protocol; lowering never reclassifies it.
+    relay_routes: BTreeMap<(StaticOriginId, ContinuationEmissionOwner), responses::RelayRoute>,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///

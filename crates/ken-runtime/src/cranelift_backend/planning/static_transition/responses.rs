@@ -30,7 +30,7 @@ use super::{
     CheckedIhEnvironmentTransport, CraneliftBackendError, StaticTransitionPlan,
 };
 use crate::cranelift_backend::grafted_spine_control_graph::GraftedSpineFunctionScope;
-use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue};
+use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
 /// A response site that may carry a `StaticResponseDeferred` placeholder.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1312,7 +1312,105 @@ pub(in crate::cranelift_backend) struct RelayDrivePair {
     pub(in crate::cranelift_backend) operation: HostOpV1,
 }
 
+/// Route metadata for one admitted pair. An emitted response member is an
+/// exact row identity; absent routes carry an independently catalogued trap.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RelayRoute {
+    pub(in crate::cranelift_backend) relay_route: Option<StaticResponseContinuationId>,
+    pub(in crate::cranelift_backend) no_route_trap: Option<RuntimeTrap>,
+}
+
 impl StaticTransitionPlan<'_> {
+    /// The returned-Vis protocol and installed owners are final before this
+    /// query. A candidate seat alone is not an emitted performing member.
+    pub(in crate::cranelift_backend) fn build_relay_routes(
+        &self,
+    ) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner), RelayRoute>, CraneliftBackendError> {
+        if self.relay_drive_pairs.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        let candidates = self.return_protocol_candidate_rows()?;
+        let mut emitted = BTreeMap::<StaticResponseContinuationId, &StaticResponseContinuation>::new();
+        for row in &self.static_response_continuations {
+            emitted.insert(row.id(), row);
+        }
+        if let Some(protocol) = &self.pending_vis_settlements.protocol {
+            for member in protocol.owners.values().flat_map(|owner| &owner.contexts)
+                .flat_map(|context| &context.members)
+            {
+                let row = member.successor.as_ref().ok_or_else(||
+                    planner_error("a returned-Vis member has no response row"))?;
+                if let Some(previous) = emitted.insert(row.id(), row) {
+                    if previous != row {
+                        return Err(planner_error("one emitted relay member identity names different response rows"));
+                    }
+                }
+            }
+        }
+        // The source's own response row need not be installed: a returned-Vis
+        // successor in its response owner can perform the same effect. Index
+        // only emitted clauses, on owner and checked effect identity as well
+        // as the closed host operation. Refuse competing emitted identities.
+        let mut clauses = BTreeMap::<
+            (ContinuationEmissionOwner, StaticOriginId, HostOpV1),
+            StaticResponseContinuationId,
+        >::new();
+        for row in emitted.values() {
+            let key = (row.base_owner(), row.effect_origin(), row.operation());
+            if let Some(previous) = clauses.insert(key, row.id()) {
+                if previous != row.id() {
+                    return Err(planner_error(
+                        "two emitted clauses claim one owner/effect/operation",
+                    ));
+                }
+            }
+        }
+        let mut routes = BTreeMap::new();
+        for (&key, pair) in &self.relay_drive_pairs {
+            let source_rows = candidates.iter()
+                .filter(|row| row.vis_origin() == pair.source)
+                .collect::<Vec<_>>();
+            let [source_row] = source_rows.as_slice() else {
+                return Err(planner_error("an admitted relay pair has no unique source response row"));
+            };
+            if source_row.effect_origin() != pair.effect_origin
+                || source_row.operation() != pair.operation
+            {
+                return Err(planner_error("an admitted relay pair disagrees with its source response operation"));
+            }
+            let relay_route = clauses
+                .get(&(pair.owner, pair.effect_origin, pair.operation))
+                .copied();
+            let no_route_trap = relay_route.is_none().then(|| RuntimeTrap {
+                code: RuntimeTrapCode::MissingRuntimeMetadata,
+                message: format!(
+                    "relay: forwarded host op {:?} from source {:?} has no performing route",
+                    pair.operation, pair.source,
+                ),
+            });
+            routes.insert(key, RelayRoute { relay_route, no_route_trap });
+        }
+        Ok(routes)
+    }
+
+    /// Admission remains `relay_drive_pair`; this accessor only reads the
+    /// member or trap already fixed by the planner's emitted-row population.
+    pub(in crate::cranelift_backend) fn relay_route(
+        &self,
+        source: StaticOriginId,
+        owner: ContinuationEmissionOwner,
+    ) -> Result<Option<&RelayRoute>, CraneliftBackendError> {
+        if self.relay_drive_pair(source, owner)?.is_none() {
+            return Ok(None);
+        }
+        let route = self.relay_routes.get(&(source, owner)).ok_or_else(||
+            planner_error("an admitted relay pair has no planned route or trap"))?;
+        match (&route.relay_route, &route.no_route_trap) {
+            (Some(_), None) | (None, Some(_)) => Ok(Some(route)),
+            _ => Err(planner_error("a relay route must name exactly one member or trap")),
+        }
+    }
+
     pub(in crate::cranelift_backend) fn build_relay_drive_pairs(
         &self,
     ) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner), RelayDrivePair>, CraneliftBackendError> {
