@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-DUPLICATE-TOP-LEVEL-REFUSAL
 title: "A ken example fence, or a later plain source, may redefine an admitted top-level name: the duplicate check is per elaboration unit, and stable_symbols_for_env names ids by spelling from the flat globals table, so the admitted declaration falls to the owner#ordinal fallback, core_semantic_hash moves, and a redefined target becomes unselectable. Refuse a duplicate top-level name across units of one package"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T1
