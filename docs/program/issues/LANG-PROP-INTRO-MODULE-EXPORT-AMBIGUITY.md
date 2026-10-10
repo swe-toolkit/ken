@@ -1,7 +1,7 @@
 ---
 id: LANG-PROP-INTRO-MODULE-EXPORT-AMBIGUITY
 title: "A prop intro P.pi and a same-named module export (module P { pub const pi }) both bind the spelling P.pi. In one order the export silently displaces the intro, leaving the canonical intro path unaddressable; in the other the program is refused as a duplicate proof name. Spec 33 section 3.3 requires AmbiguousReference, as data constructors already get"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
