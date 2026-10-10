@@ -1,7 +1,7 @@
 ---
 id: LANG-FORWARD-PROP-INTRO-EDGE
 title: "A declaration that names a later prop's intro (M.P.pi) is refused with UnresolvedCon, because the forward-reference graph keys data constructors to their data node but never inserts a prop's intros into node_names, so no edge reaches the prop and textual order wins. Key each prop intro to its prop node"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -59,3 +59,14 @@ constructors already use. The Architect confirms the spellings at review.
 - A prop intro spelling collides with a data constructor spelling in the
   graph.
 - Any kernel, trust or spec change.
+
+## Closeout
+
+Merged `09bb394d1` from exact `6499e6aae` (PR #4651). Language QA
+`evt_1p6zas1rhbq1g`, Architect `evt_6knve82e27rjr`, Decision
+`dec_7k0cf0tvbkkk9`. Each prop intro is keyed to its prop node in the
+spellings data constructors use; both witnesses check, the five controls
+hold, and both AC-3 mutations redden AC-1. No hard stops.
+
+Carry, no node: intro paths reached through an import or a hidden member
+are outside this population.

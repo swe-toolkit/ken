@@ -89,6 +89,33 @@ an admitted declaration's spelling.
   `t_ac1`, `t_ac2`, `t_ac3` and `t_ac3_guard` per corpus row (suite 9/9),
   and `ken-interp/tests/omega_erasure_cache_rollback.rs` gives its second
   declaration a fresh name and keeps the same-`GlobalId` assertion (1/1).
+- **AC-1b (recut after a second red, `evt_7feyt3anyw496`).** The source
+  inventory missed `lang_instance_registry_identity_key::
+  rebound_declaration_entry_refuses_the_old_dictionary_identity`, which
+  rebinds `data Foo` in a later `elaborate_decl` unit to pin the
+  instance-registry identity guard. The consumer population is now
+  measured per test function, not per loop: for every test that makes
+  more than one `elaborate_*` call on one env, collect the top-level
+  names each call declares, of every head kind (`const`, `def`, `data`,
+  `class`, `instance`, `prop`, `theorem` and the rest), and flag a name
+  declared twice. Only the flagged test binaries are then run, targeted.
+  No whole-crate local run (COORDINATION section 12); CI stays the
+  backstop, and a red CI is an accepted cost (operator 2026-09-26). A
+  hit whose test exists to exercise rebinding (as this one does) goes to
+  the Architect before any edit: rename, session entry, or a rewrite that
+  keeps the guarded behaviour reachable. Renames under AC-1a need no
+  ruling. **Ruled** (`evt_2w4a7teq708nh`): the five rebinding tests in
+  `lang_instance_registry_identity_key` and
+  `lang_standard_infix_call_completion`, and the second `law Foo` in
+  `verify_globals_identity_checked_insert`, send only the re-declaration
+  through `elaborate_session_decl_results_v1` and keep their original
+  diagnostic and distinct-`GlobalId` assertions; each file adds one
+  package-route pin (`DuplicateDefinition`, original owner unchanged). For
+  the `S.read` space/module overlap, the package route's
+  `DuplicateDefinition` pre-empts `DeclarationIdentityCollision` with the
+  first owner kept, and the session route keeps
+  `DeclarationIdentityCollision` covered in both orders. No engineered
+  alias fixture.
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
   their results. `rt_dasm_d1b_role_a_role_authority` is green with its
