@@ -1,7 +1,7 @@
 ---
 id: LANG-NATIVE-SIGMA-ERASED-FIELD
 title: "Native lowering of a relevant Σ lowers its first field unconditionally, so a proof-first relevant Σ (Σ(p : Eq Int 7 7).Int) reaches the ErasedOmegaSubterm arm and refuses natively, although the plan keeps the pair and the interpreter returns Pair { fst: Neutral, snd: Int(8) }. Give an erased field in a retained Σ slot a native representation at interpreter parity"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
