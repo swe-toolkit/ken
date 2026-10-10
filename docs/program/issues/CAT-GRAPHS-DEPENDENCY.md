@@ -1,7 +1,7 @@
 ---
 id: CAT-GRAPHS-DEPENDENCY
 title: "No catalog package gives a finite directed graph a decided reachability or a checked dependency order. Deliver section 1 of spec/50-stdlib/62-graphs.md as Algorithm.Graphs.Dependency: Graph, genuine walks and cycles, reachability reused from the landed automata decision, and a complete topological order or a real cycle, fully proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2

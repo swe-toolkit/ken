@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-DEPENDENCY-CONTRACT
 title: "No graph or dependency-structure contract exists in spec/50-stdlib, so the catalog's graphs layer has nothing to build against. Author spec/50-stdlib/62-graphs.md with its first section: a finite directed graph, decidable reachability, and a topological order or a cycle witness, each law proved at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -70,3 +70,17 @@ base, stop and report the mismatch.
 - Reusing the automata decision would change spec 61 section 2's
   normative laws: the D0 rules the change, and it is in this scope only
   if the Architect places it here.
+
+## Closeout
+
+Merged `bd3deaebb` from exact `9501f1a76` (PR #4641). Architect D0
+`evt_5kbcdx6e29rkg`, Architect `evt_3eee7nq87awrh`, conformance validator
+`evt_1wxjwmgc11php`, Decision `dec_2rkbm7r03x2q7`. Section 1 of
+`spec/50-stdlib/62-graphs.md` is normative for 23 public declarations in
+`Algorithm.Graphs.Dependency`: `Graph q` with a Boolean edge function;
+genuine walks, cycles and reach witnesses; reachability reusing the
+landed automata decision; and `dependency_order_or_cycle`, a complete
+duplicate-free order or a real cycle, with `DecEq q` only there and no
+`Ord q`. Deferred: SCCs, shortest paths, weighted edges, a successor-list
+adaptor, canonical orders and a cycle-refutes-order theorem. The ten-case
+seed is `conformance/stdlib/graphs/seed-dependency.md`. §1a: 0.
