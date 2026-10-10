@@ -6924,7 +6924,6 @@ impl<'a> Lowering<'a> {
             static_origin, self.defining_emission_owner,
         )?;
         let eliminator = eliminators[0];
-        let mut deferred_drive_available = false;
         if let Some(row) = self
             .static_transition_plan
             .deferred_response_at_vis(static_origin)?
@@ -6933,7 +6932,6 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .bounded_deferred_response_handler_owner(&row)?
                 .is_some_and(|owner| self.defining_emission_owner == Some(owner));
-            deferred_drive_available = current_owns_response;
             if current_owns_response
                 && !handler_owned_deferred_response_mutation_applies(
                     HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
@@ -6957,28 +6955,10 @@ impl<'a> Lowering<'a> {
                 return Ok(ProducerTrampolineStep::ordinary(resumed));
             }
         }
-        // The handler-owned route above is authoritative for its own source.
-        // A relay source without that route is driven under the *response*
-        // owner's emission identity, never solely under its own Vis identity.
-        if !deferred_drive_available {
-            if let Some(owner) = self.defining_emission_owner {
-                if let Some(pair) = self.static_transition_plan.relay_drive_pair(static_origin, owner)? {
-                    if pair.source != static_origin || pair.owner != owner {
-                        return Err(unsupported("RelayDrive", "a planned source/owner pair changed identity"));
-                    }
-                    let lowered_args = args.iter().enumerate().map(|(position, arg)| {
-                        let arg = self.child_occurrence(static_origin, position, arg)?;
-                        self.lower_expr(builder, arg, producer_env)
-                    }).collect::<Result<Vec<_>, _>>()?;
-                    let resumed = self.drive_response_at_source(
-                        builder, static_origin, &lowered_args,
-                        pair.operation_root_origin, pair.effect_origin, pair.operation,
-                        Some(eliminators),
-                    )?;
-                    return Ok(ProducerTrampolineStep::ordinary(resumed));
-                }
-            }
-        }
+        // An admitted relay source stays under its enclosing eliminator:
+        // fusion selects the producer path, and its installed response owner
+        // performs the effect. The handler-owned Deferred route above retains
+        // precedence and its own inline K, but there is no relay drive here.
         let terminal_exit = constructor == &self.process_symbols.exit_success
             || constructor == &self.process_symbols.exit_failure;
         let itree_frame = match eliminator {
