@@ -111,6 +111,11 @@ pub(crate) enum GovernedAllocationMutation {
     /// record lookup rejects nonsense; taking a real one tests that ownership
     /// discriminates between two aggregates the plan considers equally real.
     SiblingAggregateProducer,
+    /// Swap only the producer certificates of two literal Constructor fields
+    /// under one source parent, leaving both children and their positions
+    /// unchanged. This targets the parent's per-position identity check,
+    /// rather than substituting a call input.
+    SiblingChildProducer,
     /// Transfer a still-specialized call input at the PROGRAM ROOT's occurrence
     /// instead of the callee's scheduling entry, at the one call-input site that
     /// has no caller-side occurrence to carry.
@@ -830,6 +835,10 @@ impl<'a> Lowering<'a> {
         /// what makes "refuses before any allocation" true of the whole tree rather
         /// than of its root.
         pub(super) fn source_aggregate_preflight(&self, value: &Lowered) -> Result<(), CraneliftBackendError> {
+            #[cfg(test)]
+            let altered = self.substitute_sibling_child_producer(value);
+            #[cfg(test)]
+            let value = altered.as_ref().unwrap_or(value);
             match value {
                 // ── the two source aggregates: reconciled AT THIS NODE ────────
                 Lowered::Constructor { args, .. } => {
@@ -1193,6 +1202,62 @@ impl<'a> Lowering<'a> {
             self.represented_boundary_admissibility(value)?;
             self.source_aggregate_preflight(value)?;
             self.emit_carrier_transfer(builder, origin, value)
+        }
+
+        /// Test-only mutation at the parent preflight: two real source-literal
+        /// children exchange only their occurrence certificates. Their values,
+        /// fields and positions stay fixed; the mismatch must be caught by the
+        /// parent's per-position comparison before any carrier allocation.
+        #[cfg(test)]
+        fn substitute_sibling_child_producer(&self, value: &Lowered) -> Option<Lowered> {
+            if GOVERNED_ALLOCATION_MUTATION.with(std::cell::Cell::get)
+                != GovernedAllocationMutation::SiblingChildProducer
+                || GOVERNED_ALLOCATION_HITS.with(std::cell::Cell::get) != 0
+            {
+                return None;
+            }
+            let mut altered = value.clone();
+            let Lowered::Constructor { occurrence: Some(_), args, .. } = &mut altered else {
+                return None;
+            };
+            let [ConstructorField::Specialized(Lowered::Constructor {
+                constructor: first_symbol,
+                occurrence: first,
+                ..
+            }), ConstructorField::Specialized(Lowered::Constructor {
+                constructor: second_symbol,
+                occurrence: second,
+                ..
+            }), ..] = args.as_mut_slice() else {
+                return None;
+            };
+            let (Some(before), Some(after)) = (*first, *second) else {
+                return None;
+            };
+            if before == after || first_symbol != second_symbol {
+                return None;
+            }
+            let first_record = self.static_transition_plan.aggregate_record_view(before).ok()?;
+            let second_record = self.static_transition_plan.aggregate_record_view(after).ok()?;
+            let same_shape = first_record.shape() == second_record.shape();
+            let same_lane = first_record.allocation() == second_record.allocation();
+            if !same_shape || !same_lane
+                || first_record.producer_origin().is_none()
+                || second_record.producer_origin().is_none()
+            {
+                return None;
+            }
+            std::mem::swap(first, second);
+            SIBLING_PRODUCER_SUBSTITUTION.with(|cell| {
+                cell.set(Some(SiblingProducerSubstitution {
+                    from: Some(before),
+                    to: after,
+                    same_shape,
+                    same_lane,
+                }));
+            });
+            governed_allocation_hit();
+            Some(altered)
         }
 
         /// Reconcile ONE source aggregate node against the ownership record its own
@@ -5589,6 +5654,23 @@ pub(in crate::cranelift_backend::lowering) mod tests {
         }
     }
 
+    /// A parent source Construct with two literal children at distinct origins.
+    /// Both children have the same symbol, shape and lane; only their certified
+    /// producer identities distinguish their positions.
+    fn d7_literal_sibling_children() -> RuntimeExpr {
+        let child = || RuntimeExpr::Construct {
+            constructor: "ctor:fixture::CallInput::Alpha".to_string(),
+            args: Vec::new(),
+        };
+        d7_ownership_recursor(vec![
+            RuntimeExpr::Construct {
+                constructor: "ctor:fixture::CallInput::Pair".to_string(),
+                args: vec![child(), child()],
+            },
+            d7_wrap("ctor:fixture::CallInput::Beta"),
+        ])
+    }
+
     /// The same design one shape over: two records with the same field names and
     /// arity and different field constructors.
     fn d7_record_arguments() -> RuntimeExpr {
@@ -6028,6 +6110,38 @@ pub(in crate::cranelift_backend::lowering) mod tests {
         result.expect("a source Construct with a forwarded child compiles across the boundary");
         assert_eq!(hits, 0, "the baseline must not substitute a sibling producer");
         assert!(allocations > 0, "the carried boundary must allocate");
+    }
+
+    /// Promise class: durable ownership invariant. MEASURED: two literal
+    /// Constructor child positions of one source parent have independently
+    /// issued, same-shape/same-lane producer records. Swapping ONLY their
+    /// certificates refuses before allocation at the exact position check.
+    /// CLAIMED: a source producer position cannot borrow a sibling's record.
+    /// THE GAP: this does not cover forwarding; the Var-position control above
+    /// covers that disjoint branch.
+    #[test]
+    fn d7_literal_sibling_child_certificates_are_bound_to_their_positions() {
+        let program = d7_literal_sibling_children();
+        let (baseline, baseline_hits, baseline_allocations, _) =
+            d7_ownership_run(&program, GovernedAllocationMutation::None);
+        baseline.expect("the unmutated two-literal-child crossing must compile");
+        assert_eq!(baseline_hits, 0);
+        assert!(baseline_allocations > 0, "baseline must cross the allocating boundary");
+
+        let (mutated, hits, allocations, swap) =
+            d7_ownership_run(&program, GovernedAllocationMutation::SiblingChildProducer);
+        assert_eq!(hits, 1, "the sibling child certificates must actually swap");
+        let swap = swap.expect("a reached certificate swap records both occurrences");
+        assert_ne!(swap.from, Some(swap.to));
+        assert!(swap.same_shape && swap.same_lane, "only identity may change: {swap:?}");
+        let reason = format!("{:?}", mutated.expect_err("a swapped child must be refused"));
+        assert_eq!(allocations, 0, "preflight must refuse before the first allocation");
+        assert!(
+            reason.contains("carries producer occurrence")
+                && reason.contains("the planner planned")
+                && reason.contains("at that position"),
+            "refusal must be the parent's exact child-position check: {reason}"
+        );
     }
 
     #[test]
