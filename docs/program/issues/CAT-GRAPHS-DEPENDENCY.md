@@ -1,7 +1,7 @@
 ---
 id: CAT-GRAPHS-DEPENDENCY
 title: "No catalog package gives a finite directed graph a decided reachability or a checked dependency order. Deliver section 1 of spec/50-stdlib/62-graphs.md as Algorithm.Graphs.Dependency: Graph, genuine walks and cycles, reachability reused from the landed automata decision, and a complete topological order or a real cycle, fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -75,3 +75,16 @@ base, stop and report the mismatch.
 - Reuse needs a change to Reachability's or Finite's public surface or
   laws.
 - A seed case fails on the delivered package.
+
+## Closeout
+
+Merged `725b73258` from exact `cf42465a6` (PR #4655). Foundation QA
+`evt_52e6crm1d0thr`, Architect `evt_fya44jk97vch`, Decision
+`dec_2f2xkddawfnpy`. `Algorithm.Graphs.Dependency` delivers all 23
+section 1 names; every law is kernel-checked with `trusted_base()`
+unchanged. Reachability reuses `find_word` and `reachable` with their
+laws; ordering reuses `DC.sort` with `sort::sorted` and `sort::perm`. The
+AC-3 sweep found 87 importer files, all green; the AC-4 mutants
+kernel-reject. Two WIP audits recut the delivery, a QA block repaired the
+edge-direction gate, and the Architect deleted four unreferenced private
+declarations before approval. No hard stops.
