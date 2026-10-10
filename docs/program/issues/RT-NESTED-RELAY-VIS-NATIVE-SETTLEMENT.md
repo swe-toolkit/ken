@@ -307,6 +307,11 @@ base, stop and report the mismatch.
    - **Candidate gate.** Every admitted pair carries a recorded route.
      A census row whose admitted pair's forwarded op appears in neither
      trace is `vacuous for performance` and is not coverage.
+   - **The defect on main (`evt_3s45p56abgg27`).** Main `7a890f13d`
+     builds in-bounds `BRANCHED_SCRUTINEE` natively and runs it to exit
+     72 while dropping the forwarded FsReadAt the interpreter performs.
+     Exit-code parity cannot see it, because the program discards the
+     read's outcome. This WP owns closing it; it predates D4'.
 
 ## Acceptance
 
@@ -374,6 +379,14 @@ base, stop and report the mismatch.
     any trace difference. After all rows, the sum of (i) over every
     admitted pair must be above 0; a sum of 0 is a stop, because the gate
     never executed a relay source.
+- **AC-MAIN (`evt_3s45p56abgg27`).** A permanent test,
+  `branched_scrutinee_forwarded_read_is_performed_or_refused` in
+  `crates/ken-cli/tests/rt_branched_scrutinee_unit_body_port.rs`, runs
+  the in-bounds variant. It is red on main because the native ops
+  differ from the interpreter's, never through the exit code. On the
+  candidate it asserts the one outcome the D0 decision rule selects:
+  native ops equal the interpreter's, with FsReadAt performed through
+  the route, or the native build refused with D3's typed relay refusal.
 - **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
   census pair (span owner 4, source 1374) fires the typed refusal for that
   owner and reddens AC-1, and is restored byte-identically.
