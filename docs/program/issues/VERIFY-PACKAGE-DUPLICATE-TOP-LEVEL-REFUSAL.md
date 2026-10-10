@@ -89,6 +89,19 @@ an admitted declaration's spelling.
   `t_ac1`, `t_ac2`, `t_ac3` and `t_ac3_guard` per corpus row (suite 9/9),
   and `ken-interp/tests/omega_erasure_cache_rollback.rs` gives its second
   declaration a fresh name and keeps the same-`GlobalId` assertion (1/1).
+- **AC-1b (recut after a second red, `evt_7feyt3anyw496`).** The source
+  inventory missed `lang_instance_registry_identity_key::
+  rebound_declaration_entry_refuses_the_old_dictionary_identity`, which
+  rebinds `data Foo` in a later `elaborate_decl` unit to pin the
+  instance-registry identity guard. The consumer population is now
+  measured by execution, not by source: every test target of each crate
+  whose tests call `elaborate_decl*` or `elaborate_file`, run with
+  `scripts/ken-cargo test -p <crate> --no-fail-fast` on the candidate, and
+  every `DuplicateDefinition` or `AmbiguousReference` failure listed. A
+  hit whose test exists to exercise rebinding (as this one does) goes to
+  the Architect before any edit: rename, session entry, or a rewrite that
+  keeps the guarded behaviour reachable. Renames under AC-1a need no
+  ruling.
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
   their results. `rt_dasm_d1b_role_a_role_authority` is green with its
