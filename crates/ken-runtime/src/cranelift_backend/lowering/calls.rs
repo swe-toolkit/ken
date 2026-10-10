@@ -2115,25 +2115,6 @@ impl<'a> Lowering<'a> {
             selected_ticket: Option<cranelift_codegen::ir::Value>,
             #[cfg(test)] launch_ingress: Option<cranelift_codegen::ir::Value>,
         ) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst), CraneliftBackendError> {
-            let (answer, call, _) = self.call_declared_unit_target_with_frame(
-                builder, target, inputs, selected_ticket,
-                #[cfg(test)] launch_ingress,
-            )?;
-            Ok((answer, call))
-        }
-
-        /// The same checked call, retaining its caller-allocated callee frame
-        /// for an immediate, plan-authorized pending-Vis settlement. Existing
-        /// callers use the wrapper and cannot read the frame.
-        pub(super) fn call_declared_unit_target_with_frame(
-            &mut self,
-            builder: &mut FunctionBuilder<'_>,
-            target: units::DeclaredUnitCall,
-            inputs: &[LoweringOperand],
-            selected_ticket: Option<cranelift_codegen::ir::Value>,
-            #[cfg(test)] launch_ingress: Option<cranelift_codegen::ir::Value>,
-        ) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst,
-                    cranelift_codegen::ir::StackSlot), CraneliftBackendError> {
             // The consuming gate runs FIRST: not a single borrowed parameter,
             // capture, frame slot or effect may be read on a rejected ticket.
             if let Some(ticket) = selected_ticket {
@@ -2424,7 +2405,7 @@ impl<'a> Lowering<'a> {
                 == TrapCallerProtocolMutation::ReadResultBeforeTrap
             {
                 let word = builder.ins().stack_load(types::I64, payload, result_offset);
-                return Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call, payload));
+                return Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call));
             }
             let trap_word = builder.ins().stack_load(types::I64, payload, trap_offset);
             let cranelift_codegen::ir::ValueDef::Result(trap_load, _) =
@@ -2616,10 +2597,9 @@ impl<'a> Lowering<'a> {
                         boundary_environment: Some(environment.record()),
                     }),
                     call,
-                    payload,
                 ));
             }
-            Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call, payload))
+            Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), call))
         }
 }
 
