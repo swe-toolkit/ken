@@ -6219,6 +6219,18 @@ impl<'a> Lowering<'a> {
                         .static_transition_plan
                         .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner));
+                    if current_owns_response {
+                        if let Some(owner) = self.defining_emission_owner {
+                            if self.static_transition_plan
+                                .relay_drive_pair(row.vis_origin(), owner)?
+                                .is_some()
+                            {
+                                return Err(backend(BackendFailure::PlannerInvariant(
+                                    "relay: pair minted for a source the handler-owned Deferred drive consumes".to_owned(),
+                                )));
+                            }
+                        }
+                    }
                     if !current_owns_response
                         || handler_owned_deferred_response_mutation_applies(
                             HandlerOwnedDeferredResponseMutation::SuppressUnitlessDrive,
@@ -6983,6 +6995,18 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .bounded_deferred_response_handler_owner(&row)?
                 .is_some_and(|owner| self.defining_emission_owner == Some(owner));
+            if current_owns_response {
+                if let Some(owner) = self.defining_emission_owner {
+                    if self.static_transition_plan
+                        .relay_drive_pair(static_origin, owner)?
+                        .is_some()
+                    {
+                        return Err(backend(BackendFailure::PlannerInvariant(
+                            "relay: pair minted for a source the handler-owned Deferred drive consumes".to_owned(),
+                        )));
+                    }
+                }
+            }
             if current_owns_response
                 && !handler_owned_deferred_response_mutation_applies(
                     HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
@@ -16780,6 +16804,16 @@ impl<'a> Lowering<'a> {
                         .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner))
                     {
+                        if let Some(owner) = self.defining_emission_owner {
+                            if self.static_transition_plan
+                                .relay_drive_pair(static_origin, owner)?
+                                .is_some()
+                            {
+                                return Err(backend(BackendFailure::PlannerInvariant(
+                                    "relay: pair minted for a source the handler-owned Deferred drive consumes".to_owned(),
+                                )));
+                            }
+                        }
                         if !handler_owned_deferred_response_mutation_applies(
                             HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
                         ) {

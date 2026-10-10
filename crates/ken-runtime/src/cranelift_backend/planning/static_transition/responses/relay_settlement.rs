@@ -241,6 +241,32 @@ fn source_seat_row<'r>(
         .then_some(*row)
 }
 
+// One source has one consumer. The handler-owned Deferred path owns the
+// source before the relay path may mint a pair for the same owner.
+fn deferred_drive_settles(
+    plan: &StaticTransitionPlan<'_>,
+    source: &Source,
+    owner: ContinuationEmissionOwner,
+) -> Result<bool, CraneliftBackendError> {
+    let Some(row) = plan.deferred_response_at_vis(source.vis)? else {
+        return Ok(false);
+    };
+    Ok(match row.sub_case() {
+        DeferredResponseSubCase::UnconsumedTransportCaller => {
+            plan.bounded_deferred_response_handler_owner(&row)? == Some(owner)
+        }
+        DeferredResponseSubCase::NoContinuationUnit => {
+            let unitless = match source.redex_body {
+                Some(body) => plan.deferred_no_unit_response_in_body(body)?,
+                None => None,
+            };
+            unitless.as_ref() == Some(&row)
+                && plan.admitted_deferred_handler_owner(&row)? == Some(owner)
+        }
+        DeferredResponseSubCase::ContinuationBodyTail => false,
+    })
+}
+
 /// Build the admission key from the same closed relay-source traversal used
 /// by classification. A failed/open traversal installs no speculative pair;
 /// the refusal below reports the reason rather than inventing a route.
@@ -273,6 +299,9 @@ pub(super) fn build_drive_pairs(
                         continue;
                     };
                     let owner_key = owner.base_owner();
+                    if deferred_drive_settles(plan, &source, owner_key)? {
+                        continue;
+                    }
                     let pair = RelayDrivePair {
                         source: source.vis,
                         owner: owner_key,
@@ -382,19 +411,8 @@ fn classify(plan: &StaticTransitionPlan<'_>, emit_records: bool) -> (Vec<String>
                                     (&unitless_row, &deferred),
                                     (Some(Ok(Some(unitless))), Ok(Some(row))) if unitless == row
                                 );
-                                let drive_settled = match deferred.as_ref() {
-                                    Ok(Some(row)) => match row.sub_case() {
-                                        DeferredResponseSubCase::UnconsumedTransportCaller =>
-                                            matches!(&bounded_handler, Some(Ok(Some(actual)))
-                                                if *actual == owner.base_owner()),
-                                        DeferredResponseSubCase::NoContinuationUnit =>
-                                            source.redex_body.is_some() && unitless_matches
-                                            && matches!(&admitted_handler, Some(Ok(Some(actual)))
-                                                if *actual == owner.base_owner()),
-                                        DeferredResponseSubCase::ContinuationBodyTail => false,
-                                    },
-                                    Ok(None) | Err(_) => false,
-                                };
+                                let drive_result = deferred_drive_settles(plan, &source, owner.base_owner());
+                                let drive_settled = matches!(&drive_result, Ok(true));
                                 let relay_drivable = a_unique_row_and_seat
                                     && b_construct_closure.as_ref().is_ok_and(|b| *b)
                                     && c_tail_forward_only && matches!(&d_pair, Ok(Some(_)));
@@ -405,6 +423,7 @@ fn classify(plan: &StaticTransitionPlan<'_>, emit_records: bool) -> (Vec<String>
                                         owner.id(), member.origin, source.vis, source.via, source.redex_body, rows.len());
                                 }
                                 if let Err(error) = d_pair { errors.push(error.to_string()); }
+                                if let Err(error) = drive_result { errors.push(error.to_string()); }
                                 if let Err(error) = b_construct_closure { errors.push(error); }
                                 if let Err(error) = deferred { errors.push(error.to_string()); }
                                 if let Some(Err(error)) = bounded_handler { errors.push(error.to_string()); }
