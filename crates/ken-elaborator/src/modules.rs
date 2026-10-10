@@ -4818,6 +4818,30 @@ fn expand_scope(
                             node_names.insert(format!("{family}.{ctor}"), index);
                         }
                     }
+                    // Prop intros are not prebound as bare names. Their only
+                    // selectable graph spelling is the checked family selector.
+                    if let Decl::PropDecl { intros, .. } = inner {
+                        let family = family.as_ref().ok_or_else(|| {
+                            ElabError::Internal(format!(
+                                "prop '{}' has no prebound family binding",
+                                inner.name()
+                            ))
+                        })?;
+                        for intro in intros {
+                            let key = format!("{family}.{}", intro.name);
+                            // A segment node cannot claim another family's selector:
+                            // its source name is one token, or an attached proof's
+                            // qualified subject followed by `::proof`. A data family
+                            // cannot share the prop's name in the same scope.
+                            if let Some(previous) = node_names.insert(key.clone(), index) {
+                                if previous != index {
+                                    return Err(ElabError::Internal(format!(
+                                        "prop intro graph key '{key}' collides with another declaration node"
+                                    )));
+                                }
+                            }
+                        }
+                    }
                     raw_rdecls.push(raw);
                     rdecls.push(rdecl);
                 }
