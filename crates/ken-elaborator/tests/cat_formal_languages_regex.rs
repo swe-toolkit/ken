@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_interp::eval::{eval, eval_checked, EvalStore, EvalVal};
 use ken_kernel::Decl;
 
 const REGEX: &str = "Algorithm.FormalLanguages.Regex";
@@ -24,10 +24,12 @@ fn root() -> PathBuf {
 
 fn checked_bool(env: &ElabEnv, name: &str) -> bool {
     let id = env.globals[name];
-    let Some(Decl::Transparent { body, .. }) = env.env.lookup(id) else {
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(id) else {
         panic!("{name} must have a kernel-checked transparent body");
     };
-    match eval(&[], body, &env.env, &mut EvalStore::new()) {
+    match eval_checked(body, ty, &env.env, &mut EvalStore::new())
+        .expect("kernel-classified erasure plan for a checked transparent body")
+    {
         EvalVal::Ctor { id, args, .. } if id == env.numeric_env.bool_true_id && args.is_empty() => {
             true
         }
@@ -489,6 +491,25 @@ fn seven_regex_seed_cases_match_the_independent_evidence() {
             panic!("kernel-reduced seed case {name} must be {truth}: {error:?}")
         });
     }
+    // Transition sentinel: raw value-only eval does not classify its root.
+    // The dictionary's checked body collapses, but the un-erased projection in
+    // this exact root still selects a nonexistent field. Typed eval applies
+    // the root's own plan before unfolding the same checked dictionary.
+    let d_same = env.globals["d_same"];
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(d_same) else {
+        panic!("d_same must have a kernel-checked transparent body");
+    };
+    assert!(matches!(
+        eval(&[], body, &env.env, &mut EvalStore::new()),
+        EvalVal::Neutral
+    ));
+    assert!(matches!(
+        eval_checked(body, ty, &env.env, &mut EvalStore::new())
+            .expect("the same checked d_same body has a kernel-classified plan"),
+        EvalVal::Ctor { id, ref args, .. }
+            if id == env.numeric_env.bool_true_id && args.is_empty()
+    ));
+
     for (name, expected) in [
         ("fail_z", false),
         ("fail_t", false),
