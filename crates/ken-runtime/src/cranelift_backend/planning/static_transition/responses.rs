@@ -30,6 +30,7 @@ use super::{
     CheckedIhEnvironmentTransport, CraneliftBackendError, StaticTransitionPlan,
 };
 use crate::cranelift_backend::grafted_spine_control_graph::GraftedSpineFunctionScope;
+use crate::cranelift_backend::backend_module;
 use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
 /// A response site that may carry a `StaticResponseDeferred` placeholder.
@@ -1330,38 +1331,68 @@ impl StaticTransitionPlan<'_> {
             return Ok(BTreeMap::new());
         }
         let candidates = self.return_protocol_candidate_rows()?;
-        let mut emitted = BTreeMap::<StaticResponseContinuationId, &StaticResponseContinuation>::new();
-        for row in &self.static_response_continuations {
-            emitted.insert(row.id(), row);
+        // This is the emitter's population, not every planned response row.
+        // The protocol cloned into the lowerer is this same plan object; the
+        // successor's own base_owner is NOT the function that emits it.
+        let rows = self.static_response_feasibility_ledger_all()?.map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            ))
+        })?;
+        let owners = self.static_response_owner_specializations()?.map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            ))
+        })?;
+        if owners.len() != rows.len() {
+            return Err(planner_error(
+                "the response-owner definition population disagrees with the validated response rows",
+            ));
         }
-        if let Some(protocol) = &self.pending_vis_settlements.protocol {
-            for member in protocol.owners.values().flat_map(|owner| &owner.contexts)
-                .flat_map(|context| &context.members)
-            {
-                let row = member.successor.as_ref().ok_or_else(||
-                    planner_error("a returned-Vis member has no response row"))?;
-                if let Some(previous) = emitted.insert(row.id(), row) {
-                    if previous != row {
-                        return Err(planner_error("one emitted relay member identity names different response rows"));
-                    }
-                }
-            }
-        }
-        // The source's own response row need not be installed: a returned-Vis
-        // successor in its response owner can perform the same effect. Index
-        // only emitted clauses, on owner and checked effect identity as well
-        // as the closed host operation. Refuse competing emitted identities.
         let mut clauses = BTreeMap::<
             (ContinuationEmissionOwner, StaticOriginId, HostOpV1),
             StaticResponseContinuationId,
         >::new();
-        for row in emitted.values() {
-            let key = (row.base_owner(), row.effect_origin(), row.operation());
+        let mut put = |enclosing: ContinuationEmissionOwner,
+                       row: &StaticResponseContinuation|
+         -> Result<(), CraneliftBackendError> {
+            let key = (enclosing, row.effect_origin(), row.operation());
             if let Some(previous) = clauses.insert(key, row.id()) {
                 if previous != row.id() {
                     return Err(planner_error(
                         "two emitted clauses claim one owner/effect/operation",
                     ));
+                }
+            }
+            Ok(())
+        };
+        for (owner, row) in owners.iter().zip(&rows) {
+            if owner.response() != row.id()
+                || owner.base_owner() != row.base_owner()
+                || owner.selected_caller() != row.k_identity()
+                || owner.k_context() != row.k_context()
+            {
+                return Err(planner_error(
+                    "a response-owner definition disagrees with its validated response row",
+                ));
+            }
+            let enclosing = row.base_owner();
+            put(enclosing, row)?;
+            if let Some(protocol) = self.pending_vis_settlements.protocol.as_ref()
+                .and_then(|protocol| protocol.owners.get(&row.id()))
+            {
+                let mut distinct_successors = BTreeMap::new();
+                for context in &protocol.contexts {
+                    for member in &context.members {
+                        let successor = member.successor.as_ref().ok_or_else(||
+                            planner_error("a pending-Vis member has no derived response row"))?;
+                        distinct_successors.entry(successor.id()).or_insert(successor);
+                    }
+                }
+                for successor in distinct_successors.into_values() {
+                    put(enclosing, successor)?;
                 }
             }
         }
