@@ -58,7 +58,6 @@ pub struct ModuleState {
     /// Seed the next unit's resolver duplicate check from this set, not from
     /// the mutable flat globals table. A failing unit never commits its names.
     pub(crate) package_definitions: HashSet<String>,
-    pub(crate) temp_dup_census_ready: bool,
     /// Qualified module path (`"M"`, `"M.N"`) → {bare `pub` name → canonical
     /// qualified name}. Populated whenever a `module { … }` block elaborates.
     /// Only `pub` names are recorded here — the export table IS the
@@ -5316,15 +5315,10 @@ fn scc_dependency_order(adj: &[Vec<usize>], sccs: &[Vec<usize>]) -> Vec<usize> {
 /// Entry point: expand + elaborate one `elaborate_*` call's raw decls
 /// against the persisted root scope (the file-level implicit module,
 /// `33 §3.1`), returning every produced `ElabResult` in order.
-#[track_caller]
 pub fn expand_and_elaborate(
     elab: &mut ElabEnv,
     decls: &[Decl],
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
-    if elab.module_state.temp_dup_census_ready && std::env::var_os("KEN_DUP_CENSUS").is_some() {
-        let site = std::panic::Location::caller();
-        eprintln!("DUP_CENSUS caller={}:{}:{}", site.file(), site.line(), site.column());
-    }
     let boundary = admission_boundary(decls)?;
     let direct_call = boundary.is_some() && elab.class_env.current_package.is_none();
     let previous_package = elab.class_env.current_package.clone();
