@@ -251,6 +251,17 @@ with a checked `Walk` witness rather than a raw word that may stutter.
 a genuine cycle result; both branches carry checked evidence. The chapter
 does not claim its catalog build has landed or add a second fixed point.
 
+The **exact finite-support statistics contract** is pinned in
+**`63-statistics.md`** §1 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT).
+`Algorithm.Statistics.Exact` stores a finite list of natural-weight atoms
+with a checked positive total, without `Finite q` or `DecEq q`. Boolean
+event mass and natural-score expectation are exact numerators over that
+total; complement, disjoint additivity, expectation and pointwise
+congruence have nine required checked laws. Ratio equality uses natural
+cross multiplication; no rational-valued API or catalog delivery is
+claimed. `pure`/`bind`, uniform enumeration, approximate statistics and
+`Float` results remain deferred.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
