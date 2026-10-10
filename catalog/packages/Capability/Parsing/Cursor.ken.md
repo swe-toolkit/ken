@@ -211,7 +211,8 @@ The laws are predicates over an explicit dictionary. A successful peek must
 have positive remaining input, advancing such a cursor must strictly reduce
 that computed bound, and a zero remaining count must be an end position.
 
-`arg_cursor_laws` proves all three for the shipped byte cursor. The `lt_nat::leq_suc` proof from `Data.Numeric.Nat.Order` identifies strict
+`arg_cursor_laws` proves all three for the shipped byte cursor. The
+`lt_nat::leq_suc` proof from `Data.Numeric.Nat.Order` identifies strict
 `lt_nat a b` with the canonical `leq_nat (Suc a) b` evidence used by the
 imported subtraction laws. The
 normalization proof preserves the computed remaining count while it skips
@@ -811,6 +812,335 @@ pub theorem arg_cursor_laws : CursorLaws ArgCursor UInt8 ArgLocation arg_cursor_
       (CursorEndValid ArgCursor UInt8 ArgLocation arg_cursor_ops)
       arg_cursor_advance_progress
       arg_cursor_end_valid)
+```
+
+The bounded list view stops at the first empty peek. A successful peek consumes
+one unit of fuel even when an arbitrary cursor does not advance. The end law
+requires no cursor laws; the step law uses only advance progress from the
+explicit `CursorLaws` proof, relating the two fuel bounds without requiring
+an element-equality decision. The scan and all proof helpers are checked with
+the same dictionary as the existing argument cursor.
+
+```ken
+pub fn cursor_take
+      (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (fuel : Nat) (cur : c)
+    : List el =
+  match fuel {
+    Zero ↦ Nil el;
+    Suc fuel2 ↦
+      match cursor_peek c el loc ops cur {
+        None ↦ Nil el;
+        Some x ↦ Cons el x (cursor_take c el loc ops fuel2 (cursor_advance c el loc ops cur))
+      }
+  }
+
+pub fn cursor_elements
+      (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (cur : c)
+    : List el =
+  cursor_take c el loc ops (cursor_remaining c el loc ops cur) cur
+
+pub theorem cursor_elements_peek_none
+      (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (cur : c)
+    : Equal (Option el) (cursor_peek c el loc ops cur) (None el)
+      → Equal (List el) (cursor_elements c el loc ops cur) (Nil el) =
+  λpeeked. cursor_take_peek_none c el loc ops (cursor_remaining c el loc ops cur) cur peeked
+
+pub theorem cursor_elements_peek_some
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (laws : CursorLaws c el loc ops)
+      (cur : c)
+      (x : el)
+    : Equal (Option el) (cursor_peek c el loc ops cur) (Some el x)
+      → Equal
+        (List el)
+        (cursor_elements c el loc ops cur)
+        (Cons el x (cursor_elements c el loc ops (cursor_advance c el loc ops cur))) =
+  λpeeked.
+    let
+      progress : CursorAdvanceProgress c el loc ops =
+        and_fst
+          (CursorAdvanceProgress c el loc ops)
+          (CursorEndValid c el loc ops)
+          (and_snd
+            (CursorPeekHasRemaining c el loc ops)
+            (And (CursorAdvanceProgress c el loc ops) (CursorEndValid c el loc ops))
+            laws);
+      rem : Nat = cursor_remaining c el loc ops cur;
+      adv : c = cursor_advance c el loc ops cur;
+      rem_adv : Nat = cursor_remaining c el loc ops adv;
+      shrinks : Equal Bool (lt_nat rem_adv rem) True = progress cur x peeked;
+      widen : Equal
+        (List el)
+        (cursor_take c el loc ops rem cur)
+        (cursor_take c el loc ops (Suc rem) cur) =
+        cursor_take_stable
+          c
+          el
+          loc
+          ops
+          progress
+          rem
+          (Suc rem)
+          cur
+          ((proof self_suc for lt_nat) rem)
+          ((proof trans for lt_nat)
+            rem
+            (Suc rem)
+            (Suc (Suc rem))
+            ((proof self_suc for lt_nat) rem)
+            ((proof self_suc for lt_nat) (Suc rem)));
+      step_some : Equal
+        (List el)
+        (cursor_take c el loc ops (Suc rem) cur)
+        (Cons el x (cursor_take c el loc ops rem adv)) =
+        cong
+          (Option el)
+          (List el)
+          (cursor_peek c el loc ops cur)
+          (Some el x)
+          (λselected. cursor_take_step c el loc ops rem cur selected)
+          peeked;
+      tail_stable : Equal
+        (List el)
+        (cursor_take c el loc ops rem adv)
+        (cursor_take c el loc ops rem_adv adv) =
+        cursor_take_stable
+          c
+          el
+          loc
+          ops
+          progress
+          rem
+          rem_adv
+          adv
+          ((proof trans for lt_nat)
+            rem_adv
+            rem
+            (Suc rem)
+            shrinks
+            ((proof self_suc for lt_nat) rem))
+          ((proof self_suc for lt_nat) rem_adv)
+    in
+      trans
+        (List el)
+        (cursor_take c el loc ops rem cur)
+        (cursor_take c el loc ops (Suc rem) cur)
+        (Cons el x (cursor_take c el loc ops rem_adv adv))
+        widen
+        (trans
+          (List el)
+          (cursor_take c el loc ops (Suc rem) cur)
+          (Cons el x (cursor_take c el loc ops rem adv))
+          (Cons el x (cursor_take c el loc ops rem_adv adv))
+          step_some
+          (cong
+            (List el)
+            (List el)
+            (cursor_take c el loc ops rem adv)
+            (cursor_take c el loc ops rem_adv adv)
+            (Cons el x)
+            tail_stable))
+
+fn cursor_take_step
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (fuel : Nat)
+      (cur : c)
+      (selected : Option el)
+    : List el =
+  match selected {
+    None ↦ Nil el;
+    Some x ↦ Cons el x (cursor_take c el loc ops fuel (cursor_advance c el loc ops cur))
+  }
+
+theorem cursor_take_peek_none
+      (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc) (fuel : Nat)
+    : (cur : c)
+      → Equal (Option el) (cursor_peek c el loc ops cur) (None el)
+      → Equal (List el) (cursor_take c el loc ops fuel cur) (Nil el) =
+  match fuel {
+    Zero ↦ λcur. λpeeked. Proved;
+    Suc fuel2 ↦
+      λcur.
+        λpeeked.
+          cong
+            (Option el)
+            (List el)
+            (cursor_peek c el loc ops cur)
+            (None el)
+            (λselected. cursor_take_step c el loc ops fuel2 cur selected)
+            peeked
+  }
+
+theorem cursor_take_zero_step
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (progress : CursorAdvanceProgress c el loc ops)
+      (fuel : Nat)
+      (cur : c)
+      (bound : Equal Bool (lt_nat (cursor_remaining c el loc ops cur) (Suc Zero)) True)
+      (selected : Option el)
+    : Equal (Option el) (cursor_peek c el loc ops cur) selected
+      → Equal (List el) (Nil el) (cursor_take_step c el loc ops fuel cur selected) =
+  match selected {
+    None ↦ λpeeked. Proved;
+    Some x ↦
+      λpeeked.
+        absurd
+          ((proof zero_right_absurd for lt_nat)
+            (cursor_remaining c el loc ops (cursor_advance c el loc ops cur))
+            ((proof shrink_suc for lt_nat)
+              Zero
+              (cursor_remaining c el loc ops (cursor_advance c el loc ops cur))
+              (cursor_remaining c el loc ops cur)
+              (progress cur x peeked)
+              bound))
+  }
+
+theorem cursor_take_suc_step
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (progress : CursorAdvanceProgress c el loc ops)
+      (fuel : Nat)
+      (other : Nat)
+      (ih : (cur2 : c)
+        → Equal
+        Bool
+        (lt_nat (cursor_remaining c el loc ops cur2) (Suc fuel))
+        True
+        → Equal
+        Bool
+        (lt_nat (cursor_remaining c el loc ops cur2) (Suc other))
+        True
+        → Equal
+        (List el)
+        (cursor_take c el loc ops fuel cur2)
+        (cursor_take c el loc ops other cur2))
+      (cur : c)
+      (bound : Equal Bool (lt_nat (cursor_remaining c el loc ops cur) (Suc (Suc fuel))) True)
+      (other_bound : Equal
+        Bool
+        (lt_nat (cursor_remaining c el loc ops cur) (Suc (Suc other)))
+        True)
+      (selected : Option el)
+    : Equal (Option el) (cursor_peek c el loc ops cur) selected
+      → Equal
+        (List el)
+        (cursor_take_step c el loc ops fuel cur selected)
+        (cursor_take_step c el loc ops other cur selected) =
+  match selected {
+    None ↦ λpeeked. Proved;
+    Some x ↦
+      λpeeked.
+        cong
+          (List el)
+          (List el)
+          (cursor_take c el loc ops fuel (cursor_advance c el loc ops cur))
+          (cursor_take c el loc ops other (cursor_advance c el loc ops cur))
+          (Cons el x)
+          (ih
+            (cursor_advance c el loc ops cur)
+            ((proof shrink_suc for lt_nat)
+              (Suc fuel)
+              (cursor_remaining c el loc ops (cursor_advance c el loc ops cur))
+              (cursor_remaining c el loc ops cur)
+              (progress cur x peeked)
+              bound)
+            ((proof shrink_suc for lt_nat)
+              (Suc other)
+              (cursor_remaining c el loc ops (cursor_advance c el loc ops cur))
+              (cursor_remaining c el loc ops cur)
+              (progress cur x peeked)
+              other_bound))
+  }
+
+theorem cursor_take_stable
+      (c : Type)
+      (el : Type)
+      (loc : Type)
+      (ops : CursorOps c el loc)
+      (progress : CursorAdvanceProgress c el loc ops)
+      (fuel : Nat)
+    : (other : Nat)
+      → (cur : c)
+      → Equal Bool (lt_nat (cursor_remaining c el loc ops cur) (Suc fuel)) True
+      → Equal Bool (lt_nat (cursor_remaining c el loc ops cur) (Suc other)) True
+      → Equal
+        (List el)
+        (cursor_take c el loc ops fuel cur)
+        (cursor_take c el loc ops other cur) =
+  match fuel {
+    Zero ↦
+      λother.
+        match other {
+          Zero ↦ λcur. λbound. λother_bound. Proved;
+          Suc other2 ↦
+            λcur.
+              λbound.
+                λother_bound.
+                  cursor_take_zero_step
+                    c
+                    el
+                    loc
+                    ops
+                    progress
+                    other2
+                    cur
+                    bound
+                    (cursor_peek c el loc ops cur)
+                    Refl
+        };
+    Suc fuel2 ↦
+      λother.
+        match other {
+          Zero ↦
+            λcur.
+              λbound.
+                λother_bound.
+                  sym
+                    (List el)
+                    (cursor_take c el loc ops Zero cur)
+                    (cursor_take c el loc ops (Suc fuel2) cur)
+                    (cursor_take_zero_step
+                      c
+                      el
+                      loc
+                      ops
+                      progress
+                      fuel2
+                      cur
+                      other_bound
+                      (cursor_peek c el loc ops cur)
+                      Refl);
+          Suc other2 ↦
+            λcur.
+              λbound.
+                λother_bound.
+                  cursor_take_suc_step
+                    c
+                    el
+                    loc
+                    ops
+                    progress
+                    fuel2
+                    other2
+                    (cursor_take_stable c el loc ops progress fuel2 other2)
+                    cur
+                    bound
+                    other_bound
+                    (cursor_peek c el loc ops cur)
+                    Refl
+        }
+  }
 ```
 
 ## 3. Using it

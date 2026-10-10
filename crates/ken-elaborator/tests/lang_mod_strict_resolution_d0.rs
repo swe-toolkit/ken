@@ -750,6 +750,24 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Lexer imports Dfa and Cursor in one direction; strict mode
+            // measures the inherited compiler conveniences of both providers.
+            "Capability.Parsing.Lexer".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // Parsing.Numeric now declares its exact Diagnostics.Core and
             // Transport dependencies. Its ordinary package boundary loads
             // while strict mode retains compiler conveniences.
