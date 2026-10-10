@@ -962,4 +962,20 @@ mod package_definition_boundary_tests {
             super::ElabError::DuplicateDefinition { name, .. } if name == "zz_package"
         ));
     }
+
+    /// Promise class: durable invariant. MEASURED: two heads with one
+    /// spelling inside one interactive declaration refuse as a duplicate.
+    /// CLAIMED: bypassing package history does not bypass the unit resolver.
+    /// THE GAP: a second interactive call must still allow re-entry, which
+    /// the REPL's checked-ID test covers separately.
+    #[test]
+    fn session_route_still_refuses_duplicates_within_one_declaration() {
+        let mut env = ElabEnv::new().expect("complete prelude registration");
+        let error = env
+            .elaborate_session_decl_results_v1(
+                "module Zz { const zz_twice : Bool = True\nconst zz_twice : Bool = False }",
+            )
+            .expect_err("one declaration cannot bind a head twice");
+        assert!(matches!(error, super::ElabError::DuplicateDefinition { .. }));
+    }
 }
