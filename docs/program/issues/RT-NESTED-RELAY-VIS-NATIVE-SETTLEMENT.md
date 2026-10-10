@@ -281,6 +281,19 @@ base, stop and report the mismatch.
   the census file `census-r3/owner-source-rows.tsv` names them. Every row
   is green, every owner is admitted through `relay_drive_pair = Some`, and
   px8ta owner 0 is still the only typed refusal. CI owns everything else.
+  - The Architect's four R3 rows carry 35 more owners whose emission D4
+    changes, and run the same way (`evt_6r8n32qy4h9es`):
+    `rt_cold_lowering_path_enumeration` (10 owners), the
+    `fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness`
+    parity row (2), `px8f_buffer_native` (11; owner 1 source 1169 is
+    drive-settled through P1 and gets no pair) and
+    `abi_s6_mapping_surface_native` (12).
+  - abi_s6 stays 12/12, every abi_s6 source logs `drive_settled=true`, and
+    its suppressed-local-drive control keeps its result: the Deferred
+    route keeps precedence through `deferred_drive_available`, so its
+    installed pairs go unused.
+  - The roster file the run uses lists all 36 tests plus px8ta and the two
+    target rows, with its SHA-256 recorded.
 - **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
   census pair (span owner 4, source 1374) fires the typed refusal for that
   owner and reddens AC-1, and is restored byte-identically.
