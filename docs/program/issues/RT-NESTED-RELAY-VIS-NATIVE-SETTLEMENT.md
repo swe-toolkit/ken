@@ -242,6 +242,21 @@ base, stop and report the mismatch.
    - Admitted relay members leave O's returned set: span owner 4 becomes
      {528} Protocol, r2 owner 2 {746}, and r2 owner 3 {528}.
 
+5. **D4 recut (hold, `evt_3b7ws2dvx1r9v`).** D4 stays at WIP
+   `dc18308976bf`, which is not a candidate. The AC-7 roster stays unrun
+   past row 32.
+   - **Retained:** D1-D3; `relay_drive_pair` as the single route
+     authority; `source_seat_row`; the forwarded-position guard with its
+     two controls; the permanent origin and shape errors.
+   - **Replaced:** the relay arm's implicit relocation of emission, by an
+     emission-route registration. Its D0 is the Architect's, ruled after
+     the research advisory on four options (a pre-schema drive decision,
+     a planning fixpoint, calling the foreign subtree's emitted code, or
+     per-site code identity) and the one authorized measurement.
+   - **Sizing:** if the ruled registration restructures the planner's
+     build order beyond this WP's planes, it returns to the operator to
+     size as its own node (operator 2026-09-21).
+
 ## Acceptance
 
 - **AC-1.** The span row is un-ignored and green: both engines exit 0 with
@@ -326,7 +341,9 @@ base, stop and report the mismatch.
 
 ## Hard-stop inventory
 
-- **§1a.** Question (4), E disposition: 1 (`evt_5sah7xb9543hp`).
+- **§1a.** Question (4), E disposition and the D4 relay arm: 3
+  (`evt_5sah7xb9543hp`, `evt_47yp5mk4wznjb`, `evt_3b7ws2dvx1r9v`). The
+  third put D4 on hold and called a research advisory.
   Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
   `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
   research's advisory (`evt_4wcce8z24a4c9`, ruling `evt_5mgw5cwr993nd`);
@@ -355,6 +372,27 @@ base, stop and report the mismatch.
   positions owned by another function unit — keyed on "a Construct-Vis
   exists" rather than "can a Vis arrive at the Ret-only arm". §1b next
   fires at entry 6.
+- **5.** The per-position aggregate identity check in
+  `reconcile_source_aggregate` refused a forwarded value: parent
+  Source(583), position 0, is Var 582, carrying occurrence 179 produced at
+  760 in fn 12, under drive stack [1374, 744] and owner Spec(7) -- keyed
+  on "the position has a source origin" rather than "the position is a
+  producer". The guard repair stands (`evt_5zzxh9zn7f18s`).
+- **6.** Under the relay drive, a continuation claim
+  (`claim_and_call_resolved_continuation_inner`) finds no declared target
+  in the driving owner's function -- keyed on the call site's syntactic
+  enclosing owner rather than the owner that emits it. A hypothesis until
+  the `RELAY_D4_CLAIM_MISS` measurement confirms it (`evt_3b7ws2dvx1r9v`).
+- **§1b at entry 6: YES** (`evt_3b7ws2dvx1r9v`). Entries 4, 5 and 6 share
+  a predicate, extending entry 3's: the relay drive is an emission route
+  that lowering enters but the plan does not record.
+  `drive_response_at_source` lowers the driven source's operation, its K
+  and the frames it resumes under `defining_emission_owner`, while every
+  owner-keyed plane is built before `relay_drive_pairs` exists and from an
+  emission-owner authority with no relay source. The closure is
+  structural: every emission route lowering enters is an emission
+  population the plan knows before any owner-keyed plane is built, or the
+  drive does not relocate emission.
 
 ## Finding outside this WP
 
