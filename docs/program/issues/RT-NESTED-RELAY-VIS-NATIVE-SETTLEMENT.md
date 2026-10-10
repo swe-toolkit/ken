@@ -242,20 +242,27 @@ base, stop and report the mismatch.
    - Admitted relay members leave O's returned set: span owner 4 becomes
      {528} Protocol, r2 owner 2 {746}, and r2 owner 3 {528}.
 
-5. **D4 recut (hold, `evt_3b7ws2dvx1r9v`).** D4 stays at WIP
-   `dc18308976bf`, which is not a candidate. The AC-7 roster stays unrun
+5. **D4 recut, direction (C) (`evt_7r6p7j6c5408j`).** D4 stays at WIP
+   `114a1a5dbd4a`, which is not a candidate. The AC-7 roster stays unrun
    past row 32.
    - **Retained:** D1-D3; `relay_drive_pair` as the single route
      authority; `source_seat_row`; the forwarded-position guard with its
-     two controls; the permanent origin and shape errors.
-   - **Replaced:** the relay arm's implicit relocation of emission, by an
-     emission-route registration. Its D0 is the Architect's, ruled after
-     the research advisory on four options (a pre-schema drive decision,
-     a planning fixpoint, calling the foreign subtree's emitted code, or
-     per-site code identity) and the one authorized measurement.
-   - **Sizing:** if the ruled registration restructures the planner's
-     build order beyond this WP's planes, it returns to the operator to
-     size as its own node (operator 2026-09-21).
+     two controls; the permanent origin and shape errors and the
+     claim-identity error.
+   - **Replaced:** inside `drive_response_at_source`, the relay arm keeps
+     its operation drive at the source but no longer resumes the source's
+     K inline. It calls the pair's candidate-row K context (already
+     planned and emitted under its own owner and tokens), passing the
+     host result; the call's result feeds the active eliminators. The
+     deferred handler-owned route keeps its inline resume. No plane
+     changes and no relocation.
+   - **Settle mechanism: D0 census first.** One measurement with a
+     disposable recorder over row 32, `abi_s6`, and the span and r2
+     target rows: for each relay pair, the source row's `k_context`, its
+     `returned_vis_protocol` closure (relay or not, successor, seat,
+     pair), and any foreign-owned origin in the operation subtree. Then
+     stop to the Architect, who rules a plain call, an expression-level
+     settle loop over existing rows, or the boundary.
 
 ## Acceptance
 
@@ -381,8 +388,11 @@ base, stop and report the mismatch.
 - **6.** Under the relay drive, a continuation claim
   (`claim_and_call_resolved_continuation_inner`) finds no declared target
   in the driving owner's function -- keyed on the call site's syntactic
-  enclosing owner rather than the owner that emits it. A hypothesis until
-  the `RELAY_D4_CLAIM_MISS` measurement confirms it (`evt_3b7ws2dvx1r9v`).
+  enclosing owner rather than the owner that emits it. Measured
+  (`evt_21g7mkxe4v43a`): the token for producer construct 1200 has
+  target Spec(0) and emission owner Predeclared(10), and was claimed
+  under defining owner Spec(7) with drive stack [1374, 1327]; 1200 lies
+  in the K of Vis1327, not in Spec(7)'s own body.
 - **§1b at entry 6: YES** (`evt_3b7ws2dvx1r9v`). Entries 4, 5 and 6 share
   a predicate, extending entry 3's: the relay drive is an emission route
   that lowering enters but the plan does not record.
@@ -392,7 +402,10 @@ base, stop and report the mismatch.
   emission-owner authority with no relay source. The closure is
   structural: every emission route lowering enters is an emission
   population the plan knows before any owner-keyed plane is built, or the
-  drive does not relocate emission.
+  drive does not relocate emission. Ruled closure (`evt_7r6p7j6c5408j`):
+  (C), no relocation. A pre-schema drive decision is rejected: the pair
+  builder reads ownership-derived planes, and path-keyed clones would
+  re-enter the RT-NATIVE-FNSPLIT predicate.
 
 ## Finding outside this WP
 
