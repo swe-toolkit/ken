@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::Decl;
 
 const GRAPH: &str = "Algorithm.Graphs.Dependency";
@@ -341,7 +341,8 @@ fn observe(env: &mut ElabEnv, store: &mut EvalStore, name: &str, ty: &str, expr:
         .elaborate_decl(&format!("const {name} : {ty} = {expr}"))
         .unwrap_or_else(|error| panic!("{name} expression must elaborate: {error:?}"));
     match env.env.lookup(id) {
-        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
+        Some(Decl::Transparent { ty, body, .. }) => eval_checked(body, ty, &env.env, store)
+            .unwrap_or_else(|error| panic!("{name}: checked evaluation failed: {error:?}")),
         other => panic!("{name} must elaborate transparently, got {other:?}"),
     }
 }
@@ -363,11 +364,35 @@ fn boolean(env: &ElabEnv, val: &EvalVal) -> bool {
     }
 }
 
-// The reference interpreter strictly evaluates each field of a proof-carrying
-// DecEq dictionary and can yield Unknown even when a closed public expression
-// is kernel-reducible. For that pure boundary, demand a checked closed equality
-// instead of accepting Unknown or treating a test-computed value as an oracle.
-fn truth(env: &mut ElabEnv, _store: &mut EvalStore, name: &str, expr: &str, expected: bool) {
+fn bools(env: &ElabEnv, val: &EvalVal) -> Vec<bool> {
+    let mut out = Vec::new();
+    let mut rest = val;
+    loop {
+        match rest {
+            EvalVal::Ctor { id, .. } if *id == env.prelude_env.nil_id => return out,
+            EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.cons_id => {
+                out.push(boolean(env, args.get(1).expect("Cons Bool head")));
+                rest = args.get(2).expect("Cons Bool tail");
+            }
+            other => panic!("expected List Bool, got {other:?}"),
+        }
+    }
+}
+
+fn nat(env: &ElabEnv, val: &EvalVal) -> usize {
+    match val {
+        EvalVal::Ctor { id, .. } if *id == env.prelude_env.zero_id => 0,
+        EvalVal::Ctor { id, args, .. } if *id == env.prelude_env.suc_id && args.len() == 1 => {
+            1 + nat(env, args.last().expect("Suc predecessor"))
+        }
+        other => panic!("expected Nat, got {other:?}"),
+    }
+}
+
+// Typed interpretation uses the kernel-classified erasure plan; neither
+// Unknown nor Neutral can pass as a computed Bool. Kernel reduction checks the
+// same expected value independently on the admitted closed program.
+fn kernel_truth(env: &mut ElabEnv, name: &str, expr: &str, expected: bool) {
     let result = if expected { "True" } else { "False" };
     env.elaborate_file(&format!(
         "theorem seed_{name} : Equal Bool ({expr}) {result} = Proved"
@@ -375,12 +400,23 @@ fn truth(env: &mut ElabEnv, _store: &mut EvalStore, name: &str, expr: &str, expe
     .unwrap_or_else(|error| panic!("{name}: kernel must reduce to {result}: {error:?}"));
 }
 
-fn runtime_truth(env: &mut ElabEnv, store: &mut EvalStore, name: &str, expr: &str, expected: bool) {
+fn truth(env: &mut ElabEnv, store: &mut EvalStore, name: &str, expr: &str, expected: bool) {
     let val = observe(env, store, name, "Bool", expr);
-    assert_eq!(boolean(env, &val), expected, "{name}: reference evaluation");
+    assert_eq!(
+        boolean(env, &val),
+        expected,
+        "{name}: checked interpreter Bool"
+    );
+    kernel_truth(env, name, expr, expected);
 }
 
-fn list(env: &mut ElabEnv, _store: &mut EvalStore, name: &str, expr: &str, expected: &[bool]) {
+fn list(env: &mut ElabEnv, store: &mut EvalStore, name: &str, expr: &str, expected: &[bool]) {
+    let val = observe(env, store, name, "List Bool", expr);
+    assert_eq!(
+        bools(env, &val),
+        expected,
+        "{name}: checked interpreter order"
+    );
     let mut target = "Nil Bool".to_owned();
     for bit in expected.iter().rev() {
         target = format!(
@@ -394,7 +430,17 @@ fn list(env: &mut ElabEnv, _store: &mut EvalStore, name: &str, expr: &str, expec
     .unwrap_or_else(|error| panic!("{name}: checked exact order {target}: {error:?}"));
 }
 
-fn number(env: &mut ElabEnv, _store: &mut EvalStore, name: &str, expr: &str, expected: usize) {
+fn number(env: &mut ElabEnv, store: &mut EvalStore, name: &str, expr: &str, expected: usize) {
+    let val = observe(env, store, name, "Nat", expr);
+    assert_eq!(
+        nat(env, &val),
+        expected,
+        "{name}: checked interpreter walk length"
+    );
+    kernel_number(env, name, expr, expected);
+}
+
+fn kernel_number(env: &mut ElabEnv, name: &str, expr: &str, expected: usize) {
     let mut target = "Zero".to_owned();
     for _ in 0..expected {
         target = format!("Suc ({target})");
@@ -418,6 +464,16 @@ fn has_tag(
         "HasCycle" => "is_cycle",
         other => panic!("unhandled graph choice {other}"),
     };
+    let ty = format!("OrderOrCycle Bool DecEq_instance_Bool {graph}");
+    let observed = observe(env, store, &format!("{name}_result"), &ty, expr);
+    match observed {
+        EvalVal::Ctor { id, .. } => assert_eq!(
+            id,
+            env.globals[&format!("{GRAPH}.{tag}")],
+            "{name}: checked interpreter result tag"
+        ),
+        other => panic!("{name}: expected {tag}, got {other:?}"),
+    }
     truth(
         env,
         store,
@@ -429,11 +485,19 @@ fn has_tag(
 
 fn option_endpoint(
     env: &mut ElabEnv,
-    _store: &mut EvalStore,
+    store: &mut EvalStore,
     name: &str,
     expr: &str,
     expected: Option<bool>,
 ) {
+    let value = observe(env, store, name, "Option Bool", expr);
+    match (&value, expected) {
+        (EvalVal::Ctor { id, .. }, None) if *id == env.globals["None"] => {}
+        (EvalVal::Ctor { id, args, .. }, Some(bit)) if *id == env.globals["Some"] => {
+            assert_eq!(boolean(env, args.last().expect("Some Bool payload")), bit);
+        }
+        _ => panic!("{name}: checked interpreter endpoint differs: {value:?}"),
+    }
     let target = match expected {
         Some(true) => "Some Bool True",
         Some(false) => "Some Bool False",
@@ -568,6 +632,25 @@ fn seed_two_vertex_cycle_has_real_witness() {
         "cycle_result",
         "HasCycle",
     );
+    let start = observe(
+        &mut env,
+        &mut store,
+        "cycle_start_obs",
+        "Bool",
+        "result_start cycle_result",
+    );
+    let next = observe(
+        &mut env,
+        &mut store,
+        "cycle_next_obs",
+        "Bool",
+        "result_next cycle_result",
+    );
+    assert_ne!(
+        boolean(&env, &start),
+        boolean(&env, &next),
+        "returned cycle endpoints must be distinct on this two-edge fixture"
+    );
     truth(
         &mut env,
         &mut store,
@@ -582,16 +665,17 @@ fn seed_two_vertex_cycle_has_real_witness() {
         "edge Bool two_cycle (result_start cycle_result) (result_next cycle_result)",
         true,
     );
-    truth(
+    // The returned Walk is checked Type-level evidence. The current typed
+    // interpreter leaves this dependent projection Neutral; never count that
+    // as a runtime pass. Its closed edge predicate must kernel-reduce to True.
+    kernel_truth(
         &mut env,
-        &mut store,
         "cycle_return_edges",
         "result_return_edges_real cycle_result",
         true,
     );
-    number(
+    kernel_number(
         &mut env,
-        &mut store,
         "cycle_return_length",
         "result_return_steps cycle_result",
         1,
@@ -625,6 +709,28 @@ fn seed_zero_vertex_graph_has_empty_order() {
         "empty_tag",
         "empty_is_order empty_result",
         true,
+    );
+    let tagged = observe(
+        &mut env,
+        &mut store,
+        "empty_result_obs",
+        "OrderOrCycle EmptyVertex DecEq_instance_EmptyVertex empty_graph",
+        "empty_result",
+    );
+    assert!(
+        matches!(tagged, EvalVal::Ctor { id, .. } if id == env.globals[&format!("{GRAPH}.HasOrder")]),
+        "empty carrier must return a real HasOrder constructor"
+    );
+    let vertices = observe(
+        &mut env,
+        &mut store,
+        "empty_vertices_obs",
+        "List EmptyVertex",
+        "empty_result_list empty_result",
+    );
+    assert!(
+        matches!(vertices, EvalVal::Ctor { id, .. } if id == env.prelude_env.nil_id),
+        "empty order must contain no vertices"
     );
     env.elaborate_file(
         "theorem seed_empty_list : Equal (List EmptyVertex) \
@@ -764,7 +870,7 @@ fn seed_contains_rejects_missing_element() {
 #[test]
 fn seed_reachable_edge_has_walk() {
     let (mut env, mut store) = fixture();
-    runtime_truth(
+    truth(
         &mut env,
         &mut store,
         "edge_reach",
@@ -838,7 +944,7 @@ fn seed_unreachable_reverse_and_reflexive_control() {
         "edge Bool forward False True",
         false,
     );
-    runtime_truth(
+    truth(
         &mut env,
         &mut store,
         "reverse_unreachable",
@@ -847,7 +953,7 @@ fn seed_unreachable_reverse_and_reflexive_control() {
     );
     option_endpoint(&mut env, &mut store, "reverse_no_witness",
         "reach_endpoint forward False is_true (graph_find_walk Bool bool_finite forward False is_true)", None);
-    runtime_truth(
+    truth(
         &mut env,
         &mut store,
         "reflexive_reachable",
