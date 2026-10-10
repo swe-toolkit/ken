@@ -223,6 +223,24 @@ fn source_shape(plan: &StaticTransitionPlan<'_>, vis: StaticOriginId) -> Result<
     Ok(matches!(&args[1], RuntimeExpr::LexicalClosure { params, .. } if params.len() == 1))
 }
 
+/// Relay drivability (a), shared by pair construction and admission: one
+/// candidate row whose effect has at least one planned host-effect seat.
+/// Seats are recorded per (effect origin, slot), so counting records would
+/// incorrectly reject an operation with multiple argument slots.
+fn source_seat_row<'r>(
+    plan: &StaticTransitionPlan<'_>,
+    candidates: &'r [StaticResponseContinuation],
+    source: StaticOriginId,
+) -> Option<&'r StaticResponseContinuation> {
+    let rows = candidates.iter().filter(|row| row.vis_origin() == source)
+        .collect::<Vec<_>>();
+    let [row] = rows.as_slice() else { return None; };
+    plan.host_effect_seat_records().iter()
+        .any(|seat| seat.effect_origin == row.effect_origin()
+            && seat.operation == row.operation())
+        .then_some(*row)
+}
+
 /// Build the dispatch authority from the same closed relay-source traversal
 /// used by admission. A failed/open traversal installs no speculative pair;
 /// the refusal below reports the reason rather than turning it into a route.
@@ -251,13 +269,9 @@ pub(super) fn build_drive_pairs(
                     if !source.tail_edges || !source_shape(plan, source.vis).unwrap_or(false) {
                         continue;
                     }
-                    let rows = candidates.iter().filter(|row| row.vis_origin() == source.vis)
-                        .collect::<Vec<_>>();
-                    let [row] = rows.as_slice() else { continue; };
-                    let seats = plan.host_effect_seat_records().iter()
-                        .filter(|seat| seat.effect_origin == row.effect_origin()
-                            && seat.operation == row.operation()).count();
-                    if seats != 1 { continue; }
+                    let Some(row) = source_seat_row(plan, &candidates, source.vis) else {
+                        continue;
+                    };
                     let owner_key = owner.base_owner();
                     let pair = RelayDrivePair {
                         source: source.vis,
@@ -336,7 +350,17 @@ fn classify(plan: &StaticTransitionPlan<'_>, emit_records: bool) -> (Vec<String>
                                 let seats = rows.iter().filter(|row| plan.host_effect_seat_records().iter()
                                     .any(|seat| seat.effect_origin == row.effect_origin()
                                         && seat.operation == row.operation())).count();
-                                let a_unique_row_and_seat = rows.len() == 1 && seats == 1;
+                                let a_unique_row_and_seat =
+                                    source_seat_row(plan, candidates, source.vis).is_some();
+                                // Recorder-only: count physical seat slots separately
+                                // from the unique-row-with-seat admission predicate.
+                                let seat_slots = if emit_records {
+                                    rows.iter().map(|row|
+                                        plan.host_effect_seat_records().iter()
+                                            .filter(|seat| seat.effect_origin == row.effect_origin()
+                                                && seat.operation == row.operation()).count())
+                                        .sum::<usize>()
+                                } else { 0 };
                                 let b_construct_closure = source_shape(plan, source.vis);
                                 let c_tail_forward_only = source.tail_edges;
                                 // (d) is the exact plan-side authority lowering uses.
@@ -373,7 +397,7 @@ fn classify(plan: &StaticTransitionPlan<'_>, emit_records: bool) -> (Vec<String>
                                 let source_ok = drive_settled || relay_drivable;
                                 owner_admitted &= source_ok;
                                 if emit_records {
-                                    eprintln!("RELAY_D1_SOURCE thread={thread:?} owner={:?} relay={:?} source={:?} via={:?} redex_body={:?} closed={closed} drive_settled={drive_settled} deferred={deferred:?} bounded_handler={bounded_handler:?} unitless_row={unitless_row:?} unitless_matches={unitless_matches} admitted_handler={admitted_handler:?} a_unique_row_and_seat={a_unique_row_and_seat} a_row_count={} a_seat_count={seats} b_construct_closure={b_construct_closure:?} c_tail_forward_only={c_tail_forward_only} d_pair_key={d_pair_key:?} d_pair={d_pair:?} relay_drivable={relay_drivable} source_ok={source_ok}",
+                                    eprintln!("RELAY_D1_SOURCE thread={thread:?} owner={:?} relay={:?} source={:?} via={:?} redex_body={:?} closed={closed} drive_settled={drive_settled} deferred={deferred:?} bounded_handler={bounded_handler:?} unitless_row={unitless_row:?} unitless_matches={unitless_matches} admitted_handler={admitted_handler:?} a_unique_row_and_seat={a_unique_row_and_seat} a_row_count={} a_seat_count={seats} a_slot_record_count={seat_slots} b_construct_closure={b_construct_closure:?} c_tail_forward_only={c_tail_forward_only} d_pair_key={d_pair_key:?} d_pair={d_pair:?} relay_drivable={relay_drivable} source_ok={source_ok}",
                                         owner.id(), member.origin, source.vis, source.via, source.redex_body, rows.len());
                                 }
                                 if let Err(error) = d_pair { errors.push(error.to_string()); }
