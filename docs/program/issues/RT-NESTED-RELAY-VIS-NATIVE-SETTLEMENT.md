@@ -243,7 +243,7 @@ base, stop and report the mismatch.
      {528} Protocol, r2 owner 2 {746}, and r2 owner 3 {528}.
 
 5. **D4 recut, direction (C) (`evt_7r6p7j6c5408j`).** D4 stays at WIP
-   `114a1a5dbd4a`, which is not a candidate. The AC-7 roster stays unrun
+   `faae80edc`, which is not a candidate. The AC-7 roster stays unrun
    past row 32.
    - **Retained:** D1-D3; `relay_drive_pair` as the single route
      authority; `source_seat_row`; the forwarded-position guard with its
@@ -263,6 +263,13 @@ base, stop and report the mismatch.
      pair), and any foreign-owned origin in the operation subtree. Then
      stop to the Architect, who rules a plain call, an expression-level
      settle loop over existing rows, or the boundary.
+   - **Gate 2 (`evt_4tbaxstk921c2`).** The seam stays dormant. One run
+     each of the span row, r2 `:1015` and `abi_s6`, with the seam trace
+     on. If all are green with zero seam records, the drive is
+     unnecessary and the recut deletes it, keying admission on the
+     installed response-owner route that settles. If a relay Vis
+     reaches an owner at runtime, the Architect places the drive at
+     that delivery point.
 
 ## Acceptance
 
@@ -348,9 +355,10 @@ base, stop and report the mismatch.
 
 ## Hard-stop inventory
 
-- **§1a.** Question (4), E disposition and the D4 relay arm: 3
-  (`evt_5sah7xb9543hp`, `evt_47yp5mk4wznjb`, `evt_3b7ws2dvx1r9v`). The
-  third put D4 on hold and called a research advisory.
+- **§1a.** Question (4), E disposition and the D4 relay arm: 4
+  (`evt_5sah7xb9543hp`, `evt_47yp5mk4wznjb`, `evt_3b7ws2dvx1r9v`,
+  `evt_4tbaxstk921c2`). The third put D4 on hold and called a research
+  advisory; the next research hold is at the sixth.
   Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
   `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
   research's advisory (`evt_4wcce8z24a4c9`, ruling `evt_5mgw5cwr993nd`);
@@ -406,6 +414,13 @@ base, stop and report the mismatch.
   (C), no relocation. A pre-schema drive decision is rejected: the pair
   builder reads ownership-derived planes, and path-keyed clones would
   re-enter the RT-NATIVE-FNSPLIT predicate.
+- **7.** The relay drive was placed at the source token's claim seam in
+  the pair owner's function, a claim lowering never makes there: the
+  token is declared there as transported, the source falls through to
+  the eliminator, and its seat is performed by the installed response
+  owners (`evt_4tbaxstk921c2`) -- keyed on the plan pair's existence, not
+  on the route lowering takes. Entries 5, 6 and 7 share the entry 6 §1b
+  cause, which recut (C) did not close. §1b next fires at entry 9.
 
 ## Finding outside this WP
 
