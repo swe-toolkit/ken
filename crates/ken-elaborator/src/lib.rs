@@ -702,9 +702,12 @@ impl ElabEnv {
         for range in &extracted.example_ranges {
             let example_results = self
                 .elaborate_file_v1(&src[range.clone()])
-                .map_err(|_| ElabError::ParseError {
-                    msg: "a 'ken example' block failed to elaborate".to_string(),
-                    span: Span::new(range.start, range.end),
+                .map_err(|error| match error {
+                    ElabError::DuplicateDefinition { .. } => error,
+                    _ => ElabError::ParseError {
+                        msg: "a 'ken example' block failed to elaborate".to_string(),
+                        span: Span::new(range.start, range.end),
+                    },
                 })?;
             results.extend(example_results);
         }
