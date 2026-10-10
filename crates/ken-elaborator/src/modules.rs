@@ -54,6 +54,10 @@ pub struct ModuleState {
     /// references still see earlier imports/locals (a "file" is an implicit
     /// module, `33 §3.1`).
     root_scope: Scope,
+    /// Successfully elaborated root declarations across units of this package.
+    /// Seed the next unit's resolver duplicate check from this set, not from
+    /// the mutable flat globals table. A failing unit never commits its names.
+    pub(crate) package_definitions: HashSet<String>,
     /// Qualified module path (`"M"`, `"M.N"`) → {bare `pub` name → canonical
     /// qualified name}. Populated whenever a `module { … }` block elaborates.
     /// Only `pub` names are recorded here — the export table IS the
@@ -100,6 +104,9 @@ pub struct ModuleState {
     /// ambient isolated-file scope; an entry document check installs only its
     /// selected unit so checked fences see the declarations they follow.
     loaded_unit_scopes: HashMap<String, Scope>,
+    /// Completed definition sets of loaded file units. Only an entry unit
+    /// seeds document-fence collision checks; dependency units stay separate.
+    loaded_unit_definitions: HashMap<String, HashSet<String>>,
     /// Units currently being discovered/elaborated, in entry-rooted edge order.
     active_imports: Vec<String>,
     /// Parent names in the closed prelude floor (`30-taxonomy §4`).
@@ -2046,6 +2053,9 @@ fn load_unit(
         elab.module_state
             .loaded_unit_scopes
             .insert(module.to_string(), scope);
+        elab.module_state
+            .loaded_unit_definitions
+            .insert(module.to_string(), unit_definitions);
         Ok((ids, results))
     })();
     let popped = elab.module_state.active_imports.pop();
@@ -2111,6 +2121,17 @@ pub(crate) fn execute_loaded_entry_checked_fences_v1(
                 "loaded module entry '{entry}' has no completed scope"
             ))
         })?;
+    let definitions = elab
+        .module_state
+        .loaded_unit_definitions
+        .get(entry)
+        .cloned()
+        .ok_or_else(|| {
+            ElabError::Internal(format!(
+                "loaded module entry '{entry}' has no completed definition set"
+            ))
+        })?;
+    elab.module_state.package_definitions = definitions;
     let previous = std::mem::replace(&mut elab.module_state.root_scope, scope);
     let result = elab.execute_ken_md_checked_fences_v1(&source, &extracted);
     elab.module_state.root_scope = previous;
@@ -5334,7 +5355,7 @@ pub fn expand_and_elaborate(
         elab.class_env.implicit_single_provider = false;
     }
     let mut scope = elab.module_state.root_scope.clone();
-    let mut unit_definitions = HashSet::new();
+    let mut unit_definitions = elab.module_state.package_definitions.clone();
     let mut local_modules = HashSet::new();
     declared_module_paths(decls, "", &mut local_modules);
     let mut ordered_inline_modules = HashSet::new();
@@ -5389,6 +5410,7 @@ pub fn expand_and_elaborate(
         elab.module_state.boundary_header = boundary.map(|(header, _)| header);
     }
     elab.module_state.root_scope = scope;
+    elab.module_state.package_definitions = unit_definitions;
     Ok(results)
 }
 
