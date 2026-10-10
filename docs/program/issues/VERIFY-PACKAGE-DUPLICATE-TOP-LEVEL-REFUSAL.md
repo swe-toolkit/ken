@@ -61,6 +61,12 @@ an admitted declaration's spelling.
   runs; any caller outside root units, `.ken.md` parts, example and
   reject fences and test `elaborate_decl*` is a stop to the Architect,
   and the only case for per-declaration provenance.
+- **A REPL session is not a package (`evt_7rjpnjvnrxfjm`).** Interactive
+  re-entry keeps its documented shadowing policy. `ElabEnv` gains
+  `elaborate_session_decl_results_v1`, which neither seeds nor records
+  the package set, and `do_def` in `crates/ken-cli/src/repl.rs` (one
+  added path) calls it. Duplicates inside one declaration are still
+  refused.
 
 ## Acceptance
 
@@ -84,6 +90,16 @@ an admitted declaration's spelling.
   refused. Any hit is the stop below.
 - **AC-4 (mutation, QA).** Restoring the per-unit-only check reddens the
   package-route rows of AC-1.
+- **AC-R1.** `repl_redefinition_shadows_the_previous_binding` is green:
+  a re-entered name gets a new `GlobalId` and the old one is not
+  retracted. Reverting only `do_def`'s call reddens it.
+- **AC-R2.** The package-route ACs, the constructor guard, the
+  prelude-boundary and rollback units and the REPL rollback test stay
+  green.
+- **AC-R3.** Every other production session-style caller is reported by
+  name with its re-entry policy (for example `ken-verify`'s
+  `scenario.rs`). One that documents shadowing without the session entry
+  is a stop to the Architect.
 
 ## Stop conditions
 
