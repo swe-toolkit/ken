@@ -389,9 +389,9 @@ fn nat(env: &ElabEnv, val: &EvalVal) -> usize {
     }
 }
 
-// Typed interpretation uses the kernel-classified erasure plan; neither
-// Unknown nor Neutral can pass as a computed Bool. Kernel reduction checks the
-// same expected value independently on the admitted closed program.
+// Kernel reduction checks the expected value before interpretation can mask a
+// wrong result with an earlier runtime assertion. Typed interpretation then
+// uses the kernel-classified erasure plan; neither Unknown nor Neutral passes.
 fn kernel_truth(env: &mut ElabEnv, name: &str, expr: &str, expected: bool) {
     let result = if expected { "True" } else { "False" };
     env.elaborate_file(&format!(
@@ -401,13 +401,13 @@ fn kernel_truth(env: &mut ElabEnv, name: &str, expr: &str, expected: bool) {
 }
 
 fn truth(env: &mut ElabEnv, store: &mut EvalStore, name: &str, expr: &str, expected: bool) {
+    kernel_truth(env, name, expr, expected);
     let val = observe(env, store, name, "Bool", expr);
     assert_eq!(
         boolean(env, &val),
         expected,
         "{name}: checked interpreter Bool"
     );
-    kernel_truth(env, name, expr, expected);
 }
 
 fn list(env: &mut ElabEnv, store: &mut EvalStore, name: &str, expr: &str, expected: &[bool]) {
@@ -464,6 +464,13 @@ fn has_tag(
         "HasCycle" => "is_cycle",
         other => panic!("unhandled graph choice {other}"),
     };
+    truth(
+        env,
+        store,
+        name,
+        &format!("{predicate} {graph} {expr}"),
+        true,
+    );
     let ty = format!("OrderOrCycle Bool DecEq_instance_Bool {graph}");
     let observed = observe(env, store, &format!("{name}_result"), &ty, expr);
     match observed {
@@ -474,13 +481,6 @@ fn has_tag(
         ),
         other => panic!("{name}: expected {tag}, got {other:?}"),
     }
-    truth(
-        env,
-        store,
-        name,
-        &format!("{predicate} {graph} {expr}"),
-        true,
-    );
 }
 
 fn option_endpoint(
