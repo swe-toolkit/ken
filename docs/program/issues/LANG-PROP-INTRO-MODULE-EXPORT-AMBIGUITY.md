@@ -60,13 +60,22 @@ at declaration.
   nested) give `AmbiguousReference` with the module and type sources.
 - **AC-2 (controls).** The data control keeps its result, and
   `lang_forward_reference_across_data_export` and
-  `lang_qualified_constructors` stay green.
+  `lang_qualified_constructors` stay green. The distinct-owner control
+  `modules.rs` `file_prop_intro_reexports_retain_checked_helper_identity`
+  stays green unedited: a later, distinct owner's `module A { module
+  HasProof { pub const intro } }` still replaces the flat
+  `globals["A.HasProof.intro"]`, and the file-owned intro is still reached
+  by checked identity through its imports (`evt_7yabeg715nmtq`).
 - **AC-3 (mutation, QA).** Removing the intro arm of the tie-break returns
   the export-first-wins row to admitted.
 
 ## Stop conditions
 
-- A catalog or test consumer relies on an export shadowing an intro.
+- A catalog or test consumer resolves a written path, in a scope where
+  both the intro and the export are visible, to the export. Replacement
+  of a flat global by a distinct later owner is not this population; it
+  is the AC-2 control above. A mechanism that reddens that control is a
+  stop to the Architect.
 - Any kernel, `trusted_base()` or spec change.
 
 Not in scope: pattern position, and intro paths reached through an import
