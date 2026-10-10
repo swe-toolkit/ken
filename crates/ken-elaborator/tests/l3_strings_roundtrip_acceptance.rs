@@ -135,8 +135,9 @@ fn ac1_s2l_witness_is_always_a_valid_scalar() {
         "\u{10FFFF}",
         "a\u{0080}\u{10FFFF}b\u{0800}",
     ];
-    for s in corpus {
-        let v = eval_view(&mut env, &mut store, "t_ac1", "List Char", &s2l_expr(s));
+    for (index, s) in corpus.into_iter().enumerate() {
+        let name = format!("t_ac1_{index}");
+        let v = eval_view(&mut env, &mut store, &name, "List Char", &s2l_expr(s));
         for cp in list_char_codepoints(&env, &v) {
             assert!(is_scalar(cp), "codepoint {cp:#x} from {s:?} is not a valid scalar");
         }
@@ -177,11 +178,12 @@ fn ac2_round_trip_l2s_s2l_identity() {
         "e\u{301}",
         "hello, \u{4e16}\u{754c}! \u{10000}\u{1F600}",
     ];
-    for s in corpus {
+    for (index, s) in corpus.into_iter().enumerate() {
+        let name = format!("t_ac2_{index}");
         let v = eval_view(
             &mut env,
             &mut store,
-            "t_ac2",
+            &name,
             "String",
             &format!("list_char_to_string (string_to_list_char {})", str_lit(s)),
         );
@@ -241,8 +243,9 @@ fn ac3_utf8_length_boundary_corpus() {
         ("\u{10000}", 0x10000), // 4-byte min
         ("\u{10FFFF}", 0x10FFFF), // 4-byte max (Unicode ceiling)
     ];
-    for (s, expected) in cases {
-        let v = eval_view(&mut env, &mut store, "t_ac3", "List Char", &s2l_expr(s));
+    for (index, (s, expected)) in cases.iter().enumerate() {
+        let name = format!("t_ac3_{index}");
+        let v = eval_view(&mut env, &mut store, &name, "List Char", &s2l_expr(s));
         assert_eq!(
             list_char_codepoints(&env, &v),
             vec![*expected],
@@ -290,8 +293,9 @@ fn ac3_surrogate_guard_across_corpus() {
         "\u{0000}", "\u{007F}", "\u{0080}", "\u{07FF}", "\u{0800}",
         "\u{D7FF}", "\u{E000}", "\u{FFFF}", "\u{10000}", "\u{10FFFF}",
     ];
-    for s in corpus {
-        let v = eval_view(&mut env, &mut store, "t_ac3_guard", "List Char", &s2l_expr(s));
+    for (index, s) in corpus.into_iter().enumerate() {
+        let name = format!("t_ac3_guard_{index}");
+        let v = eval_view(&mut env, &mut store, &name, "List Char", &s2l_expr(s));
         for cp in list_char_codepoints(&env, &v) {
             assert!(
                 !(0xD800..=0xDFFF).contains(&cp),
