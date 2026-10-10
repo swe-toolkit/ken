@@ -20,6 +20,29 @@ fn setup_rebound_construction(with_old_pick: bool) -> ElabEnv {
     env
 }
 
+/// Promise class: durable invariant. MEASURED: a second package unit refuses
+/// Foo and retains the old carrier and dictionary. CLAIMED: package duplicate
+/// refusal does not silently turn into the interactive rebinding path. THE GAP:
+/// the session rebinding guards below separately test the stale-ID checks.
+#[test]
+fn package_route_refuses_rebound_carrier_without_displacing_old_owner() {
+    let mut env = setup_rebound_construction(true);
+    let old_foo = env.globals["Foo"];
+    let old_pick = env.class_env.instance_search("Pick", "Foo");
+    let error = env
+        .elaborate_decl("data Foo : Type where { MkNewFoo : Foo }")
+        .expect_err("a package unit cannot rebind Foo");
+    assert!(
+        matches!(error, ElabError::DuplicateDefinition { ref name, .. } if name == "Foo"),
+        "package duplicate must precede stale-dictionary resolution: {error:?}"
+    );
+    assert_eq!(
+        env.globals["Foo"], old_foo,
+        "old checked carrier remains bound"
+    );
+    assert_eq!(env.class_env.instance_search("Pick", "Foo"), old_pick);
+}
+
 #[test]
 fn rebound_construction_prerequisite_refuses_before_emitting_a_dictionary_term() {
     let mut env = setup_rebound_construction(true);
@@ -29,8 +52,8 @@ fn rebound_construction_prerequisite_refuses_before_emitting_a_dictionary_term()
         .instance_search("Pick", "Foo")
         .expect("old Pick Foo is registered");
 
-    env.elaborate_decl("data Foo : Type where { MkNewFoo : Foo }")
-        .expect("a later surface unit rebinds Foo");
+    env.elaborate_session_decl_results_v1("data Foo : Type where { MkNewFoo : Foo }")
+        .expect("a later interactive declaration rebinds Foo");
     let new_foo = env.globals["Foo"];
     assert_ne!(old_foo, new_foo, "the carrier identities must differ");
     assert_eq!(
@@ -72,8 +95,13 @@ fn rebound_declaration_entry_refuses_the_old_dictionary_identity() {
          instance Pick Foo { selected = True }",
     )
     .expect("old Foo and Pick Foo elaborate from surface source");
-    env.elaborate_decl("data Foo : Type where { MkNewFoo : Foo }")
-        .expect("a later surface unit rebinds Foo");
+    let old_foo = env.globals["Foo"];
+    env.elaborate_session_decl_results_v1("data Foo : Type where { MkNewFoo : Foo }")
+        .expect("a later interactive declaration rebinds Foo");
+    assert_ne!(
+        env.globals["Foo"], old_foo,
+        "the new carrier has its own checked ID"
+    );
 
     env.resolution_provenance.clear();
     let result = env.elaborate_decl("const rebound_entry : Bool where Pick Foo = d.selected");
@@ -96,8 +124,13 @@ fn rebound_declaration_entry_refuses_the_old_dictionary_identity() {
 #[test]
 fn absent_old_prerequisite_remains_no_instance() {
     let mut env = setup_rebound_construction(false);
-    env.elaborate_decl("data Foo : Type where { MkNewFoo : Foo }")
-        .expect("a later surface unit rebinds Foo");
+    let old_foo = env.globals["Foo"];
+    env.elaborate_session_decl_results_v1("data Foo : Type where { MkNewFoo : Foo }")
+        .expect("a later interactive declaration rebinds Foo");
+    assert_ne!(
+        env.globals["Foo"], old_foo,
+        "the new carrier has its own checked ID"
+    );
 
     let result = env.elaborate_decl("const rebound : Bool where Outer (List Foo) = d.selected");
     assert!(
