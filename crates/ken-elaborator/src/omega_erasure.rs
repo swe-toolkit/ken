@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeSet, HashMap};
 
 use ken_kernel::subst::{subst0, weaken};
-use ken_kernel::{infer, whnf, Context, GlobalEnv, KernelError, Term};
+use ken_kernel::{infer, whnf, Context, GlobalEnv, InductiveDecl, KernelError, Level, Term};
 
 /// Kernel inference over a normalized body. `ken_kernel::normalize` drops the
 /// ascriptions the elaborator places on motives, while the kernel infers
@@ -17,6 +17,30 @@ fn infer_node(env: &GlobalEnv, ctx: &Context, t: &Term) -> Result<Term, KernelEr
         Err(KernelError::Msg(reason)) if reason.contains("cannot infer an introduction form") => {
             let hinted = reascribe_motives(env, &mut ctx.clone(), t)?;
             infer(env, ctx, &hinted)
+        }
+        other => other,
+    }
+}
+
+/// `inductive::method_type` infers the motive when it builds a nested
+/// (All-lift) IH type. A normalized body's motive is a bare λ, so retry with a
+/// re-ascribed copy. The kernel checks the ascription, so the hint can refuse
+/// but never admit; the copy only supplies the expected method type, and the
+/// original method is what is visited and counted.
+fn method_type_node(
+    env: &GlobalEnv,
+    ctx: &Context,
+    ind: &InductiveDecl,
+    k: usize,
+    motive: &Term,
+    params: &[Term],
+    level_args: &[Level],
+) -> Result<Term, KernelError> {
+    match ken_kernel::inductive::method_type(env, ind, k, motive, params, level_args) {
+        Err(KernelError::Msg(reason)) if reason.contains("cannot infer an introduction form") => {
+            let inner = reascribe_motives(env, &mut ctx.clone(), motive)?;
+            let hinted = ascribe_motive(env, &mut ctx.clone(), inner)?;
+            ken_kernel::inductive::method_type(env, ind, k, &hinted, params, level_args)
         }
         other => other,
     }
@@ -486,11 +510,10 @@ fn visit(
                 KernelError::Msg(format!("Ω erasure eliminator motive: {error}"))
             })?;
             for (k, method) in methods.iter().enumerate() {
-                let method_ty =
-                    ken_kernel::inductive::method_type(env, ind, k, motive, params, level_args)
-                        .map_err(|error| {
-                            KernelError::Msg(format!("Ω erasure method type {k}: {error}"))
-                        })?;
+                let method_ty = method_type_node(env, ctx, ind, k, motive, params, level_args)
+                    .map_err(|error| {
+                        KernelError::Msg(format!("Ω erasure method type {k}: {error}"))
+                    })?;
                 visit(env, ctx, method, Some(&method_ty), next, plan, memo).map_err(|error| {
                     KernelError::Msg(format!("Ω erasure eliminator method {k}: {error}"))
                 })?;
@@ -666,6 +689,130 @@ mod tests {
                 "{term:?}"
             );
         }
+    }
+
+    /// Promise class: durable invariant (14 §3.2, 42 §3.2).
+    /// MEASURED: a kernel-checked nested-recursion elimination retains a
+    /// well-sorted bare-λ motive after normalization, while changing only its
+    /// body to a non-type makes the method-type hint and plan both refuse.
+    /// CLAIMED: a motive hint may recover an expected method type but may not
+    /// admit an ill-sorted motive. THE GAP: this exercises one nested All-lift
+    /// family; C2 pins the production admission and byte-count boundary.
+    #[test]
+    fn nested_method_type_hint_refuses_ill_sorted_motive() {
+        let mut elaborated = ElabEnv::new().expect("prelude admits");
+        elaborated
+            .elaborate_file(
+                "data Bag (a : Type) : Type where { Empty : Bag a ; One : a -> Bag a }\n\
+                 data Tree = Leaf | Node (Bag Tree)",
+            )
+            .expect("nested recursive family admits");
+        let tree_id = elaborated.globals["Tree"];
+        let tree_type = Term::indformer(tree_id, Vec::new());
+        let nat_type = Term::indformer(elaborated.globals["Nat"], Vec::new());
+        let zero = Term::constructor(elaborated.globals["Zero"], Vec::new());
+        let context = Context::new();
+        let good_motive = Term::lam(tree_type.clone(), nat_type.clone());
+        let bad_motive = Term::lam(tree_type.clone(), Term::var(0));
+        let ind = elaborated
+            .env
+            .inductive(tree_id)
+            .expect("Tree family exists");
+        assert!(matches!(
+            ken_kernel::inductive::method_type(&elaborated.env, ind, 1, &good_motive, &[], &[]),
+            Err(KernelError::Msg(reason)) if reason.contains("cannot infer an introduction form")
+        ));
+        let good_type = method_type_node(&elaborated.env, &context, ind, 1, &good_motive, &[], &[])
+            .expect("the kernel checks a well-sorted motive hint");
+        assert!(matches!(
+            whnf(&elaborated.env, &context, &good_type),
+            Term::Pi(..)
+        ));
+        let bad_type = method_type_node(&elaborated.env, &context, ind, 1, &bad_motive, &[], &[])
+            .expect_err("an ill-sorted motive cannot gain a method type from a hint");
+        assert!(
+            bad_type.to_string().contains("motive result is not a type"),
+            "the kernel must reject the motive's result sort: {bad_type}"
+        );
+
+        // The checked term is normalized to precisely the bare-λ motive that
+        // the package writer sees; the scrutinee is opaque, so no ι fires.
+        let opaque = ken_kernel::declare_postulate(
+            &mut elaborated.env,
+            "tree_probe".into(),
+            Vec::new(),
+            tree_type.clone(),
+        )
+        .expect("typed opaque tree admits");
+        let ind = elaborated
+            .env
+            .inductive(tree_id)
+            .expect("Tree family exists");
+        let hinted_motive = ascribe_motive(&elaborated.env, &mut context.clone(), good_motive)
+            .expect("the well-sorted motive can be ascribed");
+        let methods = (0..ind.constructors.len())
+            .map(|k| {
+                let method_type = ken_kernel::inductive::method_type(
+                    &elaborated.env,
+                    ind,
+                    k,
+                    &hinted_motive,
+                    &[],
+                    &[],
+                )
+                .expect("ascribed method type admits");
+                fn constant_zero_method(env: &GlobalEnv, ty: &Term, zero: &Term) -> Term {
+                    match whnf(env, &Context::new(), ty) {
+                        Term::Pi(domain, codomain) => {
+                            Term::lam(*domain, constant_zero_method(env, &codomain, zero))
+                        }
+                        _ => zero.clone(),
+                    }
+                }
+                constant_zero_method(&elaborated.env, &method_type, &zero)
+            })
+            .collect::<Vec<_>>();
+        let checked = Term::Elim {
+            fam: tree_id,
+            level_args: Vec::new(),
+            params: Vec::new(),
+            motive: Box::new(hinted_motive),
+            methods,
+            indices: Vec::new(),
+            scrut: Box::new(Term::const_(opaque, Vec::new())),
+        };
+        ken_kernel::check(&elaborated.env, &context, &checked, &nat_type)
+            .expect("positive eliminator is kernel-checked");
+        let normalized = ken_kernel::normalize(&elaborated.env, &context, &checked);
+        let Term::Elim { motive, .. } = &normalized else {
+            panic!("opaque scrutinee must retain its elimination");
+        };
+        assert!(matches!(motive.as_ref(), Term::Lam(..)));
+        omega_erasure_plan(&elaborated.env, &normalized, &nat_type)
+            .expect("well-sorted normalized motive receives a plan");
+        let Term::Elim {
+            fam,
+            level_args,
+            params,
+            methods,
+            indices,
+            scrut,
+            ..
+        } = normalized
+        else {
+            unreachable!()
+        };
+        let malformed = Term::Elim {
+            fam,
+            level_args,
+            params,
+            motive: Box::new(bad_motive),
+            methods,
+            indices,
+            scrut,
+        };
+        omega_erasure_plan(&elaborated.env, &malformed, &nat_type)
+            .expect_err("an ill-sorted motive must never acquire an erasure plan");
     }
 
     /// Promise class: transition sentinel for the kernel's current
