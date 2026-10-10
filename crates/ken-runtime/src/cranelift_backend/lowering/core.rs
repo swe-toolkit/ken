@@ -6911,29 +6911,55 @@ impl<'a> Lowering<'a> {
         self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
     }
 
-    /// A pair without a planned performing member cannot leave a consuming
-    /// seat silently. The response-owner route was fixed by the planner; this
-    /// function only emits its exact catalogued trap on the reached branch.
-    fn trap_unrouted_relay_at_consumer(
+    /// A pair without a planned performing member cannot execute a consuming
+    /// seat silently. Preserve lowering of the call path even when the runtime
+    /// arm takes the planner's trap: that descent also discharges call and
+    /// generated-entry obligations in this function and its callees.
+    fn branch_unrouted_relay_at_consumer(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         source: StaticOriginId,
         identity: &ContinuationCallIdentity,
-    ) -> Result<Option<RuntimeTrap>, CraneliftBackendError> {
+    ) -> Result<(), CraneliftBackendError> {
         let Some(owner) = self.defining_emission_owner else {
-            return Ok(None);
+            return Ok(());
         };
-        let trap = self.static_transition_plan.relay_route(source, owner, identity)?
+        let trap = self
+            .static_transition_plan
+            .relay_route(source, owner, identity)?
             .and_then(|route| route.no_route_trap.clone());
         let Some(trap) = trap else {
-            return Ok(None);
+            return Ok(());
         };
+        // All generated units already load their native-int and boundary
+        // arenas through this ABI parameter. A valid invocation therefore
+        // carries a non-null services pointer. Unlike a constant predicate,
+        // the function parameter remains a runtime value in the finished CLIF:
+        // the cold call block stays present for the call/ledger closeout.
+        let services = self.function_local.services_pointer.ok_or_else(|| {
+            unsupported(
+                "RelayRoute",
+                "a relay-consuming function has no services ABI parameter",
+            )
+        })?;
+        let valid_invocation = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+            services,
+            0,
+        );
+        let trap_block = builder.create_block();
+        let call_block = builder.create_block();
+        builder
+            .ins()
+            .brif(valid_invocation, trap_block, &[], call_block, &[]);
+        builder.switch_to_block(trap_block);
+        builder.seal_block(trap_block);
         let status = self.emit_current_trap(builder, &trap)?;
         builder.ins().return_(&[status]);
         self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
-        let unreachable = builder.create_block();
-        builder.switch_to_block(unreachable);
-        Ok(Some(trap))
+        builder.switch_to_block(call_block);
+        builder.seal_block(call_block);
+        Ok(())
     }
 
     fn lower_computational_producer_construct<'b>(
@@ -7144,13 +7170,11 @@ impl<'a> Lowering<'a> {
                     "an active transport's stable closure seat is not the recursive child being replaced",
                 ));
             }
-            if let Some(trap) = self.trap_unrouted_relay_at_consumer(
-                builder, static_origin, transport.source_call_identity(),
-            )? {
-                return Ok(ProducerTrampolineStep::ordinary(
-                    LoweringOperand::Specialized(Lowered::Trap(trap)),
-                ));
-            }
+            self.branch_unrouted_relay_at_consumer(
+                builder,
+                static_origin,
+                transport.source_call_identity(),
+            )?;
             let claimed = self.call_checked_ih_environment_transport(
                 builder,
                 &transport,
@@ -7655,8 +7679,8 @@ impl<'a> Lowering<'a> {
                 // captures was called with its declared parameter tail
                 // unfilled.
                 // A claim with a planned binding consumes the Vis constructor.
-                // Trap before the call: trapping after it would perform its
-                // continuation while silently omitting the forwarded effect.
+                // Branch to the runtime trap before the call, but still lower
+                // the call path to preserve its downstream compiler obligations.
                 if self.continuation_claims.is_some() {
                     if let Some(identity) = self.static_transition_plan.continuation_call_binding_for(
                         static_origin,
@@ -7666,13 +7690,7 @@ impl<'a> Lowering<'a> {
                         u32::try_from(position).map_err(|_| unsupported(
                             "ComputationalMatch", "recursive position exceeds addressable range"))?,
                     )? {
-                        if let Some(trap) = self.trap_unrouted_relay_at_consumer(
-                            builder, static_origin, &identity,
-                        )? {
-                            return Ok(ProducerTrampolineStep::ordinary(
-                                LoweringOperand::Specialized(Lowered::Trap(trap)),
-                            ));
-                        }
+                        self.branch_unrouted_relay_at_consumer(builder, static_origin, &identity)?;
                     }
                 }
                 if let Some(returned) = self.claim_and_call_continuation(
@@ -8645,11 +8663,7 @@ impl<'a> Lowering<'a> {
                  descent would realize one region twice",
             ));
         }
-        if let Some(trap) = self.trap_unrouted_relay_at_consumer(
-            builder, producer_construct_origin, &identity,
-        )? {
-            return Ok(Some(LoweringOperand::Specialized(Lowered::Trap(trap))));
-        }
+        self.branch_unrouted_relay_at_consumer(builder, producer_construct_origin, &identity)?;
         // ---- THE ACTION IS NON-CALLING. Architect `evt_5edhqyyhw4585`.
         //
         // ⚠ **The direct call this seat used to attempt is WITHDRAWN, and the
