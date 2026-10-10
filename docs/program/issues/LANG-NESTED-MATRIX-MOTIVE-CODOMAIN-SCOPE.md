@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-MATRIX-MOTIVE-CODOMAIN-SCOPE
 title: "nested_matrix_motive's non-reverting branch infers the codomain's sort in a context missing the split binder, and a guarded arm swallows the resulting VarOutOfScope into Level::Zero, so every such split stores its motive at Type 0 and an or-pattern match whose result lives at Type 1 is rejected. Infer under the binder and stop swallowing the error"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
