@@ -32,6 +32,13 @@ from delivered bytes on the Library route as it does on the host route.
   - Host preparation of the same source delivers `decl:rt_motive_host::Top`
     as `opaque`, declared type `omega(level_zero)`, and admits the owner as
     `ProofOnly`.
+- **The row no longer reaches admission on main.** Since
+  `LANG-REFINEMENT-PROOF-ERASURE` (`7f46e9706`), `proof_match` is wholly
+  erased as `ErasedOmegaSubterm`, the correct outcome for a proof-valued
+  owner, so it is not this WP's pin (Architect `evt_7me8knse34bqq`). D0
+  first finds a computational owner whose declared type references a
+  declaration the selection omits; if none exists, the WP closes without
+  repair.
 - **The refusal is correct for its key.** RT-MATCH reads the sort from
   delivered declarations and refuses a missing one (Architect
   `evt_34xv933a05smz`). The defect is the selection, not the reader. No
@@ -50,12 +57,13 @@ stop and report the mismatch.
 
 ## Acceptance
 
-- **AC-1.** `proof_match` on the selected Library route is admitted as
-  `ProofOnly`, with `Top` in `semantic.declarations`.
+- **AC-1.** The D0's computational owner on the selected Library route
+  is admitted, with the referenced declaration in
+  `semantic.declarations`.
 - **AC-2 (controls).** The host route and the RT-MATCH AC-3 arm counts are
   unchanged.
-- **AC-3 (mutation, QA).** Removing the closure returns `proof_match` to
-  `UnsupportedProofOnlyMatch`.
+- **AC-3 (mutation, QA).** Removing the closure returns that owner to
+  its measured refusal.
 
 ## Stop conditions
 

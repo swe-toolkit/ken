@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-PROOF-ERASURE
 title: "The interpreter is strict in Unknown on pairs, the checked-core pair view rejects dependent Σ, and the native decoder has no refl and decodes a λ over an equation as relevant, so neither a subset-Σ proof nor a path-condition convoy can run. Erase every Ω-classified position (binder, argument, refinement pair forms), keyed on the classification, in lowering and in the interpreter"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -268,3 +268,24 @@ Append one entry per Architect hard stop; never rewrite history.
 - `SPEC-REFINEMENT-SUBSET-SIGMA` lands without the plan's package
   section: stop to the Architect.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `7f46e9706` from exact `67ee63a2c` (PR #4613). Language QA
+`evt_1x8m5na46xxq1`, Architect `evt_7me8knse34bqq`, Decision
+`dec_1wjyjevenqybp` (`evt_30xa6a6jdbhw0`). The checked-core package
+carries a kernel-classified Ω erasure plan per admitted transparent
+declaration; native lowering refuses a missing plan, and the interpreter
+and REPL evaluate through it with a cache scoped to one outermost
+evaluation. A proof-first native Σ stays pinned fail-closed for
+`LANG-NATIVE-SIGMA-ERASED-FIELD`. §1a: 5, symptoms 1-5 above.
+
+Carries, no node:
+- The raw-`eval` test helpers above, now joined by
+  `CAT-GRAPHS-DEPENDENCY`'s `truth` helpers, migrate to `eval_checked`
+  when each next changes.
+- The computational-IH collector in `compiler_driver.rs` is the latent
+  sibling of symptom 5 and fails closed.
+- The selected-Library `proof_match` refusal is gone because
+  `proof_match` is now wholly erased; `RT-SELECTED-LIBRARY-DECLARATION-CLOSURE`
+  re-pins on a computational owner (`evt_7me8knse34bqq`).

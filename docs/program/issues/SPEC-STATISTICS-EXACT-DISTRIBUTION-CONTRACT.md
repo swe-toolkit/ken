@@ -1,7 +1,7 @@
 ---
 id: SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT
 title: "No statistics or probability contract exists in spec/50-stdlib, so the catalog's statistics layer has nothing to build against. Author spec/50-stdlib/63-statistics.md with its first section: an exact finite distribution, event probability and expectation, each law proved at zero trust"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -72,3 +72,22 @@ base, stop and report the mismatch.
 - The contract needs a kernel, trust, `Float` or surface-syntax change.
 - A law cannot be stated without a type that does not exist and that the
   D0 does not place in this scope.
+
+## Closeout
+
+Merged `9355e98c8` from exact `d6605d7db` (PR #4646). Architect D0
+`evt_1a2b2fhb035nw`, Architect `evt_zg3eb0z1gmb0`, conformance validator
+`evt_377mw3yz22cgz`, Decision `dec_6n0whjftb8s1g`. Section 1 of
+`spec/50-stdlib/63-statistics.md` is normative for 20 public declarations
+in `Algorithm.Statistics.Exact`: `ExactDistribution q`, a natural-weight
+atom list with a checked positive total and no `Finite q` or `DecEq q`;
+`total`, `event_mass`, `expectation_weight` and five named builders; and
+nine proved laws, including two pointwise congruence laws. A probability
+is a numerator over `total`, compared by Nat cross-multiplication.
+Deferred: `pure` and `bind` as a pair, `uniform`, conditional
+probability, variance, the empirical and approximate tiers, continuous
+distributions, `Float`, and a `Data.Numeric.Rational` contract. The
+eight-case seed is `conformance/stdlib/statistics/seed-exact-distribution.md`.
+§1a: 0. Carry, non-blocking: "vertex" in §1.1 reads better as
+"outcome", and the inline-λ remark should be scoped to the D0
+measurement (`evt_zg3eb0z1gmb0`).

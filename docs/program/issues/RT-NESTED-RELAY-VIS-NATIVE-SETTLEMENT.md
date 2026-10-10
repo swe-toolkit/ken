@@ -304,6 +304,19 @@ base, stop and report the mismatch.
      each listed seat. A consumption at an unlisted seat, or an
      ambiguous (c) attribution, is a stop to the Architect. The table
      goes to the Architect.
+   - **Seats after rows 01-24 (WIP audit `evt_4xj2fgkjmwzhx`).**
+     `active_transport` consumes without emitting and joins the gate's
+     seat list. `claimed_result_substitution` is the tail of
+     `claim_and_call_continuation`, one seat.
+     `dispatch_fusion_owned_outer_realization` is not observed. Source
+     768 is not yet attributed, because the recorder is owner-filtered and
+     sits in one function. It is settled first by unfiltered prints at
+     `constructor_enter`, `lower_computational_match_value_composed_once`
+     and `lower_computational_producer_expr_once`, keyed on the fixture's
+     roster entry. A visit under another owner or `None`, or no visit at
+     any of the three, is a stop to the Architect; no visit falsifies the
+     seat-keyed design. Rows 25-36 follow, with pairs whose emitted
+     handler is none reported separately.
    - **This WP's landing cut is increment (i):** D1-D3, the D0
      measurements and the seat-keyed refusal, with AC-MAIN asserting the
      refusal. It closes the main defect. **Increment (ii), the performing

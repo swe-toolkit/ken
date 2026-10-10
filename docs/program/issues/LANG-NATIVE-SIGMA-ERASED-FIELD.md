@@ -1,7 +1,7 @@
 ---
 id: LANG-NATIVE-SIGMA-ERASED-FIELD
 title: "Native lowering of a relevant Σ lowers its first field unconditionally, so a proof-first relevant Σ (Σ(p : Eq Int 7 7).Int) reaches the ErasedOmegaSubterm arm and refuses natively, although the plan keeps the pair and the interpreter returns Pair { fst: Neutral, snd: Int(8) }. Give an erased field in a retained Σ slot a native representation at interpreter parity"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
@@ -64,7 +64,25 @@ base, stop and report the mismatch.
      lowering IR. Any future pass that rewrites declarations between the
      plan writer and erasure reopens the plan/body binding.
 2. **The ruled representation** in relevant-Σ native lowering, for an
-   erased field in either slot.
+   erased field in either slot. **Ruled (iii)** (Architect
+   `evt_1dxqw8zq8gcwy`, on `7f46e9706`): an erased field has no slot.
+   - **Lowering.** The `StructuralPair` arm skips a child decoded as
+     `ErasedOmegaSubterm`, keyed on the plan's classification, and keeps
+     the surviving field under its own name (`{second: 8}`, not
+     renumbered). A pair with no surviving field keeps the exact
+     `erased_omega_subterm_reached_computation` refusal.
+   - **Projection admission, AC-1's projection.** In the `proj1`/`proj2`
+     decode, a base whose type (resolved as
+     `record_symbol_for_projection_base` does, for `Variable` and
+     `DirectDeclarationCall`) has a `"sigma"` head decodes as
+     `StructuralFirstProjection` or a new `StructuralSecondProjection`,
+     lowered as `Project { field: "second" }`. Every other base, including
+     an alias of a sigma, keeps its current refusals. The `:1636`/`:1717`
+     consumers take the new variant.
+   - **An erased second slot.** Write one Ω-second fixture and record its
+     plan. The expected result is that the node is in `collapsed_sigmas`
+     and is AC-2's subset row; a retained `StructuralPair` with an erased
+     second is a stop to the Architect.
 3. **The predecessor's carries** (Architect `evt_5gxf52f58g5c7`), in the
    same `erasure.rs` region:
    - `checked_erased_argument_flags` (`erasure.rs:4659`) is defined and
@@ -85,7 +103,10 @@ base, stop and report the mismatch.
   pins are unchanged.
 - **AC-3 (mutation, QA).** Lowering the erased field unconditionally again
   returns AC-1 to the exact `erased_omega_subterm_reached_computation`
-  refusal.
+  refusal. A second mutant forces `StructuralFirstProjection` onto the
+  proof-first pair: native lowering refuses it with a typed error, and
+  never reads a missing field or returns `BOUNDARY_ERR_BOUNDS` at run
+  time (`evt_1dxqw8zq8gcwy`).
 
 ## Stop conditions
 
@@ -93,3 +114,10 @@ base, stop and report the mismatch.
   change, or changes a package's plan bytes or semantic hash.
 - No option lowers without a new runtime value kind: stop to the Steward
   with the D0.
+- Either seat needs a plan-writer change, or the AC-1 projection reaches
+  native lowering through a base shape other than `Variable` or
+  `DirectDeclarationCall`: stop to the Architect.
+
+Carry, no node yet: the interpreter returns `fst: Neutral` for the erased
+slot, where spec 47 says erased subterms evaluate to canonical `tt`. AC-1
+compares only the second component (`evt_1dxqw8zq8gcwy`).
