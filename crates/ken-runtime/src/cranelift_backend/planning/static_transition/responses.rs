@@ -1413,7 +1413,9 @@ impl StaticTransitionPlan<'_> {
             match matching.as_slice() {
                 [] => Ok(None),
                 [member] => Ok(Some(EmittedRelayMember { owner: owner.id(), member: member.id() })),
-                _ => Err(planner_error("relay: one instance has two clauses for one forwarded op")),
+                _ => Err(planner_error(
+                    "relay: forwarded op reaches more than one protocol position of its minting instance; static plan refuses",
+                )),
             }
         };
         let calls = self.continuation_calls()?;
@@ -1471,11 +1473,22 @@ impl StaticTransitionPlan<'_> {
             }
             for identity in pair_edges.get(&key).into_iter().flat_map(|edges| edges.iter()) {
                 let relay_route = if let Some((owner, row)) = by_edge.get(identity) {
-                    Some(select(owner, row, pair)?.ok_or_else(|| planner_error(format!(
-                        "relay: entered response owner {:?} has no clause for source {:?} effect {:?} operation {:?} at call {:?}",
-                        owner.id(), pair.source, pair.effect_origin, pair.operation, identity,
-                    )))?)
+                    // The entered owner's own row is the clause at this causal
+                    // call edge. Another protocol position can handle the same
+                    // operation, but it is not the position this call entered.
+                    if row.vis_origin() != pair.source
+                        || row.effect_origin() != pair.effect_origin
+                        || row.operation() != pair.operation
+                    {
+                        return Err(planner_error(
+                            "relay: entered owner's own row does not record the forwarded source",
+                        ));
+                    }
+                    Some(EmittedRelayMember { owner: owner.id(), member: row.id() })
                 } else {
+                    // Without an entered owner the minting instance remains
+                    // fixed. Its emitted clauses are selected by the checked
+                    // operation only when that selector is a function.
                     select(minting_owner.0, minting_owner.1, pair)?
                 };
                 let no_route_trap = relay_route.is_none().then(|| RuntimeTrap {
