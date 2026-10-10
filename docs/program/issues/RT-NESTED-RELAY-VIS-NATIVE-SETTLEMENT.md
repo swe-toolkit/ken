@@ -367,11 +367,11 @@ base, stop and report the mismatch.
 
 ## Hard-stop inventory
 
-- **§1a.** Question (4), E disposition and the D4 relay arm: 5
+- **§1a.** Question (4), E disposition and the D4 relay arm: 6
   (`evt_5sah7xb9543hp`, `evt_47yp5mk4wznjb`, `evt_3b7ws2dvx1r9v`,
-  `evt_4tbaxstk921c2`, `evt_1pfhbxjg0f4he`). The third put D4 on hold
-  and called a research advisory; the next research hold is at the
-  sixth.
+  `evt_4tbaxstk921c2`, `evt_1pfhbxjg0f4he`, `evt_15tdpczht4e6g`). The
+  third put D4 on hold and called a research advisory; the sixth holds
+  the D4' ruling for a second advisory (`evt_5qh2rwdb1zhm8`).
   Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
   `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
   research's advisory (`evt_4wcce8z24a4c9`, ruling `evt_5mgw5cwr993nd`);
@@ -445,6 +445,22 @@ base, stop and report the mismatch.
   (`evt_4c45bzrtqevcx`, non-advancing) found no single route: owner 0
   runs for member 515 and seat 174 never executes. AC-7's census is recut
   to runtime behavior.
+- **9.** Static fusion at the relay source settles the relay's control
+  (the fall-through to `continuation_result`) but not its effect. In
+  `BRANCHED_SCRUTINEE` with the window in bounds, source 768 executes
+  once natively and its forwarded FsReadAt is never performed, while the
+  interpreter performs it (`evt_15tdpczht4e6g`) -- keyed on "the source
+  fuses statically", not on "a route performs the forwarded operation".
+- **§1b at entry 9: YES** (`evt_5qh2rwdb1zhm8`). Entries 7, 8 and 9
+  share one predicate: relay settlement is attributed to a plan-structural
+  fact (the pair, a candidate row, static fusion) rather than to a route
+  that performs the forwarded operation. The closure, cut after the
+  advisory: an admitted relay pair names a route that performs the
+  forwarded operation, measured as host-op parity on a fixture where the
+  interpreter performs it; without one, relay sources keep D3's typed
+  refusal. D1-D3, the projection, `relay_drive_pair` as admission
+  authority, the permanent errors and the census instruments carry
+  forward; D4''s claim that an undriven relay is settled does not.
 
 ## Finding outside this WP
 
