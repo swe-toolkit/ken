@@ -436,7 +436,6 @@ impl ElabEnv {
         // declarations admitted after this pre-source boundary belong to a
         // package's duplicate-name set; prelude names keep their own guards.
         elab.module_state.package_definitions.clear();
-        elab.module_state.temp_dup_census_ready = true;
         Ok(elab)
     }
 
@@ -481,13 +480,11 @@ impl ElabEnv {
     /// Elaborate a single V0/V1/L1 declaration from source.
     ///
     /// On success the declaration is registered in `self.env`.
-    #[track_caller]
     pub fn elaborate_decl(&mut self, src: &str) -> Result<GlobalId, ElabError> {
         self.elaborate_decl_v1(src).map(|result| result.def_id)
     }
 
     /// Elaborate a V1/L1 declaration, returning obligations alongside the id.
-    #[track_caller]
     pub fn elaborate_decl_v1(&mut self, src: &str) -> Result<ElabResult, ElabError> {
         let decls = parser::parse_decls(src)?;
         if decls.len() != 1 {
@@ -504,7 +501,6 @@ impl ElabEnv {
 
     /// Elaborate one declaration, returning every result it expands to
     /// (a `module { ... }` block yields one per inner declaration).
-    #[track_caller]
     pub fn elaborate_decl_results_v1(
         &mut self,
         src: &str,
@@ -528,7 +524,6 @@ impl ElabEnv {
     /// none; a `module { … }` block contributes one per inner decl) but
     /// never a kernel-visible module concept. Returns the `GlobalId` of
     /// every successfully elaborated declaration.
-    #[track_caller]
     pub fn elaborate_file(&mut self, src: &str) -> Result<Vec<GlobalId>, ElabError> {
         self.elaborate_file_v1(src)
             .map(|results| results.into_iter().map(|result| result.def_id).collect())
@@ -536,7 +531,6 @@ impl ElabEnv {
 
     /// Elaborate a file while retaining verification obligations, including
     /// those emitted by block-space operation contracts.
-    #[track_caller]
     pub fn elaborate_file_v1(&mut self, src: &str) -> Result<Vec<ElabResult>, ElabError> {
         let decls = parser::parse_decls(src)?;
         modules::expand_and_elaborate(self, &decls)
