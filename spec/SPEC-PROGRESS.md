@@ -7,9 +7,9 @@ readers use those declarations and their stated scope; this index does not
 invent a separate maturity judgment.
 
 The chapters remain authoritative for their own declarations. This index is a
-measured view of all 67 Markdown files under `spec/` at the reconciliation
-point. It is not a build tracker, a next-action queue, or a substitute for the
-work-package nodes under `docs/program/issues/`.
+measured view of all 69 Markdown files under `spec/` at this update. It is not
+a build tracker, a next-action queue, or a substitute for the work-package
+nodes under `docs/program/issues/`.
 
 ## Status convention
 
@@ -116,6 +116,7 @@ to that same declaration, including its qualifications.
 | `50-stdlib/60-length-indexed-vectors.md` | not declared | Normative for the Vec family and landed operations; `zip` and `lookup` remain gated on `DS-5c`. |
 | `50-stdlib/61-formal-languages.md` | `DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT; SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT; SPEC-FORMAL-LANGUAGES-NFA-CONTRACT; SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT; SPEC-FORMAL-LANGUAGES-MINIMISATION-CONTRACT; SPEC-FORMAL-LANGUAGES-LEXER-BRIDGE-CONTRACT)` | §§1–2 bind Dfa, finite certificates and reachability; §3 binds Nfa acceptance and finite-mask determinization; §4 binds independent Regex denotation and six checked laws; §5 binds Dfa equivalence and minimisation without `DecEq q` or a cardinality claim. §6 binds Cursor's bounded element list and the streaming DFA bridge, with four checked laws and no cross-instance cursor claim. §§5–6 package delivery is not claimed. |
 | `50-stdlib/62-graphs.md` | `DRAFT v0 (SPEC-GRAPHS-DEPENDENCY-CONTRACT)` | §1 binds Boolean directed adjacency, checked finite reachability using §61 §2's single fixed point, real walk witnesses, and a complete distinct topological list or real cycle. `DecEq q` is needed only for the ordering decision; no graph CAT delivery is claimed. |
+| `50-stdlib/63-statistics.md` | `DRAFT v0 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT)` | §1 binds positive natural-weight atom lists, Boolean-event mass and natural-score expectation as exact numerators over total, and nine checked laws including both pointwise congruences. No `Finite q` or `DecEq q` is required; rational-valued operations, `pure`/`bind`, uniform enumeration and approximate tiers are deferred. No catalog delivery is claimed. |
 | `50-stdlib/README.md` | `DRAFT v0` | Binding standard-package-tier boundary and derivation-path requirement. |
 | `60-security/61-information-flow.md` | `Sec1 + Sec1ct elaborated; implementation-ready for WS-Sec` | Normative for the declared IFC and constant-time discipline; surface spelling remains proposal-level. |
 | `60-security/62-authority.md` | `Sec2 elaborated; implementation-ready for Team Verify (WS-Sec)` | Normative for authority, attenuation, revocation contract, and audit points; spelling and named runtime mechanisms remain qualified. |
@@ -144,7 +145,7 @@ inferred axis value:
   chapter.
 - `_notes/analysis-digest.md` — the background design note declares no status.
 
-The other 64 inputs are classifiable by the operative rule. This report does
+The other 66 inputs are classifiable by the operative rule. This report does
 not repair or add chapter declarations; those declarations are inputs to this
 reconciliation.
 
