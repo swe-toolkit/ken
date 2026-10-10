@@ -487,12 +487,14 @@ pub enum CheckedCoreBodyTerm {
         body: Box<CheckedCoreBodyTerm>,
     },
     Match(CheckedCoreMatchView),
-    /// A relevant kernel Σ with no named record metadata retains both fields.
+    /// A relevant kernel Σ with no named record metadata. A checked Ω field
+    /// remains a decoded marker so native lowering can omit its runtime slot.
     StructuralPair {
         first: Box<CheckedCoreBodyTerm>,
         second: Box<CheckedCoreBodyTerm>,
     },
     StructuralFirstProjection(Box<CheckedCoreBodyTerm>),
+    StructuralSecondProjection(Box<CheckedCoreBodyTerm>),
     RecordSigmaConstruction(CheckedCoreRecordSigmaConstructionView),
     RecordSigmaProjection(CheckedCoreRecordSigmaProjectionView),
     DictionaryConstruction(CheckedCoreDictionaryConstructionView),
@@ -1637,7 +1639,8 @@ pub(crate) fn checked_runtime_match_census(
                 visit(first, next_computational_ordinal, occurrences)?;
                 visit(second, next_computational_ordinal, occurrences)?;
             }
-            CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            CheckedCoreBodyTerm::StructuralFirstProjection(pair)
+            | CheckedCoreBodyTerm::StructuralSecondProjection(pair) => {
                 visit(pair, next_computational_ordinal, occurrences)?;
             }
             CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
@@ -1714,7 +1717,8 @@ fn runtime_body_references_outer_binder_range(
             runtime_body_references_outer_binder_range(first, start, end, local_depth)
                 || runtime_body_references_outer_binder_range(second, start, end, local_depth)
         }
-        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair)
+        | CheckedCoreBodyTerm::StructuralSecondProjection(pair) => {
             runtime_body_references_outer_binder_range(pair, start, end, local_depth)
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
@@ -3829,6 +3833,17 @@ fn decode_supported_record_sigma_projection(
     type_context: &[Vec<u8>],
     plan: Option<&ErasureDecodeContext<'_>>,
 ) -> Result<CheckedCoreBodyTerm, CheckedCoreBodyViewError> {
+    if let Some(projection) = decode_structural_sigma_projection(
+        &first_tag,
+        cursor,
+        semantic,
+        selection,
+        owner,
+        type_context,
+        plan,
+    )? {
+        return Ok(projection);
+    }
     if first_tag == "proj2" {
         return Err(CheckedCoreBodyViewError::UnsupportedRecordProjectionShape {
             symbol: owner.clone(),
@@ -3891,6 +3906,69 @@ fn decode_supported_record_sigma_projection(
             skipped_fields,
         },
     ))
+}
+
+/// Only a variable or checked direct declaration can supply the exact Sigma
+/// head for structural projection. Other bases retain the record decoder's
+/// existing refusal rather than guessing a type from their runtime shape.
+fn decode_structural_sigma_projection(
+    tag: &str,
+    cursor: &mut CanonicalCursor<'_>,
+    semantic: &CheckedCoreSemanticInputs,
+    selection: &CheckedCoreBodyViewSelection,
+    owner: &StableSymbol,
+    type_context: &[Vec<u8>],
+    plan: Option<&ErasureDecodeContext<'_>>,
+) -> Result<Option<CheckedCoreBodyTerm>, CheckedCoreBodyViewError> {
+    let start = cursor.pos;
+    let mut probe = CanonicalCursor {
+        bytes: cursor.bytes,
+        pos: start,
+    };
+    let base_tag = probe
+        .read_tag()
+        .map_err(|reason| malformed_body(owner, reason))?;
+    if base_tag != "var" && base_tag != "const" {
+        return Ok(None);
+    }
+    let Ok(base) = decode_supported_body_term_after_tag(
+        base_tag,
+        &mut probe,
+        semantic,
+        selection,
+        owner,
+        type_context,
+        None,
+        plan,
+        start,
+    ) else {
+        // The ordinary record route still owns its diagnostic for this base.
+        return Ok(None);
+    };
+    let ty = match &base {
+        CheckedCoreBodyTerm::Variable { de_bruijn_index } => {
+            type_context.get(*de_bruijn_index).cloned()
+        }
+        CheckedCoreBodyTerm::DirectDeclarationCall { symbol, .. } => {
+            declaration_checked_type_bytes(semantic, symbol).ok()
+        }
+        _ => None,
+    };
+    let Some(ty) = ty else { return Ok(None) };
+    let mut type_cursor = CanonicalCursor::new(&ty);
+    if type_cursor
+        .read_tag()
+        .map_err(|reason| malformed_body(owner, reason))?
+        != "sigma"
+    {
+        return Ok(None);
+    }
+    cursor.pos = probe.pos;
+    Ok(Some(match tag {
+        "proj1" => CheckedCoreBodyTerm::StructuralFirstProjection(Box::new(base)),
+        "proj2" => CheckedCoreBodyTerm::StructuralSecondProjection(Box::new(base)),
+        _ => unreachable!("only Sigma projections use this decoder"),
+    }))
 }
 
 fn checked_record_sigma_view(

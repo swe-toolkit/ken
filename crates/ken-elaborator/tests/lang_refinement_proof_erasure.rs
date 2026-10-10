@@ -4,9 +4,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::checked_core::{
-    canonical_decl_bytes, emit_checked_core_package, CheckedCoreArtifactInputs, CheckedCorePackage,
-    CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
-    LowerabilityStatus, StableSymbol, StableSymbolTable, SymbolNamespace,
+    canonical_decl_bytes, checked_core_declaration_body_view, emit_checked_core_package,
+    CheckedCoreArtifactInputs, CheckedCoreBodyViewError, CheckedCoreBodyViewSelection,
+    CheckedCorePackage, CheckedCorePackageError, CheckedCorePackageHeader,
+    CheckedCoreSemanticInputs, LowerabilityStatus, StableSymbol, StableSymbolTable,
+    SymbolNamespace,
 };
 use ken_elaborator::erasure::{erase_checked_core_package_for_target, ErasureError};
 use ken_elaborator::omega_erasure::omega_erasure_plan;
@@ -15,7 +17,7 @@ use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::{declare_def, declare_postulate, Context, Decl, GlobalEnv, GlobalId, Term};
 use ken_runtime::{
     evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeExpr, RuntimeGroundValue,
-    RuntimeIrSeedEnvironment, RuntimeObservation,
+    RuntimeIrSeedEnvironment, RuntimeObservation, RuntimeValue,
 };
 use num_bigint::BigInt;
 
@@ -349,15 +351,16 @@ fn omega_let_erasure_preserves_outer_runtime_variable() {
 #[test]
 fn relevant_sigma_pair_keeps_both_components() {
     // Promise class: durable invariant (42 §3.2, 47 §1).
-    // MEASURED: Σ Int Int remains a pair on both runtime paths; a proof-first
-    // Σ with computational codomain remains a pair in the plan and interpreter.
-    // CLAIMED: only the codomain decides Σ collapse, not the first domain.
-    // THE GAP: native has no representation for an erased first field in a
-    // retained pair; its fail-closed boundary is pinned below.
+    // MEASURED: Σ Int Int keeps both named fields; a proof-first Σ with
+    // computational codomain retains only its named second runtime field,
+    // and projecting that field agrees with typed interpreter evaluation.
+    // CLAIMED: the codomain decides collapse; an Ω first field has no slot.
+    // THE GAP: the plan/body binding and the projection's checked base type
+    // must refer to the same admitted declarations.
     let mut elaborated = ElabEnv::new().expect("prelude admits");
     let int_id = elaborated.globals["Int"];
     let int_ty = Term::const_(int_id, vec![]);
-    let sigma = Term::sigma(int_ty.clone(), int_ty);
+    let sigma = Term::sigma(int_ty.clone(), int_ty.clone());
     let pair = Term::pair(int(7), int(8));
     let pair_id = declare_def(&mut elaborated.env, vec![], sigma.clone(), pair.clone())
         .expect("relevant pair admits");
@@ -385,6 +388,31 @@ fn relevant_sigma_pair_keeps_both_components() {
     assert!(
         matches!(result, EvalVal::Pair { fst, snd, .. } if matches!(*fst, EvalVal::Int(7)) && matches!(*snd, EvalVal::Int(8)))
     );
+    let first = Term::proj1(Term::const_(pair_id, vec![]));
+    let first_id = declare_def(&mut elaborated.env, vec![], int_ty.clone(), first.clone())
+        .expect("relevant first projection admits");
+    let first_package = crate::package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (pair_id, "pair"),
+            (first_id, "plain_first"),
+        ],
+        &[pair_id, first_id],
+    );
+    assert_eq!(
+        observed(&native_body(
+            &first_package,
+            &sym("plain_first"),
+            &[sym("plain_first"), sym("pair")],
+        )),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into()))
+    );
+    assert!(matches!(
+        eval_checked(&first, &int_ty, &elaborated.env, &mut store)
+            .expect("typed relevant first projection"),
+        EvalVal::Int(7)
+    ));
 
     // The first domain is itself Ω-classified, but the codomain remains Int.
     // Changing Σ-collapse classification to the first domain would collapse
@@ -422,7 +450,7 @@ fn relevant_sigma_pair_keeps_both_components() {
         &[proof_pair_id],
     );
     let target = sym("proof_pair");
-    let lowered = erase_checked_core_package_for_target(&proof_package, [&target]);
+    let lowered = native_body(&proof_package, &target, &[target.clone()]);
     let plan = &proof_package.artifact.semantic.omega_erasure_plans[&target];
     assert!(
         plan.collapsed_sigmas.is_empty(),
@@ -438,14 +466,232 @@ fn relevant_sigma_pair_keeps_both_components() {
             && matches!(&**snd, EvalVal::Int(8))),
         "observed: {result:?}"
     );
-    // MEASURED: native lowering refuses a relevant Σ whose first field is
-    // an erased Ω subterm at the exact erased-field lane.
-    // CLAIMED: fail-closed, never a collapsed or partial native value.
-    // THE GAP: a retained Σ slot has no native erased-field representation;
-    // successor LANG-NATIVE-SIGMA-ERASED-FIELD owns that upgrade.
-    assert!(matches!(&lowered,
-        Err(ErasureError::ExpressionLowering { symbol, lane, .. })
-            if symbol == &target && *lane == "erased_omega_subterm_reached_computation"));
+    assert!(
+        matches!(&lowered, RuntimeExpr::Record { fields }
+        if fields.len() == 1 && fields[0].0 == "second"
+            && matches!(&fields[0].1, RuntimeExpr::Value(RuntimeValue::Int(value)) if *value == 8.into())),
+        "the erased first field has no slot, and the second keeps its name: {lowered:?}"
+    );
+    assert_eq!(
+        observed(&lowered),
+        RuntimeObservation::Returned(RuntimeGroundValue::Record {
+            fields: vec![("second".into(), RuntimeGroundValue::Int(8.into()))],
+        })
+    );
+
+    // The same checked pair, not an unrelated hand-built record: its second
+    // projection must be admitted and address the surviving field by name.
+    let second = Term::proj2(Term::const_(proof_pair_id, vec![]));
+    let second_id = declare_def(&mut elaborated.env, vec![], int_ty.clone(), second.clone())
+        .expect("checked second projection admits");
+    let projected = crate::package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (hole, "proof"),
+            (proof_pair_id, "proof_pair"),
+            (second_id, "second"),
+        ],
+        &[proof_pair_id, second_id],
+    );
+    assert_eq!(
+        observed(&native_body(
+            &projected,
+            &sym("second"),
+            &[sym("second"), target.clone()],
+        )),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(8.into()))
+    );
+    assert!(matches!(
+        eval_checked(&second, &int_ty, &elaborated.env, &mut store)
+            .expect("typed second projection"),
+        EvalVal::Int(8)
+    ));
+
+    // The first projection is Ω-typed, so it must be erased before any
+    // decoder can emit a Project("first") on the omitted field.
+    let first = Term::proj1(Term::const_(proof_pair_id, vec![]));
+    let first_type = Term::Eq(Box::new(int_ty.clone()), Box::new(int(7)), Box::new(int(7)));
+    let first_id = declare_def(&mut elaborated.env, vec![], first_type, first)
+        .expect("checked proof projection admits");
+    let first_package = crate::package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (hole, "proof"),
+            (proof_pair_id, "proof_pair"),
+            (first_id, "first"),
+        ],
+        &[proof_pair_id, first_id],
+    );
+    assert!(
+        first_package.artifact.semantic.omega_erasure_plans[&sym("first")]
+            .erased_subterms
+            .contains(&0)
+    );
+
+    // Ω in the second slot collapses the entire Sigma, rather than creating
+    // a retained StructuralPair with a missing second field.
+    let subset = Term::sigma(
+        int_ty.clone(),
+        Term::Eq(
+            Box::new(int_ty.clone()),
+            Box::new(Term::var(0)),
+            Box::new(Term::var(0)),
+        ),
+    );
+    let subset_id = declare_def(
+        &mut elaborated.env,
+        vec![],
+        subset,
+        Term::pair(int(7), Term::const_(hole, vec![])),
+    )
+    .expect("proof-second Sigma admits");
+    let subset_package = crate::package(
+        &elaborated.env,
+        &[(int_id, "Int"), (hole, "proof"), (subset_id, "subset")],
+        &[subset_id],
+    );
+    let subset_plan = &subset_package.artifact.semantic.omega_erasure_plans[&sym("subset")];
+    assert_eq!(subset_plan.collapsed_sigmas, BTreeSet::from([0]));
+    assert_eq!(
+        observed(&native_body(
+            &subset_package,
+            &sym("subset"),
+            &[sym("subset")]
+        )),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into()))
+    );
+}
+
+#[test]
+fn relevant_sigma_second_projection_from_a_checked_variable_keeps_its_field() {
+    // Durable invariant (47 §1, 42 §3.2). MEASURED: a lambda whose
+    // argument is proof-first Sigma projects its computational second field
+    // through a checked variable and a native call, returning Int 8.
+    // CLAIMED: the variable-base projection uses the same no-first-slot
+    // layout as the direct-declaration case. THE GAP: the call must pass the
+    // checked pair through the executable argument route, not inline 8.
+    let mut elaborated = ElabEnv::new().expect("prelude admits");
+    let int_id = elaborated.globals["Int"];
+    let int_ty = Term::const_(int_id, vec![]);
+    let proof_ty = Term::Eq(Box::new(int_ty.clone()), Box::new(int(7)), Box::new(int(7)));
+    let hole = declare_postulate(
+        &mut elaborated.env,
+        "variable_sigma_proof".into(),
+        vec![],
+        proof_ty.clone(),
+    )
+    .expect("open proof admits");
+    let sigma = Term::sigma(proof_ty, int_ty.clone());
+    let pair_id = declare_def(
+        &mut elaborated.env,
+        vec![],
+        sigma.clone(),
+        Term::pair(Term::const_(hole, vec![]), int(8)),
+    )
+    .expect("proof-first pair admits");
+    let accessor_ty = Term::pi(sigma.clone(), int_ty.clone());
+    let accessor_id = declare_def(
+        &mut elaborated.env,
+        vec![],
+        accessor_ty,
+        Term::lam(sigma, Term::proj2(Term::var(0))),
+    )
+    .expect("checked variable projection admits");
+    let call = Term::app(
+        Term::const_(accessor_id, vec![]),
+        Term::const_(pair_id, vec![]),
+    );
+    let call_id = declare_def(&mut elaborated.env, vec![], int_ty.clone(), call.clone())
+        .expect("accessor call admits");
+    let package = crate::package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (hole, "proof"),
+            (pair_id, "pair"),
+            (accessor_id, "accessor"),
+            (call_id, "call"),
+        ],
+        &[pair_id, accessor_id, call_id],
+    );
+    assert_eq!(
+        observed(&native_body(
+            &package,
+            &sym("call"),
+            &[sym("call"), sym("accessor"), sym("pair")],
+        )),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(8.into()))
+    );
+    let mut store = EvalStore::new();
+    assert!(matches!(
+        eval_checked(&call, &int_ty, &elaborated.env, &mut store).expect("typed accessor call"),
+        EvalVal::Int(8)
+    ));
+}
+
+#[test]
+fn sigma_alias_does_not_gain_structural_projection_admission() {
+    // Durable invariant (46 §4, 47 §1). MEASURED: a kernel-checked Sigma
+    // alias remains outside the exact-head projection admission even though
+    // the kernel can unfold it to a Sigma. CLAIMED: no unchecked unfolding
+    // extends this native projection route. THE GAP: the checked package
+    // must carry the alias-typed declaration's real canonical type.
+    let mut elaborated = ElabEnv::new().expect("prelude admits");
+    let int_id = elaborated.globals["Int"];
+    let int_ty = Term::const_(int_id, vec![]);
+    let proof_ty = Term::Eq(Box::new(int_ty.clone()), Box::new(int(7)), Box::new(int(7)));
+    let hole = declare_postulate(
+        &mut elaborated.env,
+        "alias_sigma_proof".into(),
+        vec![],
+        proof_ty.clone(),
+    )
+    .expect("open proof admits");
+    let sigma_alias = declare_def(
+        &mut elaborated.env,
+        vec![],
+        Term::Type(ken_kernel::Level::zero()),
+        Term::sigma(proof_ty, int_ty.clone()),
+    )
+    .expect("type alias admits");
+    let pair_id = declare_def(
+        &mut elaborated.env,
+        vec![],
+        Term::const_(sigma_alias, vec![]),
+        Term::pair(Term::const_(hole, vec![]), int(8)),
+    )
+    .expect("pair against Sigma alias admits");
+    let projected = Term::proj2(Term::const_(pair_id, vec![]));
+    let projected_id = declare_def(&mut elaborated.env, vec![], int_ty, projected)
+        .expect("kernel checks alias projection");
+    let package = package(
+        &elaborated.env,
+        &[
+            (int_id, "Int"),
+            (hole, "proof"),
+            (sigma_alias, "AliasSigma"),
+            (pair_id, "alias_pair"),
+            (projected_id, "alias_second"),
+        ],
+        &[pair_id, projected_id],
+    );
+    let target = sym("alias_second");
+    let selection = CheckedCoreBodyViewSelection {
+        package_identity: package.header.package_identity.clone(),
+        package_core_semantic_hash: package.core_semantic_hash,
+        package_artifact_hash: package.artifact_hash,
+        target_symbol: target.clone(),
+        reachable_declarations: BTreeSet::from([target.clone(), sym("alias_pair")]),
+        external_symbols: BTreeSet::new(),
+        dependency_semantic_hashes: BTreeMap::new(),
+    };
+    assert!(matches!(
+        checked_core_declaration_body_view(&package, &selection, &target),
+        Err(CheckedCoreBodyViewError::UnsupportedRecordProjectionShape { symbol, .. })
+            if symbol == target
+    ));
 }
 
 #[test]

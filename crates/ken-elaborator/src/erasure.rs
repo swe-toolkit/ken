@@ -409,7 +409,8 @@ fn collect_checked_body_declaration_refs(
             collect_checked_body_declaration_refs(first, output);
             collect_checked_body_declaration_refs(second, output);
         }
-        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair)
+        | CheckedCoreBodyTerm::StructuralSecondProjection(pair) => {
             collect_checked_body_declaration_refs(pair, output);
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
@@ -4656,47 +4657,6 @@ fn external_declaration_symbols(
         .collect()
 }
 
-fn checked_erased_argument_flags(
-    symbol: &StableSymbol,
-    arguments: &[&CheckedCoreBodyTerm],
-    declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
-    root: &StableSymbol,
-) -> Result<Vec<bool>, ErasureError> {
-    let declaration = declarations.get(symbol).ok_or_else(|| {
-        expression_lowering_error(
-            root,
-            "missing_omega_callee",
-            format!("missing body for {symbol}"),
-        )
-    })?;
-    let mut body = &declaration.body;
-    let mut flags = Vec::with_capacity(arguments.len());
-    for argument in arguments {
-        let CheckedCoreBodyTerm::Lambda {
-            erased_parameter,
-            body: inner,
-            ..
-        } = body
-        else {
-            return Err(expression_lowering_error(
-                root,
-                "omega_callee_arity",
-                format!("{symbol} has fewer binders than the call"),
-            ));
-        };
-        if *erased_parameter != matches!(*argument, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
-            return Err(expression_lowering_error(
-                root,
-                "omega_call_mismatch",
-                format!("{symbol} Ω binder/argument classification disagrees"),
-            ));
-        }
-        flags.push(*erased_parameter);
-        body = inner;
-    }
-    Ok(flags)
-}
-
 fn lower_body_term(
     term: &CheckedCoreBodyTerm,
     declarations: &BTreeMap<StableSymbol, checked_core::CheckedCoreDeclarationBodyView>,
@@ -5223,12 +5183,18 @@ fn lower_body_term_inner(
             context_depth,
             branch_remap,
         ),
-        CheckedCoreBodyTerm::StructuralPair { first, second } => Ok(RuntimeExpr::Record {
-            fields: vec![
-                (
-                    "first".into(),
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            let mut fields = Vec::with_capacity(2);
+            for (name, child) in [("first", first), ("second", second)] {
+                // The checked decoder marks exactly the plan-classified Ω
+                // subtree. A retained Sigma never gives it a runtime slot.
+                if matches!(**child, CheckedCoreBodyTerm::ErasedOmegaSubterm) {
+                    continue;
+                }
+                fields.push((
+                    name.into(),
                     lower_body_term_inner(
-                        first,
+                        child,
                         declarations,
                         semantic,
                         stack,
@@ -5236,23 +5202,25 @@ fn lower_body_term_inner(
                         context_depth,
                         branch_remap,
                     )?,
-                ),
-                (
-                    "second".into(),
-                    lower_body_term_inner(
-                        second,
-                        declarations,
-                        semantic,
-                        stack,
-                        root_symbol,
-                        context_depth,
-                        branch_remap,
-                    )?,
-                ),
-            ],
-        }),
-        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => Ok(RuntimeExpr::Project {
-            record: Box::new(lower_body_term_inner(
+                ));
+            }
+            if fields.is_empty() {
+                return Err(expression_lowering_error(
+                    root_symbol,
+                    "erased_omega_subterm_reached_computation",
+                    "a relevant Σ pair with no runtime field",
+                ));
+            }
+            Ok(RuntimeExpr::Record { fields })
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair)
+        | CheckedCoreBodyTerm::StructuralSecondProjection(pair) => {
+            let field = if matches!(term, CheckedCoreBodyTerm::StructuralFirstProjection(_)) {
+                "first"
+            } else {
+                "second"
+            };
+            let record = lower_body_term_inner(
                 pair,
                 declarations,
                 semantic,
@@ -5260,9 +5228,23 @@ fn lower_body_term_inner(
                 root_symbol,
                 context_depth,
                 branch_remap,
-            )?),
-            field: "first".into(),
-        }),
+            )?;
+            // The proof-first pair's first field is absent. Even a malformed
+            // view forced to project it must refuse before emitting a runtime
+            // Project that would read a missing field.
+            if matches!(&record, RuntimeExpr::Record { fields } if !fields.iter().any(|(name, _)| name == field))
+            {
+                return Err(expression_lowering_error(
+                    root_symbol,
+                    "non_executable_erased_field_projection",
+                    format!("a relevant Σ pair has no runtime {field} field"),
+                ));
+            }
+            Ok(RuntimeExpr::Project {
+                record: Box::new(record),
+                field: field.into(),
+            })
+        }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => lower_record_sigma_construction(
             view,
             declarations,
@@ -6560,7 +6542,8 @@ fn has_free_variable_at_or_above(term: &CheckedCoreBodyTerm, bound: usize) -> bo
             has_free_variable_at_or_above(first, bound)
                 || has_free_variable_at_or_above(second, bound)
         }
-        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair)
+        | CheckedCoreBodyTerm::StructuralSecondProjection(pair) => {
             has_free_variable_at_or_above(pair, bound)
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
@@ -8636,6 +8619,40 @@ mod px7l_tests {
             ErasureError::ExpressionLowering { lane, .. } => lane,
             other => panic!("expected expression-lowering error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn forced_first_projection_of_an_erased_sigma_field_refuses_before_runtime() {
+        // Durable invariant (47 §1, 42 §3.2). MEASURED: forcing a first
+        // projection on the very pair whose first slot is absent returns a
+        // typed lowering refusal, while second projection is executable.
+        // CLAIMED: a malformed view cannot turn an erased field into a
+        // missing-name runtime lookup. THE GAP: checked admission must still
+        // classify the proof's first projection as erased before this arm.
+        let root = family("proof_first_sigma");
+        let pair = CheckedCoreBodyTerm::StructuralPair {
+            first: Box::new(CheckedCoreBodyTerm::ErasedOmegaSubterm),
+            second: Box::new(CheckedCoreBodyTerm::IntegerLiteral { value: 8.into() }),
+        };
+        let lower = |term: &CheckedCoreBodyTerm| {
+            lower_body_term_inner(
+                term,
+                &BTreeMap::new(),
+                &checked_core::CheckedCoreSemanticInputs::default(),
+                &mut vec![root.clone()],
+                &root,
+                0,
+                None,
+            )
+        };
+        let first = CheckedCoreBodyTerm::StructuralFirstProjection(Box::new(pair.clone()));
+        assert_eq!(
+            lane(lower(&first).expect_err("no executable first slot")),
+            "non_executable_erased_field_projection"
+        );
+        let second = CheckedCoreBodyTerm::StructuralSecondProjection(Box::new(pair));
+        assert!(matches!(lower(&second).expect("surviving second slot"),
+            RuntimeExpr::Project { field, .. } if field == "second"));
     }
 
     #[test]
