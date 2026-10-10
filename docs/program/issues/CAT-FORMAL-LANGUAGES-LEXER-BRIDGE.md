@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-LEXER-BRIDGE
 title: "No catalog lexer can claim that a DFA driven over a cursor agrees with run over the cursor's elements. Deliver section 6 of the formal-languages spec: Cursor's element-list view (cursor_take, cursor_elements and their two peek laws) and the new Capability.Parsing.Lexer (dfa_cursor_run, dfa_cursor_accepts and the two bridge laws), fully proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2

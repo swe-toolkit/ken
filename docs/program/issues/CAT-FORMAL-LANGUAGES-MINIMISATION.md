@@ -1,7 +1,7 @@
 ---
 id: CAT-FORMAL-LANGUAGES-MINIMISATION
 title: "The catalog cannot decide DFA equivalence or minimise a DFA. Deliver Algorithm.FormalLanguages.Minimisation (equivalent and equivalent_states through the product's disagreement language and section 2 reachability, canonical and minimise on the original carrier, and the eight laws of spec section 5) fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -77,3 +77,11 @@ base, stop and report the mismatch.
 - The merged section 5 differs from the development in a way it cannot
   meet.
 - A public name collides with an existing name in any importer.
+
+## Closeout
+
+Merged `4581d018a` from exact `3d384ce98` (PR #4633). Foundation QA
+`evt_21rrhrhe9v0r0` (AC-4 mutants red and restored), Architect
+`evt_3093nf3dbfsyb`, Decision `dec_6bka4gz4ape0q`. Three paths: the
+package, its acceptance target and the strict-resolution census row.
+Section 5 is delivered at zero trust. §1a: 0.
