@@ -1,7 +1,7 @@
 ---
 id: LANG-FORWARD-PROP-INTRO-EDGE
 title: "A declaration that names a later prop's intro (M.P.pi) is refused with UnresolvedCon, because the forward-reference graph keys data constructors to their data node but never inserts a prop's intros into node_names, so no edge reaches the prop and textual order wins. Key each prop intro to its prop node"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
