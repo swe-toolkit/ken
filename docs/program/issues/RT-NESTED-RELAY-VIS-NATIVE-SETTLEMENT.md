@@ -268,6 +268,45 @@ base, stop and report the mismatch.
      reaches it without the drive, otherwise it goes with its fixture;
      `source_seat_row` stays only while admission (a) calls it. Then stop
      to the Architect with the per-piece table.
+   - **Closed as falsified (`evt_4dv4h0199dsnh`, advisory
+     `evt_642vbsakdwwr`).** Static fusion settles the relay's control,
+     not its effect: the forwarded operation is dropped (entry 9). There
+     is no D3+D4' candidate. The fall-through survives only as the
+     lowering of a pair admitted with a route, where the call performs
+     the operation before the continuation runs.
+
+6. **Performing-route gate (`evt_4dv4h0199dsnh`).** A relay pair (F, O)
+   is admitted only when the plan records a performing route: a call
+   from F to an already-emitted response-owner member, outside the
+   forwarding clause, that handles F's forwarded operation, named before
+   owner planes are built. `relay_drive_pair`'s result carries that
+   target. A pair with no target takes D3's typed refusal
+   (`Excluded{Relay}`), never a fall-through or `-1`. The returned-member
+   projection applies only to pairs admitted with a route; an unrouted
+   relay member stays in the owner's returned set and is refused at
+   planning.
+   - **D0, measurement only.** For every relay-admitted pair in the
+     36-row census population plus in-bounds `BRANCHED_SCRUTINEE`:
+     (a) the forwarded operation; (b) the emitted response-owner member
+     that handles it (function, owner, member id) or none; (c) per
+     executed run, whether the forwarded op appears in the native and
+     interpreter traces, attributed by the recorder at the source; (d)
+     the in-bounds variant on main `7a890f13d` and on D3 `d7820636f`:
+     refused with its typed error, or run with exit code and both op
+     lists. The table goes to the Architect.
+   - **Decision rule.** Every pair with (b) none takes the D3 refusal; if
+     all are none, the WP lands D1-D3 with the typed relay refusal and
+     the direct-call route goes to a successor node. A pair with (b)
+     present gets the call route in this WP, and AC-7 re-runs on the
+     trace axis with the D0 attribution. Stop to the Architect if (d)
+     shows main or D3 performing the FsReadAt natively, if (d) shows
+     main running the variant without it (a defect on main, escalated to
+     the Steward), or if a (c) attribution is ambiguous. A route that
+     restructures the planner's build order returns to the operator to
+     size as its own node.
+   - **Candidate gate.** Every admitted pair carries a recorded route.
+     A census row whose admitted pair's forwarded op appears in neither
+     trace is `vacuous for performance` and is not coverage.
 
 ## Acceptance
 
@@ -371,7 +410,9 @@ base, stop and report the mismatch.
   (`evt_5sah7xb9543hp`, `evt_47yp5mk4wznjb`, `evt_3b7ws2dvx1r9v`,
   `evt_4tbaxstk921c2`, `evt_1pfhbxjg0f4he`, `evt_15tdpczht4e6g`). The
   third put D4 on hold and called a research advisory; the sixth holds
-  the D4' ruling for a second advisory (`evt_5qh2rwdb1zhm8`).
+  the D4' ruling for a second advisory (`evt_5qh2rwdb1zhm8`), answered by
+  the performing-route recut (`evt_4dv4h0199dsnh`). The next research
+  re-trigger is the ninth; the next §1b is at entry 12.
   Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
   `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
   research's advisory (`evt_4wcce8z24a4c9`, ruling `evt_5mgw5cwr993nd`);
