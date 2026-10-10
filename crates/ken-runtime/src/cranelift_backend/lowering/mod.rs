@@ -16,7 +16,6 @@
 //! escape `crate::cranelift_backend`.
 
 pub(in crate::cranelift_backend) mod core;
-
 mod residual;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
     RecursiveCarrierSlotKey, Representation};
