@@ -20823,19 +20823,13 @@ fn nested_matrix_motive(
     } else {
         check_nested_index_variables(cx, &params[ind.params.len()..], split_span)?;
     }
-    let ret_sort = if needs_reverting {
-        let mut motive_ctx = cx.ctx.clone();
-        motive_ctx.push(col_types[0].clone());
-        kernel_infer_in_context_open(cx, &motive_ctx, &codomain)
-    } else {
-        kernel_infer_current(cx, &codomain)
-    };
+    let mut motive_ctx = cx.ctx.clone();
+    motive_ctx.push(col_types[0].clone());
+    let ret_sort = kernel_infer_in_context_open(cx, &motive_ctx, &codomain);
     let ret_level = match ret_sort {
         Ok(Term::Type(level)) => level,
         Ok(_) => Level::Zero,
         Err(CurrentKernelQueryError::View(error)) => return Err(error),
-        Err(CurrentKernelQueryError::Kernel(_))
-            if !needs_reverting && cx.active_index_premise_frames.is_empty() => Level::Zero,
         Err(CurrentKernelQueryError::Kernel(error)) => {
             return Err(ElabError::KernelRejected { error, span: top_span.clone() });
         }
