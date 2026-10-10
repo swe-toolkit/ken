@@ -275,38 +275,46 @@ base, stop and report the mismatch.
      lowering of a pair admitted with a route, where the call performs
      the operation before the continuation runs.
 
-6. **Performing-route gate (`evt_4dv4h0199dsnh`).** A relay pair (F, O)
-   is admitted only when the plan records a performing route: a call
-   from F to an already-emitted response-owner member, outside the
-   forwarding clause, that handles F's forwarded operation, named before
-   owner planes are built. `relay_drive_pair`'s result carries that
-   target. A pair with no target takes D3's typed refusal
-   (`Excluded{Relay}`), never a fall-through or `-1`. The returned-member
-   projection applies only to pairs admitted with a route; an unrouted
-   relay member stays in the owner's returned set and is refused at
-   planning.
+6. **Seat-keyed refusal (`evt_4dv4h0199dsnh`, re-keyed
+   `evt_3y7fxd70stq3x`).** The drop is a property of the lowering, not
+   of admission: main, with no relay admission logic, and D3, which
+   admits 707/768, both drop the read. At every lowering seat that
+   consumes a producer whose constructor is a Vis carrying a host
+   operation without emitting it, the plan must hold a recorded
+   performing route for that (source, owner): a call into the outer
+   owner's already-emitted member, named before owner planes are built.
+   With no route, lowering refuses with the typed relay refusal and never
+   consumes silently. The refusal variant may be reused; its key is the
+   missing route at the seat, not D3's relay class. The returned-member
+   projection applies only to pairs with a route.
    - **D0, measurement only.** For every relay-admitted pair in the
      36-row census population plus in-bounds `BRANCHED_SCRUTINEE`:
      (a) the forwarded operation; (b) the emitted response-owner member
      that handles it (function, owner, member id) or none; (c) per
      executed run, whether the forwarded op appears in the native and
      interpreter traces, attributed by the recorder at the source; (d)
-     the in-bounds variant on main `7a890f13d` and on D3 `d7820636f`:
-     refused with its typed error, or run with exit code and both op
-     lists. The table goes to the Architect.
-   - **Decision rule.** Every pair with (b) none takes the D3 refusal; if
-     all are none, the WP lands D1-D3 with the typed relay refusal and
-     the direct-call route goes to a successor node. A pair with (b)
-     present gets the call route in this WP, and AC-7 re-runs on the
-     trace axis with the D0 attribution. Stop to the Architect if (d)
-     shows main or D3 performing the FsReadAt natively, if (d) shows
-     main running the variant without it (a defect on main, escalated to
-     the Steward), or if a (c) attribution is ambiguous. A route that
-     restructures the planner's build order returns to the operator to
-     size as its own node.
-   - **Candidate gate.** Every admitted pair carries a recorded route.
-     A census row whose admitted pair's forwarded op appears in neither
-     trace is `vacuous for performance` and is not coverage.
+     done: main `7a890f13d` and D3 `d7820636f` both run the variant and
+     drop the FsReadAt; (e) the fan-in of consuming seats: every
+     lowering function that can consume a Vis-constructor producer
+     without emitting its operation (the two known paths at
+     `lowering/core.rs:7581-7648`, `dispatch_fusion_owned_outer_realization`
+     and `claim_and_call_continuation`, plus every other consumer of
+     `selected_computational` and fused-realization dispatch), and the
+     seat that consumes source 768, from a disposable `eprintln!` at
+     each listed seat. A consumption at an unlisted seat, or an
+     ambiguous (c) attribution, is a stop to the Architect. The table
+     goes to the Architect.
+   - **This WP's landing cut is increment (i):** D1-D3, the D0
+     measurements and the seat-keyed refusal, with AC-MAIN asserting the
+     refusal. It closes the main defect. **Increment (ii), the performing
+     call route** that turns a refusal into a performed operation where
+     D0 (b) finds an emitted member, is a successor node, framed from
+     the D0 table; one that restructures the planner's build order
+     returns to the operator to size.
+   - **Candidate gate.** No seat consumes a host-operation Vis without a
+     recorded route. A census row whose admitted pair's forwarded op
+     appears in neither trace is `vacuous for performance` and is not
+     coverage.
    - **The defect on main (`evt_3s45p56abgg27`).** Main `7a890f13d`
      builds in-bounds `BRANCHED_SCRUTINEE` natively and runs it to exit
      72 while dropping the forwarded FsReadAt the interpreter performs.
@@ -384,9 +392,9 @@ base, stop and report the mismatch.
   `crates/ken-cli/tests/rt_branched_scrutinee_unit_body_port.rs`, runs
   the in-bounds variant. It is red on main because the native ops
   differ from the interpreter's, never through the exit code. On the
-  candidate it asserts the one outcome the D0 decision rule selects:
-  native ops equal the interpreter's, with FsReadAt performed through
-  the route, or the native build refused with D3's typed relay refusal.
+  candidate (increment i) it asserts the native build is refused with
+  the typed relay refusal at the consuming seat; increment (ii) turns it
+  into equal op lists with FsReadAt performed through the route.
 - **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
   census pair (span owner 4, source 1374) fires the typed refusal for that
   owner and reddens AC-1, and is restored byte-identically.
@@ -424,7 +432,8 @@ base, stop and report the mismatch.
   `evt_4tbaxstk921c2`, `evt_1pfhbxjg0f4he`, `evt_15tdpczht4e6g`). The
   third put D4 on hold and called a research advisory; the sixth holds
   the D4' ruling for a second advisory (`evt_5qh2rwdb1zhm8`), answered by
-  the performing-route recut (`evt_4dv4h0199dsnh`). The next research
+  the performing-route recut (`evt_4dv4h0199dsnh`, re-keyed to the
+  consuming seat `evt_3y7fxd70stq3x`). The next research
   re-trigger is the ninth; the next §1b is at entry 12.
   Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
   `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
