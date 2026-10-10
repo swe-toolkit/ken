@@ -104,7 +104,18 @@ an admitted declaration's spelling.
   hit whose test exists to exercise rebinding (as this one does) goes to
   the Architect before any edit: rename, session entry, or a rewrite that
   keeps the guarded behaviour reachable. Renames under AC-1a need no
-  ruling.
+  ruling. **Ruled** (`evt_2w4a7teq708nh`): the five rebinding tests in
+  `lang_instance_registry_identity_key` and
+  `lang_standard_infix_call_completion`, and the second `law Foo` in
+  `verify_globals_identity_checked_insert`, send only the re-declaration
+  through `elaborate_session_decl_results_v1` and keep their original
+  diagnostic and distinct-`GlobalId` assertions; each file adds one
+  package-route pin (`DuplicateDefinition`, original owner unchanged). For
+  the `S.read` space/module overlap, the package route's
+  `DuplicateDefinition` pre-empts `DeclarationIdentityCollision` with the
+  first owner kept, and the session route keeps
+  `DeclarationIdentityCollision` covered in both orders. No engineered
+  alias fixture.
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
   their results. `rt_dasm_d1b_role_a_role_authority` is green with its

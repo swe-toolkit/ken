@@ -306,10 +306,15 @@ base, stop and report the mismatch.
      route-none pair emits the trap, returns its status and records an
      `Abort` frame terminal, the `seal_source_trap_branch` sequence
      (`joins.rs:2802-2816`), and never consumes silently. Runs that never
-     reach the source are unchanged. The claim and fusion seats bind the
-     identity by `continuation_call_binding_for` on their four
-     coordinates; `active_transport` names the identity it consumes by
-     the same four.
+     reach the source are unchanged. **The trap changes only the runtime
+     path of its arm, never lowering descent** (`evt_4vykgyzxvbx0a`): it
+     sits in a cold branch to a trap block, and the existing call lowering
+     follows byte-for-byte, so claims, ledger tokens, sealed discharges and
+     admission observations are identical to the call path. Seat-visit
+     counts match the pre-(i) baseline except the trapped pair's label.
+     The claim and fusion seats bind the identity by
+     `continuation_call_binding_for` on their four coordinates;
+     `active_transport` names the identity it consumes by the same four.
    - **Run order before the candidate.** Anchors (passed, audit
      `evt_jrt6aze0s2bs`): 735 mint to owner 0 member 2; 846 none; 972,
      1115, 1164 and 1288 entry to owners 5, 0, 1 and 2; in-bounds 707
