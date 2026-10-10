@@ -1,8 +1,9 @@
 //! Returned-Vis provenance and settlement for generated response owners.
 //!
 //! This analysis reads planned source occurrences and generated call edges. It
-//! does not install a response row: a relay driven at its source leaves the
-//! returned set, while its independent static successors retain their rows.
+//! does not install a response row: an admitted relay consumed by static
+//! producer fusion leaves the returned set, while independent static
+//! successors retain their rows.
 //! A constructor tag is not an occurrence identity, and a locally emitted Vis
 //! is not necessarily a returned Vis.
 
@@ -44,7 +45,7 @@ pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
 /// A checked, program-local pending-return domain. Each member uses the
 /// *existing response row* as its only identity/ABI/effect authority. The
 /// discriminant is the row id plus one; zero is never a Vis member. No record
-/// exists for an undriven relay or an unknown returned-result endpoint.
+/// exists for an unadmitted relay or an unknown returned-result endpoint.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
     pub(in crate::cranelift_backend) owners:
@@ -60,8 +61,8 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
 /// final plan. No owner is absent; no consumer reads it through a `_` arm.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
-    /// A member of the pending-Vis record protocol, possibly after source-driven
-    /// relays have left its returned set.
+    /// A member of the pending-Vis record protocol after admitted relays
+    /// are projected out of its returned set.
     Protocol,
     /// The K route returns no Vis member, so a Ret-only body is exact.
     RetOnly,
@@ -141,8 +142,8 @@ impl PendingVisRecordProtocol {
 }
 
 impl StaticTransitionPlan<'_> {
-    /// An admitted owner's returned relay is performed at its source. Its K
-    /// must never attempt to construct that relay in the same emission owner.
+    /// An admitted owner's forwarded relay is consumed by source fusion. Its
+    /// K must never construct that relay in the same emission owner.
     pub(in crate::cranelift_backend) fn reject_reached_admitted_relay(
         &self,
         origin: StaticOriginId,
@@ -171,7 +172,7 @@ impl StaticTransitionPlan<'_> {
                 .any(|member| member.relay && member.origin == origin)
             {
                 return Err(planner_error(format!(
-                    "an admitted response owner {:?} reached relay construct {origin:?} despite source drive",
+                    "an admitted response owner {:?} reached relay construct {origin:?} despite source fusion",
                     owner.id(),
                 )));
             }
@@ -180,7 +181,7 @@ impl StaticTransitionPlan<'_> {
     }
 
     /// Classify every installed response owner. A complete relay-bearing
-    /// fixpoint may activate the record only after the shared source-drive
+    /// fixpoint may activate the record only after the shared source-pair
     /// authority admits it; a missing or unsettled relay stays excluded.
     pub(in crate::cranelift_backend) fn build_pending_vis_settlements(
         &self,
@@ -200,7 +201,7 @@ impl StaticTransitionPlan<'_> {
                     continue;
                 }
             };
-            // A source-driven relay is consumed before this K can return it.
+            // Source fusion consumes an admitted relay before this K returns.
             // Retain every non-relay successor and its existing exact row;
             // only an admitted owner's relay members leave the returned set.
             let mut protocol = protocol;

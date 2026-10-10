@@ -1296,8 +1296,11 @@ type HostResponseRoutes = BTreeMap<StaticOriginId, BTreeMap<RuntimeSymbol, HostR
 
 mod relay_settlement;
 
-/// A source Vis and the response owner whose emitted K drives its operation.
-/// Issued only after a uniquely seated source response row is found.
+/// An admission key for a source Vis and enclosing response emission owner.
+/// Static producer fusion must consume the forwarded relay at the source;
+/// the source row's installed response owner performs its effect. The pair
+/// alone establishes a uniquely seated candidate, not execution or an
+/// installed-owner witness (the D4' census checks the latter).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct RelayDrivePair {
     pub(in crate::cranelift_backend) source: StaticOriginId,
@@ -1314,8 +1317,8 @@ impl StaticTransitionPlan<'_> {
         relay_settlement::build_drive_pairs(self)
     }
 
-    /// The sole authority for the drive-at-source lowering arm and its (d)
-    /// admission condition. Absence never means a key can be invented locally.
+    /// The sole authority for relay admission condition (d), not a lowering
+    /// drive. Absence never means a key can be invented locally.
     pub(in crate::cranelift_backend) fn relay_drive_pair(
         &self,
         source: StaticOriginId,
@@ -1332,8 +1335,9 @@ impl StaticTransitionPlan<'_> {
         Ok(Some(pair))
     }
 
-    /// An installed response's operation root is source material, not a
-    /// deferred placeholder, while its relay pair is driven in this owner.
+    /// An admitted relay operation root stays source material, not a
+    /// deferred placeholder. Its pair licenses no in-place response drive;
+    /// the installed response owner remains the effect emitter.
     pub(in crate::cranelift_backend) fn relay_drive_operation_root(
         &self,
         root: StaticOriginId,
@@ -1349,16 +1353,16 @@ impl StaticTransitionPlan<'_> {
     }
 }
 
-/// The same classifier supplies pending-Vis settlement before emission:
-/// admitted relay members are driven at their source and never returned.
+/// The same classifier supplies pending-Vis projection before emission:
+/// admitted relay members are consumed by source fusion, not returned.
 pub(in crate::cranelift_backend) fn settled_relay_owners(
     plan: &StaticTransitionPlan<'_>,
 ) -> BTreeSet<StaticResponseContinuationId> {
     relay_settlement::settled_relay_owners(plan)
 }
 
-/// Fail closed only for Excluded owners whose settled relay-source inventory
-/// cannot be driven at the planned owner. The recorder calls this same walk.
+/// Fail closed for Excluded owners whose relay-source admission cannot be
+/// established from the plan. The recorder calls this same walk.
 pub(super) fn relay_settlement_refusals(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
     relay_settlement::refusals(plan)
 }

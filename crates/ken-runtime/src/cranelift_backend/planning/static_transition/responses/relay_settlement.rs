@@ -223,7 +223,7 @@ fn source_shape(plan: &StaticTransitionPlan<'_>, vis: StaticOriginId) -> Result<
     Ok(matches!(&args[1], RuntimeExpr::LexicalClosure { params, .. } if params.len() == 1))
 }
 
-/// Relay drivability (a), shared by pair construction and admission: one
+/// Relay admission (a), shared by pair construction and classification: one
 /// candidate row whose effect has at least one planned host-effect seat.
 /// Seats are recorded per (effect origin, slot), so counting records would
 /// incorrectly reject an operation with multiple argument slots.
@@ -241,9 +241,9 @@ fn source_seat_row<'r>(
         .then_some(*row)
 }
 
-/// Build the dispatch authority from the same closed relay-source traversal
-/// used by admission. A failed/open traversal installs no speculative pair;
-/// the refusal below reports the reason rather than turning it into a route.
+/// Build the admission key from the same closed relay-source traversal used
+/// by classification. A failed/open traversal installs no speculative pair;
+/// the refusal below reports the reason rather than inventing a route.
 pub(super) fn build_drive_pairs(
     plan: &StaticTransitionPlan<'_>,
 ) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner), RelayDrivePair>, CraneliftBackendError> {
@@ -363,8 +363,8 @@ fn classify(plan: &StaticTransitionPlan<'_>, emit_records: bool) -> (Vec<String>
                                 } else { 0 };
                                 let b_construct_closure = source_shape(plan, source.vis);
                                 let c_tail_forward_only = source.tail_edges;
-                                // (d) is the exact plan-side authority lowering uses.
-                                // A proposed pair without an installed drive is no route.
+                                // (d) is the exact plan-side admission key.
+                                // A proposed source without an issued pair has no route.
                                 let d_pair_key = (source.vis, owner.base_owner());
                                 let d_pair = plan.relay_drive_pair(source.vis, owner.base_owner());
                                 let deferred = plan.deferred_response_at_vis(source.vis);

@@ -5843,9 +5843,9 @@ impl<'a> Lowering<'a> {
         )
     }
 
-    /// Perform one planned response at its Construct-Vis source and resume its
-    /// exact lexical K through the active eliminators. Deferred handler rows
-    /// and source/owner relay pairs share this operation and its identity checks.
+    /// Perform a handler-owned Deferred response at its Construct-Vis source
+    /// and resume its exact lexical K through the active eliminators. This
+    /// path is not a relay drive; admitted relays use static producer fusion.
     fn drive_response_at_source(
         &mut self,
         builder: &mut FunctionBuilder<'_>,

@@ -1201,7 +1201,7 @@ pub struct DeferredResponseObservation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticResponseFeasibilityDiagnostic {
     pub returned_vis_protocols: Vec<ReturnedVisProtocolObservation>,
-    /// Only members that remain after source-driven relays leave their owner.
+    /// Only members remaining after admitted relays are projected out.
     pub settled_returned_vis_protocols: Vec<(u32, Vec<u32>)>,
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
