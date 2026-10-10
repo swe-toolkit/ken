@@ -95,8 +95,8 @@ impl Drop for Root {
 /// entry's checked example, and the example is refused by the same typed
 /// duplicate check while an unrelated fresh example succeeds. CLAIMED:
 /// module-route fence checks cannot overwrite their own entry's declaration.
-/// THE GAP: a dependency-root control below confirms imported units are not
-/// seeded into this entry's own definition population.
+/// THE GAP: this fixture has no dependency; the loader's stored set and its
+/// per-entry seed are the scope boundary checked in the module-route census.
 #[test]
 fn roots_entry_checked_fence_refuses_its_own_name() {
     let root = Root::new();
@@ -107,6 +107,40 @@ fn roots_entry_checked_fence_refuses_its_own_name() {
     let error = env.execute_loaded_entry_checked_fences_v1("Entry").unwrap_err();
     assert!(matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "base"),
         "expected the entry's own name to collide, got {error:?}");
+}
+
+/// MEASURED: an entry's fresh checked example still elaborates after the
+/// module-specific seed is installed. CLAIMED: the seed rejects collisions,
+/// not every checked fence. THE GAP: the companion base row above is the
+/// rejecting half of the same entry surface.
+#[test]
+fn roots_entry_checked_fence_accepts_fresh_name() {
+    let root = Root::new();
+    fs::write(root.0.join("Entry.ken.md"),
+        "```ken\nconst base : Bool = True\n```\n```ken example\nconst zz_fresh : Bool = False\n```\n").unwrap();
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry").unwrap();
+    let examples = env.execute_loaded_entry_checked_fences_v1("Entry")
+        .expect("fresh example name must remain legal after entry seeding");
+    assert_eq!(examples.len(), 1);
+    assert_eq!(examples[0].name, "zz_fresh");
+}
+
+/// MEASURED: a constructor recorded unqualified by the loaded entry is
+/// refused when a checked example family attempts that spelling. CLAIMED:
+/// module-route seeding retains unprefixed constructors, not only stripped
+/// entry-qualified declaration names. THE GAP: this observes one data family;
+/// package-route coverage has a separate constructor case.
+#[test]
+fn roots_entry_checked_fence_refuses_own_constructor() {
+    let root = Root::new();
+    fs::write(root.0.join("Entry.ken.md"),
+        "```ken\ndata U = ZzBase | ZzOther\n```\n```ken example\ndata T = ZzBase | ZzQ\n```\n").unwrap();
+    let mut env = ElabEnv::new().unwrap();
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry").unwrap();
+    let error = env.execute_loaded_entry_checked_fences_v1("Entry").unwrap_err();
+    assert!(matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "ZzBase"),
+        "entry constructor's root spelling must collide, got {error:?}");
 }
 
 /// MEASURED: a failed negative fence does not enter the later example's
