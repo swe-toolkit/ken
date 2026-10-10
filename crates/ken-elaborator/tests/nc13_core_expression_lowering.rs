@@ -55,6 +55,16 @@ fn package_from_decls(
 ) -> CheckedCorePackage {
     let mut semantic = CheckedCoreSemanticInputs::default();
     for (symbol, decl) in decls {
+        // These synthetic bodies test runtime-IR shapes, not kernel admission.
+        // None contains an Ω position; give each one the explicit empty plan
+        // that a typed producer would attach, so missing-plan refusal remains
+        // independently testable rather than masking each body-view control.
+        if matches!(decl, Decl::Transparent { .. }) {
+            semantic.omega_erasure_plans.insert(
+                symbol.clone(),
+                ken_elaborator::omega_erasure::OmegaErasurePlan::default(),
+            );
+        }
         semantic.symbols.insert(symbol.clone());
         semantic
             .lowerability

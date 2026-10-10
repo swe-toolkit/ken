@@ -124,6 +124,12 @@ fn record_package(package: &str) -> (CheckedCorePackage, StableSymbol, StableSym
         target.clone(),
         canonical_decl_bytes(&decl, &symbols).expect("canonical target declaration"),
     );
+    // Synthetic NC15 fixtures author their record metadata explicitly; the
+    // checked body carries no independently classified Ω subterm. A missing
+    // plan is tested separately by LANG-REFINEMENT-PROOF-ERASURE AC-5.
+    semantic
+        .omega_erasure_plans
+        .insert(target.clone(), Default::default());
     semantic
         .record_sigma_metadata
         .insert(record.clone(), record_metadata(&payload));
@@ -353,7 +359,7 @@ fn stale_record_field_order_rejects_before_runtime_program_success() {
 }
 
 #[test]
-fn unsupported_dependent_record_field_shape_rejects_before_runtime_ir() {
+fn synthetic_dependent_sigma_with_type_payload_refuses_before_runtime_ir() {
     let (mut package, target, record) = record_package("nc15_dependent_field_pkg");
     let (_, payload, _) = record_symbols("nc15_dependent_field_pkg");
     let symbols = table_many(&[
@@ -380,7 +386,7 @@ fn unsupported_dependent_record_field_shape_rejects_before_runtime_ir() {
 
     assert_eq!(
         erasure_lane(&package, &target),
-        "unsupported_dependent_field_shape"
+        "unsupported_checked_body_shape"
     );
 }
 

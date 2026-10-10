@@ -42,6 +42,7 @@ pub mod literate;
 pub mod lossless;
 pub mod modules;
 pub mod numbers;
+pub mod omega_erasure;
 pub mod parser;
 pub mod prelude;
 pub mod program_admission;

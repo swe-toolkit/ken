@@ -75,6 +75,18 @@ use num_traits::ToPrimitive;
 pub type SlotId = u64;
 const NULL_SLOT: SlotId = 0;
 
+/// Erased transparent bodies classified during one outermost [`eval`].
+///
+/// A `GlobalId` names a declaration only for one allocation prefix: rollback
+/// can free it and a later declaration can reuse it. The outermost call holds
+/// `&GlobalEnv` for its whole duration, so no rollback can happen while this
+/// scope is live; the scope is dropped when that call returns or unwinds, and
+/// it is consulted only for the environment it was opened on.
+struct ErasureScope {
+    env: usize,
+    bodies: HashMap<GlobalId, Term>,
+}
+
 /// Evaluation-time store: wraps the K3 content-addressed heap with a
 /// `code_id` side table so distinct closure bodies get distinct, collision-free
 /// integer ids.
@@ -93,6 +105,8 @@ pub struct EvalStore {
     /// Same body Term → same code_id; distinct bodies → distinct ids, no collisions.
     code_ids: HashMap<Term, u64>,
     next_code_id: u64,
+    /// Checked erased bodies, live only inside one outermost [`eval`].
+    erasure_scope: Option<ErasureScope>,
     /// Numeric literal values registered by the elaborator.
     /// Maps opaque postulate GlobalId → the EvalVal it represents.
     /// Filled by tests/driver that have access to ElabEnv.num_values.
@@ -113,6 +127,7 @@ impl EvalStore {
             k3: Store::new(),
             code_ids: HashMap::new(),
             next_code_id: 1,
+            erasure_scope: None,
             num_values: HashMap::new(),
             capacity_error: None,
             list_char_ids: None,
@@ -125,6 +140,7 @@ impl EvalStore {
             k3: Store::with_capacity_limit(limit),
             code_ids: HashMap::new(),
             next_code_id: 1,
+            erasure_scope: None,
             num_values: HashMap::new(),
             capacity_error: None,
             list_char_ids: None,
@@ -436,7 +452,10 @@ mod nfc_construction_tests {
             panic!("Ok payload must be String");
         };
         assert_eq!(decoded.as_str(), "\u{E9}");
-        assert_eq!(round_trip_string(decoded, &ids, &mut store), decoded.clone());
+        assert_eq!(
+            round_trip_string(decoded, &ids, &mut store),
+            decoded.clone()
+        );
     }
 
     #[test]
@@ -446,8 +465,7 @@ mod nfc_construction_tests {
         let mut store = EvalStore::new();
 
         let decomposed = build_list_char("e\u{301}", &ids, &mut store);
-        let raw =
-            list_char_to_evalval_string(&decomposed, &ids).expect("well-formed List Char");
+        let raw = list_char_to_evalval_string(&decomposed, &ids).expect("well-formed List Char");
         let from_list = ken_elaborator::NfcString::new(raw);
         assert_eq!(from_list.as_str(), "\u{E9}");
         assert_eq!(round_trip_string(&from_list, &ids, &mut store), from_list);
@@ -548,6 +566,38 @@ fn project_value(mut val: EvalVal, path: &[Projection]) -> EvalVal {
     val
 }
 
+// A transparent body can also be read through the projection fast path.
+// Both that path and ordinary Const unfolding must see the same checked
+// erasure; otherwise a collapsed subset pair is projected with stale offsets.
+fn erased_transparent_body(
+    id: GlobalId,
+    body: &Term,
+    ty: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Term {
+    let env = globals as *const GlobalEnv as usize;
+    let scope = store
+        .erasure_scope
+        .as_mut()
+        .filter(|scope| scope.env == env);
+    if let Some(cached) = scope.as_ref().and_then(|scope| scope.bodies.get(&id)) {
+        return cached.clone();
+    }
+    let plan = ken_elaborator::omega_erasure::omega_erasure_plan(globals, body, ty)
+        .unwrap_or_else(|error| panic!("checked Ω plan failed at {id:?}: {error}"));
+    let erased = ken_elaborator::omega_erasure::apply_omega_erasure(globals, body, &plan)
+        .unwrap_or_else(|error| panic!("checked Ω erasure failed at {id:?}: {error}"));
+    if let Some(scope) = store
+        .erasure_scope
+        .as_mut()
+        .filter(|scope| scope.env == env)
+    {
+        scope.bodies.insert(id, erased.clone());
+    }
+    erased
+}
+
 fn eval_projection_path(
     env: &[EvalVal],
     term: &Term,
@@ -585,8 +635,9 @@ fn eval_projection_path(
             }
         }
         Term::Const { id, .. } => {
-            if let Some(Decl::Transparent { body, .. }) = globals.lookup(*id) {
-                eval_projection_path(&[], body, globals, store, path)
+            if let Some(Decl::Transparent { body, ty, .. }) = globals.lookup(*id) {
+                let computational = erased_transparent_body(*id, body, ty, globals, store);
+                eval_projection_path(&[], &computational, globals, store, path)
             } else {
                 project_value(eval(env, term, globals, store), path)
             }
@@ -613,7 +664,11 @@ fn projection_path_from_var0(term: &Term) -> Option<Vec<Projection>> {
     }
 }
 
-fn projection_accessor_path(term: &Term, globals: &GlobalEnv) -> Option<Vec<Projection>> {
+fn projection_accessor_path(
+    term: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Option<Vec<Projection>> {
     match term {
         Term::Lam(_, body) => {
             let path = projection_path_from_var0(body)?;
@@ -623,9 +678,12 @@ fn projection_accessor_path(term: &Term, globals: &GlobalEnv) -> Option<Vec<Proj
                 Some(path)
             }
         }
-        Term::Ascript(inner, _) => projection_accessor_path(inner, globals),
+        Term::Ascript(inner, _) => projection_accessor_path(inner, globals, store),
         Term::Const { id, .. } => match globals.lookup(*id) {
-            Some(Decl::Transparent { body, .. }) => projection_accessor_path(body, globals),
+            Some(Decl::Transparent { body, ty, .. }) => {
+                let computational = erased_transparent_body(*id, body, ty, globals, store);
+                projection_accessor_path(&computational, globals, store)
+            }
             _ => None,
         },
         _ => None,
@@ -639,7 +697,7 @@ fn eval_projection_accessor_app(
     globals: &GlobalEnv,
     store: &mut EvalStore,
 ) -> Option<EvalVal> {
-    let path = projection_accessor_path(fun, globals)?;
+    let path = projection_accessor_path(fun, globals, store)?;
     Some(eval_projection_path(env, arg, globals, store, &path))
 }
 
@@ -677,15 +735,7 @@ fn lift_recursive_value(
                 }
             }
             elim_reduce(
-                env,
-                fam,
-                level_args,
-                params,
-                motive,
-                methods,
-                value,
-                globals,
-                store,
+                env, fam, level_args, params, motive, methods, value, globals, store,
             )
         }
         RecursiveShape::Pi { domains, body } => {
@@ -1131,9 +1181,9 @@ fn elim_reduce(
                     let ih_type = &method_domains[ctor_specific.len() + j];
                     let (ih_head, _) = peel_app(ih_type);
                     let support_sort = match ih_head {
-                        Term::IndFormer { id, .. } => globals
-                            .all_support_origin(id)
-                            .map(|(_, _, sort)| sort),
+                        Term::IndFormer { id, .. } => {
+                            globals.all_support_origin(id).map(|(_, _, sort)| sort)
+                        }
                         _ => None,
                     };
                     lift_recursive_value(
@@ -1213,12 +1263,17 @@ fn eq_reduce(
     if let EvalVal::QuotTy { relation, .. } = a_ty {
         return match (lhs, rhs) {
             (
-                EvalVal::Ctor { id: x_id, args: x, .. },
-                EvalVal::Ctor { id: y_id, args: y, .. },
+                EvalVal::Ctor {
+                    id: x_id, args: x, ..
+                },
+                EvalVal::Ctor {
+                    id: y_id, args: y, ..
+                },
             ) if x_id == GlobalId(QUOT_CLASS_TYPE_ID)
                 && y_id == GlobalId(QUOT_CLASS_TYPE_ID)
                 && x.len() == 1
-                && y.len() == 1 => {
+                && y.len() == 1 =>
+            {
                 let first = apply((*relation).clone(), x[0].clone(), globals, store);
                 apply(first, y[0].clone(), globals, store)
             }
@@ -1270,8 +1325,14 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
         (EvalVal::OmegaUniverse(la), EvalVal::OmegaUniverse(lb)) => la.equiv(lb),
         (EvalVal::IndFormerVal { id: ia }, EvalVal::IndFormerVal { id: ib }) => ia == ib,
         (
-            EvalVal::QuotTy { carrier: a, relation: r },
-            EvalVal::QuotTy { carrier: b, relation: s },
+            EvalVal::QuotTy {
+                carrier: a,
+                relation: r,
+            },
+            EvalVal::QuotTy {
+                carrier: b,
+                relation: s,
+            },
         ) => eq_type_eq(a, b) && r == s,
         (
             EvalVal::OpaquePrimType { id: ia, args: aa },
@@ -1444,13 +1505,28 @@ mod primitive_type_cast_tests {
         let string_id = env.globals["String"];
         let int = eval(&[], &Term::const_(int_id, vec![]), &env.env, &mut store);
         let string = eval(&[], &Term::const_(string_id, vec![]), &env.env, &mut store);
-        assert_eq!(int, EvalVal::OpaquePrimType { id: int_id, args: Rc::new(vec![]) });
-        assert_eq!(string, EvalVal::OpaquePrimType { id: string_id, args: Rc::new(vec![]) });
+        assert_eq!(
+            int,
+            EvalVal::OpaquePrimType {
+                id: int_id,
+                args: Rc::new(vec![])
+            }
+        );
+        assert_eq!(
+            string,
+            EvalVal::OpaquePrimType {
+                id: string_id,
+                args: Rc::new(vec![])
+            }
+        );
         assert_eq!(cast_type(int.clone(), int.clone()), EvalVal::Int(41));
         assert_eq!(cast_type(int.clone(), string.clone()), EvalVal::Unknown);
         assert_eq!(cast_index(int.clone(), int.clone()), EvalVal::Int(41));
         assert_eq!(cast_index(int, string), EvalVal::Unknown);
-        assert_eq!(cast_index(EvalVal::Neutral, EvalVal::Neutral), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(EvalVal::Neutral, EvalVal::Neutral),
+            EvalVal::Unknown
+        );
     }
 
     #[test]
@@ -1458,13 +1534,19 @@ mod primitive_type_cast_tests {
         let large = BigInt::from(i64::MAX) + BigInt::from(1);
         for (left, right) in [
             (EvalVal::Int(9), EvalVal::Int(9)),
-            (EvalVal::BigInt(large.clone()), EvalVal::BigInt(large.clone())),
+            (
+                EvalVal::BigInt(large.clone()),
+                EvalVal::BigInt(large.clone()),
+            ),
             (EvalVal::Int(9), EvalVal::BigInt(BigInt::from(9))),
             (EvalVal::BigInt(BigInt::from(9)), EvalVal::Int(9)),
         ] {
             assert_eq!(cast_index(left, right), EvalVal::Int(41));
         }
-        assert_eq!(cast_index(EvalVal::Int(9), EvalVal::Int(10)), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(EvalVal::Int(9), EvalVal::Int(10)),
+            EvalVal::Unknown
+        );
         assert_eq!(
             cast_index(EvalVal::BigInt(large), EvalVal::BigInt(BigInt::from(9))),
             EvalVal::Unknown
@@ -1473,8 +1555,14 @@ mod primitive_type_cast_tests {
 
     #[test]
     fn closed_bool_indices_cast_only_in_the_same_representation() {
-        assert_eq!(cast_index(EvalVal::Bool(true), EvalVal::Bool(true)), EvalVal::Int(41));
-        assert_eq!(cast_index(EvalVal::Bool(true), EvalVal::Bool(false)), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(EvalVal::Bool(true), EvalVal::Bool(true)),
+            EvalVal::Int(41)
+        );
+        assert_eq!(
+            cast_index(EvalVal::Bool(true), EvalVal::Bool(false)),
+            EvalVal::Unknown
+        );
         // Bool immediates and constructor values are deliberately not equated.
         let true_ctor = EvalVal::Ctor {
             id: GlobalId(504),
@@ -1511,7 +1599,9 @@ mod primitive_type_cast_tests {
         elab.elaborate_decl("const textIndexOther : String = \"e\"")
             .expect("distinct closed checked String literal");
         let text_id = elab.globals["TextIndex"];
-        let (_, text_body) = elab.env.transparent_body(elab.globals["textIndexValue"])
+        let (_, text_body) = elab
+            .env
+            .transparent_body(elab.globals["textIndexValue"])
             .expect("closed String has a checked body");
         let ty = Term::app(Term::indformer(text_id, vec![]), text_body.clone());
         let mut store = EvalStore::new();
@@ -1532,20 +1622,30 @@ mod primitive_type_cast_tests {
         ken_kernel::check(&elab.env, &ken_kernel::Context::new(), &cast, &ty)
             .expect("the closed String-indexed cast is kernel-checked");
         let expected = eval(&[], &value, &elab.env, &mut store);
-        assert!(matches!(&expected, EvalVal::Ctor { id, .. } if *id == elab.globals["MkTextIndex"]));
+        assert!(
+            matches!(&expected, EvalVal::Ctor { id, .. } if *id == elab.globals["MkTextIndex"])
+        );
         assert_eq!(eval(&[], &cast, &elab.env, &mut store), expected);
 
-        let (_, other_body) = elab.env.transparent_body(elab.globals["textIndexOther"])
+        let (_, other_body) = elab
+            .env
+            .transparent_body(elab.globals["textIndexOther"])
             .expect("distinct checked String has a body");
         let other_ty = Term::app(Term::indformer(text_id, vec![]), other_body);
-        assert_ne!(eval(&[], &ty, &elab.env, &mut store), eval(&[], &other_ty, &elab.env, &mut store));
+        assert_ne!(
+            eval(&[], &ty, &elab.env, &mut store),
+            eval(&[], &other_ty, &elab.env, &mut store)
+        );
         let unequal_cast = Term::Cast(
             Box::new(ty.clone()),
             Box::new(other_ty),
             Box::new(Term::Refl(Box::new(ty))),
             Box::new(value),
         );
-        assert_eq!(eval(&[], &unequal_cast, &elab.env, &mut store), EvalVal::Unknown);
+        assert_eq!(
+            eval(&[], &unequal_cast, &elab.env, &mut store),
+            EvalVal::Unknown
+        );
     }
 
     // Promise class: durable C5 regularity for checked finite scalar literals.
@@ -1576,9 +1676,13 @@ mod primitive_type_cast_tests {
             }
         }
         let family_id = elab.globals[&family];
-        let (_, first_body) = elab.env.transparent_body(elab.globals["scalarIndexValue"])
+        let (_, first_body) = elab
+            .env
+            .transparent_body(elab.globals["scalarIndexValue"])
             .expect("first scalar has a checked body");
-        let (_, other_body) = elab.env.transparent_body(elab.globals["scalarIndexOther"])
+        let (_, other_body) = elab
+            .env
+            .transparent_body(elab.globals["scalarIndexOther"])
             .expect("second scalar has a checked body");
         let ty = Term::app(Term::indformer(family_id, vec![]), first_body.clone());
         let other_ty = Term::app(Term::indformer(family_id, vec![]), other_body);
@@ -1609,7 +1713,10 @@ mod primitive_type_cast_tests {
             Box::new(Term::Refl(Box::new(ty))),
             Box::new(value),
         );
-        assert_eq!(eval(&[], &unequal_cast, &elab.env, &mut store), EvalVal::Unknown);
+        assert_eq!(
+            eval(&[], &unequal_cast, &elab.env, &mut store),
+            EvalVal::Unknown
+        );
     }
 
     #[test]
@@ -1634,7 +1741,10 @@ mod primitive_type_cast_tests {
 
     #[test]
     fn float_signed_zero_bits_do_not_collide() {
-        assert_eq!(cast_index(EvalVal::Float(0.0), EvalVal::Float(-0.0)), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(EvalVal::Float(0.0), EvalVal::Float(-0.0)),
+            EvalVal::Unknown
+        );
     }
 
     #[test]
@@ -1659,7 +1769,10 @@ mod primitive_type_cast_tests {
 
     #[test]
     fn float32_signed_zero_bits_do_not_collide() {
-        assert_eq!(cast_index(EvalVal::Float32(0.0), EvalVal::Float32(-0.0)), EvalVal::Unknown);
+        assert_eq!(
+            cast_index(EvalVal::Float32(0.0), EvalVal::Float32(-0.0)),
+            EvalVal::Unknown
+        );
     }
 
     #[test]
@@ -1674,13 +1787,24 @@ mod primitive_type_cast_tests {
         let mut store = EvalStore::new();
         let full_ty = eval(&[], &Term::app(cap.clone(), full), &env.env, &mut store);
         let partial_ty = eval(&[], &Term::app(cap, partial), &env.env, &mut store);
-        assert!(matches!(&full_ty, EvalVal::OpaquePrimType { id, args } if *id == cap_id && args.len() == 1));
-        assert_eq!(cast_type(full_ty.clone(), full_ty.clone()), EvalVal::Int(41));
+        assert!(
+            matches!(&full_ty, EvalVal::OpaquePrimType { id, args } if *id == cap_id && args.len() == 1)
+        );
+        assert_eq!(
+            cast_type(full_ty.clone(), full_ty.clone()),
+            EvalVal::Int(41)
+        );
         assert_eq!(cast_type(full_ty.clone(), partial_ty), EvalVal::Unknown);
-        assert_eq!(apply(full_ty, EvalVal::Int(0), &env.env, &mut store), EvalVal::Neutral);
+        assert_eq!(
+            apply(full_ty, EvalVal::Int(0), &env.env, &mut store),
+            EvalVal::Neutral
+        );
         let int_id = env.globals["Int"];
         let int = eval(&[], &Term::const_(int_id, vec![]), &env.env, &mut store);
-        assert_eq!(apply(int, EvalVal::Int(0), &env.env, &mut store), EvalVal::Neutral);
+        assert_eq!(
+            apply(int, EvalVal::Int(0), &env.env, &mut store),
+            EvalVal::Neutral
+        );
         let resource_id = env.globals["Resource"];
         let fs_handle = Term::constructor(env.globals["ResourceKind.FsHandle"], vec![]);
         let resource = eval(
@@ -1689,16 +1813,25 @@ mod primitive_type_cast_tests {
             &env.env,
             &mut store,
         );
-        assert!(matches!(&resource, EvalVal::OpaquePrimType { id, args } if *id == resource_id && args.len() == 1));
-        assert_eq!(cast_type(resource.clone(), resource.clone()), EvalVal::Int(41));
-        assert_eq!(apply(resource, EvalVal::Int(0), &env.env, &mut store), EvalVal::Neutral);
+        assert!(
+            matches!(&resource, EvalVal::OpaquePrimType { id, args } if *id == resource_id && args.len() == 1)
+        );
+        assert_eq!(
+            cast_type(resource.clone(), resource.clone()),
+            EvalVal::Int(41)
+        );
+        assert_eq!(
+            apply(resource, EvalVal::Int(0), &env.env, &mut store),
+            EvalVal::Neutral
+        );
         // K3 must not intern a primitive type, nor a container carrying it.
         assert!(to_rt(&opaque(int_id.0)).is_none());
         assert!(to_rt(&EvalVal::Pair {
             fst: Rc::new(opaque(int_id.0)),
             snd: Rc::new(EvalVal::Int(0)),
             slot: NULL_SLOT,
-        }).is_none());
+        })
+        .is_none());
     }
 }
 
@@ -2212,8 +2345,43 @@ pub fn derived_lt_int(a: &EvalVal, b: &EvalVal) -> EvalVal {
 
 // ── eval / apply ─────────────────────────────────────────────────────────────
 
-/// `eval ρ t` — evaluate a core term in environment `ρ` (`42 §3.2`).
+/// Evaluate an admitted closed body after the elaborator's kernel-classified
+/// Ω plan has erased maximal proof subterms and collapsed subset Σ pairs.
+/// This is the typed interpreter entrypoint; `eval` below is the value-only
+/// reduction engine used after erasure and by intentionally raw diagnostic rows.
+pub fn eval_checked(
+    term: &Term,
+    checked_type: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Result<EvalVal, ken_kernel::KernelError> {
+    let plan = ken_elaborator::omega_erasure::omega_erasure_plan(globals, term, checked_type)?;
+    let computational = ken_elaborator::omega_erasure::apply_omega_erasure(globals, term, &plan)?;
+    Ok(eval(&[], &computational, globals, store))
+}
+
+/// `eval ρ t` — value-only evaluation in environment `ρ` (`42 §3.2`).
 pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalStore) -> EvalVal {
+    if store.erasure_scope.is_some() {
+        return eval_in_erasure_scope(env, term, globals, store);
+    }
+    store.erasure_scope = Some(ErasureScope {
+        env: globals as *const GlobalEnv as usize,
+        bodies: HashMap::new(),
+    });
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        eval_in_erasure_scope(env, term, globals, store)
+    }));
+    store.erasure_scope = None;
+    result.unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+}
+
+fn eval_in_erasure_scope(
+    env: &[EvalVal],
+    term: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
     match term {
         // --- Var: environment lookup ---
         Term::Var(i) => env_lookup(env, *i),
@@ -2288,6 +2456,11 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
             if *id == globals.top_id() || *id == globals.bottom_id() {
                 return EvalVal::IndFormerVal { id: *id };
             }
+            if *id == globals.tt_id() {
+                // Canonical erasure witness. Its Ω binder slot is retained by
+                // the interpreter but its proof cannot become Unknown.
+                return EvalVal::Neutral;
+            }
             // The checked String payload is authoritative even if an
             // independent evaluation-side table disagrees. Char literals
             // are already core IntLit values, not Const-backed side entries.
@@ -2299,7 +2472,10 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
                 return v.clone();
             }
             match globals.lookup(*id) {
-                Some(Decl::Transparent { body, .. }) => eval(&Vec::new(), body, globals, store),
+                Some(Decl::Transparent { body, ty, .. }) => {
+                    let computational = erased_transparent_body(*id, body, ty, globals, store);
+                    eval(&[], &computational, globals, store)
+                }
                 Some(Decl::Primitive { reduction, .. }) => match reduction {
                     PrimReduction::OpaqueType => EvalVal::OpaquePrimType {
                         id: *id,
@@ -2347,15 +2523,7 @@ pub fn eval(env: &[EvalVal], term: &Term, globals: &GlobalEnv, store: &mut EvalS
         } => {
             let sv = eval(env, scrut, globals, store);
             elim_reduce(
-                env,
-                *fam,
-                level_args,
-                params,
-                motive,
-                methods,
-                sv,
-                globals,
-                store,
+                env, *fam, level_args, params, motive, methods, sv, globals, store,
             )
         }
 
@@ -2547,7 +2715,8 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
                 ty,
                 reduction: PrimReduction::OpaqueType,
                 ..
-            }) = globals.lookup(id) else {
+            }) = globals.lookup(id)
+            else {
                 return EvalVal::Neutral;
             };
             let mut remaining = ty;
@@ -3547,9 +3716,12 @@ impl HostHandler for PosixHost {
         // read the error propagates and the operation reports unavailable
         // (ABI-S3 D3).
         use std::io::Read;
-        let mut bytes = vec![0u8; usize::try_from(count).map_err(|_| {
-            io::Error::new(io::ErrorKind::InvalidInput, "entropy request too large")
-        })?];
+        let mut bytes = vec![
+            0u8;
+            usize::try_from(count).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "entropy request too large")
+            })?
+        ];
         std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
         Ok(bytes)
     }
@@ -4312,9 +4484,7 @@ impl HostHandler for CaptureHost {
     }
 
     fn clock_monotonic_now(&mut self) -> BigInt {
-        let index = self
-            .monotonic_cursor
-            .min(self.monotonic_script.len() - 1);
+        let index = self.monotonic_cursor.min(self.monotonic_script.len() - 1);
         let nanoseconds = self.monotonic_script[index].clone();
         self.monotonic_cursor = self.monotonic_cursor.saturating_add(1);
         self.clock_trace.push(ClockTrace::MonotonicNow {
@@ -5228,12 +5398,8 @@ fn map_denial_v1(error: CapabilityDenied) -> ken_host::CapabilityDeniedV1 {
                     FsOpKind::Seek => ken_host::FsCapabilityOperationV1::Seek,
                     FsOpKind::SetLength => ken_host::FsCapabilityOperationV1::SetLength,
                     FsOpKind::Sync => ken_host::FsCapabilityOperationV1::Sync,
-                    FsOpKind::GetInheritance => {
-                        ken_host::FsCapabilityOperationV1::GetInheritance
-                    }
-                    FsOpKind::SetInheritance => {
-                        ken_host::FsCapabilityOperationV1::SetInheritance
-                    }
+                    FsOpKind::GetInheritance => ken_host::FsCapabilityOperationV1::GetInheritance,
+                    FsOpKind::SetInheritance => ken_host::FsCapabilityOperationV1::SetInheritance,
                     FsOpKind::Duplicate => ken_host::FsCapabilityOperationV1::Duplicate,
                 },
                 held_rights,
@@ -5340,10 +5506,7 @@ impl<H: HostHandler> ken_host::HostEffectBackendV1 for InterpreterHostBackend<'_
         self.handler.clock_sleep_until(BigInt::from(deadline));
     }
 
-    fn entropy_random_bytes(
-        &mut self,
-        count: u64,
-    ) -> Result<Vec<u8>, ken_host::IoErrorIdentityV1> {
+    fn entropy_random_bytes(&mut self, count: u64) -> Result<Vec<u8>, ken_host::IoErrorIdentityV1> {
         self.handler
             .entropy_random_bytes(count)
             .map_err(|error| ken_host::io_error_identity_v1(&error))
@@ -7141,9 +7304,7 @@ mod px5b_effect_observation_tests {
     type ShortWriteBackend = PositionedWriteCountBackend<2>;
     type ZeroWriteBackend = PositionedWriteCountBackend<0>;
 
-    impl<const WRITTEN: usize> ken_host::HostEffectBackendV1
-        for PositionedWriteCountBackend<WRITTEN>
-    {
+    impl<const WRITTEN: usize> ken_host::HostEffectBackendV1 for PositionedWriteCountBackend<WRITTEN> {
         fn console_write(
             &mut self,
             _stream: ken_host::ConsoleStreamV1,
@@ -7496,18 +7657,10 @@ mod px5b_effect_observation_tests {
         store: &mut EvalStore,
     ) -> EvalVal {
         fs_dispatch(
-            op_id,
-            args,
-            host,
-            resources,
-            revocation,
-            fs,
-            ids,
-            store,
-            None,
+            op_id, args, host, resources, revocation, fs, ids, store, None,
         )
-            .expect("recognized FS operation")
-            .expect("FS reply reifies")
+        .expect("recognized FS operation")
+        .expect("FS reply reifies")
     }
 
     fn result_payload<'a>(value: &'a EvalVal, ctor: GlobalId) -> &'a EvalVal {
@@ -7830,15 +7983,13 @@ mod px5b_effect_observation_tests {
         .expect("interpreter mapping release dispatches");
         assert!(matches!(
             released.outcome,
-            ken_host::CanonicalOutcomeV1::Success(
-                ken_host::CanonicalReplyV1::ResourceSettlement(
-                    ken_host::ResourceSettlementObservationV1 {
-                        resource_kind: ken_host::ResourceKindV1::Mapping,
-                        outcome: ken_host::ResourceSettlementOutcomeV1::Released,
-                        ..
-                    }
-                )
-            )
+            ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ResourceSettlement(
+                ken_host::ResourceSettlementObservationV1 {
+                    resource_kind: ken_host::ResourceKindV1::Mapping,
+                    outcome: ken_host::ResourceSettlementOutcomeV1::Released,
+                    ..
+                }
+            ))
         ));
     }
 
@@ -8239,15 +8390,14 @@ mod px5b_effect_observation_tests {
                     .expect("fixture capacity has a successor");
                 let mut backend =
                     PositionedFailureBackend::<BrokenPipePositionedFailure>::default();
-                let (request, reply) =
-                    dispatch_positioned_write(
-                        &mut backend,
-                        resources,
-                        revocation,
-                        file,
-                        buffer,
-                        out_of_range,
-                    );
+                let (request, reply) = dispatch_positioned_write(
+                    &mut backend,
+                    resources,
+                    revocation,
+                    file,
+                    buffer,
+                    out_of_range,
+                );
                 assert_eq!(
                     backend.write_calls, 0,
                     "pre-I/O rejection must not visit backend"
@@ -8285,14 +8435,7 @@ mod px5b_effect_observation_tests {
             |ids, fs, store, resources, revocation, file, buffer| {
                 let mut backend = ZeroWriteBackend::default();
                 let (request, reply) =
-                    dispatch_positioned_write(
-                        &mut backend,
-                        resources,
-                        revocation,
-                        file,
-                        buffer,
-                        0,
-                    );
+                    dispatch_positioned_write(&mut backend, resources, revocation, file, buffer, 0);
                 assert_eq!(
                     backend.write_calls, 1,
                     "a real backend zero reply must produce NoProgress"
@@ -8328,26 +8471,23 @@ mod px5b_effect_observation_tests {
     /// provenance admission is pinned independently in ken-host.
     #[test]
     fn resource_origin_revoked_reifies_as_resource_host_io_revoked() {
-        with_positioned_write_fixture(
-            "px9-inc2b-interpreter",
-            |ids, fs, store, _, _, _, _| {
-                let request = ken_host::CanonicalRequestV1::FsHandleMetadata;
-                let result = reify_host_reply_v1(
-                    ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(
-                        ken_host::IoErrorIdentityV1::Revoked,
-                    )),
-                    None,
-                    None,
-                    &request,
-                    fs.private_fs_handle_metadata_id,
-                    fs,
-                    ids,
-                    store,
-                )
-                .expect("interpreter reifies canonical resource revocation");
-                expect_resource_host_io(&result, ids.revoked_id, ids, fs);
-            },
-        );
+        with_positioned_write_fixture("px9-inc2b-interpreter", |ids, fs, store, _, _, _, _| {
+            let request = ken_host::CanonicalRequestV1::FsHandleMetadata;
+            let result = reify_host_reply_v1(
+                ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(
+                    ken_host::IoErrorIdentityV1::Revoked,
+                )),
+                None,
+                None,
+                &request,
+                fs.private_fs_handle_metadata_id,
+                fs,
+                ids,
+                store,
+            )
+            .expect("interpreter reifies canonical resource revocation");
+            expect_resource_host_io(&result, ids.revoked_id, ids, fs);
+        });
     }
 
     fn assert_positioned_backend_failure<E: PositionedFailureIdentity>(
@@ -8358,14 +8498,8 @@ mod px5b_effect_observation_tests {
             label,
             |ids, fs, store, resources, revocation, file, buffer| {
                 let mut backend = PositionedFailureBackend::<E>::default();
-                let (request, reply) = dispatch_positioned_write(
-                    &mut backend,
-                    resources,
-                    revocation,
-                    file,
-                    buffer,
-                    0,
-                );
+                let (request, reply) =
+                    dispatch_positioned_write(&mut backend, resources, revocation, file, buffer, 0);
                 assert_eq!(
                     backend.write_calls, 1,
                     "real synchronous backend is the producer"
@@ -8678,7 +8812,11 @@ mod px5b_effect_observation_tests {
         };
         assert_eq!(*span_id, fs.private_buffer_span_id);
         // PX8-SPAN-PROV AC-5: budget is span_args[2] now ([origin, start, budget]).
-        assert_eq!(nat_value(&span_args[2], &fs), 4, "span must be capacity-full");
+        assert_eq!(
+            nat_value(&span_args[2], &fs),
+            4,
+            "span must be capacity-full"
+        );
         let EvalVal::Ctor {
             id: transfer_count_id,
             args: count_args,
@@ -9741,10 +9879,7 @@ mod px5b_effect_observation_tests {
             None
         );
         assert_eq!(
-            decode_deadline(
-                &ctor(clock.mk_deadline_id, vec![instant(vec![])]),
-                &clock
-            ),
+            decode_deadline(&ctor(clock.mk_deadline_id, vec![instant(vec![])]), &clock),
             None
         );
 
@@ -9760,12 +9895,8 @@ mod px5b_effect_observation_tests {
             ))
         ));
         assert!(
-            decode_clock_request(
-                clock.sleep_until_id,
-                &[good, cancellation.clone()],
-                &clock
-            )
-            .is_none(),
+            decode_clock_request(clock.sleep_until_id, &[good, cancellation.clone()], &clock)
+                .is_none(),
             "a SleepUntil carrying a second operand must not decode"
         );
 

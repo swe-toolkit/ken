@@ -13,19 +13,18 @@ use std::path::Path;
 use ken_kernel::{Context, Decl, GlobalEnv, GlobalId, Term};
 
 use crate::checked_core::{
-    AssumptionTrustKind, AssumptionTrustMetadata, CanonicalEncodingError,
-    CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
+    canonical_decl_bytes, canonical_symbol_bytes, canonical_term_bytes,
+    checked_core_declaration_body_view, emit_checked_core_package, semantic_fingerprint,
+    validate_checked_core_package, AssumptionTrustKind, AssumptionTrustMetadata,
+    CanonicalEncodingError, CheckedCoreArtifactInputs, CheckedCoreBodyTerm,
     CheckedCoreBodyViewError, CheckedCoreBodyViewSelection, CheckedCorePackage,
     CheckedCorePackageError, CheckedCorePackageHeader, CheckedCoreSemanticInputs,
     ConstructorMetadata, DataMetadata, LowerabilityStatus, ObligationMetadata, ObligationStatus,
-    PartialityMetadata, PrimitiveMetadata,
-    PrimitiveReductionMetadata, RecursionAdmission, RecursionMetadata, StableSymbol,
-    StableSymbolTable, SymbolNamespace, canonical_decl_bytes, canonical_symbol_bytes,
-    canonical_term_bytes, checked_core_declaration_body_view, emit_checked_core_package,
-    semantic_fingerprint, validate_checked_core_package,
+    PartialityMetadata, PrimitiveMetadata, PrimitiveReductionMetadata, RecursionAdmission,
+    RecursionMetadata, StableSymbol, StableSymbolTable, SymbolNamespace,
 };
 use crate::extract::{v2_extract_with_suffixes, ObligationTriple, ProvKind};
-use crate::program_admission::{CheckedMainDescriptor, ProgramAdmissionError, admit_checked_main};
+use crate::program_admission::{admit_checked_main, CheckedMainDescriptor, ProgramAdmissionError};
 use crate::{ElabEnv, ElabError, ElabResult};
 
 const PRODUCER: &str = "ken-elaborator:compiler-driver:nc10";
@@ -489,6 +488,10 @@ pub enum CompilerDriverError {
     Io(String),
     Elaboration(ElabError),
     Package(CheckedCorePackageError),
+    OmegaErasurePlan {
+        symbol: StableSymbol,
+        reason: String,
+    },
     MissingTarget {
         symbol: StableSymbol,
     },
@@ -540,6 +543,9 @@ impl fmt::Display for CompilerDriverError {
             CompilerDriverError::Io(err) => write!(f, "compiler input I/O failed: {err}"),
             CompilerDriverError::Elaboration(err) => write!(f, "elaboration failed: {err:?}"),
             CompilerDriverError::Package(err) => err.fmt(f),
+            CompilerDriverError::OmegaErasurePlan { symbol, reason } => {
+                write!(f, "checked Ω erasure plan for {symbol} failed: {reason}")
+            }
             CompilerDriverError::MissingTarget { symbol } => {
                 write!(
                     f,
@@ -1486,9 +1492,7 @@ impl RecursiveInvocationTemplateCollector<'_> {
                 self.visit(owner, function, context, true)?;
                 self.visit(owner, argument, context, false)?;
             }
-            Term::Pair(left, right)
-            | Term::Ascript(left, right)
-            | Term::Absurd(left, right) => {
+            Term::Pair(left, right) | Term::Ascript(left, right) | Term::Absurd(left, right) => {
                 self.visit(owner, left, context, false)?;
                 self.visit(owner, right, context, false)?;
             }
@@ -2469,7 +2473,21 @@ pub fn prepare_native_program_sources(
         })
     })?;
     let mut normalized = package.clone();
+    // A body version owns only the plan written with it. Drop the original
+    // version's plans for rewritten declarations: a skipped write must refuse
+    // as missing, never consume a stale plan keyed to old preorder positions.
+    // This is the only body-positional semantic field, and no declaration is
+    // rewritten between the writer below and native erasure.
+    for symbol in &executable_declarations {
+        normalized
+            .artifact
+            .semantic
+            .omega_erasure_plans
+            .remove(symbol);
+    }
     let mut normalized_bodies = BTreeMap::new();
+    // Recursive barriers give this normalization its own immutable environment.
+    let mut normalized_omega_memo = crate::omega_erasure::ClassifyMemo::new();
     for symbol in &executable_declarations {
         let id = symbols
             .iter()
@@ -2505,14 +2523,21 @@ pub fn prepare_native_program_sources(
             ty: ty.clone(),
             body: normalized_body,
         };
-        let bytes = canonical_decl_bytes(&normalized_declaration, &symbol_table).map_err(|_| {
-            NativeProgramBuildError::Driver(CompilerDriverError::MissingStableSymbol { id: *id })
-        })?;
-        normalized
-            .artifact
-            .semantic
-            .declarations
-            .insert(symbol.clone(), bytes);
+        let Decl::Transparent { ty, body, .. } = &normalized_declaration else {
+            unreachable!("normalized executable declaration remains transparent")
+        };
+        write_checked_transparent_declaration(
+            &mut normalized.artifact.semantic,
+            symbol,
+            &normalized_declaration,
+            body,
+            ty,
+            &normalization_env,
+            &symbol_table,
+            &mut normalized_omega_memo,
+            |_| CompilerDriverError::MissingStableSymbol { id: *id },
+        )
+        .map_err(NativeProgramBuildError::Driver)?;
     }
     let normalized_host_package =
         emit_checked_core_package(normalized.header.clone(), normalized.artifact.clone())
@@ -3312,7 +3337,8 @@ fn collect_runtime_support_from_term(
         | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
-        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => {}
+        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
         CheckedCoreBodyTerm::RecursiveDeclarationCall(_) => {
             support.insert(ExecutableRuntimeSupport::Recursion);
         }
@@ -3341,6 +3367,15 @@ fn collect_runtime_support_from_term(
             for branch in &view.branches {
                 collect_runtime_support_from_term(&branch.method, support);
             }
+        }
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            support.insert(ExecutableRuntimeSupport::RecordsSigma);
+            collect_runtime_support_from_term(first, support);
+            collect_runtime_support_from_term(second, support);
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            support.insert(ExecutableRuntimeSupport::RecordsSigma);
+            collect_runtime_support_from_term(pair, support);
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
             support.insert(ExecutableRuntimeSupport::RecordsSigma);
@@ -3407,11 +3442,8 @@ fn add_obligation_metadata(
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *owner })?;
         // The owner can be shadowed in `globals`; the checked stable symbol
         // retains its distinct `#n` identity independently of that spelling.
-        let obligation = StableSymbol::obligation(format!(
-            "{}.{}",
-            origin.components[1..].join("."),
-            suffix
-        ));
+        let obligation =
+            StableSymbol::obligation(format!("{}.{}", origin.components[1..].join("."), suffix));
         if let Some(prior) = semantic.obligation_metadata.get(&obligation) {
             return Err(CompilerDriverError::DuplicateObligationId {
                 obligation,
@@ -3454,6 +3486,57 @@ fn add_obligation_metadata(
     Ok(())
 }
 
+/// Store one checked transparent body and its plan as a single body-version
+/// write. The plan is classified over the exact Term encoded into `bytes`;
+/// the independent canonical-byte traversal must agree before either entry
+/// replaces the previous version in the semantic package.
+fn write_checked_transparent_declaration(
+    semantic: &mut CheckedCoreSemanticInputs,
+    symbol: &StableSymbol,
+    decl: &Decl,
+    body: &Term,
+    ty: &Term,
+    env: &GlobalEnv,
+    table: &StableSymbolTable,
+    memo: &mut crate::omega_erasure::ClassifyMemo,
+    encode_error: impl FnOnce(CanonicalEncodingError) -> CompilerDriverError,
+) -> Result<(), CompilerDriverError> {
+    if !matches!(decl, Decl::Transparent { body: stored_body, ty: stored_ty, .. }
+        if std::ptr::eq(stored_body, body) && std::ptr::eq(stored_ty, ty))
+    {
+        return Err(CompilerDriverError::OmegaErasurePlan {
+            symbol: symbol.clone(),
+            reason: "plan source is not the declaration body and type".into(),
+        });
+    }
+    let bytes = canonical_decl_bytes(decl, table).map_err(encode_error)?;
+    let (plan, term_nodes) = crate::omega_erasure::omega_erasure_plan_with_memo(
+        env, body, ty, memo,
+    )
+    .map_err(|error| CompilerDriverError::OmegaErasurePlan {
+        symbol: symbol.clone(),
+        reason: error.to_string(),
+    })?;
+    let encoded_nodes =
+        crate::checked_core::canonical_body_node_count(&bytes).map_err(|reason| {
+            CompilerDriverError::OmegaErasurePlan {
+                symbol: symbol.clone(),
+                reason,
+            }
+        })?;
+    if usize::try_from(term_nodes).ok() != Some(encoded_nodes) {
+        return Err(CompilerDriverError::OmegaErasurePlan {
+            symbol: symbol.clone(),
+            reason: format!(
+                "kernel Term preorder has {term_nodes} nodes but canonical body has {encoded_nodes}"
+            ),
+        });
+    }
+    semantic.declarations.insert(symbol.clone(), bytes);
+    semantic.omega_erasure_plans.insert(symbol.clone(), plan);
+    Ok(())
+}
+
 fn emit_package_from_env(
     manifest: &CompilerManifest,
     sources: &[CompilerSource],
@@ -3490,6 +3573,7 @@ fn emit_package_from_env(
         }
     };
 
+    let mut omega_memo = crate::omega_erasure::ClassifyMemo::new();
     for id in admitted {
         let symbol = symbols
             .get(id)
@@ -3499,9 +3583,23 @@ fn emit_package_from_env(
             .env
             .lookup(*id)
             .ok_or(CompilerDriverError::MissingStableSymbol { id: *id })?;
-        let bytes = canonical_decl_bytes(decl, &package_table)
-            .map_err(|error| outside(&symbol, error))?;
-        semantic.declarations.insert(symbol.clone(), bytes);
+        if let Decl::Transparent { ty, body, .. } = decl {
+            write_checked_transparent_declaration(
+                &mut semantic,
+                &symbol,
+                decl,
+                body,
+                ty,
+                &env.env,
+                &package_table,
+                &mut omega_memo,
+                |error| outside(&symbol, error),
+            )?;
+        } else {
+            let bytes = canonical_decl_bytes(decl, &package_table)
+                .map_err(|error| outside(&symbol, error))?;
+            semantic.declarations.insert(symbol.clone(), bytes);
+        }
         semantic
             .lowerability
             .insert(symbol, LowerabilityStatus::Supported);
@@ -4900,6 +4998,13 @@ fn collect_runtime_declaration_dependencies(
                 collect_runtime_declaration_dependencies(&branch.method, dependencies);
             }
         }
+        CheckedCoreBodyTerm::StructuralPair { first, second } => {
+            collect_runtime_declaration_dependencies(first, dependencies);
+            collect_runtime_declaration_dependencies(second, dependencies);
+        }
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+            collect_runtime_declaration_dependencies(pair, dependencies);
+        }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {
             for field in &view.fields {
                 if let crate::checked_core::CheckedCoreRecordSigmaFieldValue::Runtime {
@@ -4929,7 +5034,8 @@ fn collect_runtime_declaration_dependencies(
         | CheckedCoreBodyTerm::ImportedDeclarationCall(_)
         | CheckedCoreBodyTerm::PrimitiveLiteral(_)
         | CheckedCoreBodyTerm::ConstructorReference(_)
-        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. } => {}
+        | CheckedCoreBodyTerm::ErasedConstructorArgument { .. }
+        | CheckedCoreBodyTerm::ErasedOmegaSubterm => {}
     }
 }
 
@@ -5048,6 +5154,8 @@ fn slice_closure_semantic(
     let mut sliced = CheckedCoreSemanticInputs::default();
     sliced.symbols.extend(closure_symbols.iter().cloned());
     sliced.declarations = filter_map_by_keys(&semantic.declarations, reachable_declarations);
+    sliced.omega_erasure_plans =
+        filter_map_by_keys(&semantic.omega_erasure_plans, reachable_declarations);
     sliced.primitive_refs = filter_map_by_keys(&semantic.primitive_refs, closure_symbols);
     sliced.primitive_metadata = filter_map_by_keys(&semantic.primitive_metadata, closure_symbols);
     sliced.data_metadata = filter_map_by_keys(&semantic.data_metadata, closure_symbols);
@@ -5526,8 +5634,8 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 mod tests {
     use super::*;
     use crate::checked_core::{
-        CheckedCoreArtifactInputs, ClassInstanceKind, ClassInstanceMetadata, ObligationMetadata,
-        ObligationStatus, emit_checked_core_package,
+        emit_checked_core_package, CheckedCoreArtifactInputs, ClassInstanceKind,
+        ClassInstanceMetadata, ObligationMetadata, ObligationStatus,
     };
     use crate::erasure::erase_checked_core_package_for_target;
 
@@ -5780,10 +5888,8 @@ proc main
             vec![CompilerSource::new("src/main.ken", CALLER_OPEN_SOURCE)],
         )
         .expect("native preparation accepts open obligations");
-        let report = build_target_selection_report(
-            &preparation.package,
-            preparation.selected.clone(),
-        );
+        let report =
+            build_target_selection_report(&preparation.package, preparation.selected.clone());
         assert_one_unknown_requires(package_name, &preparation.package, &report);
         let rendered = preparation.open_obligation_reports();
         assert_eq!(rendered.len(), 1);
@@ -5882,11 +5988,16 @@ proc main
     #[test]
     fn native_literal_metadata_uses_only_live_checked_provenance_after_rollback() {
         let mut env = ElabEnv::new().expect("prelude");
-        env.elaborate_decl("const zz_lit : String = \"zz\"").unwrap();
+        env.elaborate_decl("const zz_lit : String = \"zz\"")
+            .unwrap();
         let failed = env.elaborate_decl("fn bad (s : String) : String = bad \"zz\"");
-        assert!(matches!(failed, Err(crate::ElabError::KernelRejected {
-            error: ken_kernel::KernelError::NotTerminating(_), ..
-        })));
+        assert!(matches!(
+            failed,
+            Err(crate::ElabError::KernelRejected {
+                error: ken_kernel::KernelError::NotTerminating(_),
+                ..
+            })
+        ));
         for name in ["p0", "p1"] {
             env.elaborate_decl(&format!(
                 "foreign {name} : String = \"sym_{name}\" \"libc.so\" pure"
@@ -5901,7 +6012,10 @@ proc main
         let ken_kernel::Term::Const { id: literal, .. } = body else {
             panic!("fresh String is backed by a checked literal")
         };
-        assert_eq!(literal_native_symbol(&env, literal).as_deref(), Some("lit_string_az"));
+        assert_eq!(
+            literal_native_symbol(&env, literal).as_deref(),
+            Some("lit_string_az")
+        );
     }
 
     const GATE_4A_EQUALITY_SOURCE: &str = r#"program capabilities FS APartial
@@ -6005,7 +6119,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             &output_dir,
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
-            .expect("the already-green source completes native object emission");
+        .expect("the already-green source completes native object emission");
         let _ = std::fs::remove_dir_all(&output_dir);
 
         assert_eq!(
@@ -6070,13 +6184,16 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
                 constructor: constructor_view,
                 method: CheckedCoreBodyTerm::Lambda {
                     parameter_type: Vec::new(),
+                    erased_parameter: false,
                     body: Box::new(CheckedCoreBodyTerm::Lambda {
                         parameter_type: Vec::new(),
+                        erased_parameter: false,
                         body: Box::new(body),
                     }),
                 },
             }],
             computational_recursive_hypotheses: true,
+            convoy_erased_proof_binder: false,
         }
     }
 
@@ -6086,6 +6203,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             .expect("a variable has no global symbol dependency");
         let erased_only = px8ta_match_fixture(CheckedCoreBodyTerm::Lambda {
             parameter_type: erased_ih_reference,
+            erased_parameter: false,
             body: Box::new(CheckedCoreBodyTerm::IntegerLiteral {
                 value: num_bigint::BigInt::from(0),
             }),
@@ -6093,6 +6211,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let genuine = px8ta_match_fixture(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 });
         let runtime_body = CheckedCoreBodyTerm::Let {
             value_type: Vec::new(),
+            erased_value: false,
             value: Box::new(CheckedCoreBodyTerm::Match(erased_only)),
             body: Box::new(CheckedCoreBodyTerm::Match(genuine)),
         };
@@ -6110,7 +6229,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
 
     #[test]
     fn erased_whole_match_does_not_precede_the_runtime_match_census() {
-        use ken_kernel::{CtorSpec, InductiveSpec, Level, declare_inductive};
+        use ken_kernel::{declare_inductive, CtorSpec, InductiveSpec, Level};
 
         let mut env = GlobalEnv::new();
         let family_id = declare_inductive(&mut env, |family_id| InductiveSpec {
@@ -6224,18 +6343,22 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
                     constructor: step_view,
                     method: CheckedCoreBodyTerm::Lambda {
                         parameter_type: tree_type_bytes.clone(),
+                        erased_parameter: false,
                         body: Box::new(CheckedCoreBodyTerm::Lambda {
                             parameter_type: tree_type_bytes,
+                            erased_parameter: false,
                             body: Box::new(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 }),
                         }),
                     },
                 },
             ],
             computational_recursive_hypotheses: true,
+            convoy_erased_proof_binder: false,
         };
         let runtime_body = CheckedCoreBodyTerm::Let {
             value_type: canonical_term_bytes(&erased_whole_match, &symbol_table)
                 .expect("the erased whole eliminator has canonical checked bytes"),
+            erased_value: false,
             value: Box::new(CheckedCoreBodyTerm::Match(genuine_runtime_match)),
             body: Box::new(CheckedCoreBodyTerm::Variable { de_bruijn_index: 0 }),
         };
@@ -6652,11 +6775,9 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             entrypoint.argument_packaging.shape,
             ExecutableArgumentShape::ClosedNullary
         ));
-        assert!(
-            entrypoint
+        assert!(entrypoint
             .required_runtime_support
-                .contains(&ExecutableRuntimeSupport::RuntimeValues)
-        );
+            .contains(&ExecutableRuntimeSupport::RuntimeValues));
         assert!(matches!(
             entrypoint.result_observation.shape,
             ExecutableResultShape::RuntimeValue
@@ -6880,13 +7001,11 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         .unwrap();
         let entrypoint = package_executable_entrypoint(&package, &closures[0]).unwrap();
 
-        assert!(
-            entrypoint
+        assert!(entrypoint
             .unsupported_lanes
             .values()
             .flatten()
-                .any(|lane| lane.lane == "unresolved_checked_core_symbol")
-        );
+            .any(|lane| lane.lane == "unresolved_checked_core_symbol"));
         assert!(matches!(
             entrypoint.closed_entry,
             ExecutableEntrypointVerdict::Unavailable { .. }
@@ -6964,11 +7083,9 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             entrypoint.argument_packaging.shape,
             ExecutableArgumentShape::UnsupportedRuntimeArguments { parameter_count: 1 }
         ));
-        assert!(
-            entrypoint
+        assert!(entrypoint
             .required_runtime_support
-                .contains(&ExecutableRuntimeSupport::FunctionCalls)
-        );
+            .contains(&ExecutableRuntimeSupport::FunctionCalls));
     }
 
     #[test]
@@ -7060,19 +7177,15 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         .unwrap();
         let closure = &closures[0];
         assert!(closure.semantic.obligations.contains_key(&obligation));
-        assert!(
-            closure
+        assert!(closure
             .semantic
             .obligation_metadata
-                .contains_key(&obligation)
-        );
+            .contains_key(&obligation));
         assert!(closure.semantic.assumptions.contains_key(&assumption));
-        assert!(
-            closure
+        assert!(closure
             .semantic
             .assumption_trust_metadata
-                .contains_key(&assumption)
-        );
+            .contains_key(&assumption));
         assert!(closure.semantic.trusted_base_delta.contains_key(&target));
         assert!(closure.report.assumptions.contains(&assumption));
         assert!(closure.report.trusted_base_delta.contains(&target));
@@ -7166,13 +7279,11 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             Some(&dependency)
         );
         assert!(report.external_symbols.contains(&imported));
-        assert!(
-            !report
+        assert!(!report
             .unsupported_lanes
             .values()
             .flatten()
-                .any(|lane| lane.lane == "unresolved_checked_core_symbol")
-        );
+            .any(|lane| lane.lane == "unresolved_checked_core_symbol"));
         assert_eq!(
             report.dictionary_runtime_fields.get(&dictionary),
             Some(&BTreeSet::from(["eq".to_string()]))
@@ -7221,14 +7332,12 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
                 || closure.external_symbols.contains(&true_symbol),
             "declaration references without package metadata must remain explicit externals"
         );
-        assert!(
-            closure
+        assert!(closure
             .report
             .unsupported_lanes
             .values()
             .flatten()
-                .any(|lane| lane.lane == "unresolved_checked_core_symbol")
-        );
+            .any(|lane| lane.lane == "unresolved_checked_core_symbol"));
         assert!(matches!(
             closure.report.runtime_lowering,
             ReportFact::Unavailable(UnavailableLane { ref lane, .. })
@@ -7294,15 +7403,13 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             selector(package_name, target),
         )
         .unwrap();
-        assert!(
-            closures[0]
+        assert!(closures[0]
             .report
             .unsupported_lanes
             .get(&helper)
             .unwrap()
             .iter()
-                .any(|lane| lane.lane == "non_lowerable_closure_member")
-        );
+            .any(|lane| lane.lane == "non_lowerable_closure_member"));
         assert!(matches!(
             closures[0].report.runtime_lowering,
             ReportFact::Unavailable(_)
@@ -7419,14 +7526,13 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
 
         let lanes = &out.report.selected_targets[0].lanes;
         assert!(lanes.iter().any(|lane| lane.lane == "non_runtime_target"));
-        assert!(
-            out.report
+        assert!(out
+            .report
             .unsupported_lanes
             .get(&target)
             .unwrap()
             .iter()
-                .any(|lane| lane.lane == "non_runtime_target")
-        );
+            .any(|lane| lane.lane == "non_runtime_target"));
         assert!(has_lane(
             &out.executable_entrypoints[0].unsupported_lanes,
             &target,
@@ -7447,20 +7553,17 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
             compile_ken_package_sources(&manifest, vec![real_source()], TargetSelector::Manifest)
                 .expect("unsupported target metadata remains reportable");
 
-        assert!(
-            out.report.selected_targets[0]
+        assert!(out.report.selected_targets[0]
             .lanes
             .iter()
-                .any(|lane| lane.lane == "unsupported_target_metadata")
-        );
-        assert!(
-            out.report
+            .any(|lane| lane.lane == "unsupported_target_metadata"));
+        assert!(out
+            .report
             .unsupported_lanes
             .get(&target)
             .unwrap()
             .iter()
-                .any(|lane| lane.lane == "unsupported_target_metadata")
-        );
+            .any(|lane| lane.lane == "unsupported_target_metadata"));
     }
 
     #[test]
@@ -7959,7 +8062,7 @@ mod package_route_example_declarations {
         );
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0x5ed0_ae5b_69b5_41df
+            0x2d5a_715c_51d1_e896
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -7995,7 +8098,7 @@ mod package_route_example_declarations {
         );
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0xa102_7073_c2a9_9b86
+            0xea0b_029f_f624_c5d6
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,
@@ -8124,6 +8227,239 @@ const zz_example : String = ac0_need
             example.package.core_semantic_hash,
             plain.package.core_semantic_hash
         );
+    }
+
+    /// Promise class: durable invariant (42 §3.2, 46 §4). A kernel-checked
+    /// Bool convoy may depend on the scrutinee only in its erased Eq domain.
+    /// MEASURED: both backend paths return the same Int as an unconvoyed if.
+    /// CLAIMED: the motive dependency adds no runtime parameter or argument.
+    /// THE GAP: the package's typed erasure plan must feed the method decoder.
+    #[test]
+    fn kernel_bool_convoy_matches_unconvoyed_runtime_value() {
+        use ken_kernel::{declare_def, Level};
+        use ken_runtime::{
+            evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeGroundValue,
+            RuntimeIrSeedEnvironment, RuntimeObservation,
+        };
+        for convoy in [false, true] {
+            let mut env = ElabEnv::new().expect("closed prelude");
+            let bool_id = env.globals["Bool"];
+            let true_id = env.globals["True"];
+            let false_id = env.globals["False"];
+            let int_ty = Term::const_(env.globals["Int"], vec![]);
+            let bool_ty = Term::indformer(bool_id, vec![]);
+            let scrut = Term::Constructor {
+                id: true_id,
+                level_args: vec![],
+            };
+            let proposition = |ctor: Term| {
+                Term::Eq(
+                    Box::new(bool_ty.clone()),
+                    Box::new(scrut.clone()),
+                    Box::new(ctor),
+                )
+            };
+            let motive_body = if convoy {
+                Term::pi(
+                    Term::Eq(
+                        Box::new(bool_ty.clone()),
+                        Box::new(scrut.clone()),
+                        Box::new(Term::var(0)),
+                    ),
+                    int_ty.clone(),
+                )
+            } else {
+                int_ty.clone()
+            };
+            let motive = Term::Ascript(
+                Box::new(Term::lam(bool_ty.clone(), motive_body)),
+                Box::new(Term::pi(bool_ty.clone(), Term::ty(Level::zero()))),
+            );
+            let method = |ctor: Term, value: i64| {
+                let result = Term::IntLit(num_bigint::BigInt::from(value));
+                if convoy {
+                    Term::lam(proposition(ctor), result)
+                } else {
+                    result
+                }
+            };
+            let elimination = Term::Elim {
+                fam: bool_id,
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(motive),
+                methods: vec![
+                    method(scrut.clone(), 7),
+                    method(
+                        Term::Constructor {
+                            id: false_id,
+                            level_args: vec![],
+                        },
+                        8,
+                    ),
+                ],
+                indices: vec![],
+                scrut: Box::new(scrut.clone()),
+            };
+            let body = if convoy {
+                Term::app(elimination, Term::Refl(Box::new(scrut)))
+            } else {
+                elimination
+            };
+            let id = declare_def(&mut env.env, vec![], int_ty.clone(), body.clone())
+                .expect("kernel admits the convoy");
+            env.globals.insert("convoy_bool".into(), id);
+            let name = if convoy { "bool_convoy" } else { "bool_plain" };
+            let target = declaration_symbol(name, "convoy_bool");
+            let manifest =
+                CompilerManifest::new(name, vec![ManifestTarget::executable(target.clone())]);
+            let package =
+                emit_package_from_env(&manifest, &[], &env, &[id], &[], &BTreeSet::new(), None)
+                    .expect("producer emits the checked Ω plan");
+            let program =
+                crate::erasure::erase_checked_core_package_for_target(&package, [&target])
+                    .expect("native lowering consumes the checked plan");
+            let lowered = program
+                .declarations
+                .iter()
+                .find(|declaration| declaration.symbol == target.to_string())
+                .expect("runtime target selected");
+            let RuntimeDeclarationKind::Transparent { body: native } = &lowered.kind else {
+                panic!("transparent target required")
+            };
+            assert_eq!(
+                evaluate_runtime_ir_expr(&native, &RuntimeIrSeedEnvironment::empty())
+                    .expect("native eval"),
+                RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into())),
+            );
+            let mut store = ken_interp::eval::EvalStore::new();
+            assert!(matches!(
+                ken_interp::eval::eval_checked(&body, &int_ty, &env.env, &mut store)
+                    .expect("checked eval"),
+                ken_interp::eval::EvalVal::Int(7)
+            ));
+        }
+    }
+
+    /// Promise class: durable invariant (42 §3.2, 46 §4). Unlike Bool, the
+    /// Suc method carries an actual recursive IH binder before its proof.
+    /// MEASURED: convoyed and plain Nat cases run at native/interp parity.
+    /// CLAIMED: the extra proof slot does not shift n or its IH at runtime.
+    /// THE GAP: the runtime match remapper must extend the source telescope.
+    #[test]
+    fn kernel_nat_match_convoy_keeps_recursive_binders_and_erases_proof() {
+        use ken_kernel::{declare_def, whnf, Context, Level};
+        use ken_runtime::{
+            evaluate_runtime_ir_expr, RuntimeDeclarationKind, RuntimeGroundValue,
+            RuntimeIrSeedEnvironment, RuntimeObservation,
+        };
+        fn pi_parts(env: &ken_kernel::GlobalEnv, ctx: &Context, ty: &Term) -> (Term, Term) {
+            let Term::Pi(dom, cod) = whnf(env, ctx, ty) else {
+                panic!("kernel method type must be a Π")
+            };
+            (*dom, *cod)
+        }
+        for convoy in [false, true] {
+            let mut env = ElabEnv::new().expect("closed prelude");
+            let nat_id = env.globals["Nat"];
+            let nat_ty = Term::indformer(nat_id, vec![]);
+            let int_ty = Term::const_(env.globals["Int"], vec![]);
+            let zero = Term::Constructor {
+                id: env.globals["Zero"],
+                level_args: vec![],
+            };
+            let suc = Term::Constructor {
+                id: env.globals["Suc"],
+                level_args: vec![],
+            };
+            let scrut = Term::app(suc, zero);
+            let motive_body = if convoy {
+                Term::pi(
+                    Term::Eq(
+                        Box::new(nat_ty.clone()),
+                        Box::new(scrut.clone()),
+                        Box::new(Term::var(0)),
+                    ),
+                    int_ty.clone(),
+                )
+            } else {
+                int_ty.clone()
+            };
+            let motive = Term::Ascript(
+                Box::new(Term::lam(nat_ty.clone(), motive_body)),
+                Box::new(Term::pi(nat_ty, Term::ty(Level::zero()))),
+            );
+            let family = env.env.inductive(nat_id).expect("Nat family");
+            let zero_ty =
+                ken_kernel::inductive::method_type(&env.env, family, 0, &motive, &[], &[])
+                    .expect("kernel zero method type");
+            let zero_method = if convoy {
+                let (proof_ty, _) = pi_parts(&env.env, &Context::new(), &zero_ty);
+                Term::lam(proof_ty, Term::IntLit(8.into()))
+            } else {
+                Term::IntLit(8.into())
+            };
+            let suc_ty = ken_kernel::inductive::method_type(&env.env, family, 1, &motive, &[], &[])
+                .expect("kernel suc method type");
+            let mut context = Context::new();
+            let (n_ty, ih_pi) = pi_parts(&env.env, &context, &suc_ty);
+            context.push(n_ty.clone());
+            let (ih_ty, proof_pi) = pi_parts(&env.env, &context, &ih_pi);
+            context.push(ih_ty.clone());
+            let result = if convoy {
+                let (proof_ty, _) = pi_parts(&env.env, &context, &proof_pi);
+                Term::lam(proof_ty, Term::IntLit(7.into()))
+            } else {
+                Term::IntLit(7.into())
+            };
+            let suc_method = Term::lam(n_ty, Term::lam(ih_ty, result));
+            let elimination = Term::Elim {
+                fam: nat_id,
+                level_args: vec![],
+                params: vec![],
+                motive: Box::new(motive),
+                methods: vec![zero_method, suc_method],
+                indices: vec![],
+                scrut: Box::new(scrut.clone()),
+            };
+            let body = if convoy {
+                Term::app(elimination, Term::Refl(Box::new(scrut)))
+            } else {
+                elimination
+            };
+            let id = declare_def(&mut env.env, vec![], int_ty.clone(), body.clone())
+                .expect("kernel admits Nat match");
+            env.globals.insert("convoy_nat".into(), id);
+            let name = if convoy { "nat_convoy" } else { "nat_plain" };
+            let target = declaration_symbol(name, "convoy_nat");
+            let manifest =
+                CompilerManifest::new(name, vec![ManifestTarget::executable(target.clone())]);
+            let package =
+                emit_package_from_env(&manifest, &[], &env, &[id], &[], &BTreeSet::new(), None)
+                    .expect("producer emits Nat plan");
+            let program =
+                crate::erasure::erase_checked_core_package_for_target(&package, [&target])
+                    .expect("native Nat match lowers");
+            let lowered = program
+                .declarations
+                .iter()
+                .find(|declaration| declaration.symbol == target.to_string())
+                .expect("runtime Nat target selected");
+            let RuntimeDeclarationKind::Transparent { body: native } = &lowered.kind else {
+                panic!("transparent target required")
+            };
+            assert_eq!(
+                evaluate_runtime_ir_expr(&native, &RuntimeIrSeedEnvironment::empty())
+                    .expect("native eval"),
+                RuntimeObservation::Returned(RuntimeGroundValue::Int(7.into())),
+            );
+            let mut store = ken_interp::eval::EvalStore::new();
+            assert!(matches!(
+                ken_interp::eval::eval_checked(&body, &int_ty, &env.env, &mut store)
+                    .expect("checked eval"),
+                ken_interp::eval::EvalVal::Int(7)
+            ));
+        }
     }
 }
 

@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_interp::eval::{apply, eval, EvalStore, EvalVal};
+use ken_interp::eval::{apply, eval, eval_checked, EvalStore, EvalVal};
 use ken_kernel::{Decl, GlobalId, KernelError, Term};
 
 const MODULE: &str = "Data.Collections.PriorityQueue";
@@ -79,7 +79,8 @@ fn canonical_ord_nat_id(env: &ElabEnv) -> GlobalId {
 
 fn global_value(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
     match env.env.lookup(id) {
-        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
+        Some(Decl::Transparent { body, ty, .. }) => eval_checked(body, ty, &env.env, store)
+            .expect("the checked global body has a typed Ω erasure plan"),
         Some(Decl::Inductive(_)) => EvalVal::IndFormerVal { id },
         other => panic!("global {id:?} must be evaluable, got {other:?}"),
     }
@@ -202,42 +203,18 @@ struct Values {
     tag_ids: [GlobalId; 6],
 }
 
-fn reify_checked_record(term: &Term, env: &ElabEnv, store: &mut EvalStore) -> EvalVal {
-    match term {
-        Term::Pair(first, rest) => EvalVal::Pair {
-            fst: Rc::new(eval(&[], first, &env.env, store)),
-            snd: Rc::new(reify_checked_record(rest, env, store)),
-            slot: 0,
-        },
-        other => eval(&[], other, &env.env, store),
-    }
-}
-
 fn runtime_ord_dictionary(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
-    // `Ord` is proof-carrying. Strict evaluation of its proposition-valued
-    // record terminator makes the whole ordinary record `Unknown`. Reify the
-    // already kernel-checked transparent record field-by-field so the real
-    // `leq` field plus all four laws remain present and only the unused record
-    // terminal stays opaque. This is a disclosed test-value bridge, not native
-    // full-pipeline evaluation of proposition-valued records.
-    let (_, body) = env
-        .env
-        .transparent_body(id)
-        .unwrap_or_else(|| panic!("Ord dictionary {id:?} must be transparent"));
-    let dictionary = reify_checked_record(&body, env, store);
-    let mut current = &dictionary;
-    let mut fields = 0;
-    while let EvalVal::Pair { fst, snd, .. } = current {
-        assert!(
-            !matches!(**fst, EvalVal::Unknown | EvalVal::Neutral),
-            "every reified Ord field must be a real checked runtime value"
-        );
-        fields += 1;
-        current = snd;
-    }
-    assert_eq!(
-        fields, 5,
-        "Ord runtime view must retain `leq` plus four law fields"
+    // An Ord dictionary is a checked subset Σ: its leq field is runtime
+    // data and its four law fields are Ω. The typed entrypoint projects the
+    // carrier rather than reifying proof fields for these value-only tests.
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(id) else {
+        panic!("Ord dictionary {id:?} must be transparent");
+    };
+    let dictionary = eval_checked(body, ty, &env.env, store)
+        .expect("the checked Ord body has a typed Ω erasure plan");
+    assert!(
+        matches!(dictionary, EvalVal::Closure { .. }),
+        "the Ord dictionary must be exactly its computational leq carrier, not a proof-bearing pair"
     );
     dictionary
 }
