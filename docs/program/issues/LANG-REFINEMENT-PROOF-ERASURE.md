@@ -110,6 +110,20 @@ is `Omega`. It is never recomputed from bytes or from a spelling.
   `cfg(test)` export are all out. A row that needs Ω erasure is rebuilt
   as a kernel-admitted environment and gets its plan from
   `omega_erasure_plan`. The production missing-plan refusal is unchanged.
+- **Two test migrations** (Architect `evt_5xe40d1kx5a7k`), the only
+  other paths:
+  - `crates/ken-elaborator/tests/cat_formal_languages_regex.rs`:
+    `checked_bool` evaluates the checked declaration through
+    `eval_checked`, not raw `eval` on the unerased body. The seven seed
+    cases are green, and one row pins raw `eval` on `d_same` as Neutral
+    against `eval_checked` as True.
+  - `crates/ken-elaborator/tests/rt_match_motive_admission_sort.rs`: the
+    old `unwrap_err()` becomes two rows on one kernel-admitted
+    `computational_prop` package. Decoded with its own plan it is `Ok`;
+    with that declaration's plan replaced by `OmegaErasurePlan::default()`
+    it is `UnsupportedProofOnlyMatch`. An earlier arm refusing the
+    empty-plan copy is a stop, not a dropped row.
+    `body_view_rejects_unsupported_proof_only_match` is unchanged.
 
 ## Acceptance
 
@@ -243,7 +257,11 @@ Append one entry per Architect hard stop; never rewrite history.
    `method_type_node` fallback in `omega_erasure.rs` only. Latent
    sibling, no witness: the computational-IH collector in
    `compiler_driver.rs` runs kernel queries on the same normalized
-   bodies and fails closed.
+   bodies and fails closed. The fix was accepted as built, and the regex
+   and match-motive reds resolved to the two test migrations above,
+   non-advancing (`evt_5xe40d1kx5a7k`). Carry, no node: about 20 test
+   helpers evaluate `Decl::Transparent` bodies with raw `eval`, green only
+   while their roots carry no erased or collapsed node.
 
 ## Stop conditions
 
