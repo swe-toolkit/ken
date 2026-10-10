@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-DEPENDENCY-CONTRACT
 title: "No graph or dependency-structure contract exists in spec/50-stdlib, so the catalog's graphs layer has nothing to build against. Author spec/50-stdlib/62-graphs.md with its first section: a finite directed graph, decidable reachability, and a topological order or a cycle witness, each law proved at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
