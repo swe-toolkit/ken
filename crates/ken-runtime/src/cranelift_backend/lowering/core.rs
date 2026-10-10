@@ -11808,7 +11808,16 @@ impl<'a> Lowering<'a> {
             .ok_or_else(|| {
                 unsupported(
                     "ContinuationSpecialization",
-                    "the claimed continuation target was not declared into this function",
+                    format!(
+                        "the claimed continuation target was not declared into this function \
+                         (target {:?}, token emission owner {:?}, producer owner {:?}, \
+                         producer construct {:?}, defining owner {:?})",
+                        identity.target(),
+                        identity.emission_owner(),
+                        identity.producer_owner(),
+                        identity.producer_construct_origin(),
+                        defining_owner,
+                    ),
                 )
             })?;
         // `D4` control, on the real causal call seam: substitute ONLY the
