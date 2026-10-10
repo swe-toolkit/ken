@@ -53,6 +53,15 @@ session's bound names. The repair refuses the example and cross-source
 duplicates, and stable-symbol naming no longer lets a later binding take
 an admitted declaration's spelling.
 
+- **Ruled closure (`evt_5nxr5z4pgf6ke`).** The package's name set is
+  the names declared by elaboration entered after the end of
+  `ElabEnv::empty()`, the existing "before the package could speak"
+  boundary: `package_definitions` is cleared there. A census gate counts
+  post-boundary `expand_and_elaborate` callers by kind over the AC-3
+  runs; any caller outside root units, `.ken.md` parts, example and
+  reject fences and test `elaborate_decl*` is a stop to the Architect,
+  and the only case for per-declaration provenance.
+
 ## Acceptance
 
 - **AC-1.** Each repro row with a shadowing example, and the two-source
@@ -68,7 +77,9 @@ an admitted declaration's spelling.
   migrated or are a stop.
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
-  their results.
+  their results. `rt_dasm_d1b_role_a_role_authority` is green with its
+  original `DuplicateConstructorSpelling`, and a fresh `ElabEnv::new()`
+  has an empty `package_definitions`.
 - **AC-3.** A catalog and corpus census at the base shows no package newly
   refused. Any hit is the stop below.
 - **AC-4 (mutation, QA).** Restoring the per-unit-only check reddens the
@@ -81,8 +92,9 @@ an admitted declaration's spelling.
 
 ## Hard-stop inventory
 
-- **§1a:** 2 (`evt_1mk5h1xd5zaz`, `evt_3c4aa4cbvgbx6`). §1b is due at
-  entry 3.
+- **§1a:** 3 (`evt_1mk5h1xd5zaz`, `evt_3c4aa4cbvgbx6`,
+  `evt_189f55fagz339`). Research advisory `evt_4rzm6r59rnbb8`; the next
+  research hold is at the sixth.
 - **1.** Module-route seed keyed on the loader's module-qualified
   namespace (`Entry.base`) while checked fences resolve and check in the
   root namespace (`base`). Ruled: strip exactly the `entry.` prefix when
@@ -94,3 +106,10 @@ an admitted declaration's spelling.
   measured a configuration the fence never runs. Ruled: delete the
   module-route hook and the entry-1 projection; prebind precedence is
   unchanged.
+- **3.** `package_definitions` populated by prelude registration, which
+  passes the same `expand_and_elaborate` funnel as package sources;
+  keyed on the funnel, not on the package boundary.
+- **§1b at entry 3: YES** (`evt_189f55fagz339`). Package membership was
+  inferred from the resolver funnel a name passes through, not from the
+  boundary that defines the package. Closure: anchor the set at the end
+  of `ElabEnv::empty()` (above).
