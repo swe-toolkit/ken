@@ -37,6 +37,15 @@ refusal pin becomes a native positive.
     support is unmeasured;
   - (iii) dropping the slot, which changes pair arity and `Project`
     lowering.
+- **Native Ω-Let target preparation refuses before erasure** (carried
+  from LANG-REFINEMENT-PROOF-ERASURE, `evt_wvswatxvpkcm`). On one
+  probe, base `bcf525d67` refuses at the checked-body view with
+  `UnsupportedTermShape { tag: "refl" }`; the erasure candidate refuses
+  later, at runtime-occurrence traversal, with `MissingClosureMetadata`.
+  Both are typed and return no target. The identity control succeeds.
+- **Architect carries** (`evt_nkhhjrmen4j0`): `checked_erased_argument_flags`
+  in `erasure.rs` is dead, and the omega_erasure_plan doc's "refusal"
+  wording overstates Lam-without-expectation.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
