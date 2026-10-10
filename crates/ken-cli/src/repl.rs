@@ -367,8 +367,9 @@ mod reused_env_rollback_tests {
     }
 
     /// Promise class: durable invariant. MEASURED: two interactive definitions
-    /// with one spelling mint different checked IDs, retain the first, and
-    /// list both entries. CLAIMED: REPL re-entry shadows without retracting.
+    /// with one spelling mint different checked IDs, retain the first True
+    /// body and the later False body, and list both entries. CLAIMED: REPL
+    /// re-entry shadows without retracting.
     /// THE GAP: the direct package route is independently pinned to refuse
     /// this same spelling across units.
     #[test]
@@ -382,10 +383,16 @@ mod reused_env_rollback_tests {
             first, second,
             "a re-entered name shadows the earlier binding"
         );
-        assert!(
-            session.env.env.lookup(first).is_some(),
-            "the old GlobalId is not retracted"
-        );
+        assert!(matches!(
+            session.env.env.lookup(first),
+            Some(Decl::Transparent { body, .. })
+                if *body == Term::constructor(session.env.globals["True"], Vec::new())
+        ));
+        assert!(matches!(
+            session.env.env.lookup(second),
+            Some(Decl::Transparent { body, .. })
+                if *body == Term::constructor(session.env.globals["False"], Vec::new())
+        ));
         assert_eq!(
             session
                 .names
