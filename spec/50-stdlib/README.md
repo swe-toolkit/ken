@@ -242,6 +242,15 @@ The byte-argument cursor supplies a lawful instance, but no cross-instance
 location relation or generic byte-concatenation theorem is claimed.
 Specifying §§5–6 does not claim their catalog builds have landed.
 
+The **Layer-3 graphs and dependency contract** is pinned in
+**`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT). A graph has
+Boolean directed adjacency over any carrier; explicit `Finite q` permits
+decidable predicate reachability through §61 §2's existing Dfa fixed point,
+with a checked `Walk` witness rather than a raw word that may stutter.
+`DecEq q` enters only for a complete, duplicate-free topological list or
+a genuine cycle result; both branches carry checked evidence. The chapter
+does not claim its catalog build has landed or add a second fixed point.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
