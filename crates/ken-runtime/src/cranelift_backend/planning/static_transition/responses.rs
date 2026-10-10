@@ -1308,6 +1308,9 @@ mod relay_settlement;
 pub(in crate::cranelift_backend) struct RelayDrivePair {
     pub(in crate::cranelift_backend) source: StaticOriginId,
     pub(in crate::cranelift_backend) owner: ContinuationEmissionOwner,
+    /// The enclosing response-owner row that minted this pair. A successor's
+    /// own base owner is not necessarily the instance that emits it.
+    pub(in crate::cranelift_backend) minting_row: StaticResponseContinuationId,
     pub(in crate::cranelift_backend) operation_root_origin: StaticOriginId,
     pub(in crate::cranelift_backend) effect_origin: StaticOriginId,
     pub(in crate::cranelift_backend) operation: HostOpV1,
@@ -1362,6 +1365,7 @@ impl StaticTransitionPlan<'_> {
         // Response-owner selection is a function of the exact causal call
         // identity. The owner plan itself rejects a duplicate selected caller.
         let mut by_edge = BTreeMap::new();
+        let mut emitted_by_row = BTreeMap::new();
         for (owner, row) in owners.iter().zip(&rows) {
             if owner.response() != row.id()
                 || owner.base_owner() != row.base_owner()
@@ -1375,7 +1379,43 @@ impl StaticTransitionPlan<'_> {
             if by_edge.insert(owner.selected_caller().clone(), (owner, row)).is_some() {
                 return Err(planner_error("two response owners claim one selected incoming caller"));
             }
+            if emitted_by_row.insert(row.id(), (owner, row)).is_some() {
+                return Err(planner_error("one response row is emitted by two owners"));
+            }
         }
+        let select = |owner: &StaticResponseOwnerSpecialization,
+                      row: &StaticResponseContinuation,
+                      pair: &RelayDrivePair|
+         -> Result<Option<EmittedRelayMember>, CraneliftBackendError> {
+            let mut members = BTreeMap::new();
+            members.insert(row.id(), row);
+            if let Some(protocol) = self.pending_vis_settlements.protocol.as_ref()
+                .and_then(|protocol| protocol.owners.get(&row.id()))
+            {
+                for context in &protocol.contexts {
+                    for member in &context.members {
+                        let successor = member.successor.as_ref().ok_or_else(||
+                            planner_error("a pending-Vis member has no derived response row"))?;
+                        if let Some(previous) = members.insert(successor.id(), successor) {
+                            if previous != successor {
+                                return Err(planner_error(
+                                    "one emitted relay member identity names different response rows",
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+            let matching = members.values()
+                .filter(|member| member.effect_origin() == pair.effect_origin
+                    && member.operation() == pair.operation)
+                .collect::<Vec<_>>();
+            match matching.as_slice() {
+                [] => Ok(None),
+                [member] => Ok(Some(EmittedRelayMember { owner: owner.id(), member: member.id() })),
+                _ => Err(planner_error("relay: one instance has two clauses for one forwarded op")),
+            }
+        };
         let calls = self.continuation_calls()?;
         let mut pair_edges = BTreeMap::<
             (StaticOriginId, ContinuationEmissionOwner),
@@ -1424,48 +1464,19 @@ impl StaticTransitionPlan<'_> {
             {
                 return Err(planner_error("an admitted relay pair disagrees with its source response operation"));
             }
+            let minting_owner = emitted_by_row.get(&pair.minting_row).ok_or_else(||
+                planner_error("relay: minting row is not an emitted response owner"))?;
+            if minting_owner.1.base_owner() != pair.owner {
+                return Err(planner_error("relay: minting row disagrees with its pair owner"));
+            }
             for identity in pair_edges.get(&key).into_iter().flat_map(|edges| edges.iter()) {
                 let relay_route = if let Some((owner, row)) = by_edge.get(identity) {
-                    // An entered handler selects its clause by checked effect
-                    // identity and operation. Deduplicate protocol successors
-                    // by the same member identity as the emitter.
-                    let mut members = BTreeMap::new();
-                    members.insert(row.id(), *row);
-                    if let Some(protocol) = self.pending_vis_settlements.protocol.as_ref()
-                        .and_then(|protocol| protocol.owners.get(&row.id()))
-                    {
-                        for context in &protocol.contexts {
-                            for member in &context.members {
-                                let successor = member.successor.as_ref().ok_or_else(||
-                                    planner_error("a pending-Vis member has no derived response row"))?;
-                                if let Some(previous) = members.insert(successor.id(), successor) {
-                                    if previous != successor {
-                                        return Err(planner_error(
-                                            "one emitted relay member identity names different response rows",
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    let matching = members.values()
-                        .filter(|member| member.effect_origin() == pair.effect_origin
-                            && member.operation() == pair.operation)
-                        .collect::<Vec<_>>();
-                    let [member] = matching.as_slice() else {
-                        if matching.is_empty() {
-                            return Err(planner_error(format!(
-                                "relay: entered response owner {:?} has no clause for source {:?} effect {:?} operation {:?} at call {:?}",
-                                owner.id(), pair.source, pair.effect_origin, pair.operation, identity,
-                            )));
-                        }
-                        return Err(planner_error(
-                            "relay: entered response owner has two clauses for one forwarded op",
-                        ));
-                    };
-                    Some(EmittedRelayMember { owner: owner.id(), member: member.id() })
+                    Some(select(owner, row, pair)?.ok_or_else(|| planner_error(format!(
+                        "relay: entered response owner {:?} has no clause for source {:?} effect {:?} operation {:?} at call {:?}",
+                        owner.id(), pair.source, pair.effect_origin, pair.operation, identity,
+                    )))?)
                 } else {
-                    None
+                    select(minting_owner.0, minting_owner.1, pair)?
                 };
                 let no_route_trap = relay_route.is_none().then(|| RuntimeTrap {
                     code: RuntimeTrapCode::MissingRuntimeMetadata,
@@ -1518,6 +1529,8 @@ impl StaticTransitionPlan<'_> {
         };
         if pair.source != source || pair.owner != owner
             || self.child_static_origin(source, 0)? != pair.operation_root_origin
+            || !self.static_response_continuations.iter().any(|row|
+                row.id() == pair.minting_row && row.base_owner() == owner)
         {
             return Err(planner_error("a relay drive pair disagrees with its source and owner"));
         }

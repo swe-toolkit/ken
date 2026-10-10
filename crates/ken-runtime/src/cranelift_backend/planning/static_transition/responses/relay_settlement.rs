@@ -276,11 +276,15 @@ pub(super) fn build_drive_pairs(
                     let pair = RelayDrivePair {
                         source: source.vis,
                         owner: owner_key,
+                        minting_row: owner.id(),
                         operation_root_origin: plan.child_static_origin(source.vis, 0)?,
                         effect_origin: row.effect_origin(),
                         operation: row.operation(),
                     };
                     if let Some(previous) = pairs.insert((source.vis, owner_key), pair) {
+                        if previous.minting_row != pair.minting_row {
+                            return Err(planner_error("relay pair minted by two owners"));
+                        }
                         if previous != pair {
                             return Err(planner_error("a relay source/owner pair has conflicting effect seats"));
                         }
