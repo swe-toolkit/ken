@@ -279,22 +279,48 @@ base, stop and report the mismatch.
    `evt_3y7fxd70stq3x`, ruled `evt_2228y4p1zwgkg`).** The drop is a
    property of the lowering, not of admission: main, with no relay
    admission logic, and D3, which admits 707/768, both drop the read.
-   - **Plan fact.** The plan records, per admitted pair,
-     `relay_route: Option<member>`: the emitted response-owner member
-     that handles the forwarded op, or none. Seats read this fact and
-     never discover it at lowering time.
-   - **Planned trap.** For each pair with route none, the planner
-     registers a planned `RuntimeTrap` with code
+   - **Plan fact, keyed on the entry edge (`evt_7pzcsgqvt0xs0`).**
+     `relay_route` is computed per (admitted pair, seat call identity)
+     from the plan's `selected_caller` map: the validated zip of
+     `static_response_owner_specializations` and the feasibility ledger,
+     keyed by `owner.selected_caller()`, which `responses.rs:4260` makes
+     a function. A seat identity with no entry edge has no route. One
+     with an edge selects, inside the entered owner's row and its
+     `pending_vis_record_protocol` successors, the single clause matching
+     the pair's (effect origin, operation); two clauses is a planner
+     error. No owner, effect or operation join key; the attribute-keyed
+     builders V1-V3 are discarded. Seats read this fact and never
+     discover it at lowering time.
+   - **Planned trap.** For each (pair, identity) with route none, the
+     planner registers a planned `RuntimeTrap` with code
      `RuntimeTrapCode::MissingRuntimeMetadata` and the message
      `"relay: forwarded host op <op> from source <origin> has no
      performing route"`. No new ABI variant. Lowering resolves it through
-     `static_transition_plan.trap_identity(trap)?`.
+     `static_transition_plan.trap_identity(trap)?`. A selected-caller edge
+     never reaches the trap, so the trap cannot remove a call that
+     `validate_response_owner_call_coverage` requires.
    - **At each consuming seat** (`claim_and_call_continuation`,
      `active_transport`, `dispatch_fusion_owned_outer_realization`), a
      route-none pair emits the trap, returns its status and records an
      `Abort` frame terminal, the `seal_source_trap_branch` sequence
      (`joins.rs:2802-2816`), and never consumes silently. Runs that never
-     reach the source are unchanged.
+     reach the source are unchanged. The claim and fusion seats bind the
+     identity by `continuation_call_binding_for` on their four
+     coordinates; `active_transport` names the identity it consumes by
+     the same four.
+   - **Run order before the candidate.** Row 01 anchors: 735 routes to
+     member 2; 1115 routes to `StaticResponseOwnerId(0)`; 1164 and 1288
+     route; 846 has none; in-bounds BRANCHED 768 has none; the whole row
+     01 control is green. Then rows 01-36 and both variants re-derived per
+     (pair, identity): that none population is the refusal population of
+     record and supersedes the D0 (b) column. Then AC-MAIN, the mutant
+     and the controls.
+   - **Stops** (`evt_7pzcsgqvt0xs0`): an anchor disagrees; an entered
+     owner has no clause for the pair's (effect origin, operation); a
+     route-none (pair, identity) reached in an executed run performs
+     natively, or a routed one drops the op; `active_transport` has no
+     identity bindable by the four coordinates while an admitted pair
+     reaches it; any "no verified selected incoming call" failure.
    - **Not a compile-time refusal**: that would redden 15 rows of tests
      whose measured runs are correct, and the successor would turn them
      back.
@@ -342,8 +368,8 @@ base, stop and report the mismatch.
      fleet rule: non-release events in order, release events as a set,
      through the shared helpers in `rt_parity_native.rs`.
    - **This WP's landing cut is increment (i):** D1-D3, `relay_drive_pair`
-     and the errors, the plan fact `relay_route`, and the planned
-     no-route trap at the three seats, with AC-MAIN, its mutant and the
+     and the errors, the edge-keyed plan fact `relay_route`, and the
+     planned no-route trap at the three seats, with AC-MAIN, its mutant and the
      four controls. The D0 census instruments are removed from the
      candidate (saved as `D0-disposable-recorder-unfiltered.patch`). It
      closes the main defect. **Increment (ii), route (C)**, emitting an
