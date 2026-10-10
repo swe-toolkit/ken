@@ -1435,7 +1435,31 @@ impl<'a> Lowering<'a> {
                 };
                 let expected = self
                     .static_transition_plan
-                    .source_aggregate_occurrence(child_origin, child_shape)?;
+                    .source_aggregate_occurrence(child_origin, child_shape);
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                if expected.is_err() && std::env::var_os("KEN_RELAY_D1_RECORD").is_some() {
+                    let held = child.source_aggregate_producer();
+                    let held_origin = held.map(|occ| self.static_transition_plan
+                        .aggregate_record_view(occ).map(|row| row.producer_origin()));
+                    let held_origin_value = held_origin.as_ref().and_then(|row|
+                        row.as_ref().ok().and_then(|origin| *origin));
+                    let pos_expr = format!("{:?}", self.static_transition_plan.source_occurrence(child_origin))
+                        .chars().take(200).collect::<String>();
+                    let held_expr = format!("{:?}", held_origin_value.map(|origin|
+                        self.static_transition_plan.source_occurrence(origin)))
+                        .chars().take(200).collect::<String>();
+                    eprintln!(
+                        "RELAY_D4_AGG_POS parent_origin={:?} position={} pos_origin={child_origin:?} pos_expr={pos_expr} held_occ={held:?} held_origin={held_origin:?} held_expr={held_expr} parent_fn={:?} held_fn={:?} drive_stack={:?} pos_membership={:?} held_membership={:?} defining_emission_owner={:?}",
+                        planned.producer_origin(), planned_child.position,
+                        planned.producer_origin().map(|origin| self.static_transition_plan.relay_d4_function_owner_for_probe(origin)),
+                        held_origin_value.map(|origin| self.static_transition_plan.relay_d4_function_owner_for_probe(origin)),
+                        relay_drive_stack(),
+                        self.static_transition_plan.relay_d4_source_membership_for_probe(child_origin),
+                        held_origin_value.map(|origin| self.static_transition_plan.relay_d4_source_membership_for_probe(origin)),
+                        self.defining_emission_owner,
+                    );
+                }
+                let expected = expected?;
                 // ⭐ The child must carry the occurrence the planner planned AT
                 // THAT POSITION -- not merely some record of the same shape, and
                 // not the same producer's record reached from elsewhere in the

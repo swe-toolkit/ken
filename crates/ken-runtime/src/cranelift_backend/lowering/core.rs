@@ -5856,6 +5856,8 @@ impl<'a> Lowering<'a> {
         planned_operation: ken_host::HostOpV1,
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        #[cfg(any(test, feature = "px8-ds-test-support"))]
+        let _relay_d4_drive_guard = relay_d4_drive_enter(vis_origin);
         let [operation, k] = lowered_args else {
             return Err(unsupported(
                 "StaticResponseDeferred",

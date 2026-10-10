@@ -10451,6 +10451,47 @@ impl<'src> StaticTransitionPlan<'src> {
         );
     }
 
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    pub(in crate::cranelift_backend) fn relay_d4_function_owner_for_probe(
+        &self,
+        origin: StaticOriginId,
+    ) -> String {
+        format!("{:?}", self.semantic.function_owner(origin))
+    }
+
+    /// Disposable D4 provenance observation: for each installed relay source,
+    /// is `needle` under its request operation or its lexical K? Traverse the
+    /// planned child origins by the same visited walk as occurrences.rs.
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    pub(in crate::cranelift_backend) fn relay_d4_source_membership_for_probe(
+        &self,
+        needle: StaticOriginId,
+    ) -> Vec<(StaticOriginId, &'static str, bool)> {
+        let sources = self.relay_drive_pairs.keys().map(|(source, _)| *source)
+            .collect::<BTreeSet<_>>();
+        let mut answer = Vec::new();
+        for source in sources {
+            for (position, side) in [(0, "operation"), (1, "k")] {
+                let Some(root) = self.child_static_origin(source, position).ok() else {
+                    answer.push((source, side, false));
+                    continue;
+                };
+                let mut seen = BTreeSet::new();
+                let mut stack = vec![root];
+                let mut found = false;
+                while let Some(origin) = stack.pop() {
+                    if origin == needle { found = true; break; }
+                    if !seen.insert(origin) { continue; }
+                    if let Ok(children) = self.semantic.child_origins(origin) {
+                        stack.extend(children.iter().copied());
+                    }
+                }
+                answer.push((source, side, found));
+            }
+        }
+        answer
+    }
+
     /// **`D7` — the ruled allocation lane for one aggregate producer.**
     ///
     /// ⛔ **Absence is a loud failure, never a default.** An aggregate the

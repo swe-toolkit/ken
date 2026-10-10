@@ -16,6 +16,32 @@
 //! escape `crate::cranelift_backend`.
 
 pub(in crate::cranelift_backend) mod core;
+
+// Disposable D4 recorder: nest the exact source-Vis drives on this emitter
+// thread so an aggregate guard can name which resumed K it is inside.
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static RELAY_D4_DRIVE_STACK: std::cell::RefCell<Vec<StaticOriginId>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+struct RelayD4DriveGuard;
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+impl Drop for RelayD4DriveGuard {
+    fn drop(&mut self) {
+        RELAY_D4_DRIVE_STACK.with(|stack| { stack.borrow_mut().pop(); });
+    }
+}
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn relay_d4_drive_enter(origin: StaticOriginId) -> RelayD4DriveGuard {
+    RELAY_D4_DRIVE_STACK.with(|stack| stack.borrow_mut().push(origin));
+    RelayD4DriveGuard
+}
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn relay_drive_stack() -> Vec<StaticOriginId> {
+    RELAY_D4_DRIVE_STACK.with(|stack| stack.borrow().clone())
+}
+
 mod residual;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
     RecursiveCarrierSlotKey, Representation};
