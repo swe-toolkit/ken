@@ -233,9 +233,14 @@ does not claim its catalog build has landed. Section 5 specifies Dfa
 language equivalence via a finite disagreement product and minimisation
 by canonical representatives **within `q`**, with eight checked laws.
 Neither decision requires `DecEq q`; only the named-state reachability
-and stronger state-count constructions remain deferred. The lexer byte
-bridge remains deferred. Specifying §5 does not claim its catalog build
-has landed.
+and stronger state-count constructions remain deferred. Section 6 adds a
+bounded cursor element list and a streaming DFA runner in
+`Capability.Parsing.Lexer`. Its two bridge laws compare the runner with
+`run` over `cursor_elements` for arbitrary `CursorOps`; unfolding a
+successful peek needs `CursorLaws` and uses its advance-progress law.
+The byte-argument cursor supplies a lawful instance, but no cross-instance
+location relation or generic byte-concatenation theorem is claimed.
+Specifying §§5–6 does not claim their catalog builds have landed.
 
 ## 4. I/O, effects, serialization
 
