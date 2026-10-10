@@ -57,16 +57,22 @@ an admitted declaration's spelling.
 
 - **AC-1.** Each repro row with a shadowing example, and the two-source
   plain duplicate, is refused with `DuplicateDefinition` naming the name.
-  On the module route (`evt_1mk5h1xd5zaz`): the shadowing row gives
-  `DuplicateDefinition { base }`; an admitted `data U = ZzBase | ZzOther`
-  then an example `data T = ZzBase | ZzQ` is refused with its pinned
-  variant; and a fresh name `zz_fresh` stays Ok.
+  The module route already refuses at the base through the loaded
+  entry's `root_scope` prebinding (`evt_3c4aa4cbvgbx6`); these rows are
+  controls. The checked-fence executor passes `DuplicateDefinition` and
+  `AmbiguousReference` through unchanged, so the shadowing row gives
+  `AmbiguousReference { base, sources: [Entry.base, base] }`, the
+  constructor row (`data U = ZzBase | ZzOther`, then an example
+  `data T = ZzBase | ZzQ`) gives the same for `ZzBase`, and a fresh name
+  `zz_fresh` stays Ok. Consumers asserting the generic example error are
+  migrated or are a stop.
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
   their results.
 - **AC-3.** A catalog and corpus census at the base shows no package newly
   refused. Any hit is the stop below.
-- **AC-4 (mutation, QA).** Restoring the per-unit-only check reddens AC-1.
+- **AC-4 (mutation, QA).** Restoring the per-unit-only check reddens the
+  package-route rows of AC-1.
 
 ## Stop conditions
 
@@ -75,9 +81,16 @@ an admitted declaration's spelling.
 
 ## Hard-stop inventory
 
-- **§1a:** 1 (`evt_1mk5h1xd5zaz`). §1b is due at entry 3.
+- **§1a:** 2 (`evt_1mk5h1xd5zaz`, `evt_3c4aa4cbvgbx6`). §1b is due at
+  entry 3.
 - **1.** Module-route seed keyed on the loader's module-qualified
   namespace (`Entry.base`) while checked fences resolve and check in the
   root namespace (`base`). Ruled: strip exactly the `entry.` prefix when
   seeding, keep unprefixed members verbatim, and stop on any member with
   another module path.
+- **2.** Module-route hook keyed on the resolver's definition set, while
+  the loaded entry's `root_scope` prebinding refuses the redefinition
+  first (`AmbiguousReference`); the D0 probe bypassed `root_scope`, so it
+  measured a configuration the fence never runs. Ruled: delete the
+  module-route hook and the entry-1 projection; prebind precedence is
+  unchanged.
