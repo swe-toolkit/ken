@@ -117,6 +117,92 @@ fn earlier_pi_domain_names_later_data() {
     assert!(mentions_global(&transparent_body(&env, "M.T"), env.globals["M.D"]));
 }
 
+/// Promise class: durable invariant (spec 33 §8.4). Both a separated and an
+/// adjacent later prop are checked before a theorem that names their intros.
+/// MEASURED: the theorem body contains the two kernel-checked intro IDs, each
+/// with its own checked prop family as its type. CLAIMED: P.pi orders t after P
+/// without relying on textual order or mistaking Q.qi for P.pi. THE GAP:
+/// imported and hidden intro paths have independent namespace gates.
+#[test]
+fn earlier_theorem_uses_later_prop_checked_intro_identity() {
+    for data_sibling in ["data D = MkD", ""] {
+        let source = format!(
+            "module M {{ prop Q : Omega where {{ qi : Q }} \
+             theorem t : Q = let h = P.pi in Q.qi \
+             {data_sibling} prop P : Omega where {{ pi : P }} }}"
+        );
+        let env = checked(&source);
+        let body = transparent_body(&env, "M.t");
+        let p = env.globals["M.P"];
+        let q = env.globals["M.Q"];
+        let pi = env.globals["M.P.pi"];
+        let qi = env.globals["M.Q.qi"];
+        assert_ne!(p, q);
+        assert_ne!(pi, qi);
+        for (family, intro) in [(p, pi), (q, qi)] {
+            assert!(matches!(
+                env.env.lookup(intro),
+                Some(Decl::Transparent { .. })
+            ));
+            assert_eq!(
+                env.env.const_type(intro).unwrap().1,
+                Term::const_(family, vec![])
+            );
+            assert!(
+                mentions_global(&body, intro),
+                "theorem must use its checked intro"
+            );
+        }
+    }
+}
+
+/// Promise class: durable invariant. An ordinary `pi` binding and the prop
+/// intro `P.pi` have separate dependency edges and separate checked IDs.
+/// MEASURED: a forward consumer selects the checked ordinary pi, whose body
+/// still selects its own later dependency; t selects both prop intros.
+/// CLAIMED: a prop intro never steals the bare module binding or its edges.
+/// THE GAP: other source declarations and imports have separate scope gates.
+#[test]
+fn prop_intro_keeps_an_ordinary_pi_nodes_dependency_edges() {
+    let env = checked(
+        "module M { const consumer : Int = pi \
+         const pi : Int = later \
+         theorem t : Q = let h = P.pi in Q.qi \
+         prop Q : Omega where { qi : Q } \
+         prop P : Omega where { pi : P } \
+         const later : Int = 0 }",
+    );
+    let pi = env.globals["M.pi"];
+    let p_intro = env.globals["M.P.pi"];
+    assert_ne!(pi, p_intro);
+    assert!(mentions_global(&transparent_body(&env, "M.consumer"), pi));
+    assert!(mentions_global(
+        &transparent_body(&env, "M.pi"),
+        env.globals["M.later"]
+    ));
+    assert!(mentions_global(&transparent_body(&env, "M.t"), p_intro));
+}
+
+/// Promise class: durable invariant. The neighboring dependency routes are
+/// unchanged by making a prop's family-qualified intro available to the graph.
+#[test]
+fn prop_intro_forward_edge_preserves_neighboring_forward_routes() {
+    for source in [
+        "module M { prop Q : Omega where { qi : Q } prop P : Omega where { pi : P } theorem t : Q = let h = P.pi in Q.qi data D = MkD }",
+        "module M { const a : Int = let h = C in 0 data E = MkE data D = C }",
+        "module M { prop Q : Omega where { qi : Q } theorem t (p : P) : Q = Q.qi prop P : Omega where { pi : P } }",
+        "module M { fn f (x : Int) : Int = x theorem t (x : Int) : Equal Int (f x) x = f::p x proof p for f (x : Int) : Equal Int (f x) x = Refl }",
+        "module M { fn f (x : A) : A = x def A = Int }",
+    ] {
+        checked(source);
+    }
+    let dotted = checked(
+        "module M { pub fn f (x : Int) : Int = x } \
+         proof p for M.f (x : Int) : Equal Int (M.f x) x = Refl",
+    );
+    assert!(dotted.env.lookup(dotted.globals["M.f::p"]).is_some());
+}
+
 #[test]
 fn type_declaration_cannot_share_cycle_with_a_definition() {
     let mut env = ElabEnv::new().expect("base environment");
