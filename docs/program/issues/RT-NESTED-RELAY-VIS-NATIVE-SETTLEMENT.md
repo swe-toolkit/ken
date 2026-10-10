@@ -299,6 +299,18 @@ base, stop and report the mismatch.
      successor. No owner, effect or operation join key across instances,
      and no origin id joined across builds; V1-V3 are discarded. Seats
      read this fact and never discover it at lowering time.
+   - **One source, one consumer (`evt_645k8m1snthr0`).** The relay pair
+     population excludes every source the handler-owned Deferred drive
+     already settles, enforced by the plan, not by lowering precedence. One
+     shared `deferred_drive_settles(plan, source, owner)`, factored from
+     `classify`, is called by both `classify` and `build_drive_pairs`,
+     which skips a settled source before minting. All three Deferred
+     precedence arms (`core.rs` unitless, bounded and admitted) assert that
+     no relay pair exists for the source they consume, before the mutation
+     check. Row 36's `suppressing_bounded_response_owner_drive_restores_the_pending_vis_trap`
+     is the discriminating control and is not edited. Stops: an anchor
+     source is drive-settled; any of the three guards fires; row 36 stays
+     `Ok` under suppression with the pair removed; any new red.
    - **Planned trap.** For each (pair, identity) with route none, the
      planner registers a planned `RuntimeTrap` with code
      `RuntimeTrapCode::MissingRuntimeMetadata` and the message
@@ -618,6 +630,16 @@ base, stop and report the mismatch.
   refusal. D1-D3, the projection, `relay_drive_pair` as admission
   authority, the permanent errors and the census instruments carry
   forward; D4''s claim that an undriven relay is settled does not.
+
+- **Entries 10-15** are recorded in the WP thread (`evt_2fjkzrg2vbwcj`,
+  `evt_2rs7r1xxywwyf`): attribute-key joins on the instance half (10-13),
+  trap placement truncating lowering descent (14), and the clause picked
+  by (effect, op) inside one instance (15).
+- **16.** A relay pair is minted for a source the handler-owned Deferred
+  drive already consumes, so suppressing the drive no longer restores the
+  pending-Vis trap (row 36, `evt_49m91asqstjeg`) -- keyed on relay-member
+  reachability (`source_for_relay`), not on which mechanism consumes the
+  source (`evt_645k8m1snthr0`). §1b is due at 18.
 
 ## Finding outside this WP
 
