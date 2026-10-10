@@ -703,7 +703,8 @@ impl ElabEnv {
             let example_results = self
                 .elaborate_file_v1(&src[range.clone()])
                 .map_err(|error| match error {
-                    ElabError::DuplicateDefinition { .. } => error,
+                    ElabError::DuplicateDefinition { .. }
+                    | ElabError::AmbiguousReference { .. } => error,
                     _ => ElabError::ParseError {
                         msg: "a 'ken example' block failed to elaborate".to_string(),
                         span: Span::new(range.start, range.end),

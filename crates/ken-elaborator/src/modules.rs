@@ -104,9 +104,6 @@ pub struct ModuleState {
     /// ambient isolated-file scope; an entry document check installs only its
     /// selected unit so checked fences see the declarations they follow.
     loaded_unit_scopes: HashMap<String, Scope>,
-    /// Completed definition sets of loaded file units. Only an entry unit
-    /// seeds document-fence collision checks; dependency units stay separate.
-    loaded_unit_definitions: HashMap<String, HashSet<String>>,
     /// Units currently being discovered/elaborated, in entry-rooted edge order.
     active_imports: Vec<String>,
     /// Parent names in the closed prelude floor (`30-taxonomy §4`).
@@ -2053,9 +2050,6 @@ fn load_unit(
         elab.module_state
             .loaded_unit_scopes
             .insert(module.to_string(), scope);
-        elab.module_state
-            .loaded_unit_definitions
-            .insert(module.to_string(), unit_definitions);
         Ok((ids, results))
     })();
     let popped = elab.module_state.active_imports.pop();
@@ -2121,33 +2115,6 @@ pub(crate) fn execute_loaded_entry_checked_fences_v1(
                 "loaded module entry '{entry}' has no completed scope"
             ))
         })?;
-    let definitions = elab
-        .module_state
-        .loaded_unit_definitions
-        .get(entry)
-        .cloned()
-        .ok_or_else(|| {
-            ElabError::Internal(format!(
-                "loaded module entry '{entry}' has no completed definition set"
-            ))
-        })?;
-    // The loader resolves the entry under its dotted path, but a checked
-    // fence resolves at the anonymous root. Translate only this entry's own
-    // qualified keys; constructors are already unqualified on both routes.
-    let prefix = format!("{entry}.");
-    let mut seed = HashSet::new();
-    for name in definitions {
-        if let Some(relative) = name.strip_prefix(&prefix) {
-            seed.insert(relative.to_string());
-        } else if name.contains('.') {
-            return Err(ElabError::Internal(format!(
-                "loaded entry '{entry}' has definition outside its own path: '{name}'"
-            )));
-        } else {
-            seed.insert(name);
-        }
-    }
-    elab.module_state.package_definitions = seed;
     let previous = std::mem::replace(&mut elab.module_state.root_scope, scope);
     let result = elab.execute_ken_md_checked_fences_v1(&source, &extracted);
     elab.module_state.root_scope = previous;

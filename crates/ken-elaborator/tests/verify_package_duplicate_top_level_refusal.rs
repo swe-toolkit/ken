@@ -6,13 +6,13 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use ken_elaborator::ElabEnv;
 use ken_elaborator::checked_core::{StableSymbol, SymbolNamespace};
 use ken_elaborator::compiler_driver::{
     CompilerDriverError, CompilerManifest, CompilerSource, CompilerTargetKind, TargetSelector,
     compile_ken_package_sources, compile_ken_source,
 };
 use ken_elaborator::error::ElabError;
-use ken_elaborator::ElabEnv;
 
 const PKG: &str = "zz_adv_duplicate";
 const ADMITTED: &str = "```ken\nconst base : Bool = True\nconst main : Bool = base\n```\n";
@@ -26,7 +26,9 @@ fn selected_main() -> TargetSelector {
     }
 }
 
-fn compile_literate(src: &str) -> Result<ken_elaborator::compiler_driver::CompilerDriverOutput, CompilerDriverError> {
+fn compile_literate(
+    src: &str,
+) -> Result<ken_elaborator::compiler_driver::CompilerDriverOutput, CompilerDriverError> {
     compile_ken_source(PKG, CompilerSource::new("a.ken.md", src), selected_main())
 }
 
@@ -52,7 +54,10 @@ fn examples_and_plain_sources_refuse_duplicate_names() {
         let plain = compile_ken_package_sources(
             &CompilerManifest::new(PKG, Vec::new()),
             vec![
-                CompilerSource::new("a.ken", "const base : Bool = True\nconst main : Bool = base"),
+                CompilerSource::new(
+                    "a.ken",
+                    "const base : Bool = True\nconst main : Bool = base",
+                ),
                 CompilerSource::new("b.ken", format!("const {name} : Bool = False")),
             ],
             selected_main(),
@@ -68,9 +73,13 @@ fn examples_and_plain_sources_refuse_duplicate_names() {
 /// baseline vector for this one package, not every possible package name.
 #[test]
 fn unrelated_example_keeps_the_baseline_semantics_and_hash() {
-    let baseline = compile_literate(ADMITTED).expect("ordinary checked package").package;
+    let baseline = compile_literate(ADMITTED)
+        .expect("ordinary checked package")
+        .package;
     let with_example = format!("{ADMITTED}```ken example\nconst zz_other : Bool = False\n```\n");
-    let checked = compile_literate(&with_example).expect("independent example remains valid").package;
+    let checked = compile_literate(&with_example)
+        .expect("independent example remains valid")
+        .package;
     assert_eq!(baseline.core_semantic_hash, 0x5a7d30e41360596d);
     assert_eq!(checked.core_semantic_hash, baseline.core_semantic_hash);
     assert_eq!(checked.artifact.semantic, baseline.artifact.semantic);
@@ -81,32 +90,43 @@ impl Root {
     fn new() -> Self {
         let sequence = NEXT_ROOT.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!(
-            "ken-package-duplicate-{}-{sequence}", std::process::id()
+            "ken-package-duplicate-{}-{sequence}",
+            std::process::id()
         ));
         fs::create_dir_all(&path).expect("create package-root fixture");
         Self(path)
     }
 }
 impl Drop for Root {
-    fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); }
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
-/// MEASURED: a roots-loaded entry's compiled definition is visible to that
-/// entry's checked example, and the example is refused by the same typed
-/// duplicate check while an unrelated fresh example succeeds. CLAIMED:
-/// module-route fence checks cannot overwrite their own entry's declaration.
-/// THE GAP: this fixture has no dependency; the loader's stored set and its
-/// per-entry seed are the scope boundary checked in the module-route census.
+/// MEASURED: the loaded entry's scope resolves `base` to Entry.base, so
+/// prebinding rejects a second `base` with AmbiguousReference while an
+/// unrelated fresh example succeeds. CLAIMED: module-route checked fences
+/// cannot rebind their own entry's declarations. THE GAP: this earlier scope
+/// guard does not prove the package-route resolver's duplicate-set check.
 #[test]
 fn roots_entry_checked_fence_refuses_its_own_name() {
     let root = Root::new();
-    fs::write(root.0.join("Entry.ken.md"),
-        "```ken\nconst base : Bool = True\n```\n```ken example\nconst base : Bool = False\n```\n").unwrap();
+    fs::write(
+        root.0.join("Entry.ken.md"),
+        "```ken\nconst base : Bool = True\n```\n```ken example\nconst base : Bool = False\n```\n",
+    )
+    .unwrap();
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry").unwrap();
-    let error = env.execute_loaded_entry_checked_fences_v1("Entry").unwrap_err();
-    assert!(matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "base"),
-        "expected the entry's own name to collide, got {error:?}");
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .unwrap();
+    let error = env
+        .execute_loaded_entry_checked_fences_v1("Entry")
+        .unwrap_err();
+    assert!(
+        matches!(&error, ElabError::AmbiguousReference { name, sources, .. }
+        if name == "base" && sources == &["Entry.base", "base"]),
+        "entry scope must report the exact prebind collision, got {error:?}"
+    );
 }
 
 /// MEASURED: an entry's fresh checked example still elaborates after the
@@ -119,28 +139,38 @@ fn roots_entry_checked_fence_accepts_fresh_name() {
     fs::write(root.0.join("Entry.ken.md"),
         "```ken\nconst base : Bool = True\n```\n```ken example\nconst zz_fresh : Bool = False\n```\n").unwrap();
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry").unwrap();
-    let examples = env.execute_loaded_entry_checked_fences_v1("Entry")
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .unwrap();
+    let examples = env
+        .execute_loaded_entry_checked_fences_v1("Entry")
         .expect("fresh example name must remain legal after entry seeding");
     assert_eq!(examples.len(), 1);
     assert_eq!(examples[0].name, "zz_fresh");
 }
 
-/// MEASURED: a constructor recorded unqualified by the loaded entry is
-/// refused when a checked example family attempts that spelling. CLAIMED:
-/// module-route seeding retains unprefixed constructors, not only stripped
-/// entry-qualified declaration names. THE GAP: this observes one data family;
-/// package-route coverage has a separate constructor case.
+/// MEASURED: the loaded entry's constructor binding is visible in the
+/// checked fence scope, so a duplicate constructor is rejected by prebinding.
+/// CLAIMED: module-route checked fences cannot take an entry's constructor
+/// spelling. THE GAP: the package-route resolver pin below is independent.
 #[test]
 fn roots_entry_checked_fence_refuses_own_constructor() {
     let root = Root::new();
-    fs::write(root.0.join("Entry.ken.md"),
-        "```ken\ndata U = ZzBase | ZzOther\n```\n```ken example\ndata T = ZzBase | ZzQ\n```\n").unwrap();
+    fs::write(
+        root.0.join("Entry.ken.md"),
+        "```ken\ndata U = ZzBase | ZzOther\n```\n```ken example\ndata T = ZzBase | ZzQ\n```\n",
+    )
+    .unwrap();
     let mut env = ElabEnv::new().unwrap();
-    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry").unwrap();
-    let error = env.execute_loaded_entry_checked_fences_v1("Entry").unwrap_err();
-    assert!(matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "ZzBase"),
-        "entry constructor's root spelling must collide, got {error:?}");
+    env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
+        .unwrap();
+    let error = env
+        .execute_loaded_entry_checked_fences_v1("Entry")
+        .unwrap_err();
+    assert!(
+        matches!(&error, ElabError::AmbiguousReference { name, sources, .. }
+        if name == "ZzBase" && sources == &["Entry.ZzBase", "ZzBase"]),
+        "entry constructor's scope must refuse its own spelling, got {error:?}"
+    );
 }
 
 /// MEASURED: a failed negative fence does not enter the later example's
@@ -163,11 +193,15 @@ fn rejected_fence_does_not_reserve_its_failed_name() {
 #[test]
 fn example_repeated_constructor_name_is_refused() {
     let mut env = ElabEnv::new().unwrap();
-    let error = env.elaborate_ken_md_file(
-        "```ken\ndata U = ZzBase | ZzOther\n```\n```ken example\ndata T = ZzBase | ZzQ\n```\n"
-    ).unwrap_err();
-    assert!(matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "ZzBase"),
-        "expected the resolver's package-local constructor collision, got {error:?}");
+    let error = env
+        .elaborate_ken_md_file(
+            "```ken\ndata U = ZzBase | ZzOther\n```\n```ken example\ndata T = ZzBase | ZzQ\n```\n",
+        )
+        .unwrap_err();
+    assert!(
+        matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "ZzBase"),
+        "expected the resolver's package-local constructor collision, got {error:?}"
+    );
 }
 
 #[test]
@@ -176,6 +210,8 @@ fn uppercase_const_constructor_collision() {
     let mut env = ElabEnv::new().unwrap();
     let example = "```ken\nconst ZzK : Bool = True\n```\n```ken example\ndata T = ZzK | ZzR\n```\n";
     let error = env.elaborate_ken_md_file(example).unwrap_err();
-    assert!(matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "ZzK"),
-        "uppercase const and constructor must share the definition set, got {error:?}");
+    assert!(
+        matches!(&error, ElabError::DuplicateDefinition { name, .. } if name == "ZzK"),
+        "uppercase const and constructor must share the definition set, got {error:?}"
+    );
 }
