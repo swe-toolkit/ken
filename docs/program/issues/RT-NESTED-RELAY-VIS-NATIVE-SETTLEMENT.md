@@ -356,10 +356,11 @@ base, stop and report the mismatch.
 
 ## Hard-stop inventory
 
-- **§1a.** Question (4), E disposition and the D4 relay arm: 4
+- **§1a.** Question (4), E disposition and the D4 relay arm: 5
   (`evt_5sah7xb9543hp`, `evt_47yp5mk4wznjb`, `evt_3b7ws2dvx1r9v`,
-  `evt_4tbaxstk921c2`). The third put D4 on hold and called a research
-  advisory; the next research hold is at the sixth.
+  `evt_4tbaxstk921c2`, `evt_1pfhbxjg0f4he`). The third put D4 on hold
+  and called a research advisory; the next research hold is at the
+  sixth.
   Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
   `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
   research's advisory (`evt_4wcce8z24a4c9`, ruling `evt_5mgw5cwr993nd`);
@@ -424,6 +425,13 @@ base, stop and report the mismatch.
   cause, which recut (C) did not close. D4' (`evt_5hcnh155zmm5x`) is
   their structural closure: the drive is removed, not re-placed. §1b
   next fires at entry 9.
+- **8.** Relay admission (d) admits pairs whose candidate row has no
+  installed owner (AC-7 row 01, `fs-read-at-offset-single`: 735/Spec2
+  row 3 seat 190 and 846/Spec2 row 1 seat 174, row still green); D4'
+  named the installed owner as the settling route without measuring
+  that population -- keyed on the plan's row existence, not on the
+  route that performs the seat (`evt_1pfhbxjg0f4he`). AC-7 is paused
+  for one measurement (R1, R4, R5 and a D3 baseline; outcomes M1-M3).
 
 ## Finding outside this WP
 
