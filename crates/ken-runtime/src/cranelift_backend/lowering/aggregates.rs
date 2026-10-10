@@ -1433,33 +1433,21 @@ impl<'a> Lowering<'a> {
                          no source occurrence for it at that position",
                     ));
                 };
+                // A forwarded position (binder, projection, call or match
+                // result) has no producer of its own. Its held aggregate is
+                // checked against its own record in the recursive preflight;
+                // the lifetime fit at this position was checked above. A
+                // literal producer still requires its exact position record.
+                let position_is_producer = matches!(
+                    self.static_transition_plan.source_occurrence(child_origin)?,
+                    RuntimeExpr::Construct { .. } | RuntimeExpr::Record { .. }
+                );
+                if !position_is_producer {
+                    continue;
+                }
                 let expected = self
                     .static_transition_plan
-                    .source_aggregate_occurrence(child_origin, child_shape);
-                #[cfg(any(test, feature = "px8-ds-test-support"))]
-                if expected.is_err() && std::env::var_os("KEN_RELAY_D1_RECORD").is_some() {
-                    let held = child.source_aggregate_producer();
-                    let held_origin = held.map(|occ| self.static_transition_plan
-                        .aggregate_record_view(occ).map(|row| row.producer_origin()));
-                    let held_origin_value = held_origin.as_ref().and_then(|row|
-                        row.as_ref().ok().and_then(|origin| *origin));
-                    let pos_expr = format!("{:?}", self.static_transition_plan.source_occurrence(child_origin))
-                        .chars().take(200).collect::<String>();
-                    let held_expr = format!("{:?}", held_origin_value.map(|origin|
-                        self.static_transition_plan.source_occurrence(origin)))
-                        .chars().take(200).collect::<String>();
-                    eprintln!(
-                        "RELAY_D4_AGG_POS parent_origin={:?} position={} pos_origin={child_origin:?} pos_expr={pos_expr} held_occ={held:?} held_origin={held_origin:?} held_expr={held_expr} parent_fn={:?} held_fn={:?} drive_stack={:?} pos_membership={:?} held_membership={:?} defining_emission_owner={:?}",
-                        planned.producer_origin(), planned_child.position,
-                        planned.producer_origin().map(|origin| self.static_transition_plan.relay_d4_function_owner_for_probe(origin)),
-                        held_origin_value.map(|origin| self.static_transition_plan.relay_d4_function_owner_for_probe(origin)),
-                        relay_drive_stack(),
-                        self.static_transition_plan.relay_d4_source_membership_for_probe(child_origin),
-                        held_origin_value.map(|origin| self.static_transition_plan.relay_d4_source_membership_for_probe(origin)),
-                        self.defining_emission_owner,
-                    );
-                }
-                let expected = expected?;
+                    .source_aggregate_occurrence(child_origin, child_shape)?;
                 // ⭐ The child must carry the occurrence the planner planned AT
                 // THAT POSITION -- not merely some record of the same shape, and
                 // not the same producer's record reached from elsewhere in the
@@ -5636,11 +5624,19 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     }
 
     fn d7_forwarded_pair(first: RuntimeExpr, second: RuntimeExpr) -> RuntimeExpr {
+        d7_forwarded_pair_with_first_argument(first, second, RuntimeExpr::Var(1))
+    }
+
+    fn d7_forwarded_pair_with_first_argument(
+        first: RuntimeExpr,
+        second: RuntimeExpr,
+        first_argument: RuntimeExpr,
+    ) -> RuntimeExpr {
         let call = RuntimeExpr::Call {
             callee: Box::new(RuntimeExpr::DeclarationRef {
                 symbol: D7_PAIR_CALLEE.to_string(),
             }),
-            args: vec![RuntimeExpr::Var(1), RuntimeExpr::Var(0)],
+            args: vec![first_argument, RuntimeExpr::Var(0)],
         };
         let body = RuntimeExpr::Let {
             value: Box::new(first),
@@ -5673,6 +5669,20 @@ pub(in crate::cranelift_backend::lowering) mod tests {
                 default: ac_c7_trap(),
             }),
         }
+    }
+
+    /// The matched constructor's pattern-bound child crosses a declared-call
+    /// boundary inside a NEW source Construct: that parent's child position
+    /// is a Var, while the held aggregate retains its original producer.
+    fn d7_construct_with_forwarded_child() -> RuntimeExpr {
+        d7_forwarded_pair_with_first_argument(
+            d7_wrap("ctor:fixture::CallInput::Alpha"),
+            d7_wrap("ctor:fixture::CallInput::Beta"),
+            RuntimeExpr::Construct {
+                constructor: "ctor:fixture::CallInput::Wrap".to_string(),
+                args: vec![RuntimeExpr::Var(1)],
+            },
+        )
     }
 
     fn d7_forwarded_record_arguments() -> RuntimeExpr {
@@ -6003,6 +6013,23 @@ pub(in crate::cranelift_backend::lowering) mod tests {
     /// about a certificate substituted somewhere the source machine does not reach —
     /// `call_static_worker`'s fallback is the open one, and it is measured
     /// separately.
+    /// Promise class: durable behavioral invariant. A source Construct holding
+    /// a forwarded pattern-bound aggregate crosses a carried call boundary.
+    /// MEASURED: its planned Var position and the held value's source producer
+    /// differ, yet the real compile allocates. CLAIMED: a forwarded position
+    /// cannot require its own nonexistent producer identity. THE GAP: the
+    /// sibling-producer test independently guards literal producer positions.
+    #[test]
+    fn d7_forwarded_child_position_compiles_without_a_position_producer() {
+        let (result, hits, allocations, _) = d7_ownership_run(
+            &d7_construct_with_forwarded_child(),
+            GovernedAllocationMutation::None,
+        );
+        result.expect("a source Construct with a forwarded child compiles across the boundary");
+        assert_eq!(hits, 0, "the baseline must not substitute a sibling producer");
+        assert!(allocations > 0, "the carried boundary must allocate");
+    }
+
     #[test]
     fn a_sibling_aggregates_producer_certificate_is_refused_before_any_allocation() {
         for (label, program) in [
