@@ -275,18 +275,55 @@ base, stop and report the mismatch.
      lowering of a pair admitted with a route, where the call performs
      the operation before the continuation runs.
 
-6. **Seat-keyed refusal (`evt_4dv4h0199dsnh`, re-keyed
-   `evt_3y7fxd70stq3x`).** The drop is a property of the lowering, not
-   of admission: main, with no relay admission logic, and D3, which
-   admits 707/768, both drop the read. At every lowering seat that
-   consumes a producer whose constructor is a Vis carrying a host
-   operation without emitting it, the plan must hold a recorded
-   performing route for that (source, owner): a call into the outer
-   owner's already-emitted member, named before owner planes are built.
-   With no route, lowering refuses with the typed relay refusal and never
-   consumes silently. The refusal variant may be reused; its key is the
-   missing route at the seat, not D3's relay class. The returned-member
-   projection applies only to pairs with a route.
+6. **Seat-keyed planned trap (`evt_4dv4h0199dsnh`, re-keyed
+   `evt_3y7fxd70stq3x`, ruled `evt_2228y4p1zwgkg`).** The drop is a
+   property of the lowering, not of admission: main, with no relay
+   admission logic, and D3, which admits 707/768, both drop the read.
+   - **Plan fact, keyed on the entry edge (`evt_7pzcsgqvt0xs0`).**
+     `relay_route` is computed per (admitted pair, seat call identity)
+     from the plan's `selected_caller` map: the validated zip of
+     `static_response_owner_specializations` and the feasibility ledger,
+     keyed by `owner.selected_caller()`, which `responses.rs:4260` makes
+     a function. A seat identity with no entry edge has no route. One
+     with an edge selects, inside the entered owner's row and its
+     `pending_vis_record_protocol` successors, the single clause matching
+     the pair's (effect origin, operation); two clauses is a planner
+     error. No owner, effect or operation join key; the attribute-keyed
+     builders V1-V3 are discarded. Seats read this fact and never
+     discover it at lowering time.
+   - **Planned trap.** For each (pair, identity) with route none, the
+     planner registers a planned `RuntimeTrap` with code
+     `RuntimeTrapCode::MissingRuntimeMetadata` and the message
+     `"relay: forwarded host op <op> from source <origin> has no
+     performing route"`. No new ABI variant. Lowering resolves it through
+     `static_transition_plan.trap_identity(trap)?`. A selected-caller edge
+     never reaches the trap, so the trap cannot remove a call that
+     `validate_response_owner_call_coverage` requires.
+   - **At each consuming seat** (`claim_and_call_continuation`,
+     `active_transport`, `dispatch_fusion_owned_outer_realization`), a
+     route-none pair emits the trap, returns its status and records an
+     `Abort` frame terminal, the `seal_source_trap_branch` sequence
+     (`joins.rs:2802-2816`), and never consumes silently. Runs that never
+     reach the source are unchanged. The claim and fusion seats bind the
+     identity by `continuation_call_binding_for` on their four
+     coordinates; `active_transport` names the identity it consumes by
+     the same four.
+   - **Run order before the candidate.** Row 01 anchors: 735 routes to
+     member 2; 1115 routes to `StaticResponseOwnerId(0)`; 1164 and 1288
+     route; 846 has none; in-bounds BRANCHED 768 has none; the whole row
+     01 control is green. Then rows 01-36 and both variants re-derived per
+     (pair, identity): that none population is the refusal population of
+     record and supersedes the D0 (b) column. Then AC-MAIN, the mutant
+     and the controls.
+   - **Stops** (`evt_7pzcsgqvt0xs0`): an anchor disagrees; an entered
+     owner has no clause for the pair's (effect origin, operation); a
+     route-none (pair, identity) reached in an executed run performs
+     natively, or a routed one drops the op; `active_transport` has no
+     identity bindable by the four coordinates while an admitted pair
+     reaches it; any "no verified selected incoming call" failure.
+   - **Not a compile-time refusal**: that would redden 15 rows of tests
+     whose measured runs are correct, and the successor would turn them
+     back.
    - **D0, measurement only.** For every relay-admitted pair in the
      36-row census population plus in-bounds `BRANCHED_SCRUTINEE`:
      (a) the forwarded operation; (b) the emitted response-owner member
@@ -317,17 +354,32 @@ base, stop and report the mismatch.
      any of the three, is a stop to the Architect; no visit falsifies the
      seat-keyed design. Rows 25-36 follow, with pairs whose emitted
      handler is none reported separately.
-   - **This WP's landing cut is increment (i):** D1-D3, the D0
-     measurements and the seat-keyed refusal, with AC-MAIN asserting the
-     refusal. It closes the main defect. **Increment (ii), the performing
-     call route** that turns a refusal into a performed operation where
-     D0 (b) finds an emitted member, is a successor node, framed from
-     the D0 table; one that restructures the planner's build order
-     returns to the operator to size.
+   - **D0 complete and accepted** (`evt_3y63h26apw108`,
+     `evt_6jxckz0adhrbm`; table SHA-256 `c2b23461`). Rows 33 builds 1, 2
+     and 7 and row 35 build 5 are not lowered. The 11 row-36 pair-builds
+     leave by `deferred_handler_owned`, a performing route
+     (`drive_response_at_source` emits the planned op or refuses typed), so
+     they leave the refusal population and the seat list stays at three.
+   - **Release order is not this WP.** The depth-2 release flip on rows 01,
+     14, 17, 34 and both BRANCHED variants is the tracked
+     `RT-BRACKET-RELEASE-ORDER-PARITY` defect, owned by
+     `RT-BRACKET-CONTROL-REGION-IR` (`evt_5q52byr2tg4x2`); its rows are
+     recorded in `RT-BRACKET-LOWERING-AND-D0-REFUTER`. Parity here follows the
+     fleet rule: non-release events in order, release events as a set,
+     through the shared helpers in `rt_parity_native.rs`.
+   - **This WP's landing cut is increment (i):** D1-D3, `relay_drive_pair`
+     and the errors, the edge-keyed plan fact `relay_route`, and the
+     planned no-route trap at the three seats, with AC-MAIN, its mutant and the
+     four controls. The D0 census instruments are removed from the
+     candidate (saved as `D0-disposable-recorder-unfiltered.patch`). It
+     closes the main defect. **Increment (ii), route (C)**, emitting an
+     outer member that performs the forwarded op and retiring the traps,
+     is a successor node, framed from the D0 table; one that restructures
+     the planner's build order returns to the operator to size.
    - **Candidate gate.** No seat consumes a host-operation Vis without a
-     recorded route. A census row whose admitted pair's forwarded op
-     appears in neither trace is `vacuous for performance` and is not
-     coverage.
+     recorded route or the planned trap. A census row whose admitted
+     pair's forwarded op appears in neither trace is `vacuous for
+     performance` and is not coverage.
    - **The defect on main (`evt_3s45p56abgg27`).** Main `7a890f13d`
      builds in-bounds `BRANCHED_SCRUTINEE` natively and runs it to exit
      72 while dropping the forwarded FsReadAt the interpreter performs.
@@ -400,14 +452,21 @@ base, stop and report the mismatch.
     any trace difference. After all rows, the sum of (i) over every
     admitted pair must be above 0; a sum of 0 is a stop, because the gate
     never executed a relay source.
-- **AC-MAIN (`evt_3s45p56abgg27`).** A permanent test,
+- **AC-MAIN (`evt_3s45p56abgg27`, `evt_2228y4p1zwgkg`,
+  `evt_6jxckz0adhrbm`).** A permanent test,
   `branched_scrutinee_forwarded_read_is_performed_or_refused` in
   `crates/ken-cli/tests/rt_branched_scrutinee_unit_body_port.rs`, runs
-  the in-bounds variant. It is red on main because the native ops
-  differ from the interpreter's, never through the exit code. On the
-  candidate (increment i) it asserts the native build is refused with
-  the typed relay refusal at the consuming seat; increment (ii) turns it
-  into equal op lists with FsReadAt performed through the route.
+  the in-bounds variant. Native stops with exactly the planned relay trap
+  identity; its non-release events before the trap equal, in order, the
+  interpreter's non-release prefix before `FsReadAt`; `FsReadAt` does not
+  appear natively. Releases after the trap are compared as a set through
+  the shared helpers, never ordered. Main (rc 72, no `FsReadAt`) cannot
+  pass it. Increment (ii) turns it into parity with `FsReadAt` performed.
+  - **Mutant (QA).** Deleting the trap emission returns the run to rc 72
+    with no `FsReadAt`, and AC-MAIN reddens.
+  - **Controls.** The four executed green tests whose source is not
+    reached (row 01 builds 0 and 2, rows 14 and 17) compare equal before
+    and after the change through the same shared helpers.
 - **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
   census pair (span owner 4, source 1374) fires the typed refusal for that
   owner and reddens AC-1, and is restored byte-identically.

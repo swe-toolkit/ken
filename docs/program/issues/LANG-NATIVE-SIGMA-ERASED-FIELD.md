@@ -1,7 +1,7 @@
 ---
 id: LANG-NATIVE-SIGMA-ERASED-FIELD
 title: "Native lowering of a relevant Σ lowers its first field unconditionally, so a proof-first relevant Σ (Σ(p : Eq Int 7 7).Int) reaches the ErasedOmegaSubterm arm and refuses natively, although the plan keeps the pair and the interpreter returns Pair { fst: Neutral, snd: Int(8) }. Give an erased field in a retained Σ slot a native representation at interpreter parity"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -121,3 +121,18 @@ base, stop and report the mismatch.
 Carry, no node yet: the interpreter returns `fst: Neutral` for the erased
 slot, where spec 47 says erased subterms evaluate to canonical `tt`. AC-1
 compares only the second component (`evt_1dxqw8zq8gcwy`).
+
+## Closeout
+
+Merged `665228a3e` from exact `a30856b39` (PR #4649). Language QA
+`evt_z06bjr26xxhd`, Architect `evt_1avhca3878rx7`, Decision
+`dec_337hgp0p5s9aq`. Ruled (iii): an erased Σ field has no native slot.
+The `StructuralPair` arm skips a plan-classified `ErasedOmegaSubterm`
+child and keeps the survivor under its own name; sigma-headed `proj1`/
+`proj2` on `Variable` and `DirectDeclarationCall` bases decode as
+`StructuralFirstProjection` or the new `StructuralSecondProjection`; a
+forced first projection onto the proof-first pair refuses typed. Plan
+bytes and semantic hashes are unchanged. No hard stops.
+
+Carry, no node: the interpreter's erased slot is `Neutral` where spec 47
+says canonical `tt` (above).

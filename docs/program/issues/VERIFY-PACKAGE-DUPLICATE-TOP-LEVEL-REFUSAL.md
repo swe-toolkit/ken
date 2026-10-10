@@ -81,6 +81,14 @@ an admitted declaration's spelling.
   `data T = ZzBase | ZzQ`) gives the same for `ZzBase`, and a fresh name
   `zz_fresh` stays Ok. Consumers asserting the generic example error are
   migrated or are a stop.
+- **AC-1a (test consumers, PR #4648 red, `evt_1za9gv23ehmzd`).** A test
+  that re-admits a fixed name on one env is migrated to distinct names,
+  never to the session entry (inventory `evt_t9hn8e3qwg1x`: 0
+  session-style). Two paths join the scope:
+  `ken-elaborator/tests/l3_strings_roundtrip_acceptance.rs` indexes
+  `t_ac1`, `t_ac2`, `t_ac3` and `t_ac3_guard` per corpus row (suite 9/9),
+  and `ken-interp/tests/omega_erasure_cache_rollback.rs` gives its second
+  declaration a fresh name and keeps the same-`GlobalId` assertion (1/1).
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
   their results. `rt_dasm_d1b_role_a_role_authority` is green with its
