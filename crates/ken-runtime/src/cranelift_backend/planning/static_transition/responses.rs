@@ -1297,10 +1297,12 @@ type HostResponseRoutes = BTreeMap<StaticOriginId, BTreeMap<RuntimeSymbol, HostR
 mod relay_settlement;
 
 /// An admission key for a source Vis and enclosing response emission owner.
-/// Static producer fusion must consume the forwarded relay at the source;
-/// the source row's installed response owner performs its effect. The pair
-/// alone establishes a uniquely seated candidate, not execution or an
-/// installed-owner witness (the D4' census checks the latter).
+/// Static producer fusion consumes the forwarded relay at the source, so the
+/// admitted owner's returned set omits it. The pair establishes a uniquely
+/// seated candidate, not a settling route or execution: a relay that still
+/// reaches the owner at runtime takes the owner loop's unknown-member exit,
+/// which returns the invalid status. The D4' census measures that exit and
+/// the source's execution at runtime, not which function emits the seat.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct RelayDrivePair {
     pub(in crate::cranelift_backend) source: StaticOriginId,
