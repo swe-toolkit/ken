@@ -4,11 +4,12 @@
 > SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT;
 > SPEC-FORMAL-LANGUAGES-NFA-CONTRACT;
 > SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT;
-> SPEC-FORMAL-LANGUAGES-MINIMISATION-CONTRACT).** Sections 1–3 specify Dfa,
-> finite reachability, and Nfa; section 4 specifies Regex; section 5
-> specifies Dfa equivalence and canonical-representative minimisation.
-> Section 6 remains deferred. A contract does not itself claim package
-> delivery. No kernel, trust, or surface-syntax change is introduced.
+> SPEC-FORMAL-LANGUAGES-MINIMISATION-CONTRACT;
+> SPEC-FORMAL-LANGUAGES-LEXER-BRIDGE-CONTRACT).** Sections 1–3 specify
+> Dfa, finite reachability, and Nfa; section 4 specifies Regex; section 5
+> specifies Dfa equivalence and minimisation; section 6 specifies cursor
+> elements and a DFA lexer-input bridge. A contract does not itself claim
+> package delivery. No kernel, trust, or surface-syntax change is introduced.
 
 A deterministic automaton describes a transition for every state and input
 symbol and a Boolean acceptance test. Its state carrier need not be finite:
@@ -1071,8 +1072,168 @@ is silently provided by this package. A future implementation of a
 faster algorithm must still prove the **same eight laws**.
 
 
-## 6. Lexer input bridge (deferred)
+## 6. Cursor elements and the lexer input bridge
 
-A later `Bytes`/`Cursor` runner bridge for `Capability.Parsing` lexers will
-relate byte-runner results to `run` over the corresponding byte list.
-Sections 1–5 use `List a` only and make no byte/lexer claim.
+This section specifies two package changes: an element-list view in
+`Capability.Parsing.Cursor` and a streaming DFA runner in the new
+`Capability.Parsing.Lexer`. The cursor view is independent of automata;
+Lexer imports `Algorithm.FormalLanguages.Dfa` and
+`Capability.Parsing.Cursor`, never the other way round. Neither Dfa nor
+Cursor imports Lexer, and no package under `Algorithm/` must depend on
+`Capability.*` to implement this bridge. The shared cursor interface is
+polymorphic in cursor state `c`, element `el`, and location `loc`; the
+argument-byte cursor instantiates it at `ArgCursor`, `UInt8`, and
+`ArgLocation`. The bridge does not make `Bytes` the alphabet of every DFA.
+
+### 6.1 Cursor element list (`Capability.Parsing.Cursor`)
+
+Four public declarations extend Cursor's existing 17-name surface to
+**exactly 21**. `CursorOps c el loc` already supplies
+`cursor_remaining : c → Nat`, `cursor_peek : c → Option el`, and
+`cursor_advance : c → c` through its public selectors in the landed
+Cursor package. The definitions below fix two operations;
+`cursor_take` is structurally recursive on its `fuel` and has no
+caller-supplied claim about progress.
+
+```ken
+pub fn cursor_take
+  (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc)
+  (fuel : Nat) (cur : c) : List el
+
+pub fn cursor_elements
+  (c : Type) (el : Type) (loc : Type) (ops : CursorOps c el loc)
+  (cur : c) : List el
+```
+
+`cursor_take ops Zero cur = Nil el`. For `Suc fuel`, a peek of `None`
+returns `Nil el`, while a peek of `Some x` returns `Cons el x` followed
+by `cursor_take ops fuel (cursor_advance ops cur)`. Thus neither a
+successful peek nor a stuck `cursor_advance` grants extra fuel. The
+public view is **exactly**
+`cursor_elements ops cur = cursor_take ops (cursor_remaining ops cur) cur`.
+This list contains the elements consumed by that bounded scan; its
+relation to an unbounded cursor traversal requires laws, not merely
+this definition. Both operations use the existing Cursor imports.
+
+The other two public declarations are **proved theorems**, not
+unchecked assumptions. Their explicit types pin the end and step
+observations of the cursor's remaining element list:
+
+```ken
+pub theorem cursor_elements_peek_none
+  (c : Type) (el : Type) (loc : Type)
+  (ops : CursorOps c el loc) (cur : c) :
+  Equal (Option el) (cursor_peek c el loc ops cur) (None el) →
+  Equal (List el) (cursor_elements c el loc ops cur) (Nil el)
+
+pub theorem cursor_elements_peek_some
+  (c : Type) (el : Type) (loc : Type)
+  (ops : CursorOps c el loc) (laws : CursorLaws c el loc ops)
+  (cur : c) (x : el) :
+  Equal (Option el) (cursor_peek c el loc ops cur) (Some el x) →
+  Equal (List el)
+    (cursor_elements c el loc ops cur)
+    (Cons el x
+      (cursor_elements c el loc ops (cursor_advance c el loc ops cur)))
+```
+
+The `None` law needs no `CursorLaws`: a scan stops at the first empty
+peek even when fuel remains. The `Some` law **does** require
+`CursorLaws` and uses only its `CursorAdvanceProgress` conjunct. A
+successful peek makes the next remaining count strictly smaller;
+that progress relates the scan with one fuel unit removed to
+`cursor_elements` at the advanced cursor. These two equations specify
+the full remaining element list by descent on `cursor_remaining` for
+a lawful cursor. In particular, they do not assert that a successful
+peek yields the same unfold equation for arbitrary, possibly stuck
+`CursorOps`. With `remaining = 1`, `peek = Some True`, and an advance
+that returns the same `Unit` cursor, `cursor_elements` is `[True]` but
+`Cons True (cursor_elements (advance cur))` is `[True, True]`.
+
+The CAT delivery of this section must also update the exact
+loader-visible Cursor inventory in
+`crates/ken-elaborator/src/r_layer_tests/cat_tier_d_cursor_import.rs`
+from 17 to 21. This is an implementation pin, not a fifth operation
+or an edit to that test by the Spec candidate.
+
+### 6.2 Streaming DFA (`Capability.Parsing.Lexer`)
+
+Lexer imports Dfa's `Dfa`, `accepts`, `final`, `run`, `start`, and `step`;
+Cursor's `CursorOps`, `cursor_advance`, `cursor_elements`, `cursor_peek`,
+`cursor_remaining`, and `cursor_take`; and the checked equality
+transport `cong`. Its entire public surface consists of the following
+two operations and two proved bridge laws:
+
+```ken
+pub fn dfa_cursor_run
+  (q : Type) (c : Type) (el : Type) (loc : Type)
+  (d : Dfa q el) (ops : CursorOps c el loc) (s : q) (cur : c) : q
+
+pub fn dfa_cursor_accepts
+  (q : Type) (c : Type) (el : Type) (loc : Type)
+  (d : Dfa q el) (ops : CursorOps c el loc) (cur : c) : Bool
+
+pub theorem dfa_cursor_run_elements
+  (q : Type) (c : Type) (el : Type) (loc : Type)
+  (d : Dfa q el) (ops : CursorOps c el loc) (s : q) (cur : c) :
+  Equal q
+    (dfa_cursor_run q c el loc d ops s cur)
+    (run q el d s (cursor_elements c el loc ops cur))
+
+pub theorem dfa_cursor_accepts_elements
+  (q : Type) (c : Type) (el : Type) (loc : Type)
+  (d : Dfa q el) (ops : CursorOps c el loc) (cur : c) :
+  Equal Bool
+    (dfa_cursor_accepts q c el loc d ops cur)
+    (accepts q el d (cursor_elements c el loc ops cur))
+```
+
+`dfa_cursor_run` starts in the supplied state `s`. Its private scan is
+fueled **internally** by `cursor_remaining ops cur`; at zero fuel or
+`peek = None`, it returns that state. On `peek = Some x` with fuel
+remaining, it moves to `step d s x`, advances the cursor, and recurs
+with one less fuel. It reads elements by `cursor_peek` and
+`cursor_advance` rather than materialising `cursor_elements` as a
+list. `dfa_cursor_accepts` is exactly
+`final d (dfa_cursor_run d ops (start d) cur)`: `True` is acceptance,
+`False` is rejection. No caller supplies fuel, `Finite`, `DecEq`,
+`CursorLaws`, or an end cursor; neither operation returns an end cursor.
+
+Both bridge equalities hold for **any** `CursorOps`, with no law
+argument. Induction on the shared fuel relates the runner's state to
+§6.1's bounded list and §1's `run`; applying `final` from the start
+state yields the Boolean bridge. The bridge does not claim that an
+arbitrary unlawful cursor exposes a further unbounded stream. For a
+lawful cursor, §6.1's `None`/`Some` theorems additionally justify
+reading `cursor_elements` as its remaining input. In particular,
+`arg_cursor_laws` supplies such an instance for the existing argument
+byte cursor; this **does not** establish a theorem comparing it with
+a different cursor instance or relating their locations.
+
+### 6.3 Trust boundary and deferred behavior
+
+For `q`, `c`, `el`, and `loc : Type` at level zero, `List el` and the
+runner state `q` are ordinary data. `Equal (List el)`, `Equal q`, and
+`Equal Bool` are checked `Omega` propositions; the implication from
+a checked peek equation to a list equation remains in `Omega` by the
+predicative maximum. No proof value is coerced into the runtime byte
+stream. The four public theorems here must have checked proof bodies;
+`Axiom`, a postulate, an open obligation, or a new `trusted_base()`
+entry cannot implement them. The separate Architect D0 development
+checked with rc=0 and no new trusted entry demonstrates feasibility,
+not that this CAT delivery or its seed has executed. No kernel
+primitive, declaration kind/form, reduction rule, prelude identity,
+or surface-syntax change is introduced.
+
+This bridge processes the complete bounded input, not the **longest
+accepted prefix**: maximal munch and its end cursor need a separate
+maximality law in a later tokeniser contract. Tokenising an entire
+input, mapping source locations into diagnostics (`cursor_locate` is
+unused here), and comparing locations across cursor instances remain
+deferred. So do a generic equation for
+`cursor_elements (arg_cursor_start args)` as the concatenation of
+`bytes_to_list` for every argument, a list-backed cursor instance, and
+kernel-checked literal byte examples: the byte conversions are
+conversion-opaque. Closed byte examples in the conformance seed are
+**runtime oracles**, not `Proved` theorems. Sections 1–5 retain their
+`List a` semantics independently of this bridge.
