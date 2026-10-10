@@ -661,6 +661,37 @@ fn a_fixed_instance_argument_matches_an_alias_by_global_identity() {
     );
 }
 
+/// Promise class: durable invariant. MEASURED: package units re-entering Foo
+/// and Marker are refused before either checked owner can be displaced.
+/// CLAIMED: the session rebinding guards below do not weaken package refusal.
+/// THE GAP: this pins these two carriers, not every possible declaration head.
+#[test]
+fn package_route_refuses_rebound_instance_carriers() {
+    let mut env = ElabEnv::new().expect("base environment");
+    env.elaborate_file(
+        "data Marker : Type where { MkMarker : Marker } \
+         data Foo : Type where { MkFoo : Foo }",
+    )
+    .expect("first checked carriers");
+    for (name, source) in [
+        ("Marker", "data Marker : Type where { MkMarker2 : Marker }"),
+        ("Foo", "data Foo : Type where { MkFoo2 : Foo }"),
+    ] {
+        let original = env.globals[name];
+        let error = env
+            .elaborate_decl(source)
+            .expect_err("package duplicate must refuse");
+        assert!(
+            matches!(error, ken_elaborator::ElabError::DuplicateDefinition { name: ref rejected, .. } if rejected == name),
+            "package duplicate for {name} must be typed: {error:?}"
+        );
+        assert_eq!(
+            env.globals[name], original,
+            "old {name} owner remains bound"
+        );
+    }
+}
+
 // Promise class: durable invariant. A fixed checked argument is matched by ID
 // before a stale builder can reach carrier confirmation.
 #[test]
@@ -676,9 +707,15 @@ fn a_rebound_fixed_argument_is_refused_before_builder_selection() {
     ))
     .expect("the first file registers the generic fixed-argument instance");
 
+    let old_marker = env.globals["Marker"];
+    env.elaborate_session_decl_results_v1("data Marker : Type where { MkMarker2 : Marker }")
+        .expect("an interactive declaration rebinds Marker with a new checked ID");
+    assert_ne!(
+        env.globals["Marker"], old_marker,
+        "interactive Marker has a distinct GlobalId"
+    );
     let result = env.elaborate_file(
-        "data Marker : Type where { MkMarker2 : Marker } \
-         import Core.Operators.Standard (≤) \
+        "import Core.Operators.Standard (≤) \
          fn rebound \
            (x : Carrier Bool Marker) \
            (y : Carrier Bool Marker) : Bool = x ≤ y",
@@ -790,9 +827,15 @@ fn a_rebound_carrier_name_is_refused_before_dictionary_selection() {
     ))
     .expect("the first file registers `Ord Foo` for the original `Foo`");
 
+    let old_foo = env.globals["Foo"];
+    env.elaborate_session_decl_results_v1("data Foo : Type where { MkFoo2 : Foo }")
+        .expect("an interactive declaration rebinds Foo with a new checked ID");
+    assert_ne!(
+        env.globals["Foo"], old_foo,
+        "interactive Foo has a distinct GlobalId"
+    );
     let rebound = env.elaborate_file(
-        "data Foo : Type where { MkFoo2 : Foo } \
-         import Core.Operators.Standard (≤) \
+        "import Core.Operators.Standard (≤) \
          fn f (a : Foo) (b : Foo) : Bool = a ≤ b",
     );
     let error = rebound.expect_err(
