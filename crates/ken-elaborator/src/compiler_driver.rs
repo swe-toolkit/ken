@@ -2324,17 +2324,21 @@ pub fn prepare_native_program_sources(
         .map_err(CompilerDriverError::Elaboration)
         .map_err(NativeProgramBuildError::Driver)?;
     let mut admitted_ids = Vec::new();
+    let mut example_ids = BTreeSet::new();
     let mut results = Vec::new();
     for source in &sources {
-        let source_results = if source.name.ends_with(".ken.md") {
-            env.elaborate_ken_md_file_v1(&source.text)
+        let (declarations, examples, source_example_ids) = if source.name.ends_with(".ken.md") {
+            env.elaborate_ken_md_file_parts(&source.text)
         } else {
             env.elaborate_file_v1(&source.text)
+                .map(|declarations| (declarations, Vec::new(), Vec::new()))
         }
         .map_err(CompilerDriverError::Elaboration)
         .map_err(NativeProgramBuildError::Driver)?;
-        admitted_ids.extend(source_results.iter().map(|result| result.def_id));
-        results.extend(source_results);
+        admitted_ids.extend(declarations.iter().map(|result| result.def_id));
+        example_ids.extend(source_example_ids);
+        results.extend(declarations);
+        results.extend(examples);
     }
     let obligations = owned_v2_obligations(&results);
     let open_obligation_reports = crate::render_open_obligations(&results);
@@ -2358,7 +2362,12 @@ pub fn prepare_native_program_sources(
     // The production package owns the exact live-environment closure, including
     // prelude definitions referenced by `main`; source-only generic packages
     // deliberately retain their narrower historical emission surface.
-    admitted_ids.extend(env.env.decls().map(Decl::id));
+    admitted_ids.extend(
+        env.env
+            .decls()
+            .map(Decl::id)
+            .filter(|id| !example_ids.contains(id)),
+    );
     admitted_ids.sort();
     admitted_ids.dedup();
     let mut package = emit_package_from_env(
@@ -2367,7 +2376,7 @@ pub fn prepare_native_program_sources(
         &env,
         &admitted_ids,
         &obligations,
-        &BTreeSet::new(),
+        &example_ids,
         Some(plan_bytes),
     )
     .map_err(NativeProgramBuildError::Driver)?;
@@ -8115,5 +8124,102 @@ const zz_example : String = ac0_need
             example.package.core_semantic_hash,
             plain.package.core_semantic_hash
         );
+    }
+}
+
+#[cfg(test)]
+mod native_program_example_exclusion {
+    use super::*;
+
+    const PKG: &str = "verify_native_example_exclusion";
+    const PLAIN: &str = "```ken\nconst base : Bool = True\n```\n";
+    const WITH_EXAMPLE: &str = "```ken\nconst base : Bool = True\n```\n\
+        ```ken example\nconst zz_ex : Bool = base\n```\n";
+    const MAIN: &str = "program capabilities FS APartial\n\
+        fn main (_input : ProcessInput) (_caps : ProgramCaps APartial)\n\
+          : HostIO APartial ExitCode = host_exit APartial Success\n";
+
+    fn sources(first: &str, main: &str) -> Vec<CompilerSource> {
+        vec![
+            CompilerSource::new("src/dependency.ken.md", first),
+            CompilerSource::new("src/main.ken", main),
+        ]
+    }
+
+    // Baseline provisioning for native preparation, not a repair to an
+    // existing test: the analogous native-preparation control in checked_core
+    // measured 3,936 KiB resident on a fixed 256 MiB Builder stack, leaving
+    // 258,208 KiB of numerical headroom. The default 2 MiB harness stack
+    // overflows on this new full-program preparation fixture.
+    fn on_native_stack(f: impl FnOnce() + Send + 'static) {
+        std::thread::Builder::new()
+            .stack_size(256 * 1024 * 1024)
+            .spawn(f)
+            .expect("spawn native preparation worker")
+            .join()
+            .expect("native preparation worker panicked");
+    }
+
+    /// Promise class: durable invariant. MEASURED: the same two-source native
+    /// program emits the same semantic package, entrypoint plan and checked
+    /// host spine with or without a checked example fence. CLAIMED: example
+    /// declarations never ship, while ordinary source and prelude bindings do.
+    /// THE GAP: the sibling refusal test covers a main that actually reaches
+    /// the excluded binding rather than simply never mentioning it.
+    #[test]
+    fn two_source_native_program_excludes_example_without_changing_plan_or_spine() {
+        on_native_stack(|| {
+            let plain = prepare_native_program_sources(PKG, sources(PLAIN, MAIN))
+                .expect("ordinary native preparation");
+            let example = prepare_native_program_sources(PKG, sources(WITH_EXAMPLE, MAIN))
+                .expect("a checked example does not enter the native package");
+            let symbol = StableSymbol::declaration(PKG, &[], "zz_ex");
+            let base = StableSymbol::declaration(PKG, &[], "base");
+            let semantic = &example.package.artifact.semantic;
+            let baseline = &plain.package.artifact.semantic;
+            assert!(semantic.declarations.contains_key(&base));
+            assert!(!semantic.declarations.contains_key(&symbol));
+            assert!(!semantic.symbols.contains(&symbol));
+            assert_eq!(semantic, baseline);
+            assert_eq!(
+                example.package.core_semantic_hash,
+                plain.package.core_semantic_hash
+            );
+            assert_eq!(example.plan_bytes(), plain.plan_bytes());
+            let spine = StableSymbol::new(
+                SymbolNamespace::Metadata,
+                vec![PKG.to_string(), "HostEffectSpineV1".to_string()],
+            );
+            assert!(semantic.metadata.contains_key(&spine));
+            assert_eq!(semantic.metadata[&spine], baseline.metadata[&spine]);
+        });
+    }
+
+    /// Promise class: durable invariant. MEASURED: a main in the second source
+    /// naming a checked example in the first receives the typed outside-package
+    /// refusal before native preparation can return a package. CLAIMED: no
+    /// dangling example dependency is laundered into native output. THE GAP:
+    /// the companion admission test proves ordinary two-source main succeeds.
+    #[test]
+    fn native_main_referencing_example_refuses_before_emit() {
+        on_native_stack(|| {
+            let main = MAIN.replace(
+                "host_exit APartial Success",
+                "host_exit APartial (match zz_ex { True |-> Success; False |-> Failure 1 })",
+            );
+            let error = prepare_native_program_sources(PKG, sources(WITH_EXAMPLE, &main))
+                .expect_err("a main cannot depend on an unshipped example");
+            let NativeProgramBuildError::Driver(
+                CompilerDriverError::PackageReferenceOutsidePackage {
+                    declaration,
+                    referenced,
+                },
+            ) = error
+            else {
+                panic!("expected typed package closure refusal, got {error:?}");
+            };
+            assert_eq!(declaration, StableSymbol::declaration(PKG, &[], "main"));
+            assert_eq!(referenced, StableSymbol::declaration(PKG, &[], "zz_ex"));
+        });
     }
 }
