@@ -515,6 +515,21 @@ impl ElabEnv {
         modules::expand_and_elaborate(self, &decls)
     }
 
+    /// Elaborate one interactive-session declaration. A session is not a
+    /// package: a re-entered name shadows the earlier binding (the REPL's
+    /// redefinition policy), so the package duplicate set neither seeds nor
+    /// records session names. Duplicates within the one declaration are still
+    /// refused by the unit's own resolver set.
+    pub fn elaborate_session_decl_results_v1(
+        &mut self,
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        let package = std::mem::take(&mut self.module_state.package_definitions);
+        let result = self.elaborate_decl_results_v1(src);
+        self.module_state.package_definitions = package;
+        result
+    }
+
     /// Elaborate zero or more declarations from source, in order.
     ///
     /// Each declaration is elaborated and registered in `self.env` before the
@@ -919,5 +934,31 @@ mod package_definition_boundary_tests {
         env.elaborate_file("const zz_transient : Bool = False")
             .expect("a failed transaction must not reserve the name");
         assert!(env.module_state.package_definitions.contains("zz_transient"));
+    }
+
+    /// Promise class: durable invariant. MEASURED: session success and
+    /// failure leave an existing package name reserved while adding no session
+    /// name; a later package unit still refuses its original duplicate.
+    /// CLAIMED: the session route cannot erase or augment a package's name set.
+    /// THE GAP: the REPL's do_def routing is pinned in its own behavioral test.
+    #[test]
+    fn session_elaboration_does_not_change_package_membership() {
+        let mut env = ElabEnv::new().expect("complete prelude registration");
+        env.elaborate_file("const zz_package : Bool = True")
+            .expect("first package declaration");
+        let names = env.module_state.package_definitions.clone();
+        env.elaborate_session_decl_results_v1("const zz_session : Bool = True")
+            .expect("interactive declaration");
+        assert_eq!(env.module_state.package_definitions, names);
+        assert!(env
+            .elaborate_session_decl_results_v1("const zz_bad : Bool = Missing")
+            .is_err());
+        assert_eq!(env.module_state.package_definitions, names);
+        let error = env.elaborate_file("const zz_package : Bool = False")
+            .expect_err("a package duplicate must still refuse after the session call");
+        assert!(matches!(
+            error,
+            super::ElabError::DuplicateDefinition { name, .. } if name == "zz_package"
+        ));
     }
 }
