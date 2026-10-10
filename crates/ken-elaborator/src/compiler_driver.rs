@@ -3373,7 +3373,8 @@ fn collect_runtime_support_from_term(
             collect_runtime_support_from_term(first, support);
             collect_runtime_support_from_term(second, support);
         }
-        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair)
+        | CheckedCoreBodyTerm::StructuralSecondProjection(pair) => {
             support.insert(ExecutableRuntimeSupport::RecordsSigma);
             collect_runtime_support_from_term(pair, support);
         }
@@ -5002,7 +5003,8 @@ fn collect_runtime_declaration_dependencies(
             collect_runtime_declaration_dependencies(first, dependencies);
             collect_runtime_declaration_dependencies(second, dependencies);
         }
-        CheckedCoreBodyTerm::StructuralFirstProjection(pair) => {
+        CheckedCoreBodyTerm::StructuralFirstProjection(pair)
+        | CheckedCoreBodyTerm::StructuralSecondProjection(pair) => {
             collect_runtime_declaration_dependencies(pair, dependencies);
         }
         CheckedCoreBodyTerm::RecordSigmaConstruction(view) => {

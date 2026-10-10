@@ -283,8 +283,9 @@ pub fn is_omega_classified(env: &GlobalEnv, ctx: &Context, ty: &Term) -> Result<
 
 /// Build the plan from a closed, already admitted body and its checked type.
 /// Introduction forms are checked bidirectionally: the kernel does not infer
-/// the type of a bare lambda, pair or refl. An unavailable expected type is a
-/// refusal, never a guess that the position is computationally relevant.
+/// the type of a bare lambda, pair or refl. A bare lambda with no expected
+/// type remains relevant; a shape that cannot be classified safely refuses
+/// rather than guessing that the position is computationally relevant.
 pub fn omega_erasure_plan(
     env: &GlobalEnv,
     body: &Term,
