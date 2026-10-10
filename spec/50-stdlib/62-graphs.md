@@ -154,13 +154,17 @@ pub fn all_edges_forward
 ```
 
 `contains d x xs` scans `xs` with `d.eq x` and is `True` exactly when
-some list entry is equal to `x`. `before d x y xs` is `True` exactly
-when the **first occurrence** of `x` precedes a later occurrence of
-`y`; it is `False` if an earlier occurrence of `y` intervenes, if
-one is missing, or if `x = y`. `no_duplicates d xs` rejects any
-repeated vertex according to `d.eq`. These are ordinary transparent
-Boolean list scans, not a new primitive. The two proposition-valued
-predicates are fixed by:
+some list entry is equal to `x`. `before d x y xs` scans for the first
+entry equal to **either** `x` or `y`: it returns `True` exactly when
+that entry equals `x` but not `y` and some entry equal to `y` occurs
+later in the list. It returns `False` if `y` occurs first, either
+vertex is absent, or `x = y`, even if a later occurrence of `y`
+follows `x`. For `q = Bool`, `d = DecEq_instance_Bool` gives
+`before d True False [False, True, False] = False`; an earlier
+`False` is not erased by a later one.
+`no_duplicates d xs` rejects any repeated vertex according to
+`d.eq`. These are ordinary transparent Boolean list scans, not a
+new primitive. The two proposition-valued predicates are fixed by:
 
 ```ken
 all_vertices q d xs =

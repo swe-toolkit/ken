@@ -10,9 +10,13 @@ run this seed or deliver `Algorithm.Graphs.Dependency`. The author's
 scratch used an existing Oct 6 CLI binary, not a freshly built CLI on
 the candidate base. The three shared fixture code fences were appended
 to a separate copy of that scratch and `ken check` returned rc=0; that
-checks fixture typing only. No execution of the cases, Cargo test, CI
-result, catalog build, or publication is claimed. Each case's promise class
-is **durable invariant**: it observes computed reach decisions,
+checks fixture typing only. A separate copy of the checked scratch
+also accepted eight closed `Proved` equations for the public list
+predicates; changing the duplicate-list `before` oracle from `False`
+to `True` kernel-rejected. Those checks do not execute these cases
+against a delivered CAT package. No Cargo test, CI result, catalog
+build, or publication is claimed. Each case's promise class is
+**durable invariant**: it observes computed reach decisions,
 constructor alternatives, genuine witness edges, or order validity,
 not a milestone census or a source-file spelling.
 
@@ -211,6 +215,71 @@ certificate are local fixture data, not new axioms or trust entries.
 - why: sorting the raw three entries without deduplication yields a
   repeated `True`, failing the public uniqueness field.
 
+### stdlib/graphs/before-first-of-either-on-duplicate-input
+
+- spec: `spec/50-stdlib/62-graphs.md` §1.3.
+- promise class: durable invariant.
+- given: evaluate public `before Bool DecEq_instance_Bool True False`
+  on `[False, True, False]` and `[True, False, False]`. The lists
+  have the same entries with the same multiplicities; only their
+  first two positions are swapped. Also evaluate `before False True`
+  on the first list and `before True True` on the second.
+- expect: `before True False [False, True, False] = False`, while
+  `before True False [True, False, False] = True`. On the first list,
+  `before False True = True`. `before True True = False` even though
+  its list contains a `True`. These statements hold for the public
+  predicate on **arbitrary lists**, not only `TopoOrder` outputs.
+- measured: the first-of-either comparison on two duplicate-containing
+  lists that both contain an occurrence of `False` after `True`.
+- claimed: an earlier `y` determines `before x y = False`, even when
+  a later `y` follows `x`; the predicate never silently discards the
+  earlier `y` or relies on order-list uniqueness.
+- the gap: a closed Bool pair cannot prove the list scan for every
+  carrier and `DecEq`; the CAT body must implement the specified
+  first-of-either branch for arbitrary duplicate-containing lists.
+- why: a tempting `find first x, then search for later y` scan
+  produces `True` for **both** lists; a scan reversing the comparison
+  yields the wrong result on the reversed pair.
+
+### stdlib/graphs/no-duplicates-rejects-duplicate-input
+
+- spec: `spec/50-stdlib/62-graphs.md` §1.3.
+- promise class: durable invariant.
+- given: evaluate public `no_duplicates Bool DecEq_instance_Bool`
+  directly on the **input** list of `duplicate_bool`,
+  `[True, False, True]`, and on `[True, False]` with the third entry
+  removed. Keep the same equality dictionary and first two entries.
+- expect: `no_duplicates [True, False, True] = False` and
+  `no_duplicates [True, False] = True`.
+- measured: opposite Boolean results on a repeated input and its
+  duplicate-free control, independently of the returned `TopoOrder`.
+- claimed: public `no_duplicates` detects repeated vertices in its
+  input; a separately deduplicated output does not substitute for it.
+- the gap: this direct case proves neither the general law of the
+  predicate nor the `TopoOrder` field for arbitrary input; the checked
+  `ordered_unique` projection still carries that obligation.
+- why: a predicate that always returns `True` passes the prior
+  returned-order observation but fails the repeated-input oracle.
+
+### stdlib/graphs/contains-rejects-missing-element
+
+- spec: `spec/50-stdlib/62-graphs.md` §1.3.
+- promise class: durable invariant.
+- given: evaluate public `contains Bool DecEq_instance_Bool` on the
+  same **nonempty** singleton list `[True]` for both `False` and
+  `True`, varying only the queried vertex.
+- expect: `contains False [True] = False` and
+  `contains True [True] = True`.
+- measured: a negative and positive lookup on one shared list with
+  the same checked `DecEq` dictionary.
+- claimed: `contains` does not report a missing element as present;
+  `all_vertices` cannot be satisfied by an always-True lookup.
+- the gap: these Bool inputs do not prove the generic
+  `contains_sound` and `contains_complete` laws; both remain checked
+  theorems for arbitrary `q` and `xs`.
+- why: an always-True lookup passes the prior complete-order cases
+  because they query only present vertices, but fails on `False`.
+
 ## Predicate reachability
 
 ### stdlib/graphs/reachable-edge-has-walk
@@ -265,9 +334,12 @@ certificate are local fixture data, not new axioms or trust entries.
 
 The order cases cover both `HasOrder` and `HasCycle`, singleton-edge
 orientation both ways, duplicate certificates, and the zero-vertex
-carrier. The reachable/unreachable pair holds the graph and start
-fixed while changing only the target; the positive edge traversal
-separately exercises a nonempty walk. Every public checked law has a
+carrier. Independent predicate oracles cover first-of-either `before`
+on duplicate lists, both outcomes of `no_duplicates` on its input,
+and present/absent `contains` on one nonempty list. The
+reachable/unreachable pair holds the graph and start fixed while
+changing only the target; the positive edge traversal separately
+exercises a nonempty walk. Every public checked law has a
 closed positive instance: `contains_sound`/`contains_complete` on
 both vertices, the two reachability laws on the real edge, and the
 three order projections on `forward`. Runtime examples do not replace
