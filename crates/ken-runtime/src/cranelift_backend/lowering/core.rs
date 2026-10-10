@@ -6918,11 +6918,12 @@ impl<'a> Lowering<'a> {
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         source: StaticOriginId,
+        identity: &ContinuationCallIdentity,
     ) -> Result<Option<RuntimeTrap>, CraneliftBackendError> {
         let Some(owner) = self.defining_emission_owner else {
             return Ok(None);
         };
-        let trap = self.static_transition_plan.relay_route(source, owner)?
+        let trap = self.static_transition_plan.relay_route(source, owner, identity)?
             .and_then(|route| route.no_route_trap.clone());
         let Some(trap) = trap else {
             return Ok(None);
@@ -7143,7 +7144,9 @@ impl<'a> Lowering<'a> {
                     "an active transport's stable closure seat is not the recursive child being replaced",
                 ));
             }
-            if let Some(trap) = self.trap_unrouted_relay_at_consumer(builder, static_origin)? {
+            if let Some(trap) = self.trap_unrouted_relay_at_consumer(
+                builder, static_origin, transport.source_call_identity(),
+            )? {
                 return Ok(ProducerTrampolineStep::ordinary(
                     LoweringOperand::Specialized(Lowered::Trap(trap)),
                 ));
@@ -7654,20 +7657,22 @@ impl<'a> Lowering<'a> {
                 // A claim with a planned binding consumes the Vis constructor.
                 // Trap before the call: trapping after it would perform its
                 // continuation while silently omitting the forwarded effect.
-                if self.continuation_claims.is_some()
-                    && self.static_transition_plan.continuation_call_binding_for(
+                if self.continuation_claims.is_some() {
+                    if let Some(identity) = self.static_transition_plan.continuation_call_binding_for(
                         static_origin,
                         *frame_origin,
                         u32::try_from(*case_index).map_err(|_| unsupported(
                             "ComputationalMatch", "case index exceeds addressable range"))?,
                         u32::try_from(position).map_err(|_| unsupported(
                             "ComputationalMatch", "recursive position exceeds addressable range"))?,
-                    )?.is_some()
-                {
-                    if let Some(trap) = self.trap_unrouted_relay_at_consumer(builder, static_origin)? {
-                        return Ok(ProducerTrampolineStep::ordinary(
-                            LoweringOperand::Specialized(Lowered::Trap(trap)),
-                        ));
+                    )? {
+                        if let Some(trap) = self.trap_unrouted_relay_at_consumer(
+                            builder, static_origin, &identity,
+                        )? {
+                            return Ok(ProducerTrampolineStep::ordinary(
+                                LoweringOperand::Specialized(Lowered::Trap(trap)),
+                            ));
+                        }
                     }
                 }
                 if let Some(returned) = self.claim_and_call_continuation(
@@ -8641,7 +8646,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         if let Some(trap) = self.trap_unrouted_relay_at_consumer(
-            builder, producer_construct_origin,
+            builder, producer_construct_origin, &identity,
         )? {
             return Ok(Some(LoweringOperand::Specialized(Lowered::Trap(trap))));
         }
