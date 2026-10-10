@@ -94,10 +94,13 @@ an admitted declaration's spelling.
   rebound_declaration_entry_refuses_the_old_dictionary_identity`, which
   rebinds `data Foo` in a later `elaborate_decl` unit to pin the
   instance-registry identity guard. The consumer population is now
-  measured by execution, not by source: every test target of each crate
-  whose tests call `elaborate_decl*` or `elaborate_file`, run with
-  `scripts/ken-cargo test -p <crate> --no-fail-fast` on the candidate, and
-  every `DuplicateDefinition` or `AmbiguousReference` failure listed. A
+  measured per test function, not per loop: for every test that makes
+  more than one `elaborate_*` call on one env, collect the top-level
+  names each call declares, of every head kind (`const`, `def`, `data`,
+  `class`, `instance`, `prop`, `theorem` and the rest), and flag a name
+  declared twice. Only the flagged test binaries are then run, targeted.
+  No whole-crate local run (COORDINATION section 12); CI stays the
+  backstop, and a red CI is an accepted cost (operator 2026-09-26). A
   hit whose test exists to exercise rebinding (as this one does) goes to
   the Architect before any edit: rename, session entry, or a rewrite that
   keeps the guarded behaviour reachable. Renames under AC-1a need no
