@@ -501,6 +501,26 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Graph reachability reuses the formal-languages search and
+            // Finite provider; order reuses Derived.sort. Strict mode retains
+            // the inherited compiler conveniences of those provider closures.
+            "Algorithm.Graphs.Dependency".to_string(),
+            [
+                "And",
+                "MkUnit",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Algorithm.Numeric.Gcd".to_string(),
             ["And", "and_fst", "and_intro", "and_snd"]
                 .into_iter()
