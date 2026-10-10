@@ -2131,7 +2131,23 @@ pub(crate) fn execute_loaded_entry_checked_fences_v1(
                 "loaded module entry '{entry}' has no completed definition set"
             ))
         })?;
-    elab.module_state.package_definitions = definitions;
+    // The loader resolves the entry under its dotted path, but a checked
+    // fence resolves at the anonymous root. Translate only this entry's own
+    // qualified keys; constructors are already unqualified on both routes.
+    let prefix = format!("{entry}.");
+    let mut seed = HashSet::new();
+    for name in definitions {
+        if let Some(relative) = name.strip_prefix(&prefix) {
+            seed.insert(relative.to_string());
+        } else if name.contains('.') {
+            return Err(ElabError::Internal(format!(
+                "loaded entry '{entry}' has definition outside its own path: '{name}'"
+            )));
+        } else {
+            seed.insert(name);
+        }
+    }
+    elab.module_state.package_definitions = seed;
     let previous = std::mem::replace(&mut elab.module_state.root_scope, scope);
     let result = elab.execute_ken_md_checked_fences_v1(&source, &extracted);
     elab.module_state.root_scope = previous;
