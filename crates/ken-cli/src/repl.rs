@@ -378,9 +378,22 @@ mod reused_env_rollback_tests {
         let first = session.env.globals["zz_repl_shadow"];
         do_def(&mut session, "const zz_repl_shadow : Bool = False");
         let second = session.env.globals["zz_repl_shadow"];
-        assert_ne!(first, second, "a re-entered name shadows the earlier binding");
-        assert!(session.env.env.lookup(first).is_some(), "the old GlobalId is not retracted");
-        assert_eq!(session.names.iter().filter(|n| *n == "zz_repl_shadow").count(), 2);
+        assert_ne!(
+            first, second,
+            "a re-entered name shadows the earlier binding"
+        );
+        assert!(
+            session.env.env.lookup(first).is_some(),
+            "the old GlobalId is not retracted"
+        );
+        assert_eq!(
+            session
+                .names
+                .iter()
+                .filter(|n| *n == "zz_repl_shadow")
+                .count(),
+            2
+        );
     }
 
     #[test]

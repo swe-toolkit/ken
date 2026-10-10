@@ -954,7 +954,8 @@ mod package_definition_boundary_tests {
             .elaborate_session_decl_results_v1("const zz_bad : Bool = Missing")
             .is_err());
         assert_eq!(env.module_state.package_definitions, names);
-        let error = env.elaborate_file("const zz_package : Bool = False")
+        let error = env
+            .elaborate_file("const zz_package : Bool = False")
             .expect_err("a package duplicate must still refuse after the session call");
         assert!(matches!(
             error,
