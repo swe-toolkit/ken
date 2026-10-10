@@ -1,7 +1,7 @@
 ---
 id: SPEC-FORMAL-LANGUAGES-LEXER-BRIDGE-CONTRACT
 title: "spec/50-stdlib/61-formal-languages.md section 6 is a deferred placeholder, so no Capability.Parsing lexer can claim that its byte runner agrees with a DFA's run. Specify the Bytes/Cursor runner bridge relating a DFA driven over a cursor to run over the cursor's element list, with its laws, at zero trust"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -72,3 +72,19 @@ base, stop and report the mismatch.
 - The bridge law needs a cross-instance claim that `CursorLaws` does not
   give: the D0 rules what is stated instead, and nothing unprovable is
   specified.
+
+## Closeout
+
+Merged `718b726c2` from exact `08938b163` (PR #4632). Architect D0
+`evt_2mn6kw5efep62`, Architect `evt_52aypqm3fnea8`, conformance validator
+`evt_6pm9jhrtewy9r`, Decision `dec_1ep8r8kqvn8vc`. Section 6 is normative:
+Cursor gains `cursor_take`, `cursor_elements`, `cursor_elements_peek_none`
+and `cursor_elements_peek_some`, and a new Lexer module has
+`dfa_cursor_run`, `dfa_cursor_accepts` and the bridge laws
+`dfa_cursor_run_elements` and `dfa_cursor_accepts_elements`, which hold
+for any `CursorOps`. Imports run Lexer to Dfa and Cursor only. Deferred:
+maximal munch, whole-input tokenising, locations, cross-instance cursor
+claims and kernel-checked byte literals. The seven-case runtime-oracle
+seed is at `conformance/stdlib/formal-languages/seed-lexer-bridge.md`.
+Cursor's loader-visible inventory moving from 17 to 21 is the CAT node's
+work. §1a: 0.

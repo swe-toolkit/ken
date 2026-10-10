@@ -242,6 +242,28 @@ base, stop and report the mismatch.
    - Admitted relay members leave O's returned set: span owner 4 becomes
      {528} Protocol, r2 owner 2 {746}, and r2 owner 3 {528}.
 
+5. **D4 recut, direction (C) (`evt_7r6p7j6c5408j`).** D4 stays at WIP
+   `114a1a5dbd4a`, which is not a candidate. The AC-7 roster stays unrun
+   past row 32.
+   - **Retained:** D1-D3; `relay_drive_pair` as the single route
+     authority; `source_seat_row`; the forwarded-position guard with its
+     two controls; the permanent origin and shape errors and the
+     claim-identity error.
+   - **Replaced:** inside `drive_response_at_source`, the relay arm keeps
+     its operation drive at the source but no longer resumes the source's
+     K inline. It calls the pair's candidate-row K context (already
+     planned and emitted under its own owner and tokens), passing the
+     host result; the call's result feeds the active eliminators. The
+     deferred handler-owned route keeps its inline resume. No plane
+     changes and no relocation.
+   - **Settle mechanism: D0 census first.** One measurement with a
+     disposable recorder over row 32, `abi_s6`, and the span and r2
+     target rows: for each relay pair, the source row's `k_context`, its
+     `returned_vis_protocol` closure (relay or not, successor, seat,
+     pair), and any foreign-owned origin in the operation subtree. Then
+     stop to the Architect, who rules a plain call, an expression-level
+     settle loop over existing rows, or the boundary.
+
 ## Acceptance
 
 - **AC-1.** The span row is un-ignored and green: both engines exit 0 with
@@ -326,7 +348,9 @@ base, stop and report the mismatch.
 
 ## Hard-stop inventory
 
-- **§1a.** Question (4), E disposition: 1 (`evt_5sah7xb9543hp`).
+- **§1a.** Question (4), E disposition and the D4 relay arm: 3
+  (`evt_5sah7xb9543hp`, `evt_47yp5mk4wznjb`, `evt_3b7ws2dvx1r9v`). The
+  third put D4 on hold and called a research advisory.
   Question (2), the refusal discriminant: 3 (`evt_12az6njpj0wyy`,
   `evt_62wab4peq1htm`, `evt_2spcf0ad9mmet`). The third was resolved with
   research's advisory (`evt_4wcce8z24a4c9`, ruling `evt_5mgw5cwr993nd`);
@@ -355,6 +379,33 @@ base, stop and report the mismatch.
   positions owned by another function unit — keyed on "a Construct-Vis
   exists" rather than "can a Vis arrive at the Ret-only arm". §1b next
   fires at entry 6.
+- **5.** The per-position aggregate identity check in
+  `reconcile_source_aggregate` refused a forwarded value: parent
+  Source(583), position 0, is Var 582, carrying occurrence 179 produced at
+  760 in fn 12, under drive stack [1374, 744] and owner Spec(7) -- keyed
+  on "the position has a source origin" rather than "the position is a
+  producer". The guard repair stands (`evt_5zzxh9zn7f18s`).
+- **6.** Under the relay drive, a continuation claim
+  (`claim_and_call_resolved_continuation_inner`) finds no declared target
+  in the driving owner's function -- keyed on the call site's syntactic
+  enclosing owner rather than the owner that emits it. Measured
+  (`evt_21g7mkxe4v43a`): the token for producer construct 1200 has
+  target Spec(0) and emission owner Predeclared(10), and was claimed
+  under defining owner Spec(7) with drive stack [1374, 1327]; 1200 lies
+  in the K of Vis1327, not in Spec(7)'s own body.
+- **§1b at entry 6: YES** (`evt_3b7ws2dvx1r9v`). Entries 4, 5 and 6 share
+  a predicate, extending entry 3's: the relay drive is an emission route
+  that lowering enters but the plan does not record.
+  `drive_response_at_source` lowers the driven source's operation, its K
+  and the frames it resumes under `defining_emission_owner`, while every
+  owner-keyed plane is built before `relay_drive_pairs` exists and from an
+  emission-owner authority with no relay source. The closure is
+  structural: every emission route lowering enters is an emission
+  population the plan knows before any owner-keyed plane is built, or the
+  drive does not relocate emission. Ruled closure (`evt_7r6p7j6c5408j`):
+  (C), no relocation. A pre-schema drive decision is rejected: the pair
+  builder reads ownership-derived planes, and path-keyed clones would
+  re-enter the RT-NATIVE-FNSPLIT predicate.
 
 ## Finding outside this WP
 
