@@ -213,7 +213,7 @@ base, stop and report the mismatch.
      never a merge candidate alone. D4 builds on `d7820636f`, and they take
      one QA, one Architect review and one Decision. Do not add `&&
      d_gate_installed` to admission: it would refuse those 105 owners.
-4. **The ruled relay arm: drive at the source, never carry the relay.**
+4. **Relay admission: settled by static fusion, never carried.**
    - `relay_drivable(F, R, O)` holds when all four hold:
      - (a) F has exactly one installed or candidate response row with a
        planned seat;
@@ -226,57 +226,52 @@ base, stop and report the mismatch.
      - (d) the key is the pair (F, `O.base_owner()`), never F alone,
        read through one plan-side authority (`evt_2e92pc40cyrbc`):
        `StaticTransitionPlan::relay_drive_pair(source, owner) ->
-       Result<Option<RelayDrivePair>, _>`. Lowering selects the relay arm
-       iff it returns `Some`, and `classify` admits on (d) iff it returns
-       `Ok(Some(_))`, pushing an `Err` to the owner's errors. The D3
+       Result<Option<RelayDrivePair>, _>`, the single admission
+       authority: the pair settles by static fusion at the source plus
+       its row's installed response owner. `classify` admits on (d) iff
+       it returns `Ok(Some(_))`, pushing an `Err` to the owner's errors. The D3
        constants `d_pair_proposed = true` and `d_gate_installed = false`
        in `relay_settlement.rs` are deleted. A (d) axis kept as a
        constant is a block.
-   - A second gate in `lower_computational_producer_construct`, after
-     the deferred one, calls the same drive, for `relay_drivable` sources
-     only; a `drive_settled` source keeps its existing gate. The drive is
-     refactored to take (vis_origin, operation_root_origin, effect_origin,
-     operation), so there is one drive with two row sources.
    - A relay construct of an admitted owner that is still reached is a
      typed planner-invariant error, never `-1`.
    - Admitted relay members leave O's returned set: span owner 4 becomes
      {528} Protocol, r2 owner 2 {746}, and r2 owner 3 {528}.
 
-5. **D4 recut, direction (C) (`evt_7r6p7j6c5408j`).** D4 stays at WIP
-   `faae80edc`, which is not a candidate. The AC-7 roster stays unrun
-   past row 32.
-   - **Retained:** D1-D3; `relay_drive_pair` as the single route
-     authority; `source_seat_row`; the forwarded-position guard with its
-     two controls; the permanent origin and shape errors and the
-     claim-identity error.
-   - **Replaced:** inside `drive_response_at_source`, the relay arm keeps
-     its operation drive at the source but no longer resumes the source's
-     K inline. It calls the pair's candidate-row K context (already
-     planned and emitted under its own owner and tokens), passing the
-     host result; the call's result feeds the active eliminators. The
-     deferred handler-owned route keeps its inline resume. No plane
-     changes and no relocation.
-   - **Settle mechanism: D0 census first.** One measurement with a
-     disposable recorder over row 32, `abi_s6`, and the span and r2
-     target rows: for each relay pair, the source row's `k_context`, its
-     `returned_vis_protocol` closure (relay or not, successor, seat,
-     pair), and any foreign-owned origin in the operation subtree. Then
-     stop to the Architect, who rules a plain call, an expression-level
-     settle loop over existing rows, or the boundary.
-   - **Gate 2 (`evt_4tbaxstk921c2`).** The seam stays dormant. One run
-     each of the span row, r2 `:1015` and `abi_s6`, with the seam trace
-     on. If all are green with zero seam records, the drive is
-     unnecessary and the recut deletes it, keying admission on the
-     installed response-owner route that settles. If a relay Vis
-     reaches an owner at runtime, the Architect places the drive at
-     that delivery point.
+5. **D4': no drive (`evt_5hcnh155zmm5x`).** Gate 2 measured G1: with
+   the drive dormant, span, r2 and `abi_s6` are green and no relay Vis
+   materializes at runtime. Each relay source is lowered under its
+   enclosing Computational eliminator and its seat is performed by its
+   row's installed response owner (`lower_static_response_effect`). The
+   returned-member projection is what fixed the trapping owners.
+   - **Delete:** the relay drive and every remnant
+     (`call_relay_source_token`, `relay_pair_for_source_token(_at_owner)`,
+     the inline-skip extension, `call_declared_unit_target_with_frame`,
+     the factored settle arm if it has no other caller, the verifier
+     relay branch and its closure additions); the
+     `perform_response_at_source` split, folded back into one
+     `drive_response_at_source` for the Deferred route only; the
+     claim-seam WIP.
+   - **Retain:** D1-D3; the returned-member projection (`864c43c78`,
+     `8a3f70f3f`); `relay_drive_pair` as the admission authority; the
+     permanent origin, shape and claim-identity errors.
+   - **Deletion controls, measured.** For each of source (f)
+     (`34dd31394`), `source_seat_row` (`83ce24c9e`) and the
+     forwarded-position guard (`ff7e6dc6d`, `dc1830897`), delete only
+     that piece on top of D4' and run span, r2, `abi_s6` and row 32 once.
+     A red retains the piece and names its consumer. With no red, (f) is
+     deleted; the guard stays only if its own discriminator fixture
+     reaches it without the drive, otherwise it goes with its fixture;
+     `source_seat_row` stays only while admission (a) calls it. Then stop
+     to the Architect with the per-piece table.
 
 ## Acceptance
 
 - **AC-1.** The span row is un-ignored and green: both engines exit 0 with
   the exact freeze sequence it asserts.
-- **AC-1b.** r2 (`:1015`) is un-ignored and green, with the full 42 §6.4
-  envelope and the terminal result agreeing on both engines. The three r2
+- **AC-1b.** r2 (`:1015`) is un-ignored and green: the full native and
+  interpreter operation sequences are equal, and so are the terminal
+  classes. The three r2
   compile-or-inspect rows (:861, :913, :970) pin the admitted plan.
 - **AC-5 (mutation, QA).** Deleting source (e) yields the ObjectEmission
   refusal (owner 0, context 2) on the span row. This is carried from the
@@ -287,8 +282,9 @@ base, stop and report the mismatch.
   provenance set is not planned, are refused at planning with the exact
   typed text. px8ta owner 0 (relay 370) is the second refusal witness, with
   the exact typed text. ABI-S6 is 12/12.
-- **AC-3 (mutation, QA).** Removing the relay arm returns the span row and
-  r2 to the planning refusal, never to `-1`.
+- **AC-3 (mutation, QA).** Removing the returned-member projection
+  (relay members restored to the owner's returned set) returns the span
+  row and r2 to the planning refusal, never to `-1`.
 - **AC-6 (mutation, QA).** Classifying ABI-S6 owner 0 as refused reddens
   its six rows at the refusal, so the discriminant is load-bearing.
 - **AC-4 (controls).** SEQUENTIAL, `one_bracket_retains_native_parity`,
@@ -299,8 +295,8 @@ base, stop and report the mismatch.
   both assertions, and the switch is restored after its scope.
 
 - **AC-7 (the D4 population, `evt_2e92pc40cyrbc`).** The 32 tests that
-  carry the 105 owners whose emission D4 changes from Ret-only to
-  drive-at-source run individually through `scripts/ken-cargo`. So do
+  carry the 105 owners whose admission D4 changes run individually
+  through `scripts/ken-cargo`. So do
   px8ta and the two un-ignored target rows, each with the recorder. The
   32 include the 20 `checked_ih_*` and `composed_return_*` parity rows,
   `rt_escape_second_resource_native`, `rt_span_prov_native`,
@@ -323,6 +319,11 @@ base, stop and report the mismatch.
     installed pairs go unused.
   - The roster file the run uses lists all 36 tests plus px8ta and the two
     target rows, with its SHA-256 recorded.
+  - **Census gate (`evt_5hcnh155zmm5x`).** For every pair with
+    `relay_drive_pair = Some`, record whether its row is installed (a
+    response-owner function emits its seat through
+    `lower_static_response_effect`). An admitted pair whose row is
+    candidate-only is a stop to the Architect.
 - **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
   census pair (span owner 4, source 1374) fires the typed refusal for that
   owner and reddens AC-1, and is restored byte-identically.
@@ -420,7 +421,9 @@ base, stop and report the mismatch.
   the eliminator, and its seat is performed by the installed response
   owners (`evt_4tbaxstk921c2`) -- keyed on the plan pair's existence, not
   on the route lowering takes. Entries 5, 6 and 7 share the entry 6 §1b
-  cause, which recut (C) did not close. §1b next fires at entry 9.
+  cause, which recut (C) did not close. D4' (`evt_5hcnh155zmm5x`) is
+  their structural closure: the drive is removed, not re-placed. §1b
+  next fires at entry 9.
 
 ## Finding outside this WP
 
