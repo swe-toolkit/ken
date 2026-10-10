@@ -234,6 +234,16 @@ Append one entry per Architect hard stop; never rewrite history.
    classified under: stale `Int(7)` after rollback and id reuse -- keyed on
    the id rather than on a borrow of the exact environment version
    (`evt_41pfdmjgjydz6`).
+5. Kernel `method_type` on the normalized body infers the bare motive
+   (nested All-lift, `infer_motive_level`); the entry-2 hint covered the
+   enumerated `infer` sites only -- keyed on which kernel queries were
+   hand-listed, not on every kernel query that infers a motive
+   (`evt_2h14za2hzt3a1`). §1a is 5; the sixth advancing stop holds for
+   research and the Steward, and §1b is due there. Ruled repair: a
+   `method_type_node` fallback in `omega_erasure.rs` only. Latent
+   sibling, no witness: the computational-IH collector in
+   `compiler_driver.rs` runs kernel queries on the same normalized
+   bodies and fails closed.
 
 ## Stop conditions
 
