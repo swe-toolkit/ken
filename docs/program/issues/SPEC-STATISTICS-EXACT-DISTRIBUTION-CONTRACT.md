@@ -1,7 +1,7 @@
 ---
 id: SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT
 title: "No statistics or probability contract exists in spec/50-stdlib, so the catalog's statistics layer has nothing to build against. Author spec/50-stdlib/63-statistics.md with its first section: an exact finite distribution, event probability and expectation, each law proved at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
