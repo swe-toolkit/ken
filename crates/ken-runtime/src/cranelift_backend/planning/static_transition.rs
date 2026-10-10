@@ -916,6 +916,16 @@ fn inline_synthesized_seat_emission_owners(
                     .map(|row| row.base_owner()),
             );
         }
+        // (f) A relay source's operation is performed at the source under its
+        // pair's response owner (lowering relay arm -> drive_response_at_source),
+        // which synthesizes the seat's host result there. Only the seat: the
+        // pair's K is called, never lowered here.
+        owners.extend(
+            plan.relay_drive_pairs
+                .values()
+                .filter(|pair| pair.effect_origin == seat)
+                .map(|pair| pair.owner),
+        );
     }
     owners.sort();
     owners.dedup();
