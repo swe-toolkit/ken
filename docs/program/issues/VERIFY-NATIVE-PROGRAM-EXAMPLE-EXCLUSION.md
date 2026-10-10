@@ -1,7 +1,7 @@
 ---
 id: VERIFY-NATIVE-PROGRAM-EXAMPLE-EXCLUSION
 title: "prepare_native_program_sources elaborates .ken.md example fences into the shared env, then admits every env declaration and passes an empty example set to emit_package_from_env, so a native-program package ships example declarations. Exclude example declarations on the native-program route as the package routes do"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -59,3 +59,12 @@ reaches stay admitted.
 - A catalog or corpus native program references an example declaration:
   stop with the list.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `ce4e72b33` from exact `e57f7abfd` (PR #4635; the first publisher
+run stopped at M5 on a GitHub transport timeout and was re-authorized on
+the same SHA). Verify QA `evt_3srckrfq7158r` (AC-4 mutation red and
+restored), Architect `evt_142psx4yyp8p1`, Decision `dec_5181ehpgmrbcb`.
+One path, `compiler_driver.rs`: the native-program route now excludes
+example declarations as the package routes do. §1a: 0.
