@@ -227,7 +227,7 @@ fn source_shape(plan: &StaticTransitionPlan<'_>, vis: StaticOriginId) -> Result<
 /// candidate row whose effect has at least one planned host-effect seat.
 /// Seats are recorded per (effect origin, slot), so counting records would
 /// incorrectly reject an operation with multiple argument slots.
-fn source_seat_row<'r>(
+pub(super) fn source_seat_row<'r>(
     plan: &StaticTransitionPlan<'_>,
     candidates: &'r [StaticResponseContinuation],
     source: StaticOriginId,

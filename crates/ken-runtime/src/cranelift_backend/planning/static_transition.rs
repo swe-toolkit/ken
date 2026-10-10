@@ -132,7 +132,7 @@ pub(in crate::cranelift_backend) use responses::{
     StaticResponseCapture, StaticResponseContextDemand, StaticResponseContinuation,
     StaticResponseContinuationId, StaticResponseEffectInput, StaticResponseEnvironmentBinding,
     StaticResponseFrameSource, StaticResponseOwnerId, StaticResponseOwnerSpecialization,
-    StaticResponsePhaseA, StaticResponseSite,
+    StaticResponsePhaseA, StaticResponseSite, RelayDrivePair,
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{

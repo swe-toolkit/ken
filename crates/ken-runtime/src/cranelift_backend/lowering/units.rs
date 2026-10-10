@@ -3228,6 +3228,25 @@ struct SuccessorEffect {
     operation_arguments: BTreeMap<StaticOriginId, RuntimeExpr>,
 }
 
+fn pending_vis_successor_effect(
+    compiler: &Lowering<'_>,
+    row: StaticResponseContinuation,
+) -> Result<SuccessorEffect, CraneliftBackendError> {
+    let effect = compiler.retained_body_occurrence(row.effect_origin())?.expr.clone();
+    if !matches!(&effect, RuntimeExpr::Effect { operation, .. } if *operation == row.operation()) {
+        return Err(backend_module("a pending-Vis successor has no exact host effect".to_string()));
+    }
+    let mut operation_arguments = BTreeMap::new();
+    for input in row.effect_environment() {
+        if let StaticResponseEffectInput::OperationArgument { origin, .. } = input {
+            operation_arguments.entry(*origin).or_insert(
+                compiler.retained_body_occurrence(*origin)?.expr.clone(),
+            );
+        }
+    }
+    Ok(SuccessorEffect { row, effect, operation_arguments })
+}
+
 struct PendingVisOwnerCall {
     row: StaticResponseContinuationId,
     call: cranelift_codegen::ir::Inst,
@@ -3248,6 +3267,252 @@ struct PendingVisFinishedBody {
     placeholder_offset: i32,
     input_frame: cranelift_codegen::ir::Value,
     record_discriminant_offset: i32,
+}
+
+struct PendingVisSuccessorResult {
+    returned: CarriedBoundaryWord,
+    call: cranelift_codegen::ir::Inst,
+    frame: cranelift_codegen::ir::StackSlot,
+    host_validation_end: cranelift_codegen::ir::Inst,
+    payload_loads: Vec<cranelift_codegen::ir::Inst>,
+}
+
+fn pending_vis_offset(start: i32, ordinal: usize) -> Result<i32, CraneliftBackendError> {
+    let delta = ordinal.checked_mul(8).and_then(|bytes| i32::try_from(bytes).ok())
+        .ok_or_else(|| backend_module("pending-Vis owner payload offset exhausted".to_string()))?;
+    start.checked_add(delta).ok_or_else(|| backend_module(
+        "pending-Vis owner payload exceeds its activation frame".to_string(),
+    ))
+}
+
+/// Shared successor arm for an installed response-owner loop and a relay
+/// token's in-place settlement. Both decode the row-minted member, load its
+/// exact pending operands and perform its effect under the row's authority.
+fn emit_pending_vis_successor_arm(
+    compiler: &mut Lowering<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    frame: cranelift_codegen::ir::Value,
+    region: PendingVisFrameRegion,
+    returned: CarriedBoundaryWord,
+    actual_tag: cranelift_codegen::ir::Value,
+    successor: &SuccessorEffect,
+    target: &DeclaredUnitCall,
+    record_owner_clear: bool,
+) -> Result<PendingVisSuccessorResult, CraneliftBackendError> {
+    let row = &successor.row;
+    let mut row_loads = Vec::new();
+    let vis_identity = compiler.static_transition_plan
+        .constructor_symbol_identity(row.vis_origin())?.tag_abi_word()?;
+    let vis_identity = i64::try_from(vis_identity)
+        .map_err(|_| backend_module("pending-Vis constructor tag exceeds range".to_string()))?;
+    Lowering::require_i64(builder, actual_tag, vis_identity);
+    let fields = compiler.emit_carrier_field_count(builder, returned)?;
+    Lowering::require_i64(builder, fields, 2);
+    let mut inputs = BTreeMap::new();
+    if target.header.parameters as usize != row.captures().len() + 1
+        || target.header.captures as usize != row.continuation_inputs().len() {
+        return Err(backend_module(
+            "a pending-Vis successor disagrees with its K-context ABI".to_string(),
+        ));
+    }
+    for (index, capture) in row.captures().iter().enumerate() {
+        if capture.ordinal() as usize != index {
+            return Err(backend_module("pending-Vis capture ordinals are not dense".to_string()));
+        }
+        let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
+            pending_vis_offset(region.captures, index)?);
+        if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
+            row_loads.push(inst);
+        }
+        if inputs.insert(StaticResponseFrameSource::Parameter(capture.producer_abi_slot()),
+            LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
+            return Err(backend_module("pending-Vis capture source repeats a destination slot".to_string()));
+        }
+    }
+    for (index, (ordinal, _, abi_position)) in row.continuation_inputs().iter().enumerate() {
+        if *ordinal as usize != index || !target.slots.get(*abi_position as usize)
+            .is_some_and(|slot| slot.kind == AbiSlotKind::Capture && slot.ordinal == *ordinal) {
+            return Err(backend_module(
+                "pending-Vis continuation input disagrees with the successor ABI".to_string(),
+            ));
+        }
+        let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
+            pending_vis_offset(region.continuation_inputs, index)?);
+        if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
+            row_loads.push(inst);
+        }
+        if inputs.insert(StaticResponseFrameSource::Capture(*ordinal),
+            LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
+            return Err(backend_module("pending-Vis continuation input repeats a slot".to_string()));
+        }
+    }
+    // Single-use member. A successor's own frame starts clear and is read
+    // only after the checked call. The owner-loop version also records this
+    // store for its bound-frame verifier; a relay holds the callee's frame.
+    let zero = builder.ins().iconst(types::I64, 0);
+    let cleared = builder.ins().store(MemFlags::trusted(), zero, frame, region.discriminant);
+    if record_owner_clear {
+        compiler.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
+            inst: cleared, offset: region.discriminant, source: PendingVisStoreSource::Cleared,
+        });
+    }
+    let nested = AmbientBodyAuthority::bind(
+        compiler, row.base_owner(), row.effect_source_owner(),
+    );
+    let effect = lower_static_response_effect(
+        compiler, builder, row, &successor.effect,
+        &successor.operation_arguments, &inputs,
+    );
+    nested.release(compiler);
+    let (response, host_validation_end) = effect?;
+    let mut call_inputs = vec![response];
+    for capture in row.captures() {
+        call_inputs.push(inputs.get(&StaticResponseFrameSource::Parameter(
+            capture.producer_abi_slot(),
+        )).cloned().ok_or_else(|| backend_module(
+            "pending-Vis K capture has no recorded parameter".to_string(),
+        ))?);
+    }
+    for (ordinal, _, _) in row.continuation_inputs() {
+        call_inputs.push(inputs.get(&StaticResponseFrameSource::Capture(*ordinal))
+            .cloned().ok_or_else(|| backend_module(
+                "pending-Vis K continuation input has no recorded capture".to_string(),
+            ))?);
+    }
+    let (next_result, call, next_frame) = compiler.call_declared_unit_target_with_frame(
+        builder, target.clone(), &call_inputs, None,
+        #[cfg(test)] None,
+    )?;
+    let LoweringOperand::Carried(returned) = next_result else {
+        return Err(backend_module("pending-Vis successor K returned a template".to_string()));
+    };
+    Ok(PendingVisSuccessorResult {
+        returned, call, frame: next_frame, host_validation_end,
+        payload_loads: row_loads,
+    })
+}
+
+/// Settle a relay token's returned K context using the same successor arm as
+/// an installed response owner. The caller-owned callee frame remains readable
+/// after the checked call; each successor's own frame is returned in turn.
+/// An unplanned non-Ret result never becomes a successful return.
+fn emit_relay_context_settlement(
+    compiler: &mut Lowering<'_>,
+    builder: &mut FunctionBuilder<'_>,
+    row: &StaticResponseContinuation,
+    returned: CarriedBoundaryWord,
+    frame: cranelift_codegen::ir::StackSlot,
+    successors: &BTreeMap<ContinuationContextId, Vec<SuccessorEffect>>,
+    finished: cranelift_codegen::ir::Block,
+    visiting: &mut BTreeSet<ContinuationContextId>,
+    iterations: &mut usize,
+) -> Result<(), CraneliftBackendError> {
+    if !visiting.insert(row.k_context()) {
+        return Err(unsupported("RelayDrive", "a relay K's successor context cycle was reached"));
+    }
+    let result = (|| {
+        let expected_ret = i64::try_from(row.k_ret_identity().tag_abi_word()?)
+            .map_err(|_| unsupported("RelayDrive", "a relay K's Ret identity exceeds the tag word"))?;
+        let actual_tag = compiler.emit_carrier_tag(builder, returned)?;
+        let is_ret = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::Equal, actual_tag, expected_ret,
+        );
+        let ret = builder.create_block();
+        let vis = builder.create_block();
+        builder.ins().brif(is_ret, ret, &[], vis, &[]);
+        builder.switch_to_block(ret);
+        let ret_fields = compiler.emit_carrier_field_count(builder, returned)?;
+        Lowering::require_i64(builder, ret_fields, 1);
+        builder.ins().jump(finished, &[returned.word]);
+        builder.switch_to_block(vis);
+        let members = successors.get(&row.k_context()).ok_or_else(|| unsupported(
+            "RelayDrive", "a relay K's context has no planned result walk",
+        ))?;
+        if members.is_empty() {
+            // A Ret-only context cannot return any Vis. This is an emitted
+            // refusal on the non-Ret edge, never a successful untagged word.
+            let invalid = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[invalid]);
+            compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+            return Ok(());
+        }
+        let target = compiler.function_local.context_calls.get(&row.k_context())
+            .ok_or_else(|| unsupported("RelayDrive", "a relay K context was not declared"))?;
+        if target.frame_owner != Some(PendingVisFrameOwner::Context(row.k_context())) {
+            return Err(unsupported("RelayDrive", "a relay K context has no exact frame owner"));
+        }
+        let region = compiler.pending_vis_record_protocol.as_ref()
+            .ok_or_else(|| unsupported("RelayDrive", "a relay K's Vis has no planned pending record"))?
+            .frame_region(PendingVisFrameOwner::Context(row.k_context()), target.header.frame_bytes)?
+            .ok_or_else(|| unsupported(
+                "RelayDrive", "a Vis returned from a K context without its planned frame region",
+            ))?;
+        let pointer_type = builder.func.dfg.value_type(compiler.function_local.services_pointer
+            .ok_or_else(|| backend_module("relay settlement has no services pointer".to_string()))?);
+        let frame_pointer = builder.ins().stack_addr(pointer_type, frame, 0);
+        let member = builder.ins().load(types::I64, MemFlags::trusted(), frame_pointer, region.discriminant);
+        for successor in members {
+            let selected = builder.create_block();
+            let next = builder.create_block();
+            let expected = i64::from(successor.row.id().ordinal()) + 1;
+            let matches = builder.ins().icmp_imm(
+                cranelift_codegen::ir::condcodes::IntCC::Equal, member, expected,
+            );
+            builder.ins().brif(matches, selected, &[], next, &[]);
+            builder.switch_to_block(selected);
+            let target = compiler.function_local.context_calls.get(&successor.row.k_context())
+                .cloned().ok_or_else(|| unsupported(
+                    "RelayDrive", "a relay successor's K context was not declared",
+                ))?;
+            let step = emit_pending_vis_successor_arm(
+                compiler, builder, frame_pointer, region, returned, actual_tag,
+                successor, &target, false,
+            )?;
+            *iterations += 1;
+            emit_relay_context_settlement(
+                compiler, builder, &successor.row, step.returned, step.frame,
+                successors, finished, visiting, iterations,
+            )?;
+            builder.switch_to_block(next);
+        }
+        // Exactly like the owner's unknown-member exit: a record for another
+        // row (or zero) cannot authorize an effect or a successful result.
+        let invalid = builder.ins().iconst(types::I64, -1);
+        builder.ins().return_(&[invalid]);
+        compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+        Ok(())
+    })();
+    visiting.remove(&row.k_context());
+    result
+}
+
+impl Lowering<'_> {
+    pub(super) fn settle_relay_source_at_claim(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        source: StaticOriginId,
+        row: &StaticResponseContinuation,
+        returned: CarriedBoundaryWord,
+        frame: cranelift_codegen::ir::StackSlot,
+    ) -> Result<(LoweringOperand, usize), CraneliftBackendError> {
+        let contexts = self.static_transition_plan.relay_nonrelay_successors(source)?;
+        let successors = contexts.into_iter().map(|(context, rows)| {
+            let rows = rows.into_iter().map(|row| pending_vis_successor_effect(self, row))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((context, rows))
+        }).collect::<Result<BTreeMap<_, _>, CraneliftBackendError>>()?;
+        let finished = builder.create_block();
+        builder.append_block_param(finished, types::I64);
+        let mut visiting = BTreeSet::new();
+        let mut iterations = 0;
+        emit_relay_context_settlement(
+            self, builder, row, returned, frame, &successors, finished,
+            &mut visiting, &mut iterations,
+        )?;
+        builder.switch_to_block(finished);
+        let word = builder.block_params(finished)[0];
+        Ok((LoweringOperand::Carried(CarriedBoundaryWord { word }), iterations))
+    }
 }
 
 /// The initial validated host effect and K call already happened. Every
@@ -3347,116 +3612,29 @@ fn emit_pending_vis_owner_loop(
         let invalid = builder.ins().iconst(types::I64, -1);
         builder.ins().return_(&[invalid]);
     }
-    let offset_at = |start: i32, ordinal: usize| -> Result<i32, CraneliftBackendError> {
-        let delta = ordinal.checked_mul(8).and_then(|bytes| i32::try_from(bytes).ok())
-            .ok_or_else(|| backend_module("pending-Vis owner payload offset exhausted".to_string()))?;
-        start.checked_add(delta).ok_or_else(|| backend_module(
-            "pending-Vis owner payload exceeds its activation frame".to_string(),
-        ))
-    };
     let selected_blocks = member_blocks.clone();
     let mut payload_loads = Vec::new();
     for (successor, selected) in successors.iter().zip(member_blocks) {
         builder.switch_to_block(selected);
-        let mut row_loads = Vec::new();
         let row = &successor.row;
-        // A stale record for an unrelated non-Ret constructor is never an
-        // effect permission. Both the member and its exact Vis identity hold.
-        let vis_identity = compiler.static_transition_plan
-            .constructor_symbol_identity(row.vis_origin())?.tag_abi_word()?;
-        let vis_identity = i64::try_from(vis_identity)
-            .map_err(|_| backend_module("pending-Vis constructor tag exceeds range".to_string()))?;
-        Lowering::require_i64(builder, actual_tag, vis_identity);
-        let fields = compiler.emit_carrier_field_count(builder, returned)?;
-        Lowering::require_i64(builder, fields, 2);
-        let mut inputs = BTreeMap::new();
         let target = successor_targets.get(&row.id()).ok_or_else(||
             backend_module("a pending-Vis successor K context was not declared".to_string()))?;
-        if target.header.parameters as usize != row.captures().len() + 1
-            || target.header.captures as usize != row.continuation_inputs().len() {
-            return Err(backend_module(
-                "a pending-Vis successor disagrees with its K-context ABI".to_string(),
-            ));
-        }
-        for (index, capture) in row.captures().iter().enumerate() {
-            if capture.ordinal() as usize != index {
-                return Err(backend_module("pending-Vis capture ordinals are not dense".to_string()));
-            }
-            let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
-                offset_at(region.captures, index)?);
-            if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
-                row_loads.push(inst);
-            }
-            if inputs.insert(StaticResponseFrameSource::Parameter(capture.producer_abi_slot()),
-                LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
-                return Err(backend_module("pending-Vis capture source repeats a destination slot".to_string()));
-            }
-        }
-        for (index, (ordinal, _, abi_position)) in row.continuation_inputs().iter().enumerate() {
-            if *ordinal as usize != index || !target.slots.get(*abi_position as usize)
-                .is_some_and(|slot| slot.kind == AbiSlotKind::Capture && slot.ordinal == *ordinal) {
-                return Err(backend_module(
-                    "pending-Vis continuation input disagrees with the successor ABI".to_string(),
-                ));
-            }
-            let word = builder.ins().load(types::I64, MemFlags::trusted(), frame,
-                offset_at(region.continuation_inputs, index)?);
-            if let cranelift_codegen::ir::ValueDef::Result(inst, _) = builder.func.dfg.value_def(word) {
-                row_loads.push(inst);
-            }
-            if inputs.insert(StaticResponseFrameSource::Capture(*ordinal),
-                LoweringOperand::Carried(CarriedBoundaryWord { word })).is_some() {
-                return Err(backend_module("pending-Vis continuation input repeats a slot".to_string()));
-            }
-        }
-        // Single-use record: the next K call starts with no pending member.
-        // Its callee's newly minted member is copied up only after Trap checks.
-        let zero = builder.ins().iconst(types::I64, 0);
-        let cleared = builder.ins().store(MemFlags::trusted(), zero, frame, region.discriminant);
-        compiler.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
-            inst: cleared, offset: region.discriminant, source: PendingVisStoreSource::Cleared,
-        });
-        let nested = AmbientBodyAuthority::bind(
-            compiler, row.base_owner(), row.effect_source_owner(),
-        );
-        let effect = lower_static_response_effect(
-            compiler, builder, row, &successor.effect,
-            &successor.operation_arguments, &inputs,
-        );
-        nested.release(compiler);
-        let (response, host_validation_end) = effect?;
-        let mut call_inputs = vec![response];
-        for capture in row.captures() {
-            call_inputs.push(inputs.get(&StaticResponseFrameSource::Parameter(
-                capture.producer_abi_slot(),
-            )).cloned().ok_or_else(|| backend_module(
-                "pending-Vis K capture has no recorded parameter".to_string(),
-            ))?);
-        }
-        for (ordinal, _, _) in row.continuation_inputs() {
-            call_inputs.push(inputs.get(&StaticResponseFrameSource::Capture(*ordinal))
-                .cloned().ok_or_else(|| backend_module(
-                    "pending-Vis K continuation input has no recorded capture".to_string(),
-                ))?);
-        }
-        let (next_result, call) = compiler.call_declared_unit_target(
-            builder, target.clone(), &call_inputs, None,
-            #[cfg(test)] None,
+        let next = emit_pending_vis_successor_arm(
+            compiler, builder, frame, region, returned, actual_tag,
+            successor, target, true,
         )?;
-        let LoweringOperand::Carried(next_result) = next_result else {
-            return Err(backend_module("pending-Vis successor K returned a template".to_string()));
-        };
         let expected_context = successor_contexts.get(&row.id()).copied().ok_or_else(||
             backend_module("pending-Vis successor has no exact generated K target".to_string()))?;
         calls.push(PendingVisOwnerCall {
-            row: row.id(), call, expected_context, host_validation_end,
+            row: row.id(), call: next.call, expected_context,
+            host_validation_end: next.host_validation_end,
             ret_identity: row.k_ret_identity().tag_abi_word()?,
         });
         let expected_ret = i64::try_from(row.k_ret_identity().tag_abi_word()?)
             .map_err(|_| backend_module("pending-Vis successor Ret tag exceeds range".to_string()))?;
         let expected_ret = builder.ins().iconst(types::I64, expected_ret);
-        builder.ins().jump(result, &[next_result.word, expected_ret]);
-        payload_loads.push(row_loads);
+        builder.ins().jump(result, &[next.returned.word, expected_ret]);
+        payload_loads.push(next.payload_loads);
     }
     Ok(PendingVisFinishedBody {
         calls, result_store, returned_word, member_load, member_branches,
@@ -3898,21 +4076,9 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         for successor in successors {
             distinct_successors.entry(successor.id()).or_insert_with(|| (*successor).clone());
         }
-        let successors = distinct_successors.into_values().map(|row| {
-            let effect = compiler.retained_body_occurrence(row.effect_origin())?.expr.clone();
-            if !matches!(&effect, RuntimeExpr::Effect { operation, .. } if *operation == row.operation()) {
-                return Err(backend_module("a pending-Vis successor has no exact host effect".to_string()));
-            }
-            let mut operation_arguments = BTreeMap::new();
-            for input in row.effect_environment() {
-                if let StaticResponseEffectInput::OperationArgument { origin, .. } = input {
-                    operation_arguments.entry(*origin).or_insert(
-                        compiler.retained_body_occurrence(*origin)?.expr.clone(),
-                    );
-                }
-            }
-            Ok(SuccessorEffect { row, effect, operation_arguments })
-        }).collect::<Result<Vec<_>, CraneliftBackendError>>()?;
+        let successors = distinct_successors.into_values()
+            .map(|row| pending_vis_successor_effect(compiler, row))
+            .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
         let (offsets, frame_bytes) = owner.slot_offsets()?;
         if frame_bytes != owner.header().frame_bytes {
             return Err(backend_module(
@@ -5992,7 +6158,7 @@ pub(super) fn define_continuation_context_bodies<M: Module>(
         // The same emission-seam gate every other generated function passes: the
         // callee of each recorded causal emission is decoded back out of THIS
         // finished CLIF and compared with the planner-issued target.
-        compiler.verify_emitted_continuation_calls(&func, bundle)?;
+        compiler.verify_emitted_continuation_calls(&func, bundle, emission_owner)?;
         // `D8j` — the composed relation's own gate, beside the direct one and
         // never inside it: the two answer different questions about different
         // callees.
@@ -6639,7 +6805,7 @@ pub(super) fn define_static_continuation_fusion_bodies<M: Module>(
             builder.finalize();
         }
         frame_scope.close(compiler, &func)?;
-        compiler.verify_emitted_continuation_calls(&func, bundle)?;
+        compiler.verify_emitted_continuation_calls(&func, bundle, causal_owner)?;
         compiler.verify_recorded_composed_discharges(&func, bundle)?;
         #[cfg(test)]
         crate::cranelift_backend::lowering::record_d8j_discharged(
@@ -9650,7 +9816,9 @@ fn define_unit_body<M: Module>(
     // before it is defined into the module. The callee of every recorded causal
     // emission is decoded out of this CLIF and compared with the planner-issued
     // target; a disagreement rejects here rather than being emitted.
-    compiler.verify_emitted_continuation_calls(&func, bundle)?;
+    compiler.verify_emitted_continuation_calls(
+        &func, bundle, ContinuationEmissionOwner::Predeclared(unit.function),
+    )?;
     // `D8j` — same placement in the ordinary unit-body pass. ⛔ Both passes
     // gate, because a composed discharge can be claimed in either.
     compiler.verify_recorded_composed_discharges(&func, bundle)?;

@@ -5843,9 +5843,9 @@ impl<'a> Lowering<'a> {
         )
     }
 
-    /// Perform one planned response at its Construct-Vis source and resume its
-    /// exact lexical K through the active eliminators. Deferred handler rows
-    /// and source/owner relay pairs share this operation and its identity checks.
+    /// The Deferred handler retains its established inline lexical-K tail.
+    /// Relay pairs perform only the shared first half, then call the planned K
+    /// context at their source token's claim seam.
     fn drive_response_at_source(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -5855,6 +5855,37 @@ impl<'a> Lowering<'a> {
         effect_origin: StaticOriginId,
         planned_operation: ken_host::HostOpV1,
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let response = self.perform_response_at_source(
+            builder, vis_origin, lowered_args, operation_root_origin,
+            effect_origin, planned_operation,
+        )?;
+        let [_, LoweringOperand::Specialized(Lowered::Closure { captures, body, .. })] = lowered_args else {
+            return Err(unsupported("StaticResponseDeferred", "a driven response K is not its static closure"));
+        };
+        let mut k_env = Vec::with_capacity(captures.len() + 1);
+        k_env.push(LoweringEnvironmentBinding::Value(response));
+        k_env.extend(captures.iter().cloned().map(LoweringEnvironmentBinding::Value));
+        let k_body = self.retained_body_occurrence(*body)?;
+        match producer_eliminators {
+            Some(eliminators) => {
+                let eliminators = eliminators.to_vec();
+                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
+            }
+            None => self.lower_expr(builder, k_body, &k_env),
+        }
+    }
+
+    /// Perform one source Vis under the bound response owner, including exact
+    /// operation and lexical-K shape checks. Never enter the K body here.
+    fn perform_response_at_source(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        vis_origin: StaticOriginId,
+        lowered_args: &[LoweringOperand],
+        operation_root_origin: StaticOriginId,
+        effect_origin: StaticOriginId,
+        planned_operation: ken_host::HostOpV1,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let [operation, k] = lowered_args else {
             return Err(unsupported(
@@ -6108,22 +6139,7 @@ impl<'a> Lowering<'a> {
                 "a handler-owned response effect did not produce a HostResult",
             ));
         }
-        let mut k_env = Vec::with_capacity(captures.len() + 1);
-        k_env.push(LoweringEnvironmentBinding::Value(response));
-        k_env.extend(
-            captures
-                .iter()
-                .cloned()
-                .map(LoweringEnvironmentBinding::Value),
-        );
-        let k_body = self.retained_body_occurrence(*body)?;
-        match producer_eliminators {
-            Some(eliminators) => {
-                let eliminators = eliminators.to_vec();
-                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
-            }
-            None => self.lower_expr(builder, k_body, &k_env),
-        }
+        Ok(response)
     }
 
     fn lower_computational_producer_call(
@@ -6924,7 +6940,6 @@ impl<'a> Lowering<'a> {
             static_origin, self.defining_emission_owner,
         )?;
         let eliminator = eliminators[0];
-        let mut deferred_drive_available = false;
         if let Some(row) = self
             .static_transition_plan
             .deferred_response_at_vis(static_origin)?
@@ -6933,7 +6948,6 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .bounded_deferred_response_handler_owner(&row)?
                 .is_some_and(|owner| self.defining_emission_owner == Some(owner));
-            deferred_drive_available = current_owns_response;
             if current_owns_response
                 && !handler_owned_deferred_response_mutation_applies(
                     HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
@@ -6957,28 +6971,9 @@ impl<'a> Lowering<'a> {
                 return Ok(ProducerTrampolineStep::ordinary(resumed));
             }
         }
-        // The handler-owned route above is authoritative for its own source.
-        // A relay source without that route is driven under the *response*
-        // owner's emission identity, never solely under its own Vis identity.
-        if !deferred_drive_available {
-            if let Some(owner) = self.defining_emission_owner {
-                if let Some(pair) = self.static_transition_plan.relay_drive_pair(static_origin, owner)? {
-                    if pair.source != static_origin || pair.owner != owner {
-                        return Err(unsupported("RelayDrive", "a planned source/owner pair changed identity"));
-                    }
-                    let lowered_args = args.iter().enumerate().map(|(position, arg)| {
-                        let arg = self.child_occurrence(static_origin, position, arg)?;
-                        self.lower_expr(builder, arg, producer_env)
-                    }).collect::<Result<Vec<_>, _>>()?;
-                    let resumed = self.drive_response_at_source(
-                        builder, static_origin, &lowered_args,
-                        pair.operation_root_origin, pair.effect_origin, pair.operation,
-                        Some(eliminators),
-                    )?;
-                    return Ok(ProducerTrampolineStep::ordinary(resumed));
-                }
-            }
-        }
+        // Relay sources fall through to their ordinary producer call. The
+        // source-minted token is claimed once at the shared call funnel; the
+        // Deferred route above already returned under its own precedence.
         let terminal_exit = constructor == &self.process_symbols.exit_success
             || constructor == &self.process_symbols.exit_failure;
         let itree_frame = match eliminator {
@@ -10537,10 +10532,10 @@ impl<'a> Lowering<'a> {
         // cannot be handed one, and no runtime check here is load-bearing for
         // that. If this ever returns the enum again, the exclusion is gone and
         // the three direct-outer accessors stop being total.
+        let relay_pair = self.relay_pair_for_source_token(identity)?;
         if let Some(required) = required_consumer.filter(|_| {
-            !self
-                .static_transition_plan
-                .is_static_response_selected_caller(identity)
+            !self.static_transition_plan.is_static_response_selected_caller(identity)
+                && relay_pair.is_none()
         }) {
             let answer = self.realize_required_consumer_locally(
                 builder,
@@ -11766,6 +11761,112 @@ impl<'a> Lowering<'a> {
         ))
     }
 
+    /// A relay pair is admitted only for the source Vis's own minted K token
+    /// under the emission owner lowering that source. Unrelated calls keep
+    /// their ordinary selected/required-consumer routes.
+    fn relay_pair_for_source_token(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<Option<RelayDrivePair>, CraneliftBackendError> {
+        let Some(owner) = self.defining_emission_owner else {
+            return Ok(None);
+        };
+        self.relay_pair_for_source_token_at_owner(identity, owner)
+    }
+
+    /// Also used by the finished-CLIF verifier after ambient authority has
+    /// been released; its owner is the explicitly supplied definition owner.
+    pub(super) fn relay_pair_for_source_token_at_owner(
+        &self,
+        identity: &ContinuationCallIdentity,
+        owner: ContinuationEmissionOwner,
+    ) -> Result<Option<RelayDrivePair>, CraneliftBackendError> {
+        let source = identity.producer_construct_origin();
+        let Some(pair) = self.static_transition_plan.relay_drive_pair(source, owner)? else {
+            return Ok(None);
+        };
+        let row = self.static_transition_plan.relay_source_row(source)?;
+        if row.k_identity() != identity {
+            return Ok(None);
+        }
+        Ok(Some(pair))
+    }
+
+    /// Replace exactly the source token's ordinary continuation call with a
+    /// performed response and a checked call to its planned K context. All
+    /// owner operands come from this token's assembled call run; there is no
+    /// lexical lookup or manually fabricated availability for another owner.
+    fn call_relay_source_token(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        identity: &ContinuationCallIdentity,
+        pair: RelayDrivePair,
+        fields: &[LoweringOperand],
+        inputs: &[LoweringOperand],
+        ordinary_len: usize,
+    ) -> Result<(LoweringOperand, cranelift_codegen::ir::Inst, usize), CraneliftBackendError> {
+        let row = self.static_transition_plan.relay_source_row(pair.source)?;
+        if row.k_identity() != identity || row.vis_origin() != pair.source
+            || row.effect_origin() != pair.effect_origin
+            || row.operation() != pair.operation {
+            return Err(unsupported("RelayDrive", "a relay source token changed its seated response row"));
+        }
+        let response = self.perform_response_at_source(
+            builder, pair.source, fields, pair.operation_root_origin,
+            pair.effect_origin, pair.operation,
+        )?;
+        let target = self.function_local.context_calls.get(&row.k_context())
+            .cloned().ok_or_else(|| unsupported(
+                "RelayDrive", "a relay source's planned K context was not declared",
+            ))?;
+        if target.header.parameters as usize != row.captures().len() + 1
+            || target.header.captures as usize != row.continuation_inputs().len() {
+            return Err(unsupported("RelayDrive", "a relay source K context disagrees with its planned ABI"));
+        }
+        let mut k_inputs = Vec::with_capacity(1 + row.captures().len() + row.continuation_inputs().len());
+        k_inputs.push(response);
+        for (index, capture) in row.captures().iter().enumerate() {
+            if capture.ordinal() as usize != index {
+                return Err(unsupported("RelayDrive", "a relay K capture ordinal is not dense"));
+            }
+            let slot = usize::try_from(capture.producer_abi_slot()).map_err(|_| unsupported(
+                "RelayDrive", "a relay K capture slot exceeds the assembled operand run",
+            ))?;
+            if slot >= ordinary_len {
+                return Err(unsupported("RelayDrive", "a relay K capture is absent from the token's ordinary operands"));
+            }
+            k_inputs.push(inputs[slot].clone());
+        }
+        for (index, (ordinal, _, abi_position)) in row.continuation_inputs().iter().enumerate() {
+            if *ordinal as usize != index || !target.slots.get(*abi_position as usize)
+                .is_some_and(|slot| slot.kind == AbiSlotKind::Capture && slot.ordinal == *ordinal) {
+                return Err(unsupported("RelayDrive", "a relay K continuation input disagrees with its ABI"));
+            }
+            let slot = ordinary_len.checked_add(index).ok_or_else(|| unsupported(
+                "RelayDrive", "a relay K continuation input index exhausted",
+            ))?;
+            k_inputs.push(inputs.get(slot).cloned().ok_or_else(|| unsupported(
+                "RelayDrive", "a relay K continuation input is absent from the token's assembled operands",
+            ))?);
+        }
+        let (returned, call, frame) = self.call_declared_unit_target_with_frame(
+            builder, target, &k_inputs, None,
+            #[cfg(test)] None,
+        )?;
+        let LoweringOperand::Carried(returned) = returned else {
+            return Err(unsupported("RelayDrive", "a relay K context returned a template"));
+        };
+        let (settled, iterations) = self.settle_relay_source_at_claim(
+            builder, pair.source, &row, returned, frame,
+        )?;
+        #[cfg(feature = "px8-ds-test-support")]
+        if std::env::var_os("KEN_RELAY_D4_SEAM_TRACE").is_some() {
+            eprintln!("RELAY_D4_SEAM source={:?} owner={:?} k_context={:?} emitted_successor_arms={iterations}",
+                pair.source, pair.owner, row.k_context());
+        }
+        Ok((settled, call, iterations))
+    }
+
     fn claim_and_call_resolved_continuation_inner(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -11996,19 +12097,24 @@ impl<'a> Lowering<'a> {
         // continuation inputs in ordinal order. The order is asserted by the
         // callee's own declared slot walk, which is what the assembly above
         // validated each half against separately.
+        let ordinary_len = operands.ordinary.len();
         let mut inputs = operands.ordinary;
         inputs.extend(operands.continuation_inputs);
 
         #[cfg(test)]
         let duplicate_target = target.clone();
-        let (returned, call) = self.call_declared_unit_target(
-            builder,
-            target,
-            &inputs,
-            None,
-            #[cfg(test)]
-            None,
-        )?;
+        let relay_pair = self.relay_pair_for_source_token(&identity)?;
+        let (returned, call) = if let Some(pair) = relay_pair {
+            let (settled, call, _iterations) = self.call_relay_source_token(
+                builder, &identity, pair, fields, &inputs, ordinary_len,
+            )?;
+            (settled, call)
+        } else {
+            self.call_declared_unit_target(
+                builder, target, &inputs, None,
+                #[cfg(test)] None,
+            )?
+        };
         // `4b` -- anchor the emitted instruction to the exact causal token.
         //
         // ⭐ The `Inst`, not the target: the callee is decoded back out of the

@@ -430,6 +430,44 @@ impl StaticTransitionPlan<'_> {
             .iter()
             .find(|row| row.vis_origin() == owner_vis)
             .ok_or_else(|| planner_error("returned-Vis protocol names no installed owner row"))?;
+        self.returned_vis_protocol_for_row(owner)
+    }
+
+    /// A relay source can use a uniquely seated candidate even when its row
+    /// has no independent response-owner definition. Resolve the same closed
+    /// K-context result walk as an installed owner, without installing a row.
+    pub(in crate::cranelift_backend) fn relay_returned_vis_protocol(
+        &self,
+        source: StaticOriginId,
+    ) -> Result<ReturnedVisProtocol, CraneliftBackendError> {
+        let row = self.relay_source_row(source)?;
+        self.returned_vis_protocol_for_row(&row)
+    }
+
+    /// Return only non-relay successor rows from the source K's complete
+    /// result walk. An admitted relay is consumed at its own source token,
+    /// not dispatched by its eventual returned constructor tag.
+    pub(in crate::cranelift_backend) fn relay_nonrelay_successors(
+        &self,
+        source: StaticOriginId,
+    ) -> Result<BTreeMap<ContinuationContextId, Vec<StaticResponseContinuation>>, CraneliftBackendError> {
+        let protocol = self.relay_returned_vis_protocol(source)?;
+        protocol.contexts.into_iter().map(|context| {
+            let rows = context.members.into_iter().filter(|member| !member.relay)
+                .map(|member| member.successor.ok_or_else(|| planner_error(format!(
+                    "a relay K's returned non-relay Vis {:?} has no successor row",
+                    member.origin,
+                ))))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok((context.context, rows))
+        }).collect()
+    }
+
+    fn returned_vis_protocol_for_row(
+        &self,
+        owner: &StaticResponseContinuation,
+    ) -> Result<ReturnedVisProtocol, CraneliftBackendError> {
+        let owner_vis = owner.vis_origin();
         let candidate_rows = self.return_protocol_candidate_rows()?;
         let contexts = self.continuation_contexts()?;
         let units = self.emittable_units()?;

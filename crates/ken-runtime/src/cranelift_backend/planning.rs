@@ -88,7 +88,7 @@ pub(in crate::cranelift_backend) use static_transition::{
     CaptureRun, MaterializationKind, PerEmitterCaptureClaim, TransportCarriedClaim,
     FusionComposedEdge, FusionCompositionLayer, FusionOwnedOuterRealization, FusionRegionClaim,
     FusionRegionClaimLedger, PendingVisFrameOwner, PendingVisFrameRegion,
-    PendingVisRecordProtocol, ResponseOwnerSettlement,
+    PendingVisRecordProtocol, ResponseOwnerSettlement, RelayDrivePair,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///

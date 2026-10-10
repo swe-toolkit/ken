@@ -1314,8 +1314,23 @@ impl StaticTransitionPlan<'_> {
         relay_settlement::build_drive_pairs(self)
     }
 
-    /// The sole authority for the drive-at-source lowering arm and its (d)
-    /// admission condition. Absence never means a key can be invented locally.
+    /// The source token's one seated candidate, using the exact row predicate
+    /// that issues relay pairs. A missing or ambiguous row is never invented by
+    /// the emitter after a pair was installed.
+    pub(in crate::cranelift_backend) fn relay_source_row(
+        &self,
+        source: StaticOriginId,
+    ) -> Result<StaticResponseContinuation, CraneliftBackendError> {
+        let candidates = self.return_protocol_candidate_rows()?;
+        relay_settlement::source_seat_row(self, &candidates, source)
+            .cloned()
+            .ok_or_else(|| planner_error(format!(
+                "a relay source {source:?} has no unique seated response row",
+            )))
+    }
+
+    /// The sole authority for relay drive at the source token's claim seam and
+    /// its (d) admission condition. Absence never invents a second key.
     pub(in crate::cranelift_backend) fn relay_drive_pair(
         &self,
         source: StaticOriginId,
@@ -1330,6 +1345,16 @@ impl StaticTransitionPlan<'_> {
             return Err(planner_error("a relay drive pair disagrees with its source and owner"));
         }
         Ok(Some(pair))
+    }
+
+    /// The closed pair population in one emission owner, for the finished-CLIF
+    /// verifier's exact context-callee closure. No successor or other context
+    /// is inferred from this set.
+    pub(in crate::cranelift_backend) fn relay_drive_pairs_for_owner(
+        &self,
+        owner: ContinuationEmissionOwner,
+    ) -> impl Iterator<Item = RelayDrivePair> + '_ {
+        self.relay_drive_pairs.values().copied().filter(move |pair| pair.owner == owner)
     }
 
     /// An installed response's operation root is source material, not a

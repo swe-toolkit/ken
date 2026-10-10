@@ -464,7 +464,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    ResponseOwnerSettlement, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
+    ResponseOwnerSettlement, RelayDrivePair, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 #[cfg(test)]
@@ -8176,14 +8176,22 @@ impl<'a> Lowering<'a> {
         &self,
         func: &Function,
         bundle: &units::UnitBundle,
+        owner: ContinuationEmissionOwner,
     ) -> Result<(), CraneliftBackendError> {
         let mut expected_by_callee: BTreeMap<FuncId, usize> = BTreeMap::new();
         for (identity, insts) in &self.function_local.continuation_emissions {
-            let planned = units::resolved_continuation_call_target(
-                &self.static_transition_plan,
-                bundle,
-                identity,
-            )?;
+            let planned = match self.relay_pair_for_source_token_at_owner(identity, owner)? {
+                Some(_) => {
+                    let row = self.static_transition_plan
+                        .relay_source_row(identity.producer_construct_origin())?;
+                    bundle.context(row.k_context()).ok_or_else(|| backend_module(
+                        "a relay source's planned K context was never forward-declared".to_string(),
+                    ))?
+                }
+                None => units::resolved_continuation_call_target(
+                    &self.static_transition_plan, bundle, identity,
+                )?,
+            };
             for inst in insts {
                 let emitted = Self::decode_direct_callee(func, *inst)?;
                 if emitted != planned {
@@ -8248,6 +8256,18 @@ impl<'a> Lowering<'a> {
             specialization_callees.insert(id);
         }
         specialization_callees.extend(bundle.response_targets());
+        // Relay contexts are counted only for pairs in THIS emission owner.
+        // Their source tokens still name ordinary specialization targets, so a
+        // stray original call remains in the scan but disagrees with the
+        // planned context on the forward half. No successor or blanket context
+        // population is admitted here.
+        for pair in self.static_transition_plan.relay_drive_pairs_for_owner(owner) {
+            let row = self.static_transition_plan.relay_source_row(pair.source)?;
+            let context = bundle.context(row.k_context()).ok_or_else(|| backend_module(
+                "a relay source's planned K context was never forward-declared".to_string(),
+            ))?;
+            specialization_callees.insert(context);
+        }
         // ⛔ Not a fast path around the check: with no planned specialization
         // there is no callee the scan could recognise, and the loop above has
         // already rejected any recorded emission naming one -- so `expected` is
