@@ -279,18 +279,20 @@ base, stop and report the mismatch.
    `evt_3y7fxd70stq3x`, ruled `evt_2228y4p1zwgkg`).** The drop is a
    property of the lowering, not of admission: main, with no relay
    admission logic, and D3, which admits 707/768, both drop the read.
-   - **Plan fact, keyed on the entry edge (`evt_7pzcsgqvt0xs0`).**
-     `relay_route` is computed per (admitted pair, seat call identity)
-     from the plan's `selected_caller` map: the validated zip of
-     `static_response_owner_specializations` and the feasibility ledger,
-     keyed by `owner.selected_caller()`, which `responses.rs:4260` makes
-     a function. A seat identity with no entry edge has no route. One
-     with an edge selects, inside the entered owner's row and its
-     `pending_vis_record_protocol` successors, the single clause matching
-     the pair's (effect origin, operation); two clauses is a planner
-     error. No owner, effect or operation join key; the attribute-keyed
-     builders V1-V3 are discarded. Seats read this fact and never
-     discover it at lowering time.
+   - **Plan fact: the innermost instance (`evt_7pzcsgqvt0xs0`,
+     `evt_2brbe1vae8tv1`).** `relay_route` is computed per (admitted pair,
+     seat call identity) in two steps, each selecting inside one owner's
+     row and its `pending_vis_record_protocol` successors the single
+     clause matching the pair's (effect origin, operation); two clauses is
+     a planner error. **Step 1, entry:** if the seat identity is some
+     owner's `selected_caller()` (the validated owner/ledger zip, a
+     function by `responses.rs:4260`), the route is that owner's clause;
+     an empty selector is a stop. **Step 2, mint:** otherwise the route is
+     the clause of the pair's minting owner, which `RelayDrivePair` now
+     carries as `minting_row` (one key minted by two owners is a planner
+     error); an empty selector is None. No owner, effect or operation join
+     key, and no origin id joined across builds; V1-V3 are discarded.
+     Seats read this fact and never discover it at lowering time.
    - **Planned trap.** For each (pair, identity) with route none, the
      planner registers a planned `RuntimeTrap` with code
      `RuntimeTrapCode::MissingRuntimeMetadata` and the message
@@ -308,19 +310,23 @@ base, stop and report the mismatch.
      identity by `continuation_call_binding_for` on their four
      coordinates; `active_transport` names the identity it consumes by
      the same four.
-   - **Run order before the candidate.** Row 01 anchors: 735 routes to
-     member 2; 1115 routes to `StaticResponseOwnerId(0)`; 1164 and 1288
-     route; 846 has none; in-bounds BRANCHED 768 has none; the whole row
-     01 control is green. Then rows 01-36 and both variants re-derived per
-     (pair, identity): that none population is the refusal population of
-     record and supersedes the D0 (b) column. Then AC-MAIN, the mutant
+   - **Run order before the candidate.** Anchors (passed, audit
+     `evt_jrt6aze0s2bs`): 735 mint to owner 0 member 2; 846 none; 972,
+     1115, 1164 and 1288 entry to owners 5, 0, 1 and 2; in-bounds 707
+     mint to owner 0 member 2 and 768 none; the row 01 control green.
+     Then rows 01-36 and both variants re-derived per (pair, identity),
+     with the step taken: that none population is the refusal population
+     of record and supersedes the D0 (b) column. Then AC-MAIN, the mutant
      and the controls.
-   - **Stops** (`evt_7pzcsgqvt0xs0`): an anchor disagrees; an entered
-     owner has no clause for the pair's (effect origin, operation); a
-     route-none (pair, identity) reached in an executed run performs
-     natively, or a routed one drops the op; `active_transport` has no
-     identity bindable by the four coordinates while an admitted pair
-     reaches it; any "no verified selected incoming call" failure.
+   - **Stops** (`evt_7pzcsgqvt0xs0`, `evt_2brbe1vae8tv1`): an anchor
+     disagrees; an entered owner has no clause for the pair's (effect
+     origin, operation); a route-none (pair, identity) reached in an
+     executed run performs natively, or a routed one drops the op;
+     `active_transport` has no identity bindable by the four coordinates
+     while an admitted pair reaches it; any "no verified selected incoming
+     call" failure; a minting row that is not an emitted owner; a step-2
+     route reached in an executed run that does not perform the op
+     natively.
    - **Not a compile-time refusal**: that would redden 15 rows of tests
      whose measured runs are correct, and the successor would turn them
      back.
