@@ -205,6 +205,14 @@ base, stop and report the mismatch.
      (a new path) wraps its build in both switches, and a sibling
      assertion without suppression expects the exact typed relay refusal
      naming owner 0 / relay 370, not the closure text.
+   - **D3 and D4 are one atomic merge candidate** (`evt_2e92pc40cyrbc`).
+     D3's admission is a prospective predicate over the state once D4
+     lands: at the D3 checkpoint `d7820636f`, 105 of the census's 106
+     Excluded owners with sources (in 32 green tests) are admitted only
+     through (d). So D3 delivers its refusal promise only with D4, and is
+     never a merge candidate alone. D4 builds on `d7820636f`, and they take
+     one QA, one Architect review and one Decision. Do not add `&&
+     d_gate_installed` to admission: it would refuse those 105 owners.
 4. **The ruled relay arm: drive at the source, never carry the relay.**
    - `relay_drivable(F, R, O)` holds when all four hold:
      - (a) F has exactly one installed or candidate response row with a
@@ -215,7 +223,15 @@ base, stop and report the mismatch.
        and `ComputationalMatch` scrutinees whose single Vis case
        satisfies `response_forwards_vis`, with no generated Call edge (a
        curried redex under (R1) is not one);
-     - (d) the key is the pair (F, `O.base_owner()`), never F alone.
+     - (d) the key is the pair (F, `O.base_owner()`), never F alone,
+       read through one plan-side authority (`evt_2e92pc40cyrbc`):
+       `StaticTransitionPlan::relay_drive_pair(source, owner) ->
+       Result<Option<RelayDrivePair>, _>`. Lowering selects the relay arm
+       iff it returns `Some`, and `classify` admits on (d) iff it returns
+       `Ok(Some(_))`, pushing an `Err` to the owner's errors. The D3
+       constants `d_pair_proposed = true` and `d_gate_installed = false`
+       in `relay_settlement.rs` are deleted. A (d) axis kept as a
+       constant is a block.
    - A second gate in `lower_computational_producer_construct`, after
      the deferred one, calls the same drive, for `relay_drivable` sources
      only; a `drive_settled` source keeps its existing gate. The drive is
@@ -253,6 +269,35 @@ base, stop and report the mismatch.
   `px8ds_retired_flat_order_does_not_gain_m4_representation` is green with
   both assertions, and the switch is restored after its scope.
 
+- **AC-7 (the D4 population, `evt_2e92pc40cyrbc`).** The 32 tests that
+  carry the 105 owners whose emission D4 changes from Ret-only to
+  drive-at-source run individually through `scripts/ken-cargo`. So do
+  px8ta and the two un-ignored target rows, each with the recorder. The
+  32 include the 20 `checked_ih_*` and `composed_return_*` parity rows,
+  `rt_escape_second_resource_native`, `rt_span_prov_native`,
+  `rt_branched_scrutinee_unit_body_port`, `rt_capture_projection_grow`,
+  `rt_cold_lowering_checked_family_enumeration`,
+  `rt_exactint_carried_observe` and `rt_resource_release_carried_observe`;
+  the census file `census-r3/owner-source-rows.tsv` names them. Every row
+  is green, every owner is admitted through `relay_drive_pair = Some`, and
+  px8ta owner 0 is still the only typed refusal. CI owns everything else.
+  - The Architect's four R3 rows carry 35 more owners whose emission D4
+    changes, and run the same way (`evt_6r8n32qy4h9es`):
+    `rt_cold_lowering_path_enumeration` (10 owners), the
+    `fs_read_at_out_of_range_invalid_bounds_rejects_read_eof_witness`
+    parity row (2), `px8f_buffer_native` (11; owner 1 source 1169 is
+    drive-settled through P1 and gets no pair) and
+    `abi_s6_mapping_surface_native` (12).
+  - abi_s6 stays 12/12, every abi_s6 source logs `drive_settled=true`, and
+    its suppressed-local-drive control keeps its result: the Deferred
+    route keeps precedence through `deferred_drive_available`, so its
+    installed pairs go unused.
+  - The roster file the run uses lists all 36 tests plus px8ta and the two
+    target rows, with its SHA-256 recorded.
+- **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
+  census pair (span owner 4, source 1374) fires the typed refusal for that
+  owner and reddens AC-1, and is restored byte-identically.
+
 ## Stop conditions
 
 - D0 (i) is open, or no planning-refusal discriminant separates the
@@ -275,6 +320,9 @@ base, stop and report the mismatch.
   `4b4c8565c`, `21c039918`, `7f1a04a40`), or relaxes the `units.rs:7831`
   coverage gate or the `0x101d_0000_002a` guard.
 - Any kernel, trust or spec change.
+- An owner where `relay_drive_pair` returns `None` or `Err` while the R3
+  census had (a)-(c) true, or any AC-7 row going red: stop to the
+  Architect.
 
 ## Hard-stop inventory
 
