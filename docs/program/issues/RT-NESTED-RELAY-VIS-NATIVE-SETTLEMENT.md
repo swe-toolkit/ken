@@ -227,8 +227,11 @@ base, stop and report the mismatch.
        read through one plan-side authority (`evt_2e92pc40cyrbc`):
        `StaticTransitionPlan::relay_drive_pair(source, owner) ->
        Result<Option<RelayDrivePair>, _>`, the single admission
-       authority: the pair settles by static fusion at the source plus
-       its row's installed response owner. `classify` admits on (d) iff
+       authority. The pair establishes a uniquely seated candidate, not
+       a settling route or execution: static fusion consumes the
+       forwarded relay at the source, and a relay that still reaches the
+       owner at runtime takes the owner loop's unknown-member exit, which
+       returns `-1` (`evt_4c45bzrtqevcx`). `classify` admits on (d) iff
        it returns `Ok(Some(_))`, pushing an `Err` to the owner's errors. The D3
        constants `d_pair_proposed = true` and `d_gate_installed = false`
        in `relay_settlement.rs` are deleted. A (d) axis kept as a
@@ -241,9 +244,10 @@ base, stop and report the mismatch.
 5. **D4': no drive (`evt_5hcnh155zmm5x`).** Gate 2 measured G1: with
    the drive dormant, span, r2 and `abi_s6` are green and no relay Vis
    materializes at runtime. Each relay source is lowered under its
-   enclosing Computational eliminator and its seat is performed by its
-   row's installed response owner (`lower_static_response_effect`). The
-   returned-member projection is what fixed the trapping owners.
+   enclosing Computational eliminator. Its seat is emitted generically
+   by several functions, so no single route performs it
+   (`evt_4c45bzrtqevcx` R4). The returned-member projection is what fixed
+   the trapping owners.
    - **Delete:** the relay drive and every remnant
      (`call_relay_source_token`, `relay_pair_for_source_token(_at_owner)`,
      the inline-skip extension, `call_declared_unit_target_with_frame`,
@@ -319,11 +323,18 @@ base, stop and report the mismatch.
     installed pairs go unused.
   - The roster file the run uses lists all 36 tests plus px8ta and the two
     target rows, with its SHA-256 recorded.
-  - **Census gate (`evt_5hcnh155zmm5x`).** For every pair with
-    `relay_drive_pair = Some`, record whether its row is installed (a
-    response-owner function emits its seat through
-    `lower_static_response_effect`). An admitted pair whose row is
-    candidate-only is a stop to the Architect.
+  - **Runtime census (`evt_4c45bzrtqevcx`).** Admission is a
+    completeness claim, measured at runtime, not by which function emits
+    a seat. With disposable native counters (stderr markers allowed), for
+    each admitted pair in each build record: (i) executions of the source
+    at its fall-through point in its context function; (ii) exits through
+    the pair owner's unknown-member `-1` block; (iii) the native and
+    interpreter op traces and the rc. Run one row at a time from row 01,
+    and stop to the Architect at the first red, any (ii) > 0 (report it
+    even when the native rc is 0 and the traces agree: a silent drop), or
+    any trace difference. After all rows, the sum of (i) over every
+    admitted pair must be above 0; a sum of 0 is a stop, because the gate
+    never executed a relay source.
 - **AC-8 (mutation, QA).** `relay_drive_pair` returning `None` for one
   census pair (span owner 4, source 1374) fires the typed refusal for that
   owner and reddens AC-1, and is restored byte-identically.
@@ -430,8 +441,10 @@ base, stop and report the mismatch.
   row 3 seat 190 and 846/Spec2 row 1 seat 174, row still green); D4'
   named the installed owner as the settling route without measuring
   that population -- keyed on the plan's row existence, not on the
-  route that performs the seat (`evt_1pfhbxjg0f4he`). AC-7 is paused
-  for one measurement (R1, R4, R5 and a D3 baseline; outcomes M1-M3).
+  route that performs the seat (`evt_1pfhbxjg0f4he`). The measurement
+  (`evt_4c45bzrtqevcx`, non-advancing) found no single route: owner 0
+  runs for member 515 and seat 174 never executes. AC-7's census is recut
+  to runtime behavior.
 
 ## Finding outside this WP
 
