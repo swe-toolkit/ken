@@ -3383,7 +3383,8 @@ fn required_consumer_route_manufactures_the_depth_two_plus_closure_crossing() {
             Err(CraneliftBackendError::Backend(
                 BackendFailure::PlannerInvariant(reason),
             ))
-                if reason == "aggregate producer has no planned ownership record" =>
+                if reason.starts_with("aggregate producer StaticOriginId(")
+                    && reason.ends_with(" has no planned ownership record") =>
             {
                 "AggregateProducerOwnership".to_string()
             }

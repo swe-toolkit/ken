@@ -10428,6 +10428,29 @@ pub(in crate::cranelift_backend::planning::static_transition) fn lifetime_refere
 }
 
 impl<'src> StaticTransitionPlan<'src> {
+    #[cfg(any(test, feature = "px8-ds-test-support"))]
+    fn record_relay_d4_aggregate_miss(
+        &self,
+        origin: StaticOriginId,
+        shape: PlannedAggregateShape,
+    ) {
+        if std::env::var_os("KEN_RELAY_D1_RECORD").is_none() {
+            return;
+        }
+        let source_kind = match self.source_occurrence(origin) {
+            Ok(RuntimeExpr::Construct { .. }) => "Construct",
+            Ok(RuntimeExpr::Record { .. }) => "Record",
+            Ok(_) => "other",
+            Err(_) => "absent",
+        };
+        eprintln!(
+            "RELAY_D4_AGG_MISS origin={origin:?} shape={shape:?} in_source_population={} source_kind={source_kind} function_owner={:?}\n{}",
+            self.source_occurrences.iter().flatten().any(|o| o.static_origin == origin),
+            self.semantic.function_owner(origin),
+            std::backtrace::Backtrace::force_capture(),
+        );
+    }
+
     /// **`D7` — the ruled allocation lane for one aggregate producer.**
     ///
     /// ⛔ **Absence is a loud failure, never a default.** An aggregate the
@@ -10450,7 +10473,11 @@ impl<'src> StaticTransitionPlan<'src> {
             .iter()
             .find(|record| record.producer == AggregateOccurrenceProducer::Source(origin))
             .ok_or_else(|| {
-                planner_error("aggregate producer has no planned ownership record")
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                self.record_relay_d4_aggregate_miss(origin, shape);
+                planner_error(format!(
+                    "aggregate producer {origin:?} ({shape:?}) has no planned ownership record"
+                ))
             })?;
         if record.shape != shape {
             return Err(planner_error(
@@ -10476,7 +10503,13 @@ impl<'src> StaticTransitionPlan<'src> {
             .aggregate_ownership
             .iter()
             .find(|record| record.producer == AggregateOccurrenceProducer::Source(origin))
-            .ok_or_else(|| planner_error("aggregate producer has no planned ownership record"))?;
+            .ok_or_else(|| {
+                #[cfg(any(test, feature = "px8-ds-test-support"))]
+                self.record_relay_d4_aggregate_miss(origin, shape);
+                planner_error(format!(
+                    "aggregate producer {origin:?} ({shape:?}) has no planned ownership record"
+                ))
+            })?;
         if record.shape != shape {
             return Err(planner_error(
                 "aggregate producer disagrees with its planned ownership shape",
