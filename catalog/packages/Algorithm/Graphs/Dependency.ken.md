@@ -369,20 +369,6 @@ theorem direct_step
         })
       h
 
-data CycleHead (q : Type) (g : Graph q) : Type where {
-  MkCycleHead : (s : q) → (t : q) → Equal Bool (edge q g s t) True → CycleHead q g
-}
-
-fn cycle_first_edge (q : Type) (g : Graph q) (cy : Cycle q g) : CycleHead q g =
-  match cy {
-    MkCycle s t first rest ↦ MkCycleHead q g s t first
-  }
-
-fn self_loop_cycle
-      (q : Type) (g : Graph q) (s : q) (same : Equal Bool (edge q g s s) True)
-    : Cycle q g =
-  MkCycle q g s s same (WalkHere q g s)
-
 fn walk_word (q : Type) (g : Graph q) (s : q) (t : q) (walk : Walk q g s t) : List q =
   match walk {
     WalkHere ↦ Nil q;
@@ -1234,11 +1220,6 @@ theorem dedup_covers
     x
     (dedup q d (elements q fq))
     (dedup_preserves_member q d x (elements q fq) (covers q fq x))
-
-theorem sort_perm_probe
-      (q : Type) (d : DecEq q) (le : q → q → Bool) (xs : List q) (x : q)
-    : Equal Nat (DC.count q d.eq x xs) (DC.count q d.eq x (DC.sort q le xs)) =
-  DC.sort::perm q le xs d.eq x
 
 fn is_positive (n : Nat) : Bool =
   match n {

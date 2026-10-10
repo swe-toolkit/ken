@@ -163,7 +163,7 @@ fn public_surface_generic_laws_and_zero_trust_delta() {
         "rank",
         "ordered_list",
         "dedup",
-        "sort_perm_probe",
+        "ancestor",
     ] {
         match env.elaborate_file(&format!("import {GRAPH} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
