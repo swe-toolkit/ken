@@ -279,41 +279,26 @@ base, stop and report the mismatch.
    `evt_3y7fxd70stq3x`, ruled `evt_2228y4p1zwgkg`).** The drop is a
    property of the lowering, not of admission: main, with no relay
    admission logic, and D3, which admits 707/768, both drop the read.
-   - **Plan fact: the innermost instance, clause by provenance
-     (`evt_7pzcsgqvt0xs0`, `evt_2brbe1vae8tv1`, `evt_1dr0bpwnb4adn`).**
+   - **Plan fact: the innermost instance (`evt_7pzcsgqvt0xs0`,
+     `evt_2brbe1vae8tv1`, `evt_1dr0bpwnb4adn`, final `evt_6kr9s8zaq615x`).**
      `relay_route` is computed per (admitted pair, seat call identity) in
-     two steps. The clause is selected by provenance; `(effect origin,
-     operation)` is no longer a key, only an assertion that the selected
-     clause matches the pair, else a planner error. **Step 1, entry:** if
-     the seat identity is some owner's `selected_caller()` (the validated
-     owner/ledger zip, a function by `responses.rs:4260`), the route is
-     that owner's own row, with `row.vis_origin() == pair.source` asserted
-     (else stop); successors are not consulted; an empty selector is a
-     stop. **Step 2, mint:** otherwise the route is the clause the pair's
-     minting relay member identifies. `RelayDrivePair` carries
-     `minting_row` and `minting_member: (ContinuationContextId,
-     StaticOriginId)`, set in `relay_settlement` `build_drive_pairs` (one
-     key minted by two owners is a planner error); no identified clause is
-     None. More than one reachable position for one (pair, identity), or a
-     minting member that maps to two emitted clauses, is a static refusal,
-     never a tie-break; runtime state carriage is a successor. No owner,
-     effect or operation join key, and no origin id joined across builds;
-     V1-V3 are discarded. Seats read this fact and never discover it at
-     lowering time.
-   - **Minting-member relation (attribution first, non-advancing,
-     `evt_1dr0bpwnb4adn`).** For row 01 builds 0 and 2 (735, 846),
-     in-bounds 707 and 768, and row 32's failing pair, record
-     `minting_member` and, for every emitted clause of the minting owner
-     (row plus deduped successors), its `vis_origin`, `operation_root`,
-     context and member position. (S1) `minting_member.origin` equals the
-     `vis_origin` of exactly one clause where a route is expected and of
-     none for 846 and 768, and row 32 hits exactly one: the Architect
-     confirms that relation. (S2) Otherwise, if (context, member position)
-     singles out exactly one clause for every pair, the Architect rules
-     it. (R) Row 32's pair reaches more than one position: the typed
-     refusal reddens its green test, which is a stop to the Steward for a
-     frame call. (X) Anything else: stop. No selector change before S1 or
-     S2 is ruled.
+     two steps. **Step 1, entry, by provenance:** if the seat identity is
+     some owner's `selected_caller()` (the validated owner/ledger zip, a
+     function by `responses.rs:4260`), the route is that owner's own row;
+     successors are not consulted. Assert `row.vis_origin() == pair.source`
+     and that the row's (effect origin, operation) is the pair's, else a
+     planner error (a stop). **Step 2, mint, static operation selector:**
+     otherwise take the pair's minting owner, which `RelayDrivePair`
+     carries as `minting_row` (one key minted by two owners is a planner
+     error), and select within its row and `pending_vis_record_protocol`
+     successors the clauses matching the pair's (effect origin,
+     operation): none is None, one is the route, and more than one is a
+     typed static refusal, never a tie-break. The minting relay member
+     carries no clause identity (identical for routed and None twins), so
+     no `minting_member` field is added; runtime state carriage is the
+     successor. No owner, effect or operation join key across instances,
+     and no origin id joined across builds; V1-V3 are discarded. Seats
+     read this fact and never discover it at lowering time.
    - **Planned trap.** For each (pair, identity) with route none, the
      planner registers a planned `RuntimeTrap` with code
      `RuntimeTrapCode::MissingRuntimeMetadata` and the message
@@ -340,15 +325,18 @@ base, stop and report the mismatch.
      `evt_jrt6aze0s2bs`): 735 mint to owner 0 member 2; 846 none; 972,
      1115, 1164 and 1288 entry to owners 5, 0, 1 and 2; in-bounds 707
      mint to owner 0 member 2 and 768 none; the row 01 control green.
+     Re-run under the step-1 own-row rule with row 14 at 1/1/1 and 768
+     trapping; then row 32 green with 1147 at step 1 to owner 0 row 0
+     (`evt_6kr9s8zaq615x`).
      Then rows 01-36 and both variants re-derived per (pair, identity),
      with the step taken: that none population is the refusal population
      of record and supersedes the D0 (b) column. Then AC-MAIN, the mutant
      and the controls.
    - **Stops** (`evt_7pzcsgqvt0xs0`, `evt_2brbe1vae8tv1`,
      `evt_1dr0bpwnb4adn`): an anchor disagrees; an entered owner's row
-     does not record the pair's source, or the provenance-selected clause
-     does not match the pair's (effect origin, operation); attribution
-     outcome (R) or (X); a route-none (pair, identity) reached in an
+     does not record the pair's source or operation; the step-2
+     more-than-one-position refusal firing on any row (to the Steward for
+     a frame call); a route-none (pair, identity) reached in an
      executed run performs natively, or a routed one drops the op;
      `active_transport` has no identity bindable by the four coordinates
      while an admitted pair reaches it; any "no verified selected incoming
