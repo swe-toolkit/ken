@@ -1,7 +1,7 @@
 ---
 id: CAT-NONEMPTY-TO-LIST-SHAPE
 title: "Data.Collections.NonEmpty keeps its constructor abstract but exports no law relating nonempty_to_list to nonempty_head and nonempty_tail, so an importer cannot prove anything about the list view of an arbitrary NonEmpty. Export the shape law"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -64,3 +64,15 @@ literate prose, and the private helper. No constructor export.
 
 - The law needs `NonEmptyCons` exported, an Axiom, or a kernel, trust or
   spec change.
+
+## Closeout
+
+Merged `e49cd5b95` from exact `dbfc38a00` (PR #4665). Foundation QA
+`evt_6t2vbkc67vm9m` and, after the Architect's arrangement fold
+(`evt_18nn6gjk8e8bk`), `evt_13mmvq6wmqqks`; Architect `evt_4m4x08vhezq97`;
+Decision `dec_3s757fwdaz2r2`. `nonempty_to_list_shape` is a checked
+theorem at zero trust over the public projections; its private
+constructor-case helper is load-bearing, since a direct `Refl` is refused.
+`NonEmptyCons` stays out of the public inventory. A distinct importer
+derives shape and length through `cong`, and the extra-`Suc` claim is
+kernel-rejected. §1a: 0.
