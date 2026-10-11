@@ -1,7 +1,7 @@
 ---
 id: VERIFY-EXAMPLE-BOUNDARY-HEADER-ISOLATION
 title: "A ken example fence with a program capabilities header overwrites the program's own boundary header, so the runner and native admission mint ProgramCaps from the example's authority: an example can raise a program's FS authority. Example elaboration must leave the package's boundary header as the program declared it"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -70,3 +70,21 @@ that reaches admission or the runner the same way.
 - A catalog or corpus program relies on an example's header: stop with
   the list.
 - The repair needs a kernel, trust or spec change.
+
+## Closeout
+
+Merged `f63764273` from exact `6b83e1d23` (PR #4662). Verify QA
+`evt_7bmbfc48qdvnj`, Architect `evt_tphteqveavm7`, Decision
+`dec_4bzq55z97z0np`. The checked-fence executor saves the program's
+boundary header, runs the reject and example loops through a private
+helper, and restores the header on both `Ok` and `Err`, the seam ruled at
+D0 (`evt_2k1ctycw0444f`). An example's header no longer reaches
+`ProgramCaps` on `ken run`, native admission, a dependency-only header or
+the roots-loaded entry; each fence is still checked against its own
+header. A no-op-restore mutant reddened 7 of 8 rows, including an actual
+forbidden write. Zero headed example fences among 73 tracked `.ken.md`
+files, and nine real-file outputs are byte-identical. §1a: 0.
+
+Residuals, disposed (`evt_qn2e1q8bca92`): R1 declined; R2 is
+`VERIFY-PACKAGE-BOUNDARY-HEADER-ORDER`; R3 is
+`VERIFY-EXAMPLE-MAIN-NOT-ENTRYPOINT`.
