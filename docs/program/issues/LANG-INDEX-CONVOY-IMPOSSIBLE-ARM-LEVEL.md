@@ -1,7 +1,7 @@
 ---
 id: LANG-INDEX-CONVOY-IMPOSSIBLE-ARM-LEVEL
 title: "The index-equation convoy types a conflicting-equation branch as bare Top : Omega 0, so a dependent match whose goal sort is Omega l with l >= 1 builds an ill-typed index method and is refused with Internal. Make the impossible arm live at the goal's level"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
