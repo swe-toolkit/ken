@@ -67,7 +67,7 @@ pub proof comm for add (a : Nat) (b : Nat) : Equal Nat (add a b) (add b a) =
 
 proof zero_r for mul (a : Nat) : Equal Nat (mul a Zero) Zero = Proved
 
-proof zero_l for mul (a : Nat) : Equal Nat (mul Zero a) Zero =
+pub proof zero_l for mul (a : Nat) : Equal Nat (mul Zero a) Zero =
   match a {
     Zero ↦ Proved;
     Suc a2 ↦ proof zero_l for mul a2
@@ -122,9 +122,9 @@ proof suc_l for mul (a : Nat) (b : Nat) : Equal Nat (mul (Suc a) b) (add (mul a 
               ((proof assoc for add) (mul a b2) a b2))))
   }
 
-proof one_r for mul (a : Nat) : Equal Nat (mul a (Suc Zero)) a = proof zero_l for add a
+pub proof one_r for mul (a : Nat) : Equal Nat (mul a (Suc Zero)) a = proof zero_l for add a
 
-proof one_l for mul (a : Nat) : Equal Nat (mul (Suc Zero) a) a =
+pub proof one_l for mul (a : Nat) : Equal Nat (mul (Suc Zero) a) a =
   match a {
     Zero ↦ Proved;
     Suc a2 ↦
@@ -137,7 +137,7 @@ proof one_l for mul (a : Nat) : Equal Nat (mul (Suc Zero) a) a =
         ((proof suc_r for add) a2 Zero)
   }
 
-proof comm for mul (a : Nat) (b : Nat) : Equal Nat (mul a b) (mul b a) =
+pub proof comm for mul (a : Nat) (b : Nat) : Equal Nat (mul a b) (mul b a) =
   match b {
     Zero ↦ sym Nat (mul Zero a) Zero ((proof zero_l for mul) a);
     Suc b2 ↦
@@ -175,7 +175,7 @@ pub theorem mul_add_distrib_r
           ((proof assoc for add) (mul a b) (mul a c2) a))
   }
 
-theorem mul_add_distrib_l
+pub theorem mul_add_distrib_l
       (a : Nat) (b : Nat) (c : Nat)
     : Equal Nat (mul (add a b) c) (add (mul a c) (mul b c)) =
   trans
@@ -198,7 +198,7 @@ theorem mul_add_distrib_l
         (cong Nat Nat (mul c a) (mul a c) (λx. add x (mul c b)) ((proof comm for mul) c a))
         (cong Nat Nat (mul c b) (mul b c) (λx. add (mul a c) x) ((proof comm for mul) c b))))
 
-proof assoc for mul
+pub proof assoc for mul
       (a : Nat) (b : Nat) (c : Nat)
     : Equal Nat (mul a (mul b c)) (mul (mul a b) c) =
   match c {
@@ -218,6 +218,100 @@ proof assoc for mul
           (λx. add x (mul a b))
           ((proof assoc for mul) a b c2))
   }
+
+fn pred_nat (n : Nat) : Nat =
+  match n {
+    Zero ↦ Zero;
+    Suc tail ↦ tail
+  }
+
+theorem suc_injective (a : Nat) (b : Nat) (h : Equal Nat (Suc a) (Suc b)) : Equal Nat a b =
+  cong Nat Nat (Suc a) (Suc b) pred_nat h
+
+theorem add_cancel_r
+      (a : Nat) (b : Nat)
+    : (c : Nat) → Equal Nat (add a c) (add b c) → Equal Nat a b =
+  λc.
+    match c {
+      Zero ↦ λh. h;
+      Suc tail ↦ λh. add_cancel_r a b tail (suc_injective (add a tail) (add b tail) h)
+    }
+
+theorem mul_cancel_core
+      (a : Nat) (b : Nat) (k : Nat)
+    : Equal Nat (mul a (Suc k)) (mul b (Suc k)) → Equal Nat a b =
+  match a {
+    Zero ↦
+      match b {
+        Zero ↦ λh. Proved;
+        Suc b2 ↦
+          λh.
+            absurd
+              (trans
+                Nat
+                Zero
+                (mul Zero (Suc k))
+                (mul (Suc b2) (Suc k))
+                (sym Nat (mul Zero (Suc k)) Zero ((proof zero_l for mul) (Suc k)))
+                h)
+      };
+    Suc a2 ↦
+      match b {
+        Zero ↦
+          λh.
+            absurd
+              (trans
+                Nat
+                (mul (Suc a2) (Suc k))
+                (mul Zero (Suc k))
+                Zero
+                h
+                ((proof zero_l for mul) (Suc k)));
+        Suc b2 ↦
+          λh.
+            let common_summand_equality : Equal Nat
+              (add (mul a2 (Suc k)) (Suc k))
+              (add (mul b2 (Suc k)) (Suc k)) =
+              trans
+                Nat
+                (add (mul a2 (Suc k)) (Suc k))
+                (mul (Suc a2) (Suc k))
+                (add (mul b2 (Suc k)) (Suc k))
+                (sym
+                  Nat
+                  (mul (Suc a2) (Suc k))
+                  (add (mul a2 (Suc k)) (Suc k))
+                  ((proof suc_l for mul) a2 (Suc k)))
+                (trans
+                  Nat
+                  (mul (Suc a2) (Suc k))
+                  (mul (Suc b2) (Suc k))
+                  (add (mul b2 (Suc k)) (Suc k))
+                  h
+                  ((proof suc_l for mul) b2 (Suc k)))
+            in
+              cong
+                Nat
+                Nat
+                a2
+                b2
+                Suc
+                (mul_cancel_core
+                  a2
+                  b2
+                  k
+                  (add_cancel_r
+                    (mul a2 (Suc k))
+                    (mul b2 (Suc k))
+                    (Suc k)
+                    common_summand_equality))
+      }
+  }
+
+pub proof cancel_r for mul
+      (a : Nat) (b : Nat) (k : Nat) (h : Equal Nat (mul a (Suc k)) (mul b (Suc k)))
+    : Equal Nat a b =
+  mul_cancel_core a b k h
 ```
 
 ## How the document is layered
@@ -225,9 +319,19 @@ proof assoc for mul
 `add` and `mul` recurse on their second argument and remain the only
 value-producing definitions. Their checked laws carry exactly the structural
 recursion they need and are discoverable as members of `add::…` or `mul::…`.
-The public `mul_add_distrib_r` theorem distributes multiplication over the
-sum in its right argument; its structural proof remains with the arithmetic
-operations that determine its reduction.
+Both distributivity laws are checked: `mul_add_distrib_r` follows the
+recursion of `mul` on its right argument, while `mul_add_distrib_l`
+uses commutativity to transport that result to a left-hand sum. The
+multiplicative unit, zero, commutativity, and associativity laws keep their
+attached `mul::…` identities. The successor multiplication helpers and the
+right-zero computation proof remain private.
+
+Cancellation by a positive right factor is also checked. Its private proof
+first eliminates a common `add` summand through successor injectivity, then
+recurses on both operands using the private successor multiplication law.
+The exported `mul::cancel_r` needs a `Suc` factor: cancellation by `Zero`
+would be false. These laws are the multiplication prerequisites for
+[exact rational values](../../../../../spec/50-stdlib/64-rational.md#4-nat-prerequisite-surface).
 
 ## Using it
 
