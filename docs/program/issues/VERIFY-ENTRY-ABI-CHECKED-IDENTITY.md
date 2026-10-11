@@ -1,7 +1,7 @@
 ---
 id: VERIFY-ENTRY-ABI-CHECKED-IDENTITY
 title: "The runner, the interpreter's console ids and program admission read the entry ABI (Success, Failure, Ret, Vis, Write, Stdout, HostIO, host_exit and more) from elab.globals by spelling, so a top-level const reusing one of those names, in an example or a plain fence, changes what a valid program runs. Key every entry-ABI read on checked prelude identity"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
