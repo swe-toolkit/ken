@@ -2,13 +2,13 @@
 //!
 //! `23 §4.4` needs two Ken theorems, `embedding_adequacy` and
 //! `checker_soundness`. `checker_soundness`'s statement (`23 §4.3`,
-//! `:452-467`) needs three surface-level capabilities that nothing in this
-//! tree has exercised yet:
+//! `:452-467`) needs three surface-level capabilities measured by these
+//! independent test-only fixtures:
 //!
-//! 1. an inductive **indexed by** `FokSequent` (`Derivation`'s Ken analogue,
-//!    `FokDerivation : FokSequent -> Type`);
-//! 2. propositional truncation `‖A‖`, so `Derives(s) : Omega := ‖ FokDerivation
-//!    s ‖` is writable;
+//! 1. an inductive **indexed by** `FokSequent` (`Derivation`'s Ken analogue;
+//!    the real `FokDerivation` is already in `FoKripke.ken`);
+//! 2. propositional truncation `‖A‖`, so a probe of the form
+//!    `Derives(s) : Omega := ‖ FokProbeDerivation s ‖` is writable;
 //! 3. a proof term that eliminates a `Equal Bool b True` hypothesis by cases
 //!    on `b` -- the shape every step of `fok_check_rule`'s `fok_and`/`fok_or`
 //!    unfolding will need at `D2`.
@@ -17,8 +17,7 @@
 //! elaboration** -- not by reading the kernel or the elaborator source -- and
 //! reports each result on its own. A HARD STOP at any one of them is a
 //! complete `D0` result (node doc, `AC-5`): this file does not patch the
-//! language and does not begin authoring `FokDerivation`'s real rule set
-//! (that is `D1`).
+//! language or author the real `FokDerivation` rule set in `FoKripke.ken`.
 //!
 //! No change to `fok_check_cert`/the checker, no FO `Proved` verdict, no new
 //! primitive/postulate/axiom/trusted-base entry (`AC-1`, `AC-3`, `AC-4`).
@@ -49,12 +48,12 @@ fn load_fok(env: &mut ElabEnv) {
 // Probe 1: an inductive indexed by `FokSequent`.
 // ---------------------------------------------------------------------
 
-/// `data FokDerivation : FokSequent -> Type where { ... }` -- a minimal,
-/// deliberately-not-yet-real rule set (one constructor, no premises) whose
-/// only job is to establish that the surface `data D : Idx -> Type where`
-/// form (`34 §2`) accepts a *user-defined inductive* (`FokSequent`, not a
-/// prelude type like `Nat`) as its index type, and that the kernel accepts
-/// the resulting family. `D1` authors the real rule set; this is not it.
+/// `data FokProbeDerivation : FokSequent -> Type where { ... }` -- a minimal,
+/// test-only family (one constructor, no premises) whose only job is to
+/// establish that the surface `data D : Idx -> Type where` form (`34 §2`)
+/// accepts a *user-defined inductive* (`FokSequent`, not a prelude type like
+/// `Nat`) as its index type, and that the kernel accepts the resulting family.
+/// The loaded catalog already owns `FokDerivation`; this probe is not it.
 #[test]
 fn probe1_fokderivation_indexed_by_foksequent_elaborates_and_kernel_checks() {
     let mut env = mk_env();
@@ -64,8 +63,8 @@ fn probe1_fokderivation_indexed_by_foksequent_elaborates_and_kernel_checks() {
 
     let id = env
         .elaborate_decl(
-            "data FokDerivation : FokSequent -> Type where { \
-               FokDerivationPlaceholder : (s : FokSequent) -> FokDerivation s \
+            "data FokProbeDerivation : FokSequent -> Type where { \
+               FokProbeWitness : (s : FokSequent) -> FokProbeDerivation s \
              }",
         )
         .expect("an inductive indexed by FokSequent must elaborate and kernel-check");
@@ -79,11 +78,11 @@ fn probe1_fokderivation_indexed_by_foksequent_elaborates_and_kernel_checks() {
     let ind = env
         .env
         .inductive(id)
-        .expect("FokDerivation must be registered as an inductive family");
+        .expect("FokProbeDerivation must be registered as an inductive family");
     assert_eq!(
         ind.indices.len(),
         1,
-        "FokDerivation must carry exactly one index (the FokSequent)"
+        "FokProbeDerivation must carry exactly one index (the FokSequent)"
     );
     assert_eq!(ind.constructors.len(), 1);
     assert_eq!(
@@ -97,8 +96,8 @@ fn probe1_fokderivation_indexed_by_foksequent_elaborates_and_kernel_checks() {
 // Probe 2: propositional truncation `‖A‖` from `.ken` surface syntax.
 // ---------------------------------------------------------------------
 
-/// The literal spec syntax: `Derives(s) : Omega := ‖ FokDerivation s ‖`
-/// (`23 §4.3`, adapted to the Fok names).
+/// The literal spec syntax: `Derives(s) : Omega := ‖ FokProbeDerivation s ‖`
+/// (`23 §4.3`, adapted to a separate test-only family).
 ///
 /// **Flipped by [[LANG-TRUNCATION-SURFACE-SYNTAX]] `D1`.** At `D0` this
 /// probe recorded a LEXER rejection (no `‖`/`Trunc` token existed at all) as
@@ -108,22 +107,21 @@ fn probe1_fokderivation_indexed_by_foksequent_elaborates_and_kernel_checks() {
 /// lexer.rs`'s `Token::TruncBar`, elaborating to the kernel's existing
 /// `Term::Trunc`), so the axis this probe measures now reads PASS, not
 /// FAIL — updating the assertion here is this WP's own regression fix, not
-/// an encroachment onto that node's remaining `D1b` work (`fok_derives`/
-/// `fok_classically_valid`'s REAL definitions are still untouched: this
-/// probe still only builds a placeholder `FokDerivation` and a throwaway
-/// `fok_derives`, exactly as before).
+/// an encroachment onto that node's remaining `D1b` work. The real
+/// `FokDerivation` and `fok_derives` in `FoKripke.ken` stay untouched; this
+/// probe builds a separate test-only family and a throwaway helper.
 #[test]
 fn probe2_propositional_truncation_literal_spec_syntax() {
     let mut env = mk_env();
     load_fok(&mut env);
     env.elaborate_decl(
-        "data FokDerivation : FokSequent -> Type where { \
-           FokDerivationPlaceholder : (s : FokSequent) -> FokDerivation s \
+        "data FokProbeDerivation : FokSequent -> Type where { \
+           FokProbeWitness : (s : FokSequent) -> FokProbeDerivation s \
          }",
     )
-    .expect("probe 1 must hold for probe 2 to test the real Derives shape");
+    .expect("probe 1 must hold for probe 2 to test the Derives shape");
 
-    env.elaborate_decl("fn fok_derives (s : FokSequent) : Omega = ‖ FokDerivation s ‖")
+    env.elaborate_decl("fn fok_derives_probe (s : FokSequent) : Omega = ‖ FokProbeDerivation s ‖")
         .expect(
             "propositional truncation must now elaborate from `.ken` surface syntax -- \
              LANG-TRUNCATION-SURFACE-SYNTAX D1 delivered the ‖A‖ formation spelling",
@@ -146,20 +144,21 @@ fn probe2b_propositional_truncation_ascii_spelling_probe() {
     let mut env = mk_env();
     load_fok(&mut env);
     env.elaborate_decl(
-        "data FokDerivation : FokSequent -> Type where { \
-           FokDerivationPlaceholder : (s : FokSequent) -> FokDerivation s \
+        "data FokProbeDerivation : FokSequent -> Type where { \
+           FokProbeWitness : (s : FokSequent) -> FokProbeDerivation s \
          }",
     )
-    .expect("probe 1 must hold for probe 2b to test the real Derives shape");
+    .expect("probe 1 must hold for probe 2b to test the Derives shape");
 
-    env.elaborate_decl("fn fok_derives_ascii (s : FokSequent) : Omega = ||FokDerivation s||")
+    env.elaborate_decl("fn fok_derives_ascii (s : FokSequent) : Omega = ||FokProbeDerivation s||")
         .expect(
             "the ASCII double-pipe spelling '||A||' must now elaborate -- \
              LANG-TRUNCATION-SURFACE-SYNTAX D1 delivered it as the same token as ‖A‖",
         );
 
-    let trunc_ident_result = env
-        .elaborate_decl("fn fok_derives_trunc (s : FokSequent) : Omega = Trunc (FokDerivation s)");
+    let trunc_ident_result = env.elaborate_decl(
+        "fn fok_derives_trunc (s : FokSequent) : Omega = Trunc (FokProbeDerivation s)",
+    );
     match trunc_ident_result {
         Ok(_) => panic!(
             "bare identifier 'Trunc' unexpectedly elaborated -- LANG-TRUNCATION-SURFACE-SYNTAX \

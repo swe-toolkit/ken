@@ -442,12 +442,11 @@ fn d2_elim_trunc_surface_sugar_refuses_a_type_classified_target() {
 // D3: the caller -- the exact shape V3-FO-CHECKER-SOUNDNESS D1b needs.
 // ---------------------------------------------------------------------
 
-/// `Derives(s) : Omega := ‖ FokDerivation s ‖` (`AC-5`) -- against a
-/// PLACEHOLDER `FokDerivation`, never the real rule set. `FoKripke.ken` is
-/// loaded read-only (`include_str!`); this test declares `FokDerivation`
-/// and `Derives` only in its own transient environment, touching no
-/// checked-in file and authoring none of [[V3-FO-CHECKER-SOUNDNESS]]'s
-/// `D1b` (`fok_derives`/`fok_classically_valid`'s REAL definitions).
+/// `Derives(s) : Omega := ‖ FokProbeDerivation s ‖` (`AC-5`) -- against a
+/// separate test-only indexed family, not the real `FokDerivation` rule set.
+/// `FoKripke.ken` is loaded read-only (`include_str!`); this test declares
+/// `FokProbeDerivation` and `Derives` only in its transient environment,
+/// touching no checked-in file or the catalog's real `fok_derives`.
 #[test]
 fn ac5_derives_exact_shape_elaborates_and_kernel_checks() {
     let mut env = mk_env();
@@ -458,25 +457,25 @@ fn ac5_derives_exact_shape_elaborates_and_kernel_checks() {
     let before = trust(&env);
 
     env.elaborate_decl(
-        "data FokDerivation : FokSequent -> Type where { \
-           FokDerivationPlaceholder : (s : FokSequent) -> FokDerivation s \
+        "data FokProbeDerivation : FokSequent -> Type where { \
+           FokProbeWitness : (s : FokSequent) -> FokProbeDerivation s \
          }",
     )
-    .expect("a placeholder FokDerivation indexed by FokSequent must elaborate");
+    .expect("a test-only FokProbeDerivation indexed by FokSequent must elaborate");
 
     // `fn`, not `theorem`: the declared type is the bare universe `Omega`
-    // (classifies at `Type 1`), matching `D0`'s own `fn fok_derives` probe
+    // (classifies at `Type 1`), matching `D0`'s own `fn fok_derives_probe`
     // shape -- `fn` requires >=1 explicit value parameter, satisfied by `s`.
-    env.elaborate_decl("fn Derives (s : FokSequent) : Omega = ‖ FokDerivation s ‖")
+    env.elaborate_decl("fn Derives (s : FokSequent) : Omega = ‖ FokProbeDerivation s ‖")
         .expect(
-            "`Derives(s) : Omega := ‖ FokDerivation s ‖` -- the exact D0-blocking shape -- must \
-             now elaborate and kernel-check (AC-5)",
+            "`Derives(s) : Omega := ‖ FokProbeDerivation s ‖` -- the D0-blocking shape -- must \
+             elaborate and kernel-check (AC-5)",
         );
 
     assert_eq!(
         before,
         trust(&env),
-        "AC-1: the placeholder FokDerivation + Derives sequence must add no trusted_base entry"
+        "AC-1: the test-only FokProbeDerivation + Derives sequence must add no trusted_base entry"
     );
 }
 

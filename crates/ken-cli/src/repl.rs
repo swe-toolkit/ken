@@ -135,7 +135,7 @@ fn show_term(t: &Term) -> String {
 /// Elaborate and register a declaration (`let`, `const`, `fn`, `proc`, `prove`, `law`).
 /// On success: print the registered name. On error: print diagnostic, no registration.
 fn do_def(session: &mut Session, src: &str) {
-    match session.env.elaborate_decl_results_v1(src.trim()) {
+    match session.env.elaborate_session_decl_results_v1(src.trim()) {
         Ok(results) => {
             // Extract the declared name (second whitespace token after the keyword).
             let name = src
@@ -364,6 +364,43 @@ mod reused_env_rollback_tests {
 
     fn trusted_ids(session: &Session) -> BTreeSet<GlobalId> {
         session.env.env.trusted_base().into_iter().collect()
+    }
+
+    /// Promise class: durable invariant. MEASURED: two interactive definitions
+    /// with one spelling mint different checked IDs, retain the first True
+    /// body and the later False body, and list both entries. CLAIMED: REPL
+    /// re-entry shadows without retracting.
+    /// THE GAP: the direct package route is independently pinned to refuse
+    /// this same spelling across units.
+    #[test]
+    fn repl_redefinition_shadows_the_previous_binding() {
+        let mut session = Session::new().expect("REPL environment");
+        do_def(&mut session, "const zz_repl_shadow : Bool = True");
+        let first = session.env.globals["zz_repl_shadow"];
+        do_def(&mut session, "const zz_repl_shadow : Bool = False");
+        let second = session.env.globals["zz_repl_shadow"];
+        assert_ne!(
+            first, second,
+            "a re-entered name shadows the earlier binding"
+        );
+        assert!(matches!(
+            session.env.env.lookup(first),
+            Some(Decl::Transparent { body, .. })
+                if *body == Term::constructor(session.env.globals["True"], Vec::new())
+        ));
+        assert!(matches!(
+            session.env.env.lookup(second),
+            Some(Decl::Transparent { body, .. })
+                if *body == Term::constructor(session.env.globals["False"], Vec::new())
+        ));
+        assert_eq!(
+            session
+                .names
+                .iter()
+                .filter(|n| *n == "zz_repl_shadow")
+                .count(),
+            2
+        );
     }
 
     #[test]

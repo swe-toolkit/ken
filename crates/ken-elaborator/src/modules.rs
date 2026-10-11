@@ -54,6 +54,10 @@ pub struct ModuleState {
     /// references still see earlier imports/locals (a "file" is an implicit
     /// module, `33 §3.1`).
     root_scope: Scope,
+    /// Successfully elaborated root declarations across units of this package.
+    /// Seed the next unit's resolver duplicate check from this set, not from
+    /// the mutable flat globals table. A failing unit never commits its names.
+    pub(crate) package_definitions: HashSet<String>,
     /// Qualified module path (`"M"`, `"M.N"`) → {bare `pub` name → canonical
     /// qualified name}. Populated whenever a `module { … }` block elaborates.
     /// Only `pub` names are recorded here — the export table IS the
@@ -5334,7 +5338,7 @@ pub fn expand_and_elaborate(
         elab.class_env.implicit_single_provider = false;
     }
     let mut scope = elab.module_state.root_scope.clone();
-    let mut unit_definitions = HashSet::new();
+    let mut unit_definitions = elab.module_state.package_definitions.clone();
     let mut local_modules = HashSet::new();
     declared_module_paths(decls, "", &mut local_modules);
     let mut ordered_inline_modules = HashSet::new();
@@ -5389,6 +5393,7 @@ pub fn expand_and_elaborate(
         elab.module_state.boundary_header = boundary.map(|(header, _)| header);
     }
     elab.module_state.root_scope = scope;
+    elab.module_state.package_definitions = unit_definitions;
     Ok(results)
 }
 
@@ -7977,29 +7982,31 @@ mod namespace_effect_tests {
 
     /// Promise class: durable invariant (spec 33 §5.2, 39 §6.2).
     ///
-    /// MEASURED: replacing the current spelling view across separate source
-    /// units retains each prior checked class and record owner by GlobalId.
-    /// Neither view can turn a record into a class or erase the old projection.
+    /// MEASURED: a later class or record in another root unit cannot take an
+    /// admitted record's spelling; its checked projection and globals binding
+    /// remain attached to the original GlobalId. CLAIMED: a refused package
+    /// duplicate cannot replace the record owner. THE GAP: identity behavior
+    /// for distinct qualified owners is exercised by the sibling tests.
     #[test]
-    fn checked_class_and_record_owners_survive_same_spelling_occupancy() {
+    fn checked_record_owner_survives_refused_same_spelling_occupancy() {
         let mut env = ElabEnv::new().expect("base environment");
         env.elaborate_decl("record Shared { x : Bool }")
             .expect("first record owner");
         let record_id = env.globals["Shared"];
-        env.elaborate_decl("class Shared a { marker : Bool }")
-            .expect("later class owner in a separate unit");
-        let class_id = env.globals["Shared"];
-        assert_ne!(record_id, class_id);
-        assert_eq!(env.class_env.class("Shared").unwrap().projection.type_id, class_id);
-        assert!(env.class_env.class_by_id(record_id).is_none());
-        assert_eq!(env.class_env.projection_by_type_id(record_id).unwrap().field_names, ["x"]);
-        assert_eq!(env.class_env.projection_by_type_id(class_id).unwrap().field_names, ["marker"]);
-        env.elaborate_decl("record Shared { y : Int }")
-            .expect("later record owner in a third unit");
-        let later_record_id = env.globals["Shared"];
-        assert!(env.class_env.class("Shared").is_none());
-        assert_eq!(env.class_env.class_by_id(class_id).unwrap().projection.field_names, ["marker"]);
-        assert_eq!(env.class_env.projection_by_type_id(later_record_id).unwrap().field_names, ["y"]);
+        for later in [
+            "class Shared a { marker : Bool }",
+            "record Shared { y : Int }",
+        ] {
+            let error = env.elaborate_decl(later).expect_err("package duplicate must refuse");
+            assert!(matches!(error, ElabError::DuplicateDefinition { name, .. } if name == "Shared"));
+            assert_eq!(env.globals["Shared"], record_id);
+            assert!(env.class_env.class("Shared").is_none());
+            assert!(env.class_env.class_by_id(record_id).is_none());
+            assert_eq!(
+                env.class_env.projection_by_type_id(record_id).unwrap().field_names,
+                ["x"]
+            );
+        }
     }
 
     /// Promise class: durable invariant (spec 33 §§3.2–3.3, 5.6).

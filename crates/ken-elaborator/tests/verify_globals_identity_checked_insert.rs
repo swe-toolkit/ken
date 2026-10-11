@@ -62,8 +62,10 @@ fn constructor_and_dictionary_refuse_in_both_orders_without_displacing_prior() {
 
 /// Promise class: durable invariant. MEASURED: a law-generated field and a
 /// user-spelled const with the same key refuse in both orders while the old
-/// checked binding remains. CLAIMED: law-field provenance is distinguishable
-/// from source spelling without relying on the dictionary naming convention.
+/// checked binding remains. A second law refuses on the package route without
+/// replacing the field, while an interactive re-entry mints distinct IDs.
+/// CLAIMED: law-field provenance is distinguishable from source spelling
+/// without relying on the dictionary naming convention.
 /// THE GAP: this exercises one field and one law name; the enumerator covers
 /// all fields of each checked law.
 #[test]
@@ -84,9 +86,24 @@ fn law_field_and_source_const_refuse_in_both_orders() {
     let mut env = ElabEnv::new().expect("prelude");
     let first = env.elaborate_decl_v1(law).expect("first law admitted");
     let old_field = env.globals["Foo_a"];
-    let second = env
+    let duplicate = env
         .elaborate_decl_v1(law)
-        .expect("equal minted field may rebind");
+        .expect_err("a package unit cannot rebind the law Foo");
+    assert!(
+        matches!(duplicate, ElabError::DuplicateDefinition { ref name, .. } if name == "Foo"),
+        "package law duplicate must refuse before replacing its field: {duplicate:?}"
+    );
+    assert_eq!(env.globals["Foo"], first.def_id);
+    assert_eq!(env.globals["Foo_a"], old_field);
+    assert!(
+        env.env.lookup(old_field).is_some(),
+        "original law field remains installed"
+    );
+    let second = env
+        .elaborate_session_decl_results_v1(law)
+        .expect("interactive law re-entry may mint a new checked field")
+        .pop()
+        .expect("law declaration produces a checked result");
     assert_ne!(first.def_id, second.def_id);
     assert_ne!(old_field, env.globals["Foo_a"]);
     assert!(
@@ -97,9 +114,11 @@ fn law_field_and_source_const_refuse_in_both_orders() {
 
 /// Promise class: durable invariant. MEASURED: a generated space-operation
 /// key and an independently written const in a module of that name refuse
-/// in either order. CLAIMED: dot-qualified minted symbols and source names
-/// cannot overwrite one another. THE GAP: this uses a one-cell space and
-/// a zero-argument operation; full space behavior has its own suite.
+/// in either order: the package duplicate refuses first, and the interactive
+/// route reaches the checked-identity collision. CLAIMED: dot-qualified minted
+/// symbols and source names cannot overwrite one another.
+/// THE GAP: this uses a one-cell space and a zero-argument operation; full
+/// space behavior has its own suite.
 #[test]
 fn space_operation_and_source_const_refuse_in_both_orders() {
     let space = "space S { mut cell : Int = 0 proc read () : Int visits [S] = cell }";
@@ -109,11 +128,33 @@ fn space_operation_and_source_const_refuse_in_both_orders() {
         env.elaborate_file_v1(first)
             .expect("first declaration admitted");
         let prior = env.globals["S.read"];
-        let error = env
+        let duplicate = env
             .elaborate_file_v1(second)
-            .expect_err("mixed spelling must refuse");
-        assert_collision(error, "S.read", "const S.read", "space operation S.read");
+            .expect_err("package duplicate must refuse before checked insertion");
+        assert!(
+            matches!(duplicate, ElabError::DuplicateDefinition { ref name, .. } if name == "S.read"),
+            "package overlap must refuse the duplicated operation key: {duplicate:?}"
+        );
         assert_eq!(env.globals["S.read"], prior);
+        assert!(
+            env.env.lookup(prior).is_some(),
+            "original checked operation remains installed"
+        );
+
+        let collision = env
+            .elaborate_session_decl_results_v1(second)
+            .expect_err("interactive overlap must reach checked-identity refusal");
+        assert_collision(
+            collision,
+            "S.read",
+            "const S.read",
+            "space operation S.read",
+        );
+        assert_eq!(env.globals["S.read"], prior);
+        assert!(
+            env.env.lookup(prior).is_some(),
+            "session refusal retains the original owner"
+        );
     }
 }
 
