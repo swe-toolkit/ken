@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-ARM-REFL-PAIR-GOAL
 title: "Refl in the Nil arm of a match whose goal is Equal (Pair q r) ... is refused with 'Refl expects an Eq-shaped goal', while the identical goal stated as a standalone lemma accepts Refl. The arm's expected type is not reduced to an Eq before Refl is checked. Check Refl against the arm goal as the lemma does"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
