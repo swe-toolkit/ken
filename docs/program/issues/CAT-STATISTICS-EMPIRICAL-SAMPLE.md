@@ -1,7 +1,7 @@
 ---
 id: CAT-STATISTICS-EMPIRICAL-SAMPLE
 title: "No catalog package reads a non-empty sample as an exact distribution with counts and sums. Deliver section 2 of spec/50-stdlib/63-statistics.md, the empirical tier over NonEmpty q, five functions and seven laws, fully proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
@@ -20,7 +20,7 @@ The empirical tier lands as section 2 of
 `spec/50-stdlib/63-statistics.md` specifies, with every law proved and no
 new trust.
 
-## Settled inputs (spec at `000747633`)
+## Settled inputs (spec merged at `c60ec4d92`)
 
 - **Section 2 is normative.** Carrier `NonEmpty q`, observations
   `nonempty_to_list`, append `nonempty_append`. Five functions:
