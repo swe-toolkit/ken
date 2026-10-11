@@ -26,17 +26,25 @@ its false step, not incidentally.
   both arms), T2 (`lookup` against `lookup_peer`, recursive step) and T3
   (the `DualTagged (Option a)` twin of `cross_structure`, recursive step),
   each `Equal (DualTagged a)` in a nested match over `i` and then `xs`.
-  Each gives `KernelRejected TypeMismatch { expected: (Dg647 @2), found:
-  (Dg647 (cg72 @5)) }` at the inner `DualFZ` match, the true arm.
+  On landed main (`55a0bee93`, Architect D0 `evt_74sfj4fef0vya`) the
+  `DualFZ` arm elaborates. Each row rejects at the `DualFS` inner
+  `match xs` with `KernelRejected TypeMismatch { expected: (Dg647 @2),
+  found: (Dg647 (cg72 @6)) }`. F2 rejects at `DualFZ`, where its goal is
+  genuinely false.
 - **The named coherent-frame row is a proxy.** `dual_recursive_false`
-  gives that same observation, so its `KernelRejected` assertion cannot
-  tell false from incomplete.
+  rejects at its genuinely false step, but with the same observation as
+  the true rows, so its `KernelRejected` assertion cannot tell false from
+  incomplete.
 - **Mechanism.** With `LANG-MATCH-ARM-REFL-PAIR-GOAL`'s hunks the `Eq` head
   survives, and `plan_coherent_frame_motive` (elab.rs ~:4066) routes the
   goal to `plan_embedded_method_convoy`. Method 1:1 there is unrepairable:
   its IH needs predecessor-index evidence that only injectivity derives,
   and no context variable carries it. That WP's third hunk declines the
   convoy to the ordinary frame, which mis-indexes as base does.
+- **Working hypothesis (Architect, not a ruling).** The evidence is the
+  observational reduct of an available equation (`Eq Nat (Suc a) (Suc b)`
+  whnf-reduces to `Eq Nat a b`). `repair_embedded_method_from_ih` selects
+  only context variables. If this is confirmed, no kernel rule is needed.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
