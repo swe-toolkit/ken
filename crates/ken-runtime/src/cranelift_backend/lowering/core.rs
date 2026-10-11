@@ -6221,13 +6221,15 @@ impl<'a> Lowering<'a> {
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner));
                     if current_owns_response {
                         if let Some(owner) = self.defining_emission_owner {
-                            if self.static_transition_plan
+                            if self
+                                .static_transition_plan
                                 .relay_drive_pair(row.vis_origin(), owner)?
                                 .is_some()
                             {
-                                return Err(backend(BackendFailure::PlannerInvariant(
-                                    "relay: pair minted for a source the handler-owned Deferred drive consumes".to_owned(),
-                                )));
+                                return Err(backend(BackendFailure::PlannerInvariant(format!(
+                                    "relay: pair minted for a source the handler-owned Deferred drive consumes (arm 6223-unitless, vis {:?}, owner {owner:?})",
+                                    row.vis_origin(),
+                                ))));
                             }
                         }
                     }
@@ -6997,13 +6999,14 @@ impl<'a> Lowering<'a> {
                 .is_some_and(|owner| self.defining_emission_owner == Some(owner));
             if current_owns_response {
                 if let Some(owner) = self.defining_emission_owner {
-                    if self.static_transition_plan
+                    if self
+                        .static_transition_plan
                         .relay_drive_pair(static_origin, owner)?
                         .is_some()
                     {
-                        return Err(backend(BackendFailure::PlannerInvariant(
-                            "relay: pair minted for a source the handler-owned Deferred drive consumes".to_owned(),
-                        )));
+                        return Err(backend(BackendFailure::PlannerInvariant(format!(
+                            "relay: pair minted for a source the handler-owned Deferred drive consumes (arm 6987-bounded, vis {static_origin:?}, owner {owner:?})",
+                        ))));
                     }
                 }
             }
@@ -16805,13 +16808,14 @@ impl<'a> Lowering<'a> {
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner))
                     {
                         if let Some(owner) = self.defining_emission_owner {
-                            if self.static_transition_plan
+                            if self
+                                .static_transition_plan
                                 .relay_drive_pair(static_origin, owner)?
                                 .is_some()
                             {
-                                return Err(backend(BackendFailure::PlannerInvariant(
-                                    "relay: pair minted for a source the handler-owned Deferred drive consumes".to_owned(),
-                                )));
+                                return Err(backend(BackendFailure::PlannerInvariant(format!(
+                                    "relay: pair minted for a source the handler-owned Deferred drive consumes (arm 16783-admitted, vis {static_origin:?}, owner {owner:?})",
+                                ))));
                             }
                         }
                         if !handler_owned_deferred_response_mutation_applies(

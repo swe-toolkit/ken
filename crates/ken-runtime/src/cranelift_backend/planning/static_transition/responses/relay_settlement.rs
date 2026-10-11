@@ -241,30 +241,20 @@ fn source_seat_row<'r>(
         .then_some(*row)
 }
 
-// One source has one consumer. The handler-owned Deferred path owns the
-// source before the relay path may mint a pair for the same owner.
+// One source has one consumer. Exclude the union of the owners under which
+// the bounded and admitted Deferred lowering arms can drive this source.
 fn deferred_drive_settles(
     plan: &StaticTransitionPlan<'_>,
-    source: &Source,
+    vis: StaticOriginId,
     owner: ContinuationEmissionOwner,
 ) -> Result<bool, CraneliftBackendError> {
-    let Some(row) = plan.deferred_response_at_vis(source.vis)? else {
+    let Some(row) = plan.deferred_response_at_vis(vis)? else {
         return Ok(false);
     };
-    Ok(match row.sub_case() {
-        DeferredResponseSubCase::UnconsumedTransportCaller => {
-            plan.bounded_deferred_response_handler_owner(&row)? == Some(owner)
-        }
-        DeferredResponseSubCase::NoContinuationUnit => {
-            let unitless = match source.redex_body {
-                Some(body) => plan.deferred_no_unit_response_in_body(body)?,
-                None => None,
-            };
-            unitless.as_ref() == Some(&row)
-                && plan.admitted_deferred_handler_owner(&row)? == Some(owner)
-        }
-        DeferredResponseSubCase::ContinuationBodyTail => false,
-    })
+    Ok(
+        plan.bounded_deferred_response_handler_owner(&row)? == Some(owner)
+            || plan.admitted_deferred_handler_owner(&row)? == Some(owner),
+    )
 }
 
 /// Build the admission key from the same closed relay-source traversal used
@@ -299,7 +289,7 @@ pub(super) fn build_drive_pairs(
                         continue;
                     };
                     let owner_key = owner.base_owner();
-                    if deferred_drive_settles(plan, &source, owner_key)? {
+                    if deferred_drive_settles(plan, source.vis, owner_key)? {
                         continue;
                     }
                     let pair = RelayDrivePair {
@@ -411,7 +401,7 @@ fn classify(plan: &StaticTransitionPlan<'_>, emit_records: bool) -> (Vec<String>
                                     (&unitless_row, &deferred),
                                     (Some(Ok(Some(unitless))), Ok(Some(row))) if unitless == row
                                 );
-                                let drive_result = deferred_drive_settles(plan, &source, owner.base_owner());
+                                let drive_result = deferred_drive_settles(plan, source.vis, owner.base_owner());
                                 let drive_settled = matches!(&drive_result, Ok(true));
                                 let relay_drivable = a_unique_row_and_seat
                                     && b_construct_closure.as_ref().is_ok_and(|b| *b)
