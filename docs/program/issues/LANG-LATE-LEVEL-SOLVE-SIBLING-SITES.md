@@ -1,7 +1,7 @@
 ---
 id: LANG-LATE-LEVEL-SOLVE-SIBLING-SITES
 title: "LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE kept the level open only in the check-mode dependent-motive builders, so an if, an inferred-position match, a let-bound match and a nested-pattern matrix whose motive sort is solved later still store it at Type 0 and reject. Close the class at every motive-sort site"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -64,3 +64,22 @@ site set at AC-0.
 - A site whose stored result is not re-checked at admission: stop to the
   Architect.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `49dcfafc2` from exact `d160da723` (PR #4660). Language QA
+`evt_450hvcqsj78bb`, Architect `evt_39ah5rt673c59`, Decision
+`dec_4t2ttrrsb0dtz`. The three sites ruled at AC-0 (`evt_5hp8ymc4js8c3`),
+`make_if_elim`, `build_ctor_buckets` and `infer_match_with_predicates`,
+read the motive sort with `kernel_infer_in_context_open`, keeping the
+defaulted fallback; the five repro rows check with a `Type 1` motive and
+their controls stay green. Each single-site revert reddens exactly the
+rows that site decides (1, 4 and 4). The catalog census is identical over
+71 paths, and the predecessor suite runs +2.4%. STOP (e), the standalone
+route, was ruled to re-check at admission (`evt_59hag4t231j9p`). §1a: 0.
+
+Carry, no node: seven defaulted stored-level sites (`:3498`, `:3515`,
+`:3565`, `:3744`, `:4817`, `:6368`, `:6530`) and nine pre-zonked or raw
+sites have no measured reach, and `:6272` is reached only by the catalog
+loader; this is not a closure claim over them. `elab.rs:1473` is 103
+columns; wrap it at the next touch of the file.

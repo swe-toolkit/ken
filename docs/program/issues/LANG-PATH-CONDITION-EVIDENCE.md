@@ -1,7 +1,7 @@
 ---
 id: LANG-PATH-CONDITION-EVIDENCE
 title: "Path conditions are obligation-only (elab.rs: never unchecked evidence in an emitted program), so a proof stored in a refinement pair has no term for the conditions its obligation is closed over. Bind each pushed path condition as a context variable through a convoy, with the carrier encoding otherwise unchanged"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
