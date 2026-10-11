@@ -3681,15 +3681,7 @@ fn build_index_equation_convoy_body(
             ElabError::Internal("coherent-frame index equation was not carried".into())
         })?;
         let branch_result = if conflicting_equation {
-            let impossible_result = if return_telescope {
-                expected_at_depth.clone()
-            } else {
-                Term::Const {
-                    id: env.top_id(),
-                    level_args: Vec::new(),
-                }
-            };
-            Term::pi(raw_evidence, impossible_result)
+            Term::pi(raw_evidence, expected_at_depth.clone())
         } else {
             let goal = if return_telescope {
                 if carried.telescope_argument_substitutions.is_empty() {
