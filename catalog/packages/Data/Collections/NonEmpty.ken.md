@@ -28,6 +28,8 @@ non-empty sequences.
 
 The `nonempty_` prefix keeps these operations distinct from the ordinary-list
 combinators in `Data.Collections` while preserving the same familiar names.
+The list-view shape law lets clients relate the three projections without
+seeing the constructor.
 
 ```ken
 import Core.Classes.LawfulFunctors (Semigroup)
@@ -86,6 +88,33 @@ const ordinary_one_two : List Nat = nonempty_to_list Nat one_two
 ```
 
 ## 4. Laws & proofs
+
+`nonempty_to_list_shape` splits the private constructor once. Each projection
+then reduces to the same head and tail, closing the helper by reflexivity.
+Clients receive the equality without receiving the constructor.
+
+```ken
+theorem nonempty_to_list_shape_cons
+      (a : Type) (x : a) (rest : List a)
+    : Equal
+        (List a)
+        (nonempty_to_list a (NonEmptyCons a x rest))
+        (Cons
+          a
+          (nonempty_head a (NonEmptyCons a x rest))
+          (nonempty_tail a (NonEmptyCons a x rest))) =
+  Refl
+
+pub theorem nonempty_to_list_shape
+      (a : Type) (xs : NonEmpty a)
+    : Equal
+        (List a)
+        (nonempty_to_list a xs)
+        (Cons a (nonempty_head a xs) (nonempty_tail a xs)) =
+  match xs {
+    NonEmptyCons x rest ↦ nonempty_to_list_shape_cons a x rest
+  }
+```
 
 Append preserves the left value's structural head. Exposing both constructors
 reduces the result head and the original left head to the same value.
@@ -213,8 +242,9 @@ list-append associativity.
 
 **Public API (stable names):** abstract `NonEmpty`, `nonempty_singleton`,
 `nonempty_cons`, `nonempty_head`, `nonempty_tail`, `nonempty_to_list`,
-`nonempty_map`, `nonempty_append`, their attached `list_view` laws, append's
-`head_left` law, and `Semigroup_instance_NonEmpty`. `NonEmptyCons` is internal;
+`nonempty_map`, `nonempty_append`, `nonempty_to_list_shape`, their attached
+`list_view` laws, append's `head_left` law, and
+`Semigroup_instance_NonEmpty`. `NonEmptyCons` is internal;
 the smart constructors are the public construction surface.
 
 **Source map:**
@@ -234,7 +264,8 @@ append associativity proof.
 constant, postulate, or `Axiom`; its only class law is inhabited by a checked
 proof term.
 
-**Proof families.** The head law splits both values and closes by reflexivity.
+**Proof families.** The shape law splits one value, then applies its private
+constructor helper. The head law splits both values and closes by reflexivity.
 The semigroup law is a three-value structural case split followed by congruence
 over `list_append::assoc`.
 
