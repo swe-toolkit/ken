@@ -85,45 +85,56 @@ fn computational_reference_does_not_choose_export_over_intro() {
     }
 }
 
-/// MEASURED: a dotted in-scope export item cannot pick the module member
-/// over the same written prop introduction, in either declaration order or
-/// when both declarations are nested. CLAIMED: export items share the term
-/// reference's dual-meaning verdict. THE GAP: facade and import selectors
-/// have different authorization gates and are outside this direct-use row.
+/// Promise class: transition sentinel, retired if the export-item grammar
+/// permits a lowercase dotted segment. MEASURED: `export P.pi` fails at the
+/// uppercase-only parser rule, before any ambiguity resolution. CLAIMED:
+/// prop intros currently cannot reach the dotted in-scope export choke.
+/// THE GAP: if this grammar later changes, the reachable prop intro must take
+/// the same dual-meaning verdict as the term reference; this refusal no
+/// longer proves that boundary.
 #[test]
-fn dotted_prop_intro_export_item_rejects_both_orders_at_both_depths() {
-    for inner in [
-        "prop P : Omega where { pi : P } module P { pub const pi : Int = 0 }",
-        "module P { pub const pi : Int = 0 } prop P : Omega where { pi : P }",
-    ] {
-        assert_ambiguous(&format!("{inner} export P.pi"), "P.pi");
-        assert_ambiguous(&format!("module M {{ {inner} export P.pi }}"), "P.pi");
-    }
+fn lowercase_prop_intro_export_item_is_currently_unspellable() {
+    let err = match elaborate("prop P : Omega where { pi : P } export P.pi") {
+        Err(error) => error,
+        Ok(_) => panic!("lowercase dotted export grammar unexpectedly admitted"),
+    };
+    assert!(
+        matches!(err, ElabError::ParseError { ref msg, .. }
+        if msg.contains("expected uppercase constructor name")),
+        "wrong export-item boundary: {err:?}"
+    );
 }
 
-/// MEASURED: the pre-existing data constructor/type collision is also
-/// rejected by a written dotted export, regardless of source order.
-/// CLAIMED: one verdict guards both checked family-member kinds. THE GAP:
-/// the positive export controls distinguish this from blanket dotted refusal.
+/// MEASURED: an export item spelling D.C refuses when its checked constructor
+/// competes with the module export, with data declared first. CLAIMED: dotted
+/// export selection takes the same dual-meaning verdict as term references.
+/// THE GAP: the reverse order and the module-only positive are separate pins.
 #[test]
-fn dotted_data_constructor_export_item_rejects_both_orders() {
-    for inner in [
-        "data D = C module D { pub const C : Int = 0 }",
-        "module D { pub const C : Int = 0 } data D = C",
-    ] {
-        assert_ambiguous(&format!("{inner} export D.C"), "D.C");
-    }
+fn dotted_data_export_item_refuses_data_first() {
+    assert_ambiguous(
+        "data D = C module D { pub const C : Int = 0 } export D.C",
+        "D.C",
+    );
 }
 
-/// MEASURED: unopposed intro and module exports are accepted through the
-/// identical dotted export-item syntax. CLAIMED: the ambiguity gate rejects
-/// actual dual meanings only. THE GAP: this exercises local public selection,
-/// not imported or private members.
+/// MEASURED: the same written export item refuses when the module is declared
+/// first. CLAIMED: export order does not break the constructor/module tie.
+/// THE GAP: import and facade exports have distinct selection routes.
 #[test]
-fn unopposed_dotted_export_items_still_check() {
-    elaborate("prop P : Omega where { pi : P } export P.pi").expect("sole checked intro exports");
-    elaborate("module P { pub const other : Int = 0 } export P.other")
-        .expect("sole module member exports");
+fn dotted_data_export_item_refuses_module_first() {
+    assert_ambiguous(
+        "module D { pub const C : Int = 0 } data D = C export D.C",
+        "D.C",
+    );
+}
+
+/// MEASURED: an unopposed dotted module export is still admitted. CLAIMED:
+/// the added ambiguity verdict is conditional on a checked family member.
+/// THE GAP: a sole prop intro cannot be exported by this grammar today.
+#[test]
+fn unopposed_dotted_module_export_item_still_checks() {
+    elaborate("module P { pub const Other : Int = 0 } export P.Other")
+        .expect("sole uppercase module member exports");
 }
 
 /// MEASURED: a sole prop intro remains available by its checked family path,
