@@ -1,7 +1,7 @@
 ---
 id: LANG-COHERENT-FRAME-SINGLE-CONSTRUCTOR-EQUAL
 title: "A true proof of Equal at a single-constructor data type inside a coherent-frame nested indexed match is refused: the embedded convoy cannot repair a method whose induction hypothesis needs predecessor-index evidence, so it declines to the ordinary frame, which mis-indexes. Make the true rows elaborate and give the false row a discriminating observation"
-status: active
+status: closed
 owner: language
 size: M
 tier: T1
@@ -73,3 +73,15 @@ at D0.
 - The evidence needs a kernel rule (injectivity or otherwise), a
   `trusted_base()` change or a spec change.
 - A census or suite delta outside the named rows: stop to the Architect.
+
+## Closeout
+
+Closed without merge, superseded by `LANG-EMBEDDED-METHOD-EQUATION-CONVOY`
+(Architect fork `evt_7w6zenn2rez46`, option (i), on AC-0
+`evt_7ksak22xar0xj`). The rebase generalizes the constructor-headed index
+`Suc m` to a neutral variable, which discards the only equation the IH
+needs. Both in-place repairs failed on named rows or reddened existing
+suites: carrying every unrepairable method as a companion, and the
+index-equation convoy at the outer frame. The repair is new
+equation-generalizing machinery, beyond this frame's scope. The branch is
+clean at its base, and no candidate exists. §1a: 0.

@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-ARM-REFL-INDEXED-MOTIVE
 title: "Refl in an arm of a match on an indexed family, with goal Equal (Pair Nat Nat) p p, is refused with 'Refl expects an Eq-shaped goal', while the same goal accepts Refl standalone and in List, Bool and let arms. stated_equality reads the goal's syntactic head, and on the indexed route the goal arrives as a motive redex. Recognise the stated equality up to that redex"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
