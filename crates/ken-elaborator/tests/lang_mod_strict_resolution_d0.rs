@@ -554,9 +554,10 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            // Exact natural-weight distributions inherit the arithmetic,
-            // lawful Boolean, transport and composition provider closures.
-            "Algorithm.Statistics.Exact".to_string(),
+            // Empirical statistics reuse Exact, NonEmpty, Derived and
+            // transport; their provider closures retain the same eight
+            // prelude conveniences measured by the strict-floor probe.
+            "Algorithm.Statistics.Empirical".to_string(),
             [
                 "And",
                 "Unit",
@@ -572,10 +573,9 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
-            // Empirical statistics reuse Exact, NonEmpty, Derived and
-            // transport; their provider closures retain the same eight
-            // prelude conveniences measured by the strict-floor probe.
-            "Algorithm.Statistics.Empirical".to_string(),
+            // Exact natural-weight distributions inherit the arithmetic,
+            // lawful Boolean, transport and composition provider closures.
+            "Algorithm.Statistics.Exact".to_string(),
             [
                 "And",
                 "Unit",

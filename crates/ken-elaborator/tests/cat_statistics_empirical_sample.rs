@@ -107,6 +107,11 @@ fn public_surface_generic_laws_and_zero_trust_delta() {
         .elaborate_module_from_roots(&[root()], MODULE)
         .expect("empirical provider must load checked proofs");
     let after = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    eprintln!(
+        "trusted_base() count: before={}, after={}",
+        before.len(),
+        after.len()
+    );
     assert_eq!(
         after, before,
         "empirical provider adds no trusted GlobalIds"
