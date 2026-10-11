@@ -1083,19 +1083,12 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
     planner.connect_declaration_calls(&declaration_entries)?;
     let plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
     #[cfg(feature = "px8-ds-test-support")]
-    if std::env::var_os("KEN_RELAY_D1_TEST_REFUSAL").is_some()
-        || std::env::var_os("KEN_RELAY_D1_RECORD").is_some()
-    {
-        // This diagnostic reads the same classifier as the ordinary refusal.
-        let _ = responses::relay_d1_record(&plan);
-    }
-    #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]
     per_emitter_availability::record_per_emitter_availability_diagnostic(&plan);
 
-    // Refuse only after the cfg-gated recorders, at planner.finish's sole
-    // caller. The test-only suppression preserves a negative control's older
+    // Refuse at planner.finish's sole caller. The test-only suppression
+    // preserves a negative control's older
     // lowering refusal; no ordinary build can select that suppression.
     let refused = responses::relay_settlement_refusals(&plan);
     #[cfg(feature = "px8-ds-test-support")]

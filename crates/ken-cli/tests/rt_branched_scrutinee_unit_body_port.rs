@@ -236,17 +236,16 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
     );
 }
 
-/// Promise class: durable behavioral invariant (spec/40-runtime/45-native-backend.md,
-/// RT-NESTED-RELAY AC-MAIN). A forwarded host operation is performed or its
-/// consuming seat traps with typed missing-metadata provenance, never silently
-/// omitted. A later performing route may replace the trap without changing
-/// this property.
+/// Promise class: transition sentinel for increment (i)
+/// (spec/40-runtime/45-native-backend.md, RT-NESTED-RELAY AC-MAIN). Until a
+/// performing route is implemented, the consuming seat must take the planned
+/// typed trap rather than silently omit the forwarded operation. The future
+/// performing-route WP deliberately flips this pin and redefines the outcome.
 ///
 /// MEASURED: interpreter FsReadAt after the exact native pre-read effect prefix;
-/// native either executes the full ordered non-release trace or terminates in
-/// a planned MissingRuntimeMetadata trap naming the forwarded read. Releases
-/// are compared as a set because disposal order is not the effect order.
-/// CLAIMED: reaching the nested relay never silently drops its forwarded read.
+/// native terminates in a planned MissingRuntimeMetadata trap naming the read.
+/// Releases are compared as a set because disposal order is not effect order.
+/// CLAIMED: this reached, still unrouted relay cannot silently drop its read.
 /// THE GAP: a typed trap could arise at an unrelated seat; the planned trap's
 /// forwarded-op message and its nonzero catalog identity identify this seat.
 #[test]
@@ -342,41 +341,35 @@ fn branched_scrutinee_forwarded_read_is_performed_or_refused_body() {
     );
     assert_eq!(release_set(&native), release_set(&interpreted));
     let native_ops = non_release(&native);
-    if native_ops == interpreter_ops {
-        assert_eq!(native.terminal_exit, interpreted.terminal_exit);
-        assert_eq!(native.exit_status, interpreted.exit_status);
-        assert_eq!(native.terminal_error, interpreted.terminal_error);
-    } else {
-        assert_eq!(
-            native_ops,
-            interpreter_ops[..native_ops.len().min(interpreter_ops.len())]
-        );
-        assert_eq!(native_ops.len() + 1, interpreter_ops.len());
-        assert_eq!(
-            native.exit_status, 1,
-            "missing route must fail, not return success"
-        );
-        assert_eq!(
-            native.terminal_exit,
-            ken_runtime::TerminalExitClass::ControlledTrap
-        );
-        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-            native.terminal_error.as_ref()
-        else {
-            panic!("the forwarded read needs a typed planned trap: {native:?}");
-        };
-        assert_ne!(provenance.planned_identity, 0);
-        assert_eq!(
-            provenance.trap.code,
-            ken_runtime::RuntimeTrapCode::MissingRuntimeMetadata,
-        );
-        assert!(
-            provenance
-                .trap
-                .message
-                .contains("relay: forwarded host op FsReadAt")
-                && provenance.trap.message.contains("has no performing route"),
-            "the planned trap names the consuming seat: {provenance:?}"
-        );
-    }
+    assert_eq!(
+        native_ops,
+        interpreter_ops[..native_ops.len().min(interpreter_ops.len())]
+    );
+    assert_eq!(native_ops.len() + 1, interpreter_ops.len());
+    assert_eq!(
+        native.exit_status, 1,
+        "missing route must fail, not return success"
+    );
+    assert_eq!(
+        native.terminal_exit,
+        ken_runtime::TerminalExitClass::ControlledTrap
+    );
+    let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
+        native.terminal_error.as_ref()
+    else {
+        panic!("the forwarded read needs a typed planned trap: {native:?}");
+    };
+    assert_ne!(provenance.planned_identity, 0);
+    assert_eq!(
+        provenance.trap.code,
+        ken_runtime::RuntimeTrapCode::MissingRuntimeMetadata,
+    );
+    assert!(
+        provenance
+            .trap
+            .message
+            .contains("relay: forwarded host op FsReadAt")
+            && provenance.trap.message.contains("has no performing route"),
+        "the planned trap names the consuming seat: {provenance:?}"
+    );
 }

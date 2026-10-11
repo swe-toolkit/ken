@@ -6936,6 +6936,12 @@ impl<'a> Lowering<'a> {
         identity: &ContinuationCallIdentity,
     ) -> Result<(), CraneliftBackendError> {
         let Some(owner) = self.defining_emission_owner else {
+            if self.static_transition_plan.has_relay_drive_pair_for_source(source) {
+                return Err(unsupported(
+                    "RelayRoute",
+                    "a relay-consuming seat for an admitted source has no emission owner",
+                ));
+            }
             return Ok(());
         };
         let trap = self
@@ -7112,6 +7118,11 @@ impl<'a> Lowering<'a> {
                         "a terminal transport's stable closure seat is not the recursive child being replaced",
                     ));
                 }
+                self.branch_unrouted_relay_at_consumer(
+                    builder,
+                    static_origin,
+                    transport.source_call_identity(),
+                )?;
                 let claimed = self.call_checked_ih_environment_transport(
                     builder,
                     &transport,
@@ -12514,6 +12525,9 @@ impl<'a> Lowering<'a> {
         // slice is the honest input and the composition seat refuses on it.
         // Passing the retained-frame seat's stack, or fabricating one, would be
         // exactly the inference the ruling forbids.
+        self.branch_unrouted_relay_at_consumer(
+            builder, edge.producer_construct_origin, &identity,
+        )?;
         Ok(self
             .claim_and_call_resolved_continuation(
                 builder, &identity, &field_run, position, unit_env, &[],

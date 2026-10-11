@@ -1299,11 +1299,9 @@ mod relay_settlement;
 
 /// An admission key for a source Vis and enclosing response emission owner.
 /// Static producer fusion consumes the forwarded relay at the source, so the
-/// admitted owner's returned set omits it. The pair establishes a uniquely
-/// seated candidate, not a settling route or execution: a relay that still
-/// reaches the owner at runtime takes the owner loop's unknown-member exit,
-/// which returns the invalid status. The D4' census measures that exit and
-/// the source's execution at runtime, not which function emits the seat.
+/// admitted owner's returned set omits it. Admitted only with a planned route
+/// or planned trap at every planner-issued call edge that consumes the source;
+/// each consuming seat branches to that trap when the route is absent.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct RelayDrivePair {
     pub(in crate::cranelift_backend) source: StaticOriginId,
@@ -1453,6 +1451,13 @@ impl StaticTransitionPlan<'_> {
             }
             pair_edges.entry(pair_key).or_default().insert(identity.clone());
         }
+        if let Some((source, _)) = self.relay_drive_pairs.keys()
+            .find(|key| !pair_edges.contains_key(*key))
+        {
+            return Err(planner_error(format!(
+                "an admitted relay pair has no planned call edge (source {source:?})",
+            )));
+        }
         let mut routes = BTreeMap::new();
         for (&key, pair) in &self.relay_drive_pairs {
             let source_rows = candidates.iter()
@@ -1503,6 +1508,15 @@ impl StaticTransitionPlan<'_> {
             }
         }
         Ok(routes)
+    }
+
+    /// An ownerless consuming seat cannot use an admitted source's relay
+    /// metadata, regardless of which owner minted its pair.
+    pub(in crate::cranelift_backend) fn has_relay_drive_pair_for_source(
+        &self,
+        source: StaticOriginId,
+    ) -> bool {
+        self.relay_drive_pairs.keys().any(|(paired, _)| *paired == source)
     }
 
     /// Admission remains `relay_drive_pair`. Lowering supplies its exact
@@ -1577,14 +1591,9 @@ pub(in crate::cranelift_backend) fn settled_relay_owners(
 }
 
 /// Fail closed for Excluded owners whose relay-source admission cannot be
-/// established from the plan. The recorder calls this same walk.
+/// established from the plan.
 pub(super) fn relay_settlement_refusals(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
     relay_settlement::refusals(plan)
-}
-
-#[cfg(feature = "px8-ds-test-support")]
-pub(super) fn relay_d1_record(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
-    relay_settlement::record(plan)
 }
 
 fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
