@@ -31,6 +31,12 @@ refined value is a kernel type mismatch, not a missed obligation.
 This frame is `draft` until its four dependencies land. It is re-anchored
 then.
 
+- **Scope (Steward, on Architect recut `evt_7729d1mezkcxk`).** The
+  introduction applies an obligation hole only where
+  `refinement_hole_application` returns `Some`. A hole where it returns
+  `None` (a recursive or indexed constructor condition remains) stays an
+  open obligation as today, until `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`.
+
 ## Deliverable
 
 - Designs 1-4: representation, introduction, evidence, and one `coerce`
