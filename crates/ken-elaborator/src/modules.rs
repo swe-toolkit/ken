@@ -239,6 +239,10 @@ impl ModuleState {
         self.boundary_header.as_ref()
     }
 
+    pub(crate) fn restore_boundary_header(&mut self, header: Option<BoundaryHeader>) {
+        self.boundary_header = header;
+    }
+
     /// Hide the complete closed prelude roster by checked identity, including
     /// aliases installed under a different spelling. Resolve the whole roster
     /// before changing either namespace so a missing entry cannot silently
