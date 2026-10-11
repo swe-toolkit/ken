@@ -1,7 +1,7 @@
 ---
 id: LANG-COHERENT-FRAME-SINGLE-CONSTRUCTOR-EQUAL
 title: "A true proof of Equal at a single-constructor data type inside a coherent-frame nested indexed match is refused: the embedded convoy cannot repair a method whose induction hypothesis needs predecessor-index evidence, so it declines to the ordinary frame, which mis-indexes. Make the true rows elaborate and give the false row a discriminating observation"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
