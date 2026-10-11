@@ -554,6 +554,24 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // Exact natural-weight distributions inherit the arithmetic,
+            // lawful Boolean, transport and composition provider closures.
+            "Algorithm.Statistics.Exact".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // ArgParse now declares its exact Schema, diagnostics, formatting,
             // parsing, and collection dependencies. Its ordinary package
             // boundary loads while strict mode retains only provider compiler
