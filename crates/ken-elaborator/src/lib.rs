@@ -736,13 +736,33 @@ impl ElabEnv {
         for range in &extracted.example_ranges {
             let example_results = self
                 .elaborate_file_v1(&src[range.clone()])
-                .map_err(|error| match error {
-                    ElabError::DuplicateDefinition { .. }
-                    | ElabError::AmbiguousReference { .. } => error,
-                    _ => ElabError::ParseError {
-                        msg: "a 'ken example' block failed to elaborate".to_string(),
-                        span: Span::new(range.start, range.end),
-                    },
+                .map_err(|error| {
+                    // The example is elaborated as a slice. Its typed resolver
+                    // errors retain their identity, but must name bytes in the
+                    // original document, like errors from compiled fences.
+                    let absolute =
+                        |span: Span| Span::new(range.start + span.start, range.start + span.end);
+                    match error {
+                        ElabError::DuplicateDefinition { name, span } => {
+                            ElabError::DuplicateDefinition {
+                                name,
+                                span: absolute(span),
+                            }
+                        }
+                        ElabError::AmbiguousReference {
+                            name,
+                            sources,
+                            span,
+                        } => ElabError::AmbiguousReference {
+                            name,
+                            sources,
+                            span: absolute(span),
+                        },
+                        _ => ElabError::ParseError {
+                            msg: "a 'ken example' block failed to elaborate".to_string(),
+                            span: Span::new(range.start, range.end),
+                        },
+                    }
                 })?;
             results.extend(example_results);
         }
