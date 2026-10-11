@@ -1,7 +1,7 @@
 ---
 id: VERIFY-EXAMPLE-DUPLICATE-SPAN-ABSOLUTE
 title: "A DuplicateDefinition or AmbiguousReference raised in a ken example fence carries a span relative to the fence body, so ken check points at the wrong bytes of the .ken.md file. Rebase the span to the file"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2
