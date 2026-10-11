@@ -240,16 +240,15 @@ fn headerless_example_keeps_ken_run_result_unchanged() {
     assert_same_run(&control, &with);
 }
 
-/// MEASURED: even when a headed example fails, the environment still
-/// retains the program's ANone descriptor. CLAIMED: restoration surrounds
-/// both Ok and Err exits. THE GAP: this pins the executor's error path;
-/// the CLI correctly stops before admission on that same error.
+/// MEASURED: when a successfully checked headed example precedes a failing
+/// example, the environment still retains the ANone program descriptor.
+/// CLAIMED: restoration surrounds both Ok and Err executor exits. THE GAP:
+/// the first example must succeed and write AFull before the second fails;
+/// a single failing headed example would leave the header untouched anyway.
 #[test]
-fn failed_headed_example_restores_program_boundary_before_returning_error() {
-    let source = literate(
-        OWN_ABI,
-        Some("program capabilities FS AFull\nconst zz_bad : Nat = zz_unbound"),
-    );
+fn failed_after_headed_example_restores_program_boundary() {
+    let mut source = literate(OWN_ABI, Some(FULL_EXAMPLE));
+    source.push_str("```ken example\nconst zz_bad : Nat = zz_unbound\n```\n");
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_ken_md_file_v1(&source)
         .expect_err("bad checked example must fail elaboration");
