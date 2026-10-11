@@ -218,11 +218,13 @@ list a vertex more than once, so it needs deduplication, not a raw
 count of entries. The empirical distribution and its exact counts
 and sums are outside §1 but specified in §2. Conditional probability,
 variance, sampling from a distribution, approximate statistics,
-continuous distributions,
-and every `Float`-valued result remain outside §§1–2. A mean returned
-as a value, a value-level rational carrier, its arithmetic/normalization,
-and value-typed probability and expectation require a separate
-`Data.Numeric.Rational` contract.
+continuous distributions, and every `Float`-valued result remain
+outside §§1–2. The separate `64-rational.md` contract specifies an
+exact non-negative rational carrier, arithmetic, equivalence and
+order. It does not add value-typed probability, expectation or mean
+operations to §§1–2; those statistics adapters remain deferred.
+Canonical normalization and rational division are likewise outside
+this chapter.
 
 ## 2. Empirical distributions over non-empty samples
 
@@ -356,9 +358,11 @@ generates observations from a distribution. It does not change §1's
 carrier, proofs, event/score semantics, or exact-ratio interpretation.
 No mean as a returned numeric value, variance, conditional
 probability, `pure`/`bind`, `uniform`, rational carrier, approximate
-tier, or `Float` result is part of §2. In particular,
-`score_sum q sample score` over `sample_size q sample` is an **exact
-numerator/denominator interpretation**, not a Ken-valued division.
+tier, or `Float` result is part of §2. The separate `64-rational.md`
+contract supplies a carrier and exact algebra, not a value-returning
+Empirical operation. In particular, `score_sum q sample score` over
+`sample_size q sample` is an **exact numerator/denominator
+interpretation**, not a Ken-valued division.
 A post-ruling checked development establishes feasibility of the
 seven proof bodies against the landed §1 and `NonEmpty` interfaces;
 only a checked CAT package will deliver them as public laws. The
