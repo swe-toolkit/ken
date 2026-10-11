@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-BOUNDARY-HEADER-ORDER
 title: "In a multi-source package each headed source overwrites boundary_header, so the program's authority is whichever header elaborated last. Measure, then make two headers in one package a refusal or an order-independent rule"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T1
@@ -51,3 +51,12 @@ depend on order; then the ruled rule on both package routes.
 - A catalog or corpus package has two headed sources that disagree: stop
   with the list.
 - Any kernel, trust or spec change.
+
+## Closeout
+
+Merged `52b4fe001` from exact `b11c5bef2` (PR #4670). Verify QA
+`evt_36b1ks7g7zhw6`, Architect `evt_18t4v858sbvs6` (AC-0 ruling
+`evt_2h8k6y0ytt2m4`), Decision `dec_2b8xcx8e25nnp`. A second headed source
+in one package is now a typed `DuplicateBoundaryHeader` refusal on the
+package and native routes, in either order. No catalog or conformance
+package has more than one headed source. §1a: 0.

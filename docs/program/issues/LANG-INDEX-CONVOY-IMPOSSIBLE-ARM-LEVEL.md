@@ -1,7 +1,7 @@
 ---
 id: LANG-INDEX-CONVOY-IMPOSSIBLE-ARM-LEVEL
 title: "The index-equation convoy types a conflicting-equation branch as bare Top : Omega 0, so a dependent match whose goal sort is Omega l with l >= 1 builds an ill-typed index method and is refused with Internal. Make the impossible arm live at the goal's level"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -66,3 +66,14 @@ kernel already provides.
 
 - The arm needs a new kernel constant, a universe-lifting primitive, or a
   spec change.
+
+## Closeout
+
+Merged `4a46c6163` from exact `f69470bad` (PR #4669). Language QA
+`evt_76ekpchdb93fw`, Architect `evt_132kwe5001cca` (AC-0 ruling
+`evt_536mvvaxkye9c`), Decision `dec_5ss4hbhhrvdgz`. The conflicting arm is
+`Π (e : conflicting equation). goal` at the goal's own Ω level; the three
+large-goal repros check, and the exact base arm reddens exactly them. The
+72-file catalog census is identical to base. A late-solved `let` level
+(`force_one : Nat -> Type 1 -> Nat`) stays a fail-closed `KernelRejected`,
+identical on base and candidate (Architect `evt_132kwe5001cca`). §1a: 0.
