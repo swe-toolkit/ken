@@ -1,7 +1,7 @@
 ---
 id: VERIFY-EXAMPLE-MAIN-NOT-ENTRYPOINT
 title: "Program admission reads main from globals, so when a program defines no main, a ken example fence that does may become the program's entry point. Measure, then keep example declarations out of entry-point selection"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -53,3 +53,15 @@ the seam `VERIFY-EXAMPLE-BOUNDARY-HEADER-ISOLATION` lands where it fits.
 - A catalog or corpus program takes its `main` from an example: stop with
   the list.
 - Any kernel, trust or spec change.
+
+## Closeout
+
+Merged `131897bc8` from exact `9b66ce5f2` (PR #4668). Verify QA
+`evt_33jtv847jeq20`, Architect `evt_4dwkwr8p5t7w2` (mechanism
+`evt_pckakk1xwwkg`), Decision `dec_3j8x0atybp7gg`. AC-0 admitted the row:
+an example `main` was the entry point on `ken run` and passed native
+admission. The checked-fence executor now saves and restores the program's
+`globals["main"]` and `effect_rows["main"]` around the examples, on `Ok`
+and `Err`, so both routes refuse with `MissingMain`. Both restores are
+load-bearing under mutation. Zero of 86 tracked `.ken.md` files declare
+`main` only in an example. §1a: 0.

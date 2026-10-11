@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-BOUNDARY-HEADER-ORDER
 title: "In a multi-source package each headed source overwrites boundary_header, so the program's authority is whichever header elaborated last. Measure, then make two headers in one package a refusal or an order-independent rule"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T1
