@@ -116,6 +116,20 @@ an admitted declaration's spelling.
   first owner kept, and the session route keeps
   `DeclarationIdentityCollision` covered in both orders. No engineered
   alias fixture.
+- **AC-1c (third red, shard 3, `evt_30a5kezmwr2ge`; authorized
+  `evt_1rckb4c1xszp3`).** The census also covers names declared by a
+  source a test loads (`include_str!` and file-backed `elaborate_file`).
+  Two stale placeholder consumers join the scope as test-only renames
+  under AC-1a (distinct probe-family names, used consistently; no session
+  route, no production change):
+  `ken-elaborator/tests/v3_fo_checker_soundness_d0_buildability_probe.rs`
+  (three `FokDerivation` placeholders and probe 2's `fok_derives`, each
+  also declared by `FoKripke.ken`) and
+  `ken-elaborator/tests/lang_truncation_surface_syntax.rs` (one
+  `FokDerivation` placeholder). Each probe keeps asserting the shape it
+  was written to probe. The 184 dynamic or indirect module-key sites and
+  arbitrary dynamic source construction stay residual; CI is the
+  backstop.
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
   their results. `rt_dasm_d1b_role_a_role_authority` is green with its

@@ -299,6 +299,27 @@ base, stop and report the mismatch.
      successor. No owner, effect or operation join key across instances,
      and no origin id joined across builds; V1-V3 are discarded. Seats
      read this fact and never discover it at lowering time.
+   - **One source, one consumer (`evt_645k8m1snthr0`, predicate
+     corrected `evt_693qrtt7ykgqg`).** The relay pair population excludes
+     every source a handler-owned Deferred lowering arm drives, enforced
+     by the plan, not by lowering precedence. One shared
+     `deferred_drive_settles(plan, vis, owner)` is the union of the arms'
+     own owner functions: `bounded_deferred_response_handler_owner(row) ==
+     owner` (the bounded arm) or `admitted_deferred_handler_owner(row) ==
+     owner` (the admitted and unit-less arms); the union may over-exclude
+     and never under-excludes. `classify` and `build_drive_pairs` both call
+     it with `(source.vis, owner.base_owner())`; `build_drive_pairs` skips
+     a settled source before minting. All three Deferred arms assert that
+     no relay pair exists for the source they consume, before the
+     mutation check, naming the arm, Vis and owner in the error. Row 36's
+     `suppressing_bounded_response_owner_drive_restores_the_pending_vis_trap`
+     and row 35's `px8f_buffer_native` are discriminating controls and are
+     not edited. Stops: an anchor source is drive-settled (neither
+     `bounded` nor `admitted` may equal the pair owner); any guard fires;
+     row 36 stays `Ok` under suppression with the pair removed; a removed
+     pair leaves its source with no consumer (a pending-Vis `-1` trap or
+     "no verified selected incoming call" on a green row); any new red.
+     The 15th advancing stop is a research hold, with the Steward called.
    - **Planned trap.** For each (pair, identity) with route none, the
      planner registers a planned `RuntimeTrap` with code
      `RuntimeTrapCode::MissingRuntimeMetadata` and the message
@@ -618,6 +639,21 @@ base, stop and report the mismatch.
   refusal. D1-D3, the projection, `relay_drive_pair` as admission
   authority, the permanent errors and the census instruments carry
   forward; D4''s claim that an undriven relay is settled does not.
+
+- **Entries 10-15** are recorded in the WP thread (`evt_2fjkzrg2vbwcj`,
+  `evt_2rs7r1xxywwyf`): attribute-key joins on the instance half (10-13),
+  trap placement truncating lowering descent (14), and the clause picked
+  by (effect, op) inside one instance (15).
+- **16.** A relay pair is minted for a source the handler-owned Deferred
+  drive already consumes, so suppressing the drive no longer restores the
+  pending-Vis trap (row 36, `evt_49m91asqstjeg`) -- keyed on relay-member
+  reachability (`source_for_relay`), not on which mechanism consumes the
+  source (`evt_645k8m1snthr0`). §1b is due at 18.
+- **17.** The drive-settled predicate is keyed on `classify`'s
+  per-subcase owner (the bounded owner for UnconsumedTransportCaller), not
+  on the owner each lowering arm drives under (the admitted owner at the
+  Construct arm); source 964 in row 35 fires the guard
+  (`evt_1t8by5bswpdyr`, `evt_693qrtt7ykgqg`). §1b is due at 18.
 
 ## Finding outside this WP
 

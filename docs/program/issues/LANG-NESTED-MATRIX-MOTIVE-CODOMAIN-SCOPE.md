@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-MATRIX-MOTIVE-CODOMAIN-SCOPE
 title: "nested_matrix_motive's non-reverting branch infers the codomain's sort in a context missing the split binder, and a guarded arm swallows the resulting VarOutOfScope into Level::Zero, so every such split stores its motive at Type 0 and an or-pattern match whose result lives at Type 1 is rejected. Infer under the binder and stop swallowing the error"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -60,3 +60,18 @@ what remains of the guarded arm.
 - A population that needs the `Level::Zero` fallback: stop to the
   Architect with it.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `521d7b8fa` from exact `73b5e4813` (PR #4654). Language QA
+`evt_7cyn451h44wpm`, Architect `evt_5214kfxhz3k2f`, Decision
+`dec_4p791bcj3kb47`. AC-0 ruled the guarded arm deleted
+(`evt_2mgw1fj2mwz8f`): both branches infer the codomain's sort with the
+split binder pushed, in one query, and a kernel error reaches
+`KernelRejected`. The disposable count found zero swallows across the
+eight D0 targets, and the catalog census body is byte-identical across
+base, candidate and D0. One WIP audit, (b), corrected a proxy gate. No
+hard stops.
+
+Carry, no node: `Ok(_) => Level::Zero` is unchanged, a residual question
+for the Architect, with zero hits in the bounded population.

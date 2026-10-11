@@ -1,7 +1,7 @@
 ---
 id: CAT-STATISTICS-EXACT-DISTRIBUTION
 title: "No catalog package gives an exact finite distribution, event mass or expectation. Deliver section 1 of spec/50-stdlib/63-statistics.md as Algorithm.Statistics.Exact: a natural-weight atom list with a checked positive total, event mass and natural-score expectation, and nine laws, fully proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
