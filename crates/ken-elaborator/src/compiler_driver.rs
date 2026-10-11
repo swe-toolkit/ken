@@ -533,11 +533,23 @@ pub enum CompilerDriverError {
         expected: String,
         found: String,
     },
+    DuplicateBoundaryHeader {
+        first_source: String,
+        second_source: String,
+    },
 }
 
 impl fmt::Display for CompilerDriverError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            CompilerDriverError::DuplicateBoundaryHeader {
+                first_source,
+                second_source,
+            } => write!(
+                f,
+                "package source {second_source} declares a second admission boundary; \
+                 {first_source} already declares this package's boundary"
+            ),
             CompilerDriverError::EmptyPackageName => write!(f, "compiler package name is empty"),
             CompilerDriverError::EmptySourceSet => write!(f, "compiler source set is empty"),
             CompilerDriverError::Io(err) => write!(f, "compiler input I/O failed: {err}"),
@@ -1240,6 +1252,37 @@ pub fn compile_ken_file(
     compile_ken_source(package_name, source, selector)
 }
 
+/// Elaborate one source of a package, which has one admission boundary
+/// (`33 §3.2.1`: the header's file is the boundary's single identity). A
+/// second headed source is refused in either order instead of replacing the
+/// first. A checked-fence header never reaches this point: the fence
+/// executor restores the source's own header after its fences run.
+fn elaborate_package_source(
+    env: &mut ElabEnv,
+    source: &CompilerSource,
+    headed_source: &mut Option<String>,
+) -> Result<(Vec<ElabResult>, Vec<ElabResult>, Vec<GlobalId>), CompilerDriverError> {
+    let earlier = env.module_state.boundary_header().cloned();
+    env.module_state.restore_boundary_header(None);
+    let parts = if source.name.ends_with(".ken.md") {
+        env.elaborate_ken_md_file_parts(&source.text)?
+    } else {
+        (env.elaborate_file_v1(&source.text)?, Vec::new(), Vec::new())
+    };
+    let own = env.module_state.boundary_header().cloned();
+    if own.is_some() {
+        if let Some(first_source) = headed_source.as_ref() {
+            return Err(CompilerDriverError::DuplicateBoundaryHeader {
+                first_source: first_source.clone(),
+                second_source: source.name.clone(),
+            });
+        }
+        *headed_source = Some(source.name.clone());
+    }
+    env.module_state.restore_boundary_header(own.or(earlier));
+    Ok(parts)
+}
+
 pub fn compile_ken_package_sources(
     manifest: &CompilerManifest,
     sources: Vec<CompilerSource>,
@@ -1264,12 +1307,10 @@ fn compile_ken_package_sources_with_env(
     let mut admitted = Vec::new();
     let mut example_ids = BTreeSet::new();
     let mut results = Vec::new();
+    let mut headed_source = None;
     for source in &sources {
-        let (declarations, examples, source_example_ids) = if source.name.ends_with(".ken.md") {
-            env.elaborate_ken_md_file_parts(&source.text)?
-        } else {
-            (env.elaborate_file_v1(&source.text)?, Vec::new(), Vec::new())
-        };
+        let (declarations, examples, source_example_ids) =
+            elaborate_package_source(&mut env, source, &mut headed_source)?;
         admitted.extend(declarations.iter().map(|result| result.def_id));
         example_ids.extend(source_example_ids);
         results.extend(declarations);
@@ -2330,15 +2371,11 @@ pub fn prepare_native_program_sources(
     let mut admitted_ids = Vec::new();
     let mut example_ids = BTreeSet::new();
     let mut results = Vec::new();
+    let mut headed_source = None;
     for source in &sources {
-        let (declarations, examples, source_example_ids) = if source.name.ends_with(".ken.md") {
-            env.elaborate_ken_md_file_parts(&source.text)
-        } else {
-            env.elaborate_file_v1(&source.text)
-                .map(|declarations| (declarations, Vec::new(), Vec::new()))
-        }
-        .map_err(CompilerDriverError::Elaboration)
-        .map_err(NativeProgramBuildError::Driver)?;
+        let (declarations, examples, source_example_ids) =
+            elaborate_package_source(&mut env, source, &mut headed_source)
+                .map_err(NativeProgramBuildError::Driver)?;
         admitted_ids.extend(declarations.iter().map(|result| result.def_id));
         example_ids.extend(source_example_ids);
         results.extend(declarations);
