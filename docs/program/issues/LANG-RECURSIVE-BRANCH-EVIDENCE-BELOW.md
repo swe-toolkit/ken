@@ -1,12 +1,12 @@
 ---
 id: LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW
 title: "A constructor-branch equation on a recursive family has no evidence term, because Ken's one recursor shares its motive with the induction hypothesis. Carry it on a case-only Elim convoy and compile structural recursion through generated below and brecOn"
-status: ready
+status: draft
 owner: language
 size: L
 tier: T1
 gate: architect
-depends_on: [LANG-PATH-CONDITION-EVIDENCE]
+depends_on: [LANG-REFINEMENT-SUBSET-SIGMA]
 blocks: []
 github: null
 origin: "Architect recut evt_7729d1mezkcxk of LANG-PATH-CONDITION-EVIDENCE (W2b), on Research advisory evt_2pjgy01xhz4db after the third advancing stop evt_35tcy3w6b3e4f. Operator 2026-10-07: refinements are real kernel types. Steward-filed per COORDINATION section 2."
@@ -17,9 +17,9 @@ origin: "Architect recut evt_7729d1mezkcxk of LANG-PATH-CONDITION-EVIDENCE (W2b)
 ## Objective
 
 Inside the `C r` branch of a match on a recursive family, the branch
-equation `Eq S s (C r)` is a term in Γ, so the subset-Σ introduction can
-apply the obligation holes that `LANG-PATH-CONDITION-EVIDENCE` leaves
-unapplied, without changing any induction hypothesis.
+equation `Eq S s (C r)` is supplied when a subset-Σ introduction
+beneath it demands it (`LANG-REFINEMENT-SUBSET-SIGMA`, Architect
+`evt_41fxwysr833vv`), without changing any induction hypothesis.
 
 ## Settled inputs
 
@@ -50,21 +50,20 @@ base, stop and report the mismatch.
 - Structural recursion compiled by projecting from `below` instead of
   from the method's hypothesis, including in `compiler_driver`'s
   computational-hypothesis lowering.
-- Recursive-family matches become a case-only `Elim` convoy carrying the
-  equation and the `below` dictionary; their conditions leave
-  `path_conditions`, and `refinement_hole_application` returns `Some` for
-  them.
+- A recursive-family match with a demanding introduction beneath it
+  becomes a case-only `Elim` convoy carrying the equation and the `below`
+  dictionary. Without demand the match elaborates as on base.
 
 ## Acceptance
 
 - **AC-0 (D0).** Probe that `below_D` for `Nat` and `List` checks through
   `Elim` into `Type` and reduces on a constructor (large elimination, spec
   14 section 3), then the Architect rules the cut.
-- **AC-1.** `pce_rec`'s `Zero` arm stays discharged with the equation as
-  a Γ binder, the builder returns `Some`, and an IH-using recursive method
-  computes the same result.
-- **AC-2.** Catalog and corpus obligation outcomes identical, with the
-  count of holes moving from `None` to `Some` reported per package.
+- **AC-1.** An introduction in `pce_rec`'s `Zero` arm checks with the
+  equation supplied, and an IH-using recursive method computes the same
+  result.
+- **AC-2.** Every landed package's emitted core is byte-identical to
+  base, and catalog and corpus obligation outcomes are identical.
 - **AC-3.** Native and reference runtime parity unchanged across the
   recursion corpus.
 - **AC-4 (mutation).** Projecting the wrong `below` entry reddens AC-1 or

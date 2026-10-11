@@ -1,13 +1,13 @@
 ---
 id: LANG-PATH-CONDITION-EVIDENCE
 title: "Path conditions are obligation-only (elab.rs: never unchecked evidence in an emitted program), so a proof stored in a refinement pair has no term for the conditions its obligation is closed over. Bind each pushed path condition as a context variable through a convoy, with the carrier encoding otherwise unchanged"
-status: active
+status: closed
 owner: language
 size: M
 tier: T1
 gate: architect
 depends_on: [LANG-REFINEMENT-PROOF-ERASURE]
-blocks: [LANG-REFINEMENT-SUBSET-SIGMA]
+blocks: []
 github: null
 origin: "Operator 2026-10-07: \"agreed, refinements should be real kernel types\" (OQ-refinement-representation DECIDED for the core subset Σ). Architect design and cut evt_30frdrmj45ehg. Steward-filed per COORDINATION section 2. W2. Recut by Architect AC-0 ruling evt_31p5m7pnr13fv: after LANG-REFINEMENT-PROOF-ERASURE."
 ---
@@ -98,3 +98,20 @@ base, stop and report the mismatch.
 - Any AC-2 delta: stop to the Architect with the named population.
 - The change needs any file other than `elab.rs` and tests.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Closed without merge, superseded (Architect `evt_41fxwysr833vv`, on
+Research advisory `evt_45239gwm7ddb3` after the sixth stop
+`evt_150dn6mhpbvxx`). Eager evidence at every split and `let` is withdrawn:
+path facts stay formulas on the obligation plane and become terms only
+where a refinement introduction consumes them, which
+`LANG-REFINEMENT-SUBSET-SIGMA` now owns, with recursive families in
+`LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`.
+
+WIP `59eaccce2` (parent `da817e1f0`) never lands. It is the source of the
+components already proved: the non-indexed, non-recursive convoy
+construction; the nested-split guard `row_leaves_fields_unsplit` and
+`split_convoy_allowed`; the pending-field guard
+`no_pending_path_condition`; the open-zonk `let_equation`; and the (f),
+(g) and AC-1 rows.
