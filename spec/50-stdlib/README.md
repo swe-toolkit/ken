@@ -252,15 +252,26 @@ a genuine cycle result; both branches carry checked evidence. The chapter
 does not claim its catalog build has landed or add a second fixed point.
 
 The **exact finite-support statistics contract** is pinned in
-**`63-statistics.md`** §1 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT).
-`Algorithm.Statistics.Exact` stores a finite list of natural-weight atoms
-with a checked positive total, without `Finite q` or `DecEq q`. Boolean
-event mass and natural-score expectation are exact numerators over that
-total; complement, disjoint additivity, expectation and pointwise
-congruence have nine required checked laws. Ratio equality uses natural
-cross multiplication; no rational-valued API or catalog delivery is
-claimed. `pure`/`bind`, uniform enumeration, approximate statistics and
+**`63-statistics.md`** §§1–2 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
+SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT). `Algorithm.Statistics.Exact`
+stores natural-weight atoms with checked positive total, without
+`Finite q` or `DecEq q`; its nine laws govern natural numerators.
+`Algorithm.Statistics.Empirical` reads an existing `NonEmpty q`, keeps
+repeated observations as distinct unit-weight entries, and requires
+seven checked bridge/append laws. Neither tier exports a
+rational-valued probability, expectation, or mean by this contract.
+`pure`/`bind`, uniform enumeration, approximate statistics, and
 `Float` results remain deferred.
+
+The separate **non-negative exact rational contract** is pinned in
+**`64-rational.md`** (SPEC-NUMERIC-RATIONAL-CONTRACT).
+`Data.Numeric.Rational` stores a natural numerator and the predecessor
+of a positive denominator, with cross-product value equivalence and
+Boolean order. Its checked arithmetic, relation/respect laws, and
+positive-factor Nat prerequisites add no quotient, gcd import,
+primitive, or trusted-base entry. Equivalent fractions may have
+different carrier spellings. Specifying this carrier does **not**
+claim its catalog delivery or a new statistics adapter.
 
 ## 4. I/O, effects, serialization
 
