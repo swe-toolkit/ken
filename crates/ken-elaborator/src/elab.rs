@@ -3083,10 +3083,10 @@ fn plan_embedded_method_convoy(
                 {
                     repairs.push((elim_ordinal, method_ordinal));
                 } else {
-                    return Err(ElabError::Internal(format!(
-                        "coherent-frame convoy cannot repair embedded method \
-                         {elim_ordinal}:{method_ordinal}"
-                    )));
+                    // No convoy shape covers this method: decline the whole
+                    // embedded convoy and keep the ordinary frame, whose
+                    // result the kernel adjudicates.
+                    return Ok((Vec::new(), Vec::new()));
                 }
             }
         }
@@ -4273,7 +4273,17 @@ fn compute_context_convoy(
 /// indefinitely under neutral scrutinees; this deliberately stops at stuck
 /// `Elim` nodes.
 fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
-    match whnf(env, ctx, term) {
+    let reduced = whnf(env, ctx, term);
+    if matches!(reduced, Term::Sigma(..)) {
+        if let Some((a, t, u)) = stated_equality(env, term) {
+            return Term::Eq(
+                Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
+                Box::new(simplify_branch_goal_unguarded(env, ctx, &t)),
+                Box::new(simplify_branch_goal_unguarded(env, ctx, &u)),
+            );
+        }
+    }
+    match reduced {
         Term::Pi(a, b) => {
             let a_s = simplify_branch_goal_unguarded(env, ctx, &a);
             let mut ctx2 = ctx.clone();
@@ -4315,6 +4325,29 @@ fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -
             Box::new(simplify_branch_goal_unguarded(env, ctx, &proof)),
         ),
         other => other,
+    }
+}
+
+/// The equality a branch goal states: a kernel `Eq A t u`, or a transparent
+/// head (prelude `Equal`) whose fully applied body is exactly an `Eq`.
+/// Branch simplification keeps that `Eq` head instead of its observational
+/// Sigma reduct, so `Refl`'s equality-origin gate sees the goal the same way
+/// a standalone declaration does. The two forms are convertible.
+fn stated_equality(env: &GlobalEnv, term: &Term) -> Option<(Term, Term, Term)> {
+    if let Term::Eq(a, t, u) = term {
+        return Some(((**a).clone(), (**t).clone(), (**u).clone()));
+    }
+    let (head, args) = peel_app(term);
+    let Term::Const { id, level_args } = &head else { return None };
+    let (params, body) = env.transparent_body(*id)?;
+    let mut body = subst_levels(&body, &params, level_args);
+    for arg in &args {
+        let Term::Lam(_, inner) = body else { return None };
+        body = subst0(&inner, arg);
+    }
+    match body {
+        Term::Eq(a, t, u) => Some((*a, *t, *u)),
+        _ => None,
     }
 }
 
