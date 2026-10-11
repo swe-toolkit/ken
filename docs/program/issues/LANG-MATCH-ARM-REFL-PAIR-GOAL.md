@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-ARM-REFL-PAIR-GOAL
 title: "Refl in the Nil arm of a match whose goal is Equal (Pair q r) ... is refused with 'Refl expects an Eq-shaped goal', while the identical goal stated as a standalone lemma accepts Refl. The arm's expected type is not reduced to an Eq before Refl is checked. Check Refl against the arm goal as the lemma does"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -67,3 +67,21 @@ base, stop and report the mismatch.
 ## Stop conditions
 
 - The repair needs a kernel, trust or spec change.
+
+## Closeout
+
+Merged `55a0bee93` from exact `497db0b48` (PR #4675). Language QA
+`evt_7b36xh9hdtfv2`, Architect `evt_r17kmt2rc92p` (rulings
+`evt_5r6mxx87123sc`), Decision `dec_3c037fztx498j`. Three hunks in
+`elab.rs`:
+
+- the stated equality is kept in the branch goal;
+- the `Eq` head is kept, with a Sigma guard;
+- where no convoy can repair an embedded method, the whole convoy declines
+  to the ordinary frame, replacing an `Internal` that user programs could
+  reach.
+
+The pair `Refl` rows check, the named coherent-frame row passes unmodified,
+and the 72-file census matches base. The base refusal of true `Equal`
+proofs at a single-constructor type is unchanged and framed as
+`LANG-COHERENT-FRAME-SINGLE-CONSTRUCTOR-EQUAL`. §1a: 0.
