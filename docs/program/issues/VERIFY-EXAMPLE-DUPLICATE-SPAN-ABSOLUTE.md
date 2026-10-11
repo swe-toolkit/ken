@@ -1,7 +1,7 @@
 ---
 id: VERIFY-EXAMPLE-DUPLICATE-SPAN-ABSOLUTE
 title: "A DuplicateDefinition or AmbiguousReference raised in a ken example fence carries a span relative to the fence body, so ken check points at the wrong bytes of the .ken.md file. Rebase the span to the file"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -55,3 +55,15 @@ fence-relative span the same executor returns is shifted the same way.
 
 - The fix needs a change to `KenMdExtraction`, the CLI printer, or a
   kernel, trust or spec path.
+
+## Closeout
+
+Merged `a2b9f4145` from exact `3418e812e` (PR #4664). Verify QA
+`evt_691nr8twtb7g8`, Architect `evt_41ej794mry0df`, Decision
+`dec_3c9cb5c1arbkf`. The private checked-fence executor rebuilds
+`DuplicateDefinition` and `AmbiguousReference` with the span shifted by
+the example's `range.start`, keeping variant, name and sources. Those two
+are the whole population of fence-relative spans the executor returns;
+the whole-fence `ParseError` fallback and compiled-fence errors were
+already absolute. Each removed shift reddened exactly its own pin with
+the slice-relative 0..25. Diagnostics only. §1a: 0.

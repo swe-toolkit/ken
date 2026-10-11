@@ -1,7 +1,7 @@
 ---
 id: SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT
 title: "spec/50-stdlib/63-statistics.md stops at the exact tier, so the catalog's empirical statistics tier has nothing to build against. Author section 2: a non-empty sample of observations, its empirical distribution, and its counts and sums, each law proved at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -86,3 +86,13 @@ are `nonempty_to_list`; no `observations` or `sample_append`.
 - A law cannot be stated without a type that does not exist and that the
   D0 does not place in this scope.
 - The tier needs a section 1 declaration changed rather than reused.
+
+## Closeout
+
+Merged `c60ec4d92` from exact `000747633` (PR #4666). Architect
+`evt_1bsh3kwmz8gys`, conformance-validator `evt_2ndeqtb47yv56`, Decision
+`dec_3g848gdy412c2`. Section 2 of `spec/50-stdlib/63-statistics.md` is
+normative over `NonEmpty q`: five declarations and seven laws as ruled at
+D0, with section 2.3 carrying the deferred list. The seed
+`conformance/stdlib/statistics/seed-empirical-sample.md` has the five
+cases. `CAT-STATISTICS-EMPIRICAL-SAMPLE` delivers it. §1a: 0.

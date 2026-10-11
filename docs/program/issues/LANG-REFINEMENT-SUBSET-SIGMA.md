@@ -6,7 +6,7 @@ owner: language
 size: L
 tier: T1
 gate: architect
-depends_on: [SPEC-REFINEMENT-SUBSET-SIGMA, LANG-PATH-CONDITION-EVIDENCE, LANG-REFINEMENT-PROOF-ERASURE, VERIFY-TRANSITIVE-HONESTY]
+depends_on: [SPEC-REFINEMENT-SUBSET-SIGMA, LANG-REFINEMENT-PROOF-ERASURE, VERIFY-TRANSITIVE-HONESTY]
 blocks: []
 github: null
 origin: "Operator 2026-10-07: \"agreed, refinements should be real kernel types\" (OQ-refinement-representation DECIDED for the core subset Σ). Architect design and cut evt_30frdrmj45ehg. Steward-filed per COORDINATION section 2. W5, kernel hunk K-a. Supersedes LANG-NAMED-REFINEMENT-TYPE-ARGUMENT, LANG-LAMBDA-PI-CARRIER-REFINEMENT-INTRODUCTION and LANG-NAMED-REFINED-BINDER-FIRST-CLASS."
@@ -28,14 +28,27 @@ refined value is a kernel type mismatch, not a missed obligation.
   `register_checked_char_carrier` (`check.rs:1919`), `checked_char_literal`
   (`check.rs:2033`), and the literal String view (`conv.rs` ~221).
 
-This frame is `draft` until its four dependencies land. It is re-anchored
+This frame is `draft` until its three dependencies land. It is re-anchored
 then.
 
-- **Scope (Steward, on Architect recut `evt_7729d1mezkcxk`).** The
-  introduction applies an obligation hole only where
-  `refinement_hole_application` returns `Some`. A hole where it returns
-  `None` (a recursive or indexed constructor condition remains) stays an
-  open obligation as today, until `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`.
+- **Evidence at the consumer (Architect `evt_41fxwysr833vv`).** No term
+  applies a refinement hole on base (elab.rs ~:11666, ~:11779), so every
+  program without a subset-Σ introduction elaborates byte-identically.
+  The introduction requests evidence for exactly the conditions its hole
+  is closed over, from each condition's frame record:
+  - `let`: `refl rhs` at the introduction's argument position; its type
+    checks there after kernel `Let` substitution (check.rs ~:398-401). No
+    inner Ω `Let`.
+  - `if`, literal, or non-recursive non-indexed constructor branch: a
+    convoy on the enclosing split, only when a requesting introduction is
+    beneath it, gated by `row_leaves_fields_unsplit` /
+    `split_convoy_allowed` and `no_pending_path_condition` (proved in WIP
+    `59eaccce2`, which never lands; reuse its components).
+  - Indexed family: a typed refusal.
+  - Recursive family: `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`.
+  - How demand is expressed is ruled at D0, with measurement. The
+    Architect leans to deferred re-elaboration of the enclosing split on a
+    typed demand; a pre-scan keyed on spelling is out.
 
 ## Deliverable
 
@@ -82,9 +95,18 @@ then.
 - **AC-2.** Population delta 0 (76/32 roots, 55/20 packages), apart from
   explicit-conversion migrations AC-0(c) lists. Runtime parity is
   unchanged. Derived and ArgParse timing stay within 10%.
+- **AC-E (evidence).** Every landed package's emitted core is
+  byte-identical to base. An introduction under a `let`, an `if`, a
+  literal and a non-recursive constructor branch each checks; one under an
+  indexed split is a typed refusal. A Minimisation-shaped `let` whose RHS
+  is a fixed point checks within base time when an introduction consumes
+  it; emit `Refl(rhs)` unascribed whenever `rhs` infers.
 - **AC-3.** Kernel QA reviews the K-a lines.
 
 ## Stop conditions
 
 - Any kernel line beyond K-a, any conversion change, or any
   `trusted_base()` change.
+- The AC-E fixed-point row needs a kernel conversion-order change
+  (Refl's ascription defeating the `a == b` fast path, conv.rs ~:1129):
+  stop with the measurement. It is a trust-root change for the operator.

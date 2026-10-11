@@ -1,7 +1,7 @@
 ---
 id: VERIFY-EXAMPLE-MAIN-NOT-ENTRYPOINT
 title: "Program admission reads main from globals, so when a program defines no main, a ken example fence that does may become the program's entry point. Measure, then keep example declarations out of entry-point selection"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2
