@@ -1,11 +1,12 @@
 # Exact finite-support statistics
 
-> **Status: DRAFT v0 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT).**
-> Section 1 is normative for exact distributions represented by finite
-> natural-weight atom lists, decidable-event mass, and natural-score
-> expectation in the ordinary `Algorithm.Statistics.Exact` package. The
-> contract does not claim catalog delivery. It adds no kernel, syntax,
-> primitive, `Float`, `Axiom`, or `trusted_base()` entry.
+> **Status: DRAFT v0 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
+> SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT).** Sections 1–2 are normative:
+> §1 specifies positive natural-weight atom lists in
+> `Algorithm.Statistics.Exact`; §2 specifies exact empirical observations
+> of `NonEmpty q` in `Algorithm.Statistics.Empirical`. Neither section
+> claims delivery of the empirical package. The contract adds no kernel,
+> syntax, primitive, `Float`, `Axiom`, or `trusted_base()` entry.
 
 ## 1. Exact distributions and finite sums
 
@@ -214,8 +215,152 @@ common-denominator construction would also need laws modulo
 proportional masses, an equivalence not exported here. An operation
 named `uniform` is likewise deferred: a `Finite q` certificate may
 list a vertex more than once, so it needs deduplication, not a raw
-count of entries. Conditional probability, variance, empirical
-and approximate statistics, continuous distributions, and every
-`Float`-valued result remain outside §1. A value-level rational
-carrier, its arithmetic/normalization and value-typed probability
-and expectation require a separate `Data.Numeric.Rational` contract.
+count of entries. The empirical distribution and its exact counts
+and sums are outside §1 but specified in §2. Conditional probability,
+variance, sampling from a distribution, approximate statistics,
+continuous distributions,
+and every `Float`-valued result remain outside §§1–2. A mean returned
+as a value, a value-level rational carrier, its arithmetic/normalization,
+and value-typed probability and expectation require a separate
+`Data.Numeric.Rational` contract.
+
+## 2. Empirical distributions over non-empty samples
+
+The empirical tier reads an existing `NonEmpty q` as an ordered list of
+observations, assigning **one natural unit of weight per occurrence**.
+It is a sibling, explicitly imported package,
+`Algorithm.Statistics.Empirical`, which imports
+`Algorithm.Statistics.Exact` and constructs its public
+`ExactDistribution q`. Neither `q` nor its sample needs `Finite q` or
+`DecEq q`. A repeated observation remains a second entry with its own
+unit weight. The package reuses `Data.Collections.NonEmpty`'s
+`nonempty_to_list` and `nonempty_append`; it does not define another
+sample carrier, observation projection, or append operation.
+
+All declarations use level-zero `Type`; equality propositions are in
+level-zero `Omega`. `Algorithm.Statistics.Empirical` is ordinary
+checked Ken with no extra trust. The names and theorem types in this
+section are its required public surface, not a claim that the package
+has landed.
+
+### 2.1 Counts, sums and the unit-weight distribution
+
+Let `xs = nonempty_to_list q sample`. `unit_weights q xs` preserves the
+order of `xs`, replacing each observation `x` by the pair
+`(x, Suc Zero)`. It maps `Nil` to `Nil` and `Cons x rest` to a unit pair
+followed by `unit_weights q rest`; it never merges equal observations.
+The other operations read the **same** `xs`. `sample_size` is
+`length q xs`. `event_count` adds `Suc Zero` for each `x` whose
+Boolean `event x` is `True`, and `Zero` otherwise. `score_sum` adds
+`score x` for each `x`, where `score : q → Nat`. The sums are naturals,
+not returned probabilities, expectations, ratios, or means.
+
+```ken
+pub fn sample_size (q : Type) (sample : NonEmpty q) : Nat
+pub fn event_count
+  (q : Type) (sample : NonEmpty q) (event : q → Bool) : Nat
+pub fn score_sum
+  (q : Type) (sample : NonEmpty q) (score : q → Nat) : Nat
+pub fn unit_weights
+  (q : Type) (xs : List q) : List (Pair q Nat)
+pub fn empirical_distribution
+  (q : Type) (sample : NonEmpty q) : ExactDistribution q
+```
+
+The distribution's entries are precisely `unit_weights q xs`; its
+positive-total proof is checked when constructing §1's
+`MkExactDistribution`, not asserted after construction. A non-empty
+sample supplies its structural head and possibly empty tail. The
+checked `nonempty_to_list_shape` theorem relates the abstract carrier
+to their `Cons` list without exporting `NonEmptyCons`. Induction on
+the tail proves that the sum of the unit weights is the successor of
+its length, so even a one-observation sample has total `Suc Zero`.
+The §1 total is that sum, not a separately stored, potentially stale
+sample count.
+
+### 2.2 Required checked laws
+
+Every displayed law is a **proved theorem** of the empirical package:
+its body is rechecked by the kernel and cannot be an `Axiom`, test,
+or unclosed obligation. The representation and the three observations
+are connected to §1 on the same `empirical_distribution`, so its
+positive `total` is the common denominator of the corresponding
+probability and expectation interpretations.
+
+```ken
+pub theorem empirical_entries (q : Type) (sample : NonEmpty q) :
+  Equal (List (Pair q Nat))
+    (entries q (empirical_distribution q sample))
+    (unit_weights q (nonempty_to_list q sample))
+
+pub theorem empirical_total_size (q : Type) (sample : NonEmpty q) :
+  Equal Nat
+    (total q (empirical_distribution q sample))
+    (sample_size q sample)
+
+pub theorem empirical_event_count
+  (q : Type) (sample : NonEmpty q) (event : q → Bool) :
+  Equal Nat
+    (event_mass q (empirical_distribution q sample) event)
+    (event_count q sample event)
+
+pub theorem empirical_score_sum
+  (q : Type) (sample : NonEmpty q) (score : q → Nat) :
+  Equal Nat
+    (expectation_weight q (empirical_distribution q sample) score)
+    (score_sum q sample score)
+```
+
+The equalities hold for arbitrary Boolean events and natural scores,
+not only for closed fixtures. A repeated `x` contributes once per
+appearance to `event_count` and `score_sum`; `empirical_entries`
+prevents replacing the list by a set or a keyed map. The size theorem
+uses `nonempty_to_list_shape` to transport the checked unit-weight
+sum to the public view. The mass and score theorems use the same
+transport and the §1 entry folds. No function-extensionality rule is
+needed.
+
+`nonempty_append q xs ys` concatenates the observations in their
+existing order. Its checked `nonempty_append::list_view` law reduces
+all three additive properties to the ordinary list append and
+natural addition laws. Each input is non-empty, and its repeated
+observations remain distinct occurrences after append.
+
+```ken
+pub theorem sample_size_append
+  (q : Type) (xs : NonEmpty q) (ys : NonEmpty q) :
+  Equal Nat
+    (sample_size q (nonempty_append q xs ys))
+    (add (sample_size q xs) (sample_size q ys))
+
+pub theorem event_count_append
+  (q : Type) (xs : NonEmpty q) (ys : NonEmpty q)
+  (event : q → Bool) :
+  Equal Nat
+    (event_count q (nonempty_append q xs ys) event)
+    (add (event_count q xs event) (event_count q ys event))
+
+pub theorem score_sum_append
+  (q : Type) (xs : NonEmpty q) (ys : NonEmpty q)
+  (score : q → Nat) :
+  Equal Nat
+    (score_sum q (nonempty_append q xs ys) score)
+    (add (score_sum q xs score) (score_sum q ys score))
+```
+
+### 2.3 Boundary and deferred operations
+
+This tier adds a checked mapping from observed samples into §1's
+positive natural-weight distributions, not a sampling operation that
+generates observations from a distribution. It does not change §1's
+carrier, proofs, event/score semantics, or exact-ratio interpretation.
+No mean as a returned numeric value, variance, conditional
+probability, `pure`/`bind`, `uniform`, rational carrier, approximate
+tier, or `Float` result is part of §2. In particular,
+`score_sum q sample score` over `sample_size q sample` is an **exact
+numerator/denominator interpretation**, not a Ken-valued division.
+A post-ruling checked development establishes feasibility of the
+seven proof bodies against the landed §1 and `NonEmpty` interfaces;
+only a checked CAT package will deliver them as public laws. The
+accompanying conformance seed is authored, not evidence that CAT or
+CI ran it.
