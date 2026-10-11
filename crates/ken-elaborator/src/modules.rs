@@ -1495,6 +1495,12 @@ fn select_in_scope_export(
     item: &ImportItem,
     span: &Span,
 ) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
+    if item.name.contains('.') {
+        // A written export item takes the same dual-meaning verdict as a
+        // term reference: a checked family member (data constructor or prop
+        // intro) and an authorized module export under one path are ambiguous.
+        resolve_constructor_path(scope, exports, &item.name, span)?;
+    }
     let had_scope_binding = scope.bindings.contains_key(&item.name);
     let canonical = resolve_ref(scope, exports, &item.name, span)?;
     if !had_scope_binding && !globals.contains_key(&canonical) {
