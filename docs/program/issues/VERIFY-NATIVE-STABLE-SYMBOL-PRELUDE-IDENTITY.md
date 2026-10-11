@@ -37,6 +37,10 @@ section 3.2 says, whatever spelling a user declaration takes.
   name.
 - Rows: `print-example-Stdout` and `print-plain-Stdout` fail native
   emission; `VERIFY-ENTRY-ABI-CHECKED-IDENTITY` pins them unchanged.
+- Same class, interpreter route (Architect carry, `evt_3rsmr33aw58s2`):
+  primitive reduction resolves `bytes_at`, `bytes_slice` and
+  `bytes_decode` with `elab.globals.get(symbol)` (ken-interp eval.rs
+  ~:2897). It moves to checked identity here too.
 - The L2 strict-resolution flip (operator 2026-09-25) will refuse binding
   a prelude name. This node is the native route's identity repair and
   does not wait for it.
@@ -57,7 +61,8 @@ them; the Architect rules the naming at D0.
   classifier population above, swept by mechanism. The collision case:
   a prelude declaration and a user declaration of one spelling under
   `declaration_symbol(package, name)`.
-- **AC-1.** Both rows build and run as their control.
+- **AC-1.** Both rows build and run as their control, and a
+  same-spelled `const bytes_at` leaves the bytes primitives reducing.
 - **AC-2 (control).** Programs that rebind no prelude name emit
   byte-identical symbols.
 - **AC-3 (mutation, QA).** Restoring the live-`globals` naming reddens a
