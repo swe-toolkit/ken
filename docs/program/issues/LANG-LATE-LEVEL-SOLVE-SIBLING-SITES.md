@@ -1,7 +1,7 @@
 ---
 id: LANG-LATE-LEVEL-SOLVE-SIBLING-SITES
 title: "LANG-MATCH-MOTIVE-LATE-LEVEL-SOLVE kept the level open only in the check-mode dependent-motive builders, so an if, an inferred-position match, a let-bound match and a nested-pattern matrix whose motive sort is solved later still store it at Type 0 and reject. Close the class at every motive-sort site"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
