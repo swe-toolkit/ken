@@ -644,41 +644,34 @@ checked directions form the
 [Nat prerequisites for exact rationals](../../../../../spec/50-stdlib/64-rational.md#4-nat-prerequisite-surface).
 
 ```ken
-theorem leq_nat_add_right_equiv
-      (a : Nat) (b : Nat) (c : Nat)
-    : Equal Bool (leq_nat (add a c) (add b c)) (leq_nat a b) =
-  match c {
-    Zero ↦ Refl;
-    Suc rest ↦ leq_nat_add_right_equiv a b rest
-  }
-
-theorem leq_nat_cong_two
-      (a : Nat) (a2 : Nat) (b : Nat) (b2 : Nat) (left : Equal Nat a a2) (right : Equal Nat b b2)
-    : Equal Bool (leq_nat a b) (leq_nat a2 b2) =
+pub theorem leq_nat_mul_right_cancel
+      (a : Nat)
+      (b : Nat)
+      (k : Nat)
+      (scaled : Equal Bool (leq_nat (mul a (Suc k)) (mul b (Suc k))) True)
+    : Equal Bool (leq_nat a b) True =
   trans
     Bool
     (leq_nat a b)
-    (leq_nat a2 b)
-    (leq_nat a2 b2)
-    (cong Nat Bool a a2 (λx. leq_nat x b) left)
-    (cong Nat Bool b b2 (leq_nat a2) right)
+    (leq_nat (mul a (Suc k)) (mul b (Suc k)))
+    True
+    (sym
+      Bool
+      (leq_nat (mul a (Suc k)) (mul b (Suc k)))
+      (leq_nat a b)
+      (leq_nat_mul_right_equiv a b k))
+    scaled
 
-theorem mul_right_suc
-      (a : Nat) (k : Nat)
-    : Equal Nat (mul (Suc a) (Suc k)) (add (mul a (Suc k)) (Suc k)) =
+pub theorem leq_nat_mul_right_mono
+      (a : Nat) (b : Nat) (k : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (mul a (Suc k)) (mul b (Suc k))) True =
   trans
-    Nat
-    (mul (Suc a) (Suc k))
-    (add (mul a (Suc k)) (mul (Suc Zero) (Suc k)))
-    (add (mul a (Suc k)) (Suc k))
-    (mul_add_distrib_l a (Suc Zero) (Suc k))
-    (cong
-      Nat
-      Nat
-      (mul (Suc Zero) (Suc k))
-      (Suc k)
-      (λx. add (mul a (Suc k)) x)
-      ((proof one_l for mul) (Suc k)))
+    Bool
+    (leq_nat (mul a (Suc k)) (mul b (Suc k)))
+    (leq_nat a b)
+    True
+    (leq_nat_mul_right_equiv a b k)
+    ab
 
 theorem leq_nat_mul_right_equiv
       (a : Nat)
@@ -732,34 +725,41 @@ theorem leq_nat_mul_right_equiv
         }
   }
 
-pub theorem leq_nat_mul_right_mono
-      (a : Nat) (b : Nat) (k : Nat) (ab : Equal Bool (leq_nat a b) True)
-    : Equal Bool (leq_nat (mul a (Suc k)) (mul b (Suc k))) True =
+theorem mul_right_suc
+      (a : Nat) (k : Nat)
+    : Equal Nat (mul (Suc a) (Suc k)) (add (mul a (Suc k)) (Suc k)) =
   trans
-    Bool
-    (leq_nat (mul a (Suc k)) (mul b (Suc k)))
-    (leq_nat a b)
-    True
-    (leq_nat_mul_right_equiv a b k)
-    ab
+    Nat
+    (mul (Suc a) (Suc k))
+    (add (mul a (Suc k)) (mul (Suc Zero) (Suc k)))
+    (add (mul a (Suc k)) (Suc k))
+    (mul_add_distrib_l a (Suc Zero) (Suc k))
+    (cong
+      Nat
+      Nat
+      (mul (Suc Zero) (Suc k))
+      (Suc k)
+      (λx. add (mul a (Suc k)) x)
+      ((proof one_l for mul) (Suc k)))
 
-pub theorem leq_nat_mul_right_cancel
-      (a : Nat)
-      (b : Nat)
-      (k : Nat)
-      (scaled : Equal Bool (leq_nat (mul a (Suc k)) (mul b (Suc k))) True)
-    : Equal Bool (leq_nat a b) True =
+theorem leq_nat_cong_two
+      (a : Nat) (a2 : Nat) (b : Nat) (b2 : Nat) (left : Equal Nat a a2) (right : Equal Nat b b2)
+    : Equal Bool (leq_nat a b) (leq_nat a2 b2) =
   trans
     Bool
     (leq_nat a b)
-    (leq_nat (mul a (Suc k)) (mul b (Suc k)))
-    True
-    (sym
-      Bool
-      (leq_nat (mul a (Suc k)) (mul b (Suc k)))
-      (leq_nat a b)
-      (leq_nat_mul_right_equiv a b k))
-    scaled
+    (leq_nat a2 b)
+    (leq_nat a2 b2)
+    (cong Nat Bool a a2 (λx. leq_nat x b) left)
+    (cong Nat Bool b b2 (leq_nat a2) right)
+
+theorem leq_nat_add_right_equiv
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Bool (leq_nat (add a c) (add b c)) (leq_nat a b) =
+  match c {
+    Zero ↦ Refl;
+    Suc rest ↦ leq_nat_add_right_equiv a b rest
+  }
 ```
 
 The public successor bound proves `n ≤ Suc n`; right weakening extends any
@@ -832,9 +832,10 @@ same identities for readers. A facade export changes reachability, not
 provenance, so it cannot create a second comparator or dictionary.
 
 **Local operations keep computation direct.** `min`, `max`, `sub`,
-`compare`, and `lt_nat` remain structural definitions in this package. Their computation rules stay visible beside their laws: `compare`
-consumes the imported canonical `leq_nat`, while strict `lt_nat` recurses on
-its right argument and its bridge exposes the canonical successor relation.
+`compare`, and `lt_nat` remain structural definitions in this package.
+Their computation rules stay visible beside their laws: `compare` consumes
+the imported canonical `leq_nat`, while strict `lt_nat` recurses on its right
+argument and its bridge exposes the canonical successor relation.
 
 ## 6. References
 
@@ -870,8 +871,9 @@ its right argument and its bridge exposes the canonical successor relation.
 3. **Derivation path.** The imported `leq_nat` and carried `Ord Nat` dictionary
    come from `Core.Classes.LawfulClasses`. The facade republishes their existing
    identities. `min`, `max`, `sub`, `compare`, and `lt_nat` are ordinary
-   recursive functions; `compare` uses the imported relation, and `lt_nat` is linked to its successor
-   relation by a checked attached proof. Both positive-scaling order laws use
+   recursive functions; `compare` uses the imported relation, and `lt_nat` is
+   linked to its successor relation by a checked attached proof. Both
+   positive-scaling order laws use
    the same canonical comparator and the imported checked multiplication
    proofs; they do not introduce another order identity or dictionary.
 4. **`trusted_base()` delta.** **Zero.** Re-exporting a checked identity adds no

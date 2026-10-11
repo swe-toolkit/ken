@@ -219,23 +219,10 @@ pub proof assoc for mul
           ((proof assoc for mul) a b c2))
   }
 
-fn pred_nat (n : Nat) : Nat =
-  match n {
-    Zero ↦ Zero;
-    Suc tail ↦ tail
-  }
-
-theorem suc_injective (a : Nat) (b : Nat) (h : Equal Nat (Suc a) (Suc b)) : Equal Nat a b =
-  cong Nat Nat (Suc a) (Suc b) pred_nat h
-
-theorem add_cancel_r
-      (a : Nat) (b : Nat)
-    : (c : Nat) → Equal Nat (add a c) (add b c) → Equal Nat a b =
-  λc.
-    match c {
-      Zero ↦ λh. h;
-      Suc tail ↦ λh. add_cancel_r a b tail (suc_injective (add a tail) (add b tail) h)
-    }
+pub proof cancel_r for mul
+      (a : Nat) (b : Nat) (k : Nat) (h : Equal Nat (mul a (Suc k)) (mul b (Suc k)))
+    : Equal Nat a b =
+  mul_cancel_core a b k h
 
 theorem mul_cancel_core
       (a : Nat) (b : Nat) (k : Nat)
@@ -308,10 +295,23 @@ theorem mul_cancel_core
       }
   }
 
-pub proof cancel_r for mul
-      (a : Nat) (b : Nat) (k : Nat) (h : Equal Nat (mul a (Suc k)) (mul b (Suc k)))
-    : Equal Nat a b =
-  mul_cancel_core a b k h
+theorem add_cancel_r
+      (a : Nat) (b : Nat)
+    : (c : Nat) → Equal Nat (add a c) (add b c) → Equal Nat a b =
+  λc.
+    match c {
+      Zero ↦ λh. h;
+      Suc tail ↦ λh. add_cancel_r a b tail (suc_injective (add a tail) (add b tail) h)
+    }
+
+theorem suc_injective (a : Nat) (b : Nat) (h : Equal Nat (Suc a) (Suc b)) : Equal Nat a b =
+  cong Nat Nat (Suc a) (Suc b) pred_nat h
+
+fn pred_nat (n : Nat) : Nat =
+  match n {
+    Zero ↦ Zero;
+    Suc tail ↦ tail
+  }
 ```
 
 ## How the document is layered
