@@ -1,7 +1,7 @@
 ---
 id: CAT-NONEMPTY-TO-LIST-SHAPE
 title: "Data.Collections.NonEmpty keeps its constructor abstract but exports no law relating nonempty_to_list to nonempty_head and nonempty_tail, so an importer cannot prove anything about the list view of an arbitrary NonEmpty. Export the shape law"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2

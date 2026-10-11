@@ -1,7 +1,7 @@
 ---
 id: CAT-STATISTICS-EXACT-DISTRIBUTION
 title: "No catalog package gives an exact finite distribution, event mass or expectation. Deliver section 1 of spec/50-stdlib/63-statistics.md as Algorithm.Statistics.Exact: a natural-weight atom list with a checked positive total, event mass and natural-score expectation, and nine laws, fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -75,3 +75,19 @@ base, stop and report the mismatch.
 - Reuse needs a change to a Nat arithmetic or `EffectfulClasses` public
   surface.
 - A seed case fails on the delivered package.
+
+## Closeout
+
+Merged `1ae491e3c` from exact `9de19da63` (PR #4659). Foundation QA
+`evt_75n9rh8w1p08t`, Architect `evt_7ccpymzhapwks`, Decision
+`dec_5qn496729yrkd`. `Algorithm.Statistics.Exact` delivers all 20 public
+declarations of section 1 and its nine laws, kernel-checked with no Axiom
+or trusted-base entry; the eight seed cases pass. The Architect's WIP
+audit (`evt_7kxvfagq2ct7p`) returned (b) on arrangement: the public laws
+follow the builders and the private proofs sit beneath them. QA rebased
+once, from `921969a7c`, with the three paths byte-identical. §1a: 0.
+
+Carry, no node: the spec contract's wording carry still stands (Architect
+`evt_zg3eb0z1gmb0`): "vertex" in section 1.1 reads better as "outcome",
+and the inline-`λ` remark at `63-statistics.md:91` should be scoped to the
+D0 measurement. Fold both into the next touch of the spec.
