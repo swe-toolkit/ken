@@ -1,7 +1,7 @@
 ---
 id: LANG-PROP-INTRO-MODULE-EXPORT-AMBIGUITY
 title: "A prop intro P.pi and a same-named module export (module P { pub const pi }) both bind the spelling P.pi. In one order the export silently displaces the intro, leaving the canonical intro path unaddressable; in the other the program is refused as a duplicate proof name. Spec 33 section 3.3 requires AmbiguousReference, as data constructors already get"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -80,3 +80,24 @@ at declaration.
 
 Not in scope: pattern position, and intro paths reached through an import
 or a hidden member.
+
+## Closeout
+
+Merged `0099859bb` from exact `eb1e3f891` (PR #4657). Language QA
+`evt_31cvt613c0qzc`, Architect `evt_7zsqn3tpfkg23`, Decision
+`dec_7sy1pmm5p7m8d`. The resolver records each prop intro by its checked
+family `GlobalId`, and `resolve_constructor_path` consults that ledger, so
+a written path with both meanings visible is `AmbiguousReference` in both
+orders, at top level, nested and in computational position. A dotted
+in-scope export item takes the same verdict (`evt_1h9ctyvzqx51c`), which
+closes `export D.C` for data constructors too. `export P.pi` does not
+parse and is pinned as a grammar sentinel (`evt_5z1kkbytmp9bf`). The AC-2
+distinct-owner control is unedited and green. Three mutations each
+reddened their rows. §1a: 1 (`evt_5z1kkbytmp9bf`, an Architect premise
+not written before ruling). One WIP audit, (a).
+
+Carry, no node: flat `globals["P.pi"]` still depends on declaration order
+when the collision is never referenced; every written reference reaches
+the choke. The `publish_family_intros` spelling fallback was measured
+`AmbiguousReference` in both orders. Imported and hidden selector
+ambiguity stay out of scope.
