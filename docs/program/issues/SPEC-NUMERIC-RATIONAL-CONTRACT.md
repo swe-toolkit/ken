@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERIC-RATIONAL-CONTRACT
 title: "spec/50-stdlib/63-statistics.md defers every value-typed probability, mean and the approximate tier to a Data.Numeric.Rational contract that does not exist, so the statistics layer has nothing further to build against. Author that contract: an exact non-negative rational carrier, its arithmetic and equivalence, each law proved at zero trust"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
@@ -78,3 +78,15 @@ base, stop and report the mismatch.
   `Float`.
 - The ruled carrier needs a quotient type or setoid machinery the catalog
   does not deliver: stop with the measurement.
+
+## Closeout
+
+Merged `2263461c4` from exact `1a944dd98` (PR #4673). Conformance
+validator `evt_7jk8rj2zt32t6`, Architect `evt_5k6fz5fqxnqgm`, Decision
+`dec_67zmm64jbp7dg`. `spec/50-stdlib/64-rational.md` specifies
+`Data.Numeric.Rational`: a positive-denominator carrier with no
+normalization, value equality by cross-product equivalence, total
+arithmetic, exact order, and their laws. Section 4 names the Nat
+prerequisites, and the seed is `conformance/stdlib/numeric/seed-rational.md`.
+The development checks feasibility for a subset only; the CAT nodes
+deliver every law. §1a: 0.

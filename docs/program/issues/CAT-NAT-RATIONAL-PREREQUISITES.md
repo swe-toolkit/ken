@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-RATIONAL-PREREQUISITES
 title: "Data.Numeric.Rational's proofs need natural multiplication laws that Data.Numeric.Nat.Arithmetic keeps private, plus a positive-factor cancellation and two order transports that do not exist. Deliver section 4 of spec/50-stdlib/64-rational.md: six existing laws made public under their identities, three new checked laws, at zero trust"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
