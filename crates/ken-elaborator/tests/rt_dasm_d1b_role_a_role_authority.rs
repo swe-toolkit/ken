@@ -94,13 +94,22 @@ data ConsoleOp = ShadowConsoleOp
 data ClockOp = ShadowClockOp
 data EntropyOp = ShadowEntropyOp
 data Cap = ShadowCap
-data ShadowPlan = MkProd | MkProcessInput | Success | Failure
+data ProcessInput = ShadowProcessInput
+data ProgramCaps = ShadowProgramCaps
+data HostIO = ShadowHostIO
+data ExitCode = ShadowExitCode
+const host_exit : Nat = Zero
+data ShadowPlan = MkProd | MkProcessInput | MkProgramCaps | Success | Failure
 data ShadowSpine = Ret | Vis | InL | InR
 data ShadowUnit = MkUnit
 data ShadowInstant = MkInstant
+data ShadowClock = MkMonotonicInstant | MkDeadline
 data ShadowReadResult = Chunk | Eof
 data ShadowIoErrors = NotFound | PermissionDenied | CapabilityDenied | BrokenPipe | Interrupted | AlreadyExists | InvalidInput | IsDirectory | NotDirectory | NotEmpty | Unsupported | Revoked | Other
 data ShadowResource = ResourceKindMismatch | BufferLimit | AllocationFailed | InvalidOffset | InvalidBounds | NoProgress | MappingLimit
+data ShadowResourceOpen = ResourceRead | ResourceMetadata | ResourceWriteCreate
+data ShadowMappingProtection = ReadOnly | ReadWrite
+data ShadowCreatePolicy = CreateNew | CreateOrTruncate | CreateOrKeep
 data ShadowProgress = ReadSome | ReadEof | Wrote
 data ShadowFileOps =
   MkFileError | OpReadFile | OpWriteFile | OpChangeMode | OpAppendFile | OpMetadata | OpRename |
@@ -121,6 +130,7 @@ const two : Nat = Suc (Suc Zero)
 const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowPlan", "MkProd"),
     ("ShadowPlan", "MkProcessInput"),
+    ("ShadowPlan", "MkProgramCaps"),
     ("ShadowPlan", "Success"),
     ("ShadowPlan", "Failure"),
     ("ShadowSpine", "Ret"),
@@ -129,6 +139,8 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowSpine", "InR"),
     ("ShadowUnit", "MkUnit"),
     ("ShadowInstant", "MkInstant"),
+    ("ShadowClock", "MkMonotonicInstant"),
+    ("ShadowClock", "MkDeadline"),
     ("ShadowReadResult", "Chunk"),
     ("ShadowReadResult", "Eof"),
     ("ShadowIoErrors", "NotFound"),
@@ -151,6 +163,14 @@ const SHADOWED_ROLES: &[(&str, &str)] = &[
     ("ShadowResource", "InvalidBounds"),
     ("ShadowResource", "NoProgress"),
     ("ShadowResource", "MappingLimit"),
+    ("ShadowResourceOpen", "ResourceRead"),
+    ("ShadowResourceOpen", "ResourceMetadata"),
+    ("ShadowResourceOpen", "ResourceWriteCreate"),
+    ("ShadowMappingProtection", "ReadOnly"),
+    ("ShadowMappingProtection", "ReadWrite"),
+    ("ShadowCreatePolicy", "CreateNew"),
+    ("ShadowCreatePolicy", "CreateOrTruncate"),
+    ("ShadowCreatePolicy", "CreateOrKeep"),
     ("ShadowProgress", "ReadSome"),
     ("ShadowProgress", "ReadEof"),
     ("ShadowProgress", "Wrote"),
@@ -213,13 +233,23 @@ fn compile_shadowing_package() -> Result<(), CompilerDriverError> {
     .map(|_| ())
 }
 
-/// The five **family** roles, which are declarations rather than constructors.
-///
-/// They are a separate path class: `checked_host_spine_v1` resolves them into
-/// `fs_family`/`console_family`/`clock_family`/`entropy_family`/`capability`,
-/// and a shadow is a top-level `data` of the same name rather than a colliding
-/// constructor. Kept in its own table because the symbol namespace differs.
-const SHADOWED_FAMILIES: &[&str] = &["FSOp", "ConsoleOp", "ClockOp", "EntropyOp", "Cap"];
+/// Shadowable **family** roles are declarations rather than constructors.
+/// A shadow is a top-level `data` of the same name rather than a colliding
+/// constructor. Kept in its own table because the declaration shape differs.
+const SHADOWED_FAMILIES: &[&str] = &[
+    "FSOp",
+    "ConsoleOp",
+    "ClockOp",
+    "EntropyOp",
+    "Cap",
+    "ProcessInput",
+    "ProgramCaps",
+    "HostIO",
+    "ExitCode",
+];
+
+/// Shadowable entry functions have a different declaration shape from families.
+const SHADOWED_DEFINITIONS: &[&str] = &["host_exit"];
 
 #[test]
 fn d1b_role_a_package_cannot_declare_a_runtime_role_constructor_spelling() {
@@ -305,6 +335,7 @@ fn d1b_role_a_every_canonical_role_is_covered_by_shadowing_or_floor_immutability
         .iter()
         .map(|(_, constructor)| *constructor)
         .chain(SHADOWED_FAMILIES.iter().copied())
+        .chain(SHADOWED_DEFINITIONS.iter().copied())
         .collect();
     shadowed.sort_unstable();
 

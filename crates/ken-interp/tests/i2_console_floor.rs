@@ -29,7 +29,7 @@ fn setup() -> ConsoleEnv {
             .get(name)
             .unwrap_or_else(|| panic!("missing global {name}"))
     };
-    let ids = ConsoleIds::from_elab(&elab).expect("complete Console ABI");
+    let ids = ConsoleIds::from_elab(&elab.prelude_env).expect("complete Console ABI");
     ConsoleEnv {
         print_line: get("printLine"),
         eprint_line: get("eprintLine"),

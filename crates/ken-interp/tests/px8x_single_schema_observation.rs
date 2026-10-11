@@ -52,8 +52,8 @@ fn action(env: &ken_elaborator::ElabEnv, store: &mut EvalStore) -> EvalVal {
 #[test]
 fn real_buffer_bracket_exposes_ordered_target_bindings() {
     let env = fixture();
-    let ids = ConsoleIds::from_elab(&env).expect("Console ABI");
-    let fs = FSIds::from_elab(&env).expect("FS ABI");
+    let ids = ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
+    let fs = FSIds::from_elab(&env.prelude_env).expect("FS ABI");
     let coproduct = CoproductIds {
         inl_id: env.globals["InL"],
         inr_id: env.globals["InR"],

@@ -17,8 +17,8 @@ struct FsEnv {
 
 fn setup() -> FsEnv {
     let elab = ken_elaborator::ElabEnv::new().expect("prelude registers");
-    let console = ConsoleIds::from_elab(&elab).expect("Console ABI");
-    let fs = FSIds::from_elab(&elab).expect("FS ABI");
+    let console = ConsoleIds::from_elab(&elab.prelude_env).expect("Console ABI");
+    let fs = FSIds::from_elab(&elab.prelude_env).expect("FS ABI");
     FsEnv { elab, console, fs }
 }
 
@@ -367,7 +367,7 @@ fn named_errors_and_write_gate_are_total_and_discriminating() {
 #[test]
 fn scoped_resource_kinds_keep_runtime_roles_after_user_bare_rebindings() {
     let mut elab = ken_elaborator::ElabEnv::new().expect("checked prelude");
-    let before = FSIds::from_elab(&elab).expect("FS ABI before source");
+    let before = FSIds::from_elab(&elab.prelude_env).expect("FS ABI before source");
     let resource_kind = elab.globals["ResourceKind"];
     elab.elaborate_file(
         "data Buffer = MkMyBuffer\n\
@@ -375,7 +375,7 @@ fn scoped_resource_kinds_keep_runtime_roles_after_user_bare_rebindings() {
          data FsHandle = MkMyFsHandle",
     )
     .expect("generic scoped-constructor spellings are available to source");
-    let after = FSIds::from_elab(&elab).expect("FS ABI after source");
+    let after = FSIds::from_elab(&elab.prelude_env).expect("FS ABI after source");
     for (role, original, source) in [
         ("Buffer", before.buffer_id, elab.globals["Buffer"]),
         ("Mapping", before.mapping_id, elab.globals["Mapping"]),

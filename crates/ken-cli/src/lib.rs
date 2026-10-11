@@ -160,7 +160,10 @@ where
         Err(error) => {
             return match error {
                 ken_elaborator::ElabError::DuplicateDefinition { ref name, .. }
-                    if name == "main" => Err(RunError::DuplicateEntrypoint),
+                    if name == "main" =>
+                {
+                    Err(RunError::DuplicateEntrypoint)
+                }
                 other => Err(RunError::Elaboration(other)),
             };
         }
@@ -187,7 +190,6 @@ where
         ));
     }
     let main_id = admitted.main;
-    let get = |name: &str| -> Option<ken_kernel::GlobalId> { elab_env.globals.get(name).copied() };
     let declared_fs = DeclaredFsAuthority {
         name: match admitted.authority_name.as_str() {
             "ANone" => "ANone",
@@ -199,10 +201,10 @@ where
         constructor_id: admitted.authority_constructor,
     };
 
-    let console_ids =
-        ken_interp::ConsoleIds::from_elab(&elab_env).ok_or(RunError::ConsoleAbiUnavailable)?;
-    let fs_ids = ken_interp::FSIds::from_elab(&elab_env);
-    let clock_ids = ken_interp::ClockIds::from_elab(&elab_env);
+    let console_ids = ken_interp::ConsoleIds::from_elab(&elab_env.prelude_env)
+        .ok_or(RunError::ConsoleAbiUnavailable)?;
+    let fs_ids = ken_interp::FSIds::from_elab(&elab_env.prelude_env);
+    let clock_ids = ken_interp::ClockIds::from_elab(&elab_env.prelude_env);
     let cap = match host.mint_fs_cap_for_root(
         declared_fs.authority,
         &admitted.fs_root_spec,
@@ -252,8 +254,8 @@ where
         inl_id: elab_env.prelude_env.inl_id,
         inr_id: elab_env.prelude_env.inr_id,
     };
-    let success_id = get("Success").expect("Success registered");
-    let failure_id = get("Failure").expect("Failure registered");
+    let success_id = elab_env.prelude_env.runtime_roles.exit_success;
+    let failure_id = elab_env.prelude_env.runtime_roles.exit_failure;
     if observe_effects {
         let observation = ken_interp::run_io_effect_observation(
             tree,
@@ -308,7 +310,6 @@ fn map_program_admission_error(
     match error {
         ProgramAdmissionError::MissingMain => RunError::MissingEntrypoint,
         ProgramAdmissionError::MissingProgramBoundary => RunError::EntrypointAbiUnavailable,
-        ProgramAdmissionError::MissingAbiDeclaration { .. } => RunError::EntrypointAbiUnavailable,
         ProgramAdmissionError::MissingCapability { effect }
         | ProgramAdmissionError::DuplicateCapability { effect } => RunError::MissingCapability {
             effect: effect.to_string(),
@@ -348,12 +349,6 @@ fn apply_entrypoint(
     cap: ken_interp::EvalVal,
     store: &mut ken_interp::EvalStore,
 ) -> ken_interp::EvalVal {
-    let get = |name: &str| {
-        *elab_env
-            .globals
-            .get(name)
-            .unwrap_or_else(|| panic!("entrypoint ABI global '{name}' missing"))
-    };
     let mut tree = ken_interp::eval(
         &[],
         &ken_kernel::Term::const_(main_id, vec![]),
@@ -373,7 +368,10 @@ fn apply_entrypoint(
     // Console field and the runner mints no Console capability.
     let mut caps = ken_interp::eval(
         &[],
-        &ken_kernel::Term::constructor(get("MkProgramCaps"), vec![]),
+        &ken_kernel::Term::constructor(
+            elab_env.prelude_env.runtime_roles.program_caps_constructor,
+            vec![],
+        ),
         &elab_env.env,
         store,
     );
@@ -405,13 +403,6 @@ fn process_input_value(
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
 ) -> ken_interp::EvalVal {
-    let get = |name: &str| {
-        elab_env
-            .globals
-            .get(name)
-            .copied()
-            .unwrap_or_else(|| panic!("entrypoint ABI global '{name}' missing"))
-    };
     let arguments = list_value(
         elab_env.prelude_env.nil_id,
         elab_env.prelude_env.cons_id,
@@ -434,7 +425,7 @@ fn process_input_value(
         environment,
     );
     constructor_value(
-        get("MkProcessInput"),
+        elab_env.prelude_env.runtime_roles.process_input,
         vec![
             arguments,
             environment,
@@ -555,8 +546,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
         let main_id = *env.globals.get("main").expect("main");
         assert_eq!(admitted.main, main_id);
 
-        let console = ken_interp::ConsoleIds::from_elab(&env).expect("Console ABI");
-        let fs = ken_interp::FSIds::from_elab(&env).expect("FS ABI");
+        let console = ken_interp::ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
+        let fs = ken_interp::FSIds::from_elab(&env.prelude_env).expect("FS ABI");
         let mut host = ken_interp::CaptureHost::new(Vec::new());
         host.insert_directory(b"root".to_vec());
         let cap = ken_interp::EvalVal::Cap(host.mint_fs_cap(declared.authority));
@@ -619,18 +610,17 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
     #[test]
     fn runner_has_no_implicit_fs_authority_default() {
         let env = elaborate_program("program\n");
-        assert!(
-            env.boundary_header()
-                .and_then(|header| header.capabilities.as_ref())
-                .is_none_or(|caps| caps.iter().all(|cap| cap.family != "FS"))
-        );
+        assert!(env
+            .boundary_header()
+            .and_then(|header| header.capabilities.as_ref())
+            .is_none_or(|caps| caps.iter().all(|cap| cap.family != "FS")));
     }
 
     #[test]
     fn apartial_write_returns_named_denial_before_capture_host_syscall() {
         let env = elaborate_program("program capabilities FS APartial\n");
-        let console = ken_interp::ConsoleIds::from_elab(&env).expect("Console ABI");
-        let fs = ken_interp::FSIds::from_elab(&env).expect("FS ABI");
+        let console = ken_interp::ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
+        let fs = ken_interp::FSIds::from_elab(&env.prelude_env).expect("FS ABI");
         let mut host = ken_interp::CaptureHost::new(Vec::new());
         host.insert_directory(b"root".to_vec());
         let cap =
@@ -689,8 +679,8 @@ proc main (_input : ProcessInput) (caps : ProgramCaps APartial)
     #[test]
     fn anone_readfile_reaches_named_denial_before_capture_host_syscall() {
         let env = elaborate_program("program capabilities FS ANone\n");
-        let console = ken_interp::ConsoleIds::from_elab(&env).expect("Console ABI");
-        let fs = ken_interp::FSIds::from_elab(&env).expect("FS ABI");
+        let console = ken_interp::ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
+        let fs = ken_interp::FSIds::from_elab(&env.prelude_env).expect("FS ABI");
         let mut host = ken_interp::CaptureHost::new(Vec::new());
         host.insert_directory(b"root".to_vec());
         host.insert_file(b"root/input".to_vec(), b"secret".to_vec());

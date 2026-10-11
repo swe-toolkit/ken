@@ -42,8 +42,9 @@ fn mk_env() -> FsEnv {
         *g.get(name)
             .unwrap_or_else(|| panic!("prelude: '{}' not registered", name))
     };
-    let console_ids = ken_interp::ConsoleIds::from_elab(&elab_env).expect("Console ABI");
-    let fs_ids = ken_interp::FSIds::from_elab(&elab_env).expect("FS ABI");
+    let console_ids =
+        ken_interp::ConsoleIds::from_elab(&elab_env.prelude_env).expect("Console ABI");
+    let fs_ids = ken_interp::FSIds::from_elab(&elab_env.prelude_env).expect("FS ABI");
     FsEnv {
         read_bytes_id: get("read_bytes"),
         anone_id: get("ANone"),

@@ -146,8 +146,8 @@ fn with_buffer(
 }
 
 fn drive(env: &ken_elaborator::ElabEnv, store: &mut EvalStore, tree: EvalVal) -> EvalVal {
-    let ids = ConsoleIds::from_elab(env).expect("Console ABI");
-    let fs = FSIds::from_elab(env).expect("FS ABI");
+    let ids = ConsoleIds::from_elab(&env.prelude_env).expect("Console ABI");
+    let fs = FSIds::from_elab(&env.prelude_env).expect("FS ABI");
     let coproduct = CoproductIds {
         inl_id: env.globals["InL"],
         inr_id: env.globals["InR"],

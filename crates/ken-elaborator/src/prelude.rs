@@ -210,6 +210,27 @@ canonical_runtime_roles! {
     resource_mapping_limit => "MappingLimit",
     // ABI-S6 D5a appends the now-native resource-kind reification role.
     resource_kind_mapping => "ResourceKind.Mapping",
+    // Entry ABI roles not already held by PreludeEnv or the runtime roster.
+    // Append only: established role positions are part of the runtime record.
+    process_input_type => "ProcessInput",
+    program_caps_type => "ProgramCaps",
+    program_caps_constructor => "MkProgramCaps",
+    authority_none => "ANone",
+    authority_partial => "APartial",
+    authority_full => "AFull",
+    host_io_type => "HostIO",
+    host_exit => "host_exit",
+    exit_code_type => "ExitCode",
+    monotonic_instant_constructor => "MkMonotonicInstant",
+    deadline_constructor => "MkDeadline",
+    resource_open_read => "ResourceRead",
+    resource_open_metadata => "ResourceMetadata",
+    resource_open_write_create => "ResourceWriteCreate",
+    mapping_read_only => "ReadOnly",
+    mapping_read_write => "ReadWrite",
+    create_new => "CreateNew",
+    create_or_truncate => "CreateOrTruncate",
+    create_or_keep => "CreateOrKeep",
 }
 
 /// A zeroed placeholder `PreludeEnv` for `ElabEnv` construction. `GlobalId(0)`
