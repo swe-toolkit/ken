@@ -8,7 +8,8 @@ use ken_kernel::Term;
 fn erased_body_cache_does_not_survive_checked_rollback_and_id_reuse() {
     // Promise class: durable invariant (42 §3.2, 46 §4, AC-9).
     // MEASURED: the same store evaluates a checked constant before and after
-    // a kernel-admitted rollback that reuses its GlobalId for a new body.
+    // a kernel-admitted rollback that reuses its GlobalId for a new body,
+    // even when the second package declaration has a fresh spelling.
     // CLAIMED: no erased body cached in the earlier allocation survives reuse.
     // THE GAP: this observes one Int constant and public eval entry; unwind
     // cleanup and nested evaluation share the scoped-cache implementation.
@@ -25,9 +26,9 @@ fn erased_body_cache_does_not_survive_checked_rollback_and_id_reuse() {
 
     ken_kernel::rollback_to_mark(&mut env.env, mark).expect("supported rollback admits");
     env.globals.remove("seven_or_eight");
-    env.elaborate_decl("const seven_or_eight : Int = 8")
-        .expect("second declaration admits");
-    let second = env.globals["seven_or_eight"];
+    env.elaborate_decl("const eight_after_rollback : Int = 8")
+        .expect("second declaration admits under a fresh package name");
+    let second = env.globals["eight_after_rollback"];
     assert_eq!(first, second, "the fixture must reuse the GlobalId");
     assert_eq!(
         eval(&[], &Term::const_(second, vec![]), &env.env, &mut store),

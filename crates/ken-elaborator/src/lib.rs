@@ -432,6 +432,10 @@ impl ElabEnv {
             &elab.globals,
             &elab.prelude_env.native_trusted_base,
         )?;
+        // The prelude itself uses the ordinary declaration elaborator. Only
+        // declarations admitted after this pre-source boundary belong to a
+        // package's duplicate-name set; prelude names keep their own guards.
+        elab.module_state.package_definitions.clear();
         Ok(elab)
     }
 
@@ -509,6 +513,21 @@ impl ElabEnv {
             });
         }
         modules::expand_and_elaborate(self, &decls)
+    }
+
+    /// Elaborate one interactive-session declaration. A session is not a
+    /// package: a re-entered name shadows the earlier binding (the REPL's
+    /// redefinition policy), so the package duplicate set neither seeds nor
+    /// records session names. Duplicates within the one declaration are still
+    /// refused by the unit's own resolver set.
+    pub fn elaborate_session_decl_results_v1(
+        &mut self,
+        src: &str,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        let package = std::mem::take(&mut self.module_state.package_definitions);
+        let result = self.elaborate_decl_results_v1(src);
+        self.module_state.package_definitions = package;
+        result
     }
 
     /// Elaborate zero or more declarations from source, in order.
@@ -702,9 +721,13 @@ impl ElabEnv {
         for range in &extracted.example_ranges {
             let example_results = self
                 .elaborate_file_v1(&src[range.clone()])
-                .map_err(|_| ElabError::ParseError {
-                    msg: "a 'ken example' block failed to elaborate".to_string(),
-                    span: Span::new(range.start, range.end),
+                .map_err(|error| match error {
+                    ElabError::DuplicateDefinition { .. }
+                    | ElabError::AmbiguousReference { .. } => error,
+                    _ => ElabError::ParseError {
+                        msg: "a 'ken example' block failed to elaborate".to_string(),
+                        span: Span::new(range.start, range.end),
+                    },
                 })?;
             results.extend(example_results);
         }
@@ -738,11 +761,13 @@ impl ElabEnv {
     ) -> Result<T, ElabError> {
         let mark = env_mark(&self.env);
         let provenance_len = self.resolution_provenance.len();
+        let package_definitions = self.module_state.package_definitions.clone();
         match operation(self) {
             Ok(value) => Ok(value),
             Err(error) => match self.rollback_env_mark(mark) {
                 Ok(()) => {
                     self.resolution_provenance.truncate(provenance_len);
+                    self.module_state.package_definitions = package_definitions;
                     Err(error)
                 }
                 Err(rollback_error) => Err(ElabError::Internal(format!(
@@ -869,4 +894,88 @@ impl Default for ElabEnv {
 
 pub fn kernel_version() -> &'static str {
     ken_kernel::version()
+}
+
+#[cfg(test)]
+mod package_definition_boundary_tests {
+    use super::ElabEnv;
+
+    /// Promise class: durable invariant. MEASURED: a fresh environment's
+    /// package name set is empty after all prelude stages, but a subsequently
+    /// elaborated source name enters it. CLAIMED: the pre-source boundary, not
+    /// the elaboration funnel alone, defines package membership. THE GAP:
+    /// caller classification across both routes is separately censused.
+    #[test]
+    fn package_names_begin_after_complete_prelude_registration() {
+        let mut env = ElabEnv::new().expect("complete prelude registration");
+        assert!(
+            env.module_state.package_definitions.is_empty(),
+            "prelude names must not enter the package definition set"
+        );
+        env.elaborate_file("const zz_source : Bool = True")
+            .expect("a package-owned source declaration");
+        assert!(env.module_state.package_definitions.contains("zz_source"));
+    }
+
+    /// Promise class: durable invariant. MEASURED: a rolled-back checked
+    /// declaration releases its root spelling, which a later unit can reuse.
+    /// CLAIMED: the package set tracks successfully admitted declarations,
+    /// not IDs or names from an aborted transaction. THE GAP: the sibling
+    /// rollback tests inspect the other elaborator registries independently.
+    #[test]
+    fn rolled_back_declaration_does_not_reserve_a_package_name() {
+        let mut env = ElabEnv::new().expect("complete prelude registration");
+        let error: Result<(), super::ElabError> = env.with_env_mark_rollback(|env| {
+            env.elaborate_file("const zz_transient : Bool = True")?;
+            Err(super::ElabError::Internal("abort the declaration window".into()))
+        });
+        assert!(error.is_err());
+        assert!(!env.module_state.package_definitions.contains("zz_transient"));
+        env.elaborate_file("const zz_transient : Bool = False")
+            .expect("a failed transaction must not reserve the name");
+        assert!(env.module_state.package_definitions.contains("zz_transient"));
+    }
+
+    /// Promise class: durable invariant. MEASURED: session success and
+    /// failure leave an existing package name reserved while adding no session
+    /// name; a later package unit still refuses its original duplicate.
+    /// CLAIMED: the session route cannot erase or augment a package's name set.
+    /// THE GAP: the REPL's do_def routing is pinned in its own behavioral test.
+    #[test]
+    fn session_elaboration_does_not_change_package_membership() {
+        let mut env = ElabEnv::new().expect("complete prelude registration");
+        env.elaborate_file("const zz_package : Bool = True")
+            .expect("first package declaration");
+        let names = env.module_state.package_definitions.clone();
+        env.elaborate_session_decl_results_v1("const zz_session : Bool = True")
+            .expect("interactive declaration");
+        assert_eq!(env.module_state.package_definitions, names);
+        assert!(env
+            .elaborate_session_decl_results_v1("const zz_bad : Bool = Missing")
+            .is_err());
+        assert_eq!(env.module_state.package_definitions, names);
+        let error = env
+            .elaborate_file("const zz_package : Bool = False")
+            .expect_err("a package duplicate must still refuse after the session call");
+        assert!(matches!(
+            error,
+            super::ElabError::DuplicateDefinition { name, .. } if name == "zz_package"
+        ));
+    }
+
+    /// Promise class: durable invariant. MEASURED: two heads with one
+    /// spelling inside one interactive declaration refuse as a duplicate.
+    /// CLAIMED: bypassing package history does not bypass the unit resolver.
+    /// THE GAP: a second interactive call must still allow re-entry, which
+    /// the REPL's checked-ID test covers separately.
+    #[test]
+    fn session_route_still_refuses_duplicates_within_one_declaration() {
+        let mut env = ElabEnv::new().expect("complete prelude registration");
+        let error = env
+            .elaborate_session_decl_results_v1(
+                "module Zz { const zz_twice : Bool = True\nconst zz_twice : Bool = False }",
+            )
+            .expect_err("one declaration cannot bind a head twice");
+        assert!(matches!(error, super::ElabError::DuplicateDefinition { .. }));
+    }
 }

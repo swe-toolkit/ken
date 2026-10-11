@@ -1,18 +1,16 @@
-//! VERIFY-OBLIGATION-ID-SHADOWED-OWNER. Durable invariant: a retained checked
-//! owner's premise is reported under that owner's stable obligation identity.
+//! VERIFY-OBLIGATION-ID-SHADOWED-OWNER package boundary: a second owner of
+//! one top-level name is refused before emission. The two-owner obligation
+//! identity property is tested at the emitter seam in compiler_driver.rs.
 //! Spec: 20-verification/22 §1, §2.3; 40-runtime/46 §3.2.
 
-use std::collections::BTreeSet;
-
 use ken_elaborator::checked_core::{
-    canonical_symbol_bytes, canonical_term_bytes, CheckedCorePackage, StableSymbol,
-    StableSymbolTable, SymbolNamespace,
+    canonical_term_bytes, CheckedCorePackage, StableSymbol, StableSymbolTable, SymbolNamespace,
 };
 use ken_elaborator::compiler_driver::{
-    compile_ken_package_sources, CompilerManifest, CompilerSource, CompilerTargetKind,
-    TargetSelector,
+    compile_ken_package_sources, CompilerDriverError, CompilerManifest, CompilerSource,
+    CompilerTargetKind, TargetSelector,
 };
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
 use ken_kernel::Term;
 
 const PKG: &str = "verify_shadowed_obligation_owner";
@@ -32,7 +30,7 @@ fn decl(name: &str) -> StableSymbol {
     StableSymbol::declaration(PKG, &[], name)
 }
 
-fn compile(sources: &[(&str, &str)]) -> CheckedCorePackage {
+fn compile(sources: &[(&str, &str)]) -> Result<CheckedCorePackage, CompilerDriverError> {
     let inputs = std::iter::once(CompilerSource::new("src/c.ken", PRE))
         .chain(
             sources
@@ -49,8 +47,19 @@ fn compile(sources: &[(&str, &str)]) -> CheckedCorePackage {
             kind: CompilerTargetKind::NonRuntime,
         },
     )
-    .expect("both owners admit and produce a checked package")
-    .package
+    .map(|output| output.package)
+}
+
+fn assert_package_refuses_rebound_name(sources: &[(&str, &str)], expected: &str) {
+    let error = compile(sources).expect_err("a second package owner must not produce a package");
+    assert!(
+        matches!(
+            error,
+            CompilerDriverError::Elaboration(ElabError::DuplicateDefinition { ref name, .. })
+                if name == expected
+        ),
+        "package must refuse DuplicateDefinition({expected}), got {error:?}"
+    );
 }
 
 /// The oracle is the source predicate `Equal Int 0 n`, assembled independently
@@ -108,89 +117,50 @@ fn assert_owner_goal(
     );
 }
 
-fn assert_retained_reference(package: &CheckedCorePackage, user: &str, owner: &str) {
-    let semantic = &package.artifact.semantic;
-    let body = &semantic.declarations[&decl(user)];
-    let checked_owner = canonical_symbol_bytes(&decl(owner));
-    assert!(
-        contains(body, &checked_owner),
-        "{user} must retain a checked reference to {owner}"
-    );
-}
-
-fn assert_two_owners(package: &CheckedCorePackage, name: &str, old: i64, new: i64) {
-    let semantic = &package.artifact.semantic;
-    let old_owner = format!("{name}#1");
-    let expected: BTreeSet<_> = [
-        StableSymbol::obligation(format!("{old_owner}.requires.0")),
-        StableSymbol::obligation(format!("{name}.requires.0")),
-    ]
-    .into_iter()
-    .collect();
-    assert_eq!(
-        semantic
-            .obligations
-            .keys()
-            .cloned()
-            .collect::<BTreeSet<_>>(),
-        expected
-    );
-    assert_eq!(
-        semantic
-            .obligation_metadata
-            .keys()
-            .cloned()
-            .collect::<BTreeSet<_>>(),
-        expected
-    );
-    assert_owner_goal(package, &old_owner, old, new);
-    assert_owner_goal(package, name, new, old);
-}
-
-/// AC-1; promise class: durable invariant. MEASURED: two source orders keep
-/// both checked owner ids, each with the independently pinned `Equal Int 0 n`
-/// goal and matching origin. CLAIMED: a lawful rebind cannot erase a premise.
-/// THE GAP: order-dependent `#1` naming is accepted only because the source
-/// predicate is tested separately; identical id sets do not imply goal parity.
+/// AC-1d; promise class: durable invariant. MEASURED: a second file cannot
+/// rebind `Foo` in either order; the driver returns the typed refusal and no
+/// checked package. CLAIMED: package-order changes cannot erase an owner's
+/// instance premise. THE GAP: the emitter's legal two-owner state is tested
+/// separately in compiler_driver.rs, not reached by package compilation.
 #[test]
-fn rebound_instances_keep_two_source_premises_in_both_orders() {
-    let ab = compile(&[("src/a.ken", INSTANCE_A), ("src/b.ken", INSTANCE_B)]);
-    let ba = compile(&[("src/b.ken", INSTANCE_B), ("src/a.ken", INSTANCE_A)]);
-    assert_two_owners(&ab, "Pick_instance_Foo", 1, 2);
-    assert_two_owners(&ba, "Pick_instance_Foo", 2, 1);
+fn rebound_instances_refuse_second_package_owner_in_both_orders() {
+    assert_package_refuses_rebound_name(
+        &[("src/a.ken", INSTANCE_A), ("src/b.ken", INSTANCE_B)],
+        "Foo",
+    );
+    assert_package_refuses_rebound_name(
+        &[("src/b.ken", INSTANCE_B), ("src/a.ken", INSTANCE_A)],
+        "Foo",
+    );
 }
 
-/// AC-1; promise class: durable invariant. MEASURED: the old dictionary is
-/// retained by `z`, and both old/new owned premises survive the later rebind.
-/// CLAIMED: preservation is by checked owner, not by the flat dictionary key.
-/// THE GAP: `z` is a retained declaration, not an execution assertion.
+/// AC-1d; promise class: durable invariant. MEASURED: the second file's
+/// `Foo` cannot displace the first dictionary owner reached by `z`; no
+/// checked package is emitted. CLAIMED: a package cannot silently discard
+/// that owner's premise. THE GAP: the retained reference itself is asserted
+/// in the separate emitter-state test rather than in a refused package.
 #[test]
-fn retained_dictionary_use_keeps_its_premise_after_rebind() {
+fn retained_dictionary_use_refuses_second_package_owner() {
     let a = format!("{INSTANCE_A}const z : Int where Pick Foo = d.sel MkOld\n");
-    let package = compile(&[("src/a.ken", &a), ("src/b.ken", INSTANCE_B)]);
-    assert_retained_reference(&package, "z", "Pick_instance_Foo#1");
-    assert_two_owners(&package, "Pick_instance_Foo", 1, 2);
+    assert_package_refuses_rebound_name(&[("src/a.ken", &a), ("src/b.ken", INSTANCE_B)], "Foo");
 }
 
-/// AC-1; promise class: durable invariant. MEASURED: retained `y` and two
-/// `x` premises remain distinct after a user-spelled shadow. CLAIMED: the
-/// collision protection applies equally to non-dictionary source owners.
-/// THE GAP: this is one user-declaration kind, beside the instance controls.
+/// AC-1d; promise class: durable invariant. MEASURED: `USER_B` cannot
+/// rebind `x` after `USER_A` defines `y`; no checked package is emitted.
+/// CLAIMED: a later package file cannot hide a retained user's obligation.
+/// THE GAP: `y`'s retained checked identity is pinned at the emitter seam.
 #[test]
-fn retained_user_shadow_use_keeps_both_source_premises() {
-    let package = compile(&[("src/a.ken", USER_A), ("src/b.ken", USER_B)]);
-    assert_retained_reference(&package, "y", "x#1");
-    assert_two_owners(&package, "x", 1, 2);
+fn retained_user_shadow_refuses_second_package_owner() {
+    assert_package_refuses_rebound_name(&[("src/a.ken", USER_A), ("src/b.ken", USER_B)], "x");
 }
 
-/// AC-1; promise class: durable invariant. MEASURED: rebound class owner
-/// still yields two distinct dictionary goals with checked origins. CLAIMED:
-/// the key follows the checked instance owner even after class rebinding.
-/// THE GAP: no assertion about other class method or inheritance semantics.
+/// AC-1d; promise class: durable invariant. MEASURED: `CLASS_B` cannot
+/// rebind the earlier `Pick` class, so no checked package is emitted.
+/// CLAIMED: an instance premise cannot be silently lost by class shadowing.
+/// THE GAP: whether class rebinds in a session is tested separately.
 #[test]
-fn rebound_class_keeps_both_instance_premises() {
-    let package = compile(&[("src/a.ken", CLASS_A), ("src/b.ken", CLASS_B)]);
-    assert_two_owners(&package, "Pick_instance_Foo", 1, 2);
+fn rebound_class_refuses_second_package_owner() {
+    assert_package_refuses_rebound_name(&[("src/a.ken", CLASS_A), ("src/b.ken", CLASS_B)], "Pick");
 }
 
 /// AC-2; promise class: durable invariant. MEASURED: each single-file
@@ -200,7 +170,8 @@ fn rebound_class_keeps_both_instance_premises() {
 #[test]
 fn single_owner_controls_keep_unadorned_obligation_ids() {
     for (source, expected, other) in [(INSTANCE_A, 1, 2), (INSTANCE_B, 2, 1)] {
-        let package = compile(&[("src/one.ken", source)]);
+        let package = compile(&[("src/one.ken", source)])
+            .expect("one owner must still produce a checked package");
         assert_eq!(package.artifact.semantic.obligations.len(), 1);
         assert_owner_goal(&package, "Pick_instance_Foo", expected, other);
     }

@@ -5719,6 +5719,186 @@ mod tests {
         }
     }
 
+    // K2 emitter controls use the same source shapes as the package-refusal
+    // integration suite. The package route loads PRE and A; only the B
+    // declarations use the legal session-reentry route before private emission.
+    const K2_PRE: &str = "class Pick carrier { sel : carrier -> Int }\nconst need1 : Int requires Equal Int 0 1 = 0\nconst need2 : Int requires Equal Int 0 2 = 0\nconst k : Nat = Zero\n";
+    const K2_INSTANCE_A: &str =
+        "data Foo : Type where { MkOld : Foo }\ninstance Pick Foo { sel = \\x. need1 }\n";
+    const K2_INSTANCE_B: &str =
+        "data Foo : Type where { MkNew : Foo }\ninstance Pick Foo { sel = \\x. need2 }\n";
+    const K2_USER_A: &str = "const x : Int = need1\nconst y : Int = x\n";
+    const K2_USER_B: &str = "const x : Int = need2\n";
+    const K2_CLASS_A: &str =
+        "data Foo : Type where { MkFoo : Foo }\ninstance Pick Foo { sel = \\x. need1 }\n";
+    const K2_CLASS_B: &str =
+        "class Pick carrier { sel : carrier -> Int }\ninstance Pick Foo { sel = \\x. need2 }\n";
+    const K2_PACKAGE: &str = "verify_shadowed_obligation_owner";
+
+    fn k2_symbol(name: &str) -> StableSymbol {
+        StableSymbol::declaration(K2_PACKAGE, &[], name)
+    }
+
+    fn k2_emitter_after_session_rebind(
+        first: &str,
+        second: &str,
+    ) -> Result<CheckedCorePackage, ElabError> {
+        let mut env = ElabEnv::new().expect("checked prelude");
+        let mut results = env.elaborate_file_v1(K2_PRE).expect("package PRE admits");
+        results.extend(
+            env.elaborate_file_v1(first)
+                .expect("package first file admits"),
+        );
+        for declaration in second.lines().filter(|line| !line.is_empty()) {
+            results.extend(env.elaborate_session_decl_results_v1(declaration)?);
+        }
+        let admitted = results
+            .iter()
+            .map(|result| result.def_id)
+            .collect::<Vec<_>>();
+        let obligations = owned_v2_obligations(&results);
+        Ok(emit_package_from_env(
+            &CompilerManifest::new(K2_PACKAGE, vec![]),
+            &[],
+            &env,
+            &admitted,
+            &obligations,
+            &BTreeSet::new(),
+            None,
+        )
+        .expect("the legal two-owner session state must emit without losing a premise"))
+    }
+
+    // Build an independent canonical goal fragment, not one looked up from
+    // the emitted obligation whose coverage this test must measure.
+    fn k2_predicate_fragment(value: i64) -> Vec<u8> {
+        let env = ElabEnv::new().expect("checked Int and Equal prelude");
+        let mut table = StableSymbolTable::new();
+        for name in ["Int", "Equal"] {
+            table.insert_global(env.globals[name], k2_symbol(name));
+        }
+        let goal = Term::app(
+            Term::app(
+                Term::app(
+                    Term::const_(env.globals["Equal"], vec![]),
+                    Term::const_(env.globals["Int"], vec![]),
+                ),
+                Term::IntLit(0.into()),
+            ),
+            Term::IntLit(value.into()),
+        );
+        canonical_term_bytes(&goal, &table).expect("hand-built checked predicate")
+    }
+
+    fn k2_goal_contains(haystack: &[u8], fragment: &[u8]) -> bool {
+        haystack
+            .windows(fragment.len())
+            .any(|entry| entry == fragment)
+    }
+
+    fn k2_assert_two_owners(package: &CheckedCorePackage, name: &str, old: i64, new: i64) {
+        let semantic = &package.artifact.semantic;
+        let original = format!("{name}#1");
+        let expected: BTreeSet<_> = [
+            StableSymbol::obligation(format!("{original}.requires.0")),
+            StableSymbol::obligation(format!("{name}.requires.0")),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(
+            semantic
+                .obligations
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>(),
+            expected
+        );
+        assert_eq!(
+            semantic
+                .obligation_metadata
+                .keys()
+                .cloned()
+                .collect::<BTreeSet<_>>(),
+            expected
+        );
+        for (owner, value, other) in [(original.as_str(), old, new), (name, new, old)] {
+            let id = StableSymbol::obligation(format!("{owner}.requires.0"));
+            let goal = &semantic.obligations[&id];
+            assert!(
+                k2_goal_contains(goal, &k2_predicate_fragment(value)),
+                "{id} must retain Equal Int 0 {value}"
+            );
+            assert!(
+                !k2_goal_contains(goal, &k2_predicate_fragment(other)),
+                "{id} must not carry Equal Int 0 {other}"
+            );
+            assert_eq!(semantic.obligation_metadata[&id].origin, k2_symbol(owner));
+        }
+    }
+
+    fn k2_assert_retained_reference(package: &CheckedCorePackage, user: &str, owner: &str) {
+        let body = &package.artifact.semantic.declarations[&k2_symbol(user)];
+        assert!(
+            k2_goal_contains(body, &canonical_symbol_bytes(&k2_symbol(owner))),
+            "{user} must retain the checked owner {owner}"
+        );
+    }
+
+    /// Promise class: durable invariant (22 §1, 46 §3.2). MEASURED: both
+    /// file orders admitted through package then session retain distinct
+    /// instance-owner obligation ids, goal fragments and matching origins.
+    /// CLAIMED: re-entry cannot collapse an earlier checked owner's premise.
+    /// THE GAP: only the test-only private emitter, not production package
+    /// compilation, reaches this legal two-owner environment.
+    #[test]
+    fn session_rebound_instances_keep_both_emitted_premises_in_both_orders() {
+        let ab = k2_emitter_after_session_rebind(K2_INSTANCE_A, K2_INSTANCE_B)
+            .expect("session can re-enter the second instance source");
+        let ba = k2_emitter_after_session_rebind(K2_INSTANCE_B, K2_INSTANCE_A)
+            .expect("session can re-enter the first instance source");
+        k2_assert_two_owners(&ab, "Pick_instance_Foo", 1, 2);
+        k2_assert_two_owners(&ba, "Pick_instance_Foo", 2, 1);
+    }
+
+    /// Promise class: durable invariant (22 §1, 46 §3.2). MEASURED: `z`
+    /// retains the first instance's checked reference and both source goals
+    /// survive the second session declaration. CLAIMED: a later re-entry
+    /// cannot erase a retained dictionary premise. THE GAP: this does not
+    /// execute `z`; it inspects the kernel-checked emission.
+    #[test]
+    fn session_retained_dictionary_use_keeps_first_premise() {
+        let first = format!("{K2_INSTANCE_A}const z : Int where Pick Foo = d.sel MkOld\n");
+        let package = k2_emitter_after_session_rebind(&first, K2_INSTANCE_B)
+            .expect("session can re-enter a dictionary source");
+        k2_assert_retained_reference(&package, "z", "Pick_instance_Foo#1");
+        k2_assert_two_owners(&package, "Pick_instance_Foo", 1, 2);
+    }
+
+    /// Promise class: durable invariant (22 §1, 46 §3.2). MEASURED: `y`
+    /// retains the first `x` while both source obligations keep separate
+    /// goals, ids and origins. CLAIMED: checked owner identity survives a
+    /// lawful session re-entry. THE GAP: package compilation refuses this
+    /// same two-file spelling, as the integration test separately pins.
+    #[test]
+    fn session_retained_user_shadow_keeps_both_premises() {
+        let package = k2_emitter_after_session_rebind(K2_USER_A, K2_USER_B)
+            .expect("session can re-enter a user-declared owner");
+        k2_assert_retained_reference(&package, "y", "x#1");
+        k2_assert_two_owners(&package, "x", 1, 2);
+    }
+
+    /// Promise class: durable invariant (22 §1, 46 §3.2). MEASURED: when
+    /// class re-entry is legal, the two checked instance owners retain their
+    /// own goals, ids and origins. CLAIMED: class shadowing cannot displace
+    /// an older instance premise. THE GAP: a session refusal is pinned as
+    /// its own diagnostic instead of fabricating a two-owner state.
+    #[test]
+    fn session_rebound_class_keeps_both_instance_premises_if_admitted() {
+        let package = k2_emitter_after_session_rebind(K2_CLASS_A, K2_CLASS_B)
+            .expect("session class re-entry admits the fixture");
+        k2_assert_two_owners(&package, "Pick_instance_Foo", 1, 2);
+    }
+
     const CALLER_OPEN_SOURCE: &str = r#"program capabilities FS APartial
 const ac0_need : String requires Equal Int 0 0 = "ac0-run"
 const ac0_use : String = ac0_need
