@@ -345,6 +345,7 @@ fn nonempty_loader_visible_inventory_is_exact() {
         "nonempty_singleton",
         "nonempty_tail",
         "nonempty_to_list",
+        "nonempty_to_list_shape",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -354,6 +355,52 @@ fn nonempty_loader_visible_inventory_is_exact() {
         expected,
         "NonEmpty's loader-visible surface must equal its stable abstract API"
     );
+}
+
+/// Promise class: durable invariant for the public abstraction boundary.
+///
+/// MEASURED: a distinct selective-import client checks the shape equation on
+/// arbitrary `NonEmpty a`, derives its list-length equation by congruence, and
+/// the same length equation with an extra `Suc` is kernel-rejected with an exact
+/// TypeMismatch. CLAIMED: an importer can use the law without the private
+/// constructor, while a false list-length consequence stays unprovable.
+/// THE GAP: this exercises the checked importer and the two proof statements;
+/// the loader-visible inventory above separately pins the complete public API.
+#[test]
+fn nonempty_importer_derives_shape_and_length_but_rejects_extra_successor() {
+    let mut env = ElabEnv::new().expect("prelude bootstrap");
+    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], NONEMPTY_MODULE)
+        .expect("NonEmpty must roots-load before its independent importer");
+    env.elaborate_file(
+        "import Data.Collections.NonEmpty \
+           (NonEmpty, nonempty_head, nonempty_tail, nonempty_to_list, nonempty_to_list_shape)\n\
+         import Data.Collections.Derived (length)\n\
+         import Core.Logic.Transport (cong)\n\
+         theorem cc1_imported_shape (a : Type) (xs : NonEmpty a) : \
+           Equal (List a) (nonempty_to_list a xs) \
+             (Cons a (nonempty_head a xs) (nonempty_tail a xs)) = \
+           nonempty_to_list_shape a xs\n\
+         theorem cc1_imported_length (a : Type) (xs : NonEmpty a) : \
+           Equal Nat (length a (nonempty_to_list a xs)) \
+             (Suc (length a (nonempty_tail a xs))) = \
+           cong (List a) Nat (nonempty_to_list a xs) \
+             (Cons a (nonempty_head a xs) (nonempty_tail a xs)) \
+             (length a) (nonempty_to_list_shape a xs)",
+    )
+    .expect("only public operations and their checked law suffice for arbitrary values");
+
+    match env.elaborate_decl(
+        "theorem cc1_imported_length_extra_successor (a : Type) (xs : NonEmpty a) : \
+           Equal Nat (length a (nonempty_to_list a xs)) \
+             (Suc (Suc (length a (nonempty_tail a xs)))) = \
+           cc1_imported_length a xs",
+    ) {
+        Err(ElabError::KernelRejected {
+            error: ken_kernel::KernelError::TypeMismatch { .. },
+            ..
+        }) => {}
+        other => panic!("an extra successor must be kernel-refused, got {other:?}"),
+    }
 }
 
 /// Promise class: normative compatibility vector.
@@ -562,6 +609,7 @@ fn ordered_dependency_closure_elaborates_both_packages_and_all_laws() {
             "Data.Collections.NonEmpty.nonempty_head",
             "Data.Collections.NonEmpty.nonempty_tail",
             "Data.Collections.NonEmpty.nonempty_to_list",
+            "Data.Collections.NonEmpty.nonempty_to_list_shape",
             "Data.Collections.NonEmpty.nonempty_map",
             "Data.Collections.NonEmpty.nonempty_append",
             "Data.Collections.NonEmpty.nonempty_append::assoc",
