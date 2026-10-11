@@ -4275,7 +4275,7 @@ fn compute_context_convoy(
 fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
     let reduced = whnf(env, ctx, term);
     if matches!(reduced, Term::Sigma(..)) {
-        if let Some((a, t, u)) = stated_equality(env, term) {
+        if let Some((a, t, u)) = stated_equality(env, ctx, term) {
             return Term::Eq(
                 Box::new(simplify_branch_goal_unguarded(env, ctx, &a)),
                 Box::new(simplify_branch_goal_unguarded(env, ctx, &t)),
@@ -4330,14 +4330,20 @@ fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -
 
 /// The equality a branch goal states: a kernel `Eq A t u`, or a transparent
 /// head (prelude `Equal`) whose fully applied body is exactly an `Eq`.
-/// Branch simplification keeps that `Eq` head instead of its observational
-/// Sigma reduct, so `Refl`'s equality-origin gate sees the goal the same way
-/// a standalone declaration does. The two forms are convertible.
-fn stated_equality(env: &GlobalEnv, term: &Term) -> Option<(Term, Term, Term)> {
+/// An applied, annotated motive lambda may expose either form after beta.
+/// Stop at that head, before observational reduction changes Sigma equality
+/// into a Sigma proposition. This preserves Refl's stated-equality origin;
+/// the reduced endpoints still have to pass its conversion check.
+fn stated_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<(Term, Term, Term)> {
     if let Term::Eq(a, t, u) = term {
         return Some(((**a).clone(), (**t).clone(), (**u).clone()));
     }
     let (head, args) = peel_app(term);
+    if matches!(head, Term::Lam(..) | Term::Ascript(..)) {
+        let Term::App(f, arg) = term else { return None };
+        let Term::Lam(_, body) = whnf(env, ctx, f) else { return None };
+        return stated_equality(env, ctx, &subst0(&body, arg));
+    }
     let Term::Const { id, level_args } = &head else { return None };
     let (params, body) = env.transparent_body(*id)?;
     let mut body = subst_levels(&body, &params, level_args);
