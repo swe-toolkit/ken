@@ -28,8 +28,10 @@ Every pushed path condition is a term in Γ, so the subset-Σ introduction
   hole and admits a found certificate as its body. **No term applies a
   refinement hole today.** The application is born with the subset-Σ
   introduction (`LANG-REFINEMENT-SUBSET-SIGMA`).
-- Kernel `Let` is substitution (check.rs:398), so a `let` equation's
-  evidence is `refl rhs`.
+- Kernel `Let` substitutes; `let` evidence is an inner Ω `Let` binder
+  with value `refl rhs` (Architect ruling `evt_dha43qwwnp4g`). The kernel
+  `Context` carries no let values, so `refl rhs` does not check in the
+  bare Γ.
 - At an indexed-family scrutinee (`D : Π ī. Type`) the plain convoy
   motive is ill-typed in every branch: the kernel is non-cumulative and
   `ī'` is bound.
@@ -43,15 +45,21 @@ base, stop and report the mismatch.
 - **Convoy.** At every `if` and non-indexed `match` push site, bind the
   equation as a Γ entry: motive `λ y. Eq S s y → T`, applied to
   `refl s`. A condition with a Γ binder is closed by Γ and is **not**
-  also pushed to `path_conditions`. `path_conditions` then holds `let`
-  equations only, each with evidence `refl rhs`.
+  also pushed to `path_conditions`. `path_conditions` is removed; every
+  condition is a Γ binder or, at an indexed scrutinee, not a hypothesis.
+- **`let` evidence.** At both `let` writers, push a hidden
+  `e : Eq A x rhs↑` directly after `x`, elaborate the body under both
+  binders, and emit `Let { ty: A, val: rhs, body: Let { ty: Eq A x rhs↑,
+  val: refl rhs↑, body } }`. On the inferred route, strengthen the body
+  type out of `e` with `lower_by` before the existing `subst0`. When
+  `let_equation` returns `None`, behaviour is unchanged.
 - **Indexed families.** No convoy at an indexed-family scrutinee, and its
   condition is not a hypothesis: widen the drop in
   `admissible_path_conditions` from "indexed and ill-typed" to
   `is_indexed_family_equation`.
 - **Certificate search.** In `emit_refinement_predicate_with`, record the
   ctx depth `d` of each convoy binder and add the candidate
-  `Var(hyps + conds + ctx.len() - 1 - d)`, so a discharge by a condition
+  `Var(hyps + ctx.len() - 1 - d)`, so a discharge by a condition
   survives the move into Γ.
 - **Hole application builder.** `refinement_hole_application(cx, hole,
   evidence)` builds `h v_{n-1} .. v_0 e_1 .. e_k : Π hyps. φ` in
@@ -71,8 +79,9 @@ base, stop and report the mismatch.
   ruled `evt_31p5m7pnr13fv`). Re-measure the site list at the rebased
   base before editing.
 - **AC-1.** Each `if` and non-indexed `match` site binds a convoy, observed
-  in the emitted core; each `let` site's evidence is `refl rhs`. The hole
-  application is observed through the builder's return and passes its
+  in the emitted core; each `let` site shows the inner `Let` with
+  `val = refl rhs` at `ty = Eq A x rhs` and applies the hole to `Var(e)`.
+  The hole application is observed through the builder's return and passes its
   kernel check, one row per site kind.
 - **AC-2.** Population delta 0: per-package obligation counts and
   outcomes are unchanged across the catalog and the corpus. If any
@@ -81,11 +90,12 @@ base, stop and report the mismatch.
 - **AC-3.** Runtime parity is unchanged, which shows the convoy erases
   (through `LANG-REFINEMENT-PROOF-ERASURE`).
 - **AC-4 (mutation).** Dropping one evidence argument in the hole
-  application reddens that site's AC-1 row and is refused by the
-  builder's kernel check.
+  application, including `e` at a `let` site, reddens that site's AC-1 row
+  and is refused by the builder's kernel check.
 
 ## Stop conditions
 
 - A push site whose condition has no term in Γ: stop to the Architect.
 - An AC-2 outcome change: stop to the Architect with the population.
+- Removing `path_conditions` needs any file other than `elab.rs` and tests.
 - Any kernel, `trusted_base()` or spec change.
