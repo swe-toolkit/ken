@@ -130,6 +130,26 @@ an admitted declaration's spelling.
   was written to probe. The 184 dynamic or indirect module-key sites and
   arbitrary dynamic source construction stay residual; CI is the
   backstop.
+- **AC-1d (fourth red, `evt_5v1cyb2nzf2ax`; ruled `evt_3j5470543e2xd`).**
+  The four multi-file rows of `verify_obligation_id_shadowed_owner.rs`
+  rebind a name across files of one package, which this WP refuses by
+  design. They become package-refusal pins through the same
+  `compile_ken_package_sources` entry (`compile` returns the `Result`):
+  each asserts the duplicate-definition error naming the rebound spelling
+  (`x`, `Foo` in both instance orders, `Foo`, `Pick`) and that no package
+  is produced. `single_owner_controls_keep_unadorned_obligation_ids` is
+  unchanged. K2 moves to the emitter seam: one new path,
+  `crates/ken-elaborator/src/compiler_driver.rs`, **test module only**,
+  beside `obligation_metadata_refuses_duplicate_stable_owner_and_same_goal`.
+  It builds the two-owner environment with the re-declaration on
+  `elaborate_session_decl_results_v1`, emits through
+  `emit_package_from_env`, and ports the four K2 properties as written. A
+  row the session route refuses pins that diagnostic and is reported. The
+  census extends by mechanism to every public entry that puts two or more
+  source texts into one environment (the seven entries the ruling names,
+  including `elaborate_ken_md_file_parts`); hits are classified
+  placeholder, intentional rebind (to the Architect) or false positive. No
+  production or session-route change.
 - **AC-2 (control).** The unrelated-example row keeps hash
   `48e43379ae5466ab`, and the existing example and package-route rows keep
   their results. `rt_dasm_d1b_role_a_role_authority` is green with its
@@ -154,6 +174,9 @@ an admitted declaration's spelling.
 
 - A catalog or corpus package is newly refused: stop with the list.
 - The repair needs a kernel, trust or spec change.
+- AC-1d: a package-route refusal names another spelling or a
+  non-duplicate error, or an emitter row drops a premise or collapses the
+  two obligation ids (a K2 regression on a legal state).
 
 ## Hard-stop inventory
 
