@@ -525,6 +525,9 @@ struct Scope {
     /// The parent-keyed checked constructor registry in this scope. Loaded
     /// providers still need an authorized public constructor export below.
     constructor_members: HashMap<ken_kernel::GlobalId, HashMap<String, ken_kernel::GlobalId>>,
+    /// Checked prop introductions keyed by their owning family identity. A
+    /// later module export may replace the same spelling in flat globals.
+    prop_intro_members: HashMap<ken_kernel::GlobalId, HashMap<String, ken_kernel::GlobalId>>,
     /// Snapshot of the prelude's immutable private-ID roster. Every checked
     /// reference in this scope must pass the same identity gate.
     private_ids: HashSet<ken_kernel::GlobalId>,
@@ -550,6 +553,10 @@ impl Scope {
         self.checked_local_ids.retain(|_, id| !removed.contains(id));
         self.floor_type_ids.retain(|_, id| !removed.contains(id));
         self.constructor_members.retain(|parent, members| {
+            members.retain(|_, id| !removed.contains(id));
+            !removed.contains(parent)
+        });
+        self.prop_intro_members.retain(|parent, members| {
             members.retain(|_, id| !removed.contains(id));
             !removed.contains(parent)
         });
@@ -819,16 +826,24 @@ fn resolve_constructor_path(
     let Some(type_id) = type_id else {
         return Ok(None);
     };
+    let intro_member = scope
+        .prop_intro_members
+        .get(type_id)
+        .and_then(|family| family.get(leaf));
     let Some(member) = scope
         .constructor_members
         .get(type_id)
         .and_then(|family| family.get(leaf))
+        .or(intro_member)
     else {
         return Ok(None);
     };
     let owner_member = scope.checked_local_ids.get(type_path) == Some(type_id)
         || scope.floor_type_ids.get(type_path) == Some(type_id);
     let selected_member = scope.qualified_ids.get(name) == Some(member)
+        // A checked public family grants its own introductions even when a
+        // same-spelling inline module export overwrote the flat selector.
+        || (intro_member.is_some() && scope.qualified_ids.get(type_path) == Some(type_id))
         || type_path.rsplit_once('.').is_some_and(|(module, _)| {
             scope.prefixes.contains_key(module)
                 && scope.qualified_ids.get(&format!("{module}.{leaf}")) == Some(member)
@@ -843,10 +858,20 @@ fn resolve_constructor_path(
     }
     // An authorized module export and an authorized type member are two
     // meanings even when both eventually denote the same GlobalId.
-    let module_member = scope.prefixes.get(type_path).is_some_and(|module| {
+    // Preserve the written module path for data and imported types. Only an
+    // owner-local prop family inside a nested module also has a shorter bare
+    // spelling; its actual inline module export lives at the canonical path.
+    let local_prop_module =
+        intro_member.is_some() && owner_member && !scope.prefixes.contains_key(type_path);
+    let module_path = if local_prop_module {
+        scope.bindings.get(type_path).map_or(type_path, String::as_str)
+    } else {
+        type_path
+    };
+    let module_member = scope.prefixes.get(module_path).is_some_and(|module| {
         scope
             .file_prefix_exports
-            .get(type_path)
+            .get(module_path)
             .or_else(|| exports.get(module))
             .is_some_and(|pubmap| pubmap.contains_key(leaf))
     });
@@ -1470,6 +1495,12 @@ fn select_in_scope_export(
     item: &ImportItem,
     span: &Span,
 ) -> Result<(String, Option<ken_kernel::GlobalId>), ElabError> {
+    if item.name.contains('.') {
+        // A written export item takes the same dual-meaning verdict as a
+        // term reference: a checked family member (data constructor or prop
+        // intro) and an authorized module export under one path are ambiguous.
+        resolve_constructor_path(scope, exports, &item.name, span)?;
+    }
     let had_scope_binding = scope.bindings.contains_key(&item.name);
     let canonical = resolve_ref(scope, exports, &item.name, span)?;
     if !had_scope_binding && !globals.contains_key(&canonical) {
@@ -3240,15 +3271,16 @@ fn register_checked_type_node(
     }
     if let Decl::PropDecl { intros, .. } = inner {
         let mut checked_intros = Vec::with_capacity(intros.len());
+        let mut members = HashMap::new();
         for intro in intros {
             let canonical_intro = format!("{}.{}", result.name, intro.name);
-            if !elab.globals.contains_key(&canonical_intro) {
-                return Err(ElabError::Internal(format!(
-                    "prop intro '{canonical_intro}' did not elaborate"
-                )));
-            }
+            let id = *elab.globals.get(&canonical_intro).ok_or_else(|| {
+                ElabError::Internal(format!("prop intro '{canonical_intro}' did not elaborate"))
+            })?;
+            members.insert(intro.name.clone(), id);
             checked_intros.push(intro.name.clone());
         }
+        scope.prop_intro_members.insert(result.def_id, members);
         elab.module_state
             .prop_intros
             .insert(result.name.clone(), checked_intros);
@@ -4553,6 +4585,9 @@ fn expand_scope(
                 scope
                     .constructor_members
                     .extend(elab.module_state.constructor_members.clone());
+                scope
+                    .prop_intro_members
+                    .extend(child_scope.prop_intro_members.clone());
                 // Keep the decl's span and an unnecessary `child_prefix`
                 // clone out of the recursive expansion frame. The stated-stack
                 // Map sentinel measures the whole elaboration path, not this
@@ -4896,11 +4931,41 @@ fn expand_scope(
                             &elab.module_state.exports,
                             raw_rdecls[k].clone(),
                         )?;
+                        // The proof helper checks that its canonical name is
+                        // free. If the prior occupant is this scope's public
+                        // inline-module export, both meanings must survive
+                        // until reference resolution can reject a written tie.
+                        // Other duplicate proof names still take that guard.
+                        let shadowed = if let RDeclKind::Prop { intros } = &rdecl.kind {
+                            intros
+                                .iter()
+                                .filter_map(|intro| {
+                                    let path = format!("{}.{}", rdecl.name, intro.name);
+                                    let module = scope.prefixes.get(&rdecl.name)?;
+                                    let pubmap = elab.module_state.exports.get(module)?;
+                                    let prior = elab.globals.get(&path).copied()?;
+                                    (pubmap.contains_key(&intro.name)
+                                        && scope.qualified_ids.get(&path) == Some(&prior))
+                                        .then_some((path, prior))
+                                })
+                                .collect::<Vec<_>>()
+                        } else {
+                            Vec::new()
+                        };
+                        for (path, _) in &shadowed {
+                            elab.globals.remove(path);
+                        }
                         let result = elaborate_checked(
                             elab,
                             rdecl,
                             pending_fixity_for(&declared_fixities, &rdecl.name),
-                        )?;
+                        );
+                        if result.is_err() {
+                            for (path, prior) in shadowed {
+                                elab.globals.insert(path, prior);
+                            }
+                        }
+                        let result = result?;
                         if is_type_node(&rdecl.kind) {
                             register_checked_type_node(
                                 elab,
