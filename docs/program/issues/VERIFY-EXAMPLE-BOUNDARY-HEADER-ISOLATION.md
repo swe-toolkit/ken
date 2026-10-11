@@ -1,7 +1,7 @@
 ---
 id: VERIFY-EXAMPLE-BOUNDARY-HEADER-ISOLATION
 title: "A ken example fence with a program capabilities header overwrites the program's own boundary header, so the runner and native admission mint ProgramCaps from the example's authority: an example can raise a program's FS authority. Example elaboration must leave the package's boundary header as the program declared it"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2

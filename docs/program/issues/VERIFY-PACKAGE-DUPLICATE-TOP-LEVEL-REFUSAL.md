@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PACKAGE-DUPLICATE-TOP-LEVEL-REFUSAL
 title: "A ken example fence, or a later plain source, may redefine an admitted top-level name: the duplicate check is per elaboration unit, and stable_symbols_for_env names ids by spelling from the flat globals table, so the admitted declaration falls to the owner#ordinal fallback, core_semantic_hash moves, and a redefined target becomes unselectable. Refuse a duplicate top-level name across units of one package"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1
@@ -201,3 +201,24 @@ an admitted declaration's spelling.
   inferred from the resolver funnel a name passes through, not from the
   boundary that defines the package. Closure: anchor the set at the end
   of `ElabEnv::empty()` (above).
+
+## Closeout
+
+Merged `7832e4e16` from exact `85b08bc2e` (PR #4648). Verify QA
+`evt_3s2ykt5n74dyz`, Architect `evt_6gxcxb1pvcxt7`, Decision
+`dec_dvbvrdpagxpy`. A package's name set is anchored after
+`ElabEnv::empty()`, and a top-level name redefined across units of one
+package is refused with `DuplicateDefinition` (`AmbiguousReference`
+through the checked-fence executor). The REPL keeps its shadowing policy
+through `elaborate_session_decl_results_v1`. AC-2 re-pinned the base
+semantic hash to `0x7064ef0807895040`. Four CI reds, each attributed and
+closed by an amendment: AC-1a, two fixed-name test consumers renamed;
+AC-1b, five rebinding tests moved to the session route with package-route
+pins (`evt_2w4a7teq708nh`); AC-1c, two loaded-source placeholders renamed;
+AC-1d, four cross-file package rebind rows became refusal pins, with K2
+tested at the emitter seam (`evt_3j5470543e2xd`). The `modules.rs`
+overlap with `0099859bb` was inspected under section 14(5). §1a: 3.
+
+Carry, no node: the stale "module-specific seed" comment; 186 dynamic or
+indirect module-key sites and generated sources stay a CI residual, not a
+census closure; the px4b umask failure is outside the population.

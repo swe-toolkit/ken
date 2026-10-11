@@ -1,12 +1,12 @@
 ---
 id: SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT
 title: "spec/50-stdlib/63-statistics.md stops at the exact tier, so the catalog's empirical statistics tier has nothing to build against. Author section 2: a non-empty sample of observations, its empirical distribution, and its counts and sums, each law proved at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
 gate: architect
-depends_on: [SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT]
+depends_on: [SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT, CAT-NONEMPTY-TO-LIST-SHAPE]
 blocks: []
 github: null
 origin: "Operator 2026-10-08: \"start l3 on the establish catalog program\". 06-catalog-campaign.md:375 names the statistics layer's exact, empirical and approximate tiers in that order; spec 63 section 1.4 defers the empirical tier. Same shape as SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT: an Architect boundary ruling from a checked development, then the contract, then the CAT node. Steward-filed per COORDINATION section 2."
@@ -35,6 +35,17 @@ distribution, with counts and sums the next catalog node delivers.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
+
+## D0 ruling (`evt_6xr53agbj43fr`)
+
+The carrier is `NonEmpty q`; the duplicate head-plus-tail carrier is
+rejected. Section 2 drafting waits for `CAT-NONEMPTY-TO-LIST-SHAPE` on
+main. Ruled names, over `NonEmpty q`: `sample_size`, `event_count`,
+`score_sum`, `unit_weights`, `empirical_distribution`; laws
+`empirical_entries`, `empirical_total_size`, `empirical_event_count`,
+`empirical_score_sum`, `sample_size_append`, `event_count_append` and
+`score_sum_append`, the append laws over `nonempty_append`. Observations
+are `nonempty_to_list`; no `observations` or `sample_append`.
 
 ## Deliverable
 
