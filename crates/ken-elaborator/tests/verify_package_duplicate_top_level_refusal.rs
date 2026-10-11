@@ -6,13 +6,13 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use ken_elaborator::ElabEnv;
 use ken_elaborator::checked_core::{StableSymbol, SymbolNamespace};
 use ken_elaborator::compiler_driver::{
-    CompilerDriverError, CompilerManifest, CompilerSource, CompilerTargetKind, TargetSelector,
-    compile_ken_package_sources, compile_ken_source,
+    compile_ken_package_sources, compile_ken_source, CompilerDriverError, CompilerManifest,
+    CompilerSource, CompilerTargetKind, TargetSelector,
 };
-use ken_elaborator::error::ElabError;
+use ken_elaborator::error::{ElabError, Span};
+use ken_elaborator::ElabEnv;
 
 const PKG: &str = "zz_adv_duplicate";
 const ADMITTED: &str = "```ken\nconst base : Bool = True\nconst main : Bool = base\n```\n";
@@ -38,6 +38,45 @@ fn assert_duplicate(error: CompilerDriverError, expected: &str) {
             assert_eq!(name, expected);
         }
         other => panic!("expected DuplicateDefinition({expected}), got {other:?}"),
+    }
+}
+
+/// Promise: durable invariant (`39 §5.6`). MEASURED: a duplicate inside
+/// either checked example keeps its typed name and marks its declaration's
+/// original byte range, not the same offsets within the sliced fence body.
+/// CLAIMED: package compilation returns original-source spans for checked
+/// example duplicates. THE GAP: the ambiguity branch has its own roots-row
+/// pin below; other example failures retain the existing fence-wide error.
+#[test]
+fn package_checked_example_duplicate_spans_are_absolute() {
+    let main_source = "# A\n\n```ken\nconst main : Bool = True\n```\n\n```ken example\nconst main : Bool = False\n```\n";
+    let base_source = "# Café\n\n```ken\nconst base : Bool = True\n```\n\n```ken example\nconst base : Bool = False\n```\n";
+    for (source, expected_name, expected_span) in [
+        (main_source, "main", Span::new(57, 82)),
+        (
+            base_source,
+            "base",
+            Span::new(
+                base_source.rfind("const base : Bool = False").unwrap(),
+                base_source.rfind("const base : Bool = False").unwrap()
+                    + "const base : Bool = False".len(),
+            ),
+        ),
+    ] {
+        let error = compile_literate(source).unwrap_err();
+        match error {
+            CompilerDriverError::Elaboration(ElabError::DuplicateDefinition { name, span }) => {
+                assert_eq!(name, expected_name);
+                assert_eq!(span, expected_span);
+                assert_eq!(
+                    &source[span.start..span.end],
+                    format!("const {name} : Bool = False")
+                );
+            }
+            other => {
+                panic!("expected typed checked-example duplicate for {expected_name}: {other:?}")
+            }
+        }
     }
 }
 
@@ -103,30 +142,45 @@ impl Drop for Root {
     }
 }
 
-/// MEASURED: the loaded entry's scope resolves `base` to Entry.base, so
-/// prebinding rejects a second `base` with AmbiguousReference while an
-/// unrelated fresh example succeeds. CLAIMED: module-route checked fences
-/// cannot rebind their own entry's declarations. THE GAP: this earlier scope
-/// guard does not prove the package-route resolver's duplicate-set check.
+/// Promise: durable invariant (`39 §5.6`). MEASURED: the loaded entry's
+/// scope resolves `base` to Entry.base, so prebinding rejects a second
+/// `base` with AmbiguousReference, both sources, and the source-absolute
+/// example span; a fresh example succeeds below. CLAIMED: entry checked
+/// fences cannot rebind their own declarations and report the right byte
+/// range. THE GAP: this earlier scope guard does not prove the package-route
+/// resolver's duplicate-set check.
 #[test]
 fn roots_entry_checked_fence_refuses_its_own_name() {
     let root = Root::new();
-    fs::write(
-        root.0.join("Entry.ken.md"),
-        "```ken\nconst base : Bool = True\n```\n```ken example\nconst base : Bool = False\n```\n",
-    )
-    .unwrap();
+    let source =
+        "```ken\nconst base : Bool = True\n```\n```ken example\nconst base : Bool = False\n```\n";
+    fs::write(root.0.join("Entry.ken.md"), source).unwrap();
     let mut env = ElabEnv::new().unwrap();
     env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
         .unwrap();
     let error = env
         .execute_loaded_entry_checked_fences_v1("Entry")
         .unwrap_err();
-    assert!(
-        matches!(&error, ElabError::AmbiguousReference { name, sources, .. }
-        if name == "base" && sources == &["Entry.base", "base"]),
-        "entry scope must report the exact prebind collision, got {error:?}"
-    );
+    let expected_start = source.rfind("const base : Bool = False").unwrap();
+    match error {
+        ElabError::AmbiguousReference {
+            name,
+            sources,
+            span,
+        } => {
+            assert_eq!(name, "base");
+            assert_eq!(sources, ["Entry.base", "base"]);
+            assert_eq!(
+                span,
+                Span::new(
+                    expected_start,
+                    expected_start + "const base : Bool = False".len()
+                )
+            );
+            assert_eq!(&source[span.start..span.end], "const base : Bool = False");
+        }
+        other => panic!("entry scope must report the exact prebind collision: {other:?}"),
+    }
 }
 
 /// MEASURED: an entry's fresh checked example still elaborates after the

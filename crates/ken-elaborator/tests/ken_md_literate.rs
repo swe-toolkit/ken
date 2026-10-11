@@ -1,4 +1,4 @@
-use ken_elaborator::error::ElabError;
+use ken_elaborator::error::{ElabError, Span};
 use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::{extract_ken_md, ElabEnv};
 
@@ -101,6 +101,33 @@ fn elaboration_errors_report_original_markdown_offsets() {
             assert_eq!(span.start, expected);
         }
         other => panic!("expected name-resolution error, got {other:?}"),
+    }
+}
+
+/// Promise: durable invariant (`39 §5.6`). MEASURED: a duplicate in a
+/// second plain compiled fence retains the byte span of its original source
+/// declaration. CLAIMED: shifting an example's sliced errors does not shift
+/// an already-absolute error from the full-length compiled extraction. THE
+/// GAP: this asserts the compiled-fence path, not package roots or example
+/// error conversion; the companion package test covers those independently.
+#[test]
+fn plain_fence_duplicate_span_stays_absolute() {
+    let md = "Résumé\n```ken\nconst repeated : Bool = True\n```\n```ken\nconst repeated : Bool = False\n```\n";
+    let expected = md.rfind("const repeated : Bool = False").unwrap();
+    let mut env = ElabEnv::new().expect("prelude");
+    let error = env
+        .elaborate_ken_md_file(md)
+        .expect_err("second compiled declaration must reject as a duplicate");
+    match error {
+        ElabError::DuplicateDefinition { name, span } => {
+            assert_eq!(name, "repeated");
+            assert_eq!(
+                span,
+                Span::new(expected, expected + "const repeated : Bool = False".len())
+            );
+            assert_eq!(&md[span.start..span.end], "const repeated : Bool = False");
+        }
+        other => panic!("expected source-absolute plain-fence duplicate, got {other:?}"),
     }
 }
 
