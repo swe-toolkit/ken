@@ -291,6 +291,19 @@ pub(crate) fn record_decl_owners(
     }
 }
 
+/// Entry selection reads these tables by the spelling `main`; a checked fence
+/// must leave that binding exactly as the program's own declarations left it.
+fn restore_program_binding<V>(table: &mut HashMap<String, V>, name: &str, saved: Option<V>) {
+    match saved {
+        Some(value) => {
+            table.insert(name.to_string(), value);
+        }
+        None => {
+            table.remove(name);
+        }
+    }
+}
+
 impl ElabEnv {
     pub fn empty() -> Result<Self, ElabError> {
         let mut env = GlobalEnv::new();
@@ -705,15 +718,20 @@ impl ElabEnv {
     ///
     /// A checked fence is not shipped: a boundary header inside one is checked
     /// against that fence alone and never becomes the program's
-    /// (`62-authority §3.2`, `33-declarations §3.2.1`).
+    /// (`62-authority §3.2`, `33-declarations §3.2.1`), and a `main` inside one
+    /// never becomes the program's entry point.
     pub fn execute_ken_md_checked_fences_v1(
         &mut self,
         src: &str,
         extracted: &literate::KenMdExtraction,
     ) -> Result<Vec<ElabResult>, ElabError> {
         let program_boundary = self.module_state.boundary_header().cloned();
+        let program_main = self.globals.get("main").copied();
+        let program_main_row = self.effect_rows.get("main").cloned();
         let result = self.execute_ken_md_checked_fences_unisolated(src, extracted);
         self.module_state.restore_boundary_header(program_boundary);
+        restore_program_binding(&mut self.globals, "main", program_main);
+        restore_program_binding(&mut self.effect_rows, "main", program_main_row);
         result
     }
 
