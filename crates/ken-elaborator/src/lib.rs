@@ -702,7 +702,22 @@ impl ElabEnv {
 
     /// Execute checked literate fences and return results from successful
     /// `ken example` fences. `ken reject` ranges are checked and excluded.
+    ///
+    /// A checked fence is not shipped: a boundary header inside one is checked
+    /// against that fence alone and never becomes the program's
+    /// (`62-authority §3.2`, `33-declarations §3.2.1`).
     pub fn execute_ken_md_checked_fences_v1(
+        &mut self,
+        src: &str,
+        extracted: &literate::KenMdExtraction,
+    ) -> Result<Vec<ElabResult>, ElabError> {
+        let program_boundary = self.module_state.boundary_header().cloned();
+        let result = self.execute_ken_md_checked_fences_unisolated(src, extracted);
+        self.module_state.restore_boundary_header(program_boundary);
+        result
+    }
+
+    fn execute_ken_md_checked_fences_unisolated(
         &mut self,
         src: &str,
         extracted: &literate::KenMdExtraction,
