@@ -1470,7 +1470,7 @@ fn make_if_elim(
     result_ty: &Term,
     span: &Span,
 ) -> Result<Term, ElabError> {
-    let classifier = kernel_infer_current(cx, result_ty).map_err(|error| match error {
+    let classifier = kernel_infer_in_context_open(cx, &cx.ctx, result_ty).map_err(|error| match error {
         CurrentKernelQueryError::View(error) => error,
         CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
             error,
@@ -21403,7 +21403,7 @@ fn build_ctor_buckets(
                 let scrut_ty = params0.iter().cloned().fold(
                     Term::indformer(d_id0, split_level_args.to_vec()), Term::app,
                 );
-                let ret_level = match kernel_infer_current(cx, ret) {
+                let ret_level = match kernel_infer_in_context_open(cx, &cx.ctx, ret) {
                     Ok(Term::Type(level)) => level,
                     _ => Level::Zero,
                 };
@@ -22470,7 +22470,7 @@ fn infer_match_with_predicates(
     // 7. Build a constant motive over the family, ascribed at the return
     //    type's classifier. Indexed families were dispatched above; the
     //    shared builder also handles nested indexed matrix splits.
-    let ret_level = match kernel_infer_current(cx, &ret_ty) {
+    let ret_level = match kernel_infer_in_context_open(cx, &cx.ctx, &ret_ty) {
         Ok(Term::Type(level)) => level,
         Ok(_) => Level::Zero,
         Err(CurrentKernelQueryError::View(error)) => return Err(error),
