@@ -1,7 +1,7 @@
 ---
 id: CAT-NAT-RATIONAL-PREREQUISITES
 title: "Data.Numeric.Rational's proofs need natural multiplication laws that Data.Numeric.Nat.Arithmetic keeps private, plus a positive-factor cancellation and two order transports that do not exist. Deliver section 4 of spec/50-stdlib/64-rational.md: six existing laws made public under their identities, three new checked laws, at zero trust"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -63,3 +63,20 @@ with acceptance rows for the three new laws.
   public-surface change outside the two Nat packages.
 - Making a law public changes an existing proof's identity or breaks an
   importer's public surface: stop with the list.
+
+## Closeout
+
+Merged `8f27e6893` from exact `f17fbe4f8` (PR #4679). Foundation QA
+`evt_6d4c3bdtdd54d`, Architect `evt_4qzrvzgqexe78`, Decision
+`dec_6f9a776sqzznq`.
+
+- `Data.Numeric.Nat.Arithmetic` publishes six existing multiplication
+  laws in place under their identities and adds `mul::cancel_r`. Public
+  laws lead their private helpers, top-down.
+- `Data.Numeric.Nat.Order` adds `leq_nat_mul_right_mono` and
+  `leq_nat_mul_right_cancel`.
+- The acceptance target root-loads the nine names. `trusted_base()` is
+  114 before and after, and the 42 importers of the arithmetic package
+  show no collision. §1a: 0.
+
+`CAT-NUMERIC-RATIONAL-VALUES` consumes these laws.

@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-RATIONAL-VALUES
 title: "No catalog package carries an exact rational value, so value-typed probability and means have nothing to land on. Deliver sections 1, 2 and 2.1 of spec/50-stdlib/64-rational.md as Data.Numeric.Rational: the positive-denominator carrier, equivalence, total arithmetic, respect and the algebra laws, fully proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T1
