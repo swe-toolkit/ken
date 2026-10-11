@@ -59,27 +59,6 @@ pub fn nonempty_to_list (a : Type) (xs : NonEmpty a) : List a =
     NonEmptyCons x rest ↦ Cons a x rest
   }
 
-theorem nonempty_to_list_shape_cons
-      (a : Type) (x : a) (rest : List a)
-    : Equal
-        (List a)
-        (nonempty_to_list a (NonEmptyCons a x rest))
-        (Cons
-          a
-          (nonempty_head a (NonEmptyCons a x rest))
-          (nonempty_tail a (NonEmptyCons a x rest))) =
-  Refl
-
-pub theorem nonempty_to_list_shape
-      (a : Type) (xs : NonEmpty a)
-    : Equal
-        (List a)
-        (nonempty_to_list a xs)
-        (Cons a (nonempty_head a xs) (nonempty_tail a xs)) =
-  match xs {
-    NonEmptyCons x rest ↦ nonempty_to_list_shape_cons a x rest
-  }
-
 pub fn nonempty_map (a : Type) (b : Type) (f : a → b) (xs : NonEmpty a) : NonEmpty b =
   match xs {
     NonEmptyCons x rest ↦ NonEmptyCons b (f x) (map a b f rest)
@@ -113,6 +92,29 @@ const ordinary_one_two : List Nat = nonempty_to_list Nat one_two
 `nonempty_to_list_shape` splits the private constructor once. Each projection
 then reduces to the same head and tail, closing the helper by reflexivity.
 Clients receive the equality without receiving the constructor.
+
+```ken
+theorem nonempty_to_list_shape_cons
+      (a : Type) (x : a) (rest : List a)
+    : Equal
+        (List a)
+        (nonempty_to_list a (NonEmptyCons a x rest))
+        (Cons
+          a
+          (nonempty_head a (NonEmptyCons a x rest))
+          (nonempty_tail a (NonEmptyCons a x rest))) =
+  Refl
+
+pub theorem nonempty_to_list_shape
+      (a : Type) (xs : NonEmpty a)
+    : Equal
+        (List a)
+        (nonempty_to_list a xs)
+        (Cons a (nonempty_head a xs) (nonempty_tail a xs)) =
+  match xs {
+    NonEmptyCons x rest ↦ nonempty_to_list_shape_cons a x rest
+  }
+```
 
 Append preserves the left value's structural head. Exposing both constructors
 reduces the result head and the original left head to the same value.
