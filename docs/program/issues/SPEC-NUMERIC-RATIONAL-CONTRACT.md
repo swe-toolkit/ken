@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERIC-RATIONAL-CONTRACT
 title: "spec/50-stdlib/63-statistics.md defers every value-typed probability, mean and the approximate tier to a Data.Numeric.Rational contract that does not exist, so the statistics layer has nothing further to build against. Author that contract: an exact non-negative rational carrier, its arithmetic and equivalence, each law proved at zero trust"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1

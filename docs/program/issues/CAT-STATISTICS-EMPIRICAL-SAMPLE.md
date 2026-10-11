@@ -1,7 +1,7 @@
 ---
 id: CAT-STATISTICS-EMPIRICAL-SAMPLE
 title: "No catalog package reads a non-empty sample as an exact distribution with counts and sums. Deliver section 2 of spec/50-stdlib/63-statistics.md, the empirical tier over NonEmpty q, five functions and seven laws, fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -73,3 +73,13 @@ acceptance test target and a strict-resolution ambient-census row.
   or a kernel or surface-syntax change.
 - Reuse needs a public-surface change to `Exact`, `NonEmpty` or
   `Derived`.
+
+## Closeout
+
+Merged `f2c439e5c` from exact `c514a7198` (PR #4672). Foundation QA
+`evt_2s8ff58kz6dyt`, Architect `evt_5sj2d9cxzayzh` (re-verified
+`evt_473krfjzfyxjj`), Decision `dec_35w5p2s1hj1z1`.
+`Algorithm.Statistics.Empirical` delivers section 2's five functions and
+seven laws over `NonEmpty q` at zero trust: `trusted_base()` is 114 before
+and after, the acceptance target runs the five seed cases, and each of the
+three mutants kernel-rejects. §1a: 0.
