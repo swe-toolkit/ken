@@ -239,7 +239,7 @@ canonical_runtime_roles! {
 pub fn empty_prelude_env() -> PreludeEnv {
     let z = GlobalId(0);
     PreludeEnv {
-        runtime_roles: CanonicalRuntimeRoles::zeroed(),
+        runtime_roles: Box::new(CanonicalRuntimeRoles::zeroed()),
         native_trusted_base: std::collections::BTreeSet::new(),
         nat_id: z,
         zero_id: z,
@@ -335,7 +335,10 @@ pub struct PreludeEnv {
     /// The immutable canonical roster every Runtime constructor role is derived
     /// from (`RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`). Captured at
     /// registration, before package source elaboration can shadow a spelling.
-    pub runtime_roles: CanonicalRuntimeRoles,
+    // Prelude registration elaborates deeply nested definitions before the
+    // roster is captured. Keep the growing roster off the registration stack;
+    // its checked identities are still captured exactly once, before source.
+    pub runtime_roles: Box<CanonicalRuntimeRoles>,
     /// The immutable **pre-source trusted base** — the exact set of postulates
     /// and real primitives `Σ` held when the prelude finished registering and
     /// **before one line of package source was elaborated**
@@ -2955,7 +2958,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // source has been elaborated, so each spelling still denotes the prelude's
     // own declaration. After this point the roster is closed: the ids it holds
     // survive any later shadowing declaration, which is the whole point.
-    let runtime_roles = CanonicalRuntimeRoles::capture(&elab.globals)?;
+    let runtime_roles = Box::new(CanonicalRuntimeRoles::capture(&elab.globals)?);
 
     // `D1b-role-c1`. ⛔ The trusted-base roster is deliberately NOT captured
     // here, even though this is where the sibling role roster is captured.
