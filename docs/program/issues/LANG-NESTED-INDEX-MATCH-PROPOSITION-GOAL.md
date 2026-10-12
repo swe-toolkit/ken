@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL
 title: "A dependent match on a second vector at a constructor-refined index checks only when the goal is syntactically Term::Eq. The coherent-frame convoy gates on goal syntax, so a goal that is a variable application or Equal at a data type leaves the inner scrutinee unrefined. Close the predicate to any proposition"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
