@@ -1009,6 +1009,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 LoweringOperand::Carried(scrutinee),
                 Some(ScalarMergeKind::Bool),
+                None,
                 "a carried Bool Match",
             )?
             .0
@@ -1020,6 +1021,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 LoweringOperand::Carried(scrutinee),
                 Some(ScalarMergeKind::Bool),
+                None,
                 "a carried Bool Match",
             )?
             .0
@@ -2530,7 +2532,7 @@ impl<'a> Lowering<'a> {
                     "carrier-result join reached a native-only scalar merge consumer".to_string(),
                 ));
             }
-            self.merge_scalar_operand(builder, lowered, None, construct)
+            self.merge_scalar_operand(builder, lowered, None, Some(join_plan.origin), construct)
         }
 }
 
@@ -2548,6 +2550,7 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             lowered: LoweringOperand,
             required_kind: Option<ScalarMergeKind>,
+            join_origin: Option<StaticOriginId>,
             construct: &'static str,
         ) -> Result<(NativeScalarPairV1, ScalarMergeKind), CraneliftBackendError> {
             self.scalar_operand_refused = false;
@@ -2626,8 +2629,15 @@ impl<'a> Lowering<'a> {
                     )),
                 };
             }
+            // A Ret arm is terminal only at a result-position join of the root
+            // unit. Else the scalar refusal feeds back to a carrier-word join.
+            let root_terminal_join = self.has_checked_root_exit_representation()
+                && self.function_local.root_unit
+                && join_origin.is_some_and(|origin| {
+                    self.function_local.terminal_result_origins.contains(&origin)
+                });
             let checked_root_exit_representation = self.has_checked_root_exit_representation();
-            let lowered = if checked_root_exit_representation {
+            let lowered = if root_terminal_join {
                 Self::unwrap_terminal_ret(lowered)
             } else {
                 lowered

@@ -235,6 +235,7 @@ fn recursive_backedge_refusal_does_not_mark_scalar_admission() {
         &mut builder,
         LoweringOperand::Carried(CarriedBoundaryWord { word }),
         Some(ScalarMergeKind::RecursiveBackedge),
+        None,
         "RecursiveBackedge",
     );
     assert!(matches!(
@@ -422,6 +423,7 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
+            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,
@@ -611,6 +613,7 @@ fn run_px8j_malformed_recursor_consumer(
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
+            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,
@@ -2673,6 +2676,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
+            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,

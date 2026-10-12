@@ -294,6 +294,7 @@ fn run_dynamic_constructor_dispatch_fixture(
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
+            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,
@@ -2251,6 +2252,7 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
+            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,
@@ -2983,6 +2985,7 @@ fn d1_compile_carried_match_consumer<'src>(
                     builder,
                     lowered,
                     Some(ScalarMergeKind::Int),
+                    None,
                     "a focused carried Match result",
                 )?
                 .0

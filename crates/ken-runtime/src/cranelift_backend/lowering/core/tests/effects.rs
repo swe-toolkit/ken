@@ -149,6 +149,7 @@ fn run_checked_bounded_nat_fixture(
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
+            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,

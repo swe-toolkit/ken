@@ -9481,6 +9481,7 @@ fn define_unit_body<M: Module>(
         });
         let body = compiler.retained_body_occurrence(body_origin)?;
         compiler.select_terminal_result_origins(body_origin, body.expr)?;
+        compiler.function_local.root_unit = is_root;
         let lowered = compiler.lower_expr(&mut builder, body, &env)?;
         compiler.validate_join_plan_consumption(unit.function, unit.body_occurrence)?;
         let (result, outcome) = if is_root {
