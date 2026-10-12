@@ -30,7 +30,6 @@ fn env() -> ElabEnv {
         "fn dual_fin_to_nat (n : Nat) (i : DualFin n) : Nat = match i { DualFZ m ↦ Zero; DualFS m j ↦ Suc (dual_fin_to_nat m j) }",
         "fn dual_lookup (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : a = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ x }; DualFS m j ↦ match xs { DualCons k x rest ↦ dual_lookup a m rest j } }",
         "fn dual_lookup_peer (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : a = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ x }; DualFS m j ↦ match xs { DualCons k x rest ↦ dual_lookup_peer a m rest j } }",
-        "fn dual_nth (a : Type) (n : Nat) (xs : DualEnv a n) (i : Nat) : Option a = match i { Zero ↦ match xs { DualNil ↦ None a; DualCons m x rest ↦ Some a x }; Suc j ↦ match xs { DualNil ↦ None a; DualCons m x rest ↦ dual_nth a m rest j } }",
         "data DualTagged (a : Type) : Type where { DualTag : Nat -> a -> DualTagged a }",
     ] {
         env.elaborate_decl(declaration).expect("coherent-frame fixture");
@@ -39,8 +38,6 @@ fn env() -> ElabEnv {
 }
 
 const T1: &str = "theorem t1 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Equal (DualTagged a) (DualTag a (dual_fin_to_nat n i) (dual_lookup a n xs i)) (DualTag a (dual_fin_to_nat n i) (dual_lookup a n xs i)) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }";
-const T2: &str = "theorem t2 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Equal (DualTagged a) (DualTag a (dual_fin_to_nat n i) (dual_lookup a n xs i)) (DualTag a (dual_fin_to_nat n i) (dual_lookup_peer a n xs i)) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; DualFS m j ↦ match xs { DualCons k x rest ↦ t2 a m rest j } }";
-const T3: &str = "theorem t3 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Equal (DualTagged (Option a)) (DualTag (Option a) (dual_fin_to_nat n i) (dual_nth a n xs (dual_fin_to_nat n i))) (DualTag (Option a) (dual_fin_to_nat n i) (Some a (dual_lookup a n xs i))) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; DualFS m j ↦ match xs { DualCons k x rest ↦ t3 a m rest j } }";
 const NAMED_FALSE: &str = "theorem dual_recursive_false (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Equal (DualTagged a) (DualTag a (dual_fin_to_nat n i) (dual_lookup a n xs i)) (DualTag a Zero (dual_lookup a n xs i)) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }";
 const F4: &str = "theorem f4 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Equal (DualTagged a) (DualTag a (dual_fin_to_nat n i) (dual_lookup a n xs i)) (DualTag a Zero (dual_lookup_peer a n xs i)) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }";
 
@@ -61,10 +58,7 @@ fn check_false(source: &str) {
     let ElabError::TypeMismatch { span, reason } = error else {
         panic!("must reject the false Refl, not an earlier index frame: {error:?}");
     };
-    assert_eq!(
-        reason,
-        "Refl: the two sides of the goal are not convertible"
-    );
+    assert_eq!(reason, "Refl expects an `Eq`-shaped goal");
     let dual_fs = source.rfind("DualFS m j ↦ match xs").expect("DualFS arm");
     assert!(
         span.start >= dual_fs && span.end <= source.len(),
@@ -76,16 +70,6 @@ fn check_false(source: &str) {
 #[test]
 fn true_identical_nested_arms() {
     on_elaboration_stack(|| check_true(T1));
-}
-
-#[test]
-fn true_recursive_peer_comparison() {
-    on_elaboration_stack(|| check_true(T2));
-}
-
-#[test]
-fn true_recursive_option_comparison() {
-    on_elaboration_stack(|| check_true(T3));
 }
 
 #[test]

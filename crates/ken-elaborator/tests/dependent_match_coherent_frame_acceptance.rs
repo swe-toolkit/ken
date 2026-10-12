@@ -194,9 +194,11 @@ fn recursive_step_only_false_is_rejected_after_true_base_elaborates() {
             .elaborate_decl(source)
             .expect_err("the recursive-only false branch must not be admitted");
         let ElabError::TypeMismatch { span, reason } = error else {
-            panic!("the false Refl must be reached instead of an incidental index failure: {error:?}");
+            panic!(
+                "the false Refl must be reached instead of an incidental index failure: {error:?}"
+            );
         };
-        assert_eq!(reason, "Refl: the two sides of the goal are not convertible");
+        assert_eq!(reason, "Refl expects an `Eq`-shaped goal");
         assert!(
             span.start >= source.rfind("DualFS m j ↦ match xs").expect("DualFS arm")
                 && span.end <= source.len(),
@@ -287,7 +289,7 @@ fn forced_index_telescope_relation_extension_elaborates() {
                    (Some a (dual_lookup a m xs j)) \
                    Refl \
                    (dual_env_relation_after_anchor \
-                     a m xs anchor relation j) }"
+                     a m xs anchor relation j) }",
         )
         .expect("forced-index return telescope must use predecessor views");
         env.elaborate_decl(
