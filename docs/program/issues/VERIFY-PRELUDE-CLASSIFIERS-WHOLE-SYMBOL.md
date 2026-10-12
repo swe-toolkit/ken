@@ -22,8 +22,10 @@ never taken for it.
 
 ## Settled inputs (Architect D0 `evt_x572bpfnsyj1`)
 
-- **Population.** 26 distinct `ends_with("::…")` suffixes over 56 lines
-  in `crates/*/src/*`, counting in-src test modules. 25 are constructor
+- **Population.** 26 distinct `ends_with("::…")` suffixes over 61 lines
+  in `crates/*/src/*` on `874e9f7bb` (58 production, 3 in-src test; all in
+  ken-runtime). The D0 counted 56 on its earlier base (Steward
+  `evt_7qa20faq8a0zp`). 25 are constructor
   leaves. `::buffer_nat_to_int` is the only declaration. Example:
   `console_stream_tag` (ken-runtime lowering/mod.rs) tests
   `ends_with("::Stdout")`.
