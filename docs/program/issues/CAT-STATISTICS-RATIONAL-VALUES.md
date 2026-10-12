@@ -1,7 +1,7 @@
 ---
 id: CAT-STATISTICS-RATIONAL-VALUES
 title: "Spec 63 section 3 makes probability, expectation and empirical mean Rational values, but no statistics package exports them. Deliver the 15 ruled names in Algorithm.Statistics.Exact and Empirical, every law proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
