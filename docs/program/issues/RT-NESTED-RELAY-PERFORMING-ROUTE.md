@@ -40,6 +40,11 @@ relay trap.
   discriminating witness for the three seat guards, nor any
   `Excluded{Underived}` owner, in the targeted rows (`evt_3a4mkedqb5v3c`).
   This WP supplies one witness per seat and one Underived-owner fixture.
+  The Architect restated it on the respin `b2590d9b8`
+  (`evt_22vjqdcd1btgk`): the R1, R2 and R3 seat mutants stayed green
+  because no selected row reaches those seats. It adds one more: the
+  px8ta relay owner0/Vis676/relay370 sits inside a Closure-refused
+  artifact, so it is unexercised, not cleared.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
@@ -61,6 +66,8 @@ emission point at D0.
 - **AC-2 (witnesses).** One row per seat (terminal transport, detached
   result, ownerless source) and one `Excluded{Underived}` owner row. Each
   is performed or refused, and each reddens when its seat is mutated.
+  The px8ta relay inside the Closure-refused artifact is either reached
+  by a row or named as unreachable, with the measurement.
 - **AC-3 (control).** Rows 01-36 and the four AC-MAIN controls keep
   parity under the fleet release rule.
 
