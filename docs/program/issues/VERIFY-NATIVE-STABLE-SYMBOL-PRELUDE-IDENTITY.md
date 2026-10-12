@@ -1,7 +1,7 @@
 ---
 id: VERIFY-NATIVE-STABLE-SYMBOL-PRELUDE-IDENTITY
 title: "Native stable symbols are named by reverse-mapping the live globals table, so a top-level const reusing a prelude constructor's spelling (const Stdout) takes its name, the prelude constructor falls back to ctor_{index}, and ken-runtime's suffix classifiers refuse a valid program. Name prelude ids from their checked identity"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -84,3 +84,19 @@ them; the Architect rules the naming at D0.
   kernel or trust surface: stop to the operator with the measurement.
 - The repair needs a prelude rebinding to become a refusal: that is the
   L2 flip.
+
+## Closeout
+
+Merged `8823a47a6` from exact `163efda0b` (PR #4684). Verify QA
+`evt_7v4wdp2zxsd33`, Architect `evt_47py7f26hz4k7`, Decision
+`dec_4d4c8czpwn0qs`.
+
+`PreludeEnv` captures each compiler declaration's pre-source name by
+`GlobalId` at the `ElabEnv::empty` boundary. `stable_symbols_for_env`
+reserves those symbols, and a colliding user declaration takes
+`owner#ordinal`. A typed `DuplicateStableSymbol` guards Declaration and
+Constructor injectivity. The interpreter's bytes primitives are keyed on
+the registry `Op` symbol. Both Stdout rows and `const Stream` run as
+their `zz_unrelated` controls. No kernel, trust or spec change. Carries:
+`VERIFY-PRELUDE-CLASSIFIERS-WHOLE-SYMBOL` and
+`SPEC-STABLE-SYMBOL-PRELUDE-QUALIFIER`.
