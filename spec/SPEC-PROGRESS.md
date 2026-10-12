@@ -7,7 +7,7 @@ readers use those declarations and their stated scope; this index does not
 invent a separate maturity judgment.
 
 The chapters remain authoritative for their own declarations. This index is a
-measured view of all 70 Markdown files under `spec/` at this update. It is not
+measured view of all 71 Markdown files under `spec/` at this update. It is not
 a build tracker, a next-action queue, or a substitute for the work-package
 nodes under `docs/program/issues/`.
 
@@ -113,11 +113,12 @@ to that same declaration, including its qualifications.
 | `50-stdlib/58a-priority-queues.md` | `LANDED COMPUTATION + GENERAL LAWS (CAT-PRIORITY-QUEUE and CAT-PRIORITY-QUEUE-LAWS)` | Normative for the abstract six-name interface, priority-queue semantics, validity obligations, and structural cost account; the computational implementation and private general semantic proof suite are landed, while machine-checked complexity remains separate. |
 | `50-stdlib/58b-membership.md` | `DRAFT v0 (SPEC-MEMBERSHIP-CLASS-CONTRACT)` | Binding contract for the `Membership` class, standard providers and law model; `∈` spelling and completion policy are specified elsewhere. |
 | `50-stdlib/59-parsing-syntax-diagnostics.md` | `DRAFT v0 (CAT-5)` | Binding CAT-5 package contract with the stated compiler/reflection exclusions. |
-| `50-stdlib/60-length-indexed-vectors.md` | not declared | Normative for the Vec family and landed operations; `zip` and `lookup` remain gated on `DS-5c`. |
+| `50-stdlib/60-length-indexed-vectors.md` | not declared | Normative for the Vec family and total indexed operations; `zip` and `lookup` now check in the catalog Vector module, so `DS-5c` is not a live gate. |
 | `50-stdlib/61-formal-languages.md` | `DRAFT v0 (SPEC-FORMAL-LANGUAGES-DFA-CONTRACT; SPEC-FORMAL-LANGUAGES-FINITE-REACHABILITY-CONTRACT; SPEC-FORMAL-LANGUAGES-NFA-CONTRACT; SPEC-FORMAL-LANGUAGES-REGEX-CONTRACT; SPEC-FORMAL-LANGUAGES-MINIMISATION-CONTRACT; SPEC-FORMAL-LANGUAGES-LEXER-BRIDGE-CONTRACT)` | §§1–2 bind Dfa, finite certificates and reachability; §3 binds Nfa acceptance and finite-mask determinization; §4 binds independent Regex denotation and six checked laws; §5 binds Dfa equivalence and minimisation without `DecEq q` or a cardinality claim. §6 binds Cursor's bounded element list and the streaming DFA bridge, with four checked laws and no cross-instance cursor claim. §§5–6 package delivery is not claimed. |
 | `50-stdlib/62-graphs.md` | `DRAFT v0 (SPEC-GRAPHS-DEPENDENCY-CONTRACT)` | §1 binds Boolean directed adjacency, checked finite reachability using §61 §2's single fixed point, real walk witnesses, and a complete distinct topological list or real cycle. `DecEq q` is needed only for the ordering decision; no graph CAT delivery is claimed. |
 | `50-stdlib/63-statistics.md` | `DRAFT v0 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT; SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT; SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT)` | §1 binds positive natural-weight atom lists and nine checked laws for event/score numerators; §2 binds `NonEmpty q` empirical samples and seven bridges/append laws. §3 specifies Rational-valued probability, expectation and empirical mean in those modules, with twelve additional proved laws for numerator/denominator agreement, forward cross bridges, bounds and complements; no §3 CAT delivery is claimed. `pure`/`bind`, uniform enumeration, variance and approximate statistics remain deferred. |
 | `50-stdlib/64-rational.md` | `DRAFT v0 (SPEC-NUMERIC-RATIONAL-CONTRACT)` | Normative for exact non-negative rational values as unnormalized natural/positive-denominator pairs, cross-product `Prop` equivalence, total arithmetic and Boolean order with checked relation/respect/algebra/order laws; the Nat provider exports positive-factor cancellation and order laws. The Rational and Nat packages are landed; §64 itself does not supply a value-typed statistics adapter, specified separately in §63 §3. No quotient or Gcd public API is claimed. |
+| `50-stdlib/65-linear-algebra.md` | `DRAFT v0 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT)` | §1 binds `Nat`-valued dimension-safe operations on existing `Vec`, with seven operations and five generic proved-law obligations; left matrix identity and matrix-product associativity are Language-gated, not first-node CAT obligations. No catalog delivery, signed or approximate tier is claimed. |
 | `50-stdlib/README.md` | `DRAFT v0` | Binding standard-package-tier boundary and derivation-path requirement. |
 | `60-security/61-information-flow.md` | `Sec1 + Sec1ct elaborated; implementation-ready for WS-Sec` | Normative for the declared IFC and constant-time discipline; surface spelling remains proposal-level. |
 | `60-security/62-authority.md` | `Sec2 elaborated; implementation-ready for Team Verify (WS-Sec)` | Normative for authority, attenuation, revocation contract, and audit points; spelling and named runtime mechanisms remain qualified. |
@@ -146,7 +147,7 @@ inferred axis value:
   chapter.
 - `_notes/analysis-digest.md` — the background design note declares no status.
 
-The other 67 inputs are classifiable by the operative rule. This report does
+The other 68 inputs are classifiable by the operative rule. This report does
 not repair or add chapter declarations; those declarations are inputs to this
 reconciliation.
 
