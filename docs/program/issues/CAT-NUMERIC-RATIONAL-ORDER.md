@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-RATIONAL-ORDER
 title: "Data.Numeric.Rational has rational_leq and its respect law but no order laws, so no consumer can sort, bound or compare rationals with a proof. Deliver section 2.2 of spec/50-stdlib/64-rational.md: refl, trans, antisym up to value equivalence, and total, fully proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T1
