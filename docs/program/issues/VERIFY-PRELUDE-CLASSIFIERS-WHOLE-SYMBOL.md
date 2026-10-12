@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PRELUDE-CLASSIFIERS-WHOLE-SYMBOL
 title: "ken-runtime classifies prelude constructors by a suffix of the stable symbol (ends_with(\"::Stdout\") and about 25 more), so a user constructor with the same leaf name in another family matches the prelude's classifier. Since VERIFY-NATIVE-STABLE-SYMBOL-PRELUDE-IDENTITY the prelude symbols are fixed by checked identity: compare whole prelude symbols"
-status: active
+status: closed
 owner: verify
 size: M
 tier: T1
@@ -66,3 +66,31 @@ shared source at review.
 - A change to the spec 46 stable-symbol contract, or any kernel or trust
   change.
 - The shared source needs a new stable-symbol namespace.
+
+## Closeout (closed without repair)
+
+Architect `evt_34jjncjpjkt6b`, outcome (b'), on the AC-0 measurements of
+the verify-implementer (`evt_2ks09d6tw49ds`, `evt_3er257fb4jtam` and the
+narrowed probe), all on `874e9f7bb`. Ring close-out `evt_5q84qacgk8h6s`.
+
+- **The census is a measured negative over 64 sites:** 61 `ends_with`
+  suffix sites and three `contains` sites.
+  - 17 reachable user-family rows run at check, run and native parity.
+  - Nine names are surface refusals under spec 33 section 3.3.
+  - The `ITree` terminal checks are at parity on a user `ITree`.
+  - The other suffix sites fire only on prelude-typed values, which a user
+    family cannot inhabit.
+- **The BoundedNat recognizer is unreachable.** It had zero fires on six
+  checked prelude fixtures, including a green static-response test. Its
+  closest candidates match the span on `Var(4)` or `Var(2)`, and the
+  recognizer requires `Var(0)`. So no user mirror of a firing control
+  exists, and AC-1 has no row.
+- Check 10's rule (key on checked identity) stands for any new classifier.
+  A sweeping rewrite here would be a change no test can tell from the
+  current code.
+- **Carries.**
+  - The dead recognizer's retirement is framed as
+    `VERIFY-RETIRE-BOUNDED-NAT-RECOGNIZER`.
+  - `unwrap_terminal_ret`'s `ends_with("::ITree::Ret")` (`calls.rs:2661`)
+    joins the unframed typed-guard-identity carry. RT-NESTED-READ gates it
+    to the root unit's terminal join.
