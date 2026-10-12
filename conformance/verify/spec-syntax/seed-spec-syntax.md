@@ -357,30 +357,14 @@ site.
 
 ## C. The verification status model + honesty guard (`21 §5`)
 
-### verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base
-- spec: `21 §5.1`/§5.4; `18 §4.5`/§5
-- status: Landed; superseded by
-  `proved-status-cert-checks-no-reachable-open-hole` at W4
-  (`VERIFY-TRANSITIVE-HONESTY`).
-- given: discharge the `ensures` obligation for
-  `fn tst (n : Nat) : Nat ensures TrueProp n = n` using a separate postulate
-  `wit` of the obligation's closed goal type.
-- expect: **Landed:** `discharge_hole` accepts the certificate and the
-  generated obligation hole is no longer open. The test does not assert an
-  empty trusted base; `wit` remains a separate postulate.
-- why: The current test pins retirement of this obligation's own hole, not
-  transitive proof-dependency honesty. The W4 successor replaces that direct
-  hole check with reachability.
-
 ### verify/spec-syntax/proved-status-cert-checks-no-reachable-open-hole (soundness)
 - spec: `21 §5.1` (verdict `proved`), `§5.4` (discriminator); `18 §4.5`/§5
-- status: **deferred — W4 `postulates_reachable`**; certificate checking
-  remains live.
+- status: Landed — W4 `VERIFY-TRANSITIVE-HONESTY`.
 - given: an `ensures` obligation `?h : φ` discharged by a certificate `p` with
   `Γ ⊢ p : φ` (a closed core proof term)
-- expect: `check(env, Γ, p, φ)` accepts. **Deferred — W4:** the claim is
-  `proved` only when `postulates_reachable(env, p)` reaches no open obligation
-  hole. Audited contract axioms may remain visible in `trusted_base()` without
+- expect: `check(env, Γ, p, φ)` accepts. The claim is `proved` only when
+  `postulates_reachable(env, p)` reaches no open obligation hole. Audited
+  contract axioms may remain visible in `trusted_base()` without
   demoting the checked proof.
 - why: §5.1/§5.4 — a `proved` certificate is a core term that `check`
   validates and whose transitive dependencies contain no open obligation hole.

@@ -83,7 +83,7 @@ fn ac2_provable_goal_yields_proved() {
     let x = Term::const_(x_id, vec![]);
     let phi = Term::pi(x.clone(), x);
     let triple = closed_triple(&mut env.env, "ac2_provable", phi);
-    let result = attempt_obligation(&mut env.env, &triple);
+    let result = attempt_obligation(&mut env.env, &mut env.obligation_holes, &triple);
     assert!(
         matches!(result.verdict, Verdict::Proved { .. }),
         "Pi(X,X) must be Proved by IPC; got {:?}",
@@ -109,7 +109,7 @@ fn ac2_open_goal_yields_unknown() {
     let ext = v2_extract(&er);
     assert!(!ext.obligations.is_empty(), "prove should generate obligations");
 
-    let result = attempt_obligation(&mut env.env, &ext.obligations[0]);
+    let result = attempt_obligation(&mut env.env, &mut env.obligation_holes, &ext.obligations[0]);
     assert!(
         matches!(result.verdict, Verdict::Unknown { .. }),
         "abstract atom must yield Unknown; got {:?}",
@@ -129,7 +129,7 @@ fn ac2_verdict_flip_provable_vs_open() {
     let x = Term::const_(x_id, vec![]);
     let phi_p = Term::pi(x.clone(), x);
     let triple_p = closed_triple(&mut env_p.env, "flip_provable", phi_p);
-    let v_proved = attempt_obligation(&mut env_p.env, &triple_p).verdict;
+    let v_proved = attempt_obligation(&mut env_p.env, &mut env_p.obligation_holes, &triple_p).verdict;
 
     // Open branch: abstract atom Q (uppercase = ConId = global ref in resolver)
     let mut env_o = fresh();
@@ -140,7 +140,7 @@ fn ac2_verdict_flip_provable_vs_open() {
         .elaborate_decl_v1("prove OpenQ : Q")
         .expect("prove open_q");
     let ext_o = v2_extract(&er_o);
-    let v_open = attempt_obligation(&mut env_o.env, &ext_o.obligations[0]).verdict;
+    let v_open = attempt_obligation(&mut env_o.env, &mut env_o.obligation_holes, &ext_o.obligations[0]).verdict;
 
     assert!(
         matches!(v_proved, Verdict::Proved { .. }),
@@ -259,7 +259,7 @@ fn ac5_definition_usable_in_check() {
     let nat = Term::const_(nat_id, vec![]);
     let phi = Term::pi(nat.clone(), nat);
     let triple = closed_triple(&mut env.env, "ac5_check", phi);
-    let result = attempt_obligation(&mut env.env, &triple);
+    let result = attempt_obligation(&mut env.env, &mut env.obligation_holes, &triple);
     assert!(
         matches!(result.verdict, Verdict::Proved { .. }),
         "Pi(Nat,Nat) should be Proved by IPC after session defines myid; got {:?}",
@@ -281,7 +281,7 @@ fn ac6_verify_path_is_real_prover() {
     let x = Term::const_(x_id, vec![]);
     let phi = Term::pi(x.clone(), x);
     let triple = closed_triple(&mut env.env, "ac6_prover", phi);
-    let result = attempt_obligation(&mut env.env, &triple);
+    let result = attempt_obligation(&mut env.env, &mut env.obligation_holes, &triple);
     assert!(matches!(result.verdict, Verdict::Proved { .. }));
 }
 

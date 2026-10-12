@@ -1,10 +1,12 @@
 //! V3 automated prover: obligation `Γ ⊢ φ` → verdict trichotomy
 //! (`proved` | `disproved` | `unknown`) (`23 §1.2`, `21 §5.1`).
 //!
-//! **Soundness = kernel re-checks every certificate** (`23 §1.5`): `proved` is
-//! returned **only** when `check(env, Γ, cert, φ)` accepts. A prover bug can
-//! cause `unknown` (honest failure) but **never a false `proved`** — the kernel
-//! is the sole authority (the de Bruijn criterion, `18 §4.5`).
+//! **Soundness = kernel re-checks every certificate** (`23 §1.5`): `proved`
+//! requires `check(env, Γ, cert, φ)` AND no reachable open obligation hole in
+//! its checked certificate's δ-closure (`21 §5.4`). Search may return `unknown`
+//! on a checked certificate whose proof still depends on an open obligation;
+//! the kernel validates terms, while the verification layer records which
+//! opaque assumptions it minted as obligation holes.
 //!
 //! **Exhaustive by construction** (`23 §2.1`, `§7.4`): the classifier `match`
 //! has **no `_ ⇒ skip`** arm — every obligation shape reaches an outcome.
@@ -32,6 +34,7 @@ use ken_kernel::{
 use num_bigint::BigInt;
 
 use crate::extract::{ObligationId, ObligationTriple};
+use crate::honesty::ObligationHoles;
 
 // ─── Route ──────────────────────────────────────────────────────────────────
 
@@ -288,12 +291,16 @@ fn has_free_vars(t: &Term, depth: usize) -> bool {
 
 /// Attempt one obligation; emit the verdict trichotomy (`23 §1.2`).
 ///
-/// **Cardinal rule** (`23 §1.5`): `proved` is only returned when
-/// `check(env, Γ, cert, φ)` accepts. The prover cannot forge `proved`.
+/// **Cardinal rule** (`23 §1.5`, `21 §5.4`): `proved` requires both a kernel
+/// check and no reachable open obligation hole. The prover cannot forge it.
 ///
 /// Route selection is **exhaustive**: every obligation is attempted (§2.1).
-pub fn attempt_obligation(env: &mut GlobalEnv, triple: &ObligationTriple) -> ProverResult {
-    attempt_obligation_with_optional_catalog(env, triple, None)
+pub fn attempt_obligation(
+    env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
+    triple: &ObligationTriple,
+) -> ProverResult {
+    attempt_obligation_with_optional_catalog(env, holes, triple, None)
 }
 
 /// Attempt one obligation using FoKripke catalog identities that were already
@@ -305,14 +312,16 @@ pub fn attempt_obligation(env: &mut GlobalEnv, triple: &ObligationTriple) -> Pro
 /// source-name map.
 pub fn attempt_obligation_with_catalog_handles(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     catalog: &crate::fo_kripke::FoCatalogHandles,
     triple: &ObligationTriple,
 ) -> ProverResult {
-    attempt_obligation_with_optional_catalog(env, triple, Some(catalog))
+    attempt_obligation_with_optional_catalog(env, holes, triple, Some(catalog))
 }
 
 fn attempt_obligation_with_optional_catalog(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     triple: &ObligationTriple,
     catalog: Option<&crate::fo_kripke::FoCatalogHandles>,
 ) -> ProverResult {
@@ -321,11 +330,11 @@ fn attempt_obligation_with_optional_catalog(
     let route = classify(env, &triple.goal_closed);
     let ctx = context_from_triple(triple);
     let verdict = match route {
-        Route::D => attempt_d(env, &ctx, &triple.phi, &triple.goal_closed, triple),
-        Route::FO => attempt_fo(env, &ctx, &triple.phi, &triple.goal_closed, catalog),
+        Route::D => attempt_d(env, holes, &ctx, &triple.phi, &triple.goal_closed, triple),
+        Route::FO => attempt_fo(env, holes, &ctx, &triple.phi, &triple.goal_closed, catalog),
         // HO: the default — every unrecognized shape also lands here.
         // NO `_ ⇒ skip`: this arm is always present and always attempts.
-        Route::HO => attempt_ho(env, &ctx, &triple.phi, &triple.goal_closed),
+        Route::HO => attempt_ho(env, holes, &ctx, &triple.phi, &triple.goal_closed),
     };
     ProverResult {
         obligation_id: triple.id.clone(),
@@ -337,12 +346,32 @@ fn attempt_obligation_with_optional_catalog(
 ///
 /// **The `check_cert` path** (`23 §4` route (a), distinct from the kernel API
 /// `check`): the kernel re-check `check(env, [], cert, phi_closed)` is the
-/// SOLE reason `proved` is believed. This function is the soundness bridge —
-/// nothing else here can break soundness if this call holds.
-pub fn attempt_with_cert(env: &mut GlobalEnv, phi_closed: &Term, cert: Term) -> Verdict {
+/// necessary kernel check before the separate transitive-hole honesty guard.
+/// A term may check while depending on another open obligation.
+pub fn attempt_with_cert(
+    env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
+    phi_closed: &Term,
+    cert: Term,
+) -> Verdict {
     match check(env, &Context::new(), &cert, phi_closed) {
-        Ok(()) => Verdict::Proved { cert },
-        Err(_) => emit_unknown_hole(env, phi_closed),
+        Ok(()) => certified(env, holes, phi_closed, cert),
+        Err(_) => emit_unknown_hole(env, holes, phi_closed),
+    }
+}
+
+/// The only constructor of `Verdict::Proved` (`23 §1.3`): a certificate the
+/// kernel accepted reads proved only if it reaches no open obligation hole.
+fn certified(
+    env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
+    phi_closed: &Term,
+    cert: Term,
+) -> Verdict {
+    if holes.reached_open(env, &cert).is_empty() {
+        Verdict::Proved { cert }
+    } else {
+        emit_unknown_hole(env, holes, phi_closed)
     }
 }
 
@@ -355,6 +384,7 @@ pub fn attempt_with_cert(env: &mut GlobalEnv, phi_closed: &Term, cert: Term) -> 
 /// `Unknown`, never `Disproved`.
 pub fn attempt_with_refutation(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
@@ -364,7 +394,7 @@ pub fn attempt_with_refutation(
     let not_phi = Term::pi(phi.clone(), Term::const_(env.bottom_id(), Vec::new()));
     match check(env, ctx, &refutation, &not_phi) {
         Ok(()) => Verdict::Disproved { countermodel },
-        Err(_) => emit_unknown_hole(env, phi_closed),
+        Err(_) => emit_unknown_hole(env, holes, phi_closed),
     }
 }
 
@@ -382,6 +412,7 @@ pub fn attempt_with_refutation(
 /// consulted — universally applicable regardless of fragment.
 fn attempt_d(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
@@ -391,7 +422,7 @@ fn attempt_d(
     // be intrinsically false yet still prove a sequent when it is an explicit
     // premise; report that checked certificate before attempting refutation.
     if let Some(cert) = try_ipc_cert(env, ctx, phi, phi_closed) {
-        return Verdict::Proved { cert };
+        return certified(env, holes, phi_closed, cert);
     }
 
     // The kernel's registered decidable-equality certificate reduces unequal
@@ -407,6 +438,7 @@ fn attempt_d(
                 ));
                 return attempt_with_refutation(
                     env,
+                    holes,
                     ctx,
                     phi,
                     phi_closed,
@@ -419,7 +451,7 @@ fn attempt_d(
 
     #[cfg(feature = "z3-process")]
     {
-        return attempt_d_with_z3_process(env, triple, &Z3ProcessConfig::default());
+        return attempt_d_with_z3_process(env, holes, triple, &Z3ProcessConfig::default());
     }
 
     #[cfg(not(feature = "z3-process"))]
@@ -427,7 +459,7 @@ fn attempt_d(
         let _ = triple;
         // Conservative feature-off baseline: emit exactly one honest hole after
         // proof and refutation candidates have both failed.
-        emit_unknown_hole(env, phi_closed)
+        emit_unknown_hole(env, holes, phi_closed)
     }
 }
 
@@ -440,16 +472,17 @@ fn attempt_d(
 /// `Disproved`.
 pub fn attempt_d_with_int_assignment(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     triple: &ObligationTriple,
     assignment: &[BigInt],
 ) -> Verdict {
     if classify(env, &triple.goal_closed) != Route::D {
-        return emit_unknown_hole(env, &triple.goal_closed);
+        return emit_unknown_hole(env, holes, &triple.goal_closed);
     }
 
     let Some((ground, applied_proof)) = specialize_int_goal(env, &triple.goal_closed, assignment)
     else {
-        return emit_unknown_hole(env, &triple.goal_closed);
+        return emit_unknown_hole(env, holes, &triple.goal_closed);
     };
     let int_id = env.int_lit_type().expect("classification required registered Int");
     let is_ground_int_equality = matches!(
@@ -460,7 +493,7 @@ pub fn attempt_d_with_int_assignment(
                 && matches!(rhs.as_ref(), Term::IntLit(_))
     );
     if !is_ground_int_equality {
-        return emit_unknown_hole(env, &triple.goal_closed);
+        return emit_unknown_hole(env, holes, &triple.goal_closed);
     }
 
     // Under the outer `λh : goal`, `applied_proof` is `h` applied to every
@@ -469,6 +502,7 @@ pub fn attempt_d_with_int_assignment(
     let refutation = Term::lam(triple.goal_closed.clone(), applied_proof);
     attempt_with_refutation(
         env,
+        holes,
         &Context::new(),
         &triple.goal_closed,
         &triple.goal_closed,
@@ -504,6 +538,7 @@ impl Default for Z3ProcessConfig {
 #[cfg(feature = "z3-process")]
 pub fn attempt_d_with_z3_process(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     triple: &ObligationTriple,
     config: &Z3ProcessConfig,
 ) -> Verdict {
@@ -512,9 +547,9 @@ pub fn attempt_d_with_z3_process(
         env.int_lit_type(),
         config,
     ) else {
-        return emit_unknown_hole(env, &triple.goal_closed);
+        return emit_unknown_hole(env, holes, &triple.goal_closed);
     };
-    attempt_d_with_int_assignment(env, triple, &assignment)
+    attempt_d_with_int_assignment(env, holes, triple, &assignment)
 }
 
 fn specialize_int_goal(
@@ -575,14 +610,15 @@ fn specialize_int_goal(
 /// or unrecognized obligation is refused exactly as before this node.
 fn attempt_fo(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
     catalog: Option<&crate::fo_kripke::FoCatalogHandles>,
 ) -> Verdict {
     match crate::fo_kripke::discover_and_quote_fo_with_catalog(env, phi_closed, catalog) {
-        Some((sig, _problem)) => attempt_fo_with_signature(env, ctx, phi, phi_closed, &sig),
-        None => attempt_ipc(env, ctx, phi, phi_closed),
+        Some((sig, _problem)) => attempt_fo_with_signature(env, holes, ctx, phi, phi_closed, &sig),
+        None => attempt_ipc(env, holes, ctx, phi, phi_closed),
     }
 }
 
@@ -603,6 +639,7 @@ fn attempt_fo(
 /// fallback below.
 pub fn attempt_fo_with_signature(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
@@ -621,15 +658,15 @@ pub fn attempt_fo_with_signature(
                 return match crate::fo_kripke::kernel_checked_fo_composite(
                     env, sig, &problem, &cert, phi_closed,
                 ) {
-                    Some(cert) => Verdict::Proved { cert },
-                    None => emit_unknown_hole_fo_withheld(env, phi_closed),
+                    Some(cert) => certified(env, holes, phi_closed, cert),
+                    None => emit_unknown_hole_fo_withheld(env, holes, phi_closed),
                 };
             }
         }
     }
     // Quotation refused this obligation, or the slice's rule set found no
     // certificate: fall back to the IPC propositional skeleton, as before.
-    attempt_ipc(env, ctx, phi, phi_closed)
+    attempt_ipc(env, holes, ctx, phi, phi_closed)
 }
 
 // ─── Fragment HO ─────────────────────────────────────────────────────────────
@@ -642,11 +679,12 @@ pub fn attempt_fo_with_signature(
 /// `[placeholder — reifies in V4]` (`23 §5`).
 fn attempt_ho(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
 ) -> Verdict {
-    attempt_ipc(env, ctx, phi, phi_closed)
+    attempt_ipc(env, holes, ctx, phi, phi_closed)
 }
 
 // ─── IPC proof search ────────────────────────────────────────────────────────
@@ -658,13 +696,14 @@ fn attempt_ho(
 /// — the cardinal rule (`23 §1.5`).
 fn attempt_ipc(
     env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
     ctx: &Context,
     phi: &Term,
     phi_closed: &Term,
 ) -> Verdict {
     match try_ipc_cert(env, ctx, phi, phi_closed) {
-        Some(cert) => Verdict::Proved { cert },
-        None => emit_unknown_hole(env, phi_closed),
+        Some(cert) => certified(env, holes, phi_closed, cert),
+        None => emit_unknown_hole(env, holes, phi_closed),
     }
 }
 
@@ -781,7 +820,11 @@ fn ipc_search(ctx: &Context, phi: &Term, depth: usize) -> Option<Term> {
 /// as an assumption, so its id appears in `trusted_base()`. This is what makes
 /// `unknown` **kernel-structural** and **`trusted_base()`-distinct from `proved`**
 /// (which retires the postulate on discharge).
-fn emit_unknown_hole(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
+fn emit_unknown_hole(
+    env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
+    phi_closed: &Term,
+) -> Verdict {
     let hole_id = declare_postulate(
         env,
         "prover unknown goal".to_string(),
@@ -789,6 +832,7 @@ fn emit_unknown_hole(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
         phi_closed.clone(),
     )
         .expect("declare_postulate for unknown hole must succeed");
+    holes.record(hole_id);
     Verdict::Unknown { hole_id }
 }
 
@@ -826,7 +870,11 @@ fn emit_unknown_hole(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
 /// sharpest instance of that problem. Changing this string changes emitted
 /// artifact bytes for every package that carries one of these holes — treat
 /// it exactly like changing a wire format, not like editing a comment.
-fn emit_unknown_hole_fo_withheld(env: &mut GlobalEnv, phi_closed: &Term) -> Verdict {
+fn emit_unknown_hole_fo_withheld(
+    env: &mut GlobalEnv,
+    holes: &mut ObligationHoles,
+    phi_closed: &Term,
+) -> Verdict {
     let hole_id = declare_postulate(
         env,
         "prover unknown goal -- FO: certificate held, theorem-home unapproved (23-prover.md §4.4)"
@@ -835,6 +883,7 @@ fn emit_unknown_hole_fo_withheld(env: &mut GlobalEnv, phi_closed: &Term) -> Verd
         phi_closed.clone(),
     )
         .expect("declare_postulate for FO-withheld unknown hole must succeed");
+    holes.record(hole_id);
     Verdict::Unknown { hole_id }
 }
 

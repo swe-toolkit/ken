@@ -161,7 +161,7 @@ fn unknown_verdict_not_relabeled_false() {
 
     // phi = P: abstract prop, no proof (unknown), not refutable (not false)
     let triple = closed_triple(&mut env, "test.phi_a2", p.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     // Verify V3 yields unknown (not disproved) — the Glivenko check
     assert!(
@@ -193,7 +193,7 @@ fn evidence_consumed_unchanged_from_v3() {
 
     let phi = p.clone();
     let triple = closed_triple(&mut env, "test.phi_a3", phi.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     let hole_id = match &result.verdict {
         Verdict::Unknown { hole_id } => *hole_id,
@@ -233,7 +233,7 @@ fn refuted_goal_false_with_forcing_world() {
     );
     let trusted_before = elab.env.trusted_base();
     let triple = closed_triple(&mut elab.env, "test.phi_b1", phi);
-    let result = attempt_obligation(&mut elab.env, &triple);
+    let result = attempt_obligation(&mut elab.env, &mut elab.obligation_holes, &triple);
     assert!(
         matches!(result.verdict, Verdict::Disproved { .. }),
         "unequal Int literals must exercise the real V3 refutation path"
@@ -540,7 +540,7 @@ fn lem_unknown_no_forcing_world() {
 
     let phi = p.clone();
     let triple = closed_triple(&mut env, "test.phi_b2", phi.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     let diag = project_diagnostic(&result, &triple).expect("unknown → diagnostic");
 
@@ -570,7 +570,7 @@ fn open_hole_typechecks_runs_in_trusted_base() {
 
     let phi = p.clone();
     let triple = closed_triple(&mut env, "test.phi_c1", phi.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     let hole_id = match &result.verdict {
         Verdict::Unknown { hole_id } => *hole_id,
@@ -706,7 +706,7 @@ fn hole_free_program_never_unknown() {
     // A provable goal: (p ∧ q) ⇒ p — IPC closes it, no hole emitted
     let phi = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
     let cert = Term::lam(Term::sigma(p.clone(), q.clone()), Term::proj1(Term::var(0)));
-    let verdict = attempt_with_cert(&mut env, &phi, cert);
+    let verdict = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi, cert);
     assert!(
         matches!(verdict, Verdict::Proved { .. }),
         "proved goal: no hole"
@@ -738,7 +738,7 @@ fn three_regions_partition_keyed_to_verdict() {
     // proved: (p ∧ q) ⇒ p
     let phi_proved = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
     let triple_proved = closed_triple(&mut env, "test.proved", phi_proved.clone());
-    let result_proved = attempt_obligation(&mut env, &triple_proved);
+    let result_proved = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_proved);
     assert!(matches!(result_proved.verdict, Verdict::Proved { .. }));
     let diag_proved = project_diagnostic(&result_proved, &triple_proved);
     assert!(diag_proved.is_none(), "proved → S_φ: no diagnostic (24 §3)");
@@ -746,7 +746,7 @@ fn three_regions_partition_keyed_to_verdict() {
     // unknown: abstract P, no proof
     let phi_unknown = p.clone();
     let triple_unknown = closed_triple(&mut env, "test.unknown", phi_unknown.clone());
-    let result_unknown = attempt_obligation(&mut env, &triple_unknown);
+    let result_unknown = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_unknown);
     assert!(matches!(result_unknown.verdict, Verdict::Unknown { .. }));
     let diag_unknown =
         project_diagnostic(&result_unknown, &triple_unknown).expect("unknown → diagnostic");
@@ -793,7 +793,7 @@ fn classically_valid_never_in_refuted_region() {
     let not_not_p = Term::pi(not_p, Term::const_(env.bottom_id(), vec![]));
     let phi_lem = Term::pi(not_not_p, p.clone());
     let triple_lem = closed_triple(&mut env, "test.lem", phi_lem.clone());
-    let result_lem = attempt_obligation(&mut env, &triple_lem);
+    let result_lem = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_lem);
 
     let diag_lem = project_diagnostic(&result_lem, &triple_lem).expect("unknown → diagnostic");
 
@@ -830,7 +830,7 @@ fn slice_missing_hypothesis_sufficiency_flip() {
     // Without hypothesis: Γ ⊢ P → unknown
     let phi = p.clone();
     let triple_no_hyp = closed_triple(&mut env, "test.slice_unknown", phi.clone());
-    let result_no_hyp = attempt_obligation(&mut env, &triple_no_hyp);
+    let result_no_hyp = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_no_hyp);
     assert!(
         matches!(result_no_hyp.verdict, Verdict::Unknown { .. }),
         "Γ ⊢ P (empty context) must be unknown"
@@ -863,7 +863,7 @@ fn slice_missing_hypothesis_sufficiency_flip() {
             span: Span::zero(),
         },
     };
-    let result_with_hyp = attempt_obligation(&mut env, &triple_with_hyp);
+    let result_with_hyp = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_with_hyp);
 
     // The flip: unknown (without hyp) → proved (with hyp ψ=P)
     assert!(
@@ -922,7 +922,7 @@ fn fully_proved_program_zero_diagnostics() {
 
     let phi = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
     let triple = closed_triple(&mut env, "test.all_proved", phi.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     assert!(matches!(result.verdict, Verdict::Proved { .. }));
 
     let results = vec![result];
@@ -948,11 +948,11 @@ fn deterministic_same_input_same_diagnostic() {
         // Obligation A: proved ((p∧q)⇒p)
         let phi_a = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
         let triple_a = closed_triple(&mut env, "decl.phi_a", phi_a.clone());
-        let result_a = attempt_obligation(&mut env, &triple_a);
+        let result_a = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_a);
 
         // Obligation B: unknown (abstract P)
         let triple_b = closed_triple(&mut env, "decl.phi_b", p.clone());
-        let result_b = attempt_obligation(&mut env, &triple_b);
+        let result_b = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_b);
 
         let results = vec![result_a, result_b];
         let triples = vec![triple_a, triple_b];

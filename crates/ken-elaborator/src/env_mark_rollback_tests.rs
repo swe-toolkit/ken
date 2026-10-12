@@ -15,6 +15,37 @@ fn trusted_ids(env: &ElabEnv) -> BTreeSet<GlobalId> {
     env.env.trusted_base().into_iter().collect()
 }
 
+/// Promise class: durable invariant. MEASURED: a rolled-back obligation id is
+/// reallocated as an audited assumption, and remains outside the hole registry.
+/// CLAIMED: GlobalId reuse cannot silently turn an axiom into an open hole.
+/// THE GAP: this local mark controls rollback; package failures traverse the
+/// same rollback_env_mark path before returning to clients.
+#[test]
+fn rollback_forgets_minted_hole_before_reused_id_becomes_an_audited_assumption() {
+    let mut env = ElabEnv::new().unwrap();
+    let top = Term::const_(env.env.top_id(), Vec::new());
+    let mut rolled_id = None;
+    let result: Result<(), ElabError> = env.with_env_mark_rollback(|env| {
+        let hole = declare_postulate(&mut env.env, "temporary hole".into(), vec![], top.clone())
+            .expect("a checked postulate");
+        env.obligation_holes.record(hole);
+        rolled_id = Some(hole);
+        Err(ElabError::Internal("discard temporary hole".into()))
+    });
+    assert!(matches!(result, Err(ElabError::Internal(_))));
+    let reused = env
+        .declare_postulate_raw("audited_reuser", top)
+        .expect("reallocated checked axiom");
+    assert_eq!(Some(reused), rolled_id);
+    assert!(env.env.trusted_base().contains(&reused));
+    assert!(
+        env.obligation_holes
+            .reached_open(&env.env, &Term::const_(reused, Vec::new()))
+            .is_empty(),
+        "the new audited axiom did not inherit the retired hole's identity"
+    );
+}
+
 /// MEASURED: a deliberately failed operation adds an opaque ID, populates the
 /// ElabEnv identity maps, and leaves the exact trusted-base delta empty after
 /// rollback; the same ID is then reused for a transparent declaration.

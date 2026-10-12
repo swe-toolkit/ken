@@ -143,7 +143,7 @@ fn proved_result_empty_diagnostics_and_delta() {
     // (p ∧ q) ⇒ p — provable by IPC
     let phi = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
     let triple = closed_triple(&mut env, "ob:divide#post.0", phi.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     assert!(matches!(result.verdict, Verdict::Proved { .. }));
 
     let diag = project_diagnostic(&result, &triple);
@@ -238,7 +238,7 @@ fn hole_kind_round_trips_and_lists_in_delta() {
 
     // abstract P → V3 unknown
     let triple = closed_triple(&mut env, "ob:sort#post.0", p.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     assert!(matches!(result.verdict, Verdict::Unknown { .. }));
 
     let diag = project_diagnostic(&result, &triple).unwrap();
@@ -380,7 +380,7 @@ fn unknown_goal_unknown_tag_no_forcing_world() {
     let ProofEnv { mut env, p, .. } = make_proof_env();
 
     let triple = closed_triple(&mut env, "ob:lem#post.0", p.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     assert!(matches!(result.verdict, Verdict::Unknown { .. }),
             "abstract P must be V3 unknown");
 
@@ -426,7 +426,7 @@ fn false_unknown_non_confusable_roundtrip() {
     // "unknown" side: abstract P
     let (unk_result, _unk_triple) = {
         let triple = closed_triple(&mut env, "ob:lem#post.0", p.clone());
-        let result = attempt_obligation(&mut env, &triple);
+        let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
         let diag = project_diagnostic(&result, &triple).unwrap();
         let diag_val = serialize_diagnostic(&diag, &triple.id);
         (diag_val, result.verdict)
@@ -899,12 +899,12 @@ fn deterministic_modulo_stats_and_display() {
         // Obligation A: proved
         let phi_a = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
         let triple_a = closed_triple(&mut env, "ob:divide#post.0", phi_a);
-        let result_a = attempt_obligation(&mut env, &triple_a);
+        let result_a = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_a);
         let diag_a = project_diagnostic(&result_a, &triple_a);
 
         // Obligation B: unknown
         let triple_b = closed_triple(&mut env, "ob:sort#post.0", p.clone());
-        let result_b = attempt_obligation(&mut env, &triple_b);
+        let result_b = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_b);
         let diag_b = project_diagnostic(&result_b, &triple_b);
 
         let mut doc = serialize_document("target", &[

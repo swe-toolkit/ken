@@ -272,6 +272,7 @@ fn encoder_covers_every_slice_source_constructor_and_route_consumes_composite() 
 
     let direct_verdict = attempt_fo_with_signature(
         &mut env.env,
+        &mut env.obligation_holes,
         &Context::new(),
         &phi_closed,
         &phi_closed,
@@ -293,8 +294,13 @@ fn encoder_covers_every_slice_source_constructor_and_route_consumes_composite() 
         .expect("public-route obligation");
     let extracted = v2_extract(&elaborated);
     let triple = extracted.obligations.first().expect("one obligation");
-    let public_verdict =
-        attempt_obligation_with_catalog_handles(&mut env.env, &handles, triple).verdict;
+    let public_verdict = attempt_obligation_with_catalog_handles(
+        &mut env.env,
+        &mut env.obligation_holes,
+        &handles,
+        triple,
+    )
+    .verdict;
     let public_cert = match public_verdict {
         Verdict::Proved { cert } => cert,
         other => panic!("installed public route must consume the composite, got {other:?}"),

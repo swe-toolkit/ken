@@ -74,7 +74,7 @@ fn pi_bound_int_atoms_route_d_and_preserve_ho_default() {
     for (id, goal) in [("equality", equality), ("inequality", inequality)] {
         let obligation = triple(&mut elab, id, goal);
         let before = elab.env.trusted_base().len();
-        let result = attempt_obligation(&mut elab.env, &obligation);
+        let result = attempt_obligation(&mut elab.env, &mut elab.obligation_holes, &obligation);
         let Verdict::Unknown { hole_id } = result.verdict else {
             panic!("D route without a candidate must remain Unknown");
         };
@@ -97,12 +97,22 @@ fn assignment_is_substituted_before_kernel_checked_refutation() {
     let obligation = triple(&mut elab, "candidate", goal);
 
     let before_good = elab.env.trusted_base().len();
-    let good = attempt_d_with_int_assignment(&mut elab.env, &obligation, &[BigInt::from(1)]);
+    let good = attempt_d_with_int_assignment(
+        &mut elab.env,
+        &mut elab.obligation_holes,
+        &obligation,
+        &[BigInt::from(1)],
+    );
     assert!(matches!(good, Verdict::Disproved { .. }));
     assert_eq!(elab.env.trusted_base().len(), before_good);
 
     let before_bad = elab.env.trusted_base().len();
-    let bad = attempt_d_with_int_assignment(&mut elab.env, &obligation, &[BigInt::from(0)]);
+    let bad = attempt_d_with_int_assignment(
+        &mut elab.env,
+        &mut elab.obligation_holes,
+        &obligation,
+        &[BigInt::from(0)],
+    );
     let Verdict::Unknown { hole_id } = bad else {
         panic!("non-refuting candidate must be Unknown");
     };

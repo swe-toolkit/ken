@@ -35,6 +35,7 @@ pub mod extract;
 pub mod fo_kripke;
 pub mod foreign;
 pub mod format;
+pub mod honesty;
 pub mod ifc;
 pub mod layout;
 pub mod lexer;
@@ -102,6 +103,7 @@ pub use extract::{
 pub use foreign::{
     trusted_base_delta, FfiRuntimeCheck, ForeignBinding, ForeignEnv, MarshalKind, MarshalSig,
 };
+pub use honesty::ObligationHoles;
 pub use literate::{
     extract_ken_md, format_ken_md, validate_ken_md_fences, KenMdExtraction, KenMdFence,
     KenMdFenceRole,
@@ -146,6 +148,8 @@ pub struct SpaceElaborationMetadata {
 pub struct ElabEnv {
     pub env: GlobalEnv,
     pub globals: HashMap<String, GlobalId>,
+    /// Checked identities minted by the verification layer as obligation holes.
+    pub obligation_holes: ObligationHoles,
     /// Elaborator-side ownership of kernel declarations without a source name.
     /// A qualified declaration or fixed prelude stage owns each allocation.
     pub(crate) decl_owner: BTreeMap<GlobalId, (String, u32)>,
@@ -249,6 +253,7 @@ fn acknowledge_elab_env_field_inventory(env: &ElabEnv) {
     let ElabEnv {
         env: _,
         globals: _,
+        obligation_holes: _,
         decl_owner: _,
         owner_ordinals: _,
         preconditions: _,
@@ -386,6 +391,7 @@ impl ElabEnv {
         let mut elab = Self {
             env,
             globals,
+            obligation_holes: ObligationHoles::default(),
             decl_owner,
             owner_ordinals,
             preconditions: HashMap::new(),
@@ -831,7 +837,14 @@ impl ElabEnv {
         ken_kernel::check::admit_bodies(&mut self.env, &[(obl.hole_id, cert)]).is_ok()
     }
 
-    /// Returns `true` if `hole_id` is still in `trusted_base()` (status = `unknown`).
+    /// Whether a checked claim is transparent and has no reachable open hole.
+    pub fn claim_proved(&self, id: GlobalId) -> bool {
+        self.obligation_holes.claim_proved(&self.env, id)
+    }
+
+    /// Returns whether this one hole is still in `trusted_base()`. A retired
+    /// hole can still depend on a different open hole; use `claim_proved` for
+    /// the transitive proof-status question.
     pub fn is_open_hole(&self, hole_id: GlobalId) -> bool {
         self.env.trusted_base().contains(&hole_id)
     }
@@ -883,6 +896,7 @@ impl ElabEnv {
         let ElabEnv {
             env: _,
             globals,
+            obligation_holes,
             decl_owner,
             owner_ordinals,
             preconditions,
@@ -909,6 +923,7 @@ impl ElabEnv {
                 .filter_map(|(name, id)| removed_ids.contains(id).then_some(name.clone())),
         );
         globals.retain(|_, id| !removed_ids.contains(id));
+        obligation_holes.forget(&removed_ids);
         decl_owner.retain(|id, _| !removed_ids.contains(id));
         owner_ordinals.clear();
         for (_, (owner, ordinal)) in decl_owner.iter() {

@@ -230,7 +230,12 @@ fn assert_unknown(config: Z3ProcessConfig) {
     let mut elab = ElabEnv::new().expect("numeric environment");
     let obligation = equality(&mut elab);
     let before = elab.env.trusted_base().len();
-    let verdict = attempt_d_with_z3_process(&mut elab.env, &obligation, &config);
+    let verdict = attempt_d_with_z3_process(
+        &mut elab.env,
+        &mut elab.obligation_holes,
+        &obligation,
+        &config,
+    );
     let Verdict::Unknown { hole_id } = verdict else {
         panic!("solver failure must use the Unknown baseline");
     };
@@ -263,7 +268,12 @@ fn sibling_fork_during_stub_write_does_not_inherit_writer_descriptor() {
     };
     let before = elab.env.trusted_base().len();
     let started = Instant::now();
-    let verdict = attempt_d_with_z3_process(&mut elab.env, &obligation, &config);
+    let verdict = attempt_d_with_z3_process(
+        &mut elab.env,
+        &mut elab.obligation_holes,
+        &obligation,
+        &config,
+    );
     let adapter_elapsed = started.elapsed();
     let direct_probe = Command::new(&path).args(["-in", "-smt2"]).output();
     blocker.join().expect("fork blocker thread");
@@ -292,7 +302,12 @@ fn parsed_model_is_candidate_not_verdict() {
 
     let refuting = stub(&dir, "printf 'sat\\n((k0 1))\\n'");
     let before = elab.env.trusted_base().len();
-    let verdict = attempt_d_with_z3_process(&mut elab.env, &obligation, &refuting);
+    let verdict = attempt_d_with_z3_process(
+        &mut elab.env,
+        &mut elab.obligation_holes,
+        &obligation,
+        &refuting,
+    );
     let process_probe = if matches!(&verdict, Verdict::Disproved { .. }) {
         None
     } else {
@@ -341,7 +356,12 @@ fn identical_input_and_candidate_have_deterministic_verdict() {
     let before = elab.env.trusted_base().len();
     for _ in 0..3 {
         assert!(matches!(
-            attempt_d_with_z3_process(&mut elab.env, &obligation, &config),
+            attempt_d_with_z3_process(
+                &mut elab.env,
+                &mut elab.obligation_holes,
+                &obligation,
+                &config
+            ),
             Verdict::Disproved { .. }
         ));
     }
@@ -368,13 +388,13 @@ fn installed_z3_round_trip_reaches_kernel_checked_refutation() {
     let mut elab = ElabEnv::new().expect("numeric environment");
     let obligation = equality(&mut elab);
     let before = elab.env.trusted_base().len();
-    let result = attempt_obligation(&mut elab.env, &obligation);
+    let result = attempt_obligation(&mut elab.env, &mut elab.obligation_holes, &obligation);
     assert!(matches!(result.verdict, Verdict::Disproved { .. }));
     assert_eq!(elab.env.trusted_base().len(), before);
 
     let two_binder = two_binder_equality(&mut elab);
     let before_two = elab.env.trusted_base().len();
-    let two_result = attempt_obligation(&mut elab.env, &two_binder);
+    let two_result = attempt_obligation(&mut elab.env, &mut elab.obligation_holes, &two_binder);
     assert!(matches!(two_result.verdict, Verdict::Disproved { .. }));
     assert_eq!(elab.env.trusted_base().len(), before_two);
 }
