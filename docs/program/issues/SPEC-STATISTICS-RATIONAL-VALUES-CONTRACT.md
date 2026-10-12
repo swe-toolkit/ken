@@ -1,7 +1,7 @@
 ---
 id: SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT
 title: "Spec 63 reads every probability, expectation and empirical mean as a numerator/denominator interpretation, and spec 64 now supplies an exact Rational carrier but adds no value-returning statistics operation, so a probability still cannot be a Ken value. Author the adapter contract: probability, expectation and mean returning Rational, agreeing with spec 63's numerators, each law proved at zero trust"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1
@@ -81,3 +81,18 @@ base, stop and report the mismatch.
   `Float`.
 - The adapter needs a public-surface change to a statistics or Rational
   package beyond adding the new names: stop with the measurement.
+
+## Closeout
+
+Merged `4d4dedbd8` from exact `eaf1b789` (PR #4690). CV approval
+`evt_7k31bdr1ya99p`, Architect `evt_5175kmt2m2k68`, Decision
+`dec_3r16ff78y6z28`.
+
+Spec 63 section 3 makes `probability`, `expectation` and `empirical_mean`
+`Rational` values: 15 names in `Algorithm.Statistics.Exact` and
+`Algorithm.Statistics.Empirical`, each `den_tail` the existing
+`one_less_total`, agreement by `rational_equiv`, every law a proved
+theorem at zero trust (D0 `evt_1m3dbd68wnrcn`). Spec 63 sections 1.4 and
+2.3 and spec 64 section 5 point at it. The seed is
+`conformance/stdlib/statistics/seed-rational-values.md`. Delivery is
+`CAT-STATISTICS-RATIONAL-VALUES`.

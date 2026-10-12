@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT
 title: "Native lowering has no representation for a relay Vis (a K that forwards a pattern-bound operation, or a functional-IH reference) returned to a response owner beside a non-relay member, so such an owner is emitted Ret-only and traps -1 (or is unplanned), and the ignored rt_span_prov_native:355 and r2 (rt_escape_second_resource_native:1015) rows stay ignored. Refuse at planning, on a discriminant read from the settling plane, every owner native lowering cannot settle, and give the relay a planned native arm that settles it at interpreter parity"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
@@ -665,3 +665,22 @@ the same owner 0, while the interpreter exits 0. Its exemption in
 runnable. This WP leaves it ignored, and its failure becomes the typed
 refusal. Its successor gives these P1 sources a handler, un-ignores the row
 and corrects the exemption.
+
+## Closeout
+
+Merged `d12ba46e7` from exact `5d4a1be23` (PR #4676, reused). Runtime QA
+`evt_34sb7gqjsep5n`, Architect `evt_6ga5d3ba9a0gb`, Decision
+`dec_9t7x2pv3p1a`. The red `22d5f0956` and the red `b2590d9b8` never
+landed.
+
+Increment (i): a forwarded host op with no performing route now stops
+native at a typed relay trap at the consumer seat, not at planning time.
+Two ignored rows are cleared: `rt_span_prov_native`
+`sp_a_foreign_span_freeze_rejects_own_span_succeeds_on_both_engines` and
+`rt_escape_second_resource_native`
+`r2_cross_buffer_freeze_fails_closed_with_invalid_bounds`. The 6154/4250
+suppression controls and the px7f pending-Vis control are re-pinned to the
+exact new diagnostics (Steward option (i), twice). The pending-Vis
+verifier is tightened and its diagnostics unified with the ordinary-owner
+path. Sixteen crates paths. §1a ends at 18. The coverage residuals are
+carried to `RT-NESTED-RELAY-PERFORMING-ROUTE`.
