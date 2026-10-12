@@ -1,7 +1,7 @@
 ---
 id: LANG-ELAB-RECURSIVE-FRAME-BUDGET
 title: "Logic inlined into the elaborator's recursive cycle (check, infer, check_dependent_branch_body) regressed the stack three times on 2026-10-04, and each regression surfaced only as overflowing CI shards. Reduce the prelude's stack floor and guard the cycle's frame budget with a test that fails at review"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
