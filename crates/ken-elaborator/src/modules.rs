@@ -4757,6 +4757,9 @@ fn expand_scope(
                     elab, qualified_name, resolved.span.clone(), declared,
                     |elab| elaborate_resolved_space(elab, &resolved),
                 )?;
+                for result in &space_results {
+                    register_obligation_holes(elab, result);
+                }
                 ids.extend(space_results);
                 i += 1;
             }
