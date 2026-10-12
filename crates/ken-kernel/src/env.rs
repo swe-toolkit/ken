@@ -1498,6 +1498,11 @@ mod postulates_reachable_kb_tests {
         id
     }
 
+    // Depth pin: 200,000 App nodes must traverse with a fixed 512 KiB stack,
+    // rather than inherit libtest's ambient thread stack or RUST_MIN_STACK.
+    // Builder::stack_size sets this bound locally; there is no child process.
+    const DEPTH_PIN_STACK_BYTES: usize = 512 * 1024;
+
     /// Promise class: durable invariant. MEASURED: transparent chains, pair
     /// projections, shared/cyclic paths and deep syntax return exactly the
     /// opaque non-prelude dependencies; checked-hole upgrade removes them.
@@ -1569,14 +1574,22 @@ mod postulates_reachable_kb_tests {
         let op_term = Term::app(Term::const_(op, vec![]), Term::const_(env.tt_id(), vec![]));
         assert!(postulates_reachable(&env, &op_term).is_empty());
 
-        let mut deep = Term::const_(h, vec![]);
-        for _ in 0..200_000 {
-            deep = Term::app(deep, Term::var(0));
-        }
-        assert_eq!(postulates_reachable(&env, &deep), BTreeSet::from([h]));
-        // Rust's recursive Box destructor is not the query: do not make it a
-        // different stack test by dropping 200k nested App nodes here.
-        std::mem::forget(deep);
+        std::thread::scope(|scope| {
+            let depth_pin = std::thread::Builder::new()
+                .stack_size(DEPTH_PIN_STACK_BYTES)
+                .spawn_scoped(scope, || {
+                    let mut deep = Term::const_(h, vec![]);
+                    for _ in 0..200_000 {
+                        deep = Term::app(deep, Term::var(0));
+                    }
+                    assert_eq!(postulates_reachable(&env, &deep), BTreeSet::from([h]));
+                    // Recursive Box destruction is not the query; do not
+                    // measure dropping this 200k-node spine instead.
+                    std::mem::forget(deep);
+                })
+                .expect("spawn stated-stack depth pin");
+            depth_pin.join().expect("stated-stack depth pin");
+        });
 
         assert!(env.upgrade_to_transparent(h, Term::const_(env.tt_id(), vec![])));
         assert!(postulates_reachable(&env, &two_term).is_empty());
