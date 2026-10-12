@@ -269,9 +269,9 @@ in §§1–2, with every proof body kernel-checked and no `Axiom`,
 postulate or open proof obligation. A scratch check demonstrates
 feasibility for the named D0 and AC-0b subset only. Tests and the
 accompanying seed are independent behavioral oracles; neither
-substitutes for any public proof. Until the CAT package and its
-Nat prerequisites are delivered, this chapter is a normative target,
-not a claim that imports currently succeed on `main`.
+substitutes for any public proof. The CAT package and its Nat
+prerequisites have since landed. Their checked proofs, not the
+original scratch or seed, make catalog imports available on `main`.
 
 ## 4. Nat prerequisite surface
 
@@ -357,13 +357,14 @@ work. A normalized subtype can be built over this carrier later;
 this chapter does not pretend every equivalent spelling is identical
 now.
 
-`spec/50-stdlib/63-statistics.md` §§1–2 currently interpret event
-mass and score sum over a positive total as numerator/denominator
-pairs, without returning a `Rational`. `MkRational n k` supplies the
-value-level representation of `n/(Suc k)` needed by a future
-statistics adapter, but **no value-typed probability, expectation or
-mean operation** is added to either statistics tier by this chapter.
-Those re-statements, including any required compatibility bridge to
-§63's existing numerators, need their own checked CAT contract and
-conformance. The denominator-proof obligations in §63 are not
-silently replaced by this constructor.
+`spec/50-stdlib/63-statistics.md` §§1–2 interpret event mass and
+score sum over a positive total as numerator/denominator pairs,
+without returning a `Rational`. `MkRational n k` supplies the
+value-level representation of `n/(Suc k)` that §63 §3 now uses for
+its separately specified probability, expectation and empirical-mean
+adapters. This chapter itself adds **no** statistics operation.
+The §63 §3 forward bridges require checked agreement with the
+existing numerators and positive denominators; this constructor
+does not silently replace §63's denominator-proof obligations.
+The §3 additions still need their own checked CAT delivery and
+conformance.

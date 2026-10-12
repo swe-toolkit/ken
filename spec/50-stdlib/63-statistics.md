@@ -1,12 +1,14 @@
 # Exact finite-support statistics
 
 > **Status: DRAFT v0 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
-> SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT).** Sections 1–2 are normative:
+> SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT;
+> SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT).** Sections 1–3 are normative:
 > §1 specifies positive natural-weight atom lists in
 > `Algorithm.Statistics.Exact`; §2 specifies exact empirical observations
-> of `NonEmpty q` in `Algorithm.Statistics.Empirical`. Neither section
-> claims delivery of the empirical package. The contract adds no kernel,
-> syntax, primitive, `Float`, `Axiom`, or `trusted_base()` entry.
+> of `NonEmpty q` in `Algorithm.Statistics.Empirical`; §3 specifies their
+> exact Rational-valued probability, expectation, and mean adapters.
+> This contract adds no kernel, syntax, primitive, `Float`, `Axiom`, or
+> `trusted_base()` entry. A specification is not CAT delivery.
 
 ## 1. Exact distributions and finite sums
 
@@ -201,10 +203,11 @@ trusted source of those laws.
 `Algorithm.Statistics.Exact` contributes no primitive, `Axiom`,
 unchecked assumption, `Float`, new surface form, kernel rule, or
 `trusted_base()` entry. The D0 checked development accepted the
-representation, sums, and all nine law bodies with the existing
-Ken checker; that feasibility evidence does **not** deliver the
-catalog package or run these conformance cases. Every theorem must
-be checked in the eventual package before its public promise is met.
+representation, sums, and all nine law bodies with the then-existing
+Ken checker; that feasibility evidence did **not** itself deliver the
+catalog package
+or run conformance. The landed Exact package now exports the nine
+checked laws; §3 adds separate value-typed obligations.
 
 `pure` and `bind`, including monad laws, are deferred **as a pair**.
 Flattening atoms naïvely is not a probability-preserving bind when
@@ -219,12 +222,12 @@ count of entries. The empirical distribution and its exact counts
 and sums are outside §1 but specified in §2. Conditional probability,
 variance, sampling from a distribution, approximate statistics,
 continuous distributions, and every `Float`-valued result remain
-outside §§1–2. The separate `64-rational.md` contract specifies an
-exact non-negative rational carrier, arithmetic, equivalence and
-order. It does not add value-typed probability, expectation or mean
-operations to §§1–2; those statistics adapters remain deferred.
-Canonical normalization and rational division are likewise outside
-this chapter.
+outside §§1–2. The separate `64-rational.md` contract specifies the
+landed exact non-negative rational carrier, arithmetic, equivalence
+and order. Sections 1–2 do not export value-typed statistics
+operations; §3 specifies the Rational-valued adapters separately,
+without changing any declaration or law above. Canonical
+normalization and rational division remain outside this chapter.
 
 ## 2. Empirical distributions over non-empty samples
 
@@ -358,13 +361,238 @@ generates observations from a distribution. It does not change §1's
 carrier, proofs, event/score semantics, or exact-ratio interpretation.
 No mean as a returned numeric value, variance, conditional
 probability, `pure`/`bind`, `uniform`, rational carrier, approximate
-tier, or `Float` result is part of §2. The separate `64-rational.md`
-contract supplies a carrier and exact algebra, not a value-returning
-Empirical operation. In particular, `score_sum q sample score` over
-`sample_size q sample` is an **exact numerator/denominator
-interpretation**, not a Ken-valued division.
-A post-ruling checked development establishes feasibility of the
-seven proof bodies against the landed §1 and `NonEmpty` interfaces;
-only a checked CAT package will deliver them as public laws. The
-accompanying conformance seed is authored, not evidence that CAT or
-CI ran it.
+tier, or `Float` result is part of §2. Section 3 separately specifies
+`empirical_mean` using §64's Rational carrier and §1's `expectation`;
+it does not redefine `score_sum q sample score` over
+`sample_size q sample` as a Ken-valued division.
+
+A post-ruling checked development established feasibility of the
+seven proof bodies against the §1 and `NonEmpty` interfaces. The
+landed Empirical package now exports those checked laws; its authored
+conformance seed alone establishes neither their delivery nor CI.
+
+## 3. Rational-valued statistics adapters
+
+This section extends the existing `Algorithm.Statistics.Exact` and
+`Algorithm.Statistics.Empirical` modules with exactly three operations
+and twelve proved laws. It leaves the §§1–2 declarations untouched.
+`Data.Numeric.Rational` supplies the existing unnormalized, non-negative
+carrier, `MkRational`, `rational_equiv`, arithmetic, and Boolean order.
+The value represented by `MkRational n k` is `n/(Suc k)`: the second
+field is **not** a denominator. No division, normalized fraction, or
+new sample/distribution carrier is introduced.
+
+The existing public total witnesses do the conversion without a new
+predecessor operation. `total_positive q d` proves `total q d = Suc
+(one_less_total q d)`. An empirical sample uses its existing
+`empirical_distribution q sample`; `empirical_total_size` then
+identifies that distribution's positive total with
+`sample_size q sample`. In particular, `empirical_mean` uses the
+same `expectation` construction, not an independently constructed
+rational with a second positivity proof. Every public law in §3
+requires a checked body without `Axiom`, postulate, or open proof
+obligation, at the same trust boundary as §§1–2.
+
+### 3.1 Exact event probabilities and expectations
+
+`Algorithm.Statistics.Exact` imports the existing Rational surface
+`Rational`, `MkRational`, `numerator`, `denominator`,
+`rational_equiv`, `rational_leq`, `rational_add`, and `rational_one`.
+It adds `leq_nat` to its existing LawfulClasses import,
+`mul_add_distrib_l` to its Nat.Arithmetic import, and imports
+`leq_nat_add_left_bound` from Nat.Order. No import adds a primitive
+or changes the public surface of those providers.
+
+```ken
+pub fn probability
+  (q : Type) (d : ExactDistribution q) (event : q → Bool) : Rational =
+  MkRational (event_mass q d event) (one_less_total q d)
+
+pub fn expectation
+  (q : Type) (d : ExactDistribution q) (score : q → Nat) : Rational =
+  MkRational (expectation_weight q d score) (one_less_total q d)
+```
+
+The four projection laws connect the actual returned value to the
+§1 pair. In particular, the denominator laws are proved from the
+stored positive-total witness, not from an unchecked equality or a
+zero-permitting natural denominator. Neither operation silently
+normalizes, rounds, or changes the event/score fold.
+
+```ken
+pub theorem probability_numerator
+  (q : Type) (d : ExactDistribution q) (event : q → Bool) :
+  Equal Nat (numerator (probability q d event)) (event_mass q d event)
+
+pub theorem probability_denominator
+  (q : Type) (d : ExactDistribution q) (event : q → Bool) :
+  Equal Nat (denominator (probability q d event)) (total q d)
+
+pub theorem expectation_numerator
+  (q : Type) (d : ExactDistribution q) (score : q → Nat) :
+  Equal Nat
+    (numerator (expectation q d score))
+    (expectation_weight q d score)
+
+pub theorem expectation_denominator
+  (q : Type) (d : ExactDistribution q) (score : q → Nat) :
+  Equal Nat (denominator (expectation q d score)) (total q d)
+```
+
+The forward bridges compare an adapter result with any differently
+spelled positive fraction `MkRational n k`. Their premise is exactly
+the **cross-product equality** between that fraction and §1's
+numerator/positive-total interpretation. Their conclusion is
+`rational_equiv`, never structural `Equal Rational`. The comparison
+fraction need not be reduced. No reverse bridge is exported: its
+cross equation follows from the existing denominator law and the
+definition of `rational_equiv`, without a second public name.
+
+```ken
+pub theorem probability_cross_bridge
+  (q : Type) (d : ExactDistribution q) (event : q → Bool)
+  (n : Nat) (k : Nat)
+  (same : Equal Nat
+    (mul (event_mass q d event) (Suc k))
+    (mul n (total q d))) :
+  rational_equiv (probability q d event) (MkRational n k)
+
+pub theorem expectation_cross_bridge
+  (q : Type) (d : ExactDistribution q) (score : q → Nat)
+  (n : Nat) (k : Nat)
+  (same : Equal Nat
+    (mul (expectation_weight q d score) (Suc k))
+    (mul n (total q d))) :
+  rational_equiv (expectation q d score) (MkRational n k)
+```
+
+### 3.2 Empirical mean without a second rational construction
+
+`Algorithm.Statistics.Empirical` adds `expectation` and
+`expectation_denominator` to its existing Exact import, and imports
+`Rational`, `MkRational`, `numerator`, `denominator`, and
+`rational_equiv` from Rational. The new operation accepts the
+existing `NonEmpty q`, not a second sample type. Its score is still
+natural-valued and its result is non-negative and exact.
+
+```ken
+pub fn empirical_mean
+  (q : Type) (sample : NonEmpty q) (score : q → Nat) : Rational =
+  expectation q (empirical_distribution q sample) score
+
+pub theorem empirical_mean_numerator
+  (q : Type) (sample : NonEmpty q) (score : q → Nat) :
+  Equal Nat
+    (numerator (empirical_mean q sample score))
+    (score_sum q sample score)
+
+pub theorem empirical_mean_denominator
+  (q : Type) (sample : NonEmpty q) (score : q → Nat) :
+  Equal Nat
+    (denominator (empirical_mean q sample score))
+    (sample_size q sample)
+
+pub theorem empirical_mean_cross_bridge
+  (q : Type) (sample : NonEmpty q) (score : q → Nat)
+  (n : Nat) (k : Nat)
+  (same : Equal Nat
+    (mul (score_sum q sample score) (Suc k))
+    (mul n (sample_size q sample))) :
+  rational_equiv (empirical_mean q sample score) (MkRational n k)
+```
+
+The numerator law uses §2's `empirical_score_sum`, while the
+denominator law composes §1's `expectation_denominator` with §2's
+`empirical_total_size`. The forward bridge transports **both**
+checked equations to the §2 cross product; a closed three-observation
+fixture is not a substitute for those generic proofs. The sample's
+non-emptiness makes its size a positive denominator through the
+checked `empirical_distribution`, not a separate assumed count.
+
+### 3.3 Probability bounds and complements
+
+A Boolean event selects some of the distribution's natural weights.
+The existing `complement_mass` partitions **all** entries, including
+repeated atoms and zero weights. With Nat.Order's checked
+`leq_nat_add_left_bound`, this proves the mass is at most the positive
+total. The returned probability is therefore at most `rational_one`
+under Rational's exact Boolean value order. Adding the event and its
+complement gives one under `rational_equiv`, regardless of the
+unreduced spelling of their sum.
+
+```ken
+pub theorem probability_mass_bound
+  (q : Type) (d : ExactDistribution q) (event : q → Bool) :
+  Equal Bool (leq_nat (event_mass q d event) (total q d)) True
+
+pub theorem probability_complement_one
+  (q : Type) (d : ExactDistribution q) (event : q → Bool) :
+  rational_equiv
+    (rational_add
+      (probability q d event)
+      (probability q d (compose q Bool Bool bool_not event)))
+    rational_one
+```
+
+`probability_leq_one` needs no third private copy of a Nat-order
+congruence helper. The following checked D0 body uses the two
+`cong` steps directly to eliminate multiplication by one, then
+transports the mass bound across `probability_denominator`:
+
+```ken
+pub theorem probability_leq_one
+    (q : Type) (d : ExactDistribution q) (event : q → Bool)
+  : Equal Bool (rational_leq (probability q d event) rational_one) True =
+  let
+    mass = event_mass q d event;
+    den = denominator (probability q d event);
+    raw_comparison = leq_nat (mul mass (Suc Zero)) (mul (Suc Zero) den);
+    reduced_comparison = leq_nat mass den
+  in
+    trans Bool raw_comparison reduced_comparison True
+      (trans Bool
+        raw_comparison
+        (leq_nat mass (mul (Suc Zero) den))
+        reduced_comparison
+        (cong Nat Bool (mul mass (Suc Zero)) mass
+          (λv. leq_nat v (mul (Suc Zero) den))
+          ((proof one_r for mul) mass))
+        (cong Nat Bool (mul (Suc Zero) den) den (leq_nat mass)
+          ((proof one_l for mul) den)))
+      (trans Bool reduced_comparison (leq_nat mass (total q d)) True
+        (cong Nat Bool den (total q d) (leq_nat mass)
+          (probability_denominator q d event))
+        (probability_mass_bound q d event))
+```
+
+The displayed body elaborates in the D0 development; the eventual
+catalog package must check every named body, not only this witness.
+The complement proof also uses Nat distributivity and Rational's
+checked `denominator_product` for `rational_add`; it does not add a
+second complement builder or change Rational.
+
+### 3.4 Trust boundary and exclusions
+
+The ruled public inventory is **eleven Exact declarations** (two
+operations and nine proved laws) and **four Empirical declarations**
+(one operation and three proved laws). No other public name or
+existing-declaration change is required; there is no duplicate
+Nat-order congruence helper. All value equalities use
+`rational_equiv`, not carrier identity. Sections 1–2's raw natural
+numerators remain available unchanged. The D0
+checked both extended source-shaped modules and a separate imported
+consumer with the existing checker, and rejected a weakened cross
+premise and two false closed value claims. This establishes
+feasibility only: it does not deliver the CAT additions, execute the
+new seed against them, rebuild the CLI, or establish CI green.
+
+The natural score of an expectation is unbounded, so **no**
+`expectation ≤ rational_one` law holds: a checked closed result is
+`4/3`. No score-maximum bound or reverse cross bridge is in the
+required public inventory. `pure`/`bind`, `uniform`, conditional
+probability, variance, sampling, signed values, subtraction or
+division, normalized or reduced forms, quotient equality,
+structural `Equal Rational` for differently spelled fractions,
+`Float`, and approximate statistics remain outside §3. No law may
+be justified by an `Axiom`, primitive, new surface or kernel rule,
+or unchecked proof assumption.
