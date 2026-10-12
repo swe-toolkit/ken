@@ -357,36 +357,25 @@ site.
 
 ## C. The verification status model + honesty guard (`21 §5`)
 
-### verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base
-- spec: `21 §5.1`/§5.4; `18 §4.5`/§5
-- status: Landed; superseded by
-  `proved-status-cert-checks-no-reachable-open-hole` at W4
-  (`VERIFY-TRANSITIVE-HONESTY`).
-- given: discharge the `ensures` obligation for
-  `fn tst (n : Nat) : Nat ensures TrueProp n = n` using a separate postulate
-  `wit` of the obligation's closed goal type.
-- expect: **Landed:** `discharge_hole` accepts the certificate and the
-  generated obligation hole is no longer open. The test does not assert an
-  empty trusted base; `wit` remains a separate postulate.
-- why: The current test pins retirement of this obligation's own hole, not
-  transitive proof-dependency honesty. The W4 successor replaces that direct
-  hole check with reachability.
-
 ### verify/spec-syntax/proved-status-cert-checks-no-reachable-open-hole (soundness)
 - spec: `21 §5.1` (verdict `proved`), `§5.4` (discriminator); `18 §4.5`/§5
-- status: **deferred — W4 `postulates_reachable`**; certificate checking
-  remains live.
-- given: an `ensures` obligation `?h : φ` discharged by a certificate `p` with
-  `Γ ⊢ p : φ` (a closed core proof term)
-- expect: `check(env, Γ, p, φ)` accepts. **Deferred — W4:** the claim is
-  `proved` only when `postulates_reachable(env, p)` reaches no open obligation
-  hole. Audited contract axioms may remain visible in `trusted_base()` without
-  demoting the checked proof.
-- why: §5.1/§5.4 — a `proved` certificate is a core term that `check`
-  validates and whose transitive dependencies contain no open obligation hole.
-  This is the clean-certificate side; the refined-constant contrast follows.
-  The cert is given, not prover-generated — V1 fixes the status model; the
-  prover is V3.
+- status: Landed — W4 `VERIFY-TRANSITIVE-HONESTY`.
+- given: mint an open obligation hole `hole_seed : Top` and check the
+  transparent definitions `bridge_one : Top = hole_seed` and
+  `bridge_two : Top = bridge_one`. For a distinct open claim obligation
+  `claim_target : Top`, supply the certificate `p = bridge_two`. Its two-level
+  δ-closure reaches `hole_seed`, not merely the claim's own hole.
+- expect: `check(env, [], p, Top)` accepts while `hole_seed` is open, but the
+  claim yields `Unknown` (not `proved`), and `bridge_two` does not read
+  `proved`. Discharge `hole_seed` with checked `tt`: the same certificate
+  now yields `Proved`, and discharging `claim_target` with it makes that claim
+  read `proved`. An independent audited contract axiom may remain visible in
+  `trusted_base()` without demoting a checked proof that relies on it.
+- why: §5.1/§5.4 — kernel checking is necessary but not sufficient for
+  `proved`: the certificate's transitive dependencies must reach no open
+  obligation hole. The same checked certificate crosses the status boundary
+  when the distinct seed closes. This certificate is supplied, not found by
+  the V3 prover; V1 fixes the status discriminator.
 
 ### verify/spec-syntax/bogus-cert-not-proved (soundness)
 - spec: `21 §5.1`, `§5.4`; `18 §4.5` (de Bruijn re-check); `../seed-verify.md`

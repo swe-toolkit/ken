@@ -88,7 +88,7 @@ fn discharged_goal_cert_kernel_accepts() {
         Term::proj1(Term::var(0)),
     );
 
-    let verdict = attempt_with_cert(&mut env, &phi, cert);
+    let verdict = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi, cert);
     assert!(
         matches!(verdict, Verdict::Proved { .. }),
         "expected Proved but got {:?}",
@@ -125,7 +125,7 @@ fn corrupted_cert_kernel_rejects_unknown() {
     // Corrupted cert: λpair. pair — has type Pi(Sigma(P,Q), Sigma(P,Q)) ≠ phi
     let bad_cert = Term::lam(Term::sigma(p.clone(), q.clone()), Term::var(0));
 
-    let verdict = attempt_with_cert(&mut env, &phi, bad_cert);
+    let verdict = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi, bad_cert);
     let hole_id = hole_of(&verdict);
 
     // Corrupted cert → unknown (not proved); the goal is in trusted_base().
@@ -146,7 +146,7 @@ fn classically_valid_topos_invalid_cert_rejected() {
     let phi = p.clone();
     let wrong_cert = q.clone();
 
-    let verdict = attempt_with_cert(&mut env, &phi, wrong_cert);
+    let verdict = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi, wrong_cert);
     let hole_id = hole_of(&verdict);
 
     assert!(
@@ -225,7 +225,7 @@ fn unrecognized_shape_to_ho_default_no_skip() {
 
     // The obligation is ATTEMPTED (→ unknown-with-hole), never silently dropped.
     let triple = closed_triple(&mut env, "test.unrecognized", phi_eq.clone());
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     assert!(
         matches!(result.verdict, Verdict::Unknown { .. }),
         "unrecognized-shape HO attempt must yield unknown (not a crash or forged proved); \
@@ -298,7 +298,7 @@ fn bare_unsat_no_cert_is_unknown_not_proved() {
 
     // phi = P; no valid cert (Q has wrong type) — backend has no π to emit.
     let phi = p.clone();
-    let verdict = attempt_with_cert(&mut env, &phi, q.clone());
+    let verdict = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi, q.clone());
 
     // No cert → unknown (not proved); the de Bruijn firewall holds (23 §4 ledger).
     assert!(
@@ -321,7 +321,7 @@ fn ipc_valid_propositional_proved() {
     let phi = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
     let triple = closed_triple(&mut env, "test.conjunction_elim", phi.clone());
 
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     assert!(
         matches!(result.verdict, Verdict::Proved { .. }),
@@ -348,7 +348,7 @@ fn ipc_lem_invalid_not_refuted_unknown() {
     let phi = p.clone();
     let triple = closed_triple(&mut env, "test.abstract_atom", phi.clone());
 
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     // Must be unknown (honest hole), NOT disproved.
     assert!(
@@ -395,7 +395,7 @@ fn disproved_carries_countermodel() {
     let trusted_before = elab.env.trusted_base();
     let triple = closed_triple(&mut elab.env, "test.int_literal_disequality", phi.clone());
 
-    let result = attempt_obligation(&mut elab.env, &triple);
+    let result = attempt_obligation(&mut elab.env, &mut elab.obligation_holes, &triple);
     let description = match result.verdict {
         Verdict::Disproved { countermodel } => countermodel.description,
         other => panic!("unequal Int literals must be disproved, got {other:?}"),
@@ -426,7 +426,7 @@ fn disproved_carries_countermodel() {
         provenance: Provenance { kind: ProvKind::Prove, span: Span::zero() },
     };
     let trusted_before_premise = elab.env.trusted_base();
-    let premise_result = attempt_obligation(&mut elab.env, &premise_triple);
+    let premise_result = attempt_obligation(&mut elab.env, &mut elab.obligation_holes, &premise_triple);
     assert!(
         matches!(&premise_result.verdict, Verdict::Proved { .. }),
         "Γ containing φ must prove Γ ⊢ φ before refutation; got {:?}",
@@ -446,7 +446,7 @@ fn disproved_carries_countermodel() {
         Term::Refl(Box::new(Term::IntLit(BigInt::from(2)))),
     );
     let invalid = attempt_with_refutation(
-        &mut elab.env,
+        &mut elab.env, &mut elab.obligation_holes,
         &Context::new(),
         &phi,
         &phi,
@@ -472,7 +472,7 @@ fn unknown_hole_trusted_base_distinct_from_proved() {
     // -- Unknown path: abstract P, no proof → hole in trusted_base()
     let phi_unknown = p.clone();
     let triple_u = closed_triple(&mut env, "test.unknown_phi", phi_unknown.clone());
-    let result_u = attempt_obligation(&mut env, &triple_u);
+    let result_u = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_u);
     let hole_id = hole_of(&result_u.verdict);
 
     assert!(
@@ -486,7 +486,7 @@ fn unknown_hole_trusted_base_distinct_from_proved() {
         Term::sigma(p.clone(), q.clone()),
         Term::proj1(Term::var(0)),
     );
-    let verdict_p = attempt_with_cert(&mut env, &phi_proved, cert);
+    let verdict_p = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi_proved, cert);
     assert!(
         matches!(verdict_p, Verdict::Proved { .. }),
         "proved verdict expected for (p∧q)⇒p; got {:?}",
@@ -530,12 +530,12 @@ fn verdict_keyed_by_id_no_side_channel() {
     // Obligation A: provable — (p ∧ q) ⇒ p
     let phi_a = Term::pi(Term::sigma(p.clone(), q.clone()), p.clone());
     let triple_a = closed_triple(&mut env, "decl.phi_a", phi_a.clone());
-    let result_a = attempt_obligation(&mut env, &triple_a);
+    let result_a = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_a);
 
     // Obligation B: unprovable — abstract P with empty context
     let phi_b = p.clone();
     let triple_b = closed_triple(&mut env, "decl.phi_b", phi_b.clone());
-    let result_b = attempt_obligation(&mut env, &triple_b);
+    let result_b = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple_b);
 
     // Verdicts are keyed by id (23 §1.4 / 21 §5.3)
     assert_eq!(result_a.obligation_id.0, "decl.phi_a");

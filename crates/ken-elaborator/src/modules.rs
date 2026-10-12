@@ -3297,6 +3297,17 @@ fn register_checked_type_node(
 }
 
 
+fn register_obligation_holes(elab: &mut ElabEnv, result: &crate::elab::ElabResult) {
+    for obligation in &result.obligations {
+        elab.obligation_holes.record(obligation.hole_id);
+    }
+    if let Some(binding) = &result.foreign_binding {
+        for check in &binding.runtime_checks {
+            elab.obligation_holes.record(check.hole_id);
+        }
+    }
+}
+
 fn register_effect_row(elab: &mut ElabEnv, result: &crate::elab::ElabResult) {
     if let Some(row) = &result.effect_row_type {
         elab.effect_rows.insert(result.name.clone(), row.clone());
@@ -3641,6 +3652,7 @@ fn elaborate_checked_spine_free(
         None,
         rdecl,
     )?;
+    register_obligation_holes(elab, &result);
     register_effect_row(elab, &result);
     Ok(result)
 }
@@ -3681,6 +3693,7 @@ fn elaborate_checked_with_fixity(
     if let Some(pending) = declared_fixity {
         install_declared_fixity(elab, &result.name, result.def_id, pending)?;
     }
+    register_obligation_holes(elab, &result);
     register_effect_row(elab, &result);
     Ok(result)
 }
@@ -5083,6 +5096,7 @@ fn expand_scope(
                             ),
                         )?;
                         for (rdecl, result) in members.iter().zip(results) {
+                            register_obligation_holes(elab, &result);
                             register_effect_row(elab, &result);
                             register_declared_effect_row(elab, rdecl)?;
                             record_checked_local(

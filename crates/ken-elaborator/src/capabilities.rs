@@ -193,6 +193,7 @@ pub fn attenuate<W: Into<AttenuationWindow>>(cap: &Cap, window: W) -> (Cap, Atte
 /// mirrors its product-bound decision rather than independently checking it.
 pub fn discharge_attenuation(
     env: &mut GlobalEnv,
+    holes: &mut crate::honesty::ObligationHoles,
     obl: &AttenuationObligation,
     id: &str,
 ) -> ProverResult {
@@ -238,7 +239,7 @@ pub fn discharge_attenuation(
         Box::new(bound_term),
     );
     let cert = Term::Refl(Box::new(child_term));
-    let verdict = attempt_with_cert(env, &phi, cert);
+    let verdict = attempt_with_cert(env, holes, &phi, cert);
     ProverResult {
         obligation_id: ObligationId(id.to_owned()),
         verdict,

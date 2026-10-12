@@ -130,7 +130,7 @@ fn attempt_fo_with_signature_returns_unknown_never_proved_for_accepted_slice_cer
          for this test to be exercising the D5 boundary at all"
     );
 
-    let verdict = attempt_fo_with_signature(&mut env, &Context::new(), &positive, &positive, &sig);
+    let verdict = attempt_fo_with_signature(&mut env, &mut ken_elaborator::ObligationHoles::default(), &Context::new(), &positive, &positive, &sig);
     assert!(
         matches!(verdict, Verdict::Unknown { .. }),
         "an accepted slice certificate must still yield Unknown, never \
@@ -170,7 +170,7 @@ fn fo_withheld_and_ordinary_unknown_holes_carry_distinct_trusted_base_labels() {
          test to be exercising the withheld-certificate exit at all"
     );
     let accepted_verdict =
-        attempt_fo_with_signature(&mut env, &Context::new(), &positive, &positive, &sig);
+        attempt_fo_with_signature(&mut env, &mut ken_elaborator::ObligationHoles::default(), &Context::new(), &positive, &positive, &sig);
     let accepted_id = match accepted_verdict {
         Verdict::Unknown { hole_id } => hole_id,
         other => panic!("accepted-certificate obligation must yield Unknown, got {other:?}"),
@@ -186,7 +186,7 @@ fn fo_withheld_and_ordinary_unknown_holes_carry_distinct_trusted_base_labels() {
         "precondition: the negative control must not obtain a certificate"
     );
     let negative_verdict =
-        attempt_fo_with_signature(&mut env, &Context::new(), &negative, &negative, &sig);
+        attempt_fo_with_signature(&mut env, &mut ken_elaborator::ObligationHoles::default(), &Context::new(), &negative, &negative, &sig);
     let ordinary_id = match negative_verdict {
         Verdict::Unknown { hole_id } => hole_id,
         other => panic!("unestablishable obligation must yield Unknown, got {other:?}"),

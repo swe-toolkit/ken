@@ -459,8 +459,12 @@ impl RelationalClaim {
     }
 
     /// Check the NI claim via V3 (kernel re-checks the cert).
-    pub fn check(&self, env: &mut ken_kernel::GlobalEnv) -> ProverResult {
-        attempt_obligation(env, &self.obligation)
+    pub fn check(
+        &self,
+        env: &mut ken_kernel::GlobalEnv,
+        holes: &mut crate::honesty::ObligationHoles,
+    ) -> ProverResult {
+        attempt_obligation(env, holes, &self.obligation)
     }
 
     /// True iff this claim carries a non-silent deferred trigger.

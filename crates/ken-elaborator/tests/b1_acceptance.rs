@@ -157,7 +157,12 @@ fn proved_postcondition_projects_to_q() {
 
     // V3 prover cert: lam(P, Var(0)) = λx:P.x proves P → P.
     let cert = Term::lam(ke.p_term.clone(), Term::var(0));
-    let verdict = attempt_with_cert(&mut ke.env, &phi, cert.clone());
+    let verdict = attempt_with_cert(
+        &mut ke.env,
+        &mut ken_elaborator::ObligationHoles::default(),
+        &phi,
+        cert.clone(),
+    );
     assert!(
         matches!(verdict, Verdict::Proved { .. }),
         "lam(P,Var(0)) should prove Pi(P,P), got {:?}",
@@ -676,7 +681,12 @@ fn same_program_same_export_hash() {
 
     // Discharge the hole.
     let cert = Term::lam(ke.p_term.clone(), Term::var(0));
-    let verdict_check = attempt_with_cert(&mut ke.env, &phi, cert.clone());
+    let verdict_check = attempt_with_cert(
+        &mut ke.env,
+        &mut ken_elaborator::ObligationHoles::default(),
+        &phi,
+        cert.clone(),
+    );
     assert!(
         matches!(verdict_check, Verdict::Proved { .. }),
         "cert must prove phi"

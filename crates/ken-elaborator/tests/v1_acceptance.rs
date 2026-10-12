@@ -273,11 +273,15 @@ fn old_out_of_scope_rejects() {
 // C. Verification status model + honesty guard
 // ======================================================================
 
-/// verify/spec-syntax/proved-status-cert-checks-not-in-trusted-base  (soundness)
+/// verify/spec-syntax/proved-status-cert-checks-no-reachable-open-hole
 ///
-/// Discharge an obligation with a valid cert → hole leaves trusted_base.
+/// Promise class: durable invariant. MEASURED: a checked witness closes this
+/// claim without reachable open *obligation* holes; an audited assumption
+/// remains outside the hole registry. CLAIMED: only reachable open obligations
+/// demote checked proof claims. THE GAP: the distinct-hole δ contrast is in
+/// `verify_transitive_honesty` and guards against own-hole-only projection.
 #[test]
-fn proved_status_cert_checks_not_in_trusted_base() {
+fn proved_status_cert_checks_no_reachable_open_hole() {
     let mut env = mk_env();
     decl_nat_pred(&mut env, "TrueProp");
 
@@ -307,8 +311,9 @@ fn proved_status_cert_checks_not_in_trusted_base() {
     assert!(discharged, "valid cert should discharge the hole");
     assert!(
         !env.is_open_hole(obl.hole_id),
-        "after discharge, hole is not in trusted_base (proved)"
+        "after discharge, hole is not in trusted_base"
     );
+    assert!(env.claim_proved(obl.hole_id), "audited wit is not an open obligation hole");
     let _ = (trueprop_id, nat);
 }
 
@@ -442,7 +447,7 @@ fn epistemic_projection_distinct() {
     decl_nat_pred(&mut env, "PropE");
 
     // proved side: no hole → not in trusted_base
-    // (we test this via discharge_hole; see proved_status_cert_checks_not_in_trusted_base)
+    // (we test this via discharge_hole; see proved_status_cert_checks_no_reachable_open_hole)
     // unknown side: open hole → in trusted_base
     let res = env
         .elaborate_decl_v1("fn etest (n : Nat) : Nat ensures PropE n = n")

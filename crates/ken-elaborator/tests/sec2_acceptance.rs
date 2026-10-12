@@ -170,7 +170,12 @@ fn attenuate_bound_discharge_mirrors_elaborator() {
     let parent = Cap::mint(AUTH_FULL, "FS");
     let (_, obl) = attenuate(&parent, AUTH_PARTIAL);
     let mut env = GlobalEnv::new();
-    let result = discharge_attenuation(&mut env, &obl, "c3_canonical");
+    let result = discharge_attenuation(
+        &mut env,
+        &mut ken_elaborator::ObligationHoles::default(),
+        &obl,
+        "c3_canonical",
+    );
     assert!(
         matches!(result.verdict, Verdict::Proved { .. }),
         "canonical attenuation must discharge with Refl on the same postulate"
@@ -181,7 +186,12 @@ fn attenuate_bound_discharge_mirrors_elaborator() {
     let mut over_strong_obl = obl.clone();
     over_strong_obl.child_authority = AUTH_FULL;
     let mut env2 = GlobalEnv::new();
-    let result2 = discharge_attenuation(&mut env2, &over_strong_obl, "c3_over_strong");
+    let result2 = discharge_attenuation(
+        &mut env2,
+        &mut ken_elaborator::ObligationHoles::default(),
+        &over_strong_obl,
+        "c3_over_strong",
+    );
     assert!(
         matches!(result2.verdict, Verdict::Unknown { .. }),
         "the elaborator's distinct postulates must make the deviant child Unknown"

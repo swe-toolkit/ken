@@ -320,7 +320,7 @@ fn product_attenuation_narrows_and_deviant_widenings_are_unknown() {
     ));
     let mut env = GlobalEnv::new();
     assert!(matches!(
-        discharge_attenuation(&mut env, &obligation, "i5_narrow").verdict,
+        discharge_attenuation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &obligation, "i5_narrow").verdict,
         Verdict::Proved { .. }
     ));
 
@@ -328,7 +328,7 @@ fn product_attenuation_narrows_and_deviant_widenings_are_unknown() {
     widened.child_rights = RightSet::READ.union(RightSet::WRITE);
     let mut env = GlobalEnv::new();
     assert!(matches!(
-        discharge_attenuation(&mut env, &widened, "i5_right_widen").verdict,
+        discharge_attenuation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &widened, "i5_right_widen").verdict,
         Verdict::Unknown { .. }
     ));
 
@@ -351,7 +351,7 @@ fn product_attenuation_narrows_and_deviant_widenings_are_unknown() {
     escaped.child_scope = outside;
     let mut env = GlobalEnv::new();
     assert!(matches!(
-        discharge_attenuation(&mut env, &escaped, "i5_scope_widen").verdict,
+        discharge_attenuation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &escaped, "i5_scope_widen").verdict,
         Verdict::Unknown { .. }
     ));
 }

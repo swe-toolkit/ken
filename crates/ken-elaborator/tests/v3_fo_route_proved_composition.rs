@@ -81,6 +81,7 @@ fn accepted_certificate_returns_exact_kernel_checked_composite() {
 
     let verdict = attempt_fo_with_signature(
         &mut env.env,
+        &mut env.obligation_holes,
         &Context::new(),
         &phi_closed,
         &phi_closed,
@@ -133,6 +134,7 @@ fn checker_acceptance_without_a_kernel_check_stays_withheld_unknown() {
 
     let verdict = attempt_fo_with_signature(
         &mut env.env,
+        &mut env.obligation_holes,
         &Context::new(),
         &phi_closed,
         &phi_closed,
@@ -193,7 +195,12 @@ fn public_catalog_route_returns_a_kernel_backed_proved_verdict() {
     .expect("public-route composition must check against independent goal_closed");
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
 
-    let result = attempt_obligation_with_catalog_handles(&mut env.env, &handles, triple);
+    let result = attempt_obligation_with_catalog_handles(
+        &mut env.env,
+        &mut env.obligation_holes,
+        &handles,
+        triple,
+    );
     let cert = match result.verdict {
         Verdict::Proved { cert } => cert,
         other => panic!("catalog-backed public FO route must be Proved, got {other:?}"),
@@ -225,11 +232,17 @@ fn quotation_refusal_and_no_certificate_keep_the_ipc_fallback() {
         find_certificate(&no_cert_problem.f).is_none(),
         "negative control must reach the no-certificate path"
     );
-    let no_cert_hole =
-        match attempt_fo_with_signature(&mut env.env, &Context::new(), &no_cert, &no_cert, &sig) {
-            Verdict::Unknown { hole_id } => hole_id,
-            other => panic!("no-certificate path must preserve IPC fallback, got {other:?}"),
-        };
+    let no_cert_hole = match attempt_fo_with_signature(
+        &mut env.env,
+        &mut env.obligation_holes,
+        &Context::new(),
+        &no_cert,
+        &no_cert,
+        &sig,
+    ) {
+        Verdict::Unknown { hole_id } => hole_id,
+        other => panic!("no-certificate path must preserve IPC fallback, got {other:?}"),
+    };
     assert_eq!(hole_label(&env.env, no_cert_hole), ORDINARY_LABEL);
 
     let refused = Term::Type(Level::zero());
@@ -237,10 +250,16 @@ fn quotation_refusal_and_no_certificate_keep_the_ipc_fallback() {
         quote_fo(&env.env, &sig, &refused).is_err(),
         "refusal control must not enter certificate search"
     );
-    let refused_hole =
-        match attempt_fo_with_signature(&mut env.env, &Context::new(), &refused, &refused, &sig) {
-            Verdict::Unknown { hole_id } => hole_id,
-            other => panic!("quotation refusal must preserve IPC fallback, got {other:?}"),
-        };
+    let refused_hole = match attempt_fo_with_signature(
+        &mut env.env,
+        &mut env.obligation_holes,
+        &Context::new(),
+        &refused,
+        &refused,
+        &sig,
+    ) {
+        Verdict::Unknown { hole_id } => hole_id,
+        other => panic!("quotation refusal must preserve IPC fallback, got {other:?}"),
+    };
     assert_eq!(hole_label(&env.env, refused_hole), ORDINARY_LABEL);
 }

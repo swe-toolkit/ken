@@ -172,7 +172,11 @@ fn do_check(session: &mut Session, goal_src: &str) {
                 return;
             }
             for triple in &extraction.obligations {
-                let result = attempt_obligation(&mut session.env.env, triple);
+                let result = attempt_obligation(
+                    &mut session.env.env,
+                    &mut session.env.obligation_holes,
+                    triple,
+                );
                 println!("  {}", show_verdict(&result.verdict));
             }
         }

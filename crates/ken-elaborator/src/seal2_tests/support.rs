@@ -106,6 +106,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
         env: global_env,
         globals,
         class_env,
+        obligation_holes, // GlobalId set, checked obligation origin; no Term
         decl_owner: _, // GlobalId -> owner/ordinal; no carrier-bearing Term
         owner_ordinals: _, // owner -> next ordinal; no Term
         // Predicate templates are Ω-valued obligations, not independently
@@ -141,6 +142,7 @@ pub fn enumerate_producer_types(env: &ElabEnv) -> Vec<Producer> {
     } = env;
     let _ = (
         refinement_facts,
+        obligation_holes,
         num_values,
         preconditions,
         fixities,

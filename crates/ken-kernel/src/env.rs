@@ -1154,6 +1154,101 @@ impl GlobalEnv {
     }
 }
 
+/// `postulates_reachable` — the postulate identities a checked term relies on
+/// (`18 §5`, `21 §5.4`, W4 K-b). Traverses `term`'s substructure and, through
+/// each referenced `Const`, the body of every transparent declaration,
+/// transitively; a visited-identity guard makes shared and cyclic δ
+/// dependencies finite. Opaque, non-prelude declarations are the result;
+/// primitives, inductives, constructors and opaque bodies are leaves, never
+/// unfolded. Read-only and off `check`/`convert`: it reduces nothing, compares
+/// nothing, and does not classify what it returns.
+pub fn postulates_reachable(env: &GlobalEnv, term: &Term) -> BTreeSet<GlobalId> {
+    let mut found = BTreeSet::new();
+    let mut visited: HashSet<GlobalId> = HashSet::new();
+    let mut stack: Vec<&Term> = vec![term];
+    while let Some(t) = stack.pop() {
+        match t {
+            Term::Const { id, .. } => {
+                if visited.insert(*id) {
+                    match env.lookup(*id) {
+                        Some(Decl::Transparent { body, .. }) => stack.push(body),
+                        Some(Decl::Opaque { .. }) => {
+                            if !env.is_prelude(*id) {
+                                found.insert(*id);
+                            }
+                        }
+                        Some(Decl::Primitive { .. }) | Some(Decl::Inductive(_)) | None => {}
+                    }
+                }
+            }
+            Term::Type(_)
+            | Term::Omega(_)
+            | Term::Var(_)
+            | Term::IntLit(_)
+            | Term::IndFormer { .. }
+            | Term::Constructor { .. } => {}
+            Term::Elim {
+                params,
+                motive,
+                methods,
+                indices,
+                scrut,
+                ..
+            } => {
+                stack.extend(params.iter());
+                stack.push(motive);
+                stack.extend(methods.iter());
+                stack.extend(indices.iter());
+                stack.push(scrut);
+            }
+            Term::Pi(a, b)
+            | Term::Lam(a, b)
+            | Term::App(a, b)
+            | Term::Sigma(a, b)
+            | Term::Pair(a, b)
+            | Term::Ascript(a, b)
+            | Term::Absurd(a, b) => {
+                stack.push(a);
+                stack.push(b);
+            }
+            Term::Proj1(a)
+            | Term::Proj2(a)
+            | Term::Refl(a)
+            | Term::QuotClass(a)
+            | Term::Trunc(a)
+            | Term::TruncProj(a) => stack.push(a),
+            Term::Let { ty, val, body } => {
+                stack.push(ty);
+                stack.push(val);
+                stack.push(body);
+            }
+            Term::Eq(a, b, c) | Term::J(a, b, c) | Term::Quot(a, b, c) => {
+                stack.push(a);
+                stack.push(b);
+                stack.push(c);
+            }
+            Term::Cast(a, b, c, d) => {
+                stack.push(a);
+                stack.push(b);
+                stack.push(c);
+                stack.push(d);
+            }
+            Term::QuotElim {
+                motive,
+                method,
+                respect,
+                scrut,
+            } => {
+                stack.push(motive);
+                stack.push(method);
+                stack.push(respect);
+                stack.push(scrut);
+            }
+        }
+    }
+    found
+}
+
 impl InductiveDecl {
     /// Build the type former's type `Π Δ_p. Π Δ_i. Type ℓ` and the constructor
     /// types `Π Δ_p. Π Δₖ. D Δ_p t̄ₖ`, populating `former_type` and each
@@ -1383,6 +1478,125 @@ mod upgrade_origin_tests {
         assert_ne!(
             env, missing_origin,
             "declaration equality must not hide provenance changes"
+        );
+    }
+}
+
+#[cfg(test)]
+mod postulates_reachable_kb_tests {
+    use super::*;
+    use crate::check::{declare_postulate, declare_primitive};
+
+    fn add_transparent(env: &mut GlobalEnv, body: Term) -> GlobalId {
+        let id = env.fresh_id();
+        env.add_decl(Decl::Transparent {
+            id,
+            level_params: vec![],
+            ty: Term::const_(env.top_id(), vec![]),
+            body,
+        });
+        id
+    }
+
+    // Depth pin: 200,000 App nodes must traverse with a fixed 512 KiB stack,
+    // rather than inherit libtest's ambient thread stack or RUST_MIN_STACK.
+    // Builder::stack_size sets this bound locally; there is no child process.
+    const DEPTH_PIN_STACK_BYTES: usize = 512 * 1024;
+
+    /// Promise class: durable invariant. MEASURED: transparent chains, pair
+    /// projections, shared/cyclic paths and deep syntax return exactly the
+    /// opaque non-prelude dependencies; checked-hole upgrade removes them.
+    /// CLAIMED: read-only δ-closure is total and independent of recursion
+    /// depth. THE GAP: the elaborator must separately classify returned ids
+    /// by minted obligation identity rather than treating every axiom as a hole.
+    #[test]
+    fn two_level_chain_projected_dependencies_cycles_and_depth() {
+        let mut env = GlobalEnv::new();
+        let top = Term::const_(env.top_id(), vec![]);
+        let h = declare_postulate(&mut env, "h".into(), vec![], top.clone()).unwrap();
+        let audit = declare_postulate(&mut env, "audit".into(), vec![], top.clone()).unwrap();
+        let one = add_transparent(&mut env, Term::const_(h, vec![]));
+        let two = add_transparent(&mut env, Term::const_(one, vec![]));
+        let two_term = Term::const_(two, vec![]);
+        assert_eq!(postulates_reachable(&env, &two_term), BTreeSet::from([h]));
+        assert_eq!(
+            postulates_reachable(&env, &Term::const_(h, vec![])),
+            BTreeSet::from([h])
+        );
+
+        let clean = add_transparent(
+            &mut env,
+            Term::pair(Term::IntLit(0.into()), Term::const_(audit, vec![])),
+        );
+        let refined = add_transparent(
+            &mut env,
+            Term::pair(Term::IntLit(0.into()), Term::const_(h, vec![])),
+        );
+        let clean_projection = Term::lam(top.clone(), Term::proj2(Term::const_(clean, vec![])));
+        let refined_projection = Term::lam(top.clone(), Term::proj2(Term::const_(refined, vec![])));
+        assert_eq!(
+            postulates_reachable(&env, &clean_projection),
+            BTreeSet::from([audit])
+        );
+        assert_eq!(
+            postulates_reachable(&env, &refined_projection),
+            BTreeSet::from([h])
+        );
+
+        let a = env.fresh_id();
+        let b = env.fresh_id();
+        env.add_decl(Decl::Transparent {
+            id: a,
+            level_params: vec![],
+            ty: top.clone(),
+            body: Term::pair(Term::const_(b, vec![]), Term::const_(h, vec![])),
+        });
+        env.add_decl(Decl::Transparent {
+            id: b,
+            level_params: vec![],
+            ty: top.clone(),
+            body: Term::const_(a, vec![]),
+        });
+        assert_eq!(
+            postulates_reachable(&env, &Term::const_(a, vec![])),
+            BTreeSet::from([h])
+        );
+
+        let op = declare_primitive(
+            &mut env,
+            vec![],
+            Term::ty(Level::zero()),
+            PrimReduction::Op {
+                symbol: "kb_query_op",
+            },
+        )
+        .unwrap();
+        let op_term = Term::app(Term::const_(op, vec![]), Term::const_(env.tt_id(), vec![]));
+        assert!(postulates_reachable(&env, &op_term).is_empty());
+
+        std::thread::scope(|scope| {
+            let depth_pin = std::thread::Builder::new()
+                .stack_size(DEPTH_PIN_STACK_BYTES)
+                .spawn_scoped(scope, || {
+                    let mut deep = Term::const_(h, vec![]);
+                    for _ in 0..200_000 {
+                        deep = Term::app(deep, Term::var(0));
+                    }
+                    assert_eq!(postulates_reachable(&env, &deep), BTreeSet::from([h]));
+                    // Recursive Box destruction is not the query; do not
+                    // measure dropping this 200k-node spine instead.
+                    std::mem::forget(deep);
+                })
+                .expect("spawn stated-stack depth pin");
+            depth_pin.join().expect("stated-stack depth pin");
+        });
+
+        assert!(env.upgrade_to_transparent(h, Term::const_(env.tt_id(), vec![])));
+        assert!(postulates_reachable(&env, &two_term).is_empty());
+        assert!(postulates_reachable(&env, &refined_projection).is_empty());
+        assert_eq!(
+            postulates_reachable(&env, &clean_projection),
+            BTreeSet::from([audit])
         );
     }
 }

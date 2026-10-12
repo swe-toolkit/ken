@@ -297,7 +297,7 @@ fn related_pair_proved() {
     let triple = closed_triple(&mut env, "ob:ni:D1.0", ni_goal);
 
     let claim = RelationalClaim::new("well_labeled_view", PUBLIC, triple, None);
-    let result = claim.check(&mut env);
+    let result = claim.check(&mut env, &mut ken_elaborator::ObligationHoles::default());
 
     assert!(
         matches!(result.verdict, Verdict::Proved { .. }),
@@ -354,7 +354,7 @@ fn unprovable_relational_incomplete_never_false_proved() {
         Some(TRIGGER_REL_DEFERRED), // non-silent deferred trigger
     );
 
-    let result = claim.check(&mut env);
+    let result = claim.check(&mut env, &mut ken_elaborator::ObligationHoles::default());
 
     assert!(
         matches!(result.verdict, Verdict::Unknown { .. }),
@@ -397,7 +397,7 @@ fn progress_sensitive_divergence_is_a_leak() {
     // (The relaxation must SHOW in the four-way status — never silent.)
     let ti_ni_goal = Term::pi(p.clone(), p.clone()); // ni-only, no coterminates
     let ti_triple = closed_triple(&mut env, "ob:ni:D4.ti", ti_ni_goal);
-    let ti_result = attempt_obligation(&mut env, &ti_triple);
+    let ti_result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &ti_triple);
     assert!(
         matches!(ti_result.verdict, Verdict::Proved { .. }),
         "TI mode (no coterminates): ni-only obligation → proved"
@@ -474,7 +474,7 @@ fn forged_label_or_cert_kernel_rejected() {
     let phi_closed = Term::pi(p.clone(), q.clone()); // p → q (not provable from nothing)
     let forged_cert = Term::var(0); // free variable — wrong type, wrong context
 
-    let verdict = attempt_with_cert(&mut env, &phi_closed, forged_cert);
+    let verdict = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi_closed, forged_cert);
     assert!(
         matches!(verdict, Verdict::Unknown { .. }),
         "forged cert: kernel re-check fails → Unknown (never false Proved)"
@@ -487,7 +487,7 @@ fn forged_label_or_cert_kernel_rejected() {
     // Contrast: a correct cert for p → p (IPC-provable) passes the re-check.
     let phi_id = Term::pi(p.clone(), p.clone()); // p → p
     let correct_cert = Term::lam(p.clone(), Term::var(0)); // λ_:p. x — the identity proof
-    let verdict_ok = attempt_with_cert(&mut env, &phi_id, correct_cert);
+    let verdict_ok = attempt_with_cert(&mut env, &mut ken_elaborator::ObligationHoles::default(), &phi_id, correct_cert);
     assert!(
         matches!(verdict_ok, Verdict::Proved { .. }),
         "correct cert for p→p: kernel accepts → Proved"
@@ -633,7 +633,7 @@ fn by_proof_trichotomy_cross_case_sweep() {
 
     // D1 verdict class: related → Proved (non-interfering never Disproved)
     let d1_triple = closed_triple(&mut env, "ob:sweep:D1", Term::pi(p.clone(), p.clone()));
-    let d1 = attempt_obligation(&mut env, &d1_triple);
+    let d1 = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &d1_triple);
     assert!(matches!(d1.verdict, Verdict::Proved { .. }), "D1 class: proved");
 
     // D2 verdict class: distinguishing pair → Disproved (with witness)
@@ -642,7 +642,7 @@ fn by_proof_trichotomy_cross_case_sweep() {
 
     // D3 verdict class: undischargeable → Unknown (honesty guard: never false Proved)
     let d3_triple = closed_triple(&mut env, "ob:sweep:D3", q.clone());
-    let d3 = attempt_obligation(&mut env, &d3_triple);
+    let d3 = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &d3_triple);
     assert!(matches!(d3.verdict, Verdict::Unknown { .. }), "D3 class: unknown (incomplete-hole)");
     assert!(!matches!(d3.verdict, Verdict::Proved { .. }), "D3: NEVER a false proved");
 

@@ -109,7 +109,7 @@ fn real_positive_obligation_reaches_fo_boundary_through_public_route() {
     assert_eq!(classify(&env, &phi), Route::FO, "classify must route this obligation to FO");
 
     let triple = closed_triple(&mut env, "d2.positive", phi);
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     let hole_id = match result.verdict {
         Verdict::Unknown { hole_id } => hole_id,
@@ -150,7 +150,7 @@ fn bottom_in_antecedent_does_not_overcollect_as_a_spurious_sort() {
     assert!(check_cert(&target, &cert), "the certificate must compute True");
 
     let triple = closed_triple(&mut env, "d1.bottom_antecedent", phi);
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     let hole_id = match result.verdict {
         Verdict::Unknown { hole_id } => hole_id,
         other => panic!("must never be Proved, got {other:?}"),
@@ -190,7 +190,7 @@ fn accepted_certificate_through_public_route_yields_unknown_never_proved() {
     let _ = sig; // discovered signature reconfirmed only for the precondition above
 
     let triple = closed_triple(&mut env, "d3.accepted", phi);
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
 
     match result.verdict {
         Verdict::Unknown { hole_id } => {
@@ -285,7 +285,7 @@ fn ambiguous_two_sort_obligation_is_refused_by_discovery_not_guessed() {
     );
 
     let triple = closed_triple(&mut env, "ac1.ambiguous", phi);
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     let hole_id = match result.verdict {
         Verdict::Unknown { hole_id } => hole_id,
         other => panic!("ambiguous obligation must not be Proved, got {other:?}"),
@@ -326,7 +326,7 @@ fn predicate_applied_to_non_var_argument_is_refused_not_widened() {
     );
 
     let triple = closed_triple(&mut env, "d4.non_var_atom", phi);
-    let result = attempt_obligation(&mut env, &triple);
+    let result = attempt_obligation(&mut env, &mut ken_elaborator::ObligationHoles::default(), &triple);
     match result.verdict {
         Verdict::Unknown { hole_id } => {
             let label = hole_label(&env, hole_id);
