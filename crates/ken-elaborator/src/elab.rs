@@ -3212,7 +3212,7 @@ fn plan_index_equation_elim(
     {
         return Ok(None);
     }
-    let mut elim = Term::Elim {
+    let elim = Term::Elim {
         fam: ambient.fam,
         level_args: ambient.level_args.clone(),
         params,
@@ -3229,10 +3229,6 @@ fn plan_index_equation_elim(
     let mut entries = Vec::with_capacity(pairs.len());
     for (premise_ordinal, (ty, target, original)) in pairs.into_iter().enumerate() {
         domains.push(Term::Eq(Box::new(ty), Box::new(target), Box::new(original)));
-        elim = Term::app(
-            elim,
-            index_refinement_sentinel(sentinel_region, premise_ordinal),
-        );
         entries.push(EmbeddedConvoyCompanion::IndexEquation(
             EmbeddedIndexEquationConvoy {
                 sentinel_region,
@@ -3244,8 +3240,15 @@ fn plan_index_equation_elim(
             },
         ));
     }
-    let checked = wrap_premise_pis_finalized(elim, &domains, sentinel_region);
-    match kernel_infer_in_context_current(cx, motive_ctx, &checked) {
+    // The embedded E' computes a value of the carrier, not a type. Infer a
+    // lambda over its new proof arguments; a Pi over the value is ill-sorted.
+    let n = domains.len();
+    let mut applied = weaken(&elim, n as i64);
+    for j in 0..n {
+        applied = Term::app(applied, Term::var(n - 1 - j));
+    }
+    let probe = wrap_premise_lams_from_full(applied, &domains);
+    match kernel_infer_in_context_current(cx, motive_ctx, &probe) {
         Ok(_) => Ok(Some(entries)),
         Err(CurrentKernelQueryError::View(error)) => Err(error),
         Err(CurrentKernelQueryError::Kernel(_)) => Ok(None),
