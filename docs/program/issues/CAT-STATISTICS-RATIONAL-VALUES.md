@@ -1,7 +1,7 @@
 ---
 id: CAT-STATISTICS-RATIONAL-VALUES
 title: "Spec 63 section 3 makes probability, expectation and empirical mean Rational values, but no statistics package exports them. Deliver the 15 ruled names in Algorithm.Statistics.Exact and Empirical, every law proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -74,3 +74,20 @@ rows in the two existing statistics acceptance targets.
 - Reuse needs a public-surface change to Rational, Nat.Order or an
   existing statistics declaration, beyond the 15 new names. Exporting
   one shared `leq_nat_cong_two` is not this WP.
+
+## Closeout
+
+Merged `291faa5f9` from exact `92090227e` (PR #4693). Foundation QA
+`evt_6fvdz8zddhb1k`, Architect `evt_4q4vrskn68bv7`, Decision
+`dec_8fjet35hzabc`.
+
+- All 15 spec 63 section 3 names landed with the spec's signatures:
+  eleven in `Algorithm.Statistics.Exact`, four in
+  `Algorithm.Statistics.Empirical`. No private helper was added.
+- `trusted_base()` is 114 to 114 in each root. Exact 13/13, Empirical
+  8/8, Rational 6/6. The three AC-4 mutants each kernel-rejected.
+- The carried Rational pin now names the existing private `mul_shuffle`
+  and asserts it exists before asserting `UnboundName`.
+- The statistics exact and empirical tiers are complete. The
+  approximate tier waits on the numerical-computing layer. L3 moves to
+  `SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT`.
