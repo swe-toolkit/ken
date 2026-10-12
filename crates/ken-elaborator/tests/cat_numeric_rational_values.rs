@@ -248,8 +248,17 @@ theorem client_leq_total (x : Rational) (y : Rational)
         "leq_cross_respect",
         "rational_leq_cross_trans",
         "rational_leq_false_opposite",
-        "bool_or_false_right",
+        "mul_shuffle",
     ] {
+        let id = env.globals[&format!("{MODULE}.{private}")];
+        assert!(
+            owned.contains(&id),
+            "{private} must really exist in the package"
+        );
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{private} must have a checked body, not an absent spelling"
+        );
         match env.elaborate_file(&format!("import {MODULE} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
                 assert_eq!(name, format!("{MODULE}.{private}"));

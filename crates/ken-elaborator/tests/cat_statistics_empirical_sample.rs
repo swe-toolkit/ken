@@ -1,5 +1,7 @@
-//! Checked empirical samples and five conformance/stdlib/statistics/seed-empirical-sample.md
-//! durable-invariant cases. Contract: spec/50-stdlib/63-statistics.md §2.
+//! Checked empirical samples and Rational-valued means. Original five cases:
+//! conformance/stdlib/statistics/seed-empirical-sample.md; added value case:
+//! conformance/stdlib/statistics/seed-rational-values.md. All seed oracles
+//! have promise class durable invariant (spec/50-stdlib/63-statistics.md §§2–3).
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -27,15 +29,20 @@ import Algorithm.Statistics.Empirical
   (sample_size, event_count, score_sum, unit_weights,
    empirical_distribution, empirical_entries, empirical_total_size,
    empirical_event_count, empirical_score_sum,
-   sample_size_append, event_count_append, score_sum_append)
+   sample_size_append, event_count_append, score_sum_append,
+   empirical_mean, empirical_mean_numerator,
+   empirical_mean_denominator, empirical_mean_cross_bridge)
 import Algorithm.Statistics.Exact
-  (entries, total, event_mass, expectation_weight, constant_one)
+  (entries, total, event_mass, expectation_weight, constant_one,
+   expectation)
 import Data.Collections.NonEmpty
   (NonEmpty, nonempty_singleton, nonempty_cons, nonempty_append,
    nonempty_to_list)
 import Data.Collections.Derived (filter)
 import Data.Collections.List (length)
-import Data.Numeric.Nat.Arithmetic (add)
+import Data.Numeric.Nat.Arithmetic (add, mul)
+import Data.Numeric.Rational
+  (Rational, MkRational, numerator, denominator, rational_equiv)
 
 const lone : NonEmpty Bool = nonempty_singleton Bool True
 const duplicate : NonEmpty Bool =
@@ -43,6 +50,10 @@ const duplicate : NonEmpty Bool =
 const misses : NonEmpty Bool =
   nonempty_cons Bool False (Cons Bool False (Nil Bool))
 const joined : NonEmpty Bool = nonempty_append Bool duplicate misses
+const triple : NonEmpty Bool =
+  nonempty_cons Bool True (Cons Bool True (Cons Bool False (Nil Bool)))
+const five_thirds : Rational =
+  MkRational (Suc (Suc (Suc (Suc (Suc Zero))))) (Suc (Suc Zero))
 const is_true : Bool → Bool = λx. x
 const score : Bool → Nat =
   λx. match x { True ↦ Suc (Suc Zero); False ↦ Suc Zero }
@@ -82,13 +93,13 @@ fn checked_list_equation(env: &mut ElabEnv, name: &str, proposition: &str) {
 }
 
 /// Promise class: durable invariant. MEASURED: roots-loading with all providers
-/// present adds no trusted GlobalId, exactly five functions and seven checked
-/// laws can be selectively imported, private helpers cannot, and seven generic
-/// clients inhabit the public law signatures. CLAIMED: the public empirical
+/// present adds no trusted GlobalId, exactly six functions and ten checked
+/// laws can be selectively imported, private helpers cannot, and ten generic
+/// clients inhabit the public law signatures. CLAIMED: the §2–3 empirical
 /// tier consists of those checked definitions alone. THE GAP: this does not
-/// establish the seed's closed values; five independent cases below do.
+/// establish the closed values; the six independent cases below do.
 #[test]
-fn public_surface_generic_laws_and_zero_trust_delta() {
+fn public_surface_generic_mean_laws_and_zero_trust_delta() {
     let mut env = ElabEnv::new().expect("base environment");
     for provider in [
         "Algorithm.Statistics.Exact",
@@ -130,6 +141,10 @@ fn public_surface_generic_laws_and_zero_trust_delta() {
         "sample_size_append",
         "event_count_append",
         "score_sum_append",
+        "empirical_mean",
+        "empirical_mean_numerator",
+        "empirical_mean_denominator",
+        "empirical_mean_cross_bridge",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -168,7 +183,7 @@ fn public_surface_generic_laws_and_zero_trust_delta() {
     }
     assert_eq!(
         visible, expected,
-        "loader-visible API must be exactly §2's names"
+        "loader-visible API must be exactly §§2–3's names"
     );
 
     env.elaborate_file(
@@ -208,7 +223,40 @@ fn public_surface_generic_laws_and_zero_trust_delta() {
             (add (score_sum q x f) (score_sum q y f)) =
           score_sum_append q x y f"#,
     )
-    .expect("all seven public laws must serve generic independent clients");
+    .expect("all seven §2 public laws must serve generic independent clients");
+    env.elaborate_file(
+        r#"import Algorithm.Statistics.Empirical
+             (empirical_distribution, sample_size, score_sum,
+              empirical_mean, empirical_mean_numerator,
+              empirical_mean_denominator, empirical_mean_cross_bridge)
+           import Algorithm.Statistics.Exact
+             (ExactDistribution, expectation)
+           import Data.Collections.NonEmpty (NonEmpty)
+           import Data.Numeric.Rational
+             (Rational, MkRational, numerator, denominator, rational_equiv)
+           import Data.Numeric.Nat.Arithmetic (mul)
+           fn client_mean (q : Type) (s : NonEmpty q) (f : q → Nat) : Rational =
+             empirical_mean q s f
+           theorem client_mean_numerator (q : Type) (s : NonEmpty q)
+             (f : q → Nat) :
+             Equal Nat (numerator (empirical_mean q s f)) (score_sum q s f) =
+             empirical_mean_numerator q s f
+           theorem client_mean_denominator (q : Type) (s : NonEmpty q)
+             (f : q → Nat) :
+             Equal Nat (denominator (empirical_mean q s f))
+               (sample_size q s) = empirical_mean_denominator q s f
+           theorem client_mean_cross_bridge (q : Type) (s : NonEmpty q)
+             (f : q → Nat) (n : Nat) (k : Nat)
+             (same : Equal Nat (mul (score_sum q s f) (Suc k))
+               (mul n (sample_size q s))) :
+             rational_equiv (empirical_mean q s f) (MkRational n k) =
+             empirical_mean_cross_bridge q s f n k same
+           theorem client_reused_expectation (q : Type) (s : NonEmpty q)
+             (f : q → Nat) :
+             Equal Rational (empirical_mean q s f)
+               (expectation q (empirical_distribution q s) f) = Refl"#,
+    )
+    .expect("§3 mean and three generic public laws check through imports");
 }
 
 /// Promise class: durable invariant. Singleton total and event count must be
@@ -391,4 +439,48 @@ fn filtered_length_agrees_with_event_count_and_extra_unit_rejects() {
         }) => {}
         other => panic!("a wrong extra count must be kernel-rejected: {other:?}"),
     }
+}
+
+/// Promise class: durable invariant. MEASURED: two True observations and one
+/// False produce numerator five and positive denominator three; the returned
+/// mean is definitionally Exact's expectation and equivalent to an independent
+/// 5/3 spelling. CLAIMED: every nonempty sample uses the shared construction.
+/// THE GAP: this closed triple cannot replace the three generic law clients.
+#[test]
+fn seed_rational_empirical_mean_five_thirds() {
+    let mut env = fixture();
+    checked(
+        &mut env,
+        "rational_mean_score_sum",
+        "score_sum Bool triple score",
+        5,
+    );
+    checked(
+        &mut env,
+        "rational_mean_sample_size",
+        "sample_size Bool triple",
+        3,
+    );
+    checked(
+        &mut env,
+        "rational_mean_numerator",
+        "numerator (empirical_mean Bool triple score)",
+        5,
+    );
+    checked(
+        &mut env,
+        "rational_mean_denominator",
+        "denominator (empirical_mean Bool triple score)",
+        3,
+    );
+    env.elaborate_file(
+        "theorem seed_mean_equiv : \
+         rational_equiv (empirical_mean Bool triple score) five_thirds = \
+         empirical_mean_cross_bridge Bool triple score \
+         (Suc (Suc (Suc (Suc (Suc Zero))))) (Suc (Suc Zero)) Proved \
+         theorem seed_mean_uses_exact_expectation : \
+         Equal Rational (empirical_mean Bool triple score) \
+         (expectation Bool (empirical_distribution Bool triple) score) = Refl",
+    )
+    .expect("independent 5/3 cross equation uses the shared Exact expectation");
 }
