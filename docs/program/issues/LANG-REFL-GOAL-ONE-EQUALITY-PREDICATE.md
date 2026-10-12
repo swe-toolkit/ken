@@ -48,13 +48,20 @@ serves both the standalone gate and the branch simplifier.
 
 ## Acceptance
 
-- **AC-1.** `MyEq p p` gives the same verdict on all five routes, the one
-  D0 rules.
-- **AC-2 (control).** The false twin is refused on every route. The
-  `lang_match_arm_refl_pair_goal.rs` and
-  `lang_match_arm_refl_indexed_motive.rs` suites are unchanged.
-- **AC-3 (mutation, QA).** Reverting either path to its own key reddens
-  AC-1.
+Replaced by the Architect's D0 `evt_2gzhr3newfzwm`.
+
+- **AC-1.** `MyEq p p` gives the D0 verdict on all five routes. So do the
+  standalone and List alias-chain rows `MyEq2`, `MyEq3` and `MyEq4`.
+- **AC-2 (control).**
+  - The false twin is refused with its exact non-convertibility reason.
+  - The `Both` Sigma control is refused with its exact Eq-shaped reason.
+  - The `lang_match_arm_refl_pair_goal.rs` and
+    `lang_match_arm_refl_indexed_motive.rs` suites, and the eight
+    message-pinning suites D0 names, are unchanged.
+- **AC-3 (mutation, QA).** Restoring the standalone key reddens AC-1, and
+  so does restoring the arm key at one level. Removing the recursive-id
+  guard is recorded as unexercised unless a recursive transparent row
+  reaches it.
 
 ## Stop conditions
 
