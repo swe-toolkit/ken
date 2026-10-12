@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PRELUDE-CLASSIFIERS-WHOLE-SYMBOL
 title: "ken-runtime classifies prelude constructors by a suffix of the stable symbol (ends_with(\"::Stdout\") and about 25 more), so a user constructor with the same leaf name in another family matches the prelude's classifier. Since VERIFY-NATIVE-STABLE-SYMBOL-PRELUDE-IDENTITY the prelude symbols are fixed by checked identity: compare whole prelude symbols"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1

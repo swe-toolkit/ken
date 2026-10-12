@@ -1,7 +1,7 @@
 ---
 id: VERIFY-TRANSITIVE-HONESTY
 title: "A claim reads proved when its own certificate checks and its own hole is outside trusted_base(); nothing computes reachability. Under subset Σ a certificate using the proof of a constant whose obligation is open would read proved. Add a read-only kernel reachability query and require it to find no open hole or unaccepted postulate"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -61,3 +61,19 @@ base, stop and report the mismatch.
 
 - Any kernel line beyond K-b, any check or conversion change, or any
   `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `874e9f7bb` from exact `d1954b7a4` (PR #4689). Kernel QA
+`evt_6b5j836q9cjvv`, Verify QA `evt_4g1tqf15y27t6`, Architect
+`evt_4831vxn845br9`, CV approval and Decision `dec_541jk50zeptat`. The
+rejected first candidate `37518da33` landed only inside this squash.
+
+A claim reads `proved` only if its certificate checks and no open
+obligation hole is reachable from it. A read-only kernel query (K-b)
+walks transparent δ levels and classifies checked proof closure by minted
+hole identity; the prover reads it for status. The conformance row
+`proved-status-cert-checks-no-reachable-open-hole` pins the two-level
+bridge against a distinct closed hole. The catalog census is unchanged.
+The 200,000-App depth row runs on a stated 512 KiB stack. No new trusted
+rule. Unblocks `LANG-REFINEMENT-SUBSET-SIGMA`.
