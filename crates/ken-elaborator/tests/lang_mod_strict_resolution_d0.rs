@@ -1229,6 +1229,15 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // Rational imports the checked Nat, Order, and Transport providers;
+            // only the inherited conjunction vocabulary remains ambient.
+            "Data.Numeric.Rational".to_string(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
             // Json now declares its exact Derived and Cursor dependencies. Its
             // ordinary package boundary loads while strict mode retains only
             // the compiler conveniences inherited through that provider closure.
