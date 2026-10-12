@@ -1,0 +1,66 @@
+---
+id: LANG-RECURSIVE-STEP-COORDINATE-COHERENCE
+title: "After a nested index match splits, the goal is refined from the scrutinee coordinate to the target coordinate while the fields are cast the other way, so the recursive step of a true Equal proof compares terms neutral at different index variables and is refused. A step-reachable control with no embedded eliminator ends in an Internal error. Put the goal, the fields and the recursive call at one coordinate, with the IH at that coordinate"
+status: ready
+owner: language
+size: L
+tier: T1
+gate: architect
+depends_on: [LANG-EMBEDDED-METHOD-EQUATION-CONVOY]
+blocks: []
+github: null
+origin: "Architect fork evt_3bfdj7qm0azt4, option (i), taken by the Steward (evt_33zvpm72tmtwn): T2, T3 and the step-reachable control move here from LANG-EMBEDDED-METHOD-EQUATION-CONVOY, which lands at T1. Steward-filed per COORDINATION section 2."
+---
+
+# One coordinate for the recursive step
+
+## Objective
+
+The recursive step of a nested indexed match sees one index coordinate
+for its goal, its fields and its recursive call, so true rows check and
+user-reachable failures are typed.
+
+## Settled inputs (Architect `evt_3bfdj7qm0azt4`, WIP `1048192afa`)
+
+- **T2 and T3 are red** in the corrected spelling, in the convoy WP's
+  entry-1 shape. The found side casts `rest` to `DualEnv a m` through the
+  predecessor `Eq Nat k m` binder. The expected side keeps the target
+  coordinate `k`.
+- **Two producers act in opposite directions.** At the T3 leaf (Nat,
+  target @2 = k, scrutinee @4 = m), `refine_branch_goal` moves the goal
+  from m to k, while `install_index_refinements` casts `rest` from k to m.
+  Both Σ components then compare terms neutral at different index
+  variables, related only by an equation. No convoy companion supplies
+  that.
+- **The wall predates the convoy.** The step-reachable control, with
+  `Proved` at DualFZ and no embedded xs-eliminator, fails identically on
+  base `f7a9a2989` and on the WIP. The error is `Internal("large index
+  convoy could not construct its recursive goal transport")` at elab.rs
+  ~:6886 in `build_large_convoy_recursive_method`, where
+  `check_large_convoy_recursive_arm` returns `None`.
+- **Prior art to pull at kickoff.** The Coq `depelim` solution and
+  simplification step, and Lean `cases` substituting index equations.
+
+Treat anchors as perishable. If a settled input is false on the landed
+base, stop and report the mismatch.
+
+## Deliverable
+
+D0 first: the Architect rules the design, with a research prior-art pull
+at kickoff. Then one coordinate for goal, fields and recursive call after
+the split, with the IH at that coordinate.
+
+## Acceptance
+
+- **AC-1.** T2 and T3 elaborate and check.
+- **AC-2.** The step-reachable control succeeds or returns a typed
+  refusal. No `Internal` reaches the user from elab.rs ~:6886.
+- **AC-3 (control).** The convoy WP's T1, named-row and F4 rows, and its
+  61-row suite set and 72-file catalog census, are unchanged.
+- **AC-4 (mutation, QA).** Restoring either producer's direction reddens
+  AC-1.
+
+## Stop conditions
+
+- Any kernel rule, conversion change or `trusted_base()` change.
+- A suite or census delta outside the named rows: stop to the Architect.
