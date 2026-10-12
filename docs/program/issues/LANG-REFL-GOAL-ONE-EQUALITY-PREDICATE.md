@@ -1,7 +1,7 @@
 ---
 id: LANG-REFL-GOAL-ONE-EQUALITY-PREDICATE
 title: "Refl decides that its goal is an equality by two different keys: the standalone gate looks up the spelling Equal in globals, the match-arm branch simplifier reads a transparent body that is exactly Eq. A user alias of Eq is refused standalone and accepted in every arm. Decide it once, by checked identity, for both paths"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -67,3 +67,18 @@ Replaced by the Architect's D0 `evt_2gzhr3newfzwm`.
 
 - A kernel, conversion or `trusted_base()` change.
 - A catalog or suite delta outside these rows.
+
+## Closeout
+
+Merged `437091eaa` from exact `b80411c32` (PR #4688, reused after its red
+first run). Language QA `evt_62hk6vmak1bhz`, Architect
+`evt_1axmb509vnfpb`, Decision `dec_7t863mvejbmsd`.
+
+Every route that accepts `Refl` at an equality goal asks one predicate,
+`stated_equality`, so the five routes agree on aliases of `Equal`,
+including the `MyEq2`-`MyEq4` chains. The first candidate `c6ad5ca96` was
+red at `px7f_resource_native`: the triple enlarged `check`'s recursive
+frame and overflowed the default test stack. The respin moves the gate
+into an `#[inline(never)]` `states_equality`, which brings the frame back
+to its base size (`0x1700`) with no stack raise. It lands only inside
+this squash. The recursive-id guard mutant stays unexercised.

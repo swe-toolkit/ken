@@ -1,7 +1,7 @@
 ---
 id: VERIFY-SPACE-OBLIGATION-HOLE-REGISTRATION
 title: "Obligation holes minted inside a space declaration are never recorded in the hole registry, so a claim that reaches one through a transparent space operation or cell still reads proved. Register them at the space seam"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T1

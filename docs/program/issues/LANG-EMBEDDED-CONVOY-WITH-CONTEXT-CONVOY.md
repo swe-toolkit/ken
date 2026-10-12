@@ -1,7 +1,7 @@
 ---
 id: LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY
 title: "The embedded-method equation convoy runs only when no context convoy is present, so a true Equal at a single-constructor type is still refused once the goal names a second value at the matched index (two lists at one index). Let the equation convoy coexist with the context convoy at the coherent-frame gate"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
