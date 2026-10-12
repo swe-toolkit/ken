@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-12 18:47:03Z — from 964 issue file(s) in `docs/program/issues/`.
+2026-10-12 18:52:40Z — from 964 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -988,7 +988,7 @@ the committed file matches the generator's output.
 | `VERIFY-PACKAGE-EXAMPLE-BINDING-SCOPE` | Since VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS a .ken.md source's example-fence declarations are dropped from the package but stay bound in the shared env, so a later source can reference one: the package validates with a dangling symbol and an executable entrypoint, and only erasure refuses. Close the reference before emit | merged | verify | S | architect | — |
 | `VERIFY-PACKAGE-ROUTE-EXAMPLE-DECLARATIONS` | Since VERIFY-CALLER-OBLIGATION-REPORTING the compiler driver builds a .ken.md package's admitted list from elaborate_ken_md_file_v1, which also returns ken example fence declarations, so an obligation-free literate package gains example declarations and a new core_semantic_hash. Admit only the source's declarations | merged | verify | S | architect | — |
 | `VERIFY-PRELUDE-CLASSIFIERS-WHOLE-SYMBOL` | ken-runtime classifies prelude constructors by a suffix of the stable symbol (ends_with(\"::Stdout\") and about 25 more), so a user constructor with the same leaf name in another family matches the prelude's classifier. Since VERIFY-NATIVE-STABLE-SYMBOL-PRELUDE-IDENTITY the prelude symbols are fixed by checked identity: compare whole prelude symbols | closed | verify | M | architect | — |
-| `VERIFY-RETIRE-BOUNDED-NAT-RECOGNIZER` | The static-response BoundedNat recognizer keys a declaration and a constructor family by spelling and never fires: no prelude fixture reaches it and no test names it. Remove it so every candidate takes the general OperationArgument path | active | verify | S | architect | — |
+| `VERIFY-RETIRE-BOUNDED-NAT-RECOGNIZER` | The static-response BoundedNat recognizer keys a declaration and a constructor family by spelling. It fires on the prelude freeze path, but the general OperationArgument path computes the same length correctly. Remove it, with a positive control that observes the length | active | verify | S | architect | — |
 | `VERIFY-REUSED-ENV-TRUST-RESIDUE` | A reusable elaboration environment keeps a trusted-base entry nobody reports: a declaration that fails after minting a premise hole leaves an orphan postulate in the REPL, expand_and_elaborate, load_unit and a reused ElabEnv. Roll the environment back to a mark taken before each declaration | merged | verify | M | architect | — |
 | `VERIFY-SPACE-OBLIGATION-HOLE-REGISTRATION` | Obligation holes minted inside a space declaration are never recorded in the hole registry, so a claim that reaches one through a transparent space operation or cell still reads proved. Register them at the space seam | merged | verify | S | architect | — |
 | `VERIFY-STRUCTURAL-HEAD-INSTANCE-IDENTITY` | An instance whose head is structural (arrow, Pi, Sigma, Univ, Trunc, Proj) gets no synthesized dictionary identity, so two such instances of one class share the declaration symbol {class}_instance_->: the second overwrites globals, the first falls back to {owner}#{n}, and their owner and obligation ids stay order-dependent. Give a structural-head instance a canonical, injective identity | merged | verify | M | architect | — |
