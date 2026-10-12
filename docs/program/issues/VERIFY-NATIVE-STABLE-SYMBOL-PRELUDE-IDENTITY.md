@@ -1,7 +1,7 @@
 ---
 id: VERIFY-NATIVE-STABLE-SYMBOL-PRELUDE-IDENTITY
 title: "Native stable symbols are named by reverse-mapping the live globals table, so a top-level const reusing a prelude constructor's spelling (const Stdout) takes its name, the prelude constructor falls back to ctor_{index}, and ken-runtime's suffix classifiers refuse a valid program. Name prelude ids from their checked identity"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1

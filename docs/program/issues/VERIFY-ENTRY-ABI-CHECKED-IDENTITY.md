@@ -1,7 +1,7 @@
 ---
 id: VERIFY-ENTRY-ABI-CHECKED-IDENTITY
 title: "The runner, the interpreter's console ids and program admission read the entry ABI (Success, Failure, Ret, Vis, Write, Stdout, HostIO, host_exit and more) from elab.globals by spelling, so a top-level const reusing one of those names, in an example or a plain fence, changes what a valid program runs. Key every entry-ABI read on checked prelude identity"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -65,3 +65,21 @@ the carrier (extend `PreludeEnv` or an equivalent) at D0.
 - The repair needs a rebinding of a prelude name to become a refusal: that
   is the strict-resolution flip on L2, not this node. Stop and report.
 - Any kernel, trust or spec change.
+
+## Closeout
+
+Merged `f30ae577e` from exact `fc1dcbf78`. The first candidate,
+`00a3c3fe0`, was red in PR CI and was respun. Verify QA
+`evt_5vkyjpaznd8vh`, Architect `evt_4wcc6kq2v2xh0`, Decision
+`dec_38m03qf5zvh9g`.
+
+- Every entry-ABI read resolves the prelude's checked identity through the
+  `canonical_runtime_roles!` roster. The interpreter harvesters take
+  `&PreludeEnv`. Admission and the runner no longer read `globals` by
+  spelling.
+- The D1b roster-identity test asserts each of the 19 appended roles. The
+  roster storage is boxed, so prelude registration stays within the
+  default stack.
+- A top-level const reusing an ABI name no longer changes what a valid
+  program runs. The native print-Stdout emission refusal is unchanged and
+  framed as `VERIFY-NATIVE-STABLE-SYMBOL-PRELUDE-IDENTITY`.
