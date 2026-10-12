@@ -1318,6 +1318,7 @@ fn catalog_ambient_passthrough_migration_census() {
         .map(|(entry, _)| entry.clone())
         .collect::<BTreeSet<_>>();
     let expected_clean = [
+        "Algorithm.LinearAlgebra.NatMatrix",
         "Core.Function.Combinators",
         "Core.Logic.And",
         "Core.Logic.Not",
