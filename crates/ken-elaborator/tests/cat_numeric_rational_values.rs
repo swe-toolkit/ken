@@ -1,4 +1,4 @@
-//! Spec: spec/50-stdlib/64-rational.md §§1, 2, 2.1.
+//! Spec: spec/50-stdlib/64-rational.md §§1–2.2.
 //! Conformance: conformance/stdlib/numeric/seed-rational.md.
 //! Each seed oracle has promise class durable invariant. Closed arithmetic
 //! expectations are independent fixtures; generic obligations are proved by
@@ -58,9 +58,9 @@ fn checked(env: &mut ElabEnv, name: &str, proposition: &str) {
 }
 
 /// Promise class: durable invariant. MEASURED: the provider's 10 public
-/// declarations, exported constructor, and 19 public checked laws have owned
+/// declarations, exported constructor, and 23 public checked laws have owned
 /// GlobalIds; an independent generic client unpacks every law at its exact
-/// proposition; the exact trusted-ID set stays equal. CLAIMED: §§1–2.1 add a
+/// proposition; the exact trusted-ID set stays equal. CLAIMED: §§1–2.2 add a
 /// zero-trust importable rational value and all its generic obligations. THE
 /// GAP: the five separate seed cases exercise concrete value distinctions;
 /// neither the owned-ID census nor this client's type alone is a seed oracle.
@@ -118,6 +118,10 @@ fn all_public_values_and_laws_import_generically_without_trust_growth() {
         "rational_mul::one_r",
         "rational_mul::zero_l",
         "rational_mul::distrib_l",
+        "rational_leq::refl",
+        "rational_leq::trans",
+        "rational_leq::antisym",
+        "rational_leq::total",
     ] {
         let qualified = format!("{MODULE}.{name}");
         let id = *env
@@ -217,15 +221,34 @@ theorem client_mul_zero_l (x : Rational) :
 theorem client_distrib_l (x : Rational) (y : Rational) (z : Rational) :
   rational_equiv (rational_mul x (rational_add y z))
     (rational_add (rational_mul x y) (rational_mul x z)) =
-  (proof distrib_l for rational_mul) x y z"#,
+  (proof distrib_l for rational_mul) x y z
+theorem client_leq_refl (x : Rational) : Equal Bool (rational_leq x x) True =
+  (proof refl for rational_leq) x
+theorem client_leq_trans (x : Rational) (y : Rational) (z : Rational)
+  (xy : Equal Bool (rational_leq x y) True)
+  (yz : Equal Bool (rational_leq y z) True) :
+  Equal Bool (rational_leq x z) True =
+  (proof trans for rational_leq) x y z xy yz
+theorem client_leq_antisym (x : Rational) (y : Rational)
+  (xy : Equal Bool (rational_leq x y) True)
+  (yx : Equal Bool (rational_leq y x) True) :
+  rational_equiv x y =
+  (proof antisym for rational_leq) x y xy yx
+theorem client_leq_total (x : Rational) (y : Rational)
+  (xy_false : Equal Bool (rational_leq x y) False) :
+  Equal Bool (rational_leq y x) True =
+  (proof total for rational_leq) x y xy_false"#,
     )
-    .expect("all 19 public checked laws must inhabit generic client claims");
+    .expect("all 23 public checked laws must inhabit generic client claims");
 
     for private in [
         "positive_product_tail",
         "positive_product_factor",
         "mul_cross_respect",
         "leq_cross_respect",
+        "rational_leq_cross_trans",
+        "rational_leq_false_opposite",
+        "bool_or_false_right",
     ] {
         match env.elaborate_file(&format!("import {MODULE} ({private})")) {
             Err(ElabError::UnboundName { name, .. }) => {
@@ -326,9 +349,11 @@ fn seed_product_one_sixth() {
 
 /// Promise class: durable invariant. MEASURED: the same strictly unequal
 /// inputs yield True and False in opposite directions, while different
-/// equivalent spellings tie both ways. CLAIMED: canonical cross-product order
-/// is exact. THE GAP: generic order respect is checked above; §2.2's order
-/// reflexivity/transitivity/antisymmetry/totality are not in this WP.
+/// equivalent spellings tie both ways; the law applications below inhabit
+/// their generic claims from these real fixed comparisons. CLAIMED: canonical
+/// cross-product order is exact. THE GAP: generic order and respect laws are
+/// independently unpacked in the client above; these closed fixtures cannot
+/// replace those checked arbitrary-input proofs.
 #[test]
 fn seed_order_opposite_directions() {
     let mut env = fixture();
@@ -341,6 +366,15 @@ fn seed_order_opposite_directions() {
         &mut env,
         "half_not_leq_third",
         "Equal Bool (rational_leq half third) False",
+    );
+    let incorrect_reverse = env
+        .elaborate_decl(
+            "theorem false_order_direction : Equal Bool (rational_leq half third) True = Proved",
+        )
+        .expect_err("the opposite Boolean result must kernel-reject");
+    assert!(
+        matches!(incorrect_reverse, ElabError::KernelRejected { .. }),
+        "false reverse order must kernel-reject, not {incorrect_reverse:?}"
     );
     checked(
         &mut env,
@@ -362,6 +396,22 @@ fn seed_order_opposite_directions() {
         "quarters_not_leq_third",
         "Equal Bool (rational_leq two_quarters third) False",
     );
+    checked(
+        &mut env,
+        "half_quarters_equivalent",
+        "rational_equiv half two_quarters",
+    );
+    env.elaborate_file(
+        r#"theorem seed_order_refl : Equal Bool (rational_leq half half) True =
+  (proof refl for rational_leq) half
+theorem seed_order_trans : Equal Bool (rational_leq third two_quarters) True =
+  (proof trans for rational_leq) third half two_quarters Proved Proved
+theorem seed_order_antisym : rational_equiv half two_quarters =
+  (proof antisym for rational_leq) half two_quarters Proved Proved
+theorem seed_order_total : Equal Bool (rational_leq third half) True =
+  (proof total for rational_leq) half third Proved"#,
+    )
+    .expect("order seed law instances must kernel-check over unequal and tied fixtures");
 }
 
 /// Promise class: durable invariant. MEASURED: two distinct zero spellings

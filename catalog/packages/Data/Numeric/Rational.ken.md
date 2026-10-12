@@ -29,7 +29,7 @@ represents `n/(Suc k)`. All exported calculations preserve that positivity.
 ```ken
 import Core.Logic.Transport (sym, trans, cong)
 
-import Core.Classes.LawfulClasses (leq_nat)
+import Core.Classes.LawfulClasses (bool_or, leq_nat)
 
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l, mul_add_distrib_r)
 
@@ -500,6 +500,44 @@ pub proof distrib_l for rational_mul
           }
       }
   }
+
+pub proof refl for rational_leq (x : Rational) : Equal Bool (rational_leq x x) True =
+  (proof refl for leq_nat) (mul (numerator x) (denominator x))
+
+pub proof trans for rational_leq
+      (x : Rational) (y : Rational) (z : Rational)
+    : Equal Bool (rational_leq x y) True
+      → Equal Bool (rational_leq y z) True
+      → Equal Bool (rational_leq x z) True =
+  match x {
+    MkRational a bx ↦
+      match y {
+        MkRational c by ↦
+          match z {
+            MkRational e bz ↦ λxy. λyz. rational_leq_cross_trans a bx c by e bz xy yz
+          }
+      }
+  }
+
+pub proof antisym for rational_leq
+      (x : Rational) (y : Rational)
+    : Equal Bool (rational_leq x y) True
+      → Equal Bool (rational_leq y x) True
+      → rational_equiv x y =
+  λxy.
+    λyx.
+      (proof antisym for leq_nat)
+        (mul (numerator x) (denominator y))
+        (mul (numerator y) (denominator x))
+        xy
+        yx
+
+pub proof total for rational_leq
+      (x : Rational) (y : Rational)
+    : Equal Bool (rational_leq x y) False → Equal Bool (rational_leq y x) True =
+  rational_leq_false_opposite
+    (mul (numerator x) (denominator y))
+    (mul (numerator y) (denominator x))
 ```
 
 ## 3. Using it
@@ -531,6 +569,10 @@ paired products. Addition first distributes each cross sum, then reuses the
 same paired-product equalities. Boolean order respect compares equivalent
 pairs after scaling by positive denominator products in both directions; the
 checked Nat order laws carry each comparison into and back from those scales.
+Order transitivity scales both adjacent comparisons by the opposite positive
+denominator, joins them at the shared middle product, then cancels the common
+positive factor. Antisymmetry follows on the two cross products, while Nat
+totality and the actual false comparison force the reverse comparison.
 
 Commutativity and multiplicative associativity lift the matching natural-number
 algebra to both numerator and denominator. Additive associativity expands the
@@ -702,6 +744,82 @@ theorem leq_cross_respect
             (leq_nat_mul_right_mono next_left next_right (positive_product_tail bx by) h))
   in
     bool_eq_from_iff (leq_nat left right) (leq_nat next_left next_right) forward backward
+
+theorem rational_leq_cross_trans
+      (a : Nat)
+      (bx : Nat)
+      (c : Nat)
+      (by : Nat)
+      (e : Nat)
+      (bz : Nat)
+      (xy : Equal Bool (leq_nat (mul a (Suc by)) (mul c (Suc bx))) True)
+      (yz : Equal Bool (leq_nat (mul c (Suc bz)) (mul e (Suc by))) True)
+    : Equal Bool (leq_nat (mul a (Suc bz)) (mul e (Suc bx))) True =
+  let
+    first = mul a (Suc by);
+    middle_x = mul c (Suc bx);
+    middle_z = mul c (Suc bz);
+    last = mul e (Suc by);
+    first_scaled : Equal Bool (leq_nat (mul first (Suc bz)) (mul middle_x (Suc bz))) True =
+      leq_nat_mul_right_mono first middle_x bz xy;
+    second_scaled : Equal Bool (leq_nat (mul middle_z (Suc bx)) (mul last (Suc bx))) True =
+      leq_nat_mul_right_mono middle_z last bx yz;
+    joined_middle : Equal Bool (leq_nat (mul middle_x (Suc bz)) (mul last (Suc bx))) True =
+      trans
+        Bool
+        (leq_nat (mul middle_x (Suc bz)) (mul last (Suc bx)))
+        (leq_nat (mul middle_z (Suc bx)) (mul last (Suc bx)))
+        True
+        (leq_cong_two
+          (mul middle_x (Suc bz))
+          (mul middle_z (Suc bx))
+          (mul last (Suc bx))
+          (mul last (Suc bx))
+          (mul_swap_tail c (Suc bx) (Suc bz))
+          Refl)
+        second_scaled;
+    scaled : Equal Bool (leq_nat (mul first (Suc bz)) (mul last (Suc bx))) True =
+      (proof trans for leq_nat)
+        (mul first (Suc bz))
+        (mul middle_x (Suc bz))
+        (mul last (Suc bx))
+        first_scaled
+        joined_middle;
+    reordered : Equal Bool
+      (leq_nat (mul (mul a (Suc bz)) (Suc by)) (mul (mul e (Suc bx)) (Suc by)))
+      True =
+      trans
+        Bool
+        (leq_nat (mul (mul a (Suc bz)) (Suc by)) (mul (mul e (Suc bx)) (Suc by)))
+        (leq_nat (mul first (Suc bz)) (mul last (Suc bx)))
+        True
+        (leq_cong_two
+          (mul (mul a (Suc bz)) (Suc by))
+          (mul first (Suc bz))
+          (mul (mul e (Suc bx)) (Suc by))
+          (mul last (Suc bx))
+          (sym
+            Nat
+            (mul first (Suc bz))
+            (mul (mul a (Suc bz)) (Suc by))
+            (mul_swap_tail a (Suc by) (Suc bz)))
+          (sym
+            Nat
+            (mul last (Suc bx))
+            (mul (mul e (Suc bx)) (Suc by))
+            (mul_swap_tail e (Suc by) (Suc bx))))
+        scaled
+  in
+    leq_nat_mul_right_cancel (mul a (Suc bz)) (mul e (Suc bx)) by reordered
+
+theorem rational_leq_false_opposite
+      (a : Nat) (b : Nat) (ab_false : Equal Bool (leq_nat a b) False)
+    : Equal Bool (leq_nat b a) True =
+  (proof left_false_elim for bool_or)
+    (leq_nat a b)
+    (leq_nat b a)
+    ab_false
+    ((proof total for leq_nat) a b)
 
 fn positive_product_tail (a : Nat) (b : Nat) : Nat = add (mul (Suc a) b) a
 
@@ -1106,12 +1224,14 @@ compare values; different carrier spellings are not asserted to have structural
 
 1. **Public API.** The exported constructor, projections, value constants,
    natural embedding, equivalence, three arithmetic/order operations and the
-   checked equations of specification §§1–2.1 appear above.
+   checked equations and order laws of specification §§1–2.2 appear above.
 2. **Source map.** [Definition](#2-definition) lists the exported values and
    laws; [Laws & proofs](#4-laws--proofs) explains and carries the private
    derivation; [Using it](#3-using-it) compares distinct spellings.
 3. **Derivation.** The carrier uses `Nat`; arithmetic reuses the checked Nat
    operations, algebraic laws, positive cancellation and canonical order.
+   Order transitivity additionally uses the Nat positive-factor monotonicity
+   and cancellation laws; totality uses the canonical Nat totality proof.
 4. **Trusted-base delta.** Zero: all exported theorems carry checked proof
    terms. Nat and equality imports retain their existing trusted base; this
    package adds no `Axiom`, postulate, primitive or floating point.
