@@ -52,26 +52,41 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first. The Architect rules the predicate that replaces the two
-syntactic gates, and whether closing it also removes the ambient-method
-symptom. Then the repair: one predicate, not one more case.
+D0 ruled (Architect `evt_3yey05qyvbds0`; Steward fork (i) `evt_jqa7eq0hnx8w`).
+The predicate is "the goal's checked sort is `Omega`", at three sites:
+
+- a helper `goal_is_proposition`, next to `states_equality`;
+- `has_nontrivial_coupled_sides` in `plan_coherent_frame_motive`, keeping
+  both of its uses;
+- the Eq destructure in `check_large_convoy_recursive_arm`. Its Eq arm
+  stays byte-identical, and a non-Eq proposition reads its level from
+  its own `Omega` sort.
+
+The repair also deletes the planner's unused `defer_coupled_expansion`
+parameter (Architect `evt_23ne4fxf29f0x`). `left_head` is a different
+defect, a λ-headed redex reaching kernel inference, and moves to
+`LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE`.
 
 ## Acceptance
 
-- **AC-1.** `vec_pair_ind`, in both forms, and `left_head` check, with no
-  Axiom and no trust change.
+- **AC-1.** `vec_pair_ind` checks in both forms, with no Axiom and no
+  trust change.
 - **AC-2 (control).** The `lang_embedded_context_convoy` and
-  `lang_embedded_method_equation_convoy` suites and the 61-row AC-3 set
-  of `LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY` are unchanged, as is the
-  74-file catalog census.
+  `lang_embedded_method_equation_convoy` suites, the 61-row AC-3 set of
+  `LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY` and the 74-file catalog
+  census are unchanged. Report the census per file, with rc before and
+  after.
 - **AC-3.** A false twin of `vec_pair_ind`, whose `on_cons` step has the
   wrong motive index, is still refused.
-- **AC-4 (mutation, QA).** Restoring either syntactic gate reddens
-  AC-1.
+- **AC-4 (mutation, QA).** Each revert alone reddens AC-1: the Eq-only
+  flag, and the Eq-only site 3 (`_ => return Ok(None)`).
 
 ## Stop conditions
 
 - Any kernel, conversion or `trusted_base()` change.
-- A catalog census row changes status, or the false twin checks.
-- The repair overlaps `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`'s
-  recursive-coordinate wall. Stop to the Architect to rule the order.
+- A catalog census row or an Eq-goal row changes, or the false twin
+  checks. The Eq-goal rows include those of
+  `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`; the Architect ruled the
+  order free because they take the unchanged Eq arm.
+- The embedded planner raises "changed the embedded-eliminator
+  population" or an ill-typed-ambient Internal on any census file.
