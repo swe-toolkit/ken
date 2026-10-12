@@ -206,10 +206,12 @@ dependent-types totality showcase — is pinned in
 **`60-length-indexed-vectors.md`** (DS-5). The length index rules the empty case
 out *at the type level*, so `head : Vec A (Suc n) → A` is total with no
 `Option`; the family, `vnil`/`vcons`, and `head` are landed (the acceptance
-suite `explicit_data_elaboration.rs`), while `tail`/`zip`/`lookup` and the `Fin`
-bounded index's *use* are gated on the dependent-`match` refinement enhancement
-landing this run as `DS-5b` (Kernel ring). Zero `Axiom`, zero `trusted_base()`
-delta — `Vec` is an ordinary inductive with a real eliminator.
+suite `explicit_data_elaboration.rs`). `tail`, `zip`, `lookup`, and
+bounded `Fin` use now check in the catalog Vector module from CAT-VEC
+(`665059cfd`). DS-5b landed; the former DS-5c gate is retired because
+the catalog capability is present, not because a DS-5c package landed.
+`Vector.ken.md` contains no `Axiom`; `Vec` is an ordinary inductive
+with a real eliminator, not a new trusted-base entry.
 
 The **formal-languages contract** is pinned in
 **`61-formal-languages.md`**. Section 1 specifies an ordinary `Dfa q a`
@@ -274,6 +276,17 @@ positive-factor Nat prerequisites add no quotient, gcd import,
 primitive, or trusted-base entry. Equivalent fractions may have
 different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
+
+The **dimension-safe exact linear-algebra contract** is pinned in
+**`65-linear-algebra.md`** §1 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT).
+`Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
+with row-major `Vec (Vec Nat n) m` matrices. Seven natural-valued
+operations and five checked-law obligations cover dot products,
+transpose, vector identity and **right** matrix identity. Left
+matrix identity and matrix-product associativity remain gated on
+`LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`, not promised by this
+first catalog node. No rational/Float tier or catalog delivery is
+claimed.
 
 ## 4. I/O, effects, serialization
 

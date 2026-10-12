@@ -693,8 +693,11 @@ coverage. Boolean tokens remain constructor patterns, not comparator cases.
 (e.g. `Suc m ≡ Suc n` in `VCons`'s arm of `Vec A (Suc n)`) is carried into the
 local context via the kernel's own `Eq`/`J`/`Cast` — **never postulated**. The
 positives below are **landed** (DS-5b, `origin/main`); the two-vector `zip`
-recursive step and `Fin`-indexed `lookup` are `(gated: DS-5c)` — the named
-follow-on `§3.2.1` scopes. Vocabulary matches the acceptance suite
+recursive step and `Fin`-indexed `lookup` also check in the catalog Vector
+module from CAT-VEC (`665059cfd`). The former DS-5c gate is retired
+because this capability is present, not because a DS-5c package landed.
+These were the named follow-on `§3.2.1` scopes. Vocabulary matches
+the acceptance suite
 `ds5b_dependent_match_refinement_acceptance.rs` and the AC5/AC9 cases above:
 
 ```ken
@@ -733,7 +736,7 @@ data Vec (A : Type) : Nat -> Type where {
   unsoundness vector); a bug that under-refines (never re-types the peeled field)
   **rejects `tail`**. The pair flips in opposite directions on the same
   `Suc m ≡ Suc n` premise. This is the load-bearing soundness net, and it stays
-  **live** while `zip`/`lookup` are gated below.
+  **live** alongside the now-checked catalog `zip`/`lookup`.
 
 ### surface/data-match/dr-sibling-convoy-and-goal-refinement (DS-5b)
 - spec: `spec/30-surface/34-data-match.md §3.2.1`
@@ -758,10 +761,11 @@ data Vec (A : Type) : Nat -> Type where {
 - why: covers convoy (capability 2) and goal refinement (capability 3) — the two
   DS-5b forms beyond peeled-field injectivity. **Single-level** is load-bearing:
   one sibling, one nested match, no reuse of an enclosing-match field (that reuse
-  is exactly the `zip` gap below).
+  was the former DS-5c `zip` gap, now retired by CAT-VEC).
 
-### surface/data-match/dr-zip-two-vector (gated: DS-5c)
-- spec: `spec/30-surface/34-data-match.md §3.2.1` (the named `DS-5c` boundary)
+### surface/data-match/dr-zip-two-vector (checked: catalog Vector)
+- spec: `spec/30-surface/34-data-match.md §3.2.1` (former `DS-5c` gate,
+  retired by checked CAT-VEC capability)
 - given: the full two-vector `zip` recursive step, which nests a match on the
   second vector **and** reuses the first vector's own peeled tail in the
   recursive call:
@@ -773,30 +777,28 @@ data Vec (A : Type) : Nat -> Type where {
       VCons m a xs |-> match w { VCons k b ys |-> VCons m a (zipNat m xs ys) }
     }
   ```
-- expect: `(gated: DS-5c)` — **rejects today** (`KernelRejected`), expected to
-  **accept once `DS-5c` lands**. The gate is real: DS-5b's convoy handles **one**
-  sibling through **one** nested match with no further reuse; reusing the
-  enclosing match's `xs` in `zipNat m xs ys` hits `§3.2.1`'s named root cause
-  (sibling-convoy cannot yet distinguish a genuine outer parameter from a field
-  the enclosing match already bound). The rejection is fail-closed and
-  kernel-backstopped (a completeness gap, "never unsound").
-- why: **honest gate marker.** Un-stage to a positive accept when `DS-5c` lands;
-  until then the AC8 net above (`dr-injectivity-and-over-refinement`) stays the
-  live enforcer of the no-spurious-refinement posture. `(gated: DS-5c)`.
+- expect: **accept**. The corresponding two-vector recursion in the catalog
+  Vector module's `zip` checks from CAT-VEC (`665059cfd`). On the earlier
+  DS-5b elaborator, reuse of the enclosing match's `xs` in `zipNat m xs ys`
+  met the named sibling-convoy completeness gap; that is history, not a
+  current rejection expectation. This row does not claim execution of
+  this seed against a delivered test harness.
+- why: this positive expectation covers the former DS-5c two-vector
+  gate, retired by checked CAT-VEC capability. The AC8 negative above
+  remains the independent no-spurious-refinement check.
 
-### surface/data-match/dr-lookup-fin (gated: DS-5c)
+### surface/data-match/dr-lookup-fin (checked: catalog Vector)
 - spec: `spec/30-surface/34-data-match.md §3.2.1`; `50-stdlib/60 §3` (`Fin`)
 - given: `lookup : (A : Type) → (n : Nat) → Vec A n → Fin n → A`, the safe
   positional accessor recursing through the vector's tail indexed by a bounded
   `Fin n` (`60 §3`).
-- expect: `(gated: DS-5c)` — the `Fin`-indexed recursion into the tail is the
-  same follow-on capability as `zip`'s two-vector step; it does not elaborate on
-  the DS-5b elaborator and is staged to `DS-5c`. Design is total-by-construction
-  (a `Fin n` **is** an in-range witness, no side-proof); only its elaboration is
-  gated. Un-stage to a positive accept + its `§5` computation law when `DS-5c`
-  lands.
-- why: the second `DS-5c`-gated operation; kept design-stated + gated so the
-  chapter's `§4` table (`lookup` gated on `DS-5c`) has a conformance home.
+- expect: **accept**. The Fin-indexed recursion into the tail checks in the
+  catalog Vector module's `lookup` from CAT-VEC (`665059cfd`). Design remains
+  total-by-construction: a `Fin n` is an in-range witness with no side-proof.
+  This row makes no separate seed-execution or computation-law claim.
+- why: this positive expectation covers the former DS-5c Fin-indexed
+  gate, retired by checked CAT-VEC capability; the catalog module and
+  §60 now state it as checked, not gated.
 
 ## Subsumed upstream (one home per property)
 

@@ -9,21 +9,21 @@
 > (§3, §6): **`DS-5b`** delivered the dependent-`match` refinement (single-
 > scrutinee constructor-injectivity + single-level sibling convoy + goal
 > refinement, `34 §3.2.1`), so `tail` now builds. `zip` (the full two-vector
-> recursive step) and `lookup` (`Fin`-indexed) remain **specified but GATED** on
-> a named follow-on, **`DS-5c`** (§6) — a scoped prerequisite, not an open-ended
-> deferral; the chapter **names it and does not itself resolve it**. **Zero
-> `trusted_base()` delta and zero `Axiom`:** `Vec`
-> is an ordinary inductive family with a real eliminator, its operations
-> genuinely kernel-proved; the gated operations need **no** postulate either —
-> the gap is elaboration *completeness*, not soundness (§6, §7). DS-5.
+> recursive step) and `lookup` (`Fin`-indexed) check in the catalog
+> Vector module from CAT-VEC (`665059cfd`). The former `DS-5c` gate
+> is retired because that capability is present, not because a DS-5c
+> package landed (§6). `Vec` is an ordinary inductive family with a
+> real eliminator; `Vector.ken.md` contains no `Axiom`, and its named
+> operations and laws have checked bodies (§6, §7). DS-5.
 
 Length-indexed vectors are the canonical dependent-types showcase: the length
 lives *in the type* as an **index**, so an operation that is partial on lists —
 `head` on the empty list — becomes **total** on `Vec`, because the type rules
 the empty case out before the term is ever written. This chapter specifies the
-family and the operations that make that showcase concrete, and is explicit
-about which are buildable on the landed elaborator today and which wait on the
-`DS-5c` follow-on named in §6.
+family and the operations that make that showcase concrete. The
+catalog Vector module now checks `zip` and `lookup` as well as `tail`;
+§6 records the former DS-5c gate as retired by checked catalog
+capability, not by a DS-5c delivery.
 
 ## 1. The family — `Vec (A : Type) : Nat → Type`
 
@@ -126,11 +126,11 @@ data Fin : Nat → Type where
   `Fin` states totality *by construction* — `lookup : Vec A n → Fin n → A` is
   total with **no** side-proof — which is the cleaner spec.
 
-**Honest caveat (not hidden).** Choosing `Fin` over `Nat + proof` does **not**
-dodge the §6 gap: `Fin` states the *totality* cleanly, but `lookup`'s
-*definition* still recurses into the vector's tail, so it hits the same
-dependent-`match` enhancement regardless (§6). The discipline choice is about the
-cleanest totality *statement*, not about avoiding the enhancement.
+Choosing `Fin` over `Nat + proof` did not itself solve the former
+§6 elaboration gap: `lookup` still recurses into the vector's tail.
+That dependent-`match` enhancement has since landed, and `lookup`
+checks in the catalog Vector module. The discipline choice remains
+about the cleanest totality *statement*, not bypassing a checker.
 
 ## 4. The total API
 
@@ -143,17 +143,17 @@ buildability state (per the Architect's ground-truthed DS-5 ruling):
 | `head` | `(A : Type) → (n : Nat) → Vec A (Suc n) → A` | **landed** (§2) |
 | `Fin` decl | `Nat → Type` (§3) | **landed** (decl) |
 | `tail` | `(A : Type) → (n : Nat) → Vec A (Suc n) → Vec A n` | **landed** (§6; DS-5b) |
-| `zip` | `(A B : Type) → (n : Nat) → Vec A n → Vec B n → Vec (Pair A B) n` | **gated** (§6; DS-5c) |
-| `lookup` | `(A : Type) → (n : Nat) → Vec A n → Fin n → A` | **gated** (§6; DS-5c) |
+| `zip` | `(A B : Type) → (n : Nat) → Vec A n → Vec B n → Vec (Pair A B) n` | **checked in catalog Vector** (§6; CAT-VEC `665059cfd`; former DS-5c gate retired) |
+| `lookup` | `(A : Type) → (n : Nat) → Vec A n → Fin n → A` | **checked in catalog Vector** (§6; CAT-VEC `665059cfd`; former DS-5c gate retired) |
 
 `Pair` in `zip`'s codomain is the canonical non-dependent compiler-origin floor
 family (`Pair : Type → Type → Type`, `../30-surface/34 §"Canonical
-non-dependent pair floor family"`). This positive Strict vector is gated on
-both the Pair floor realization and §6's `DS-5c`; it requires no provider
-import. The length index `n` guarantees the two input vectors **align**, so
-`zip` is total and loses no elements — unlike the `List` `zip`, which must
-truncate. That guarantee is the second showcase; the Pair gate changes
-availability, not the design or the existing `DS-5c` elaboration boundary.
+non-dependent pair floor family"`). The catalog Vector module now
+checks the Pair-valued `zip` without a live Pair or DS-5c gate.
+The length index `n` guarantees the two input vectors **align**, so
+`zip` is total and loses no elements — unlike the `List` `zip`, which
+must truncate. That guarantee is the second showcase; landing the
+previous gates changed availability, not this indexed contract.
 
 ## 5. Laws (scoped to the totality showcase)
 
@@ -169,19 +169,22 @@ silently.
   and worth pinning but are **not** in this chapter's scope; each is deferred
   explicitly, not omitted silently:
   - `tail` / `lookup` computation (`tail A n (vcons n x xs) ≡ xs`;
-    `lookup … (fsuc …) ≡ lookup … `) — deferred by this chapter's scope; `tail`'s
-    is provable now (`tail` landed, §6), `lookup`'s lands with `lookup` (gated on
-    `DS-5c`).
+    `lookup … (fsuc …) ≡ lookup … `) — deferred by this chapter's
+    scope; `tail`'s is provable now (`tail` landed, §6); `lookup` and
+    its private computation proof have checked in the catalog Vector
+    module. This chapter still defers adding those equations to its
+    own law list.
   - `zip` / `map` **naturality** and the `zip`-`unzip` round-trip.
   - The **length / `to_list` bridge** (`Vec A n → List A` and `length ∘ to_list ≡ n`)
     relating the indexed family to the unindexed `List`.
 
-## 6. Dependent-`match` refinement — `tail` landed, `zip`/`lookup` on `DS-5c`
+## 6. Dependent-`match` refinement — checked catalog operations
 
-`tail` is **landed**; `zip` and `lookup` are **specified and gated on the named
-follow-on `DS-5c`**. The single dependent-`match` capability these three needed
-is no longer one indivisible gap: **`DS-5b`** (landed, `origin/main`) delivered
-its first tranche, which is exactly enough for `tail`.
+`tail`, `zip`, and `lookup` check in the catalog Vector module.
+**`DS-5b`** delivered enough dependent-`match` refinement for `tail`;
+the two-vector recursive step and Fin-indexed lookup check in CAT-VEC
+(`665059cfd`). Their former DS-5c gate is retired because these
+capabilities are present, not because a DS-5c package landed.
 
 **What `DS-5b` landed (`34 §3.2.1`).** A dependent `match` recovers its motive
 automatically over the scrutinee's own index (`34 §3.2`); `DS-5b` extended that
@@ -202,39 +205,40 @@ The refinement is load-bearing, not permissive: the **AC8** over-refinement case
 (a goal demanding an equation the branch does *not* license) **stays a genuine
 kernel rejection**, never a silent accept.
 
-**What remains — the `DS-5c` follow-on (`zip`, `lookup`).** Two operations need
-more than `DS-5b`'s single-level convoy:
+**Why the former DS-5c gate is retired.** At the DS-5b stage,
+two operations needed more than its single-level convoy:
 
 - **`zip`** — the full **two-vector recursive step**. The recursive `zip xs ys`
-  reuses *both* vectors' peeled tails; `DS-5b`'s convoy handles **one** sibling
-  through **one** nested match with **no further reuse** (`34 §3.2.1`), and the
-  recursive reuse hits the root cause `34 §3.2.1` names: the sibling-convoy
-  **cannot yet distinguish a genuine outer parameter from a field the enclosing
-  `match` already bound**.
-- **`lookup`** — the `Fin`-indexed recursion into the vector's tail, the same
-  follow-on capability.
+  reuses *both* vectors' peeled tails; `DS-5b`'s convoy handled **one**
+  sibling through **one** nested match with **no further reuse**
+  (`34 §3.2.1`). The recursive reuse hit its then-unresolved distinction
+  between a genuine outer parameter and a field the enclosing `match`
+  already bound.
+- **`lookup`** — the `Fin`-indexed recursion into the vector's tail
+  needed the same follow-on capability.
 
-Both are captured as **`DS-5c`** (two-vector convoy + `Fin`-indexed `lookup`) —
-still an **`elab.rs`** dependent-`match` enhancement (**not** a kernel or
-`data.rs` change; the family-declaration path of §1 is complete), and still
-zero-`Axiom`: the gap is elaboration *completeness* (a sound over-rejection),
-never a soundness hole. There remains **no manual-motive escape hatch** — `match`
-carries only a scrutinee and arms (`ast.rs::Expr::EMatch` has no motive field;
-`parser.rs::parse_match_expr` builds `EMatch { scrut, arms, span }`), so the
-automatic path that `DS-5c` extends is the only path. The chapter **names
-`DS-5c` and does not itself resolve it.**
+CAT-VEC (`665059cfd`) supplies checked `zip` and `lookup` in the
+catalog Vector module. The former DS-5c gate is retired because the
+capability is present, not because a DS-5c package was delivered.
+`Vector.ken.md` contains no `Axiom`. The former gap was elaboration
+*completeness*, not soundness.
+There remains **no manual-motive escape hatch** — `match` carries only
+a scrutinee and arms (`ast.rs::Expr::EMatch` has no motive field;
+`parser.rs::parse_match_expr` builds `EMatch { scrut, arms, span }`).
+The automatic path now supports these two operations; that says
+nothing about every more general nested proposition goal.
 
 ## 7. Trust, provenance, and clean-room
 
-- **Zero `trusted_base()` delta, zero `Axiom`.** `Vec` and `Fin` are ordinary
-  inductive families with real eliminators; `head`'s totality is
-  **kernel-proved** by the total `elim_Vec` the index-impossible auto-discharge
-  synthesizes (§2), not postulated. The gated operations (§6) likewise need
-  **no** `Axiom`: once the enhancement lands, each is discharged by its
-  dependent `match`. There is **no spot in this design that forces an `Axiom`** —
-  the §6 gap is elaboration *completeness* (an over-rejection of a valid
-  program, fail-closed and sound), never a soundness hole papered over by a
-  postulate. This is the `List` / `Nat` posture (`reflect-don't-extend`).
+- **No new trusted form.** `Vec` and `Fin` are ordinary inductive
+  families with real eliminators; `head`'s totality is **kernel-proved**
+  by the total `elim_Vec` the index-impossible auto-discharge
+  synthesizes (§2), not postulated. The catalog Vector module checks
+  `zip` and `lookup` using dependent `match`; `Vector.ken.md` contains
+  no `Axiom` and adds no `trusted_base()` entry. The former DS-5c gap
+  was elaboration *completeness*, never a soundness hole papered over
+  by a postulate. This is the `List` / `Nat` posture
+  (`reflect-don't-extend`).
 - **Landed evidence.** The family-declaration + total-`head` mechanism is the
   acceptance suite `crates/ken-elaborator/tests/explicit_data_elaboration.rs`
   (14 tests); the spec rules it rests on are `14 §2`/`§3` (indexed families +
