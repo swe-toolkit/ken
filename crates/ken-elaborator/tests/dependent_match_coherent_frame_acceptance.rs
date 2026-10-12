@@ -182,27 +182,27 @@ fn recursive_step_only_false_is_rejected_after_true_base_elaborates() {
         )
         .expect("the DualFZ-restricted true base must elaborate");
 
-        let error = env
-            .elaborate_decl(
-                "theorem dual_recursive_false \
+        let source = "theorem dual_recursive_false \
                    (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : \
                    Equal (DualTagged a) \
                      (DualTag a (dual_fin_to_nat n i) (dual_lookup a n xs i)) \
                      (DualTag a Zero (dual_lookup a n xs i)) = \
                  match i { \
                    DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; \
-                   DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }",
-            )
+                   DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }";
+        let error = env
+            .elaborate_decl(source)
             .expect_err("the recursive-only false branch must not be admitted");
+        let ElabError::TypeMismatch { span, reason } = error else {
+            panic!(
+                "the false Refl must be reached instead of an incidental index failure: {error:?}"
+            );
+        };
+        assert_eq!(reason, "Refl expects an `Eq`-shaped goal");
         assert!(
-            matches!(
-                error,
-                ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch { .. },
-                    ..
-                }
-            ),
-            "the recursive-only false branch must fail at kernel type checking, found {error:?}"
+            span.start >= source.rfind("DualFS m j ↦ match xs").expect("DualFS arm")
+                && span.end <= source.len(),
+            "the false Refl must lie in DualFS: {span:?}"
         );
     });
 }
@@ -289,7 +289,7 @@ fn forced_index_telescope_relation_extension_elaborates() {
                    (Some a (dual_lookup a m xs j)) \
                    Refl \
                    (dual_env_relation_after_anchor \
-                     a m xs anchor relation j) }"
+                     a m xs anchor relation j) }",
         )
         .expect("forced-index return telescope must use predecessor views");
         env.elaborate_decl(
