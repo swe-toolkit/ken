@@ -252,16 +252,18 @@ a genuine cycle result; both branches carry checked evidence. The chapter
 does not claim its catalog build has landed or add a second fixed point.
 
 The **exact finite-support statistics contract** is pinned in
-**`63-statistics.md`** §§1–2 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
-SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT). `Algorithm.Statistics.Exact`
+**`63-statistics.md`** §§1–3 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
+SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT;
+SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT). `Algorithm.Statistics.Exact`
 stores natural-weight atoms with checked positive total, without
-`Finite q` or `DecEq q`; its nine laws govern natural numerators.
-`Algorithm.Statistics.Empirical` reads an existing `NonEmpty q`, keeps
-repeated observations as distinct unit-weight entries, and requires
-seven checked bridge/append laws. Neither tier exports a
-rational-valued probability, expectation, or mean by this contract.
-`pure`/`bind`, uniform enumeration, approximate statistics, and
-`Float` results remain deferred.
+`Finite q` or `DecEq q`; its nine §1 laws govern natural numerators.
+`Algorithm.Statistics.Empirical` reads an existing `NonEmpty q`, keeping
+repeated observations as distinct unit-weight entries under seven §2
+laws. Section 3 adds value-typed probability, expectation, and
+empirical mean to those same modules, with twelve further checked-law
+obligations and no §3 CAT delivery claim. `pure`/`bind`, uniform
+enumeration, approximate statistics, and `Float` results remain
+deferred.
 
 The separate **non-negative exact rational contract** is pinned in
 **`64-rational.md`** (SPEC-NUMERIC-RATIONAL-CONTRACT).
@@ -270,8 +272,8 @@ of a positive denominator, with cross-product value equivalence and
 Boolean order. Its checked arithmetic, relation/respect laws, and
 positive-factor Nat prerequisites add no quotient, gcd import,
 primitive, or trusted-base entry. Equivalent fractions may have
-different carrier spellings. Specifying this carrier does **not**
-claim its catalog delivery or a new statistics adapter.
+different carrier spellings. The carrier's catalog package is
+landed; its contract does **not** itself supply the §63 §3 adapters.
 
 ## 4. I/O, effects, serialization
 
