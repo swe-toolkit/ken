@@ -815,15 +815,11 @@ theorem rational_leq_cross_trans
 theorem rational_leq_false_opposite
       (a : Nat) (b : Nat) (ab_false : Equal Bool (leq_nat a b) False)
     : Equal Bool (leq_nat b a) True =
-  bool_or_false_right (leq_nat a b) (leq_nat b a) ab_false ((proof total for leq_nat) a b)
-
-theorem bool_or_false_right
-      (p : Bool)
-    : (q : Bool) → Equal Bool p False → Equal Bool (bool_or p q) True → Equal Bool q True =
-  match p {
-    True ↦ λq. λp_false. λeither. absurd p_false;
-    False ↦ λq. λp_false. λeither. either
-  }
+  (proof left_false_elim for bool_or)
+    (leq_nat a b)
+    (leq_nat b a)
+    ab_false
+    ((proof total for leq_nat) a b)
 
 fn positive_product_tail (a : Nat) (b : Nat) : Nat = add (mul (Suc a) b) a
 
