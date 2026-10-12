@@ -2132,7 +2132,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             let exp_wh = whnf(cx.env, &cx.ctx, expected);
             if matches!(exp_wh, Term::Eq(..))
                 || (matches!(exp_wh, Term::Sigma(..))
-                    && stated_equality(cx.env, &cx.ctx, expected).is_some())
+                    && states_equality(cx.env, &cx.ctx, expected))
             {
                 synth_refl_proof(cx.env, &cx.ctx, expected, rspan)
             } else {
@@ -4720,6 +4720,14 @@ fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -
         ),
         other => other,
     }
+}
+
+/// The Refl gate's question, answered outside `check`'s frame. `check`
+/// recurses through every nested expression, so the equality triple that
+/// `stated_equality` returns must not occupy a slot in each activation.
+#[inline(never)]
+fn states_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> bool {
+    stated_equality(env, ctx, term).is_some()
 }
 
 /// The equality a goal states, for `Refl` standalone and in every arm. It is
