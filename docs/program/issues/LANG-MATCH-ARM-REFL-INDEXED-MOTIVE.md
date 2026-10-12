@@ -1,7 +1,7 @@
 ---
 id: LANG-MATCH-ARM-REFL-INDEXED-MOTIVE
 title: "Refl in an arm of a match on an indexed family, with goal Equal (Pair Nat Nat) p p, is refused with 'Refl expects an Eq-shaped goal', while the same goal accepts Refl standalone and in List, Bool and let arms. stated_equality reads the goal's syntactic head, and on the indexed route the goal arrives as a motive redex. Recognise the stated equality up to that redex"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -64,3 +64,17 @@ head. The Architect confirms the reduction boundary at review.
 - The repair needs a kernel or conversion change, or a `trusted_base()`
   change.
 - A catalog or suite delta outside these rows.
+
+## Closeout
+
+Merged `f7a9a2989` from exact `271ca6752` (PR #4680). Language QA
+`evt_48yjv8dgewbx7`, Architect `evt_250h0zqwxeq96`, Decision
+`dec_6nn78fdf4ekr6`.
+
+`stated_equality` now beta-peels the annotated motive application before
+the observational Sigma step. It keeps the result only when it is an exact
+`Eq`, or a fully applied transparent `Equal` whose body is exactly `Eq`.
+The four Sigma carriers check in the `DualFin` arm. The false `mk_pair`
+control is refused as not convertible, and the List, Bool, let and
+standalone rows are unchanged. One 16-line hunk in `elab.rs` and a new
+suite. No kernel, conversion or trust change. §1a: 0.
