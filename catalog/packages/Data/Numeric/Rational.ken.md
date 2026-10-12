@@ -540,196 +540,66 @@ shared denominator. Every final equation is value equivalence, not structural
 identity of two carrier spellings.
 
 ```ken
-fn positive_product_tail (a : Nat) (b : Nat) : Nat = add (mul (Suc a) b) a
-
 theorem positive_product_factor
       (bx : Nat) (by : Nat)
     : Equal Nat (Suc (positive_product_tail bx by)) (mul (Suc bx) (Suc by)) =
   Refl
 
-theorem denominator_repeat
-      (a : Nat) (b : Nat) (c : Nat)
-    : Equal Nat (mul (mul a b) (mul a c)) (mul a (mul a (mul b c))) =
-  trans
-    Nat
-    (mul (mul a b) (mul a c))
-    (mul (mul a a) (mul b c))
-    (mul a (mul a (mul b c)))
-    (mul_shuffle a b a c)
-    (sym
-      Nat
-      (mul a (mul a (mul b c)))
-      (mul (mul a a) (mul b c))
-      ((proof assoc for mul) a a (mul b c)))
-
-theorem mul_factor_shuffle
-      (x : Nat) (c : Nat) (d : Nat) (y : Nat)
-    : Equal Nat (mul (mul x c) (mul d y)) (mul (mul x (mul d c)) y) =
-  trans
-    Nat
-    (mul (mul x c) (mul d y))
-    (mul (mul x d) (mul c y))
-    (mul (mul x (mul d c)) y)
-    (mul_shuffle x c d y)
-    (trans
-      Nat
-      (mul (mul x d) (mul c y))
-      (mul (mul (mul x d) c) y)
-      (mul (mul x (mul d c)) y)
-      ((proof assoc for mul) (mul x d) c y)
-      (cong
-        Nat
-        Nat
-        (mul (mul x d) c)
-        (mul x (mul d c))
-        (λv. mul v y)
-        (sym Nat (mul x (mul d c)) (mul (mul x d) c) ((proof assoc for mul) x d c))))
-
-theorem distrib_cross_term
-      (a : Nat) (b : Nat) (c : Nat) (d : Nat) (e : Nat) (f : Nat)
+theorem add_cross_respect
+      (a : Nat)
+      (b : Nat)
+      (c : Nat)
+      (d : Nat)
+      (ap : Nat)
+      (bp : Nat)
+      (cp : Nat)
+      (dp : Nat)
+      (ha : Equal Nat (mul a bp) (mul ap b))
+      (hc : Equal Nat (mul c dp) (mul cp d))
     : Equal Nat
-        (mul (mul a (mul b c)) (mul (mul d e) (mul d f)))
-        (mul (mul (mul a b) (mul d c)) (mul d (mul e f))) =
+        (mul (add (mul a d) (mul c b)) (mul bp dp))
+        (mul (add (mul ap dp) (mul cp bp)) (mul b d)) =
   let
-    numerator_factor = mul a (mul b c);
-    associated_numerator = mul (mul a b) c;
-    repeated_denominator = mul (mul d e) (mul d f);
-    common_denominator = mul d (mul e f);
-    left = mul numerator_factor repeated_denominator;
-    reassociated = mul associated_numerator repeated_denominator;
-    shared = mul associated_numerator (mul d common_denominator);
-    right = mul (mul (mul a b) (mul d c)) common_denominator
+    left_cross_product : Equal Nat (mul (mul a d) (mul bp dp)) (mul (mul ap dp) (mul b d)) =
+      cross_first a b d ap bp dp ha;
+    right_cross_product : Equal Nat (mul (mul c b) (mul bp dp)) (mul (mul cp bp) (mul b d)) =
+      cross_second b c d bp cp dp hc
   in
     trans
       Nat
-      left
-      reassociated
-      right
-      (cong
-        Nat
-        Nat
-        numerator_factor
-        associated_numerator
-        (λv. mul v repeated_denominator)
-        ((proof assoc for mul) a b c))
+      (mul (add (mul a d) (mul c b)) (mul bp dp))
+      (add (mul (mul a d) (mul bp dp)) (mul (mul c b) (mul bp dp)))
+      (mul (add (mul ap dp) (mul cp bp)) (mul b d))
+      (mul_add_distrib_l (mul a d) (mul c b) (mul bp dp))
       (trans
         Nat
-        reassociated
-        shared
-        right
-        (cong
-          Nat
-          Nat
-          repeated_denominator
-          (mul d common_denominator)
-          (λv. mul associated_numerator v)
-          (denominator_repeat d e f))
-        (mul_factor_shuffle (mul a b) c d common_denominator))
-
-theorem rational_distrib_cross
-      (a : Nat) (b : Nat) (c : Nat) (d : Nat) (e : Nat) (f : Nat)
-    : Equal Nat
-        (mul (mul a (add (mul b f) (mul c e))) (mul (mul d e) (mul d f)))
-        (mul (add (mul (mul a b) (mul d f)) (mul (mul a c) (mul d e))) (mul d (mul e f))) =
-  let
-    left_numerator = mul a (add (mul b f) (mul c e));
-    expanded_left = mul a (mul b f);
-    expanded_right = mul a (mul c e);
-    right_left = mul (mul a b) (mul d f);
-    right_right = mul (mul a c) (mul d e);
-    repeated_denominator = mul (mul d e) (mul d f);
-    common_denominator = mul d (mul e f);
-    initial = mul left_numerator repeated_denominator;
-    expanded = mul (add expanded_left expanded_right) repeated_denominator;
-    distributed =
-      add (mul expanded_left repeated_denominator) (mul expanded_right repeated_denominator);
-    rearranged = add (mul right_left common_denominator) (mul right_right common_denominator);
-    final_product = mul (add right_left right_right) common_denominator
-  in
-    trans
-      Nat
-      initial
-      expanded
-      final_product
-      (cong
-        Nat
-        Nat
-        left_numerator
-        (add expanded_left expanded_right)
-        (λv. mul v repeated_denominator)
-        (mul_add_distrib_r a (mul b f) (mul c e)))
-      (trans
-        Nat
-        expanded
-        distributed
-        final_product
-        (mul_add_distrib_l expanded_left expanded_right repeated_denominator)
+        (add (mul (mul a d) (mul bp dp)) (mul (mul c b) (mul bp dp)))
+        (add (mul (mul ap dp) (mul b d)) (mul (mul cp bp) (mul b d)))
+        (mul (add (mul ap dp) (mul cp bp)) (mul b d))
         (trans
           Nat
-          distributed
-          rearranged
-          final_product
-          (add_cong2
-            (mul expanded_left repeated_denominator)
-            (mul right_left common_denominator)
-            (mul expanded_right repeated_denominator)
-            (mul right_right common_denominator)
-            (distrib_cross_term a b f d e f)
-            (distrib_cross_term a c e d e f))
-          (sym
+          (add (mul (mul a d) (mul bp dp)) (mul (mul c b) (mul bp dp)))
+          (add (mul (mul ap dp) (mul b d)) (mul (mul c b) (mul bp dp)))
+          (add (mul (mul ap dp) (mul b d)) (mul (mul cp bp) (mul b d)))
+          (cong
             Nat
-            final_product
-            rearranged
-            (mul_add_distrib_l right_left right_right common_denominator))))
-
-theorem mul_swap_tail
-      (a : Nat) (b : Nat) (c : Nat)
-    : Equal Nat (mul (mul a b) c) (mul (mul a c) b) =
-  trans
-    Nat
-    (mul (mul a b) c)
-    (mul a (mul b c))
-    (mul (mul a c) b)
-    (sym Nat (mul a (mul b c)) (mul (mul a b) c) ((proof assoc for mul) a b c))
-    (trans
-      Nat
-      (mul a (mul b c))
-      (mul a (mul c b))
-      (mul (mul a c) b)
-      (cong Nat Nat (mul b c) (mul c b) (λv. mul a v) ((proof comm for mul) b c))
-      ((proof assoc for mul) a c b))
-
-theorem mul_shuffle
-      (a : Nat) (b : Nat) (c : Nat) (d : Nat)
-    : Equal Nat (mul (mul a b) (mul c d)) (mul (mul a c) (mul b d)) =
-  trans
-    Nat
-    (mul (mul a b) (mul c d))
-    (mul (mul (mul a b) c) d)
-    (mul (mul a c) (mul b d))
-    ((proof assoc for mul) (mul a b) c d)
-    (trans
-      Nat
-      (mul (mul (mul a b) c) d)
-      (mul (mul (mul a c) b) d)
-      (mul (mul a c) (mul b d))
-      (cong Nat Nat (mul (mul a b) c) (mul (mul a c) b) (λv. mul v d) (mul_swap_tail a b c))
-      (sym
-        Nat
-        (mul (mul a c) (mul b d))
-        (mul (mul (mul a c) b) d)
-        ((proof assoc for mul) (mul a c) b d)))
-
-theorem mul_cong2
-      (a : Nat) (b : Nat) (c : Nat) (d : Nat) (hab : Equal Nat a b) (hcd : Equal Nat c d)
-    : Equal Nat (mul a c) (mul b d) =
-  trans
-    Nat
-    (mul a c)
-    (mul b c)
-    (mul b d)
-    (cong Nat Nat a b (λv. mul v c) hab)
-    (cong Nat Nat c d (mul b) hcd)
+            Nat
+            (mul (mul a d) (mul bp dp))
+            (mul (mul ap dp) (mul b d))
+            (λv. add v (mul (mul c b) (mul bp dp)))
+            left_cross_product)
+          (cong
+            Nat
+            Nat
+            (mul (mul c b) (mul bp dp))
+            (mul (mul cp bp) (mul b d))
+            (λv. add (mul (mul ap dp) (mul b d)) v)
+            right_cross_product))
+        (sym
+          Nat
+          (mul (add (mul ap dp) (mul cp bp)) (mul b d))
+          (add (mul (mul ap dp) (mul b d)) (mul (mul cp bp) (mul b d)))
+          (mul_add_distrib_l (mul ap dp) (mul cp bp) (mul b d))))
 
 theorem mul_cross_respect
       (a : Nat)
@@ -757,27 +627,188 @@ theorem mul_cross_respect
       (mul_cong2 (mul a bp) (mul ap b) (mul c dp) (mul cp d) ha hc)
       (mul_shuffle ap b cp d))
 
-theorem add_cong2
-      (a : Nat) (ap : Nat) (b : Nat) (bp : Nat) (ha : Equal Nat a ap) (hb : Equal Nat b bp)
-    : Equal Nat (add a b) (add ap bp) =
-  trans
-    Nat
-    (add a b)
-    (add ap b)
-    (add ap bp)
-    (cong Nat Nat a ap (λv. add v b) ha)
-    (cong Nat Nat b bp (add ap) hb)
+theorem leq_cross_respect
+      (a : Nat)
+      (bx : Nat)
+      (c : Nat)
+      (by : Nat)
+      (ap : Nat)
+      (bxp : Nat)
+      (cp : Nat)
+      (byp : Nat)
+      (ha : Equal Nat (mul a (Suc bxp)) (mul ap (Suc bx)))
+      (hc : Equal Nat (mul c (Suc byp)) (mul cp (Suc by)))
+    : Equal Bool
+        (leq_nat (mul a (Suc by)) (mul c (Suc bx)))
+        (leq_nat (mul ap (Suc byp)) (mul cp (Suc bxp))) =
+  let
+    left = mul a (Suc by);
+    right = mul c (Suc bx);
+    next_left = mul ap (Suc byp);
+    next_right = mul cp (Suc bxp);
+    before_factor = mul (Suc bxp) (Suc byp);
+    after_factor = mul (Suc bx) (Suc by);
+    cross_left : Equal Nat (mul left before_factor) (mul next_left after_factor) =
+      cross_first a (Suc bx) (Suc by) ap (Suc bxp) (Suc byp) ha;
+    cross_right : Equal Nat (mul right before_factor) (mul next_right after_factor) =
+      cross_second (Suc bx) c (Suc by) (Suc bxp) cp (Suc byp) hc;
+    comparison : Equal Bool
+      (leq_nat (mul left before_factor) (mul right before_factor))
+      (leq_nat (mul next_left after_factor) (mul next_right after_factor)) =
+      leq_cong_two
+        (mul left before_factor)
+        (mul next_left after_factor)
+        (mul right before_factor)
+        (mul next_right after_factor)
+        cross_left
+        cross_right;
+    forward : Equal Bool
+      (leq_nat left right)
+      True → Equal Bool
+      (leq_nat next_left next_right)
+      True =
+      λh.
+        leq_nat_mul_right_cancel
+          next_left
+          next_right
+          (positive_product_tail bx by)
+          (trans
+            Bool
+            (leq_nat (mul next_left after_factor) (mul next_right after_factor))
+            (leq_nat (mul left before_factor) (mul right before_factor))
+            True
+            (sym
+              Bool
+              (leq_nat (mul left before_factor) (mul right before_factor))
+              (leq_nat (mul next_left after_factor) (mul next_right after_factor))
+              comparison)
+            (leq_nat_mul_right_mono left right (positive_product_tail bxp byp) h));
+    backward : Equal Bool
+      (leq_nat next_left next_right)
+      True → Equal Bool
+      (leq_nat left right)
+      True =
+      λh.
+        leq_nat_mul_right_cancel
+          left
+          right
+          (positive_product_tail bxp byp)
+          (trans
+            Bool
+            (leq_nat (mul left before_factor) (mul right before_factor))
+            (leq_nat (mul next_left after_factor) (mul next_right after_factor))
+            True
+            comparison
+            (leq_nat_mul_right_mono next_left next_right (positive_product_tail bx by) h))
+  in
+    bool_eq_from_iff (leq_nat left right) (leq_nat next_left next_right) forward backward
 
-theorem mul_reorder_right
-      (a : Nat) (b : Nat) (c : Nat)
-    : Equal Nat (mul (mul a b) c) (mul a (mul c b)) =
+fn positive_product_tail (a : Nat) (b : Nat) : Nat = add (mul (Suc a) b) a
+
+theorem cross_first
+      (a : Nat)
+      (b : Nat)
+      (d : Nat)
+      (ap : Nat)
+      (bp : Nat)
+      (dp : Nat)
+      (ha : Equal Nat (mul a bp) (mul ap b))
+    : Equal Nat (mul (mul a d) (mul bp dp)) (mul (mul ap dp) (mul b d)) =
   trans
     Nat
-    (mul (mul a b) c)
-    (mul a (mul b c))
-    (mul a (mul c b))
-    (sym Nat (mul a (mul b c)) (mul (mul a b) c) ((proof assoc for mul) a b c))
-    (cong Nat Nat (mul b c) (mul c b) (mul a) ((proof comm for mul) b c))
+    (mul (mul a d) (mul bp dp))
+    (mul (mul a bp) (mul d dp))
+    (mul (mul ap dp) (mul b d))
+    (mul_shuffle a d bp dp)
+    (trans
+      Nat
+      (mul (mul a bp) (mul d dp))
+      (mul (mul ap b) (mul dp d))
+      (mul (mul ap dp) (mul b d))
+      (mul_cong2 (mul a bp) (mul ap b) (mul d dp) (mul dp d) ha ((proof comm for mul) d dp))
+      (sym Nat (mul (mul ap dp) (mul b d)) (mul (mul ap b) (mul dp d)) (mul_shuffle ap dp b d)))
+
+theorem cross_second
+      (b : Nat)
+      (c : Nat)
+      (d : Nat)
+      (bp : Nat)
+      (cp : Nat)
+      (dp : Nat)
+      (hc : Equal Nat (mul c dp) (mul cp d))
+    : Equal Nat (mul (mul c b) (mul bp dp)) (mul (mul cp bp) (mul b d)) =
+  trans
+    Nat
+    (mul (mul c b) (mul bp dp))
+    (mul (mul c dp) (mul b bp))
+    (mul (mul cp bp) (mul b d))
+    (trans
+      Nat
+      (mul (mul c b) (mul bp dp))
+      (mul (mul c b) (mul dp bp))
+      (mul (mul c dp) (mul b bp))
+      (cong Nat Nat (mul bp dp) (mul dp bp) (λv. mul (mul c b) v) ((proof comm for mul) bp dp))
+      (mul_shuffle c b dp bp))
+    (trans
+      Nat
+      (mul (mul c dp) (mul b bp))
+      (mul (mul cp d) (mul bp b))
+      (mul (mul cp bp) (mul b d))
+      (mul_cong2 (mul c dp) (mul cp d) (mul b bp) (mul bp b) hc ((proof comm for mul) b bp))
+      (trans
+        Nat
+        (mul (mul cp d) (mul bp b))
+        (mul (mul cp bp) (mul d b))
+        (mul (mul cp bp) (mul b d))
+        (sym
+          Nat
+          (mul (mul cp bp) (mul d b))
+          (mul (mul cp d) (mul bp b))
+          (mul_shuffle cp bp d b))
+        (cong Nat Nat (mul d b) (mul b d) (λv. mul (mul cp bp) v) ((proof comm for mul) d b))))
+
+theorem mul_cong2
+      (a : Nat) (b : Nat) (c : Nat) (d : Nat) (hab : Equal Nat a b) (hcd : Equal Nat c d)
+    : Equal Nat (mul a c) (mul b d) =
+  trans
+    Nat
+    (mul a c)
+    (mul b c)
+    (mul b d)
+    (cong Nat Nat a b (λv. mul v c) hab)
+    (cong Nat Nat c d (mul b) hcd)
+
+theorem leq_cong_two
+      (a : Nat) (ap : Nat) (b : Nat) (bp : Nat) (ha : Equal Nat a ap) (hb : Equal Nat b bp)
+    : Equal Bool (leq_nat a b) (leq_nat ap bp) =
+  trans
+    Bool
+    (leq_nat a b)
+    (leq_nat ap b)
+    (leq_nat ap bp)
+    (cong Nat Bool a ap (λv. leq_nat v b) ha)
+    (cong Nat Bool b bp (leq_nat ap) hb)
+
+theorem bool_eq_from_iff
+      (p : Bool)
+    : (q : Bool)
+      → (Equal Bool p True → Equal Bool q True)
+      → (Equal Bool q True → Equal Bool p True)
+      → Equal Bool p q =
+  match p {
+    True ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. Proved;
+          False ↦ λforward. λbackward. absurd (forward Proved)
+        };
+    False ↦
+      λq.
+        match q {
+          True ↦ λforward. λbackward. absurd (backward Proved);
+          False ↦ λforward. λbackward. Proved
+        }
+  }
 
 theorem add_assoc_cross
       (a : Nat) (b : Nat) (c : Nat) (d : Nat) (e : Nat) (f : Nat)
@@ -858,231 +889,200 @@ theorem add_assoc_cross
                 (add first_associated middle)
                 (mul_add_distrib_l (mul a e) (mul b d) f))))))
 
-theorem cross_first
-      (a : Nat)
-      (b : Nat)
-      (d : Nat)
-      (ap : Nat)
-      (bp : Nat)
-      (dp : Nat)
-      (ha : Equal Nat (mul a bp) (mul ap b))
-    : Equal Nat (mul (mul a d) (mul bp dp)) (mul (mul ap dp) (mul b d)) =
+theorem mul_reorder_right
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul (mul a b) c) (mul a (mul c b)) =
   trans
     Nat
-    (mul (mul a d) (mul bp dp))
-    (mul (mul a bp) (mul d dp))
-    (mul (mul ap dp) (mul b d))
-    (mul_shuffle a d bp dp)
-    (trans
-      Nat
-      (mul (mul a bp) (mul d dp))
-      (mul (mul ap b) (mul dp d))
-      (mul (mul ap dp) (mul b d))
-      (mul_cong2 (mul a bp) (mul ap b) (mul d dp) (mul dp d) ha ((proof comm for mul) d dp))
-      (sym Nat (mul (mul ap dp) (mul b d)) (mul (mul ap b) (mul dp d)) (mul_shuffle ap dp b d)))
+    (mul (mul a b) c)
+    (mul a (mul b c))
+    (mul a (mul c b))
+    (sym Nat (mul a (mul b c)) (mul (mul a b) c) ((proof assoc for mul) a b c))
+    (cong Nat Nat (mul b c) (mul c b) (mul a) ((proof comm for mul) b c))
 
-theorem cross_second
-      (b : Nat)
-      (c : Nat)
-      (d : Nat)
-      (bp : Nat)
-      (cp : Nat)
-      (dp : Nat)
-      (hc : Equal Nat (mul c dp) (mul cp d))
-    : Equal Nat (mul (mul c b) (mul bp dp)) (mul (mul cp bp) (mul b d)) =
-  trans
-    Nat
-    (mul (mul c b) (mul bp dp))
-    (mul (mul c dp) (mul b bp))
-    (mul (mul cp bp) (mul b d))
-    (trans
-      Nat
-      (mul (mul c b) (mul bp dp))
-      (mul (mul c b) (mul dp bp))
-      (mul (mul c dp) (mul b bp))
-      (cong Nat Nat (mul bp dp) (mul dp bp) (λv. mul (mul c b) v) ((proof comm for mul) bp dp))
-      (mul_shuffle c b dp bp))
-    (trans
-      Nat
-      (mul (mul c dp) (mul b bp))
-      (mul (mul cp d) (mul bp b))
-      (mul (mul cp bp) (mul b d))
-      (mul_cong2 (mul c dp) (mul cp d) (mul b bp) (mul bp b) hc ((proof comm for mul) b bp))
-      (trans
-        Nat
-        (mul (mul cp d) (mul bp b))
-        (mul (mul cp bp) (mul d b))
-        (mul (mul cp bp) (mul b d))
-        (sym
-          Nat
-          (mul (mul cp bp) (mul d b))
-          (mul (mul cp d) (mul bp b))
-          (mul_shuffle cp bp d b))
-        (cong Nat Nat (mul d b) (mul b d) (λv. mul (mul cp bp) v) ((proof comm for mul) d b))))
-
-theorem leq_cong_two
-      (a : Nat) (ap : Nat) (b : Nat) (bp : Nat) (ha : Equal Nat a ap) (hb : Equal Nat b bp)
-    : Equal Bool (leq_nat a b) (leq_nat ap bp) =
-  trans
-    Bool
-    (leq_nat a b)
-    (leq_nat ap b)
-    (leq_nat ap bp)
-    (cong Nat Bool a ap (λv. leq_nat v b) ha)
-    (cong Nat Bool b bp (leq_nat ap) hb)
-
-theorem bool_eq_from_iff
-      (p : Bool)
-    : (q : Bool)
-      → (Equal Bool p True → Equal Bool q True)
-      → (Equal Bool q True → Equal Bool p True)
-      → Equal Bool p q =
-  match p {
-    True ↦
-      λq.
-        match q {
-          True ↦ λforward. λbackward. Proved;
-          False ↦ λforward. λbackward. absurd (forward Proved)
-        };
-    False ↦
-      λq.
-        match q {
-          True ↦ λforward. λbackward. absurd (backward Proved);
-          False ↦ λforward. λbackward. Proved
-        }
-  }
-
-theorem leq_cross_respect
-      (a : Nat)
-      (bx : Nat)
-      (c : Nat)
-      (by : Nat)
-      (ap : Nat)
-      (bxp : Nat)
-      (cp : Nat)
-      (byp : Nat)
-      (ha : Equal Nat (mul a (Suc bxp)) (mul ap (Suc bx)))
-      (hc : Equal Nat (mul c (Suc byp)) (mul cp (Suc by)))
-    : Equal Bool
-        (leq_nat (mul a (Suc by)) (mul c (Suc bx)))
-        (leq_nat (mul ap (Suc byp)) (mul cp (Suc bxp))) =
-  let
-    left = mul a (Suc by);
-    right = mul c (Suc bx);
-    next_left = mul ap (Suc byp);
-    next_right = mul cp (Suc bxp);
-    before_factor = mul (Suc bxp) (Suc byp);
-    after_factor = mul (Suc bx) (Suc by);
-    cross_left : Equal Nat (mul left before_factor) (mul next_left after_factor) =
-      cross_first a (Suc bx) (Suc by) ap (Suc bxp) (Suc byp) ha;
-    cross_right : Equal Nat (mul right before_factor) (mul next_right after_factor) =
-      cross_second (Suc bx) c (Suc by) (Suc bxp) cp (Suc byp) hc;
-    comparison : Equal Bool
-      (leq_nat (mul left before_factor) (mul right before_factor))
-      (leq_nat (mul next_left after_factor) (mul next_right after_factor)) =
-      leq_cong_two
-        (mul left before_factor)
-        (mul next_left after_factor)
-        (mul right before_factor)
-        (mul next_right after_factor)
-        cross_left
-        cross_right;
-    forward : Equal Bool
-      (leq_nat left right)
-      True → Equal Bool
-      (leq_nat next_left next_right)
-      True =
-      λh.
-        leq_nat_mul_right_cancel
-          next_left
-          next_right
-          (positive_product_tail bx by)
-          (trans
-            Bool
-            (leq_nat (mul next_left after_factor) (mul next_right after_factor))
-            (leq_nat (mul left before_factor) (mul right before_factor))
-            True
-            (sym
-              Bool
-              (leq_nat (mul left before_factor) (mul right before_factor))
-              (leq_nat (mul next_left after_factor) (mul next_right after_factor))
-              comparison)
-            (leq_nat_mul_right_mono left right (positive_product_tail bxp byp) h));
-    backward : Equal Bool
-      (leq_nat next_left next_right)
-      True → Equal Bool
-      (leq_nat left right)
-      True =
-      λh.
-        leq_nat_mul_right_cancel
-          left
-          right
-          (positive_product_tail bxp byp)
-          (trans
-            Bool
-            (leq_nat (mul left before_factor) (mul right before_factor))
-            (leq_nat (mul next_left after_factor) (mul next_right after_factor))
-            True
-            comparison
-            (leq_nat_mul_right_mono next_left next_right (positive_product_tail bx by) h))
-  in
-    bool_eq_from_iff (leq_nat left right) (leq_nat next_left next_right) forward backward
-
-theorem add_cross_respect
-      (a : Nat)
-      (b : Nat)
-      (c : Nat)
-      (d : Nat)
-      (ap : Nat)
-      (bp : Nat)
-      (cp : Nat)
-      (dp : Nat)
-      (ha : Equal Nat (mul a bp) (mul ap b))
-      (hc : Equal Nat (mul c dp) (mul cp d))
+theorem rational_distrib_cross
+      (a : Nat) (b : Nat) (c : Nat) (d : Nat) (e : Nat) (f : Nat)
     : Equal Nat
-        (mul (add (mul a d) (mul c b)) (mul bp dp))
-        (mul (add (mul ap dp) (mul cp bp)) (mul b d)) =
+        (mul (mul a (add (mul b f) (mul c e))) (mul (mul d e) (mul d f)))
+        (mul (add (mul (mul a b) (mul d f)) (mul (mul a c) (mul d e))) (mul d (mul e f))) =
   let
-    left_cross_product : Equal Nat (mul (mul a d) (mul bp dp)) (mul (mul ap dp) (mul b d)) =
-      cross_first a b d ap bp dp ha;
-    right_cross_product : Equal Nat (mul (mul c b) (mul bp dp)) (mul (mul cp bp) (mul b d)) =
-      cross_second b c d bp cp dp hc
+    left_numerator = mul a (add (mul b f) (mul c e));
+    expanded_left = mul a (mul b f);
+    expanded_right = mul a (mul c e);
+    right_left = mul (mul a b) (mul d f);
+    right_right = mul (mul a c) (mul d e);
+    repeated_denominator = mul (mul d e) (mul d f);
+    common_denominator = mul d (mul e f);
+    initial = mul left_numerator repeated_denominator;
+    expanded = mul (add expanded_left expanded_right) repeated_denominator;
+    distributed =
+      add (mul expanded_left repeated_denominator) (mul expanded_right repeated_denominator);
+    rearranged = add (mul right_left common_denominator) (mul right_right common_denominator);
+    final_product = mul (add right_left right_right) common_denominator
   in
     trans
       Nat
-      (mul (add (mul a d) (mul c b)) (mul bp dp))
-      (add (mul (mul a d) (mul bp dp)) (mul (mul c b) (mul bp dp)))
-      (mul (add (mul ap dp) (mul cp bp)) (mul b d))
-      (mul_add_distrib_l (mul a d) (mul c b) (mul bp dp))
+      initial
+      expanded
+      final_product
+      (cong
+        Nat
+        Nat
+        left_numerator
+        (add expanded_left expanded_right)
+        (λv. mul v repeated_denominator)
+        (mul_add_distrib_r a (mul b f) (mul c e)))
       (trans
         Nat
-        (add (mul (mul a d) (mul bp dp)) (mul (mul c b) (mul bp dp)))
-        (add (mul (mul ap dp) (mul b d)) (mul (mul cp bp) (mul b d)))
-        (mul (add (mul ap dp) (mul cp bp)) (mul b d))
+        expanded
+        distributed
+        final_product
+        (mul_add_distrib_l expanded_left expanded_right repeated_denominator)
         (trans
           Nat
-          (add (mul (mul a d) (mul bp dp)) (mul (mul c b) (mul bp dp)))
-          (add (mul (mul ap dp) (mul b d)) (mul (mul c b) (mul bp dp)))
-          (add (mul (mul ap dp) (mul b d)) (mul (mul cp bp) (mul b d)))
-          (cong
+          distributed
+          rearranged
+          final_product
+          (add_cong2
+            (mul expanded_left repeated_denominator)
+            (mul right_left common_denominator)
+            (mul expanded_right repeated_denominator)
+            (mul right_right common_denominator)
+            (distrib_cross_term a b f d e f)
+            (distrib_cross_term a c e d e f))
+          (sym
             Nat
-            Nat
-            (mul (mul a d) (mul bp dp))
-            (mul (mul ap dp) (mul b d))
-            (λv. add v (mul (mul c b) (mul bp dp)))
-            left_cross_product)
-          (cong
-            Nat
-            Nat
-            (mul (mul c b) (mul bp dp))
-            (mul (mul cp bp) (mul b d))
-            (λv. add (mul (mul ap dp) (mul b d)) v)
-            right_cross_product))
-        (sym
+            final_product
+            rearranged
+            (mul_add_distrib_l right_left right_right common_denominator))))
+
+theorem add_cong2
+      (a : Nat) (ap : Nat) (b : Nat) (bp : Nat) (ha : Equal Nat a ap) (hb : Equal Nat b bp)
+    : Equal Nat (add a b) (add ap bp) =
+  trans
+    Nat
+    (add a b)
+    (add ap b)
+    (add ap bp)
+    (cong Nat Nat a ap (λv. add v b) ha)
+    (cong Nat Nat b bp (add ap) hb)
+
+theorem distrib_cross_term
+      (a : Nat) (b : Nat) (c : Nat) (d : Nat) (e : Nat) (f : Nat)
+    : Equal Nat
+        (mul (mul a (mul b c)) (mul (mul d e) (mul d f)))
+        (mul (mul (mul a b) (mul d c)) (mul d (mul e f))) =
+  let
+    numerator_factor = mul a (mul b c);
+    associated_numerator = mul (mul a b) c;
+    repeated_denominator = mul (mul d e) (mul d f);
+    common_denominator = mul d (mul e f);
+    left = mul numerator_factor repeated_denominator;
+    reassociated = mul associated_numerator repeated_denominator;
+    shared = mul associated_numerator (mul d common_denominator);
+    right = mul (mul (mul a b) (mul d c)) common_denominator
+  in
+    trans
+      Nat
+      left
+      reassociated
+      right
+      (cong
+        Nat
+        Nat
+        numerator_factor
+        associated_numerator
+        (λv. mul v repeated_denominator)
+        ((proof assoc for mul) a b c))
+      (trans
+        Nat
+        reassociated
+        shared
+        right
+        (cong
           Nat
-          (mul (add (mul ap dp) (mul cp bp)) (mul b d))
-          (add (mul (mul ap dp) (mul b d)) (mul (mul cp bp) (mul b d)))
-          (mul_add_distrib_l (mul ap dp) (mul cp bp) (mul b d))))
+          Nat
+          repeated_denominator
+          (mul d common_denominator)
+          (λv. mul associated_numerator v)
+          (denominator_repeat d e f))
+        (mul_factor_shuffle (mul a b) c d common_denominator))
+
+theorem denominator_repeat
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul (mul a b) (mul a c)) (mul a (mul a (mul b c))) =
+  trans
+    Nat
+    (mul (mul a b) (mul a c))
+    (mul (mul a a) (mul b c))
+    (mul a (mul a (mul b c)))
+    (mul_shuffle a b a c)
+    (sym
+      Nat
+      (mul a (mul a (mul b c)))
+      (mul (mul a a) (mul b c))
+      ((proof assoc for mul) a a (mul b c)))
+
+theorem mul_factor_shuffle
+      (x : Nat) (c : Nat) (d : Nat) (y : Nat)
+    : Equal Nat (mul (mul x c) (mul d y)) (mul (mul x (mul d c)) y) =
+  trans
+    Nat
+    (mul (mul x c) (mul d y))
+    (mul (mul x d) (mul c y))
+    (mul (mul x (mul d c)) y)
+    (mul_shuffle x c d y)
+    (trans
+      Nat
+      (mul (mul x d) (mul c y))
+      (mul (mul (mul x d) c) y)
+      (mul (mul x (mul d c)) y)
+      ((proof assoc for mul) (mul x d) c y)
+      (cong
+        Nat
+        Nat
+        (mul (mul x d) c)
+        (mul x (mul d c))
+        (λv. mul v y)
+        (sym Nat (mul x (mul d c)) (mul (mul x d) c) ((proof assoc for mul) x d c))))
+
+theorem mul_shuffle
+      (a : Nat) (b : Nat) (c : Nat) (d : Nat)
+    : Equal Nat (mul (mul a b) (mul c d)) (mul (mul a c) (mul b d)) =
+  trans
+    Nat
+    (mul (mul a b) (mul c d))
+    (mul (mul (mul a b) c) d)
+    (mul (mul a c) (mul b d))
+    ((proof assoc for mul) (mul a b) c d)
+    (trans
+      Nat
+      (mul (mul (mul a b) c) d)
+      (mul (mul (mul a c) b) d)
+      (mul (mul a c) (mul b d))
+      (cong Nat Nat (mul (mul a b) c) (mul (mul a c) b) (λv. mul v d) (mul_swap_tail a b c))
+      (sym
+        Nat
+        (mul (mul a c) (mul b d))
+        (mul (mul (mul a c) b) d)
+        ((proof assoc for mul) (mul a c) b d)))
+
+theorem mul_swap_tail
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul (mul a b) c) (mul (mul a c) b) =
+  trans
+    Nat
+    (mul (mul a b) c)
+    (mul a (mul b c))
+    (mul (mul a c) b)
+    (sym Nat (mul a (mul b c)) (mul (mul a b) c) ((proof assoc for mul) a b c))
+    (trans
+      Nat
+      (mul a (mul b c))
+      (mul a (mul c b))
+      (mul (mul a c) b)
+      (cong Nat Nat (mul b c) (mul c b) (λv. mul a v) ((proof comm for mul) b c))
+      ((proof assoc for mul) a c b))
 ```
 
 ## 5. Design notes
