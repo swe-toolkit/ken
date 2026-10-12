@@ -122,13 +122,6 @@ impl StaticResponseEnvironmentBinding {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum StaticResponseEffectInput {
     Frame(StaticResponseEnvironmentBinding),
-    /// The exact `buffer_nat_to_int` normalization inside a static FsWriteAt
-    /// request. The owner reads the already-validated span field directly;
-    /// this is not a general admission of carried Nat constructor matching.
-    BoundedNatToInt {
-        span: StaticResponseEnvironmentBinding,
-        span_identity: ConstructorIdentity,
-    },
     /// An operation argument lowered from its retained source occurrence using
     /// only the explicitly mapped owner-frame environment.
     OperationArgument {
@@ -2288,76 +2281,6 @@ fn static_response_argument_environment(
     Ok(Ok(environment))
 }
 
-fn is_exact_bounded_nat_to_int(expr: &RuntimeExpr) -> bool {
-    let RuntimeExpr::Call {
-        callee,
-        args: outer_args,
-    } = expr
-    else {
-        return false;
-    };
-    let RuntimeExpr::LexicalClosure { params, body, .. } = callee.as_ref() else {
-        return false;
-    };
-    if params.len() != 1 || outer_args.len() != 1 {
-        return false;
-    }
-    let RuntimeExpr::Match {
-        scrutinee,
-        cases: span_cases,
-        ..
-    } = &outer_args[0]
-    else {
-        return false;
-    };
-    if !matches!(scrutinee.as_ref(), RuntimeExpr::Var(0))
-        || span_cases.len() != 1
-        || span_cases[0].binders != 3
-        || !span_cases[0]
-            .constructor
-            .as_str()
-            .contains("::BufferSpan::")
-        || !matches!(span_cases[0].body, RuntimeExpr::Var(2))
-    {
-        return false;
-    }
-    let RuntimeExpr::Match { cases, .. } = body.as_ref() else {
-        return false;
-    };
-    let zero = cases.iter().find(|case| {
-        case.constructor.as_str().ends_with("::Nat::Zero")
-            && case.binders == 0
-            && matches!(case.body, RuntimeExpr::Value(crate::RuntimeValue::Int(crate::RuntimeIntV1::Small(0))))
-    });
-    let suc = cases.iter().find(|case| {
-        case.constructor.as_str().ends_with("::Nat::Suc") && case.binders == 1
-    });
-    if zero.is_none() || suc.is_none() || cases.len() != 2 {
-        return false;
-    }
-    let RuntimeExpr::PrimitiveCall {
-        primitive,
-        args: suc_args,
-    } = &suc.expect("one Suc case").body
-    else {
-        return false;
-    };
-    if primitive.symbol.as_str() != "add_int" || suc_args.len() != 2 {
-        return false;
-    }
-    matches!(
-        suc_args.as_slice(),
-        [
-            RuntimeExpr::Call {
-                callee,
-                args: recursive_args,
-            },
-            RuntimeExpr::Value(crate::RuntimeValue::Int(crate::RuntimeIntV1::Small(1))),
-        ] if matches!(callee.as_ref(), RuntimeExpr::DeclarationRef { symbol } if symbol.as_str().ends_with("::buffer_nat_to_int"))
-            && matches!(recursive_args.as_slice(), [RuntimeExpr::Var(0)])
-    )
-}
-
 fn static_response_effect_environment(
     plan: &StaticTransitionPlan<'_>,
     owner: super::units::PredeclaredFunctionId,
@@ -2424,23 +2347,10 @@ fn static_response_effect_environment(
             Ok(environment) => environment,
             Err(reason) => return Ok(Err(reason)),
         };
-        if is_exact_bounded_nat_to_int(argument) {
-            let span = environment.first().cloned().ok_or_else(|| {
-                planner_error("the exact BoundedNat conversion has no span environment input")
-            })?;
-            let span_match_origin = plan.semantic.child_origin(argument_origin, 1)?;
-            actual_argument_inputs.push(StaticResponseEffectInput::BoundedNatToInt {
-                span,
-                span_identity: plan
-                    .semantic
-                    .case_constructor_identity(span_match_origin, 0)?,
-            });
-        } else {
-            actual_argument_inputs.push(StaticResponseEffectInput::OperationArgument {
-                origin: argument_origin,
-                environment,
-            });
-        }
+        actual_argument_inputs.push(StaticResponseEffectInput::OperationArgument {
+            origin: argument_origin,
+            environment,
+        });
     }
 
     let mut free = BTreeSet::new();
