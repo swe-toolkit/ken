@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-NAT-MATRIX
 title: "Spec 65 section 1 specifies dimension-safe Nat vectors and matrices, but no catalog package declares them and the Vec carrier they use is private. Publish Vec and deliver Algorithm.LinearAlgebra.NatMatrix: seven operations and five laws, every law proved at zero trust"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2
