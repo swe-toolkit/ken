@@ -1,7 +1,7 @@
 ---
 id: LANG-EMBEDDED-METHOD-EQUATION-CONVOY
 title: "The coherent-frame motive planner generalizes a constructor-headed index of an embedded recursive method to a fresh variable and drops the equation that relates them, so a true Equal proof at a single-constructor type in a nested indexed match is refused exactly like a false one. Generalize by equation: convoy the index equation and supply the IH evidence from it"
-status: ready
+status: active
 owner: language
 size: L
 tier: T1
