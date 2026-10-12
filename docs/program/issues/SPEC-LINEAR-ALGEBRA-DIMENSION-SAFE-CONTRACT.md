@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT
 title: "No linear-algebra contract exists in spec/50-stdlib, so the catalog's dimension-safe linear algebra layer has nothing to build against. Author its chapter with a first section: vectors and matrices whose dimensions are in their types, dot product, matrix-vector and matrix-matrix product, transpose and identity, each law proved at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
