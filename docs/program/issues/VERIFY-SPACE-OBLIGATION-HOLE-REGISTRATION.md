@@ -1,7 +1,7 @@
 ---
 id: VERIFY-SPACE-OBLIGATION-HOLE-REGISTRATION
 title: "Obligation holes minted inside a space declaration are never recorded in the hole registry, so a claim that reaches one through a transparent space operation or cell still reads proved. Register them at the space seam"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1
@@ -65,3 +65,21 @@ path that feeds `ids` for the same gap.
 - Any kernel or `trusted_base()` change.
 - A catalog claim newly reads not proved: stop with the list, since that
   is a status change the Architect rules on.
+
+## Closeout
+
+Merged `fd3b9262b` from exact `6874ff2a6` (PR #4695). Verify QA
+`evt_2a7gn0sxns1cz`, Architect `evt_53p3pg47vxdzj`, Decision
+`dec_knv8ctx0j3np`.
+
+- `expand_scope`'s space arm now registers every hole its results mint,
+  through `register_obligation_holes`, before `ids.extend`. It was the
+  only one of the five `ids` routes without registration.
+- `S.call`, `ts1` and a claim reading `T`'s cell read not proved and name
+  their hole. The `k` control is unchanged.
+- The suite checks registry, claim status and kernel reachability
+  separately; 3/3, and 68/68 with the honesty and space suites. Removing
+  the loop reddens all three rows.
+- Catalog census on the candidate: 68 roots, 0 tainted, so the stop did
+  not fire. It is bounded to those roots and the registry predicate.
+- Verify moves to `VERIFY-RETIRE-BOUNDED-NAT-RECOGNIZER`.

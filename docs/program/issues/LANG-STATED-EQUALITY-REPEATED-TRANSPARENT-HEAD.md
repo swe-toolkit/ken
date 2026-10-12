@@ -1,7 +1,7 @@
 ---
 id: LANG-STATED-EQUALITY-REPEATED-TRANSPARENT-HEAD
 title: "stated_equality gives up when a goal's head chain unfolds the same transparent id twice, so a non-recursive wrapper used twice (Id (Id (Equal ...))) is reported as stating no equality and Refl is refused on every predicate route. Bound the unfolding by recursion, not by revisit"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
@@ -50,22 +50,31 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first: the Architect rules the termination bound that admits a
-repeated non-recursive head and still stops a recursive transparent group.
-Then the change in `stated_equality`.
+D0 ruled (Architect `evt_12z122k4j4266`). The revisit guard keys on the
+kernel's cycle predicate: `env.is_recursive_transparent(id) &&
+!unfolded.insert(id)`, with no fuel and no depth bound. It terminates
+because both consumers run `whnf` first and the walk follows a prefix of
+that head reduction. The change is confined to `stated_equality`.
 
 ## Acceptance
 
 - **AC-1.** The five refused rows are Ok, on both routes where listed.
-- **AC-2 (control).** A recursive transparent group still terminates and
-  states no equality. The REFL-GOAL suite, its false twin, the `Both`
+  Both false twins are refused for non-convertibility.
+- **AC-2 (control).** An elab.rs unit test declares an SCT-admitted
+  Prop-valued recursive family `P : Nat -> Prop` through
+  `declare_recursive_group`, and asserts that `env.is_recursive_transparent(P)`
+  holds and `stated_equality` returns `None` on `P k`, for a neutral `k`
+  and for `Suc Zero`. The REFL-GOAL suite, its false twin, the `Both`
   refusal and the message-pinning suites are unchanged.
-- **AC-3 (mutation, QA).** Restoring the revisit guard reddens AC-1, and
-  removing the termination bound makes the AC-2 recursive row fail to
-  terminate within its test.
+- **AC-3a (mutation, QA).** Restoring the bare `!unfolded.insert(id)`
+  guard reddens all five AC-1 rows.
+- **AC-3b (recorded, not red).** Deleting the guard line leaves the AC-2
+  recursive row terminating. Record it as evidence that the guard is
+  defensive: no head-only cycle is constructible through the public API.
 
 ## Stop conditions
 
 - Any kernel rule, conversion change or `trusted_base()` change.
-- The bound needs fuel or a depth that changes another elaborator route's
-  verdict: stop to the Architect.
+- Any AC-1 row stays refused.
+- Either false twin or the `Both` refusal checks or changes its reason.
+- The REFL-GOAL suite or the message-pinning suites change.

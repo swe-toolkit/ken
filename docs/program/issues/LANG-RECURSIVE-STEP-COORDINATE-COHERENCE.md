@@ -40,6 +40,10 @@ user-reachable failures are typed.
   `check_large_convoy_recursive_arm` returns `None`.
 - **Prior art to pull at kickoff.** The Coq `depelim` solution and
   simplification step, and Lean `cases` substituting index equations.
+- **Carry (Architect `evt_23ne4fxf29f0x`).** After
+  `LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY`, `defer_coupled_expansion` is
+  an unused parameter of `plan_coherent_frame_motive`. If this WP touches
+  that planner, delete the parameter and its caller's computation.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
