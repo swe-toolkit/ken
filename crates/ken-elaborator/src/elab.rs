@@ -3913,7 +3913,23 @@ fn build_index_equation_convoy_body(
             };
             (true, goal_level)
         }
-        _ => return Ok(None),
+        _ => {
+            let Term::Omega(goal_level) = whnf(
+                env,
+                outer_ctx,
+                &kernel_infer_in_context_current(cx, outer_ctx, original_expected).map_err(
+                    |error| match error {
+                        CurrentKernelQueryError::View(error) => error,
+                        CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                            "large index convoy could not classify its proposition: {error:?}"
+                        )),
+                    },
+                )?,
+            ) else {
+                return Ok(None);
+            };
+            (false, goal_level)
+        }
     };
     let goal_sort = Term::Omega(goal_level);
 
@@ -4499,37 +4515,31 @@ fn plan_coherent_frame_motive(
         }
     }
 
-    let planning_expected = if defer_coupled_expansion && has_nontrivial_coupled_sides {
-        original_expected
-    } else {
-        &expanded_expected
-    };
-    let probe_rebase = dependent_rebase_subs(
+    // Defer coupled expansion to nested frames only when this frame has no
+    // goal-keyed embedded eliminators of its own.
+    let embedded_expected = expanded_expected.as_ref();
+    let embedded_probe_rebase = dependent_rebase_subs(
         scrut_core,
         scrut_indices,
         motive_base_depth as i64,
         motive_local_indices,
         &Term::var(0),
-        planning_expected,
+        embedded_expected,
         probe_context_convoy
             .iter()
-            .any(|entry| scrut_occurs(planning_expected, &Term::var(entry.var))),
+            .any(|entry| scrut_occurs(embedded_expected, &Term::var(entry.var))),
     );
-    let probe_body = subst_term_generalize_many(
-        &weaken(planning_expected, motive_base_depth as i64),
-        &probe_rebase,
+    let embedded_probe_body = subst_term_generalize_many(
+        &weaken(embedded_expected, motive_base_depth as i64),
+        &embedded_probe_rebase,
     );
-    let (embedded_method_convoy, embedded_method_repairs) = if !(defer_coupled_expansion
-        && has_nontrivial_coupled_sides)
-        && has_nontrivial_coupled_sides
-        && probe_context_convoy.is_empty()
-    {
+    let (embedded_method_convoy, embedded_method_repairs) = if has_nontrivial_coupled_sides {
         plan_embedded_method_convoy(
             cx,
             &zonked_ctx,
             &motive_ctx,
-            planning_expected,
-            &probe_body,
+            embedded_expected,
+            &embedded_probe_body,
             sentinel_region,
         )?
     } else {
@@ -4538,7 +4548,7 @@ fn plan_coherent_frame_motive(
     let expected = if embedded_method_convoy.is_empty() && embedded_method_repairs.is_empty() {
         original_expected.clone()
     } else {
-        planning_expected.clone()
+        embedded_expected.clone()
     };
     let context_convoy = if embedded_method_convoy.is_empty() && embedded_method_repairs.is_empty()
     {
