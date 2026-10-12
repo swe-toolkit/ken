@@ -1,7 +1,7 @@
 ---
 id: LANG-EMBEDDED-METHOD-EQUATION-CONVOY
 title: "The coherent-frame motive planner generalizes a constructor-headed index of an embedded recursive method to a fresh variable and drops the equation that relates them, so a true Equal proof at a single-constructor type in a nested indexed match is refused exactly like a false one. Generalize by equation: convoy the index equation and supply the IH evidence from it"
-status: active
+status: merged
 owner: language
 size: L
 tier: T1
@@ -74,3 +74,19 @@ Architect's ruling `evt_3bfdj7qm0azt4`. T2 and T3 move to
 
 - Any kernel rule, conversion change or `trusted_base()` change.
 - A suite or census delta outside the named rows: stop to the Architect.
+
+## Closeout
+
+Merged `c6008b54c` from exact `27cc9c572` (PR #4685). Language QA
+`evt_9atqxe9y021`, Architect `evt_1fd74f3z1hdcg`, Decision
+`dec_5jvqwg30ym0sm`. Scope narrowed to T1 by fork (i)
+(`evt_33zvpm72tmtwn`).
+
+At the unrepairable-method decline arm, an index-equation eliminator
+fallback, admitted by a companion-context E' inference probe, keeps the
+equation that relates the generalized index to its original. Three
+companion installs run after the refresh, and the gate is unchanged. T1
+elaborates. The named row and F4 refuse with the Eq-shaped reason, where
+base gave `KernelRejected`. Elaborator only: three crates paths, no kernel,
+trust or catalog change. T2, T3 and the elab.rs `Internal` control are
+`LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`.

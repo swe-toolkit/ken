@@ -1,7 +1,7 @@
 ---
 id: LANG-REFL-GOAL-ONE-EQUALITY-PREDICATE
 title: "Refl decides that its goal is an equality by two different keys: the standalone gate looks up the spelling Equal in globals, the match-arm branch simplifier reads a transparent body that is exactly Eq. A user alias of Eq is refused standalone and accepted in every arm. Decide it once, by checked identity, for both paths"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
