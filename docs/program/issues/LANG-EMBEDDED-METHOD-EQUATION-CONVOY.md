@@ -7,7 +7,7 @@ size: L
 tier: T1
 gate: architect
 depends_on: [LANG-MATCH-ARM-REFL-PAIR-GOAL]
-blocks: []
+blocks: [LANG-RECURSIVE-STEP-COORDINATE-COHERENCE]
 github: null
 origin: "Architect fork evt_7w6zenn2rez46, option (i), taken by the Steward: it supersedes LANG-COHERENT-FRAME-SINGLE-CONSTRUCTOR-EQUAL, carrying over its AC-1, AC-2 and measurements (evt_7ksak22xar0xj). Steward-filed per COORDINATION section 2."
 ---
@@ -56,14 +56,19 @@ the coherent-frame motive planner, coexisting with the context convoy.
 
 ## Acceptance
 
-- **AC-1.** T1 and T3 elaborate and check. T2 as the D0 ruling places it.
-- **AC-2 (discriminating).** The named row and F4 are refused at their
-  false step, with an assertion that a true twin does not satisfy.
+Narrowed by the Steward's fork choice (i) (`evt_33zvpm72tmtwn`) on the
+Architect's ruling `evt_3bfdj7qm0azt4`. T2 and T3 move to
+`LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`.
+
+- **AC-1.** T1 elaborates and checks.
+- **AC-2 (discriminating).** The named row and F4 refuse with
+  `TypeMismatch` "Refl expects an `Eq`-shaped goal" at the `DualFS` Refl
+  span, and T1 is Ok as the twin. Base gives `KernelRejected` Dg647
+  (`evt_4knk3yth92kew`).
 - **AC-3 (control).** The coherent_frame, context_telescope, motive_rebase,
   index_convoy_impossible_arm_level and other suites in the Architect's
   61-row set, and the 72-file catalog census, are unchanged.
-- **AC-4 (mutation, QA).** Dropping the convoyed equation reddens T1 and
-  T3.
+- **AC-4 (mutation, QA).** Dropping the convoyed equation reddens T1.
 
 ## Stop conditions
 

@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-RATIONAL-VALUES
 title: "No catalog package carries an exact rational value, so value-typed probability and means have nothing to land on. Deliver sections 1, 2 and 2.1 of spec/50-stdlib/64-rational.md as Data.Numeric.Rational: the positive-denominator carrier, equivalence, total arithmetic, respect and the algebra laws, fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T1
@@ -75,3 +75,17 @@ The section 2.2 order laws (`refl`, `trans`, `antisym` and `total` for
 - A law needs an Axiom, a quotient or setoid facility, a kernel or surface
   change, or a Nat law outside section 4.
 - Reuse needs a public-surface change to a provider.
+
+## Closeout
+
+Merged `557b9daea` from exact `7f86db5cc` (PR #4682). Foundation QA
+`evt_1awnzdejggz7n`, Architect `evt_25x1rh9wx6tft`, Decision
+`dec_203195shy59b4`.
+
+`Data.Numeric.Rational` carries the section 1, 2 and 2.1 surface with
+every law proved, using the section 4 Nat laws from
+`CAT-NAT-RATIONAL-PREREQUISITES`. Its private helpers read top-down as
+ruled. The acceptance target `cat_numeric_rational_values.rs` runs the
+seed cases, and the strict-resolution census gains its row.
+`trusted_base()` is unchanged. Three paths, catalog plus crates. The
+section 2.2 order laws are `CAT-NUMERIC-RATIONAL-ORDER`.
