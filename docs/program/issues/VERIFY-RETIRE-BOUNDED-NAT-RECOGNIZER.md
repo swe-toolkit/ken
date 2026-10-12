@@ -1,7 +1,7 @@
 ---
 id: VERIFY-RETIRE-BOUNDED-NAT-RECOGNIZER
 title: "The static-response BoundedNat recognizer keys a declaration and a constructor family by spelling and never fires: no prelude fixture reaches it and no test names it. Remove it so every candidate takes the general OperationArgument path"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2
