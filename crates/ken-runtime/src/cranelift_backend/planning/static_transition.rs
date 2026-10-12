@@ -667,6 +667,12 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// Complete closed return settlement for every installed response owner.
     /// Built once after phase B, validated by exact re-derivation at closure.
     pub(in crate::cranelift_backend) pending_vis_settlements: PendingVisSettlements,
+    /// The exact source/response-owner pairs driven before a forwarded Vis can
+    /// reach an excluded owner's K. Both admission and lowering read this map.
+    relay_drive_pairs: BTreeMap<(StaticOriginId, ContinuationEmissionOwner), responses::RelayDrivePair>,
+    /// An admitted pair's exact emitted member, or its planned no-route trap.
+    /// Installed after the returned-Vis protocol; lowering never reclassifies it.
+    relay_routes: BTreeMap<(StaticOriginId, ContinuationEmissionOwner, ContinuationCallIdentity), responses::RelayRoute>,
     /// `RT-LEXICAL-RECURSOR-CONSUMERS` `D2f`. The interned fusion identity
     /// plane, **installed after planning rather than during it**.
     ///
@@ -1054,6 +1060,7 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]
     per_emitter_availability::record_per_emitter_availability_diagnostic(&plan);
+
     Ok(plan)
 }
 
@@ -1152,6 +1159,8 @@ pub struct DeferredResponseObservation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticResponseFeasibilityDiagnostic {
     pub returned_vis_protocols: Vec<ReturnedVisProtocolObservation>,
+    /// Only members remaining after admitted relays are projected out.
+    pub settled_returned_vis_protocols: Vec<(u32, Vec<u32>)>,
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
@@ -1394,6 +1403,11 @@ fn record_static_response_feasibility_diagnostic(
         if let Some(rows) = slot.borrow_mut().as_mut() {
             rows.push(StaticResponseFeasibilityDiagnostic {
                 returned_vis_protocols,
+                settled_returned_vis_protocols: plan.pending_vis_settlements.protocol.as_ref()
+                    .map(|protocol| protocol.owners.values().map(|owner| {
+                        (owner.owner.0, owner.contexts.iter().flat_map(|context| &context.members)
+                            .map(|member| member.origin.0).collect())
+                    }).collect()).unwrap_or_default(),
                 static_response_rows,
                 static_response_infeasible,
                 all_static_response_rows,

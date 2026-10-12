@@ -17,8 +17,8 @@ use super::continuations::{
     continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
     generated_context_parameters,
     walk_continuation_value_environment, CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
-    ContinuationContextId,
-    ContinuationEmissionOwner, ContinuationInputProjection, ContinuationSourceCoordinate,
+    ContinuationContextId, ContinuationEmissionOwner, ContinuationInputProjection,
+    ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
     ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
     RequiredConsumerProjection, SourceReturnContextRole, SourceReturnContextTemplate,
@@ -30,7 +30,8 @@ use super::{
     CheckedIhEnvironmentTransport, CraneliftBackendError, StaticTransitionPlan,
 };
 use crate::cranelift_backend::grafted_spine_control_graph::GraftedSpineFunctionScope;
-use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue};
+use crate::cranelift_backend::backend_module;
+use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
 
 /// A response site that may carry a `StaticResponseDeferred` placeholder.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1293,6 +1294,301 @@ fn checked_host_response_call(
 
 type ResponseParents = BTreeMap<StaticOriginId, (StaticOriginId, usize)>;
 type HostResponseRoutes = BTreeMap<StaticOriginId, BTreeMap<RuntimeSymbol, HostResponseRoute>>;
+
+mod relay_settlement;
+
+/// An admission key for a source Vis and enclosing response emission owner.
+/// Static producer fusion consumes the forwarded relay at the source, so the
+/// admitted owner's returned set omits it. Admitted only with a planned route
+/// or planned trap at every planner-issued call edge that consumes the source;
+/// each consuming seat branches to that trap when the route is absent.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RelayDrivePair {
+    pub(in crate::cranelift_backend) source: StaticOriginId,
+    pub(in crate::cranelift_backend) owner: ContinuationEmissionOwner,
+    /// The enclosing response-owner row that minted this pair. A successor's
+    /// own base owner is not necessarily the instance that emits it.
+    pub(in crate::cranelift_backend) minting_row: StaticResponseContinuationId,
+    pub(in crate::cranelift_backend) operation_root_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) effect_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) operation: HostOpV1,
+}
+
+/// An exact emitted clause and the response-owner function entered to reach it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct EmittedRelayMember {
+    owner: StaticResponseOwnerId,
+    member: StaticResponseContinuationId,
+}
+
+/// Route metadata for one admitted pair at one planner-issued call edge.
+/// Absence of an entry edge carries an independently catalogued trap.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct RelayRoute {
+    pub(in crate::cranelift_backend) relay_route: Option<EmittedRelayMember>,
+    pub(in crate::cranelift_backend) no_route_trap: Option<RuntimeTrap>,
+}
+
+impl StaticTransitionPlan<'_> {
+    /// The final returned-Vis protocol and checked-IH transports exist here.
+    /// A pair's performing member belongs to its selected incoming call edge,
+    /// not to a join on the source, owner, or operation spelling.
+    pub(in crate::cranelift_backend) fn build_relay_routes(
+        &self,
+    ) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner, ContinuationCallIdentity), RelayRoute>, CraneliftBackendError> {
+        if self.relay_drive_pairs.is_empty() {
+            return Ok(BTreeMap::new());
+        }
+        let candidates = self.return_protocol_candidate_rows()?;
+        // This is the emitter's population, not every planned response row.
+        // The protocol cloned into the lowerer is this same plan object; the
+        // successor's own base_owner is NOT the function that emits it.
+        let rows = self.static_response_feasibility_ledger_all()?.map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            ))
+        })?;
+        let owners = self.static_response_owner_specializations()?.map_err(|infeasible| {
+            backend_module(format!(
+                "compile-time response specialization is infeasible at {:?}: {}",
+                infeasible.vis_origin(), infeasible.reason(),
+            ))
+        })?;
+        if owners.len() != rows.len() {
+            return Err(planner_error(
+                "the response-owner definition population disagrees with the validated response rows",
+            ));
+        }
+        // Response-owner selection is a function of the exact causal call
+        // identity. The owner plan itself rejects a duplicate selected caller.
+        let mut by_edge = BTreeMap::new();
+        let mut emitted_by_row = BTreeMap::new();
+        for (owner, row) in owners.iter().zip(&rows) {
+            if owner.response() != row.id()
+                || owner.base_owner() != row.base_owner()
+                || owner.selected_caller() != row.k_identity()
+                || owner.k_context() != row.k_context()
+            {
+                return Err(planner_error(
+                    "a response-owner definition disagrees with its validated response row",
+                ));
+            }
+            if by_edge.insert(owner.selected_caller().clone(), (owner, row)).is_some() {
+                return Err(planner_error("two response owners claim one selected incoming caller"));
+            }
+            if emitted_by_row.insert(row.id(), (owner, row)).is_some() {
+                return Err(planner_error("one response row is emitted by two owners"));
+            }
+        }
+        let select = |owner: &StaticResponseOwnerSpecialization,
+                      row: &StaticResponseContinuation,
+                      pair: &RelayDrivePair|
+         -> Result<Option<EmittedRelayMember>, CraneliftBackendError> {
+            let mut members = BTreeMap::new();
+            members.insert(row.id(), row);
+            if let Some(protocol) = self.pending_vis_settlements.protocol.as_ref()
+                .and_then(|protocol| protocol.owners.get(&row.id()))
+            {
+                for context in &protocol.contexts {
+                    for member in &context.members {
+                        let successor = member.successor.as_ref().ok_or_else(||
+                            planner_error("a pending-Vis member has no derived response row"))?;
+                        if let Some(previous) = members.insert(successor.id(), successor) {
+                            if previous != successor {
+                                return Err(planner_error(
+                                    "one emitted relay member identity names different response rows",
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+            let matching = members.values()
+                .filter(|member| member.effect_origin() == pair.effect_origin
+                    && member.operation() == pair.operation)
+                .collect::<Vec<_>>();
+            match matching.as_slice() {
+                [] => Ok(None),
+                [member] => Ok(Some(EmittedRelayMember { owner: owner.id(), member: member.id() })),
+                _ => Err(planner_error(
+                    "relay: forwarded op reaches more than one protocol position of its minting instance; static plan refuses",
+                )),
+            }
+        };
+        let calls = self.continuation_calls()?;
+        let mut pair_edges = BTreeMap::<
+            (StaticOriginId, ContinuationEmissionOwner),
+            BTreeSet<ContinuationCallIdentity>,
+        >::new();
+        for (&pair_key, pair) in &self.relay_drive_pairs {
+            for call in &calls {
+                if call.producer_construct_origin() == pair.source {
+                    pair_edges.entry(pair_key).or_default().insert(call.identity());
+                }
+            }
+        }
+        // An active transport consumes its source's checked call identity,
+        // even when its destination construct is not that call's producer.
+        // Verify that identity against the very four-coordinate binding the
+        // computational seats use, rather than guessing from the destination.
+        for transport in &self.checked_ih_environment_transports {
+            let pair_key = (transport.destination_construct_origin(), transport.destination_owner());
+            if !self.relay_drive_pairs.contains_key(&pair_key) {
+                continue;
+            }
+            let identity = transport.source_call_identity();
+            let call = calls.iter().find(|call| call.identity() == *identity)
+                .ok_or_else(|| planner_error("an admitted active transport has no issued call identity"))?;
+            let rebound = self.continuation_call_binding_for(
+                call.producer_construct_origin(),
+                call.continuation_origin(),
+                call.producer_alternative(),
+                call.recursive_position(),
+            )?;
+            if rebound.as_ref() != Some(identity) {
+                return Err(planner_error("an admitted active transport call is not bound by its four coordinates"));
+            }
+            pair_edges.entry(pair_key).or_default().insert(identity.clone());
+        }
+        if let Some((source, _)) = self.relay_drive_pairs.keys()
+            .find(|key| !pair_edges.contains_key(*key))
+        {
+            return Err(planner_error(format!(
+                "an admitted relay pair has no planned call edge (source {source:?})",
+            )));
+        }
+        let mut routes = BTreeMap::new();
+        for (&key, pair) in &self.relay_drive_pairs {
+            let source_rows = candidates.iter()
+                .filter(|row| row.vis_origin() == pair.source)
+                .collect::<Vec<_>>();
+            let [source_row] = source_rows.as_slice() else {
+                return Err(planner_error("an admitted relay pair has no unique source response row"));
+            };
+            if source_row.effect_origin() != pair.effect_origin
+                || source_row.operation() != pair.operation
+            {
+                return Err(planner_error("an admitted relay pair disagrees with its source response operation"));
+            }
+            let minting_owner = emitted_by_row.get(&pair.minting_row).ok_or_else(||
+                planner_error("relay: minting row is not an emitted response owner"))?;
+            if minting_owner.1.base_owner() != pair.owner {
+                return Err(planner_error("relay: minting row disagrees with its pair owner"));
+            }
+            for identity in pair_edges.get(&key).into_iter().flat_map(|edges| edges.iter()) {
+                let relay_route = if let Some((owner, row)) = by_edge.get(identity) {
+                    // The entered owner's own row is the clause at this causal
+                    // call edge. Another protocol position can handle the same
+                    // operation, but it is not the position this call entered.
+                    if row.vis_origin() != pair.source
+                        || row.effect_origin() != pair.effect_origin
+                        || row.operation() != pair.operation
+                    {
+                        return Err(planner_error(
+                            "relay: entered owner's own row does not record the forwarded source",
+                        ));
+                    }
+                    Some(EmittedRelayMember { owner: owner.id(), member: row.id() })
+                } else {
+                    // Without an entered owner the minting instance remains
+                    // fixed. Its emitted clauses are selected by the checked
+                    // operation only when that selector is a function.
+                    select(minting_owner.0, minting_owner.1, pair)?
+                };
+                let no_route_trap = relay_route.is_none().then(|| RuntimeTrap {
+                    code: RuntimeTrapCode::MissingRuntimeMetadata,
+                    message: format!(
+                        "relay: forwarded host op {:?} from source {:?} has no performing route",
+                        pair.operation, pair.source,
+                    ),
+                });
+                routes.insert((pair.source, pair.owner, identity.clone()),
+                    RelayRoute { relay_route, no_route_trap });
+            }
+        }
+        Ok(routes)
+    }
+
+    /// An ownerless consuming seat cannot use an admitted source's relay
+    /// metadata, regardless of which owner minted its pair.
+    pub(in crate::cranelift_backend) fn has_relay_drive_pair_for_source(
+        &self,
+        source: StaticOriginId,
+    ) -> bool {
+        self.relay_drive_pairs.keys().any(|(paired, _)| *paired == source)
+    }
+
+    /// Admission remains `relay_drive_pair`. Lowering supplies its exact
+    /// planner-issued call identity; it never discovers a route locally.
+    pub(in crate::cranelift_backend) fn relay_route(
+        &self,
+        source: StaticOriginId,
+        owner: ContinuationEmissionOwner,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<Option<&RelayRoute>, CraneliftBackendError> {
+        if self.relay_drive_pair(source, owner)?.is_none() {
+            return Ok(None);
+        }
+        let route = self.relay_routes.get(&(source, owner, identity.clone())).ok_or_else(||
+            planner_error("an admitted relay pair has no planned route or trap for its selected call"))?;
+        match (&route.relay_route, &route.no_route_trap) {
+            (Some(_), None) | (None, Some(_)) => Ok(Some(route)),
+            _ => Err(planner_error("a relay route must name exactly one member or trap")),
+        }
+    }
+
+    pub(in crate::cranelift_backend) fn build_relay_drive_pairs(
+        &self,
+    ) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner), RelayDrivePair>, CraneliftBackendError> {
+        relay_settlement::build_drive_pairs(self)
+    }
+
+    /// The sole authority for relay admission condition (d), not a lowering
+    /// drive. Absence never means a key can be invented locally.
+    pub(in crate::cranelift_backend) fn relay_drive_pair(
+        &self,
+        source: StaticOriginId,
+        owner: ContinuationEmissionOwner,
+    ) -> Result<Option<RelayDrivePair>, CraneliftBackendError> {
+        let Some(pair) = self.relay_drive_pairs.get(&(source, owner)).copied() else {
+            return Ok(None);
+        };
+        if pair.source != source || pair.owner != owner
+            || self.child_static_origin(source, 0)? != pair.operation_root_origin
+            || !self.static_response_continuations.iter().any(|row|
+                row.id() == pair.minting_row && row.base_owner() == owner)
+        {
+            return Err(planner_error("a relay drive pair disagrees with its source and owner"));
+        }
+        Ok(Some(pair))
+    }
+
+    /// An admitted relay operation root stays source material, not a
+    /// deferred placeholder. Its pair licenses no in-place response drive;
+    /// the installed response owner remains the effect emitter.
+    pub(in crate::cranelift_backend) fn relay_drive_operation_root(
+        &self,
+        root: StaticOriginId,
+        owner: Option<ContinuationEmissionOwner>,
+    ) -> Result<bool, CraneliftBackendError> {
+        let Some(owner) = owner else { return Ok(false); };
+        for (&(source, pair_owner), pair) in &self.relay_drive_pairs {
+            if pair_owner == owner && pair.operation_root_origin == root {
+                return Ok(self.relay_drive_pair(source, owner)?.is_some());
+            }
+        }
+        Ok(false)
+    }
+}
+
+/// The same classifier supplies pending-Vis projection before emission:
+/// admitted relay members are consumed by source fusion, not returned.
+pub(in crate::cranelift_backend) fn settled_relay_owners(
+    plan: &StaticTransitionPlan<'_>,
+) -> BTreeSet<StaticResponseContinuationId> {
+    relay_settlement::settled_relay_owners(plan)
+}
 
 fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
     let mut parents = BTreeMap::new();
@@ -3904,6 +4200,24 @@ impl StaticTransitionPlan<'_> {
                 "one bounded Deferred response suffix has more than one static handler owner",
             )),
         }
+    }
+
+    /// The same admitted Deferred handler authority used by lowering and
+    /// relay settlement. A selected pending response fixes its owner once;
+    /// otherwise the existing response-plan lookup determines the owner.
+    pub(in crate::cranelift_backend) fn admitted_deferred_handler_owner(
+        &self,
+        row: &DeferredResponseRow,
+    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
+        if let Some(witness) = self.selected_pending_response_at_vis(row.vis_origin())? {
+            if witness.disposition() != Some(ResponseDisposition::Deferred) {
+                return Err(planner_error(
+                    "an admitted pending response disagrees with its Deferred disposition",
+                ));
+            }
+            return Ok(witness.owner());
+        }
+        self.deferred_response_handler_owner(row)
     }
 
     /// The specialized handler that consumes one Deferred response.

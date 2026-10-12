@@ -3237,8 +3237,11 @@ struct PendingVisOwnerCall {
 }
 
 struct PendingVisFinishedBody {
+    initial_context_calls: usize,
+    initial_response_is_current_host_result: bool,
     calls: Vec<PendingVisOwnerCall>,
     result_store: cranelift_codegen::ir::Inst,
+    result_offset: i32,
     returned_word: cranelift_codegen::ir::Value,
     member_load: cranelift_codegen::ir::Inst,
     member_branches: Vec<cranelift_codegen::ir::Inst>,
@@ -3250,8 +3253,10 @@ struct PendingVisFinishedBody {
     record_discriminant_offset: i32,
 }
 
-/// The initial validated host effect and K call already happened. Every
-/// subsequent iteration is selected by the producer-minted response-row id;
+/// On the ordinary path the initial validated host effect and K call already
+/// happened. A malformed test control may omit or duplicate that K call; the
+/// finished-body verifier checks the recorded run against the emitted flow.
+/// Every subsequent iteration is selected by the producer-minted response-row id;
 /// no runtime tag, closure word or allocator chooses a successor target.
 fn emit_pending_vis_owner_loop(
     compiler: &mut Lowering<'_>,
@@ -3259,30 +3264,38 @@ fn emit_pending_vis_owner_loop(
     frame: cranelift_codegen::ir::Value,
     region: PendingVisFrameRegion,
     initial: &StaticResponseContinuation,
-    initial_call: cranelift_codegen::ir::Inst,
+    initial_ret_abi_word: u64,
+    initial_calls: &[cranelift_codegen::ir::Inst],
     initial_context: FuncId,
     initial_validation: cranelift_codegen::ir::Inst,
+    initial_response_is_current_host_result: bool,
     returned: CarriedBoundaryWord,
     successors: &[SuccessorEffect],
     successor_targets: &BTreeMap<StaticResponseContinuationId, DeclaredUnitCall>,
     successor_contexts: &BTreeMap<StaticResponseContinuationId, FuncId>,
     result_offset: i32,
     placeholder_offset: i32,
+    #[cfg(feature = "px8-ds-test-support")]
+    raw_host_result_escape: Option<CarriedBoundaryWord>,
     force_unknown_member: bool,
     bypass_unknown_to_c2: bool,
 ) -> Result<PendingVisFinishedBody, CraneliftBackendError> {
     if successors.is_empty() {
         return Err(backend_module("a pending-Vis owner has no successor set".to_string()));
     }
-    let mut calls = vec![PendingVisOwnerCall {
-        row: initial.id(), call: initial_call, expected_context: initial_context,
+    // Retain malformed 0/2 initial-call controls through emission. The
+    // issued-call handles belong to this same function as the successor loop;
+    // the finished-body verifier checks them after the CLIF is finalized.
+    let initial_ret_identity = initial.k_ret_identity().tag_abi_word()?;
+    let mut calls = initial_calls.first().map(|&call| vec![PendingVisOwnerCall {
+        row: initial.id(), call, expected_context: initial_context,
         host_validation_end: initial_validation,
-        ret_identity: initial.k_ret_identity().tag_abi_word()?,
-    }];
+        ret_identity: initial_ret_identity,
+    }]).unwrap_or_default();
     let result = builder.create_block();
     builder.append_block_param(result, types::I64);
     builder.append_block_param(result, types::I64);
-    let first_ret = i64::try_from(initial.k_ret_identity().tag_abi_word()?)
+    let first_ret = i64::try_from(initial_ret_abi_word)
         .map_err(|_| backend_module("pending-Vis initial Ret tag exceeds range".to_string()))?;
     let first_ret = builder.ins().iconst(types::I64, first_ret);
     builder.ins().jump(result, &[returned.word, first_ret]);
@@ -3300,7 +3313,11 @@ fn emit_pending_vis_owner_loop(
     builder.switch_to_block(ret);
     let ret_fields = compiler.emit_carrier_field_count(builder, returned)?;
     Lowering::require_i64(builder, ret_fields, 1);
-    let result_store = builder.ins().store(MemFlags::trusted(), returned_word, frame, result_offset);
+    #[cfg(feature = "px8-ds-test-support")]
+    let stored_word = raw_host_result_escape.map_or(returned_word, |word| word.word);
+    #[cfg(not(feature = "px8-ds-test-support"))]
+    let stored_word = returned_word;
+    let result_store = builder.ins().store(MemFlags::trusted(), stored_word, frame, result_offset);
     let success = builder.ins().iconst(types::I64, 0);
     builder.ins().return_(&[success]);
     compiler.record_checked_frame_terminal(builder, FrameTerminalKind::Normal)?;
@@ -3459,7 +3476,9 @@ fn emit_pending_vis_owner_loop(
         payload_loads.push(row_loads);
     }
     Ok(PendingVisFinishedBody {
-        calls, result_store, returned_word, member_load, member_branches,
+        initial_context_calls: initial_calls.len(),
+        initial_response_is_current_host_result,
+        calls, result_store, result_offset, returned_word, member_load, member_branches,
         member_ids, selected_blocks, payload_loads,
         placeholder_offset, input_frame: frame,
         record_discriminant_offset: region.discriminant,
@@ -3493,6 +3512,12 @@ fn verify_pending_vis_finished_body(
     let error = |reason: &str| backend_module(format!(
         "pending-Vis finished-body verifier: {reason}",
     ));
+    if facts.initial_context_calls != 1 {
+        return Err(backend_module(format!(
+            "a response owner emitted {} K calls instead of exactly one",
+            facts.initial_context_calls,
+        )));
+    }
     if facts.calls.len() != successors.len() + 1
         || facts.member_branches.len() != successors.len()
         || facts.member_ids.len() != successors.len()
@@ -3507,7 +3532,9 @@ fn verify_pending_vis_finished_body(
         if let InstructionData::Load { offset, .. } = func.dfg.insts[inst] {
             if i32::from(offset) == facts.placeholder_offset
                 && func.dfg.inst_args(inst).first() == Some(&facts.input_frame) {
-                return Err(error("the owner loaded its parameter-zero placeholder"));
+                return Err(backend_module(
+                    "a response owner loaded its deferred parameter-zero placeholder".to_string(),
+                ));
             }
         }
     }
@@ -3528,11 +3555,25 @@ fn verify_pending_vis_finished_body(
     if func.dfg.inst_args(facts.result_store).first() != Some(&facts.returned_word)
         || !matches!(func.dfg.insts[facts.result_store], InstructionData::Store { .. })
     {
-        return Err(error("the owner stored something other than its Trap-checked K result"));
+        return Err(backend_module(
+            "a response owner let a raw HostResult or non-K value escape to Result".to_string(),
+        ));
     }
     let cfg = ControlFlowGraph::with_function(func);
     let mut dom = cranelift_codegen::dominator_tree::DominatorTree::new();
     dom.compute(func, &cfg);
+    // Neither the owner nor a malformed initial K may collapse Result before
+    // the first checked call. Read the actual finished stores, not a test flag.
+    if func.layout.blocks().flat_map(|block| func.layout.block_insts(block)).any(|inst| {
+        matches!(func.dfg.insts[inst], InstructionData::Store { offset, .. }
+            if i32::from(offset) == facts.result_offset)
+            && func.dfg.inst_args(inst).get(1) == Some(&facts.input_frame)
+            && dom.dominates(inst, facts.calls[0].call, &func.layout)
+    }) {
+        return Err(backend_module(
+            "a response owner called K after its answer was already collapsed".to_string(),
+        ));
+    }
     if !dom.dominates(result_block, facts.member_load, &func.layout)
         || !dom.dominates(result_block, facts.result_store, &func.layout)
     {
@@ -3558,6 +3599,11 @@ fn verify_pending_vis_finished_body(
             return Err(error("one response row entered the K join twice"));
         }
         if Lowering::decode_direct_callee(func, selected.call)? != selected.expected_context {
+            if selected.row == initial.id() {
+                return Err(backend_module(
+                    "a response owner called a context or raw worker other than its exact K context".to_string(),
+                ));
+            }
             return Err(error("a selected response row called a non-exact K context"));
         }
         let positions = func.layout.blocks()
@@ -3565,6 +3611,11 @@ fn verify_pending_vis_finished_body(
             .enumerate().map(|(index, inst)| (inst, index))
             .collect::<BTreeMap<_, _>>();
         if positions[&selected.call] <= positions[&selected.host_validation_end] {
+            if selected.row == initial.id() {
+                return Err(backend_module(
+                    "a response owner called K before host response validation completed".to_string(),
+                ));
+            }
             return Err(error("a selected K was called before its host effect validation"));
         }
         let guards = positions.iter().filter(|(inst, _)| {
@@ -3573,6 +3624,11 @@ fn verify_pending_vis_finished_body(
                 && dom.dominates(**inst, edge.inst, &func.layout)
         }).map(|(inst, _)| *inst).collect::<Vec<_>>();
         if guards.len() < 2 {
+            if selected.row == initial.id() {
+                return Err(backend_module(
+                    "a response K call read Result without the status then Trap-before-Result branches".to_string(),
+                ));
+            }
             return Err(error("a selected K result lacks status then Trap branches"));
         }
         let jumps = func.dfg.insts[edge.inst].branch_destination(&func.dfg.jump_tables);
@@ -3601,11 +3657,21 @@ fn verify_pending_vis_finished_body(
         };
         if imm.bits() != i64::try_from(selected.ret_identity)
             .map_err(|_| error("a K Ret identity exceeds the word range"))? {
+            if selected.row == initial.id() {
+                return Err(backend_module(
+                    "a response owner validated a Ret identity other than its exact K Ret".to_string(),
+                ));
+            }
             return Err(error("a K Ret identity disagrees with the selected row"));
         }
     }
     if facts.calls.iter().any(|call| !reached.contains(&call.row)) {
         return Err(error("a selected-row K call has no checked result edge"));
+    }
+    if !facts.initial_response_is_current_host_result {
+        return Err(backend_module(
+            "a response owner substituted operation, prior-response, or application-environment authority for the current HostResult".to_string(),
+        ));
     }
     for (index, successor) in successors.iter().enumerate() {
         let row = &successor.row;
@@ -4561,29 +4627,6 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                     emission.row.id(), emission.successors.len(),
                 ))),
             };
-            if pending_vis_owner {
-                let pending = compiler.function_local.pending_vis_frame.ok_or_else(||
-                    backend_module("a pending-Vis owner has no caller-owned record".to_string()))?;
-                let initial_call = *context_calls.first().ok_or_else(||
-                    backend_module("a pending-Vis owner did not call its first K".to_string()))?;
-                #[cfg(feature = "px8-ds-test-support")]
-                let nonmember_mode = claim_pending_vis_nonmember_mutation(bypass_ret_validation);
-                let (force_unknown_member, bypass_unknown_to_c2) = {
-                    #[cfg(feature = "px8-ds-test-support")]
-                    { (nonmember_mode.is_some(),
-                        nonmember_mode == Some(PendingVisNonmemberMutation::BypassToC2)) }
-                    #[cfg(not(feature = "px8-ds-test-support"))]
-                    { (false, false) }
-                };
-                pending_finished = Some(emit_pending_vis_owner_loop(
-                    compiler, &mut builder, frame, pending.region,
-                    &emission.row, initial_call, expected_context_target,
-                    host_validation_end, returned, &emission.successors,
-                    &successor_targets, &successor_contexts,
-                    result_offset, placeholder_offset,
-                    force_unknown_member, bypass_unknown_to_c2,
-                )?);
-            } else {
             let exact_ret_abi_word = emission.row.k_ret_identity().tag_abi_word()?;
             #[cfg(feature = "px8-ds-test-support")]
             let ret_abi_word = if body_mutation
@@ -4597,6 +4640,30 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             };
             #[cfg(not(feature = "px8-ds-test-support"))]
             let ret_abi_word = exact_ret_abi_word;
+            if pending_vis_owner {
+                let pending = compiler.function_local.pending_vis_frame.ok_or_else(||
+                    backend_module("a pending-Vis owner has no caller-owned record".to_string()))?;
+                #[cfg(feature = "px8-ds-test-support")]
+                let nonmember_mode = claim_pending_vis_nonmember_mutation(bypass_ret_validation);
+                let (force_unknown_member, bypass_unknown_to_c2) = {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    { (nonmember_mode.is_some(),
+                        nonmember_mode == Some(PendingVisNonmemberMutation::BypassToC2)) }
+                    #[cfg(not(feature = "px8-ds-test-support"))]
+                    { (false, false) }
+                };
+                pending_finished = Some(emit_pending_vis_owner_loop(
+                    compiler, &mut builder, frame, pending.region,
+                    &emission.row, ret_abi_word, &context_calls, expected_context_target,
+                    host_validation_end, response_is_current_host_result,
+                    returned, &emission.successors,
+                    &successor_targets, &successor_contexts,
+                    result_offset, placeholder_offset,
+                    #[cfg(feature = "px8-ds-test-support")]
+                    raw_host_result_escape,
+                    force_unknown_member, bypass_unknown_to_c2,
+                )?);
+            } else {
             let ret_tag = compiler.emit_carrier_tag(&mut builder, returned)?;
             let expected_ret = i64::try_from(ret_abi_word).map_err(|_| {
                 backend_module("response Ret identity exceeds the runtime tag word".to_string())

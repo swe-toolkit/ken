@@ -5542,6 +5542,7 @@ impl<'a> Lowering<'a> {
         };
         let vis_origin = row.vis_origin();
         let handler_owner = self
+            .static_transition_plan
             .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
                 unsupported(
@@ -5794,30 +5795,6 @@ impl<'a> Lowering<'a> {
         ))
     }
 
-    /// For a pending route, admission fixes the handler owner once; ordinary
-    /// responses retain the existing response-plan lookup. The caller still
-    /// compares this owner with the emission it is actually lowering in.
-    fn admitted_deferred_handler_owner(
-        &self,
-        row: &crate::cranelift_backend::planning::DeferredResponseRow,
-    ) -> Result<Option<ContinuationEmissionOwner>, CraneliftBackendError> {
-        if let Some(witness) = self
-            .static_transition_plan
-            .selected_pending_response_at_vis(row.vis_origin())?
-        {
-            if witness.disposition()
-                != Some(crate::cranelift_backend::planning::ResponseDisposition::Deferred)
-            {
-                return Err(backend(BackendFailure::PlannerInvariant(
-                    "an admitted pending response disagrees with its Deferred disposition"
-                        .to_string(),
-                )));
-            }
-            return Ok(witness.owner());
-        }
-        self.static_transition_plan.deferred_response_handler_owner(row)
-    }
-
     /// Consume a Deferred `Vis` inside its statically selected response handler.
     ///
     /// The established P1 route proves a one-use, tail-resumptive lexical K. The
@@ -5840,6 +5817,7 @@ impl<'a> Lowering<'a> {
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let handler_owner = self
+            .static_transition_plan
             .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
                 unsupported(
@@ -5859,6 +5837,25 @@ impl<'a> Lowering<'a> {
                 "a handler-owned response row names a different source Vis",
             ));
         }
+        self.drive_response_at_source(
+            builder, vis_origin, lowered_args, row.operation_root_origin(),
+            row.effect_origin(), row.operation(), producer_eliminators,
+        )
+    }
+
+    /// Perform a handler-owned Deferred response at its Construct-Vis source
+    /// and resume its exact lexical K through the active eliminators. This
+    /// path is not a relay drive; admitted relays use static producer fusion.
+    fn drive_response_at_source(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        vis_origin: StaticOriginId,
+        lowered_args: &[LoweringOperand],
+        operation_root_origin: StaticOriginId,
+        effect_origin: StaticOriginId,
+        planned_operation: ken_host::HostOpV1,
+        producer_eliminators: Option<&[EliminatorFrame<'_>]>,
+    ) -> Result<LoweringOperand, CraneliftBackendError> {
         let [operation, k] = lowered_args else {
             return Err(unsupported(
                 "StaticResponseDeferred",
@@ -5882,7 +5879,7 @@ impl<'a> Lowering<'a> {
         let operation_origin = self
             .static_transition_plan
             .child_static_origin(vis_origin, 0)?;
-        if operation_origin != row.operation_root_origin() {
+        if operation_origin != operation_root_origin {
             return Err(unsupported(
                 "StaticResponseDeferred",
                 "a handler-owned response row disagrees with its operation root",
@@ -6064,7 +6061,7 @@ impl<'a> Lowering<'a> {
             ));
         }
 
-        let effect = self.retained_body_occurrence(row.effect_origin())?;
+        let effect = self.retained_body_occurrence(effect_origin)?;
         let RuntimeExpr::Effect {
             family,
             operation,
@@ -6077,10 +6074,10 @@ impl<'a> Lowering<'a> {
                 "a handler-owned response row names no host effect",
             ));
         };
-        if *operation != row.operation() {
+        if *operation != planned_operation {
             return Err(unsupported(
                 "StaticResponseDeferred",
-                "a handler-owned response row disagrees with its host effect",
+                "a driven response row disagrees with its host effect",
             ));
         }
         let effect_env = selected_fields
@@ -6219,8 +6216,23 @@ impl<'a> Lowering<'a> {
                     .deferred_no_unit_response_in_body(body)?
                 {
                     let current_owns_response = self
+                        .static_transition_plan
                         .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner));
+                    if current_owns_response {
+                        if let Some(owner) = self.defining_emission_owner {
+                            if self
+                                .static_transition_plan
+                                .relay_drive_pair(row.vis_origin(), owner)?
+                                .is_some()
+                            {
+                                return Err(backend(BackendFailure::PlannerInvariant(format!(
+                                    "relay: pair minted for a source the handler-owned Deferred drive consumes (arm 6223-unitless, vis {:?}, owner {owner:?})",
+                                    row.vis_origin(),
+                                ))));
+                            }
+                        }
+                    }
                     if !current_owns_response
                         || handler_owned_deferred_response_mutation_applies(
                             HandlerOwnedDeferredResponseMutation::SuppressUnitlessDrive,
@@ -6913,6 +6925,63 @@ impl<'a> Lowering<'a> {
         self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
     }
 
+    /// A pair without a planned performing member cannot execute a consuming
+    /// seat silently. Preserve lowering of the call path even when the runtime
+    /// arm takes the planner's trap: that descent also discharges call and
+    /// generated-entry obligations in this function and its callees.
+    fn branch_unrouted_relay_at_consumer(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        source: StaticOriginId,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(owner) = self.defining_emission_owner else {
+            if self.static_transition_plan.has_relay_drive_pair_for_source(source) {
+                return Err(unsupported(
+                    "RelayRoute",
+                    "a relay-consuming seat for an admitted source has no emission owner",
+                ));
+            }
+            return Ok(());
+        };
+        let trap = self
+            .static_transition_plan
+            .relay_route(source, owner, identity)?
+            .and_then(|route| route.no_route_trap.clone());
+        let Some(trap) = trap else {
+            return Ok(());
+        };
+        // All generated units already load their native-int and boundary
+        // arenas through this ABI parameter. A valid invocation therefore
+        // carries a non-null services pointer. Unlike a constant predicate,
+        // the function parameter remains a runtime value in the finished CLIF:
+        // the cold call block stays present for the call/ledger closeout.
+        let services = self.function_local.services_pointer.ok_or_else(|| {
+            unsupported(
+                "RelayRoute",
+                "a relay-consuming function has no services ABI parameter",
+            )
+        })?;
+        let valid_invocation = builder.ins().icmp_imm(
+            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
+            services,
+            0,
+        );
+        let trap_block = builder.create_block();
+        let call_block = builder.create_block();
+        builder
+            .ins()
+            .brif(valid_invocation, trap_block, &[], call_block, &[]);
+        builder.switch_to_block(trap_block);
+        builder.seal_block(trap_block);
+        let status = self.emit_current_trap(builder, &trap)?;
+        builder.ins().return_(&[status]);
+        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
+        builder.switch_to_block(call_block);
+        builder.seal_block(call_block);
+        Ok(())
+    }
+
     fn lower_computational_producer_construct<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -6922,6 +6991,9 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
+        self.static_transition_plan.reject_reached_admitted_relay(
+            static_origin, constructor, args, self.defining_emission_owner,
+        )?;
         let eliminator = eliminators[0];
         if let Some(row) = self
             .static_transition_plan
@@ -6931,6 +7003,19 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .bounded_deferred_response_handler_owner(&row)?
                 .is_some_and(|owner| self.defining_emission_owner == Some(owner));
+            if current_owns_response {
+                if let Some(owner) = self.defining_emission_owner {
+                    if self
+                        .static_transition_plan
+                        .relay_drive_pair(static_origin, owner)?
+                        .is_some()
+                    {
+                        return Err(backend(BackendFailure::PlannerInvariant(format!(
+                            "relay: pair minted for a source the handler-owned Deferred drive consumes (arm 6987-bounded, vis {static_origin:?}, owner {owner:?})",
+                        ))));
+                    }
+                }
+            }
             if current_owns_response
                 && !handler_owned_deferred_response_mutation_applies(
                     HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
@@ -6954,6 +7039,10 @@ impl<'a> Lowering<'a> {
                 return Ok(ProducerTrampolineStep::ordinary(resumed));
             }
         }
+        // An admitted relay source stays under its enclosing eliminator:
+        // fusion selects the producer path, and its installed response owner
+        // performs the effect. The handler-owned Deferred route above retains
+        // precedence and its own inline K, but there is no relay drive here.
         let terminal_exit = constructor == &self.process_symbols.exit_success
             || constructor == &self.process_symbols.exit_failure;
         let itree_frame = match eliminator {
@@ -7029,6 +7118,11 @@ impl<'a> Lowering<'a> {
                         "a terminal transport's stable closure seat is not the recursive child being replaced",
                     ));
                 }
+                self.branch_unrouted_relay_at_consumer(
+                    builder,
+                    static_origin,
+                    transport.source_call_identity(),
+                )?;
                 let claimed = self.call_checked_ih_environment_transport(
                     builder,
                     &transport,
@@ -7114,6 +7208,11 @@ impl<'a> Lowering<'a> {
                     "an active transport's stable closure seat is not the recursive child being replaced",
                 ));
             }
+            self.branch_unrouted_relay_at_consumer(
+                builder,
+                static_origin,
+                transport.source_call_identity(),
+            )?;
             let claimed = self.call_checked_ih_environment_transport(
                 builder,
                 &transport,
@@ -7617,6 +7716,21 @@ impl<'a> Lowering<'a> {
                 // them, so a continuation whose selected worker had
                 // captures was called with its declared parameter tail
                 // unfilled.
+                // A claim with a planned binding consumes the Vis constructor.
+                // Branch to the runtime trap before the call, but still lower
+                // the call path to preserve its downstream compiler obligations.
+                if self.continuation_claims.is_some() {
+                    if let Some(identity) = self.static_transition_plan.continuation_call_binding_for(
+                        static_origin,
+                        *frame_origin,
+                        u32::try_from(*case_index).map_err(|_| unsupported(
+                            "ComputationalMatch", "case index exceeds addressable range"))?,
+                        u32::try_from(position).map_err(|_| unsupported(
+                            "ComputationalMatch", "recursive position exceeds addressable range"))?,
+                    )? {
+                        self.branch_unrouted_relay_at_consumer(builder, static_origin, &identity)?;
+                    }
+                }
                 if let Some(returned) = self.claim_and_call_continuation(
                     builder,
                     static_origin,
@@ -8587,6 +8701,7 @@ impl<'a> Lowering<'a> {
                  descent would realize one region twice",
             ));
         }
+        self.branch_unrouted_relay_at_consumer(builder, producer_construct_origin, &identity)?;
         // ---- THE ACTION IS NON-CALLING. Architect `evt_5edhqyyhw4585`.
         //
         // ⚠ **The direct call this seat used to attempt is WITHDRAWN, and the
@@ -11783,7 +11898,16 @@ impl<'a> Lowering<'a> {
             .ok_or_else(|| {
                 unsupported(
                     "ContinuationSpecialization",
-                    "the claimed continuation target was not declared into this function",
+                    format!(
+                        "the claimed continuation target was not declared into this function \
+                         (target {:?}, token emission owner {:?}, producer owner {:?}, \
+                         producer construct {:?}, defining owner {:?})",
+                        identity.target(),
+                        identity.emission_owner(),
+                        identity.producer_owner(),
+                        identity.producer_construct_origin(),
+                        defining_owner,
+                    ),
                 )
             })?;
         // `D4` control, on the real causal call seam: substitute ONLY the
@@ -12401,6 +12525,9 @@ impl<'a> Lowering<'a> {
         // slice is the honest input and the composition seat refuses on it.
         // Passing the retained-frame seat's stack, or fabricating one, would be
         // exactly the inference the ruling forbids.
+        self.branch_unrouted_relay_at_consumer(
+            builder, edge.producer_construct_origin, &identity,
+        )?;
         Ok(self
             .claim_and_call_resolved_continuation(
                 builder, &identity, &field_run, position, unit_env, &[],
@@ -16593,6 +16720,9 @@ impl<'a> Lowering<'a> {
                 self.finish_planned_join(builder, merge, &join_plan, merge_kind, "If")
             }
             RuntimeExpr::Construct { constructor, args } => {
+                self.static_transition_plan.reject_reached_admitted_relay(
+                    static_origin, constructor, args, self.defining_emission_owner,
+                )?;
                 // Recut §7 total match (AC-2) over the response classify verdict.
                 // No catch-all: adding a ResponseDisposition variant reddens the
                 // build here.
@@ -16612,7 +16742,11 @@ impl<'a> Lowering<'a> {
                         })?;
                         let site = StaticResponseSite::OperationRoot(static_origin);
                         if self.static_transition_plan
-                            .static_response_placeholder_licensed(site, scope)? {
+                            .static_response_placeholder_licensed(site, scope)?
+                            && !self.static_transition_plan.relay_drive_operation_root(
+                                static_origin, self.defining_emission_owner,
+                            )?
+                        {
                             return Ok(LoweringOperand::Specialized(
                                 Lowered::StaticResponseDeferred { site },
                             ));
@@ -16683,9 +16817,21 @@ impl<'a> Lowering<'a> {
                     .deferred_response_at_vis(static_origin)?
                 {
                     if self
+                        .static_transition_plan
                         .admitted_deferred_handler_owner(&row)?
                         .is_some_and(|owner| self.defining_emission_owner == Some(owner))
                     {
+                        if let Some(owner) = self.defining_emission_owner {
+                            if self
+                                .static_transition_plan
+                                .relay_drive_pair(static_origin, owner)?
+                                .is_some()
+                            {
+                                return Err(backend(BackendFailure::PlannerInvariant(format!(
+                                    "relay: pair minted for a source the handler-owned Deferred drive consumes (arm 16783-admitted, vis {static_origin:?}, owner {owner:?})",
+                                ))));
+                            }
+                        }
                         if !handler_owned_deferred_response_mutation_applies(
                             HandlerOwnedDeferredResponseMutation::SuppressLocalContinuationDrive,
                         ) {

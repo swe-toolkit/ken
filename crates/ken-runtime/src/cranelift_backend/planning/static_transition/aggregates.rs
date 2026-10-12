@@ -10449,9 +10449,9 @@ impl<'src> StaticTransitionPlan<'src> {
             .aggregate_ownership
             .iter()
             .find(|record| record.producer == AggregateOccurrenceProducer::Source(origin))
-            .ok_or_else(|| {
-                planner_error("aggregate producer has no planned ownership record")
-            })?;
+            .ok_or_else(|| planner_error(format!(
+                "aggregate producer {origin:?} ({shape:?}) has no planned ownership record"
+            )))?;
         if record.shape != shape {
             return Err(planner_error(
                 "aggregate producer disagrees with its planned ownership shape",
@@ -10476,7 +10476,9 @@ impl<'src> StaticTransitionPlan<'src> {
             .aggregate_ownership
             .iter()
             .find(|record| record.producer == AggregateOccurrenceProducer::Source(origin))
-            .ok_or_else(|| planner_error("aggregate producer has no planned ownership record"))?;
+            .ok_or_else(|| planner_error(format!(
+                "aggregate producer {origin:?} ({shape:?}) has no planned ownership record"
+            )))?;
         if record.shape != shape {
             return Err(planner_error(
                 "aggregate producer disagrees with its planned ownership shape",

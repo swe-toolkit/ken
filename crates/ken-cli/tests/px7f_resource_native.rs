@@ -714,24 +714,40 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
 
 /// Promise class: durable invariant. An owner whose generated K result is
 /// loaded before the Trap branch must be rejected by the pending-Vis finished
-/// CLIF verifier, not merely by a Ret-only verifier or a runtime trap.
+/// CLIF verifier, not merely by a Ret-only verifier or a runtime trap. The
+/// refusal text is shared with the Ret-only verifier, so the owner's record
+/// tail, not the message, names the pending-Vis arm.
 #[cfg(target_os = "linux")]
 #[test]
 fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     let dir = output_dir("right-denial-unchecked-k-result");
-    let (compiled, applications) = ken_runtime::with_static_response_owner_body_mutation(
+    let ((compiled, frames), applications) = ken_runtime::with_static_response_owner_body_mutation(
         ken_runtime::StaticResponseOwnerBodyMutation::BypassTrapBeforeResult,
-        || ken_cli::build_native_program(
-            RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken,
-            "right-denial-unchecked-k-result", dir.path(),
-            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-        ),
+        || ken_runtime::with_pending_vis_owner_frame_observations(|| {
+            ken_cli::build_native_program(
+                RIGHT_NOT_HELD, ken_cli::SourceFormat::Ken,
+                "right-denial-unchecked-k-result", dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            )
+        }),
     );
     assert_eq!(applications, 1, "the pending-Vis owner must receive the K mutation");
     let error = compiled.expect_err("an unchecked K result must not emit an object");
-    assert!(format!("{error:?}").contains(
-        "pending-Vis finished-body verifier: a selected K result lacks status then Trap branches"
-    ), "the exact pending-Vis verifier must refuse: {error:?}");
+    let rendered = format!("{error:?}");
+    assert!(
+        rendered.contains("stage: ObjectEmission")
+            && rendered.contains("checked_process_object")
+            && rendered.contains(
+                "a response K call read Result without the status then Trap-before-Result branches"
+            ),
+        "the exact finished-body verifier must refuse: {error:?}"
+    );
+    // The refusal text is shared with the Ret-only verifier. The refused owner
+    // is the last one emitted; its planned record tail places it on the
+    // pending-Vis verifier.
+    let refused = frames.last().expect("the refused owner was emitted");
+    assert_eq!(refused.owner_origin, 578, "the refused owner is the protocol owner");
+    assert!(refused.widths.is_some(), "the refused owner took the pending-Vis arm: {frames:?}");
 }
 
 /// Promise class: durable invariant. MEASURED: the same licensed placeholder

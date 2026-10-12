@@ -1,9 +1,11 @@
-//! Behavior-inert returned-Vis provenance for generated response owners.
+//! Returned-Vis provenance and settlement for generated response owners.
 //!
-//! This analysis reads planned source occurrences and generated call edges; it
-//! does not install a response row or change any emitted function. In particular,
-//! a constructor tag is not an occurrence identity and a locally emitted Vis is
-//! not necessarily a returned Vis.
+//! This analysis reads planned source occurrences and generated call edges. It
+//! does not install a response row: an admitted relay consumed by static
+//! producer fusion leaves the returned set, while independent static
+//! successors retain their rows.
+//! A constructor tag is not an occurrence identity, and a locally emitted Vis
+//! is not necessarily a returned Vis.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -43,7 +45,7 @@ pub(in crate::cranelift_backend) struct ReturnedVisProtocol {
 /// A checked, program-local pending-return domain. Each member uses the
 /// *existing response row* as its only identity/ABI/effect authority. The
 /// discriminant is the row id plus one; zero is never a Vis member. No record
-/// exists for an owner with a relay or an unknown returned-result endpoint.
+/// exists for an unadmitted relay or an unknown returned-result endpoint.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
     pub(in crate::cranelift_backend) owners:
@@ -59,7 +61,8 @@ pub(in crate::cranelift_backend) struct PendingVisRecordProtocol {
 /// final plan. No owner is absent; no consumer reads it through a `_` arm.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
-    /// A member of the pending-Vis record protocol.
+    /// A member of the pending-Vis record protocol after admitted relays
+    /// are projected out of its returned set.
     Protocol,
     /// The K route returns no Vis member, so a Ret-only body is exact.
     RetOnly,
@@ -69,7 +72,7 @@ pub(in crate::cranelift_backend) enum ResponseOwnerSettlement {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) enum ExcludedSettlement {
-    /// At least one returned member forwards a pattern-bound operation.
+    /// At least one unsettled returned member forwards a pattern-bound operation.
     Relay,
     /// The census errored while deriving a returned member (its text).
     Underived(String),
@@ -139,12 +142,50 @@ impl PendingVisRecordProtocol {
 }
 
 impl StaticTransitionPlan<'_> {
-    /// Classify every installed response owner. Only a complete, non-relay
-    /// closed fixpoint may activate the record; missing or relay-bearing
-    /// fixpoints remain explicit exclusions and keep baseline emission.
+    /// An admitted owner's forwarded relay is consumed by source fusion. Its
+    /// K must never construct that relay in the same emission owner.
+    pub(in crate::cranelift_backend) fn reject_reached_admitted_relay(
+        &self,
+        origin: StaticOriginId,
+        constructor: &str,
+        args: &[RuntimeExpr],
+        emission_owner: Option<super::continuations::ContinuationEmissionOwner>,
+    ) -> Result<(), CraneliftBackendError> {
+        let Some(emission_owner) = emission_owner else { return Ok(()); };
+        // The reached Construct and its arguments are already the lowering
+        // operand. Do not re-resolve its source occurrence behind the single
+        // origin-to-expression route merely to inspect this shape.
+        if !constructor.ends_with("::ITree::Vis") || args.len() != 2
+            || !matches!(args.first(), Some(RuntimeExpr::Var(_))) {
+            return Ok(());
+        }
+        for owner in &self.static_response_continuations {
+            if owner.base_owner() != emission_owner
+                || !matches!(self.pending_vis_settlements.owners.get(&owner.id()),
+                    Some(ResponseOwnerSettlement::Protocol | ResponseOwnerSettlement::RetOnly))
+            {
+                continue;
+            }
+            let protocol = self.returned_vis_protocol(owner.vis_origin())?;
+            if protocol.contexts.iter().flat_map(|context| &context.members)
+                .any(|member| member.relay && member.origin == origin)
+            {
+                return Err(planner_error(format!(
+                    "an admitted response owner {:?} reached relay construct {origin:?} despite source fusion",
+                    owner.id(),
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Classify every installed response owner. A complete relay-bearing
+    /// fixpoint may activate the record only after the shared source-pair
+    /// authority admits it; a missing or unsettled relay stays excluded.
     pub(in crate::cranelift_backend) fn build_pending_vis_settlements(
         &self,
     ) -> Result<PendingVisSettlements, CraneliftBackendError> {
+        let admitted_relays = super::responses::settled_relay_owners(self);
         let mut settlements = BTreeMap::new();
         let mut owners = BTreeMap::new();
         let mut members: BTreeMap<StaticOriginId, StaticResponseContinuation> = BTreeMap::new();
@@ -159,6 +200,16 @@ impl StaticTransitionPlan<'_> {
                     continue;
                 }
             };
+            // Source fusion consumes an admitted relay before this K returns.
+            // Retain every non-relay successor and its existing exact row;
+            // only an admitted owner's relay members leave the returned set.
+            let mut protocol = protocol;
+            if protocol.excluded_by_relay && admitted_relays.contains(&owner.id()) {
+                for context in &mut protocol.contexts {
+                    context.members.retain(|member| !member.relay);
+                }
+                protocol.excluded_by_relay = false;
+            }
             if protocol.contexts.iter().all(|ctx| ctx.members.is_empty()) {
                 settlements.insert(owner.id(), ResponseOwnerSettlement::RetOnly);
                 continue;

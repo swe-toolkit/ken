@@ -1,0 +1,401 @@
+//! Relay-source admission for pending-Vis fusion. A reached unsettled relay
+//! traps at its lowering consumer, not at this planning-time classification.
+use super::*;
+use crate::cranelift_backend::planning::static_transition::returned_vis::{
+    ExcludedSettlement, ResponseOwnerSettlement,
+};
+
+#[derive(Clone, Debug)]
+struct Source {
+    vis: StaticOriginId,
+    tail_edges: bool,
+    redex_body: Option<StaticOriginId>,
+}
+
+// A source result must reach the scrutinized CM through *only* tail edges.
+// The CM scrutinee itself is deliberately not a tail edge: its single Vis arm
+// is separately checked by response_forwards_vis in source_for_relay.
+fn tail_to(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    mut from: StaticOriginId,
+    to: StaticOriginId,
+) -> Result<bool, String> {
+    let mut seen = BTreeSet::new();
+    while from != to {
+        if !seen.insert(from) {
+            return Err(format!("parent cycle at {from:?}"));
+        }
+        let (parent, position) = *parents.get(&from)
+            .ok_or_else(|| format!("no parent for {from:?} before {to:?}"))?;
+        let expr = plan.planned_occurrence_expr(parent).map_err(|e| e.to_string())?;
+        if response_tail_edge(expr, position).is_none() {
+            return Ok(false);
+        }
+        from = parent;
+    }
+    Ok(true)
+}
+
+// Trace the operation binder of R back through its enclosing Vis-case CM,
+// enumerate ALL result terminals of the scrutinee in its function owner, then
+// recurse through Var-Vis feeders. An open terminal or missing parent is a
+// false closure, never silently an empty source set.
+fn source_for_relay(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    relay: StaticOriginId,
+    root: StaticOriginId,
+    seen: &mut BTreeSet<StaticOriginId>,
+    omissions: &mut BTreeSet<StaticOriginId>,
+) -> Result<Vec<Source>, String> {
+    if !seen.insert(relay) {
+        // Least fixpoint: another branch already contributed this relay.
+        return Ok(Vec::new());
+    }
+    if seen.len() > plan.source_occurrences.len() {
+        return Err("relay traversal exceeded occurrence population".to_owned());
+    }
+    let operation_origin = plan.child_static_origin(relay, 0).map_err(|e| e.to_string())?;
+    let RuntimeExpr::Var(index) = plan.source_occurrence(operation_origin).map_err(|e| e.to_string())?
+    else {
+        return Err(format!("relay {relay:?} operation is not a Var"));
+    };
+    let mut cursor = relay;
+    let mut crossed_binders = 0usize;
+    let mut visited = BTreeSet::new();
+    let (_match_origin, scrutinee) = loop {
+        if cursor == root || !visited.insert(cursor) {
+            return Err(format!("relay {relay:?} has no enclosing Vis-case CM before {root:?}"));
+        }
+        let (parent, position) = *parents.get(&cursor)
+            .ok_or_else(|| format!("relay {relay:?} missing parent at {cursor:?}"))?;
+        let expr = plan.planned_occurrence_expr(parent).map_err(|e| e.to_string())?;
+        if let RuntimeExpr::ComputationalMatch { cases, .. } = expr {
+            if position > 0 {
+                let case = cases.get(position - 1)
+                    .ok_or_else(|| format!("CM {parent:?} missing case {position}"))?;
+                if case.constructor.as_str().ends_with("::ITree::Vis") {
+                    let binder = response_vis_operation_binder(case)
+                        .ok_or_else(|| format!("CM {parent:?} has no checked Vis operation binder"))?;
+                    if usize::try_from(*index).ok().and_then(|i| i.checked_add(crossed_binders))
+                        != usize::try_from(binder).ok()
+                    {
+                        return Err(format!("relay {relay:?} Var({index}) does not name CM {parent:?} op binder {binder} across {crossed_binders} binders"));
+                    }
+                    let body = plan.child_static_origin(parent, position).map_err(|e| e.to_string())?;
+                    if !response_forwards_vis(plan, body, binder).map_err(|e| e.to_string())? {
+                        return Err(format!("CM {parent:?} Vis arm is not pure operation forwarding"));
+                    }
+                    break (parent, plan.child_static_origin(parent, 0).map_err(|e| e.to_string())?);
+                }
+            }
+        }
+        let count = response_tail_edge(expr, position)
+            .ok_or_else(|| format!("non-tail edge {parent:?}[{position}] between relay {relay:?} and CM"))?;
+        crossed_binders = crossed_binders.checked_add(count)
+            .ok_or_else(|| "operation binder depth overflow".to_owned())?;
+        cursor = parent;
+    };
+    let sources = source_results_in_scope(plan, parents, relay, scrutinee, None,
+        true, seen, &mut BTreeSet::new(), omissions)?;
+    // Every result position of the scrutinee was classified (an unclassified
+    // terminal, unknown Call, open operation or omitted position is an error
+    // above), so an empty set means the scrutinee never yields a Vis: this
+    // relay's arm is unreachable and contributes no source.
+    Ok(sources)
+}
+
+// Only a direct curried application of one-parameter lexical closures is a
+// known redex. An arbitrary/generated Call has no source-result provenance.
+fn curried_redex_body(
+    plan: &StaticTransitionPlan<'_>,
+    call: StaticOriginId,
+) -> Result<Option<StaticOriginId>, String> {
+    let mut depth = 0usize;
+    let mut head = call;
+    while let RuntimeExpr::Call { .. } = plan.source_occurrence(head).map_err(|e| e.to_string())? {
+        depth += 1;
+        head = plan.child_static_origin(head, 0).map_err(|e| e.to_string())?;
+    }
+    if !matches!(plan.source_occurrence(head).map_err(|e| e.to_string())?, RuntimeExpr::LexicalClosure { .. }) {
+        return Ok(None);
+    }
+    let mut body = head;
+    for _ in 0..depth {
+        match plan.source_occurrence(body).map_err(|e| e.to_string())? {
+            RuntimeExpr::LexicalClosure { params, .. } if params.len() == 1 => {
+                body = plan.child_static_origin(body, 0).map_err(|e| e.to_string())?;
+            }
+            _ => return Err(format!("curried closure call {call:?} arity disagrees at {body:?}")),
+        }
+    }
+    Ok(Some(body))
+}
+
+fn source_results_in_scope(
+    plan: &StaticTransitionPlan<'_>,
+    parents: &ResponseParents,
+    relay: StaticOriginId,
+    scope: StaticOriginId,
+    redex_body: Option<StaticOriginId>,
+    inherited_tail: bool,
+    seen_relays: &mut BTreeSet<StaticOriginId>,
+    seen_calls: &mut BTreeSet<StaticOriginId>,
+    omissions: &mut BTreeSet<StaticOriginId>,
+) -> Result<Vec<Source>, String> {
+    let (terminal_origins, omitted) = plan.source_result_origins_with_omissions(scope)
+        .map_err(|e| e.to_string())?;
+    omissions.extend(&omitted);
+    if let Some(position) = omitted.first() {
+        return Err(format!("source scope {scope:?} result position {position:?} leaves its function owner"));
+    }
+    let mut sources = Vec::new();
+    for origin in terminal_origins {
+        let expr = plan.source_occurrence(origin).map_err(|e| e.to_string())?;
+        match expr {
+            RuntimeExpr::Call { .. } => {
+                if !seen_calls.insert(origin) {
+                    return Err(format!("curried source Call repeats at {origin:?}"));
+                }
+                let body = curried_redex_body(plan, origin)?
+                    .ok_or_else(|| format!("generated or unknown Call terminal {origin:?}"))?;
+                let _call_side_tail = inherited_tail && tail_to(plan, parents, origin, scope)?;
+                // The redex is a bounded source scope, not a generated call
+                // edge. But crossing its Call is not itself a response_tail_edge;
+                // condition (c) is false for a source found inside that body.
+                sources.extend(source_results_in_scope(plan, parents, relay, body,
+                    Some(body), false, seen_relays, seen_calls, omissions)?);
+            }
+            RuntimeExpr::Construct { constructor, args }
+                if constructor.as_str().ends_with("::ITree::Vis") && args.len() == 2 => {
+                let path_tail = inherited_tail && tail_to(plan, parents, origin, scope)?;
+                let operation = plan.child_static_origin(origin, 0).map_err(|e| e.to_string())?;
+                match plan.source_occurrence(operation).map_err(|e| e.to_string())? {
+                    RuntimeExpr::Construct { .. } => sources.push(Source {
+                        vis: origin, tail_edges: path_tail, redex_body,
+                    }),
+                    RuntimeExpr::Var(_) => {
+                        let upstream = source_for_relay(plan, parents, origin, scope, seen_relays, omissions)?;
+                        for mut source in upstream {
+                            source.tail_edges &= path_tail;
+                            sources.push(source);
+                        }
+                    }
+                    other => return Err(format!("source {origin:?} operation open: {:?}",
+                        std::mem::discriminant(other))),
+                }
+            }
+            RuntimeExpr::Construct { constructor, .. }
+                if constructor.as_str().ends_with("::ITree::Ret") => {}
+            RuntimeExpr::Trap(_) => {}
+            RuntimeExpr::Effect { .. } | RuntimeExpr::Var(_)
+            | RuntimeExpr::Value(_) | RuntimeExpr::PrimitiveCall { .. }
+            | RuntimeExpr::Record { .. } | RuntimeExpr::Project { .. }
+            | RuntimeExpr::Closure { .. } | RuntimeExpr::LexicalClosure { .. }
+            | RuntimeExpr::DeclarationRef { .. } | RuntimeExpr::ImportedDeclarationRef { .. }
+            | RuntimeExpr::Construct { .. } => {
+                return Err(format!("unclassified source terminal {origin:?}: {:?}",
+                    std::mem::discriminant(expr)));
+            }
+            // The result inventory also includes the wrappers it visited.
+            RuntimeExpr::CheckedJoinSite { .. }
+            | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            | RuntimeExpr::CheckedRecursiveInvocation { .. }
+            | RuntimeExpr::CheckedComputationalIHSlots { .. }
+            | RuntimeExpr::CheckedComputationalIHInvocation { .. }
+            | RuntimeExpr::Let { .. } | RuntimeExpr::If { .. }
+            | RuntimeExpr::Match { .. } | RuntimeExpr::ComputationalMatch { .. } => {}
+        }
+    }
+    Ok(sources)
+}
+
+fn source_shape(plan: &StaticTransitionPlan<'_>, vis: StaticOriginId) -> Result<bool, String> {
+    let expr = plan.source_occurrence(vis).map_err(|e| e.to_string())?;
+    let RuntimeExpr::Construct { constructor, args } = expr else { return Ok(false) };
+    if !constructor.as_str().ends_with("::ITree::Vis") || args.len() != 2 { return Ok(false); }
+    let RuntimeExpr::Construct { args: outer, .. } = &args[0] else { return Ok(false) };
+    if !matches!(outer.as_slice(), [RuntimeExpr::Construct { .. }]) { return Ok(false); }
+    Ok(matches!(&args[1], RuntimeExpr::LexicalClosure { params, .. } if params.len() == 1))
+}
+
+/// Relay admission (a), shared by pair construction and classification: one
+/// candidate row whose effect has at least one planned host-effect seat.
+/// Seats are recorded per (effect origin, slot), so counting records would
+/// incorrectly reject an operation with multiple argument slots.
+fn source_seat_row<'r>(
+    plan: &StaticTransitionPlan<'_>,
+    candidates: &'r [StaticResponseContinuation],
+    source: StaticOriginId,
+) -> Option<&'r StaticResponseContinuation> {
+    let rows = candidates.iter().filter(|row| row.vis_origin() == source)
+        .collect::<Vec<_>>();
+    let [row] = rows.as_slice() else { return None; };
+    plan.host_effect_seat_records().iter()
+        .any(|seat| seat.effect_origin == row.effect_origin()
+            && seat.operation == row.operation())
+        .then_some(*row)
+}
+
+// One source has one consumer. Exclude the union of the owners under which
+// the bounded and admitted Deferred lowering arms can drive this source.
+fn deferred_drive_settles(
+    plan: &StaticTransitionPlan<'_>,
+    vis: StaticOriginId,
+    owner: ContinuationEmissionOwner,
+) -> Result<bool, CraneliftBackendError> {
+    let Some(row) = plan.deferred_response_at_vis(vis)? else {
+        return Ok(false);
+    };
+    Ok(
+        plan.bounded_deferred_response_handler_owner(&row)? == Some(owner)
+            || plan.admitted_deferred_handler_owner(&row)? == Some(owner),
+    )
+}
+
+/// Build the admission key from the same closed relay-source traversal used
+/// by classification. A failed/open traversal installs no speculative pair;
+/// the refusal below reports the reason rather than inventing a route.
+pub(super) fn build_drive_pairs(
+    plan: &StaticTransitionPlan<'_>,
+) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner), RelayDrivePair>, CraneliftBackendError> {
+    let mut pairs = BTreeMap::new();
+    let protocols = plan.static_response_continuations.iter()
+        .filter_map(|owner| plan.returned_vis_protocol(owner.vis_origin()).ok()
+            .filter(|protocol| protocol.excluded_by_relay)
+            .map(|protocol| (owner, protocol)))
+        .collect::<Vec<_>>();
+    if protocols.is_empty() { return Ok(pairs); }
+    let Ok(parents) = response_parents(plan) else { return Ok(pairs); };
+    let Ok(candidates) = plan.return_protocol_candidate_rows() else { return Ok(pairs); };
+    let Ok(contexts) = plan.continuation_contexts() else { return Ok(pairs); };
+    for (owner, protocol) in protocols {
+        for context in &protocol.contexts {
+            let Some(root) = contexts.iter().find(|row| row.id() == context.context)
+                .map(|row| row.worker_body_origin()) else { continue; };
+            for member in &context.members {
+                if !member.relay { continue; }
+                let Ok(sources) = source_for_relay(plan, &parents, member.origin, root,
+                    &mut BTreeSet::new(), &mut BTreeSet::new()) else { continue; };
+                for source in sources {
+                    if !source.tail_edges || !source_shape(plan, source.vis).unwrap_or(false) {
+                        continue;
+                    }
+                    let Some(row) = source_seat_row(plan, &candidates, source.vis) else {
+                        continue;
+                    };
+                    let owner_key = owner.base_owner();
+                    if deferred_drive_settles(plan, source.vis, owner_key)? {
+                        continue;
+                    }
+                    let pair = RelayDrivePair {
+                        source: source.vis,
+                        owner: owner_key,
+                        minting_row: owner.id(),
+                        operation_root_origin: plan.child_static_origin(source.vis, 0)?,
+                        effect_origin: row.effect_origin(),
+                        operation: row.operation(),
+                    };
+                    if let Some(previous) = pairs.insert((source.vis, owner_key), pair) {
+                        if previous.minting_row != pair.minting_row {
+                            return Err(planner_error("relay pair minted by two owners"));
+                        }
+                        if previous != pair {
+                            return Err(planner_error("a relay source/owner pair has conflicting effect seats"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(pairs)
+}
+
+fn classify(plan: &StaticTransitionPlan<'_>) -> BTreeSet<StaticResponseContinuationId> {
+    let mut settled_relay_owners = BTreeSet::new();
+    let parents = response_parents(plan);
+    let candidates = plan.return_protocol_candidate_rows();
+    let contexts = plan.continuation_contexts();
+    for owner in &plan.static_response_continuations {
+        let class = plan.pending_vis_settlements.owners.get(&owner.id());
+        let protocol = plan.returned_vis_protocol(owner.vis_origin());
+        // Underived carries no relay-membership information: keep baseline
+        // emission instead of reading an unavailable protocol as a refusal.
+        let candidate = match class {
+            Some(ResponseOwnerSettlement::Excluded { reason: ExcludedSettlement::Underived(_) }) => false,
+            Some(ResponseOwnerSettlement::Excluded { reason: ExcludedSettlement::Relay })
+            | Some(ResponseOwnerSettlement::Protocol)
+            | Some(ResponseOwnerSettlement::RetOnly)
+            | None => protocol.as_ref().is_ok_and(|row| row.excluded_by_relay),
+        };
+        if !candidate { continue; }
+        let mut relay_count = 0usize;
+        let mut omissions = BTreeSet::new();
+        let mut owner_admitted = true;
+        let mut errors = Vec::new();
+        match (&protocol, &parents, &candidates, &contexts) {
+            (Ok(protocol), Ok(parents), Ok(candidates), Ok(contexts)) => {
+                for context in &protocol.contexts {
+                    let root = contexts.iter().find(|v| v.id() == context.context)
+                        .map(|v| v.worker_body_origin());
+                    for member in &context.members {
+                        if !member.relay { continue; }
+                        relay_count += 1;
+                        let traced = root.ok_or_else(|| "missing context root".to_owned())
+                            .and_then(|root| source_for_relay(plan, parents, member.origin, root,
+                                &mut BTreeSet::new(), &mut omissions));
+                        if traced.is_err() { owner_admitted = false; }
+                        match traced {
+                            Err(error) => errors.push(error),
+                            Ok(sources) => for source in sources {
+                                let a_unique_row_and_seat =
+                                    source_seat_row(plan, candidates, source.vis).is_some();
+                                let b_construct_closure = source_shape(plan, source.vis);
+                                let c_tail_forward_only = source.tail_edges;
+                                // (d) is the exact plan-side admission key.
+                                // A proposed source without an issued pair has no route.
+                                let d_pair = plan.relay_drive_pair(source.vis, owner.base_owner());
+                                let deferred = plan.deferred_response_at_vis(source.vis);
+                                let bounded_handler = deferred.as_ref().ok().and_then(Option::as_ref)
+                                    .map(|row| plan.bounded_deferred_response_handler_owner(row));
+                                let unitless_row = source.redex_body
+                                    .map(|body| plan.deferred_no_unit_response_in_body(body));
+                                let admitted_handler = deferred.as_ref().ok().and_then(Option::as_ref)
+                                    .map(|row| plan.admitted_deferred_handler_owner(row));
+                                let drive_result = deferred_drive_settles(plan, source.vis, owner.base_owner());
+                                let drive_settled = matches!(&drive_result, Ok(true));
+                                let relay_drivable = a_unique_row_and_seat
+                                    && b_construct_closure.as_ref().is_ok_and(|b| *b)
+                                    && c_tail_forward_only && matches!(&d_pair, Ok(Some(_)));
+                                let source_ok = drive_settled || relay_drivable;
+                                owner_admitted &= source_ok;
+                                if let Err(error) = d_pair { errors.push(error.to_string()); }
+                                if let Err(error) = drive_result { errors.push(error.to_string()); }
+                                if let Err(error) = b_construct_closure { errors.push(error); }
+                                if let Err(error) = deferred { errors.push(error.to_string()); }
+                                if let Some(Err(error)) = bounded_handler { errors.push(error.to_string()); }
+                                if let Some(Err(error)) = admitted_handler { errors.push(error.to_string()); }
+                                if let Some(Err(error)) = unitless_row { errors.push(error.to_string()); }
+                            },
+                        }
+                    }
+                }
+            }
+            _ => {
+                owner_admitted = false;
+                errors.push(format!("unavailable inputs protocol={:?} parents={:?} candidates={:?} contexts={:?}",
+                    protocol.as_ref().err(), parents.as_ref().err(),
+                    candidates.as_ref().err(), contexts.as_ref().err()));
+            }
+        }
+        if relay_count == 0 { owner_admitted = false; }
+        if !errors.is_empty() { owner_admitted = false; }
+        if owner_admitted { settled_relay_owners.insert(owner.id()); }
+    }
+    settled_relay_owners
+}
+
+pub(super) fn settled_relay_owners(plan: &StaticTransitionPlan<'_>) -> BTreeSet<StaticResponseContinuationId> {
+    classify(plan)
+}

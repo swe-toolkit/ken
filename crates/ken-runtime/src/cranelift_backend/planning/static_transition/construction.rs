@@ -318,6 +318,8 @@ impl<'src> Planner<'src> {
                 static_response_deferred: Vec::new(),
                 static_response_phase_a: None,
                 pending_vis_settlements: PendingVisSettlements::default(),
+                relay_drive_pairs: BTreeMap::new(),
+                relay_routes: BTreeMap::new(),
                 // Empty by construction: the planner has no oriented plan, so a
                 // fusion identity cannot exist yet. `D2f`'s post-planner
                 // installer is the only writer.
@@ -1523,6 +1525,7 @@ impl<'src> Planner<'src> {
         // Phase B has installed the final response-owner population and its
         // selected calls. Close the returned-Vis settlement exactly once before
         // ownership source (e) reads its successor rows.
+        self.plan.relay_drive_pairs = self.plan.build_relay_drive_pairs()?;
         self.plan.pending_vis_settlements = self.plan.build_pending_vis_settlements()?;
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
@@ -1546,6 +1549,16 @@ impl<'src> Planner<'src> {
             return Err(planner_error(
                 "execute-then-resume response-owner assignment changed the checked-IH transport source population",
             ));
+        }
+        // Resolve each admitted relay on the final continuation entry edges,
+        // including the refreshed checked-IH transport population. The trap
+        // catalogue exists before any lowering consumes the selected fact.
+        self.plan.relay_routes = self.plan.build_relay_routes()?;
+        let relay_traps = self.plan.relay_routes.values()
+            .filter_map(|route| route.no_route_trap.as_ref().cloned())
+            .collect::<Vec<_>>();
+        for trap in &relay_traps {
+            self.intern_trap(trap)?;
         }
         // After response-owner phase B the actual transport destinations are
         // final. The census only records unavailable captures; unlike the
