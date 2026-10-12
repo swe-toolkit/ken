@@ -1,6 +1,5 @@
-//! Closed relay-source settlement shared by the planning refusal and recorder.
-//! The (d) source/owner pair is installed once and read by both this classifier
-//! and lowering; an uninstalled proposal is never an admission.
+//! Relay-source admission for pending-Vis fusion. A reached unsettled relay
+//! traps at its lowering consumer, not at this planning-time classification.
 use super::*;
 use crate::cranelift_backend::planning::static_transition::returned_vis::{
     ExcludedSettlement, ResponseOwnerSettlement,
@@ -313,8 +312,7 @@ pub(super) fn build_drive_pairs(
     Ok(pairs)
 }
 
-fn classify(plan: &StaticTransitionPlan<'_>) -> (Vec<String>, BTreeSet<StaticResponseContinuationId>) {
-    let mut hypothetical_refusals = Vec::new();
+fn classify(plan: &StaticTransitionPlan<'_>) -> BTreeSet<StaticResponseContinuationId> {
     let mut settled_relay_owners = BTreeSet::new();
     let parents = response_parents(plan);
     let candidates = plan.return_protocol_candidate_rows();
@@ -322,23 +320,19 @@ fn classify(plan: &StaticTransitionPlan<'_>) -> (Vec<String>, BTreeSet<StaticRes
     for owner in &plan.static_response_continuations {
         let class = plan.pending_vis_settlements.owners.get(&owner.id());
         let protocol = plan.returned_vis_protocol(owner.vis_origin());
-        let reason = match class {
-            Some(ResponseOwnerSettlement::Excluded { reason: ExcludedSettlement::Underived(detail) }) =>
-                ExcludedSettlement::Underived(detail.clone()),
+        // Underived carries no relay-membership information: keep baseline
+        // emission instead of reading an unavailable protocol as a refusal.
+        let candidate = match class {
+            Some(ResponseOwnerSettlement::Excluded { reason: ExcludedSettlement::Underived(_) }) => false,
             Some(ResponseOwnerSettlement::Excluded { reason: ExcludedSettlement::Relay })
             | Some(ResponseOwnerSettlement::Protocol)
             | Some(ResponseOwnerSettlement::RetOnly)
-            | None => {
-                if protocol.as_ref().is_ok_and(|row| row.excluded_by_relay) {
-                    ExcludedSettlement::Relay
-                } else {
-                    continue;
-                }
-            }
+            | None => protocol.as_ref().is_ok_and(|row| row.excluded_by_relay),
         };
+        if !candidate { continue; }
         let mut relay_count = 0usize;
         let mut omissions = BTreeSet::new();
-        let mut owner_admitted = matches!(&reason, ExcludedSettlement::Relay);
+        let mut owner_admitted = true;
         let mut errors = Vec::new();
         match (&protocol, &parents, &candidates, &contexts) {
             (Ok(protocol), Ok(parents), Ok(candidates), Ok(contexts)) => {
@@ -398,24 +392,10 @@ fn classify(plan: &StaticTransitionPlan<'_>) -> (Vec<String>, BTreeSet<StaticRes
         if relay_count == 0 { owner_admitted = false; }
         if !errors.is_empty() { owner_admitted = false; }
         if owner_admitted { settled_relay_owners.insert(owner.id()); }
-        if !owner_admitted {
-            let relays = protocol.as_ref().ok().map(|protocol| protocol.contexts.iter()
-                .flat_map(|context| context.members.iter())
-                .filter(|member| member.relay)
-                .map(|member| format!("{:?}", member.origin))
-                .collect::<Vec<_>>()).unwrap_or_default();
-            hypothetical_refusals.push(format!(
-                "owner {:?} at Vis {:?} excluded {reason:?}: relay [{}] not settled (base {:?})",
-                owner.id(), owner.vis_origin(), relays.join(", "), owner.base_owner()));
-        }
     }
-    (hypothetical_refusals, settled_relay_owners)
+    settled_relay_owners
 }
 
 pub(super) fn settled_relay_owners(plan: &StaticTransitionPlan<'_>) -> BTreeSet<StaticResponseContinuationId> {
-    classify(plan).1
-}
-
-pub(super) fn refusals(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
-    classify(plan).0
+    classify(plan)
 }

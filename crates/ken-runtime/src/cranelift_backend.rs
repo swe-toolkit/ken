@@ -49,7 +49,7 @@ mod grafted_spine_control_graph;
 mod lowering;
 pub(crate) mod planning;
 #[cfg(feature = "px8-ds-test-support")]
-pub use planning::{with_forced_carrier_match_joins, with_relay_settlement_refusal_suppressed};
+pub use planning::with_forced_carrier_match_joins;
 pub(crate) mod surface;
 
 #[cfg(test)]

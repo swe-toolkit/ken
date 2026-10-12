@@ -6992,7 +6992,7 @@ impl<'a> Lowering<'a> {
         eliminators: &[EliminatorFrame<'b>],
     ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
         self.static_transition_plan.reject_reached_admitted_relay(
-            static_origin, self.defining_emission_owner,
+            static_origin, constructor, args, self.defining_emission_owner,
         )?;
         let eliminator = eliminators[0];
         if let Some(row) = self
@@ -16721,7 +16721,7 @@ impl<'a> Lowering<'a> {
             }
             RuntimeExpr::Construct { constructor, args } => {
                 self.static_transition_plan.reject_reached_admitted_relay(
-                    static_origin, self.defining_emission_owner,
+                    static_origin, constructor, args, self.defining_emission_owner,
                 )?;
                 // Recut §7 total match (AC-2) over the response classify verdict.
                 // No catch-all: adding a ResponseDisposition variant reddens the

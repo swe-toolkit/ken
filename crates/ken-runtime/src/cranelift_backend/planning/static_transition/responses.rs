@@ -1590,12 +1590,6 @@ pub(in crate::cranelift_backend) fn settled_relay_owners(
     relay_settlement::settled_relay_owners(plan)
 }
 
-/// Fail closed for Excluded owners whose relay-source admission cannot be
-/// established from the plan.
-pub(super) fn relay_settlement_refusals(plan: &StaticTransitionPlan<'_>) -> Vec<String> {
-    relay_settlement::refusals(plan)
-}
-
 fn response_parents(plan: &StaticTransitionPlan<'_>) -> Result<ResponseParents, CraneliftBackendError> {
     let mut parents = BTreeMap::new();
     for occurrence in plan.source_occurrences.iter().flatten() {

@@ -147,17 +147,16 @@ impl StaticTransitionPlan<'_> {
     pub(in crate::cranelift_backend) fn reject_reached_admitted_relay(
         &self,
         origin: StaticOriginId,
+        constructor: &str,
+        args: &[RuntimeExpr],
         emission_owner: Option<super::continuations::ContinuationEmissionOwner>,
     ) -> Result<(), CraneliftBackendError> {
         let Some(emission_owner) = emission_owner else { return Ok(()); };
-        let RuntimeExpr::Construct { constructor, args } = self.source_occurrence(origin)? else {
-            return Ok(());
-        };
-        if !constructor.as_str().ends_with("::ITree::Vis") || args.len() != 2 {
-            return Ok(());
-        }
-        let operation = self.child_static_origin(origin, 0)?;
-        if !matches!(self.source_occurrence(operation)?, RuntimeExpr::Var(_)) {
+        // The reached Construct and its arguments are already the lowering
+        // operand. Do not re-resolve its source occurrence behind the single
+        // origin-to-expression route merely to inspect this shape.
+        if !constructor.ends_with("::ITree::Vis") || args.len() != 2
+            || !matches!(args.first(), Some(RuntimeExpr::Var(_))) {
             return Ok(());
         }
         for owner in &self.static_response_continuations {

@@ -769,32 +769,6 @@ fn planner_capacity_error(detail: impl Into<String>) -> CraneliftBackendError {
     unsupported("NativeStaticTransitionPlanner", detail)
 }
 
-// Disposable test-support diagnostic only: no production admission is changed.
-#[cfg(any(test, feature = "px8-ds-test-support"))]
-thread_local! {
-    static RELAY_REFUSAL_SUPPRESSED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-/// Test-only: keep recording a hypothetical refusal while allowing a
-/// lowering-time negative control to reach its own guard. Restore on unwind.
-#[cfg(feature = "px8-ds-test-support")]
-#[doc(hidden)]
-pub fn with_relay_settlement_refusal_suppressed<R>(run: impl FnOnce() -> R) -> R {
-    struct Restore(bool);
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            RELAY_REFUSAL_SUPPRESSED.with(|suppressed| suppressed.set(self.0));
-        }
-    }
-    let _restore = Restore(RELAY_REFUSAL_SUPPRESSED.with(|s| s.replace(true)));
-    run()
-}
-
-#[cfg(feature = "px8-ds-test-support")]
-fn relay_settlement_refusal_suppressed() -> bool {
-    RELAY_REFUSAL_SUPPRESSED.with(std::cell::Cell::get)
-}
-
 fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetime {
     use crate::RuntimeValue;
     match value {
@@ -1087,18 +1061,6 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
     #[cfg(feature = "px8-ds-test-support")]
     per_emitter_availability::record_per_emitter_availability_diagnostic(&plan);
 
-    // Refuse at planner.finish's sole caller. The test-only suppression
-    // preserves a negative control's older
-    // lowering refusal; no ordinary build can select that suppression.
-    let refused = responses::relay_settlement_refusals(&plan);
-    #[cfg(feature = "px8-ds-test-support")]
-    if relay_settlement_refusal_suppressed() {
-        return Ok(plan);
-    }
-    if !refused.is_empty() {
-        return Err(planner_capacity_error(format!(
-            "response owner relay settlement refused: {}", refused.join("; "))));
-    }
     Ok(plan)
 }
 

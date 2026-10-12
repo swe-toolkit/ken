@@ -4220,6 +4220,8 @@ fn assert_generated_entry_capsule_mutation_child() {
 }
 
 const EXECUTE_THEN_RESUME_REKEY_CHILD: &str = "KEN_RT_EXECUTE_THEN_RESUME_REKEY_CHILD";
+const EXECUTE_THEN_RESUME_SUPPRESSED_RELAY_TRAP: &str =
+    "relay: forwarded host op BufferAllocate from source StaticOriginId(1288) has no performing route";
 
 fn assert_execute_then_resume_rekey_child() {
     use ken_runtime::StaticResponseOwnerBodyMutation as OwnerMutation;
@@ -4247,7 +4249,11 @@ fn assert_execute_then_resume_rekey_child() {
         else {
             panic!("materialization suppression did not restore the pre-effect trap");
         };
-        assert!(provenance.trap.message.ends_with("::ResourceBodyResult"));
+        assert_eq!(provenance.trap.code, ken_runtime::RuntimeTrapCode::MissingRuntimeMetadata);
+        assert_eq!(
+            provenance.trap.message.as_str(),
+            EXECUTE_THEN_RESUME_SUPPRESSED_RELAY_TRAP
+        );
         assert!(
             ken_runtime::suppressed_execute_then_resume_response_is_exact(),
             "materialization suppression did not restore"
@@ -4366,6 +4372,8 @@ generated_entry_split_checked_case!(
 // one independently mutated fact of the execute-then-resume response edge:
 // materialization, exact K context, no raw-worker substitution, exactly-one K,
 // K-Result identity, tail order, Trap-before-Result, and exact Ret identity.
+// Outer-carried suppression now pins the exact pre-effect relay trap, not the
+// downstream ResourceBodyResult default that the missing route used to reach.
 //
 // MEASURED: every mode mutates the production classification or one finished
 // response-owner instruction/value relation and the unchanged write fixture
@@ -6130,7 +6138,8 @@ fn fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset() 
 ///
 /// MEASURED: suppressing that classification at its production site leaves the
 /// interpreter unchanged but restores native's exact pre-effect
-/// `ResourceBodyResult` trap, with neither BufferAllocate nor FsReadAt reached.
+/// `MissingRuntimeMetadata` relay trap, with neither BufferAllocate nor
+/// FsReadAt reached.
 /// CLAIMED: the existing transport-source response-owner call is causally
 /// necessary for execute-then-resume. THE GAP: this proves materialization, not
 /// the per-owner once/order property; finished-CLIF owner verification and its
@@ -6153,10 +6162,11 @@ fn suppressing_execute_then_resume_restores_the_pre_effect_write_trap() {
         };
         assert_eq!(
             provenance.trap.code,
-            ken_runtime::RuntimeTrapCode::PatternMatchFailure
+            ken_runtime::RuntimeTrapCode::MissingRuntimeMetadata
         );
-        assert!(
-            provenance.trap.message.ends_with("::ResourceBodyResult"),
+        assert_eq!(
+            provenance.trap.message.as_str(),
+            EXECUTE_THEN_RESUME_SUPPRESSED_RELAY_TRAP,
             "suppression reached the wrong trap: {provenance:?}"
         );
         for skipped in [
