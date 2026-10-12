@@ -1,7 +1,7 @@
 ---
 id: LANG-STATED-EQUALITY-REPEATED-TRANSPARENT-HEAD
 title: "stated_equality gives up when a goal's head chain unfolds the same transparent id twice, so a non-recursive wrapper used twice (Id (Id (Equal ...))) is reported as stating no equality and Refl is refused on every predicate route. Bound the unfolding by recursion, not by revisit"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -78,3 +78,18 @@ that head reduction. The change is confined to `stated_equality`.
 - Any AC-1 row stays refused.
 - Either false twin or the `Both` refusal checks or changes its reason.
 - The REFL-GOAL suite or the message-pinning suites change.
+
+## Closeout
+
+Merged `cc2d62abe` from exact `77d67584d` (PR #4700). Language QA
+`evt_14hqa85c3482j`; Architect `evt_3f3nft5xc67rd` with Decision
+`dec_3chrbm1bvgkra`.
+
+- `stated_equality` keys its revisit guard on the kernel's checked cycle
+  set, `env.is_recursive_transparent(id) && !unfolded.insert(id)`, so a
+  non-recursive wrapper used twice states its equality and a recursive
+  transparent group still stops. No fuel and no depth bound.
+- `lang_stated_equality_repeated_transparent_head.rs` holds the five
+  formerly refused rows, controls and false twins (8/8), and a unit test
+  covers a recursive `P : Nat -> Prop`.
+- L2 moves to `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`.

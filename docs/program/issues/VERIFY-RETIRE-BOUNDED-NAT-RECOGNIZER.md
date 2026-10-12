@@ -1,7 +1,7 @@
 ---
 id: VERIFY-RETIRE-BOUNDED-NAT-RECOGNIZER
 title: "The static-response BoundedNat recognizer keys a declaration and a constructor family by spelling. It fires on the prelude freeze path, but the general OperationArgument path computes the same length correctly. Remove it, with a positive control that observes the length"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -81,3 +81,18 @@ variant and its lowering arm. Build in place at base `fd3b9262b`.
 ```text
 1. spelling-keyed classifier ruled unreachable from a fixture population that never called the prelude op reaching it (freeze/spanBytes -> buffer_span_length) — keyed on fixture population, not on the op inventory
 ```
+
+## Closeout
+
+Merged `095aecb61` from exact `53e0c19ff` (PR #4701). Verify QA
+`evt_2x7vvthkwn68e`; Architect `evt_ce0f83xfmnc2` with Decision
+`dec_p79zp9wcfm5c`.
+
+- The `BoundedNatToInt` input, `is_exact_bounded_nat_to_int` with its
+  spelling probes, and its lowering arm are deleted. Every argument takes
+  the general `OperationArgument` lowering. No shared helper is orphaned.
+- `r2_same_buffer_freeze_returns_exact_span_bytes` asserts native and
+  interpreter `b"held r"`. The base length mutant reddens it.
+- The AC-1 census counted 0, 251 and 0 recognizer fires, a population and
+  not a gate. Per-test results match the base.
+- The verify ring moves to `LANG-ELAB-RECURSIVE-FRAME-BUDGET`.

@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT
 title: "No linear-algebra contract exists in spec/50-stdlib, so the catalog's dimension-safe linear algebra layer has nothing to build against. Author its chapter with a first section: vectors and matrices whose dimensions are in their types, dot product, matrix-vector and matrix-matrix product, transpose and identity, each law proved at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -108,3 +108,21 @@ base, stop and report the mismatch.
 - A law needs an elaboration capability the landed elaborator lacks.
   Stop with the failing development, since that is a Language
   prerequisite for the D0 to name.
+
+## Closeout
+
+Merged `d0a357a54` from exact `f211f538b` (PR #4699). Conformance
+validator `evt_x1jjjtzpc44y` with Decision `dec_4vpz7f8saegc0`; Architect
+`evt_2bc3shy87e8vf`, after changes requested on `81bbc690d`
+(`evt_6tg33zgkax7py`).
+
+- `spec/50-stdlib/65-linear-algebra.md` section 1 is normative for the
+  seven Nat operations and the five proved laws, over the existing
+  catalog `Vec`. Left identity and associativity are gated on
+  `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`.
+- The seed `conformance/stdlib/linear-algebra/seed-nat-matrix.md` has
+  nine cases, with direct `dot` and `identity` oracles and one
+  dimension-mismatch row.
+- Spec 60, the stdlib README and the data-match seed now attribute `zip`
+  and `lookup` to CAT-VEC `665059cfd`, not to a DS-5c delivery.
+- L3 moves to `CAT-LINEAR-ALGEBRA-NAT-MATRIX`.
