@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-RATIONAL-ORDER
 title: "Data.Numeric.Rational has rational_leq and its respect law but no order laws, so no consumer can sort, bound or compare rationals with a proof. Deliver section 2.2 of spec/50-stdlib/64-rational.md: refl, trans, antisym up to value equivalence, and total, fully proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T1
@@ -70,3 +70,17 @@ root-load them and run the seed's order cases.
 - A law needs an Axiom, a quotient or setoid facility, a kernel or surface
   change, or a Nat law outside section 4 and the canonical `leq_nat` laws.
 - Reuse needs a public-surface change to a provider.
+
+## Closeout
+
+Merged `28506f169` from exact `60ae7079f` (PR #4686). Foundation QA
+`evt_639m0s5tzf7gq`, Architect `evt_74acwfjyf6hcq`, Decision
+`dec_4mjw48xada95w`.
+
+`Data.Numeric.Rational` now carries the section 2.2 order laws for
+`rational_leq`: `refl`, `trans`, `antisym` (to `rational_equiv`) and
+`total`, each a public proof. The totality helper reuses the public
+`bool_or` elimination rather than a private copy. The acceptance target
+`cat_numeric_rational_values.rs` runs the order cases. `trusted_base()` is
+unchanged. Two paths, catalog plus crates. The next L3 node is
+`SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT`.

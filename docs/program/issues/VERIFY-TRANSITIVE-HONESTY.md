@@ -1,7 +1,7 @@
 ---
 id: VERIFY-TRANSITIVE-HONESTY
 title: "A claim reads proved when its own certificate checks and its own hole is outside trusted_base(); nothing computes reachability. Under subset Σ a certificate using the proof of a constant whose obligation is open would read proved. Add a read-only kernel reachability query and require it to find no open hole or unaccepted postulate"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
