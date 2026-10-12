@@ -1,7 +1,7 @@
 ---
 id: LANG-STATED-EQUALITY-REPEATED-TRANSPARENT-HEAD
 title: "stated_equality gives up when a goal's head chain unfolds the same transparent id twice, so a non-recursive wrapper used twice (Id (Id (Equal ...))) is reported as stating no equality and Refl is refused on every predicate route. Bound the unfolding by recursion, not by revisit"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1

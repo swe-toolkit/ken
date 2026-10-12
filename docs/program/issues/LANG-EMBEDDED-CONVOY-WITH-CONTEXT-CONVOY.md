@@ -1,7 +1,7 @@
 ---
 id: LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY
 title: "The embedded-method equation convoy runs only when no context convoy is present, so a true Equal at a single-constructor type is still refused once the goal names a second value at the matched index (two lists at one index). Let the equation convoy coexist with the context convoy at the coherent-frame gate"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -70,3 +70,23 @@ planner.
 - Any kernel rule, conversion change or `trusted_base()` change.
 - The repair is the recursive-step coordinate split: stop to the
   Architect, since that is `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`.
+
+## Closeout
+
+Merged `66cb5e9b7` from exact `4361cc6bc` (PR #4696). Language QA
+`evt_52rd2svgq47s9`, Architect `evt_23ne4fxf29f0x`, Decision
+`dec_1dc0vevbp41zn`.
+
+- `plan_coherent_frame_motive` now generalizes the goal-keyed embedded
+  eliminators of an expanded goal itself, probing the embedded plan on
+  that goal, instead of deferring to nested frames (Architect V8,
+  `evt_6gp1wr5zgvzc2`).
+- `build_index_equation_convoy_body` admits any proposition-valued goal
+  into its reindex path; a non-proposition goal still declines.
+- `lang_embedded_context_convoy.rs`: six rows, including a false twin
+  refused at its `Refl` leaf. The eight ruled suites 42/42 and the AC-3
+  set 61/61 are unchanged, and so is the 74-file catalog census.
+- Carry: the now-unused `defer_coupled_expansion` parameter is deleted by
+  the next WP touching this planner, recorded in
+  `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`.
+- Language moves to `LANG-STATED-EQUALITY-REPEATED-TRANSPARENT-HEAD`.
