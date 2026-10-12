@@ -1014,6 +1014,37 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
     });
 }
 
+/// Promise class: durable invariant. MEASURED: a same-buffer freeze of a
+/// read span returns exactly the span's bytes natively and in the interpreter.
+/// CLAIMED: the span length reaching BufferFreeze is the span's budget. THE
+/// GAP: this fixture observes one six-byte span; it does not bound the
+/// general conversion's cost or prove every possible span length.
+#[test]
+fn r2_same_buffer_freeze_returns_exact_span_bytes() {
+    in_large_stack_thread("rt-escape-r2-same-buffer-freeze", || {
+        let source = R2_CROSS_BUFFER_FREEZE
+            .replace(
+                "(\\outcome. after_read buffer_b outcome)",
+                "(\\outcome. after_read buffer_a outcome)",
+            )
+            .replace(
+                "Ok bytes |-> ResourceBodyErr Unit Unit MkUnit;",
+                "Ok bytes |-> ResourceBodyOk Unit Unit MkUnit;",
+            );
+        assert!(
+            source.contains("after_read buffer_a outcome"),
+            "the control must freeze the span's own buffer"
+        );
+        let diff = differential("r2-same-buffer-freeze", &source);
+        assert_native_matches_interpreter("r2-same-buffer-freeze", &diff);
+        let expected = ken_runtime::CanonicalOutcomeV1::Success(
+            ken_runtime::CanonicalReplyV1::Bytes(b"held r".to_vec()),
+        );
+        assert_eq!(buffer_freeze_outcome(&diff.native), expected);
+        assert_eq!(buffer_freeze_outcome(&diff.interpreted), expected);
+    });
+}
+
 #[test]
 fn r2_cross_buffer_freeze_fails_closed_with_invalid_bounds() {
     in_large_stack_thread("rt-escape-r2", || {

@@ -3106,51 +3106,6 @@ fn lower_static_response_effect(
     for input in row.effect_environment() {
         let operand = match input {
             StaticResponseEffectInput::Frame(binding) => frame_operand(binding)?,
-            StaticResponseEffectInput::BoundedNatToInt {
-                span,
-                span_identity,
-            } => {
-                let span = match frame_operand(span)? {
-                    LoweringOperand::Carried(word) => word,
-                    LoweringOperand::Residual(_) => return Err(
-                        CraneliftBackendError::ResidualRepresentationRequired {
-                            site: "a response BoundedNat conversion span",
-                        },
-                    ),
-                    LoweringOperand::Specialized(_) => {
-                        return Err(backend_module(
-                            "a response BoundedNat conversion span is not carried"
-                                .to_string(),
-                        ));
-                    }
-                };
-                let tag = compiler.emit_carrier_tag(builder, span)?;
-                let expected = i64::try_from(span_identity.tag_abi_word()?).map_err(|_| {
-                    backend_module(
-                        "response span identity exceeds the runtime tag word".to_string(),
-                    )
-                })?;
-                Lowering::require_i64(builder, tag, expected);
-                let fields = compiler.emit_carrier_field_count(builder, span)?;
-                Lowering::require_i64(builder, fields, 3);
-                let length = compiler.emit_carrier_field(builder, span, 2)?;
-                let length_tag = builder.ins().band_imm(
-                    length.word,
-                    crate::boundary_value::BOUNDARY_TAG_MASK as i64,
-                );
-                Lowering::require_i64(
-                    builder,
-                    length_tag,
-                    crate::boundary_value::BoundaryTag::ImmediateBoundedNat as i64,
-                );
-                let value = builder.ins().ushr_imm(
-                    length.word,
-                    i64::from(crate::boundary_value::BOUNDARY_TAG_BITS),
-                );
-                LoweringOperand::Specialized(
-                    compiler.lower_dynamic_small_int(builder, value),
-                )
-            }
             StaticResponseEffectInput::OperationArgument {
                 origin,
                 environment,
