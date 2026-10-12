@@ -25,7 +25,9 @@ never taken for it.
 - **Population.** 26 distinct `ends_with("::…")` suffixes over 61 lines
   in `crates/*/src/*` on `874e9f7bb` (58 production, 3 in-src test; all in
   ken-runtime). The D0 counted 56 on its earlier base (Steward
-  `evt_7qa20faq8a0zp`). 25 are constructor
+  `evt_7qa20faq8a0zp`). Three `contains("::…::")` sites bring it to 64
+  (Architect `evt_5b3tqdbwy5fg2`): lowering/core.rs:7052 and :7056
+  (`::ITree::`) and responses.rs:2319 (`::BufferSpan::`). 25 are constructor
   leaves. `::buffer_nat_to_int` is the only declaration. Example:
   `console_stream_tag` (ken-runtime lowering/mod.rs) tests
   `ends_with("::Stdout")`.
