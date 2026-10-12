@@ -2119,7 +2119,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         }
         RExpr::RStr(s, span) => check_refined_string_literal(cx, s, expected, span),
         // `Refl` — reflexivity, checked (never inferred): the expected goal
-        // must originate as a kernel `Eq A t u` / prelude `Equal A t u` with
+        // must originate as a kernel `Eq A t u` / transparent equality alias with
         // `t`/`u` CONVERTIBLE. If observational equality reduces that equality
         // to Sigma-shaped component obligations before checking sees the Eq
         // head, synthesize the corresponding component proof. This remains
@@ -2132,7 +2132,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             let exp_wh = whnf(cx.env, &cx.ctx, expected);
             if matches!(exp_wh, Term::Eq(..))
                 || (matches!(exp_wh, Term::Sigma(..))
-                    && refl_goal_originates_in_equality(cx, expected))
+                    && states_equality(cx.env, &cx.ctx, expected))
             {
                 synth_refl_proof(cx.env, &cx.ctx, expected, rspan)
             } else {
@@ -2335,17 +2335,6 @@ fn check_match_result(
                 emit_refinement_introduction(cx, expected, &inferred_ty, core, span, None)
             }
     }
-}
-
-fn refl_goal_originates_in_equality(cx: &ElabCtx, expected: &Term) -> bool {
-    if matches!(expected, Term::Eq(..)) {
-        return true;
-    }
-    let (head, _) = peel_app(expected);
-    matches!(
-        head,
-        Term::Const { id, .. } if cx.globals.get("Equal").copied() == Some(id)
-    )
 }
 
 fn synth_refl_proof(
@@ -4733,32 +4722,57 @@ fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -
     }
 }
 
-/// The equality a branch goal states: a kernel `Eq A t u`, or a transparent
-/// head (prelude `Equal`) whose fully applied body is exactly an `Eq`.
-/// An applied, annotated motive lambda may expose either form after beta.
-/// Stop at that head, before observational reduction changes Sigma equality
-/// into a Sigma proposition. This preserves Refl's stated-equality origin;
-/// the reduced endpoints still have to pass its conversion check.
+/// The Refl gate's question, answered outside `check`'s frame. `check`
+/// recurses through every nested expression, so the equality triple that
+/// `stated_equality` returns must not occupy a slot in each activation.
+#[inline(never)]
+fn states_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> bool {
+    stated_equality(env, ctx, term).is_some()
+}
+
+/// The equality a goal states, for `Refl` standalone and in every arm. It is
+/// decided by checked identity, never by a name: a kernel `Eq A t u`, reached
+/// by beta through an applied, annotated motive lambda and by delta through
+/// transparent definitions (prelude `Equal` is one; a user alias is another).
+/// Stop at the first `Eq`, before observational reduction changes a Sigma
+/// equality into a Sigma proposition. Any other head (opaque, inductive,
+/// `Elim`, variable) states no equality. A transparent id is unfolded at most
+/// once, so a recursive transparent group cannot loop here. The endpoints
+/// still have to pass Refl's conversion check.
 fn stated_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<(Term, Term, Term)> {
-    if let Term::Eq(a, t, u) = term {
-        return Some(((**a).clone(), (**t).clone(), (**u).clone()));
-    }
-    let (head, args) = peel_app(term);
-    if matches!(head, Term::Lam(..) | Term::Ascript(..)) {
-        let Term::App(f, arg) = term else { return None };
-        let Term::Lam(_, body) = whnf(env, ctx, f) else { return None };
-        return stated_equality(env, ctx, &subst0(&body, arg));
-    }
-    let Term::Const { id, level_args } = &head else { return None };
-    let (params, body) = env.transparent_body(*id)?;
-    let mut body = subst_levels(&body, &params, level_args);
-    for arg in &args {
-        let Term::Lam(_, inner) = body else { return None };
-        body = subst0(&inner, arg);
-    }
-    match body {
-        Term::Eq(a, t, u) => Some((*a, *t, *u)),
-        _ => None,
+    let mut term = term.clone();
+    let mut unfolded = HashSet::new();
+    loop {
+        if let Term::Eq(a, t, u) = term {
+            return Some((*a, *t, *u));
+        }
+        let (head, args) = peel_app(&term);
+        term = match head {
+            Term::Lam(..) | Term::Ascript(..) => {
+                let Term::App(f, arg) = &term else { return None };
+                let Term::Lam(_, body) = whnf(env, ctx, f) else { return None };
+                subst0(&body, arg)
+            }
+            Term::Const { id, level_args } => {
+                if !unfolded.insert(id) {
+                    return None;
+                }
+                let (params, body) = env.transparent_body(id)?;
+                let mut body = subst_levels(&body, &params, &level_args);
+                let mut rest = args.into_iter();
+                for arg in rest.by_ref() {
+                    match body {
+                        Term::Lam(_, inner) => body = subst0(&inner, &arg),
+                        other => {
+                            body = Term::app(other, arg);
+                            break;
+                        }
+                    }
+                }
+                rest.fold(body, Term::app)
+            }
+            _ => return None,
+        };
     }
 }
 
