@@ -3240,15 +3240,18 @@ fn plan_index_equation_elim(
             },
         ));
     }
-    // The embedded E' computes a value of the carrier, not a type. Infer a
-    // lambda over its new proof arguments; a Pi over the value is ill-sorted.
+    // Check the value-level E' application in the context of its companions.
+    // Neither a Pi over this value nor a bare lambda can be kernel-inferred.
     let n = domains.len();
+    let mut probe_ctx = motive_ctx.clone();
+    for domain in &domains {
+        probe_ctx.push(domain.clone());
+    }
     let mut applied = weaken(&elim, n as i64);
     for j in 0..n {
         applied = Term::app(applied, Term::var(n - 1 - j));
     }
-    let probe = wrap_premise_lams_from_full(applied, &domains);
-    match kernel_infer_in_context_current(cx, motive_ctx, &probe) {
+    match kernel_infer_in_context_current(cx, &probe_ctx, &applied) {
         Ok(_) => Ok(Some(entries)),
         Err(CurrentKernelQueryError::View(error)) => Err(error),
         Err(CurrentKernelQueryError::Kernel(_)) => Ok(None),
@@ -7154,7 +7157,7 @@ fn build_dependent_constructor_frame(
             &expected_here,
             embedded_method_convoy,
             embedded_slot_base,
-            cx.ctx.len() + field_count,
+            cx.ctx.len(),
         )?;
         let branch_rebase = dependent_rebase_subs(
             scrut_core,
