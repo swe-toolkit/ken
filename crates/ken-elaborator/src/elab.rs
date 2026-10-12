@@ -4746,9 +4746,12 @@ fn states_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> bool {
 /// transparent definitions (prelude `Equal` is one; a user alias is another).
 /// Stop at the first `Eq`, before observational reduction changes a Sigma
 /// equality into a Sigma proposition. Any other head (opaque, inductive,
-/// `Elim`, variable) states no equality. A transparent id is unfolded at most
-/// once, so a recursive transparent group cannot loop here. The endpoints
-/// still have to pass Refl's conversion check.
+/// `Elim`, variable) states no equality. A transparent id on a body-reference
+/// cycle (`is_recursive_transparent`) is unfolded at most once; a non-recursive
+/// id is unfolded as often as the head chain names it. Both callers run the
+/// kernel's eager `whnf` on the same goal first, and this walk follows a prefix
+/// of that same head reduction, so it terminates whenever that `whnf` did.
+/// The endpoints still have to pass Refl's conversion check.
 fn stated_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<(Term, Term, Term)> {
     let mut term = term.clone();
     let mut unfolded = HashSet::new();
@@ -4764,7 +4767,9 @@ fn stated_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<(Term,
                 subst0(&body, arg)
             }
             Term::Const { id, level_args } => {
-                if !unfolded.insert(id) {
+                // Only a transparent-body cycle can revisit a head forever; a
+                // non-recursive wrapper may recur through its own arguments.
+                if env.is_recursive_transparent(id) && !unfolded.insert(id) {
                     return None;
                 }
                 let (params, body) = env.transparent_body(id)?;
@@ -4783,6 +4788,78 @@ fn stated_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<(Term,
             }
             _ => return None,
         };
+    }
+}
+
+#[cfg(test)]
+mod stated_equality_cycle_tests {
+    use super::stated_equality;
+    use crate::ElabEnv;
+    use ken_kernel::{check::declare_recursive_group, Context, Level, Term};
+
+    #[test]
+    fn checked_recursive_proposition_stops_at_elim_for_neutral_and_closed_indices() {
+        // Promise class: durable invariant. MEASURED: a checked cyclic
+        // transparent identity reaches a stuck Elim without stating Eq for a
+        // neutral index and for a closed successor. CLAIMED: recursive
+        // transparent definitions cannot fabricate a stated equality. THE
+        // GAP: public SCT admission excludes a head-only cycle; the guard is
+        // defensive, and this row does not test a divergent recursive term.
+        let mut env = ElabEnv::new().expect("prelude");
+        let trust = env.env.trusted_base();
+        let nat = Term::indformer(env.globals["Nat"], vec![]);
+        let omega = Term::Omega(Level::Zero);
+        let zero = Term::constructor(env.globals["Zero"], vec![]);
+        let suc_zero = Term::app(Term::constructor(env.globals["Suc"], vec![]), zero);
+        let top = Term::const_(env.env.top_id(), vec![]);
+        let recursive = declare_recursive_group(
+            &mut env.env,
+            vec![(vec![], Term::pi(nat.clone(), omega.clone()))],
+            |ids| {
+                let step = Term::lam(
+                    nat.clone(),
+                    Term::lam(
+                        omega.clone(),
+                        Term::app(Term::const_(ids[0], vec![]), Term::var(1)),
+                    ),
+                );
+                vec![Term::lam(
+                    nat.clone(),
+                    Term::Elim {
+                        fam: env.globals["Nat"],
+                        level_args: vec![],
+                        params: vec![],
+                        motive: Box::new(Term::Ascript(
+                            Box::new(Term::lam(nat.clone(), omega.clone())),
+                            Box::new(Term::pi(nat.clone(), Term::ty(Level::Zero.suc()))),
+                        )),
+                        methods: vec![top.clone(), step],
+                        indices: vec![],
+                        scrut: Box::new(Term::var(0)),
+                    },
+                )]
+            },
+        )
+        .expect("SCT-admitted recursive proposition")[0];
+        assert!(env.env.is_recursive_transparent(recursive));
+        let head = Term::const_(recursive, vec![]);
+        let mut ctx = Context::new();
+        ctx.push(nat);
+        assert_eq!(
+            stated_equality(&env.env, &ctx, &Term::app(head.clone(), Term::var(0))),
+            None,
+            "neutral recursive proposition is not an Eq"
+        );
+        assert_eq!(
+            stated_equality(&env.env, &Context::new(), &Term::app(head, suc_zero)),
+            None,
+            "closed recursive proposition is not an Eq"
+        );
+        assert_eq!(
+            env.env.trusted_base(),
+            trust,
+            "checked recursion adds no trust"
+        );
     }
 }
 
