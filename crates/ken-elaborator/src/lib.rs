@@ -291,6 +291,19 @@ pub(crate) fn record_decl_owners(
     }
 }
 
+/// The single name-to-identity inverse for both the pre-source snapshot and
+/// the live package projection. A name alias picks the lexicographically first
+/// spelling, as it did in the existing stable-symbol producer.
+pub(crate) fn names_by_id(globals: &HashMap<String, GlobalId>) -> BTreeMap<GlobalId, String> {
+    let mut sorted = globals.iter().collect::<Vec<_>>();
+    sorted.sort_by(|(left, _), (right, _)| left.cmp(right));
+    let mut names = BTreeMap::new();
+    for (name, id) in sorted {
+        names.entry(*id).or_insert_with(|| name.clone());
+    }
+    names
+}
+
 /// Entry selection reads these tables by the spelling `main`; a checked fence
 /// must leave that binding exactly as the program's own declarations left it.
 fn restore_program_binding<V>(table: &mut HashMap<String, V>, name: &str, saved: Option<V>) {
@@ -439,6 +452,21 @@ impl ElabEnv {
         // `prelude.rs` derives roster/tuple equality as a SET relation on a
         // freshly built environment, so such an addition reddens there.
         elab.prelude_env.native_trusted_base = elab.env.trusted_base().into_iter().collect();
+        // The same boundary fixes stable spellings for *all* compiler-declared
+        // identities, not only trusted ones. Membership in this map distinguishes
+        // compiler declarations from later package declarations, including
+        // declarations whose source-visible name was already hidden.
+        let names = names_by_id(&elab.globals);
+        let mut pre_source = BTreeMap::new();
+        for decl in elab.env.decls() {
+            pre_source.insert(decl.id(), names.get(&decl.id()).cloned());
+            if let KernelDecl::Inductive(ind) = decl {
+                for ctor in &ind.constructors {
+                    pre_source.insert(ctor.id, names.get(&ctor.id).cloned());
+                }
+            }
+        }
+        elab.prelude_env.pre_source_names = pre_source;
         elab.module_state.install_prelude_floor();
         elab.module_state.capture_strict_builtin_names(
             &elab.env,
@@ -903,6 +931,9 @@ impl ElabEnv {
         prelude_env
             .native_trusted_base
             .retain(|id| !removed_ids.contains(id));
+        prelude_env
+            .pre_source_names
+            .retain(|id, _| !removed_ids.contains(id));
         class_env.scrub_global_ids(&removed_ids);
         module_state.scrub_global_ids(&removed_ids);
         refinement_facts.scrub_global_ids(&removed_ids);

@@ -510,6 +510,11 @@ pub enum CompilerDriverError {
     MissingStableSymbol {
         id: GlobalId,
     },
+    DuplicateStableSymbol {
+        symbol: StableSymbol,
+        first: GlobalId,
+        second: GlobalId,
+    },
     DuplicateObligationId {
         obligation: StableSymbol,
         first_owner: StableSymbol,
@@ -585,6 +590,14 @@ impl fmt::Display for CompilerDriverError {
             CompilerDriverError::MissingStableSymbol { id } => {
                 write!(f, "missing stable symbol for admitted global {id}")
             }
+            CompilerDriverError::DuplicateStableSymbol {
+                symbol,
+                first,
+                second,
+            } => write!(
+                f,
+                "stable symbol {symbol} names both admitted globals {first} and {second}"
+            ),
             CompilerDriverError::DuplicateObligationId {
                 obligation,
                 first_owner,
@@ -4364,39 +4377,57 @@ fn stable_symbols_for_env(
     env: &ElabEnv,
     native_primitives: bool,
 ) -> Result<(BTreeMap<GlobalId, StableSymbol>, StableSymbolTable), CompilerDriverError> {
-    let mut names_by_id = BTreeMap::<GlobalId, String>::new();
-    let mut global_names = env.globals.iter().collect::<Vec<_>>();
-    global_names.sort_by(|(left, _), (right, _)| left.cmp(right));
-    for (name, id) in global_names {
-        names_by_id.entry(*id).or_insert_with(|| name.clone());
-    }
+    let live = crate::names_by_id(&env.globals);
+    let pre_source = &env.prelude_env.pre_source_names;
+    let name_of = |id: GlobalId| match pre_source.get(&id) {
+        Some(name) => name.clone(), // even `None` is an immutable pre-source identity
+        None => live.get(&id).cloned(),
+    };
+    let fallback = |id: GlobalId| -> Result<String, CompilerDriverError> {
+        let (owner, ordinal) = env
+            .decl_owner
+            .get(&id)
+            .ok_or(CompilerDriverError::MissingStableSymbol { id })?;
+        Ok(format!("{owner}#{ordinal}"))
+    };
 
     let mut symbols = BTreeMap::new();
-    for decl in env.env.decls() {
-        if native_primitives {
-            if let Decl::Primitive { id, reduction, .. } = decl {
-                let registry_symbol = match reduction {
-                    ken_kernel::PrimReduction::Op { symbol } => Some((*symbol).to_string()),
-                    ken_kernel::PrimReduction::Literal => literal_native_symbol(env, *id),
-                    ken_kernel::PrimReduction::OpaqueType => None,
-                };
-                if let Some(registry_symbol) = registry_symbol {
-                    symbols.insert(*id, StableSymbol::primitive(registry_symbol));
-                    continue;
+    let mut reserved = BTreeSet::new();
+    // Compiler declarations reserve their original symbols before a package
+    // declaration can reuse a spelling. The latter takes the existing
+    // displaced-declaration fallback rather than renaming the compiler id.
+    for compiler_pass in [true, false] {
+        for decl in env.env.decls() {
+            if pre_source.contains_key(&decl.id()) != compiler_pass {
+                continue;
+            }
+            if native_primitives {
+                if let Decl::Primitive { id, reduction, .. } = decl {
+                    let registry_symbol = match reduction {
+                        ken_kernel::PrimReduction::Op { symbol } => Some((*symbol).to_string()),
+                        ken_kernel::PrimReduction::Literal => literal_native_symbol(env, *id),
+                        ken_kernel::PrimReduction::OpaqueType => None,
+                    };
+                    if let Some(registry_symbol) = registry_symbol {
+                        symbols.insert(*id, StableSymbol::primitive(registry_symbol));
+                        continue;
+                    }
                 }
             }
-        }
-        let name = match names_by_id.get(&decl.id()) {
-            Some(name) => name.clone(),
-            None => {
-                let (owner, ordinal) = env
-                    .decl_owner
-                    .get(&decl.id())
-                    .ok_or(CompilerDriverError::MissingStableSymbol { id: decl.id() })?;
-                format!("{owner}#{ordinal}")
+            let mut symbol = declaration_symbol(
+                package_name,
+                &match name_of(decl.id()) {
+                    Some(name) => name,
+                    None => fallback(decl.id())?,
+                },
+            );
+            if compiler_pass {
+                reserved.insert(symbol.clone());
+            } else if reserved.contains(&symbol) {
+                symbol = declaration_symbol(package_name, &fallback(decl.id())?);
             }
-        };
-        symbols.insert(decl.id(), declaration_symbol(package_name, &name));
+            symbols.insert(decl.id(), symbol);
+        }
     }
 
     for decl in env.env.decls() {
@@ -4405,11 +4436,27 @@ fn stable_symbols_for_env(
                 continue;
             };
             for (index, ctor) in ind.constructors.iter().enumerate() {
-                let name = names_by_id
-                    .get(&ctor.id)
-                    .cloned()
-                    .unwrap_or_else(|| format!("ctor_{index}"));
+                let name = name_of(ctor.id).unwrap_or_else(|| format!("ctor_{index}"));
                 symbols.insert(ctor.id, StableSymbol::constructor(&parent, name));
+            }
+        }
+    }
+
+    // The table is id-keyed, but package sections and trust targets are keyed
+    // by stable symbol. Never silently merge two declaration/constructor ids;
+    // native registry and literal primitive symbols are many-to-one by design.
+    let mut holders = BTreeMap::<StableSymbol, GlobalId>::new();
+    for (id, symbol) in &symbols {
+        if matches!(
+            symbol.namespace,
+            SymbolNamespace::Declaration | SymbolNamespace::Constructor
+        ) {
+            if let Some(first) = holders.insert(symbol.clone(), *id) {
+                return Err(CompilerDriverError::DuplicateStableSymbol {
+                    symbol: symbol.clone(),
+                    first,
+                    second: *id,
+                });
             }
         }
     }
@@ -4487,6 +4534,187 @@ fn declaration_symbol(package_name: &str, name: &str) -> StableSymbol {
         components.push(part.to_string());
     }
     StableSymbol::new(SymbolNamespace::Declaration, components)
+}
+
+#[cfg(test)]
+mod native_pre_source_stable_symbols {
+    use super::*;
+
+    /// Promise class: durable invariant. MEASURED: every compiler declaration
+    /// and every checked constructor is a key in the pre-source snapshot.
+    /// CLAIMED: compiler membership cannot be inferred from a source spelling
+    /// or silently omitted when a registration stage adds declarations.
+    /// THE GAP: this covers the initial boundary; rollback has its own test.
+    #[test]
+    fn snapshot_covers_every_checked_compiler_identity() {
+        let env = ElabEnv::new().expect("complete pre-source registration");
+        let mut checked = BTreeSet::new();
+        for decl in env.env.decls() {
+            checked.insert(decl.id());
+            if let Decl::Inductive(ind) = decl {
+                checked.extend(ind.constructors.iter().map(|ctor| ctor.id));
+            }
+        }
+        let recorded = env
+            .prelude_env
+            .pre_source_names
+            .keys()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        assert!(
+            !checked.is_empty(),
+            "the compiler registered no declarations"
+        );
+        assert_eq!(
+            recorded, checked,
+            "every checked compiler id must be captured"
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: pre-source family and
+    /// constructor ids retain exact names while source takes both spellings,
+    /// and the user declaration takes its owner-derived collision fallback.
+    /// CLAIMED: package source cannot rename or collide with compiler symbols.
+    /// THE GAP: native execution and the primitive registry are separate
+    /// consumers, exercised by their own tests.
+    #[test]
+    fn stream_and_stdout_shadows_keep_distinct_prelude_symbols() {
+        let mut env = ElabEnv::new().expect("pre-source environment");
+        let stream = env.prelude_env.stream_id;
+        let stdout = env.prelude_env.stdout_id;
+        let (before, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        let family = StableSymbol::declaration("native-program", &[], "Stream");
+        let constructor = StableSymbol::constructor(&family, "Stdout");
+        assert_eq!(before[&stream], family);
+        assert_eq!(before[&stdout], constructor);
+
+        env.elaborate_file("const Stream : Nat = Zero\nconst Stdout : Nat = Zero\n")
+            .expect("separate source declarations may rebind prelude names");
+        let user_stream = env.globals["Stream"];
+        let user_stdout = env.globals["Stdout"];
+        assert_ne!(user_stream, stream);
+        assert_ne!(user_stdout, stdout);
+        let (symbols, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        assert_eq!(symbols[&stream], family);
+        assert_eq!(symbols[&stdout], constructor);
+        let (owner, ordinal) = &env.decl_owner[&user_stream];
+        assert_eq!(owner, "Stream");
+        assert_eq!(
+            symbols[&user_stream],
+            StableSymbol::declaration("native-program", &[], format!("Stream#{ordinal}"))
+        );
+        assert_ne!(symbols[&user_stream], symbols[&stream]);
+        assert_eq!(
+            symbols[&user_stdout],
+            StableSymbol::declaration("native-program", &[], "Stdout")
+        );
+        assert_ne!(symbols[&user_stdout], symbols[&stdout]);
+    }
+
+    /// Promise class: durable invariant. MEASURED: a compiler declaration
+    /// unnamed at capture keeps its owner/ordinal symbol even if the live
+    /// spelling map is later given an alias for that same checked id.
+    /// CLAIMED: captured `None` is an identity, not an invitation to read the
+    /// mutable name table. THE GAP: the actual package route uses this producer.
+    #[test]
+    fn unnamed_compiler_identity_ignores_a_later_live_alias() {
+        let mut env = ElabEnv::new().expect("pre-source environment");
+        let id = env
+            .prelude_env
+            .pre_source_names
+            .iter()
+            .find_map(|(id, name)| {
+                (name.is_none()
+                    && env
+                        .env
+                        .lookup(*id)
+                        .is_some_and(|decl| !matches!(decl, Decl::Primitive { .. })))
+                .then_some(*id)
+            })
+            .expect("prelude has an admitted unnamed declaration");
+        let (before, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        let (owner, ordinal) = &env.decl_owner[&id];
+        let expected =
+            StableSymbol::declaration("native-program", &[], format!("{owner}#{ordinal}"));
+        assert_eq!(before[&id], expected);
+        env.globals.insert("zz_new_alias_for_unnamed".into(), id);
+        let (after, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        assert_eq!(after[&id], expected);
+        assert_ne!(
+            after[&id],
+            StableSymbol::declaration("native-program", &[], "zz_new_alias_for_unnamed")
+        );
+    }
+
+    /// Promise class: durable invariant. MEASURED: changing an unrelated
+    /// source binding leaves every earlier emitted compiler symbol unchanged.
+    /// CLAIMED: the pre-source snapshot does not rename intact programs.
+    /// THE GAP: package hashes/rosters have separate targeted pins.
+    #[test]
+    fn unrelated_source_leaves_prelude_symbol_table_unchanged() {
+        let mut env = ElabEnv::new().expect("pre-source environment");
+        let (before, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        env.elaborate_file("const zz_unrelated : Nat = Zero\n")
+            .expect("unrelated source declaration");
+        let (after, _) = stable_symbols_for_env("native-program", &env, true).unwrap();
+        for (id, symbol) in before {
+            assert_eq!(after.get(&id), Some(&symbol), "compiler id {id}");
+        }
+    }
+
+    /// Promise class: durable invariant. MEASURED: intentionally duplicated
+    /// checked snapshot names fail at the exact typed projection guard, for
+    /// declaration and constructor namespaces separately. CLAIMED: emission
+    /// cannot silently merge two distinct ids through a symbol-keyed section.
+    /// THE GAP: ordinary source cannot forge this snapshot; this test injects
+    /// conflicting checked identities to exercise the fail-closed arm.
+    #[test]
+    fn duplicate_declaration_and_constructor_symbols_are_typed_refusals() {
+        let mut env = ElabEnv::new().expect("pre-source environment");
+        let stream = env.prelude_env.stream_id;
+        let option = env.prelude_env.option_id;
+        env.prelude_env
+            .pre_source_names
+            .insert(option, Some("Stream".into()));
+        match stable_symbols_for_env("native-program", &env, true) {
+            Err(CompilerDriverError::DuplicateStableSymbol {
+                symbol,
+                first,
+                second,
+            }) => {
+                assert_eq!(
+                    symbol,
+                    StableSymbol::declaration("native-program", &[], "Stream")
+                );
+                assert_eq!(
+                    BTreeSet::from([first, second]),
+                    BTreeSet::from([stream, option])
+                );
+            }
+            other => panic!("expected declaration-identity collision: {other:?}"),
+        }
+        let mut env = ElabEnv::new().expect("pre-source environment");
+        let stdout = env.prelude_env.stdout_id;
+        let stdin = env.prelude_env.stdin_id;
+        env.prelude_env
+            .pre_source_names
+            .insert(stdin, Some("Stdout".into()));
+        match stable_symbols_for_env("native-program", &env, true) {
+            Err(CompilerDriverError::DuplicateStableSymbol {
+                symbol,
+                first,
+                second,
+            }) => {
+                let parent = StableSymbol::declaration("native-program", &[], "Stream");
+                assert_eq!(symbol, StableSymbol::constructor(&parent, "Stdout"));
+                assert_eq!(
+                    BTreeSet::from([first, second]),
+                    BTreeSet::from([stdout, stdin])
+                );
+            }
+            other => panic!("expected constructor-identity collision: {other:?}"),
+        }
+    }
 }
 
 fn package_identity(package_name: &str) -> StableSymbol {

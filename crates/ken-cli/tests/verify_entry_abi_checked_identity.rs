@@ -286,13 +286,14 @@ fn plain_success_named_by_main_stays_a_kernel_rejection() {
     );
 }
 
-/// Promise class: transition sentinel. MEASURED: the same two Stdout native
-/// rows still refuse after admission at ObjectEmission while their controls
-/// build. CLAIMED: this WP does not silently absorb the separate native
-/// stable-symbol naming defect. THE GAP: retire this test when the successor
-/// native stable-symbol identity WP lands its own corrected behavior.
+/// Promise class: durable invariant. MEASURED: a prelude constructor's
+/// shadowed spelling in either fence form and its parent family's shadowed
+/// spelling in the plain form build and execute like their unrelated control.
+/// CLAIMED: native stable symbols name pre-source compiler identities, while
+/// a colliding user declaration remains distinct. THE GAP: the producer unit
+/// test checks the exact symbols; this test observes the native consumer.
 #[test]
-fn native_stdout_stable_symbol_followup_is_still_required() {
+fn native_stdout_and_stream_shadows_run_like_unrelated_control() {
     let temp = TempDir::new().expect("native fixture directory");
     let profile = temp.path().join("profile.json");
     fs::write(&profile, PROFILE).expect("native resource profile");
@@ -302,34 +303,35 @@ fn native_stdout_stable_symbol_followup_is_still_required() {
             &format!("print-{}-control", fence.label()),
             &fixture(PRINT_MAIN, fence, "zz_unrelated"),
         );
-        let shadow = write_fixture(
-            temp.path(),
-            &format!("print-{}-Stdout", fence.label()),
-            &fixture(PRINT_MAIN, fence, "Stdout"),
-        );
-        assert!(
-            native_build(
-                &control,
-                &temp
-                    .path()
-                    .join(format!("native-{}-control", fence.label())),
-                &profile,
-            )
-            .status
-            .success(),
-            "native control must build"
-        );
-        let result = native_build(
-            &shadow,
-            &temp.path().join(format!("native-{}-Stdout", fence.label())),
+        let expected = native_run(
+            &control,
+            &temp
+                .path()
+                .join(format!("native-{}-control", fence.label())),
             &profile,
         );
-        assert!(!result.status.success(), "native Stdout shadow must refuse");
-        assert!(
-            String::from_utf8_lossy(&result.stderr).contains(
-                "ObjectEmission/checked_process_object: unsupported runtime-IR lowering: Effect: Console operation has a malformed Stream operand"
-            ),
-            "refusal must remain at separate native symbol-lowering seam: {result:?}"
-        );
+        assert!(expected.status.success(), "native control: {expected:?}");
+        assert_eq!(expected.stdout, b"entered main\n");
+        let shadows: &[&str] = match fence {
+            Fence::Example => &["Stdout"],
+            Fence::Plain => &["Stdout", "Stream"],
+        };
+        for shadow in shadows {
+            let source = write_fixture(
+                temp.path(),
+                &format!("print-{}-{shadow}", fence.label()),
+                &fixture(PRINT_MAIN, fence, shadow),
+            );
+            let actual = native_run(
+                &source,
+                &temp
+                    .path()
+                    .join(format!("native-{}-{shadow}", fence.label())),
+                &profile,
+            );
+            assert_eq!(actual.status, expected.status, "{shadow}: {actual:?}");
+            assert_eq!(actual.stdout, expected.stdout, "{shadow}: {actual:?}");
+            assert_eq!(actual.stderr, expected.stderr, "{shadow}: {actual:?}");
+        }
     }
 }

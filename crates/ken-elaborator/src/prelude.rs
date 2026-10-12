@@ -241,6 +241,7 @@ pub fn empty_prelude_env() -> PreludeEnv {
     PreludeEnv {
         runtime_roles: Box::new(CanonicalRuntimeRoles::zeroed()),
         native_trusted_base: std::collections::BTreeSet::new(),
+        pre_source_names: std::collections::BTreeMap::new(),
         nat_id: z,
         zero_id: z,
         suc_id: z,
@@ -354,6 +355,10 @@ pub struct PreludeEnv {
     /// `globals`, a fresh prelude, source names, package prefixes, or a name
     /// whitelist would re-admit exactly what it exists to refuse.
     pub native_trusted_base: std::collections::BTreeSet<GlobalId>,
+    /// Names of every compiler-declared identity at the end of `ElabEnv::empty`,
+    /// before package source can rebind `globals`. A present `None` is an
+    /// admitted unnamed declaration, not a request to consult the live map.
+    pub(crate) pre_source_names: std::collections::BTreeMap<GlobalId, Option<String>>,
     // `Nat` (Peano) — the `unfoldUpTo` fuel.
     pub nat_id: GlobalId,
     pub zero_id: GlobalId,
@@ -2983,6 +2988,7 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     Ok(PreludeEnv {
         runtime_roles,
         native_trusted_base: std::collections::BTreeSet::new(),
+        pre_source_names: std::collections::BTreeMap::new(),
         nat_id,
         zero_id,
         suc_id,
