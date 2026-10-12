@@ -43,6 +43,23 @@ indices. The first linear-algebra catalog node builds against it.
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
 
+## D0 so far (Architect `evt_20e1sjrny6hjb`, `evt_1ze7b0na77885`)
+
+- **Boundaries approved.** Chapter `spec/50-stdlib/65-linear-algebra.md`,
+  module `Algorithm.LinearAlgebra.NatMatrix`, `Nat` scalars only, row-major
+  `Vec (Vec Nat n) m`. The CAT node publishes the existing `Vec`, `VNil`,
+  `VCons`, `map`, `zip_with` and `vec_zero_vnil`; no second carrier.
+- **Five laws proved generically:** dot commutativity, dot distributivity,
+  transpose involution, vector identity and right matrix identity.
+- **Left matrix identity is blocked** by an elaborator gap, so the frame's
+  Language-prerequisite stop fired. Associativity is unmeasured and
+  expected to hit the same gap.
+- **Steward scope choice (ii).** Section 1 lands now with the seven
+  operations and the five proved laws. Left identity and associativity are
+  named as gated on `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`, the way spec
+  60 names DS-5c, and are not stated as proved. A follow-on section adds
+  them when that WP lands.
+
 ## Deliverable
 
 1. **D0 (Architect boundary ruling, measured).** Rule from a checked
@@ -61,10 +78,14 @@ base, stop and report the mismatch.
      associativity of matrix multiplication;
    - what stays deferred: signed scalars, determinants, inverses,
      solving, decompositions and any `Float` result.
-2. **Section 1, normative** for every ruled declaration and law, each
-   stated as a proved theorem, with the trust boundary: no Axiom,
-   primitive, `Float`, kernel form or `trusted_base()` entry. Index the
-   chapter in `spec/50-stdlib/README.md` and `spec/SPEC-PROGRESS.md`.
+2. **Section 1, normative** for every ruled declaration and the five
+   proved laws, each stated as a proved theorem, with the trust boundary:
+   no Axiom, primitive, `Float`, kernel form or `trusted_base()` entry.
+   Left identity and associativity are named as gated, not stated as
+   proved. Index the chapter in `spec/50-stdlib/README.md` and
+   `spec/SPEC-PROGRESS.md`. Also correct spec 60's table (:145-146), which
+   still marks `zip` and `lookup` gated on DS-5c although both are checked
+   in the catalog Vector module (Architect carry).
 3. **A conformance seed** under `conformance/stdlib/` in the existing seed
    shape:
    - a 2 by 3 times 3 by 2 product with its closed result;
