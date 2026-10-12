@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-READ-CONTINUATION-HOST-VALUE-TRAP
 title: "A second readFile inside a selected arm, whose continuation inspects a host value (bytes_at or bytes_length of a read payload, or a match on the first read's captured response), builds natively and traps UnclassifiedRuntimeTrap { terminal_value: -1 } at a carrier-class or carrier-tag check, while the interpreter returns a value. Since cc0e6f2b6 the outer-Option rows build instead of refusing. Make each row run at parity or refuse at build"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
