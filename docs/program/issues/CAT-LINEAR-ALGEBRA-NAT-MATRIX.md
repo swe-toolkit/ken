@@ -32,7 +32,10 @@ with no new trust.
   `catalog/packages/Data/Vector/Vector.ken.md`, `Vec`, `map`, `zip_with`
   and `vec_zero_vnil` are not `pub`; only `Fin`, `FZero` and `FSuc` are
   exported. This WP publishes `Vec`, `VNil`, `VCons`, `map`, `zip_with`
-  and `vec_zero_vnil`, as the D0 rules, and changes no body.
+  and `vec_zero_vnil`, as the D0 rules, and changes no body. The export
+  sentinel at `cat_vector_closeout.rs:300-363` enumerates the owned
+  inventory and allows only `Fin`, `FZero` and `FSuc`, so it is
+  rebaselined (AC-2b).
 - **The development exists.** The spec-author's scratch development
   checked the seven operations, the generic transpose, vector identity,
   right identity and dot commutativity proofs rc=0 with no Axiom. The
@@ -64,9 +67,13 @@ target that runs the seed.
   runs every seed case with its listed result. The mismatch row is
   refused, and the same product at matching dimensions checks.
 - **AC-2.** `trusted_base()` is equal before and after. No Axiom,
-  postulate, primitive or `Float`. `cat_vec_acceptance`,
-  `cat_vector_closeout` and every existing importer of
-  `Data.Vector.Vector` are unchanged.
+  postulate, primitive or `Float`. `cat_vec_acceptance` and every
+  existing importer of `Data.Vector.Vector` are unchanged.
+- **AC-2b (sentinel rebaseline).** `cat_vector_closeout`'s
+  `vector_exports_only_checked_fin_family_and_constructors` pins
+  Vector's export set. Its allowed set grows by exactly the six ruled
+  names, and every other owned name still fails selective import with
+  `UnboundName`. No other assertion in that file changes.
 - **AC-3 (mutation, QA).** Each mutant makes a proof or a seed oracle
   kernel-reject, and is restored:
   - `dot` as constant `Zero`;
