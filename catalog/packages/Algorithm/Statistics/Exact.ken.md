@@ -22,21 +22,34 @@ carrier. Each entry contributes independently, so repeated atoms add and
 zero-weight entries remain valid. The constructor requires a proof that the
 sum of the list's weights is `Suc n`; an empty or all-zero list cannot supply
 one. An event is a Boolean predicate, and a score produces a natural number.
-Both observations sum over the original list, with the checked positive
-`total` serving as their denominator when interpreting a probability or an
-expectation.
+Both observations sum over the original list. `probability` and `expectation`
+turn those natural numerators and the checked positive `total` into exact
+`Rational` values without normalization or rounding.
 
 ## 2. Definition
 
 The public declarations follow the exact-distribution contract: the carrier
-and observations, the five named event and score builders, then nine laws.
-Private list inductions and natural-arithmetic rearrangements connect those
-laws to the carrier's stored entries. Every proof is a checked term.
+and observations, the five named event and score builders, nine natural laws,
+then two Rational adapters and nine value laws. Private list inductions and
+natural-arithmetic rearrangements connect the laws to the stored entries.
+Every proof is a checked term.
 
 ```ken
-import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_r)
+import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_r, mul_add_distrib_l)
 
-import Core.Classes.LawfulClasses (bool_not, bool_or, bool_and, bool_cases)
+import Core.Classes.LawfulClasses (bool_not, bool_or, bool_and, bool_cases, leq_nat)
+
+import Data.Numeric.Nat.Order (leq_nat_add_left_bound)
+
+import Data.Numeric.Rational
+  (Rational,
+    MkRational,
+    numerator,
+    denominator,
+    rational_equiv,
+    rational_leq,
+    rational_add,
+    rational_one)
 
 import Core.Logic.Transport (cong, trans, sym)
 
@@ -171,16 +184,229 @@ pub theorem expectation_weight_ext
       (same : (x : q) → Equal Nat (f x) (g x))
     : Equal Nat (expectation_weight q d f) (expectation_weight q d g) =
   expectation_list_ext q (entries q d) f g same
+
+pub fn probability (q : Type) (d : ExactDistribution q) (event : q → Bool) : Rational =
+  MkRational (event_mass q d event) (one_less_total q d)
+
+pub fn expectation (q : Type) (d : ExactDistribution q) (score : q → Nat) : Rational =
+  MkRational (expectation_weight q d score) (one_less_total q d)
+
+pub theorem probability_numerator
+      (q : Type) (d : ExactDistribution q) (event : q → Bool)
+    : Equal Nat (numerator (probability q d event)) (event_mass q d event) =
+  Refl
+
+pub theorem probability_denominator
+      (q : Type) (d : ExactDistribution q) (event : q → Bool)
+    : Equal Nat (denominator (probability q d event)) (total q d) =
+  sym Nat (total q d) (denominator (probability q d event)) (total_positive q d)
+
+pub theorem expectation_numerator
+      (q : Type) (d : ExactDistribution q) (score : q → Nat)
+    : Equal Nat (numerator (expectation q d score)) (expectation_weight q d score) =
+  Refl
+
+pub theorem expectation_denominator
+      (q : Type) (d : ExactDistribution q) (score : q → Nat)
+    : Equal Nat (denominator (expectation q d score)) (total q d) =
+  sym Nat (total q d) (denominator (expectation q d score)) (total_positive q d)
+
+pub theorem probability_cross_bridge
+      (q : Type)
+      (d : ExactDistribution q)
+      (event : q → Bool)
+      (n : Nat)
+      (k : Nat)
+      (same : Equal Nat (mul (event_mass q d event) (Suc k)) (mul n (total q d)))
+    : rational_equiv (probability q d event) (MkRational n k) =
+  trans
+    Nat
+    (mul (event_mass q d event) (Suc k))
+    (mul n (total q d))
+    (mul n (denominator (probability q d event)))
+    same
+    (cong
+      Nat
+      Nat
+      (total q d)
+      (denominator (probability q d event))
+      (mul n)
+      (sym
+        Nat
+        (denominator (probability q d event))
+        (total q d)
+        (probability_denominator q d event)))
+
+pub theorem expectation_cross_bridge
+      (q : Type)
+      (d : ExactDistribution q)
+      (score : q → Nat)
+      (n : Nat)
+      (k : Nat)
+      (same : Equal Nat (mul (expectation_weight q d score) (Suc k)) (mul n (total q d)))
+    : rational_equiv (expectation q d score) (MkRational n k) =
+  trans
+    Nat
+    (mul (expectation_weight q d score) (Suc k))
+    (mul n (total q d))
+    (mul n (denominator (expectation q d score)))
+    same
+    (cong
+      Nat
+      Nat
+      (total q d)
+      (denominator (expectation q d score))
+      (mul n)
+      (sym
+        Nat
+        (denominator (expectation q d score))
+        (total q d)
+        (expectation_denominator q d score)))
+
+pub theorem probability_mass_bound
+      (q : Type) (d : ExactDistribution q) (event : q → Bool)
+    : Equal Bool (leq_nat (event_mass q d event) (total q d)) True =
+  let
+    mass = event_mass q d event;
+    complement_mass_value = event_mass q d (compose q Bool Bool bool_not event)
+  in
+    trans
+      Bool
+      (leq_nat mass (total q d))
+      (leq_nat mass (add mass complement_mass_value))
+      True
+      (cong
+        Nat
+        Bool
+        (total q d)
+        (add mass complement_mass_value)
+        (leq_nat mass)
+        (sym Nat (add mass complement_mass_value) (total q d) (complement_mass q d event)))
+      (leq_nat_add_left_bound mass complement_mass_value)
+
+pub theorem probability_complement_one
+      (q : Type) (d : ExactDistribution q) (event : q → Bool)
+    : rational_equiv
+        (rational_add
+          (probability q d event)
+          (probability q d (compose q Bool Bool bool_not event)))
+        rational_one =
+  let
+    complement_event = compose q Bool Bool bool_not event;
+    event_mass_value = event_mass q d event;
+    complement_mass_value = event_mass q d complement_event;
+    positive_total = Suc (one_less_total q d);
+    rational_sum = rational_add (probability q d event) (probability q d complement_event);
+    sum_numerator =
+      add (mul event_mass_value positive_total) (mul complement_mass_value positive_total);
+    sum_denominator = denominator rational_sum;
+    partition_witness : Equal Nat (add event_mass_value complement_mass_value) positive_total =
+      trans
+        Nat
+        (add event_mass_value complement_mass_value)
+        (total q d)
+        positive_total
+        (complement_mass q d event)
+        (total_positive q d);
+    numerator_identity : Equal Nat
+      (mul sum_numerator (Suc Zero))
+      (mul positive_total positive_total) =
+      trans
+        Nat
+        (mul sum_numerator (Suc Zero))
+        (mul (add event_mass_value complement_mass_value) positive_total)
+        (mul positive_total positive_total)
+        (trans
+          Nat
+          (mul sum_numerator (Suc Zero))
+          sum_numerator
+          (mul (add event_mass_value complement_mass_value) positive_total)
+          ((proof one_r for mul) sum_numerator)
+          (sym
+            Nat
+            (mul (add event_mass_value complement_mass_value) positive_total)
+            sum_numerator
+            (mul_add_distrib_l event_mass_value complement_mass_value positive_total)))
+        (cong
+          Nat
+          Nat
+          (add event_mass_value complement_mass_value)
+          positive_total
+          (λv. mul v positive_total)
+          partition_witness)
+  in
+    trans
+      Nat
+      (mul sum_numerator (Suc Zero))
+      (mul positive_total positive_total)
+      (mul (Suc Zero) sum_denominator)
+      numerator_identity
+      (trans
+        Nat
+        (mul positive_total positive_total)
+        sum_denominator
+        (mul (Suc Zero) sum_denominator)
+        (sym
+          Nat
+          sum_denominator
+          (mul positive_total positive_total)
+          ((proof denominator_product for rational_add)
+            (probability q d event)
+            (probability q d complement_event)))
+        (sym
+          Nat
+          (mul (Suc Zero) sum_denominator)
+          sum_denominator
+          ((proof one_l for mul) sum_denominator)))
+
+pub theorem probability_leq_one
+      (q : Type) (d : ExactDistribution q) (event : q → Bool)
+    : Equal Bool (rational_leq (probability q d event) rational_one) True =
+  let
+    mass = event_mass q d event;
+    den = denominator (probability q d event);
+    raw_comparison = leq_nat (mul mass (Suc Zero)) (mul (Suc Zero) den);
+    reduced_comparison = leq_nat mass den
+  in
+    trans
+      Bool
+      raw_comparison
+      reduced_comparison
+      True
+      (trans
+        Bool
+        raw_comparison
+        (leq_nat mass (mul (Suc Zero) den))
+        reduced_comparison
+        (cong
+          Nat
+          Bool
+          (mul mass (Suc Zero))
+          mass
+          (λv. leq_nat v (mul (Suc Zero) den))
+          ((proof one_r for mul) mass))
+        (cong Nat Bool (mul (Suc Zero) den) den (leq_nat mass) ((proof one_l for mul) den)))
+      (trans
+        Bool
+        reduced_comparison
+        (leq_nat mass (total q d))
+        True
+        (cong Nat Bool den (total q d) (leq_nat mass) (probability_denominator q d event))
+        (probability_mass_bound q d event))
 ```
 
 ## 3. Using it
 
 The following closed example makes the denominator explicit. The event for
 `True` has mass one and the total is two; the proof field is discharged by
-reduction rather than an assumption.
+reduction rather than an assumption. The resulting Rational probability
+exposes those same numerator and denominator values.
 
 ```ken example
-import Algorithm.Statistics.Exact (ExactDistribution, MkExactDistribution, total, event_mass)
+import Algorithm.Statistics.Exact
+  (ExactDistribution, MkExactDistribution, total, event_mass, probability)
+
+import Data.Numeric.Rational (Rational, numerator, denominator)
 
 const two_atoms : List (Pair Bool Nat) =
   Cons
@@ -198,6 +424,15 @@ theorem two_atom_total : Equal Nat (total Bool two_atom_distribution) (Suc (Suc 
 theorem two_atom_true_mass
     : Equal Nat (event_mass Bool two_atom_distribution accepts_true) (Suc Zero) =
   Proved
+
+const two_atom_probability : Rational = probability Bool two_atom_distribution accepts_true
+
+theorem two_atom_probability_numerator : Equal Nat (numerator two_atom_probability) (Suc Zero) =
+  Proved
+
+theorem two_atom_probability_denominator
+    : Equal Nat (denominator two_atom_probability) (Suc (Suc Zero)) =
+  Proved
 ```
 
 ## 4. Laws & proofs
@@ -209,7 +444,10 @@ from an overlap decomposition: a pointwise proof that every overlap is false
 makes its mass zero. `expectation_linearity` distributes multiplication over
 the sum of two scores. Both extensionality laws transport the checked
 pointwise premise under the head atom's contribution and combine it with the
-induction hypothesis for the tail. None assumes function extensionality.
+induction hypothesis for the tail. The Rational laws use the stored positive
+total, cross-multiplication, and the mass partition. The order bound eliminates
+multiplication by one with checked congruence, not another private helper.
+None assumes function extensionality.
 
 ```ken
 theorem event_mass_impossible
@@ -682,12 +920,12 @@ theorem expectation_list_ext
 The support is the list, not a `Finite q` enumeration or a map keyed by
 `DecEq q`. Each repeated atom contributes its weight on each appearance.
 Zero-weight atoms do not change mass, whereas an all-zero list cannot provide
-the constructor's positive-total proof. Event probabilities and expectations
-are exact numerator/denominator interpretations; the package exports no ratio
-type, division, approximation or `Float`. Equal fractions can be compared by
-cross multiplication at the client boundary. Binding a distribution is not a
-raw concatenation of inner lists when their totals differ; it and a proper
-common-denominator construction are outside this package.
+the constructor's positive-total proof. The returned Rational values use the
+existing unnormalized carrier: `MkRational n k` represents `n/(Suc k)`.
+Theorems compare values by cross multiplication, not structural equality.
+Expectation scores are unbounded, so there is no expectation-at-most-one law.
+Binding a distribution is not raw concatenation when inner totals differ; a
+proper common-denominator construction remains outside this package.
 
 ## 6. References
 
@@ -700,12 +938,13 @@ common-denominator construction are outside this package.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [statistics §1](../../../../spec/50-stdlib/63-statistics.md)
-and the eight-case [seed](../../../../conformance/stdlib/statistics/seed-exact-distribution.md).
-The public surface is `ExactDistribution`, `MkExactDistribution`, five
-observations, five event/score builders and nine proved laws. The finite-list
-sums, Boolean partitions, arithmetic rearrangements and congruence lemmas
-remain private to the package.
+The behavioral contract is [statistics §§1, 3](../../../../spec/50-stdlib/63-statistics.md),
+with the original [natural seed](../../../../conformance/stdlib/statistics/seed-exact-distribution.md)
+and the [Rational seed](../../../../conformance/stdlib/statistics/seed-rational-values.md).
+The public surface adds `probability`, `expectation` and nine proved value laws
+to the existing distribution, natural observations, builders and nine laws.
+The finite-list sums, Boolean partitions and arithmetic rearrangements remain
+private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -714,10 +953,12 @@ remain private to the package.
 | Review laws and trust | [Laws & proofs](#4-laws--proofs), [Trust & derivation](#7-trust--derivation) |
 
 The derivation imports `Data.Numeric.Nat.Arithmetic` for `add`, `mul` and
-its checked arithmetic laws; `Core.Classes.LawfulClasses` for Boolean
-operations and cases; `Core.Classes.EffectfulClasses.compose` for the
-complement; and `Core.Logic.Transport` for equality reasoning. It adds no
+its checked arithmetic laws; `Data.Numeric.Nat.Order` for the mass bound;
+`Data.Numeric.Rational` for exact values, operations, order and equivalence;
+`Core.Classes.LawfulClasses` for Boolean operations, cases and `leq_nat`;
+`Core.Classes.EffectfulClasses.compose` for the complement; and
+`Core.Logic.Transport` for equality reasoning. It adds no
 `Axiom`, postulate, primitive, foreign binding or `trusted_base()` entry;
 inherited trust in any imported provider remains visible to its consumers.
-The seed and package acceptance target exercise the eight closed behaviors,
-public proof clients, exact root-loaded ownership and local trust delta.
+Both seeds and the package acceptance target exercise closed values, generic
+public proof clients, exact root-loaded ownership and the local trust delta.

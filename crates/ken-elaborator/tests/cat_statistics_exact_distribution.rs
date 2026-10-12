@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::Decl;
+use ken_kernel::{Decl, KernelError};
 
 const MODULE: &str = "Algorithm.Statistics.Exact";
 
@@ -17,21 +17,22 @@ fn root() -> PathBuf {
         .join("catalog/packages")
 }
 
-/// Promise class: durable invariant. MEASURED: the 20 §1 declarations and
-/// constructor are rooted in the module, all nine public law signatures have
-/// generic checked client terms, private proof helpers cannot be imported,
-/// and the exact trusted GlobalId set agrees with the preloaded provider
-/// closure. CLAIMED: clients have the checked public surface with zero local
-/// trust increase. THE GAP: generic law clients do not exercise the eight
-/// independent closed behavior oracles below.
+/// Promise class: durable invariant. MEASURED: the 31 §1/§3 declarations
+/// and constructor are rooted in the module, all 18 public laws have generic
+/// checked client terms, and the exact trusted GlobalId set equals the
+/// preloaded provider closure. CLAIMED: the checked public surface adds no
+/// local trust. THE GAP: generic clients do not replace independent closed
+/// value oracles, nor does an owned name alone establish its precise type.
 #[test]
-fn public_surface_nine_laws_and_zero_trust_delta() {
+fn public_surface_eighteen_laws_and_zero_trust_delta() {
     let mut env = ElabEnv::new().expect("base environment");
     for provider in [
         "Data.Numeric.Nat.Arithmetic",
         "Core.Classes.LawfulClasses",
         "Core.Logic.Transport",
         "Core.Classes.EffectfulClasses",
+        "Data.Numeric.Nat.Order",
+        "Data.Numeric.Rational",
     ] {
         env.elaborate_module_from_roots(&[root()], provider)
             .unwrap_or_else(|error| panic!("{provider} must roots-load: {error:?}"));
@@ -41,6 +42,11 @@ fn public_surface_nine_laws_and_zero_trust_delta() {
         .elaborate_module_from_roots(&[root()], MODULE)
         .expect("§1 exact-distribution package must roots-load");
     let after = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    eprintln!(
+        "trusted_base() count: before={}, after={}",
+        before.len(),
+        after.len()
+    );
     assert_eq!(after, before, "package adds no trusted GlobalIds");
     for name in [
         "ExactDistribution",
@@ -63,6 +69,17 @@ fn public_surface_nine_laws_and_zero_trust_delta() {
         "expectation_linearity",
         "event_mass_ext",
         "expectation_weight_ext",
+        "probability",
+        "expectation",
+        "probability_numerator",
+        "probability_denominator",
+        "expectation_numerator",
+        "expectation_denominator",
+        "probability_cross_bridge",
+        "expectation_cross_bridge",
+        "probability_mass_bound",
+        "probability_leq_one",
+        "probability_complement_one",
     ] {
         let id = env.globals[&format!("{MODULE}.{name}")];
         assert!(owned.contains(&id), "{name} must be package-owned");
@@ -134,7 +151,65 @@ fn public_surface_nine_laws_and_zero_trust_delta() {
              Equal Nat (expectation_weight q d f) (expectation_weight q d g) =
              expectation_weight_ext q d f g same"#,
     )
-    .expect("20 public declarations, one constructor, and nine law clients elaborate");
+    .expect("§1 public declarations and nine law clients elaborate");
+    env.elaborate_file(
+        r#"import Algorithm.Statistics.Exact
+             (ExactDistribution, event_mass, expectation_weight, total,
+              probability, expectation, probability_numerator,
+              probability_denominator, expectation_numerator,
+              expectation_denominator, probability_cross_bridge,
+              expectation_cross_bridge, probability_mass_bound,
+              probability_leq_one, probability_complement_one)
+           import Data.Numeric.Rational
+             (MkRational, numerator, denominator, rational_equiv,
+              rational_leq, rational_add, rational_one)
+           import Data.Numeric.Nat.Arithmetic (mul)
+           import Core.Classes.LawfulClasses (leq_nat, bool_not)
+           import Core.Classes.EffectfulClasses (compose)
+           theorem client_probability_numerator (q : Type)
+             (d : ExactDistribution q) (p : q → Bool) :
+             Equal Nat (numerator (probability q d p)) (event_mass q d p) =
+             probability_numerator q d p
+           theorem client_probability_denominator (q : Type)
+             (d : ExactDistribution q) (p : q → Bool) :
+             Equal Nat (denominator (probability q d p)) (total q d) =
+             probability_denominator q d p
+           theorem client_expectation_numerator (q : Type)
+             (d : ExactDistribution q) (f : q → Nat) :
+             Equal Nat (numerator (expectation q d f))
+               (expectation_weight q d f) = expectation_numerator q d f
+           theorem client_expectation_denominator (q : Type)
+             (d : ExactDistribution q) (f : q → Nat) :
+             Equal Nat (denominator (expectation q d f)) (total q d) =
+             expectation_denominator q d f
+           theorem client_probability_cross_bridge (q : Type)
+             (d : ExactDistribution q) (p : q → Bool) (n : Nat) (k : Nat)
+             (same : Equal Nat (mul (event_mass q d p) (Suc k))
+               (mul n (total q d))) :
+             rational_equiv (probability q d p) (MkRational n k) =
+             probability_cross_bridge q d p n k same
+           theorem client_expectation_cross_bridge (q : Type)
+             (d : ExactDistribution q) (f : q → Nat) (n : Nat) (k : Nat)
+             (same : Equal Nat (mul (expectation_weight q d f) (Suc k))
+               (mul n (total q d))) :
+             rational_equiv (expectation q d f) (MkRational n k) =
+             expectation_cross_bridge q d f n k same
+           theorem client_probability_mass_bound (q : Type)
+             (d : ExactDistribution q) (p : q → Bool) :
+             Equal Bool (leq_nat (event_mass q d p) (total q d)) True =
+             probability_mass_bound q d p
+           theorem client_probability_leq_one (q : Type)
+             (d : ExactDistribution q) (p : q → Bool) :
+             Equal Bool (rational_leq (probability q d p) rational_one) True =
+             probability_leq_one q d p
+           theorem client_probability_complement_one (q : Type)
+             (d : ExactDistribution q) (p : q → Bool) :
+             rational_equiv
+               (rational_add (probability q d p)
+                 (probability q d (compose q Bool Bool bool_not p)))
+               rational_one = probability_complement_one q d p"#,
+    )
+    .expect("nine §3 laws must inhabit exact generic client propositions");
     for private in [
         "total_weight",
         "event_weight",
@@ -160,8 +235,17 @@ import Algorithm.Statistics.Exact
    constant_one, total_positive, impossible_event, sure_event,
    complement_mass, disjoint_mass, expectation_unit)
 import Data.Numeric.Nat.Arithmetic (add, mul)
-import Core.Classes.LawfulClasses (bool_not, bool_and)
+import Core.Classes.LawfulClasses (bool_not, bool_and, leq_nat)
 import Core.Classes.EffectfulClasses (compose)
+import Algorithm.Statistics.Exact
+  (probability, expectation, probability_numerator,
+   probability_denominator, expectation_numerator,
+   expectation_denominator, probability_cross_bridge,
+   expectation_cross_bridge, probability_mass_bound,
+   probability_leq_one, probability_complement_one)
+import Data.Numeric.Rational
+  (Rational, MkRational, numerator, denominator, rational_equiv,
+   rational_leq, rational_add, rational_one)
 
 const uniform_atoms : List (Pair Bool Nat) =
   Cons (Pair Bool Nat) (mk_pair Bool Nat True (Suc Zero))
@@ -197,6 +281,13 @@ const bool_true : Bool → Bool = λx. x
 const bool_false : Bool → Bool = λx. bool_not x
 const score_true : Bool → Nat =
   λx. match x { True ↦ Suc Zero; False ↦ Zero }
+const rational_score : Bool → Nat =
+  λx. match x { True ↦ Suc (Suc Zero); False ↦ Suc Zero }
+const two_sixths : Rational =
+  MkRational (Suc (Suc Zero)) (Suc (Suc (Suc (Suc (Suc Zero)))))
+const one_half : Rational = MkRational (Suc Zero) (Suc Zero)
+const four_thirds : Rational =
+  MkRational (Suc (Suc (Suc (Suc Zero)))) (Suc (Suc Zero))
 theorem bool_true_false_disjoint (x : Bool) :
   Equal Bool (bool_and (bool_true x) (bool_false x)) False =
   match x { True ↦ Proved; False ↦ Proved }
@@ -486,4 +577,135 @@ fn seed_zero_weight_atom_remains_valid() {
          (entries Bool zero_weight) zero_atoms = Refl",
     )
     .expect("the zero-weight atom remains in the original entry list");
+}
+
+/// Promise class: durable invariant. MEASURED: a 1/3 result has numerator one,
+/// denominator three, and an independently constructed 2/6 value has the same
+/// cross product. CLAIMED: the adapter preserves exact event probability.
+/// THE GAP: this fixture alone does not prove the generic cross bridge; the
+/// independent generic client consumes that checked law above.
+#[test]
+fn seed_rational_probability_one_third_equals_two_sixths() {
+    let mut env = fixture();
+    number(
+        &mut env,
+        "rational_probability_mass",
+        "event_mass Bool skew bool_true",
+        1,
+    );
+    number(&mut env, "rational_probability_total", "total Bool skew", 3);
+    number(
+        &mut env,
+        "rational_probability_numerator",
+        "numerator (probability Bool skew bool_true)",
+        1,
+    );
+    number(
+        &mut env,
+        "rational_probability_denominator",
+        "denominator (probability Bool skew bool_true)",
+        3,
+    );
+    env.elaborate_file(
+        "theorem seed_rational_probability_equiv : \
+         rational_equiv (probability Bool skew bool_true) two_sixths = \
+         probability_cross_bridge Bool skew bool_true \
+         (Suc (Suc Zero)) (Suc (Suc (Suc (Suc (Suc Zero))))) Proved",
+    )
+    .expect("independent 1/3 ~ 2/6 cross equation supplies the public bridge");
+}
+
+/// Promise class: durable invariant. MEASURED: both weighted scores yield 4/3,
+/// whose order against one is False. CLAIMED: expectation is not clamped to an
+/// event probability. THE GAP: arbitrary scores rely on the generic bridge.
+#[test]
+fn seed_rational_expectation_four_thirds_exceeds_one() {
+    let mut env = fixture();
+    number(
+        &mut env,
+        "rational_expectation_weight",
+        "expectation_weight Bool skew rational_score",
+        4,
+    );
+    number(
+        &mut env,
+        "rational_expectation_numerator",
+        "numerator (expectation Bool skew rational_score)",
+        4,
+    );
+    number(
+        &mut env,
+        "rational_expectation_denominator",
+        "denominator (expectation Bool skew rational_score)",
+        3,
+    );
+    env.elaborate_file(
+        "theorem seed_rational_expectation_equiv : \
+         rational_equiv (expectation Bool skew rational_score) four_thirds = \
+         expectation_cross_bridge Bool skew rational_score \
+         (Suc (Suc (Suc (Suc Zero)))) (Suc (Suc Zero)) Proved \
+         theorem seed_rational_expectation_above_one : \
+         Equal Bool (rational_leq (expectation Bool skew rational_score) rational_one) \
+         False = Proved",
+    )
+    .expect("independent score 4/3 is exactly valued and exceeds one");
+}
+
+/// Promise class: durable invariant. MEASURED: 1/3 and 1/2 share numerator
+/// one yet the first is equivalent to 2/6 and not to 1/2. CLAIMED: equality
+/// compares cross products, not just numerators or constructor fields.
+/// THE GAP: the contradiction is closed, not a generic inequivalence theorem.
+#[test]
+fn seed_rational_probability_one_third_is_not_one_half() {
+    let mut env = fixture();
+    env.elaborate_file(
+        "theorem seed_one_third_not_half \
+         (claim : rational_equiv (probability Bool skew bool_true) one_half) \
+         : Bottom = claim",
+    )
+    .expect("different closed cross-products make the false claim impossible");
+    match env.elaborate_file(
+        "theorem seed_wrong_one_third_is_half : \
+         rational_equiv (probability Bool skew bool_true) one_half = Proved",
+    ) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            ..
+        }) => {}
+        Err(other) => panic!("false equivalence rejected for wrong reason: {other:?}"),
+        Ok(_) => panic!("1/3 must not equal 1/2"),
+    }
+    env.elaborate_file(
+        "theorem seed_positive_control_two_sixths : \
+         rational_equiv (probability Bool skew bool_true) two_sixths = Proved",
+    )
+    .expect("opposite closed value result stays accepted on the same adapter");
+}
+
+/// Promise class: durable invariant. MEASURED: both nonzero complementary
+/// probabilities share denominator three, remain bounded, and sum to one by
+/// value. CLAIMED: all Boolean events partition positive natural mass.
+/// THE GAP: the imported generic partition and order proofs cover every event.
+#[test]
+fn seed_rational_probability_bounded_and_complementary() {
+    let mut env = fixture();
+    number(
+        &mut env,
+        "rational_complement_mass",
+        "event_mass Bool skew (compose Bool Bool Bool bool_not bool_true)",
+        2,
+    );
+    env.elaborate_file(
+        "theorem seed_rational_mass_bound : \
+         Equal Bool (leq_nat (event_mass Bool skew bool_true) (total Bool skew)) \
+         True = probability_mass_bound Bool skew bool_true \
+         theorem seed_rational_leq_one : \
+         Equal Bool (rational_leq (probability Bool skew bool_true) rational_one) \
+         True = probability_leq_one Bool skew bool_true \
+         theorem seed_rational_complement_one : \
+         rational_equiv (rational_add (probability Bool skew bool_true) \
+           (probability Bool skew (compose Bool Bool Bool bool_not bool_true))) \
+         rational_one = probability_complement_one Bool skew bool_true",
+    )
+    .expect("the partition, Boolean order and Rational sum are kernel checked");
 }

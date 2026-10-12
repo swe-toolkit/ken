@@ -3,6 +3,8 @@
 A non-empty sample can be read as an exact distribution: each observation keeps
 its place and contributes one unit of natural weight. Counts and sums are
 exact numerators; the total is a checked positive natural number.
+`empirical_mean` reuses Exact's `expectation` to return an exact Rational
+value over that same total.
 
 ## Contents
 
@@ -30,10 +32,19 @@ accumulate one for a matching event, whereas `sum_list` accumulates each score.
 `unit_weights` reuses ordinary-list `map`. The private `empirical_tail`
 constructs the positive distribution from the head and possibly empty tail;
 prepending one weight carries the old total as the new predecessor witness.
+The Rational mean then reuses Exact's expectation, and its three checked laws
+relate the returned numerator and positive denominator to sample counts.
 
 ```ken
 import Algorithm.Statistics.Exact
-  (ExactDistribution, MkExactDistribution, entries, total, event_mass, expectation_weight)
+  (ExactDistribution,
+    MkExactDistribution,
+    entries,
+    total,
+    event_mass,
+    expectation_weight,
+    expectation,
+    expectation_denominator)
 
 import Data.Collections.Derived (list_append, map, filter)
 
@@ -48,6 +59,8 @@ import Data.Collections.NonEmpty
     nonempty_append)
 
 import Data.Numeric.Nat.Arithmetic (add, mul)
+
+import Data.Numeric.Rational (Rational, MkRational, numerator, denominator, rational_equiv)
 
 import Core.Logic.Transport (cong, trans, sym)
 
@@ -113,6 +126,63 @@ fn empirical_tail (q : Type) (x : q) (rest : List q) : ExactDistribution q =
 
 pub fn empirical_distribution (q : Type) (sample : NonEmpty q) : ExactDistribution q =
   empirical_tail q (nonempty_head q sample) (nonempty_tail q sample)
+
+pub fn empirical_mean (q : Type) (sample : NonEmpty q) (score : q → Nat) : Rational =
+  expectation q (empirical_distribution q sample) score
+
+pub theorem empirical_mean_numerator
+      (q : Type) (sample : NonEmpty q) (score : q → Nat)
+    : Equal Nat (numerator (empirical_mean q sample score)) (score_sum q sample score) =
+  empirical_score_sum q sample score
+
+pub theorem empirical_mean_denominator
+      (q : Type) (sample : NonEmpty q) (score : q → Nat)
+    : Equal Nat (denominator (empirical_mean q sample score)) (sample_size q sample) =
+  trans
+    Nat
+    (denominator (empirical_mean q sample score))
+    (total q (empirical_distribution q sample))
+    (sample_size q sample)
+    (expectation_denominator q (empirical_distribution q sample) score)
+    (empirical_total_size q sample)
+
+pub theorem empirical_mean_cross_bridge
+      (q : Type)
+      (sample : NonEmpty q)
+      (score : q → Nat)
+      (n : Nat)
+      (k : Nat)
+      (same : Equal Nat (mul (score_sum q sample score) (Suc k)) (mul n (sample_size q sample)))
+    : rational_equiv (empirical_mean q sample score) (MkRational n k) =
+  trans
+    Nat
+    (mul (numerator (empirical_mean q sample score)) (Suc k))
+    (mul (score_sum q sample score) (Suc k))
+    (mul n (denominator (empirical_mean q sample score)))
+    (cong
+      Nat
+      Nat
+      (numerator (empirical_mean q sample score))
+      (score_sum q sample score)
+      (λv. mul v (Suc k))
+      (empirical_mean_numerator q sample score))
+    (trans
+      Nat
+      (mul (score_sum q sample score) (Suc k))
+      (mul n (sample_size q sample))
+      (mul n (denominator (empirical_mean q sample score)))
+      same
+      (cong
+        Nat
+        Nat
+        (sample_size q sample)
+        (denominator (empirical_mean q sample score))
+        (mul n)
+        (sym
+          Nat
+          (denominator (empirical_mean q sample score))
+          (sample_size q sample)
+          (empirical_mean_denominator q sample score))))
 ```
 
 ## 3. Using it
@@ -120,15 +190,28 @@ pub fn empirical_distribution (q : Type) (sample : NonEmpty q) : ExactDistributi
 Smart constructors supply a sample without exposing its constructor. Its
 `empirical_distribution` is an ordinary exact distribution and can be passed
 to the same event and score operations as any other positive distribution.
+`empirical_mean` uses Exact's expectation to return the score sum over the
+sample size, including the singleton case below.
 
 ```ken example
 import Data.Collections.NonEmpty (nonempty_singleton)
+
+import Data.Numeric.Rational (Rational, numerator, denominator)
 
 const observation : NonEmpty Bool = nonempty_singleton Bool True
 
 const observation_size : Nat = sample_size Bool observation
 
 const weighted_observation : ExactDistribution Bool = empirical_distribution Bool observation
+
+const unit_score : Bool → Nat = λx. Suc Zero
+
+const observation_mean : Rational = empirical_mean Bool observation unit_score
+
+theorem observation_mean_numerator : Equal Nat (numerator observation_mean) (Suc Zero) = Proved
+
+theorem observation_mean_denominator : Equal Nat (denominator observation_mean) (Suc Zero) =
+  Proved
 ```
 
 ## 4. Laws & proofs
@@ -573,9 +656,10 @@ recursion, and the event fold has a checked `filter`/`length` counterpart.
 The constructor proof makes the total positive even for a singleton sample;
 it does not assert a total independently of the stored weights.
 
-The total is a denominator for interpreting event and score numerators, not
-a returned probability or mean. This package offers no rational carrier,
-division, normalization, variance, approximate value, or sampling operation.
+`empirical_mean` returns a Rational value for the score sum over the sample
+size. It delegates the positive-tail construction to Exact's `expectation`;
+no independent carrier, division, normalization, variance, approximate value
+or sampling operation is introduced.
 
 ## 6. References
 
@@ -588,11 +672,13 @@ division, normalization, variance, approximate value, or sampling operation.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [statistics §2](../../../../spec/50-stdlib/63-statistics.md)
-and the five-case [seed](../../../../conformance/stdlib/statistics/seed-empirical-sample.md).
-The public surface is five functions and seven checked laws. Private helpers
-construct the positive distribution, count or sum lists, and prove the tail,
-filter and append inductions. None is separately exported.
+The behavioral contract is [statistics §§2–3](../../../../spec/50-stdlib/63-statistics.md),
+with the original [sample seed](../../../../conformance/stdlib/statistics/seed-empirical-sample.md)
+and the [Rational seed](../../../../conformance/stdlib/statistics/seed-rational-values.md).
+The public surface adds `empirical_mean` and three proved laws to the five
+functions and seven prior laws. Private helpers construct the positive
+distribution, count or sum lists, and prove the tail, filter and append
+inductions. None is separately exported.
 
 | Reader task | Section |
 |---|---|
@@ -601,11 +687,13 @@ filter and append inductions. None is separately exported.
 | Review laws and trust | [Laws & proofs](#4-laws--proofs), [Trust & derivation](#7-trust--derivation) |
 
 The derivation imports `Algorithm.Statistics.Exact` for the proof-carrying
-carrier and its observations; `Data.Collections.NonEmpty` for the sample and
-its shape/append transports; `Data.Collections.Derived` for `map`, `filter` and
+carrier, observations and exact Rational expectation; `Data.Numeric.Rational`
+for the value's projections and equivalence; `Data.Collections.NonEmpty`
+for the sample and its shape/append transports; `Data.Collections.Derived`
+for `map`, `filter` and
 `list_append`; `Data.Collections.List` for `length`; natural arithmetic for
 `add` and `mul`; and transport/Boolean case proofs for induction bridges.
 No `Axiom`, postulate, primitive, foreign binding or new `trusted_base()`
 entry is introduced. Assumptions inherited from imported providers remain
-visible to clients. The seed and package acceptance target validate the
-closed behavior, generic proof imports and roots-loaded trust delta.
+visible to clients. Both seeds and the package acceptance target validate
+closed behavior, generic proof imports and the roots-loaded trust delta.
