@@ -86,6 +86,9 @@ fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
             .initial_states
             .insert("ac0_scrub_probe".into(), id);
         env.prelude_env.native_trusted_base.insert(id);
+        env.prelude_env
+            .pre_source_names
+            .insert(id, Some("ac0_scrub_probe".into()));
         env.class_env
             .register_record("ac0_scrub_probe".into(), id, Vec::new(), Vec::new());
         env.resolution_provenance.push(InstanceResolution {
@@ -140,6 +143,7 @@ fn failed_operation_scrubs_elab_identity_tables_before_id_reuse() {
     assert!(!env.effect_rows_by_id.contains_key(&id));
     assert_eq!(env.space_initial_state("ac0_scrub_probe"), None);
     assert!(!env.prelude_env.native_trusted_base.contains(&id));
+    assert!(!env.prelude_env.pre_source_names.contains_key(&id));
     assert!(env.class_env.projection_by_type_id(id).is_none());
     assert!(env.resolution_provenance.is_empty());
     assert!(!env.refinement_facts.refinement_predicates.contains_key(&id));

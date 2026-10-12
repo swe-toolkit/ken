@@ -458,6 +458,70 @@ mod nfc_construction_tests {
         );
     }
 
+    /// Promise class: durable invariant. MEASURED: safe Bytes primitive
+    /// reduction still returns its checked Option/Result constructor after
+    /// source takes each primitive's spelling. CLAIMED: this public entry
+    /// selects the registered primitive identity rather than mutable globals.
+    /// THE GAP: the production evaluator's already-id-keyed call is separate.
+    #[test]
+    fn elaborated_safe_bytes_reduction_keeps_registered_ids_after_shadowing() {
+        for (symbol, args, expected_ctor, expected_value) in [
+            (
+                "bytes_at",
+                vec![EvalVal::Bytes(vec![7]), EvalVal::Int(0)],
+                "Some",
+                EvalVal::Int(7),
+            ),
+            (
+                "bytes_slice",
+                vec![EvalVal::Bytes(vec![7]), EvalVal::Int(0), EvalVal::Int(1)],
+                "Some",
+                EvalVal::Bytes(vec![7]),
+            ),
+            (
+                "bytes_decode",
+                vec![EvalVal::Bytes(b"a".to_vec())],
+                "Ok",
+                EvalVal::Str("a".into()),
+            ),
+        ] {
+            let mut env = ken_elaborator::ElabEnv::new().expect("base env");
+            let original_id = env.globals[symbol];
+            let mut store = EvalStore::new();
+            let control = prim_reduce_elaborated(symbol, &args, &env, &mut store);
+            let control_id = match control {
+                EvalVal::Ctor { id, .. } => id,
+                other => panic!("{symbol} control must reduce: {other:?}"),
+            };
+            let source = format!("const {symbol} : Nat = Zero\n");
+            env.elaborate_file(&source)
+                .expect("source shadow elaborates");
+            assert_ne!(
+                env.globals[symbol], original_id,
+                "source must displace a binding"
+            );
+            let value = prim_reduce_elaborated(symbol, &args, &env, &mut store);
+            let EvalVal::Ctor { id, args, .. } = value else {
+                panic!("{symbol} must reduce after source shadow: {value:?}");
+            };
+            assert_eq!(id, control_id, "{symbol} must keep the checked constructor");
+            assert_eq!(
+                id,
+                if expected_ctor == "Some" {
+                    env.prelude_env.some_id
+                } else {
+                    env.prelude_env.ok_id
+                },
+                "{symbol} must return {expected_ctor}"
+            );
+            assert_eq!(
+                args.last(),
+                Some(&expected_value),
+                "{symbol} result payload"
+            );
+        }
+    }
+
     #[test]
     fn normalized_list_ingress_value_preserves_string_retraction() {
         let env = ken_elaborator::ElabEnv::new().expect("base env");
@@ -2894,7 +2958,17 @@ pub fn prim_reduce_elaborated(
     store: &mut EvalStore,
 ) -> EvalVal {
     if matches!(symbol, "bytes_at" | "bytes_slice" | "bytes_decode") {
-        let Some(id) = elab.globals.get(symbol).copied() else {
+        // A same-spelled source declaration can replace `elab.globals[symbol]`.
+        // The checked kernel primitive retains its registry identity instead.
+        let mut ids = elab.env.decls().filter_map(|decl| match decl {
+            Decl::Primitive {
+                id,
+                reduction: PrimReduction::Op { symbol: registered },
+                ..
+            } if *registered == symbol => Some(*id),
+            _ => None,
+        });
+        let (Some(id), None) = (ids.next(), ids.next()) else {
             return EvalVal::Neutral;
         };
         reduce_safe_bytes_primitive(id, symbol, args, &elab.env, store)
