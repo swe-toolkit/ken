@@ -12,8 +12,14 @@ use std::sync::Mutex;
 // both empty and nonempty payloads for every row. CLAIMED: these reads run at
 // interpreter parity instead of trapping on a carried byte or lost Ret.
 // THE GAP: these six sources do not enumerate every generated-unit shape.
-// An intended extension adding another byte class can retain parity; replacing
-// a class-aware consumer or unwrapping a nonroot Ret must make a row red.
+// The captured-read Ret is in a generated context with no selected terminal
+// origins. Deleting root_unit alone leaves all six rows green; this suite does
+// not claim to pin that conjunct. The direct scalar-consumer test
+// `root_unit_and_result_origin_independently_guard_ret_scalar_join` pins it
+// with a seeded selected nonroot/root pair. Surface-source reachability of a
+// selected nonroot Ret scalar join remains review-enforced. Reinstating the
+// prior object-wide Ret unwrap or either old byte-class guard reddens its
+// respective rows; an intended new byte class can retain parity.
 //
 // Baseline provisioning: the landed single-read fixture uses 256 MiB because
 // its native build exceeded the default 2 MiB and passed at 16 MiB. This

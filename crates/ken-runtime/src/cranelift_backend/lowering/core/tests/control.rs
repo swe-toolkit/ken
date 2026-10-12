@@ -249,6 +249,74 @@ fn recursive_backedge_refusal_does_not_mark_scalar_admission() {
     assert_eq!(refused.get(), None);
 }
 
+/// Spec 42 §5; 45 §4. Promise: durable scalar-join gate invariant.
+/// MEASURED: with a consumed checked-root exit site and the same selected
+/// result-position Ret arm, a nonroot unit refuses scalar admission while the
+/// root unit unwraps and accepts it. An unselected root join also refuses.
+/// CLAIMED: the root-unit and result-position predicates independently guard
+/// Ret unwrapping at the real scalar consumer. GAP: this direct seam fixture
+/// seeds a function-local result set; it does not prove that a surface source
+/// currently emits a nonroot terminal Ret scalar join. The CLI suite covers the
+/// generated-context Ret, and reports the separate source reachability limit.
+#[test]
+fn root_unit_and_result_origin_independently_guard_ret_scalar_join() {
+    let seed_env =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let source = RuntimeExpr::Value(RuntimeValue::Int(37.into()));
+    let (_, join_origin) = planned_root_occurrence(&source);
+    for (root, selected, accept) in [
+        (false, true, false),
+        (true, false, false),
+        (true, true, true),
+    ] {
+        let mut lowering = root_authority_test_lowering(&seed_env);
+        lowering.consumed_join_sites.insert(0);
+        assert!(lowering.has_checked_root_exit_representation());
+        lowering.function_local.root_unit = root;
+        if selected {
+            lowering
+                .function_local
+                .terminal_result_origins
+                .insert(join_origin);
+        }
+        let mut func = Function::new();
+        let mut context = FunctionBuilderContext::new();
+        let mut builder = FunctionBuilder::new(&mut func, &mut context);
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+        let value = builder.ins().iconst(types::I64, 37);
+        let ret = LoweringOperand::Specialized(Lowered::Constructor {
+            constructor: "ctor:prelude::ITree::Ret".to_string(),
+            synthesized_identity: None,
+            occurrence: None,
+            args: vec![ConstructorField::Specialized(Lowered::Int {
+                value,
+                known: Some(37),
+            })],
+        });
+        let result = lowering.merge_scalar_operand(
+            &mut builder,
+            ret,
+            None,
+            Some(join_origin),
+            "a seeded result-position join",
+        );
+        if accept {
+            assert!(matches!(result, Ok((_, ScalarMergeKind::Int))));
+            assert!(!lowering.scalar_operand_refused);
+        } else {
+            assert!(matches!(
+                result,
+                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    construct: "a seeded result-position join",
+                    reason,
+                })) if reason == "dynamic arms must produce scalar Int or Bool values"
+            ));
+            assert!(lowering.scalar_operand_refused);
+        }
+    }
+}
+
 /// Promise: durable invariant. MEASURED: a direct test Lowering with no
 /// feedback Cell returns its original scalar refusal rather than panicking.
 /// CLAIMED: inert test constructors do not become a second admission route.
