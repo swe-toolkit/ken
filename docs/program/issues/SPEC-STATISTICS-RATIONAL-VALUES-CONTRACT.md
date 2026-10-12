@@ -1,7 +1,7 @@
 ---
 id: SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT
 title: "Spec 63 reads every probability, expectation and empirical mean as a numerator/denominator interpretation, and spec 64 now supplies an exact Rational carrier but adds no value-returning statistics operation, so a probability still cannot be a Ken value. Author the adapter contract: probability, expectation and mean returning Rational, agreeing with spec 63's numerators, each law proved at zero trust"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
