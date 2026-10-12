@@ -28,8 +28,8 @@ struct FsEnv {
 fn fs_env() -> FsEnv {
     let elab = ken_elaborator::ElabEnv::new().expect("prelude");
     let get = |name: &str| *elab.globals.get(name).unwrap_or_else(|| panic!("{name}"));
-    let console = ken_interp::ConsoleIds::from_elab(&elab).expect("Console ABI");
-    let fs = ken_interp::FSIds::from_elab(&elab).expect("FS ABI");
+    let console = ken_interp::ConsoleIds::from_elab(&elab.prelude_env).expect("Console ABI");
+    let fs = ken_interp::FSIds::from_elab(&elab.prelude_env).expect("FS ABI");
     FsEnv {
         read_bytes: get("read_bytes"),
         write_file: get("write_file"),

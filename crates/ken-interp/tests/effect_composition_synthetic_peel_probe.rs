@@ -62,7 +62,7 @@ fn single_wrap_peels_to_the_synthetic_base_tag() {
         inl_id: elab.prelude_env.inl_id,
         inr_id: elab.prelude_env.inr_id,
     };
-    let console_ids = ConsoleIds::from_elab(&elab).expect("Console ABI");
+    let console_ids = ConsoleIds::from_elab(&elab.prelude_env).expect("Console ABI");
     let op = wrap(ping_id, &coproduct_ids, true);
     let k = EvalVal::Unknown;
     let vis = EvalVal::Ctor {
@@ -114,7 +114,7 @@ fn nested_wrap_peels_through_multiple_layers_to_the_synthetic_base_tag() {
         inl_id: elab.prelude_env.inl_id,
         inr_id: elab.prelude_env.inr_id,
     };
-    let console_ids = ConsoleIds::from_elab(&elab).expect("Console ABI");
+    let console_ids = ConsoleIds::from_elab(&elab.prelude_env).expect("Console ABI");
     let inner = wrap(ping_id, &coproduct_ids, true); // InL Ping
     let op = {
         // InR (InL Ping) — wrap `inner` in InR by hand (mirrors `wrap`'s shape).
@@ -172,7 +172,7 @@ fn no_coproduct_ids_disables_peeling() {
         inl_id: elab.prelude_env.inl_id,
         inr_id: elab.prelude_env.inr_id,
     };
-    let console_ids = ConsoleIds::from_elab(&elab).expect("Console ABI");
+    let console_ids = ConsoleIds::from_elab(&elab.prelude_env).expect("Console ABI");
     let op = wrap(ping_id, &coproduct_ids, true);
     let k = EvalVal::Unknown;
     let vis = EvalVal::Ctor {

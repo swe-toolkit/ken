@@ -7858,7 +7858,8 @@ mod d1b_role_c1_roster_identity {
     use super::*;
 
     /// `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-c1` — every emitted role symbol
-    /// is the exact canonical `GlobalId` projection.
+    /// is the exact canonical `GlobalId` projection. Entry-only roles also
+    /// project from their pre-source identities after their names are rebound.
     ///
     /// **This is the sibling-substitution detector**, and it lives here because
     /// this is the only place both operands exist: the canonical roster
@@ -7881,8 +7882,89 @@ mod d1b_role_c1_roster_identity {
     #[test]
     fn every_emitted_role_equals_its_canonical_global_id_projection() {
         let mut env = ElabEnv::new().expect("prelude env");
-        env.elaborate_file("const two : Nat = Suc (Suc Zero)\n")
+        let roles = &env.prelude_env.runtime_roles;
+        // The spelling table here is independent of the registration macro:
+        // wiring an entry role to a different prelude id must fail, even when
+        // both the wrong id and its symbol are otherwise valid. None of these
+        // roles occupies a checked-runtime record field, so their projection
+        // is checked against the pre-source global identity instead.
+        let entry_abi_roles: [(&str, &str, GlobalId); 19] = [
+            (
+                "process_input_type",
+                "ProcessInput",
+                roles.process_input_type,
+            ),
+            ("program_caps_type", "ProgramCaps", roles.program_caps_type),
+            (
+                "program_caps_constructor",
+                "MkProgramCaps",
+                roles.program_caps_constructor,
+            ),
+            ("authority_none", "ANone", roles.authority_none),
+            ("authority_partial", "APartial", roles.authority_partial),
+            ("authority_full", "AFull", roles.authority_full),
+            ("host_io_type", "HostIO", roles.host_io_type),
+            ("host_exit", "host_exit", roles.host_exit),
+            ("exit_code_type", "ExitCode", roles.exit_code_type),
+            (
+                "monotonic_instant_constructor",
+                "MkMonotonicInstant",
+                roles.monotonic_instant_constructor,
+            ),
+            (
+                "deadline_constructor",
+                "MkDeadline",
+                roles.deadline_constructor,
+            ),
+            (
+                "resource_open_read",
+                "ResourceRead",
+                roles.resource_open_read,
+            ),
+            (
+                "resource_open_metadata",
+                "ResourceMetadata",
+                roles.resource_open_metadata,
+            ),
+            (
+                "resource_open_write_create",
+                "ResourceWriteCreate",
+                roles.resource_open_write_create,
+            ),
+            ("mapping_read_only", "ReadOnly", roles.mapping_read_only),
+            ("mapping_read_write", "ReadWrite", roles.mapping_read_write),
+            ("create_new", "CreateNew", roles.create_new),
+            (
+                "create_or_truncate",
+                "CreateOrTruncate",
+                roles.create_or_truncate,
+            ),
+            ("create_or_keep", "CreateOrKeep", roles.create_or_keep),
+        ];
+        for (field, spelling, id) in &entry_abi_roles {
+            assert_eq!(
+                env.globals.get(*spelling),
+                Some(id),
+                "entry role {field} must capture its own pre-source identity"
+            );
+        }
+        env.elaborate_file("const two : Nat = Suc (Suc Zero)\nconst rebound : Nat = Zero\n")
             .expect("package source elaborates");
+        let replacement = env.globals["rebound"];
+        // Constructors cannot all be shadowed by valid source declarations:
+        // the constructor-namespace guard rejects them before registration.
+        // Perturb the mutable map directly to test this projection boundary
+        // even for those roles, while actual source substitutions are covered
+        // by the entry-ABI behavior suite.
+        for (field, spelling, id) in &entry_abi_roles {
+            assert_ne!(replacement, *id, "{field} must have a distinct replacement");
+            env.globals.insert((*spelling).to_owned(), replacement);
+            assert_ne!(
+                env.globals.get(*spelling),
+                Some(id),
+                "entry role {field} needs an effective binding substitution"
+            );
+        }
 
         let (symbols, _table) = stable_symbols_for_env("roster_pkg", &env, false).unwrap();
         let record = checked_runtime_symbols_v1(&env.prelude_env, &symbols)
@@ -7902,6 +7984,14 @@ mod d1b_role_c1_roster_identity {
                 (field, symbol)
             })
             .collect();
+
+        for (field, spelling, id) in &entry_abi_roles {
+            assert_eq!(
+                canonical.get(field),
+                symbols.get(id),
+                "entry role {field} must still project the captured {spelling} id"
+            );
+        }
 
         let emitted: Vec<(&'static str, StableSymbol)> = vec![
             ("ret", record.spine.ret.clone()),
@@ -8107,8 +8197,9 @@ mod d1b_role_c1_roster_identity {
         }
 
         // COMPLETENESS, so the loops above cannot go quietly partial: every
-        // canonical role is covered by one of the three checks.
-        let mut covered: BTreeSet<&'static str> = emitted.iter().map(|(field, _)| *field).collect();
+        // canonical role has an emitted-record check or entry-ABI identity check.
+        let mut covered: BTreeSet<&str> = emitted.iter().map(|(field, _)| *field).collect();
+        covered.extend(entry_abi_roles.iter().map(|(field, _, _)| *field));
         covered.extend([
             "op_console_read",
             "op_console_write",

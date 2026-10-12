@@ -237,20 +237,8 @@ fn decode_ken_bool(
     env: &ElabEnv,
     value: EvalVal,
 ) -> Result<bool, KenProofErasureBoundaryCheckError> {
-    let true_id = *env.globals.get("True").ok_or_else(|| {
-        check_error(
-            KenProofErasureBoundaryCheckStage::CheckerEvaluation,
-            "Bool",
-            "Ken prelude has no True constructor",
-        )
-    })?;
-    let false_id = *env.globals.get("False").ok_or_else(|| {
-        check_error(
-            KenProofErasureBoundaryCheckStage::CheckerEvaluation,
-            "Bool",
-            "Ken prelude has no False constructor",
-        )
-    })?;
+    let true_id = env.prelude_env.runtime_roles.bool_true;
+    let false_id = env.prelude_env.runtime_roles.bool_false;
     match value {
         EvalVal::Bool(value) => Ok(value),
         EvalVal::Ctor { id, .. } if id == true_id => Ok(true),
