@@ -1,7 +1,7 @@
 ---
 id: RT-INTERP-J-COMPUTATIONAL-REDUCTION
 title: "The interpreter has no Term::J arm, so a closed, ground J whose motive is a data type evaluates to Neutral where the kernel gives a constructor. CAT-GRAPHS-DEPENDENCY's public Cycle return walk is such a J. Reduce J in the interpreter as the kernel does"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -82,3 +82,18 @@ at D0, including whether a proof-valued (`Omega`) J stays erased.
 
 - The interpreter's result differs from the kernel's on any row.
 - The arm needs a kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `44443145c` from exact `5739d053c` (PR #4717). Runtime QA
+`evt_1mzb86tqjpad6`; Architect `evt_3rb4jb9jervtv` with Decision
+`dec_6a6v3ezwde0xa`.
+
+- The interpreter reduces a closed, ground `J` as the kernel does. The
+  graph `Cycle` return walk now evaluates to the kernel's constructor on
+  the four AC-2 cycles. tri_dup is deleted under fork (a).
+- The first candidate `16f7bcd12` (PR #4714, closed) was red in CI. The
+  inline arm grew the evaluator's frame from 6016 to 8080 bytes, and
+  `cc7_argparse_acceptance` overflowed its stack. The respin moves the
+  arm into an `#[inline(never)] fn eval_j`, which brings the frame back to
+  6064 bytes. `16f7bcd12` is never republished.
