@@ -1,7 +1,7 @@
 ---
 id: LANG-STATED-EQUALITY-WHNF-HEAD-WALK
 title: "stated_equality still answers by carrier: a true Refl goal at a Pair carrier is refused when its head chain passes a recursive id twice without a cycle, or passes a match or let that whnf reduces through, while the Nat twins check. Make the walk follow the head reduction whnf already takes"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
