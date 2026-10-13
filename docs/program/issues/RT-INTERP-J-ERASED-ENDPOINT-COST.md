@@ -1,7 +1,7 @@
 ---
 id: RT-INTERP-J-ERASED-ENDPOINT-COST
 title: "The interpreter's J arm evaluates both endpoints of the erased equation before the base, so a J that transports a recursive result along a lemma about that result costs 3^n where the source and the kernel are linear. Reduce J without computing erased endpoints the result does not need"
-status: ready
+status: active
 owner: runtime
 size: S
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: RT-PENDING-CALL-ERR-PAYLOAD-ADMISSION
 title: "Pending-call admission refuses the px7m dynamic-error route at (J): J-a's accounting is deferred, and response-owner emissions lower their own copy of the selected leaf's joins with no closeout. Close out joins in response-owner emissions and account R by both closeouts so px7m err runs natively with interpreter parity"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
