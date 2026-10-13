@@ -59,8 +59,12 @@ at D0, including whether a proof-valued (`Omega`) J stays erased.
   (evaluation, erasure, caches) by mechanism with `file:line`, and what
   the interpreter's cast path does with the kernel's non-`refl` result.
   The Architect rules the arm.
-- **AC-1.** The three minimal rows evaluate to the kernel's constructor
-  (1, 1, 2).
+- **AC-1.** Three `eval_checked` rows evaluate to the kernel's
+  constructor, each paired with an accepted kernel theorem and a rejected
+  wrong twin: `tr True Proved` = 1, `trId True Proved` = 2, and the
+  Architect's value-argument row `tv (Suc Zero) Proved` = 1 (`J (λp _. Nat)
+  n h` over `Equal Nat (same_nat n) n`). The Adversary's third source was
+  unavailable (Steward `evt_42tsz9t8r26dp`).
 - **AC-2.** The graph `Cycle` return walk's step count and edges match the
   kernel on the five measured cycles, and the
   `cat_graphs_dependency.rs` row checks them at runtime, not kernel-only.
