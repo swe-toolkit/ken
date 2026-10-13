@@ -28,8 +28,8 @@ positive coefficient with an ordered list of variable indices. The public
 operations interpret either carrier, distribute products into monomial lists,
 reify those lists and normalize by reification. The carriers and their five
 constructors are exported alongside the public functions and laws; internal
-products and proof bridges remain private. Public laws lead the definition so a reader can find each contract
-before its supporting proofs.
+products and proof bridges remain private. Public laws lead the definition,
+so a reader can find each contract before its supporting proofs.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)

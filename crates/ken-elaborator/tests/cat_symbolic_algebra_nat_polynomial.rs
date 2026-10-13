@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::{Decl, KernelError};
+use ken_kernel::Decl;
 
 const POLYNOMIAL: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
 
@@ -277,15 +277,12 @@ theorem canonical_converse_rejected :
 
 fn rejects_false_refl(env: &mut ElabEnv, bad: &str, label: &str) {
     match env.elaborate_file(bad) {
-        Err(ElabError::KernelRejected {
-            error: KernelError::TypeMismatch { .. },
-            span,
-        }) => assert_eq!(
+        Err(ElabError::TypeMismatch { span, .. }) => assert_eq!(
             bad.get(span.start..span.end),
             Some("Refl"),
             "{label}: refusal must point to the false proof, not unrelated source",
         ),
-        other => panic!("{label}: expected Refl-span kernel TypeMismatch, got {other:?}"),
+        other => panic!("{label}: expected Refl-span TypeMismatch, got {other:?}"),
     }
 }
 
@@ -294,7 +291,7 @@ fn rejects_false_refl(env: &mut ElabEnv, bad: &str, label: &str) {
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: with the same positive client loaded first, dropping the third
 /// monomial or asserting structural equality for two semantic equivalents
-/// gets a kernel TypeMismatch at the false `Refl` proof span.
+/// gets an elaborator TypeMismatch at the false `Refl` proof span.
 /// CLAIMED: the distributed list retains the missing term, and semantic
 /// equality does not collapse distinct ordered monomial lists.
 /// THE GAP: this guards these two counterexamples only, not arbitrary
