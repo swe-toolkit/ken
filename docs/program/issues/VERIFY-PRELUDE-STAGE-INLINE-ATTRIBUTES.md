@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PRELUDE-STAGE-INLINE-ATTRIBUTES
 title: "LANG-ELAB-RECURSIVE-FRAME-BUDGET left three prelude stages with a duplicated #[inline(never)] and three siblings with none. rustc is moving the duplicate toward a hard error. Place one attribute per stage and remeasure the prelude frame"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T2
@@ -62,3 +62,16 @@ remeasure moves them.
   ceiling, or the prelude no longer loads at 1,664 KiB.
 - The fix needs a change outside these two source files, other than
   re-stating measured numbers in the guard file.
+
+## Closeout
+
+Merged `6fed4e243` from exact `dd00dd9e6` (PR #4716). Verify QA
+`evt_1qk5a51kt68wv`; Architect `evt_67php22m83at5` with Decision
+`dec_6b1ejxqjyvr3`.
+
+- All 15 `register_prelude_*` stages carry exactly one `#[inline(never)]`.
+  The largest is `register_prelude_buffer_views` at 32,632 B, and
+  `register_prelude` is 6,408 B.
+- The prelude and 71/71 catalog packages load at 1,664 KiB. The guard
+  passes 2/2, unchanged.
+- The four warnings at these sites are gone.
