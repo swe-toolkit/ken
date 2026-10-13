@@ -14,8 +14,8 @@ use ken_kernel::{
     declare_primitive, declare_recursive_group,
     env::PrimReduction,
     inductive::{
-        all_support_evidence_positions, method_type, peel_app, peel_pi, recursive_shapes,
-        RecursiveArgumentShape,
+        all_support_evidence_positions, iota_reduct, method_type, peel_app, peel_pi,
+        recursive_shapes, RecursiveArgumentShape,
     },
     infer as kernel_infer_raw,
     subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
@@ -4878,53 +4878,72 @@ fn goal_is_proposition(cx: &ElabCtx<'_>, ctx: &Context, goal: &Term) -> Result<b
 }
 
 /// The equality a goal states, for `Refl` standalone and in every arm. It is
-/// decided by checked identity, never by a name: a kernel `Eq A t u`, reached
-/// by beta through an applied, annotated motive lambda and by delta through
-/// transparent definitions (prelude `Equal` is one; a user alias is another).
-/// Stop at the first `Eq`, before observational reduction changes a Sigma
-/// equality into a Sigma proposition. Any other head (opaque, inductive,
-/// `Elim`, variable) states no equality. A transparent id on a body-reference
-/// cycle (`is_recursive_transparent`) is unfolded at most once; a non-recursive
-/// id is unfolded as often as the head chain names it. Both callers run the
-/// kernel's eager `whnf` on the same goal first, and this walk follows a prefix
-/// of that same head reduction, so it terminates whenever that `whnf` did.
-/// The endpoints still have to pass Refl's conversion check.
+/// decided by checked identity, never by a name: the walk takes exactly the
+/// head steps the kernel's `whnf` takes (beta through an applied or annotated
+/// lambda, delta through a transparent definition, iota at a constructor-headed
+/// scrutinee, let, ascription, and a pair projection), and stops at the first
+/// `Eq`, before observational reduction changes a Sigma equality into a Sigma
+/// proposition. Any other head (opaque, inductive, a stuck eliminator, a
+/// variable, an observational form) states no equality. Both callers run that
+/// `whnf` on the same goal first, and this walk is a prefix of its head
+/// reduction, so it terminates whenever that `whnf` did; no head needs a
+/// revisit bound. The endpoints still have to pass Refl's conversion check.
 fn stated_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<(Term, Term, Term)> {
     let mut term = term.clone();
-    let mut unfolded = HashSet::new();
     loop {
         if let Term::Eq(a, t, u) = term {
             return Some((*a, *t, *u));
         }
         let (head, args) = peel_app(&term);
-        term = match head {
-            Term::Lam(..) | Term::Ascript(..) => {
-                let Term::App(f, arg) = &term else { return None };
-                let Term::Lam(_, body) = whnf(env, ctx, f) else { return None };
-                subst0(&body, arg)
-            }
+        let mut args = args.into_iter();
+        let head = match head {
+            Term::Lam(_, body) => subst0(&body, &args.next()?),
+            Term::Ascript(inner, _) => *inner,
             Term::Const { id, level_args } => {
-                // Only a transparent-body cycle can revisit a head forever; a
-                // non-recursive wrapper may recur through its own arguments.
-                if env.is_recursive_transparent(id) && !unfolded.insert(id) {
+                let (params, body) = env.transparent_body(id)?;
+                subst_levels(&body, &params, &level_args)
+            }
+            Term::Let { val, body, .. } => subst0(&body, &val),
+            Term::Elim {
+                fam,
+                level_args,
+                params,
+                motive,
+                methods,
+                scrut,
+                ..
+            } => {
+                let (constructor, fields) = peel_app(&whnf(env, ctx, &scrut));
+                let Term::Constructor { id, .. } = constructor else {
+                    return None;
+                };
+                let (ind, k) = env.constructor(id)?;
+                if ind.id != fam {
                     return None;
                 }
-                let (params, body) = env.transparent_body(id)?;
-                let mut body = subst_levels(&body, &params, &level_args);
-                let mut rest = args.into_iter();
-                for arg in rest.by_ref() {
-                    match body {
-                        Term::Lam(_, inner) => body = subst0(&inner, &arg),
-                        other => {
-                            body = Term::app(other, arg);
-                            break;
-                        }
-                    }
-                }
-                rest.fold(body, Term::app)
+                iota_reduct(
+                    env,
+                    ind,
+                    k,
+                    &level_args,
+                    &params,
+                    &motive,
+                    &methods,
+                    &fields,
+                )
+                .ok()?
             }
+            Term::Proj1(pair) => match whnf(env, ctx, &pair) {
+                Term::Pair(first, _) => *first,
+                _ => return None,
+            },
+            Term::Proj2(pair) => match whnf(env, ctx, &pair) {
+                Term::Pair(_, second) => *second,
+                _ => return None,
+            },
             _ => return None,
         };
+        term = args.fold(head, Term::app);
     }
 }
 
@@ -4935,13 +4954,47 @@ mod stated_equality_cycle_tests {
     use ken_kernel::{check::declare_recursive_group, Context, Level, Term};
 
     #[test]
-    fn checked_recursive_proposition_stops_at_elim_for_neutral_and_closed_indices() {
-        // Promise class: durable invariant. MEASURED: a checked cyclic
-        // transparent identity reaches a stuck Elim without stating Eq for a
-        // neutral index and for a closed successor. CLAIMED: recursive
-        // transparent definitions cannot fabricate a stated equality. THE
-        // GAP: public SCT admission excludes a head-only cycle; the guard is
-        // defensive, and this row does not test a divergent recursive term.
+    fn sigma_beta_projections_expose_stated_equality() {
+        // Promise class: durable invariant. MEASURED: both pair projections
+        // expose the same open Eq at this seam. CLAIMED: Σ-β head steps are
+        // followed before the first Eq. THE GAP: these are direct core terms;
+        // the surface AC rows independently exercise elaborated head walks.
+        let env = ElabEnv::new().expect("prelude");
+        let trust = env.env.trusted_base();
+        let nat = Term::indformer(env.globals["Nat"], vec![]);
+        let mut ctx = Context::new();
+        ctx.push(nat.clone());
+        let endpoint = Term::var(0);
+        let equality = Term::Eq(
+            Box::new(nat),
+            Box::new(endpoint.clone()),
+            Box::new(endpoint.clone()),
+        );
+        let expected = Some((
+            Term::indformer(env.globals["Nat"], vec![]),
+            endpoint.clone(),
+            endpoint.clone(),
+        ));
+        let pair_first = Term::Pair(Box::new(equality.clone()), Box::new(endpoint.clone()));
+        let pair_second = Term::Pair(Box::new(endpoint), Box::new(equality));
+        assert_eq!(
+            stated_equality(&env.env, &ctx, &Term::Proj1(Box::new(pair_first))),
+            expected
+        );
+        assert_eq!(
+            stated_equality(&env.env, &ctx, &Term::Proj2(Box::new(pair_second))),
+            expected
+        );
+        assert_eq!(env.env.trusted_base(), trust, "projections add no trust");
+    }
+
+    #[test]
+    fn checked_recursive_proposition_states_no_equality_for_neutral_and_closed_indices() {
+        // Promise class: durable invariant. MEASURED: the neutral index
+        // reaches a stuck Elim; the closed successor iota-reduces to Top.
+        // Neither states Eq. CLAIMED: checked recursive definitions cannot
+        // fabricate a stated equality. THE GAP: public SCT admission excludes
+        // a head-only cycle; this row does not test divergent recursion.
         let mut env = ElabEnv::new().expect("prelude");
         let trust = env.env.trusted_base();
         let nat = Term::indformer(env.globals["Nat"], vec![]);
