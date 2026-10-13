@@ -289,6 +289,17 @@ exported as catalog theorems; neither awaits
 `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`.
 No rational or `Float` tier is claimed.
 
+The **natural-coefficient symbolic-algebra contract** is pinned in
+**`66-symbolic-algebra.md`** §1 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT).
+`Algorithm.SymbolicAlgebra.NatPolynomial` is the specified catalog
+module, not a landed export. `Expr` has natural constants, `Nat`-indexed
+variables, addition and multiplication under a total environment.
+Ordered distributed `Monomial` lists support reification and
+normalization with five generically checked D0 laws, including
+soundness and idempotence. No sorting, merging, canonical semantic
+equality decision, signed/field arithmetic, or CAT delivery is
+claimed.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
