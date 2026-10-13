@@ -26,7 +26,7 @@ fn matrix_env() -> ElabEnv {
 }
 
 /// MEASURED: exact owned, transparent law identities, selective imports of
-/// all twelve names and generic clients for five specified propositions.
+/// all fourteen names and generic clients for seven specified propositions.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
@@ -64,6 +64,8 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "transpose_invol",
         "vector_identity",
         "matrix_identity_right",
+        "matrix_identity_left",
+        "matrix_product_assoc",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -80,7 +82,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         .collect::<BTreeSet<_>>();
     assert!(
         expected.is_subset(&owned_names),
-        "all twelve public names are owned"
+        "all fourteen public names are owned"
     );
     for name in &expected {
         let id = env.globals[&format!("{MATRIX}.{name}")];
@@ -109,7 +111,7 @@ import Data.Numeric.Nat.Arithmetic (add)
 import Algorithm.LinearAlgebra.NatMatrix
   (vector_add, vector_scale, dot, matrix_vector, transpose, matrix_product,
    identity, dot_comm, dot_distrib, transpose_invol, vector_identity,
-   matrix_identity_right)
+   matrix_identity_right, matrix_identity_left, matrix_product_assoc)
 fn client_add (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Vec Nat n =
   vector_add n xs ys
 fn client_scale (n : Nat) (f : Nat) (xs : Vec Nat n) : Vec Nat n =
@@ -137,12 +139,23 @@ theorem client_matrix_identity (m : Nat) (n : Nat)
   (a : Vec (Vec Nat n) m) :
   Equal (Vec (Vec Nat n) m) (matrix_product m n n a (identity n)) a =
   matrix_identity_right m n a
+theorem client_matrix_identity_left (m : Nat) (n : Nat)
+  (a : Vec (Vec Nat m) n) :
+  Equal (Vec (Vec Nat m) n) (matrix_product n n m (identity n) a) a =
+  matrix_identity_left m n a
+theorem client_product_assoc (m : Nat) (n : Nat) (p : Nat) (q : Nat)
+  (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n)
+  (c : Vec (Vec Nat q) p) :
+  Equal (Vec (Vec Nat q) m)
+    (matrix_product m p q (matrix_product m n p a b) c)
+    (matrix_product m n q a (matrix_product n p q b c)) =
+  matrix_product_assoc m n p q a b c
 "#,
     )
-    .expect("generic clients independently state five law types");
+    .expect("generic clients independently state seven law types");
 }
 
-// Ten positive, closed oracles from the nine-case conformance seed. The
+// Thirteen positive, closed oracles from the twelve-case conformance seed. The
 // expected vectors are constructed independently of the operations tested.
 const SEED: &str = r#"
 import Data.Vector.Vector (Vec, VNil, VCons)
@@ -181,6 +194,9 @@ const expected32 : Vec (Vec Nat two) three =
     (VCons (Vec Nat two) one (v2 two one)
       (VCons (Vec Nat two) Zero (v2 Zero three)
         (VNil (Vec Nat two))))
+const c22 : Vec (Vec Nat two) two =
+  VCons (Vec Nat two) one (v2 one two)
+    (VCons (Vec Nat two) Zero (v2 three Zero) (VNil (Vec Nat two)))
 
 theorem dot_oracle : Equal Nat
   (dot three (v3 one two Zero) (v3 three one two)) five = Proved
@@ -193,6 +209,9 @@ theorem vector_add_oracle : Equal (Vec Nat three)
 theorem vector_scale_oracle : Equal (Vec Nat three)
   (vector_scale three two (v3 one two Zero))
   (v3 two four Zero) = Refl
+theorem vector_scale_three_oracle : Equal (Vec Nat three)
+  (vector_scale three three (v3 one two Zero))
+  (v3 three six Zero) = Refl
 theorem vector_scale_empty_oracle : Equal (Vec Nat Zero)
   (vector_scale Zero three (VNil Nat)) (VNil Nat) = Proved
 theorem matrix_vector_oracle : Equal (Vec Nat two)
@@ -202,30 +221,41 @@ theorem product_oracle : Equal (Vec (Vec Nat two) two)
   (matrix_product two three two a23 b32) expected22 = Refl
 theorem right_identity_oracle : Equal (Vec (Vec Nat three) two)
   (matrix_product two three three a23 (identity three)) a23 = Refl
+theorem left_identity_oracle : Equal (Vec (Vec Nat three) two)
+  (matrix_product two two three (identity two) a23) a23 = Refl
+theorem product_assoc_oracle : Equal (Vec (Vec Nat two) two)
+  (matrix_product two two two (matrix_product two three two a23 b32) c22)
+  (matrix_product two three two a23 (matrix_product three two two b32 c22))
+  = Refl
 theorem transpose_intermediate_oracle : Equal (Vec (Vec Nat two) three)
   (transpose two three a23) expected32 = Refl
 theorem transpose_round_trip_oracle : Equal (Vec (Vec Nat three) two)
   (transpose three two (transpose two three a23)) a23 = Refl
 "#;
 
-/// MEASURED: the ten closed propositions kernel-check against independent
-/// numeral/constructor expectations. CLAIMED: the nine specified seed cases
-/// produce the stated results. THE GAP: finite oracles do not prove generic
-/// laws; those are checked above at arbitrary indexed lengths.
+/// MEASURED: the thirteen closed propositions kernel-check against independent
+/// numeral/constructor expectations, except that the association row compares
+/// two product groupings. CLAIMED: the twelve specified seed cases produce the
+/// stated results. THE GAP: closed equality cannot prove a generic law, and
+/// the association row alone could pass if both products erred the same way;
+/// the separately fixed product intermediate and generic proofs cover that gap.
 #[test]
-fn nine_seed_cases_check_ten_independent_closed_oracles() {
+fn twelve_seed_cases_check_thirteen_closed_oracles() {
     let mut env = matrix_env();
     env.elaborate_file(SEED)
-        .expect("all ten seed oracles must kernel-check from public imports");
+        .expect("all thirteen seed oracles must kernel-check from public imports");
     for name in [
         "dot_oracle",
         "identity_two_oracle",
         "vector_add_oracle",
         "vector_scale_oracle",
+        "vector_scale_three_oracle",
         "vector_scale_empty_oracle",
         "matrix_vector_oracle",
         "product_oracle",
         "right_identity_oracle",
+        "left_identity_oracle",
+        "product_assoc_oracle",
         "transpose_intermediate_oracle",
         "transpose_round_trip_oracle",
     ] {
