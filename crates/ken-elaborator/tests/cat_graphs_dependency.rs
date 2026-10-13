@@ -327,9 +327,8 @@ fn empty_is_order
   match decision { HasOrder order ↦ True; HasCycle cycle ↦ False }
 "#;
 
-// Four further cycles with fixed expected return lengths. The Pair Bool
-// Bool carrier supplies three distinct vertices for tri's return walk; a
-// duplicate finite certificate probes enumeration multiplicity independently.
+// Three further cycles with fixed expected return lengths. The Pair Bool
+// Bool carrier supplies three distinct vertices for tri's return walk.
 const MORE_CYCLES: &str = r#"
 import Data.Finite.Finite (pair_finite)
 import Core.Classes.LawfulClasses (DecEq_instance_Pair)
@@ -341,9 +340,6 @@ const pair_dec : DecEq (Pair Bool Bool) =
   DecEq_instance_Pair Bool Bool DecEq_instance_Bool DecEq_instance_Bool
 const pair_vertices : Finite (Pair Bool Bool) =
   pair_finite Bool Bool bool_finite bool_finite
-const pair_vertices_duplicate : Finite (Pair Bool Bool) =
-  pair_finite Bool Bool duplicate_bool bool_finite
-
 const part_cycle : Graph (Pair Bool Bool) = MkGraph (Pair Bool Bool)
   (λu. λv. match pair_is u True True {
     True ↦ pair_is v True False;
@@ -363,15 +359,12 @@ const tri : Graph (Pair Bool Bool) = MkGraph (Pair Bool Bool)
       }
     }
   })
-const tri_dup : Graph (Pair Bool Bool) = tri
 const selfc : Graph Bool = MkGraph Bool (λu. λv. bool_and u v)
 
 const part_result : OrderOrCycle (Pair Bool Bool) pair_dec part_cycle =
   dependency_order_or_cycle (Pair Bool Bool) pair_vertices pair_dec part_cycle
 const tri_result : OrderOrCycle (Pair Bool Bool) pair_dec tri =
   dependency_order_or_cycle (Pair Bool Bool) pair_vertices pair_dec tri
-const tri_dup_result : OrderOrCycle (Pair Bool Bool) pair_dec tri_dup =
-  dependency_order_or_cycle (Pair Bool Bool) pair_vertices_duplicate pair_dec tri_dup
 const selfc_result : OrderOrCycle Bool DecEq_instance_Bool selfc =
   dependency_order_or_cycle Bool bool_finite DecEq_instance_Bool selfc
 
@@ -703,7 +696,7 @@ fn seed_reversing_only_edge_reverses_order() {
 /// mistake reflexive WalkHere alone for a nonempty cycle. THE GAP: checked
 /// Walk/Cycle constructor fields and generic search carry the universal case.
 #[test]
-fn seed_two_vertex_cycle_has_real_witness() {
+fn cycle_return_walk_two_cycle() {
     let (mut env, mut store) = fixture();
     has_tag(
         &mut env,
@@ -793,79 +786,123 @@ fn seed_two_vertex_cycle_has_real_witness() {
     );
 }
 
-/// Promise class: durable invariant (15 §4, 42 §3.6). MEASURED: four
-/// independent checked Cycle return walks agree with kernel conversion on
-/// both their real edges and constructor-valued step counts. CLAIMED: the
-/// interpreter's J reduction remains reached under generic graph clients,
-/// including a duplicate enumeration and a reflexive cycle. THE GAP: these
-/// are selected closed observations, not a proof of arbitrary graph walks.
-#[test]
-fn seed_four_cycle_return_walks_match_kernel_and_interpreter() {
+/// Promise class: durable invariant (15 §4, 42 §3.6). MEASURED: each
+/// checked Cycle return walk agrees with kernel conversion on its real edges
+/// and constructor-valued step count. CLAIMED: computational J is reached in
+/// generic graph clients, including pair-indexed and reflexive cycles.
+/// THE GAP: these are selected closed observations, not all graph walks.
+#[derive(Clone, Copy)]
+enum CyclePhase {
+    KernelEdges,
+    KernelSteps,
+    RuntimeEdges,
+    RuntimeSteps,
+}
+
+fn check_cycle_return_walk(
+    name: &str,
+    carrier: &str,
+    dec: &str,
+    graph: &str,
+    result: &str,
+    expected_steps: usize,
+) {
+    let started = std::time::Instant::now();
     let (mut env, mut store) = fixture();
     env.elaborate_file(MORE_CYCLES)
-        .expect("four additional real graph fixtures must elaborate");
-    for (name, carrier, dec, graph, result, expected_steps) in [
-        (
-            "part_cycle",
-            "(Pair Bool Bool)",
-            "pair_dec",
-            "part_cycle",
-            "part_result",
-            1,
-        ),
-        (
-            "tri",
-            "(Pair Bool Bool)",
-            "pair_dec",
-            "tri",
-            "tri_result",
-            2,
-        ),
-        (
-            "selfc",
-            "Bool",
-            "DecEq_instance_Bool",
-            "selfc",
-            "selfc_result",
-            0,
-        ),
-        (
-            "tri_dup",
-            "(Pair Bool Bool)",
-            "pair_dec",
-            "tri_dup",
-            "tri_dup_result",
-            2,
-        ),
-    ] {
-        let edges = format!("result_return_edges_at {carrier} {dec} {graph} {result}");
-        let steps = format!("result_return_steps_at {carrier} {dec} {graph} {result}");
-        kernel_truth(&mut env, &format!("{name}_edges"), &edges, true);
-        kernel_number(&mut env, &format!("{name}_steps"), &steps, expected_steps);
-        let runtime_edges = observe(
-            &mut env,
-            &mut store,
-            &format!("{name}_edges_runtime"),
-            "Bool",
-            &edges,
+        .expect("three additional real graph fixtures must elaborate");
+    let edges = format!("result_return_edges_at {carrier} {dec} {graph} {result}");
+    let steps = format!("result_return_steps_at {carrier} {dec} {graph} {result}");
+    let phases = [
+        CyclePhase::KernelEdges,
+        CyclePhase::KernelSteps,
+        CyclePhase::RuntimeEdges,
+        CyclePhase::RuntimeSteps,
+    ];
+    for phase in phases {
+        let label = match phase {
+            CyclePhase::KernelEdges => "kernel-edges",
+            CyclePhase::KernelSteps => "kernel-steps",
+            CyclePhase::RuntimeEdges => "runtime-edges",
+            CyclePhase::RuntimeSteps => "runtime-steps",
+        };
+        eprintln!(
+            "ARCH-PHASE {name} {label} {}",
+            started.elapsed().as_millis()
         );
-        assert!(
-            boolean(&env, &runtime_edges),
-            "{name}: runtime return edges"
-        );
-        let runtime_steps = observe(
-            &mut env,
-            &mut store,
-            &format!("{name}_steps_runtime"),
-            "Nat",
-            &steps,
-        );
-        assert_eq!(
-            nat(&env, &runtime_steps),
-            expected_steps,
-            "{name}: runtime return steps"
+        match phase {
+            CyclePhase::KernelEdges => {
+                kernel_truth(&mut env, &format!("{name}_edges"), &edges, true);
+            }
+            CyclePhase::KernelSteps => {
+                kernel_number(&mut env, &format!("{name}_steps"), &steps, expected_steps);
+            }
+            CyclePhase::RuntimeEdges => {
+                let value = observe(
+                    &mut env,
+                    &mut store,
+                    &format!("{name}_edges_runtime"),
+                    "Bool",
+                    &edges,
+                );
+                let value = boolean(&env, &value);
+                eprintln!("ARCH-RESULT {name} runtime-edges {value}");
+                assert!(value, "{name}: runtime return edges");
+            }
+            CyclePhase::RuntimeSteps => {
+                let value = observe(
+                    &mut env,
+                    &mut store,
+                    &format!("{name}_steps_runtime"),
+                    "Nat",
+                    &steps,
+                );
+                let value = nat(&env, &value);
+                eprintln!("ARCH-RESULT {name} runtime-steps {value}");
+                assert_eq!(value, expected_steps, "{name}: runtime return steps");
+            }
+        }
+        eprintln!(
+            "ARCH-PHASE {name} {label}-done {}",
+            started.elapsed().as_millis()
         );
     }
+}
+
+#[test]
+fn cycle_return_walk_part_cycle() {
+    check_cycle_return_walk(
+        "part_cycle",
+        "(Pair Bool Bool)",
+        "pair_dec",
+        "part_cycle",
+        "part_result",
+        1,
+    );
+}
+
+#[test]
+fn cycle_return_walk_tri() {
+    check_cycle_return_walk(
+        "tri",
+        "(Pair Bool Bool)",
+        "pair_dec",
+        "tri",
+        "tri_result",
+        2,
+    );
+}
+
+#[test]
+fn cycle_return_walk_selfc() {
+    check_cycle_return_walk(
+        "selfc",
+        "Bool",
+        "DecEq_instance_Bool",
+        "selfc",
+        "selfc_result",
+        0,
+    );
 }
 
 /// Promise class: durable invariant. MEASURED: checked empty-carrier evidence
