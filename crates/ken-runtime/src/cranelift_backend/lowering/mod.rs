@@ -4743,6 +4743,12 @@ pub enum CheckedIhRealizationObservation {
         consumed: Vec<u32>,
         dispositioned: Vec<u32>,
     },
+    ResponseJoinCloseout {
+        owner: u32,
+        required: Vec<u32>,
+        consumed: Vec<u32>,
+        dispositioned: Vec<u32>,
+    },
     BoundaryClosureTransfer {
         owner: String,
         seat: u32,

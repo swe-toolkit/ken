@@ -891,6 +891,26 @@ impl<'src> StaticTransitionPlan<'src> {
             .collect()
     }
 
+    /// Find the single emittable unit whose source emission contains `origin`.
+    /// No match or an ambiguous match is not authority for selected pending
+    /// join accounting; the caller keeps its fail-closed (J) refusal.
+    pub(in crate::cranelift_backend) fn unique_emission_containing(
+        &self,
+        origin: StaticOriginId,
+    ) -> Result<Option<(PredeclaredFunctionId, StaticOriginId)>, CraneliftBackendError> {
+        let mut found = None;
+        for unit in self.emittable_units()? {
+            let identity = (unit.function(), unit.body_occurrence());
+            if !self.emission_source_origins(identity.0, identity.1)?.contains(&origin) {
+                continue;
+            }
+            if found.replace(identity).is_some() {
+                return Ok(None);
+            }
+        }
+        Ok(found)
+    }
+
     /// The exact source occurrences lowered by one predeclared emission.
     ///
     /// Retained-worker descriptors are already sealed by the ABI plane. This
