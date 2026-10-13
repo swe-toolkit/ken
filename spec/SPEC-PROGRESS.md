@@ -7,7 +7,7 @@ readers use those declarations and their stated scope; this index does not
 invent a separate maturity judgment.
 
 The chapters remain authoritative for their own declarations. This index is a
-measured view of all 71 Markdown files under `spec/` at this update. It is not
+measured view of all 73 Markdown files under `spec/` at this update. It is not
 a build tracker, a next-action queue, or a substitute for the work-package
 nodes under `docs/program/issues/`.
 
@@ -149,7 +149,7 @@ inferred axis value:
   chapter.
 - `_notes/analysis-digest.md` — the background design note declares no status.
 
-The other 68 inputs are classifiable by the operative rule. This report does
+The other 70 inputs are classifiable by the operative rule. This report does
 not repair or add chapter declarations; those declarations are inputs to this
 reconciliation.
 
