@@ -64,69 +64,43 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-**Route recut (Architect `evt_12m8vjr4ptk7c`, §1a 5): replace the route
-rule.** Hard-stop entries 1, 2, 5 and 6 each flip the same binary decision,
-selector or coupled route. Each one keys that decision on a stand-in: frame
-presence, goal shape, the side table, convoy presence. The deliverable is
-one route-decision function over the properties the two routes actually
-consume:
-- (a) whether each scrutinee index can be abstracted by the motive: a
-  distinct ambient variable that is not a sentinel, not refined and not
-  constructor-headed;
-- (b) which ambient dependents mention the scrutinee itself, as opposed to
-  only its index;
-- (c) whether the goal is a proposition with non-trivial coupled sides.
+**Route function (Architect route D0 `evt_3h9c6mzexngtv`, after the recut
+`evt_12m8vjr4ptk7c`).** It replaces the S1 gate and the 2b gate. The route
+is decided by what each route consumes:
+- **(a) Index abstractable.** The coupled route abstracts the indices, so
+  `scrutinee_level` is `Some` and each index is a distinct ambient variable.
+  No enclosing frame refines the index or the scrutinee
+  (`mentions_enclosing_refinement`).
+- **(b) Carries scrutinee.** Some convoy entry depends on the scrutinee,
+  transitively, walked outermost-first. The selector keeps the outer
+  coordinate, so index-only dependents need no convoy there. It cannot
+  carry a scrutinee dependent.
+- **The selector is taken** when the frame is nested, the index is not
+  abstractable, the goal has non-trivial coupled sides, and no entry carries
+  the scrutinee. `forced_telescope_convoy` is unchanged.
+- **The convoy per route.** On the selector the convoy is empty. On the
+  coupled route it is the full refined-plane convoy, including when the
+  selector returns `None`.
+- **Code.** The ruling gives the replacement for `plan_coherent_frame_motive`
+  from `let enclosing_refines` through the overlap check, and the
+  `selector_convoy` threading. The `enclosing_refines` binding goes.
+- **Measured on `37bcaf64f`.** The 19 suite tests are green:
+  `lang_embedded_context_convoy` 6/6, `lang_nested_index_match_proposition_goal`
+  4/4 and `dependent_match_coherent_frame_acceptance` 9/9. So are
+  `lang_embedded_method_equation_convoy` 2/2,
+  `lang_index_convoy_impossible_arm_level` 5/5 and
+  `lang_proposition_goal_scrutinee_free_recursion` 10/10. The probe rows
+  are unchanged and no row has a trust delta. Not measured: the catalog
+  census, fmt and clippy.
+- **Retained:** the refined-plane convoy, the C1/C2 ordering, the
+  scope-aware collector, and H1 and K2 in RSC.
 
-The convoy is computed per route. The selector convoys only scrutinee
-dependents. The coupled route convoys every index dependent.
-- **Retained, already proved:** the refined-plane convoy, the C1/C2
-  ordering, the scope-aware collector, H1 and K2 in RSC, and the S1 rows
-  (E9 and E11 Ok).
-- **Next step: a route D0, owned by the Architect.** It measures a decision
-  table of every population row against (a), (b), (c) and each route's
-  outcome, then rules the function. A cell that needs the selector to carry
-  a scrutinee dependent is the open fork. The table covers the 14 probes,
-  G1, G2, the Vec form, A1, A1F, and every test in
-  `lang_embedded_context_convoy`, `lang_nested_index_match_proposition_goal`,
-  `lang_embedded_method_equation_convoy`,
-  `lang_index_convoy_impossible_arm_level`,
-  `lang_proposition_goal_scrutinee_free_recursion` and the 19 suite tests.
-- The ring holds at `37bcaf64f` until the D0 posts, and does not repair the
-  four S6 tests separately. The S1, S6 and build-order rulings below
-  stand until the route D0 replaces them.
-
-The D0 is ruled (Architect `evt_mgkvvs0f31b7`, part 2): one composition
-rule. The motive is one telescope. Every rewrite applied to the goal is
-applied at the same depth to each premise type its subject occurs in, and
-premises are ordered so each follows everything its rewritten type
-mentions. The ruling gives the order at the four sites (index premises,
-C1, companions, C2, goal). A companion that depends on a C2 binder is
-refused as a typed error.
-
-**S6 ruling (`evt_469ezp3by3mj6`): the selector carries no context
-convoy.**
-- D0's hoist of the convoy block into `build_index_equation_convoy_body`
-  is withdrawn, and the selector is left untouched.
-- A frame whose ambient binders depend on the index takes the coupled
-  route: `equation_convoy` also requires `probe_context_convoy.is_empty()`,
-  apart from `forced_telescope_convoy`.
-- The overlap `Internal` stays as it is. It now states the invariant this
-  gate enforces.
-- **Build order:**
-  1. the S1 gate;
-  2. the refined plane;
-  - 2b. this gate;
-  3. D0 part 2's ordering at the motive, the arm,
-     `build_convoy_refined_type` and `finish_dependent_elim`.
-
-**S1 ruling (`evt_2qrmtt7t9pfkv`): E9 and E11 never take the selector.**
-The index-equation selector is entered only when an enclosing frame
-refines the scrutinee or its index (`enclosing_refines`, with
-`mentions_enclosing_refinement` reading `var_refinements` and the
-sentinels). It is no longer entered merely because some frame encloses
-it. The selector method itself is not revised. Build this gate first, then
-the amendment below with D0 part 2's composition. A `NotAFunction` at a
-selector use with a constructor-headed index is a stop under S1.
+**Composition (Architect `evt_mgkvvs0f31b7`, part 2).** The motive is one
+telescope. Every rewrite applied to the goal is applied at the same depth
+to each premise type its subject occurs in, and premises are ordered so
+each follows everything its rewritten type mentions. The ruling gives the
+order at the four sites (index premises, C1, companions, C2, goal). A
+companion that depends on a C2 binder is refused as a typed error.
 
 **D0 amendment (`evt_3p22pk3q6f7fb`): the convoy reads the arm-refined
 plane.**
@@ -175,9 +149,11 @@ plane.**
   `q1_option_wrapped_pair_goal`, `q1_two_lists_in_both_fin_arms`,
   `q1_swapped_inner_match_order` and
   `variable_proposition_motive_with_result_binder`.
-- **AC-4 (mutation, QA).** Per input of the route function: replacing it
-  with a stand-in key (frame presence, the side table, or convoy presence)
-  reddens a named row. The route D0 names the row for each mutation.
+- **AC-4 (mutation, QA).** Dropping `!index_abstractable` makes E9 and
+  E11 `KernelRejected NotAFunction`, the selector at a neutral Nat index.
+- **AC-4b (mutation, QA).** Dropping `!carries_scrutinee` makes G2
+  `KernelRejected TypeMismatch`, the base J-cast. H7 stays Ok under this
+  mutation, so it does not discriminate.
 
 ## Stop conditions
 
@@ -185,8 +161,7 @@ plane.**
 - The repair overlaps `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`'s gates
   or `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`'s wall: stop to the
   Architect to rule the order.
-- **S6.** Evaluated at the end of step 3, not between steps. Stop to the
-  Architect if any of these differs from Ok: H7 or another AC-2 control, a
-  `lang_embedded_context_convoy` row, the 19 suite tests, or a
-  `LANG-PROPOSITION-GOAL-SCRUTINEE-FREE-RECURSION` row. Also stop if step 3
-  makes H9 and H5 Ok but leaves H7 failing.
+- **S6.** Stop to the Architect on any suite or census delta: an AC-2 or
+  AC-2b control, a row of the 19 suite tests (the three files above), or a
+  `LANG-PROPOSITION-GOAL-SCRUTINEE-FREE-RECURSION` row that differs from
+  Ok.
