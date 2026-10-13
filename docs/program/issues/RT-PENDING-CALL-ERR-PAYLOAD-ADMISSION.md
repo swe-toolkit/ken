@@ -1,6 +1,6 @@
 ---
 id: RT-PENDING-CALL-ERR-PAYLOAD-ADMISSION
-title: "Pending-call admission refuses the px7m dynamic-error route at (J): the selected ERR leaf relocates joins that no accounting covers, because J-a's accounting is deferred. Account for the leaf's relocated joins so px7m err runs natively with interpreter parity"
+title: "Pending-call admission refuses the px7m dynamic-error route at (J): J-a's accounting is deferred, and response-owner emissions lower their own copy of the selected leaf's joins with no closeout. Close out joins in response-owner emissions and account R by both closeouts so px7m err runs natively with interpreter parity"
 status: active
 owner: runtime
 size: M
@@ -34,9 +34,7 @@ interpreter parity and is un-ignored.
   accounting is deferred, because no admitted row had a nonempty `R`. The
   complement refuses rather than making a selected join look unselected.
 - **The capability** (Architect `evt_2spyd3965e84m`): the J-a join
-  accounting for a selected leaf whose relocated joins are nonempty. The
-  response-owner environment extension the same ruling named is needed only
-  if the D0 shows (E) would refuse once (J) admits.
+  accounting for a selected leaf whose relocated joins are nonempty.
 - **Controls already native.** Both px7l rows and px7m ok run natively with
   zero packages. An OrdinarySpecialization-fed leaf is refused at admission
   (C3). The two-print arm-tail row
@@ -55,26 +53,55 @@ stop and report the mismatch.
    whether the leaf is StaticResponseOwner-fed or OrdinarySpecialization-fed
    under C1, since C3 refuses the second. State whether (E) still admits
    the producer once `R` is accounted. The Architect rules the repair shape.
-2. **The ruled repair:** J-a accounting for the leaf's `R`, plus the
-   environment extension only if the D0 shows it is needed.
+2. **The ruled repair (Architect `evt_7859dqm72wayz`, on `44443145c`).**
+   The D0 found that `R` is duplicated, not relocated. The issuer emission
+   `Predeclared(5)` lowers root 400 ordinarily, because the placeholder is
+   licensed only in `Continuation` scopes. Its unit closeout consumes 393,
+   396 and 404 and passes. `StaticResponseOwnerId(1)` lowers its own copy
+   and consumes `{393, 396}`, and no closeout checks it. Bypassing (J) alone
+   makes the row pass at parity. No environment extension is needed, and
+   (E) is untouched.
+   - **A response-owner join closeout.** Add
+     `validate_response_join_plan_consumption` in `joins.rs` and make
+     `validate_materialized_dead_join_cfg_for` `pub(super)`. In
+     `define_static_response_owner_bodies`, derive `required` from the same
+     `OwnedResponseEmission` the body lowers. Call the closeout after the
+     last `lower_expr`, and the dead-join CFG check next to
+     `verify_cranelift_function`. The ruling has the code.
+   - **J-a accounting at admission.** It replaces the blanket refusal at
+     `selected_pending_calls.rs:714-719`. `R` is accounted when it is a
+     subset of both the response owner's copied operation-argument joins
+     and the issuer's `required_join_origins`. That uses a new planner
+     helper, `unique_emission_containing`, in `joins_traps.rs`. The
+     comments at :656 and :765-766 are updated.
 
 ## Acceptance
 
 - **AC-1.** The row is un-ignored and agrees across real executors on
   stdout (`missing.binnot-found\n`) and the host-op vector `[FsReadFile,
   ConsoleWrite, ConsoleWrite]`.
-- **AC-2 (sentinel).** The (J) sentinel is retargeted, as its comment
-  anticipates. The err producer is admitted with a validated response
-  owner, and each join in `R` is consumed by exactly one emission.
-- **AC-3 (controls).** Both px7l rows, px7m ok, the C3 classifier pair and
-  the two-print parity row keep their results, and `rt_parity_native` at 4
-  threads is unchanged.
-- **AC-4 (mutation, QA).** Removing the J-a accounting returns err to the
-  (J) refusal.
+- **AC-2 (sentinel).** The (J) sentinel is retargeted. The err producer is
+  admitted with a validated response owner. Each join in `R` is consumed
+  exactly once by the issuer emission and exactly once by the
+  response-owner emission, each under its own closeout.
+- **AC-3 (controls).** Every existing response-owner row keeps its result:
+  both px7l rows, px7m ok, the two-print parity row, and the rt suites with
+  response owners. So do the C3 classifier pair and `rt_parity_native` at 4
+  threads.
+- **AC-4 (mutation, QA).** AC-1 alone cannot discriminate, because the row
+  is green with (J) simply deleted. These two observations carry the gate:
+  - (a) restoring `unaccounted_joins |= !relocated_joins.is_empty()`
+    returns err to the (J) refusal;
+  - (b) passing an empty `required` to the response closeout refuses err
+    with "source join StaticOriginId(393) was classified outside its
+    owning function".
 
 ## Stop conditions
 
 - The repair needs a kernel, trust or spec change.
-- One join is consumed by two emissions, or a `Deferred` row lowers outside
-  its handler owner.
+- A join is consumed twice within one emission, an emission lowers a
+  planned join with no closeout, or a `Deferred` row lowers outside its
+  handler owner.
+- The response closeout reddens an AC-3 row, or `unique_emission_containing`
+  returns `None` for err's root 400: stop to the Architect.
 - A runtime trap or a dropped effect on any row after the repair.
