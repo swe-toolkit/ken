@@ -2704,7 +2704,7 @@ fn rewrite_rexpr_inner_rold(
         unreachable!("rewrite_rexpr_inner_rold dispatch")
     };
     let _ = &kernel_head;
-    Ok({ rewrite_rexpr_arm(|| Ok(RExpr::ROld(Box::new(rewrite_rexpr(scope, exports, *e)?), s)))? })
+    Ok(rewrite_rexpr_arm(|| Ok(RExpr::ROld(Box::new(rewrite_rexpr(scope, exports, *e)?), s)))?)
 }
 
 #[inline(never)]
