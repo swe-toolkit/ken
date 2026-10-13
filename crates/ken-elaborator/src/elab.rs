@@ -4539,24 +4539,41 @@ fn plan_coherent_frame_motive(
         && scrut_indices
             .iter()
             .any(|index| !matches!(index, Term::Var(_)));
-    // The index-equation selector carries an enclosing frame's refinement of
-    // this scrutinee or its index. A frame that refines neither leaves the
-    // index neutral, where the selector's Nat eliminator hides its method
-    // premise; use the coupled route with its context convoy instead.
-    let enclosing_refines = !cx.match_frames.is_empty()
-        && (frame.scrutinee_level.is_none()
-            || std::iter::once(scrut_core)
-                .chain(scrut_indices.iter())
-                .any(|term| mentions_enclosing_refinement(cx, term)));
-    // The index-equation selector carries no ambient context convoy. A frame
-    // whose ambient binders depend on the index takes the coupled route,
-    // where the convoy composes with the embedded companions.
-    let equation_convoy = (enclosing_refines
+    // The route is decided by what each route consumes. The coupled route
+    // abstracts the indices, so each must be a distinct ambient variable that
+    // no enclosing frame refines.
+    let index_abstractable = frame.scrutinee_level.is_some()
+        && !mentions_enclosing_refinement(cx, scrut_core)
+        && scrut_indices.iter().enumerate().all(|(position, index)| {
+            matches!(index, Term::Var(_))
+                && !mentions_enclosing_refinement(cx, index)
+                && !scrut_indices[..position].contains(index)
+        });
+    // The selector keeps the outer coordinate, so index-only dependents need
+    // no convoy there; it cannot carry a dependent of the scrutinee.
+    let mut scrutinee_dependencies = vec![scrut_core.clone()];
+    let mut carries_scrutinee = false;
+    for entry in probe_context_convoy.iter().rev() {
+        if scrutinee_dependencies
+            .iter()
+            .any(|dependency| scrut_occurs(&entry.ambient_ty, dependency))
+        {
+            carries_scrutinee = true;
+            scrutinee_dependencies.push(entry.occurrence.clone());
+        }
+    }
+    let equation_convoy = (!cx.match_frames.is_empty()
+        && !index_abstractable
         && has_nontrivial_coupled_sides
-        && probe_context_convoy.is_empty())
+        && !carries_scrutinee)
         || forced_telescope_convoy;
+    let selector_convoy = if equation_convoy && !forced_telescope_convoy {
+        Vec::new()
+    } else {
+        probe_context_convoy.clone()
+    };
     if equation_convoy {
-        if !probe_context_convoy.is_empty() && !forced_telescope_convoy {
+        if !selector_convoy.is_empty() && !forced_telescope_convoy {
             return Err(ElabError::Internal(
                 "index-equation convoy unexpectedly overlaps an ambient context convoy".into(),
             ));
@@ -4571,13 +4588,13 @@ fn plan_coherent_frame_motive(
             scrut_indices,
             original_expected,
             motive_base_depth,
-            &probe_context_convoy,
+            &selector_convoy,
             sentinel_region,
             span,
         )? {
             return Ok(Box::new(CoherentFrameMotivePlan {
                 expected: original_expected.clone(),
-                context_convoy: probe_context_convoy.clone(),
+                context_convoy: selector_convoy.clone(),
                 embedded_method_convoy: Vec::new(),
                 embedded_method_repairs: Vec::new(),
                 motive_user_body,
@@ -8113,7 +8130,7 @@ fn wrap_dependent_motive_convoy(
                 embedded_slot_base,
             )?);
         }
-        motive_user_body = 
+        motive_user_body =
             wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region);
     }
     Ok(motive_user_body)
