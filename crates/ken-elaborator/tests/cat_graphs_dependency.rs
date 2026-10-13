@@ -327,6 +327,87 @@ fn empty_is_order
   match decision { HasOrder order ↦ True; HasCycle cycle ↦ False }
 "#;
 
+// Four further cycles with fixed expected return lengths. The Pair Bool
+// Bool carrier supplies three distinct vertices for tri's return walk; a
+// duplicate finite certificate probes enumeration multiplicity independently.
+const MORE_CYCLES: &str = r#"
+import Data.Finite.Finite (pair_finite)
+import Core.Classes.LawfulClasses (DecEq_instance_Pair)
+
+fn pair_is (p : Pair Bool Bool) (x : Bool) (y : Bool) : Bool =
+  bool_and (bool_eq (pair_fst Bool Bool p) x)
+           (bool_eq (pair_snd Bool Bool p) y)
+const pair_dec : DecEq (Pair Bool Bool) =
+  DecEq_instance_Pair Bool Bool DecEq_instance_Bool DecEq_instance_Bool
+const pair_vertices : Finite (Pair Bool Bool) =
+  pair_finite Bool Bool bool_finite bool_finite
+const pair_vertices_duplicate : Finite (Pair Bool Bool) =
+  pair_finite Bool Bool duplicate_bool bool_finite
+
+const part_cycle : Graph (Pair Bool Bool) = MkGraph (Pair Bool Bool)
+  (λu. λv. match pair_is u True True {
+    True ↦ pair_is v True False;
+    False ↦ match pair_is u True False {
+      True ↦ pair_is v True True;
+      False ↦ False
+    }
+  })
+const tri : Graph (Pair Bool Bool) = MkGraph (Pair Bool Bool)
+  (λu. λv. match pair_is u True True {
+    True ↦ pair_is v True False;
+    False ↦ match pair_is u True False {
+      True ↦ pair_is v False True;
+      False ↦ match pair_is u False True {
+        True ↦ pair_is v True True;
+        False ↦ False
+      }
+    }
+  })
+const tri_dup : Graph (Pair Bool Bool) = tri
+const selfc : Graph Bool = MkGraph Bool (λu. λv. bool_and u v)
+
+const part_result : OrderOrCycle (Pair Bool Bool) pair_dec part_cycle =
+  dependency_order_or_cycle (Pair Bool Bool) pair_vertices pair_dec part_cycle
+const tri_result : OrderOrCycle (Pair Bool Bool) pair_dec tri =
+  dependency_order_or_cycle (Pair Bool Bool) pair_vertices pair_dec tri
+const tri_dup_result : OrderOrCycle (Pair Bool Bool) pair_dec tri_dup =
+  dependency_order_or_cycle (Pair Bool Bool) pair_vertices_duplicate pair_dec tri_dup
+const selfc_result : OrderOrCycle Bool DecEq_instance_Bool selfc =
+  dependency_order_or_cycle Bool bool_finite DecEq_instance_Bool selfc
+
+fn walk_steps_at (q : Type) (g : Graph q) (s : q) (t : q)
+  (walk : Walk q g s t) : Nat =
+  match walk {
+    WalkHere ↦ Zero;
+    WalkStep u v edge_proof prefix ↦ Suc (walk_steps_at q g s u prefix)
+  }
+fn walk_edges_at (q : Type) (g : Graph q) (s : q) (t : q)
+  (walk : Walk q g s t) : Bool =
+  match walk {
+    WalkHere ↦ True;
+    WalkStep u v edge_proof prefix ↦
+      bool_and (edge q g u v) (walk_edges_at q g s u prefix)
+  }
+fn cycle_return_steps_at (q : Type) (g : Graph q) (cy : Cycle q g) : Nat =
+  match cy { MkCycle start next first rest ↦
+    walk_steps_at q g next start rest }
+fn cycle_return_edges_at (q : Type) (g : Graph q) (cy : Cycle q g) : Bool =
+  match cy { MkCycle start next first rest ↦
+    walk_edges_at q g next start rest }
+fn result_return_steps_at (q : Type) (d : DecEq q) (g : Graph q)
+  (decision : OrderOrCycle q d g) : Nat =
+  match decision {
+    HasCycle cy ↦ cycle_return_steps_at q g cy;
+    HasOrder order ↦ Zero
+  }
+fn result_return_edges_at (q : Type) (d : DecEq q) (g : Graph q)
+  (decision : OrderOrCycle q d g) : Bool =
+  match decision {
+    HasCycle cy ↦ cycle_return_edges_at q g cy;
+    HasOrder order ↦ False
+  }
+"#;
+
 fn fixture() -> (ElabEnv, EvalStore) {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_module_from_roots(&[root()], GRAPH)
@@ -665,21 +746,37 @@ fn seed_two_vertex_cycle_has_real_witness() {
         "edge Bool two_cycle (result_start cycle_result) (result_next cycle_result)",
         true,
     );
-    // The returned Walk is checked Type-level evidence. The current typed
-    // interpreter leaves this dependent projection Neutral; never count that
-    // as a runtime pass. Its closed edge predicate must kernel-reduce to True.
+    // The same public Cycle return walk is observed through both conversion
+    // and the checked interpreter, rather than inferring runtime success from
+    // the kernel-only theorem.
     kernel_truth(
         &mut env,
         "cycle_return_edges",
         "result_return_edges_real cycle_result",
         true,
     );
+    let edges = observe(
+        &mut env,
+        &mut store,
+        "cycle_return_edges_runtime",
+        "Bool",
+        "result_return_edges_real cycle_result",
+    );
+    assert!(boolean(&env, &edges), "two_cycle runtime return edges");
     kernel_number(
         &mut env,
         "cycle_return_length",
         "result_return_steps cycle_result",
         1,
     );
+    let steps = observe(
+        &mut env,
+        &mut store,
+        "cycle_return_length_runtime",
+        "Nat",
+        "result_return_steps cycle_result",
+    );
+    assert_eq!(nat(&env, &steps), 1, "two_cycle runtime return steps");
     truth(
         &mut env,
         &mut store,
@@ -694,6 +791,81 @@ fn seed_two_vertex_cycle_has_real_witness() {
         "edge Bool two_cycle False False",
         false,
     );
+}
+
+/// Promise class: durable invariant (15 §4, 42 §3.6). MEASURED: four
+/// independent checked Cycle return walks agree with kernel conversion on
+/// both their real edges and constructor-valued step counts. CLAIMED: the
+/// interpreter's J reduction remains reached under generic graph clients,
+/// including a duplicate enumeration and a reflexive cycle. THE GAP: these
+/// are selected closed observations, not a proof of arbitrary graph walks.
+#[test]
+fn seed_four_cycle_return_walks_match_kernel_and_interpreter() {
+    let (mut env, mut store) = fixture();
+    env.elaborate_file(MORE_CYCLES)
+        .expect("four additional real graph fixtures must elaborate");
+    for (name, carrier, dec, graph, result, expected_steps) in [
+        (
+            "part_cycle",
+            "(Pair Bool Bool)",
+            "pair_dec",
+            "part_cycle",
+            "part_result",
+            1,
+        ),
+        (
+            "tri",
+            "(Pair Bool Bool)",
+            "pair_dec",
+            "tri",
+            "tri_result",
+            2,
+        ),
+        (
+            "selfc",
+            "Bool",
+            "DecEq_instance_Bool",
+            "selfc",
+            "selfc_result",
+            0,
+        ),
+        (
+            "tri_dup",
+            "(Pair Bool Bool)",
+            "pair_dec",
+            "tri_dup",
+            "tri_dup_result",
+            2,
+        ),
+    ] {
+        let edges = format!("result_return_edges_at {carrier} {dec} {graph} {result}");
+        let steps = format!("result_return_steps_at {carrier} {dec} {graph} {result}");
+        kernel_truth(&mut env, &format!("{name}_edges"), &edges, true);
+        kernel_number(&mut env, &format!("{name}_steps"), &steps, expected_steps);
+        let runtime_edges = observe(
+            &mut env,
+            &mut store,
+            &format!("{name}_edges_runtime"),
+            "Bool",
+            &edges,
+        );
+        assert!(
+            boolean(&env, &runtime_edges),
+            "{name}: runtime return edges"
+        );
+        let runtime_steps = observe(
+            &mut env,
+            &mut store,
+            &format!("{name}_steps_runtime"),
+            "Nat",
+            &steps,
+        );
+        assert_eq!(
+            nat(&env, &runtime_steps),
+            expected_steps,
+            "{name}: runtime return steps"
+        );
+    }
 }
 
 /// Promise class: durable invariant. MEASURED: checked empty-carrier evidence
