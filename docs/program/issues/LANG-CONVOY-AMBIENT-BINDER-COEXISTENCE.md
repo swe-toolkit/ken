@@ -42,8 +42,20 @@ source is in the finding.
   `KernelRejected TypeMismatch` at the `match xs`, the signature R1 had
   before the fix. H5 (leaf `h`) fails identically, and H1, the nested
   `match i` form using `h`, fails with a `J`-cast mismatch. The controls
-  H6, H7 and H8 are Ok. In these rows the convoyed binder's own type
-  carries the goal's embedded eliminator.
+  H6, H7 and H8 are Ok. The embedded eliminator is not what blocks H1.
+  At the inner frame the convoy tests each binder at its raw context type,
+  which does not mention the inner index, so `h` is never convoyed
+  (Architect trace `evt_3p22pk3q6f7fb`).
+- **Shape 3, an untransported hypothesis about the inner scrutinee**
+  (Adversary `evt_1n4z88r4r064e`; pre-existing on `4ee16ba51`). G1 has a
+  Type goal, `h : pe n xs`, nested `match i` then `match xs`, and
+  `f k x rest h` at the leaf. It is `KernelRejected TypeMismatch`. G2 has
+  the goal `pe n xs` with `h` at the leaf, and is a `J`-cast mismatch. The
+  Vec form fails the same way. The single-level `match xs` control is Ok.
+  - **The mechanism.** At the inner `match xs`, `scrutinee_level` is
+    `None` and the seed is `{m}`. `compute_context_convoy` (~:4615) tests
+    raw types. `cx.var_refinements` carries the refined types
+    (`h : pe (Suc m) S1`, where S1 is the inner `scrut_core`).
 - **Not a regression.** All the failing rows fail identically on
   `fd3b9262b`. No row has a recursive step.
 
@@ -64,17 +76,31 @@ measured a negative: dropping the value-branch convoy gives
 `NotAFunction`, so the convoy must be composed, not omitted. The repair
 follows that rule.
 
+**D0 amendment (`evt_3p22pk3q6f7fb`): the convoy reads the arm-refined
+plane.**
+- When `scrutinee_level` is `None`, the referent is the binder whose active
+  refinement value is `scrut_core`, matched by term identity. It is
+  skipped.
+- A refined binder is tested and carried at its refined type, weakened to
+  the ambient depth.
+- `ConvoyEntry` gains an `occurrence` term, and every `Term::var(entry.var)`
+  consumer uses it. The ruling lists the nine sites and the two test
+  callers.
+- The seed and the premise order are unchanged. G1/G2's `h` is C1, and
+  H1's `h` is C2.
+
 ## Acceptance
 
-- **AC-1.** E9, E11, H9, H5, H1 and K2 check, with no Axiom and no trust
-  change. K2 is `pp (dual_lookup a n xs i)` with nested `match i` then
-  `match xs`. It is H1's class and is refused on base (Architect sibling,
-  CHECK 7).
-- **AC-2 (control).** E8, E10, H6, H7 and H8 stay Ok. The
+- **AC-1.** E9, E11, H9, H5, H1, G1, G2 and G2's Vec form check, with no
+  Axiom and no trust change.
+- **AC-2 (control).** E8, E10, H6, H7, H8 and K2 stay Ok, and so does the
+  single-level `match xs` control. K2, `pp (dual_lookup a n xs i)`, is
+  already Ok on `4ee16ba51`, so it cannot evidence the fix. The
   `lang_embedded_context_convoy` suite, including its false twin, is
   unchanged, and so is the catalog census.
 - **AC-3.** A false twin of H9, whose hypothesis disagrees with the goal,
-  is still refused.
+  is still refused. So is G2's false twin `h : pe n ys`, with a typed
+  error.
 - **AC-3b.** The And-over-`dual_lookup` pair from the Architect's
   `evt_26r9qax9s5ze` never reaches the user as an `Internal`. That pair is
   A1, `lookup_and`, a true theorem, and A1F, its false twin with `hp x` in
@@ -90,3 +116,7 @@ follows that rule.
 - The repair overlaps `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`'s gates
   or `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`'s wall: stop to the
   Architect to rule the order.
+- **S6.** Reading the refined plane changes an AC-2 control, a
+  `lang_embedded_context_convoy` row, the 19 suite tests, or a
+  `LANG-PROPOSITION-GOAL-SCRUTINEE-FREE-RECURSION` row: stop to the
+  Architect.
