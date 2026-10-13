@@ -69,24 +69,38 @@ base, stop and report the mismatch.
    says which, and whether P2, P4 and P6 then check. It covers every
    `convoy_entry_order` consumer above, since check 2 applies: the motive,
    method, refined-type and finish sites must agree.
-2. **The ruled repair**, plus replacing the `.expect` at :9619 with a typed
-   error, so that any slot underflow left over is a refusal, not a panic.
+2. **The ruled repair** (D0 `evt_2mrprmr13yax7`): dependency order. A C1
+   entry whose type mentions a C2 binder, directly or through another such
+   C1 entry, joins the group after the companions, in outermost-first
+   source order. The change is in `convoy_entry_order` and a new fixpoint
+   helper `convoy_entries_following_c2`, and every consumer follows it.
+   `reject_convoy_companion_cycle` extends to that whole group. The
+   `.expect` in `finalize_refined_body` becomes the typed `TypeMismatch`
+   "a match premise names a binder bound later in its telescope", through
+   both `wrap_premise_*_finalized` wrappers and their ten call sites.
 
 ## Acceptance
 
-- **AC-1.** P2, P4 and P6 reach no panic. Each one checks, or returns the
-  typed refusal the D0 names. A false twin of P2, with the goal `Equal a
-  (L) z` for a fresh `z : a`, is refused.
+- **AC-1.** P2, P4, P6, S1 (transitive: `... (r : phi h) (psi : phi h →
+  Prop) (s : psi r)`, leaf `h`) and S2 (mixed: `(q : pe xs) h (rr : Equal a
+  (L) y → pe xs → Prop) (r : rr h q)`) check, with `trusted_base()`
+  unchanged. The P2 false twin (goal `Equal a (L) z` for a fresh `z : a`)
+  and S5 (S1 with that false goal) are refused, typed.
 - **AC-2 (control).** The four rows in the controls list stay Ok, and P5
   is unchanged. `lang_convoy_ambient_binder_coexistence` 7/7, the 19-test
   set (`lang_embedded_context_convoy` 6, `lang_nested_index_match_proposition_goal`
   4, `dependent_match_coherent_frame_acceptance` 9) and the true rows'
-  `trusted_base()` are unchanged.
-- **AC-3 (mutation, QA).** Restoring the C1-first order reddens AC-1 at
-  the ruled site.
+  `trusted_base()` are unchanged. S4 (an independent `(w : a)` after `r`)
+  checks.
+- **AC-3 (mutation, QA).** No control reddens under either mutation:
+  - (a) restoring the C2-only partition makes P2, P4, P6, S1, S2 and S4
+    each return the typed `TypeMismatch`, never a panic;
+  - (b) replacing the fixpoint with one pass reddens S1 alone.
 
 ## Stop conditions
 
 - Any kernel rule, conversion or `trusted_base()` change.
 - A false twin checks.
 - A suite or census delta outside the named rows: stop to the Architect.
+- To the Architect: a control changes, an AC-1 row misses with the ruled
+  code, or a companion-cycle refusal appears on an existing suite.
