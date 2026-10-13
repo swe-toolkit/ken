@@ -1149,7 +1149,6 @@ fn register_prelude_state(elab: &mut ElabEnv, unit_id: GlobalId, mkunit_id: Glob
 }
 
 #[inline(never)]
-#[inline(never)]
 fn register_prelude_pairs(elab: &mut ElabEnv, type0: &Term) -> Result<(), ElabError> {
     // `Pair : Type -> Type -> Type` — the non-dependent Sigma pair,
     // `k × v` (`52-map.md §4`, `13 §3`): "the Σ-pair... distinct from the
@@ -1245,6 +1244,7 @@ fn register_prelude_pairs(elab: &mut ElabEnv, type0: &Term) -> Result<(), ElabEr
     Ok(())
 }
 
+#[inline(never)]
 fn register_prelude_propositions(elab: &mut ElabEnv, omega0: &Term, type0: &Term) -> Result<(GlobalId, GlobalId), ElabError> {
     // ── Ω constants (ES2: real definitions, demoted out of `trusted_base()`) ─
     // `Equal : Π(A:Type). Π(x:A). Π(y:A). Ω`  (the `≡`).
@@ -1932,7 +1932,6 @@ fn register_prelude_text_and_ambient(elab: &mut ElabEnv, list_id: GlobalId, nil_
 }
 
 #[inline(never)]
-#[inline(never)]
 fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<PreludeResourceSeed, ElabError> {
     // ── `[FS]` real file I/O (VAL2 #9 / OQ-B, FS-driver-build D1) ──────────
     //
@@ -2422,6 +2421,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     Ok(PreludeOperationIds { private_fs_open_id, private_fs_handle_metadata_id, private_resource_release_id, private_buffer_allocate_id, private_fs_read_at_id, private_fs_write_at_id, private_buffer_freeze_id, private_mapping_allocate_id, private_mapping_read_view_id, private_mapping_write_view_id, private_mapping_acquire_file_id })
 }
 
+#[inline(never)]
 fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<PreludeResourceIds, ElabError> {
     let seed = register_prelude_resource_seed(elab, type0)?;
 
@@ -2458,7 +2458,6 @@ fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<
     })
 }
 
-#[inline(never)]
 #[inline(never)]
 fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
     // `fs_resp : (a : Auth) -> FSOp a -> Type` is a genuine non-constant
@@ -3077,6 +3076,7 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
     Ok(())
 }
 
+#[inline(never)]
 fn register_prelude_resource_protocol(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId) -> Result<(), ElabError> {
     register_prelude_fs_operations(elab)?;
 
