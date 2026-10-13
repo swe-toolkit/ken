@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-PRODUCT-LAWS
 title: "Spec 65 section 2 states left matrix identity and matrix-product associativity as proved, but Algorithm.LinearAlgebra.NatMatrix exports neither. Deliver both laws at zero trust, through the private named helper the D0 checked, and pin vector_scale's factor"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -88,3 +88,18 @@ scope says so.
   change.
 - A census row, or a consumer of `NatMatrix` outside this package,
   changes.
+
+## Closeout
+
+Merged `bc092bdd5` from exact `b83706505` (PR #4713). Foundation QA
+`evt_ctnmk85tn8dz`; Architect `evt_2rzf69b0vd08` with Decision
+`dec_4drt726kbec7m`. The first candidate, `69b2084e2`, was QA-blocked on
+test traceability, and the respin changed only comments.
+
+- `matrix_identity_left` and `matrix_product_assoc` are public at zero
+  trust and match spec 65 section 2. The package has fourteen public
+  names.
+- `row_product_columns` passes `map` a private named `dot_with`, in place
+  of the λ that hits `LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE`.
+- Acceptance is 3/3, and `trusted_base()` stays 109 to 109. All three AC-3
+  mutants are kernel-rejected.

@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-CONTRACT
 title: "No symbolic-algebra contract exists in spec/50-stdlib, so the catalog's next roadmap layer after linear algebra has nothing to build against. Author its chapter with a first section: a polynomial expression type over natural coefficients, its evaluation, and a normal form whose evaluation is proved equal to the expression's, at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
