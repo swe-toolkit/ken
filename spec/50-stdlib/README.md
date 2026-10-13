@@ -300,6 +300,18 @@ soundness and idempotence. No sorting, merging, canonical semantic
 equality decision, signed/field arithmetic, or CAT delivery is
 claimed.
 
+The **exact natural-geometry contract** is pinned in
+**`67-geometry.md`** §1 (SPEC-GEOMETRY-EXACT-CONTRACT).
+`Algorithm.Geometry.NatBox` specifies two-coordinate `Nat` points and
+closed axis-aligned boxes, including inverted-corner empty boxes and
+structural corner equality. Coordinatewise intersection and hull,
+point membership and Manhattan distance carry six generically
+checked D0 laws. The public `greatest for min` and `least for max`
+exports remain a **catalog follow-on**, not a landed prerequisite.
+No geometry catalog delivery, signed-coordinate geometry, Euclidean
+or floating-point distance, box area, or measured trusted-base delta
+is claimed.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
