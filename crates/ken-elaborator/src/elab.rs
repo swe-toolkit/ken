@@ -10876,6 +10876,283 @@ fn infer_ascription(
     Ok((e_core, ty_core))
 }
 
+#[inline(never)]
+fn infer_recursive_result(
+    cx: &mut ElabCtx,
+    selector: &RecursiveResultSelector,
+    index: usize,
+    binding_span: &Span,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (result, result_type) = cx.selected_recursive_result(index).ok_or_else(|| {
+        ElabError::StructuralResultOutOfScope {
+            selector_span: span.clone(),
+            binding_span: binding_span.clone(),
+        }
+    })?;
+    let classifier = kernel_infer_current(cx, &result_type).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        },
+    })?;
+    let classifier = whnf(cx.env, &cx.ctx, &classifier);
+    let (actual, required) = match classifier {
+        Term::Type(level) => (
+            RecursiveResultSort::Type(level),
+            RecursiveResultSelector::RecursiveResult,
+        ),
+        Term::Omega(level) => (
+            RecursiveResultSort::Omega(level),
+            RecursiveResultSelector::InductionHypothesis,
+        ),
+        _ => {
+            return Err(ElabError::RecursiveResultClassifierNotUniverse {
+                selector_span: span.clone(),
+                binding_span: binding_span.clone(),
+            })
+        }
+    };
+    if *selector != required {
+        return Err(ElabError::RecursiveResultSortMismatch {
+            selector_span: span.clone(),
+            binding_span: binding_span.clone(),
+            actual_classifier: actual,
+            required_spelling: required.spelling(),
+        });
+    }
+    Ok((result, result_type))
+}
+
+#[inline(never)]
+fn infer_space_cell(
+    cx: &mut ElabCtx,
+    index: usize,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let Some((state_position, cell_types)) = &cx.space_state else {
+        return Err(ElabError::MutationOutsideSpace {
+            construct: "cell read".to_string(),
+            span: span.clone(),
+        });
+    };
+    let cell_ty = cell_types
+        .get(index)
+        .cloned()
+        .ok_or_else(|| ElabError::Internal(format!("space cell index {index} out of range")))?;
+    let state_index = cx.ctx.len() - 1 - state_position;
+    Ok((
+        project_space_cell(Term::var(state_index), index, cell_types.len()),
+        cell_ty,
+    ))
+}
+
+#[inline(never)]
+fn infer_checked_global(
+    cx: &mut ElabCtx,
+    name: &str,
+    id: GlobalId,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if let Some((ind, k)) = cx.env.constructor(id) {
+        let ty = ind.constructors[k].type_.clone();
+        return Ok((
+            Term::Constructor {
+                id,
+                level_args: vec![],
+            },
+            ty,
+        ));
+    }
+    if let Some(ind) = cx.env.inductive(id) {
+        return Ok((
+            Term::IndFormer {
+                id,
+                level_args: vec![],
+            },
+            ind.former_type.clone(),
+        ));
+    }
+    let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "no checked type for imported global '{name}' {id:?}"
+        ))
+    })?;
+    let (core, ty) = (Term::const_(id, vec![]), ty.clone());
+    apply_zero_arity_preconditions(cx, id, core, ty, span)
+}
+
+#[inline(never)]
+fn infer_constructor_global(
+    cx: &mut ElabCtx,
+    name: &str,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (core, ty) = infer_spelling_global(cx, name, span)?;
+    let Term::Const { id, .. } = core else {
+        return Ok((core, ty));
+    };
+    apply_zero_arity_preconditions(cx, id, core, ty, span)
+}
+
+#[inline(never)]
+fn infer_universe(cx: &mut ElabCtx, n: Option<u32>) -> Result<(Term, Term), ElabError> {
+    let l = if let Some(n) = n {
+        level_from_nat(n)
+    } else {
+        cx.metas.fresh()
+    };
+    let ty = Term::ty(Level::Suc(Box::new(l.clone())));
+    Ok((Term::ty(l), ty))
+}
+
+#[inline(never)]
+fn infer_j_sugar(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
+    let args = peel_named_app(expr, SUGAR_J, 3).expect("checked by guard");
+    infer_j(cx, args[0], args[1], args[2], expr.span())
+}
+
+#[inline(never)]
+fn infer_eq_sugar(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
+    let args = peel_named_app(expr, SUGAR_EQ, 3).expect("checked by guard");
+    infer_eq(cx, args[0], args[1], args[2], expr.span())
+}
+
+#[inline(never)]
+fn infer_elim_trunc_sugar(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
+    let args = peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).expect("checked by guard");
+    infer_elim_trunc(cx, args[0], args[1], args[2], expr.span())
+}
+
+#[cold]
+#[inline(never)]
+fn infer_trunc_intro_error(rspan: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::TypeMismatch {
+        span: rspan.clone(),
+        reason: "trunc_intro (‖A‖ introduction) cannot be inferred — it needs an \
+                         expected type; add an ascription `(trunc_intro a : ‖A‖)` or place \
+                         it where the expected type is already known (e.g. a declaration's \
+                         declared type)"
+            .into(),
+    })
+}
+
+#[inline(never)]
+fn infer_application(
+    cx: &mut ElabCtx,
+    expr: &RExpr,
+    f: &RExpr,
+    a: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    // Peel and inspect the whole source spine in a separate frame.
+    // On the overwhelmingly-common decline path that frame (including
+    // its argument vector) is gone before generic application recurses.
+    if let Some(call) = infer_reflexive_recursive_self_call(cx, expr, span)? {
+        return append_saturated_preconditions(cx, expr, call, span);
+    }
+    if let Some(call) = infer_preconditioned_application(cx, expr, span)? {
+        return Ok(call);
+    }
+    let (f_core, f_ty) = infer(cx, f)?;
+    let f_ty_wh = whnf(cx.env, &cx.ctx, &f_ty);
+    match f_ty_wh {
+        Term::Pi(dom, cod) => {
+            let a_core = check(cx, a, &dom, span)?;
+            emit_call_refinements(cx, &f_core, &a_core, span)?;
+            let result_ty = subst0(&cod, &a_core);
+            Ok((Term::app(f_core, a_core), result_ty))
+        }
+        _ => Err(ElabError::NotAFunction { span: span.clone() }),
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn infer_unannotated_lambda_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "cannot infer type of lambda without annotation".into(),
+    })
+}
+
+#[inline(never)]
+fn infer_let(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>,
+    rhs: &RExpr,
+    body: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
+    let equation = let_equation(cx, &rhs_ty, &rhs_core);
+    cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
+    let path_base = cx.path_conditions.len();
+    if let Some(equation) = equation {
+        cx.path_conditions.push((equation, cx.ctx.len()));
+    }
+    let body_result = infer(cx, body);
+    cx.path_conditions.truncate(path_base);
+    cx.ctx.pop();
+    let (body_core, body_ty) = body_result?;
+    let result_ty = subst0(&body_ty, &rhs_core);
+    Ok((
+        Term::Let {
+            ty: Box::new(rhs_ty),
+            val: Box::new(rhs_core),
+            body: Box::new(body_core),
+        },
+        result_ty,
+    ))
+}
+
+#[inline(never)]
+fn infer_old(cx: &mut ElabCtx, inner: &RExpr, span: &Span) -> Result<(Term, Term), ElabError> {
+    let Some(pre_state) = cx.space_pre_state.clone() else {
+        return Err(ElabError::OldPreStateUnsupported { span: span.clone() });
+    };
+    let post_state = cx.space_state.replace(pre_state);
+    let result = infer(cx, inner);
+    cx.space_state = post_state;
+    result
+}
+
+#[cold]
+#[inline(never)]
+fn infer_match_equation_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "`match ... eqn:` requires a declared expected type".into(),
+    })
+}
+
+#[inline(never)]
+fn infer_attached_proof_ref(
+    cx: &mut ElabCtx,
+    subject: &str,
+    proof_name: &str,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    // This variant has no expression child to receive a checking
+    // goal: it is a leaf lookup for the qualified proof name. The
+    // ordinary infer-then-unify checking fallback therefore loses no
+    // bidirectional information here.
+    infer(
+        cx,
+        &RExpr::RCon(format!("{subject}::{proof_name}"), span.clone()),
+    )
+}
+
+#[cold]
+#[inline(never)]
+fn infer_becomes_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::MutationOutsideSpace {
+        construct: "becomes".to_string(),
+        span: span.clone(),
+    })
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -10884,111 +11161,21 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             else_branch,
             span,
         } => infer_if(cx, condition, then_branch, else_branch, span),
-        RExpr::RRecursiveResult {
-            selector,
-            index,
-            name: _,
-            binding_span,
-            span,
-        } => {
-            let (result, result_type) = cx.selected_recursive_result(*index).ok_or_else(|| {
-                ElabError::StructuralResultOutOfScope {
-                    selector_span: span.clone(),
-                    binding_span: binding_span.clone(),
-                }
-            })?;
-            let classifier = kernel_infer_current(cx, &result_type).map_err(|error| match error {
-                CurrentKernelQueryError::View(error) => error,
-                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                    error,
-                    span: span.clone(),
-                },
-            })?;
-            let classifier = whnf(cx.env, &cx.ctx, &classifier);
-            let (actual, required) = match classifier {
-                Term::Type(level) => (
-                    RecursiveResultSort::Type(level),
-                    RecursiveResultSelector::RecursiveResult,
-                ),
-                Term::Omega(level) => (
-                    RecursiveResultSort::Omega(level),
-                    RecursiveResultSelector::InductionHypothesis,
-                ),
-                _ => {
-                    return Err(ElabError::RecursiveResultClassifierNotUniverse {
-                        selector_span: span.clone(),
-                        binding_span: binding_span.clone(),
-                    })
-                }
-            };
-            if *selector != required {
-                return Err(ElabError::RecursiveResultSortMismatch {
-                    selector_span: span.clone(),
-                    binding_span: binding_span.clone(),
-                    actual_classifier: actual,
-                    required_spelling: required.spelling(),
-                });
-            }
-            Ok((result, result_type))
-        }
+        RExpr::RRecursiveResult { selector, index, binding_span, span, .. } =>
+            infer_recursive_result(cx, selector, *index, binding_span, span),
+
         RExpr::RPatternAlias(slot, name, _span) => infer_active_pattern_alias(cx, *slot, name),
         RExpr::RVar(i, name, span) => infer_named_local_variable(cx, i, name, span),
 
-        RExpr::RCell(index, _, span) => {
-            let Some((state_position, cell_types)) = &cx.space_state else {
-                return Err(ElabError::MutationOutsideSpace {
-                    construct: "cell read".to_string(),
-                    span: span.clone(),
-                });
-            };
-            let cell_ty = cell_types.get(*index).cloned().ok_or_else(|| {
-                ElabError::Internal(format!("space cell index {index} out of range"))
-            })?;
-            let state_index = cx.ctx.len() - 1 - state_position;
-            Ok((
-                project_space_cell(Term::var(state_index), *index, cell_types.len()),
-                cell_ty,
-            ))
-        }
+        RExpr::RCell(index, _, span) => infer_space_cell(cx, *index, span),
 
-        RExpr::RBecomes(_, _, _, span) => Err(ElabError::MutationOutsideSpace {
-            construct: "becomes".to_string(),
-            span: span.clone(),
-        }),
+        RExpr::RBecomes(_, _, _, span) => infer_becomes_error(span),
 
-        RExpr::RCheckedGlobal { name, id, span } => {
-            let id = *id;
-            if let Some((ind, k)) = cx.env.constructor(id) {
-                let ty = ind.constructors[k].type_.clone();
-                return Ok((Term::Constructor { id, level_args: vec![] }, ty));
-            }
-            if let Some(ind) = cx.env.inductive(id) {
-                return Ok((Term::IndFormer { id, level_args: vec![] }, ind.former_type.clone()));
-            }
-            let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
-                ElabError::Internal(format!("no checked type for imported global '{name}' {id:?}"))
-            })?;
-            let (core, ty) = (Term::const_(id, vec![]), ty.clone());
-            apply_zero_arity_preconditions(cx, id, core, ty, span)
-        }
-        RExpr::RCon(name, span) => {
-            let (core, ty) = infer_spelling_global(cx, name, span)?;
-            let Term::Const { id, .. } = core else {
-                return Ok((core, ty));
-            };
-            apply_zero_arity_preconditions(cx, id, core, ty, span)
-        }
+        RExpr::RCheckedGlobal { name, id, span } => infer_checked_global(cx, name, *id, span),
 
-        RExpr::RUniv(None, _) => {
-            let l = cx.metas.fresh();
-            let ty = Term::ty(Level::Suc(Box::new(l.clone())));
-            Ok((Term::ty(l), ty))
-        }
-        RExpr::RUniv(Some(n), _) => {
-            let l = level_from_nat(*n);
-            let ty = Term::ty(Level::Suc(Box::new(l.clone())));
-            Ok((Term::ty(l), ty))
-        }
+        RExpr::RCon(name, span) => infer_constructor_global(cx, name, span),
+
+        RExpr::RUniv(n, _) => infer_universe(cx, *n),
 
         // `J motive base eq` — the identity eliminator (`34 §3.4`), surfaced
         // as an INFER-mode former mirroring the existing checked-sugar idiom
@@ -10998,20 +11185,14 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         // from a checked goal). Detected BEFORE the generic application arm
         // below via a full application-spine peel (`absurd` only needed one
         // level; `J` needs three).
-        RExpr::RApp(..) if peel_named_app(expr, SUGAR_J, 3).is_some() => {
-            let args = peel_named_app(expr, SUGAR_J, 3).expect("checked by guard");
-            infer_j(cx, args[0], args[1], args[2], expr.span())
-        }
+        RExpr::RApp(..) if peel_named_app(expr, SUGAR_J, 3).is_some() => infer_j_sugar(cx, expr),
 
         // `Eq A a b` at EXPRESSION position (e.g. inside a `J` motive's body,
         // `\b' _. Eq B (P a) (P b')` — `cong`'s motive, `50-stdlib/53-
         // transport.md §2`). Same plumbing as the `elab_type` arm above
         // (`peel_named_rtype_app`), needed because a motive body is
         // elaborated via `infer`/`check`, not `elab_type`.
-        RExpr::RApp(..) if peel_named_app(expr, SUGAR_EQ, 3).is_some() => {
-            let args = peel_named_app(expr, SUGAR_EQ, 3).expect("checked by guard");
-            infer_eq(cx, args[0], args[1], args[2], expr.span())
-        }
+        RExpr::RApp(..) if peel_named_app(expr, SUGAR_EQ, 3).is_some() => infer_eq_sugar(cx, expr),
 
         // `elim_trunc P f t` — the `16 §6` truncation eliminator
         // (LANG-TRUNCATION-SURFACE-SYNTAX D2), elaborated directly to a
@@ -11020,89 +11201,24 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         // single-arg checked-sugar idiom `absurd`/`trunc_intro` use): the
         // target proposition `P` is user-written, not recovered from a
         // checked goal.
-        RExpr::RApp(..) if peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).is_some() => {
-            let args = peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).expect("checked by guard");
-            infer_elim_trunc(cx, args[0], args[1], args[2], expr.span())
-        }
+        RExpr::RApp(..) if peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).is_some() => infer_elim_trunc_sugar(cx, expr),
 
         // `trunc_intro a` reached in INFER position (no expected type in
         // scope) — the introduction form is checked-only (see the `check`
         // arm below); give the actionable remedy rather than letting this
         // fall through to the generic `RApp` arm and report an unrelated
         // "unresolved identifier 'trunc_intro'" (AC-4).
-        RExpr::RApp(f, _, rspan) if matches!(f.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) => {
-            Err(ElabError::TypeMismatch {
-                span: rspan.clone(),
-                reason: "trunc_intro (‖A‖ introduction) cannot be inferred — it needs an \
-                         expected type; add an ascription `(trunc_intro a : ‖A‖)` or place \
-                         it where the expected type is already known (e.g. a declaration's \
-                         declared type)"
-                    .into(),
-            })
-        }
+        RExpr::RApp(f, _, rspan) if matches!(f.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) => infer_trunc_intro_error(rspan),
 
-        RExpr::RApp(f, a, span) => {
-            // Peel and inspect the whole source spine in a separate frame.
-            // On the overwhelmingly-common decline path that frame (including
-            // its argument vector) is gone before generic application recurses.
-            if let Some(call) = infer_reflexive_recursive_self_call(cx, expr, span)? {
-                return append_saturated_preconditions(cx, expr, call, span);
-            }
-            if let Some(call) = infer_preconditioned_application(cx, expr, span)? {
-                return Ok(call);
-            }
-            let (f_core, f_ty) = infer(cx, f)?;
-            let f_ty_wh = whnf(cx.env, &cx.ctx, &f_ty);
-            match f_ty_wh {
-                Term::Pi(dom, cod) => {
-                    let a_core = check(cx, a, &dom, span)?;
-                    emit_call_refinements(cx, &f_core, &a_core, span)?;
-                    let result_ty = subst0(&cod, &a_core);
-                    Ok((Term::app(f_core, a_core), result_ty))
-                }
-                _ => Err(ElabError::NotAFunction { span: span.clone() }),
-            }
-        }
+        RExpr::RApp(f, a, span) => infer_application(cx, expr, f, a, span),
 
         RExpr::RAsc(e, ty, span) => infer_ascription(cx, e, ty, span),
 
-        RExpr::RLam(_, _, span) => Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: "cannot infer type of lambda without annotation".into(),
-        }),
+        RExpr::RLam(_, _, span) => infer_unannotated_lambda_error(span),
 
-        RExpr::RLet(_x, ty_opt, rhs, body, span) => {
-            let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
-            let equation = let_equation(cx, &rhs_ty, &rhs_core);
-            cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
-            let path_base = cx.path_conditions.len();
-            if let Some(equation) = equation {
-                cx.path_conditions.push((equation, cx.ctx.len()));
-            }
-            let body_result = infer(cx, body);
-            cx.path_conditions.truncate(path_base);
-            cx.ctx.pop();
-            let (body_core, body_ty) = body_result?;
-            let result_ty = subst0(&body_ty, &rhs_core);
-            Ok((
-                Term::Let {
-                    ty: Box::new(rhs_ty),
-                    val: Box::new(rhs_core),
-                    body: Box::new(body_core),
-                },
-                result_ty,
-            ))
-        }
+        RExpr::RLet(_x, ty_opt, rhs, body, span) => infer_let(cx, ty_opt, rhs, body, span),
 
-        RExpr::ROld(inner, span) => {
-            let Some(pre_state) = cx.space_pre_state.clone() else {
-                return Err(ElabError::OldPreStateUnsupported { span: span.clone() });
-            };
-            let post_state = cx.space_state.replace(pre_state);
-            let result = infer(cx, inner);
-            cx.space_state = post_state;
-            result
-        }
+        RExpr::ROld(inner, span) => infer_old(cx, inner, span),
 
         RExpr::RNumLit(lit, span) => elab_num_lit_infer(cx, lit, span),
 
@@ -11122,15 +11238,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RInfixSpine { span, .. } => unassociated_infix_error(span),
 
-        RExpr::RMatch {
-            scrut: _,
-            equation: Some(_),
-            span,
-            ..
-        } => Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: "`match ... eqn:` requires a declared expected type".into(),
-        }),
+        RExpr::RMatch { equation: Some(_), span, .. } => infer_match_equation_error(span),
 
         RExpr::RMatch {
             scrut,
@@ -11141,9 +11249,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RProj(base, field, span) => infer_proj(cx, base, field, span),
 
-        RExpr::RPosProj(base, projection, span) => {
-            infer_positional_proj(cx, base, *projection, span)
-        }
+        RExpr::RPosProj(base, projection, span) => infer_positional_proj(cx, base, *projection, span),
 
         RExpr::RPair(components, span) => infer_pair(cx, components, span),
         RExpr::RRecord { span, .. } => infer_record_requires_expected_type(span),
@@ -11154,18 +11260,8 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RTrunc(inner, span) => infer_trunc(cx, inner, span),
 
-        RExpr::RAttachedProofRef {
-            subject,
-            proof_name,
-            span,
-            // This variant has no expression child to receive a checking
-            // goal: it is a leaf lookup for the qualified proof name. The
-            // ordinary infer-then-unify checking fallback therefore loses no
-            // bidirectional information here.
-        } => infer(
-            cx,
-            &RExpr::RCon(format!("{subject}::{proof_name}"), span.clone()),
-        ),
+        RExpr::RAttachedProofRef { subject, proof_name, span } =>
+            infer_attached_proof_ref(cx, subject, proof_name, span),
     }
 }
 

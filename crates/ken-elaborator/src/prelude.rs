@@ -816,20 +816,86 @@ fn register_resource_bracket_laws(elab: &mut ElabEnv) -> Result<(), ElabError> {
     Ok(())
 }
 
-/// Register the L3 prelude in `elab` (called from `ElabEnv::empty`).
-///
-/// `LANG-STACK-ARC-EVIDENCE-USABILITY` `D3`/`AC-5`: this function's own
-/// stack frame is large, and it is live beneath `register_decimal_char`'s
-/// 31-level `decimalPow10` cascade -- `ElabEnv::new` calls this before any
-/// package source elaborates, so a caller further up the same chain pays
-/// this frame and the cascade's frame together. **Read this function's own
-/// `objdump` prologue before adding a local here**, rather than trusting a
-/// number in this comment: an in-code figure would need a custodian and
-/// would go stale silently at the next unrelated edit, with nothing red.
-pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
-    let omega0 = Term::omega(Level::Zero);
-    let type0 = Term::ty(Level::Zero);
+// Registration stages hand checked identities to the final driver record.
+// Identities hidden from the public name map cannot be recovered afterward.
+struct PreludeResourceSeed {
+    auth_t: Term,
+    bytes_t: Term,
+    create_policy_t: Term,
+    bool_t: Term,
+    int_t: Term,
+    cap_id: GlobalId,
+    resource_kind_id: GlobalId,
+    fs_handle_id: GlobalId,
+    resource_id: GlobalId,
+    private_resource_trace_identity_id: GlobalId,
+    resource_host_io_id: GlobalId,
+    closed_id: GlobalId,
+    malformed_resource_id: GlobalId,
+    right_not_held_id: GlobalId,
+    release_failed_id: GlobalId,
+}
 
+struct PreludeBufferIds {
+    private_buffer_span_id: GlobalId,
+    private_transfer_count_id: GlobalId,
+    private_buffer_handle_id: GlobalId,
+    buffer_handle_resource_id: GlobalId,
+    buffer_handle_capacity_id: GlobalId,
+}
+
+struct PreludeOperationIds {
+    private_fs_open_id: GlobalId,
+    private_fs_handle_metadata_id: GlobalId,
+    private_resource_release_id: GlobalId,
+    private_buffer_allocate_id: GlobalId,
+    private_fs_read_at_id: GlobalId,
+    private_fs_write_at_id: GlobalId,
+    private_buffer_freeze_id: GlobalId,
+    private_mapping_allocate_id: GlobalId,
+    private_mapping_read_view_id: GlobalId,
+    private_mapping_write_view_id: GlobalId,
+    private_mapping_acquire_file_id: GlobalId,
+}
+
+struct PreludeResourceIds {
+    auth_t: Term,
+    cap_id: GlobalId,
+    private_fs_open_id: GlobalId,
+    private_fs_handle_metadata_id: GlobalId,
+    private_buffer_allocate_id: GlobalId,
+    private_fs_read_at_id: GlobalId,
+    private_fs_write_at_id: GlobalId,
+    private_buffer_freeze_id: GlobalId,
+    private_mapping_allocate_id: GlobalId,
+    private_mapping_read_view_id: GlobalId,
+    private_mapping_write_view_id: GlobalId,
+    private_mapping_acquire_file_id: GlobalId,
+    private_buffer_handle_id: GlobalId,
+    buffer_handle_resource_id: GlobalId,
+    buffer_handle_capacity_id: GlobalId,
+    private_buffer_span_id: GlobalId,
+    private_transfer_count_id: GlobalId,
+    private_resource_release_id: GlobalId,
+    private_resource_trace_identity_id: GlobalId,
+    fs_handle_id: GlobalId,
+    resource_host_io_id: GlobalId,
+    closed_id: GlobalId,
+    malformed_resource_id: GlobalId,
+    right_not_held_id: GlobalId,
+    release_failed_id: GlobalId,
+}
+
+#[inline(never)]
+fn prelude_registered_id(elab: &ElabEnv, name: &str) -> Result<GlobalId, ElabError> {
+    elab.globals
+        .get(name)
+        .copied()
+        .ok_or_else(|| ElabError::Internal(format!("prelude: '{}' not registered", name)))
+}
+
+#[inline(never)]
+fn register_prelude_inductives(elab: &mut ElabEnv) -> Result<(), ElabError> {
     // ── Inductives (landed `data` machinery, `34 §1`) ──────────────────────
     // `Nat` is the Peano inductive (replaces the placeholder postulate Nat).
     elab.elaborate_decl("data Nat = Zero | Suc Nat")
@@ -962,52 +1028,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     elab.globals.insert("ITree".to_string(), itree_id);
     elab.globals.insert("Ret".to_string(), ret_id);
     elab.globals.insert("Vis".to_string(), vis_id);
+    Ok(())
+}
 
-    let lookup = |name: &str| -> Result<GlobalId, ElabError> {
-        elab.globals
-            .get(name)
-            .copied()
-            .ok_or_else(|| ElabError::Internal(format!("prelude: '{}' not registered", name)))
-    };
-
-    let nat_id = lookup("Nat")?;
-    let zero_id = lookup("Zero")?;
-    let suc_id = lookup("Suc")?;
-    let list_id = lookup("List")?;
-    let nil_id = lookup("Nil")?;
-    let cons_id = lookup("Cons")?;
-    let option_id = lookup("Option")?;
-    let none_id = lookup("None")?;
-    let some_id = lookup("Some")?;
-    let result_id = lookup("Result")?;
-    let err_id = lookup("Err")?;
-    let ok_id = lookup("Ok")?;
-    let prod_id = lookup("Prod")?;
-    let mkprod_id = lookup("MkProd")?;
-    // VAL1-surface inductives (declared before lookup closure above).
-    let unit_id = lookup("Unit")?;
-    let mkunit_id = lookup("MkUnit")?;
-    let stream_id = lookup("Stream")?;
-    let stdin_id = lookup("Stdin")?;
-    let stdout_id = lookup("Stdout")?;
-    let stderr_id = lookup("Stderr")?;
-    let console_op_id = lookup("ConsoleOp")?;
-    let read_id = lookup("Read")?;
-    let write_id = lookup("Write")?;
-    let flush_id = lookup("Flush")?;
-    let is_terminal_id = lookup("IsTerminal")?;
-    let instant_id = lookup("Instant")?;
-    let mkinstant_id = lookup("MkInstant")?;
-    let clock_op_id = lookup("ClockOp")?;
-    let wall_now_id = lookup("WallNow")?;
-    let read_result_id = lookup("ReadResult")?;
-    let chunk_id = lookup("Chunk")?;
-    let eof_id = lookup("Eof")?;
-    let itree_id = lookup("ITree")?;
-    let ret_id = lookup("Ret")?;
-    let vis_id = lookup("Vis")?;
-    // `lookup` is last used above; NLL ends its borrow here.
-
+#[inline(never)]
+fn register_prelude_state(elab: &mut ElabEnv, unit_id: GlobalId, mkunit_id: GlobalId, itree_id: GlobalId, ret_id: GlobalId, vis_id: GlobalId) -> Result<(GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId), ElabError> {
     // ── `[State s]` direct effect surface (VAL2 #10 / OQ-C·C2, `36 §4.5`) ──
     // Every definition below is a real kernel `Decl::Inductive`/`Decl::Def`
     // (`declare_inductive`/`declare_def`, kernel-rechecked) — never a
@@ -1120,7 +1145,107 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     )
     .map_err(ElabError::Internal)?;
     elab.globals.insert("inject_r".to_string(), inject_r_id);
+    Ok((state_op_id, get_id, put_id, coproduct_id, inl_id, inr_id, resp_state_id, resp_coproduct_id, bind_id, run_state_id, get_fn_id, put_fn_id, inject_l_id, inject_r_id))
+}
 
+#[inline(never)]
+#[inline(never)]
+fn register_prelude_pairs(elab: &mut ElabEnv, type0: &Term) -> Result<(), ElabError> {
+    // `Pair : Type -> Type -> Type` — the non-dependent Sigma pair,
+    // `k × v` (`52-map.md §4`, `13 §3`): "the Σ-pair... distinct from the
+    // inductive `Prod`". Built exactly like `And`'s `Σ(_:A).B` above — the
+    // kernel Sigma/Pair/Proj1/Proj2 formers are already landed
+    // (`ken-kernel/src/term.rs`); only the concrete `×` INFIX surface
+    // spelling is missing, which `52-map.md §4`'s own hedge tags `(oracle)`
+    // ("any still-open surface-syntax token is tagged `(oracle)`") — the
+    // mechanism (Sigma) is landed, so this is a named-application spelling
+    // of it, not a new kernel feature or a workaround. `mk_pair`/`pair_fst`/
+    // `pair_snd` are the corresponding intro/elim helpers (no surface `.1`/
+    // `.2` projection exists for a bare Sigma — that syntax is reserved for
+    // class-dictionary records only, `elab.rs::infer_proj`).
+    let pair_ty_ty = Term::pi(type0.clone(), Term::pi(type0.clone(), type0.clone()));
+    let pair_ty_body = Term::lam(
+        type0.clone(),
+        Term::lam(
+            type0.clone(),
+            Term::sigma(Term::var(1), weaken(&Term::var(0), 1)),
+        ),
+    );
+    let pair_ty_id = declare_def(&mut elab.env, vec![], pair_ty_ty, pair_ty_body)
+        .map_err(|e| ElabError::Internal(format!("prelude Pair failed: {}", e)))?;
+    elab.globals.insert("Pair".to_string(), pair_ty_id);
+
+    // `mk_pair : (a:Type) -> (b:Type) -> a -> b -> Pair a b`.
+    let pair_app_at_len2 = Term::app(
+        Term::app(Term::const_(pair_ty_id, vec![]), Term::var(1)),
+        Term::var(0),
+    );
+    let pair_app_at_len4 = Term::app(
+        Term::app(Term::const_(pair_ty_id, vec![]), Term::var(3)),
+        Term::var(2),
+    );
+    let mkpair_ty = Term::pi(
+        type0.clone(),
+        Term::pi(
+            type0.clone(),
+            Term::pi(Term::var(1), Term::pi(Term::var(1), pair_app_at_len4)),
+        ),
+    );
+    let mkpair_body = Term::lam(
+        type0.clone(),
+        Term::lam(
+            type0.clone(),
+            Term::lam(
+                Term::var(1),
+                Term::lam(Term::var(1), Term::pair(Term::var(1), Term::var(0))),
+            ),
+        ),
+    );
+    let mkpair_id = declare_def(&mut elab.env, vec![], mkpair_ty, mkpair_body)
+        .map_err(|e| ElabError::Internal(format!("prelude mk_pair failed: {}", e)))?;
+    elab.globals.insert("mk_pair".to_string(), mkpair_id);
+
+    // `pair_fst : (a:Type) -> (b:Type) -> Pair a b -> a`.
+    let fst_ty = Term::pi(
+        type0.clone(),
+        Term::pi(
+            type0.clone(),
+            Term::pi(pair_app_at_len2.clone(), Term::var(2)),
+        ),
+    );
+    let fst_body = Term::lam(
+        type0.clone(),
+        Term::lam(
+            type0.clone(),
+            Term::lam(pair_app_at_len2.clone(), Term::proj1(Term::var(0))),
+        ),
+    );
+    let fst_id = declare_def(&mut elab.env, vec![], fst_ty, fst_body)
+        .map_err(|e| ElabError::Internal(format!("prelude pair_fst failed: {}", e)))?;
+    elab.globals.insert("pair_fst".to_string(), fst_id);
+
+    // `pair_snd : (a:Type) -> (b:Type) -> Pair a b -> b`.
+    let snd_ty = Term::pi(
+        type0.clone(),
+        Term::pi(
+            type0.clone(),
+            Term::pi(pair_app_at_len2.clone(), Term::var(1)),
+        ),
+    );
+    let snd_body = Term::lam(
+        type0.clone(),
+        Term::lam(
+            type0.clone(),
+            Term::lam(pair_app_at_len2, Term::proj2(Term::var(0))),
+        ),
+    );
+    let snd_id = declare_def(&mut elab.env, vec![], snd_ty, snd_body)
+        .map_err(|e| ElabError::Internal(format!("prelude pair_snd failed: {}", e)))?;
+    elab.globals.insert("pair_snd".to_string(), snd_id);
+    Ok(())
+}
+
+fn register_prelude_propositions(elab: &mut ElabEnv, omega0: &Term, type0: &Term) -> Result<(GlobalId, GlobalId), ElabError> {
     // ── Ω constants (ES2: real definitions, demoted out of `trusted_base()`) ─
     // `Equal : Π(A:Type). Π(x:A). Π(y:A). Ω`  (the `≡`).
     // de Bruijn: Pi(Type, Pi(Var 0, Pi(Var 1, Ω₀)))  — A=Var0, x=Var0, y=Var1
@@ -1317,98 +1442,13 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         .map_err(|e| ElabError::Internal(format!("prelude Not failed: {}", e)))?;
     elab.globals.insert("Not".to_string(), not_id);
 
-    // `Pair : Type -> Type -> Type` — the non-dependent Sigma pair,
-    // `k × v` (`52-map.md §4`, `13 §3`): "the Σ-pair... distinct from the
-    // inductive `Prod`". Built exactly like `And`'s `Σ(_:A).B` above — the
-    // kernel Sigma/Pair/Proj1/Proj2 formers are already landed
-    // (`ken-kernel/src/term.rs`); only the concrete `×` INFIX surface
-    // spelling is missing, which `52-map.md §4`'s own hedge tags `(oracle)`
-    // ("any still-open surface-syntax token is tagged `(oracle)`") — the
-    // mechanism (Sigma) is landed, so this is a named-application spelling
-    // of it, not a new kernel feature or a workaround. `mk_pair`/`pair_fst`/
-    // `pair_snd` are the corresponding intro/elim helpers (no surface `.1`/
-    // `.2` projection exists for a bare Sigma — that syntax is reserved for
-    // class-dictionary records only, `elab.rs::infer_proj`).
-    let pair_ty_ty = Term::pi(type0.clone(), Term::pi(type0.clone(), type0.clone()));
-    let pair_ty_body = Term::lam(
-        type0.clone(),
-        Term::lam(
-            type0.clone(),
-            Term::sigma(Term::var(1), weaken(&Term::var(0), 1)),
-        ),
-    );
-    let pair_ty_id = declare_def(&mut elab.env, vec![], pair_ty_ty, pair_ty_body)
-        .map_err(|e| ElabError::Internal(format!("prelude Pair failed: {}", e)))?;
-    elab.globals.insert("Pair".to_string(), pair_ty_id);
+    register_prelude_pairs(elab, type0)?;
 
-    // `mk_pair : (a:Type) -> (b:Type) -> a -> b -> Pair a b`.
-    let pair_app_at_len2 = Term::app(
-        Term::app(Term::const_(pair_ty_id, vec![]), Term::var(1)),
-        Term::var(0),
-    );
-    let pair_app_at_len4 = Term::app(
-        Term::app(Term::const_(pair_ty_id, vec![]), Term::var(3)),
-        Term::var(2),
-    );
-    let mkpair_ty = Term::pi(
-        type0.clone(),
-        Term::pi(
-            type0.clone(),
-            Term::pi(Term::var(1), Term::pi(Term::var(1), pair_app_at_len4)),
-        ),
-    );
-    let mkpair_body = Term::lam(
-        type0.clone(),
-        Term::lam(
-            type0.clone(),
-            Term::lam(
-                Term::var(1),
-                Term::lam(Term::var(1), Term::pair(Term::var(1), Term::var(0))),
-            ),
-        ),
-    );
-    let mkpair_id = declare_def(&mut elab.env, vec![], mkpair_ty, mkpair_body)
-        .map_err(|e| ElabError::Internal(format!("prelude mk_pair failed: {}", e)))?;
-    elab.globals.insert("mk_pair".to_string(), mkpair_id);
+    Ok((equal_id, and_id))
+}
 
-    // `pair_fst : (a:Type) -> (b:Type) -> Pair a b -> a`.
-    let fst_ty = Term::pi(
-        type0.clone(),
-        Term::pi(
-            type0.clone(),
-            Term::pi(pair_app_at_len2.clone(), Term::var(2)),
-        ),
-    );
-    let fst_body = Term::lam(
-        type0.clone(),
-        Term::lam(
-            type0.clone(),
-            Term::lam(pair_app_at_len2.clone(), Term::proj1(Term::var(0))),
-        ),
-    );
-    let fst_id = declare_def(&mut elab.env, vec![], fst_ty, fst_body)
-        .map_err(|e| ElabError::Internal(format!("prelude pair_fst failed: {}", e)))?;
-    elab.globals.insert("pair_fst".to_string(), fst_id);
-
-    // `pair_snd : (a:Type) -> (b:Type) -> Pair a b -> b`.
-    let snd_ty = Term::pi(
-        type0.clone(),
-        Term::pi(
-            type0.clone(),
-            Term::pi(pair_app_at_len2.clone(), Term::var(1)),
-        ),
-    );
-    let snd_body = Term::lam(
-        type0.clone(),
-        Term::lam(
-            type0.clone(),
-            Term::lam(pair_app_at_len2, Term::proj2(Term::var(0))),
-        ),
-    );
-    let snd_id = declare_def(&mut elab.env, vec![], snd_ty, snd_body)
-        .map_err(|e| ElabError::Internal(format!("prelude pair_snd failed: {}", e)))?;
-    elab.globals.insert("pair_snd".to_string(), snd_id);
-
+#[inline(never)]
+fn register_prelude_decisions(elab: &mut ElabEnv, omega0: &Term, type0: &Term, unit_id: GlobalId, list_id: GlobalId, cons_id: GlobalId) -> Result<(crate::decimal_char::DecimalCharEnv, GlobalId, GlobalId, GlobalId), ElabError> {
     // `Decimal`/`Char` DEMOTE→derived (`18a §5.6`/`§5.9`, Phase-2 tranche #2).
     // Must run here: after `Equal`/`And`/`Prop`/`Proved` (needed by `IsTrue`),
     // before the L3a String-ops registration below (needs `Char` in
@@ -1696,7 +1736,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     // primitives). `Map`/`Set` are no longer prelude-global names; a
     // program spells the carrier `Tree k v` (`52 §3`), matching the spec's
     // own naming — there are not two `Map`s (`52 §1.1`).
+    Ok((decimal_char_env, empty_id, issorted_id, perm_id))
+}
 
+#[inline(never)]
+fn register_prelude_text_and_ambient(elab: &mut ElabEnv, list_id: GlobalId, nil_id: GlobalId, cons_id: GlobalId) -> Result<(GlobalId, GlobalId, GlobalId, GlobalId, GlobalId, GlobalId), ElabError> {
     // ── L3a String surface ops (`37 §2`) ───────────────────────────────────
     // `String` (bytes layer) + `Int` (numeric tower) + `Char` (numeric) +
     // `List` (prelude) are all in globals now.
@@ -1884,7 +1928,12 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         .get("print_line")
         .copied()
         .ok_or_else(|| ElabError::Internal("prelude: 'print_line' not registered".into()))?;
+    Ok((byte_length_id, char_length_id, string_to_list_char_id, list_char_to_string_id, io_id, print_line_id))
+}
 
+#[inline(never)]
+#[inline(never)]
+fn register_prelude_resource_seed(elab: &mut ElabEnv, type0: &Term) -> Result<PreludeResourceSeed, ElabError> {
     // ── `[FS]` real file I/O (VAL2 #9 / OQ-B, FS-driver-build D1) ──────────
     //
     // Mirrors `print_line`'s own real-`view` pattern above (`ITree`/`Vis`/
@@ -2043,6 +2092,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         .get("ReleaseFailed")
         .copied()
         .ok_or_else(|| ElabError::Internal("prelude: ReleaseFailed missing".into()))?;
+    Ok(PreludeResourceSeed { auth_t, bytes_t, create_policy_t, bool_t, int_t, cap_id, resource_kind_id, fs_handle_id, resource_id, private_resource_trace_identity_id, resource_host_io_id, closed_id, malformed_resource_id, right_not_held_id, release_failed_id })
+}
+
+#[inline(never)]
+fn register_prelude_buffer_views(elab: &mut ElabEnv) -> Result<PreludeBufferIds, ElabError> {
     // PX8-F checked buffer views. The proof-carrying constructors and the
     // acquisition-bound handle constructor are removed from the public name map
     // after the checked wrappers are installed.
@@ -2195,6 +2249,20 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         "data ResourceBracketResult e a = ResourceBracketOk a | ResourceBracketBodyError e | ResourceBracketReleaseError ResourceError | ResourceBracketBodyAndReleaseError e ResourceError",
     )
     .map_err(|e| ElabError::Internal(format!("prelude ResourceBracketResult failed: {e}")))?;
+    Ok(PreludeBufferIds { private_buffer_span_id, private_transfer_count_id, private_buffer_handle_id, buffer_handle_resource_id, buffer_handle_capacity_id })
+}
+
+#[inline(never)]
+fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResourceSeed) -> Result<PreludeOperationIds, ElabError> {
+    let auth_t = &seed.auth_t;
+    let cap_id = seed.cap_id;
+    let resource_kind_id = seed.resource_kind_id;
+    let fs_handle_id = seed.fs_handle_id;
+    let resource_id = seed.resource_id;
+    let bytes_t = seed.bytes_t.clone();
+    let create_policy_t = seed.create_policy_t.clone();
+    let bool_t = seed.bool_t.clone();
+    let int_t = seed.int_t.clone();
     let resource_fs_handle_t = Term::app(
         Term::const_(resource_id, vec![]),
         Term::constructor(fs_handle_id, vec![]),
@@ -2351,7 +2419,48 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
     let private_mapping_read_view_id = elab.globals["PrivateMappingReadView"];
     let private_mapping_write_view_id = elab.globals["PrivateMappingWriteView"];
     let private_mapping_acquire_file_id = elab.globals["PrivateMappingAcquireFile"];
+    Ok(PreludeOperationIds { private_fs_open_id, private_fs_handle_metadata_id, private_resource_release_id, private_buffer_allocate_id, private_fs_read_at_id, private_fs_write_at_id, private_buffer_freeze_id, private_mapping_allocate_id, private_mapping_read_view_id, private_mapping_write_view_id, private_mapping_acquire_file_id })
+}
 
+fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<PreludeResourceIds, ElabError> {
+    let seed = register_prelude_resource_seed(elab, type0)?;
+
+    let buffer = register_prelude_buffer_views(elab)?;
+
+    let op = register_prelude_fs_operation_carrier(elab, &seed)?;
+
+    Ok(PreludeResourceIds {
+        auth_t: seed.auth_t,
+        cap_id: seed.cap_id,
+        private_fs_open_id: op.private_fs_open_id,
+        private_fs_handle_metadata_id: op.private_fs_handle_metadata_id,
+        private_buffer_allocate_id: op.private_buffer_allocate_id,
+        private_fs_read_at_id: op.private_fs_read_at_id,
+        private_fs_write_at_id: op.private_fs_write_at_id,
+        private_buffer_freeze_id: op.private_buffer_freeze_id,
+        private_mapping_allocate_id: op.private_mapping_allocate_id,
+        private_mapping_read_view_id: op.private_mapping_read_view_id,
+        private_mapping_write_view_id: op.private_mapping_write_view_id,
+        private_mapping_acquire_file_id: op.private_mapping_acquire_file_id,
+        private_buffer_handle_id: buffer.private_buffer_handle_id,
+        buffer_handle_resource_id: buffer.buffer_handle_resource_id,
+        buffer_handle_capacity_id: buffer.buffer_handle_capacity_id,
+        private_buffer_span_id: buffer.private_buffer_span_id,
+        private_transfer_count_id: buffer.private_transfer_count_id,
+        private_resource_release_id: op.private_resource_release_id,
+        private_resource_trace_identity_id: seed.private_resource_trace_identity_id,
+        fs_handle_id: seed.fs_handle_id,
+        resource_host_io_id: seed.resource_host_io_id,
+        closed_id: seed.closed_id,
+        malformed_resource_id: seed.malformed_resource_id,
+        right_not_held_id: seed.right_not_held_id,
+        release_failed_id: seed.release_failed_id,
+    })
+}
+
+#[inline(never)]
+#[inline(never)]
+fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
     // `fs_resp : (a : Auth) -> FSOp a -> Type` is a genuine non-constant
     // large elimination. Every arm returns a total `Result FileError _`, with
     // the success payload selected by the operation constructor.
@@ -2525,7 +2634,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
          inject_l (FSOp a) AmbientOp (fs_resp a) ambient_resp r action",
     )
     .map_err(|e| ElabError::Internal(format!("prelude host_fs failed: {e}")))?;
+    Ok(())
+}
 
+#[inline(never)]
+fn register_prelude_brackets(elab: &mut ElabEnv) -> Result<(), ElabError> {
     // Private resource protocol nodes. Only the checked brackets below name
     // acquisition producers; all private constructor spellings and raw
     // acquisition helpers are removed from the public global-name map afterward.
@@ -2758,7 +2871,11 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
            (\\acquired. private_with_buffer_after_allocate a e r capacity body acquired)",
     )
     .map_err(|e| ElabError::Internal(format!("prelude withBuffer failed: {e}")))?;
+    Ok(())
+}
 
+#[inline(never)]
+fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId) -> Result<(), ElabError> {
     // ABI-S6 ResourceKind.Mapping uses the same checked bracket and opaque-resource lifetime
     // as ResourceKind.Buffer while keeping its mapping token private. Each access passes its
     // immutable window directly to the frozen read/write operation.
@@ -2957,38 +3074,138 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
          write_file AFull cap path policy contents",
     )
     .map_err(|e| ElabError::Internal(format!("prelude writeFile failed: {e}")))?;
+    Ok(())
+}
 
-    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Capture the canonical role
-    // roster HERE — every prelude declaration is registered and no package
-    // source has been elaborated, so each spelling still denotes the prelude's
-    // own declaration. After this point the roster is closed: the ids it holds
-    // survive any later shadowing declaration, which is the whole point.
-    let runtime_roles = Box::new(CanonicalRuntimeRoles::capture(&elab.globals)?);
+fn register_prelude_resource_protocol(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId) -> Result<(), ElabError> {
+    register_prelude_fs_operations(elab)?;
 
-    // `D1b-role-c1`. ⛔ The trusted-base roster is deliberately NOT captured
-    // here, even though this is where the sibling role roster is captured.
-    //
-    // MEASURED: capturing at this line yields 98 targets while a clean package
-    // emits 107 trust tuples -- `register_safe_bytes_ops` and `init_class_env`
-    // run in `ElabEnv::empty()` AFTER this function returns, and they declare
-    // `bytes_at`, `bytes_decode`, `bytes_list_roundtrip`, `RecordNil` and the
-    // rest. Those are compiler-owned prelude stages, not package source, so
-    // their postulates belong to the pre-source base; a roster captured here
-    // would refuse every real package for entries the user never wrote.
-    //
-    // The capture therefore sits at the END of `ElabEnv::empty()` in `lib.rs`,
-    // after every compiler-owned initializer has run and immediately before the
-    // constructor returns an environment any package source could elaborate
-    // into. That constructor phase transition is the authority boundary.
-    //
-    // ⛔ It is NOT `install_prelude_floor()`, even though the assignment sits
-    // adjacent to that call. That method installs only the unshadowable source-
-    // NAME floor; naming it as the boundary would attribute the guarantee to a
-    // mechanism that does not provide it. See the comment at the capture site.
-    Ok(PreludeEnv {
-        runtime_roles,
-        native_trusted_base: std::collections::BTreeSet::new(),
-        pre_source_names: std::collections::BTreeMap::new(),
+    register_prelude_brackets(elab)?;
+
+    register_prelude_program(elab, auth_t, cap_id)?;
+
+    Ok(())
+}
+
+struct PreludeCoreIds {
+    nat_id: GlobalId,
+    zero_id: GlobalId,
+    suc_id: GlobalId,
+    list_id: GlobalId,
+    nil_id: GlobalId,
+    cons_id: GlobalId,
+    option_id: GlobalId,
+    none_id: GlobalId,
+    some_id: GlobalId,
+    result_id: GlobalId,
+    err_id: GlobalId,
+    ok_id: GlobalId,
+    prod_id: GlobalId,
+    mkprod_id: GlobalId,
+    equal_id: GlobalId,
+    empty_id: GlobalId,
+    and_id: GlobalId,
+    issorted_id: GlobalId,
+    perm_id: GlobalId,
+    byte_length_id: GlobalId,
+    char_length_id: GlobalId,
+    string_to_list_char_id: GlobalId,
+    list_char_to_string_id: GlobalId,
+    unit_id: GlobalId,
+    mkunit_id: GlobalId,
+    stream_id: GlobalId,
+    stdin_id: GlobalId,
+    stdout_id: GlobalId,
+    stderr_id: GlobalId,
+    console_op_id: GlobalId,
+    read_id: GlobalId,
+    write_id: GlobalId,
+    flush_id: GlobalId,
+    is_terminal_id: GlobalId,
+    instant_id: GlobalId,
+    mkinstant_id: GlobalId,
+    clock_op_id: GlobalId,
+    wall_now_id: GlobalId,
+    read_result_id: GlobalId,
+    chunk_id: GlobalId,
+    eof_id: GlobalId,
+    itree_id: GlobalId,
+    ret_id: GlobalId,
+    vis_id: GlobalId,
+    io_id: GlobalId,
+    print_line_id: GlobalId,
+    mkdecimalpair_id: GlobalId,
+    state_op_id: GlobalId,
+    get_id: GlobalId,
+    put_id: GlobalId,
+    coproduct_id: GlobalId,
+    inl_id: GlobalId,
+    inr_id: GlobalId,
+    resp_state_id: GlobalId,
+    resp_coproduct_id: GlobalId,
+    bind_id: GlobalId,
+    run_state_id: GlobalId,
+    get_fn_id: GlobalId,
+    put_fn_id: GlobalId,
+    inject_l_id: GlobalId,
+    inject_r_id: GlobalId,
+}
+
+#[inline(never)]
+fn register_prelude_core(elab: &mut ElabEnv) -> Result<PreludeCoreIds, ElabError> {
+    let omega0 = Term::omega(Level::Zero);
+    let type0 = Term::ty(Level::Zero);
+
+    register_prelude_inductives(elab)?;
+
+    let lookup = |name: &str| prelude_registered_id(elab, name);
+
+    let nat_id = lookup("Nat")?;
+    let zero_id = lookup("Zero")?;
+    let suc_id = lookup("Suc")?;
+    let list_id = lookup("List")?;
+    let nil_id = lookup("Nil")?;
+    let cons_id = lookup("Cons")?;
+    let option_id = lookup("Option")?;
+    let none_id = lookup("None")?;
+    let some_id = lookup("Some")?;
+    let result_id = lookup("Result")?;
+    let err_id = lookup("Err")?;
+    let ok_id = lookup("Ok")?;
+    let prod_id = lookup("Prod")?;
+    let mkprod_id = lookup("MkProd")?;
+    // VAL1-surface inductives (declared before lookup closure above).
+    let unit_id = lookup("Unit")?;
+    let mkunit_id = lookup("MkUnit")?;
+    let stream_id = lookup("Stream")?;
+    let stdin_id = lookup("Stdin")?;
+    let stdout_id = lookup("Stdout")?;
+    let stderr_id = lookup("Stderr")?;
+    let console_op_id = lookup("ConsoleOp")?;
+    let read_id = lookup("Read")?;
+    let write_id = lookup("Write")?;
+    let flush_id = lookup("Flush")?;
+    let is_terminal_id = lookup("IsTerminal")?;
+    let instant_id = lookup("Instant")?;
+    let mkinstant_id = lookup("MkInstant")?;
+    let clock_op_id = lookup("ClockOp")?;
+    let wall_now_id = lookup("WallNow")?;
+    let read_result_id = lookup("ReadResult")?;
+    let chunk_id = lookup("Chunk")?;
+    let eof_id = lookup("Eof")?;
+    let itree_id = lookup("ITree")?;
+    let ret_id = lookup("Ret")?;
+    let vis_id = lookup("Vis")?;
+    // `lookup` is last used above; NLL ends its borrow here.
+
+    let (state_op_id, get_id, put_id, coproduct_id, inl_id, inr_id, resp_state_id, resp_coproduct_id, bind_id, run_state_id, get_fn_id, put_fn_id, inject_l_id, inject_r_id) = register_prelude_state(elab, unit_id, mkunit_id, itree_id, ret_id, vis_id)?;
+
+    let (equal_id, and_id) = register_prelude_propositions(elab, &omega0, &type0)?;
+
+    let (decimal_char_env, empty_id, issorted_id, perm_id) = register_prelude_decisions(elab, &omega0, &type0, unit_id, list_id, cons_id)?;
+
+    let (byte_length_id, char_length_id, string_to_list_char_id, list_char_to_string_id, io_id, print_line_id) = register_prelude_text_and_ambient(elab, list_id, nil_id, cons_id)?;
+    Ok(PreludeCoreIds {
         nat_id,
         zero_id,
         suc_id,
@@ -3050,30 +3267,144 @@ pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
         put_fn_id,
         inject_l_id,
         inject_r_id,
-        private_fs_open_id,
-        private_fs_handle_metadata_id,
-        private_buffer_allocate_id,
-        private_fs_read_at_id,
-        private_fs_write_at_id,
-        private_buffer_freeze_id,
-        private_mapping_allocate_id,
-        private_mapping_read_view_id,
-        private_mapping_write_view_id,
-        private_mapping_acquire_file_id,
-        private_buffer_handle_id,
-        buffer_handle_resource_id,
-        buffer_handle_capacity_id,
-        private_buffer_span_id,
-        private_transfer_count_id,
-        private_resource_release_id,
-        private_resource_trace_identity_id,
-        fs_handle_id,
-        resource_host_io_id,
-        closed_id,
-        malformed_resource_id,
-        right_not_held_id,
-        release_failed_id,
     })
+}
+
+#[inline(never)]
+fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: PreludeCoreIds, fs_ids: PreludeResourceIds) -> PreludeEnv {
+    PreludeEnv {
+        runtime_roles,
+        native_trusted_base: std::collections::BTreeSet::new(),
+        pre_source_names: std::collections::BTreeMap::new(),
+        nat_id: core.nat_id,
+        zero_id: core.zero_id,
+        suc_id: core.suc_id,
+        list_id: core.list_id,
+        nil_id: core.nil_id,
+        cons_id: core.cons_id,
+        option_id: core.option_id,
+        none_id: core.none_id,
+        some_id: core.some_id,
+        result_id: core.result_id,
+        err_id: core.err_id,
+        ok_id: core.ok_id,
+        prod_id: core.prod_id,
+        mkprod_id: core.mkprod_id,
+        equal_id: core.equal_id,
+        empty_id: core.empty_id,
+        and_id: core.and_id,
+        issorted_id: core.issorted_id,
+        perm_id: core.perm_id,
+        byte_length_id: core.byte_length_id,
+        char_length_id: core.char_length_id,
+        string_to_list_char_id: core.string_to_list_char_id,
+        list_char_to_string_id: core.list_char_to_string_id,
+        unit_id: core.unit_id,
+        mkunit_id: core.mkunit_id,
+        stream_id: core.stream_id,
+        stdin_id: core.stdin_id,
+        stdout_id: core.stdout_id,
+        stderr_id: core.stderr_id,
+        console_op_id: core.console_op_id,
+        read_id: core.read_id,
+        write_id: core.write_id,
+        flush_id: core.flush_id,
+        is_terminal_id: core.is_terminal_id,
+        instant_id: core.instant_id,
+        mkinstant_id: core.mkinstant_id,
+        clock_op_id: core.clock_op_id,
+        wall_now_id: core.wall_now_id,
+        read_result_id: core.read_result_id,
+        chunk_id: core.chunk_id,
+        eof_id: core.eof_id,
+        itree_id: core.itree_id,
+        ret_id: core.ret_id,
+        vis_id: core.vis_id,
+        io_id: core.io_id,
+        print_line_id: core.print_line_id,
+        mkdecimalpair_id: core.mkdecimalpair_id,
+        state_op_id: core.state_op_id,
+        get_id: core.get_id,
+        put_id: core.put_id,
+        coproduct_id: core.coproduct_id,
+        inl_id: core.inl_id,
+        inr_id: core.inr_id,
+        resp_state_id: core.resp_state_id,
+        resp_coproduct_id: core.resp_coproduct_id,
+        bind_id: core.bind_id,
+        run_state_id: core.run_state_id,
+        get_fn_id: core.get_fn_id,
+        put_fn_id: core.put_fn_id,
+        inject_l_id: core.inject_l_id,
+        inject_r_id: core.inject_r_id,
+        private_fs_open_id: fs_ids.private_fs_open_id,
+        private_fs_handle_metadata_id: fs_ids.private_fs_handle_metadata_id,
+        private_buffer_allocate_id: fs_ids.private_buffer_allocate_id,
+        private_fs_read_at_id: fs_ids.private_fs_read_at_id,
+        private_fs_write_at_id: fs_ids.private_fs_write_at_id,
+        private_buffer_freeze_id: fs_ids.private_buffer_freeze_id,
+        private_mapping_allocate_id: fs_ids.private_mapping_allocate_id,
+        private_mapping_read_view_id: fs_ids.private_mapping_read_view_id,
+        private_mapping_write_view_id: fs_ids.private_mapping_write_view_id,
+        private_mapping_acquire_file_id: fs_ids.private_mapping_acquire_file_id,
+        private_buffer_handle_id: fs_ids.private_buffer_handle_id,
+        buffer_handle_resource_id: fs_ids.buffer_handle_resource_id,
+        buffer_handle_capacity_id: fs_ids.buffer_handle_capacity_id,
+        private_buffer_span_id: fs_ids.private_buffer_span_id,
+        private_transfer_count_id: fs_ids.private_transfer_count_id,
+        private_resource_release_id: fs_ids.private_resource_release_id,
+        private_resource_trace_identity_id: fs_ids.private_resource_trace_identity_id,
+        fs_handle_id: fs_ids.fs_handle_id,
+        resource_host_io_id: fs_ids.resource_host_io_id,
+        closed_id: fs_ids.closed_id,
+        malformed_resource_id: fs_ids.malformed_resource_id,
+        right_not_held_id: fs_ids.right_not_held_id,
+        release_failed_id: fs_ids.release_failed_id,
+    }
+}
+
+/// Register the L3 prelude in `elab` (called from `ElabEnv::empty`).
+///
+/// Every stage is outlined before it elaborates a declaration. The role roster
+/// is captured only after all stages finish; the trusted-base roster is still
+/// captured later by `ElabEnv::empty`. Inspect this entry's and the stage
+/// frames in the debug binary before growing their locals: the depth path
+/// also pays the recursive elaborator frames.
+pub fn register_prelude(elab: &mut ElabEnv) -> Result<PreludeEnv, ElabError> {
+    let core = register_prelude_core(elab)?;
+    let type0 = Term::ty(Level::Zero);
+    let fs_ids = register_prelude_resource_shapes(elab, &type0)?;
+
+    register_prelude_resource_protocol(elab, &fs_ids.auth_t, fs_ids.cap_id)?;
+
+    // `RT-DYNAMIC-ARM-SCALAR-MERGE` `D1b-role-a`. Capture the canonical role
+    // roster HERE — every prelude declaration is registered and no package
+    // source has been elaborated, so each spelling still denotes the prelude's
+    // own declaration. After this point the roster is closed: the ids it holds
+    // survive any later shadowing declaration, which is the whole point.
+    let runtime_roles = Box::new(CanonicalRuntimeRoles::capture(&elab.globals)?);
+
+    // `D1b-role-c1`. ⛔ The trusted-base roster is deliberately NOT captured
+    // here, even though this is where the sibling role roster is captured.
+    //
+    // MEASURED: capturing at this line yields 98 targets while a clean package
+    // emits 107 trust tuples -- `register_safe_bytes_ops` and `init_class_env`
+    // run in `ElabEnv::empty()` AFTER this function returns, and they declare
+    // `bytes_at`, `bytes_decode`, `bytes_list_roundtrip`, `RecordNil` and the
+    // rest. Those are compiler-owned prelude stages, not package source, so
+    // their postulates belong to the pre-source base; a roster captured here
+    // would refuse every real package for entries the user never wrote.
+    //
+    // The capture therefore sits at the END of `ElabEnv::empty()` in `lib.rs`,
+    // after every compiler-owned initializer has run and immediately before the
+    // constructor returns an environment any package source could elaborate
+    // into. That constructor phase transition is the authority boundary.
+    //
+    // ⛔ It is NOT `install_prelude_floor()`, even though the assignment sits
+    // adjacent to that call. That method installs only the unshadowable source-
+    // NAME floor; naming it as the boundary would attribute the guarantee to a
+    // mechanism that does not provide it. See the comment at the capture site.
+    Ok(assemble_prelude_env(runtime_roles, core, fs_ids))
 }
 
 /// Preserve the pre-hide order of the positioned I/O and writeAll definitions
