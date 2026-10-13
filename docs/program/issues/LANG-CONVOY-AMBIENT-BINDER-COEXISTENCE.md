@@ -130,14 +130,16 @@ plane.**
   A1, `lookup_and`, a true theorem, and A1F, its false twin with `hp x` in
   the `qq` slot. Both were kernel refusals on `f1ae73cc5` and are
   `Internal("coherent-frame convoy found an ill-typed ambient method")`
-  on `033c19fa7`. Neither is an `Internal`. A1 checking moves to RSC, and
-  A1F is refused with a typed error.
+  on `033c19fa7`. A1 checks, and A1F is refused with a typed error
+  (Architect `evt_6y37qbrjket3t`, which corrects `evt_40eh6614dch8`).
   - **The source of the `Internal`:** `plan_embedded_method_convoy`
     (elab.rs ~:3062) kernel-checks the original method in an
     `ambient_ctx` whose binder positions disagree with it.
   - **The fix:** make that check well-scoped. Relabelling the `Internal`
-    as a typed error is not a fix. If a well-scoped check needs a design
-    call, stop to the Architect.
+    as a typed error is not a fix. The ruled design is a scope-carrying
+    `collect_outer_embedded_elims`. An eliminator under binders that is
+    independent of them is lowered to the planner's depth. Otherwise it
+    is left in place.
 - **AC-4 (mutation, QA).** Restoring `!cx.match_frames.is_empty()` in
   place of `enclosing_refines` returns E9 to its failure.
 - **AC-4b (mutation, QA).** Removing `&& probe_context_convoy.is_empty()`

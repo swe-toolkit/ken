@@ -70,8 +70,7 @@ with the IH at that coordinate.
   in thread `thr_5007397vycb5t`):
   - H1, whose `DualFS` leaf uses the convoyed `h`;
   - K2, `pp (dual_lookup a n xs i)` with the recursive call
-    `hp (dual_lookup a m rest j)`;
-  - A1, `lookup_and`.
+    `hp (dual_lookup a m rest j)`.
 
   CONVOY's typed refusals of the false twins stay refusals.
 - **AC-2.** The step-reachable control succeeds or returns a typed
