@@ -341,13 +341,12 @@ fn scoped_premise_inference_pairs_redirected_term_with_its_binder_type() {
 }
 
 #[test]
-fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
-    // Promise class: transition sentinel, retired when a sound composition
-    // of index-equation and ambient convoys admits genuine siblings. MEASURED:
-    // scrutinee identity skips itself, while an independent dependent sibling
-    // reaches the exact overlap refusal. CLAIMED: the self-skip does not
-    // suppress a real ambient binder. THE GAP: this constructed seam checks
-    // the guard; the f4 source separately reaches its redirected scrutinee.
+fn nested_frame_with_abstractable_index_convoys_a_genuine_ambient_sibling() {
+    // Promise class: durable invariant. MEASURED: the scrutinee y skips
+    // itself, a dependent sibling x is convoyed, and with an abstractable
+    // index the plan takes the coupled route carrying x. CLAIMED: the
+    // selector is never asked to carry an ambient sibling. THE GAP: this
+    // constructed seam checks the plan; E9 and E11 check the shape end to end.
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_file(
         "data ConvoyVec (a : Type) : Nat → Type where { \
@@ -380,7 +379,7 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
     cx.push_match_binder(vec_ty(Term::var(0)), MatchBinderOrigin::UserLocal); // y
     let without_sibling = MatchFrame::new(cx.ctx.len(), 1, None, Some(cx.ctx.len() - 1));
     assert!(
-        compute_context_convoy(&cx, &without_sibling, &[Term::var(1)])
+        compute_context_convoy(&cx, &without_sibling, &Term::var(0), &[Term::var(1)])
             .expect("scrutinee classification")
             .is_empty(),
         "a dependent scrutinee is not its own ambient sibling"
@@ -392,7 +391,7 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
     let scrutinee = Term::var(0);
     let goal = eq(nat_ty.clone(), index.clone(), index.clone());
     let frame = MatchFrame::new(cx.ctx.len(), 1, Some(goal.clone()), Some(cx.ctx.len() - 1));
-    let convoy = compute_context_convoy(&cx, &frame, std::slice::from_ref(&index))
+    let convoy = compute_context_convoy(&cx, &frame, &scrutinee, std::slice::from_ref(&index))
         .expect("sibling provenance");
     assert_eq!(
         convoy.len(),
@@ -400,7 +399,7 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
         "real dependent sibling is not self-skipped"
     );
     assert_eq!(convoy[0].var, 1, "x, not the scrutinee y");
-    let error = plan_coherent_frame_motive(
+    let plan = plan_coherent_frame_motive(
         &cx,
         &family,
         &[nat_ty],
@@ -414,10 +413,10 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
         &Span { start: 0, end: 0 },
         &frame,
     )
-    .err()
-    .expect("real sibling must be refused");
-    assert!(matches!(error, ElabError::Internal(ref reason)
-        if reason == "index-equation convoy unexpectedly overlaps an ambient context convoy"));
+    .expect("an abstractable index carries a real sibling on the coupled route");
+    assert!(!plan.equation_convoy, "coupled route, not the selector");
+    assert_eq!(plan.context_convoy.len(), 1);
+    assert_eq!(plan.context_convoy[0].var, 1, "x is convoyed");
 }
 
 #[test]

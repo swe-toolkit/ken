@@ -2792,10 +2792,16 @@ fn dependent_rebase_subs(
 /// than be re-typed in place.
 #[derive(Clone)]
 struct ConvoyEntry {
-    /// de Bruijn index of the ambient binding at the ambient depth (0 = innermost).
+    /// De Bruijn index of the ambient binding at the ambient depth. This is
+    /// the provenance key even when its active occurrence is a refined alias.
     var: usize,
-    /// The binding's declared type, weakened to the ambient depth (valid there).
+    /// The arm-visible occurrence (the refined sentinel, if installed).
+    occurrence: Term,
+    /// The arm-visible type, weakened to the ambient depth. For a C2 entry,
+    /// this is expanded to expose the same embedded eliminator as the goal.
     ambient_ty: Term,
+    /// Local eliminator ordinal to the goal's planned ordinal. Empty for C1.
+    embedded_elims: Vec<(usize, usize)>,
 }
 
 /// One method of an already-elaborated indexed eliminator that is valid in the
@@ -2832,6 +2838,15 @@ struct EmbeddedIndexEquationConvoy {
 enum EmbeddedConvoyCompanion {
     Method(EmbeddedMethodConvoy),
     IndexEquation(EmbeddedIndexEquationConvoy),
+}
+
+impl EmbeddedConvoyCompanion {
+    fn elim_ordinal(&self) -> usize {
+        match self {
+            Self::Method(method) => method.elim_ordinal,
+            Self::IndexEquation(equation) => equation.elim_ordinal,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -2872,12 +2887,36 @@ struct CoherentFrameMotivePlan {
 /// and is not a sibling companion of the enclosing goal occurrence.
 #[inline(never)]
 fn collect_outer_embedded_elims(term: &Term, out: &mut Vec<EmbeddedElimSnapshot>) {
+    collect_outer_embedded_elims_at(term, 0, out);
+}
+
+/// `local` counts the binders between the planner's context and `term`. An
+/// occurrence under binders is a companion of the planner's frame only when it
+/// is independent of those binders; it is then lowered to the planner's depth,
+/// so every snapshot is stated in one context. An occurrence that mentions a
+/// local binder has no value at the planner's depth and stays in place.
+fn collect_outer_embedded_elims_at(
+    term: &Term,
+    local: usize,
+    out: &mut Vec<EmbeddedElimSnapshot>,
+) {
     let (head, arguments) = match term {
         Term::App(_, _) => peel_app(term),
         Term::Elim { .. } => (term.clone(), Vec::new()),
+        Term::Pi(domain, body) | Term::Lam(domain, body) | Term::Sigma(domain, body) => {
+            collect_outer_embedded_elims_at(domain, local, out);
+            collect_outer_embedded_elims_at(body, local + 1, out);
+            return;
+        }
+        Term::Let { ty, val, body } => {
+            collect_outer_embedded_elims_at(ty, local, out);
+            collect_outer_embedded_elims_at(val, local, out);
+            collect_outer_embedded_elims_at(body, local + 1, out);
+            return;
+        }
         _ => {
             for child in term.children() {
-                collect_outer_embedded_elims(child, out);
+                collect_outer_embedded_elims_at(child, local, out);
             }
             return;
         }
@@ -2892,20 +2931,24 @@ fn collect_outer_embedded_elims(term: &Term, out: &mut Vec<EmbeddedElimSnapshot>
         scrut,
     } = head
     {
+        if (0..local).any(|binder| scrut_occurs(term, &Term::var(binder))) {
+            return;
+        }
+        let lower = |term: &Term| shift(term, -(local as i64), 0);
         out.push(EmbeddedElimSnapshot {
             fam,
             level_args,
-            params,
-            motive: *motive,
-            methods,
-            indices,
-            scrut: *scrut,
-            arguments,
+            params: params.iter().map(lower).collect(),
+            motive: lower(&motive),
+            methods: methods.iter().map(lower).collect(),
+            indices: indices.iter().map(lower).collect(),
+            scrut: lower(&scrut),
+            arguments: arguments.iter().map(lower).collect(),
         });
         return;
     }
     for child in term.children() {
-        collect_outer_embedded_elims(child, out);
+        collect_outer_embedded_elims_at(child, local, out);
     }
 }
 
@@ -3294,6 +3337,7 @@ fn install_embedded_method_sentinels(
     plan: &[EmbeddedConvoyCompanion],
     repairs: &[(usize, usize)],
     slot_base: usize,
+    plan_slots: Option<&[usize]>,
 ) -> Result<Term, ElabError> {
     fn go(
         cx: &ElabCtx<'_>,
@@ -3302,6 +3346,7 @@ fn install_embedded_method_sentinels(
         plan: &[EmbeddedConvoyCompanion],
         repairs: &[(usize, usize)],
         slot_base: usize,
+        plan_slots: Option<&[usize]>,
         next_elim: &mut usize,
         seen: &mut [bool],
         repair_error: &std::cell::RefCell<Option<ElabError>>,
@@ -3315,6 +3360,7 @@ fn install_embedded_method_sentinels(
                 plan,
                 repairs,
                 slot_base,
+                plan_slots,
                 next_elim,
                 seen,
                 repair_error,
@@ -3357,7 +3403,7 @@ fn install_embedded_method_sentinels(
                                 })
                         {
                             seen[plan_index] = true;
-                            index_refinement_sentinel(entry.sentinel_region, slot_base + plan_index)
+                            index_refinement_sentinel(entry.sentinel_region, slot_base + plan_slots.map_or(plan_index, |slots| slots[plan_index]))
                         } else if repairs.contains(&(ordinal, method_ordinal)) {
                             let repaired_ty = env.inductive(*fam).and_then(|ind| {
                                 method_type(env, ind, method_ordinal, &motive, &params, level_args)
@@ -3475,6 +3521,7 @@ fn install_embedded_method_sentinels(
         plan,
         repairs,
         slot_base,
+        plan_slots,
         &mut next_elim,
         &mut seen,
         &repair_error,
@@ -3647,17 +3694,19 @@ fn install_embedded_index_equation_companions(
     plan: &[EmbeddedConvoyCompanion],
     slot_base: usize,
     frame_depth: usize,
+    plan_slots: Option<&[usize]>,
 ) -> Result<Term, ElabError> {
     fn go(
         term: &Term,
         plan: &[EmbeddedConvoyCompanion],
         slot_base: usize,
         frame_depth: usize,
+        plan_slots: Option<&[usize]>,
         next_elim: &mut usize,
         seen: &mut [bool],
     ) -> Term {
         let recur = |term: &Term, next_elim: &mut usize, seen: &mut [bool]| {
-            go(term, plan, slot_base, frame_depth, next_elim, seen)
+            go(term, plan, slot_base, frame_depth, plan_slots, next_elim, seen)
         };
         match term {
             Term::App(_, _) => {
@@ -3722,7 +3771,7 @@ fn install_embedded_index_equation_companions(
                         seen[i] = true;
                         moved = Term::app(
                             moved,
-                            index_refinement_sentinel(entry.sentinel_region, slot_base + i),
+                            index_refinement_sentinel(entry.sentinel_region, slot_base + plan_slots.map_or(i, |slots| slots[i])),
                         );
                     }
                     moved
@@ -3814,6 +3863,7 @@ fn install_embedded_index_equation_companions(
         plan,
         slot_base,
         frame_depth,
+        plan_slots,
         &mut next_elim,
         &mut seen,
     );
@@ -4115,6 +4165,7 @@ fn build_index_equation_convoy_body(
                         &Term::var(1),
                         depth,
                         0,
+                        0,
                         sentinel_region,
                     );
                     let types_inner_first: Vec<Term> = types_inner_first
@@ -4307,7 +4358,7 @@ fn recursive_field_index_path(
         || scrut_indices.len() != 1
         || !matches!(scrut_core, Term::Var(_))
         || !matches!(scrut_indices[0], Term::Var(_))
-        || !compute_context_convoy(cx, frame, scrut_indices)?.is_empty()
+        || !compute_context_convoy(cx, frame, scrut_core, scrut_indices)?.is_empty()
     {
         return Ok(RecursiveFieldIndexPath::CoupledRefinement);
     }
@@ -4391,7 +4442,7 @@ fn ordinary_coherent_frame_plan(
     recursive_field_index_path: RecursiveFieldIndexPath,
     frame: &MatchFrame,
 ) -> Result<Box<CoherentFrameMotivePlan>, ElabError> {
-    let context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
+    let context_convoy = compute_context_convoy(cx, frame, scrut_core, scrut_indices)?;
     let motive_rebase = dependent_rebase_subs(
         scrut_core,
         scrut_indices,
@@ -4402,7 +4453,7 @@ fn ordinary_coherent_frame_plan(
         recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
             || context_convoy
                 .iter()
-                .any(|entry| scrut_occurs(original_expected, &Term::var(entry.var))),
+                .any(|entry| scrut_occurs(original_expected, &entry.occurrence)),
     );
     Ok(Box::new(CoherentFrameMotivePlan {
         expected: original_expected.clone(),
@@ -4476,7 +4527,7 @@ fn plan_coherent_frame_motive(
         || matches!(expanded_expected.as_ref(), Term::Eq(_, _, _))
         || (scrut_occurs(&zonked_expected, scrut_core)
             && goal_is_proposition(cx, &zonked_ctx, original_expected)?);
-    let probe_context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
+    let probe_context_convoy = compute_context_convoy(cx, frame, scrut_core, scrut_indices)?;
 
     // A nested covering is already inside a constructor-refined outer frame.
     // Its motive convoys the generated index equation and transports the inner
@@ -4488,14 +4539,40 @@ fn plan_coherent_frame_motive(
         && scrut_indices
             .iter()
             .any(|index| !matches!(index, Term::Var(_)));
-    let equation_convoy = (!cx.match_frames.is_empty() && has_nontrivial_coupled_sides)
-        || forced_telescope_convoy;
-    if equation_convoy {
-        if !probe_context_convoy.is_empty() && !forced_telescope_convoy {
-            return Err(ElabError::Internal(
-                "index-equation convoy unexpectedly overlaps an ambient context convoy".into(),
-            ));
+    // The route is decided by what each route consumes. The coupled route
+    // abstracts the indices, so each must be a distinct ambient variable that
+    // no enclosing frame refines.
+    let index_abstractable = frame.scrutinee_level.is_some()
+        && !mentions_enclosing_refinement(cx, scrut_core)
+        && scrut_indices.iter().enumerate().all(|(position, index)| {
+            matches!(index, Term::Var(_))
+                && !mentions_enclosing_refinement(cx, index)
+                && !scrut_indices[..position].contains(index)
+        });
+    // The selector keeps the outer coordinate, so index-only dependents need
+    // no convoy there; it cannot carry a dependent of the scrutinee.
+    let mut scrutinee_dependencies = vec![scrut_core.clone()];
+    let mut carries_scrutinee = false;
+    for entry in probe_context_convoy.iter().rev() {
+        if scrutinee_dependencies
+            .iter()
+            .any(|dependency| scrut_occurs(&entry.ambient_ty, dependency))
+        {
+            carries_scrutinee = true;
+            scrutinee_dependencies.push(entry.occurrence.clone());
         }
+    }
+    let equation_convoy = (!cx.match_frames.is_empty()
+        && !index_abstractable
+        && has_nontrivial_coupled_sides
+        && !carries_scrutinee)
+        || forced_telescope_convoy;
+    let selector_convoy = if equation_convoy && !forced_telescope_convoy {
+        Vec::new()
+    } else {
+        probe_context_convoy.clone()
+    };
+    if equation_convoy {
         if let Some(motive_user_body) = build_index_equation_convoy_body(
             cx,
             &zonked_ctx,
@@ -4506,13 +4583,13 @@ fn plan_coherent_frame_motive(
             scrut_indices,
             original_expected,
             motive_base_depth,
-            &probe_context_convoy,
+            &selector_convoy,
             sentinel_region,
             span,
         )? {
             return Ok(Box::new(CoherentFrameMotivePlan {
                 expected: original_expected.clone(),
-                context_convoy: probe_context_convoy.clone(),
+                context_convoy: selector_convoy.clone(),
                 embedded_method_convoy: Vec::new(),
                 embedded_method_repairs: Vec::new(),
                 motive_user_body,
@@ -4534,7 +4611,7 @@ fn plan_coherent_frame_motive(
         embedded_expected,
         probe_context_convoy
             .iter()
-            .any(|entry| scrut_occurs(embedded_expected, &Term::var(entry.var))),
+            .any(|entry| scrut_occurs(embedded_expected, &entry.occurrence)),
     );
     let embedded_probe_body = subst_term_generalize_many(
         &weaken(embedded_expected, motive_base_depth as i64),
@@ -4557,11 +4634,37 @@ fn plan_coherent_frame_motive(
     } else {
         embedded_expected.clone()
     };
-    let context_convoy = if embedded_method_convoy.is_empty() && embedded_method_repairs.is_empty()
-    {
-        compute_context_convoy(cx, frame, scrut_indices)?
-    } else {
-        probe_context_convoy
+    let mut context_convoy = probe_context_convoy;
+    if !embedded_method_convoy.is_empty() || !embedded_method_repairs.is_empty() {
+        let mut goal_elims = Vec::new();
+        collect_outer_embedded_elims(embedded_expected, &mut goal_elims);
+        for entry in &mut context_convoy {
+            let expanded_ty = boxed_simplify_branch_goal(
+                cx.env, cx.refinement_facts, &zonked_ctx, &entry.ambient_ty,
+            );
+            let mut type_elims = Vec::new();
+            collect_outer_embedded_elims(&expanded_ty, &mut type_elims);
+            for (local, candidate) in type_elims.iter().enumerate() {
+                if let Some(global) = goal_elims.iter().position(|goal| {
+                    candidate.fam == goal.fam
+                        && candidate.level_args == goal.level_args
+                        && candidate.params == goal.params
+                        && candidate.indices == goal.indices
+                        && candidate.scrut == goal.scrut
+                        && candidate.arguments == goal.arguments
+                }) {
+                    let planned = embedded_method_convoy.iter().any(|companion| {
+                        companion.elim_ordinal() == global
+                    }) || embedded_method_repairs.iter().any(|(ordinal, _)| *ordinal == global);
+                    if planned {
+                        entry.embedded_elims.push((local, global));
+                    }
+                }
+            }
+            if !entry.embedded_elims.is_empty() {
+                entry.ambient_ty = *expanded_ty;
+            }
+        }
     };
     let motive_rebase = dependent_rebase_subs(
         scrut_core,
@@ -4572,7 +4675,7 @@ fn plan_coherent_frame_motive(
         &expected,
         context_convoy
             .iter()
-            .any(|entry| scrut_occurs(&expected, &Term::var(entry.var))),
+            .any(|entry| scrut_occurs(&expected, &entry.occurrence)),
     );
     let mut motive_user_body =
         subst_term_generalize_many(&weaken(&expected, motive_base_depth as i64), &motive_rebase);
@@ -4583,15 +4686,17 @@ fn plan_coherent_frame_motive(
             &motive_user_body,
             &embedded_method_convoy,
             &embedded_method_repairs,
-            context_convoy.len(),
+            convoy_entry_order(&context_convoy, false).len(),
+            None,
         )?;
         motive_user_body =
             refresh_embedded_elim_evidence(cx.env, &motive_ctx, &motive_user_body, span)?;
         motive_user_body = install_embedded_index_equation_companions(
             &motive_user_body,
             &embedded_method_convoy,
-            context_convoy.len(),
+            convoy_entry_order(&context_convoy, false).len(),
             motive_ctx.len(),
+            None,
         )?;
     }
     Ok(Box::new(CoherentFrameMotivePlan {
@@ -4612,68 +4717,82 @@ fn plan_coherent_frame_motive(
 /// wraps them outermost-first. The scrutinee's own binder is excluded (the
 /// motive already abstracts it). Binders with a recorded generated/arm origin
 /// are excluded; user-local binders remain ambient even within an arm.
+/// True when `term` mentions an index-refinement sentinel or a binder that an
+/// enclosing frame has refined (an active `var_refinements` entry).
+fn mentions_enclosing_refinement(cx: &ElabCtx, term: &Term) -> bool {
+    let depth = cx.ctx.len();
+    crate::omega_erasure::has_free_var(term, INDEX_REFINEMENT_SENTINEL_BASE)
+        || cx.var_refinements.keys().any(|bottom| {
+            *bottom < depth && scrut_occurs(term, &Term::var(depth - 1 - bottom))
+        })
+}
+
 fn compute_context_convoy(
     cx: &ElabCtx,
     frame: &MatchFrame,
+    scrut_core: &Term,
     scrut_indices: &[Term],
 ) -> Result<Vec<ConvoyEntry>, ElabError> {
     let ctx = &cx.ctx;
     let depth = ctx.len();
-    // The dependency seed: the free variables occurring in the scrutinee's
-    // actual indices, as de Bruijn indices at the ambient depth. A binding is
-    // convoyed when its type mentions one of these (or a var added below).
-    let mut dep_vars: Vec<usize> = Vec::new();
+    // Seed only with free variables of the actual indices. A captured binder
+    // extends this closure by both its original variable and its arm-visible
+    // occurrence, which may be a generated refinement sentinel.
+    let mut dependencies = Vec::new();
     for idx in scrut_indices {
-        for v in 0..depth {
-            if scrut_occurs(idx, &Term::var(v)) && !dep_vars.contains(&v) {
-                dep_vars.push(v);
+        for var in 0..depth {
+            let occurrence = Term::var(var);
+            if scrut_occurs(idx, &occurrence) && !dependencies.contains(&occurrence) {
+                dependencies.push(occurrence);
             }
         }
     }
-    let mut convoy: Vec<ConvoyEntry> = Vec::new();
-    // Walk bindings OUTERMOST (highest var) to innermost. A binding's type can
-    // only mention OUTER bindings (higher var, bound earlier), so processing
-    // outer-first guarantees every dependency a binding could name has ALREADY
-    // entered `dep_vars` before that binding is tested — that is what makes this
-    // the transitive forward-dependency closure, in ONE pass. Innermost-first is
-    // WRONG: an inner `h : p xs` mentions the captured `xs` WITHOUT mentioning
-    // the index `n`, so inner-first would test `h` before `xs` joined `dep_vars`
-    // and drop it. Collected outermost-first here, then reversed to the
-    // innermost-first representation the motive/method telescope consumes.
+    let mut convoy = Vec::new();
+    // An inner binder may depend on an earlier convoy entry without mentioning
+    // the index itself, so walk outermost first and then reverse for the motive.
     for var in (0..depth).rev() {
-        // Skip the scrutinee recorded once at match introduction; the motive
-        // abstracts it directly even as later binders move its de Bruijn index.
-        if frame.scrutinee_level == Some(depth - 1 - var) {
+        let bottom_pos = depth - 1 - var;
+        let refinement = cx.var_refinements.get(&bottom_pos).map(|(value, ty, at_depth)| {
+            let growth = depth.checked_sub(*at_depth).ok_or_else(|| {
+                ElabError::Internal("context convoy refinement escaped its branch context".into())
+            })? as i64;
+            Ok::<_, ElabError>((weaken(value, growth), weaken(ty, growth)))
+        }).transpose()?;
+        // A scrutinee introduced as a local variable has its recorded level;
+        // a refined alias has no level, and its active value is its identity.
+        if frame.scrutinee_level == Some(bottom_pos)
+            || (frame.scrutinee_level.is_none()
+                && refinement.as_ref().is_some_and(|(value, _)| value == scrut_core))
+        {
             continue;
         }
-        // A user-local binder remains genuinely ambient, even when pushed
-        // between an enclosing arm and this match. Every other origin is
-        // owned by its arm; missing provenance inside an active frame is an
-        // error, never a positional guess.
-        let bottom_pos = depth - 1 - var;
         if let Some(origin) = cx.match_binder_origin(bottom_pos)? {
             if origin != MatchBinderOrigin::UserLocal {
                 continue;
             }
         }
-        // The binding's stored type, weakened to be valid at the ambient depth.
-        let raw_ty = match ctx.lookup(var) {
-            Some(t) => t.clone(),
-            None => continue,
+        let (occurrence, ambient_ty) = if let Some(pair) = refinement {
+            pair
+        } else {
+            let Some(raw_ty) = ctx.lookup(var) else {
+                continue;
+            };
+            (Term::var(var), weaken(raw_ty, (var as i64) + 1))
         };
-        let ambient_ty = weaken(&raw_ty, (var as i64) + 1);
-        let mentions_dep = dep_vars
+        if dependencies
             .iter()
-            .any(|d| scrut_occurs(&ambient_ty, &Term::var(*d)));
-        if mentions_dep {
-            dep_vars.push(var);
-            convoy.push(ConvoyEntry { var, ambient_ty });
+            .any(|dependency| scrut_occurs(&ambient_ty, dependency))
+        {
+            let raw = Term::var(var);
+            if !dependencies.contains(&raw) {
+                dependencies.push(raw);
+            }
+            if !dependencies.contains(&occurrence) {
+                dependencies.push(occurrence.clone());
+            }
+            convoy.push(ConvoyEntry { var, occurrence, ambient_ty, embedded_elims: Vec::new() });
         }
     }
-    // Collected outermost-first (descending var); the telescope representation
-    // is innermost-first (ascending var), so reverse. de Bruijn position is
-    // itself a topological order, so this single reversed pass — no fixpoint —
-    // yields dependency-consistent innermost-first entries.
     convoy.reverse();
     Ok(convoy)
 }
@@ -6711,7 +6830,7 @@ fn wrap_dependent_method_ihs(
                         expected,
                         context_convoy
                             .iter()
-                            .any(|e| scrut_occurs(expected, &Term::var(e.var))),
+                            .any(|e| scrut_occurs(expected, &e.occurrence)),
                     ),
                 );
                 // The direct IH is `motive` applied to the recursive field at
@@ -6805,8 +6924,8 @@ fn finish_dependent_elim(
     // outermost binder first (reverse of the innermost-first convoy), so the
     // completed eliminator's type reconstructs the caller's `expected` at the
     // actual indices (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-REBASE step 5).
-    for entry in context_convoy.iter().rev() {
-        elim = Term::app(elim, Term::var(entry.var));
+    for index in convoy_entry_order(context_convoy, false) {
+        elim = Term::app(elim, context_convoy[index].occurrence.clone());
     }
     for entry in embedded_method_convoy {
         let value = match entry {
@@ -6814,6 +6933,9 @@ fn finish_dependent_elim(
             EmbeddedConvoyCompanion::IndexEquation(equation) => &equation.ambient_value,
         };
         elim = Term::app(elim, value.clone());
+    }
+    for index in convoy_entry_order(context_convoy, true) {
+        elim = Term::app(elim, context_convoy[index].occurrence.clone());
     }
     if add_hidden_equation {
         let hidden_equation = Term::Eq(
@@ -7225,7 +7347,7 @@ fn build_dependent_constructor_frame(
                 expected,
                 context_convoy
                     .iter()
-                    .any(|entry| scrut_occurs(expected, &Term::var(entry.var))),
+                    .any(|entry| scrut_occurs(expected, &entry.occurrence)),
             ),
         )
     };
@@ -7239,6 +7361,7 @@ fn build_dependent_constructor_frame(
         &concrete,
         field_count,
         index_premise_count,
+        embedded_method_convoy.len(),
         sentinel_region,
     );
     if equation_convoy && !context_convoy.is_empty() {
@@ -7265,16 +7388,7 @@ fn build_dependent_constructor_frame(
         }
     }
     expected_here = redirect_convoy_body(context_convoy, field_count, &sentinels, expected_here);
-    let mut convoy_refinements = Vec::with_capacity(context_convoy.len());
-    for (index, entry) in context_convoy.iter().enumerate() {
-        let bottom_position = cx.ctx.len() - 1 - (entry.var + field_count);
-        convoy_refinements.push((
-            bottom_position,
-            sentinels[index].clone(),
-            types_inner_first[index].clone(),
-        ));
-    }
-    for index in (0..context_convoy.len()).rev() {
+    for index in convoy_entry_order(context_convoy, false) {
         premise_domains.push(types_inner_first[index].clone());
     }
 
@@ -7287,6 +7401,7 @@ fn build_dependent_constructor_frame(
             embedded_method_convoy,
             embedded_method_repairs,
             embedded_slot_base,
+            None,
         )?;
         expected_here = refresh_embedded_elim_evidence(cx.env, &cx.ctx, &expected_here, span)?;
         expected_here = install_embedded_index_equation_companions(
@@ -7294,6 +7409,7 @@ fn build_dependent_constructor_frame(
             embedded_method_convoy,
             embedded_slot_base,
             cx.ctx.len(),
+            None,
         )?;
         let branch_rebase = dependent_rebase_subs(
             scrut_core,
@@ -7304,7 +7420,7 @@ fn build_dependent_constructor_frame(
             expected,
             context_convoy
                 .iter()
-                .any(|entry| scrut_occurs(expected, &Term::var(entry.var))),
+                .any(|entry| scrut_occurs(expected, &entry.occurrence)),
         );
         for entry in embedded_method_convoy {
             let branch_ty = match entry {
@@ -7316,6 +7432,7 @@ fn build_dependent_constructor_frame(
                     embedded_index_equation_domain(cx.env, equation, field_count, &branch_rebase)?
                 }
             };
+            reject_convoy_companion_cycle(&branch_ty, context_convoy, field_count, span)?;
             premise_domains.push(redirect_convoy_body(
                 context_convoy,
                 field_count,
@@ -7323,6 +7440,24 @@ fn build_dependent_constructor_frame(
                 branch_ty,
             ));
         }
+    }
+    let embedded_slot_base = index_premise_count + convoy_entry_order(context_convoy, false).len();
+    for index in convoy_entry_order(context_convoy, true) {
+        types_inner_first[index] = rewrite_c2_premise(
+            cx, &cx.ctx, span, types_inner_first[index].clone(),
+            &context_convoy[index], embedded_method_convoy, embedded_method_repairs,
+            embedded_slot_base,
+        )?;
+        premise_domains.push(types_inner_first[index].clone());
+    }
+    let mut convoy_refinements = Vec::with_capacity(context_convoy.len());
+    for (index, entry) in context_convoy.iter().enumerate() {
+        let bottom_position = cx.ctx.len() - 1 - (entry.var + field_count);
+        convoy_refinements.push((
+            bottom_position,
+            sentinels[index].clone(),
+            types_inner_first[index].clone(),
+        ));
     }
 
     let hidden_result_premise_slot = if hidden_group_result_refinement {
@@ -7913,10 +8048,13 @@ fn infer_dependent_match_scrutinee(
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
 fn wrap_dependent_motive_convoy(
-    env: &GlobalEnv,
+    cx: &ElabCtx<'_>,
+    motive_ctx: &Context,
+    span: &Span,
     expected: &Term,
     context_convoy: &[ConvoyEntry],
     embedded_method_convoy: &[EmbeddedConvoyCompanion],
+    embedded_method_repairs: &[(usize, usize)],
     scrut_indices: &[Term],
     scrut_core: &Term,
     motive_local_indices: &[Term],
@@ -7937,6 +8075,7 @@ fn wrap_dependent_motive_convoy(
             &Term::var(0),
             motive_base_depth,
             0,
+            embedded_method_convoy.len(),
             sentinel_region,
         );
         motive_user_body = redirect_convoy_body(
@@ -7946,9 +8085,10 @@ fn wrap_dependent_motive_convoy(
             motive_user_body,
         );
         let mut convoy_premises = Vec::with_capacity(convoy_count + embedded_method_convoy.len());
-        for i in (0..convoy_count).rev() {
+        for i in convoy_entry_order(context_convoy, false) {
             convoy_premises.push(cv_types_inner_first[i].clone());
         }
+        let embedded_slot_base = convoy_premises.len();
         let motive_rebase = dependent_rebase_subs(
             scrut_core,
             scrut_indices,
@@ -7958,24 +8098,32 @@ fn wrap_dependent_motive_convoy(
             expected,
             context_convoy
                 .iter()
-                .any(|e| scrut_occurs(expected, &Term::var(e.var))),
+                .any(|e| scrut_occurs(expected, &e.occurrence)),
         );
         for entry in embedded_method_convoy {
             let ty = match entry {
                 EmbeddedConvoyCompanion::Method(method) => method.motive_ty.clone(),
                 EmbeddedConvoyCompanion::IndexEquation(equation) => embedded_index_equation_domain(
-                    env,
+                    cx.env,
                     equation,
                     motive_base_depth,
                     &motive_rebase,
                 )?,
             };
+            reject_convoy_companion_cycle(&ty, context_convoy, motive_base_depth, span)?;
             convoy_premises.push(redirect_convoy_body(
                 context_convoy,
                 motive_base_depth,
                 &sentinels,
                 ty,
             ));
+        }
+        for i in convoy_entry_order(context_convoy, true) {
+            convoy_premises.push(rewrite_c2_premise(
+                cx, motive_ctx, span, cv_types_inner_first[i].clone(),
+                &context_convoy[i], embedded_method_convoy, embedded_method_repairs,
+                embedded_slot_base,
+            )?);
         }
         motive_user_body =
             wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region);
@@ -8007,10 +8155,13 @@ fn finish_checked_dependent_motive<const MAY_REFINE_GROUP_RESULT: bool>(
     let motive_ctx = motive_context(&cx.ctx, ind, params);
     // The context convoy and embedded methods share one finalized telescope.
     motive_user_body = wrap_dependent_motive_convoy(
-        cx.env,
+        cx,
+        &motive_ctx,
+        span,
         &plan.expected,
         &plan.context_convoy,
         &plan.embedded_method_convoy,
+        &plan.embedded_method_repairs,
         scrut_indices,
         scrut_core,
         motive_local_indices,
@@ -10440,9 +10591,18 @@ fn wrap_premise_pis_finalized(
 /// order-independent — an entry's type names only outer convoy binders, never
 /// itself; fixes the indirect `h : p xs` where `h` is innermost yet depends on
 /// the outer `xs`). `frame_depth` = binders between the ambient context and
+/// The C1 binders precede every embedded companion, and C2 follows them.
+/// Both groups retain their outermost-first source order.
+fn convoy_entry_order(context_convoy: &[ConvoyEntry], c2: bool) -> Vec<usize> {
+    (0..context_convoy.len())
+        .rev()
+        .filter(|&index| context_convoy[index].embedded_elims.is_empty() != c2)
+        .collect()
+}
+
 /// where these types are stated (`motive_base_depth` for the motive; `n` for a
-/// method/IH). `slot_base` = premises preceding the convoy in the enclosing
-/// telescope (0 for the motive; the index-premise count for a method/IH).
+/// method/IH). `slot_base` = premises preceding C1 in the enclosing telescope
+/// (0 for the motive; the index-premise count for a method/IH).
 /// `finalize_refined_body` later relocates each sentinel to its real binder.
 fn convoy_binder_types(
     context_convoy: &[ConvoyEntry],
@@ -10452,11 +10612,22 @@ fn convoy_binder_types(
     core_target: &Term,
     frame_depth: usize,
     slot_base: usize,
+    companion_count: usize,
     sentinel_region: usize,
 ) -> (Vec<Term>, Vec<Term>) {
     let c = context_convoy.len();
-    let sentinels: Vec<Term> = (0..c)
-        .map(|i| index_refinement_sentinel(sentinel_region, slot_base + (c - 1 - i)))
+    let c1 = convoy_entry_order(context_convoy, false);
+    let c2 = convoy_entry_order(context_convoy, true);
+    let mut slots = vec![0; c];
+    for (slot, &index) in c1.iter().enumerate() {
+        slots[index] = slot_base + slot;
+    }
+    for (slot, &index) in c2.iter().enumerate() {
+        slots[index] = slot_base + c1.len() + companion_count + slot;
+    }
+    let sentinels: Vec<Term> = slots
+        .into_iter()
+        .map(|slot| index_refinement_sentinel(sentinel_region, slot))
         .collect();
     let mut types: Vec<Term> = Vec::with_capacity(c);
     for (i, entry) in context_convoy.iter().enumerate() {
@@ -10467,7 +10638,7 @@ fn convoy_binder_types(
         subs.push((weaken(scrut_core, frame_depth as i64), core_target.clone()));
         for (k, e2) in context_convoy.iter().enumerate() {
             if k != i {
-                subs.push((Term::var(e2.var + frame_depth), sentinels[k].clone()));
+                subs.push((weaken(&e2.occurrence, frame_depth as i64), sentinels[k].clone()));
             }
         }
         types.push(subst_term_generalize_many(
@@ -10488,9 +10659,83 @@ fn redirect_convoy_body(
 ) -> Term {
     let mut body = body;
     for (i, entry) in context_convoy.iter().enumerate() {
-        body = subst_term_generalize(&body, &Term::var(entry.var + frame_depth), &sentinels[i]);
+        body = subst_term_generalize(
+            &body,
+            &weaken(&entry.occurrence, frame_depth as i64),
+            &sentinels[i],
+        );
     }
     body
+}
+
+/// A C2 premise is checked under exactly the same embedded-eliminator rewrite
+/// as the goal. Its local eliminator ordinals need not equal the goal's, while
+/// its companion sentinel slots must remain those of the single telescope.
+fn rewrite_c2_premise(
+    cx: &ElabCtx<'_>,
+    ctx: &Context,
+    span: &Span,
+    ty: Term,
+    entry: &ConvoyEntry,
+    companions: &[EmbeddedConvoyCompanion],
+    repairs: &[(usize, usize)],
+    companion_slot_base: usize,
+) -> Result<Term, ElabError> {
+    if entry.embedded_elims.is_empty() {
+        return Ok(ty);
+    }
+    let mut local_plan = Vec::new();
+    let mut plan_slots = Vec::new();
+    for (global_slot, companion) in companions.iter().enumerate() {
+        if let Some(&(local, _)) = entry.embedded_elims.iter().find(|(_, global)| {
+            *global == companion.elim_ordinal()
+        }) {
+            let mut local_companion = companion.clone();
+            match &mut local_companion {
+                EmbeddedConvoyCompanion::Method(method) => method.elim_ordinal = local,
+                EmbeddedConvoyCompanion::IndexEquation(equation) => equation.elim_ordinal = local,
+            }
+            local_plan.push(local_companion);
+            plan_slots.push(global_slot);
+        }
+    }
+    let local_repairs: Vec<(usize, usize)> = repairs
+        .iter()
+        .filter_map(|&(global, method)| {
+            entry.embedded_elims.iter().find(|(_, ordinal)| *ordinal == global)
+                .map(|&(local, _)| (local, method))
+        })
+        .collect();
+    if local_plan.is_empty() && local_repairs.is_empty() {
+        return Ok(ty);
+    }
+    let ty = install_embedded_method_sentinels(
+        cx, ctx, &ty, &local_plan, &local_repairs,
+        companion_slot_base, Some(&plan_slots),
+    )?;
+    let ty = refresh_embedded_elim_evidence(cx.env, ctx, &ty, span)?;
+    install_embedded_index_equation_companions(
+        &ty, &local_plan, companion_slot_base, ctx.len(), Some(&plan_slots),
+    )
+}
+
+/// A companion preceding C2 cannot require a value bound only by C2.
+fn reject_convoy_companion_cycle(
+    ty: &Term,
+    context_convoy: &[ConvoyEntry],
+    frame_depth: usize,
+    span: &Span,
+) -> Result<(), ElabError> {
+    if context_convoy.iter().any(|entry| {
+        !entry.embedded_elims.is_empty()
+            && scrut_occurs(ty, &weaken(&entry.occurrence, frame_depth as i64))
+    }) {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "embedded companion depends on a later context convoy binder".into(),
+        });
+    }
+    Ok(())
 }
 
 fn build_convoy_refined_type(
@@ -10513,7 +10758,7 @@ fn build_convoy_refined_type(
     let env: &GlobalEnv = &*cx.env;
     let mut premises = method_index_premises(ind, params_terms, refined_indices, scrut_indices, n);
     let n_idx = premises.len();
-    let (types_inner_first, sentinels) = convoy_binder_types(
+    let (mut types_inner_first, sentinels) = convoy_binder_types(
         context_convoy,
         scrut_indices,
         scrut_core,
@@ -10521,11 +10766,12 @@ fn build_convoy_refined_type(
         refined_core,
         n,
         n_idx,
+        embedded_method_convoy.len(),
         sentinel_region,
     );
     let mut body = redirect_convoy_body(context_convoy, n, &sentinels, base_body);
-    // Append the convoy binder types outermost-first (reverse of innermost-first).
-    for i in (0..context_convoy.len()).rev() {
+    // C1 precedes companions; C2's rewritten type consumes those companions.
+    for i in convoy_entry_order(context_convoy, false) {
         premises.push(types_inner_first[i].clone());
     }
     if !embedded_method_convoy.is_empty() || !embedded_method_repairs.is_empty() {
@@ -10537,6 +10783,7 @@ fn build_convoy_refined_type(
             embedded_method_convoy,
             embedded_method_repairs,
             embedded_slot_base,
+            None,
         )?;
         body = refresh_embedded_elim_evidence(env, ctx, &body, span)?;
         body = install_embedded_index_equation_companions(
@@ -10544,6 +10791,7 @@ fn build_convoy_refined_type(
             embedded_method_convoy,
             embedded_slot_base,
             ctx.len(),
+            None,
         )?;
         let branch_rebase = dependent_rebase_subs(
             scrut_core,
@@ -10564,6 +10812,7 @@ fn build_convoy_refined_type(
                     embedded_index_equation_domain(env, equation, n, &branch_rebase)?
                 }
             };
+            reject_convoy_companion_cycle(&branch_ty, context_convoy, n, span)?;
             premises.push(redirect_convoy_body(
                 context_convoy,
                 n,
@@ -10571,6 +10820,15 @@ fn build_convoy_refined_type(
                 branch_ty,
             ));
         }
+    }
+    let embedded_slot_base = n_idx + convoy_entry_order(context_convoy, false).len();
+    for index in convoy_entry_order(context_convoy, true) {
+        types_inner_first[index] = rewrite_c2_premise(
+            cx, ctx, span, types_inner_first[index].clone(),
+            &context_convoy[index], embedded_method_convoy, embedded_method_repairs,
+            embedded_slot_base,
+        )?;
+        premises.push(types_inner_first[index].clone());
     }
     Ok(wrap_premise_pis_finalized(body, &premises, sentinel_region))
 }

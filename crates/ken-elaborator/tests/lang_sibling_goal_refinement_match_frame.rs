@@ -73,17 +73,12 @@ fn pointwise_zip_with_map_remains_checked_against_catalog_vector() {
 }
 
 #[test]
-fn a_user_local_sibling_still_reaches_the_ambient_convoy_refusal() {
-    // Promise class: transition sentinel until a separately authorized
-    // composition admits genuine ambient siblings. MEASURED: one user `let`
-    // inserted between an enclosing field and nested match is rejected by
-    // the existing overlap guard. CLAIMED: field and generated-equation
-    // origins never exempt user-local dependents. THE GAP: a private origin
-    // control separately pins the exact classification at binder entry.
-    let error = verdict(AMBIENT).expect_err("a dependent user let remains ambient");
-    assert!(
-        matches!(error, ElabError::Internal(ref reason)
-        if reason == "index-equation convoy unexpectedly overlaps an ambient context convoy"),
-        "expected the unchanged ambient overlap guard, found {error:?}"
-    );
+fn a_user_local_sibling_checks_against_catalog_vector() {
+    // Promise class: durable invariant. MEASURED: one user `let` inserted
+    // between an enclosing field and a nested match elaborates and is
+    // kernel-admitted against the current catalog Vector without new trust.
+    // CLAIMED: an index-only user-local dependent is not a dependent of the
+    // scrutinee, so the route needs no convoy for it. THE GAP: the private
+    // seam test pins the coupled route for an abstractable index separately.
+    verdict(AMBIENT).expect("a user-local index-only sibling must check");
 }
