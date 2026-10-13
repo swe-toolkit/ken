@@ -76,6 +76,15 @@ measured a negative: dropping the value-branch convoy gives
 `NotAFunction`, so the convoy must be composed, not omitted. The repair
 follows that rule.
 
+**S1 ruling (`evt_2qrmtt7t9pfkv`): E9 and E11 never take the selector.**
+The index-equation selector is entered only when an enclosing frame
+refines the scrutinee or its index (`enclosing_refines`, with
+`mentions_enclosing_refinement` reading `var_refinements` and the
+sentinels). It is no longer entered merely because some frame encloses
+it. The selector method itself is not revised. Build this gate first, then
+the amendment below with D0 part 2's composition. A `NotAFunction` at a
+selector use with a constructor-headed index is a stop under S1.
+
 **D0 amendment (`evt_3p22pk3q6f7fb`): the convoy reads the arm-refined
 plane.**
 - When `scrutinee_level` is `None`, the referent is the binder whose active
@@ -91,11 +100,12 @@ plane.**
 
 ## Acceptance
 
-- **AC-1.** E9, E11, H9, H5, H1, G1, G2 and G2's Vec form check, with no
-  Axiom and no trust change.
-- **AC-2 (control).** E8, E10, H6, H7, H8 and K2 stay Ok, and so does the
-  single-level `match xs` control. K2, `pp (dual_lookup a n xs i)`, is
-  already Ok on `4ee16ba51`, so it cannot evidence the fix. The
+- **AC-1.** E9, E11, H9, H5, H1, K2, G1, G2 and G2's Vec form check, with
+  no Axiom and no trust change. K2 is `pp (dual_lookup a n xs i)` with
+  nested `match i` then `match xs`, refused on `4ee16ba51` (Architect
+  `evt_2qrmtt7t9pfkv`).
+- **AC-2 (control).** E8, E10, H6, H7 and H8 stay Ok, and so does the
+  single-level `match xs` control. The
   `lang_embedded_context_convoy` suite, including its false twin, is
   unchanged, and so is the catalog census.
 - **AC-3.** A false twin of H9, whose hypothesis disagrees with the goal,
@@ -108,7 +118,8 @@ plane.**
   `Internal("coherent-frame convoy found an ill-typed ambient method")`
   on `033c19fa7`. A1 checks, or the D0 extension rules why it is a typed
   refusal. A1F is refused with a typed error.
-- **AC-4 (mutation, QA).** Restoring the overlap assertion reddens E9.
+- **AC-4 (mutation, QA).** Restoring `!cx.match_frames.is_empty()` in
+  place of `enclosing_refines` returns E9 to its failure.
 
 ## Stop conditions
 
