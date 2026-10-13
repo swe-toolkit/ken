@@ -43,8 +43,16 @@ real one.
   so `zip_with add xs xs` and `map (mul two) xs` both pass 3/3. The
   closed row `vector_scale three three [1,2,0] = [3,6,0]` checks on the
   landed package and refuses both.
-- **Seed rows.** Spec 65's seed gains left-identity, associativity and
-  factor-three rows (SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS).
+- **Seed rows.** SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS grows the seed from
+  nine cases and ten positive closed assertions to twelve and thirteen.
+  It adds non-square left identity, triple associativity with
+  `c22 = [[1,2],[3,0]]`, and the factor-three scale row.
+- **Two stale consumers** (spec-author sweep `evt_521mf004e3ahq`,
+  `evt_31mkshnc41d95`). Both still count nine seed cases and become false
+  when the spec lands:
+  - `NatMatrix.ken.md` section 7 calls the seed "nine behavioral cases";
+  - `cat_linear_algebra_nat_matrix.rs` :154-257 hard-codes the original
+    ten assertions as "the nine specified seed cases".
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
@@ -53,14 +61,16 @@ base, stop and report the mismatch.
 
 The two laws with their private lemmas, and the `dot_with` respelling, in
 `NatMatrix.ken.md`. The laws go in the public lede after the five
-section 1 laws, in section 2 order. The acceptance target runs the new
-seed rows.
+section 1 laws, in section 2 order. Section 7's case count matches the
+seed. The acceptance target runs all twelve seed cases, and its stated
+scope says so.
 
 ## Acceptance
 
 - **AC-1.** `ken check` and `ken fmt --check` pass.
   `cat_linear_algebra_nat_matrix` root-loads both new names and runs
-  every seed case, including the three new rows.
+  every seed case, including the three new rows, and no comment or
+  message in it still claims nine cases.
 - **AC-2.** `trusted_base()` is equal before and after. There is no Axiom
   or primitive. The strict-resolution census and the Vector sentinel are
   unchanged.
