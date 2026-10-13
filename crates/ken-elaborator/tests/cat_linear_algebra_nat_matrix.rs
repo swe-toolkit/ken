@@ -1,4 +1,4 @@
-//! Dimension-safe natural matrices: spec/50-stdlib/65-linear-algebra.md §1.
+//! Dimension-safe natural matrices: spec/50-stdlib/65-linear-algebra.md §§1–2.
 //! Every closed assertion and the dimension refusal derive from
 //! conformance/stdlib/linear-algebra/seed-nat-matrix.md. Promise class:
 //! durable invariant (including the seed's explicitly fixed numeric oracles).
@@ -25,6 +25,9 @@ fn matrix_env() -> ElabEnv {
     env
 }
 
+/// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2. The generic
+/// `matrix_identity_left` and `matrix_product_assoc` clients exercise §2.
+/// PROMISE CLASS: durable invariant.
 /// MEASURED: exact owned, transparent law identities, selective imports of
 /// all fourteen names and generic clients for seven specified propositions.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
