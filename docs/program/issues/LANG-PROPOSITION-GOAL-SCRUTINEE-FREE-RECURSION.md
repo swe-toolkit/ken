@@ -1,7 +1,7 @@
 ---
 id: LANG-PROPOSITION-GOAL-SCRUTINEE-FREE-RECURSION
 title: "LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL routes every Omega goal through the equation convoy, so a recursive nested match whose propositional goal does not mention the inner scrutinee, which checked on f1ae73cc5, now fails with an Internal. Restore those proofs without losing the rows that WP admitted"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
@@ -105,3 +105,21 @@ false twin, and the merged WP's rows.
 - A row that is accepted on `033c19fa7` is refused, or changes diagnostic
   class.
 - A catalog census file changes.
+
+## Closeout
+
+Merged `4ee16ba51` from exact `f72d25795` (PR #4715). Language QA
+`evt_7xg7a374k9dj2`; Architect `evt_r0da9asztj8z` with Decision
+`dec_kw19w6gp0fwj`. AC-3 follows the Steward's disposition
+`evt_3hg3dd1ajqxsh`.
+
+- The gate is in `plan_coherent_frame_motive`. A syntactic `Eq` keeps its
+  route. Any other proposition is convoyed only when the zonked goal
+  mentions the scrutinee. Both flag consumers, `equation_convoy` and
+  `embedded_method_convoy`, revert to base routing for scrutinee-free
+  goals.
+- The new suite passes 10/10: G1-G5, the population rows, and the typed
+  `Bottom` refusal. The merged 19 tests pass. The 75-path catalog census is
+  byte-identical between base and candidate.
+- AC-4: the base `elab.rs` returns the minimal repro to the `Internal`.
+- C1 was measured Ok on base and candidate. It is not a committed row.
