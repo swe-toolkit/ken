@@ -411,7 +411,6 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
         &[Term::var(1)],
         RecursiveFieldIndexPath::CoupledRefinement,
         1,
-        false,
         &Span { start: 0, end: 0 },
         &frame,
     )
