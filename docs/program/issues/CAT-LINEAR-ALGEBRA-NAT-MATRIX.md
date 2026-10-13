@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-NAT-MATRIX
 title: "Spec 65 section 1 specifies dimension-safe Nat vectors and matrices, but no catalog package declares them and the Vec carrier they use is private. Publish Vec and deliver Algorithm.LinearAlgebra.NatMatrix: seven operations and five laws, every law proved at zero trust"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
@@ -98,3 +98,23 @@ target that runs the seed.
   Architect to rule it, with the `leq_nat_cong_two` export question.
 - Publishing `Vec` changes another package's resolution or a
   strict-resolution census row.
+
+## Closeout
+
+Merged `234ab73c1` from exact `27bacb5ae` (PR #4704). Foundation QA
+`evt_1whsmvcw1nja4`; Architect `evt_6p4mfmpvnw4ka` with Decision
+`dec_fcnv4c0ckppw`. The first candidate, `7e9cfd8c4`, was QA-blocked on
+top-down arrangement (`evt_4839hz66eee3d`). The respin moved
+declarations only.
+
+- `Algorithm.LinearAlgebra.NatMatrix` exports the seven operations and
+  five laws of spec 65 section 1, all at zero trust (109 before and
+  after). The public lede comes before the 19 private helpers.
+- `Data.Vector.Vector` publishes `Vec`, `VNil`, `VCons`, `map`,
+  `zip_with` and `vec_zero_vnil`. The closeout sentinel's allow-set grew
+  by those six names (AC-2b), and the strict census gained the NatMatrix
+  row (AC-2c).
+- Carries (Architect, non-blocking): the private `repeat` and `map_cong`
+  move to `Data.Vector.Vector` when a second consumer appears;
+  `add_shuffle` joins the add-shuffle export carry.
+- L3 moves to `SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS`.
