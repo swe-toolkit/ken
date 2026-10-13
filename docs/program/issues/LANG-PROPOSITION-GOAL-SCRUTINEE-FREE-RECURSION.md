@@ -60,8 +60,14 @@ user as an `Internal`.
   unchanged:
   - a motive over `dual_lookup`;
   - `same_len` over `dual_lookup`;
-  - an `And` of two motives;
   - the merged WP's four rows, including RECURSIVE-STEP's T2.
+
+  The finding also listed "an `And` of two motives". No source reproduces
+  that as a gain. The Architect's reconstruction is refused on both
+  `f1ae73cc5` and `033c19fa7` (`evt_26r9qax9s5ze`), so it is not pinned
+  here. C1, `And (pp n i) (qq n i)` over the index only, is Ok on both
+  and stays Ok as a control. The And-over-`dual_lookup` Internal goes to
+  `LANG-CONVOY-AMBIENT-BINDER-COEXISTENCE`.
 - **Not this WP.** RECURSIVE-STEP's step-reachable control already failed
   on base. Its fix is in `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`.
 

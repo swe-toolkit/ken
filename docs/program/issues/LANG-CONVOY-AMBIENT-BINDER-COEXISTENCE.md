@@ -75,6 +75,13 @@ follows that rule.
   unchanged, and so is the catalog census.
 - **AC-3.** A false twin of H9, whose hypothesis disagrees with the goal,
   is still refused.
+- **AC-3b.** The And-over-`dual_lookup` pair from the Architect's
+  `evt_26r9qax9s5ze` never reaches the user as an `Internal`. That pair is
+  A1, `lookup_and`, a true theorem, and A1F, its false twin with `hp x` in
+  the `qq` slot. Both were kernel refusals on `f1ae73cc5` and are
+  `Internal("coherent-frame convoy found an ill-typed ambient method")`
+  on `033c19fa7`. A1 checks, or the D0 extension rules why it is a typed
+  refusal. A1F is refused with a typed error.
 - **AC-4 (mutation, QA).** Restoring the overlap assertion reddens E9.
 
 ## Stop conditions
