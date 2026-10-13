@@ -648,9 +648,7 @@ fn erased_transparent_body(
     if let Some(cached) = scope.as_ref().and_then(|scope| scope.bodies.get(&id)) {
         return cached.clone();
     }
-    let plan = ken_elaborator::omega_erasure::omega_erasure_plan(globals, body, ty)
-        .unwrap_or_else(|error| panic!("checked Ω plan failed at {id:?}: {error}"));
-    let erased = ken_elaborator::omega_erasure::apply_omega_erasure(globals, body, &plan)
+    let erased = ken_elaborator::omega_erasure::erase_for_interpreter(globals, body, ty)
         .unwrap_or_else(|error| panic!("checked Ω erasure failed at {id:?}: {error}"));
     if let Some(scope) = store
         .erasure_scope
@@ -1381,8 +1379,9 @@ fn eq_reduce(
     EvalVal::Unknown
 }
 
-/// Structural type equality (by value structure, not alpha-eq of closed types).
-/// Used only by C5 regularity in `cast_reduce` to confirm the same type.
+/// Structural value equality (not alpha-eq of closed terms). Used both for
+/// C5 type endpoints and for J-beta's checked, erased equation endpoints
+/// (`15 §4`). Pair components compare structurally; closures fail closed.
 fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
     match (a, b) {
         (EvalVal::TypeUniverse(la), EvalVal::TypeUniverse(lb)) => la.equiv(lb),
@@ -1423,6 +1422,14 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
                 && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
         }
         (
+            EvalVal::Pair {
+                fst: af, snd: asnd, ..
+            },
+            EvalVal::Pair {
+                fst: bf, snd: bsnd, ..
+            },
+        ) => eq_type_eq(af, bf) && eq_type_eq(asnd, bsnd),
+        (
             EvalVal::Ctor {
                 id: a, args: aa, ..
             },
@@ -1435,6 +1442,53 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
                 && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
         }
         _ => false,
+    }
+}
+
+/// `J` (`15 §4`): checked erasure left the equation, not its Ω proof.
+/// Compare only the closed endpoint values, never the motive (which can
+/// contain closures). Unequal endpoints transport through existing C5.
+/// A raw, unlowered J stays neutral.
+///
+/// Out of line on purpose: its locals must not enlarge every recursive
+/// `eval_in_erasure_scope` frame (cc7_argparse_acceptance overflowed).
+#[inline(never)]
+fn eval_j(
+    env: &[EvalVal],
+    motive: &Term,
+    base: &Term,
+    evidence: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
+    match evidence {
+        Term::Eq(_, lhs, rhs) => {
+            let a = eval(env, lhs, globals, store);
+            let b = eval(env, rhs, globals, store);
+            if matches!(a, EvalVal::Unknown) || matches!(b, EvalVal::Unknown) {
+                return EvalVal::Unknown;
+            }
+            if eq_type_eq(&a, &b) {
+                return eval(env, base, globals, store);
+            }
+            let tt = eval(
+                env,
+                &Term::const_(globals.tt_id(), Vec::new()),
+                globals,
+                store,
+            );
+            let family = eval(env, motive, globals, store);
+            let source = apply(
+                apply(family.clone(), a, globals, store),
+                tt.clone(),
+                globals,
+                store,
+            );
+            let target = apply(apply(family, b, globals, store), tt.clone(), globals, store);
+            let payload = eval(env, base, globals, store);
+            cast_reduce(source, target, tt, payload)
+        }
+        _ => EvalVal::Neutral,
     }
 }
 
@@ -1896,6 +1950,102 @@ mod primitive_type_cast_tests {
             slot: NULL_SLOT,
         })
         .is_none());
+    }
+}
+
+#[cfg(test)]
+mod computational_j_tests {
+    use super::*;
+
+    fn closure_endpoint(n: i64) -> Term {
+        Term::lam(
+            Term::Type(ken_kernel::Level::zero()),
+            Term::IntLit(n.into()),
+        )
+    }
+
+    fn equation(lhs: Term, rhs: Term) -> Term {
+        Term::Eq(
+            Box::new(Term::Type(ken_kernel::Level::zero())),
+            Box::new(lhs),
+            Box::new(rhs),
+        )
+    }
+
+    fn run(motive: Term, evidence: Term) -> (EvalVal, GlobalId) {
+        let globals = ken_elaborator::ElabEnv::new().expect("checked prelude");
+        let zero = globals.prelude_env.zero_id;
+        let raw_j = Term::J(
+            Box::new(motive),
+            Box::new(Term::constructor(zero, Vec::new())),
+            Box::new(evidence),
+        );
+        (eval(&[], &raw_j, &globals.env, &mut EvalStore::new()), zero)
+    }
+
+    // Promise class: durable invariant (15 §4): a constant family with two
+    // distinct closure endpoints takes the C5 transport step, not a closure
+    // identity shortcut. MEASURED: Zero is returned; CLAIMED: unequal
+    // endpoints with equal motive targets still transport. THE GAP: this is a
+    // raw-Term value-seam test, not kernel admission of a closure proof.
+    #[test]
+    fn constant_motive_distinct_closure_endpoints_use_cast() {
+        let nat = ken_elaborator::ElabEnv::new().unwrap().globals["Nat"];
+        let motive = Term::lam(
+            Term::Type(ken_kernel::Level::zero()),
+            Term::lam(
+                Term::Type(ken_kernel::Level::zero()),
+                Term::indformer(nat, Vec::new()),
+            ),
+        );
+        let (value, zero) = run(motive, equation(closure_endpoint(1), closure_endpoint(2)));
+        assert!(matches!(value, EvalVal::Ctor { id, .. } if id == zero));
+    }
+
+    // Promise class: durable invariant: a dependent motive at unequal
+    // closure endpoints cannot obtain type equality via pointer identity.
+    // MEASURED: Unknown; CLAIMED: fail-closed C6 departure. THE GAP: a
+    // future structural C6 implementation may deliberately refine it.
+    #[test]
+    fn dependent_motive_distinct_closure_endpoints_fail_closed() {
+        let motive = Term::lam(
+            Term::Type(ken_kernel::Level::zero()),
+            Term::lam(Term::Type(ken_kernel::Level::zero()), Term::var(1)),
+        );
+        let (value, _) = run(motive, equation(closure_endpoint(1), closure_endpoint(2)));
+        assert_eq!(value, EvalVal::Unknown);
+    }
+
+    // Promise class: durable invariant (42 §4). Unknown in a reached
+    // computational endpoint propagates instead of selecting the base.
+    #[test]
+    fn unknown_endpoint_propagates() {
+        let motive = Term::lam(
+            Term::Type(ken_kernel::Level::zero()),
+            Term::lam(Term::Type(ken_kernel::Level::zero()), Term::var(1)),
+        );
+        let (value, _) = run(
+            motive,
+            equation(
+                Term::const_(GlobalId(999_999), Vec::new()),
+                closure_endpoint(2),
+            ),
+        );
+        assert_eq!(value, EvalVal::Unknown);
+    }
+
+    // Promise class: durable invariant: raw J with erased tt but without a
+    // checked equation remains Neutral, not an unconditional base.
+    #[test]
+    fn raw_unlowered_j_with_tt_is_neutral() {
+        let (value, _) = run(
+            Term::lam(Term::Type(ken_kernel::Level::zero()), Term::var(0)),
+            Term::const_(
+                ken_elaborator::ElabEnv::new().unwrap().env.tt_id(),
+                Vec::new(),
+            ),
+        );
+        assert_eq!(value, EvalVal::Neutral);
     }
 }
 
@@ -2419,8 +2569,8 @@ pub fn eval_checked(
     globals: &GlobalEnv,
     store: &mut EvalStore,
 ) -> Result<EvalVal, ken_kernel::KernelError> {
-    let plan = ken_elaborator::omega_erasure::omega_erasure_plan(globals, term, checked_type)?;
-    let computational = ken_elaborator::omega_erasure::apply_omega_erasure(globals, term, &plan)?;
+    let computational =
+        ken_elaborator::omega_erasure::erase_for_interpreter(globals, term, checked_type)?;
     Ok(eval(&[], &computational, globals, store))
 }
 
@@ -2658,6 +2808,9 @@ fn eval_in_erasure_scope(
         // --- Open hole → unknown (`42 §4`) ---
         // (No Hole variant in Term — holes are represented as opaque Consts
         // with no body, handled in the Const case above.)
+
+        // --- J (`15 §4`): see `eval_j`. ---
+        Term::J(motive, base, evidence) => eval_j(env, motive, base, evidence, globals, store),
 
         // --- Remaining K2 forms: not reduced in the G1 scope ---
         _ => EvalVal::Neutral,
