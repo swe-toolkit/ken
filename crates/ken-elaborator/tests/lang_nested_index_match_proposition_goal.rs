@@ -126,3 +126,29 @@ fn wrong_cons_step_index_is_rejected_after_reaching_the_cast() {
         assert_eq!(env.env.trusted_base(), trust, "no new trust");
     });
 }
+
+#[test]
+fn corrected_t2_checks_without_new_trust() {
+    // MEASURED: the constant-Zero DualTagged proof uses a recursive successor
+    // branch, checks, and adds no trusted identity. CLAIMED: a proposition
+    // that observationally reduces beyond syntactic Eq can be convoyed.
+    // THE GAP: the separate T3 and step-reachable control remain unmeasured.
+    on_elaboration_stack(|| {
+        let mut env = ElabEnv::new().expect("prelude");
+        for declaration in [
+            "data DualFin : Nat -> Type where { DualFZ : (n : Nat) -> DualFin (Suc n); DualFS : (n : Nat) -> DualFin n -> DualFin (Suc n) }",
+            "data DualEnv (a : Type) : Nat -> Type where { DualNil : DualEnv a Zero; DualCons : (n : Nat) -> a -> DualEnv a n -> DualEnv a (Suc n) }",
+            "fn dual_lookup (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : a = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ x }; DualFS m j ↦ match xs { DualCons k x rest ↦ dual_lookup a m rest j } }",
+            "fn dual_lookup_peer (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : a = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ x }; DualFS m j ↦ match xs { DualCons k x rest ↦ dual_lookup_peer a m rest j } }",
+            "data DualTagged (a : Type) : Type where { DualTag : Nat -> a -> DualTagged a }",
+        ] {
+            env.elaborate_decl(declaration)
+                .unwrap_or_else(|error| panic!("T2 fixture {declaration}: {error:?}"));
+        }
+        let trust = env.env.trusted_base();
+        let source = "theorem t2 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : Equal (DualTagged a) (DualTag a Zero (dual_lookup a n xs i)) (DualTag a Zero (dual_lookup_peer a n xs i)) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; DualFS m j ↦ match xs { DualCons k x rest ↦ t2 a m rest j } }";
+        env.elaborate_decl(source)
+            .expect("corrected T2 must check through the nested-index convoy");
+        assert_eq!(env.env.trusted_base(), trust, "T2 adds no trusted identity");
+    });
+}
