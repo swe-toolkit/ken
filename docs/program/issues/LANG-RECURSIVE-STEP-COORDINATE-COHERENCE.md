@@ -62,6 +62,12 @@ D0 first: the Architect rules the design. The research pull is done
 Then one coordinate for goal, fields and recursive call after the split,
 with the IH at that coordinate.
 
+**Carried from the convoy WP (Architect `evt_1kc148cfjm929`).** It changes
+no behaviour and needs no gate of its own. In `elab.rs`, move
+`mentions_enclosing_refinement` above `compute_context_convoy`'s doc block,
+and move `convoy_entry_order` out of the middle of `convoy_binder_types`'s
+doc comment.
+
 ## Acceptance
 
 - **AC-1.** T3 elaborates and checks, and the pinned T2 row stays green.
