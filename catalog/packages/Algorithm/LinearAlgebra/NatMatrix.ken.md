@@ -34,16 +34,6 @@ import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l)
 
-fn prepend (n : Nat) (x : Nat) (column : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n x column
-
-fn prepend_zero (n : Nat) (row : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n Zero row
-
-fn repeat (a : Type) (n : Nat) (x : a) : Vec a n =
-  match n {
-    Zero ↦ VNil a;
-    Suc k ↦ VCons a k x (repeat a k x)
-  }
-
 pub fn vector_add (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Vec Nat n =
   zip_with Nat Nat Nat n add xs ys
 
@@ -70,14 +60,6 @@ pub fn transpose (m : Nat) (n : Nat) (rows : Vec (Vec Nat n) m) : Vec (Vec Nat m
     VCons k row tail_rows ↦
       zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) row (transpose k n tail_rows)
   }
-
-fn row_product_columns
-      (n : Nat) (p : Nat) (row : Vec Nat n) (columns : Vec (Vec Nat n) p)
-    : Vec Nat p =
-  map (Vec Nat n) Nat p (λcolumn. dot n row column) columns
-
-fn row_product (n : Nat) (p : Nat) (right : Vec (Vec Nat p) n) (row : Vec Nat n) : Vec Nat p =
-  row_product_columns n p row (transpose n p right)
 
 pub fn matrix_product
       (m : Nat) (n : Nat) (p : Nat) (left : Vec (Vec Nat n) m) (right : Vec (Vec Nat p) n)
@@ -129,44 +111,6 @@ pub theorem dot_comm
       }
   }
 
-theorem swap_middle
-      (a : Nat) (b : Nat) (c : Nat)
-    : Equal Nat (add (add a b) c) (add (add a c) b) =
-  trans
-    Nat
-    (add (add a b) c)
-    (add a (add b c))
-    (add (add a c) b)
-    (sym Nat (add a (add b c)) (add (add a b) c) ((proof assoc for add) a b c))
-    (trans
-      Nat
-      (add a (add b c))
-      (add a (add c b))
-      (add (add a c) b)
-      (cong Nat Nat (add b c) (add c b) (λz. add a z) ((proof comm for add) b c))
-      ((proof assoc for add) a c b))
-
-theorem add_shuffle
-      (a : Nat) (b : Nat) (c : Nat) (d : Nat)
-    : Equal Nat (add (add a b) (add c d)) (add (add a c) (add b d)) =
-  trans
-    Nat
-    (add (add a b) (add c d))
-    (add (add (add a b) c) d)
-    (add (add a c) (add b d))
-    ((proof assoc for add) (add a b) c d)
-    (trans
-      Nat
-      (add (add (add a b) c) d)
-      (add (add (add a c) b) d)
-      (add (add a c) (add b d))
-      (cong Nat Nat (add (add a b) c) (add (add a c) b) (λz. add z d) (swap_middle a b c))
-      (sym
-        Nat
-        (add (add a c) (add b d))
-        (add (add (add a c) b) d)
-        ((proof assoc for add) (add a c) b d)))
-
 pub theorem dot_distrib
       (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) (zs : Vec Nat n)
     : Equal Nat (dot n (vector_add n xs ys) zs) (add (dot n xs zs) (dot n ys zs)) =
@@ -213,6 +157,159 @@ pub theorem dot_distrib
           }
       }
   }
+
+pub theorem transpose_invol
+      (m : Nat) (n : Nat) (rows : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (transpose n m (transpose m n rows)) rows =
+  match rows {
+    VNil ↦ transpose_zero_repeat n;
+    VCons k row rest ↦
+      trans
+        (Vec (Vec Nat n) (Suc k))
+        (transpose n (Suc k) (transpose (Suc k) n (VCons (Vec Nat n) k row rest)))
+        (VCons (Vec Nat n) k row (transpose n k (transpose k n rest)))
+        (VCons (Vec Nat n) k row rest)
+        (transpose_zip_cons k n row (transpose k n rest))
+        (cong
+          (Vec (Vec Nat n) k)
+          (Vec (Vec Nat n) (Suc k))
+          (transpose n k (transpose k n rest))
+          rest
+          (VCons (Vec Nat n) k row)
+          (transpose_invol k n rest))
+  }
+
+pub theorem vector_identity
+      (n : Nat) (v : Vec Nat n)
+    : Equal (Vec Nat n) (matrix_vector n n (identity n) v) v =
+  match v {
+    VNil ↦ Proved;
+    VCons k x tail ↦
+      let
+        head = dot (Suc k) (VCons Nat k (Suc Zero) (repeat Nat k Zero)) (VCons Nat k x tail);
+        rest_rows = map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k);
+        old_tail = matrix_vector k (Suc k) rest_rows (VCons Nat k x tail);
+        new_tail = matrix_vector k k (identity k) tail
+      in
+        trans
+          (Vec Nat (Suc k))
+          (VCons Nat k head old_tail)
+          (VCons Nat k x new_tail)
+          (VCons Nat k x tail)
+          (trans
+            (Vec Nat (Suc k))
+            (VCons Nat k head old_tail)
+            (VCons Nat k x old_tail)
+            (VCons Nat k x new_tail)
+            (cong
+              Nat
+              (Vec Nat (Suc k))
+              head
+              x
+              (λv2. VCons Nat k v2 old_tail)
+              (dot_one_head k x tail))
+            (cong
+              (Vec Nat k)
+              (Vec Nat (Suc k))
+              old_tail
+              new_tail
+              (VCons Nat k x)
+              (matrix_vector_zero_prefix k k (identity k) x tail)))
+          (cong
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            new_tail
+            tail
+            (VCons Nat k x)
+            (vector_identity k tail))
+  }
+
+pub theorem matrix_identity_right
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (matrix_product m n n a (identity n)) a =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        old_head = row_product n n (identity n) row;
+        old_tail = matrix_product k n n rest (identity n)
+      in
+        trans
+          (Vec (Vec Nat n) (Suc k))
+          (VCons (Vec Nat n) k old_head old_tail)
+          (VCons (Vec Nat n) k row old_tail)
+          (VCons (Vec Nat n) k row rest)
+          (cong
+            (Vec Nat n)
+            (Vec (Vec Nat n) (Suc k))
+            old_head
+            row
+            (λv. VCons (Vec Nat n) k v old_tail)
+            (row_right_identity n row))
+          (cong
+            (Vec (Vec Nat n) k)
+            (Vec (Vec Nat n) (Suc k))
+            old_tail
+            rest
+            (VCons (Vec Nat n) k row)
+            (matrix_identity_right k n rest))
+  }
+
+fn prepend (n : Nat) (x : Nat) (column : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n x column
+
+fn prepend_zero (n : Nat) (row : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n Zero row
+
+fn repeat (a : Type) (n : Nat) (x : a) : Vec a n =
+  match n {
+    Zero ↦ VNil a;
+    Suc k ↦ VCons a k x (repeat a k x)
+  }
+
+fn row_product_columns
+      (n : Nat) (p : Nat) (row : Vec Nat n) (columns : Vec (Vec Nat n) p)
+    : Vec Nat p =
+  map (Vec Nat n) Nat p (λcolumn. dot n row column) columns
+
+fn row_product (n : Nat) (p : Nat) (right : Vec (Vec Nat p) n) (row : Vec Nat n) : Vec Nat p =
+  row_product_columns n p row (transpose n p right)
+
+theorem swap_middle
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (add (add a b) c) (add (add a c) b) =
+  trans
+    Nat
+    (add (add a b) c)
+    (add a (add b c))
+    (add (add a c) b)
+    (sym Nat (add a (add b c)) (add (add a b) c) ((proof assoc for add) a b c))
+    (trans
+      Nat
+      (add a (add b c))
+      (add a (add c b))
+      (add (add a c) b)
+      (cong Nat Nat (add b c) (add c b) (λz. add a z) ((proof comm for add) b c))
+      ((proof assoc for add) a c b))
+
+theorem add_shuffle
+      (a : Nat) (b : Nat) (c : Nat) (d : Nat)
+    : Equal Nat (add (add a b) (add c d)) (add (add a c) (add b d)) =
+  trans
+    Nat
+    (add (add a b) (add c d))
+    (add (add (add a b) c) d)
+    (add (add a c) (add b d))
+    ((proof assoc for add) (add a b) c d)
+    (trans
+      Nat
+      (add (add (add a b) c) d)
+      (add (add (add a c) b) d)
+      (add (add a c) (add b d))
+      (cong Nat Nat (add (add a b) c) (add (add a c) b) (λz. add z d) (swap_middle a b c))
+      (sym
+        Nat
+        (add (add a c) (add b d))
+        (add (add (add a c) b) d)
+        ((proof assoc for add) (add a c) b d)))
 
 theorem transpose_zip_cons_empty
       (k : Nat)
@@ -293,27 +390,6 @@ theorem transpose_zero_repeat
   match n {
     Zero ↦ Proved;
     Suc k ↦ Proved
-  }
-
-pub theorem transpose_invol
-      (m : Nat) (n : Nat) (rows : Vec (Vec Nat n) m)
-    : Equal (Vec (Vec Nat n) m) (transpose n m (transpose m n rows)) rows =
-  match rows {
-    VNil ↦ transpose_zero_repeat n;
-    VCons k row rest ↦
-      trans
-        (Vec (Vec Nat n) (Suc k))
-        (transpose n (Suc k) (transpose (Suc k) n (VCons (Vec Nat n) k row rest)))
-        (VCons (Vec Nat n) k row (transpose n k (transpose k n rest)))
-        (VCons (Vec Nat n) k row rest)
-        (transpose_zip_cons k n row (transpose k n rest))
-        (cong
-          (Vec (Vec Nat n) k)
-          (Vec (Vec Nat n) (Suc k))
-          (transpose n k (transpose k n rest))
-          rest
-          (VCons (Vec Nat n) k row)
-          (transpose_invol k n rest))
   }
 
 theorem dot_zero_left
@@ -416,51 +492,6 @@ theorem matrix_vector_zero_prefix
             right_tail
             (VCons Nat k new_head)
             (matrix_vector_zero_prefix k n rest x tail))
-  }
-
-pub theorem vector_identity
-      (n : Nat) (v : Vec Nat n)
-    : Equal (Vec Nat n) (matrix_vector n n (identity n) v) v =
-  match v {
-    VNil ↦ Proved;
-    VCons k x tail ↦
-      let
-        head = dot (Suc k) (VCons Nat k (Suc Zero) (repeat Nat k Zero)) (VCons Nat k x tail);
-        rest_rows = map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k);
-        old_tail = matrix_vector k (Suc k) rest_rows (VCons Nat k x tail);
-        new_tail = matrix_vector k k (identity k) tail
-      in
-        trans
-          (Vec Nat (Suc k))
-          (VCons Nat k head old_tail)
-          (VCons Nat k x new_tail)
-          (VCons Nat k x tail)
-          (trans
-            (Vec Nat (Suc k))
-            (VCons Nat k head old_tail)
-            (VCons Nat k x old_tail)
-            (VCons Nat k x new_tail)
-            (cong
-              Nat
-              (Vec Nat (Suc k))
-              head
-              x
-              (λv2. VCons Nat k v2 old_tail)
-              (dot_one_head k x tail))
-            (cong
-              (Vec Nat k)
-              (Vec Nat (Suc k))
-              old_tail
-              new_tail
-              (VCons Nat k x)
-              (matrix_vector_zero_prefix k k (identity k) x tail)))
-          (cong
-            (Vec Nat k)
-            (Vec Nat (Suc k))
-            new_tail
-            tail
-            (VCons Nat k x)
-            (vector_identity k tail))
   }
 
 theorem transpose_zero_prefix_rows
@@ -652,37 +683,6 @@ theorem row_right_identity
         row
         (map_cong (Vec Nat n) Nat n f g (λcol. dot_comm n row col) (identity n))
         (vector_identity n row))
-
-pub theorem matrix_identity_right
-      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m)
-    : Equal (Vec (Vec Nat n) m) (matrix_product m n n a (identity n)) a =
-  match a {
-    VNil ↦ Proved;
-    VCons k row rest ↦
-      let
-        old_head = row_product n n (identity n) row;
-        old_tail = matrix_product k n n rest (identity n)
-      in
-        trans
-          (Vec (Vec Nat n) (Suc k))
-          (VCons (Vec Nat n) k old_head old_tail)
-          (VCons (Vec Nat n) k row old_tail)
-          (VCons (Vec Nat n) k row rest)
-          (cong
-            (Vec Nat n)
-            (Vec (Vec Nat n) (Suc k))
-            old_head
-            row
-            (λv. VCons (Vec Nat n) k v old_tail)
-            (row_right_identity n row))
-          (cong
-            (Vec (Vec Nat n) k)
-            (Vec (Vec Nat n) (Suc k))
-            old_tail
-            rest
-            (VCons (Vec Nat n) k row)
-            (matrix_identity_right k n rest))
-  }
 ```
 
 ## 3. Using it
