@@ -1,7 +1,7 @@
 ---
 id: RT-PENDING-CALL-ERR-PAYLOAD-ADMISSION
 title: "Pending-call admission refuses the px7m dynamic-error route at (E): the deferred Effect has free Var(1), but its selected operation supplies one field, so the response owner's frame never receives that binder. Build the response-owner environment extension with the J-a join accounting so px7m err runs natively with interpreter parity"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
