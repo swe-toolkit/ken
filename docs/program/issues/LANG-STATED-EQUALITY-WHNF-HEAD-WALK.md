@@ -63,7 +63,7 @@ D0 first. The Architect rules one rule for the walk that covers both
 findings, for example reading the head after the consumer's own `whnf`
 step, or advancing through every head `whnf` reduces through, and whether
 the revisit guard survives. Then the repair, confined to
-`stated_equality`.
+`stated_equality` and its two consumers.
 
 ## Acceptance
 
