@@ -4573,11 +4573,6 @@ fn plan_coherent_frame_motive(
         probe_context_convoy.clone()
     };
     if equation_convoy {
-        if !selector_convoy.is_empty() && !forced_telescope_convoy {
-            return Err(ElabError::Internal(
-                "index-equation convoy unexpectedly overlaps an ambient context convoy".into(),
-            ));
-        }
         if let Some(motive_user_body) = build_index_equation_convoy_body(
             cx,
             &zonked_ctx,
