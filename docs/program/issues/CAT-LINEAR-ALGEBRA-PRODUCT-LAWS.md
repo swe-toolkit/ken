@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-PRODUCT-LAWS
 title: "Spec 65 section 2 states left matrix identity and matrix-product associativity as proved, but Algorithm.LinearAlgebra.NatMatrix exports neither. Deliver both laws at zero trust, through the private named helper the D0 checked, and pin vector_scale's factor"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
