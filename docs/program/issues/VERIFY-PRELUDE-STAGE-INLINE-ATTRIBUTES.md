@@ -1,7 +1,7 @@
 ---
 id: VERIFY-PRELUDE-STAGE-INLINE-ATTRIBUTES
 title: "LANG-ELAB-RECURSIVE-FRAME-BUDGET left three prelude stages with a duplicated #[inline(never)] and three siblings with none. rustc is moving the duplicate toward a hard error. Place one attribute per stage and remeasure the prelude frame"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2
