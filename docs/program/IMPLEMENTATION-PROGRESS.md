@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-13 12:34:36Z — from 974 issue file(s) in `docs/program/issues/`.
+2026-10-13 12:48:25Z — from 974 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -788,7 +788,7 @@ the committed file matches the generator's output.
 | `RT-OWNER-VIS-RETURN-PROTOCOL` | Carry a grafted continuation's Vis and its K back across a generated response-owner boundary, so the owner accepts a conforming non-Ret result instead of trapping at its Ret-tag check | merged | runtime | L | architect | — |
 | `RT-PARITY-NATIVE-GOLDEN-REBASELINE` | Re-baseline every stale rt_parity_native checked_ih_* golden (census at base — four measured at 60c482cb8: two duplicated direct-origin 741/759, the admission-population set, and the confluence W0/W1 coordinate) so the native-slow CI job goes green, converting brittle absolute ids to relationship/cardinality assertions | merged | runtime | S | none | — |
 | `RT-PARITY` | interpreter/native parity erratum (adversary F5 + F6) | closed | runtime | M | none | — |
-| `RT-PENDING-CALL-ERR-PAYLOAD-ADMISSION` | Pending-call admission refuses the px7m dynamic-error route at (E): the deferred Effect has free Var(1), but its selected operation supplies one field, so the response owner's frame never receives that binder. Build the response-owner environment extension with the J-a join accounting so px7m err runs natively with interpreter parity | active | runtime | M | architect | — |
+| `RT-PENDING-CALL-ERR-PAYLOAD-ADMISSION` | Pending-call admission refuses the px7m dynamic-error route at (J): the selected ERR leaf relocates joins that no accounting covers, because J-a's accounting is deferred. Account for the leaf's relocated joins so px7m err runs natively with interpreter parity | active | runtime | M | architect | — |
 | `RT-PENDING-ROUTE-CONTINUATION-DROP` | An owner-validated pending route runs natively only when the owner runs the selected leaf's whole continuation; otherwise it is refused at compile time with its admission reason, never a silent drop and never a planner-invariant ICE | merged | runtime | M | architect | — |
 | `RT-PLANNED-CLOSURE-PREEXISTENCE` | Suppression cannot answer closure pre-existence because it removes the observation point along with the crossing -- ask the PLANNER instead: does the planned occurrence at origin 5 carry a closure-typed field 0 by construction? | merged | runtime | S | none | https://github.com/swe-toolkit/ken/pull/2317 |
 | `RT-PLANNER-AGGREGATES-SPLIT` | Move the aggregates domain out of planning/static_transition.rs -- aggregate allocation events, relation closures and their planner-side lifecycle | merged | runtime | M | none | — |
