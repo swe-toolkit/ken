@@ -250,29 +250,29 @@ fn recursive_backedge_refusal_does_not_mark_scalar_admission() {
 }
 
 /// Spec 42 §5; 45 §4. Promise: durable scalar-join gate invariant.
-/// MEASURED: with a consumed checked-root exit site and the same selected
-/// result-position Ret arm, a nonroot unit refuses scalar admission while the
-/// root unit unwraps and accepts it. An unselected root join also refuses.
-/// CLAIMED: the root-unit and result-position predicates independently guard
-/// Ret unwrapping at the real scalar consumer. GAP: this direct seam fixture
-/// seeds a function-local result set; it does not prove that a surface source
-/// currently emits a nonroot terminal Ret scalar join. The CLI suite covers the
-/// generated-context Ret, and reports the separate source reachability limit.
+/// MEASURED: with a consumed checked-root exit site, a selected result-position
+/// Ret whose payload is the process exit unwraps and is admitted as ExitCode;
+/// the same Ret at an unselected join refuses; a selected Ret carrying a
+/// non-exit Int refuses, and so does an unselected one. CLAIMED: the
+/// result-position and exit-payload predicates independently guard Ret
+/// unwrapping at the real scalar consumer, and the unit's root status is not
+/// consulted. GAP: the nonroot exit-by-tail-call source shape is covered by
+/// px8l `dynamic_zero_seed_takes_the_base_case`, not by this direct seam.
 #[test]
-fn root_unit_and_result_origin_independently_guard_ret_scalar_join() {
+fn result_origin_and_exit_payload_independently_guard_ret_scalar_join() {
     let seed_env =
         NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
     let source = RuntimeExpr::Value(RuntimeValue::Int(37.into()));
     let (_, join_origin) = planned_root_occurrence(&source);
-    for (root, selected, accept) in [
+    for (selected, exit, accept) in [
+        (true, true, true),
         (false, true, false),
         (true, false, false),
-        (true, true, true),
+        (false, false, false),
     ] {
         let mut lowering = root_authority_test_lowering(&seed_env);
         lowering.consumed_join_sites.insert(0);
         assert!(lowering.has_checked_root_exit_representation());
-        lowering.function_local.root_unit = root;
         if selected {
             lowering
                 .function_local
@@ -285,14 +285,19 @@ fn root_unit_and_result_origin_independently_guard_ret_scalar_join() {
         let entry = builder.create_block();
         builder.switch_to_block(entry);
         let value = builder.ins().iconst(types::I64, 37);
+        let payload = if exit {
+            Lowered::ProcessExitStatus { value }
+        } else {
+            Lowered::Int {
+                value,
+                known: Some(37),
+            }
+        };
         let ret = LoweringOperand::Specialized(Lowered::Constructor {
             constructor: "ctor:prelude::ITree::Ret".to_string(),
             synthesized_identity: None,
             occurrence: None,
-            args: vec![ConstructorField::Specialized(Lowered::Int {
-                value,
-                known: Some(37),
-            })],
+            args: vec![ConstructorField::Specialized(payload)],
         });
         let result = lowering.merge_scalar_operand(
             &mut builder,
@@ -302,16 +307,22 @@ fn root_unit_and_result_origin_independently_guard_ret_scalar_join() {
             "a seeded result-position join",
         );
         if accept {
-            assert!(matches!(result, Ok((_, ScalarMergeKind::Int))));
+            assert!(
+                matches!(result, Ok((_, ScalarMergeKind::ExitCode))),
+                "{selected} {exit}"
+            );
             assert!(!lowering.scalar_operand_refused);
         } else {
-            assert!(matches!(
-                result,
-                Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    construct: "a seeded result-position join",
-                    reason,
-                })) if reason == "dynamic arms must produce scalar Int or Bool values"
-            ));
+            assert!(
+                matches!(
+                    result,
+                    Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                        construct: "a seeded result-position join",
+                        reason,
+                    })) if reason == "dynamic arms must produce scalar Int or Bool values"
+                ),
+                "{selected} {exit}"
+            );
             assert!(lowering.scalar_operand_refused);
         }
     }
@@ -491,7 +502,6 @@ pub(in crate::cranelift_backend::lowering) fn root_authority_test_lowering<'a>(s
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
-            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,
@@ -681,7 +691,6 @@ fn run_px8j_malformed_recursor_consumer(
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
-            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,
@@ -2744,7 +2753,6 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             declaration_calls: BTreeMap::new(),
             trap_exit: None,
             terminal_result_origins: BTreeSet::new(),
-            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,

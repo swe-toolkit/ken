@@ -1171,7 +1171,6 @@ impl ArtifactHelpers<'_> {
             declaration_calls: BTreeMap::new(),
             trap_exit,
             terminal_result_origins: BTreeSet::new(),
-            root_unit: false,
             consumed_join_origins: BTreeSet::new(),
             dispositioned_join_origins: BTreeSet::new(),
             join_disposition_finalized: false,
@@ -1530,8 +1529,6 @@ struct FunctionLocalRefs {
     /// position. Process-exit constructors are normalized only at these
     /// occurrences, never merely because an exit-shaped value appears nested.
     terminal_result_origins: BTreeSet<StaticOriginId>,
-    /// Root status of this generated function, not an object-wide exit convention.
-    root_unit: bool,
     /// Join-plan entries consumed while defining this function.  Each
     /// `FunctionLocalRefs` is freshly declared for one generated function, so
     /// this set cannot alias consumption across unit bodies.

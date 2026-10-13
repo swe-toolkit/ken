@@ -2629,15 +2629,35 @@ impl<'a> Lowering<'a> {
                     )),
                 };
             }
-            // A Ret arm is terminal only at a result-position join of the root
-            // unit. Else the scalar refusal feeds back to a carrier-word join.
-            let root_terminal_join = self.has_checked_root_exit_representation()
-                && self.function_local.root_unit
+            // A Ret arm is unwrapped only at a result-position join, and only
+            // when its payload is the process exit. The unit's root status is
+            // not the property: a nonroot declaration can answer the process
+            // exit through a tail call. Any other Ret refuses here, and the
+            // scalar refusal feeds back to a carrier-word join.
+            let ret_carries_exit = match &lowered {
+                Lowered::Constructor { constructor, args, .. }
+                    if constructor.ends_with("::ITree::Ret") && args.len() == 1 =>
+                {
+                    match &args[0] {
+                        ConstructorField::Specialized(Lowered::ProcessExitStatus { .. }) => true,
+                        ConstructorField::Specialized(Lowered::Constructor {
+                            constructor: inner, ..
+                        }) => {
+                            *inner == self.process_symbols.exit_success
+                                || *inner == self.process_symbols.exit_failure
+                        }
+                        _ => false,
+                    }
+                }
+                _ => false,
+            };
+            let exit_terminal_join = self.has_checked_root_exit_representation()
+                && ret_carries_exit
                 && join_origin.is_some_and(|origin| {
                     self.function_local.terminal_result_origins.contains(&origin)
                 });
             let checked_root_exit_representation = self.has_checked_root_exit_representation();
-            let lowered = if root_terminal_join {
+            let lowered = if exit_terminal_join {
                 Self::unwrap_terminal_ret(lowered)
             } else {
                 lowered
