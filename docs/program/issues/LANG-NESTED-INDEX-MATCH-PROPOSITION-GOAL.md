@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL
 title: "A dependent match on a second vector at a constructor-refined index checks only when the goal is syntactically Term::Eq. The coherent-frame convoy gates on goal syntax, so a goal that is a variable application or Equal at a data type leaves the inner scrutinee unrefined. Close the predicate to any proposition"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
@@ -84,9 +84,41 @@ defect, a λ-headed redex reaching kernel inference, and moves to
 ## Stop conditions
 
 - Any kernel, conversion or `trusted_base()` change.
-- A catalog census row or an Eq-goal row changes, or the false twin
-  checks. The Eq-goal rows include those of
-  `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`; the Architect ruled the
-  order free because they take the unchanged Eq arm.
+- Restated by the Architect (`evt_hvk99ype841v`), replacing "an Eq-goal
+  row changes", which was keyed on surface spelling rather than the
+  planner's goal. Each is advancing:
+  - a row accepted on base is refused, or changes diagnostic class, other
+    than the authorized `dual_false` re-pin;
+  - a new `Internal` appears on any row or census file;
+  - a newly accepted row adds a `trusted_base()` entry, or the false twin
+    checks.
+
+  A row going from refused to accepted with no trust delta is recorded,
+  not a stop.
 - The embedded planner raises "changed the embedded-eliminator
   population" or an ill-typed-ambient Internal on any census file.
+
+## Closeout
+
+Merged `033c19fa7` from exact `0f2247b04` (PR #4710). Language QA
+`evt_268d05xtfzqgr`; Architect `evt_ygrc5ga8cvwn` with Decision
+`dec_2wk69frs7wkw1`. The first route, `d555d6ba3` (PR #4707), failed CI:
+an in-crate `#[cfg(test)]` caller still passed the deleted argument
+(E0061). The respin deleted that one argument. QA on `d555d6ba3`
+(`evt_2a0df0pkwjz4t`) carries over for unchanged content.
+
+- `goal_is_proposition` reads the goal's checked sort as `Omega`. Both
+  planner entries share it, and site 3 builds the recursive transport from
+  `Omega(l)` when the goal is not a syntactic `Eq`. The kernel stays the
+  arbiter.
+- `defer_coupled_expansion` is deleted from `plan_coherent_frame_motive`,
+  closing the carry from `evt_23ne4fxf29f0x`.
+- Pinned rows: `vec_pair_ind` (direct and result-binder), the wrong-index
+  twin at kernel `TypeMismatch`, and RECURSIVE-STEP's T2, each with exact
+  `trusted_base()` identity. The false `Refl` row pins its own shape
+  error.
+- **Carries:**
+  - `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE` records T2 green and
+    narrows AC-1 to T3;
+  - the λ spelling of `left_head` stays with
+    `LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE`.

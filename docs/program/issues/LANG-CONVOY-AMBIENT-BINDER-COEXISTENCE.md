@@ -1,7 +1,7 @@
 ---
 id: LANG-CONVOY-AMBIENT-BINDER-COEXISTENCE
 title: "A true dependent-match proof fails when one more ambient binder is in scope: an unused binder typed at the index hits an internal assertion that the index-equation convoy overlaps an ambient context convoy, and an unused hypothesis carrying the goal's embedded eliminator makes the elaborator emit ill-typed core. Let both convoys coexist"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1

@@ -22,8 +22,13 @@ user-reachable failures are typed.
 
 ## Settled inputs (Architect `evt_3bfdj7qm0azt4`, WIP `1048192afa`)
 
-- **T2 and T3 are red** in the corrected spelling, in the convoy WP's
-  entry-1 shape. The found side casts `rest` to `DualEnv a m` through the
+- **T2 is green on `033c19fa7`.** `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`
+  admits it through site 3's checked-`Omega` arm and pins it as a positive
+  row with exact `trusted_base()` identity (Architect `evt_hvk99ype841v`,
+  Steward fork (i) `evt_6267xckj3mzbk`). The step-reachable control stays
+  `Internal` there.
+- **T3 is red** in the corrected spelling, in the convoy WP's entry-1
+  shape. The found side casts `rest` to `DualEnv a m` through the
   predecessor `Eq Nat k m` binder. The expected side keeps the target
   coordinate `k`.
 - **Two producers act in opposite directions.** At the T3 leaf (Nat,
@@ -40,10 +45,6 @@ user-reachable failures are typed.
   `check_large_convoy_recursive_arm` returns `None`.
 - **Prior art to pull at kickoff.** The Coq `depelim` solution and
   simplification step, and Lean `cases` substituting index equations.
-- **Carry (Architect `evt_23ne4fxf29f0x`).** After
-  `LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY`, `defer_coupled_expansion` is
-  an unused parameter of `plan_coherent_frame_motive`. If this WP touches
-  that planner, delete the parameter and its caller's computation.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
@@ -56,7 +57,7 @@ the split, with the IH at that coordinate.
 
 ## Acceptance
 
-- **AC-1.** T2 and T3 elaborate and check.
+- **AC-1.** T3 elaborates and checks, and the pinned T2 row stays green.
 - **AC-2.** The step-reachable control succeeds or returns a typed
   refusal. No `Internal` reaches the user from elab.rs ~:6886.
 - **AC-3 (control).** The convoy WP's T1, named-row and F4 rows, and its
