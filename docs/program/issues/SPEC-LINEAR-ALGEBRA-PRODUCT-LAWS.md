@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS
 title: "Spec 65 gates left matrix identity and product associativity on LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL, but the Architect measured left identity checking on the landed elaborator through a named helper. Add section 2: left identity as a proved law, and associativity proved or gated on its measured prerequisite"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
@@ -68,3 +68,22 @@ base, stop and report the mismatch.
 
 - Left identity does not check on the landed base with a named helper.
 - A law needs a kernel, trust, syntax or `Float` change.
+
+## Closeout
+
+Merged `a512daa5b` from exact `b2fee01d2` (PR #4708). Conformance
+validator `evt_4k931m2bek06r`; Architect `evt_7k17n5x6tsqns` with Decision
+`dec_63qct10tb3ffh`. Architect D0 `evt_41pxr8vn2mchx` checked both laws
+generically on `e940e481c`.
+
+- Spec 65 section 2 states `matrix_identity_left` and
+  `matrix_product_assoc` as normative proved laws. Section 1.4 drops the
+  stale `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL` gate and names
+  `LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE` as the reason the
+  private helper is named.
+- `seed-nat-matrix.md` grows to twelve cases and thirteen positive closed
+  assertions, including the factor-three `vector_scale` row (Adversary
+  `evt_30w9qxvkmr0vm`).
+- **Carry:** `CAT-LINEAR-ALGEBRA-PRODUCT-LAWS` delivers both laws and owns
+  the package's section 7 count and the acceptance test's inventory, both
+  stale on `a512daa5b` until it lands.

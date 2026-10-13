@@ -1,7 +1,7 @@
 ---
 id: RT-INTERP-J-COMPUTATIONAL-REDUCTION
 title: "The interpreter has no Term::J arm, so a closed, ground J whose motive is a data type evaluates to Neutral where the kernel gives a constructor. CAT-GRAPHS-DEPENDENCY's public Cycle return walk is such a J. Reduce J in the interpreter as the kernel does"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
@@ -38,8 +38,10 @@ derives, as spec 42 §3.6 requires.
   gives Neutral for its step count and edges on every measured cycle; the
   kernel gives Bool two_cycle 1, part_cycle 1, tri 2, selfc 0, tri-dup 2.
   `cat_graphs_dependency.rs` ~:669 narrows that row to kernel-only checks.
-- **Ignored row.** `ds5b_dependent_match_refinement_acceptance.rs` carries
-  an ignored row labelled "ken-interp has no `Term::J` reduction arm".
+- **No ignored row remains.** The `ds5b` row labelled "ken-interp has no
+  `Term::J` reduction arm" left the suite in `e41f7589e`. On `0568688cb`,
+  no `#[ignore]` row under `crates/` cites a missing J arm (D0
+  `evt_7swzx84np0qav`; Steward `evt_7nyxbwt3m3vdt` struck AC-3).
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
@@ -57,13 +59,15 @@ at D0, including whether a proof-valued (`Omega`) J stays erased.
   (evaluation, erasure, caches) by mechanism with `file:line`, and what
   the interpreter's cast path does with the kernel's non-`refl` result.
   The Architect rules the arm.
-- **AC-1.** The three minimal rows evaluate to the kernel's constructor
-  (1, 1, 2).
+- **AC-1.** Three `eval_checked` rows evaluate to the kernel's
+  constructor, each paired with an accepted kernel theorem and a rejected
+  wrong twin: `tr True Proved` = 1, `trId True Proved` = 2, and the
+  Architect's value-argument row `tv (Suc Zero) Proved` = 1 (`J (λp _. Nat)
+  n h` over `Equal Nat (same_nat n) n`). The Adversary's third source was
+  unavailable (Steward `evt_42tsz9t8r26dp`).
 - **AC-2.** The graph `Cycle` return walk's step count and edges match the
   kernel on the five measured cycles, and the
   `cat_graphs_dependency.rs` row checks them at runtime, not kernel-only.
-- **AC-3.** The ignored `ds5b` J row is run: un-ignored if it now passes,
-  otherwise its remaining blocker is named and it stays ignored.
 - **AC-4 (control).** Proof-term J in cast evidence keeps its current
   behaviour unless the Architect rules otherwise, and the `ds5b` suite's
   other rows stay green.

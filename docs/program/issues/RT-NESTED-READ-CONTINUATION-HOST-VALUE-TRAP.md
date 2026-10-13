@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-READ-CONTINUATION-HOST-VALUE-TRAP
 title: "A second readFile inside a selected arm, whose continuation inspects a host value (bytes_at or bytes_length of a read payload, or a match on the first read's captured response), builds natively and traps UnclassifiedRuntimeTrap { terminal_value: -1 } at a carrier-class or carrier-tag check, while the interpreter returns a value. Since cc0e6f2b6 the outer-Option rows build instead of refusing. Make each row run at parity or refuse at build"
-status: active
+status: merged
 owner: runtime
 size: M
 tier: T1
@@ -75,3 +75,21 @@ base, stop and report the mismatch.
   `7f1a04a40`, `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`) or bracket-tree
   work.
 - Any kernel, `trusted_base()` or spec change.
+
+## Closeout
+
+Merged `0568688cb` from exact `c20ae9c5e` (PR #4706). Runtime QA
+`evt_26gc2cy9yh4hv`; Architect `evt_7qzengx83qeap` with Decision
+`dec_kvkm40p07ygd`. The D0 (`evt_nx4wn5h84sse`) and the Architect's V3
+ruling (`evt_5vaawqk35b6x7`) replaced the earlier candidate
+`c474775e2`.
+
+- `bytes_at` and `bytes_length` admit both lawful carried byte classes.
+  All four second-read forms and both controls run at interpreter parity.
+- A `Ret` unwraps at a scalar join only when its payload is exit-bearing
+  and its join origin is a selected terminal result origin. Any other
+  `Ret` takes the carrier path. The dead `root_unit` field is deleted.
+- Residual, review-enforced: no fixture reaches an exit-bearing `Ret` at a
+  nonterminal join. The zero count is from the parent D0's census of 223
+  observations.
+- L1 moves to `RT-INTERP-J-COMPUTATIONAL-REDUCTION`.
