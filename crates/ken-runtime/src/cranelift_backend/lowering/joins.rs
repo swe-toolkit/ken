@@ -2299,6 +2299,47 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
+        /// Close the planned joins lowered by this response-owner function's
+        /// own copy of its effect and operation-argument subtrees.
+        pub(super) fn validate_response_join_plan_consumption(
+            &mut self,
+            required: &BTreeSet<StaticOriginId>,
+        ) -> Result<(), CraneliftBackendError> {
+            self.close_statically_unselected_match_cases()?;
+            let outcome = self.finalize_join_disposition(required);
+            #[cfg(any(test, feature = "checked-ih-realization-observation"))]
+            if outcome.is_ok() {
+                if let Some(GraftedSpineFunctionScope::Response(id)) =
+                    self.function_local.grafted_spine_scope
+                {
+                    record_checked_ih_realization_observation(
+                        CheckedIhRealizationObservation::ResponseJoinCloseout {
+                            owner: id.ordinal(),
+                            required: required
+                                .iter()
+                                .map(|origin| origin.observation_ordinal())
+                                .collect(),
+                            consumed: self
+                                .function_local
+                                .consumed_join_origins
+                                .iter()
+                                .map(|origin| origin.observation_ordinal())
+                                .collect(),
+                            dispositioned: self
+                                .function_local
+                                .dispositioned_join_origins
+                                .iter()
+                                .map(|origin| origin.observation_ordinal())
+                                .collect(),
+                        },
+                    );
+                }
+            }
+            outcome
+        }
+}
+
+impl<'a> Lowering<'a> {
         fn finalize_join_disposition(
             &mut self,
             required: &BTreeSet<StaticOriginId>,
@@ -2396,7 +2437,7 @@ impl<'a> Lowering<'a> {
 }
 
 impl<'a> Lowering<'a> {
-        fn validate_materialized_dead_join_cfg_for(
+        pub(super) fn validate_materialized_dead_join_cfg_for(
             &self,
             required: &BTreeSet<StaticOriginId>,
             func: &Function,

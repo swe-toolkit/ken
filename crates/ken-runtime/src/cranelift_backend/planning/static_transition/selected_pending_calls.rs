@@ -652,8 +652,8 @@ fn admit_validated_owner(
 /// Every Vis in a leaf's constructor and declared worker subtree is classified
 /// before the producer is admitted. This is a whole-producer decision, not a
 /// per-leaf fallback. (E) reads the explicit lowering environments constructed
-/// by the response owner, not its wider frame; (J) accounts for the joins a
-/// Specialized operation skips when its emitter returns a placeholder.
+/// by the response owner, not its wider frame; (J) accounts for both emissions
+/// that lower a Specialized operation's planned joins and close them out.
 fn selected_leaf_response_witness(
     plan: &StaticTransitionPlan<'_>,
     candidates: &[PendingCandidate],
@@ -715,7 +715,28 @@ fn selected_leaf_response_witness(
                 if response_owner != Some(owner) {
                     let operation = plan.semantic.child_origin(vis, 0)?;
                     relocated_joins = plan.source_join_origins_in_owner_subtree(operation)?;
-                    unaccounted_joins |= !relocated_joins.is_empty();
+                    if !relocated_joins.is_empty() {
+                        // The response owner lowers each copied operation argument
+                        // under its own join closeout. The issuer lowers the
+                        // operation ordinarily outside a Continuation scope, and
+                        // its unit has a separate join closeout for that copy.
+                        let mut copied = BTreeSet::new();
+                        for input in row.effect_environment() {
+                            if let super::StaticResponseEffectInput::OperationArgument {
+                                origin,
+                                ..
+                            } = input
+                            {
+                                copied.extend(plan.source_join_origins_in_owner_subtree(*origin)?);
+                            }
+                        }
+                        let issued = match plan.unique_emission_containing(operation)? {
+                            Some((function, body)) => plan.required_join_origins(function, body)?,
+                            None => BTreeSet::new(),
+                        };
+                        unaccounted_joins |= !(relocated_joins.is_subset(&copied)
+                            && relocated_joins.is_subset(&issued));
+                    }
                 }
             }
             // P1 Deferred rows have no handler-owned drive and fall through to
@@ -763,9 +784,9 @@ fn selected_leaf_response_witness(
             });
         }
     }
-    // An E failure must be visible before J for the same producer. J-a's
-    // accounting is deferred: no presently admitted row has nonempty R. Its
-    // complement refuses rather than making a selected join look unselected.
+    // An E failure must be visible before J for the same producer. J-a
+    // requires each relocated join in both the response owner's copied
+    // argument run and the issuer's required run. Either omission refuses.
     if !environment_closed {
         return Ok(Err(PendingRefusal::RelocatedWorkMissingLoweringBinding));
     }

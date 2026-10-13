@@ -3953,6 +3953,20 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
     let worker_targets = resolve_worker_targets(&compiler.static_transition_plan, bundle)?;
     let mut defined = 0usize;
     for emission in emissions {
+        // Derive this function's closeout from exactly the source inputs it
+        // lowers, including every pending-Vis successor's own effect inputs.
+        let mut required = BTreeSet::new();
+        for root in std::iter::once(emission.row.effect_origin())
+            .chain(emission.operation_arguments.keys().copied())
+            .chain(emission.successors.iter().flat_map(|successor| {
+                std::iter::once(successor.row.effect_origin())
+                    .chain(successor.operation_arguments.keys().copied())
+            }))
+        {
+            required.extend(
+                compiler.static_transition_plan.source_join_origins_in_owner_subtree(root)?,
+            );
+        }
         let id = bundle.response(emission.owner.id()).ok_or_else(|| {
             backend_module("a response owner was never forward-declared".to_string())
         })?;
@@ -4679,6 +4693,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
                 ret_abi_word,
             });
             }
+            compiler.validate_response_join_plan_consumption(&required)?;
             builder.seal_all_blocks();
             builder.finalize();
         }
@@ -4686,6 +4701,7 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
         frame_scope.close(compiler, &func)?;
         token_scope.close(compiler, &func)?;
         compiler.record_finished_grafted_spine_function(&func, bundle)?;
+        compiler.validate_materialized_dead_join_cfg_for(&required, &func)?;
         verify_cranelift_function(&func, module.isa())?;
         // The test-only Vis ingress bypasses finished-body verification as a
         // layer, whichever owner arm is emitted. No production build has this

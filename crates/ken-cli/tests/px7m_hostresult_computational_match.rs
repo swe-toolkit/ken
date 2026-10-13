@@ -382,12 +382,11 @@ fn owner_nonmember_refuses_at_the_loop_before_c2() {
 // RT-SRCBODY-BIND-ORDER commit.
 // It refuses at object emission, so the program never executes and no
 // binding order is observable in it.
-// Annotation only -- test body and expectations are unchanged.
+// Historical D10 attribution; the current parity row is governed below.
 #[test]
 // RT-SITEOP-CARRIED-WITNESS D1a/D2: FsReadFile Argument(0) was site-bound:
 // FileError SiteOperand(0) could not project its carried word. D5 byte-span
 // observation was not the blocker; D2 supplies the exact emitted-helper port.
-#[ignore = "RT-SELECTED-PENDING-CALL-BUILD: the selected ERR route refuses at admission J (SelectedPendingLeafRelocatesUnaccountedJoins). No native dynamic-error execution is claimed; the separate admission test pins the exact refusal reason."]
 fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
     assert_agreement(
         ERR_PROGRAM,
@@ -401,12 +400,16 @@ fn dynamic_err_payload_selects_a_multistep_tree_across_real_executors() {
     );
 }
 
-// Transition sentinel: the selected ERR route still relocates unaccounted
-// joins. If J-a accounting later admits it, this exact-refusal pin reddens;
-// checked-source planning alone does not establish native execution.
+// Promise class: durable invariant. MEASURED: the checked ERR producer has
+// a validated response owner, and both the issuer and that owner's own
+// emission close out the joins they actually consumed. CLAIMED: copies of
+// its operation are independently accounted per emission. THE GAP: these
+// records cover this fixture's selected producer, not all response owners;
+// the remaining rows run in the response-owner regression suites.
 #[test]
-fn dynamic_err_pending_route_refuses_unaccounted_relocated_joins() {
+fn dynamic_err_pending_route_accounts_joins_in_both_emissions() {
     let dir = output_dir("err-admission");
+    let scope = ken_runtime::checked_ih_realization_observation_scope();
     let (result, admissions) = ken_runtime::with_selected_pending_call_admissions(|| {
         ken_cli::build_native_program(
             ERR_PROGRAM,
@@ -416,20 +419,51 @@ fn dynamic_err_pending_route_refuses_unaccounted_relocated_joins() {
             ken_runtime::boundary_resource_profile::starter_smoke_profile(),
         )
     });
-    let relevant: Vec<_> = admissions.iter().filter_map(|row| match row.outcome {
-        ken_runtime::SelectedPendingCallOutcomeObservation::Refused(reason) => Some(reason),
+    let closeouts = scope.finish();
+    result.expect("the owner-validated ERR route must emit a native artifact");
+    let validated = admissions.iter().filter_map(|row| match &row.outcome {
+        ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner {
+            defining_function, candidates, ..
+        } => Some((*defining_function, candidates)),
         _ => None,
-    }).collect();
-    assert_eq!(relevant, [ken_runtime::PendingRefusal::SelectedPendingLeafRelocatesUnaccountedJoins],
-        "the checked ERR source must reach J's unaccounted-join refusal: {admissions:#?}");
-    assert!(!admissions.iter().any(|row| matches!(
-        row.outcome,
-        ken_runtime::SelectedPendingCallOutcomeObservation::ValidatedResponseOwner { .. }
-    )), "one refused producer must not gain an owner-validated route: {admissions:#?}");
-    let error = result.expect_err("a refused pending route cannot emit an artifact");
-    let text = error.to_string();
-    assert!(text.contains("unsupported runtime-IR lowering: PendingCallAdmission: refused pending call: SelectedPendingLeafRelocatesUnaccountedJoins"),
-        "the user must see the admission-J reason rather than a compiler ICE: {text}");
-    assert!(!text.contains("planner invariant") && !text.contains("compiler bug"),
-        "a classified admission refusal is not a compiler ICE: {text}");
+    }).collect::<Vec<_>>();
+    assert_eq!(validated.len(), 1, "one owner-validated pending producer: {admissions:#?}");
+    let (issuer_id, candidates) = validated[0];
+    assert!(candidates.iter().all(|candidate| matches!(
+        &candidate.callee,
+        ken_runtime::SelectedPendingCalleeObservation::StaticResponseOwner(_)
+    )), "C3 must not admit an ordinary-specialization-fed leaf: {candidates:#?}");
+    let leaf = candidates.iter().find(|candidate| candidate.arm == 0)
+        .expect("the ERR arm must be one of the selected leaves");
+    let ken_runtime::SelectedPendingCalleeObservation::StaticResponseOwner(owner_id) = &leaf.callee
+    else {
+        panic!("the ERR leaf must have a static response owner: {leaf:?}");
+    };
+    let issuer = closeouts.iter().filter_map(|row| match row {
+        ken_runtime::CheckedIhRealizationObservation::EmissionJoinCloseout {
+            function, required, consumed, ..
+        } if *function == issuer_id => Some((required, consumed)),
+        _ => None,
+    }).collect::<Vec<_>>();
+    assert_eq!(issuer.len(), 1, "the issuer must close out its own joins: {closeouts:#?}");
+    let (issuer_required, issuer_consumed) = issuer[0];
+    let response = closeouts.iter().filter_map(|row| match row {
+        ken_runtime::CheckedIhRealizationObservation::ResponseJoinCloseout {
+            owner, required, consumed, dispositioned
+        } if *owner == *owner_id => Some((required, consumed, dispositioned)),
+        _ => None,
+    }).collect::<Vec<_>>();
+    assert_eq!(response.len(), 1, "the response owner must close out its own joins: {closeouts:#?}");
+    let (response_required, response_consumed, response_dispositioned) = response[0];
+    assert!(!response_consumed.is_empty(), "the ERR operation has relocated join copies");
+    for origin in response_consumed {
+        assert!(response_required.contains(origin) && issuer_required.contains(origin)
+            && issuer_consumed.contains(origin),
+            "join {origin} must be covered and consumed in both emitted copies: {closeouts:#?}");
+    }
+    let covered = response_consumed.iter().chain(response_dispositioned.iter())
+        .copied().collect::<std::collections::BTreeSet<_>>();
+    let required = response_required.iter().copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(covered, required, "response closeout must cover its entire source set");
 }
