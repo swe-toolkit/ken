@@ -1446,9 +1446,10 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
 }
 
 /// `J` (`15 §4`): checked erasure left the equation, not its Ω proof.
-/// Compare only the closed endpoint values, never the motive (which can
-/// contain closures). Unequal endpoints transport through existing C5.
-/// A raw, unlowered J stays neutral.
+/// A statically regular transport returns the base without evaluating its
+/// erased endpoints. Otherwise compare only the closed endpoint values,
+/// never the motive (which can contain closures); unequal endpoints transport
+/// through existing C5. A raw, unlowered J stays neutral.
 ///
 /// Out of line on purpose: its locals must not enlarge every recursive
 /// `eval_in_erasure_scope` frame (cc7_argparse_acceptance overflowed).
@@ -1462,34 +1463,68 @@ fn eval_j(
     store: &mut EvalStore,
 ) -> EvalVal {
     match evidence {
-        Term::Eq(_, lhs, rhs) => {
-            let a = eval(env, lhs, globals, store);
-            let b = eval(env, rhs, globals, store);
-            if matches!(a, EvalVal::Unknown) || matches!(b, EvalVal::Unknown) {
-                return EvalVal::Unknown;
-            }
-            if eq_type_eq(&a, &b) {
-                return eval(env, base, globals, store);
-            }
-            let tt = eval(
-                env,
-                &Term::const_(globals.tt_id(), Vec::new()),
-                globals,
-                store,
-            );
-            let family = eval(env, motive, globals, store);
-            let source = apply(
-                apply(family.clone(), a, globals, store),
-                tt.clone(),
-                globals,
-                store,
-            );
-            let target = apply(apply(family, b, globals, store), tt.clone(), globals, store);
-            let payload = eval(env, base, globals, store);
-            cast_reduce(source, target, tt, payload)
+        Term::Eq(_, lhs, rhs) if j_transport_is_statically_regular(motive, lhs, rhs) => {
+            eval(env, base, globals, store)
         }
+        Term::Eq(_, lhs, rhs) => eval_j_by_endpoints(env, motive, base, lhs, rhs, globals, store),
         _ => EvalVal::Neutral,
     }
+}
+
+/// C5 regularity decided by the terms alone. The transport's source and
+/// target types are the motive applied to each endpoint; they are the same
+/// term in the same environment when the endpoints are the same term, or when
+/// the motive's body never mentions its index. Then `castReduce A A e a`
+/// returns the base for any evidence, as the kernel's J-cast does, so neither
+/// endpoint nor the motive is evaluated (`42 §3.2`: the endpoints belong to the
+/// erased proof's type).
+fn j_transport_is_statically_regular(motive: &Term, lhs: &Term, rhs: &Term) -> bool {
+    let mut motive = motive;
+    while let Term::Ascript(inner, _) = motive {
+        motive = inner;
+    }
+    lhs == rhs
+        || matches!(motive, Term::Lam(_, inner)
+            if matches!(inner.as_ref(), Term::Lam(_, body) if !term_var_free(body, 1)))
+}
+
+/// A motive that mentions its index at endpoints that differ as terms: the
+/// transport's types depend on the endpoint values, so evaluate both and
+/// return the base only when C5 regularity holds; otherwise fail closed.
+#[inline(never)]
+fn eval_j_by_endpoints(
+    env: &[EvalVal],
+    motive: &Term,
+    base: &Term,
+    lhs: &Term,
+    rhs: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
+    let a = eval(env, lhs, globals, store);
+    let b = eval(env, rhs, globals, store);
+    if matches!(a, EvalVal::Unknown) || matches!(b, EvalVal::Unknown) {
+        return EvalVal::Unknown;
+    }
+    if eq_type_eq(&a, &b) {
+        return eval(env, base, globals, store);
+    }
+    let tt = eval(
+        env,
+        &Term::const_(globals.tt_id(), Vec::new()),
+        globals,
+        store,
+    );
+    let family = eval(env, motive, globals, store);
+    let source = apply(
+        apply(family.clone(), a, globals, store),
+        tt.clone(),
+        globals,
+        store,
+    );
+    let target = apply(apply(family, b, globals, store), tt.clone(), globals, store);
+    let payload = eval(env, base, globals, store);
+    cast_reduce(source, target, tt, payload)
 }
 
 #[cfg(test)]
@@ -1984,12 +2019,12 @@ mod computational_j_tests {
     }
 
     // Promise class: durable invariant (15 §4): a constant family with two
-    // distinct closure endpoints takes the C5 transport step, not a closure
-    // identity shortcut. MEASURED: Zero is returned; CLAIMED: unequal
-    // endpoints with equal motive targets still transport. THE GAP: this is a
+    // distinct closure endpoints is statically regular, not a closure-identity
+    // shortcut. MEASURED: Zero is returned; CLAIMED: an index-independent
+    // motive carries its base despite distinct endpoints. THE GAP: this is a
     // raw-Term value-seam test, not kernel admission of a closure proof.
     #[test]
-    fn constant_motive_distinct_closure_endpoints_use_cast() {
+    fn constant_motive_distinct_closure_endpoints_return_base() {
         let nat = ken_elaborator::ElabEnv::new().unwrap().globals["Nat"];
         let motive = Term::lam(
             Term::Type(ken_kernel::Level::zero()),
