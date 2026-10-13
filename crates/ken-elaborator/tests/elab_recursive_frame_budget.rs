@@ -14,39 +14,47 @@ use ken_elaborator::ElabEnv;
 
 // Measured 2026-10-13 with rustc 1.97.1, LLVM 22.1.6, Linux x86_64,
 // Cargo test profile (Ken crates unoptimized) at depth 24. A fresh child with
-// RUST_MIN_STACK removed passed at 2,176 KiB; at 2,112 KiB it overflowed
+// RUST_MIN_STACK removed passed at 2,624 KiB; at 2,560 KiB it overflowed
 // AFTER full-prelude registration and BEFORE the nested-match completion.
 // This is the first passing 64-KiB grid point, not an exact-byte minimum.
 // Reproduce with the scratch AC-0 child-process sweep: on the repaired tip,
 // run scripts/ken-cargo test -p ken-elaborator --test
-// elab_recursive_frame_budget -- nested_dependent_match_fits_stated_stack.
-const GUARD_STACK_BYTES: usize = 2_176 * 1024;
+// elab_recursive_frame_budget nested_dependent_match_fits_stated_stack
+// -- --exact --test-threads=1. A twelve-application scrutinee spine keeps
+// infer's generic application frame live while each dependent match is checked.
+const GUARD_STACK_BYTES: usize = 2_624 * 1024;
 const DEPENDENT_MATCH_DEPTH: usize = 24;
+const SCRUTINEE_APPLICATIONS: usize = 12;
 const CHILD_TIMEOUT: Duration = Duration::from_secs(600);
 const REGRESSION_MESSAGE: &str = "the elaborator's recursive cycle \
     (check / infer / check_dependent_branch_body) grew: outline the new block \
     with #[inline(never)], or re-measure and re-record GUARD_STACK with the evidence";
 
+fn scrutinee(index: &str) -> String {
+    (0..SCRUTINEE_APPLICATIONS).fold(index.to_owned(), |arg, _| {
+        format!("(frame_budget_id {arg})")
+    })
+}
+
 fn goal(index: &str) -> String {
-    format!(
-        "Equal Nat (frame_budget_carrier (frame_budget_id {index}) x) \
-         (frame_budget_carrier (frame_budget_id {index}) x)"
-    )
+    let scrutinee = scrutinee(index);
+    format!("Equal Nat (frame_budget_carrier {scrutinee} x) (frame_budget_carrier {scrutinee} x)")
 }
 
 // Each branch binds a strictly smaller Nat scrutinee. The annotated local
 // proof puts each inner match in checking mode at a goal that mentions that
-// scrutinee. The checked scrutinee itself is an application, entering infer
-// once per level before check_dependent_branch_body checks its methods.
+// scrutinee. Its twelve nested applications keep infer's call chain live
+// before check_dependent_branch_body checks each match's methods.
 fn nested_match(index: &str, depth: usize) -> String {
     if depth == 0 {
         return "Refl".to_owned();
     }
     let successor = format!("k{depth}");
     format!(
-        "let p{depth} : {} = match (frame_budget_id {index}) \
+        "let p{depth} : {} = match {} \
          {{ Zero |-> Refl; Suc {successor} |-> {} }} in Refl",
         goal(index),
+        scrutinee(index),
         nested_match(&successor, depth - 1),
     )
 }
@@ -127,9 +135,10 @@ fn frame_budget_child() {
             .expect("checked carrier whose result depends on the matched Nat");
             let declaration = format!(
                 "theorem frame_budget_depth_{} (n : Nat) (x : Nat) : {} = \
-                 match (frame_budget_id n) {{ Zero |-> Refl; Suc k{} |-> {} }}",
+                 match {} {{ Zero |-> Refl; Suc k{} |-> {} }}",
                 DEPENDENT_MATCH_DEPTH,
                 goal("n"),
+                scrutinee("n"),
                 DEPENDENT_MATCH_DEPTH,
                 nested_match(
                     &format!("k{}", DEPENDENT_MATCH_DEPTH),
