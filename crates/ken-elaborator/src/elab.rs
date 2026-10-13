@@ -2887,12 +2887,36 @@ struct CoherentFrameMotivePlan {
 /// and is not a sibling companion of the enclosing goal occurrence.
 #[inline(never)]
 fn collect_outer_embedded_elims(term: &Term, out: &mut Vec<EmbeddedElimSnapshot>) {
+    collect_outer_embedded_elims_at(term, 0, out);
+}
+
+/// `local` counts the binders between the planner's context and `term`. An
+/// occurrence under binders is a companion of the planner's frame only when it
+/// is independent of those binders; it is then lowered to the planner's depth,
+/// so every snapshot is stated in one context. An occurrence that mentions a
+/// local binder has no value at the planner's depth and stays in place.
+fn collect_outer_embedded_elims_at(
+    term: &Term,
+    local: usize,
+    out: &mut Vec<EmbeddedElimSnapshot>,
+) {
     let (head, arguments) = match term {
         Term::App(_, _) => peel_app(term),
         Term::Elim { .. } => (term.clone(), Vec::new()),
+        Term::Pi(domain, body) | Term::Lam(domain, body) | Term::Sigma(domain, body) => {
+            collect_outer_embedded_elims_at(domain, local, out);
+            collect_outer_embedded_elims_at(body, local + 1, out);
+            return;
+        }
+        Term::Let { ty, val, body } => {
+            collect_outer_embedded_elims_at(ty, local, out);
+            collect_outer_embedded_elims_at(val, local, out);
+            collect_outer_embedded_elims_at(body, local + 1, out);
+            return;
+        }
         _ => {
             for child in term.children() {
-                collect_outer_embedded_elims(child, out);
+                collect_outer_embedded_elims_at(child, local, out);
             }
             return;
         }
@@ -2907,20 +2931,24 @@ fn collect_outer_embedded_elims(term: &Term, out: &mut Vec<EmbeddedElimSnapshot>
         scrut,
     } = head
     {
+        if (0..local).any(|binder| scrut_occurs(term, &Term::var(binder))) {
+            return;
+        }
+        let lower = |term: &Term| shift(term, -(local as i64), 0);
         out.push(EmbeddedElimSnapshot {
             fam,
             level_args,
-            params,
-            motive: *motive,
-            methods,
-            indices,
-            scrut: *scrut,
-            arguments,
+            params: params.iter().map(lower).collect(),
+            motive: lower(&motive),
+            methods: methods.iter().map(lower).collect(),
+            indices: indices.iter().map(lower).collect(),
+            scrut: lower(&scrut),
+            arguments: arguments.iter().map(lower).collect(),
         });
         return;
     }
     for child in term.children() {
-        collect_outer_embedded_elims(child, out);
+        collect_outer_embedded_elims_at(child, local, out);
     }
 }
 
