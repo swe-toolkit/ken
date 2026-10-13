@@ -1,11 +1,11 @@
 # Dimension-safe exact linear algebra
 
-> **Status: DRAFT v0 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT).**
-> Section 1 is normative for the seven `Nat`-valued operations and five
-> proved laws below. Left matrix identity and matrix-product
-> associativity are named but **gated**, not part of this section's
-> deliverable. Specifying a catalog interface does not claim it has
-> landed or that its conformance seed has run.
+> **Status: DRAFT v1 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
+> SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS).** Section 1 specifies the seven
+> `Nat`-valued operations and five laws landed in the catalog. Section 2
+> adds two generically checked product laws for a follow-on catalog
+> delivery. An authored conformance seed is not itself evidence that it
+> has run as a delivered suite.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -18,10 +18,10 @@ with each inner vector a row in order. A matrix has no second indexed
 carrier, unchecked shape field, truncating zip, or implicit resizing.
 A vector of length zero and a matrix with either dimension zero are
 valid. `Vec`, `VNil`, `VCons`, `map`, `zip_with`, and the checked
-`vec_zero_vnil` are existing declarations that the catalog node must
-publish from `Data.Vector.Vector`; the latter supplies the empty-index
-transport needed by generic proofs. The chapter neither duplicates
-the family nor changes its constructors or law bodies.
+`vec_zero_vnil` are published by `Data.Vector.Vector`; the latter
+supplies the empty-index transport needed by generic proofs. The
+chapter neither duplicates the family nor changes its constructors
+or law bodies.
 
 `Nat` is the only scalar in this section. Its existing checked `add`
 and `mul`, identities, commutativity, associativity, and distributivity
@@ -97,7 +97,7 @@ operations.
 
 ### 1.3 Five checked-law obligations
 
-The catalog node must provide a **checked proof body** for each
+The landed catalog module provides a **checked proof body** for each
 public theorem below, with no `Axiom`, postulate, assumed lemma, or
 open obligation. The statements quantify over every length and
 well-typed operand; a finite fixture is not a substitute for any
@@ -142,35 +142,76 @@ is not a left-identity claim in disguise. The `vec_zero_vnil`
 transport used in the checked proof of the dot and transpose empty
 cases is a **proved Vec law**, not a fresh axiom.
 
-### 1.4 Gated laws, trust boundary, and evidence limits
-
-`matrix_identity_left` (identity on the **left** of a matrix product)
-and `matrix_product_assoc` (associativity across three composable
-matrices) are **gated on
-`LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`**. Neither is declared as
-a proved theorem in §1; neither is owed by its first catalog node.
-The left-identity proof's empty and successor branches each checked
-separately, but their assembled nested dependent match is rejected
-by the current elaborator. Associativity's generic proposition
-type-forms, but its proof remains unmeasured. Closed left-identity
-fixtures do not promote either gated universal property to proved.
-A later section may add these laws only after its Language
-prerequisite lands and the generic proofs check.
+### 1.4 Trust boundary and evidence limits
 
 The ordinary `Vec` eliminator, natural recursion, `Equal`, and the
-existing Nat laws account for the specified work. This section adds
-no kernel form, syntax, primitive, `Float`, or `trusted_base()` entry.
-A source-shaped D0 development checked the seven operations, the
-generic transpose, vector identity, right matrix identity and dot
-commutativity proofs, and the fixed product/identity/transpose
-fixtures without `Axiom`; the Architect separately checked generic
-dot distributivity. Scratch checks demonstrate feasibility of these
-**five** promises but neither deliver catalog exports nor execute
-the authored conformance seed. The rejected assembled left-identity
-proof remains a named elaboration gate, not a trust workaround.
+existing Nat laws account for §1's specified work. Its seven
+operations and five generic laws are now landed in
+`Algorithm.LinearAlgebra.NatMatrix`; neither the first catalog node
+nor the §1 signatures promise the two additional theorems in §2.
+The checked catalog module introduces no `Axiom`. Section 2's
+additional generic proofs are checked in a scratch development but
+are not yet exported by that module. No statement in this chapter
+adds a kernel form, syntax, primitive, or `Float` support. A scratch
+check or authored seed is not execution of the delivered seed.
 
 Signed scalars, a relation-parametric semiring abstraction and a
 Rational-valued matrix tier, determinants, inverses, solving and
 decompositions, and every `Float` or approximate/error-bound result
-are outside §1. No requirement is discharged by a comment, an
-unchecked assumption, or a numerical example alone.
+are outside this contract. No requirement is discharged by a comment,
+an unchecked assumption, or a numerical example alone.
+
+## 2. Left identity and associativity of matrix products
+
+The following two **generic laws have checked proof bodies** in the
+product-laws D0 development. A follow-on catalog node must publish
+them as theorems over every well-typed operand; the landed module
+still exports only the §1 laws. Neither law is gated on
+`LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`. Both use the existing
+`Nat`, `Vec`, and matrix operations, without a new carrier or scalar
+tier.
+
+```ken
+pub theorem matrix_identity_left
+  (m : Nat) (n : Nat) (a : Vec (Vec Nat m) n) :
+  Equal (Vec (Vec Nat m) n)
+    (matrix_product n n m (identity n) a) a
+
+pub theorem matrix_product_assoc
+  (m : Nat) (n : Nat) (p : Nat) (q : Nat)
+  (a : Vec (Vec Nat n) m)
+  (b : Vec (Vec Nat p) n)
+  (c : Vec (Vec Nat q) p) :
+  Equal (Vec (Vec Nat q) m)
+    (matrix_product m p q (matrix_product m n p a b) c)
+    (matrix_product m n q a (matrix_product n p q b c))
+```
+
+Left identity picks each row of `a` with the corresponding unit row
+and preserves its order, including when either dimension is zero.
+This is not a rephrasing of §1's right identity: the unit matrix is
+on the other side and its size is the **row** count `n`, rather than
+the column count `m`. Product associativity compares two ways to
+compose `m × n`, `n × p`, and `p × q` matrices; both sides are `m × q`
+and the shared indices are statically equal. Its proof distributes
+column products across vector addition and scaling, using the
+existing checked Nat distributivity and associativity laws. Neither
+a finite equality of products nor the type formation of these
+propositions is the generic proof.
+
+The D0 check on landed base `e940e481c` closed each theorem and both
+together by structural recursion, using existing Nat proofs and
+`Refl`, `Proved`, `J`, `cong`, `trans`, and `sym`. The added proof text
+has **no `Axiom`**; the trusted-base delta was **not measured**, so
+that observation is not a quantified zero-delta assertion. The
+checked D0 uses a private named helper `dot_with n row` where the
+landed package writes the argument to `map` as
+`λcolumn. dot n row column`. With the λ spelling, the proof checks
+failed during elaboration at `left_head` and `columns_cons` with an
+ill-typed ambient-method error; the named spelling checked both
+laws without changing any public type or operation. The λ failure
+belongs to `LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE`; fixing
+that elaborator defect is **not a prerequisite** for these theorems.
+The catalog follow-on may use the named private helper while
+retaining the exact public interface above. D0 proves feasibility,
+not catalog publication, shipped-seed execution, or CI.

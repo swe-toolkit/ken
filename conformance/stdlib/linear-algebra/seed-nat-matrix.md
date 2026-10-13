@@ -1,42 +1,35 @@
 # Dimension-safe natural matrix operations
 
 Format: `../../README.md`.
-Spec: `spec/50-stdlib/65-linear-algebra.md` §1.
+Spec: `spec/50-stdlib/65-linear-algebra.md` §§1–2.
 
-These nine cases are **authored behavioral oracles**, not executed
-conformance results. Out-of-repository source-shaped Vector with only
-the ruled publications (SHA256
-`396224f79cade3d0e06e7d2aa11a46c8f5a3f5d2ef4fd9d1629da2698b68bc40`)
-and `Algorithm.LinearAlgebra.NatMatrix` with the seven operations
-(SHA256
-`c77599146e1409641a7cc0d6b67b3ea83b66387ca64dacdad1af9f3f183080ff`)
-checked rc=0 against current first-party dependencies. The seed's
-positive code (ten closed assertions) was extracted to
-`/tmp/ken-la-seed/catalog/packages/Algorithm/LinearAlgebra/SeedPositive.ken`
-(SHA256
-`9ea82015ae6ef270e3a26d1b918143e1429e84f82ae136550e0c369cf77a7e8b`):
-`ken check` returned rc=0. The same code with the isolated negative
-call appended was extracted to `SeedNegative.ken` (SHA256
-`1eb00ce7569e3ece7d94e7548e61079212850acc836a54ff1f7ace2fb2bf7584`):
-`ken check` returned rc=1 `KernelRejected TypeMismatch`. Replacing
-only the dot oracle's expected `five` with `six` in the positive code
+These twelve cases are **authored behavioral oracles**. The catalog's
+`Algorithm.LinearAlgebra.NatMatrix` publishes the §1 operations and
+five checked theorems; the two generic §2 laws are checked in the
+Architect's scratch D0 (named private helper, no added `Axiom`) but
+not yet exported by the catalog. The positive block below was
+extracted verbatim to scratch `SeedPositive.ken` (SHA256
+`9ea54b100399c24cfaa282b36f16a8a45072189b054ebe65784c4efb276a819d`):
+all thirteen closed assertions checked, rc=0, against the **landed**
+§1 package. The positive code plus only the rejected call became
+`SeedNegative.ken` (SHA256
+`07e666c9bffdd00a2894820cf4fce094e034d022ed52db82d6383f21c0a800f0`):
+rc=1 `KernelRejected TypeMismatch`. Three one-change controls on the
+same positive source also reject: dot expected five changed to six
 (`SeedBadDot.ken`, SHA256
-`0a1d249969bf589da00532c1ef4e16e0dbee88ac74cc5b61e9175d34fe784b83`)
-also returned rc=1 `KernelRejected TypeMismatch`. All three used
-`/workspaces/ken/target/debug/ken`, freshly built from the candidate's
-Rust base `66cb5e9b` with `scripts/ken-cargo build -p ken-cli --bin ken`
-(rc=0). These are source-shaped scratch checks, not execution against
-delivered CAT.
-The checked generic transpose, vector identity, right matrix
-identity and dot commutativity bodies are in scratch
-`MatrixRightIdentityCols.ken`
-(SHA256
-`cfa7de7ac04336ba54a916241a7eafe4c4035898ca26be0c124f067fe3313672`);
-the Architect separately checked generic dot distributivity. None
-of these scratch checks delivers the catalog exports, executes this
-seed against a delivered package, runs Cargo tests, or establishes CI
-or publication. Every case has
-promise class **durable invariant**.
+`2cc4f8a080c9f78596335603738e8c24e6eebcc967df276855344b267e586c90`),
+rc=1 `KernelRejected TypeMismatch`; factor-three scale's expected six
+changed to five (`SeedBadFactor.ken`, SHA256
+`5e8e22e66a2f6deb070342a1b3d7c6f4faa4eebd54909d9654e743c69dd5145c`),
+rc=1 `TypeMismatch`; and the association oracle's inner `c22` on
+one side changed to `expected22` (`SeedBadAssoc.ken`, SHA256
+`5a9719d6473428733ba0d6b051d87806f9a1d2259b58aba888e9cc89d6cc5dbd`),
+rc=1 `TypeMismatch`. These source-shaped checks used `ken check` with
+`/workspaces/ken/.worktrees/spec-author/target/debug/ken`, built from
+base `e940e481c` by `scripts/ken-cargo build -p ken-cli --bin ken`
+(rc=0). They do not establish generic laws, delivery of §2 theorems,
+execution of a shipped conformance suite, Cargo test results, CI, or
+publication. Every case has promise class **durable invariant**.
 
 ## Shared fixtures and closed oracles
 
@@ -86,6 +79,9 @@ const expected32 : Vec (Vec Nat two) three =
     (VCons (Vec Nat two) one (v2 two one)
       (VCons (Vec Nat two) Zero (v2 Zero three)
         (VNil (Vec Nat two))))
+const c22 : Vec (Vec Nat two) two =
+  VCons (Vec Nat two) one (v2 one two)
+    (VCons (Vec Nat two) Zero (v2 three Zero) (VNil (Vec Nat two)))
 
 theorem dot_oracle : Equal Nat
   (dot three (v3 one two Zero) (v3 three one two)) five = Proved
@@ -102,6 +98,10 @@ theorem vector_scale_oracle : Equal (Vec Nat three)
   (vector_scale three two (v3 one two Zero))
   (v3 two four Zero) = Refl
 
+theorem vector_scale_three_oracle : Equal (Vec Nat three)
+  (vector_scale three three (v3 one two Zero))
+  (v3 three six Zero) = Refl
+
 theorem vector_scale_empty_oracle : Equal (Vec Nat Zero)
   (vector_scale Zero three (VNil Nat)) (VNil Nat) = Proved
 
@@ -115,6 +115,14 @@ theorem product_oracle : Equal (Vec (Vec Nat two) two)
 theorem right_identity_oracle : Equal (Vec (Vec Nat three) two)
   (matrix_product two three three a23 (identity three)) a23 = Refl
 
+theorem left_identity_oracle : Equal (Vec (Vec Nat three) two)
+  (matrix_product two two three (identity two) a23) a23 = Refl
+
+theorem product_assoc_oracle : Equal (Vec (Vec Nat two) two)
+  (matrix_product two two two (matrix_product two three two a23 b32) c22)
+  (matrix_product two three two a23 (matrix_product three two two b32 c22))
+  = Refl
+
 theorem transpose_intermediate_oracle : Equal (Vec (Vec Nat two) three)
   (transpose two three a23) expected32 = Refl
 
@@ -125,9 +133,10 @@ theorem transpose_round_trip_oracle : Equal (Vec (Vec Nat three) two)
 The nonempty closed vector equalities check using `Refl`. The
 zero-length scaling case uses `Proved`, as the catalog's
 `map_vnil` does; `Equal Nat` in the direct dot oracle also takes
-`Proved`. Neither asserts a generic Vec extensionality law. These
-fixed value oracles must not be used to claim that every matrix is
-a unit or that two still-gated generic laws were proved.
+`Proved`. Neither asserts a generic Vec extensionality law. The
+closed §2 rows illustrate, but do not themselves prove, universal
+left identity or associativity; their generic proof evidence is
+separate D0 work.
 
 ## A direct dot product pins the public operation
 
@@ -161,7 +170,8 @@ a unit or that two still-gated generic laws were proved.
 - claimed: the public identity constructor places one exactly on
   the diagonal and zero off it.
 - the gap: this finite fixture is not a generic left or right
-  identity theorem; left identity remains gated.
+  identity theorem; §2's left identity has separate generic proof
+  evidence, not yet catalog publication.
 - why: diagonal placement is checked directly rather than inferred
   only from the product with one selected matrix.
 
@@ -192,13 +202,34 @@ a unit or that two still-gated generic laws were proved.
 - expect: `vector_scale three two (v3 one two Zero)` equals
   `[2, 4, 0]` at length three; `vector_scale Zero three (VNil Nat)`
   equals `VNil Nat` at length zero. Both closed equalities check.
-- measured: multiplication by a factor other than zero or one,
-  preservation of an input zero, and an empty indexed boundary.
+- measured: component multiplication by two, preservation of an
+  input zero, and an empty indexed boundary.
 - claimed: scaling multiplies every component without changing its
   length, and the zero-length result is empty.
-- the gap: these two fixtures do not prove a generic scaling law.
-- why: multiplying only the head, adding instead of multiplying, or
-  fabricating a scalar entry for the empty vector changes a result.
+- the gap: these two fixtures do not prove a generic scaling law;
+  for a nonempty input, factor two alone cannot distinguish a body
+  that always doubles from one that uses the caller's factor.
+- why: multiplying only the head or fabricating a scalar entry for
+  the empty vector changes a result; the factor-three row below
+  separately checks that the factor is used.
+
+## Scaling by three distinguishes the factor from doubling
+
+### stdlib/linear-algebra/nat-vector-scale-factor-three
+
+- spec: `spec/50-stdlib/65-linear-algebra.md` §1.2.
+- promise class: durable invariant.
+- given: factor three and the indexed input `[1, 2, 0]`.
+- expect: `vector_scale three three (v3 one two Zero)` equals
+  `[3, 6, 0]` at length three; the closed equality checks with `Refl`.
+- measured: a second nonempty factor, with two nonzero input values
+  and a zero retained in its original position.
+- claimed: the output uses the supplied scalar factor, rather than
+  a fixed factor of two or ignoring it.
+- the gap: two finite factors do not establish a generic scaling law;
+  a mathematically equivalent implementation is not distinguished.
+- why: a body that doubles regardless of `factor` passes the factor-two
+  fixture but cannot produce six from the second component here.
 
 ## Matrix-vector multiplication uses ordered row dots
 
@@ -234,13 +265,13 @@ a unit or that two still-gated generic laws were proved.
 - claimed: the exact product joins equal inner dimensions and
   preserves the outer dimensions without truncating either input.
 - the gap: a single pair of matrices does not prove the generic dot
-  laws or matrix-product associativity. The latter is explicitly
-  gated, not silently inferred from this result.
+  laws or §2's matrix-product associativity. Generic proof evidence
+  for the latter is separate from this closed result.
 - why: treating the rows of `b32` as its columns, dropping its last
   row, or confusing the two outer dimensions changes at least one
   expected cell.
 
-## Right identity, not a left-identity claim
+## Right identity with an independently indexed left operand
 
 ### stdlib/linear-algebra/nat-right-identity-2x3
 
@@ -254,13 +285,59 @@ a unit or that two still-gated generic laws were proved.
 - measured: a **right** identity product with two different rows
   and a non-square left operand.
 - claimed: the public generic `matrix_identity_right` theorem has a
-  concrete nondegenerate witness; no left identity theorem follows.
+  concrete nondegenerate witness. This case does not test the left side.
 - the gap: a closed result cannot discharge the universal right
-  identity proof. The **left** identity is gated on
-  `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL` and not tested here.
+  identity proof or §2's generic left-identity obligation; the left
+  case below is separately indexed and checked.
 - why: replacing the diagonal with all ones or losing the second
   row changes the result. A square-only oracle would not reveal a
   mistaken assumption that both outer dimensions must be equal.
+
+## Left identity preserves a rectangular matrix
+
+### stdlib/linear-algebra/nat-left-identity-2x3
+
+- spec: `spec/50-stdlib/65-linear-algebra.md` §2.
+- promise class: durable invariant.
+- given: `identity two` on the left of the non-square `a23`, whose
+  two rows each have three ordered entries.
+- expect: `matrix_product two two three (identity two) a23` equals
+  exactly `a23` as `Vec (Vec Nat three) two`; the closed equality
+  checks with `Refl`.
+- measured: a left unit matrix sized to the **row** dimension,
+  distinct from the right-identity fixture's column-sized unit.
+- claimed: the checked generic `matrix_identity_left` obligation
+  preserves arbitrary well-typed input matrices, including those
+  with unequal outer dimensions.
+- the gap: one 2×3 value does not prove the generic law or export it
+  from the catalog; the §2 D0 proof supplies the former, not the latter.
+- why: a wrong-side implementation that accepts only square
+  operands or swaps row and column dimensions cannot satisfy this
+  typed, non-square left-identity equality.
+
+## Associativity composes three nontrivial matrices
+
+### stdlib/linear-algebra/nat-product-assoc-2x3x2x2
+
+- spec: `spec/50-stdlib/65-linear-algebra.md` §2.
+- promise class: durable invariant.
+- given: `a23` (2×3), `b32` (3×2), and independently constructed
+  `c22` (2×2), with rows `[1, 2]` and `[3, 0]`.
+- expect: `(a23 · b32) · c22` equals `a23 · (b32 · c22)` as a
+  `Vec (Vec Nat two) two`; the two fully indexed expressions in
+  `product_assoc_oracle` check with `Refl`.
+- measured: both parenthesizations over two independent inner
+  dimensions and non-identity, nonzero matrices; the pre-existing
+  `product_oracle` independently pins `a23 · b32` to `expected22`.
+- claimed: the generic §2 associativity law respects order and
+  inner indices across all composable matrices.
+- the gap: closed equality alone could pass for two identically wrong
+  products. The independently pinned intermediate limits, but does
+  not eliminate, that finite-fixture gap; the generic checked D0
+  proof and follow-on catalog publication are distinct obligations.
+- why: changing the inner right operand in one parenthesization
+  rejects this equality, while a shape mismatch is refused by shared
+  indices rather than cast to a common matrix type.
 
 ## Transpose round trip with an independent intermediate value
 
@@ -322,11 +399,12 @@ const bad_product : Vec (Vec Nat two) two =
 
 ## Coverage boundary
 
-These cases exercise the direct dot and identity results, aligned
-vector addition, nontrivial and empty vector scaling, ordered
-matrix-vector multiplication, exact matrix products, right-sided
-identity, transpose orientation and involution, and one real
-type-index refusal. They do not assert a source-text census, a floating
-approximation, left matrix identity, or matrix-product associativity.
-The latter two remain named Language-gated obligations rather than
-requirements of this seed or of the first catalog node.
+These cases exercise direct dot and identity values, aligned vector
+addition, factor-two and factor-three plus empty vector scaling,
+ordered matrix-vector multiplication, exact matrix products, left
+and right identity, two parenthesizations of a product, transpose
+orientation and involution, and one real type-index refusal. They do
+not assert a source-text census, a floating approximation, a generic
+proof from closed instances, or delivery of the §2 public theorems.
+The D0 generic proofs, this seed, and follow-on catalog publication
+remain distinct evidence.
