@@ -1,7 +1,7 @@
 ---
 id: RT-PX8DS-SAME-DEPTH-P1-HANDLER
 title: "px8ds_real_same_depth_path_runs_exact_edges is red at base: native refuses at ObjectEmission because the relay P1 sources of px8ta owner 0 have no admitted handler, while the interpreter exits 0. Give those sources a settling route and un-ignore the row"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
