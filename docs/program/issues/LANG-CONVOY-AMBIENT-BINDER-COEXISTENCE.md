@@ -69,12 +69,24 @@ rule. The motive is one telescope. Every rewrite applied to the goal is
 applied at the same depth to each premise type its subject occurs in, and
 premises are ordered so each follows everything its rewritten type
 mentions. The ruling gives the order at the four sites (index premises,
-C1, companions, C2, goal), the hoist of the context-convoy block into both
-branches, and the deletion of the overlap Internal. A companion that
-depends on a C2 binder is refused as a typed error. The ruling also
-measured a negative: dropping the value-branch convoy gives
-`NotAFunction`, so the convoy must be composed, not omitted. The repair
-follows that rule.
+C1, companions, C2, goal). A companion that depends on a C2 binder is
+refused as a typed error.
+
+**S6 ruling (`evt_469ezp3by3mj6`): the selector carries no context
+convoy.**
+- D0's hoist of the convoy block into `build_index_equation_convoy_body`
+  is withdrawn, and the selector is left untouched.
+- A frame whose ambient binders depend on the index takes the coupled
+  route: `equation_convoy` also requires `probe_context_convoy.is_empty()`,
+  apart from `forced_telescope_convoy`.
+- The overlap `Internal` stays as it is. It now states the invariant this
+  gate enforces.
+- **Build order:**
+  1. the S1 gate;
+  2. the refined plane;
+  - 2b. this gate;
+  3. D0 part 2's ordering at the motive, the arm,
+     `build_convoy_refined_type` and `finish_dependent_elim`.
 
 **S1 ruling (`evt_2qrmtt7t9pfkv`): E9 and E11 never take the selector.**
 The index-equation selector is entered only when an enclosing frame
@@ -120,6 +132,9 @@ plane.**
   refusal. A1F is refused with a typed error.
 - **AC-4 (mutation, QA).** Restoring `!cx.match_frames.is_empty()` in
   place of `enclosing_refines` returns E9 to its failure.
+- **AC-4b (mutation, QA).** Removing `&& probe_context_convoy.is_empty()`
+  sends H7 back to an `Internal`. It discriminates only once step 3 is
+  in.
 
 ## Stop conditions
 
@@ -127,7 +142,8 @@ plane.**
 - The repair overlaps `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`'s gates
   or `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE`'s wall: stop to the
   Architect to rule the order.
-- **S6.** Reading the refined plane changes an AC-2 control, a
+- **S6.** Evaluated at the end of step 3, not between steps. Stop to the
+  Architect if any of these differs from Ok: H7 or another AC-2 control, a
   `lang_embedded_context_convoy` row, the 19 suite tests, or a
-  `LANG-PROPOSITION-GOAL-SCRUTINEE-FREE-RECURSION` row: stop to the
-  Architect.
+  `LANG-PROPOSITION-GOAL-SCRUTINEE-FREE-RECURSION` row. Also stop if step 3
+  makes H9 and H5 Ok but leaves H1 or H7 failing.
