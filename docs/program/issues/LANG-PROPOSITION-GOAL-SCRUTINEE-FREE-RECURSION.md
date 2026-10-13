@@ -70,10 +70,17 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first: the Architect rules where the scrutinee-free case leaves the
-equation convoy, for example at the flag, at site 3, or by a transport-free
-recursive call. Then the repair, and a regression test file that pins
-every population row above, its false twin and the merged WP's rows.
+The D0 is ruled (Architect `evt_mgkvvs0f31b7`, part 1). In
+`plan_coherent_frame_motive` (elab.rs ~:4469), `has_nontrivial_coupled_sides`
+keeps the syntactic-Eq route and convoys any other proposition only when
+the zonked goal mentions the scrutinee (`scrut_occurs`, ~:2668). The ruling
+has the exact text. On a prototype without the zonk, G1, G2, G3 and G5 went
+Ok, the `Bottom` twin G4 went to `KernelRejected TypeMismatch`, the E and H
+rows and K1/K3 were unchanged, and the three suites stayed at 19/19.
+
+The repair is that gate, with the zonk, measured as written. Add a
+regression test file that pins G1-G5, every population row above, its
+false twin, and the merged WP's rows.
 
 ## Acceptance
 

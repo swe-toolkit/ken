@@ -52,15 +52,24 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first. The Architect rules how the index-equation convoy and an
-ambient context convoy compose, and whether one rule also convoys a
-hypothesis whose type mentions the goal's embedded eliminator. Then the
-repair.
+The D0 is ruled (Architect `evt_mgkvvs0f31b7`, part 2): one composition
+rule. The motive is one telescope. Every rewrite applied to the goal is
+applied at the same depth to each premise type its subject occurs in, and
+premises are ordered so each follows everything its rewritten type
+mentions. The ruling gives the order at the four sites (index premises,
+C1, companions, C2, goal), the hoist of the context-convoy block into both
+branches, and the deletion of the overlap Internal. A companion that
+depends on a C2 binder is refused as a typed error. The ruling also
+measured a negative: dropping the value-branch convoy gives
+`NotAFunction`, so the convoy must be composed, not omitted. The repair
+follows that rule.
 
 ## Acceptance
 
-- **AC-1.** E9, E11, H9, H5 and H1 check, with no Axiom and no trust
-  change.
+- **AC-1.** E9, E11, H9, H5, H1 and K2 check, with no Axiom and no trust
+  change. K2 is `pp (dual_lookup a n xs i)` with nested `match i` then
+  `match xs`. It is H1's class and is refused on base (Architect sibling,
+  CHECK 7).
 - **AC-2 (control).** E8, E10, H6, H7 and H8 stay Ok. The
   `lang_embedded_context_convoy` suite, including its false twin, is
   unchanged, and so is the catalog census.
