@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and the five algebraic laws below have checked proofs.
+all arithmetic is exact, and the seven algebraic laws below have checked proofs.
 
 ## Contents
 
@@ -32,7 +32,7 @@ import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
 
 import Core.Logic.Transport (cong, sym, trans)
 
-import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l)
+import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l, mul_add_distrib_r)
 
 pub fn vector_add (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Vec Nat n =
   zip_with Nat Nat Nat n add xs ys
@@ -255,6 +255,94 @@ pub theorem matrix_identity_right
             (matrix_identity_right k n rest))
   }
 
+pub theorem matrix_identity_left
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat m) n)
+    : Equal (Vec (Vec Nat m) n) (matrix_product n n m (identity n) a) a =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        whole = VCons (Vec Nat m) k row rest;
+        old_head = row_product (Suc k) m whole (VCons Nat k (Suc Zero) (repeat Nat k Zero));
+        old_tail =
+          map
+            (Vec Nat (Suc k))
+            (Vec Nat m)
+            k
+            (row_product (Suc k) m whole)
+            (map (Vec Nat k) (Vec Nat (Suc k)) k (prepend_zero k) (identity k));
+        mid_tail = matrix_product k k m (identity k) rest
+      in
+        trans
+          (Vec (Vec Nat m) (Suc k))
+          (VCons (Vec Nat m) k old_head old_tail)
+          (VCons (Vec Nat m) k row old_tail)
+          (VCons (Vec Nat m) k row rest)
+          (cong
+            (Vec Nat m)
+            (Vec (Vec Nat m) (Suc k))
+            old_head
+            row
+            (λv. VCons (Vec Nat m) k v old_tail)
+            (left_head k m row (transpose k m rest)))
+          (cong
+            (Vec (Vec Nat m) k)
+            (Vec (Vec Nat m) (Suc k))
+            old_tail
+            rest
+            (VCons (Vec Nat m) k row)
+            (trans
+              (Vec (Vec Nat m) k)
+              old_tail
+              mid_tail
+              rest
+              (left_tail_rows k m row rest k (identity k))
+              (matrix_identity_left m k rest)))
+  }
+
+pub theorem matrix_product_assoc
+      (m : Nat)
+      (n : Nat)
+      (p : Nat)
+      (q : Nat)
+      (a : Vec (Vec Nat n) m)
+      (b : Vec (Vec Nat p) n)
+      (c : Vec (Vec Nat q) p)
+    : Equal
+        (Vec (Vec Nat q) m)
+        (matrix_product m p q (matrix_product m n p a b) c)
+        (matrix_product m n q a (matrix_product n p q b c)) =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        bc = matrix_product n p q b c;
+        old_head = row_product p q c (row_product n p b row);
+        new_head = row_product n q bc row;
+        old_tail = matrix_product k p q (matrix_product k n p rest b) c;
+        new_tail = matrix_product k n q rest bc
+      in
+        trans
+          (Vec (Vec Nat q) (Suc k))
+          (VCons (Vec Nat q) k old_head old_tail)
+          (VCons (Vec Nat q) k new_head old_tail)
+          (VCons (Vec Nat q) k new_head new_tail)
+          (cong
+            (Vec Nat q)
+            (Vec (Vec Nat q) (Suc k))
+            old_head
+            new_head
+            (λv. VCons (Vec Nat q) k v old_tail)
+            (row_product_assoc n p q row b c))
+          (cong
+            (Vec (Vec Nat q) k)
+            (Vec (Vec Nat q) (Suc k))
+            old_tail
+            new_tail
+            (VCons (Vec Nat q) k new_head)
+            (matrix_product_assoc k n p q rest b c))
+  }
+
 fn prepend (n : Nat) (x : Nat) (column : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n x column
 
 fn prepend_zero (n : Nat) (row : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n Zero row
@@ -265,10 +353,12 @@ fn repeat (a : Type) (n : Nat) (x : a) : Vec a n =
     Suc k ↦ VCons a k x (repeat a k x)
   }
 
+fn dot_with (n : Nat) (row : Vec Nat n) (column : Vec Nat n) : Nat = dot n row column
+
 fn row_product_columns
       (n : Nat) (p : Nat) (row : Vec Nat n) (columns : Vec (Vec Nat n) p)
     : Vec Nat p =
-  map (Vec Nat n) Nat p (λcolumn. dot n row column) columns
+  map (Vec Nat n) Nat p (dot_with n row) columns
 
 fn row_product (n : Nat) (p : Nat) (right : Vec (Vec Nat p) n) (row : Vec Nat n) : Vec Nat p =
   row_product_columns n p row (transpose n p right)
@@ -683,6 +773,569 @@ theorem row_right_identity
         row
         (map_cong (Vec Nat n) Nat n f g (λcol. dot_comm n row col) (identity n))
         (vector_identity n row))
+
+theorem left_head_empty
+      (k : Nat)
+    : Equal
+        (Vec Nat Zero)
+        (row_product_columns
+          (Suc k)
+          Zero
+          (VCons Nat k (Suc Zero) (repeat Nat k Zero))
+          (zip_with
+            Nat
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            Zero
+            (prepend k)
+            (VNil Nat)
+            (VNil (Vec Nat k))))
+        (VNil Nat) =
+  Proved
+
+theorem left_head
+      (k : Nat) (n : Nat) (row : Vec Nat n) (columns : Vec (Vec Nat k) n)
+    : Equal
+        (Vec Nat n)
+        (row_product_columns
+          (Suc k)
+          n
+          (VCons Nat k (Suc Zero) (repeat Nat k Zero))
+          (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) row columns))
+        row =
+  match row {
+    VNil ↦
+      J
+        (λcs _.
+          Equal
+            (Vec Nat Zero)
+            (row_product_columns
+              (Suc k)
+              Zero
+              (VCons Nat k (Suc Zero) (repeat Nat k Zero))
+              (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) Zero (prepend k) (VNil Nat) cs))
+            (VNil Nat))
+        (left_head_empty k)
+        (vec_zero_vnil (Vec Nat k) columns);
+    VCons t x tail_row ↦
+      match columns {
+        VCons _ col tail_cols ↦
+          let
+            unit = VCons Nat k (Suc Zero) (repeat Nat k Zero);
+            first = dot (Suc k) unit (VCons Nat k x col);
+            old_tail =
+              row_product_columns
+                (Suc k)
+                t
+                unit
+                (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) t (prepend k) tail_row tail_cols)
+          in
+            trans
+              (Vec Nat (Suc t))
+              (VCons Nat t first old_tail)
+              (VCons Nat t x old_tail)
+              (VCons Nat t x tail_row)
+              (cong
+                Nat
+                (Vec Nat (Suc t))
+                first
+                x
+                (λv. VCons Nat t v old_tail)
+                (dot_one_head k x col))
+              (cong
+                (Vec Nat t)
+                (Vec Nat (Suc t))
+                old_tail
+                tail_row
+                (VCons Nat t x)
+                (left_head k t tail_row tail_cols))
+      }
+  }
+
+theorem zero_prefix_columns
+      (k : Nat) (p : Nat) (r : Vec Nat k) (row : Vec Nat p) (columns : Vec (Vec Nat k) p)
+    : Equal
+        (Vec Nat p)
+        (row_product_columns
+          (Suc k)
+          p
+          (VCons Nat k Zero r)
+          (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) p (prepend k) row columns))
+        (row_product_columns k p r columns) =
+  match row {
+    VNil ↦
+      J
+        (λcs _.
+          Equal
+            (Vec Nat Zero)
+            (row_product_columns
+              (Suc k)
+              Zero
+              (VCons Nat k Zero r)
+              (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) Zero (prepend k) (VNil Nat) cs))
+            (row_product_columns k Zero r cs))
+        Proved
+        (vec_zero_vnil (Vec Nat k) columns);
+    VCons t x tail_row ↦
+      match columns {
+        VCons _ col tail_cols ↦
+          let
+            prefixed = VCons Nat k Zero r;
+            old_head = dot (Suc k) prefixed (VCons Nat k x col);
+            new_head = dot k r col;
+            old_tail =
+              row_product_columns
+                (Suc k)
+                t
+                prefixed
+                (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) t (prepend k) tail_row tail_cols);
+            new_tail = row_product_columns k t r tail_cols
+          in
+            trans
+              (Vec Nat (Suc t))
+              (VCons Nat t old_head old_tail)
+              (VCons Nat t new_head old_tail)
+              (VCons Nat t new_head new_tail)
+              (cong
+                Nat
+                (Vec Nat (Suc t))
+                old_head
+                new_head
+                (λv. VCons Nat t v old_tail)
+                (dot_zero_prefix k x r col))
+              (cong
+                (Vec Nat t)
+                (Vec Nat (Suc t))
+                old_tail
+                new_tail
+                (VCons Nat t new_head)
+                (zero_prefix_columns k t r tail_row tail_cols))
+      }
+  }
+
+theorem left_tail_rows
+      (k : Nat)
+      (m : Nat)
+      (row : Vec Nat m)
+      (rest : Vec (Vec Nat m) k)
+      (j : Nat)
+      (rows : Vec (Vec Nat k) j)
+    : Equal
+        (Vec (Vec Nat m) j)
+        (map
+          (Vec Nat (Suc k))
+          (Vec Nat m)
+          j
+          (row_product (Suc k) m (VCons (Vec Nat m) k row rest))
+          (map (Vec Nat k) (Vec Nat (Suc k)) j (prepend_zero k) rows))
+        (map (Vec Nat k) (Vec Nat m) j (row_product k m rest) rows) =
+  match rows {
+    VNil ↦ Proved;
+    VCons i r more ↦
+      let
+        whole = VCons (Vec Nat m) k row rest;
+        old_head = row_product (Suc k) m whole (VCons Nat k Zero r);
+        new_head = row_product k m rest r;
+        old_tail =
+          map
+            (Vec Nat (Suc k))
+            (Vec Nat m)
+            i
+            (row_product (Suc k) m whole)
+            (map (Vec Nat k) (Vec Nat (Suc k)) i (prepend_zero k) more);
+        new_tail = map (Vec Nat k) (Vec Nat m) i (row_product k m rest) more
+      in
+        trans
+          (Vec (Vec Nat m) (Suc i))
+          (VCons (Vec Nat m) i old_head old_tail)
+          (VCons (Vec Nat m) i new_head old_tail)
+          (VCons (Vec Nat m) i new_head new_tail)
+          (cong
+            (Vec Nat m)
+            (Vec (Vec Nat m) (Suc i))
+            old_head
+            new_head
+            (λv. VCons (Vec Nat m) i v old_tail)
+            (zero_prefix_columns k m r row (transpose k m rest)))
+          (cong
+            (Vec (Vec Nat m) i)
+            (Vec (Vec Nat m) (Suc i))
+            old_tail
+            new_tail
+            (VCons (Vec Nat m) i new_head)
+            (left_tail_rows k m row rest i more))
+  }
+
+theorem columns_empty_row
+      (p : Nat) (columns : Vec (Vec Nat Zero) p)
+    : Equal (Vec Nat p) (row_product_columns Zero p (VNil Nat) columns) (repeat Nat p Zero) =
+  match columns {
+    VNil ↦ Proved;
+    VCons j col rest ↦
+      cong
+        (Vec Nat j)
+        (Vec Nat (Suc j))
+        (row_product_columns Zero j (VNil Nat) rest)
+        (repeat Nat j Zero)
+        (VCons Nat j Zero)
+        (columns_empty_row j rest)
+  }
+
+theorem columns_zero_row
+      (n : Nat) (q : Nat) (columns : Vec (Vec Nat n) q)
+    : Equal
+        (Vec Nat q)
+        (row_product_columns n q (repeat Nat n Zero) columns)
+        (repeat Nat q Zero) =
+  match columns {
+    VNil ↦ Proved;
+    VCons j col rest ↦
+      let
+        old_head = dot n (repeat Nat n Zero) col;
+        old_tail = row_product_columns n j (repeat Nat n Zero) rest;
+        zeros = repeat Nat j Zero
+      in
+        trans
+          (Vec Nat (Suc j))
+          (VCons Nat j old_head old_tail)
+          (VCons Nat j Zero old_tail)
+          (VCons Nat j Zero zeros)
+          (cong
+            Nat
+            (Vec Nat (Suc j))
+            old_head
+            Zero
+            (λv. VCons Nat j v old_tail)
+            (dot_zero_left n col))
+          (cong
+            (Vec Nat j)
+            (Vec Nat (Suc j))
+            old_tail
+            zeros
+            (VCons Nat j Zero)
+            (columns_zero_row n j rest))
+  }
+
+theorem columns_cons
+      (k : Nat)
+      (p : Nat)
+      (x : Nat)
+      (rest_row : Vec Nat k)
+      (b : Vec Nat p)
+      (columns : Vec (Vec Nat k) p)
+    : Equal
+        (Vec Nat p)
+        (row_product_columns
+          (Suc k)
+          p
+          (VCons Nat k x rest_row)
+          (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) p (prepend k) b columns))
+        (vector_add p (vector_scale p x b) (row_product_columns k p rest_row columns)) =
+  match b {
+    VNil ↦
+      J
+        (λcs _.
+          Equal
+            (Vec Nat Zero)
+            (row_product_columns
+              (Suc k)
+              Zero
+              (VCons Nat k x rest_row)
+              (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) Zero (prepend k) (VNil Nat) cs))
+            (vector_add
+              Zero
+              (vector_scale Zero x (VNil Nat))
+              (row_product_columns k Zero rest_row cs)))
+        Proved
+        (vec_zero_vnil (Vec Nat k) columns);
+    VCons j y tail_b ↦
+      match columns {
+        VCons _ col tail_cols ↦
+          let
+            head_value = add (mul x y) (dot k rest_row col);
+            old_tail =
+              row_product_columns
+                (Suc k)
+                j
+                (VCons Nat k x rest_row)
+                (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) j (prepend k) tail_b tail_cols);
+            new_tail =
+              vector_add
+                j
+                (vector_scale j x tail_b)
+                (row_product_columns k j rest_row tail_cols)
+          in
+            cong
+              (Vec Nat j)
+              (Vec Nat (Suc j))
+              old_tail
+              new_tail
+              (VCons Nat j head_value)
+              (columns_cons k j x rest_row tail_b tail_cols)
+      }
+  }
+
+theorem dot_scale
+      (n : Nat) (x : Nat) (u : Vec Nat n) (c : Vec Nat n)
+    : Equal Nat (dot n (vector_scale n x u) c) (mul x (dot n u c)) =
+  match u {
+    VNil ↦ Proved;
+    VCons k y tail_u ↦
+      match c {
+        VCons _ z tail_c ↦
+          let
+            tail_dot = dot k tail_u tail_c;
+            scaled_tail_dot = dot k (vector_scale k x tail_u) tail_c
+          in
+            trans
+              Nat
+              (add (mul (mul x y) z) scaled_tail_dot)
+              (add (mul x (mul y z)) scaled_tail_dot)
+              (mul x (add (mul y z) tail_dot))
+              (cong
+                Nat
+                Nat
+                (mul (mul x y) z)
+                (mul x (mul y z))
+                (λv. add v scaled_tail_dot)
+                (sym Nat (mul x (mul y z)) (mul (mul x y) z) ((proof assoc for mul) x y z)))
+              (trans
+                Nat
+                (add (mul x (mul y z)) scaled_tail_dot)
+                (add (mul x (mul y z)) (mul x tail_dot))
+                (mul x (add (mul y z) tail_dot))
+                (cong
+                  Nat
+                  Nat
+                  scaled_tail_dot
+                  (mul x tail_dot)
+                  (add (mul x (mul y z)))
+                  (dot_scale k x tail_u tail_c))
+                (sym
+                  Nat
+                  (mul x (add (mul y z) tail_dot))
+                  (add (mul x (mul y z)) (mul x tail_dot))
+                  (mul_add_distrib_r x (mul y z) tail_dot)))
+      }
+  }
+
+theorem columns_scale
+      (n : Nat) (q : Nat) (x : Nat) (u : Vec Nat n) (columns : Vec (Vec Nat n) q)
+    : Equal
+        (Vec Nat q)
+        (row_product_columns n q (vector_scale n x u) columns)
+        (vector_scale q x (row_product_columns n q u columns)) =
+  match columns {
+    VNil ↦ Proved;
+    VCons j col rest ↦
+      let
+        old_head = dot n (vector_scale n x u) col;
+        new_head = mul x (dot n u col);
+        old_tail = row_product_columns n j (vector_scale n x u) rest;
+        new_tail = vector_scale j x (row_product_columns n j u rest)
+      in
+        trans
+          (Vec Nat (Suc j))
+          (VCons Nat j old_head old_tail)
+          (VCons Nat j new_head old_tail)
+          (VCons Nat j new_head new_tail)
+          (cong
+            Nat
+            (Vec Nat (Suc j))
+            old_head
+            new_head
+            (λv. VCons Nat j v old_tail)
+            (dot_scale n x u col))
+          (cong
+            (Vec Nat j)
+            (Vec Nat (Suc j))
+            old_tail
+            new_tail
+            (VCons Nat j new_head)
+            (columns_scale n j x u rest))
+  }
+
+theorem columns_add
+      (n : Nat) (q : Nat) (u : Vec Nat n) (v : Vec Nat n) (columns : Vec (Vec Nat n) q)
+    : Equal
+        (Vec Nat q)
+        (row_product_columns n q (vector_add n u v) columns)
+        (vector_add q (row_product_columns n q u columns) (row_product_columns n q v columns)) =
+  match columns {
+    VNil ↦ Proved;
+    VCons j col rest ↦
+      let
+        old_head = dot n (vector_add n u v) col;
+        new_head = add (dot n u col) (dot n v col);
+        old_tail = row_product_columns n j (vector_add n u v) rest;
+        new_tail =
+          vector_add j (row_product_columns n j u rest) (row_product_columns n j v rest)
+      in
+        trans
+          (Vec Nat (Suc j))
+          (VCons Nat j old_head old_tail)
+          (VCons Nat j new_head old_tail)
+          (VCons Nat j new_head new_tail)
+          (cong
+            Nat
+            (Vec Nat (Suc j))
+            old_head
+            new_head
+            (λw. VCons Nat j w old_tail)
+            (dot_distrib n u v col))
+          (cong
+            (Vec Nat j)
+            (Vec Nat (Suc j))
+            old_tail
+            new_tail
+            (VCons Nat j new_head)
+            (columns_add n j u v rest))
+  }
+
+theorem row_product_assoc_empty
+      (p : Nat) (q : Nat) (c : Vec (Vec Nat q) p)
+    : Equal
+        (Vec Nat q)
+        (row_product p q c (row_product Zero p (VNil (Vec Nat p)) (VNil Nat)))
+        (row_product Zero q (VNil (Vec Nat q)) (VNil Nat)) =
+  let
+    inner = row_product Zero p (VNil (Vec Nat p)) (VNil Nat);
+    zeros_p = repeat Nat p Zero;
+    cols = transpose p q c;
+    rhs = row_product Zero q (VNil (Vec Nat q)) (VNil Nat)
+  in
+    trans
+      (Vec Nat q)
+      (row_product_columns p q inner cols)
+      (row_product_columns p q zeros_p cols)
+      rhs
+      (cong
+        (Vec Nat p)
+        (Vec Nat q)
+        inner
+        zeros_p
+        (λw. row_product_columns p q w cols)
+        (columns_empty_row p (transpose Zero p (VNil (Vec Nat p)))))
+      (trans
+        (Vec Nat q)
+        (row_product_columns p q zeros_p cols)
+        (repeat Nat q Zero)
+        rhs
+        (columns_zero_row p q cols)
+        (sym
+          (Vec Nat q)
+          rhs
+          (repeat Nat q Zero)
+          (columns_empty_row q (transpose Zero q (VNil (Vec Nat q))))))
+
+theorem row_product_assoc
+      (n : Nat)
+      (p : Nat)
+      (q : Nat)
+      (a : Vec Nat n)
+      (b : Vec (Vec Nat p) n)
+      (c : Vec (Vec Nat q) p)
+    : Equal
+        (Vec Nat q)
+        (row_product p q c (row_product n p b a))
+        (row_product n q (matrix_product n p q b c) a) =
+  match a {
+    VNil ↦
+      J
+        (λbs _.
+          Equal
+            (Vec Nat q)
+            (row_product p q c (row_product Zero p bs (VNil Nat)))
+            (row_product Zero q (matrix_product Zero p q bs c) (VNil Nat)))
+        (row_product_assoc_empty p q c)
+        (vec_zero_vnil (Vec Nat p) b);
+    VCons k x tail_a ↦
+      match b {
+        VCons _ brow tail_b ↦
+          let
+            cols = transpose p q c;
+            scaled = vector_scale p x brow;
+            rest_product = row_product k p tail_b tail_a;
+            inner =
+              row_product (Suc k) p (VCons (Vec Nat p) k brow tail_b) (VCons Nat k x tail_a);
+            split = vector_add p scaled rest_product;
+            head_image = row_product_columns p q brow cols;
+            rest_bc = matrix_product k p q tail_b c;
+            step0 = row_product_columns p q inner cols;
+            step1 = row_product_columns p q split cols;
+            step2 =
+              vector_add
+                q
+                (row_product_columns p q scaled cols)
+                (row_product_columns p q rest_product cols);
+            step3 =
+              vector_add
+                q
+                (vector_scale q x head_image)
+                (row_product_columns p q rest_product cols);
+            step4 = vector_add q (vector_scale q x head_image) (row_product k q rest_bc tail_a);
+            goal_rhs =
+              row_product
+                (Suc k)
+                q
+                (matrix_product (Suc k) p q (VCons (Vec Nat p) k brow tail_b) c)
+                (VCons Nat k x tail_a)
+          in
+            trans
+              (Vec Nat q)
+              step0
+              step1
+              goal_rhs
+              (cong
+                (Vec Nat p)
+                (Vec Nat q)
+                inner
+                split
+                (λw. row_product_columns p q w cols)
+                (columns_cons k p x tail_a brow (transpose k p tail_b)))
+              (trans
+                (Vec Nat q)
+                step1
+                step2
+                goal_rhs
+                (columns_add p q scaled rest_product cols)
+                (trans
+                  (Vec Nat q)
+                  step2
+                  step3
+                  goal_rhs
+                  (cong
+                    (Vec Nat q)
+                    (Vec Nat q)
+                    (row_product_columns p q scaled cols)
+                    (vector_scale q x head_image)
+                    (λw. vector_add q w (row_product_columns p q rest_product cols))
+                    (columns_scale p q x brow cols))
+                  (trans
+                    (Vec Nat q)
+                    step3
+                    step4
+                    goal_rhs
+                    (cong
+                      (Vec Nat q)
+                      (Vec Nat q)
+                      (row_product_columns p q rest_product cols)
+                      (row_product k q rest_bc tail_a)
+                      (vector_add q (vector_scale q x head_image))
+                      (row_product_assoc k p q tail_a tail_b c))
+                    (sym
+                      (Vec Nat q)
+                      goal_rhs
+                      step4
+                      (columns_cons
+                        k
+                        q
+                        x
+                        tail_a
+                        (row_product p q c brow)
+                        (transpose k q rest_bc))))))
+      }
+  }
 ```
 
 ## 3. Using it
@@ -722,17 +1375,23 @@ associativity and commutativity; it does not add a shared export.
 zero-prefixed trailing rows ignore the added coordinate, and recurses.
 `matrix_identity_right` first proves the diagonal matrix is unchanged by
 transpose, applies `dot_comm` pointwise to each right-identity row, and lifts
-the row proof across the matrix. These are generic, indexed proof terms; the
-closed example only illustrates their operations.
+the row proof across the matrix. `matrix_identity_left` instead selects the
+head row with the first unit row and removes the zero-prefixed coordinate
+from each trailing row. `matrix_product_assoc` distributes column products
+over vector sums and scaling; `dot_scale` uses the checked natural-number
+right-distribution law. These are generic, indexed proof terms; the closed
+example only illustrates their operations.
 
 ## 5. Design notes
 
 A matrix is `Vec (Vec Nat n) m`, not a list plus an unchecked width. `transpose`
 keeps columns and rows in source order. `identity` places `Suc Zero` on the
-diagonal and `Zero` elsewhere. The laws make no claim about left matrix
-identity or associativity of matrix products, which require separate generic
-proofs. A rational-valued or approximate matrix would require a different
-statement of equality and is not implied by natural-number arithmetic.
+diagonal and `Zero` elsewhere. Left identity and product associativity have
+distinct generic proofs from right identity. The named `dot_with` helper passes
+the row's dot product to
+`map` without a lambda-headed application in a proof goal. A rational-valued
+or approximate matrix would require a different statement of equality and is
+not implied by natural-number arithmetic.
 
 ## 6. References
 
@@ -743,11 +1402,11 @@ statement of equality and is not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [linear-algebra contract](../../../../spec/50-stdlib/65-linear-algebra.md)
-§1 and its [seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md)
-own the twelve public names and nine behavioral cases. The module reuses the
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–2
+and [seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md)
+own fourteen public names and twelve behavioral cases. The module reuses the
 published `Data.Vector.Vector` carrier and natural arithmetic. `repeat`,
-column prepending, row products and proof bridges remain private. All five
+column prepending, row products and proof bridges remain private. All seven
 public theorems have checked bodies. This package adds no Axiom, postulate,
 primitive, `Float` or trusted-base entry; dependencies retain their own trust
 posture. The root-loaded acceptance target checks generic imports, closed
