@@ -208,7 +208,7 @@ pub(crate) struct ClassifyMemo {
     application_types: HashMap<usize, (Term, Term)>,
 }
 
-fn has_free_var(term: &Term, bound: usize) -> bool {
+pub(crate) fn has_free_var(term: &Term, bound: usize) -> bool {
     match term {
         Term::Var(index) => *index >= bound,
         Term::Lam(domain, body) | Term::Pi(domain, body) | Term::Sigma(domain, body) => {

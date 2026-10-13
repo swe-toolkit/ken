@@ -380,7 +380,7 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
     cx.push_match_binder(vec_ty(Term::var(0)), MatchBinderOrigin::UserLocal); // y
     let without_sibling = MatchFrame::new(cx.ctx.len(), 1, None, Some(cx.ctx.len() - 1));
     assert!(
-        compute_context_convoy(&cx, &without_sibling, &[Term::var(1)])
+        compute_context_convoy(&cx, &without_sibling, &Term::var(0), &[Term::var(1)])
             .expect("scrutinee classification")
             .is_empty(),
         "a dependent scrutinee is not its own ambient sibling"
@@ -392,7 +392,7 @@ fn nested_equation_convoy_still_rejects_a_genuine_ambient_sibling() {
     let scrutinee = Term::var(0);
     let goal = eq(nat_ty.clone(), index.clone(), index.clone());
     let frame = MatchFrame::new(cx.ctx.len(), 1, Some(goal.clone()), Some(cx.ctx.len() - 1));
-    let convoy = compute_context_convoy(&cx, &frame, std::slice::from_ref(&index))
+    let convoy = compute_context_convoy(&cx, &frame, &scrutinee, std::slice::from_ref(&index))
         .expect("sibling provenance");
     assert_eq!(
         convoy.len(),
