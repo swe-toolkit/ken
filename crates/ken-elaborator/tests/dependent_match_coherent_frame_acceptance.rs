@@ -211,25 +211,26 @@ fn recursive_step_only_false_is_rejected_after_true_base_elaborates() {
 fn genuinely_false_reachable_branch_stays_rejected() {
     on_elaboration_stack(|| {
         let mut env = env();
-        let error = env
-            .elaborate_decl(
-                "theorem dual_false (a : Type) (n : Nat) (xs : DualEnv a n) \
+        let source = "theorem dual_false (a : Type) (n : Nat) (xs : DualEnv a n) \
                (i : DualFin n) : \
                Equal (Option a) (Some a (dual_lookup a n xs i)) (None a) = \
              match i { \
                DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; \
-               DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }",
-            )
+               DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }";
+        let error = env
+            .elaborate_decl(source)
             .expect_err("a reachable Some = None branch must not be admitted");
+        let ElabError::TypeMismatch { span, reason } = error else {
+            panic!(
+                "the false Refl must be reached instead of an incidental index failure: {error:?}"
+            );
+        };
+        assert_eq!(reason, "Refl expects an `Eq`-shaped goal");
+        let fz = source.find("DualFZ m ↦ match xs").expect("DualFZ arm");
+        let fs = source.find("DualFS m j ↦ match xs").expect("DualFS arm");
         assert!(
-            matches!(
-                error,
-                ElabError::KernelRejected {
-                    error: KernelError::TypeMismatch { .. },
-                    ..
-                }
-            ),
-            "the underivable control must fail at kernel type checking, found {error:?}"
+            span.start >= fz && span.end <= fs,
+            "the false Refl must lie in the DualFZ arm: {span:?}"
         );
     });
 }

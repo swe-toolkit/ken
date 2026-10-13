@@ -4437,7 +4437,6 @@ fn plan_coherent_frame_motive(
     motive_local_indices: &[Term],
     recursive_field_index_path: RecursiveFieldIndexPath,
     sentinel_region: usize,
-    defer_coupled_expansion: bool,
     span: &Span,
     frame: &MatchFrame,
 ) -> Result<Box<CoherentFrameMotivePlan>, ElabError> {
@@ -4467,8 +4466,7 @@ fn plan_coherent_frame_motive(
     let expanded_expected = boxed_simplify_branch_goal(
         cx.env, cx.refinement_facts, &zonked_ctx, original_expected,
     );
-    let has_nontrivial_coupled_sides = matches!(original_expected, Term::Eq(_, _, _))
-        || matches!(expanded_expected.as_ref(), Term::Eq(_, _, _));
+    let has_nontrivial_coupled_sides = goal_is_proposition(cx, &zonked_ctx, original_expected)?;
     let probe_context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
 
     // A nested covering is already inside a constructor-refined outer frame.
@@ -4738,6 +4736,17 @@ fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -
 #[inline(never)]
 fn states_equality(env: &GlobalEnv, ctx: &Context, term: &Term) -> bool {
     stated_equality(env, ctx, term).is_some()
+}
+
+/// A goal the coherent-frame planner may convoy: its checked sort is
+/// `Omega`. A syntactic `Eq` is one case; a neutral motive application,
+/// a user predicate and an `Equal` at a data type are others.
+fn goal_is_proposition(cx: &ElabCtx<'_>, ctx: &Context, goal: &Term) -> Result<bool, ElabError> {
+    match kernel_infer_in_context_current(cx, ctx, goal) {
+        Ok(sort) => Ok(matches!(whnf(cx.env, ctx, &sort), Term::Omega(_))),
+        Err(CurrentKernelQueryError::View(error)) => Err(error),
+        Err(CurrentKernelQueryError::Kernel(_)) => Ok(false),
+    }
 }
 
 /// The equality a goal states, for `Refl` standalone and in every arm. It is
@@ -7062,20 +7071,37 @@ fn check_large_convoy_recursive_arm(
     let motive_goal = subst_term_generalize_many(&weaken(expected_here, 2), &motive_substitutions);
     let motive_result = wrap_premise_pis_finalized(motive_goal, &motive_domains, source_region);
 
-    let Term::Eq(goal_carrier, _, _) = whnf(cx.env, &cx.ctx, expected_here) else {
-        return Ok(None);
-    };
-    let Term::Type(goal_level) = whnf(
-        cx.env,
-        &cx.ctx,
-        &kernel_infer_current(cx, &goal_carrier).map_err(|error| match error {
-            CurrentKernelQueryError::View(error) => error,
-            CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
-                "large index convoy could not classify its recursive goal: {error:?}"
-            )),
-        })?,
-    ) else {
-        return Ok(None);
+    let goal_level = match whnf(cx.env, &cx.ctx, expected_here) {
+        Term::Eq(goal_carrier, _, _) => {
+            let Term::Type(goal_level) = whnf(
+                cx.env,
+                &cx.ctx,
+                &kernel_infer_current(cx, &goal_carrier).map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                        "large index convoy could not classify its recursive goal: {error:?}"
+                    )),
+                })?,
+            ) else {
+                return Ok(None);
+            };
+            goal_level
+        }
+        _ => {
+            let Term::Omega(goal_level) = whnf(
+                cx.env,
+                &cx.ctx,
+                &kernel_infer_current(cx, expected_here).map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                        "large index convoy could not classify its recursive proposition: {error:?}"
+                    )),
+                })?,
+            ) else {
+                return Ok(None);
+            };
+            goal_level
+        }
     };
     let motive_body = Term::lam(
         leaf.index_ty.clone(),
@@ -8195,10 +8221,6 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         &motive_local_indices,
         recursive_field_index_path,
         sentinel_region,
-        !ind.indices.is_empty()
-            && arms
-                .iter()
-                .any(|arm| matches!(arm.body, RExpr::RMatch { .. })),
         span,
         &frame,
     )?;
