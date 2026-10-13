@@ -1379,8 +1379,9 @@ fn eq_reduce(
     EvalVal::Unknown
 }
 
-/// Structural type equality (by value structure, not alpha-eq of closed types).
-/// Used by C5 regularity and J-beta's congruent endpoint decision (`15 §4`).
+/// Structural value equality (not alpha-eq of closed terms). Used both for
+/// C5 type endpoints and for J-beta's checked, erased equation endpoints
+/// (`15 §4`). Pair components compare structurally; closures fail closed.
 fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
     match (a, b) {
         (EvalVal::TypeUniverse(la), EvalVal::TypeUniverse(lb)) => la.equiv(lb),
@@ -1420,6 +1421,14 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
                 && aa.len() == ba.len()
                 && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
         }
+        (
+            EvalVal::Pair {
+                fst: af, snd: asnd, ..
+            },
+            EvalVal::Pair {
+                fst: bf, snd: bsnd, ..
+            },
+        ) => eq_type_eq(af, bf) && eq_type_eq(asnd, bsnd),
         (
             EvalVal::Ctor {
                 id: a, args: aa, ..
