@@ -91,14 +91,26 @@ const A1: &str = "theorem lookup_and (a : Type) (pp : a → Prop) (qq : a → Pr
 const A1F: &str = "theorem lookup_and_false (a : Type) (pp : a → Prop) (qq : a → Prop) (hp : (x : a) → pp x) (hq : (x : a) → qq x) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : And (pp (dual_lookup a n xs i)) (qq (dual_lookup a n xs i)) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ and_intro (pp x) (qq x) (hp x) (hp x) }; DualFS m j ↦ match xs { DualCons k x rest ↦ lookup_and_false a pp qq hp hq m rest j } }";
 
 #[test]
+fn ac1_e9_ambient_binder_before_index_checks() {
+    on_elaboration_stack(|| check_true(true, &e_like("e9", true, false, true)));
+}
+
+#[test]
+fn ac1_e11_ambient_binder_after_index_checks() {
+    on_elaboration_stack(|| check_true(true, &e_like("e11", false, true, true)));
+}
+
+#[test]
+fn ac1_g2_nested_hypothesis_checks() {
+    on_elaboration_stack(|| check_true(true, G2));
+}
+
+#[test]
 fn ac1_context_and_embedded_companions_coexist() {
     on_elaboration_stack(|| {
-        check_true(true, &e_like("e9", true, false, true));
-        check_true(true, &e_like("e11", false, true, true));
         check_true(true, &h_like("h9", false, false));
         check_true(true, &h_like("h5", true, false));
         check_true(true, G1);
-        check_true(true, G2);
         check_true(false, VEC_G2);
     });
 }
