@@ -10898,6 +10898,283 @@ fn infer_ascription(
     Ok((e_core, ty_core))
 }
 
+#[inline(never)]
+fn infer_recursive_result(
+    cx: &mut ElabCtx,
+    selector: &RecursiveResultSelector,
+    index: usize,
+    binding_span: &Span,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (result, result_type) = cx.selected_recursive_result(index).ok_or_else(|| {
+        ElabError::StructuralResultOutOfScope {
+            selector_span: span.clone(),
+            binding_span: binding_span.clone(),
+        }
+    })?;
+    let classifier = kernel_infer_current(cx, &result_type).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error,
+            span: span.clone(),
+        },
+    })?;
+    let classifier = whnf(cx.env, &cx.ctx, &classifier);
+    let (actual, required) = match classifier {
+        Term::Type(level) => (
+            RecursiveResultSort::Type(level),
+            RecursiveResultSelector::RecursiveResult,
+        ),
+        Term::Omega(level) => (
+            RecursiveResultSort::Omega(level),
+            RecursiveResultSelector::InductionHypothesis,
+        ),
+        _ => {
+            return Err(ElabError::RecursiveResultClassifierNotUniverse {
+                selector_span: span.clone(),
+                binding_span: binding_span.clone(),
+            })
+        }
+    };
+    if *selector != required {
+        return Err(ElabError::RecursiveResultSortMismatch {
+            selector_span: span.clone(),
+            binding_span: binding_span.clone(),
+            actual_classifier: actual,
+            required_spelling: required.spelling(),
+        });
+    }
+    Ok((result, result_type))
+}
+
+#[inline(never)]
+fn infer_space_cell(
+    cx: &mut ElabCtx,
+    index: usize,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let Some((state_position, cell_types)) = &cx.space_state else {
+        return Err(ElabError::MutationOutsideSpace {
+            construct: "cell read".to_string(),
+            span: span.clone(),
+        });
+    };
+    let cell_ty = cell_types
+        .get(index)
+        .cloned()
+        .ok_or_else(|| ElabError::Internal(format!("space cell index {index} out of range")))?;
+    let state_index = cx.ctx.len() - 1 - state_position;
+    Ok((
+        project_space_cell(Term::var(state_index), index, cell_types.len()),
+        cell_ty,
+    ))
+}
+
+#[inline(never)]
+fn infer_checked_global(
+    cx: &mut ElabCtx,
+    name: &str,
+    id: GlobalId,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    if let Some((ind, k)) = cx.env.constructor(id) {
+        let ty = ind.constructors[k].type_.clone();
+        return Ok((
+            Term::Constructor {
+                id,
+                level_args: vec![],
+            },
+            ty,
+        ));
+    }
+    if let Some(ind) = cx.env.inductive(id) {
+        return Ok((
+            Term::IndFormer {
+                id,
+                level_args: vec![],
+            },
+            ind.former_type.clone(),
+        ));
+    }
+    let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "no checked type for imported global '{name}' {id:?}"
+        ))
+    })?;
+    let (core, ty) = (Term::const_(id, vec![]), ty.clone());
+    apply_zero_arity_preconditions(cx, id, core, ty, span)
+}
+
+#[inline(never)]
+fn infer_constructor_global(
+    cx: &mut ElabCtx,
+    name: &str,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (core, ty) = infer_spelling_global(cx, name, span)?;
+    let Term::Const { id, .. } = core else {
+        return Ok((core, ty));
+    };
+    apply_zero_arity_preconditions(cx, id, core, ty, span)
+}
+
+#[inline(never)]
+fn infer_universe(cx: &mut ElabCtx, n: Option<u32>) -> Result<(Term, Term), ElabError> {
+    let l = if let Some(n) = n {
+        level_from_nat(n)
+    } else {
+        cx.metas.fresh()
+    };
+    let ty = Term::ty(Level::Suc(Box::new(l.clone())));
+    Ok((Term::ty(l), ty))
+}
+
+#[inline(never)]
+fn infer_j_sugar(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
+    let args = peel_named_app(expr, SUGAR_J, 3).expect("checked by guard");
+    infer_j(cx, args[0], args[1], args[2], expr.span())
+}
+
+#[inline(never)]
+fn infer_eq_sugar(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
+    let args = peel_named_app(expr, SUGAR_EQ, 3).expect("checked by guard");
+    infer_eq(cx, args[0], args[1], args[2], expr.span())
+}
+
+#[inline(never)]
+fn infer_elim_trunc_sugar(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
+    let args = peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).expect("checked by guard");
+    infer_elim_trunc(cx, args[0], args[1], args[2], expr.span())
+}
+
+#[cold]
+#[inline(never)]
+fn infer_trunc_intro_error(rspan: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::TypeMismatch {
+        span: rspan.clone(),
+        reason: "trunc_intro (‖A‖ introduction) cannot be inferred — it needs an \
+                         expected type; add an ascription `(trunc_intro a : ‖A‖)` or place \
+                         it where the expected type is already known (e.g. a declaration's \
+                         declared type)"
+            .into(),
+    })
+}
+
+#[inline(never)]
+fn infer_application(
+    cx: &mut ElabCtx,
+    expr: &RExpr,
+    f: &RExpr,
+    a: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    // Peel and inspect the whole source spine in a separate frame.
+    // On the overwhelmingly-common decline path that frame (including
+    // its argument vector) is gone before generic application recurses.
+    if let Some(call) = infer_reflexive_recursive_self_call(cx, expr, span)? {
+        return append_saturated_preconditions(cx, expr, call, span);
+    }
+    if let Some(call) = infer_preconditioned_application(cx, expr, span)? {
+        return Ok(call);
+    }
+    let (f_core, f_ty) = infer(cx, f)?;
+    let f_ty_wh = whnf(cx.env, &cx.ctx, &f_ty);
+    match f_ty_wh {
+        Term::Pi(dom, cod) => {
+            let a_core = check(cx, a, &dom, span)?;
+            emit_call_refinements(cx, &f_core, &a_core, span)?;
+            let result_ty = subst0(&cod, &a_core);
+            Ok((Term::app(f_core, a_core), result_ty))
+        }
+        _ => Err(ElabError::NotAFunction { span: span.clone() }),
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn infer_unannotated_lambda_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "cannot infer type of lambda without annotation".into(),
+    })
+}
+
+#[inline(never)]
+fn infer_let(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>,
+    rhs: &RExpr,
+    body: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
+    let equation = let_equation(cx, &rhs_ty, &rhs_core);
+    cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
+    let path_base = cx.path_conditions.len();
+    if let Some(equation) = equation {
+        cx.path_conditions.push((equation, cx.ctx.len()));
+    }
+    let body_result = infer(cx, body);
+    cx.path_conditions.truncate(path_base);
+    cx.ctx.pop();
+    let (body_core, body_ty) = body_result?;
+    let result_ty = subst0(&body_ty, &rhs_core);
+    Ok((
+        Term::Let {
+            ty: Box::new(rhs_ty),
+            val: Box::new(rhs_core),
+            body: Box::new(body_core),
+        },
+        result_ty,
+    ))
+}
+
+#[inline(never)]
+fn infer_old(cx: &mut ElabCtx, inner: &RExpr, span: &Span) -> Result<(Term, Term), ElabError> {
+    let Some(pre_state) = cx.space_pre_state.clone() else {
+        return Err(ElabError::OldPreStateUnsupported { span: span.clone() });
+    };
+    let post_state = cx.space_state.replace(pre_state);
+    let result = infer(cx, inner);
+    cx.space_state = post_state;
+    result
+}
+
+#[cold]
+#[inline(never)]
+fn infer_match_equation_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: "`match ... eqn:` requires a declared expected type".into(),
+    })
+}
+
+#[inline(never)]
+fn infer_attached_proof_ref(
+    cx: &mut ElabCtx,
+    subject: &str,
+    proof_name: &str,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
+    // This variant has no expression child to receive a checking
+    // goal: it is a leaf lookup for the qualified proof name. The
+    // ordinary infer-then-unify checking fallback therefore loses no
+    // bidirectional information here.
+    infer(
+        cx,
+        &RExpr::RCon(format!("{subject}::{proof_name}"), span.clone()),
+    )
+}
+
+#[cold]
+#[inline(never)]
+fn infer_becomes_error(span: &Span) -> Result<(Term, Term), ElabError> {
+    Err(ElabError::MutationOutsideSpace {
+        construct: "becomes".to_string(),
+        span: span.clone(),
+    })
+}
+
 fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
     match expr {
         RExpr::RIf {
@@ -10906,111 +11183,21 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
             else_branch,
             span,
         } => infer_if(cx, condition, then_branch, else_branch, span),
-        RExpr::RRecursiveResult {
-            selector,
-            index,
-            name: _,
-            binding_span,
-            span,
-        } => {
-            let (result, result_type) = cx.selected_recursive_result(*index).ok_or_else(|| {
-                ElabError::StructuralResultOutOfScope {
-                    selector_span: span.clone(),
-                    binding_span: binding_span.clone(),
-                }
-            })?;
-            let classifier = kernel_infer_current(cx, &result_type).map_err(|error| match error {
-                CurrentKernelQueryError::View(error) => error,
-                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                    error,
-                    span: span.clone(),
-                },
-            })?;
-            let classifier = whnf(cx.env, &cx.ctx, &classifier);
-            let (actual, required) = match classifier {
-                Term::Type(level) => (
-                    RecursiveResultSort::Type(level),
-                    RecursiveResultSelector::RecursiveResult,
-                ),
-                Term::Omega(level) => (
-                    RecursiveResultSort::Omega(level),
-                    RecursiveResultSelector::InductionHypothesis,
-                ),
-                _ => {
-                    return Err(ElabError::RecursiveResultClassifierNotUniverse {
-                        selector_span: span.clone(),
-                        binding_span: binding_span.clone(),
-                    })
-                }
-            };
-            if *selector != required {
-                return Err(ElabError::RecursiveResultSortMismatch {
-                    selector_span: span.clone(),
-                    binding_span: binding_span.clone(),
-                    actual_classifier: actual,
-                    required_spelling: required.spelling(),
-                });
-            }
-            Ok((result, result_type))
-        }
+        RExpr::RRecursiveResult { selector, index, binding_span, span, .. } =>
+            infer_recursive_result(cx, selector, *index, binding_span, span),
+
         RExpr::RPatternAlias(slot, name, _span) => infer_active_pattern_alias(cx, *slot, name),
         RExpr::RVar(i, name, span) => infer_named_local_variable(cx, i, name, span),
 
-        RExpr::RCell(index, _, span) => {
-            let Some((state_position, cell_types)) = &cx.space_state else {
-                return Err(ElabError::MutationOutsideSpace {
-                    construct: "cell read".to_string(),
-                    span: span.clone(),
-                });
-            };
-            let cell_ty = cell_types.get(*index).cloned().ok_or_else(|| {
-                ElabError::Internal(format!("space cell index {index} out of range"))
-            })?;
-            let state_index = cx.ctx.len() - 1 - state_position;
-            Ok((
-                project_space_cell(Term::var(state_index), *index, cell_types.len()),
-                cell_ty,
-            ))
-        }
+        RExpr::RCell(index, _, span) => infer_space_cell(cx, *index, span),
 
-        RExpr::RBecomes(_, _, _, span) => Err(ElabError::MutationOutsideSpace {
-            construct: "becomes".to_string(),
-            span: span.clone(),
-        }),
+        RExpr::RBecomes(_, _, _, span) => infer_becomes_error(span),
 
-        RExpr::RCheckedGlobal { name, id, span } => {
-            let id = *id;
-            if let Some((ind, k)) = cx.env.constructor(id) {
-                let ty = ind.constructors[k].type_.clone();
-                return Ok((Term::Constructor { id, level_args: vec![] }, ty));
-            }
-            if let Some(ind) = cx.env.inductive(id) {
-                return Ok((Term::IndFormer { id, level_args: vec![] }, ind.former_type.clone()));
-            }
-            let (_, ty) = cx.env.const_type(id).ok_or_else(|| {
-                ElabError::Internal(format!("no checked type for imported global '{name}' {id:?}"))
-            })?;
-            let (core, ty) = (Term::const_(id, vec![]), ty.clone());
-            apply_zero_arity_preconditions(cx, id, core, ty, span)
-        }
-        RExpr::RCon(name, span) => {
-            let (core, ty) = infer_spelling_global(cx, name, span)?;
-            let Term::Const { id, .. } = core else {
-                return Ok((core, ty));
-            };
-            apply_zero_arity_preconditions(cx, id, core, ty, span)
-        }
+        RExpr::RCheckedGlobal { name, id, span } => infer_checked_global(cx, name, *id, span),
 
-        RExpr::RUniv(None, _) => {
-            let l = cx.metas.fresh();
-            let ty = Term::ty(Level::Suc(Box::new(l.clone())));
-            Ok((Term::ty(l), ty))
-        }
-        RExpr::RUniv(Some(n), _) => {
-            let l = level_from_nat(*n);
-            let ty = Term::ty(Level::Suc(Box::new(l.clone())));
-            Ok((Term::ty(l), ty))
-        }
+        RExpr::RCon(name, span) => infer_constructor_global(cx, name, span),
+
+        RExpr::RUniv(n, _) => infer_universe(cx, *n),
 
         // `J motive base eq` — the identity eliminator (`34 §3.4`), surfaced
         // as an INFER-mode former mirroring the existing checked-sugar idiom
@@ -11020,20 +11207,14 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         // from a checked goal). Detected BEFORE the generic application arm
         // below via a full application-spine peel (`absurd` only needed one
         // level; `J` needs three).
-        RExpr::RApp(..) if peel_named_app(expr, SUGAR_J, 3).is_some() => {
-            let args = peel_named_app(expr, SUGAR_J, 3).expect("checked by guard");
-            infer_j(cx, args[0], args[1], args[2], expr.span())
-        }
+        RExpr::RApp(..) if peel_named_app(expr, SUGAR_J, 3).is_some() => infer_j_sugar(cx, expr),
 
         // `Eq A a b` at EXPRESSION position (e.g. inside a `J` motive's body,
         // `\b' _. Eq B (P a) (P b')` — `cong`'s motive, `50-stdlib/53-
         // transport.md §2`). Same plumbing as the `elab_type` arm above
         // (`peel_named_rtype_app`), needed because a motive body is
         // elaborated via `infer`/`check`, not `elab_type`.
-        RExpr::RApp(..) if peel_named_app(expr, SUGAR_EQ, 3).is_some() => {
-            let args = peel_named_app(expr, SUGAR_EQ, 3).expect("checked by guard");
-            infer_eq(cx, args[0], args[1], args[2], expr.span())
-        }
+        RExpr::RApp(..) if peel_named_app(expr, SUGAR_EQ, 3).is_some() => infer_eq_sugar(cx, expr),
 
         // `elim_trunc P f t` — the `16 §6` truncation eliminator
         // (LANG-TRUNCATION-SURFACE-SYNTAX D2), elaborated directly to a
@@ -11042,89 +11223,24 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
         // single-arg checked-sugar idiom `absurd`/`trunc_intro` use): the
         // target proposition `P` is user-written, not recovered from a
         // checked goal.
-        RExpr::RApp(..) if peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).is_some() => {
-            let args = peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).expect("checked by guard");
-            infer_elim_trunc(cx, args[0], args[1], args[2], expr.span())
-        }
+        RExpr::RApp(..) if peel_named_app(expr, SUGAR_ELIM_TRUNC, 3).is_some() => infer_elim_trunc_sugar(cx, expr),
 
         // `trunc_intro a` reached in INFER position (no expected type in
         // scope) — the introduction form is checked-only (see the `check`
         // arm below); give the actionable remedy rather than letting this
         // fall through to the generic `RApp` arm and report an unrelated
         // "unresolved identifier 'trunc_intro'" (AC-4).
-        RExpr::RApp(f, _, rspan) if matches!(f.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) => {
-            Err(ElabError::TypeMismatch {
-                span: rspan.clone(),
-                reason: "trunc_intro (‖A‖ introduction) cannot be inferred — it needs an \
-                         expected type; add an ascription `(trunc_intro a : ‖A‖)` or place \
-                         it where the expected type is already known (e.g. a declaration's \
-                         declared type)"
-                    .into(),
-            })
-        }
+        RExpr::RApp(f, _, rspan) if matches!(f.as_ref(), RExpr::RCon(n, _) if n == SUGAR_TRUNC_INTRO) => infer_trunc_intro_error(rspan),
 
-        RExpr::RApp(f, a, span) => {
-            // Peel and inspect the whole source spine in a separate frame.
-            // On the overwhelmingly-common decline path that frame (including
-            // its argument vector) is gone before generic application recurses.
-            if let Some(call) = infer_reflexive_recursive_self_call(cx, expr, span)? {
-                return append_saturated_preconditions(cx, expr, call, span);
-            }
-            if let Some(call) = infer_preconditioned_application(cx, expr, span)? {
-                return Ok(call);
-            }
-            let (f_core, f_ty) = infer(cx, f)?;
-            let f_ty_wh = whnf(cx.env, &cx.ctx, &f_ty);
-            match f_ty_wh {
-                Term::Pi(dom, cod) => {
-                    let a_core = check(cx, a, &dom, span)?;
-                    emit_call_refinements(cx, &f_core, &a_core, span)?;
-                    let result_ty = subst0(&cod, &a_core);
-                    Ok((Term::app(f_core, a_core), result_ty))
-                }
-                _ => Err(ElabError::NotAFunction { span: span.clone() }),
-            }
-        }
+        RExpr::RApp(f, a, span) => infer_application(cx, expr, f, a, span),
 
         RExpr::RAsc(e, ty, span) => infer_ascription(cx, e, ty, span),
 
-        RExpr::RLam(_, _, span) => Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: "cannot infer type of lambda without annotation".into(),
-        }),
+        RExpr::RLam(_, _, span) => infer_unannotated_lambda_error(span),
 
-        RExpr::RLet(_x, ty_opt, rhs, body, span) => {
-            let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
-            let equation = let_equation(cx, &rhs_ty, &rhs_core);
-            cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
-            let path_base = cx.path_conditions.len();
-            if let Some(equation) = equation {
-                cx.path_conditions.push((equation, cx.ctx.len()));
-            }
-            let body_result = infer(cx, body);
-            cx.path_conditions.truncate(path_base);
-            cx.ctx.pop();
-            let (body_core, body_ty) = body_result?;
-            let result_ty = subst0(&body_ty, &rhs_core);
-            Ok((
-                Term::Let {
-                    ty: Box::new(rhs_ty),
-                    val: Box::new(rhs_core),
-                    body: Box::new(body_core),
-                },
-                result_ty,
-            ))
-        }
+        RExpr::RLet(_x, ty_opt, rhs, body, span) => infer_let(cx, ty_opt, rhs, body, span),
 
-        RExpr::ROld(inner, span) => {
-            let Some(pre_state) = cx.space_pre_state.clone() else {
-                return Err(ElabError::OldPreStateUnsupported { span: span.clone() });
-            };
-            let post_state = cx.space_state.replace(pre_state);
-            let result = infer(cx, inner);
-            cx.space_state = post_state;
-            result
-        }
+        RExpr::ROld(inner, span) => infer_old(cx, inner, span),
 
         RExpr::RNumLit(lit, span) => elab_num_lit_infer(cx, lit, span),
 
@@ -11144,15 +11260,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RInfixSpine { span, .. } => unassociated_infix_error(span),
 
-        RExpr::RMatch {
-            scrut: _,
-            equation: Some(_),
-            span,
-            ..
-        } => Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: "`match ... eqn:` requires a declared expected type".into(),
-        }),
+        RExpr::RMatch { equation: Some(_), span, .. } => infer_match_equation_error(span),
 
         RExpr::RMatch {
             scrut,
@@ -11163,9 +11271,7 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RProj(base, field, span) => infer_proj(cx, base, field, span),
 
-        RExpr::RPosProj(base, projection, span) => {
-            infer_positional_proj(cx, base, *projection, span)
-        }
+        RExpr::RPosProj(base, projection, span) => infer_positional_proj(cx, base, *projection, span),
 
         RExpr::RPair(components, span) => infer_pair(cx, components, span),
         RExpr::RRecord { span, .. } => infer_record_requires_expected_type(span),
@@ -11176,18 +11282,8 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RTrunc(inner, span) => infer_trunc(cx, inner, span),
 
-        RExpr::RAttachedProofRef {
-            subject,
-            proof_name,
-            span,
-            // This variant has no expression child to receive a checking
-            // goal: it is a leaf lookup for the qualified proof name. The
-            // ordinary infer-then-unify checking fallback therefore loses no
-            // bidirectional information here.
-        } => infer(
-            cx,
-            &RExpr::RCon(format!("{subject}::{proof_name}"), span.clone()),
-        ),
+        RExpr::RAttachedProofRef { subject, proof_name, span } =>
+            infer_attached_proof_ref(cx, subject, proof_name, span),
     }
 }
 
@@ -14438,161 +14534,56 @@ fn reassociate_rexpr(
     fixities: &HashMap<GlobalId, Fixity>,
     standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<RExpr, ElabError> {
-    Ok(match expr {
-        RExpr::RApp(function, argument, span) => RExpr::RApp(
-            Box::new(reassociate_rexpr(*function, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*argument, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RLam(name, body, span) => RExpr::RLam(
-            name,
-            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RLet(name, ty, value, body, span) => RExpr::RLet(
-            name,
-            ty.map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
-                .transpose()?,
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RAsc(value, ty, span) => RExpr::RAsc(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rtype(*ty, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::ROld(value, span) => RExpr::ROld(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RBecomes(index, name, value, span) => RExpr::RBecomes(
-            index,
-            name,
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RBinOp(operator, lhs, rhs, span) => RExpr::RBinOp(
-            operator,
-            Box::new(reassociate_rexpr(*lhs, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*rhs, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RInfixSpine {
-            operands,
-            operators,
-            ..
-        } => {
-            let mut operands = operands
-                .into_iter()
-                .map(|operand| reassociate_rexpr(operand, globals, fixities, standard_operators));
-            let mut values = vec![operands
-                .next()
-                .expect("a parsed spine has one more operand")?];
-            let mut pending: Vec<RInfixOperator> = Vec::new();
-            for (operator, rhs) in operators.into_iter().zip(operands) {
-                while let Some(top) = pending.last() {
-                    if !should_reduce_before(top, &operator, globals, fixities)? {
-                        break;
-                    }
-                    reduce_resolved_operator(
-                        &mut values,
-                        pending.pop().expect("pending operator exists"),
-                        globals,
-                        standard_operators,
-                    );
-                }
-                pending.push(operator);
-                values.push(rhs?);
-            }
-            while let Some(operator) = pending.pop() {
-                reduce_resolved_operator(&mut values, operator, globals, standard_operators);
-            }
-            values.pop().expect("reassociation produces one expression")
+    match expr {
+        arm @ RExpr::RApp(..) => {
+            reassociate_rexpr_rapp(arm, globals, fixities, standard_operators)
         }
-        RExpr::RMatch {
-            scrut,
-            equation,
-            arms,
-            span,
-        } => RExpr::RMatch {
-            scrut: Box::new(reassociate_rexpr(*scrut, globals, fixities, standard_operators)?),
-            equation,
-            arms: arms
-                .into_iter()
-                .map(|arm| {
-                    Ok(RMatchArm {
-                        pat: arm.pat,
-                        guard: arm
-                            .guard
-                            .map(|guard| reassociate_rexpr(guard, globals, fixities, standard_operators))
-                            .transpose()?,
-                        body: reassociate_rexpr(arm.body, globals, fixities, standard_operators)?,
-                        span: arm.span,
-                    })
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?,
-            span,
-        },
-        RExpr::RIf {
-            condition,
-            then_branch,
-            else_branch,
-            span,
-        } => RExpr::RIf {
-            condition: Box::new(reassociate_rexpr(*condition, globals, fixities, standard_operators)?),
-            then_branch: Box::new(reassociate_rexpr(*then_branch, globals, fixities, standard_operators)?),
-            else_branch: Box::new(reassociate_rexpr(*else_branch, globals, fixities, standard_operators)?),
-            span,
-        },
-        RExpr::RPair(components, span) => RExpr::RPair(
-            components
-                .into_iter()
-                .map(|component| reassociate_rexpr(component, globals, fixities, standard_operators))
-                .collect::<Result<Vec<_>, _>>()?,
-            span,
-        ),
-        RExpr::RRecord { base, fields, span } => RExpr::RRecord {
-            base: base
-                .map(|base| reassociate_rexpr(*base, globals, fixities, standard_operators).map(Box::new))
-                .transpose()?,
-            fields: fields
-                .into_iter()
-                .map(|(name, value, name_span)| {
-                    Ok((
-                        name,
-                        reassociate_rexpr(value, globals, fixities, standard_operators)?,
-                        name_span,
-                    ))
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?,
-            span,
-        },
-        RExpr::RProj(value, field, span) => RExpr::RProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            field,
-            span,
-        ),
-        RExpr::RPosProj(value, index, span) => RExpr::RPosProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            index,
-            span,
-        ),
-        RExpr::RPi(name, domain, codomain, span) => RExpr::RPi(
-            name,
-            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RArrow(domain, codomain, span) => RExpr::RArrow(
-            Box::new(reassociate_rexpr(*domain, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RTrunc(inner, span) => RExpr::RTrunc(
-            Box::new(reassociate_rexpr(*inner, globals, fixities, standard_operators)?),
-            span,
-        ),
+        arm @ RExpr::RLam(..) => {
+            reassociate_rexpr_rlam(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RLet(..) => {
+            reassociate_rexpr_rlet(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RAsc(..) => {
+            reassociate_rexpr_rasc(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::ROld(..) => {
+            reassociate_rexpr_rold(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RBecomes(..) => {
+            reassociate_rexpr_rbecomes(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RBinOp(..) => {
+            reassociate_rexpr_rbinop(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RInfixSpine { .. } => {
+            reassociate_rexpr_rinfixspine(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RMatch { .. } => {
+            reassociate_rexpr_rmatch(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RIf { .. } => {
+            reassociate_rexpr_rif(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RPair(..) => {
+            reassociate_rexpr_rpair(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RRecord { .. } => {
+            reassociate_rexpr_rrecord(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RProj(..) => {
+            reassociate_rexpr_rproj(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RPosProj(..) => {
+            reassociate_rexpr_rposproj(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RPi(..) => reassociate_rexpr_rpi(arm, globals, fixities, standard_operators),
+        arm @ RExpr::RArrow(..) => {
+            reassociate_rexpr_rarrow(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RTrunc(..) => {
+            reassociate_rexpr_rtrunc(arm, globals, fixities, standard_operators)
+        }
         // A LEAF HERE, AND THE ARGUMENT IS WHY -- stated because
         // `leaf => leaf` below would have swallowed this variant with no
         // compile error, the same invisible shape as the `modules.rs` remap.
@@ -14604,9 +14595,484 @@ fn reassociate_rexpr(
         // descending would also be correct; what is not correct is leaving
         // which one it is to a catch-all, since the reachability argument is
         // the part that rots when the minting site moves.
-        leaf @ RExpr::RStandardOp { .. } => leaf,
-        leaf => leaf,
+        leaf @ RExpr::RStandardOp { .. } => Ok(leaf),
+        leaf => Ok(leaf),
+    }
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rapp(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RApp(function, argument, span) = expr else {
+        unreachable!("reassociate_rexpr_rapp dispatch")
+    };
+    Ok(RExpr::RApp(
+        Box::new(reassociate_rexpr(
+            *function,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *argument,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rlam(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RLam(name, body, span) = expr else {
+        unreachable!("reassociate_rexpr_rlam dispatch")
+    };
+    Ok(RExpr::RLam(
+        name,
+        Box::new(reassociate_rexpr(
+            *body,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rlet(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RLet(name, ty, value, body, span) = expr else {
+        unreachable!("reassociate_rexpr_rlet dispatch")
+    };
+    Ok(RExpr::RLet(
+        name,
+        ty.map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
+            .transpose()?,
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *body,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rasc(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RAsc(value, ty, span) = expr else {
+        unreachable!("reassociate_rexpr_rasc dispatch")
+    };
+    Ok(RExpr::RAsc(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rtype(
+            *ty,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rold(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::ROld(value, span) = expr else {
+        unreachable!("reassociate_rexpr_rold dispatch")
+    };
+    Ok(RExpr::ROld(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rbecomes(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RBecomes(index, name, value, span) = expr else {
+        unreachable!("reassociate_rexpr_rbecomes dispatch")
+    };
+    Ok(RExpr::RBecomes(
+        index,
+        name,
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rbinop(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RBinOp(operator, lhs, rhs, span) = expr else {
+        unreachable!("reassociate_rexpr_rbinop dispatch")
+    };
+    Ok(RExpr::RBinOp(
+        operator,
+        Box::new(reassociate_rexpr(
+            *lhs,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *rhs,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rinfixspine(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RInfixSpine {
+        operands,
+        operators,
+        ..
+    } = expr
+    else {
+        unreachable!("reassociate_rexpr_rinfixspine dispatch")
+    };
+    Ok({
+        let mut operands = operands
+            .into_iter()
+            .map(|operand| reassociate_rexpr(operand, globals, fixities, standard_operators));
+        let mut values = vec![operands
+            .next()
+            .expect("a parsed spine has one more operand")?];
+        let mut pending: Vec<RInfixOperator> = Vec::new();
+        for (operator, rhs) in operators.into_iter().zip(operands) {
+            while let Some(top) = pending.last() {
+                if !should_reduce_before(top, &operator, globals, fixities)? {
+                    break;
+                }
+                reduce_resolved_operator(
+                    &mut values,
+                    pending.pop().expect("pending operator exists"),
+                    globals,
+                    standard_operators,
+                );
+            }
+            pending.push(operator);
+            values.push(rhs?);
+        }
+        while let Some(operator) = pending.pop() {
+            reduce_resolved_operator(&mut values, operator, globals, standard_operators);
+        }
+        values.pop().expect("reassociation produces one expression")
     })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rmatch(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RMatch {
+        scrut,
+        equation,
+        arms,
+        span,
+    } = expr
+    else {
+        unreachable!("reassociate_rexpr_rmatch dispatch")
+    };
+    Ok(RExpr::RMatch {
+        scrut: Box::new(reassociate_rexpr(
+            *scrut,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        equation,
+        arms: arms
+            .into_iter()
+            .map(|arm| {
+                Ok(RMatchArm {
+                    pat: arm.pat,
+                    guard: arm
+                        .guard
+                        .map(|guard| {
+                            reassociate_rexpr(guard, globals, fixities, standard_operators)
+                        })
+                        .transpose()?,
+                    body: reassociate_rexpr(arm.body, globals, fixities, standard_operators)?,
+                    span: arm.span,
+                })
+            })
+            .collect::<Result<Vec<_>, ElabError>>()?,
+        span,
+    })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rif(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RIf {
+        condition,
+        then_branch,
+        else_branch,
+        span,
+    } = expr
+    else {
+        unreachable!("reassociate_rexpr_rif dispatch")
+    };
+    Ok(RExpr::RIf {
+        condition: Box::new(reassociate_rexpr(
+            *condition,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        then_branch: Box::new(reassociate_rexpr(
+            *then_branch,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        else_branch: Box::new(reassociate_rexpr(
+            *else_branch,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rpair(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPair(components, span) = expr else {
+        unreachable!("reassociate_rexpr_rpair dispatch")
+    };
+    Ok(RExpr::RPair(
+        components
+            .into_iter()
+            .map(|component| reassociate_rexpr(component, globals, fixities, standard_operators))
+            .collect::<Result<Vec<_>, _>>()?,
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rrecord(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RRecord { base, fields, span } = expr else {
+        unreachable!("reassociate_rexpr_rrecord dispatch")
+    };
+    Ok(RExpr::RRecord {
+        base: base
+            .map(|base| {
+                reassociate_rexpr(*base, globals, fixities, standard_operators).map(Box::new)
+            })
+            .transpose()?,
+        fields: fields
+            .into_iter()
+            .map(|(name, value, name_span)| {
+                Ok((
+                    name,
+                    reassociate_rexpr(value, globals, fixities, standard_operators)?,
+                    name_span,
+                ))
+            })
+            .collect::<Result<Vec<_>, ElabError>>()?,
+        span,
+    })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rproj(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RProj(value, field, span) = expr else {
+        unreachable!("reassociate_rexpr_rproj dispatch")
+    };
+    Ok(RExpr::RProj(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        field,
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rposproj(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPosProj(value, index, span) = expr else {
+        unreachable!("reassociate_rexpr_rposproj dispatch")
+    };
+    Ok(RExpr::RPosProj(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        index,
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rpi(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPi(name, domain, codomain, span) = expr else {
+        unreachable!("reassociate_rexpr_rpi dispatch")
+    };
+    Ok(RExpr::RPi(
+        name,
+        Box::new(reassociate_rtype(
+            *domain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *codomain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rarrow(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RArrow(domain, codomain, span) = expr else {
+        unreachable!("reassociate_rexpr_rarrow dispatch")
+    };
+    Ok(RExpr::RArrow(
+        Box::new(reassociate_rexpr(
+            *domain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *codomain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rtrunc(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RTrunc(inner, span) = expr else {
+        unreachable!("reassociate_rexpr_rtrunc dispatch")
+    };
+    Ok(RExpr::RTrunc(
+        Box::new(reassociate_rexpr(
+            *inner,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
 }
 
 fn reassociate_rtype(
