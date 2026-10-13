@@ -1009,6 +1009,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 LoweringOperand::Carried(scrutinee),
                 Some(ScalarMergeKind::Bool),
+                None,
                 "a carried Bool Match",
             )?
             .0
@@ -1020,6 +1021,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 LoweringOperand::Carried(scrutinee),
                 Some(ScalarMergeKind::Bool),
+                None,
                 "a carried Bool Match",
             )?
             .0
@@ -2530,7 +2532,7 @@ impl<'a> Lowering<'a> {
                     "carrier-result join reached a native-only scalar merge consumer".to_string(),
                 ));
             }
-            self.merge_scalar_operand(builder, lowered, None, construct)
+            self.merge_scalar_operand(builder, lowered, None, Some(join_plan.origin), construct)
         }
 }
 
@@ -2548,6 +2550,7 @@ impl<'a> Lowering<'a> {
             builder: &mut FunctionBuilder<'_>,
             lowered: LoweringOperand,
             required_kind: Option<ScalarMergeKind>,
+            join_origin: Option<StaticOriginId>,
             construct: &'static str,
         ) -> Result<(NativeScalarPairV1, ScalarMergeKind), CraneliftBackendError> {
             self.scalar_operand_refused = false;
@@ -2626,8 +2629,35 @@ impl<'a> Lowering<'a> {
                     )),
                 };
             }
+            // A Ret arm is unwrapped only at a result-position join, and only
+            // when its payload is the process exit. The unit's root status is
+            // not the property: a nonroot declaration can answer the process
+            // exit through a tail call. Any other Ret refuses here, and the
+            // scalar refusal feeds back to a carrier-word join.
+            let ret_carries_exit = match &lowered {
+                Lowered::Constructor { constructor, args, .. }
+                    if constructor.ends_with("::ITree::Ret") && args.len() == 1 =>
+                {
+                    match &args[0] {
+                        ConstructorField::Specialized(Lowered::ProcessExitStatus { .. }) => true,
+                        ConstructorField::Specialized(Lowered::Constructor {
+                            constructor: inner, ..
+                        }) => {
+                            *inner == self.process_symbols.exit_success
+                                || *inner == self.process_symbols.exit_failure
+                        }
+                        _ => false,
+                    }
+                }
+                _ => false,
+            };
+            let exit_terminal_join = self.has_checked_root_exit_representation()
+                && ret_carries_exit
+                && join_origin.is_some_and(|origin| {
+                    self.function_local.terminal_result_origins.contains(&origin)
+                });
             let checked_root_exit_representation = self.has_checked_root_exit_representation();
-            let lowered = if checked_root_exit_representation {
+            let lowered = if exit_terminal_join {
                 Self::unwrap_terminal_ret(lowered)
             } else {
                 lowered

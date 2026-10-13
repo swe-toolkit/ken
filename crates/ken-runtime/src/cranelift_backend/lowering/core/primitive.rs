@@ -107,10 +107,7 @@ impl<'a> Lowering<'a> {
                     },
                 ),
                 [LoweringOperand::Carried(word)] => {
-                    let class = self.emit_carrier_class(builder, *word)?;
-                    Self::require_i64(builder, class, BoundaryClass::BorrowedOpaque as i64);
-                    let pointer = self.emit_carrier_scalar(builder, *word)?;
-                    vec![Lowered::BorrowedNativeValue { pointer }]
+                    vec![self.lower_carried_bytes_operand(builder, *word)?]
                 }
                 _ => {
                     return Err(unsupported(
@@ -126,10 +123,7 @@ impl<'a> Lowering<'a> {
                 .map(|(position, arg)| match (position, arg) {
                     (_, LoweringOperand::Specialized(value)) => Ok(value),
                     (0, LoweringOperand::Carried(word)) => {
-                        let class = self.emit_carrier_class(builder, word)?;
-                        Self::require_i64(builder, class, BoundaryClass::BorrowedOpaque as i64);
-                        let pointer = self.emit_carrier_scalar(builder, word)?;
-                        Ok(Lowered::BorrowedNativeValue { pointer })
+                        self.lower_carried_bytes_operand(builder, word)
                     }
                     (1, LoweringOperand::Carried(word)) => {
                         let tag = builder
@@ -488,6 +482,81 @@ impl<'a> Lowering<'a> {
             value: emit(builder, lhs, rhs),
             known: lhs_known.and_then(|lhs| rhs_known.map(|rhs| eval(lhs, rhs))),
         })
+    }
+
+    /// Turn either lawful carried Bytes class into a span consumed by this primitive.
+    /// An invocation-borrowed native value has class BorrowedOpaque; a response
+    /// payload copied into the region across a generated-unit frame has class
+    /// Bytes. Keep the persistent view within the primitive: its address is
+    /// stable only until the next materialization.
+    fn lower_carried_bytes_operand(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        word: CarriedBoundaryWord,
+    ) -> Result<Lowered, CraneliftBackendError> {
+        use cranelift_codegen::ir::condcodes::IntCC;
+        let refs = self.carrier_refs()?;
+        let arena = self.carrier_arena()?;
+        let pointer_type = builder.func.dfg.value_type(arena);
+        let class = self.emit_carrier_class(builder, word)?;
+        let borrowed = builder.create_block();
+        let persistent = builder.create_block();
+        let done = builder.create_block();
+        builder.append_block_param(done, pointer_type);
+        builder.append_block_param(done, types::I64);
+        let is_borrowed =
+            builder
+                .ins()
+                .icmp_imm(IntCC::Equal, class, BoundaryClass::BorrowedOpaque as i64);
+        builder
+            .ins()
+            .brif(is_borrowed, borrowed, &[], persistent, &[]);
+
+        builder.switch_to_block(borrowed);
+        let pointer = self.emit_carrier_scalar(builder, word)?;
+        let kind = builder
+            .ins()
+            .load(types::I64, MemFlags::trusted(), pointer, 0);
+        Self::require_i64(builder, kind, 1);
+        let data = builder
+            .ins()
+            .load(pointer_type, MemFlags::trusted(), pointer, 16);
+        let len = builder
+            .ins()
+            .load(types::I64, MemFlags::trusted(), pointer, 24);
+        // Preserve the borrowed arm's non-null guard before reading a byte.
+        let null = builder.ins().icmp_imm(IntCC::Equal, data, 0);
+        let nonempty = builder.ins().icmp_imm(IntCC::NotEqual, len, 0);
+        let broken = builder.ins().band(null, nonempty);
+        let broken = builder.ins().uextend(types::I64, broken);
+        Self::require_i64(builder, broken, 0);
+        builder.ins().jump(done, &[data.into(), len.into()]);
+
+        builder.switch_to_block(persistent);
+        Self::require_i64(builder, class, BoundaryClass::Bytes as i64);
+        let slot =
+            builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, 16, 3));
+        let view = builder.ins().stack_addr(pointer_type, slot, 0);
+        let call = builder
+            .ins()
+            .call(refs.bytes_view, &[arena, word.word, view]);
+        let status = builder.inst_results(call)[0];
+        Self::require_i64(builder, status, BOUNDARY_OK);
+        let data = builder.ins().stack_load(pointer_type, slot, 0);
+        let len = builder.ins().stack_load(types::I64, slot, 8);
+        builder.ins().jump(done, &[data.into(), len.into()]);
+
+        builder.switch_to_block(done);
+        let data = builder.block_params(done)[0];
+        let len = builder.block_params(done)[1];
+        let valid = builder.ins().iconst(types::I8, 1);
+        Ok(Lowered::ResponseBytes(SafeByteSpan::masked_at_producer(
+            builder,
+            pointer_type,
+            data,
+            len,
+            valid,
+        )))
     }
 
     fn lower_bytes_length(

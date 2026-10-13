@@ -2983,6 +2983,7 @@ fn d1_compile_carried_match_consumer<'src>(
                     builder,
                     lowered,
                     Some(ScalarMergeKind::Int),
+                    None,
                     "a focused carried Match result",
                 )?
                 .0

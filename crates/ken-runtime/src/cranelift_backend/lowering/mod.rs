@@ -13866,7 +13866,13 @@ impl<'a> Lowering<'a> {
                 "carrier-result join reached a native checked-plan merge consumer".to_string(),
             ));
         }
-        self.merge_scalar_operand(builder, lowered, Some(required_kind), construct)
+        self.merge_scalar_operand(
+            builder,
+            lowered,
+            Some(required_kind),
+            Some(join_plan.origin),
+            construct,
+        )
     }
 
     fn lowered_from_scalar_pair(
