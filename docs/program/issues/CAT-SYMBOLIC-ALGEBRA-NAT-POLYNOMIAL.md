@@ -1,7 +1,7 @@
 ---
 id: CAT-SYMBOLIC-ALGEBRA-NAT-POLYNOMIAL
 title: "Spec 66 section 1 specifies Algorithm.SymbolicAlgebra.NatPolynomial with five proved laws, but no catalog package delivers it. Deliver the package from the Architect's checked D0 at zero trust, with the constructor exports a client needs, and its seed as an acceptance target"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
