@@ -24,7 +24,7 @@ the committed file matches the generator's output.
 
 ## Last generated
 
-2026-10-13 10:01:28Z — from 974 issue file(s) in `docs/program/issues/`.
+2026-10-13 11:02:38Z — from 974 issue file(s) in `docs/program/issues/`.
 
 ## Work-item status
 
@@ -1020,7 +1020,6 @@ itself `merged` or `closed` (i.e. nothing left blocking a kickoff):
 - `LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE` — An elaborator-built term reaches a kernel inference position with a λ-headed redex, so the kernel refuses with \"cannot infer an introduction form\". Linear-algebra left_head fails this way when map's argument is a λ, and checks when the same function is a named helper. Find every producer and close them by one rule
 - `LANG-FACADE-EXPORT-LOAD-ORDER` — A facade export M (…) must select the same provider whatever the caller loaded first: when the unit also declares an inline module M, the facade today fails cold but is admitted, publishing the file M's names, when a caller imported M earlier; route the facade edge through the same order-independent identity as import
 - `LANG-OBLIGATION-HOLE-LEVEL-META-CLOSURE` — A refinement obligation emitted while an unannotated Type parameter's level metavariable is unsolved closes over LevelVar(0) and is declared with no level parameters, so fn k (A : Type) (n : Int) : Int = use5 n is rejected by the kernel. Declare the hole over a level-closed context
-- `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE` — After a nested index match splits, the goal is refined from the scrutinee coordinate to the target coordinate while the fields are cast the other way, so the recursive step of a true Equal proof compares terms neutral at different index variables and is refused. A step-reachable control with no embedded eliminator ends in an Internal error. Put the goal, the fields and the recursive call at one coordinate, with the IH at that coordinate
 - `LANG-REFINED-PARAM-REQUIRES-DESUGAR` — A refined parameter lowers to its bare carrier, so its predicate is neither available in the body nor carried in the function's type. Desugar a refined parameter, and a refined domain in a written function type, to the carrier plus a requires premise, as spec 21 now defines
 - `LANG-STATED-EQUALITY-WHNF-HEAD-WALK` — stated_equality still answers by carrier: a true Refl goal at a Pair carrier is refused when its head chain passes a recursive id twice without a cycle, or passes a match or let that whnf reduces through, while the Nat twins check. Make the walk follow the head reduction whnf already takes
 - `PROG-TRACKER-MERGE-DRIVER` — Two docs candidates in flight ALWAYS conflict on generated IMPLEMENTATION-PROGRESS.md and nowhere else -- and the recorded reason merge=union was rejected is FALSE at the current generator, so D0 re-derives the warrant before anything is built
@@ -1075,6 +1074,7 @@ is itself not yet `merged`/`closed`:
 - `LANG-CLASS-IDENTITY-BY-CHECKED-ID` blocked by `LANG-SESSION-SCOPE` (status: active)
 - `LANG-MODULE-PATH-OWNER-GATE` blocked by `LANG-SESSION-SCOPE` (status: active)
 - `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW` blocked by `LANG-REFINEMENT-SUBSET-SIGMA` (status: draft)
+- `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE` blocked by `LANG-CONVOY-AMBIENT-BINDER-COEXISTENCE` (status: active)
 - `PX10` blocked by `ABI-S5` (status: draft)
 - `PX12` blocked by `PX10` (status: draft)
 - `PX12` blocked by `PX11` (status: draft)

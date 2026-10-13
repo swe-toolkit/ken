@@ -6,7 +6,7 @@ owner: language
 size: L
 tier: T1
 gate: architect
-depends_on: [LANG-EMBEDDED-METHOD-EQUATION-CONVOY]
+depends_on: [LANG-EMBEDDED-METHOD-EQUATION-CONVOY, LANG-CONVOY-AMBIENT-BINDER-COEXISTENCE]
 blocks: []
 github: null
 origin: "Architect fork evt_3bfdj7qm0azt4, option (i), taken by the Steward (evt_33zvpm72tmtwn): T2, T3 and the step-reachable control move here from LANG-EMBEDDED-METHOD-EQUATION-CONVOY, which lands at T1. Steward-filed per COORDINATION section 2."
@@ -51,13 +51,29 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first: the Architect rules the design, with a research prior-art pull
-at kickoff. Then one coordinate for goal, fields and recursive call after
-the split, with the IH at that coordinate.
+D0 first: the Architect rules the design. The research pull is done
+(`evt_5fcb7m8pk78nx`). Its invariant is a D0 input:
+- a solved index variable is eliminated exactly once, by one transport;
+- that transport's motive abstracts the goal together with every
+  dependent of the variable: convoyed hypotheses, fields and the
+  recursive call's arguments;
+- no dependent is cast separately, in either direction.
+
+Then one coordinate for goal, fields and recursive call after the split,
+with the IH at that coordinate.
 
 ## Acceptance
 
 - **AC-1.** T3 elaborates and checks, and the pinned T2 row stays green.
+  The rows from `LANG-CONVOY-AMBIENT-BINDER-COEXISTENCE` also check, with
+  no Axiom and no trust change (Architect `evt_40eh6614dch8`; exact sources
+  in thread `thr_5007397vycb5t`):
+  - H1, whose `DualFS` leaf uses the convoyed `h`;
+  - K2, `pp (dual_lookup a n xs i)` with the recursive call
+    `hp (dual_lookup a m rest j)`;
+  - A1, `lookup_and`.
+
+  CONVOY's typed refusals of the false twins stay refusals.
 - **AC-2.** The step-reachable control succeeds or returns a typed
   refusal. No `Internal` reaches the user from elab.rs ~:6886.
 - **AC-3 (control).** The convoy WP's T1, named-row and F4 rows, and its

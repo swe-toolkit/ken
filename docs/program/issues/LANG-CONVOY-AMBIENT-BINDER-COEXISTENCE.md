@@ -7,7 +7,7 @@ size: M
 tier: T1
 gate: architect
 depends_on: [LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY]
-blocks: []
+blocks: [LANG-RECURSIVE-STEP-COORDINATE-COHERENCE]
 github: null
 origin: "Adversary M8 finding evt_2qd35nyer850 on 66cb5e9b7 (LANG-EMBEDDED-CONVOY-WITH-CONTEXT-CONVOY): two sibling shapes of the class, both failing on fd3b9262b too, fail-closed. Check 7 (a fix must hold on its siblings). Steward-filed per COORDINATION section 2."
 ---
@@ -112,24 +112,32 @@ plane.**
 
 ## Acceptance
 
-- **AC-1.** E9, E11, H9, H5, H1, K2, G1, G2 and G2's Vec form check, with
-  no Axiom and no trust change. K2 is `pp (dual_lookup a n xs i)` with
-  nested `match i` then `match xs`, refused on `4ee16ba51` (Architect
-  `evt_2qrmtt7t9pfkv`).
+- **AC-1.** E9, E11, H9, H5, G1, G2 and G2's Vec form check, with no
+  Axiom and no trust change. H1 and K2 move to
+  `LANG-RECURSIVE-STEP-COORDINATE-COHERENCE` (Architect order ruling
+  `evt_40eh6614dch8`, after research `evt_5fcb7m8pk78nx`). Both fail at a
+  recursive-step position, where a solved index is transported twice.
 - **AC-2 (control).** E8, E10, H6, H7 and H8 stay Ok, and so does the
   single-level `match xs` control. The
   `lang_embedded_context_convoy` suite, including its false twin, is
   unchanged, and so is the catalog census.
 - **AC-3.** A false twin of H9, whose hypothesis disagrees with the goal,
   is still refused. So is G2's false twin `h : pe n ys`, with a typed
-  error.
+  error. H1 and K2 are typed refusals (`KernelRejected` or
+  `TypeMismatch`), never `Internal`, with trust identical.
 - **AC-3b.** The And-over-`dual_lookup` pair from the Architect's
   `evt_26r9qax9s5ze` never reaches the user as an `Internal`. That pair is
   A1, `lookup_and`, a true theorem, and A1F, its false twin with `hp x` in
   the `qq` slot. Both were kernel refusals on `f1ae73cc5` and are
   `Internal("coherent-frame convoy found an ill-typed ambient method")`
-  on `033c19fa7`. A1 checks, or the D0 extension rules why it is a typed
-  refusal. A1F is refused with a typed error.
+  on `033c19fa7`. Neither is an `Internal`. A1 checking moves to RSC, and
+  A1F is refused with a typed error.
+  - **The source of the `Internal`:** `plan_embedded_method_convoy`
+    (elab.rs ~:3062) kernel-checks the original method in an
+    `ambient_ctx` whose binder positions disagree with it.
+  - **The fix:** make that check well-scoped. Relabelling the `Internal`
+    as a typed error is not a fix. If a well-scoped check needs a design
+    call, stop to the Architect.
 - **AC-4 (mutation, QA).** Restoring `!cx.match_frames.is_empty()` in
   place of `enclosing_refines` returns E9 to its failure.
 - **AC-4b (mutation, QA).** Removing `&& probe_context_convoy.is_empty()`
@@ -146,4 +154,4 @@ plane.**
   Architect if any of these differs from Ok: H7 or another AC-2 control, a
   `lang_embedded_context_convoy` row, the 19 suite tests, or a
   `LANG-PROPOSITION-GOAL-SCRUTINEE-FREE-RECURSION` row. Also stop if step 3
-  makes H9 and H5 Ok but leaves H1 or H7 failing.
+  makes H9 and H5 Ok but leaves H7 failing.
