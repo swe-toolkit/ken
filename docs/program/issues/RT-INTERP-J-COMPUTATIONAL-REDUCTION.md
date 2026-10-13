@@ -38,8 +38,10 @@ derives, as spec 42 §3.6 requires.
   gives Neutral for its step count and edges on every measured cycle; the
   kernel gives Bool two_cycle 1, part_cycle 1, tri 2, selfc 0, tri-dup 2.
   `cat_graphs_dependency.rs` ~:669 narrows that row to kernel-only checks.
-- **Ignored row.** `ds5b_dependent_match_refinement_acceptance.rs` carries
-  an ignored row labelled "ken-interp has no `Term::J` reduction arm".
+- **No ignored row remains.** The `ds5b` row labelled "ken-interp has no
+  `Term::J` reduction arm" left the suite in `e41f7589e`. On `0568688cb`,
+  no `#[ignore]` row under `crates/` cites a missing J arm (D0
+  `evt_7swzx84np0qav`; Steward `evt_7nyxbwt3m3vdt` struck AC-3).
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
@@ -62,8 +64,6 @@ at D0, including whether a proof-valued (`Omega`) J stays erased.
 - **AC-2.** The graph `Cycle` return walk's step count and edges match the
   kernel on the five measured cycles, and the
   `cat_graphs_dependency.rs` row checks them at runtime, not kernel-only.
-- **AC-3.** The ignored `ds5b` J row is run: un-ignored if it now passes,
-  otherwise its remaining blocker is named and it stays ignored.
 - **AC-4 (control).** Proof-term J in cast evidence keeps its current
   behaviour unless the Architect rules otherwise, and the `ds5b` suite's
   other rows stay green.
