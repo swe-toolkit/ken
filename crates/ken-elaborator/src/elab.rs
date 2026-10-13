@@ -3921,7 +3921,7 @@ fn build_index_equation_convoy_body(
     motive_base_depth: usize,
     context_convoy: &[ConvoyEntry],
     sentinel_region: usize,
-    _split_span: &Span,
+    split_span: &Span,
 ) -> Result<Option<Term>, ElabError> {
     let env: &GlobalEnv = &*cx.env;
     if ind.indices.len() != 1 || scrut_indices.len() != 1 {
@@ -4177,7 +4177,7 @@ fn build_index_equation_convoy_body(
                     for index in (0..context_convoy.len()).rev() {
                         premises.push(types_inner_first[index].clone());
                     }
-                    goal = wrap_premise_pis_finalized(goal, &premises, sentinel_region);
+                    goal = wrap_premise_pis_finalized(goal, &premises, sentinel_region, split_span)?;
                 }
                 goal
             } else {
@@ -7207,8 +7207,9 @@ fn check_large_convoy_recursive_arm(
         let refined_target = cx.match_frames.last().and_then(|frame| frame.refined_target.clone())
             .ok_or_else(|| ElabError::Internal("large convoy arm lost its refined target".into()))?;
         let core = check_match_arm_result(cx, arm, &refined_target, &arm.span)?;
-        let base = wrap_premise_lams_finalized(core, &source_domains, source_region);
-        let base_ty = wrap_premise_pis_finalized(base_goal.clone(), &source_domains, source_region);
+        let base = wrap_premise_lams_finalized(core, &source_domains, source_region, &arm.span)?;
+        let base_ty =
+            wrap_premise_pis_finalized(base_goal.clone(), &source_domains, source_region, &arm.span)?;
         validate_large_convoy_base(cx, &base, &base_ty, &arm.span)
     })();
     cx.active_index_premise_frames.truncate(premise_frame_base);
@@ -7253,7 +7254,8 @@ fn check_large_convoy_recursive_arm(
         ));
     }
     let motive_goal = subst_term_generalize_many(&weaken(expected_here, 2), &motive_substitutions);
-    let motive_result = wrap_premise_pis_finalized(motive_goal, &motive_domains, source_region);
+    let motive_result =
+        wrap_premise_pis_finalized(motive_goal, &motive_domains, source_region, &arm.span)?;
 
     let goal_level = match whnf(cx.env, &cx.ctx, expected_here) {
         Term::Eq(goal_carrier, _, _) => {
@@ -7630,7 +7632,7 @@ fn build_large_convoy_recursive_method(
             "large index convoy could not construct its recursive goal transport".into(),
         )
     })?;
-    Ok(wrap_premise_lams_finalized(goal_j, premise_domains, sentinel_region))
+    wrap_premise_lams_finalized(goal_j, premise_domains, sentinel_region, &arm.span)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -7868,7 +7870,7 @@ fn install_plain_declared_index_aliases(
 fn check_dependent_branch_body(
     cx: &mut ElabCtx,
     arm: &RMatchArm,
-    _match_span: &Span,
+    match_span: &Span,
     ind: &InductiveDecl,
     params: &[Term],
     level_args: &[Level],
@@ -8017,7 +8019,7 @@ fn check_dependent_branch_body(
                 )?
             }
         };
-        Ok(wrap_premise_lams_finalized(checked, premise_domains, sentinel_region))
+        wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
     })();
 
     cx.active_index_premise_frames
@@ -8179,7 +8181,7 @@ fn wrap_dependent_motive_convoy(
             )?);
         }
         motive_user_body =
-            wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region);
+            wrap_premise_pis_finalized(motive_user_body, &convoy_premises, sentinel_region, span)?;
     }
     Ok(motive_user_body)
 }
@@ -9653,8 +9655,10 @@ fn finalize_refined_body(
     depth: usize,
     premise_count: usize,
     sentinel_region: usize,
+    escaped: &Cell<bool>,
 ) -> Term {
-    let go = |t: &Term, d: usize| finalize_refined_body(t, d, premise_count, sentinel_region);
+    let go =
+        |t: &Term, d: usize| finalize_refined_body(t, d, premise_count, sentinel_region, escaped);
     match term {
         Term::Var(v) => {
             if *v < depth {
@@ -9667,10 +9671,13 @@ fn finalize_refined_body(
                     && canonical < region_start + INDEX_REFINEMENT_SENTINEL_STRIDE
                 {
                     let slot = canonical - region_start;
-                    let resolved = premise_count
-                        .checked_sub(1 + slot)
-                        .expect("refinement sentinel slot exceeds its own premise telescope");
-                    Term::var(depth + resolved)
+                    match premise_count.checked_sub(1 + slot) {
+                        Some(resolved) => Term::var(depth + resolved),
+                        None => {
+                            escaped.set(true);
+                            Term::var(*v)
+                        }
+                    }
                 } else {
                     Term::var(*v + premise_count)
                 }
@@ -10596,32 +10603,48 @@ fn wrap_premise_lams_finalized(
     body: Term,
     premises: &[Term],
     sentinel_region: usize,
-) -> Term {
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let escaped = Cell::new(false);
     let total = premises.len();
-    let mut term = finalize_refined_body(&body, 0, total, sentinel_region);
+    let mut term = finalize_refined_body(&body, 0, total, sentinel_region, &escaped);
     for i in (0..total).rev() {
         term = Term::lam(
-            finalize_refined_body(&premises[i], 0, i, sentinel_region),
+            finalize_refined_body(&premises[i], 0, i, sentinel_region, &escaped),
             term,
         );
     }
-    term
+    if escaped.get() {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "a match premise names a binder bound later in its telescope".into(),
+        });
+    }
+    Ok(term)
 }
 
 fn wrap_premise_pis_finalized(
     body: Term,
     premises: &[Term],
     sentinel_region: usize,
-) -> Term {
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let escaped = Cell::new(false);
     let total = premises.len();
-    let mut term = finalize_refined_body(&body, 0, total, sentinel_region);
+    let mut term = finalize_refined_body(&body, 0, total, sentinel_region, &escaped);
     for i in (0..total).rev() {
         term = Term::pi(
-            finalize_refined_body(&premises[i], 0, i, sentinel_region),
+            finalize_refined_body(&premises[i], 0, i, sentinel_region, &escaped),
             term,
         );
     }
-    term
+    if escaped.get() {
+        return Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "a match premise names a binder bound later in its telescope".into(),
+        });
+    }
+    Ok(term)
 }
 
 /// Build the constructor-refined motive-application type
@@ -10644,13 +10667,47 @@ fn wrap_premise_pis_finalized(
 /// order-independent — an entry's type names only outer convoy binders, never
 /// itself; fixes the indirect `h : p xs` where `h` is innermost yet depends on
 /// the outer `xs`). `frame_depth` = binders between the ambient context and
-/// The C1 binders precede every embedded companion, and C2 follows them.
-/// Both groups retain their outermost-first source order.
+/// C1 entries that do not depend on C2 precede every embedded companion;
+/// C2 and the C1 entries that depend on it follow them. Both groups retain
+/// their outermost-first source order.
 fn convoy_entry_order(context_convoy: &[ConvoyEntry], c2: bool) -> Vec<usize> {
+    let follows_c2 = convoy_entries_following_c2(context_convoy);
     (0..context_convoy.len())
         .rev()
-        .filter(|&index| context_convoy[index].embedded_elims.is_empty() != c2)
+        .filter(|&index| follows_c2[index] == c2)
         .collect()
+}
+
+/// Which entries the telescope places after the companions: every C2 entry,
+/// and every C1 entry whose type mentions one of them, directly or through
+/// another such entry. Closed to a fixpoint, so it does not rely on the
+/// convoy's source order.
+fn convoy_entries_following_c2(context_convoy: &[ConvoyEntry]) -> Vec<bool> {
+    let mut follows: Vec<bool> = context_convoy
+        .iter()
+        .map(|entry| !entry.embedded_elims.is_empty())
+        .collect();
+    loop {
+        let mut changed = false;
+        for index in 0..context_convoy.len() {
+            if !follows[index]
+                && (0..context_convoy.len()).any(|other| {
+                    other != index
+                        && follows[other]
+                        && scrut_occurs(
+                            &context_convoy[index].ambient_ty,
+                            &context_convoy[other].occurrence,
+                        )
+                })
+            {
+                follows[index] = true;
+                changed = true;
+            }
+        }
+        if !changed {
+            return follows;
+        }
+    }
 }
 
 /// where these types are stated (`motive_base_depth` for the motive; `n` for a
@@ -10772,23 +10829,68 @@ fn rewrite_c2_premise(
     )
 }
 
-/// A companion preceding C2 cannot require a value bound only by C2.
+/// A companion cannot require a value bound in the later C2-dependent group.
 fn reject_convoy_companion_cycle(
     ty: &Term,
     context_convoy: &[ConvoyEntry],
     frame_depth: usize,
     span: &Span,
 ) -> Result<(), ElabError> {
-    if context_convoy.iter().any(|entry| {
-        !entry.embedded_elims.is_empty()
-            && scrut_occurs(ty, &weaken(&entry.occurrence, frame_depth as i64))
-    }) {
+    if convoy_entry_order(context_convoy, true)
+        .into_iter()
+        .any(|index| {
+            scrut_occurs(
+                ty,
+                &weaken(&context_convoy[index].occurrence, frame_depth as i64),
+            )
+        })
+    {
         return Err(ElabError::TypeMismatch {
             span: span.clone(),
             reason: "embedded companion depends on a later context convoy binder".into(),
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod convoy_companion_cycle_tests {
+    use super::*;
+
+    #[test]
+    fn companion_cannot_depend_on_a_late_c1_binder() {
+        // Promise class: durable invariant. MEASURED: a companion naming r
+        // is refused when r's type depends on the C2 binder h. CLAIMED: no
+        // companion requires a binder placed after it. THE GAP: the public
+        // match fixtures independently exercise the generated telescope.
+        // At the ambient depth, r is var 0 and h is var 1.
+        let entries = [
+            ConvoyEntry {
+                var: 0,
+                occurrence: Term::var(0),
+                ambient_ty: Term::app(Term::var(4), Term::var(1)),
+                embedded_elims: vec![],
+            },
+            ConvoyEntry {
+                var: 1,
+                occurrence: Term::var(1),
+                ambient_ty: Term::var(5),
+                embedded_elims: vec![(0, 0)],
+            },
+        ];
+        let span = Span::new(0, 0);
+        let error = reject_convoy_companion_cycle(&Term::var(0), &entries, 0, &span)
+            .expect_err("a companion cannot name late r");
+        assert!(
+            matches!(error, ElabError::TypeMismatch { reason, .. }
+                if reason == "embedded companion depends on a later context convoy binder"),
+            "cycle must refuse at the dependency guard"
+        );
+        assert!(
+            reject_convoy_companion_cycle(&Term::var(7), &entries, 0, &span).is_ok(),
+            "an independent companion remains valid"
+        );
+    }
 }
 
 fn build_convoy_refined_type(
@@ -10823,7 +10925,7 @@ fn build_convoy_refined_type(
         sentinel_region,
     );
     let mut body = redirect_convoy_body(context_convoy, n, &sentinels, base_body);
-    // C1 precedes companions; C2's rewritten type consumes those companions.
+    // Independent C1 precedes companions; the later group's C2 types use them.
     for i in convoy_entry_order(context_convoy, false) {
         premises.push(types_inner_first[i].clone());
     }
@@ -10883,7 +10985,7 @@ fn build_convoy_refined_type(
         )?;
         premises.push(types_inner_first[index].clone());
     }
-    Ok(wrap_premise_pis_finalized(body, &premises, sentinel_region))
+    wrap_premise_pis_finalized(body, &premises, sentinel_region, span)
 }
 
 fn synthesize_omitted_index_method(
@@ -10914,7 +11016,7 @@ fn synthesize_omitted_index_method(
     })?;
     let proof = index_refinement_sentinel(sentinel_region, impossible_idx);
     let body = Term::Absurd(Box::new(expected_here.clone()), Box::new(proof));
-    Ok(wrap_premise_lams_finalized(body, premise_domains, sentinel_region))
+    wrap_premise_lams_finalized(body, premise_domains, sentinel_region, span)
 }
 
 fn ctor_name(cx: &ElabCtx, id: GlobalId) -> String {
@@ -23018,7 +23120,7 @@ fn close_inferred_index_method(
     field_count: usize,
     ih_count: usize,
     sentinel_region: usize,
-    _split_span: &Span,
+    split_span: &Span,
 ) -> Result<(Option<Term>, Vec<Term>), ElabError> {
     let mut domains = Vec::with_capacity(field_count + ih_count);
     let mut tail_ty = method_ty;
@@ -23050,7 +23152,8 @@ fn close_inferred_index_method(
             .iter()
             .map(|premise| weaken(premise, ih_count as i64))
             .collect();
-        let mut closed = wrap_premise_lams_finalized(body, &premises_under_ih, sentinel_region);
+        let mut closed =
+            wrap_premise_lams_finalized(body, &premises_under_ih, sentinel_region, split_span)?;
         for domain in domains.iter().rev() {
             closed = Term::lam(domain.clone(), closed);
         }
