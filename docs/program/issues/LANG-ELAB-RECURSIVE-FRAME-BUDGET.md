@@ -1,7 +1,7 @@
 ---
 id: LANG-ELAB-RECURSIVE-FRAME-BUDGET
 title: "Logic inlined into the elaborator's recursive cycle (check, infer, check_dependent_branch_body) regressed the stack three times on 2026-10-04, and each regression surfaced only as overflowing CI shards. Reduce the prelude's stack floor and guard the cycle's frame budget with a test that fails at review"
-status: active
+status: merged
 owner: verify
 size: M
 tier: T1
@@ -70,3 +70,18 @@ on.
 - The guard needs a workflow file change. Stop to the Steward: the operator
   designates the author of any CI workflow edit.
 - A reduction needs a kernel or spec change.
+
+## Closeout
+
+Merged `819a73edb` from exact `3b776f307` (PR #4711). Verify QA
+`evt_31xp6tk59p9af`; Architect `evt_3ea7andmw55wy` with Decision
+`dec_4hcta0r13yrre`.
+
+- The prelude and all 71 catalog packages load at 1,664 KiB.
+  `register_prelude` is 6,408 B, and its largest stage is 32,632 B, under
+  the 32,768 B ceiling.
+- Two stated-stack guard rows pass 2/2. Each has a cycle-top unwind and an
+  independent red then restored-green on production inlining.
+- Residual, carried as `VERIFY-PRELUDE-STAGE-INLINE-ATTRIBUTES`: three
+  stages carry a duplicated `#[inline(never)]` and three carry none, and
+  `modules.rs` has one unnecessary-braces warning.
