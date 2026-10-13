@@ -2525,86 +2525,27 @@ fn rewrite_rexpr_inner(
     e: RExpr,
     kernel_head: Option<&'static str>,
 ) -> Result<RExpr, ElabError> {
-    Ok(match e {
-        RExpr::RCon(name, span) if kernel_head == Some(name.as_str()) => RExpr::RCon(name, span),
-        RExpr::RCon(name, span) => {
-            let (name, selected) = resolve_checked_ref(scope, exports, &name, &span)?;
-            match selected {
-                Some(id) => RExpr::RCheckedGlobal { name, id, span },
-                None => RExpr::RCon(name, span),
-            }
+    match e {
+        arm @ RExpr::RCon(..) => rewrite_rexpr_inner_rcon(scope, exports, arm, kernel_head),
+        leaf @ RExpr::RCheckedGlobal { .. } => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RVar(..) => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RPatternAlias(..) => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RRecursiveResult { .. } => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RUniv(..) => rewrite_rexpr_leaf(leaf),
+        arm @ RExpr::RApp(..) => rewrite_rexpr_inner_rapp(scope, exports, arm, kernel_head),
+        arm @ RExpr::RLam(..) => rewrite_rexpr_inner_rlam(scope, exports, arm, kernel_head),
+        arm @ RExpr::RLet(..) => rewrite_rexpr_inner_rlet(scope, exports, arm, kernel_head),
+        arm @ RExpr::RAsc(..) => rewrite_rexpr_inner_rasc(scope, exports, arm, kernel_head),
+        arm @ RExpr::ROld(..) => rewrite_rexpr_inner_rold(scope, exports, arm, kernel_head),
+        leaf @ RExpr::RCell(..) => rewrite_rexpr_leaf(leaf),
+        arm @ RExpr::RBecomes(..) => {
+            rewrite_rexpr_inner_rbecomes(scope, exports, arm, kernel_head)
         }
-        RExpr::RCheckedGlobal { name, id, span } => RExpr::RCheckedGlobal { name, id, span },
-        RExpr::RVar(i, n, s) => RExpr::RVar(i, n, s),
-        RExpr::RPatternAlias(slot, n, s) => RExpr::RPatternAlias(slot, n, s),
-        RExpr::RRecursiveResult {
-            selector,
-            index,
-            name,
-            binding_span,
-            span,
-        } => RExpr::RRecursiveResult {
-            selector,
-            index,
-            name,
-            binding_span,
-            span,
-        },
-        RExpr::RUniv(l, s) => RExpr::RUniv(l, s),
-        RExpr::RApp(f, a, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RApp(
-                Box::new(rewrite_rexpr_inner(scope, exports, *f, kernel_head)?),
-                Box::new(rewrite_rexpr(scope, exports, *a)?),
-                s,
-            ))
-        })?,
-        RExpr::RLam(n, b, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RLam(
-                n,
-                Box::new(rewrite_rexpr(scope, exports, *b)?),
-                s,
-            ))
-        })?,
-        RExpr::RLet(x, ty, rhs, body, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RLet(
-                x,
-                ty.map(|t| rewrite_rtype(scope, exports, t)).transpose()?,
-                Box::new(rewrite_rexpr(scope, exports, *rhs)?),
-                Box::new(rewrite_rexpr(scope, exports, *body)?),
-                s,
-            ))
-        })?,
-        RExpr::RAsc(e, t, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RAsc(
-                Box::new(rewrite_rexpr(scope, exports, *e)?),
-                Box::new(rewrite_rtype(scope, exports, *t)?),
-                s,
-            ))
-        })?,
-        RExpr::ROld(e, s) => {
-            rewrite_rexpr_arm(|| Ok(RExpr::ROld(Box::new(rewrite_rexpr(scope, exports, *e)?), s)))?
-        }
-        RExpr::RCell(index, name, span) => RExpr::RCell(index, name, span),
-        RExpr::RBecomes(index, name, value, span) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RBecomes(
-                index,
-                name,
-                Box::new(rewrite_rexpr(scope, exports, *value)?),
-                span,
-            ))
-        })?,
-        RExpr::RNumLit(l, s) => RExpr::RNumLit(l, s),
-        RExpr::RStr(v, s) => RExpr::RStr(v, s),
-        RExpr::RCharLit(c, s) => RExpr::RCharLit(c, s),
-        RExpr::RByteStr(v, s) => RExpr::RByteStr(v, s),
-        RExpr::RBinOp(op, l, r, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RBinOp(
-                op,
-                Box::new(rewrite_rexpr(scope, exports, *l)?),
-                Box::new(rewrite_rexpr(scope, exports, *r)?),
-                s,
-            ))
-        })?,
+        leaf @ RExpr::RNumLit(..) => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RStr(..) => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RCharLit(..) => rewrite_rexpr_leaf(leaf),
+        leaf @ RExpr::RByteStr(..) => rewrite_rexpr_leaf(leaf),
+        arm @ RExpr::RBinOp(..) => rewrite_rexpr_inner_rbinop(scope, exports, arm, kernel_head),
         // THE CROSS-MODULE REMAP, and omitting it would have been INVISIBLE
         // rather than a compile error (Architect, `evt_2y0a3j5yjznn2`). This
         // function is a REWRITE over every node: a variant left out does not
@@ -2619,163 +2560,503 @@ fn rewrite_rexpr_inner(
         // boundary to rewrite. That is the whole reason this node carries the
         // identity rather than the glyph: the glyph WOULD have needed
         // remapping, and forgetting it is the invisible failure above.
-        RExpr::RStandardOp {
+        arm @ RExpr::RStandardOp { .. } => {
+            rewrite_rexpr_inner_rstandardop(scope, exports, arm, kernel_head)
+        }
+        arm @ RExpr::RInfixSpine { .. } => {
+            rewrite_rexpr_inner_rinfixspine(scope, exports, arm, kernel_head)
+        }
+        arm @ RExpr::RMatch { .. } => rewrite_rexpr_inner_rmatch(scope, exports, arm, kernel_head),
+        arm @ RExpr::RIf { .. } => rewrite_rexpr_inner_rif(scope, exports, arm, kernel_head),
+        arm @ RExpr::RPair(..) => rewrite_rexpr_inner_rpair(scope, exports, arm, kernel_head),
+        arm @ RExpr::RRecord { .. } => {
+            rewrite_rexpr_inner_rrecord(scope, exports, arm, kernel_head)
+        }
+        arm @ RExpr::RPosProj(..) => {
+            rewrite_rexpr_inner_rposproj(scope, exports, arm, kernel_head)
+        }
+        arm @ RExpr::RProj(..) => rewrite_rexpr_inner_rproj(scope, exports, arm, kernel_head),
+        arm @ RExpr::RPi(..) => rewrite_rexpr_inner_rpi(scope, exports, arm, kernel_head),
+        arm @ RExpr::RArrow(..) => rewrite_rexpr_inner_rarrow(scope, exports, arm, kernel_head),
+        arm @ RExpr::RAttachedProofRef { .. } => {
+            rewrite_rexpr_inner_rattachedproofref(scope, exports, arm, kernel_head)
+        }
+        arm @ RExpr::RTrunc(..) => rewrite_rexpr_inner_rtrunc(scope, exports, arm, kernel_head),
+    }
+}
+
+#[inline(never)]
+fn rewrite_rexpr_leaf(expr: RExpr) -> Result<RExpr, ElabError> {
+    Ok(expr)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rcon(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RCon(name, span) = e else {
+        unreachable!("rewrite_rexpr_inner_rcon dispatch")
+    };
+    if kernel_head == Some(name.as_str()) {
+        return Ok(RExpr::RCon(name, span));
+    }
+    Ok({
+        let (name, selected) = resolve_checked_ref(scope, exports, &name, &span)?;
+        match selected {
+            Some(id) => RExpr::RCheckedGlobal { name, id, span },
+            None => RExpr::RCon(name, span),
+        }
+    })
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rapp(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RApp(f, a, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rapp dispatch")
+    };
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RApp(
+            Box::new(rewrite_rexpr_inner(scope, exports, *f, kernel_head)?),
+            Box::new(rewrite_rexpr(scope, exports, *a)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rlam(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RLam(n, b, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rlam dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RLam(
+            n,
+            Box::new(rewrite_rexpr(scope, exports, *b)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rlet(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RLet(x, ty, rhs, body, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rlet dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RLet(
+            x,
+            ty.map(|t| rewrite_rtype(scope, exports, t)).transpose()?,
+            Box::new(rewrite_rexpr(scope, exports, *rhs)?),
+            Box::new(rewrite_rexpr(scope, exports, *body)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rasc(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RAsc(e, t, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rasc dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RAsc(
+            Box::new(rewrite_rexpr(scope, exports, *e)?),
+            Box::new(rewrite_rtype(scope, exports, *t)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rold(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::ROld(e, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rold dispatch")
+    };
+    let _ = &kernel_head;
+    Ok({ rewrite_rexpr_arm(|| Ok(RExpr::ROld(Box::new(rewrite_rexpr(scope, exports, *e)?), s)))? })
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rbecomes(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RBecomes(index, name, value, span) = e else {
+        unreachable!("rewrite_rexpr_inner_rbecomes dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RBecomes(
+            index,
+            name,
+            Box::new(rewrite_rexpr(scope, exports, *value)?),
+            span,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rbinop(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RBinOp(op, l, r, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rbinop dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RBinOp(
             op,
-            lhs,
-            rhs,
+            Box::new(rewrite_rexpr(scope, exports, *l)?),
+            Box::new(rewrite_rexpr(scope, exports, *r)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rstandardop(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RStandardOp { op, lhs, rhs, span } = e else {
+        unreachable!("rewrite_rexpr_inner_rstandardop dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RStandardOp {
+            op,
+            lhs: Box::new(rewrite_rexpr(scope, exports, *lhs)?),
+            rhs: Box::new(rewrite_rexpr(scope, exports, *rhs)?),
             span,
-        } => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RStandardOp {
-                op,
-                lhs: Box::new(rewrite_rexpr(scope, exports, *lhs)?),
-                rhs: Box::new(rewrite_rexpr(scope, exports, *rhs)?),
-                span,
-            })
-        })?,
-        RExpr::RInfixSpine {
-            operands,
-            operators,
+        })
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rinfixspine(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RInfixSpine {
+        operands,
+        operators,
+        span,
+    } = e
+    else {
+        unreachable!("rewrite_rexpr_inner_rinfixspine dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RInfixSpine {
+            operands: operands
+                .into_iter()
+                .map(|operand| rewrite_rexpr(scope, exports, operand))
+                .collect::<Result<Vec<_>, _>>()?,
+            operators: operators
+                .into_iter()
+                .map(|operator| match operator {
+                    RInfixOperator::Builtin(op, span) => Ok(RInfixOperator::Builtin(op, span)),
+                    RInfixOperator::User(name, span) => {
+                        let (name, selected) = resolve_checked_ref(scope, exports, &name, &span)?;
+                        Ok(match selected {
+                            Some(id) => RInfixOperator::CheckedUser(name, id, span),
+                            None => RInfixOperator::User(name, span),
+                        })
+                    }
+                    RInfixOperator::CheckedUser(name, id, span) => {
+                        Ok(RInfixOperator::CheckedUser(name, id, span))
+                    }
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
             span,
-        } => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RInfixSpine {
-                operands: operands
-                    .into_iter()
-                    .map(|operand| rewrite_rexpr(scope, exports, operand))
-                    .collect::<Result<Vec<_>, _>>()?,
-                operators: operators
-                    .into_iter()
-                    .map(|operator| match operator {
-                        RInfixOperator::Builtin(op, span) => Ok(RInfixOperator::Builtin(op, span)),
-                        RInfixOperator::User(name, span) => {
-                            let (name, selected) = resolve_checked_ref(scope, exports, &name, &span)?;
-                            Ok(match selected {
-                                Some(id) => RInfixOperator::CheckedUser(name, id, span),
-                                None => RInfixOperator::User(name, span),
-                            })
-                        }
-                        RInfixOperator::CheckedUser(name, id, span) => {
-                            Ok(RInfixOperator::CheckedUser(name, id, span))
-                        }
-                    })
-                    .collect::<Result<Vec<_>, ElabError>>()?,
-                span,
-            })
-        })?,
-        RExpr::RMatch {
+        })
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rmatch(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RMatch {
+        scrut,
+        equation,
+        arms,
+        span,
+    } = e
+    else {
+        unreachable!("rewrite_rexpr_inner_rmatch dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        let scrut = Box::new(rewrite_rexpr(scope, exports, *scrut)?);
+        // Keep recursive match descent free of per-arm iterator frames. The
+        // iterator/Result collection adds a chain of adapter frames
+        // for every nested source match; a finite checked program must not
+        // become unresolvable merely because the prelude gained declarations.
+        let mut rewritten_arms = Vec::with_capacity(arms.len());
+        for arm in arms {
+            rewritten_arms.push(RMatchArm {
+                pat: rewrite_rpattern(scope, exports, arm.pat)?,
+                guard: arm
+                    .guard
+                    .map(|guard| rewrite_rexpr(scope, exports, guard))
+                    .transpose()?,
+                body: rewrite_rexpr(scope, exports, arm.body)?,
+                span: arm.span,
+            });
+        }
+        let arms = rewritten_arms;
+        Ok(RExpr::RMatch {
             scrut,
             equation,
             arms,
             span,
-        } => rewrite_rexpr_arm(|| {
-            let scrut = Box::new(rewrite_rexpr(scope, exports, *scrut)?);
-            // Keep recursive match descent free of per-arm iterator frames. The
-            // iterator/Result collection adds a chain of adapter frames
-            // for every nested source match; a finite checked program must not
-            // become unresolvable merely because the prelude gained declarations.
-            let mut rewritten_arms = Vec::with_capacity(arms.len());
-            for arm in arms {
-                rewritten_arms.push(RMatchArm {
-                    pat: rewrite_rpattern(scope, exports, arm.pat)?,
-                    guard: arm
-                        .guard
-                        .map(|guard| rewrite_rexpr(scope, exports, guard))
-                        .transpose()?,
-                    body: rewrite_rexpr(scope, exports, arm.body)?,
-                    span: arm.span,
-                });
-            }
-            let arms = rewritten_arms;
-            Ok(RExpr::RMatch {
-                scrut,
-                equation,
-                arms,
-                span,
-            })
-        })?,
-        RExpr::RIf {
-            condition,
-            then_branch,
-            else_branch,
+        })
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rif(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RIf {
+        condition,
+        then_branch,
+        else_branch,
+        span,
+    } = e
+    else {
+        unreachable!("rewrite_rexpr_inner_rif dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RIf {
+            condition: Box::new(rewrite_rexpr(scope, exports, *condition)?),
+            then_branch: Box::new(rewrite_rexpr(scope, exports, *then_branch)?),
+            else_branch: Box::new(rewrite_rexpr(scope, exports, *else_branch)?),
             span,
-        } => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RIf {
-                condition: Box::new(rewrite_rexpr(scope, exports, *condition)?),
-                then_branch: Box::new(rewrite_rexpr(scope, exports, *then_branch)?),
-                else_branch: Box::new(rewrite_rexpr(scope, exports, *else_branch)?),
-                span,
-            })
-        })?,
-        RExpr::RPair(components, span) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RPair(
-                components
-                    .into_iter()
-                    .map(|component| rewrite_rexpr(scope, exports, component))
-                    .collect::<Result<Vec<_>, _>>()?,
-                span,
-            ))
-        })?,
-        RExpr::RRecord { base, fields, span } => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RRecord {
-                base: base
-                    .map(|base| rewrite_rexpr(scope, exports, *base).map(Box::new))
-                    .transpose()?,
-                fields: fields
-                    .into_iter()
-                    .map(|(name, value, name_span)| {
-                        Ok((name, rewrite_rexpr(scope, exports, value)?, name_span))
-                    })
-                    .collect::<Result<Vec<_>, ElabError>>()?,
-                span,
-            })
-        })?,
-        RExpr::RPosProj(e, index, span) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RPosProj(
-                Box::new(rewrite_rexpr(scope, exports, *e)?),
-                index,
-                span,
-            ))
-        })?,
-        RExpr::RProj(e, field, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RProj(
-                Box::new(rewrite_rexpr(scope, exports, *e)?),
-                field,
-                s,
-            ))
-        })?,
-        RExpr::RPi(x, a, b, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RPi(
-                x,
-                Box::new(rewrite_rtype(scope, exports, *a)?),
-                Box::new(rewrite_rexpr(scope, exports, *b)?),
-                s,
-            ))
-        })?,
-        RExpr::RArrow(a, b, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RArrow(
-                Box::new(rewrite_rexpr(scope, exports, *a)?),
-                Box::new(rewrite_rexpr(scope, exports, *b)?),
-                s,
-            ))
-        })?,
-        RExpr::RAttachedProofRef {
-            subject,
-            proof_name,
+        })
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rpair(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPair(components, span) = e else {
+        unreachable!("rewrite_rexpr_inner_rpair dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RPair(
+            components
+                .into_iter()
+                .map(|component| rewrite_rexpr(scope, exports, component))
+                .collect::<Result<Vec<_>, _>>()?,
             span,
-        } => rewrite_rexpr_arm(|| {
-            let (name, selected) =
-                resolve_attached_ref(scope, exports, &subject, &proof_name, &span)?;
-            Ok(match selected {
-                Some(id) => RExpr::RCheckedGlobal { name, id, span },
-                None => RExpr::RCon(name, span),
-            })
-        })?,
-        RExpr::RTrunc(e, s) => rewrite_rexpr_arm(|| {
-            Ok(RExpr::RTrunc(
-                Box::new(rewrite_rexpr(scope, exports, *e)?),
-                s,
-            ))
-        })?,
-    })
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rrecord(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RRecord { base, fields, span } = e else {
+        unreachable!("rewrite_rexpr_inner_rrecord dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RRecord {
+            base: base
+                .map(|base| rewrite_rexpr(scope, exports, *base).map(Box::new))
+                .transpose()?,
+            fields: fields
+                .into_iter()
+                .map(|(name, value, name_span)| {
+                    Ok((name, rewrite_rexpr(scope, exports, value)?, name_span))
+                })
+                .collect::<Result<Vec<_>, ElabError>>()?,
+            span,
+        })
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rposproj(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPosProj(e, index, span) = e else {
+        unreachable!("rewrite_rexpr_inner_rposproj dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RPosProj(
+            Box::new(rewrite_rexpr(scope, exports, *e)?),
+            index,
+            span,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rproj(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RProj(e, field, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rproj dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RProj(
+            Box::new(rewrite_rexpr(scope, exports, *e)?),
+            field,
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rpi(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPi(x, a, b, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rpi dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RPi(
+            x,
+            Box::new(rewrite_rtype(scope, exports, *a)?),
+            Box::new(rewrite_rexpr(scope, exports, *b)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rarrow(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RArrow(a, b, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rarrow dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RArrow(
+            Box::new(rewrite_rexpr(scope, exports, *a)?),
+            Box::new(rewrite_rexpr(scope, exports, *b)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rattachedproofref(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RAttachedProofRef {
+        subject,
+        proof_name,
+        span,
+    } = e
+    else {
+        unreachable!("rewrite_rexpr_inner_rattachedproofref dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        let (name, selected) = resolve_attached_ref(scope, exports, &subject, &proof_name, &span)?;
+        Ok(match selected {
+            Some(id) => RExpr::RCheckedGlobal { name, id, span },
+            None => RExpr::RCon(name, span),
+        })
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rtrunc(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RTrunc(e, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rtrunc dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RTrunc(
+            Box::new(rewrite_rexpr(scope, exports, *e)?),
+            s,
+        ))
+    })?)
 }
 
 fn rewrite_rpattern(

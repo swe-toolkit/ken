@@ -1867,310 +1867,542 @@ fn resolve_infix_spine(
 
 fn resolve_expr_ctx(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
     match expr {
-        Expr::EVar(name, span) => {
-            if name == "result"
-                && !matches!(ctx, PropCtx::PureViewEnsures | PropCtx::SpaceOpEnsures)
-            {
-                return Err(ElabError::UnboundName {
-                    name: name.clone(),
-                    span: span.clone(),
-                });
-            }
-            if scope.is_local_dictionary(name) {
-                return Ok(RExpr::RCon(name.clone(), span.clone()));
-            }
-            if let Some(slot) = scope.pattern_alias(name) {
-                Ok(RExpr::RPatternAlias(slot, name.clone(), span.clone()))
-            } else if let Some(i) = scope.index_of(name) {
-                Ok(RExpr::RVar(i, name.clone(), span.clone()))
-            } else if let Some(index) = scope.space_cells.get(name) {
-                Ok(RExpr::RCell(*index, name.clone(), span.clone()))
-            } else {
-                // Local scope miss — fall through to global lookup (same as TVar).
-                // The elaborator's RCon handler resolves the name against globals.
-                Ok(RExpr::RCon(name.clone(), span.clone()))
-            }
-        }
-
+        Expr::EVar(..) => resolve_expr_ctx_evar(scope, expr, ctx),
         Expr::ECon(name, span) => Ok(RExpr::RCon(name.clone(), span.clone())),
-
         Expr::EUniv(l, span) => Ok(RExpr::RUniv(*l, span.clone())),
-
-        Expr::EApp(f, a, span) => {
-            let rf = resolve_expr_ctx(scope, f, ctx)?;
-            let ra = resolve_expr_ctx(scope, a, ctx)?;
-            Ok(RExpr::RApp(Box::new(rf), Box::new(ra), span.clone()))
-        }
-
-        Expr::ELam(names, body, span) => {
-            let depth_before = scope.depth();
-            for n in names {
-                scope.push(n);
-            }
-            let rb = resolve_expr_ctx(scope, body, ctx)?;
-            for _ in names {
-                scope.pop();
-            }
-            assert_eq!(scope.depth(), depth_before);
-            let mut rexpr = rb;
-            for n in names.iter().rev() {
-                let s = rexpr.span().clone();
-                rexpr = RExpr::RLam(n.clone(), Box::new(rexpr), s);
-            }
-            let _ = span;
-            Ok(rexpr)
-        }
-
-        Expr::ELet(bindings, body, _) => {
-            let depth_before = scope.depth();
-            let result = (|| {
-                let mut seen = std::collections::HashSet::new();
-                let mut resolved = Vec::with_capacity(bindings.len());
-                for binding in bindings {
-                    if !seen.insert(binding.name.as_str()) {
-                        return Err(ElabError::ParseError {
-                            msg: format!("duplicate local binding '{}' in let group", binding.name),
-                            span: binding.name_span.clone(),
-                        });
-                    }
-                    let resolved_ty = binding
-                        .annotation
-                        .as_ref()
-                        .map(|ty| resolve_type(scope, ty))
-                        .transpose()?;
-                    let resolved_value = resolve_expr_ctx(scope, &binding.value, ctx)?;
-                    resolved.push((
-                        binding.name.clone(),
-                        resolved_ty,
-                        resolved_value,
-                        binding.span.clone(),
-                    ));
-                    scope.push_spanned(&binding.name, binding.name_span.clone());
-                }
-                let mut resolved_body = resolve_expr_ctx(scope, body, ctx)?;
-                for (name, ty, value, binding_span) in resolved.into_iter().rev() {
-                    let let_span = Span::new(binding_span.start, resolved_body.span().end);
-                    resolved_body =
-                        RExpr::RLet(name, ty, Box::new(value), Box::new(resolved_body), let_span);
-                }
-                Ok(resolved_body)
-            })();
-            while scope.depth() > depth_before {
-                scope.pop();
-            }
-            assert_eq!(scope.depth(), depth_before);
-            result
-        }
-
-        Expr::EAsc(e, ty, span) => {
-            let re = resolve_expr_ctx(scope, e, ctx)?;
-            let rt = resolve_type(scope, ty)?;
-            Ok(RExpr::RAsc(Box::new(re), Box::new(rt), span.clone()))
-        }
-
-        Expr::EOld(e, span) => {
-            if ctx != PropCtx::SpaceOpEnsures {
-                return Err(ElabError::UnboundName {
-                    name: "old".to_string(),
-                    span: span.clone(),
-                });
-            }
-            let re = resolve_expr_ctx(scope, e, ctx)?;
-            Ok(RExpr::ROld(Box::new(re), span.clone()))
-        }
-
-        Expr::EBecomes(cell, value, span) => {
-            let Expr::EVar(name, _) = cell.as_ref() else {
-                return Err(ElabError::MutationOutsideSpace {
-                    construct: "becomes".to_string(),
-                    span: span.clone(),
-                });
-            };
-            let Some(index) = scope.space_cells.get(name).copied() else {
-                return Err(ElabError::MutationOutsideSpace {
-                    construct: "becomes".to_string(),
-                    span: span.clone(),
-                });
-            };
-            let value = resolve_expr_ctx(scope, value, ctx)?;
-            Ok(RExpr::RBecomes(
-                index,
-                name.clone(),
-                Box::new(value),
-                span.clone(),
-            ))
-        }
-
-        Expr::ENumLit(lit, span) => Ok(RExpr::RNumLit(lit.clone(), span.clone())),
-        Expr::EStr(s, span) => Ok(RExpr::RStr(s.clone(), span.clone())),
-        Expr::ECharLit(c, span) => Ok(RExpr::RCharLit(*c, span.clone())),
-        Expr::EByteStr(b, span) => Ok(RExpr::RByteStr(b.clone(), span.clone())),
-
-        Expr::EBinOp(op, l, r, span) => {
-            let rl = resolve_expr_ctx(scope, l, ctx)?;
-            let rr = resolve_expr_ctx(scope, r, ctx)?;
-            Ok(RExpr::RBinOp(*op, Box::new(rl), Box::new(rr), span.clone()))
-        }
-
+        Expr::EApp(..) => resolve_expr_ctx_eapp(scope, expr, ctx),
+        Expr::ELam(..) => resolve_expr_ctx_elam(scope, expr, ctx),
+        Expr::ELet(..) => resolve_expr_ctx_elet(scope, expr, ctx),
+        Expr::EAsc(..) => resolve_expr_ctx_easc(scope, expr, ctx),
+        Expr::EOld(..) => resolve_expr_ctx_eold(scope, expr, ctx),
+        Expr::EBecomes(..) => resolve_expr_ctx_ebecomes(scope, expr, ctx),
+        Expr::ENumLit(..) => resolve_expr_ctx_enumlit(scope, expr, ctx),
+        Expr::EStr(..) => resolve_expr_ctx_estr(scope, expr, ctx),
+        Expr::ECharLit(..) => resolve_expr_ctx_echarlit(scope, expr, ctx),
+        Expr::EByteStr(..) => resolve_expr_ctx_ebytestr(scope, expr, ctx),
+        Expr::EBinOp(..) => resolve_expr_ctx_ebinop(scope, expr, ctx),
         Expr::EInfixSpine {
             operands,
             operators,
             span,
         } => resolve_infix_spine(scope, operands, operators, span, ctx),
+        Expr::EProj(..) => resolve_expr_ctx_eproj(scope, expr, ctx),
+        Expr::EPosProj(..) => resolve_expr_ctx_eposproj(scope, expr, ctx),
+        Expr::EPair(..) => resolve_expr_ctx_epair(scope, expr, ctx),
+        Expr::ERecord { .. } => resolve_expr_ctx_erecord(scope, expr, ctx),
+        Expr::EPi(..) => resolve_expr_ctx_epi(scope, expr, ctx),
+        Expr::EArrow(..) => resolve_expr_ctx_earrow(scope, expr, ctx),
+        Expr::ETrunc(..) => resolve_expr_ctx_etrunc(scope, expr, ctx),
+        Expr::EAttachedProofRef { .. } => resolve_expr_ctx_eattachedproofref(scope, expr, ctx),
+        Expr::ERecursiveResult { .. } => resolve_expr_ctx_erecursiveresult(scope, expr, ctx),
+        Expr::EIf { .. } => resolve_expr_ctx_eif(scope, expr, ctx),
+        Expr::EMatch { .. } => resolve_expr_ctx_ematch(scope, expr, ctx),
+    }
+}
 
-        Expr::EProj(e, field, span) => {
-            let re = resolve_expr_ctx(scope, e, ctx)?;
-            Ok(RExpr::RProj(Box::new(re), field.clone(), span.clone()))
+#[inline(never)]
+fn resolve_expr_ctx_evar(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::EVar(name, span) = expr else {
+        unreachable!("resolve_expr_ctx_evar dispatch")
+    };
+    {
+        if name == "result" && !matches!(ctx, PropCtx::PureViewEnsures | PropCtx::SpaceOpEnsures) {
+            return Err(ElabError::UnboundName {
+                name: name.clone(),
+                span: span.clone(),
+            });
         }
-
-        Expr::EPosProj(e, index, span) => {
-            let re = resolve_expr_ctx(scope, e, ctx)?;
-            Ok(RExpr::RPosProj(Box::new(re), *index, span.clone()))
+        if scope.is_local_dictionary(name) {
+            return Ok(RExpr::RCon(name.clone(), span.clone()));
         }
+        if let Some(slot) = scope.pattern_alias(name) {
+            Ok(RExpr::RPatternAlias(slot, name.clone(), span.clone()))
+        } else if let Some(i) = scope.index_of(name) {
+            Ok(RExpr::RVar(i, name.clone(), span.clone()))
+        } else if let Some(index) = scope.space_cells.get(name) {
+            Ok(RExpr::RCell(*index, name.clone(), span.clone()))
+        } else {
+            // Local scope miss — fall through to global lookup (same as TVar).
+            // The elaborator's RCon handler resolves the name against globals.
+            Ok(RExpr::RCon(name.clone(), span.clone()))
+        }
+    }
+}
 
-        Expr::EPair(components, span) => Ok(RExpr::RPair(
-            components
-                .iter()
-                .map(|component| resolve_expr_ctx(scope, component, ctx))
-                .collect::<Result<Vec<_>, _>>()?,
-            span.clone(),
-        )),
-        Expr::ERecord { base, fields, span } => Ok(RExpr::RRecord {
-            base: base
-                .as_ref()
-                .map(|base| resolve_expr_ctx(scope, base, ctx).map(Box::new))
-                .transpose()?,
-            fields: fields
-                .iter()
-                .map(|field| {
-                    Ok((
-                        field.name.clone(),
-                        resolve_expr_ctx(scope, &field.value, ctx)?,
-                        field.name_span.clone(),
-                    ))
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?,
-            span: span.clone(),
-        }),
+#[inline(never)]
+fn resolve_expr_ctx_eapp(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::EApp(f, a, span) = expr else {
+        unreachable!("resolve_expr_ctx_eapp dispatch")
+    };
+    {
+        let rf = resolve_expr_ctx(scope, f, ctx)?;
+        let ra = resolve_expr_ctx(scope, a, ctx)?;
+        Ok(RExpr::RApp(Box::new(rf), Box::new(ra), span.clone()))
+    }
+}
 
-        Expr::EPi(x, a, b, span) => {
-            let ra = resolve_type(scope, a)?;
-            scope.push(x);
-            let rb = resolve_expr_ctx(scope, b, ctx)?;
+#[inline(never)]
+fn resolve_expr_ctx_elam(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::ELam(names, body, span) = expr else {
+        unreachable!("resolve_expr_ctx_elam dispatch")
+    };
+    {
+        let depth_before = scope.depth();
+        for n in names {
+            scope.push(n);
+        }
+        let rb = resolve_expr_ctx(scope, body, ctx)?;
+        for _ in names {
             scope.pop();
-            Ok(RExpr::RPi(
-                x.clone(),
-                Box::new(ra),
-                Box::new(rb),
-                span.clone(),
-            ))
         }
-
-        Expr::EArrow(a, b, span) => {
-            let ra = resolve_expr_ctx(scope, a, ctx)?;
-            let rb = resolve_expr_ctx(scope, b, ctx)?;
-            Ok(RExpr::RArrow(Box::new(ra), Box::new(rb), span.clone()))
+        assert_eq!(scope.depth(), depth_before);
+        let mut rexpr = rb;
+        for n in names.iter().rev() {
+            let s = rexpr.span().clone();
+            rexpr = RExpr::RLam(n.clone(), Box::new(rexpr), s);
         }
+        let _ = span;
+        Ok(rexpr)
+    }
+}
 
-        Expr::ETrunc(e, span) => {
-            let re = resolve_expr_ctx(scope, e, ctx)?;
-            Ok(RExpr::RTrunc(Box::new(re), span.clone()))
-        }
-
-        Expr::EAttachedProofRef {
-            subject,
-            proof_name,
-            span,
-        } => Ok(RExpr::RAttachedProofRef {
-            subject: subject.clone(),
-            proof_name: proof_name.clone(),
-            span: span.clone(),
-        }),
-
-        Expr::ERecursiveResult {
-            selector,
-            operand,
-            operand_span,
-            span,
-        } => {
-            let (index, binding_span) =
-                scope
-                    .resolve_binding(operand)
-                    .ok_or_else(|| ElabError::UnboundName {
-                        name: operand.clone(),
-                        span: operand_span.clone(),
-                    })?;
-            Ok(RExpr::RRecursiveResult {
-                selector: *selector,
-                index,
-                name: operand.clone(),
-                binding_span,
-                span: span.clone(),
-            })
-        }
-
-        Expr::EIf {
-            condition,
-            then_branch,
-            else_branch,
-            span,
-        } => Ok(RExpr::RIf {
-            condition: Box::new(resolve_expr_ctx(scope, condition, ctx)?),
-            then_branch: Box::new(resolve_expr_ctx(scope, then_branch, ctx)?),
-            else_branch: Box::new(resolve_expr_ctx(scope, else_branch, ctx)?),
-            span: span.clone(),
-        }),
-
-        Expr::EMatch {
-            scrut,
-            equation,
-            arms,
-            span,
-        } => {
-            let rscrut = resolve_expr_ctx(scope, scrut, ctx)?;
-            let mut rarms = Vec::new();
-            for arm in arms {
-                let (rpat, bound_names) = resolve_pattern(&arm.pat)?;
-                let depth_before = scope.depth();
-                for binding in &bound_names {
-                    if let Some(slot) = binding.alias_slot {
-                        scope.push_pattern_alias(&binding.name, binding.span.clone(), slot);
-                    } else if binding.name == "_" {
-                        scope.push_anonymous(binding.span.clone());
-                    } else {
-                        scope.push_spanned(&binding.name, binding.span.clone());
-                    }
+#[inline(never)]
+fn resolve_expr_ctx_elet(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::ELet(bindings, body, _) = expr else {
+        unreachable!("resolve_expr_ctx_elet dispatch")
+    };
+    {
+        let depth_before = scope.depth();
+        let result = (|| {
+            let mut seen = std::collections::HashSet::new();
+            let mut resolved = Vec::with_capacity(bindings.len());
+            for binding in bindings {
+                if !seen.insert(binding.name.as_str()) {
+                    return Err(ElabError::ParseError {
+                        msg: format!("duplicate local binding '{}' in let group", binding.name),
+                        span: binding.name_span.clone(),
+                    });
                 }
-                if let Some(equation) = equation {
-                    scope.push(equation);
-                }
-                let rguard = arm
-                    .guard
+                let resolved_ty = binding
+                    .annotation
                     .as_ref()
-                    .map(|guard| resolve_expr_ctx(scope, guard, ctx))
+                    .map(|ty| resolve_type(scope, ty))
                     .transpose()?;
-                let rbody = resolve_expr_ctx(scope, &arm.body, ctx)?;
-                if equation.is_some() {
-                    scope.pop();
-                }
-                for _ in &bound_names {
-                    scope.pop();
-                }
-                assert_eq!(scope.depth(), depth_before);
-                rarms.push(RMatchArm {
-                    pat: rpat,
-                    guard: rguard,
-                    body: rbody,
-                    span: arm.span.clone(),
-                });
+                let resolved_value = resolve_expr_ctx(scope, &binding.value, ctx)?;
+                resolved.push((
+                    binding.name.clone(),
+                    resolved_ty,
+                    resolved_value,
+                    binding.span.clone(),
+                ));
+                scope.push_spanned(&binding.name, binding.name_span.clone());
             }
-            Ok(RExpr::RMatch {
-                scrut: Box::new(rscrut),
-                equation: equation.clone(),
-                arms: rarms,
-                span: span.clone(),
-            })
+            let mut resolved_body = resolve_expr_ctx(scope, body, ctx)?;
+            for (name, ty, value, binding_span) in resolved.into_iter().rev() {
+                let let_span = Span::new(binding_span.start, resolved_body.span().end);
+                resolved_body =
+                    RExpr::RLet(name, ty, Box::new(value), Box::new(resolved_body), let_span);
+            }
+            Ok(resolved_body)
+        })();
+        while scope.depth() > depth_before {
+            scope.pop();
         }
+        assert_eq!(scope.depth(), depth_before);
+        result
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_easc(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::EAsc(e, ty, span) = expr else {
+        unreachable!("resolve_expr_ctx_easc dispatch")
+    };
+    {
+        let re = resolve_expr_ctx(scope, e, ctx)?;
+        let rt = resolve_type(scope, ty)?;
+        Ok(RExpr::RAsc(Box::new(re), Box::new(rt), span.clone()))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_eold(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::EOld(e, span) = expr else {
+        unreachable!("resolve_expr_ctx_eold dispatch")
+    };
+    {
+        if ctx != PropCtx::SpaceOpEnsures {
+            return Err(ElabError::UnboundName {
+                name: "old".to_string(),
+                span: span.clone(),
+            });
+        }
+        let re = resolve_expr_ctx(scope, e, ctx)?;
+        Ok(RExpr::ROld(Box::new(re), span.clone()))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_ebecomes(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EBecomes(cell, value, span) = expr else {
+        unreachable!("resolve_expr_ctx_ebecomes dispatch")
+    };
+    {
+        let Expr::EVar(name, _) = cell.as_ref() else {
+            return Err(ElabError::MutationOutsideSpace {
+                construct: "becomes".to_string(),
+                span: span.clone(),
+            });
+        };
+        let Some(index) = scope.space_cells.get(name).copied() else {
+            return Err(ElabError::MutationOutsideSpace {
+                construct: "becomes".to_string(),
+                span: span.clone(),
+            });
+        };
+        let value = resolve_expr_ctx(scope, value, ctx)?;
+        Ok(RExpr::RBecomes(
+            index,
+            name.clone(),
+            Box::new(value),
+            span.clone(),
+        ))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_enumlit(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::ENumLit(lit, span) = expr else {
+        unreachable!("resolve_expr_ctx_enumlit dispatch")
+    };
+    let _ = &scope;
+    let _ = &ctx;
+    Ok(RExpr::RNumLit(lit.clone(), span.clone()))
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_estr(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::EStr(s, span) = expr else {
+        unreachable!("resolve_expr_ctx_estr dispatch")
+    };
+    let _ = &scope;
+    let _ = &ctx;
+    Ok(RExpr::RStr(s.clone(), span.clone()))
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_echarlit(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::ECharLit(c, span) = expr else {
+        unreachable!("resolve_expr_ctx_echarlit dispatch")
+    };
+    let _ = &scope;
+    let _ = &ctx;
+    Ok(RExpr::RCharLit(*c, span.clone()))
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_ebytestr(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EByteStr(b, span) = expr else {
+        unreachable!("resolve_expr_ctx_ebytestr dispatch")
+    };
+    let _ = &scope;
+    let _ = &ctx;
+    Ok(RExpr::RByteStr(b.clone(), span.clone()))
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_ebinop(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EBinOp(op, l, r, span) = expr else {
+        unreachable!("resolve_expr_ctx_ebinop dispatch")
+    };
+    {
+        let rl = resolve_expr_ctx(scope, l, ctx)?;
+        let rr = resolve_expr_ctx(scope, r, ctx)?;
+        Ok(RExpr::RBinOp(*op, Box::new(rl), Box::new(rr), span.clone()))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_eproj(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EProj(e, field, span) = expr else {
+        unreachable!("resolve_expr_ctx_eproj dispatch")
+    };
+    {
+        let re = resolve_expr_ctx(scope, e, ctx)?;
+        Ok(RExpr::RProj(Box::new(re), field.clone(), span.clone()))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_eposproj(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EPosProj(e, index, span) = expr else {
+        unreachable!("resolve_expr_ctx_eposproj dispatch")
+    };
+    {
+        let re = resolve_expr_ctx(scope, e, ctx)?;
+        Ok(RExpr::RPosProj(Box::new(re), *index, span.clone()))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_epair(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EPair(components, span) = expr else {
+        unreachable!("resolve_expr_ctx_epair dispatch")
+    };
+    Ok(RExpr::RPair(
+        components
+            .iter()
+            .map(|component| resolve_expr_ctx(scope, component, ctx))
+            .collect::<Result<Vec<_>, _>>()?,
+        span.clone(),
+    ))
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_erecord(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::ERecord { base, fields, span } = expr else {
+        unreachable!("resolve_expr_ctx_erecord dispatch")
+    };
+    Ok(RExpr::RRecord {
+        base: base
+            .as_ref()
+            .map(|base| resolve_expr_ctx(scope, base, ctx).map(Box::new))
+            .transpose()?,
+        fields: fields
+            .iter()
+            .map(|field| {
+                Ok((
+                    field.name.clone(),
+                    resolve_expr_ctx(scope, &field.value, ctx)?,
+                    field.name_span.clone(),
+                ))
+            })
+            .collect::<Result<Vec<_>, ElabError>>()?,
+        span: span.clone(),
+    })
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_epi(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::EPi(x, a, b, span) = expr else {
+        unreachable!("resolve_expr_ctx_epi dispatch")
+    };
+    {
+        let ra = resolve_type(scope, a)?;
+        scope.push(x);
+        let rb = resolve_expr_ctx(scope, b, ctx)?;
+        scope.pop();
+        Ok(RExpr::RPi(
+            x.clone(),
+            Box::new(ra),
+            Box::new(rb),
+            span.clone(),
+        ))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_earrow(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EArrow(a, b, span) = expr else {
+        unreachable!("resolve_expr_ctx_earrow dispatch")
+    };
+    {
+        let ra = resolve_expr_ctx(scope, a, ctx)?;
+        let rb = resolve_expr_ctx(scope, b, ctx)?;
+        Ok(RExpr::RArrow(Box::new(ra), Box::new(rb), span.clone()))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_etrunc(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::ETrunc(e, span) = expr else {
+        unreachable!("resolve_expr_ctx_etrunc dispatch")
+    };
+    {
+        let re = resolve_expr_ctx(scope, e, ctx)?;
+        Ok(RExpr::RTrunc(Box::new(re), span.clone()))
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_eattachedproofref(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EAttachedProofRef {
+        subject,
+        proof_name,
+        span,
+    } = expr
+    else {
+        unreachable!("resolve_expr_ctx_eattachedproofref dispatch")
+    };
+    let _ = &scope;
+    let _ = &ctx;
+    Ok(RExpr::RAttachedProofRef {
+        subject: subject.clone(),
+        proof_name: proof_name.clone(),
+        span: span.clone(),
+    })
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_erecursiveresult(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::ERecursiveResult {
+        selector,
+        operand,
+        operand_span,
+        span,
+    } = expr
+    else {
+        unreachable!("resolve_expr_ctx_erecursiveresult dispatch")
+    };
+    let _ = &ctx;
+    {
+        let (index, binding_span) =
+            scope
+                .resolve_binding(operand)
+                .ok_or_else(|| ElabError::UnboundName {
+                    name: operand.clone(),
+                    span: operand_span.clone(),
+                })?;
+        Ok(RExpr::RRecursiveResult {
+            selector: *selector,
+            index,
+            name: operand.clone(),
+            binding_span,
+            span: span.clone(),
+        })
+    }
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_eif(scope: &mut Scope, expr: &Expr, ctx: PropCtx) -> Result<RExpr, ElabError> {
+    let Expr::EIf {
+        condition,
+        then_branch,
+        else_branch,
+        span,
+    } = expr
+    else {
+        unreachable!("resolve_expr_ctx_eif dispatch")
+    };
+    Ok(RExpr::RIf {
+        condition: Box::new(resolve_expr_ctx(scope, condition, ctx)?),
+        then_branch: Box::new(resolve_expr_ctx(scope, then_branch, ctx)?),
+        else_branch: Box::new(resolve_expr_ctx(scope, else_branch, ctx)?),
+        span: span.clone(),
+    })
+}
+
+#[inline(never)]
+fn resolve_expr_ctx_ematch(
+    scope: &mut Scope,
+    expr: &Expr,
+    ctx: PropCtx,
+) -> Result<RExpr, ElabError> {
+    let Expr::EMatch {
+        scrut,
+        equation,
+        arms,
+        span,
+    } = expr
+    else {
+        unreachable!("resolve_expr_ctx_ematch dispatch")
+    };
+    {
+        let rscrut = resolve_expr_ctx(scope, scrut, ctx)?;
+        let mut rarms = Vec::new();
+        for arm in arms {
+            let (rpat, bound_names) = resolve_pattern(&arm.pat)?;
+            let depth_before = scope.depth();
+            for binding in &bound_names {
+                if let Some(slot) = binding.alias_slot {
+                    scope.push_pattern_alias(&binding.name, binding.span.clone(), slot);
+                } else if binding.name == "_" {
+                    scope.push_anonymous(binding.span.clone());
+                } else {
+                    scope.push_spanned(&binding.name, binding.span.clone());
+                }
+            }
+            if let Some(equation) = equation {
+                scope.push(equation);
+            }
+            let rguard = arm
+                .guard
+                .as_ref()
+                .map(|guard| resolve_expr_ctx(scope, guard, ctx))
+                .transpose()?;
+            let rbody = resolve_expr_ctx(scope, &arm.body, ctx)?;
+            if equation.is_some() {
+                scope.pop();
+            }
+            for _ in &bound_names {
+                scope.pop();
+            }
+            assert_eq!(scope.depth(), depth_before);
+            rarms.push(RMatchArm {
+                pat: rpat,
+                guard: rguard,
+                body: rbody,
+                span: arm.span.clone(),
+            });
+        }
+        Ok(RExpr::RMatch {
+            scrut: Box::new(rscrut),
+            equation: equation.clone(),
+            arms: rarms,
+            span: span.clone(),
+        })
     }
 }
 

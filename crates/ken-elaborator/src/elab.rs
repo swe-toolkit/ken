@@ -14512,161 +14512,56 @@ fn reassociate_rexpr(
     fixities: &HashMap<GlobalId, Fixity>,
     standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
 ) -> Result<RExpr, ElabError> {
-    Ok(match expr {
-        RExpr::RApp(function, argument, span) => RExpr::RApp(
-            Box::new(reassociate_rexpr(*function, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*argument, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RLam(name, body, span) => RExpr::RLam(
-            name,
-            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RLet(name, ty, value, body, span) => RExpr::RLet(
-            name,
-            ty.map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
-                .transpose()?,
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*body, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RAsc(value, ty, span) => RExpr::RAsc(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rtype(*ty, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::ROld(value, span) => RExpr::ROld(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RBecomes(index, name, value, span) => RExpr::RBecomes(
-            index,
-            name,
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RBinOp(operator, lhs, rhs, span) => RExpr::RBinOp(
-            operator,
-            Box::new(reassociate_rexpr(*lhs, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*rhs, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RInfixSpine {
-            operands,
-            operators,
-            ..
-        } => {
-            let mut operands = operands
-                .into_iter()
-                .map(|operand| reassociate_rexpr(operand, globals, fixities, standard_operators));
-            let mut values = vec![operands
-                .next()
-                .expect("a parsed spine has one more operand")?];
-            let mut pending: Vec<RInfixOperator> = Vec::new();
-            for (operator, rhs) in operators.into_iter().zip(operands) {
-                while let Some(top) = pending.last() {
-                    if !should_reduce_before(top, &operator, globals, fixities)? {
-                        break;
-                    }
-                    reduce_resolved_operator(
-                        &mut values,
-                        pending.pop().expect("pending operator exists"),
-                        globals,
-                        standard_operators,
-                    );
-                }
-                pending.push(operator);
-                values.push(rhs?);
-            }
-            while let Some(operator) = pending.pop() {
-                reduce_resolved_operator(&mut values, operator, globals, standard_operators);
-            }
-            values.pop().expect("reassociation produces one expression")
+    match expr {
+        arm @ RExpr::RApp(..) => {
+            reassociate_rexpr_rapp(arm, globals, fixities, standard_operators)
         }
-        RExpr::RMatch {
-            scrut,
-            equation,
-            arms,
-            span,
-        } => RExpr::RMatch {
-            scrut: Box::new(reassociate_rexpr(*scrut, globals, fixities, standard_operators)?),
-            equation,
-            arms: arms
-                .into_iter()
-                .map(|arm| {
-                    Ok(RMatchArm {
-                        pat: arm.pat,
-                        guard: arm
-                            .guard
-                            .map(|guard| reassociate_rexpr(guard, globals, fixities, standard_operators))
-                            .transpose()?,
-                        body: reassociate_rexpr(arm.body, globals, fixities, standard_operators)?,
-                        span: arm.span,
-                    })
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?,
-            span,
-        },
-        RExpr::RIf {
-            condition,
-            then_branch,
-            else_branch,
-            span,
-        } => RExpr::RIf {
-            condition: Box::new(reassociate_rexpr(*condition, globals, fixities, standard_operators)?),
-            then_branch: Box::new(reassociate_rexpr(*then_branch, globals, fixities, standard_operators)?),
-            else_branch: Box::new(reassociate_rexpr(*else_branch, globals, fixities, standard_operators)?),
-            span,
-        },
-        RExpr::RPair(components, span) => RExpr::RPair(
-            components
-                .into_iter()
-                .map(|component| reassociate_rexpr(component, globals, fixities, standard_operators))
-                .collect::<Result<Vec<_>, _>>()?,
-            span,
-        ),
-        RExpr::RRecord { base, fields, span } => RExpr::RRecord {
-            base: base
-                .map(|base| reassociate_rexpr(*base, globals, fixities, standard_operators).map(Box::new))
-                .transpose()?,
-            fields: fields
-                .into_iter()
-                .map(|(name, value, name_span)| {
-                    Ok((
-                        name,
-                        reassociate_rexpr(value, globals, fixities, standard_operators)?,
-                        name_span,
-                    ))
-                })
-                .collect::<Result<Vec<_>, ElabError>>()?,
-            span,
-        },
-        RExpr::RProj(value, field, span) => RExpr::RProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            field,
-            span,
-        ),
-        RExpr::RPosProj(value, index, span) => RExpr::RPosProj(
-            Box::new(reassociate_rexpr(*value, globals, fixities, standard_operators)?),
-            index,
-            span,
-        ),
-        RExpr::RPi(name, domain, codomain, span) => RExpr::RPi(
-            name,
-            Box::new(reassociate_rtype(*domain, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RArrow(domain, codomain, span) => RExpr::RArrow(
-            Box::new(reassociate_rexpr(*domain, globals, fixities, standard_operators)?),
-            Box::new(reassociate_rexpr(*codomain, globals, fixities, standard_operators)?),
-            span,
-        ),
-        RExpr::RTrunc(inner, span) => RExpr::RTrunc(
-            Box::new(reassociate_rexpr(*inner, globals, fixities, standard_operators)?),
-            span,
-        ),
+        arm @ RExpr::RLam(..) => {
+            reassociate_rexpr_rlam(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RLet(..) => {
+            reassociate_rexpr_rlet(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RAsc(..) => {
+            reassociate_rexpr_rasc(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::ROld(..) => {
+            reassociate_rexpr_rold(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RBecomes(..) => {
+            reassociate_rexpr_rbecomes(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RBinOp(..) => {
+            reassociate_rexpr_rbinop(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RInfixSpine { .. } => {
+            reassociate_rexpr_rinfixspine(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RMatch { .. } => {
+            reassociate_rexpr_rmatch(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RIf { .. } => {
+            reassociate_rexpr_rif(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RPair(..) => {
+            reassociate_rexpr_rpair(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RRecord { .. } => {
+            reassociate_rexpr_rrecord(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RProj(..) => {
+            reassociate_rexpr_rproj(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RPosProj(..) => {
+            reassociate_rexpr_rposproj(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RPi(..) => reassociate_rexpr_rpi(arm, globals, fixities, standard_operators),
+        arm @ RExpr::RArrow(..) => {
+            reassociate_rexpr_rarrow(arm, globals, fixities, standard_operators)
+        }
+        arm @ RExpr::RTrunc(..) => {
+            reassociate_rexpr_rtrunc(arm, globals, fixities, standard_operators)
+        }
         // A LEAF HERE, AND THE ARGUMENT IS WHY -- stated because
         // `leaf => leaf` below would have swallowed this variant with no
         // compile error, the same invisible shape as the `modules.rs` remap.
@@ -14678,9 +14573,484 @@ fn reassociate_rexpr(
         // descending would also be correct; what is not correct is leaving
         // which one it is to a catch-all, since the reachability argument is
         // the part that rots when the minting site moves.
-        leaf @ RExpr::RStandardOp { .. } => leaf,
-        leaf => leaf,
+        leaf @ RExpr::RStandardOp { .. } => Ok(leaf),
+        leaf => Ok(leaf),
+    }
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rapp(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RApp(function, argument, span) = expr else {
+        unreachable!("reassociate_rexpr_rapp dispatch")
+    };
+    Ok(RExpr::RApp(
+        Box::new(reassociate_rexpr(
+            *function,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *argument,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rlam(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RLam(name, body, span) = expr else {
+        unreachable!("reassociate_rexpr_rlam dispatch")
+    };
+    Ok(RExpr::RLam(
+        name,
+        Box::new(reassociate_rexpr(
+            *body,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rlet(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RLet(name, ty, value, body, span) = expr else {
+        unreachable!("reassociate_rexpr_rlet dispatch")
+    };
+    Ok(RExpr::RLet(
+        name,
+        ty.map(|ty| reassociate_rtype(ty, globals, fixities, standard_operators))
+            .transpose()?,
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *body,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rasc(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RAsc(value, ty, span) = expr else {
+        unreachable!("reassociate_rexpr_rasc dispatch")
+    };
+    Ok(RExpr::RAsc(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rtype(
+            *ty,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rold(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::ROld(value, span) = expr else {
+        unreachable!("reassociate_rexpr_rold dispatch")
+    };
+    Ok(RExpr::ROld(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rbecomes(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RBecomes(index, name, value, span) = expr else {
+        unreachable!("reassociate_rexpr_rbecomes dispatch")
+    };
+    Ok(RExpr::RBecomes(
+        index,
+        name,
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rbinop(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RBinOp(operator, lhs, rhs, span) = expr else {
+        unreachable!("reassociate_rexpr_rbinop dispatch")
+    };
+    Ok(RExpr::RBinOp(
+        operator,
+        Box::new(reassociate_rexpr(
+            *lhs,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *rhs,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rinfixspine(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RInfixSpine {
+        operands,
+        operators,
+        ..
+    } = expr
+    else {
+        unreachable!("reassociate_rexpr_rinfixspine dispatch")
+    };
+    Ok({
+        let mut operands = operands
+            .into_iter()
+            .map(|operand| reassociate_rexpr(operand, globals, fixities, standard_operators));
+        let mut values = vec![operands
+            .next()
+            .expect("a parsed spine has one more operand")?];
+        let mut pending: Vec<RInfixOperator> = Vec::new();
+        for (operator, rhs) in operators.into_iter().zip(operands) {
+            while let Some(top) = pending.last() {
+                if !should_reduce_before(top, &operator, globals, fixities)? {
+                    break;
+                }
+                reduce_resolved_operator(
+                    &mut values,
+                    pending.pop().expect("pending operator exists"),
+                    globals,
+                    standard_operators,
+                );
+            }
+            pending.push(operator);
+            values.push(rhs?);
+        }
+        while let Some(operator) = pending.pop() {
+            reduce_resolved_operator(&mut values, operator, globals, standard_operators);
+        }
+        values.pop().expect("reassociation produces one expression")
     })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rmatch(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RMatch {
+        scrut,
+        equation,
+        arms,
+        span,
+    } = expr
+    else {
+        unreachable!("reassociate_rexpr_rmatch dispatch")
+    };
+    Ok(RExpr::RMatch {
+        scrut: Box::new(reassociate_rexpr(
+            *scrut,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        equation,
+        arms: arms
+            .into_iter()
+            .map(|arm| {
+                Ok(RMatchArm {
+                    pat: arm.pat,
+                    guard: arm
+                        .guard
+                        .map(|guard| {
+                            reassociate_rexpr(guard, globals, fixities, standard_operators)
+                        })
+                        .transpose()?,
+                    body: reassociate_rexpr(arm.body, globals, fixities, standard_operators)?,
+                    span: arm.span,
+                })
+            })
+            .collect::<Result<Vec<_>, ElabError>>()?,
+        span,
+    })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rif(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RIf {
+        condition,
+        then_branch,
+        else_branch,
+        span,
+    } = expr
+    else {
+        unreachable!("reassociate_rexpr_rif dispatch")
+    };
+    Ok(RExpr::RIf {
+        condition: Box::new(reassociate_rexpr(
+            *condition,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        then_branch: Box::new(reassociate_rexpr(
+            *then_branch,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        else_branch: Box::new(reassociate_rexpr(
+            *else_branch,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rpair(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPair(components, span) = expr else {
+        unreachable!("reassociate_rexpr_rpair dispatch")
+    };
+    Ok(RExpr::RPair(
+        components
+            .into_iter()
+            .map(|component| reassociate_rexpr(component, globals, fixities, standard_operators))
+            .collect::<Result<Vec<_>, _>>()?,
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rrecord(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RRecord { base, fields, span } = expr else {
+        unreachable!("reassociate_rexpr_rrecord dispatch")
+    };
+    Ok(RExpr::RRecord {
+        base: base
+            .map(|base| {
+                reassociate_rexpr(*base, globals, fixities, standard_operators).map(Box::new)
+            })
+            .transpose()?,
+        fields: fields
+            .into_iter()
+            .map(|(name, value, name_span)| {
+                Ok((
+                    name,
+                    reassociate_rexpr(value, globals, fixities, standard_operators)?,
+                    name_span,
+                ))
+            })
+            .collect::<Result<Vec<_>, ElabError>>()?,
+        span,
+    })
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rproj(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RProj(value, field, span) = expr else {
+        unreachable!("reassociate_rexpr_rproj dispatch")
+    };
+    Ok(RExpr::RProj(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        field,
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rposproj(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPosProj(value, index, span) = expr else {
+        unreachable!("reassociate_rexpr_rposproj dispatch")
+    };
+    Ok(RExpr::RPosProj(
+        Box::new(reassociate_rexpr(
+            *value,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        index,
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rpi(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RPi(name, domain, codomain, span) = expr else {
+        unreachable!("reassociate_rexpr_rpi dispatch")
+    };
+    Ok(RExpr::RPi(
+        name,
+        Box::new(reassociate_rtype(
+            *domain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *codomain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rarrow(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RArrow(domain, codomain, span) = expr else {
+        unreachable!("reassociate_rexpr_rarrow dispatch")
+    };
+    Ok(RExpr::RArrow(
+        Box::new(reassociate_rexpr(
+            *domain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        Box::new(reassociate_rexpr(
+            *codomain,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
+}
+
+#[inline(never)]
+fn reassociate_rexpr_rtrunc(
+    expr: RExpr,
+    globals: &HashMap<String, GlobalId>,
+    fixities: &HashMap<GlobalId, Fixity>,
+    standard_operators: Option<&HashMap<StandardOperatorRole, GlobalId>>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RTrunc(inner, span) = expr else {
+        unreachable!("reassociate_rexpr_rtrunc dispatch")
+    };
+    Ok(RExpr::RTrunc(
+        Box::new(reassociate_rexpr(
+            *inner,
+            globals,
+            fixities,
+            standard_operators,
+        )?),
+        span,
+    ))
 }
 
 fn reassociate_rtype(
