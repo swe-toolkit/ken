@@ -64,6 +64,37 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
+**Route recut (Architect `evt_12m8vjr4ptk7c`, §1a 5): replace the route
+rule.** Hard-stop entries 1, 2, 5 and 6 each flip the same binary decision,
+selector or coupled route. Each one keys that decision on a stand-in: frame
+presence, goal shape, the side table, convoy presence. The deliverable is
+one route-decision function over the properties the two routes actually
+consume:
+- (a) whether each scrutinee index can be abstracted by the motive: a
+  distinct ambient variable that is not a sentinel, not refined and not
+  constructor-headed;
+- (b) which ambient dependents mention the scrutinee itself, as opposed to
+  only its index;
+- (c) whether the goal is a proposition with non-trivial coupled sides.
+
+The convoy is computed per route. The selector convoys only scrutinee
+dependents. The coupled route convoys every index dependent.
+- **Retained, already proved:** the refined-plane convoy, the C1/C2
+  ordering, the scope-aware collector, H1 and K2 in RSC, and the S1 rows
+  (E9 and E11 Ok).
+- **Next step: a route D0, owned by the Architect.** It measures a decision
+  table of every population row against (a), (b), (c) and each route's
+  outcome, then rules the function. A cell that needs the selector to carry
+  a scrutinee dependent is the open fork. The table covers the 14 probes,
+  G1, G2, the Vec form, A1, A1F, and every test in
+  `lang_embedded_context_convoy`, `lang_nested_index_match_proposition_goal`,
+  `lang_embedded_method_equation_convoy`,
+  `lang_index_convoy_impossible_arm_level`,
+  `lang_proposition_goal_scrutinee_free_recursion` and the 19 suite tests.
+- The ring holds at `37bcaf64f` until the D0 posts, and does not repair the
+  four S6 tests separately. The S1, S6 and build-order rulings below
+  stand until the route D0 replaces them.
+
 The D0 is ruled (Architect `evt_mgkvvs0f31b7`, part 2): one composition
 rule. The motive is one telescope. Every rewrite applied to the goal is
 applied at the same depth to each premise type its subject occurs in, and
@@ -140,11 +171,13 @@ plane.**
     `collect_outer_embedded_elims`. An eliminator under binders that is
     independent of them is lowered to the planner's depth. Otherwise it
     is left in place.
-- **AC-4 (mutation, QA).** Restoring `!cx.match_frames.is_empty()` in
-  place of `enclosing_refines` returns E9 to its failure.
-- **AC-4b (mutation, QA).** Removing `&& probe_context_convoy.is_empty()`
-  sends H7 back to an `Internal`. It discriminates only once step 3 is
-  in.
+- **AC-2b (control).** The four S6 tests stay Ok:
+  `q1_option_wrapped_pair_goal`, `q1_two_lists_in_both_fin_arms`,
+  `q1_swapped_inner_match_order` and
+  `variable_proposition_motive_with_result_binder`.
+- **AC-4 (mutation, QA).** Per input of the route function: replacing it
+  with a stand-in key (frame presence, the side table, or convoy presence)
+  reddens a named row. The route D0 names the row for each mutation.
 
 ## Stop conditions
 
