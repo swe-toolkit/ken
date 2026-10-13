@@ -66,8 +66,13 @@ at D0, including whether a proof-valued (`Omega`) J stays erased.
   n h` over `Equal Nat (same_nat n) n`). The Adversary's third source was
   unavailable (Steward `evt_42tsz9t8r26dp`).
 - **AC-2.** The graph `Cycle` return walk's step count and edges match the
-  kernel on the five measured cycles, and the
+  kernel on four cycles: two_cycle, part_cycle, tri and selfc. Each row
+  computes its kernel pairing live from its fixture, and the
   `cat_graphs_dependency.rs` row checks them at runtime, not kernel-only.
+  tri_dup is deleted, not ignored: it is tri's graph, its kernel oracle does
+  not finish in 1,800 s, and its enumeration axis is not the J arm's
+  (Architect `evt_38j28mej8919j`, Steward fork (a) `evt_2pb5r5pjk5tyn`). A
+  row is admitted only if its kernel phases finish within 600 s locally.
 - **AC-4 (control).** Proof-term J in cast evidence keeps its current
   behaviour unless the Architect rules otherwise, and the `ds5b` suite's
   other rows stay green.
