@@ -2,7 +2,7 @@
 //! compilation plan, not a new kernel admission rule.
 
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use ken_kernel::subst::{subst0, weaken};
 use ken_kernel::{infer, whnf, Context, GlobalEnv, InductiveDecl, KernelError, Level, Term};
@@ -198,6 +198,11 @@ pub struct OmegaErasurePlan {
     pub collapsed_sigmas: BTreeSet<u32>,
 }
 
+/// Interpreter-only: preorder id of a computational J to its checked
+/// equation, with endpoints erased in the J node's own context. Never stored
+/// in the durable OmegaErasurePlan consumed by checked-core lowering.
+type JEquations = BTreeMap<u32, Term>;
+
 /// Memoized kernel sort classifications for exactly one immutable GlobalEnv.
 /// Scoped entries are dropped at each context pop, so sibling binders cannot
 /// share a result merely because they have the same de Bruijn depth.
@@ -321,8 +326,84 @@ pub(crate) fn omega_erasure_plan_with_memo(
         &mut next,
         &mut plan,
         memo,
+        None,
     )?;
     Ok((plan, next))
+}
+
+/// Erase a checked body for the interpreter. Unlike the durable plan, the
+/// computational J's erased evidence slot carries its checked equation, so
+/// its endpoints can decide J-beta after the proof itself has been erased.
+pub fn erase_for_interpreter(
+    env: &GlobalEnv,
+    body: &Term,
+    checked_type: &Term,
+) -> Result<Term, KernelError> {
+    let mut plan = OmegaErasurePlan::default();
+    let mut equations = JEquations::new();
+    let mut next = 0u32;
+    visit(
+        env,
+        &mut Context::new(),
+        body,
+        Some(checked_type),
+        &mut next,
+        &mut plan,
+        &mut ClassifyMemo::new(),
+        Some(&mut equations),
+    )?;
+    let mut next = 0u32;
+    rewrite(env, body, &plan, Some(&equations), &mut next)
+}
+
+/// The checked equation for J, preferring the elaborator's recorded Eq
+/// ascription as in the kernel's endpoint derivation (15 §4). A carrier read
+/// by inference at Type is refused: its WHNF may expose other endpoints.
+fn erased_j_equation(
+    env: &GlobalEnv,
+    ctx: &mut Context,
+    evidence: &Term,
+    memo: &mut ClassifyMemo,
+) -> Option<Term> {
+    let (carrier, lhs, rhs) = match evidence {
+        Term::Ascript(_, recorded) => match recorded.as_ref() {
+            Term::Eq(a, x, y) => ((**a).clone(), (**x).clone(), (**y).clone()),
+            _ => return None,
+        },
+        _ => match whnf(env, ctx, &infer_node(env, ctx, evidence).ok()?) {
+            Term::Eq(a, x, y) if !matches!(whnf(env, ctx, &a), Term::Type(_)) => (*a, *x, *y),
+            _ => return None,
+        },
+    };
+    let lhs = erase_open(env, ctx, &lhs, &carrier, memo)?;
+    let rhs = erase_open(env, ctx, &rhs, &carrier, memo)?;
+    // Carrier slot is never evaluated by the interpreter's J arm.
+    Some(Term::Eq(Box::new(carrier), Box::new(lhs), Box::new(rhs)))
+}
+
+fn erase_open(
+    env: &GlobalEnv,
+    ctx: &mut Context,
+    term: &Term,
+    expected: &Term,
+    memo: &mut ClassifyMemo,
+) -> Option<Term> {
+    let mut plan = OmegaErasurePlan::default();
+    let mut equations = JEquations::new();
+    let mut next = 0u32;
+    visit(
+        env,
+        ctx,
+        term,
+        Some(expected),
+        &mut next,
+        &mut plan,
+        memo,
+        Some(&mut equations),
+    )
+    .ok()?;
+    let mut next = 0u32;
+    rewrite(env, term, &plan, Some(&equations), &mut next).ok()
 }
 
 fn skipped_nodes(node: &Term, next: &mut u32) -> Result<(), KernelError> {
@@ -343,6 +424,7 @@ fn visit(
     next: &mut u32,
     plan: &mut OmegaErasurePlan,
     memo: &mut ClassifyMemo,
+    mut equations: Option<&mut JEquations>,
 ) -> Result<(), KernelError> {
     let here = *next;
     *next = next
@@ -386,7 +468,16 @@ fn visit(
     }
     match node {
         Term::Lam(dom, body) => {
-            visit(env, ctx, dom, None, next, plan, memo)?;
+            visit(
+                env,
+                ctx,
+                dom,
+                None,
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )?;
             if memo.classify(env, ctx, dom)? {
                 plan.erased_binders.insert(here);
             }
@@ -395,24 +486,69 @@ fn visit(
                 _ => None,
             });
             memo.under_binding(ctx, (**dom).clone(), |ctx, memo| {
-                visit(env, ctx, body, expected_body.as_ref(), next, plan, memo)
+                visit(
+                    env,
+                    ctx,
+                    body,
+                    expected_body.as_ref(),
+                    next,
+                    plan,
+                    memo,
+                    equations,
+                )
             })
         }
         Term::Pi(dom, cod) | Term::Sigma(dom, cod) => {
-            visit(env, ctx, dom, None, next, plan, memo)?;
+            visit(
+                env,
+                ctx,
+                dom,
+                None,
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )?;
             memo.under_binding(ctx, (**dom).clone(), |ctx, memo| {
-                visit(env, ctx, cod, None, next, plan, memo)
+                visit(env, ctx, cod, None, next, plan, memo, equations)
             })
         }
         Term::Let { ty, val, body } => {
-            visit(env, ctx, ty, None, next, plan, memo)?;
+            visit(
+                env,
+                ctx,
+                ty,
+                None,
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )?;
             if memo.classify(env, ctx, ty)? {
                 plan.erased_binders.insert(here);
             }
-            visit(env, ctx, val, Some(ty), next, plan, memo)?;
+            visit(
+                env,
+                ctx,
+                val,
+                Some(ty),
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )?;
             let expected_body = inferred.as_deref().map(|t| weaken(t, 1));
             memo.under_binding(ctx, (**ty).clone(), |ctx, memo| {
-                visit(env, ctx, body, expected_body.as_ref(), next, plan, memo)
+                visit(
+                    env,
+                    ctx,
+                    body,
+                    expected_body.as_ref(),
+                    next,
+                    plan,
+                    memo,
+                    equations,
+                )
             })
         }
         Term::App(function, argument) => {
@@ -447,8 +583,26 @@ fn visit(
                 .application_types
                 .remove(&key)
                 .expect("a checked application spine has an inferred Π at every node");
-            visit(env, ctx, function, Some(&function_type), next, plan, memo)?;
-            visit(env, ctx, argument, Some(&domain), next, plan, memo)
+            visit(
+                env,
+                ctx,
+                function,
+                Some(&function_type),
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )?;
+            visit(
+                env,
+                ctx,
+                argument,
+                Some(&domain),
+                next,
+                plan,
+                memo,
+                equations,
+            )
         }
         Term::Pair(first, second) => {
             let Some(ty) = inferred else {
@@ -467,9 +621,27 @@ fn visit(
             if collapsed {
                 plan.collapsed_sigmas.insert(here);
             }
-            visit(env, ctx, first, Some(&domain), next, plan, memo)?;
+            visit(
+                env,
+                ctx,
+                first,
+                Some(&domain),
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )?;
             let second_type = subst0(&codomain, first);
-            visit(env, ctx, second, Some(&second_type), next, plan, memo)
+            visit(
+                env,
+                ctx,
+                second,
+                Some(&second_type),
+                next,
+                plan,
+                memo,
+                equations,
+            )
         }
         Term::Proj1(pair) => {
             let pair_type = infer_node(env, ctx, pair)?;
@@ -484,11 +656,29 @@ fn visit(
             if collapsed {
                 plan.collapsed_sigmas.insert(here);
             }
-            visit(env, ctx, pair, Some(&pair_type), next, plan, memo)
+            visit(
+                env,
+                ctx,
+                pair,
+                Some(&pair_type),
+                next,
+                plan,
+                memo,
+                equations,
+            )
         }
         Term::Ascript(term, ty) => {
-            visit(env, ctx, term, Some(ty), next, plan, memo)?;
-            visit(env, ctx, ty, None, next, plan, memo)
+            visit(
+                env,
+                ctx,
+                term,
+                Some(ty),
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )?;
+            visit(env, ctx, ty, None, next, plan, memo, equations)
         }
         Term::Elim {
             fam,
@@ -505,28 +695,93 @@ fn visit(
                 KernelError::Msg(format!("erasure plan has unknown family {fam:?}"))
             })?;
             for param in params {
-                visit(env, ctx, param, None, next, plan, memo)?;
+                visit(
+                    env,
+                    ctx,
+                    param,
+                    None,
+                    next,
+                    plan,
+                    memo,
+                    equations.as_deref_mut(),
+                )?;
             }
-            visit(env, ctx, motive, None, next, plan, memo).map_err(|error| {
-                KernelError::Msg(format!("Ω erasure eliminator motive: {error}"))
-            })?;
+            visit(
+                env,
+                ctx,
+                motive,
+                None,
+                next,
+                plan,
+                memo,
+                equations.as_deref_mut(),
+            )
+            .map_err(|error| KernelError::Msg(format!("Ω erasure eliminator motive: {error}")))?;
             for (k, method) in methods.iter().enumerate() {
                 let method_ty = method_type_node(env, ctx, ind, k, motive, params, level_args)
                     .map_err(|error| {
                         KernelError::Msg(format!("Ω erasure method type {k}: {error}"))
                     })?;
-                visit(env, ctx, method, Some(&method_ty), next, plan, memo).map_err(|error| {
+                visit(
+                    env,
+                    ctx,
+                    method,
+                    Some(&method_ty),
+                    next,
+                    plan,
+                    memo,
+                    equations.as_deref_mut(),
+                )
+                .map_err(|error| {
                     KernelError::Msg(format!("Ω erasure eliminator method {k}: {error}"))
                 })?;
             }
             for index in indices {
-                visit(env, ctx, index, None, next, plan, memo)?;
+                visit(
+                    env,
+                    ctx,
+                    index,
+                    None,
+                    next,
+                    plan,
+                    memo,
+                    equations.as_deref_mut(),
+                )?;
             }
-            visit(env, ctx, scrut, None, next, plan, memo)
+            visit(env, ctx, scrut, None, next, plan, memo, equations)
+        }
+        Term::J(_, _, evidence) => {
+            for child in node.children() {
+                visit(
+                    env,
+                    ctx,
+                    child,
+                    None,
+                    next,
+                    plan,
+                    memo,
+                    equations.as_deref_mut(),
+                )?;
+            }
+            if let Some(equations) = equations {
+                if let Some(equation) = erased_j_equation(env, ctx, evidence, memo) {
+                    equations.insert(here, equation);
+                }
+            }
+            Ok(())
         }
         _ => {
             for child in node.children() {
-                visit(env, ctx, child, None, next, plan, memo)?;
+                visit(
+                    env,
+                    ctx,
+                    child,
+                    None,
+                    next,
+                    plan,
+                    memo,
+                    equations.as_deref_mut(),
+                )?;
             }
             Ok(())
         }
@@ -542,13 +797,14 @@ pub fn apply_omega_erasure(
     plan: &OmegaErasurePlan,
 ) -> Result<Term, KernelError> {
     let mut next = 0u32;
-    rewrite(env, term, plan, &mut next)
+    rewrite(env, term, plan, None, &mut next)
 }
 
 fn rewrite(
     env: &GlobalEnv,
     node: &Term,
     plan: &OmegaErasurePlan,
+    equations: Option<&JEquations>,
     next: &mut u32,
 ) -> Result<Term, KernelError> {
     let here = *next;
@@ -561,7 +817,7 @@ fn rewrite(
         }
         return Ok(Term::const_(env.tt_id(), Vec::new()));
     }
-    let mut child = |t: &Term| rewrite(env, t, plan, next);
+    let mut child = |t: &Term| rewrite(env, t, plan, equations, next);
     match node {
         Term::Pair(a, b) if plan.collapsed_sigmas.contains(&here) => {
             let first = child(a)?;
@@ -611,11 +867,20 @@ fn rewrite(
             Box::new(child(e)?),
             Box::new(child(t)?),
         )),
-        Term::J(m, d, e) => Ok(Term::J(
-            Box::new(child(m)?),
-            Box::new(child(d)?),
-            Box::new(child(e)?),
-        )),
+        Term::J(m, d, e) => {
+            let motive = child(m)?;
+            let base = child(d)?;
+            let erased = child(e)?;
+            let evidence = equations
+                .and_then(|eqs| eqs.get(&here))
+                .cloned()
+                .unwrap_or(erased);
+            Ok(Term::J(
+                Box::new(motive),
+                Box::new(base),
+                Box::new(evidence),
+            ))
+        }
         Term::Quot(a, r, e) => Ok(Term::Quot(
             Box::new(child(a)?),
             Box::new(child(r)?),
@@ -659,6 +924,33 @@ mod tests {
     /// terms, including binding and eliminator shapes. CLAIMED: memoizing a
     /// closed classification cannot reuse a context-dependent type result.
     /// THE GAP: a newly added Term variant must be recursed by children().
+    /// Promise class: durable invariant (15 §4, 42 §3.2). MEASURED: the
+    /// checked Ω-valued J theorem's erased root is the canonical tt constant,
+    /// while the computational J path does not see its original proof body.
+    /// CLAIMED: proof J remains erased, not computationally reduced. THE GAP:
+    /// this root assertion alone cannot speak for other Ω cast evidence;
+    /// existing proof-erasure controls cover those positions.
+    #[test]
+    fn proof_valued_j_is_erased_before_interpretation() {
+        let mut elaborated = ElabEnv::new().expect("checked prelude");
+        let id = elaborated
+            .elaborate_decl(
+                "theorem jProof (x : Bool) (h : Equal Bool x True) : \
+                 Equal Bool x True = J (λp _. Equal Bool x True) h h",
+            )
+            .expect("the proof J must be kernel checked");
+        let ken_kernel::Decl::Transparent { body, ty, .. } = elaborated
+            .env
+            .lookup(id)
+            .expect("checked theorem is in the environment")
+        else {
+            panic!("the theorem must have a checked transparent body");
+        };
+        let erased = erase_for_interpreter(&elaborated.env, body, ty)
+            .expect("interpreter erasure classifies the proof J");
+        assert_eq!(erased, Term::const_(elaborated.env.tt_id(), Vec::new()));
+    }
+
     #[test]
     fn memo_closedness_matches_kernel_weakening() {
         let int = Term::IntLit(0.into());

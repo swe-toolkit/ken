@@ -327,6 +327,80 @@ fn empty_is_order
   match decision { HasOrder order ↦ True; HasCycle cycle ↦ False }
 "#;
 
+// Three further cycles with fixed expected return lengths. The Pair Bool
+// Bool carrier supplies three distinct vertices for tri's return walk.
+const MORE_CYCLES: &str = r#"
+import Data.Finite.Finite (pair_finite)
+import Core.Classes.LawfulClasses (DecEq_instance_Pair)
+
+fn pair_is (p : Pair Bool Bool) (x : Bool) (y : Bool) : Bool =
+  bool_and (bool_eq (pair_fst Bool Bool p) x)
+           (bool_eq (pair_snd Bool Bool p) y)
+const pair_dec : DecEq (Pair Bool Bool) =
+  DecEq_instance_Pair Bool Bool DecEq_instance_Bool DecEq_instance_Bool
+const pair_vertices : Finite (Pair Bool Bool) =
+  pair_finite Bool Bool bool_finite bool_finite
+const part_cycle : Graph (Pair Bool Bool) = MkGraph (Pair Bool Bool)
+  (λu. λv. match pair_is u True True {
+    True ↦ pair_is v True False;
+    False ↦ match pair_is u True False {
+      True ↦ pair_is v True True;
+      False ↦ False
+    }
+  })
+const tri : Graph (Pair Bool Bool) = MkGraph (Pair Bool Bool)
+  (λu. λv. match pair_is u True True {
+    True ↦ pair_is v True False;
+    False ↦ match pair_is u True False {
+      True ↦ pair_is v False True;
+      False ↦ match pair_is u False True {
+        True ↦ pair_is v True True;
+        False ↦ False
+      }
+    }
+  })
+const selfc : Graph Bool = MkGraph Bool (λu. λv. bool_and u v)
+
+const part_result : OrderOrCycle (Pair Bool Bool) pair_dec part_cycle =
+  dependency_order_or_cycle (Pair Bool Bool) pair_vertices pair_dec part_cycle
+const tri_result : OrderOrCycle (Pair Bool Bool) pair_dec tri =
+  dependency_order_or_cycle (Pair Bool Bool) pair_vertices pair_dec tri
+const selfc_result : OrderOrCycle Bool DecEq_instance_Bool selfc =
+  dependency_order_or_cycle Bool bool_finite DecEq_instance_Bool selfc
+
+fn walk_steps_at (q : Type) (g : Graph q) (s : q) (t : q)
+  (walk : Walk q g s t) : Nat =
+  match walk {
+    WalkHere ↦ Zero;
+    WalkStep u v edge_proof prefix ↦ Suc (walk_steps_at q g s u prefix)
+  }
+fn walk_edges_at (q : Type) (g : Graph q) (s : q) (t : q)
+  (walk : Walk q g s t) : Bool =
+  match walk {
+    WalkHere ↦ True;
+    WalkStep u v edge_proof prefix ↦
+      bool_and (edge q g u v) (walk_edges_at q g s u prefix)
+  }
+fn cycle_return_steps_at (q : Type) (g : Graph q) (cy : Cycle q g) : Nat =
+  match cy { MkCycle start next first rest ↦
+    walk_steps_at q g next start rest }
+fn cycle_return_edges_at (q : Type) (g : Graph q) (cy : Cycle q g) : Bool =
+  match cy { MkCycle start next first rest ↦
+    walk_edges_at q g next start rest }
+fn result_return_steps_at (q : Type) (d : DecEq q) (g : Graph q)
+  (decision : OrderOrCycle q d g) : Nat =
+  match decision {
+    HasCycle cy ↦ cycle_return_steps_at q g cy;
+    HasOrder order ↦ Zero
+  }
+fn result_return_edges_at (q : Type) (d : DecEq q) (g : Graph q)
+  (decision : OrderOrCycle q d g) : Bool =
+  match decision {
+    HasCycle cy ↦ cycle_return_edges_at q g cy;
+    HasOrder order ↦ False
+  }
+"#;
+
 fn fixture() -> (ElabEnv, EvalStore) {
     let mut env = ElabEnv::new().expect("base environment");
     env.elaborate_module_from_roots(&[root()], GRAPH)
@@ -622,7 +696,7 @@ fn seed_reversing_only_edge_reverses_order() {
 /// mistake reflexive WalkHere alone for a nonempty cycle. THE GAP: checked
 /// Walk/Cycle constructor fields and generic search carry the universal case.
 #[test]
-fn seed_two_vertex_cycle_has_real_witness() {
+fn cycle_return_walk_two_cycle() {
     let (mut env, mut store) = fixture();
     has_tag(
         &mut env,
@@ -665,21 +739,37 @@ fn seed_two_vertex_cycle_has_real_witness() {
         "edge Bool two_cycle (result_start cycle_result) (result_next cycle_result)",
         true,
     );
-    // The returned Walk is checked Type-level evidence. The current typed
-    // interpreter leaves this dependent projection Neutral; never count that
-    // as a runtime pass. Its closed edge predicate must kernel-reduce to True.
+    // The same public Cycle return walk is observed through both conversion
+    // and the checked interpreter, rather than inferring runtime success from
+    // the kernel-only theorem.
     kernel_truth(
         &mut env,
         "cycle_return_edges",
         "result_return_edges_real cycle_result",
         true,
     );
+    let edges = observe(
+        &mut env,
+        &mut store,
+        "cycle_return_edges_runtime",
+        "Bool",
+        "result_return_edges_real cycle_result",
+    );
+    assert!(boolean(&env, &edges), "two_cycle runtime return edges");
     kernel_number(
         &mut env,
         "cycle_return_length",
         "result_return_steps cycle_result",
         1,
     );
+    let steps = observe(
+        &mut env,
+        &mut store,
+        "cycle_return_length_runtime",
+        "Nat",
+        "result_return_steps cycle_result",
+    );
+    assert_eq!(nat(&env, &steps), 1, "two_cycle runtime return steps");
     truth(
         &mut env,
         &mut store,
@@ -693,6 +783,125 @@ fn seed_two_vertex_cycle_has_real_witness() {
         "no_false_loop",
         "edge Bool two_cycle False False",
         false,
+    );
+}
+
+/// Promise class: durable invariant (15 §4, 42 §3.6). MEASURED: each
+/// checked Cycle return walk agrees with kernel conversion on its real edges
+/// and constructor-valued step count. CLAIMED: computational J is reached in
+/// generic graph clients, including pair-indexed and reflexive cycles.
+/// THE GAP: these are selected closed observations, not all graph walks.
+#[derive(Clone, Copy)]
+enum CyclePhase {
+    KernelEdges,
+    KernelSteps,
+    RuntimeEdges,
+    RuntimeSteps,
+}
+
+fn check_cycle_return_walk(
+    name: &str,
+    carrier: &str,
+    dec: &str,
+    graph: &str,
+    result: &str,
+    expected_steps: usize,
+) {
+    let started = std::time::Instant::now();
+    let (mut env, mut store) = fixture();
+    env.elaborate_file(MORE_CYCLES)
+        .expect("three additional real graph fixtures must elaborate");
+    let edges = format!("result_return_edges_at {carrier} {dec} {graph} {result}");
+    let steps = format!("result_return_steps_at {carrier} {dec} {graph} {result}");
+    let phases = [
+        CyclePhase::KernelEdges,
+        CyclePhase::KernelSteps,
+        CyclePhase::RuntimeEdges,
+        CyclePhase::RuntimeSteps,
+    ];
+    for phase in phases {
+        let label = match phase {
+            CyclePhase::KernelEdges => "kernel-edges",
+            CyclePhase::KernelSteps => "kernel-steps",
+            CyclePhase::RuntimeEdges => "runtime-edges",
+            CyclePhase::RuntimeSteps => "runtime-steps",
+        };
+        eprintln!(
+            "ARCH-PHASE {name} {label} {}",
+            started.elapsed().as_millis()
+        );
+        match phase {
+            CyclePhase::KernelEdges => {
+                kernel_truth(&mut env, &format!("{name}_edges"), &edges, true);
+            }
+            CyclePhase::KernelSteps => {
+                kernel_number(&mut env, &format!("{name}_steps"), &steps, expected_steps);
+            }
+            CyclePhase::RuntimeEdges => {
+                let value = observe(
+                    &mut env,
+                    &mut store,
+                    &format!("{name}_edges_runtime"),
+                    "Bool",
+                    &edges,
+                );
+                let value = boolean(&env, &value);
+                eprintln!("ARCH-RESULT {name} runtime-edges {value}");
+                assert!(value, "{name}: runtime return edges");
+            }
+            CyclePhase::RuntimeSteps => {
+                let value = observe(
+                    &mut env,
+                    &mut store,
+                    &format!("{name}_steps_runtime"),
+                    "Nat",
+                    &steps,
+                );
+                let value = nat(&env, &value);
+                eprintln!("ARCH-RESULT {name} runtime-steps {value}");
+                assert_eq!(value, expected_steps, "{name}: runtime return steps");
+            }
+        }
+        eprintln!(
+            "ARCH-PHASE {name} {label}-done {}",
+            started.elapsed().as_millis()
+        );
+    }
+}
+
+#[test]
+fn cycle_return_walk_part_cycle() {
+    check_cycle_return_walk(
+        "part_cycle",
+        "(Pair Bool Bool)",
+        "pair_dec",
+        "part_cycle",
+        "part_result",
+        1,
+    );
+}
+
+#[test]
+fn cycle_return_walk_tri() {
+    check_cycle_return_walk(
+        "tri",
+        "(Pair Bool Bool)",
+        "pair_dec",
+        "tri",
+        "tri_result",
+        2,
+    );
+}
+
+#[test]
+fn cycle_return_walk_selfc() {
+    check_cycle_return_walk(
+        "selfc",
+        "Bool",
+        "DecEq_instance_Bool",
+        "selfc",
+        "selfc_result",
+        0,
     );
 }
 
