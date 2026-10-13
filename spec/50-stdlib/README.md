@@ -278,15 +278,16 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §1 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT).
+**`65-linear-algebra.md`** §§1–2
+(SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
+SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
-with row-major `Vec (Vec Nat n) m` matrices. Seven natural-valued
-operations and five checked-law obligations cover dot products,
-transpose, vector identity and **right** matrix identity. Left
-matrix identity and matrix-product associativity remain gated on
-`LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`, not promised by this
-first catalog node. No rational/Float tier or catalog delivery is
-claimed.
+with row-major `Vec (Vec Nat n) m` matrices. Its seven natural-valued
+operations and five checked laws are landed. §2 adds generically
+checked left matrix identity and product associativity, not yet
+exported as catalog theorems; neither awaits
+`LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`.
+No rational or `Float` tier is claimed.
 
 ## 4. I/O, effects, serialization
 
