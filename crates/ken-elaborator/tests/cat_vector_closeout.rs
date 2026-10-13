@@ -318,7 +318,20 @@ fn vector_exports_only_checked_fin_family_and_constructors() {
 
     let (mut env, _) = load(VECTOR);
     let owned = expected_owned_names();
-    let public = BTreeSet::from(["Fin", "FZero", "FSuc"].map(str::to_owned));
+    let public = BTreeSet::from(
+        [
+            "Fin",
+            "FZero",
+            "FSuc",
+            "Vec",
+            "VNil",
+            "VCons",
+            "map",
+            "zip_with",
+            "vec_zero_vnil",
+        ]
+        .map(str::to_owned),
+    );
     assert!(
         public.is_subset(&owned),
         "the public names must be in Vector's complete owned inventory"

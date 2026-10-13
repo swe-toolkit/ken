@@ -42,10 +42,12 @@ import Core.Logic.Transport (cong, sym, trans)
 
 import Data.Collections.List (length)
 
-data Vec (a : Type) : Nat → Type where {
+pub data Vec (a : Type) : Nat → Type where {
   VNil : Vec a Zero;
   VCons : (n : Nat) → a → Vec a n → Vec a (Suc n)
 }
+
+export VNil, VCons
 
 pub data Fin : Nat → Type where {
   FZero : (n : Nat) → Fin (Suc n);
@@ -64,13 +66,13 @@ fn tail (a : Type) (n : Nat) (xs : Vec a (Suc n)) : Vec a n =
     VCons m x tail_xs ↦ tail_xs
   }
 
-fn map (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) : Vec b n =
+pub fn map (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) : Vec b n =
   match xs {
     VNil ↦ VNil b;
     VCons m x tail_xs ↦ VCons b m (f x) (map a b m f tail_xs)
   }
 
-fn zip_with
+pub fn zip_with
       (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b → c) (xs : Vec a n) (ys : Vec b n)
     : Vec c n =
   match xs {
@@ -208,7 +210,7 @@ theorem vector_pair_cong
     (cong (Vec b n) (Pair (Vec a n) (Vec b n)) ys ys2 (mk_pair (Vec a n) (Vec b n) xs) py)
     px
 
-theorem vec_zero_vnil (b : Type) (ys : Vec b Zero) : Equal (Vec b Zero) (VNil b) ys =
+pub theorem vec_zero_vnil (b : Type) (ys : Vec b Zero) : Equal (Vec b Zero) (VNil b) ys =
   vec_nil_case_holds b Zero ys
 
 theorem vec_nil_case_holds (b : Type) (n : Nat) (ys : Vec b n) : vec_nil_case b n ys =
@@ -654,21 +656,22 @@ ordinary `Pair` projections, `J`, and Sigma eta, with a checked index-computed
 motive for the empty vector's uniqueness.
 
 The `Fin` family and its constructors `FZero` and `FSuc` are public as the
-bounded-index provider for `Data.Finite.Finite`. The `Vec` family, its
-constructors, all operations including `to_list`, `zip`, and `unzip`, and all
-theorems remain private to this package. Eight computation theorems, map
-composition, lookup after map and after `zip_with`, pointwise `zip_with`/map
-naturality, `unzip_zip`, and `zip_unzip` are checked laws. The private
-`to_list_length` theorem relates the structural `List` length to the vector's
-index.
+bounded-index provider for `Data.Finite.Finite`. `Vec`, its constructors
+`VNil` and `VCons`, the length-preserving `map` and `zip_with`, and the checked
+empty-index transport `vec_zero_vnil` are public for indexed consumers.
+Other operations, including `to_list`, `zip` and `unzip`, and the other
+laws remain private. Eight computation theorems, map composition, lookup
+after map and after `zip_with`, pointwise `zip_with`/map naturality,
+`unzip_zip`, and `zip_unzip` are checked laws. The private `to_list_length`
+theorem relates the structural `List` length to the vector's index.
 
 `Vec` and `Fin` are kernel-checked inductive families. Every function is a
 transparent definition, every theorem has a checked proof term, and the entry
 adds no axiom, postulate, primitive, foreign declaration, or unresolved hole.
 Its cold roots-loaded `trusted_base()` set equals a separately fresh compiler
 base set. The imported combinator, congruence, and `Data.Collections.List` length
-providers contribute no trusted items, and making `Fin` public adds no
-`trusted_base()` entry or other trust.
+providers contribute no trusted items, and publishing the `Fin` and `Vec`
+surfaces adds no `trusted_base()` entry or other trust.
 
 Targeted validation checks the package through the roots-based module loader,
 the exact family indices and constructor targets, generic operation and
