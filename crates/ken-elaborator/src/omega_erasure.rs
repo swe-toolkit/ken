@@ -919,11 +919,6 @@ mod tests {
     use super::*;
     use crate::ElabEnv;
 
-    /// Promise class: durable invariant (11 §5). MEASURED: the non-allocating
-    /// free-variable walker agrees with kernel weakening on open and closed
-    /// terms, including binding and eliminator shapes. CLAIMED: memoizing a
-    /// closed classification cannot reuse a context-dependent type result.
-    /// THE GAP: a newly added Term variant must be recursed by children().
     /// Promise class: durable invariant (15 §4, 42 §3.2). MEASURED: the
     /// checked Ω-valued J theorem's erased root is the canonical tt constant,
     /// while the computational J path does not see its original proof body.
@@ -951,6 +946,11 @@ mod tests {
         assert_eq!(erased, Term::const_(elaborated.env.tt_id(), Vec::new()));
     }
 
+    /// Promise class: durable invariant (11 §5). MEASURED: the non-allocating
+    /// free-variable walker agrees with kernel weakening on open and closed
+    /// terms, including binding and eliminator shapes. CLAIMED: memoizing a
+    /// closed classification cannot reuse a context-dependent type result.
+    /// THE GAP: a newly added Term variant must be recursed by children().
     #[test]
     fn memo_closedness_matches_kernel_weakening() {
         let int = Term::IntLit(0.into());

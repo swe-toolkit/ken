@@ -791,14 +791,6 @@ fn cycle_return_walk_two_cycle() {
 /// and constructor-valued step count. CLAIMED: computational J is reached in
 /// generic graph clients, including pair-indexed and reflexive cycles.
 /// THE GAP: these are selected closed observations, not all graph walks.
-#[derive(Clone, Copy)]
-enum CyclePhase {
-    KernelEdges,
-    KernelSteps,
-    RuntimeEdges,
-    RuntimeSteps,
-}
-
 fn check_cycle_return_walk(
     name: &str,
     carrier: &str,
@@ -807,66 +799,36 @@ fn check_cycle_return_walk(
     result: &str,
     expected_steps: usize,
 ) {
-    let started = std::time::Instant::now();
     let (mut env, mut store) = fixture();
     env.elaborate_file(MORE_CYCLES)
         .expect("three additional real graph fixtures must elaborate");
     let edges = format!("result_return_edges_at {carrier} {dec} {graph} {result}");
     let steps = format!("result_return_steps_at {carrier} {dec} {graph} {result}");
-    let phases = [
-        CyclePhase::KernelEdges,
-        CyclePhase::KernelSteps,
-        CyclePhase::RuntimeEdges,
-        CyclePhase::RuntimeSteps,
-    ];
-    for phase in phases {
-        let label = match phase {
-            CyclePhase::KernelEdges => "kernel-edges",
-            CyclePhase::KernelSteps => "kernel-steps",
-            CyclePhase::RuntimeEdges => "runtime-edges",
-            CyclePhase::RuntimeSteps => "runtime-steps",
-        };
-        eprintln!(
-            "ARCH-PHASE {name} {label} {}",
-            started.elapsed().as_millis()
-        );
-        match phase {
-            CyclePhase::KernelEdges => {
-                kernel_truth(&mut env, &format!("{name}_edges"), &edges, true);
-            }
-            CyclePhase::KernelSteps => {
-                kernel_number(&mut env, &format!("{name}_steps"), &steps, expected_steps);
-            }
-            CyclePhase::RuntimeEdges => {
-                let value = observe(
-                    &mut env,
-                    &mut store,
-                    &format!("{name}_edges_runtime"),
-                    "Bool",
-                    &edges,
-                );
-                let value = boolean(&env, &value);
-                eprintln!("ARCH-RESULT {name} runtime-edges {value}");
-                assert!(value, "{name}: runtime return edges");
-            }
-            CyclePhase::RuntimeSteps => {
-                let value = observe(
-                    &mut env,
-                    &mut store,
-                    &format!("{name}_steps_runtime"),
-                    "Nat",
-                    &steps,
-                );
-                let value = nat(&env, &value);
-                eprintln!("ARCH-RESULT {name} runtime-steps {value}");
-                assert_eq!(value, expected_steps, "{name}: runtime return steps");
-            }
-        }
-        eprintln!(
-            "ARCH-PHASE {name} {label}-done {}",
-            started.elapsed().as_millis()
-        );
-    }
+    kernel_truth(&mut env, &format!("{name}_edges"), &edges, true);
+    kernel_number(&mut env, &format!("{name}_steps"), &steps, expected_steps);
+    let runtime_edges = observe(
+        &mut env,
+        &mut store,
+        &format!("{name}_edges_runtime"),
+        "Bool",
+        &edges,
+    );
+    assert!(
+        boolean(&env, &runtime_edges),
+        "{name}: runtime return edges"
+    );
+    let runtime_steps = observe(
+        &mut env,
+        &mut store,
+        &format!("{name}_steps_runtime"),
+        "Nat",
+        &steps,
+    );
+    assert_eq!(
+        nat(&env, &runtime_steps),
+        expected_steps,
+        "{name}: runtime return steps"
+    );
 }
 
 #[test]

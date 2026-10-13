@@ -1445,6 +1445,53 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
     }
 }
 
+/// `J` (`15 §4`): checked erasure left the equation, not its Ω proof.
+/// Compare only the closed endpoint values, never the motive (which can
+/// contain closures). Unequal endpoints transport through existing C5.
+/// A raw, unlowered J stays neutral.
+///
+/// Out of line on purpose: its locals must not enlarge every recursive
+/// `eval_in_erasure_scope` frame (cc7_argparse_acceptance overflowed).
+#[inline(never)]
+fn eval_j(
+    env: &[EvalVal],
+    motive: &Term,
+    base: &Term,
+    evidence: &Term,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
+    match evidence {
+        Term::Eq(_, lhs, rhs) => {
+            let a = eval(env, lhs, globals, store);
+            let b = eval(env, rhs, globals, store);
+            if matches!(a, EvalVal::Unknown) || matches!(b, EvalVal::Unknown) {
+                return EvalVal::Unknown;
+            }
+            if eq_type_eq(&a, &b) {
+                return eval(env, base, globals, store);
+            }
+            let tt = eval(
+                env,
+                &Term::const_(globals.tt_id(), Vec::new()),
+                globals,
+                store,
+            );
+            let family = eval(env, motive, globals, store);
+            let source = apply(
+                apply(family.clone(), a, globals, store),
+                tt.clone(),
+                globals,
+                store,
+            );
+            let target = apply(apply(family, b, globals, store), tt.clone(), globals, store);
+            let payload = eval(env, base, globals, store);
+            cast_reduce(source, target, tt, payload)
+        }
+        _ => EvalVal::Neutral,
+    }
+}
+
 #[cfg(test)]
 mod ds5b_cast_regular_tests {
     use super::*;
@@ -2762,39 +2809,8 @@ fn eval_in_erasure_scope(
         // (No Hole variant in Term — holes are represented as opaque Consts
         // with no body, handled in the Const case above.)
 
-        // --- J (`15 §4`): checked erasure left the equation, not its Ω proof.
-        // Compare only the closed endpoint values, never the motive (which can
-        // contain closures). Unequal endpoints transport through existing C5.
-        // A raw, unlowered J stays neutral.
-        Term::J(motive, base, evidence) => match evidence.as_ref() {
-            Term::Eq(_, lhs, rhs) => {
-                let a = eval(env, lhs, globals, store);
-                let b = eval(env, rhs, globals, store);
-                if matches!(a, EvalVal::Unknown) || matches!(b, EvalVal::Unknown) {
-                    return EvalVal::Unknown;
-                }
-                if eq_type_eq(&a, &b) {
-                    return eval(env, base, globals, store);
-                }
-                let tt = eval(
-                    env,
-                    &Term::const_(globals.tt_id(), Vec::new()),
-                    globals,
-                    store,
-                );
-                let family = eval(env, motive, globals, store);
-                let source = apply(
-                    apply(family.clone(), a, globals, store),
-                    tt.clone(),
-                    globals,
-                    store,
-                );
-                let target = apply(apply(family, b, globals, store), tt.clone(), globals, store);
-                let payload = eval(env, base, globals, store);
-                cast_reduce(source, target, tt, payload)
-            }
-            _ => EvalVal::Neutral,
-        },
+        // --- J (`15 §4`): see `eval_j`. ---
+        Term::J(motive, base, evidence) => eval_j(env, motive, base, evidence, globals, store),
 
         // --- Remaining K2 forms: not reduced in the G1 scope ---
         _ => EvalVal::Neutral,
