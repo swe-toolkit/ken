@@ -4466,7 +4466,16 @@ fn plan_coherent_frame_motive(
     let expanded_expected = boxed_simplify_branch_goal(
         cx.env, cx.refinement_facts, &zonked_ctx, original_expected,
     );
-    let has_nontrivial_coupled_sides = goal_is_proposition(cx, &zonked_ctx, original_expected)?;
+    // The equation convoy carries the goal's dependence on the scrutinee
+    // across the index equation. A syntactic Eq keeps its pre-widening route;
+    // any other proposition is convoyed only when it mentions the scrutinee.
+    // A scrutinee-free goal has nothing to transport, and the ordinary plan
+    // checks it.
+    let zonked_expected = cx.metas.zonk_term(original_expected);
+    let has_nontrivial_coupled_sides = matches!(original_expected, Term::Eq(_, _, _))
+        || matches!(expanded_expected.as_ref(), Term::Eq(_, _, _))
+        || (scrut_occurs(&zonked_expected, scrut_core)
+            && goal_is_proposition(cx, &zonked_ctx, original_expected)?);
     let probe_context_convoy = compute_context_convoy(cx, frame, scrut_indices)?;
 
     // A nested covering is already inside a constructor-refined outer frame.
