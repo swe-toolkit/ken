@@ -1,7 +1,7 @@
 ---
 id: RT-INTERP-J-COMPUTATIONAL-REDUCTION
 title: "The interpreter has no Term::J arm, so a closed, ground J whose motive is a data type evaluates to Neutral where the kernel gives a constructor. CAT-GRAPHS-DEPENDENCY's public Cycle return walk is such a J. Reduce J in the interpreter as the kernel does"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1
