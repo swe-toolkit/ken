@@ -1,7 +1,7 @@
 ---
 id: DIAG-STABLE-ERROR-CODES
 title: "Errors and refusals are identified only by message text, so tests and tools pin prose and a reworded message breaks them. Give every error the CLI can return a stable code plus a context-sensitive message: deterministic systems check the code, intelligent actors read the message"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T2

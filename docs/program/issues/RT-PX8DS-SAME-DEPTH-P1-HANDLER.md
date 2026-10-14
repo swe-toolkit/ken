@@ -1,7 +1,7 @@
 ---
 id: RT-PX8DS-SAME-DEPTH-P1-HANDLER
 title: "px8ds_real_same_depth_path_runs_exact_edges is red at base: native refuses at ObjectEmission because the response-owner effect gate admits only a HostResult, while ConsoleIsTerminal answers a bare Bool. Key the gate on the operation's response shape and un-ignore the row"
-status: active
+status: merged
 owner: runtime
 size: S
 tier: T1
