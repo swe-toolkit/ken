@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{ElabEnv, ElabError};
+use ken_elaborator::ElabEnv;
 use ken_kernel::{Decl, GlobalId, Term};
 
 const ORDER: &str = "Data.Numeric.Nat.Order";
@@ -112,13 +112,14 @@ fn max_least_has_exact_checked_proposition() {
 }
 
 /// Promise class: durable visibility and trust invariant.
-/// MEASURED: a public attached law remains usable from a selective import;
-/// each new private attached law is unavailable to that same kind of client,
-/// and the exact trusted GlobalId set is unchanged by roots-loading Order.
-/// CLAIMED: tightness adds no export or trust. THE GAP: imported providers
-/// still carry their own trust; this checks only Order's incremental delta.
+/// MEASURED: a selective client imports the two tightness proofs through
+/// their attached operations; the exact trusted GlobalId set stays unchanged
+/// after roots-loading Nat Order.
+/// CLAIMED: both checked bounds are publicly usable without added trust.
+/// THE GAP: imported providers carry their own trust; this checks only
+/// Nat Order's incremental delta, not an empty inherited ledger.
 #[test]
-fn tightness_laws_stay_private_without_new_trust() {
+fn tightness_laws_are_public_without_new_trust() {
     let (mut env, _) = load_order();
     env.elaborate_file(
         "import Data.Numeric.Nat.Order (min, max, leq_nat, IsTrue as NatOrderIsTrue)\n\
@@ -142,18 +143,11 @@ fn tightness_laws_stay_private_without_new_trust() {
     ] {
         let client = format!(
             "import Data.Numeric.Nat.Order ({operation}, leq_nat, IsTrue as NatOrderIsTrue)\n\
-             theorem private_bound (k : Nat) (m : Nat) (n : Nat)\n\
+             theorem public_{operation}_bound (k : Nat) (m : Nat) (n : Nat)\n\
                : {statement} =\n\
                λfirst. λsecond. (proof {law} for {operation}) k m n first second"
         );
-        match env.elaborate_file(&client) {
-            Err(ElabError::UnboundName { name, .. }) => {
-                assert_eq!(name, format!("{ORDER}.{operation}::{law}"));
-            }
-            Err(other) => {
-                panic!("private {operation}::{law} import failed for another reason: {other:?}")
-            }
-            Ok(_) => panic!("private {operation}::{law} was unexpectedly reachable"),
-        }
+        env.elaborate_file(&client)
+            .unwrap_or_else(|error| panic!("public {operation}::{law} must be selectable: {error:?}"));
     }
 }
