@@ -3080,6 +3080,27 @@ pub(super) fn lower_continuation_selected_case_body(
     Ok(lowered)
 }
 
+/// The response shape `lower_process_host_effect` materializes for one
+/// operation. ConsoleIsTerminal is infallible and answers a bare Bool.
+/// ClockWallNow answers an Instant constructor and stays refused here until a
+/// fixture measures its owner path. Every other operation answers a
+/// specialized HostResult.
+fn static_response_shape_matches(
+    operation: ken_host::HostOpV1,
+    response: &LoweringOperand,
+) -> bool {
+    match operation {
+        ken_host::HostOpV1::ConsoleIsTerminal => {
+            matches!(response, LoweringOperand::Specialized(Lowered::Bool { .. }))
+        }
+        ken_host::HostOpV1::ClockWallNow => false,
+        _ => matches!(
+            response,
+            LoweringOperand::Specialized(Lowered::HostResult { .. })
+        ),
+    }
+}
+
 /// Emit one validated response effect from an existing response row. Initial
 /// owners and pending-Vis successors use this same lowering, so a successor
 /// does not acquire a second operation/effect or frame-input authority.
@@ -3154,11 +3175,11 @@ fn lower_static_response_effect(
         },
         &effect_environment,
     )?;
-    if !matches!(response, LoweringOperand::Specialized(Lowered::HostResult { .. })) {
-        return Err(backend_module(
-            "a specialized response owner did not materialize an exact HostResult"
-                .to_string(),
-        ));
+    if !static_response_shape_matches(row.operation(), &response) {
+        return Err(backend_module(format!(
+            "a specialized response owner did not materialize the exact {:?} response",
+            row.operation(),
+        )));
     }
     let host_validation_block = builder.current_block().ok_or_else(|| {
         backend_module(

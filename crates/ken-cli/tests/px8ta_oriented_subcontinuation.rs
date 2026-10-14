@@ -439,17 +439,11 @@ fn run_px8ds_retired_flat_control() {
 const PX8DS_THREAD_STACK_BYTES: usize = 256 * 1024 * 1024;
 
 #[cfg(target_os = "linux")]
-// This focused native row compiles, links, and runs a large artifact on its
-// separately provisioned thread. It is invoked explicitly by targeted Runtime
-// validation rather than by the default package suite. The assertions pin a
-// successful false branch with one Console observation and one release.
-//
-// Registered in .github/ignored-test-exemptions.toml as `policy-cost` under
-// RT-IGNORED-PASSING-ROWS, the disposition the frame pre-classified for it
-// (D-REGISTER). Its ignore is a standing cost decision, not a defect, so it
-// should never have been a sweep finding in either direction.
+// This native row compiles, links, and runs a large artifact on its separately
+// provisioned thread. The assertions pin a successful false branch with one
+// Console observation and one release. The true-branch P1 tail-call route is
+// outside this row's observation (RT-P1-TAIL-CALL-EXIT-HANDLER).
 #[test]
-#[ignore = "focused native resource-cost row; run outside default suite"]
 fn px8ds_real_same_depth_path_runs_exact_edges() {
     std::thread::Builder::new()
         .name("px8ds-real-siblings".to_string())
