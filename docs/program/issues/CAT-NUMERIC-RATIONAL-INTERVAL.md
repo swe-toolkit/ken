@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-RATIONAL-INTERVAL
 title: "Spec 68 section 1 specifies Algorithm.Numeric.RationalInterval with six proved laws, but no catalog package delivers it and Data.Numeric.Rational lacks the two monotonicity laws it needs. Publish those laws, deliver the package from the Architect's checked D0 at zero trust, and run its seed as an acceptance target"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
