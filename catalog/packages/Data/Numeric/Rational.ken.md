@@ -538,6 +538,48 @@ pub proof total for rational_leq
   rational_leq_false_opposite
     (mul (numerator x) (denominator y))
     (mul (numerator y) (denominator x))
+
+pub theorem rational_add_mono
+      (x : Rational) (y : Rational) (z : Rational) (w : Rational)
+    : Equal Bool (rational_leq x y) True
+      → Equal Bool (rational_leq z w) True
+      → Equal Bool (rational_leq (rational_add x z) (rational_add y w)) True =
+  match x {
+    MkRational a ax ↦
+      match y {
+        MkRational b bx ↦
+          match z {
+            MkRational c cx ↦
+              match w {
+                MkRational d dx ↦
+                  λxy.
+                    λzw.
+                      rational_add_cross_mono a (Suc ax) b (Suc bx) c (Suc cx) d (Suc dx) xy zw
+              }
+          }
+      }
+  }
+
+pub theorem rational_mul_mono
+      (x : Rational) (y : Rational) (z : Rational) (w : Rational)
+    : Equal Bool (rational_leq x y) True
+      → Equal Bool (rational_leq z w) True
+      → Equal Bool (rational_leq (rational_mul x z) (rational_mul y w)) True =
+  match x {
+    MkRational a ax ↦
+      match y {
+        MkRational b bx ↦
+          match z {
+            MkRational c cx ↦
+              match w {
+                MkRational d dx ↦
+                  λxy.
+                    λzw.
+                      rational_mul_cross_mono a (Suc ax) b (Suc bx) c (Suc cx) d (Suc dx) xy zw
+              }
+          }
+      }
+  }
 ```
 
 ## 3. Using it
@@ -573,6 +615,9 @@ Order transitivity scales both adjacent comparisons by the opposite positive
 denominator, joins them at the shared middle product, then cancels the common
 positive factor. Antisymmetry follows on the two cross products, while Nat
 totality and the actual false comparison force the reverse comparison.
+Addition and multiplication preserve paired rational inequalities: the
+monotonicity proofs distribute and permute natural cross products, lift both
+input bounds through non-negative factors, and reassemble checked Nat order.
 
 Commutativity and multiplicative associativity lift the matching natural-number
 algebra to both numerator and denominator. Additive associativity expands the
@@ -1201,6 +1246,167 @@ theorem mul_swap_tail
       (mul (mul a c) b)
       (cong Nat Nat (mul b c) (mul c b) (λv. mul a v) ((proof comm for mul) b c))
       ((proof assoc for mul) a c b))
+
+theorem rational_add_cross_mono
+      (a : Nat)
+      (aa : Nat)
+      (b : Nat)
+      (bb : Nat)
+      (c : Nat)
+      (cc : Nat)
+      (d : Nat)
+      (dd : Nat)
+      (xy : Equal Bool (leq_nat (mul a bb) (mul b aa)) True)
+      (zw : Equal Bool (leq_nat (mul c dd) (mul d cc)) True)
+    : Equal Bool
+        (leq_nat
+          (mul (add (mul a cc) (mul c aa)) (mul bb dd))
+          (mul (add (mul b dd) (mul d bb)) (mul aa cc)))
+        True =
+  leq_rewrite
+    (mul (add (mul a cc) (mul c aa)) (mul bb dd))
+    (add (mul (mul a cc) (mul bb dd)) (mul (mul c aa) (mul bb dd)))
+    (mul (add (mul b dd) (mul d bb)) (mul aa cc))
+    (add (mul (mul b dd) (mul aa cc)) (mul (mul d bb) (mul aa cc)))
+    (mul_add_distrib_l (mul a cc) (mul c aa) (mul bb dd))
+    (mul_add_distrib_l (mul b dd) (mul d bb) (mul aa cc))
+    (leq_nat_add_mono
+      (mul (mul a cc) (mul bb dd))
+      (mul (mul b dd) (mul aa cc))
+      (mul (mul c aa) (mul bb dd))
+      (mul (mul d bb) (mul aa cc))
+      (leq_rewrite
+        (mul (mul a cc) (mul bb dd))
+        (mul (mul a bb) (mul cc dd))
+        (mul (mul b dd) (mul aa cc))
+        (mul (mul b aa) (mul cc dd))
+        (mul_shuffle a cc bb dd)
+        (trans
+          Nat
+          (mul (mul b dd) (mul aa cc))
+          (mul (mul b aa) (mul dd cc))
+          (mul (mul b aa) (mul cc dd))
+          (mul_shuffle b dd aa cc)
+          (mul_inner_comm (mul b aa) dd cc))
+        (leq_nat_mul_right_mono_any (mul a bb) (mul b aa) (mul cc dd) xy))
+      (leq_rewrite
+        (mul (mul c aa) (mul bb dd))
+        (mul (mul c dd) (mul aa bb))
+        (mul (mul d bb) (mul aa cc))
+        (mul (mul d cc) (mul aa bb))
+        (trans
+          Nat
+          (mul (mul c aa) (mul bb dd))
+          (mul (mul c aa) (mul dd bb))
+          (mul (mul c dd) (mul aa bb))
+          (mul_inner_comm (mul c aa) bb dd)
+          (mul_shuffle c aa dd bb))
+        (trans
+          Nat
+          (mul (mul d bb) (mul aa cc))
+          (mul (mul d bb) (mul cc aa))
+          (mul (mul d cc) (mul aa bb))
+          (mul_inner_comm (mul d bb) aa cc)
+          (trans
+            Nat
+            (mul (mul d bb) (mul cc aa))
+            (mul (mul d cc) (mul bb aa))
+            (mul (mul d cc) (mul aa bb))
+            (mul_shuffle d bb cc aa)
+            (mul_inner_comm (mul d cc) bb aa)))
+        (leq_nat_mul_right_mono_any (mul c dd) (mul d cc) (mul aa bb) zw)))
+
+theorem rational_mul_cross_mono
+      (a : Nat)
+      (aa : Nat)
+      (b : Nat)
+      (bb : Nat)
+      (c : Nat)
+      (cc : Nat)
+      (d : Nat)
+      (dd : Nat)
+      (xy : Equal Bool (leq_nat (mul a bb) (mul b aa)) True)
+      (zw : Equal Bool (leq_nat (mul c dd) (mul d cc)) True)
+    : Equal Bool (leq_nat (mul (mul a c) (mul bb dd)) (mul (mul b d) (mul aa cc))) True =
+  leq_rewrite
+    (mul (mul a c) (mul bb dd))
+    (mul (mul a bb) (mul c dd))
+    (mul (mul b d) (mul aa cc))
+    (mul (mul b aa) (mul d cc))
+    (mul_shuffle a c bb dd)
+    (mul_shuffle b d aa cc)
+    ((proof trans for leq_nat)
+      (mul (mul a bb) (mul c dd))
+      (mul (mul b aa) (mul c dd))
+      (mul (mul b aa) (mul d cc))
+      (leq_nat_mul_right_mono_any (mul a bb) (mul b aa) (mul c dd) xy)
+      (leq_nat_mul_left_mono_any (mul b aa) (mul c dd) (mul d cc) zw))
+
+theorem leq_nat_add_mono
+      (a : Nat)
+      (b : Nat)
+      (c : Nat)
+      (d : Nat)
+      (ab : Equal Bool (leq_nat a b) True)
+      (cd : Equal Bool (leq_nat c d) True)
+    : Equal Bool (leq_nat (add a c) (add b d)) True =
+  (proof trans for leq_nat)
+    (add a c)
+    (add b c)
+    (add b d)
+    (leq_nat_add_right_mono a b c ab)
+    (leq_rewrite
+      (add b c)
+      (add c b)
+      (add b d)
+      (add d b)
+      ((proof comm for add) b c)
+      ((proof comm for add) b d)
+      (leq_nat_add_right_mono c d b cd))
+
+theorem leq_nat_add_right_mono
+      (a : Nat) (b : Nat) (c : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (add a c) (add b c)) True =
+  match c {
+    Zero ↦ ab;
+    Suc rest ↦ leq_nat_add_right_mono a b rest ab
+  }
+
+theorem leq_nat_mul_left_mono_any
+      (k : Nat) (a : Nat) (b : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (mul k a) (mul k b)) True =
+  leq_rewrite
+    (mul k a)
+    (mul a k)
+    (mul k b)
+    (mul b k)
+    ((proof comm for mul) k a)
+    ((proof comm for mul) k b)
+    (leq_nat_mul_right_mono_any a b k ab)
+
+theorem leq_nat_mul_right_mono_any
+      (a : Nat) (b : Nat) (k : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (mul a k) (mul b k)) True =
+  match k {
+    Zero ↦ Proved;
+    Suc rest ↦ leq_nat_mul_right_mono a b rest ab
+  }
+
+theorem leq_rewrite
+      (l : Nat)
+      (lp : Nat)
+      (r : Nat)
+      (rp : Nat)
+      (hl : Equal Nat l lp)
+      (hr : Equal Nat r rp)
+      (h : Equal Bool (leq_nat lp rp) True)
+    : Equal Bool (leq_nat l r) True =
+  trans Bool (leq_nat l r) (leq_nat lp rp) True (leq_cong_two l lp r rp hl hr) h
+
+theorem mul_inner_comm
+      (p : Nat) (u : Nat) (v : Nat)
+    : Equal Nat (mul p (mul u v)) (mul p (mul v u)) =
+  mul_cong2 p p (mul u v) (mul v u) Refl ((proof comm for mul) u v)
 ```
 
 ## 5. Design notes
@@ -1219,19 +1425,26 @@ compare values; different carrier spellings are not asserted to have structural
 - **Ken specification** —
   [Exact non-negative rational values](../../../../spec/50-stdlib/64-rational.md)
   — normative carrier, algebra and trust boundaries for this package.
+- **Ken specification** —
+  [Exact numerical intervals](../../../../spec/50-stdlib/68-numerical.md)
+  — the two-input rational monotonicity obligations used by intervals.
 
 ## 7. Trust & derivation
 
 1. **Public API.** The exported constructor, projections, value constants,
    natural embedding, equivalence, three arithmetic/order operations and the
    checked equations and order laws of specification §§1–2.2 appear above.
+   `rational_add_mono` and `rational_mul_mono` add the checked two-input
+   monotonicity required by exact intervals.
 2. **Source map.** [Definition](#2-definition) lists the exported values and
    laws; [Laws & proofs](#4-laws--proofs) explains and carries the private
-   derivation; [Using it](#3-using-it) compares distinct spellings.
+   derivation, including the cross-product monotonicity helpers;
+   [Using it](#3-using-it) compares distinct spellings.
 3. **Derivation.** The carrier uses `Nat`; arithmetic reuses the checked Nat
    operations, algebraic laws, positive cancellation and canonical order.
    Order transitivity additionally uses the Nat positive-factor monotonicity
    and cancellation laws; totality uses the canonical Nat totality proof.
+   Paired-input monotonicity uses only checked Nat add and multiply laws.
 4. **Trusted-base delta.** Zero: all exported theorems carry checked proof
    terms. Nat and equality imports retain their existing trusted base; this
    package adds no `Axiom`, postulate, primitive or floating point.

@@ -537,6 +537,15 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // RationalInterval reuses the checked rational provider; its
+            // conjunction names remain ambient under the strict floor.
+            "Algorithm.Numeric.RationalInterval".to_string(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
             // With its own Dec-family imports, this package now reaches the
             // strict-floor census. Its conjunction names remain prelude-bound
             // until the separate collections slice moves And and is_sorted.
