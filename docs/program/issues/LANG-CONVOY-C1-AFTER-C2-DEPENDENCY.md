@@ -1,7 +1,7 @@
 ---
 id: LANG-CONVOY-C1-AFTER-C2-DEPENDENCY
 title: "LANG-CONVOY-AMBIENT-BINDER-COEXISTENCE orders every C1 convoy entry before the companions and C2, so a C1 hypothesis whose type mentions a C2 binder names sentinels bound later in the telescope, and the elaborator panics on well-formed source where its parent returned a typed error. Order premises by what each mentions, and never panic"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1

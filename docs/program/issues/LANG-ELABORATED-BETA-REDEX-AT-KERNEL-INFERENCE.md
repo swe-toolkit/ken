@@ -1,7 +1,7 @@
 ---
 id: LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE
 title: "An elaborator-built term reaches a kernel inference position with a λ-headed redex, so the kernel refuses with \"cannot infer an introduction form\". Linear-algebra left_head fails this way when map's argument is a λ, and checks when the same function is a named helper. Find every producer and close them by one rule"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
