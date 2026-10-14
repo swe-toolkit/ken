@@ -19,6 +19,7 @@ path = "src/main.rs"
 dasm-c2-observation = ["ken-runtime/dasm-c2-observation"]
 
 [dependencies]
+ken-diagnostic = { path = "../ken-diagnostic" }
 ken-kernel = { path = "../ken-kernel" }
 ken-elaborator = { path = "../ken-elaborator" }
 ken-interp = { path = "../ken-interp" }

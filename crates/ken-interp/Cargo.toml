@@ -9,6 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+ken-diagnostic = { path = "../ken-diagnostic" }
 ken-kernel = { path = "../ken-kernel" }
 ken-runtime = { path = "../ken-runtime" }
 ken-host = { path = "../ken-host" }

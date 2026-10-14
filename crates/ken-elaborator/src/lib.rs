@@ -25,6 +25,7 @@ pub mod compiler_driver;
 pub mod conversions;
 pub mod data;
 pub mod decimal_char;
+mod diagnostic_codes;
 pub mod diagnostics;
 pub mod effects;
 pub mod elab;
@@ -87,6 +88,7 @@ pub use diagnostics::{
     TypedHole, WorldId,
 };
 pub use elab::{ElabResult, Obligation, ObligationKind};
+pub use diagnostic_codes::kernel_error_code;
 pub use error::{ArmDeadCause, ElabError, MissingPatternWitness, Span};
 pub use export::{
     canonical_host_perform_signature_v1, canonical_l5_perform_signature_v1,
