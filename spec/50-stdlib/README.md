@@ -312,6 +312,18 @@ No geometry catalog delivery, signed-coordinate geometry, Euclidean
 or floating-point distance, box area, or measured trusted-base delta
 is claimed.
 
+The **exact rational-interval contract** is pinned in
+**`68-numerical.md`** §1 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT).
+`Algorithm.Numeric.RationalInterval` uses the existing non-negative
+`Rational` to represent inclusive endpoint intervals, including
+inverted-bounds empty values. Point, endpoint-wise addition and
+endpoint-wise multiplication have six generic laws checked in D0
+scratch. The two required Rational monotonicity exports remain a
+**catalog follow-on**; neither the interval catalog module nor its
+shipped seed, CI or trusted-base delta is established by §1. Signed
+arithmetic, division, `Float`, rounding, width, intersection and
+hull remain deferred.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
