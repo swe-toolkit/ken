@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-EXACT-CONTRACT
 title: "No geometry contract exists in spec/50-stdlib, so the catalog's next roadmap layer after symbolic algebra has nothing to build against. Author its chapter with a first exact section: points and axis-aligned boxes over natural coordinates, containment, intersection and hull, with their laws proved at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1

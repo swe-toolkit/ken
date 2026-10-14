@@ -1,7 +1,7 @@
 ---
 id: CAT-GEOMETRY-NAT-BOX
 title: "Spec 67 section 1 specifies Algorithm.Geometry.NatBox with six proved laws, but no catalog package delivers it. Deliver the package from the Architect's checked D0 at zero trust, publish the two Nat.Order bounds its proof needs, and run its seed as an acceptance target"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
