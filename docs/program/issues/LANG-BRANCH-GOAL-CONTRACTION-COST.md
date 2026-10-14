@@ -1,7 +1,7 @@
 ---
 id: LANG-BRANCH-GOAL-CONTRACTION-COST
 title: "Since 473ccf9b4 contract_applied_lambdas fully beta-normalizes every branch goal, under binders and inside stuck eliminator methods, and stores the normal form; a duplicating λ argument nested n deep makes elaboration time and the stored term grow as 2^n. Bound the contraction so elaboration cost stays proportional to the source"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
