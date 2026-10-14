@@ -5056,7 +5056,7 @@ mod stated_equality_cycle_tests {
 /// Keep checked refinement identities rigid while exposing beta/iota and
 /// ordinary transparent heads needed by dependent branch goals.
 #[inline(never)]
-fn simplify_branch_goal_keeping_refinements(
+fn simplify_branch_goal_keeping_refinements_uncontracted(
     env: &GlobalEnv, facts: &RefinementFacts, ctx: &Context, term: &Term,
 ) -> Term {
     let mut roots = Vec::new();
@@ -5080,6 +5080,97 @@ fn simplify_branch_goal_keeping_refinements(
         out = subst0(&out, root);
     }
     out
+}
+
+/// Reduced branch goals reach kernel check positions (ambient methods,
+/// branch bodies, motives). The kernel never infers a λ, and `whnf` can
+/// substitute a λ argument into head position inside a stuck eliminator's
+/// method. Contract every applied λ here, at the one producer all of those
+/// consumers read. β preserves conversion, and both sides of the embedded
+/// eliminator identity match are outputs of this producer.
+fn simplify_branch_goal_keeping_refinements(
+    env: &GlobalEnv,
+    facts: &RefinementFacts,
+    ctx: &Context,
+    term: &Term,
+) -> Term {
+    contract_applied_lambdas(&simplify_branch_goal_keeping_refinements_uncontracted(
+        env, facts, ctx, term,
+    ))
+}
+
+/// Contract `App(Lam(_, body), arg)` to `body[arg]` throughout a term,
+/// including redexes a contraction exposes. No `_` arm: a new `Term` variant
+/// must decide whether it can carry a redex.
+fn contract_applied_lambdas(t: &Term) -> Term {
+    let b = |x: &Term| Box::new(contract_applied_lambdas(x));
+    match t {
+        Term::App(f, a) => {
+            let f = contract_applied_lambdas(f);
+            let a = contract_applied_lambdas(a);
+            if let Term::Lam(_, body) = &f {
+                contract_applied_lambdas(&subst0(body, &a))
+            } else {
+                Term::app(f, a)
+            }
+        }
+        Term::Var(_)
+        | Term::Type(_)
+        | Term::Omega(_)
+        | Term::Const { .. }
+        | Term::IndFormer { .. }
+        | Term::Constructor { .. }
+        | Term::IntLit(_) => t.clone(),
+        Term::Pi(a, c) => Term::pi(contract_applied_lambdas(a), contract_applied_lambdas(c)),
+        Term::Lam(a, c) => Term::lam(contract_applied_lambdas(a), contract_applied_lambdas(c)),
+        Term::Sigma(a, c) => Term::sigma(contract_applied_lambdas(a), contract_applied_lambdas(c)),
+        Term::Let { ty, val, body } => Term::Let {
+            ty: b(ty),
+            val: b(val),
+            body: b(body),
+        },
+        Term::Pair(x, y) => Term::pair(contract_applied_lambdas(x), contract_applied_lambdas(y)),
+        Term::Proj1(x) => Term::proj1(contract_applied_lambdas(x)),
+        Term::Proj2(x) => Term::proj2(contract_applied_lambdas(x)),
+        Term::Ascript(x, y) => Term::Ascript(b(x), b(y)),
+        Term::Eq(x, y, z) => Term::Eq(b(x), b(y), b(z)),
+        Term::Cast(w, x, y, z) => Term::Cast(b(w), b(x), b(y), b(z)),
+        Term::J(x, y, z) => Term::J(b(x), b(y), b(z)),
+        Term::Quot(x, y, z) => Term::Quot(b(x), b(y), b(z)),
+        Term::QuotClass(x) => Term::QuotClass(b(x)),
+        Term::Trunc(x) => Term::Trunc(b(x)),
+        Term::TruncProj(x) => Term::TruncProj(b(x)),
+        Term::Refl(x) => Term::Refl(b(x)),
+        Term::QuotElim {
+            motive,
+            method,
+            respect,
+            scrut,
+        } => Term::QuotElim {
+            motive: b(motive),
+            method: b(method),
+            respect: b(respect),
+            scrut: b(scrut),
+        },
+        Term::Elim {
+            fam,
+            level_args,
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+        } => Term::Elim {
+            fam: *fam,
+            level_args: level_args.clone(),
+            params: params.iter().map(contract_applied_lambdas).collect(),
+            motive: b(motive),
+            methods: methods.iter().map(contract_applied_lambdas).collect(),
+            indices: indices.iter().map(contract_applied_lambdas).collect(),
+            scrut: b(scrut),
+        },
+        Term::Absurd(x, y) => Term::Absurd(b(x), b(y)),
+    }
 }
 
 /// Enumerate distinct checked Const uses, including those below binders and
