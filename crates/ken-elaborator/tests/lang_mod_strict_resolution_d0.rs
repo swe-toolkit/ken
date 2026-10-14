@@ -501,6 +501,15 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // NatBox reuses the checked Boolean and natural-order providers;
+            // their four conjunction conveniences remain ambient in Strict.
+            "Algorithm.Geometry.NatBox".to_string(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
             // Graph reachability reuses the formal-languages search and
             // Finite provider; order reuses Derived.sort. Strict mode retains
             // the inherited compiler conveniences of those provider closures.

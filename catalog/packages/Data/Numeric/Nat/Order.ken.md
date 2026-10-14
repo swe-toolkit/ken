@@ -43,9 +43,9 @@ import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l)
 export Core.Classes.LawfulClasses (Ord, IsTrue, bool_or, leq_nat)
 ```
 
-`min` and `max` follow `leq_nat`'s recursion directly. Their private
-meet and join proofs split structural inputs before binding the order
-premises. The paired-successor branches reuse those premises at smaller
+`min` and `max` follow `leq_nat`'s recursion directly. Their meet and
+join proofs split structural inputs before binding the order premises.
+The paired-successor branches reuse those premises at smaller
 arguments; a positive bound against `Zero` contradicts its premise.
 `sub` is saturating natural-number subtraction; `compare` returns the
 three-way result `OrdResult`. Strict `lt_nat` recurses on its right
@@ -87,7 +87,7 @@ pub proof leq_right for min (m : Nat) (n : Nat) : IsTrue (leq_nat (min m n) n) =
       }
   }
 
-proof greatest for min
+pub proof greatest for min
       (k : Nat) (m : Nat) (n : Nat)
     : IsTrue (leq_nat k m) → IsTrue (leq_nat k n) → IsTrue (leq_nat k (min m n)) =
   match k {
@@ -135,7 +135,7 @@ pub proof right_leq for max (m : Nat) (n : Nat) : IsTrue (leq_nat n (max m n)) =
       }
   }
 
-proof least for max
+pub proof least for max
       (k : Nat) (m : Nat) (n : Nat)
     : IsTrue (leq_nat m k) → IsTrue (leq_nat n k) → IsTrue (leq_nat (max m n) k) =
   match m {
@@ -793,7 +793,7 @@ These conditional subtraction laws carry their Boolean hypotheses as `IsTrue`
 propositions, matching this package's order examples and letting downstream
 consumers pass canonical `leq_nat` evidence without restating the underlying
 Boolean equation.
-The four `min`/`max` bounds use the same form. The two private tightness
+The four `min`/`max` bounds use the same form. The two public tightness
 proofs complete these bounds: any common lower bound lies below `min`, and
 `max` lies below every common upper bound. The private `compare` proofs
 establish the missing result directions: self-comparison is `Eq`, a strict
@@ -855,7 +855,7 @@ argument and its bridge exposes the canonical successor relation.
    `max`, `sub`, `compare`, and `lt_nat` operations; their three zero computation
    facts; twelve attached `lt_nat` proofs; the successor and right-weakening
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
-   positive-right-multiplication order transports; the four `min`/`max` bounds;
+   positive-right-multiplication order transports; the six `min`/`max` bounds;
    the three `compare` agreements; and the five inductive
    `sub` proofs, including `sub::add_cancel`. `OrdResult` remains package-local.
 2. **Source map.**
