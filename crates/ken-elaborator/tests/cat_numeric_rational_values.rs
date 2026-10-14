@@ -58,7 +58,7 @@ fn checked(env: &mut ElabEnv, name: &str, proposition: &str) {
 }
 
 /// Promise class: durable invariant. MEASURED: the provider's 10 public
-/// declarations, exported constructor, and 23 public checked laws have owned
+/// declarations, exported constructor, and 25 public checked laws have owned
 /// GlobalIds; an independent generic client unpacks every law at its exact
 /// proposition; the exact trusted-ID set stays equal. CLAIMED: §§1–2.2 add a
 /// zero-trust importable rational value and all its generic obligations. THE
@@ -122,6 +122,8 @@ fn all_public_values_and_laws_import_generically_without_trust_growth() {
         "rational_leq::trans",
         "rational_leq::antisym",
         "rational_leq::total",
+        "rational_add_mono",
+        "rational_mul_mono",
     ] {
         let qualified = format!("{MODULE}.{name}");
         let id = *env
@@ -151,7 +153,8 @@ fn all_public_values_and_laws_import_generically_without_trust_growth() {
     env.elaborate_file(
         r#"import Data.Numeric.Rational
   (Rational, MkRational, numerator, denominator, rational_zero, rational_one,
-   rational_of_nat, rational_equiv, rational_add, rational_mul, rational_leq)
+   rational_of_nat, rational_equiv, rational_add, rational_mul, rational_leq,
+   rational_add_mono, rational_mul_mono)
 import Data.Numeric.Nat.Arithmetic (mul)
 import Data.Numeric.Nat.Order (lt_nat)
 
@@ -237,9 +240,21 @@ theorem client_leq_antisym (x : Rational) (y : Rational)
 theorem client_leq_total (x : Rational) (y : Rational)
   (xy_false : Equal Bool (rational_leq x y) False) :
   Equal Bool (rational_leq y x) True =
-  (proof total for rational_leq) x y xy_false"#,
+  (proof total for rational_leq) x y xy_false
+theorem client_add_mono (x : Rational) (y : Rational)
+  (z : Rational) (w : Rational)
+  (xy : Equal Bool (rational_leq x y) True)
+  (zw : Equal Bool (rational_leq z w) True) :
+  Equal Bool (rational_leq (rational_add x z) (rational_add y w)) True =
+  rational_add_mono x y z w xy zw
+theorem client_mul_mono (x : Rational) (y : Rational)
+  (z : Rational) (w : Rational)
+  (xy : Equal Bool (rational_leq x y) True)
+  (zw : Equal Bool (rational_leq z w) True) :
+  Equal Bool (rational_leq (rational_mul x z) (rational_mul y w)) True =
+  rational_mul_mono x y z w xy zw"#,
     )
-    .expect("all 23 public checked laws must inhabit generic client claims");
+    .expect("all 25 public checked laws must inhabit generic client claims");
 
     for private in [
         "positive_product_tail",
