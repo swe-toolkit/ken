@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT
 title: "No numerical-computing contract exists in spec/50-stdlib, so the catalog's next roadmap layer after geometry has nothing to build against. Author its chapter with a first exact section: closed intervals over non-negative rationals, with addition and multiplication proved to enclose their arguments' results at zero trust"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
