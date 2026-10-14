@@ -1,7 +1,7 @@
 ---
 id: LANG-CONVOY-EMBEDDED-SENTINEL-UNDER-BINDER
 title: "Since 295ff612e a planned embedded eliminator found under a binder gets its refinement sentinel installed at the wrong depth, so the raw sentinel index reaches the kernel as VarOutOfScope 2^40+k. Make the sentinel and companion installers depth-aware"
-status: ready
+status: merged
 owner: language
 size: S
 tier: T1
