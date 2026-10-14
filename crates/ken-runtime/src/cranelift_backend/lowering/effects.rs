@@ -3945,6 +3945,9 @@ impl<'a> Lowering<'a> {
         );
         if operation == ken_host::HostOpV1::ConsoleIsTerminal {
             Self::require_i64(builder, tag, wire.reply_bool_tag as i64);
+            // Static response ownership splits after the current block's last
+            // instruction, as on the HostResult arm below.
+            let _response_owner_endpoint = builder.ins().iconst(types::I64, 0);
             Ok(LoweringOperand::Specialized(Lowered::Bool {
                 value: detail,
                 known: None,
