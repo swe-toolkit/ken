@@ -3350,6 +3350,7 @@ fn install_embedded_method_sentinels(
         next_elim: &mut usize,
         seen: &mut [bool],
         repair_error: &std::cell::RefCell<Option<ElabError>>,
+        local: usize,
     ) -> Term {
         let env: &GlobalEnv = &*cx.env;
         let recur = |term: &Term, next_elim: &mut usize, seen: &mut [bool]| {
@@ -3364,6 +3365,22 @@ fn install_embedded_method_sentinels(
                 next_elim,
                 seen,
                 repair_error,
+                local,
+            )
+        };
+        let under = |term: &Term, next_elim: &mut usize, seen: &mut [bool]| {
+            go(
+                cx,
+                ctx,
+                term,
+                plan,
+                repairs,
+                slot_base,
+                plan_slots,
+                next_elim,
+                seen,
+                repair_error,
+                local + 1,
             )
         };
         match term {
@@ -3403,7 +3420,14 @@ fn install_embedded_method_sentinels(
                                 })
                         {
                             seen[plan_index] = true;
-                            index_refinement_sentinel(entry.sentinel_region, slot_base + plan_slots.map_or(plan_index, |slots| slots[plan_index]))
+                            weaken(
+                                &index_refinement_sentinel(
+                                    entry.sentinel_region,
+                                    slot_base
+                                        + plan_slots.map_or(plan_index, |slots| slots[plan_index]),
+                                ),
+                                local as i64,
+                            )
                         } else if repairs.contains(&(ordinal, method_ordinal)) {
                             let repaired_ty = env.inductive(*fam).and_then(|ind| {
                                 method_type(env, ind, method_ordinal, &motive, &params, level_args)
@@ -3439,13 +3463,13 @@ fn install_embedded_method_sentinels(
                     scrut,
                 }
             }
-            Term::Pi(a, b) => Term::pi(recur(a, next_elim, seen), recur(b, next_elim, seen)),
-            Term::Lam(a, b) => Term::lam(recur(a, next_elim, seen), recur(b, next_elim, seen)),
-            Term::Sigma(a, b) => Term::sigma(recur(a, next_elim, seen), recur(b, next_elim, seen)),
+            Term::Pi(a, b) => Term::pi(recur(a, next_elim, seen), under(b, next_elim, seen)),
+            Term::Lam(a, b) => Term::lam(recur(a, next_elim, seen), under(b, next_elim, seen)),
+            Term::Sigma(a, b) => Term::sigma(recur(a, next_elim, seen), under(b, next_elim, seen)),
             Term::Let { ty, val, body } => Term::Let {
                 ty: Box::new(recur(ty, next_elim, seen)),
                 val: Box::new(recur(val, next_elim, seen)),
-                body: Box::new(recur(body, next_elim, seen)),
+                body: Box::new(under(body, next_elim, seen)),
             },
             Term::App(f, a) => Term::app(recur(f, next_elim, seen), recur(a, next_elim, seen)),
             Term::Pair(a, b) => Term::pair(recur(a, next_elim, seen), recur(b, next_elim, seen)),
@@ -3525,6 +3549,7 @@ fn install_embedded_method_sentinels(
         &mut next_elim,
         &mut seen,
         &repair_error,
+        0,
     );
     if let Some(error) = repair_error.into_inner() {
         return Err(error);
@@ -3704,9 +3729,31 @@ fn install_embedded_index_equation_companions(
         plan_slots: Option<&[usize]>,
         next_elim: &mut usize,
         seen: &mut [bool],
+        local: usize,
     ) -> Term {
         let recur = |term: &Term, next_elim: &mut usize, seen: &mut [bool]| {
-            go(term, plan, slot_base, frame_depth, plan_slots, next_elim, seen)
+            go(
+                term,
+                plan,
+                slot_base,
+                frame_depth,
+                plan_slots,
+                next_elim,
+                seen,
+                local,
+            )
+        };
+        let under = |term: &Term, next_elim: &mut usize, seen: &mut [bool]| {
+            go(
+                term,
+                plan,
+                slot_base,
+                frame_depth,
+                plan_slots,
+                next_elim,
+                seen,
+                local + 1,
+            )
         };
         match term {
             Term::App(_, _) => {
@@ -3744,7 +3791,7 @@ fn install_embedded_index_equation_companions(
                         .expect("nonempty index-equation plan")
                         .1
                         .ambient_elim;
-                    let depth = frame_depth
+                    let depth = local + frame_depth
                         - entries
                             .peek()
                             .expect("nonempty index-equation plan")
@@ -3771,7 +3818,13 @@ fn install_embedded_index_equation_companions(
                         seen[i] = true;
                         moved = Term::app(
                             moved,
-                            index_refinement_sentinel(entry.sentinel_region, slot_base + plan_slots.map_or(i, |slots| slots[i])),
+                            weaken(
+                                &index_refinement_sentinel(
+                                    entry.sentinel_region,
+                                    slot_base + plan_slots.map_or(i, |slots| slots[i]),
+                                ),
+                                local as i64,
+                            ),
                         );
                     }
                     moved
@@ -3786,13 +3839,13 @@ fn install_embedded_index_equation_companions(
                 *next_elim += 1;
                 term.clone()
             }
-            Term::Pi(a, b) => Term::pi(recur(a, next_elim, seen), recur(b, next_elim, seen)),
-            Term::Lam(a, b) => Term::lam(recur(a, next_elim, seen), recur(b, next_elim, seen)),
-            Term::Sigma(a, b) => Term::sigma(recur(a, next_elim, seen), recur(b, next_elim, seen)),
+            Term::Pi(a, b) => Term::pi(recur(a, next_elim, seen), under(b, next_elim, seen)),
+            Term::Lam(a, b) => Term::lam(recur(a, next_elim, seen), under(b, next_elim, seen)),
+            Term::Sigma(a, b) => Term::sigma(recur(a, next_elim, seen), under(b, next_elim, seen)),
             Term::Let { ty, val, body } => Term::Let {
                 ty: Box::new(recur(ty, next_elim, seen)),
                 val: Box::new(recur(val, next_elim, seen)),
-                body: Box::new(recur(body, next_elim, seen)),
+                body: Box::new(under(body, next_elim, seen)),
             },
             Term::Pair(a, b) => Term::pair(recur(a, next_elim, seen), recur(b, next_elim, seen)),
             Term::Proj1(p) => Term::proj1(recur(p, next_elim, seen)),
@@ -3866,6 +3919,7 @@ fn install_embedded_index_equation_companions(
         plan_slots,
         &mut next_elim,
         &mut seen,
+        0,
     );
     if let Some(missing) = seen.iter().position(|seen| !seen) {
         return Err(ElabError::Internal(format!(
