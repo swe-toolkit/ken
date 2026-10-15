@@ -95,7 +95,7 @@ theorem window_preserves_tie_order :
     (trace_window Bool t2 t4 ordered_input) window_keeps_tie = Refl
 theorem window_equal_bounds_is_empty :
   Equal (List (Event Bool))
-    (trace_window Bool t3 t3 ordered_input) (Nil (Event Bool)) = Refl
+    (trace_window Bool t3 t3 ordered_input) (Nil (Event Bool)) = Proved
 theorem window_keeps_unordered_relative_order :
   Equal (List (Event Bool))
     (trace_window Bool t1 t4 scrambled_left) window_keeps_unordered = Refl
@@ -153,7 +153,7 @@ theorem seed_ordered_input : time_ordered Bool ordered_input =
     (Equal Bool (event_before Bool e1 e2) True)
     (time_ordered Bool
       (Cons (Event Bool) e2
-        (Cons (Event Bool) e3 (Cons (Event Bool) e3b (Nil (Event Bool)))))
+        (Cons (Event Bool) e3 (Cons (Event Bool) e3b (Nil (Event Bool))))))
     Proved seed_ordered_tail
 
 theorem seed_window_ordered :
