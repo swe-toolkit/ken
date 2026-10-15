@@ -4857,6 +4857,9 @@ fn compute_context_convoy(
 /// indefinitely under neutral scrutinees; this deliberately stops at stuck
 /// `Elim` nodes.
 fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
+    if branch_goal_budget_spent() {
+        return term.clone();
+    }
     // `whnf` erases an ascription, but the kernel reads one: a `J` infers its
     // motive and evidence through it. Keep it and simplify underneath.
     if let Term::Ascript(t, a) = term {
@@ -4866,6 +4869,9 @@ fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -
         );
     }
     let reduced = whnf(env, ctx, term);
+    if !charge_branch_goal_budget(&reduced) {
+        return term.clone();
+    }
     if matches!(reduced, Term::Sigma(..)) {
         if let Some((a, t, u)) = stated_equality(env, ctx, term) {
             return Term::Eq(
@@ -5115,6 +5121,63 @@ mod stated_equality_cycle_tests {
     }
 }
 
+/// Work allowance for one branch-goal simplification, in reduct nodes: a
+/// fixed allowance plus a per-node allowance on the goal. Each `whnf` reduct
+/// the simplifier visits is charged by its size, so the work and the result
+/// are linear in the goal. A goal whose simplification exceeds it is used
+/// unsimplified, which is convertible to the simplified form.
+const BRANCH_GOAL_BUDGET_BASE: usize = 16384;
+const BRANCH_GOAL_BUDGET_PER_NODE: usize = 64;
+
+thread_local! {
+    /// Remaining allowance of the running simplification; `None` outside one.
+    static BRANCH_GOAL_BUDGET: std::cell::Cell<Option<usize>> =
+        const { std::cell::Cell::new(None) };
+}
+
+fn branch_goal_budget_spent() -> bool {
+    BRANCH_GOAL_BUDGET.with(|budget| budget.get() == Some(0))
+}
+
+/// Charge a reduct against the running allowance. False once it is spent.
+fn charge_branch_goal_budget(reduct: &Term) -> bool {
+    BRANCH_GOAL_BUDGET.with(|budget| match budget.get() {
+        None => true,
+        Some(left) => {
+            let cost = bounded_term_size(reduct, left.saturating_add(1));
+            let rest = left.saturating_sub(cost);
+            budget.set(Some(rest));
+            cost <= left && rest > 0
+        }
+    })
+}
+
+/// The node count of `term`, counting no further than `limit`.
+fn bounded_term_size(term: &Term, limit: usize) -> usize {
+    let mut count = 0;
+    let mut stack = vec![term];
+    while let Some(next) = stack.pop() {
+        count += 1;
+        if count >= limit {
+            return count;
+        }
+        stack.extend(next.children());
+    }
+    count
+}
+
+/// Simplify `term` within its allowance, or `None` when the allowance ran out.
+#[inline(never)]
+fn simplify_branch_goal_within_budget(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<Term> {
+    let allowance = BRANCH_GOAL_BUDGET_BASE.saturating_add(
+        BRANCH_GOAL_BUDGET_PER_NODE.saturating_mul(bounded_term_size(term, usize::MAX)),
+    );
+    let outer = BRANCH_GOAL_BUDGET.with(|budget| budget.replace(Some(allowance)));
+    let simplified = simplify_branch_goal_unguarded(env, ctx, term);
+    let left = BRANCH_GOAL_BUDGET.with(|budget| budget.replace(outer));
+    (left != Some(0)).then_some(simplified)
+}
+
 /// Keep checked refinement identities rigid while exposing beta/iota and
 /// ordinary transparent heads needed by dependent branch goals.
 #[inline(never)]
@@ -5124,7 +5187,7 @@ fn simplify_branch_goal_keeping_refinements_uncontracted(
     let mut roots = Vec::new();
     collect_refinement_consts(facts, term, &mut roots);
     if roots.is_empty() {
-        return simplify_branch_goal_unguarded(env, ctx, term);
+        return simplify_branch_goal_within_budget(env, ctx, term).unwrap_or_else(|| term.clone());
     }
     let k = roots.len();
     let mut extended = ctx.clone();
@@ -5137,7 +5200,9 @@ fn simplify_branch_goal_keeping_refinements_uncontracted(
         .map(|(i, root)| (root.clone(), Term::var(k - 1 - i)))
         .collect();
     let abstracted = subst_term_generalize_many(&weaken(term, k as i64), &substitutions);
-    let mut out = simplify_branch_goal_unguarded(env, &extended, &abstracted);
+    let Some(mut out) = simplify_branch_goal_within_budget(env, &extended, &abstracted) else {
+        return term.clone();
+    };
     for root in roots.iter().rev() {
         out = subst0(&out, root);
     }
