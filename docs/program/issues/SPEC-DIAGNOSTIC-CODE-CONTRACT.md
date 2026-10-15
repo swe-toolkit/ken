@@ -36,13 +36,12 @@ implementation's own ledger.
   - seven native cause families N0001-N0007, defined by meaning.
 
   The spec may respell the codes once, before rendering lands.
-- **The C domain has a population with no carrier yet** (Architect
-  `evt_7pc8f6x3x9z9q`, on Adversary F2). At `ed41114df`,
-  `crates/ken-cli/src/main.rs` has 19 exit paths with no coded carrier:
-  10 `process::exit` sites and 9 `return 1` paths. They cover argument
-  parsing, the unknown subcommand, unreadable files and paths, native-build
-  profiles and every `fmt` failure. DIAG increment 3 codes them as `C`
-  through one `CliError`, and needs this section to define the domain.
+- **The C and H domains have a population with no carrier yet** (spec
+  D0 `evt_5gjsaxr0t1xvg`, correcting `evt_7pc8f6x3x9z9q`). At `74dd59d20`
+  there are 21 C sites in ken-cli `main.rs` and 3 H sites in ken-cli
+  `lib.rs` on the `ken run` path. The domain is chosen by carrier, so the
+  `native-build` build error and the `fmt` formatting error are E. DIAG
+  increment 3 codes this population and needs this section to define C.
 - **Unsettled, and this section's to decide or defer:** a JSON form
   (for example mirroring `ken.verify/v1`), more than one diagnostic per
   run, and warnings.

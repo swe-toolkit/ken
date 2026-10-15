@@ -69,8 +69,20 @@ work (operator 2026-08-06):
      the D0's membership rule; `planner_error` maps to N0003 and
      `planner_capacity_error` to N0002.
    - No site changes carrier variant.
-3. **CLI rendering**, only after `SPEC-DIAGNOSTIC-CODE-CONTRACT` lands.
-   - The first stderr line becomes `error[<code>]: <message>`.
+3. **CLI rendering**, only after `SPEC-DIAGNOSTIC-CODE-CONTRACT` lands,
+   and as that section states it (spec D0 `evt_5gjsaxr0t1xvg`).
+   - Every coded failure prints a whole stderr line
+     `error[<code>]: <message>`. Its position on stderr is not pinned.
+   - The population with no carrier yet, measured at `74dd59d20`:
+     - 21 C sites in ken-cli `main.rs`, coded through one `CliError`.
+       These are 17 exit-path diagnostics and the 4 `fmt` per-path
+       diagnostics.
+     - 3 H sites in ken-cli `lib.rs` on the `ken run` path, coded by
+       projection from ken-host's `TerminalErrorV1` with no ken-host
+       change. Two of them exit 1 with no message today.
+     - The `native-build` build error and the `fmt` formatting error stay
+       E. The dead `run` arm at `main.rs:409` is deleted.
+   - Coded failures exit 1. `main.rs:502` and `:517` change from 2.
    - Tests that identify a failure migrate to codes.
    - px7f:741 asserts N0004.
 
@@ -90,6 +102,9 @@ work (operator 2026-08-06):
 - **AC-4 (no behaviour change).** Interpreter and native results, exit
   statuses and `trusted_base()` are unchanged, and ken-kernel and
   ken-host sources are byte-identical. CI is green on each increment.
+  Increment 3 is the one exception, and only as the spec section rules:
+  the coded line, exit status 1 at `main.rs:502` and `:517`, and messages
+  on the two silent H sites.
 
 ## Stop conditions
 
