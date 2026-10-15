@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-EVENT-TRACE-CONTRACT
 title: "No time, event or trace contract exists in spec/50-stdlib, so the catalog's next roadmap layer after numerical computing has nothing to build against. Author its chapter with a first exact section: finite event traces over natural timestamps, with ordering and merge laws proved at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
