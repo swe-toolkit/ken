@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+mod diagnostic_codes;
 pub mod eval;
 pub mod proof_erasure_checker;
 

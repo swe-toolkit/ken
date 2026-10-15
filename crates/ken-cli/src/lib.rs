@@ -2,6 +2,8 @@
 
 use std::rc::Rc;
 
+mod diagnostic_codes;
+
 /// Selects the source front end used by run_program.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceFormat {

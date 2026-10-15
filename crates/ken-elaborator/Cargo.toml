@@ -14,6 +14,7 @@ r3-4b-observation = ["ken-runtime/r3-4b-observation"]
 z3-process = []
 
 [dependencies]
+ken-diagnostic = { path = "../ken-diagnostic" }
 ken-host = { path = "../ken-host" }
 ken-kernel = { path = "../ken-kernel" }
 ken-runtime = { path = "../ken-runtime" }

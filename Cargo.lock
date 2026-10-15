@@ -599,6 +599,7 @@ dependencies = [
 name = "ken-cli"
 version = "0.0.0"
 dependencies = [
+ "ken-diagnostic",
  "ken-elaborator",
  "ken-interp",
  "ken-kernel",
@@ -608,9 +609,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ken-diagnostic"
+version = "0.0.0"
+
+[[package]]
 name = "ken-elaborator"
 version = "0.0.0"
 dependencies = [
+ "ken-diagnostic",
  "ken-host",
  "ken-interp",
  "ken-kernel",
@@ -643,6 +649,7 @@ dependencies = [
 name = "ken-interp"
 version = "0.0.0"
 dependencies = [
+ "ken-diagnostic",
  "ken-elaborator",
  "ken-host",
  "ken-kernel",
