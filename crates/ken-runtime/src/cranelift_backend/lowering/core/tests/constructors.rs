@@ -1,6 +1,7 @@
 //! Constructor-field, dynamic-constructor, nested-computational and
 //! heterogeneous-eliminator lowering tests (RT-SPLIT §10.2 -> `constructors`).
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 // Ruled test module: imports permitted here (AC-8 class 2).
@@ -156,7 +157,7 @@ fn run_dynamic_constructor_dispatch_fixture(
     signature.returns.push(AbiParam::new(types::I64));
     let func_id = module
         .declare_function("px7p_dynamic_dispatch", Linkage::Local, &signature)
-        .map_err(|error| backend_module(error.to_string()))?;
+        .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
     let mut context = module.make_context();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
@@ -360,7 +361,7 @@ fn run_dynamic_constructor_dispatch_fixture(
     verify_cranelift_function(&context.func, module.isa())?;
     module
         .define_function(func_id, &mut context)
-        .map_err(|error| backend_module(error.to_string()))?;
+        .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
     let carrier_identity_catalog = compiler
         .static_transition_plan
@@ -459,8 +460,7 @@ fn dynamic_constructor_duplicate_tag_and_identity_reject_exactly() {
         duplicate_tag,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "DynamicConstructor",
-            reason,
-        }) if reason == "duplicate alternative tag 0"
+            reason, .. }) if reason == "duplicate alternative tag 0"
     ));
 
     let duplicate_identity = validate_dynamic_constructor_alternatives([
@@ -472,8 +472,7 @@ fn dynamic_constructor_duplicate_tag_and_identity_reject_exactly() {
         duplicate_identity,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "DynamicConstructor",
-            reason,
-        }) if reason == "duplicate alternative constructor ctor:fixture::Dynamic::A"
+            reason, .. }) if reason == "duplicate alternative constructor ctor:fixture::Dynamic::A"
     ));
 }
 #[test]
@@ -787,8 +786,7 @@ fn dynamic_host_result_producer_wrong_arity_rejects_specifically() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        }) if reason == "dynamic HostResult tree producer case ctor:prelude::Result::Ok expects exactly one binder, got 0"
+            reason, .. }) if reason == "dynamic HostResult tree producer case ctor:prelude::Result::Ok expects exactly one binder, got 0"
     ));
 }
 #[test]
@@ -828,8 +826,7 @@ fn nested_computational_outer_arity_rejects_specifically() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        }) if reason == "case ctor:fixture::Aggregate::Ok expects 0 constructor arguments but value has 1"
+            reason, .. }) if reason == "case ctor:fixture::Aggregate::Ok expects 0 constructor arguments but value has 1"
     ));
 }
 #[test]
@@ -843,8 +840,7 @@ fn nested_computational_malformed_recursive_position_rejects_specifically() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        }) if reason == "case ctor:fixture::Inner::TrueLeaf has malformed recursive position 1"
+            reason, .. }) if reason == "case ctor:fixture::Inner::TrueLeaf has malformed recursive position 1"
     ));
 }
 #[test]
@@ -868,8 +864,7 @@ fn nested_computational_payload_kind_rejects_specifically() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "PrimitiveCall",
-            reason,
-        }) if reason == "sub_int only supports Int arguments in native lowering"
+            reason, .. }) if reason == "sub_int only supports Int arguments in native lowering"
     ));
 }
 #[test]
@@ -1079,8 +1074,7 @@ fn constructor_field_binder_shift_mutation_recovers_exact_refusal() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+            ref reason, .. }) if reason == "dynamic arms must produce scalar Int or Bool values"
     ), "{err:?}");
 
     // The earlier gate masks this independent mutation in the Result family.
@@ -1101,8 +1095,7 @@ fn constructor_field_binder_shift_mutation_recovers_exact_refusal() {
         mutated,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Match",
-            ref reason,
-        }) if reason == "scrutinee is not a constructor value"
+            ref reason, .. }) if reason == "scrutinee is not a constructor value"
     ), "{mutated:?}");
 }
 #[test]
@@ -1135,8 +1128,7 @@ fn constructor_field_bridge_removal_recovers_exact_refusal() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+            ref reason, .. }) if reason == "dynamic arms must produce scalar Int or Bool values"
     ), "{err:?}");
     assert!(
         refusal_observations.is_empty(),
@@ -1175,8 +1167,7 @@ fn constructor_field_bridge_removal_recovers_exact_refusal() {
         removed,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Match",
-            ref reason,
-        }) if reason == "scrutinee is not a constructor value"
+            ref reason, .. }) if reason == "scrutinee is not a constructor value"
     ), "{removed:?}");
     assert_eq!(
         observations,
@@ -1198,8 +1189,7 @@ fn constructor_field_outer_arity_rejects_before_field_lowering() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        }) if reason == "case ctor:fixture::Envelope::Wrap expects 1 constructor arguments but value has 2"
+            reason, .. }) if reason == "case ctor:fixture::Envelope::Wrap expects 1 constructor arguments but value has 2"
     ));
 }
 #[test]
@@ -1272,8 +1262,7 @@ fn constructor_field_aggregate_unconsumed_sibling_refuses_nonexit_projection() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+            ref reason, .. }) if reason == "dynamic arms must produce scalar Int or Bool values"
     ), "{err:?}");
 }
 #[test]
@@ -1352,8 +1341,7 @@ fn dynamic_constructor_binder_arity_rejects_exactly() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "DynamicConstructor",
-            reason,
-        }) if reason == "case ctor:prelude::IOError::Other expects 1 binders but alternative has 0 fields"
+            reason, .. }) if reason == "case ctor:prelude::IOError::Other expects 1 binders but alternative has 0 fields"
     ));
 }
 #[test]
@@ -1572,8 +1560,7 @@ fn heterogeneous_final_merge_kind_is_deferred_to_the_runtime_discriminator() {
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Match",
-            ref reason,
-        }) if reason == "dynamic arms must produce scalar Int or Bool values"
+            ref reason, .. }) if reason == "dynamic arms must produce scalar Int or Bool values"
     ), "{err:?}");
 }
 #[test]
@@ -2118,7 +2105,7 @@ fn emit_process_entrypoint_object_with_symbols(
         .module
         .finish()
         .emit()
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let object_hash = fnv1a_64(&object_bytes);
     Ok(CraneliftObjectArtifact {
         example: "native-process-entrypoint".to_string(),
@@ -3587,11 +3574,12 @@ fn generated_context_pairing_refuses_raw_owner_header_mismatch() {
         .expect_err("a 2+4 raw header cannot describe five context parameters");
     assert_eq!(
         error,
-        CraneliftBackendError::Backend(BackendFailure::Module(
-            "a generated context's Parameter run holds 5 operands, but its raw owner declares 2 \
+        CraneliftBackendError::Backend(BackendFailure::Module {
+            reason: "a generated context's Parameter run holds 5 operands, but its raw owner declares 2 \
              parameters plus 4 captures"
                 .to_string(),
-        ))
+            cause: LoweringCause::PlannerInvariant,
+        })
     );
 }
 
@@ -4042,7 +4030,7 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
                 None,
             )?;
             let LoweringOperand::Carried(observed) = lowered else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "HostResult",
                     "the separately generated consumer recovered a compile-time template",
                 ));
@@ -6869,8 +6857,7 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
             destination_error,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "CheckedIhEnvironmentTransport",
-                ref reason,
-            }) if reason.contains("force-materialization target was not declared")
+                ref reason, .. }) if reason.contains("force-materialization target was not declared")
         ),
         "the same owner must enter the production transport call and stop only at \
          the bare fixture's deliberately absent function-local target: {destination_error:?}"
@@ -6897,10 +6884,10 @@ fn invocation_return_transport_selection_is_per_producer_in_production() {
                 &[EliminatorFrame::InvocationReturn],
             )? {
                 LoweringOperand::Carried(word) => Ok(word.word),
-                LoweringOperand::Residual(_) => Err(unsupported(
+                LoweringOperand::Residual(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "InvocationReturn", "a transport-free ordinary return cannot carry an R",
                 )),
-                LoweringOperand::Specialized(other) => Err(unsupported(
+                LoweringOperand::Specialized(other) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "InvocationReturn",
                     format!(
                         "the transport-free mixed-owner producer returned specialized {}",
@@ -7035,8 +7022,7 @@ fn mixed_recursive_carrier_boxed_member_is_refused_before_lowering() {
     let (result, counters) = with_residual_lowering_counters(|| compile_expr(&call, &env));
     match result {
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-            construct: "RecursiveResidual", reason,
-        })) => assert_eq!(reason, "a Boxed carrier member has no executed consumer"),
+            construct: "RecursiveResidual", reason, .. })) => assert_eq!(reason, "a Boxed carrier member has no executed consumer"),
         Err(error) => panic!("the Boxed member reached another refusal: {error:?}"),
         Ok(_) => panic!("the Boxed member compiled without an executed consumer"),
     }

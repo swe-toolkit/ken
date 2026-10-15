@@ -2,6 +2,7 @@
 //! source-install lowering tests (RT-SPLIT §10.2: `oriented_*`, `px8j_*`,
 //! root-authority, join-site, source-install and recursor tests -> `control`).
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 use crate::cranelift_backend::lowering::units::{
     continuation_case_binder_run, ContinuationCaseBinderSource,
@@ -73,8 +74,7 @@ fn carried_producer_match_reentry_admits_limit_and_refuses_first_excess() {
         if rejected {
             assert!(matches!(result,
                 Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    construct: "BoundaryCarrier", reason,
-                })) if reason == "a carried producer match's pending eliminators exceeded the bounded re-entry depth"
+                    construct: "BoundaryCarrier", reason, .. })) if reason == "a carried producer match's pending eliminators exceeded the bounded re-entry depth"
             ), "the first excess must refuse at the producer guard");
         } else {
             assert!(matches!(result,
@@ -143,8 +143,7 @@ fn carried_ordinary_suffix_reentry_admits_limit_and_refuses_first_excess() {
         if rejected {
             assert!(matches!(result,
                 Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    construct: "BoundaryCarrier", reason,
-                })) if reason.contains("a carried ordinary elimination's composed suffix exceeded")
+                    construct: "BoundaryCarrier", reason, .. })) if reason.contains("a carried ordinary elimination's composed suffix exceeded")
             ), "the first excess must refuse at the ordinary guard");
         } else {
             assert!(matches!(result,
@@ -242,8 +241,7 @@ fn recursive_backedge_refusal_does_not_mark_scalar_admission() {
         error,
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "RecursiveBackedge",
-            reason,
-        })) if reason == "a carried word cannot mint a recursive-backedge control marker"
+            reason, .. })) if reason == "a carried word cannot mint a recursive-backedge control marker"
     ));
     assert!(!lowering.scalar_operand_refused);
     assert_eq!(refused.get(), None);
@@ -318,8 +316,7 @@ fn result_origin_and_exit_payload_independently_guard_ret_scalar_join() {
                     result,
                     Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
                         construct: "a seeded result-position join",
-                        reason,
-                    })) if reason == "dynamic arms must produce scalar Int or Bool values"
+                        reason, .. })) if reason == "dynamic arms must produce scalar Int or Bool values"
                 ),
                 "{selected} {exit}"
             );
@@ -376,8 +373,7 @@ fn direct_lowering_without_feedback_cell_returns_original_refusal() {
         result,
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Match",
-            reason,
-        })) if reason == "dynamic arms must produce scalar Int or Bool values"
+            reason, .. })) if reason == "dynamic arms must produce scalar Int or Bool values"
     ));
     assert_eq!(merge_kind, None);
 }
@@ -561,7 +557,7 @@ fn run_px8j_malformed_recursor_consumer(
     signature.returns.push(AbiParam::new(types::I64));
     let func_id = module
         .declare_function("px8j_malformed_recursor", Linkage::Local, &signature)
-        .map_err(|error| backend_module(error.to_string()))?;
+        .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
     let mut context = module.make_context();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
@@ -941,8 +937,7 @@ fn oriented_dynamic_edge_mutations_reject_through_named_lanes() {
                     error,
                     CraneliftBackendError::Unsupported(UnsupportedLowering {
                         construct: "OrientedSubcontinuationPlanV1",
-                        ref reason,
-                    }) if reason.contains(expected)
+                        ref reason, .. }) if reason.contains(expected)
                 ),
                 "expected {expected:?}, got {error:?}"
             );
@@ -1107,7 +1102,7 @@ fn run_px8ds_edge_consumer(
     signature.returns.push(AbiParam::new(types::I64));
     let func_id = module
         .declare_function("px8ds_edge_consumer", Linkage::Local, &signature)
-        .map_err(|error| backend_module(error.to_string()))?;
+        .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
     let mut context = module.make_context();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
@@ -1159,8 +1154,7 @@ fn oriented_edge_mutations_reject_in_all_three_direct_consumers() {
                     error,
                     CraneliftBackendError::Unsupported(UnsupportedLowering {
                         construct: "OrientedSubcontinuationPlanV1",
-                        ref reason,
-                    }) if reason.contains(expected)
+                        ref reason, .. }) if reason.contains(expected)
                 ),
                 "{consumer:?}/{mutation:?}: expected {expected:?}, got {error:?}"
             );
@@ -1233,8 +1227,7 @@ fn rt_escape_within_path_duplicate_frame_consume_still_rejects() {
             err,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "OrientedSubcontinuationPlanV1",
-                ref reason,
-            }) if reason == &format!(
+                ref reason, .. }) if reason == &format!(
                 "checked Runtime frame violations: {{(0, {frame_id}): {{E2}}}}"
             )
         ),
@@ -1367,8 +1360,7 @@ fn px8j_all_three_direct_consumers_propagate_the_role_validator() {
                 error,
                 CraneliftBackendError::Unsupported(UnsupportedLowering {
                     construct: "ComputationalRecursor",
-                    ref reason,
-                }) if reason == "recursor selection role does not select the invocation origin"
+                    ref reason, .. }) if reason == "recursor selection role does not select the invocation origin"
             ),
             "{consumer:?}: {error:?}"
         );
@@ -1399,8 +1391,7 @@ fn px8j_release_validator_rejects_repeated_and_broken_scope_lineage() {
                 error,
                 CraneliftBackendError::Unsupported(UnsupportedLowering {
                     construct: "ComputationalRecursor",
-                    ref reason,
-                }) if reason == expected_reason
+                    ref reason, .. }) if reason == expected_reason
             ),
             "{malformation:?}: {error:?}"
         );
@@ -1477,8 +1468,7 @@ fn oriented_endpoint_corruption_and_affine_reuse_fail_closed() {
         error,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "OrientedSubcontinuationPlanV1",
-            reason,
-        }) if reason.contains("endpoints do not compose")
+            reason, .. }) if reason.contains("endpoints do not compose")
     ));
 
     let mut capability = AffineSpliceCapability {
@@ -1815,7 +1805,7 @@ fn px8j_siblings_share_an_origin_and_nested_ih_gets_a_child_origin() {
         px8j_capture_source_trace(&expression, false, "ken_px8j_live_sibling_origins");
     assert!(matches!(
         result,
-        Err(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
+        Err(CraneliftBackendError::Backend(BackendFailure::Module { reason, .. }))
             if reason == "the selected case has a recursive position 1 that the continuation \
                 specialization projects no worker for, so its induction-hypothesis prefix \
                 cannot be built"
@@ -2314,8 +2304,7 @@ fn unmarked_equal_shape_frame_cannot_consume_retained_join_site() {
         error,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "NativeJoinPlanV1",
-            reason,
-        }) if reason.contains("unconsumed or orphan site")
+            reason, .. }) if reason.contains("unconsumed or orphan site")
     ));
 }
 pub(in crate::cranelift_backend::lowering) fn px8j_scope_chain_observation_result(transform_layers: usize, input_depth: usize) -> RuntimeExpr {
@@ -2541,8 +2530,7 @@ fn px8j_one_two_three_scope_segments_reach_selection_hole_and_unwind() {
             result,
             Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "StaticWorkerBinding",
-                reason,
-            })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
+                reason, .. })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
                 && reason.contains("has no runtime representation")
         ), "scope depth {depth} must retain its measured conservation refusal");
     }
@@ -2567,15 +2555,13 @@ fn px8j_selected_scope_partitions_differ_across_the_real_return_hole() {
         before_result,
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+            reason, .. })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
     ));
     assert!(matches!(
         after_result,
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "StaticWorkerBinding",
-            reason,
-        })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
+            reason, .. })) if reason.contains("this recognition's own transport never reaches a consumer at an exact-Var call")
             && reason.contains("has no runtime representation")
     ));
 }
@@ -2770,8 +2756,7 @@ fn distinguished_root_cannot_discharge_missing_match_site_marker() {
             error,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "NativeJoinPlanV1",
-                ref reason,
-            }) if reason.contains("root cannot consume an active match occurrence marker")
+                ref reason, .. }) if reason.contains("root cannot consume an active match occurrence marker")
         ),
         "{error:?}"
     );
@@ -2876,8 +2861,7 @@ fn checked_join_marker_without_exact_plan_site_rejects_before_emission() {
         error,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "NativeJoinPlanV1",
-            reason,
-        }) if reason.contains("marker was not consumed")
+            reason, .. }) if reason.contains("marker was not consumed")
     ));
 }
 #[test]
@@ -2906,8 +2890,7 @@ fn process_lowering_without_checked_root_authority_rejects_before_cfg() {
         error,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "NativeJoinPlanV1",
-            reason,
-        }) if reason == "process-object lowering has no checked distinguished-root answer authority"
+            reason, .. }) if reason == "process-object lowering has no checked distinguished-root answer authority"
     ));
 }
 #[test]
@@ -2939,8 +2922,7 @@ fn checked_marker_census_rejects_duplicate_call_and_slot_occurrences_before_cfg(
                 error,
                 CraneliftBackendError::Unsupported(UnsupportedLowering {
                     construct: "OrientedSubcontinuationPlanV1",
-                    ref reason,
-                }) if reason.contains(expected)
+                    ref reason, .. }) if reason.contains(expected)
             ),
             "{error:?}"
         );
@@ -2978,8 +2960,7 @@ fn valid_root_plus_missing_marked_scalar_cut_rejects_before_emission() {
             error,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "NativeJoinPlanV1",
-                ref reason,
-            }) if reason.contains("marker was not consumed")
+                ref reason, .. }) if reason.contains("marker was not consumed")
         ),
         "{error:?}"
     );
@@ -3013,8 +2994,7 @@ fn self_consistent_appended_orphan_join_site_rejects_before_emission() {
         error,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "NativeJoinPlanV1",
-            reason,
-        }) if reason.contains("unconsumed or orphan site")
+            reason, .. }) if reason.contains("unconsumed or orphan site")
     ));
 }
 #[test]
@@ -3867,8 +3847,7 @@ fn refusal_pins_rehomed_static_worker_without_selector_exclusion() {
         refused,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "StaticWorkerBinding",
-            reason,
-        }) if reason == expected_reason
+            reason, .. }) if reason == expected_reason
     ));
 }
 

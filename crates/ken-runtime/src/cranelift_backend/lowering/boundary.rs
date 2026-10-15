@@ -17,6 +17,7 @@
 //! `Lowered`'s bare-private variants via descendant-of-`mod.rs` visibility —
 //! zero widening, the item-10 hub-stays/methods-move shape.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 #[cfg(test)]
@@ -1042,18 +1043,18 @@ impl Lowered {
                     "  BOUNDARY-REFUSAL first closure child variant={}",
                     lowered_value_kind(self)
                 ));
-                Err(unsupported(
+                Err(unsupported(LoweringCause::Fragment,
                     "Closure",
                     "a closure cannot cross the boundary: it is runtime-local and \
                      live-domain only, and it has no durable lane",
                 ))
             }
-            Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(
+            Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "a computational recursor closure names an in-flight activation, \
                  not a transferable value",
             )),
-            Lowered::StaticResponseDeferred { .. } => Err(unsupported(
+            Lowered::StaticResponseDeferred { .. } => Err(unsupported(LoweringCause::Fragment,
                 "StaticResponseDeferred",
                 "a deferred host response is compiler control and can only enter its exact response owner",
             )),
@@ -1462,7 +1463,7 @@ mod tests {
     fn c1_d5_a_closure_is_inadmissible_at_the_root_and_at_every_depth() {
         // Promise class: durable invariant.
         let origin = c1_closure_fixture_origin();
-        let expected = unsupported(
+        let expected = unsupported(LoweringCause::Fragment,
             "Closure",
             "a closure cannot cross the boundary: it is runtime-local and \
              live-domain only, and it has no durable lane",
@@ -2772,8 +2773,7 @@ mod tests {
             refused,
             CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct: "ComputationalMatch",
-                reason,
-            }) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+                reason, .. }) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
         ));
     }
 }

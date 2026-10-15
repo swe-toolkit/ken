@@ -52,8 +52,7 @@ fn d2f_a_production_compile_builds_the_fusion_identity_plane() {
         result,
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+            reason, .. })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
     ), "the plane must be observed before the fixture's measured D8 refusal");
     let planes = crate::cranelift_backend::lowering::core::d2f_production_fusion_planes_take();
     // THE WHOLE CLAIM, and it is one line on purpose. Delete the production
@@ -390,7 +389,7 @@ fn d2f_armed_compile_completes_and_its_populations_are_pinned() {
     assert!(
         matches!(
             &unarmed,
-            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
                 if *construct == "ComputationalMatch" && reason.contains("in-flight activation")
         ),
         "the POSITIVE control for the arm: unarmed, the same root must still reach the ordinary \
@@ -478,8 +477,7 @@ fn r3_fused_parameter_projection_refuses_before_claim_consumption() {
             None => "completed",
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct,
-                reason,
-            })) if *construct == "StaticContinuationFusion"
+                reason, .. })) if *construct == "StaticContinuationFusion"
                 && reason.contains("visited argument origins") =>
             {
                 "visited-origin refusal"
@@ -646,7 +644,7 @@ fn r3_fused_worker_body_refuses_before_claim_consumption() {
     fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
         match error {
             None => "completed",
-            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
                 if *construct == "StaticContinuationFusion"
                     && reason.contains("checked worker body")
                     && reason.contains("is not the claim's producer body") =>
@@ -780,7 +778,7 @@ fn r3_fused_wrong_consuming_call_refuses_before_claim_consumption() {
     fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
         match error {
             None => "completed",
-            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
                 if *construct == "StaticContinuationFusion"
                     && reason.contains("selected fused consuming Call occurrence")
                     && reason.contains("not the claim's exact consuming Call") =>
@@ -1076,7 +1074,7 @@ fn r3_fused_late_call_build_refusal_keeps_claim_outstanding() {
     fn classify(error: &Option<CraneliftBackendError>) -> &'static str {
         match error {
             None => "completed",
-            Some(CraneliftBackendError::Backend(BackendFailure::Module(reason)))
+            Some(CraneliftBackendError::Backend(BackendFailure::Module { reason, .. }))
                 if reason == "callee frame is missing a declared input" =>
             {
                 "late call-build refusal"
@@ -1227,8 +1225,7 @@ fn r3_fused_post_field_direct_call_reintroduction_refuses_before_emission() {
             None => "completed",
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct,
-                reason,
-            })) if *construct == "StaticContinuationFusion"
+                reason, .. })) if *construct == "StaticContinuationFusion"
                 && reason.contains("reintroduced directly")
                 && reason.contains("post-field seam") =>
             {
@@ -1380,8 +1377,7 @@ fn r3_fused_outer_selector_refuses_an_escaped_selected_claim() {
             None => "completed",
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct,
-                reason,
-            })) if *construct == "StaticContinuationFusion"
+                reason, .. })) if *construct == "StaticContinuationFusion"
                 && reason.contains("selected region claim")
                 && reason.contains("no longer outstanding after closure") =>
             {
@@ -1537,8 +1533,7 @@ fn r3_fused_capture_projection_refuses_before_emission() {
             None => "completed",
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct,
-                reason,
-            })) if *construct == "StaticContinuationFusion"
+                reason, .. })) if *construct == "StaticContinuationFusion"
                 && reason.contains("capture suffix")
                 && reason.contains("exact ordered input projection") =>
             {
@@ -1742,8 +1737,7 @@ fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct,
-                reason,
-            })) if *construct == "ComputationalMatch" && reason.contains(
+                reason, .. })) if *construct == "ComputationalMatch" && reason.contains(
                 "case ctor:fixture::D2gOut::Node expects 1 constructor arguments but value has 2"
             )
         ),
@@ -2178,7 +2172,7 @@ fn d2f_0_the_applied_root_production_path_gate() {
         assert!(
             matches!(
                 error,
-                Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
                     if *construct == "ComputationalMatch"
                         && reason.contains("in-flight activation")
             ),
@@ -2227,8 +2221,7 @@ fn d2f_0_the_applied_root_production_path_gate() {
         seed_result,
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+            reason, .. })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
     ), "the seed must reach the builder before its measured D8 refusal");
     let seed = match d2f_gate_arrivals_take().as_slice() {
         [only] => only.clone(),
@@ -2287,7 +2280,7 @@ fn d2f_0_the_applied_root_production_path_gate() {
         };
         let named_its_own_authority = matches!(
             &error,
-            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
                 if *construct == "OrientedSubcontinuationPlanV1" && reason.contains(expected)
         );
         (
@@ -2749,7 +2742,7 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
     );
     let withheld_refuses_for_missing_metadata = matches!(
         &withheld,
-        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
             if *construct == "OrientedSubcontinuationPlanV1"
                 && reason.contains("no checked plan metadata")
     );
@@ -2765,8 +2758,7 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
         seed_result,
         Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason,
-        })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
+            reason, .. })) if reason == "a computational recursor closure names an in-flight activation, not a transferable value"
     ), "the seed must reach the builder before its measured D8 refusal");
     let seed = match d2f_gate_arrivals_take().as_slice() {
         [only] => only.clone(),
@@ -2795,7 +2787,7 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
     let (stripped_arrivals, stripped_error) = compile_cause(D2jCause::Frame, "ken_r3_d0_stripped");
     let stripped_refusal = matches!(
         &stripped_error,
-        Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+        Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
             if *construct == "OrientedSubcontinuationPlanV1"
                 && reason.contains("frame marker is missing or transplanted")
     );
@@ -2861,7 +2853,7 @@ fn d0_r3_fusion_gate_resolves_zero_for_the_seed_and_one_for_the_checked_twin() {
     assert!(
         matches!(
             &positive_error,
-            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+            Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
                 if *construct == "ComputationalMatch"
                     && reason.contains("in-flight activation")
         ),

@@ -40,6 +40,7 @@
 //! `super::CAPACITY_PHASE_DISPATCH` -- updated to `super::effects::
 //! CAPACITY_PHASE_DISPATCH` as part of this transport.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 // `masked_reply_response_bytes` stays in the retained `core.rs` (a sibling
@@ -384,7 +385,7 @@ impl<'a> Lowering<'a> {
             return Ok(None);
         };
         let function = function.ok_or_else(|| {
-            backend_module(
+            backend_module(LoweringCause::PlannerInvariant,
                 "a host effect occurrence was visited inside the emission pass with no declared \
                  function open, so its claim group has no body to be scoped by"
                     .to_string(),
@@ -619,7 +620,7 @@ impl<'a> Lowering<'a> {
                 self.disposition_dead_arm_joins(effect_origin)?;
                 return Ok(SeatClaimOutcome::UnreachableArm);
             }
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "Effect",
                 format!(
                     "seat {slot:?} of {:?} needs {:?}, which it cannot observe in {observed:?}",
@@ -808,19 +809,19 @@ impl EffectSeatLedger {
         planned: BTreeSet<EffectSeatSlot>,
     ) -> Result<EffectSeatGroupId, CraneliftBackendError> {
         if let Some(open) = &self.open {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {:?} is still open while a visit to {effect_origin:?} \
                  starts, so a seat could be claimed into the wrong visit",
                 open.effect_origin
             )));
         }
         if planned.is_empty() && operation != ken_host::HostOpV1::ClockWallNow {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {effect_origin:?} is visited but plans no seat at all"
             )));
         }
         if operation == ken_host::HostOpV1::ClockWallNow && !planned.is_empty() {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: zero-arity ClockWallNow \
                  {effect_origin:?} planned unexpected seats {planned:?}"
             )));
@@ -845,14 +846,14 @@ impl EffectSeatLedger {
         group: EffectSeatGroupId,
     ) -> Result<&mut OpenEffectSeatGroup, CraneliftBackendError> {
         let open = self.open.as_mut().ok_or_else(|| {
-            backend_module(
+            backend_module(LoweringCause::PlannerInvariant,
                 "host effect seat ledger: a seat was claimed with no open visit, so it belongs \
                  to no group"
                     .to_string(),
             )
         })?;
         if open.id != group {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: a claim names {group:?} while {:?} is open",
                 open.id
             )));
@@ -874,7 +875,7 @@ impl EffectSeatLedger {
         // recorded and unread.
         let recomputed = host_effect_seat_contract_of(record.operation, record.slot);
         if recomputed != Some((record.semantic_operation, record.need, record.avail)) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {record:?} recomputes from its own operation and slot \
                  to {recomputed:?}, so its recorded contract is not the one its key names"
             )));
@@ -907,7 +908,7 @@ impl EffectSeatLedger {
             }
         };
         if !admissible {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {:?} seat {:?} of {:?} was observed as {observed:?} \
                  through {route:?}, which its planned contract does not admit",
                 record.effect_origin, record.slot, record.operation,
@@ -915,14 +916,14 @@ impl EffectSeatLedger {
         }
         let open = self.open_group_mut(group)?;
         if record.effect_origin != open.effect_origin || record.operation != open.operation {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {record:?} was claimed into the visit to {:?} {:?}, so \
                  one occurrence's seat carries another's authority",
                 open.effect_origin, open.operation
             )));
         }
         if !open.planned.contains(&record.slot) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {:?} is not a planned slot of {:?}",
                 record.slot, open.effect_origin
             )));
@@ -935,7 +936,7 @@ impl EffectSeatLedger {
                 route,
             },
         ) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {:?} of {:?} is claimed twice in one visit (first as \
                  {previous:?})",
                 record.slot, open.effect_origin
@@ -957,7 +958,7 @@ impl EffectSeatLedger {
     ) -> Result<(), CraneliftBackendError> {
         let open = self.open_group_mut(group)?;
         if open.claims.contains_key(&slot) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: seat {slot:?} of {:?} was already claimed, so recording \
                  it as unobservable would put one seat on both sides of the visit's accounting",
                 open.effect_origin
@@ -987,7 +988,7 @@ impl EffectSeatLedger {
             .copied()
             .collect::<BTreeSet<_>>();
         if reached != open.planned {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: the visit to {:?} reached {reached:?} but its planned \
                  population is {:?}, so the occurrence was read incompletely",
                 open.effect_origin, open.planned
@@ -1038,7 +1039,7 @@ impl EffectSeatLedger {
     pub(super) fn commit_body(&mut self, function: FuncId) -> Result<(), CraneliftBackendError> {
         if let Some(open) = &self.open {
             if open.function == function {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "host effect seat ledger: the visit to {:?} is still open as function \
                      {function} is defined, so its claims were never closed",
                     open.effect_origin
@@ -1052,7 +1053,7 @@ impl EffectSeatLedger {
             match self.committed.get(id) {
                 Some(committed) if committed.function == function => {}
                 Some(committed) => {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                         "host effect seat ledger: {id:?} was opened for function {function} but \
                          committed under {}, so a visit's claims belong to a body that did not \
                          make them",
@@ -1060,7 +1061,7 @@ impl EffectSeatLedger {
                     )));
                 }
                 None => {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                         "host effect seat ledger: {id:?} was opened for function {function} and \
                          never committed, so a visit's claims were discarded before the body was \
                          defined"
@@ -1085,7 +1086,7 @@ impl EffectSeatLedger {
         planned: &[PlannedEffectSeat],
     ) -> Result<EffectSeatClosure, CraneliftBackendError> {
         if let Some(open) = &self.open {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: the visit to {:?} is still open at the close, so it \
                  was never committed",
                 open.effect_origin
@@ -1094,7 +1095,7 @@ impl EffectSeatLedger {
         let committed = self.committed.keys().copied().collect::<BTreeSet<_>>();
         let opened = self.opened.keys().copied().collect::<BTreeSet<_>>();
         if committed != opened {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "host effect seat ledger: {} visits opened but {} committed, so a visit's claims \
                  were discarded",
                 opened.len(),
@@ -1112,7 +1113,7 @@ impl EffectSeatLedger {
                 claims += 1;
                 let key = (claimed.record.effect_origin, claimed.record.slot);
                 if !population.contains(&key) {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                         "host effect seat ledger: function {} claimed {key:?}, which is not in \
                          the planned population",
                         group.function
@@ -1347,7 +1348,7 @@ impl<'a> Lowering<'a> {
                     ));
                 }
                 let size = u32::try_from(bytes.len())
-                    .map_err(|_| unsupported("Effect", "Bytes exceed native stack slot"))?;
+                    .map_err(|_| unsupported(LoweringCause::Capacity, "Effect", "Bytes exceed native stack slot"))?;
                 let slot = builder.create_sized_stack_slot(StackSlotData::new(
                     StackSlotKind::ExplicitSlot,
                     size,
@@ -1362,7 +1363,7 @@ impl<'a> Lowering<'a> {
                     builder.ins().iconst(types::I64, bytes.len() as i64),
                 ))
             }
-            _ => Err(unsupported("Effect", "operand is not a Bytes value")),
+            _ => Err(unsupported(LoweringCause::Fragment, "Effect", "operand is not a Bytes value")),
         }
     }
     pub(super) fn narrow_native_int_u64(
@@ -1372,14 +1373,14 @@ impl<'a> Lowering<'a> {
     ) -> Result<(cranelift_codegen::ir::Value, cranelift_codegen::ir::Value), CraneliftBackendError>
     {
         let Lowered::Int { value, known } = value else {
-            return Err(unsupported("Effect", "host-width operand is not Int"));
+            return Err(unsupported(LoweringCause::Fragment, "Effect", "host-width operand is not Int"));
         };
         let arena = self
             .function_local
             .native_int_arena
-            .ok_or_else(|| unsupported("Effect", "host-width Int has no invocation arena"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "Effect", "host-width Int has no invocation arena"))?;
         let helper = self.function_local.native_int_narrow.ok_or_else(|| {
-            unsupported("Effect", "host-width Int has no checked narrowing helper")
+            unsupported(LoweringCause::PlannerInvariant, "Effect", "host-width Int has no checked narrowing helper")
         })?;
         let tag = self.native_int_tag(builder, *value, *known)?;
         let output_slot =
@@ -1554,7 +1555,7 @@ impl<'a> Lowering<'a> {
         // planner never said was one, and that is a representation decision
         // taken by the caller rather than by the authority.
         if seat.need != EffectSeatNeed::BytesPointerLength {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "Effect",
                 format!(
                     "the byte-span observer was asked for seat {:?} of {:?}, whose need is \
@@ -1644,7 +1645,7 @@ impl<'a> Lowering<'a> {
                 let value = value.clone();
                 self.narrow_native_int_u64(builder, &value)
             }
-            LoweringOperand::Specialized(_) => Err(unsupported(
+            LoweringOperand::Specialized(_) => Err(unsupported(LoweringCause::Fragment,
                 "Effect",
                 format!("positioned {name} operand is not Int"),
             )),
@@ -1852,10 +1853,10 @@ impl<'a> Lowering<'a> {
         let limb_count = builder.ins().select(high_nonzero, two, one);
 
         let arena = self.function_local.native_int_arena.ok_or_else(|| {
-            unsupported("ClockWallNow", "Instant Int has no invocation arena")
+            unsupported(LoweringCause::PlannerInvariant, "ClockWallNow", "Instant Int has no invocation arena")
         })?;
         let helper = self.function_local.native_int_intern.ok_or_else(|| {
-            unsupported("ClockWallNow", "Instant Int has no local intern helper")
+            unsupported(LoweringCause::PlannerInvariant, "ClockWallNow", "Instant Int has no local intern helper")
         })?;
         let output = builder.create_sized_stack_slot(StackSlotData::new(
             StackSlotKind::ExplicitSlot,
@@ -2213,7 +2214,7 @@ impl<'a> Lowering<'a> {
         paths: &[EffectSeatConstructorPath],
     ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
         if paths.is_empty() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "Effect",
                 "a carried constructor seat has no artifact-static dispatch path",
             ));
@@ -2276,7 +2277,7 @@ impl<'a> Lowering<'a> {
                 } => {
                     Self::require_i64(builder, root_field_count, i64::from(*expected_root_fields));
                     let child_position = usize::try_from(*child_position).map_err(|_| {
-                        unsupported(
+                        unsupported(LoweringCause::Capacity,
                             "Effect",
                             "a constructor child position exceeds the target index space",
                         )
@@ -2344,13 +2345,13 @@ impl<'a> Lowering<'a> {
         match operand {
             LoweringOperand::Specialized(lowered) => classify_specialized(lowered)
                 .map(|wire_tag| builder.ins().iconst(types::I64, wire_tag))
-                .ok_or_else(|| unsupported("Effect", malformed)),
+                .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "Effect", malformed)),
             LoweringOperand::Carried(word) => {
                 let paths = self
                     .static_transition_plan
                     .host_effect_constructor_dispatch(record.operation, record.slot)?
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::Fragment,
                             "Effect",
                             format!(
                                 "seat {:?} of {:?} has no constructor dispatcher",
@@ -2385,7 +2386,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
         match operand {
             LoweringOperand::Specialized(Lowered::ResourceToken { value }) => Ok(*value),
-            LoweringOperand::Specialized(_) => Err(unsupported(
+            LoweringOperand::Specialized(_) => Err(unsupported(LoweringCause::Fragment,
                 "Effect",
                 format!("{owner} {seat} is not a resource"),
             )),
@@ -2429,7 +2430,7 @@ impl<'a> Lowering<'a> {
         use super::aggregates::CarrierAllocationRequest;
 
         let owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "DirectoryEntries",
                 "a response list is being decoded outside a declared emission owner",
             )
@@ -2445,7 +2446,7 @@ impl<'a> Lowering<'a> {
             SynthesizedConstructorRole::Fixed(Role::ListCons),
         ];
         if alternatives != expected_alternatives {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "DirectoryEntries",
                 "the response-list alternative population is not exactly Nil/Cons",
             ));
@@ -2473,7 +2474,7 @@ impl<'a> Lowering<'a> {
             ]
         );
         if !cons_children_match {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "DirectoryEntries",
                 "the response Cons node is not planned as DirEntry plus a persistent loop link",
             ));
@@ -2826,7 +2827,7 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .static_response_feasibility_ledger_all()?
             .map_err(|infeasible| {
-                backend_module(format!(
+                backend_module(LoweringCause::Fragment, format!(
                     "compile-time response specialization is infeasible at {:?}: {}",
                     infeasible.vis_origin(),
                     infeasible.reason(),
@@ -2881,7 +2882,7 @@ impl<'a> Lowering<'a> {
                         != Some(static_origin) =>
             {
                 let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
-                    backend_module("a response host effect is lowered outside a defined function scope".to_string())
+                    backend_module(LoweringCause::PlannerInvariant, "a response host effect is lowered outside a defined function scope".to_string())
                 })?;
                 let site = StaticResponseSite::Effect(static_origin);
                 if self.static_transition_plan
@@ -2922,7 +2923,7 @@ impl<'a> Lowering<'a> {
                     dead_arm_effect_trap(family, operation),
                 )));
             }
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "Effect",
                 format!(
                     "effect {family}.{} is a represented unavailable lane",
@@ -3023,7 +3024,7 @@ impl<'a> Lowering<'a> {
         }
         for (ordinal, operand) in lowered.iter().enumerate() {
             let ordinal = u32::try_from(ordinal).map_err(|_| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "Effect",
                     "host effect argument ordinal exceeds the seat space",
                 )
@@ -3088,7 +3089,7 @@ impl<'a> Lowering<'a> {
                 .expect("process effect lowering owns a direct host context"),
         );
         let wire = ken_host::host_effect_wire_layout_v1(operation).map_err(|error| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "Effect",
                 format!("generated HostEffectAbiV1 layout rejected: {error:?}"),
             )
@@ -3168,7 +3169,7 @@ impl<'a> Lowering<'a> {
         match operation {
             ken_host::HostOpV1::ConsoleRead => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "ambient ConsoleRead carried a capability",
                     ));
@@ -3200,7 +3201,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::ClockWallNow => {
                 if capability.is_some() || !args.is_empty() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "ambient ClockWallNow carried an operand",
                     ));
@@ -3210,7 +3211,7 @@ impl<'a> Lowering<'a> {
             | ken_host::HostOpV1::ConsoleFlush
             | ken_host::HostOpV1::ConsoleIsTerminal => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "ambient Console carried a capability",
                     ));
@@ -3254,7 +3255,7 @@ impl<'a> Lowering<'a> {
                         },
                     ),
                     LoweringOperand::Specialized(other) => {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "Effect",
                             format!(
                                 "seat {:?} of {:?} needs {:?}, but the specialized template at \
@@ -3326,7 +3327,7 @@ impl<'a> Lowering<'a> {
                         },
                     ),
                     LoweringOperand::Specialized(other) => {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "Effect",
                             format!(
                                 "seat {:?} of {:?} needs {:?}, but the specialized template at \
@@ -3438,7 +3439,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::FsHandleMetadata | ken_host::HostOpV1::ResourceRelease => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "resource operation carried a capability",
                     ));
@@ -3479,7 +3480,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::BufferAllocate => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "buffer allocation carried a capability",
                     ));
@@ -3544,7 +3545,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::BufferFreeze => {
                 if capability.is_some() {
-                    return Err(unsupported("Effect", "BufferFreeze carried a capability"));
+                    return Err(unsupported(LoweringCause::Fragment, "Effect", "BufferFreeze carried a capability"));
                 }
                 let token = self.lower_resource_token_seat(
                     builder,
@@ -3581,7 +3582,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::MappingAllocate => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "MappingAllocate carried a capability",
                     ));
@@ -3625,7 +3626,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::MappingReadView => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "MappingReadView carried a capability",
                     ));
@@ -3669,7 +3670,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::MappingWriteView => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "MappingWriteView carried a capability",
                     ));
@@ -3721,7 +3722,7 @@ impl<'a> Lowering<'a> {
             }
             ken_host::HostOpV1::FsReadAt | ken_host::HostOpV1::FsWriteAt => {
                 if capability.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Effect",
                         "positioned resource operation carried a capability",
                     ));

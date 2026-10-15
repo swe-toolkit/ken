@@ -34,6 +34,7 @@
 //! configuration can observe; it fails only in CI. Grep the workspace for the
 //! name as a STRING before touching that declaration.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::collections::BTreeMap;
 
 use crate::fnv1a_64;
@@ -77,7 +78,7 @@ pub(crate) fn emit_process_entrypoint_object_with_cranelift(
         .module
         .finish()
         .emit()
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let object_hash = fnv1a_64(&object_bytes);
     Ok(CraneliftObjectArtifact {
         example: "native-process-entrypoint".to_string(),
@@ -505,7 +506,7 @@ pub(crate) fn emit_px8tr_nested_post_effect_object_with_plan(
         .module
         .finish()
         .emit()
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let object_hash = fnv1a_64(&object_bytes);
     let provenance = PX8TR_TRAP_PROVENANCE.with(|trace| trace.borrow().clone());
     Ok(Px8trNestedRouteObject {

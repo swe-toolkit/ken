@@ -273,8 +273,8 @@ pub use surface::{
     InterpreterOracleObservation, NativeArtifactIdentity, NativeDifferentialReport,
     NativeDifferentialStage, NativeDifferentialVerdict, NativeEvidenceFact, NativeFidelity,
     NativeRunEvidence, NativeRuntimeIrComparisonReport, NativeRuntimeIrComparisonVerdict,
-    NativeSeedEnvironment, NativeToolchainReport, NativeTrustReport, UnsupportedLowering,
-    ValidatedNativeRunError,
+    LoweringCause, NativeSeedEnvironment, NativeToolchainReport, NativeTrustReport,
+    UnsupportedLowering, ValidatedNativeRunError,
 };
 
 // Test-only facade surface. These re-exports carry names to consumers OUTSIDE

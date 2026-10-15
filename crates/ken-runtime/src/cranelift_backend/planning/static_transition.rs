@@ -36,6 +36,7 @@ pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
     ResponseOwnerSettlement,
 };
+use crate::cranelift_backend::surface::LoweringCause;
 use returned_vis::PendingVisSettlements;
 mod selected_pending_calls;
 #[cfg(feature = "px8-ds-test-support")]
@@ -766,7 +767,7 @@ fn planner_error(detail: impl Into<String>) -> CraneliftBackendError {
 }
 
 fn planner_capacity_error(detail: impl Into<String>) -> CraneliftBackendError {
-    unsupported("NativeStaticTransitionPlanner", detail)
+    unsupported(LoweringCause::Capacity, "NativeStaticTransitionPlanner", detail)
 }
 
 fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetime {

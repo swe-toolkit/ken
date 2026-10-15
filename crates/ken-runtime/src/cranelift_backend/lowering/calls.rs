@@ -30,6 +30,7 @@
 //! the move -- this is the ordinary sibling-module recompute item 11/12 also
 //! needed, not new scaffolding, so it carries no `AC-5` ledger entry.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -261,7 +262,7 @@ impl<'a> Lowering<'a> {
                 return Ok(None);
             }
             let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhFunctionalRepresentation",
                     "a consumed checked-IH application has no oriented plan",
                 )
@@ -269,14 +270,14 @@ impl<'a> Lowering<'a> {
             let call = plan
                 .computational_ih_call(pending.call_template_id)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhFunctionalRepresentation",
                         "a consumed checked-IH application has no checked call template",
                     )
                 })?;
             plan.computational_ih_slot(call.slot_template_id)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhFunctionalRepresentation",
                         "a consumed checked-IH application names a slot the plan does not hold",
                     )
@@ -362,9 +363,9 @@ impl<'a> Lowering<'a> {
             // this is the one place both consumers can be held to the declared
             // arity without either restating it.
             let supplied = u32::try_from(inputs.len())
-                .map_err(|_| unsupported("Call", "call argument count exceeds addressable range"))?;
+                .map_err(|_| unsupported(LoweringCause::Capacity, "Call", "call argument count exceeds addressable range"))?;
             if supplied != worker.declared_arity {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "Call",
                     format!(
                         "static worker expects {} arguments but call provides {supplied}",
@@ -422,7 +423,7 @@ impl<'a> Lowering<'a> {
                         .generated_context_captures
                         .as_ref()
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "Call",
                                 format!(
                                     "a static worker binding for body origin {:?} is routed to a \
@@ -433,7 +434,7 @@ impl<'a> Lowering<'a> {
                             )
                         })?;
                     if extra.worker_body_origin != worker.body_origin {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "Call",
                             format!(
                                 "a context-routed static worker binding names body origin {:?}, but \
@@ -501,7 +502,7 @@ impl<'a> Lowering<'a> {
                 }
             };
             let exact = table.get(&worker.body_origin).cloned().ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "Call",
                     format!(
                         "no {table_name} target for body origin {:?} was declared into this \
@@ -554,7 +555,7 @@ impl<'a> Lowering<'a> {
                     })
                     .map(|(_, call)| call.clone())
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "StaticWorkerMutation",
                             "the AC-5 redirect found no DISTINCT target of the same declared arity \
                              and capture count; it never falls back to exact, because a fallback \
@@ -569,7 +570,7 @@ impl<'a> Lowering<'a> {
             let target = exact;
 
             if target.origin != worker.body_origin {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "Call",
                     format!(
                         "worker call target carries origin {:?} but the binding names body origin \
@@ -702,7 +703,7 @@ impl<'a> Lowering<'a> {
                 .worker_templates
                 .get(&body_origin)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "RetainedCallableCaptureContract",
                         format!(
                             "a mixed-phase retained callable at {closure_origin:?} has no planner-issued \
@@ -714,7 +715,7 @@ impl<'a> Lowering<'a> {
             // 2. The record is keyed by the callable SOURCE BODY, so a disagreement
             //    here is a wrong-body contract rather than a lookup miss.
             if target.call_site_origin != body_origin {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "RetainedCallableCaptureContract",
                     format!(
                         "the worker template reached for body origin {body_origin:?} is keyed by \
@@ -726,7 +727,7 @@ impl<'a> Lowering<'a> {
 
             // 3. Declared arity and capture count, against the descriptor header.
             if target.header.parameters as usize != declared_arity {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "RetainedCallableCaptureContract",
                     format!(
                         "worker descriptor declares {} parameters but the retained callable declares \
@@ -736,7 +737,7 @@ impl<'a> Lowering<'a> {
                 ));
             }
             if target.header.captures as usize != captures.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "RetainedCallableCaptureContract",
                     format!(
                         "worker descriptor declares {} captures but {} were projected from the \
@@ -757,7 +758,7 @@ impl<'a> Lowering<'a> {
                 .filter(|slot| slot.kind == AbiSlotKind::Capture)
                 .collect::<Vec<_>>();
             if capture_slots.len() != captures.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "RetainedCallableCaptureContract",
                     format!(
                         "worker descriptor's slot run declares {} capture slots against a header of \
@@ -771,7 +772,7 @@ impl<'a> Lowering<'a> {
 
             for (position, (slot, capture)) in capture_slots.iter().zip(captures).enumerate() {
                 let ordinal = u32::try_from(position).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "RetainedCallableCaptureContract",
                         "retained callable capture count exceeds addressable range",
                     )
@@ -801,7 +802,7 @@ impl<'a> Lowering<'a> {
                     // before execution began, nor the persistent store.
                     LoweringOperand::Carried(_) => {
                         if slot.storage_owner != AbiStorageOwner::ActivationFrame {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "RetainedCallableCaptureContract",
                                 format!(
                                     "capture {position} of the retained callable at \
@@ -815,7 +816,7 @@ impl<'a> Lowering<'a> {
                     }
                     LoweringOperand::Residual(_) => {
                         if slot.storage_owner != AbiStorageOwner::ActivationFrame {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "RetainedCallableCaptureContract",
                                 format!(
                                     "capture {position} of the retained callable at \
@@ -828,7 +829,7 @@ impl<'a> Lowering<'a> {
                 }
                 let expected = expected_capture_slot(provenance, ordinal);
                 if **slot != expected {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "RetainedCallableCaptureContract",
                         format!(
                             "capture {position} of the retained callable at {closure_origin:?} \
@@ -897,14 +898,14 @@ impl<'a> Lowering<'a> {
                 return arm(self, builder, body, carried_base);
             };
             if coordinates.is_none() {
-                return Err(unsupported("RecursiveResidual", "a labelled pending-Let invocation has no coordinates for its retarget"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a labelled pending-Let invocation has no coordinates for its retarget"));
             }
-            let word = carried_base.ok_or_else(|| unsupported(
+            let word = carried_base.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "a labelled recursive invocation has no carried residual base",
             ))?;
             let slot = self.static_transition_plan.recursive_carrier_slot(
                 eliminator, constructor, position,
-            )?.ok_or_else(|| unsupported("RecursiveResidual", "a labelled invocation has no planner slot"))?.clone();
+            )?.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a labelled invocation has no planner slot"))?.clone();
             let candidates = slot.flow.clone();
             let ordinal = self.residual_label_ordinal(builder, word, &slot)?;
             let join = builder.create_block();
@@ -913,36 +914,36 @@ impl<'a> Lowering<'a> {
             ) else { unreachable!("labelled answer joins in the value plane") };
             for (index, candidate) in candidates.iter().enumerate() {
                 let variant = slot.variant(*candidate)?.clone();
-                let label = u32::try_from(index).map_err(|_| unsupported(
+                let label = u32::try_from(index).map_err(|_| unsupported(LoweringCause::Capacity,
                     "RecursiveResidual", "a candidate label exceeds the carrier ABI",
                 ))?;
                 if variant.label != Some(label) {
-                    return Err(unsupported("RecursiveResidual", "a labelled candidate changed its issued label"));
+                    return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a labelled candidate changed its issued label"));
                 }
                 let disposition = match variant.schema {
                     RecursiveCarrierMemberSchema::Residual => Some(self.static_transition_plan
                         .recursive_residual_for_specialization(*candidate)?
                         .filter(|entry| entry.wrapped() && entry.label == Some(label))
-                        .cloned().ok_or_else(|| unsupported(
+                        .cloned().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                             "RecursiveResidual", "a residual candidate has no matching capture disposition",
                         ))?),
                     RecursiveCarrierMemberSchema::Boxed => {
                         if self.static_transition_plan.recursive_residual_for_specialization(*candidate)?
                             .is_some() {
-                            return Err(unsupported("RecursiveResidual", "a boxed candidate gained a residual disposition"));
+                            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a boxed candidate gained a residual disposition"));
                         }
                         None
                     }
                 };
                 let body = self.static_transition_plan.continuation_units()?.into_iter()
                     .find(|unit| unit.id() == *candidate)
-                    .ok_or_else(|| unsupported("RecursiveResidual", "a labelled candidate has no worker unit"))?
+                    .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a labelled candidate has no worker unit"))?
                     .worker_body_origin();
                 let selected = builder.create_block();
                 let next = builder.create_block();
                 let matched = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal, ordinal,
-                    i64::try_from(index).map_err(|_| unsupported(
+                    i64::try_from(index).map_err(|_| unsupported(LoweringCause::Capacity,
                         "RecursiveResidual", "a candidate label exceeds the carrier ABI",
                     ))?,
                 );
@@ -952,7 +953,7 @@ impl<'a> Lowering<'a> {
                     let _ = self.assert_recursive_carrier_variant(builder, word, disposition)?;
                 } else {
                     if word.slot() != RecursiveCarrierSlotKey::of(&slot) {
-                        return Err(unsupported("RecursiveResidual", "a boxed candidate has a foreign slot key"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a boxed candidate has a foreign slot key"));
                     }
                     let _ = self.decode_residual_child(builder, word)?;
                 }
@@ -962,7 +963,7 @@ impl<'a> Lowering<'a> {
                     // A Tail pass-through contributes its Child K, not the R.
                     LoweringOperand::Residual(residual) =>
                         self.decode_residual_child(builder, residual)?,
-                    LoweringOperand::Specialized(_) => return Err(unsupported(
+                    LoweringOperand::Specialized(_) => return Err(unsupported(LoweringCause::PlannerInvariant,
                         "RecursiveResidual", "a labelled unit returned a specialized value across its ABI",
                     )),
                 };
@@ -1035,7 +1036,7 @@ impl<'a> Lowering<'a> {
                     .iter()
                     .any(|context| context.worker_body_origin() == body_origin)
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
                         "a carried recursive-position invocation of body {body_origin:?} resolved no \
@@ -1115,7 +1116,7 @@ impl<'a> Lowering<'a> {
                 .get(&context)
                 .cloned()
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "the generated execution context bound to body {body_origin:?} was not                          declared into this function"
@@ -1137,13 +1138,13 @@ impl<'a> Lowering<'a> {
                 .into_iter()
                 .find(|candidate| candidate.id() == context)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         "the bound generated context has no projected view",
                     )
                 })?;
             let defining_owner = self.defining_emission_owner.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     "a carried invocation retarget was reached with no emission owner bound for the                  context currently being defined",
                 )
@@ -1161,14 +1162,14 @@ impl<'a> Lowering<'a> {
             let gather_cannot_serve = inputs.len() != header.parameters as usize
                 || claims.iter().any(|claim| claim.availability.context_capture.is_none());
             if gather_cannot_serve != disposition.as_ref().is_some_and(|entry| entry.wrapped()) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "RecursiveResidual",
                     "the bound context needs a residual capture suffix but has no matching issued disposition",
                 ));
             }
             let mut carried_context = None;
             if let Some(disposition) = disposition.filter(|entry| entry.wrapped()) {
-                let base = carried_base.ok_or_else(|| unsupported(
+                let base = carried_base.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                     "RecursiveResidual",
                     "a bound generated context needs its carried recursive-position residual",
                 ))?;
@@ -1182,7 +1183,7 @@ impl<'a> Lowering<'a> {
                     || header.captures as usize != claims.len()
                     || inputs.len().checked_add(worker.len()) != Some(header.parameters as usize)
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "RecursiveResidual",
                         "the bound context's worker Parameter and Capture runs disagree with the residual schema",
                     ));
@@ -1219,9 +1220,9 @@ impl<'a> Lowering<'a> {
                 // because a capture slot is a position in exactly this run.
                 let operand = if let Some(context) = &carried_context {
                     if capture.ordinal as usize != capture_index {
-                        return Err(unsupported("RecursiveResidual", "a residual Capture ordinal is out of declared order"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a residual Capture ordinal is out of declared order"));
                     }
-                    context.get(capture_index).ok_or_else(|| unsupported(
+                    context.get(capture_index).ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                         "RecursiveResidual", "a residual lacks a declared Capture",
                     ))?.clone()
                 } else {
@@ -1234,7 +1235,7 @@ impl<'a> Lowering<'a> {
                     // lexical environment. Keep the existing claim membership
                     // and slot checks for every planner-recoverable member.
                     self.function_local.defining_abi_operands.get(immediate_slot as usize)
-                        .ok_or_else(|| unsupported(
+                        .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!("a generated context capture names immediate slot {immediate_slot} outside the emitting function's {} ABI operands", self.function_local.defining_abi_operands.len()),
                         ))?.clone()
@@ -1252,7 +1253,7 @@ impl<'a> Lowering<'a> {
                 inputs.push(operand);
             }
             if inputs.len() != (header.parameters as usize + header.captures as usize) {
-                return Err(unsupported("RecursiveResidual", "the context call did not consume its exact declared Capture run"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the context call did not consume its exact declared Capture run"));
             }
             self.call_declared_unit_target(
                 builder,
@@ -1318,7 +1319,7 @@ impl<'a> Lowering<'a> {
             // emitted. The descriptor rejects a mismatched slice too, but it can
             // only say "the frame is missing an input"; this says which call.
             if params.len() != args.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "Call",
                     format!(
                         "closure expects {} args but call provides {}",
@@ -1440,7 +1441,7 @@ impl<'a> Lowering<'a> {
                 .declaration_calls
                 .get(&reference)
                 .ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "DeclarationRef has no planner-derived declaration call target".to_string(),
                     )
                 })?;
@@ -1537,19 +1538,19 @@ impl<'a> Lowering<'a> {
                 return Ok(());
             };
             let InvocationTemplateRef::SameSccCall(call_template_id) = instance.source else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "declaration-owned unit call received a computational IH invocation",
                 ));
             };
             let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked declaration-owned unit call has no checked plan",
                 )
             })?;
             let call = plan.recursive_call(call_template_id).ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked declaration-owned unit call has no checked template",
                 )
@@ -1559,13 +1560,13 @@ impl<'a> Lowering<'a> {
             // names is the callee the emitter is about to call, applied to exactly
             // the arity the plan admitted.
             if &call.callee != symbol {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked declaration-owned unit call names another callee",
                 ));
             }
             if call.arity != params as u64 {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     format!(
                         "checked recursive invocation of {symbol} is admitted at arity {} but the \
@@ -1575,7 +1576,7 @@ impl<'a> Lowering<'a> {
                 ));
             }
             if call.local_telescope.len() as u64 != call.arity {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked recursive invocation's local telescope does not cover its arity",
                 ));
@@ -1599,7 +1600,7 @@ impl<'a> Lowering<'a> {
                 .filter(|other| other.recursion_group == call.recursion_group)
                 .collect::<Vec<_>>();
             if !group.iter().any(|other| other.declaration == call.callee) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked recursive invocation's callee is not a recursive member of its own \
                      recursion group",
@@ -1609,13 +1610,13 @@ impl<'a> Lowering<'a> {
             // predicate is discharged by either disagreement holding, so it could
             // not tell the `scc_index` mutation from the `admission` one.
             if group.iter().any(|other| other.scc_index != call.scc_index) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked recursion group disagrees about its scc index",
                 ));
             }
             if group.iter().any(|other| other.admission != call.admission) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked recursion group disagrees about its admission",
                 ));
@@ -1623,7 +1624,7 @@ impl<'a> Lowering<'a> {
             if plan.recursive_calls.iter().any(|other| {
                 other.scc_index == call.scc_index && other.recursion_group != call.recursion_group
             }) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "two checked recursion groups claim one scc index",
                 ));
@@ -1718,7 +1719,7 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .boundary_closure_environment_by_record(environment_record)?;
             if environment.body_origin() != body {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryClosureEnvironment",
                     "a reconstructed boundary closure disagrees with its compile-time body identity",
                 ));
@@ -1728,13 +1729,13 @@ impl<'a> Lowering<'a> {
                 .len()
                 .checked_add(environment.capture_origins().len())
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "BoundaryClosureEnvironment",
                         "a boundary closure input arity overflowed",
                     )
                 })?;
             if inputs.len() != expected {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryClosureEnvironment",
                     format!(
                         "the boundary closure descriptor expects {expected} parameter-plus-capture inputs but the call assembled {}",
@@ -1748,7 +1749,7 @@ impl<'a> Lowering<'a> {
                 .get(&body)
                 .cloned()
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "BoundaryClosureEnvironment",
                         "the statically selected boundary closure body has no declared target in this function",
                     )
@@ -1788,7 +1789,7 @@ impl<'a> Lowering<'a> {
                 .get(&body_origin)
                 .cloned()
                 .ok_or_else(|| {
-                    backend_module(format!(
+                    backend_module(LoweringCause::PlannerInvariant, format!(
                         "retained body {body_origin:?} has no graph-derived call target in this unit"
                     ))
                 })?;
@@ -1862,7 +1863,7 @@ impl<'a> Lowering<'a> {
                 .get(&reference_origin)
                 .cloned()
                 .ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "DeclarationRef has no planner-derived declaration call target".to_string(),
                     )
                 })?;
@@ -1890,7 +1891,7 @@ impl<'a> Lowering<'a> {
             let emitted_callee = match builder.func.dfg.insts[call] {
                 cranelift_codegen::ir::InstructionData::Call { func_ref, .. } => func_ref,
                 _ => {
-                    return Err(backend_module(
+                    return Err(backend_module(LoweringCause::PlannerInvariant,
                         "a declared unit call was not emitted as a direct call instruction".to_string(),
                     ));
                 }
@@ -1916,7 +1917,7 @@ impl<'a> Lowering<'a> {
                     return Ok(operand);
                 }
                 let ledger = self.checked_call_ledger.as_mut().ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "a checked declaration-unit call was emitted outside the unit bundle pass"
                             .to_string(),
                     )
@@ -1984,11 +1985,11 @@ impl<'a> Lowering<'a> {
             let cranelift_codegen::ir::ExternalName::User(name_ref) =
                 builder.func.dfg.ext_funcs[target.function].name
             else {
-                return Err(backend_module("selected call target has no module user identity".to_string()));
+                return Err(backend_module(LoweringCause::PlannerInvariant, "selected call target has no module user identity".to_string()));
             };
             let user = &builder.func.params.user_named_funcs()[name_ref];
             if user.namespace != 0 {
-                return Err(backend_module("selected call target is outside the module function namespace".to_string()));
+                return Err(backend_module(LoweringCause::PlannerInvariant, "selected call target is outside the module function namespace".to_string()));
             }
             let callee_id = user.index;
             let body = builder.ins().iconst(
@@ -2024,10 +2025,10 @@ impl<'a> Lowering<'a> {
             target: &units::DeclaredUnitCall,
         ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
             let services = self.function_local.services_pointer.ok_or_else(|| {
-                backend_module("selected call has no published activation services".to_string())
+                backend_module(LoweringCause::PlannerInvariant, "selected call has no published activation services".to_string())
             })?;
             let issue = self.function_local.selected_call_issue.ok_or_else(|| {
-                backend_module("selected call has no checked issuer helper".to_string())
+                backend_module(LoweringCause::PlannerInvariant, "selected call has no checked issuer helper".to_string())
             })?;
             let pointer_type = builder.func.dfg.value_type(services);
             let ticket = builder.create_sized_stack_slot(StackSlotData::new(
@@ -2039,7 +2040,7 @@ impl<'a> Lowering<'a> {
             let (body, callee) = Self::selected_call_target_words(builder, target)?;
             let call = builder.ins().call(issue, &[services, body, callee, pointer]);
             let [status] = builder.inst_results(call) else {
-                return Err(backend_module("selected issuer returned no status".to_string()));
+                return Err(backend_module(LoweringCause::PlannerInvariant, "selected issuer returned no status".to_string()));
             };
             let status = *status;
             self.branch_on_selected_call_status(builder, status)?;
@@ -2064,10 +2065,10 @@ impl<'a> Lowering<'a> {
             callee: cranelift_codegen::ir::Value,
         ) -> Result<(), CraneliftBackendError> {
             let services = self.function_local.services_pointer.ok_or_else(|| {
-                backend_module("selected gate has no published activation services".to_string())
+                backend_module(LoweringCause::PlannerInvariant, "selected gate has no published activation services".to_string())
             })?;
             let consume = self.function_local.selected_call_consume.ok_or_else(|| {
-                backend_module("selected gate has no checked consuming helper".to_string())
+                backend_module(LoweringCause::PlannerInvariant, "selected gate has no checked consuming helper".to_string())
             })?;
             #[cfg(test)]
             let callee = if SELECTED_TICKET_GATE_MUTATION.with(std::cell::Cell::get)
@@ -2080,7 +2081,7 @@ impl<'a> Lowering<'a> {
             };
             let call = builder.ins().call(consume, &[services, ticket, body, callee]);
             let [status] = builder.inst_results(call) else {
-                return Err(backend_module("selected gate returned no status".to_string()));
+                return Err(backend_module(LoweringCause::PlannerInvariant, "selected gate returned no status".to_string()));
             };
             let status = *status;
             self.branch_on_selected_call_status(builder, status)?;
@@ -2091,7 +2092,7 @@ impl<'a> Lowering<'a> {
                 SELECTED_TICKET_GATE_MUTATION_APPLIED.with(|cell| cell.set(cell.get() + 1));
                 let duplicate = builder.ins().call(consume, &[services, ticket, body, callee]);
                 let [status] = builder.inst_results(duplicate) else {
-                    return Err(backend_module("duplicate gate returned no status".to_string()));
+                    return Err(backend_module(LoweringCause::PlannerInvariant, "duplicate gate returned no status".to_string()));
                 };
                 let status = *status;
                 self.branch_on_selected_call_status(builder, status)?;
@@ -2155,12 +2156,12 @@ impl<'a> Lowering<'a> {
             let mut trap_offset = None;
             for (slot, offset) in target.slots.iter().zip(&target.offsets) {
                 let offset = i32::try_from(*offset).map_err(|_| {
-                    backend_module("callee slot offset exceeds addressable range".to_string())
+                    backend_module(LoweringCause::Capacity, "callee slot offset exceeds addressable range".to_string())
                 })?;
                 match slot.kind {
                     AbiSlotKind::Parameter | AbiSlotKind::Capture => {
                         let value = inputs.get(input).ok_or_else(|| {
-                            backend_module("callee frame is missing a declared input".to_string())
+                            backend_module(LoweringCause::PlannerInvariant, "callee frame is missing a declared input".to_string())
                         })?;
                         let word = match value {
                             LoweringOperand::Carried(word) => word.word,
@@ -2173,7 +2174,7 @@ impl<'a> Lowering<'a> {
                             },
                             LoweringOperand::Specialized(Lowered::StaticResponseDeferred { site }) => {
                                 let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
-                                    backend_module("a deferred host response reached a call outside a defined function scope".to_string())
+                                    backend_module(LoweringCause::PlannerInvariant, "a deferred host response reached a call outside a defined function scope".to_string())
                                 })?;
                                 #[cfg(feature = "px8-ds-test-support")]
                                 let checked_origin = if PLACEHOLDER_NONOWNER_TARGET_MUTATION
@@ -2183,7 +2184,7 @@ impl<'a> Lowering<'a> {
                                         .find(|unit| unit.entry_origin() != target.origin
                                             && matches!(unit.definition(),
                                                 crate::cranelift_backend::planning::AbiUnitDefinition::SchedulingEntry { .. }))
-                                        .ok_or_else(|| backend_module(
+                                        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
                                             "placeholder non-owner mutation found no scheduling-entry target".to_string(),
                                         ))?;
                                     PLACEHOLDER_NONOWNER_TARGET_APPLICATIONS.with(|count|
@@ -2195,7 +2196,7 @@ impl<'a> Lowering<'a> {
                                 if !self.static_transition_plan.static_response_placeholder_mint_licensed(
                                     *site, scope, checked_origin, slot,
                                 )? {
-                                    return Err(backend_module(
+                                    return Err(backend_module(LoweringCause::PlannerInvariant,
                                         "a deferred host response may only mint owner parameter zero at its licensed site".to_string(),
                                     ));
                                 }
@@ -2293,14 +2294,14 @@ impl<'a> Lowering<'a> {
                 }
             }
             if input != inputs.len() {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "caller supplied inputs absent from the callee descriptor".to_string(),
                 ));
             }
             let pointer_type = builder.func.dfg.value_type(
                 self.function_local
                     .services_pointer
-                    .ok_or_else(|| backend_module("unit call has no services pointer".to_string()))?,
+                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "unit call has no services pointer".to_string()))?,
             );
             let slots = builder.ins().stack_addr(pointer_type, payload, 0);
             let envelope = builder.create_sized_stack_slot(StackSlotData::new(
@@ -2320,7 +2321,7 @@ impl<'a> Lowering<'a> {
                 .expect("services pointer checked above");
             let exact_host_dispatch_context =
                 self.function_local.host_dispatch_context.ok_or_else(|| {
-                    backend_module("unit call has no direct host-dispatch context".to_string())
+                    backend_module(LoweringCause::PlannerInvariant, "unit call has no direct host-dispatch context".to_string())
                 })?;
             #[cfg(test)]
             let host_dispatch_context = if launch_ingress.is_some()
@@ -2373,7 +2374,7 @@ impl<'a> Lowering<'a> {
                 ),
             );
             let [unit_status] = builder.inst_results(call) else {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "internal unit call did not return exactly one word".to_string(),
                 ));
             };
@@ -2395,10 +2396,10 @@ impl<'a> Lowering<'a> {
             builder.switch_to_block(trap_check_block);
             builder.seal_block(trap_check_block);
             let trap_offset = trap_offset.ok_or_else(|| {
-                backend_module("callee frame declares no trap slot".to_string())
+                backend_module(LoweringCause::PlannerInvariant, "callee frame declares no trap slot".to_string())
             })?;
             let result_offset = result_offset.ok_or_else(|| {
-                backend_module("callee frame declares no result slot".to_string())
+                backend_module(LoweringCause::PlannerInvariant, "callee frame declares no result slot".to_string())
             })?;
             #[cfg(any(test, feature = "px8-ds-test-support"))]
             if TRAP_CALLER_PROTOCOL_MUTATION.with(std::cell::Cell::get)
@@ -2410,7 +2411,7 @@ impl<'a> Lowering<'a> {
             let trap_word = builder.ins().stack_load(types::I64, payload, trap_offset);
             let cranelift_codegen::ir::ValueDef::Result(trap_load, _) =
                 builder.func.dfg.value_def(trap_word) else {
-                return Err(backend_module("unit TrapWord did not come from its callee frame".to_string()));
+                return Err(backend_module(LoweringCause::PlannerInvariant, "unit TrapWord did not come from its callee frame".to_string()));
             };
             let trapped = builder.ins().icmp_imm(
                 cranelift_codegen::ir::condcodes::IntCC::NotEqual,
@@ -2471,7 +2472,7 @@ impl<'a> Lowering<'a> {
                     self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                 }
                 None => {
-                    return Err(backend_module(
+                    return Err(backend_module(LoweringCause::PlannerInvariant,
                         "trap branch has no generated-unit TrapWord lane".to_string(),
                     ));
                 }
@@ -2489,7 +2490,7 @@ impl<'a> Lowering<'a> {
                 let member = builder.ins().stack_load(types::I64, payload, source.discriminant);
                 let cranelift_codegen::ir::ValueDef::Result(member_load, _) =
                     builder.func.dfg.value_def(member) else {
-                    return Err(backend_module("pending-Vis member did not come from its callee frame".to_string()));
+                    return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis member did not come from its callee frame".to_string()));
                 };
                 let present = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::NotEqual, member, 0,
@@ -2506,16 +2507,16 @@ impl<'a> Lowering<'a> {
                                   start: i32, end: i32, words: u32| -> Result<(), CraneliftBackendError> {
                     for index in 0..words {
                         let delta = i32::try_from(index.checked_mul(8)
-                            .ok_or_else(|| backend_module("pending-Vis copy offset exhausted".to_string()))?)
-                            .map_err(|_| backend_module("pending-Vis copy offset exceeds range".to_string()))?;
+                            .ok_or_else(|| backend_module(LoweringCause::Capacity, "pending-Vis copy offset exhausted".to_string()))?)
+                            .map_err(|_| backend_module(LoweringCause::Capacity, "pending-Vis copy offset exceeds range".to_string()))?;
                         let from = start.checked_add(delta)
-                            .ok_or_else(|| backend_module("pending-Vis source offset exhausted".to_string()))?;
+                            .ok_or_else(|| backend_module(LoweringCause::Capacity, "pending-Vis source offset exhausted".to_string()))?;
                         let to = end.checked_add(delta)
-                            .ok_or_else(|| backend_module("pending-Vis destination offset exhausted".to_string()))?;
+                            .ok_or_else(|| backend_module(LoweringCause::Capacity, "pending-Vis destination offset exhausted".to_string()))?;
                         let value = builder.ins().stack_load(types::I64, payload, from);
                         let cranelift_codegen::ir::ValueDef::Result(load, _) =
                             builder.func.dfg.value_def(value) else {
-                            return Err(backend_module("pending-Vis copy did not load the callee frame".to_string()));
+                            return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis copy did not load the callee frame".to_string()));
                         };
                         let inst = builder.ins().store(MemFlags::trusted(), value, destination.slots, to);
                         copy_facts.push(PendingVisSlotStore {
@@ -2540,22 +2541,22 @@ impl<'a> Lowering<'a> {
                                     dest_start: i32, dest_end: i32|
                     -> Result<u32, CraneliftBackendError> {
                     let source_bytes = source_end.checked_sub(source_start)
-                        .ok_or_else(|| backend_module("pending-Vis source region is inverted".to_string()))?;
+                        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "pending-Vis source region is inverted".to_string()))?;
                     let dest_bytes = dest_end.checked_sub(dest_start)
-                        .ok_or_else(|| backend_module("pending-Vis destination region is inverted".to_string()))?;
+                        .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "pending-Vis destination region is inverted".to_string()))?;
                     if source_bytes % 8 != 0 || dest_bytes % 8 != 0 {
-                        return Err(backend_module("pending-Vis region is not word-aligned".to_string()));
+                        return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis region is not word-aligned".to_string()));
                     }
                     u32::try_from(source_bytes.min(dest_bytes) / 8)
-                        .map_err(|_| backend_module("pending-Vis copy width exceeds range".to_string()))
+                        .map_err(|_| backend_module(LoweringCause::Capacity, "pending-Vis copy width exceeds range".to_string()))
                 };
                 copy_words(builder, source.captures, destination.region.captures,
                     common_words(source.captures, source.continuation_inputs,
                         destination.region.captures, destination.region.continuation_inputs)?)?;
                 let source_end = i32::try_from(source.frame_bytes)
-                    .map_err(|_| backend_module("pending-Vis source frame exceeds addressable range".to_string()))?;
+                    .map_err(|_| backend_module(LoweringCause::Capacity, "pending-Vis source frame exceeds addressable range".to_string()))?;
                 let dest_end = i32::try_from(destination.region.frame_bytes)
-                    .map_err(|_| backend_module("pending-Vis destination frame exceeds addressable range".to_string()))?;
+                    .map_err(|_| backend_module(LoweringCause::Capacity, "pending-Vis destination frame exceeds addressable range".to_string()))?;
                 copy_words(builder, source.continuation_inputs,
                     destination.region.continuation_inputs,
                     common_words(source.continuation_inputs, source_end,
@@ -2626,21 +2627,21 @@ impl<'a> Lowering<'a> {
         ) -> Result<FuncId, CraneliftBackendError> {
             let cranelift_codegen::ir::InstructionData::Call { func_ref, .. } = func.dfg.insts[inst]
             else {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "an emitted continuation call site does not hold a direct call instruction"
                         .to_string(),
                 ));
             };
             let cranelift_codegen::ir::ExternalName::User(name_ref) = func.dfg.ext_funcs[func_ref].name
             else {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "an emitted continuation call names a callee that is not a user function"
                         .to_string(),
                 ));
             };
             let user = &func.params.user_named_funcs()[name_ref];
             if user.namespace != 0 {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "an emitted continuation call names a callee outside the module function namespace"
                         .to_string(),
                 ));
@@ -2724,10 +2725,10 @@ impl<'a> Lowering<'a> {
                 Lowered::Int { value, known } => {
                     let tag = self.native_int_tag(builder, value, known)?;
                     let arena = self.function_local.native_int_arena.ok_or_else(|| {
-                        unsupported("NativeResult", "Int result has no invocation arena")
+                        unsupported(LoweringCause::PlannerInvariant, "NativeResult", "Int result has no invocation arena")
                     })?;
                     let export = self.function_local.native_int_export.ok_or_else(|| {
-                        unsupported("NativeResult", "Int result has no export support function")
+                        unsupported(LoweringCause::PlannerInvariant, "NativeResult", "Int result has no export support function")
                     })?;
                     #[cfg(test)]
                     if self.native_int_mutation == NativeIntLoweringMutation::SuppressTerminalExport {

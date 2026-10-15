@@ -12,6 +12,7 @@
 #[cfg(test)]
 mod tests;
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::collections::BTreeMap;
 
 use cranelift_module::Linkage;
@@ -283,6 +284,7 @@ pub(crate) fn run_runtime_ir_report_with_authority(
                     verdict: NativeRuntimeIrComparisonVerdict::RuntimeIrNativeAgreement {
                         stage: NativeDifferentialStage::RuntimeIrNativeCompare,
                     },
+                    cause: None,
                 }
             } else {
                 NativeRuntimeIrComparisonReport {
@@ -295,6 +297,7 @@ pub(crate) fn run_runtime_ir_report_with_authority(
                     },
                     runtime_ir: run_report,
                     native: Some(native),
+                    cause: Some(LoweringCause::Backend),
                 }
             }
         }
@@ -375,7 +378,7 @@ pub(crate) fn emit_runtime_ir_object_with_authority(
         .module
         .finish()
         .emit()
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let object_hash = fnv1a_64(&object_bytes);
 
     Ok(CraneliftObjectArtifact {
@@ -434,7 +437,7 @@ pub(crate) fn emit_bound_process_program_object_with_cranelift(
         .module
         .finish()
         .emit()
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let object_hash = fnv1a_64(&object_bytes);
     Ok(CraneliftObjectArtifact {
         example: "checked-native-program".to_string(),
@@ -659,7 +662,7 @@ fn reject_unadmitted_package_trust(program: &RuntimeProgram) -> Result<(), Crane
             .is_empty()
         || !program.erased_core.metadata.trusted_base_delta.is_empty()
     {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeProgram",
             "package carries trust metadata outside the supported native subset",
         ));
@@ -696,7 +699,7 @@ pub(crate) fn reject_admitted_program_blockers(
         .cloned()
         .collect();
     if assumption_keys != *admitted.admitted_trust() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeProgram",
             format!(
                 "package trust metadata is not the set admission proved: not admitted {:?}; \
@@ -718,19 +721,19 @@ pub(crate) fn reject_admitted_program_blockers(
 /// provenance. Unchanged by this node.
 fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), CraneliftBackendError> {
     if !program.erased_core.metadata.effects.is_empty() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeProgram",
             "package carries effect metadata outside the NC6 D1 supported subset",
         ));
     }
     if !program.erased_core.metadata.capabilities.is_empty() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeProgram",
             "package carries capability metadata outside the NC6 D1 supported subset",
         ));
     }
     if !program.erased_core.metadata.runtime_checks.is_empty() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeProgram",
             "package carries runtime-check metadata outside the supported native subset",
         ));
@@ -743,7 +746,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
                 .unsupported
                 .contains_key(&declaration.symbol)
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "RuntimeProgram",
                 format!("reachable unsupported entry {}", declaration.symbol),
             ));
@@ -761,7 +764,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
                     .get(&declaration.symbol)
             })
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Admission,
                     "RuntimeProgram",
                     format!(
                         "{} is missing runtime lowerability metadata",
@@ -770,7 +773,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
                 )
             })?;
         if !matches!(lowerability, RuntimeLowerabilityStatus::Supported) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "RuntimeProgram",
                 format!(
                     "{} has blocking lowerability metadata: {:?}",
@@ -780,7 +783,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
         }
 
         if !declaration.metadata.effects.is_empty() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Admission,
                 "RuntimeProgram",
                 format!(
                     "{} carries effect metadata outside the NC6 D1 supported subset",
@@ -789,7 +792,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
             ));
         }
         if !declaration.metadata.capabilities.is_empty() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Admission,
                 "RuntimeProgram",
                 format!(
                     "{} carries capability metadata outside the NC6 D1 supported subset",
@@ -798,7 +801,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
             ));
         }
         if !declaration.metadata.runtime_checks.is_empty() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Admission,
                 "RuntimeProgram",
                 format!(
                     "{} carries runtime-check metadata outside the NC6 D1 supported subset",
@@ -810,7 +813,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
             || !declaration.metadata.assumption_trust_metadata.is_empty()
             || !declaration.metadata.trusted_base_delta.is_empty()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Admission,
                 "RuntimeProgram",
                 format!(
                     "{} carries trust metadata outside the NC6 D1 supported subset",
@@ -821,7 +824,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
 
         if let RuntimeDeclarationKind::EffectBoundary { effects } = &declaration.kind {
             if !effects.is_empty() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::Admission,
                     "RuntimeProgram",
                     format!(
                         "{} declares effects outside the NC6 D1 supported subset",
@@ -845,7 +848,7 @@ fn reject_residual_program_blockers(program: &RuntimeProgram) -> Result<(), Cran
                 || !effect_meta.capabilities.is_empty()
                 || !effect_meta.runtime_checks.is_empty()
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::Admission,
                     "RuntimeProgram",
                     format!(
                         "{} carries effects/foreign metadata outside the NC6 D1 subset",
@@ -985,13 +988,13 @@ fn runtime_ir_report_example<'a>(
 ) -> Result<&'a RuntimeExample, CraneliftBackendError> {
     let artifact = RuntimeArtifactIdentity::from_program(program);
     if run_report.artifact != artifact || run_report.observation.artifact != artifact {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeIrRunReport",
             "RuntimeIrRunReport artifact identity does not match the exact RuntimeProgram",
         ));
     }
     if run_report.observation.target != run_report.target {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeIrRunReport",
             "RuntimeIrRunReport observation target does not match the run target",
         ));
@@ -1000,7 +1003,7 @@ fn runtime_ir_report_example<'a>(
         || run_report.evidence.core_semantic_hash != program.core_semantic_hash
         || run_report.evidence.runtime_artifact_hash != program.artifact_hash
     {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeIrRunReport",
             "RuntimeIrRunReport evidence identity does not match the exact RuntimeProgram",
         ));
@@ -1008,7 +1011,7 @@ fn runtime_ir_report_example<'a>(
     if run_report.evidence.target_example != run_report.target.example
         || run_report.evidence.checked_core_shape != run_report.target.checked_core_shape
     {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeIrRunReport",
             "RuntimeIrRunReport evidence target does not match the run target",
         ));
@@ -1019,13 +1022,13 @@ fn runtime_ir_report_example<'a>(
         .iter()
         .filter(|example| RuntimeIrTargetIdentity::from_example(example) == run_report.target);
     let Some(example) = matches.next() else {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeIrRunReport",
             "RuntimeIrRunReport target is not present in RuntimeProgram.examples",
         ));
     };
     if matches.next().is_some() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Admission,
             "RuntimeIrRunReport",
             "RuntimeIrRunReport target identity is ambiguous in RuntimeProgram.examples",
         ));
@@ -1121,6 +1124,7 @@ fn runtime_ir_comparison_error_report(
     stage: NativeDifferentialStage,
 ) -> NativeRuntimeIrComparisonReport {
     let example = run_report.target.example.clone();
+    let cause = err.cause();
     let verdict = match err {
         CraneliftBackendError::CapacityExhausted(fault) => {
             NativeRuntimeIrComparisonVerdict::CapacityExhausted(fault)
@@ -1155,5 +1159,6 @@ fn runtime_ir_comparison_error_report(
         runtime_ir: run_report,
         native: None,
         verdict,
+        cause: Some(cause),
     }
 }

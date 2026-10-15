@@ -32,6 +32,7 @@
 //! Any further widening this D1 required beyond what was traced here is
 //! named in the handback, not silently introduced.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -277,7 +278,7 @@ impl<'a> Lowering<'a> {
                 // would have fewer predecessors than the case chain has arms. That
                 // is a control-flow shape this route does not build yet, and
                 // refusing is strictly better than emitting a half-formed merge.
-                LoweringOperand::Specialized(Lowered::Trap(trap)) => Err(unsupported(
+                LoweringOperand::Specialized(Lowered::Trap(trap)) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryCarrier",
                     format!(
                         "{join} resolves at compile time to a trap ({}), and the carried join \
@@ -391,7 +392,7 @@ impl<'a> Lowering<'a> {
                 JoinResultRepresentation::NativeScalarPair => {
                     if matches!(lowered, LoweringOperand::Carried(_)) {
                         let planned = self.retained_body_occurrence(join_plan.origin)?;
-                        return Err(backend_module(format!(
+                        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                             "{join} source join {:?} ({:?}) planned native scalar lanes but \
                              lowering produced a carried boundary word",
                             join_plan.origin, planned.expr
@@ -442,7 +443,7 @@ impl<'a> Lowering<'a> {
                         payload: builder.block_params(merge)[1],
                     };
                     let kind = merge_kind.ok_or_else(|| {
-                        backend_module(format!(
+                        backend_module(LoweringCause::PlannerInvariant, format!(
                             "{join} has a continuing native predecessor without a result kind"
                         ))
                     })?;
@@ -572,7 +573,7 @@ impl<'a> Lowering<'a> {
                 )?;
                 if !self.seal_source_trap_branch(builder, &bounded_result)? {
                     let merge = merge.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "join plan omitted a merge despite a continuing carried BoundedNat predecessor"
                                 .to_string(),
                         )
@@ -626,7 +627,7 @@ impl<'a> Lowering<'a> {
                 )?;
                 if !self.seal_source_trap_branch(builder, &structural_result)? {
                     let merge = merge.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "join plan omitted a merge despite a continuing carried \
                              StructuralNat predecessor"
                                 .to_string(),
@@ -656,7 +657,7 @@ impl<'a> Lowering<'a> {
                 )?;
                 if !self.seal_source_trap_branch(builder, &represented_result)? {
                     let merge = merge.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "join plan omitted a merge despite a continuing carried Nat constructor predecessor"
                                 .to_string(),
                         )
@@ -748,7 +749,7 @@ impl<'a> Lowering<'a> {
                 // This runtime representation has no continuing predecessor.
             } else {
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a merge despite a continuing predecessor".to_string(),
                     )
                 })?;
@@ -778,7 +779,7 @@ impl<'a> Lowering<'a> {
                 // This runtime representation has no continuing predecessor.
             } else {
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a merge despite a continuing predecessor".to_string(),
                     )
                 })?;
@@ -836,13 +837,13 @@ impl<'a> Lowering<'a> {
                 .find(|(_, case)| case.constructor == self.process_symbols.result_err);
             if ok_case.is_some() || err_case.is_some() {
                 let (Some(ok_case), Some(err_case)) = (ok_case, err_case) else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "HostResult",
                         "a carried HostResult match requires both closed Result cases",
                     ));
                 };
                 if ok_case.1.binders != 1 || err_case.1.binders != 1 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "HostResult",
                         "carried Result cases must each bind exactly one selected payload",
                     ));
@@ -910,7 +911,7 @@ impl<'a> Lowering<'a> {
                 }
                 let defaulted = LoweringOperand::Specialized(Lowered::Trap(default.clone()));
                 if !self.seal_source_trap_branch(builder, &defaulted)? {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
                         "the carried Result match's closed default did not seal its branch",
                     ));
@@ -934,7 +935,7 @@ impl<'a> Lowering<'a> {
                         continue;
                     }
                     let merge = merge.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "join plan omitted a merge despite a continuing predecessor".to_string(),
                         )
                     })?;
@@ -1060,7 +1061,7 @@ impl<'a> Lowering<'a> {
                 continue;
             }
             let merge = merge.ok_or_else(|| {
-                backend_module(
+                backend_module(LoweringCause::PlannerInvariant,
                     "join plan omitted a merge despite a continuing predecessor".to_string(),
                 )
             })?;
@@ -1184,7 +1185,7 @@ impl<'a> Lowering<'a> {
                 // condition — so it takes the same failure status as every other
                 // carrier ABI violation.
                 let binders = i64::try_from(case.binders).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "BoundaryCarrier",
                         "a case binds more binders than the carrier ABI can count",
                     )
@@ -1229,7 +1230,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a merge despite a continuing predecessor".to_string(),
                     )
                 })?;
@@ -1254,7 +1255,7 @@ impl<'a> Lowering<'a> {
             // artifact-static case set lands here, at runtime, and returns.
             let defaulted = LoweringOperand::Specialized(Lowered::Trap(default.clone()));
             if !self.seal_source_trap_branch(builder, &defaulted)? {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "Match",
                     "the carried match's closed default did not seal its branch",
                 ));
@@ -1306,13 +1307,13 @@ impl<'a> Lowering<'a> {
                 let (expected_tag, expected_arity) =
                     borrowed_constructor_identity(&self.process_symbols, &case.constructor)
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "Match",
                                 format!("{} has no borrowed constructor identity", case.constructor),
                             )
                         })?;
                 if case.binders != expected_arity {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
                         format!("{} borrowed arity mismatch", case.constructor),
                     ));
@@ -1357,13 +1358,13 @@ impl<'a> Lowering<'a> {
                 let (expected_tag, expected_arity) =
                     borrowed_constructor_identity(&self.process_symbols, &case.constructor)
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "Match",
                                 format!("{} has no borrowed constructor identity", case.constructor),
                             )
                         })?;
                 if case.binders != expected_arity {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
                         format!("{} borrowed arity mismatch", case.constructor),
                     ));
@@ -1395,7 +1396,7 @@ impl<'a> Lowering<'a> {
                 let lowered = self.lower_expr(builder, body, &arm_env)?;
                 if !self.seal_source_trap_branch(builder, &lowered)? {
                     let merge = merge.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "join plan omitted a merge despite a continuing predecessor".to_string(),
                         )
                     })?;
@@ -1474,7 +1475,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 };
                 if case.binders != fields.len() {
-                    return Err(unsupported("Match", "borrowed Option arity mismatch"));
+                    return Err(unsupported(LoweringCause::PlannerInvariant, "Match", "borrowed Option arity mismatch"));
                 }
                 let arm_env = env_with(fields, env);
                 let body = self.case_body_occurrence(static_origin, index, &case.body)?;
@@ -1490,7 +1491,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "borrowed Option join omitted a merge despite a continuing predecessor"
                             .to_string(),
                     )
@@ -1509,7 +1510,7 @@ impl<'a> Lowering<'a> {
                 let unreachable_continuation = builder.create_block();
                 builder.switch_to_block(unreachable_continuation);
                 let trap = terminal_trap.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "borrowed Option join omitted both a continuing predecessor and a source \
                          trap"
                             .to_string(),
@@ -1583,7 +1584,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a merge despite a continuing predecessor".to_string(),
                     )
                 })?;
@@ -1675,7 +1676,7 @@ impl<'a> Lowering<'a> {
                 case.constructor == self.process_symbols.nat_suc && case.binders == 1
             });
             let (Some(zero), Some(suc)) = (zero, suc) else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::Fragment,
                     "BoundedNat",
                     "structural Nat match requires exact Zero and Suc predecessor arms",
                 ));
@@ -1732,7 +1733,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a BoundedNat merge despite a continuing predecessor"
                             .to_string(),
                     )
@@ -1751,7 +1752,7 @@ impl<'a> Lowering<'a> {
                 let unreachable = builder.create_block();
                 builder.switch_to_block(unreachable);
                 let trap = terminal_trap.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "BoundedNat join omitted both a continuing predecessor and a source trap"
                             .to_string(),
                     )
@@ -1861,7 +1862,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a DynamicConstructor merge despite a continuing \
                          predecessor"
                             .to_string(),
@@ -1908,7 +1909,7 @@ impl<'a> Lowering<'a> {
         ) -> Result<JoinPlanToken, CraneliftBackendError> {
             let token = self.static_transition_plan.join_plan_token(origin)?;
             if token.origin != origin {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "source join consumed a result plan for a different origin".to_string(),
                 ));
             }
@@ -1936,7 +1937,7 @@ impl<'a> Lowering<'a> {
                 | JoinConsumptionMutation::DispositionDynamicHostResultMerge => {}
             }
             if !self.function_local.consumed_join_origins.insert(origin) {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "one source join consumed its static result plan more than once".to_string(),
                 ));
             }
@@ -2030,7 +2031,7 @@ impl<'a> Lowering<'a> {
                 .source_match_case_body_origins(match_origin)?;
             let case_count = case_bodies.len();
             if selected_case.is_some_and(|index| index >= case_count) {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "selected source Match case is outside the validated child population".to_string(),
                 ));
             }
@@ -2159,7 +2160,7 @@ impl<'a> Lowering<'a> {
                                     self.function_local.consumed_join_origins.insert(join);
                                 }
                                 if self.function_local.consumed_join_origins.contains(&join) {
-                                    return Err(backend_module(
+                                    return Err(backend_module(LoweringCause::PlannerInvariant,
                                         "an owner-fed Match emitted a non-Ret case body".to_string(),
                                     ));
                                 }
@@ -2203,7 +2204,7 @@ impl<'a> Lowering<'a> {
             origin: StaticOriginId,
         ) -> Result<JoinPlanToken, CraneliftBackendError> {
             if !self.function_local.consumed_join_origins.contains(&origin) {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "source join {origin:?} requested its static result plan before consumption",
                 )));
             }
@@ -2389,17 +2390,17 @@ impl<'a> Lowering<'a> {
                     .copied(),
             );
             if let Some(origin) = covered.difference(required).next() {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "source join {origin:?} was classified outside its owning function",
                 )));
             }
             if let Some(origin) = required.difference(&covered).next() {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "function left planned source join {origin:?} neither emitted nor statically unselected",
                 )));
             }
             if self.function_local.join_disposition_finalized {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "generated function finalized its source join disposition more than once"
                         .to_string(),
                 ));
@@ -2443,7 +2444,7 @@ impl<'a> Lowering<'a> {
             func: &Function,
         ) -> Result<(), CraneliftBackendError> {
             if !self.function_local.join_disposition_finalized {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "generated function checked materialized joins before final disposition"
                         .to_string(),
                 ));
@@ -2461,7 +2462,7 @@ impl<'a> Lowering<'a> {
                     .final_reachable_join_origins
                     .is_disjoint(&self.function_local.dispositioned_join_origins)
             {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "generated function has an incomplete or overlapping final join disposition"
                         .to_string(),
                 ));
@@ -2470,7 +2471,7 @@ impl<'a> Lowering<'a> {
             let entry = func
                 .layout
                 .entry_block()
-                .ok_or_else(|| backend_module("generated function has no entry block".to_string()))?;
+                .ok_or_else(|| backend_module(LoweringCause::FinishedCode, "generated function has no entry block".to_string()))?;
             let mut reachable = BTreeSet::from([entry]);
             let mut pending = vec![entry];
             while let Some(block) = pending.pop() {
@@ -2489,7 +2490,7 @@ impl<'a> Lowering<'a> {
                 .collect::<Vec<_>>();
             for origin in overlap {
                 if !required.contains(&origin) {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "materialized-but-dead source join {origin:?} escaped its owning function",
                     )));
                 }
@@ -2519,7 +2520,7 @@ impl<'a> Lowering<'a> {
                 };
                 for block in blocks {
                     if reachable.contains(&block) {
-                        return Err(backend_module(format!(
+                        return Err(backend_module(LoweringCause::FinishedCode, format!(
                             "materialized-but-dead source join {origin:?} retained a reachable block",
                         )));
                     }
@@ -2527,7 +2528,7 @@ impl<'a> Lowering<'a> {
                         .pred_iter(block)
                         .any(|predecessor| reachable.contains(&predecessor.block))
                     {
-                        return Err(backend_module(format!(
+                        return Err(backend_module(LoweringCause::FinishedCode, format!(
                             "materialized-but-dead source join {origin:?} retained a live predecessor",
                         )));
                     }
@@ -2540,7 +2541,7 @@ impl<'a> Lowering<'a> {
                                 .iter()
                                 .any(|argument| params.contains(argument))
                             {
-                                return Err(backend_module(format!(
+                                return Err(backend_module(LoweringCause::FinishedCode, format!(
                                     "materialized-but-dead source join {origin:?} retained a reachable use",
                                 )));
                             }
@@ -2569,7 +2570,7 @@ impl<'a> Lowering<'a> {
             construct: &'static str,
         ) -> Result<(NativeScalarPairV1, ScalarMergeKind), CraneliftBackendError> {
             if join_plan.representation != JoinResultRepresentation::NativeScalarPair {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "carrier-result join reached a native-only scalar merge consumer".to_string(),
                 ));
             }
@@ -2597,7 +2598,7 @@ impl<'a> Lowering<'a> {
             self.scalar_operand_refused = false;
             if let LoweringOperand::Carried(word) = lowered {
                 let required_kind = required_kind.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "a carried scalar reached an untyped private merge consumer".to_string(),
                     )
                 })?;
@@ -2622,7 +2623,7 @@ impl<'a> Lowering<'a> {
                         builder.ins().iconst(types::I64, 0),
                     ),
                     ScalarMergeKind::RecursiveBackedge => {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             construct,
                             "a carried word cannot mint a recursive-backedge control marker",
                         ));
@@ -2664,7 +2665,7 @@ impl<'a> Lowering<'a> {
                         },
                         ScalarMergeKind::ExitCode,
                     )),
-                    _ => Err(unsupported(
+                    _ => Err(unsupported(LoweringCause::Fragment,
                         construct,
                         "checked ExitCode join is unavailable outside process-object lowering",
                     )),
@@ -2787,7 +2788,7 @@ impl<'a> Lowering<'a> {
                 },
                 _ => {
                     self.scalar_operand_refused = true;
-                    Err(unsupported(
+                    Err(unsupported(LoweringCause::Fragment,
                         construct,
                         "dynamic arms must produce scalar Int or Bool values",
                     ))
@@ -2816,7 +2817,7 @@ impl<'a> Lowering<'a> {
                 return Ok(());
             }
             match expected {
-                Some(expected) if *expected != kind => Err(unsupported(
+                Some(expected) if *expected != kind => Err(unsupported(LoweringCause::Fragment,
                     construct,
                     "dynamic native arms disagree on scalar result kind",
                 )),
@@ -2847,7 +2848,7 @@ impl LoweringOperand {
         fn specialized_join_arm(self, join: &'static str) -> Result<Lowered, CraneliftBackendError> {
             match self {
                 LoweringOperand::Specialized(lowered) => Ok(lowered),
-                LoweringOperand::Carried(_) => Err(unsupported(
+                LoweringOperand::Carried(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryCarrier",
                     format!(
                         "{join} merges native scalar lanes and has no carried lane; a boundary word \
@@ -2956,13 +2957,13 @@ impl<'a> Lowering<'a> {
                         ))
                     }
                 }
-                None => Err(backend_module(
+                None => Err(backend_module(LoweringCause::PlannerInvariant,
                     "trap branch has no generated-unit TrapWord lane".to_string(),
                 )),
                 Some(TrapExitAuthority::Root {
                     source_authorized: false,
                     ..
-                }) => Err(backend_module(
+                }) => Err(backend_module(LoweringCause::PlannerInvariant,
                     "generated function has no source-trap authority".to_string(),
                 )),
             }
@@ -2976,7 +2977,7 @@ impl FunctionLocalRefs {
         trap_offset: i32,
     ) -> Result<(), CraneliftBackendError> {
         if self.trap_exit.is_some() {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "unit trap frame was bound to a function without unit authority".to_string(),
             ));
         }
@@ -2994,7 +2995,7 @@ impl FunctionLocalRefs {
         if let Some(region) = protocol.map(|protocol| protocol.frame_region(owner, base_bytes))
             .transpose()?.flatten() {
             if self.pending_vis_frame.is_some() {
-                return Err(backend_module("pending-Vis activation frame was bound twice".to_string()));
+                return Err(backend_module(LoweringCause::PlannerInvariant, "pending-Vis activation frame was bound twice".to_string()));
             }
             self.pending_vis_frame = Some(PendingVisFrame { slots, region });
         }

@@ -1,107 +1,114 @@
-# code<TAB>label<TAB>status; append rows, never reuse a code or label
-E0001	elab.parse_error	active
-E0002	elab.non_ascii_identifier_character	active
-E0003	elab.raw_format_character	active
-E0004	elab.invalid_escape	active
-E0005	elab.foreign_name_control_character	active
-E0006	elab.named_boundary_header	active
-E0007	elab.unknown_capability_family	active
-E0008	elab.invalid_capability_authority	active
-E0009	elab.duplicate_capability_family	active
-E0010	elab.package_capabilities_not_allowed	active
-E0011	elab.missing_capability	active
-E0012	elab.unbound_name	active
-E0013	elab.if_condition_not_bool	active
-E0014	elab.positional_projection_not_pair	active
-E0015	elab.fixed_width_literal_out_of_range	active
-E0016	elab.structural_result_out_of_scope	active
-E0017	elab.structural_result_association_missing	active
-E0018	elab.structural_result_association_duplicate	active
-E0019	elab.structural_result_association_swapped	active
-E0020	elab.structural_result_association_foreign	active
-E0021	elab.recursive_result_sort_mismatch	active
-E0022	elab.recursive_result_sort_ambiguous	active
-E0023	elab.recursive_result_classifier_not_universe	active
-E0024	elab.old_pre_state_unsupported	active
-E0025	elab.mutation_outside_space	active
-E0026	elab.unsupported_space_placement	active
-E0027	elab.unresolved_con	active
-E0028	elab.declaration_identity_collision	active
-E0029	elab.duplicate_definition	active
-E0030	elab.duplicate_constructor_spelling	active
-E0031	elab.fixity_target_not_local	active
-E0032	elab.conflicting_fixity	active
-E0033	elab.non_associative_infix	active
-E0034	elab.invalid_fixity_precedence	active
-E0035	elab.import_cycle	active
-E0036	elab.premise_without_obligation_channel	active
-E0037	elab.obligation_without_channel	active
-E0038	elab.type_mismatch	active
-E0039	elab.lambda_vs_non_function	active
-E0040	elab.not_a_function	active
-E0041	elab.level_conflict	active
-E0042	elab.constructor_universe_violation	active
-E0043	elab.exhaustiveness_error	active
-E0044	elab.inferred_match_result_escapes_pattern	active
-E0045	elab.matrix_result_discovered	active
-E0046	elab.reachability_error	active
-E0047	elab.orphan_instance	active
-E0048	elab.overlapping_instances	active
-E0049	elab.unadmitted_instance	active
-E0050	elab.ambiguous_instance	active
-E0051	elab.no_instance	active
-E0052	elab.standard_operator_role_unfilled	active
-E0053	elab.standard_operator_role_wrong_shape	active
-E0054	elab.standard_operator_roles_share_a_binding	active
-E0055	elab.instance_head_spellings_share_an_identity	active
-E0056	elab.instance_carrier_identity_mismatch	active
-E0057	elab.non_terminating_instances	active
-E0058	elab.ambiguous_reference	active
-E0059	elab.re_export_collision	active
-E0060	elab.internal	active
-E0061	compiler.empty_package_name	active
-E0062	compiler.empty_source_set	active
-E0063	compiler.io	active
-E0064	compiler.package	active
-E0065	compiler.omega_erasure_plan	active
-E0066	compiler.missing_target	active
-E0067	compiler.ambiguous_manifest_target	active
-E0068	compiler.mismatched_package_identity	active
-E0069	compiler.target_from_different_package	active
-E0070	compiler.missing_stable_symbol	active
-E0071	compiler.duplicate_stable_symbol	active
-E0072	compiler.duplicate_obligation_id	active
-E0073	compiler.package_reference_outside_package	active
-E0074	compiler.missing_closure_metadata	active
-E0075	compiler.checked_core_body_view	active
-E0076	compiler.entrypoint_closure_package_mismatch	active
-E0077	compiler.duplicate_boundary_header	active
-E0078	native_build.admission	active
-E0079	native_build.erasure	active
-E0080	native_build.packaging	active
-E0081	native_build.unavailable	active
-K0001	kernel.var_out_of_scope	active
-K0002	kernel.k2_reserved_former	active
-K0003	kernel.universe_inconsistency	active
-K0004	kernel.type_mismatch	active
-K0005	kernel.not_a_function	active
-K0006	kernel.not_a_sigma	active
-K0007	kernel.positivity_violation	active
-K0008	kernel.constructor_universe_violation	active
-K0009	kernel.ill_formed_decl	active
-K0010	kernel.level_arity_mismatch	active
-K0011	kernel.bad_eliminator	active
-K0012	kernel.primitive	active
-K0013	kernel.msg	active
-K0014	kernel.not_terminating	active
-X0001	run_io.unknown_effect	active
-X0002	run_io.unknown_tree	active
-X0003	run_io.not_an_io_tree	active
-X0004	run.duplicate_entrypoint	active
-X0005	run.missing_entrypoint	active
-X0006	run.entrypoint_abi_unavailable	active
-X0007	run.missing_capability	active
-X0008	run.invalid_entrypoint	active
-X0009	run.console_abi_unavailable	active
-X0010	run.root_execution_observation_unavailable	active
-X0011	run.capability_root	active
+# code<TAB>label<TAB>status<TAB>variant; append rows, never reuse code or label
+E0001	elab.parse_error	active	ElabError::ParseError
+E0002	elab.non_ascii_identifier_character	active	ElabError::NonAsciiIdentifierCharacter
+E0003	elab.raw_format_character	active	ElabError::RawFormatCharacter
+E0004	elab.invalid_escape	active	ElabError::InvalidEscape
+E0005	elab.foreign_name_control_character	active	ElabError::ForeignNameControlCharacter
+E0006	elab.named_boundary_header	active	ElabError::NamedBoundaryHeader
+E0007	elab.unknown_capability_family	active	ElabError::UnknownCapabilityFamily
+E0008	elab.invalid_capability_authority	active	ElabError::InvalidCapabilityAuthority
+E0009	elab.duplicate_capability_family	active	ElabError::DuplicateCapabilityFamily
+E0010	elab.package_capabilities_not_allowed	active	ElabError::PackageCapabilitiesNotAllowed
+E0011	elab.missing_capability	active	ElabError::MissingCapability
+E0012	elab.unbound_name	active	ElabError::UnboundName
+E0013	elab.if_condition_not_bool	active	ElabError::IfConditionNotBool
+E0014	elab.positional_projection_not_pair	active	ElabError::PositionalProjectionNotPair
+E0015	elab.fixed_width_literal_out_of_range	active	ElabError::FixedWidthLiteralOutOfRange
+E0016	elab.structural_result_out_of_scope	active	ElabError::StructuralResultOutOfScope
+E0017	elab.structural_result_association_missing	active	ElabError::StructuralResultAssociationMissing
+E0018	elab.structural_result_association_duplicate	active	ElabError::StructuralResultAssociationDuplicate
+E0019	elab.structural_result_association_swapped	active	ElabError::StructuralResultAssociationSwapped
+E0020	elab.structural_result_association_foreign	active	ElabError::StructuralResultAssociationForeign
+E0021	elab.recursive_result_sort_mismatch	active	ElabError::RecursiveResultSortMismatch
+E0022	elab.recursive_result_sort_ambiguous	active	ElabError::RecursiveResultSortAmbiguous
+E0023	elab.recursive_result_classifier_not_universe	active	ElabError::RecursiveResultClassifierNotUniverse
+E0024	elab.old_pre_state_unsupported	active	ElabError::OldPreStateUnsupported
+E0025	elab.mutation_outside_space	active	ElabError::MutationOutsideSpace
+E0026	elab.unsupported_space_placement	active	ElabError::UnsupportedSpacePlacement
+E0027	elab.unresolved_con	active	ElabError::UnresolvedCon
+E0028	elab.declaration_identity_collision	active	ElabError::DeclarationIdentityCollision
+E0029	elab.duplicate_definition	active	ElabError::DuplicateDefinition
+E0030	elab.duplicate_constructor_spelling	active	ElabError::DuplicateConstructorSpelling
+E0031	elab.fixity_target_not_local	active	ElabError::FixityTargetNotLocal
+E0032	elab.conflicting_fixity	active	ElabError::ConflictingFixity
+E0033	elab.non_associative_infix	active	ElabError::NonAssociativeInfix
+E0034	elab.invalid_fixity_precedence	active	ElabError::InvalidFixityPrecedence
+E0035	elab.import_cycle	active	ElabError::ImportCycle
+E0036	elab.premise_without_obligation_channel	active	ElabError::PremiseWithoutObligationChannel
+E0037	elab.obligation_without_channel	active	ElabError::ObligationWithoutChannel
+E0038	elab.type_mismatch	active	ElabError::TypeMismatch
+E0039	elab.lambda_vs_non_function	active	ElabError::LambdaVsNonFunction
+E0040	elab.not_a_function	active	ElabError::NotAFunction
+E0041	elab.level_conflict	active	ElabError::LevelConflict
+E0042	elab.constructor_universe_violation	active	ElabError::ConstructorUniverseViolation
+E0043	elab.exhaustiveness_error	active	ElabError::ExhaustivenessError
+E0044	elab.inferred_match_result_escapes_pattern	active	ElabError::InferredMatchResultEscapesPattern
+E0045	elab.matrix_result_discovered	active	ElabError::MatrixResultDiscovered
+E0046	elab.reachability_error	active	ElabError::ReachabilityError
+E0047	elab.orphan_instance	active	ElabError::OrphanInstance
+E0048	elab.overlapping_instances	active	ElabError::OverlappingInstances
+E0049	elab.unadmitted_instance	active	ElabError::UnadmittedInstance
+E0050	elab.ambiguous_instance	active	ElabError::AmbiguousInstance
+E0051	elab.no_instance	active	ElabError::NoInstance
+E0052	elab.standard_operator_role_unfilled	active	ElabError::StandardOperatorRoleUnfilled
+E0053	elab.standard_operator_role_wrong_shape	active	ElabError::StandardOperatorRoleWrongShape
+E0054	elab.standard_operator_roles_share_a_binding	active	ElabError::StandardOperatorRolesShareABinding
+E0055	elab.instance_head_spellings_share_an_identity	active	ElabError::InstanceHeadSpellingsShareAnIdentity
+E0056	elab.instance_carrier_identity_mismatch	active	ElabError::InstanceCarrierIdentityMismatch
+E0057	elab.non_terminating_instances	active	ElabError::NonTerminatingInstances
+E0058	elab.ambiguous_reference	active	ElabError::AmbiguousReference
+E0059	elab.re_export_collision	active	ElabError::ReExportCollision
+E0060	elab.internal	active	ElabError::Internal
+E0061	compiler.empty_package_name	active	CompilerDriverError::EmptyPackageName
+E0062	compiler.empty_source_set	active	CompilerDriverError::EmptySourceSet
+E0063	compiler.io	active	CompilerDriverError::Io
+E0064	compiler.package	active	CompilerDriverError::Package
+E0065	compiler.omega_erasure_plan	active	CompilerDriverError::OmegaErasurePlan
+E0066	compiler.missing_target	active	CompilerDriverError::MissingTarget
+E0067	compiler.ambiguous_manifest_target	active	CompilerDriverError::AmbiguousManifestTarget
+E0068	compiler.mismatched_package_identity	active	CompilerDriverError::MismatchedPackageIdentity
+E0069	compiler.target_from_different_package	active	CompilerDriverError::TargetFromDifferentPackage
+E0070	compiler.missing_stable_symbol	active	CompilerDriverError::MissingStableSymbol
+E0071	compiler.duplicate_stable_symbol	active	CompilerDriverError::DuplicateStableSymbol
+E0072	compiler.duplicate_obligation_id	active	CompilerDriverError::DuplicateObligationId
+E0073	compiler.package_reference_outside_package	active	CompilerDriverError::PackageReferenceOutsidePackage
+E0074	compiler.missing_closure_metadata	active	CompilerDriverError::MissingClosureMetadata
+E0075	compiler.checked_core_body_view	active	CompilerDriverError::CheckedCoreBodyView
+E0076	compiler.entrypoint_closure_package_mismatch	active	CompilerDriverError::EntrypointClosurePackageMismatch
+E0077	compiler.duplicate_boundary_header	active	CompilerDriverError::DuplicateBoundaryHeader
+E0078	native_build.admission	active	NativeProgramBuildError::Admission
+E0079	native_build.erasure	active	NativeProgramBuildError::Erasure
+E0080	native_build.packaging	retired	NativeProgramBuildError::Packaging
+E0081	native_build.unavailable	active	NativeProgramBuildError::Unavailable
+K0001	kernel.var_out_of_scope	active	KernelError::VarOutOfScope
+K0002	kernel.k2_reserved_former	active	KernelError::K2ReservedFormer
+K0003	kernel.universe_inconsistency	active	KernelError::UniverseInconsistency
+K0004	kernel.type_mismatch	active	KernelError::TypeMismatch
+K0005	kernel.not_a_function	active	KernelError::NotAFunction
+K0006	kernel.not_a_sigma	active	KernelError::NotASigma
+K0007	kernel.positivity_violation	active	KernelError::PositivityViolation
+K0008	kernel.constructor_universe_violation	active	KernelError::ConstructorUniverseViolation
+K0009	kernel.ill_formed_decl	active	KernelError::IllFormedDecl
+K0010	kernel.level_arity_mismatch	active	KernelError::LevelArityMismatch
+K0011	kernel.bad_eliminator	active	KernelError::BadEliminator
+K0012	kernel.primitive	active	KernelError::Primitive
+K0013	kernel.msg	active	KernelError::Msg
+K0014	kernel.not_terminating	active	KernelError::NotTerminating
+X0001	run_io.unknown_effect	active	RunIoError::UnknownEffect
+X0002	run_io.unknown_tree	active	RunIoError::UnknownTree
+X0003	run_io.not_an_io_tree	active	RunIoError::NotAnIOTree
+X0004	run.duplicate_entrypoint	active	RunError::DuplicateEntrypoint
+X0005	run.missing_entrypoint	active	RunError::MissingEntrypoint
+X0006	run.entrypoint_abi_unavailable	active	RunError::EntrypointAbiUnavailable
+X0007	run.missing_capability	active	RunError::MissingCapability
+X0008	run.invalid_entrypoint	active	RunError::InvalidEntrypoint
+X0009	run.console_abi_unavailable	active	RunError::ConsoleAbiUnavailable
+X0010	run.root_execution_observation_unavailable	active	RunError::RootExecutionObservationUnavailable
+X0011	run.capability_root	active	RunError::CapabilityRoot
+N0001	native.fragment	active	LoweringCause::Fragment
+N0002	native.capacity	active	LoweringCause::Capacity
+N0003	native.planner_invariant	active	LoweringCause::PlannerInvariant
+N0004	native.finished_code	active	LoweringCause::FinishedCode
+N0005	native.admission	active	LoweringCause::Admission
+N0006	native.backend	active	LoweringCause::Backend
+N0007	native.resource_enforcement	active	LoweringCause::ResourceEnforcement

@@ -5,6 +5,7 @@
 #[cfg(test)]
 mod tests;
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
 
@@ -68,7 +69,7 @@ impl<K> Default for FrameEvents<K> {
 }
 
 fn refusal(reason: impl Into<String>) -> CraneliftBackendError {
-    unsupported("OrientedSubcontinuationPlanV1", reason)
+    unsupported(LoweringCause::PlannerInvariant, "OrientedSubcontinuationPlanV1", reason)
 }
 
 // The generated-unit ABI returns exactly one I64 status. A nonzero constant

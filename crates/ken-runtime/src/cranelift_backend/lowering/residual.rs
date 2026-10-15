@@ -1,6 +1,7 @@
 //! Private representation of an issued recursive-position residual. Only this
 //! module can read its SSA word or turn it into an ordinary boundary value.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 /// The slot, not a dynamically selected member of its closed flow.
@@ -95,9 +96,9 @@ impl<'a> Lowering<'a> {
         slot: &RecursiveCarrierSlot,
     ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
         if residual.slot != RecursiveCarrierSlotKey::of(slot) || slot.flow.len() < 2 {
-            return Err(unsupported("RecursiveResidual", "label reader has no matching issued slot"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "label reader has no matching issued slot"));
         }
-        let first = *slot.flow.first().ok_or_else(|| unsupported(
+        let first = *slot.flow.first().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "the labelled slot has no member",
         ))?;
         let label_index = slot.variant(first)?.role_index(RecursiveCarrierRole::Label)?;
@@ -119,13 +120,13 @@ impl<'a> Lowering<'a> {
         disposition: &RecursiveResidualDisposition,
     ) -> Result<RecursiveCarrierVariant, CraneliftBackendError> {
         if !disposition.wrapped() {
-            return Err(unsupported("RecursiveResidual", "the bound residual has no issued sum schema"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the bound residual has no issued sum schema"));
         }
         let slot = self.static_transition_plan
             .recursive_carrier_for_specialization(disposition.specialization)?
-            .ok_or_else(|| unsupported("RecursiveResidual", "the bound residual has no planner slot"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the bound residual has no planner slot"))?;
         if residual.slot != RecursiveCarrierSlotKey::of(slot) {
-            return Err(unsupported("RecursiveResidual", "R has a foreign slot key at W/C consumption"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "R has a foreign slot key at W/C consumption"));
         }
         let variant = slot.variant(disposition.specialization)?.clone();
         if disposition.record != Some(variant.record)
@@ -134,7 +135,7 @@ impl<'a> Lowering<'a> {
             || disposition.constructor != slot.constructor
             || variant.roles.len() != disposition.field_count()
         {
-            return Err(unsupported("RecursiveResidual", "the bound residual differs from its issued slot variant"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the bound residual differs from its issued slot variant"));
         }
         let wrapped = CarriedBoundaryWord { word: residual.word };
         let class = self.emit_carrier_class(builder, wrapped)?;
@@ -168,7 +169,7 @@ impl<'a> Lowering<'a> {
         });
         let mut worker = Vec::with_capacity(disposition.worker_captures as usize);
         for ordinal in 0..disposition.worker_captures {
-            let seat = seat.ok_or_else(|| unsupported(
+            let seat = seat.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "a residual worker role has no issued capture seat",
             ))?;
             let index = variant.role_index(RecursiveCarrierRole::WorkerCapture { seat, ordinal })?;
@@ -192,7 +193,7 @@ impl<'a> Lowering<'a> {
         let key = residual.slot();
         let slot = self.static_transition_plan.recursive_carrier_slot(
             key.eliminator, key.constructor, key.position,
-        )?.ok_or_else(|| unsupported("RecursiveResidual", "residual names no issued slot"))?.clone();
+        )?.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "residual names no issued slot"))?.clone();
         let wrapped = CarriedBoundaryWord { word: residual.word };
         let class = self.emit_carrier_class(builder, wrapped)?;
         Self::require_i64(builder, class, BoundaryClass::Record as i64);
@@ -200,7 +201,7 @@ impl<'a> Lowering<'a> {
         Self::require_i64(builder, tag, 1);
         let labelled = slot.flow.len() > 1;
         let ordinal = if labelled {
-            let first = *slot.flow.first().ok_or_else(|| unsupported(
+            let first = *slot.flow.first().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "a residual slot has no flow",
             ))?;
             let label_index = slot.variant(first)?.role_index(RecursiveCarrierRole::Label)?;
@@ -224,7 +225,7 @@ impl<'a> Lowering<'a> {
                 let chosen = builder.ins().icmp_imm(
                     cranelift_codegen::ir::condcodes::IntCC::Equal,
                     ordinal,
-                    i64::try_from(index).map_err(|_| unsupported(
+                    i64::try_from(index).map_err(|_| unsupported(LoweringCause::Capacity,
                         "RecursiveResidual", "a residual variant index exceeds its label ABI",
                     ))?,
                 );
@@ -253,7 +254,7 @@ impl<'a> Lowering<'a> {
         // false comparison. Seal that unreachable block before the value join.
         let refused = builder.ins().iconst(types::I64, -1);
         builder.ins().return_(&[refused]);
-        let join = join.ok_or_else(|| unsupported(
+        let join = join.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "a singleton residual has no issued member",
         ))?;
         builder.switch_to_block(join);
@@ -268,7 +269,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
         let schema = self.static_transition_plan.aggregate_record_view(variant.record)?;
         if schema.shape() != PlannedAggregateShape::Record {
-            return Err(unsupported("RecursiveResidual", "the issued variant is not a Record"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the issued variant is not a Record"));
         }
         let wrapped = CarriedBoundaryWord { word: residual.word };
         let count = self.emit_carrier_field_count(builder, wrapped)?;

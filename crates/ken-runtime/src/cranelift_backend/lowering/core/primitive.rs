@@ -3,6 +3,7 @@
 //! This child owns primitive argument evaluation, partiality, carried
 //! projection, representation checks, symbol dispatch, and emission.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 use unicode_normalization::UnicodeNormalization;
 
@@ -110,7 +111,7 @@ impl<'a> Lowering<'a> {
                     vec![self.lower_carried_bytes_operand(builder, *word)?]
                 }
                 _ => {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "PrimitiveCall",
                         "bytes_length requires exactly one bytes operand",
                     ));
@@ -137,7 +138,7 @@ impl<'a> Lowering<'a> {
                         let value = self.emit_carrier_scalar(builder, word)?;
                         Ok(self.lower_dynamic_small_int(builder, value))
                     }
-                    (_, LoweringOperand::Carried(_)) => Err(unsupported(
+                    (_, LoweringOperand::Carried(_)) => Err(unsupported(LoweringCause::Fragment,
                         "PrimitiveCall",
                         "bytes_at received more operands than its closed static signature",
                     )),
@@ -214,7 +215,7 @@ impl<'a> Lowering<'a> {
             ),
             "uint8_to_int" | "int_to_uint8_raw" | "int_to_uint64_raw" => {
                 let [value]: [Lowered; 1] = lowered_args.try_into().map_err(|args: Vec<_>| {
-                    unsupported(
+                    unsupported(LoweringCause::Fragment,
                         "PrimitiveCall",
                         format!(
                             "{} expects one argument, got {}",
@@ -224,7 +225,7 @@ impl<'a> Lowering<'a> {
                     )
                 })?;
                 let Lowered::Int { .. } = value else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "PrimitiveCall",
                         format!("{} expects an Int-represented value", primitive.symbol),
                     ));
@@ -254,7 +255,7 @@ impl<'a> Lowering<'a> {
             "bytes_decode" => self.lower_bytes_decode(lowered_args, &primitive.partiality),
             "list_char_to_string" => {
                 let [value]: [Lowered; 1] = lowered_args.try_into().map_err(|args: Vec<_>| {
-                    unsupported(
+                    unsupported(LoweringCause::Fragment,
                         "PrimitiveCall",
                         format!(
                             "list_char_to_string expects one argument, got {}",
@@ -263,7 +264,7 @@ impl<'a> Lowering<'a> {
                     )
                 })?;
                 let chars = lowered_char_list(&value).ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::Fragment,
                         "PrimitiveCall",
                         "list_char_to_string requires a closed List Char of Unicode scalars",
                     )
@@ -272,7 +273,7 @@ impl<'a> Lowering<'a> {
             }
             "byte_length" => self.lower_string_byte_length(builder, lowered_args),
             "char_length" => self.lower_string_char_length(builder, lowered_args),
-            other => Err(unsupported(
+            other => Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("primitive {other} is not in the supported native set"),
             )),
@@ -301,7 +302,7 @@ impl<'a> Lowering<'a> {
             },
         ) = (lhs, rhs)
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("{symbol} only supports Int arguments in native lowering"),
             ));
@@ -311,7 +312,7 @@ impl<'a> Lowering<'a> {
             NativeIntLoweringMutation::Exact => {}
             NativeIntLoweringMutation::Wrapping => {}
             NativeIntLoweringMutation::Trap => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "PrimitiveCall",
                     "PX8-I mutation traps before exact Int support",
                 ));
@@ -322,13 +323,13 @@ impl<'a> Lowering<'a> {
         let lhs_tag = self.native_int_tag(builder, lhs, lhs_known)?;
         let rhs_tag = self.native_int_tag(builder, rhs, rhs_known)?;
         let arena = self.function_local.native_int_arena.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 "exact Int operation has no invocation arena",
             )
         })?;
         let helper = self.function_local.native_int_binop.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 "exact Int operation has no local support function",
             )
@@ -387,7 +388,7 @@ impl<'a> Lowering<'a> {
             },
         ) = (lhs, rhs)
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("{symbol} only supports Int arguments in native lowering"),
             ));
@@ -395,13 +396,13 @@ impl<'a> Lowering<'a> {
         let lhs_tag = self.native_int_tag(builder, lhs, lhs_known)?;
         let rhs_tag = self.native_int_tag(builder, rhs, rhs_known)?;
         let arena = self.function_local.native_int_arena.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 "exact Int comparison has no invocation arena",
             )
         })?;
         let helper = self.function_local.native_int_compare.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 "exact Int comparison has no local support function",
             )
@@ -431,13 +432,13 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(
+            unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("not_bool expects 1 arg, got {}", args.len()),
             )
         })?;
         let Lowered::Bool { value, known } = arg else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "not_bool only supports Bool arguments in native lowering",
             ));
@@ -473,7 +474,7 @@ impl<'a> Lowering<'a> {
             },
         ) = (lhs, rhs)
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("{symbol} only supports Bool arguments in native lowering"),
             ));
@@ -565,7 +566,7 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(
+            unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("bytes_length expects 1 arg, got {}", args.len()),
             )
@@ -584,13 +585,13 @@ impl<'a> Lowering<'a> {
             return self.lower_unsigned_u64_int(builder, len);
         }
         let Lowered::Bytes(bytes) = arg else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_length only supports Bytes arguments in native lowering",
             ));
         };
         let len = i64::try_from(bytes.len()).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "PrimitiveCall",
                 "bytes_length result does not fit the runtime Int representation",
             )
@@ -608,7 +609,7 @@ impl<'a> Lowering<'a> {
         partiality: &RuntimePartiality,
     ) -> Result<Lowered, CraneliftBackendError> {
         let RuntimePartiality::SafeOption { none, some, .. } = partiality else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_at requires safe Option result metadata",
             ));
@@ -618,7 +619,7 @@ impl<'a> Lowering<'a> {
             known: Some(index), ..
         } = index
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_at requires a statically known Int index",
             ));
@@ -714,7 +715,7 @@ impl<'a> Lowering<'a> {
             });
         }
         let Lowered::Bytes(bytes) = bytes else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_at requires Bytes in native lowering",
             ));
@@ -747,13 +748,13 @@ impl<'a> Lowering<'a> {
         partiality: &RuntimePartiality,
     ) -> Result<Lowered, CraneliftBackendError> {
         let RuntimePartiality::SafeOption { none, some, .. } = partiality else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_slice requires safe Option result metadata",
             ));
         };
         let [bytes, start, len]: [Lowered; 3] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(
+            unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("bytes_slice expects 3 args, got {}", args.len()),
             )
@@ -768,7 +769,7 @@ impl<'a> Lowering<'a> {
             },
         ) = (bytes, start, len)
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_slice requires Bytes and statically known Int bounds",
             ));
@@ -801,7 +802,7 @@ impl<'a> Lowering<'a> {
     fn lower_bytes_concat(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {
         let (lhs, rhs) = expect_two_args("bytes_concat", args)?;
         let (Lowered::Bytes(mut lhs), Lowered::Bytes(rhs)) = (lhs, rhs) else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_concat only supports Bytes arguments in native lowering",
             ));
@@ -812,13 +813,13 @@ impl<'a> Lowering<'a> {
 
     fn lower_bytes_encode(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(
+            unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("bytes_encode expects 1 arg, got {}", args.len()),
             )
         })?;
         let Lowered::String(value) = arg else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_encode only supports String arguments in native lowering",
             ));
@@ -832,19 +833,19 @@ impl<'a> Lowering<'a> {
         partiality: &RuntimePartiality,
     ) -> Result<Lowered, CraneliftBackendError> {
         let RuntimePartiality::SafeResult { err, ok, error } = partiality else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_decode requires safe Result metadata",
             ));
         };
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(
+            unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("bytes_decode expects 1 arg, got {}", args.len()),
             )
         })?;
         let Lowered::Bytes(value) = arg else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "bytes_decode only supports Bytes arguments in native lowering",
             ));
@@ -878,19 +879,19 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(
+            unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("byte_length expects 1 arg, got {}", args.len()),
             )
         })?;
         let Lowered::String(value) = arg else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "byte_length only supports String arguments in native lowering",
             ));
         };
         let len = i64::try_from(value.len()).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "PrimitiveCall",
                 "byte_length result does not fit the runtime Int representation",
             )
@@ -907,19 +908,19 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(
+            unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 format!("char_length expects 1 arg, got {}", args.len()),
             )
         })?;
         let Lowered::String(value) = arg else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "PrimitiveCall",
                 "char_length only supports String arguments in native lowering",
             ));
         };
         let len = i64::try_from(value.chars().count()).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "PrimitiveCall",
                 "char_length result does not fit the runtime Int representation",
             )

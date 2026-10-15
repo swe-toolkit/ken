@@ -10,6 +10,7 @@
 //! artifact -> lowering. Test-only adapter reach is not a production DAG edge
 //! in either direction (§10.3), which is why both can coexist without a cycle.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 use std::mem;
@@ -46,7 +47,7 @@ fn scalar_join_feedback_does_not_retry_unmarked_recursive_backedge() {
             entered += 1;
             assert!(forced.is_empty());
             assert_eq!(refused.get(), None);
-            Err::<(), _>(crate::cranelift_backend::surface::unsupported(
+            Err::<(), _>(crate::cranelift_backend::surface::unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveBackedge",
                 "a carried word cannot mint a recursive-backedge control marker",
             ))

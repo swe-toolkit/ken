@@ -1841,20 +1841,19 @@ mod tests {
     }
 
 
-    /// Emit one fixture end to end, returning the failure text if it refuses.
+    /// Emit one fixture end to end, preserving a typed failure if it refuses.
     #[cfg(test)]
     pub(in crate::cranelift_backend::planning::static_transition) fn ac3_emit(
         root: &RuntimeExpr,
         declarations: &BTreeMap<&str, &RuntimeDeclaration>,
-    ) -> Result<(), String> {
+    ) -> Result<(), CraneliftBackendError> {
         use crate::cranelift_backend::artifact::new_object_module_for_lowering_tests;
         use crate::cranelift_backend::lowering::core::{
             compile_expr_into_object_module, NativeSeedEnvironment,
         };
         let seed_env = NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
         compile_expr_into_object_module(
-            new_object_module_for_lowering_tests("ac3")
-                .map_err(|error| format!("{error:?}"))?,
+            new_object_module_for_lowering_tests("ac3")?,
             "ac3_entry",
             cranelift_module::Linkage::Export,
             root,
@@ -1867,7 +1866,6 @@ mod tests {
             None,
         )
         .map(|_| ())
-        .map_err(|error| format!("{error:?}"))
     }
 
     /// **`RT-BODY-OCCURRENCE-PROVENANCE` `AC-3` — collapsing the issued body
@@ -1924,11 +1922,12 @@ mod tests {
         );
         assert_eq!(
             collapsed_root,
-            Err(
-                "Backend(Module(\"function left planned source join StaticOriginId(5) \
-                 neither emitted nor statically unselected\"))"
-                    .to_string()
-            ),
+            Err(CraneliftBackendError::Backend(BackendFailure::Module {
+                reason: "function left planned source join StaticOriginId(5) \
+                         neither emitted nor statically unselected"
+                    .to_string(),
+                cause: LoweringCause::PlannerInvariant,
+            })),
             "AC-3: with the body collapsed to the scheduling entry the traversal \
              enters the entry and never reaches the join subtree, so closeout \
              finds a required join neither consumed nor dispositioned"
@@ -1950,10 +1949,14 @@ mod tests {
             || ac3_emit(&root, &declarations),
         );
         assert!(
-            collapsed_declaration
-                .as_ref()
-                .err()
-                .is_some_and(|message| message.contains("planned source join")),
+            matches!(
+                &collapsed_declaration,
+                Err(CraneliftBackendError::Backend(BackendFailure::Module {
+                    reason,
+                    cause: LoweringCause::PlannerInvariant,
+                })) if reason.contains("planned source join")
+                    && reason.contains("neither emitted nor statically unselected")
+            ),
             "AC-3: the non-root unit is the population the removed root-only \
              substitution never covered; collapsing its body must recreate the \
              same closeout failure. got {collapsed_declaration:?}"
@@ -2065,11 +2068,12 @@ mod tests {
         );
         assert_eq!(
             collapsed,
-            Err(
-                "Backend(Module(\"retained body StaticOriginId(7) has no graph-derived call \
-                 target in this unit\"))"
-                    .to_string()
-            ),
+            Err(CraneliftBackendError::Backend(BackendFailure::Module {
+                reason: "retained body StaticOriginId(7) has no graph-derived call \
+                         target in this unit"
+                    .to_string(),
+                cause: LoweringCause::PlannerInvariant,
+            })),
             "AC-3: restoring the retired fallback for this class alone must \
              corrupt the retained body's exact entry/body call projection"
         );

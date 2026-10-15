@@ -88,7 +88,7 @@ fn d2k_wall_under_current_selector(
     let (result, _trace) = px8j_capture_source_trace(expression, false, symbol);
     match result {
         Ok(_) => None,
-        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason })) => {
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. })) => {
             // The edge is the prefix the caller supplied; the rest of the
             // sentence is the chokepoint's own and is shared by construction,
             // so it cannot discriminate anything.
@@ -3699,7 +3699,7 @@ fn r3_the_base_uncomposed_slot_population_stays_singleton_and_rehomed_expects_no
         .map(|(cause, outer, inner, callee, error)| {
             let ordinary = matches!(
                 error,
-                Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }))
+                Some(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }))
                     if *construct == "ComputationalMatch"
                         && reason.contains("in-flight activation")
             );

@@ -16,6 +16,7 @@ use super::{
     StaticTransitionPlan,
 };
 use crate::cranelift_backend::lowering::core::agreeing_recursive_body_unit;
+use crate::cranelift_backend::surface::LoweringCause;
 use crate::{CheckedComputationalIHInvocationKind, OrientedSubcontinuationPlanV1};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -178,10 +179,30 @@ pub enum PendingRefusal {
     RouteLeavesDefiningFunction,
     NotLinearOrMustReach,
     UnsupportedRouteEdge,
+    /// A required planner lookup failed; it is not a route-shape refusal.
+    RouteLookupFailed,
+    /// A de Bruijn route shift overflowed the u32 index space.
+    RouteIndexOverflow,
     MissingDeclaredMembers,
     RelocatedWorkMissingLoweringBinding,
     SelectedPendingLeafRelocatesUnaccountedJoins,
     PendingResultNotValidatedByResponseOwner,
+}
+
+impl PendingRefusal {
+    pub(in crate::cranelift_backend) fn cause(self) -> LoweringCause {
+        match self {
+            Self::RouteLeavesDefiningFunction
+            | Self::NotLinearOrMustReach
+            | Self::UnsupportedRouteEdge
+            | Self::MissingDeclaredMembers
+            | Self::RelocatedWorkMissingLoweringBinding
+            | Self::SelectedPendingLeafRelocatesUnaccountedJoins
+            | Self::PendingResultNotValidatedByResponseOwner => LoweringCause::Fragment,
+            Self::RouteLookupFailed => LoweringCause::PlannerInvariant,
+            Self::RouteIndexOverflow => LoweringCause::Capacity,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -453,7 +474,7 @@ impl StaticTransitionPlan<'_> {
                 Ok(true)
             }
             Some(PendingCallAdmission::Refused(reason)) => Err(unsupported(
-                "PendingCallAdmission", format!("refused pending call: {reason:?}"),
+                reason.cause(), "PendingCallAdmission", format!("refused pending call: {reason:?}"),
             )),
             Some(PendingCallAdmission::NotApplicable) | None => Ok(false),
         }
@@ -929,13 +950,13 @@ fn prove_route(
 > {
     let root = plan
         .root_static_origin()
-        .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
+        .map_err(|_| PendingRefusal::RouteLookupFailed)?;
     if occurrence_authority(plan, root)
-        .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?
+        .map_err(|_| PendingRefusal::RouteLookupFailed)?
         .owner
         == owner
         || occurrence_authority(plan, producer)
-            .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?
+            .map_err(|_| PendingRefusal::RouteLookupFailed)?
             .owner
             != owner
     {
@@ -984,10 +1005,10 @@ fn prove_route(
 /// Calls, closure boundaries and owner changes refuse rather than inventing
 /// an F5/F6 transport. The source occurrence tree bounds traversal.
 fn shifted_pending_ih(index: u32, binders: usize) -> Result<u32, PendingRefusal> {
-    let shift = u32::try_from(binders).map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
+    let shift = u32::try_from(binders).map_err(|_| PendingRefusal::RouteIndexOverflow)?;
     index
         .checked_add(shift)
-        .ok_or(PendingRefusal::UnsupportedRouteEdge)
+        .ok_or(PendingRefusal::RouteIndexOverflow)
 }
 
 fn walk_to_gate(
@@ -1003,12 +1024,12 @@ fn walk_to_gate(
     require_defining_function(
         owner,
         occurrence_authority(plan, origin)
-            .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?
+            .map_err(|_| PendingRefusal::RouteLookupFailed)?
             .owner,
     )?;
     let expr = plan
         .planned_occurrence_expr(origin)
-        .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
+        .map_err(|_| PendingRefusal::RouteLookupFailed)?;
     let kind = route_kind(expr)?;
     if visited
         .kinds
@@ -1020,7 +1041,7 @@ fn walk_to_gate(
     let child = |position| {
         plan.semantic
             .child_origin(origin, position)
-            .map_err(|_| PendingRefusal::UnsupportedRouteEdge)
+            .map_err(|_| PendingRefusal::RouteLookupFailed)
     };
     match expr {
         RuntimeExpr::Trap(_) => Ok(Vec::new()),
@@ -1056,7 +1077,7 @@ fn walk_to_gate(
             require_defining_function(
                 owner,
                 occurrence_authority(plan, gate)
-                    .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?
+                    .map_err(|_| PendingRefusal::RouteLookupFailed)?
                     .owner,
             )?;
             // The marked callee is this authorized pending IH; ordinary call
@@ -1483,7 +1504,7 @@ fn walk_sequence(
     let child = plan
         .semantic
         .child_origin(parent, index)
-        .map_err(|_| PendingRefusal::UnsupportedRouteEdge)?;
+        .map_err(|_| PendingRefusal::RouteLookupFailed)?;
     let prefix = walk_to_gate(
         plan,
         child,
@@ -1516,6 +1537,56 @@ fn walk_sequence(
 mod tests {
     use super::*;
     use crate::CheckedComputationalIHBinderMorphism;
+
+    #[test]
+    fn route_refusal_predicates_keep_distinct_typed_causes() {
+        assert_eq!(PendingRefusal::UnsupportedRouteEdge.cause().code().as_str(), "N0001");
+        assert_eq!(PendingRefusal::RouteLookupFailed.cause().code().as_str(), "N0003");
+        assert_eq!(PendingRefusal::RouteIndexOverflow.cause().code().as_str(), "N0002");
+        assert_eq!(
+            PendingRefusal::PendingResultNotValidatedByResponseOwner
+                .cause()
+                .code()
+                .as_str(),
+            "N0001"
+        );
+    }
+
+    #[test]
+    fn planner_lookup_and_fixed_route_index_fail_at_their_own_predicates() {
+        let expr = RuntimeExpr::Value(crate::RuntimeValue::Bool(true));
+        let plan = super::super::plan_static_transition_graph(&expr, &BTreeMap::new())
+            .expect("the simple root plans");
+        let root = plan.root_static_origin().expect("root exists");
+        let owner = occurrence_authority(&plan, root).expect("root owner exists").owner;
+        let missing = StaticOriginId::for_test(u32::MAX);
+        let refusal = walk_to_gate(
+            &plan,
+            missing,
+            owner,
+            0,
+            true,
+            PendingPathCounts::START,
+            &mut BTreeSet::new(),
+            &mut PendingRouteEvidence::new(0, &|_| None),
+        )
+        .expect_err("the route must not invent missing planner authority");
+        assert_eq!(refusal, PendingRefusal::RouteLookupFailed);
+        assert_eq!(refusal.cause().code().as_str(), "N0003");
+
+        let overflow = shifted_pending_ih(u32::MAX, 1)
+            .expect_err("one binder cannot shift a maximal u32 coordinate");
+        assert_eq!(overflow, PendingRefusal::RouteIndexOverflow);
+        assert_eq!(overflow.cause().code().as_str(), "N0002");
+        if usize::BITS > u32::BITS {
+            let binders = usize::try_from(u64::from(u32::MAX) + 1)
+                .expect("a wider usize represents the first overflowing binder count");
+            assert_eq!(
+                shifted_pending_ih(0, binders),
+                Err(PendingRefusal::RouteIndexOverflow)
+            );
+        }
+    }
 
     #[test]
     fn one_emission_owner_refuses_mixed_response_and_ordinary_returns() {
@@ -1824,8 +1895,9 @@ mod tests {
     #[test]
     fn wrong_template_slot_refuses_at_the_production_walker() {
         assert!(pending_route_input(0, true, 171).is_ok());
-        assert_eq!(pending_route_input(0, true, 172).unwrap_err(),
-            PendingRefusal::UnsupportedRouteEdge);
+        let refusal = pending_route_input(0, true, 172).unwrap_err();
+        assert_eq!(refusal, PendingRefusal::UnsupportedRouteEdge);
+        assert_eq!(refusal.cause().code().as_str(), "N0001");
     }
 
     #[test]

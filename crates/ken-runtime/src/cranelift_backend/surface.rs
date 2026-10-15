@@ -102,6 +102,9 @@ pub struct NativeRuntimeIrComparisonReport {
     pub runtime_ir: RuntimeIrRunReport,
     pub native: Option<CraneliftRunReport>,
     pub verdict: NativeRuntimeIrComparisonVerdict,
+    /// A refusal's typed cause survives conversion to a display-only verdict.
+    /// Agreement has no cause; observation mismatch names backend behavior.
+    pub cause: Option<LoweringCause>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -189,17 +192,46 @@ pub enum ValidatedNativeRunError {
     Backend(CraneliftBackendError),
 }
 
+/// Stable cause of a native refusal, independent of its rendering or carrier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoweringCause {
+    Fragment,
+    Capacity,
+    PlannerInvariant,
+    FinishedCode,
+    Admission,
+    Backend,
+    ResourceEnforcement,
+}
+
+ken_diagnostic::define_error_codes! {
+    impl LoweringCause;
+    table LOWERING_CAUSE_TABLE;
+    Self::Fragment [] => ("N0001", "native.fragment"),
+    Self::Capacity [] => ("N0002", "native.capacity"),
+    Self::PlannerInvariant [] => ("N0003", "native.planner_invariant"),
+    Self::FinishedCode [] => ("N0004", "native.finished_code"),
+    Self::Admission [] => ("N0005", "native.admission"),
+    Self::Backend [] => ("N0006", "native.backend"),
+    Self::ResourceEnforcement [] => ("N0007", "native.resource_enforcement"),
+    ;
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnsupportedLowering {
     pub construct: &'static str,
     pub reason: String,
+    pub cause: LoweringCause,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BackendFailure {
     Target(String),
     Verifier(String),
-    Module(String),
+    Module {
+        reason: String,
+        cause: LoweringCause,
+    },
     PlannerInvariant(String),
     /// The compiled code returned `token` and the result decoder could not turn
     /// it into a value.
@@ -222,6 +254,47 @@ pub enum BackendFailure {
     },
 }
 
+impl CraneliftBackendError {
+    pub fn cause(&self) -> LoweringCause {
+        match self {
+            Self::Unsupported(err) => err.cause,
+            Self::ResidualRepresentationRequired { .. } => LoweringCause::Fragment,
+            Self::Backend(err) => err.cause(),
+            Self::CapacityExhausted(_)
+            | Self::SelectedCallIntegrity(_)
+            | Self::ProfileMismatch(_) => LoweringCause::ResourceEnforcement,
+        }
+    }
+
+    pub fn code(&self) -> ken_diagnostic::Code {
+        self.cause().code()
+    }
+}
+
+impl BackendFailure {
+    pub fn cause(&self) -> LoweringCause {
+        match self {
+            Self::Target(_) | Self::NativeResultDecode { .. } => LoweringCause::Backend,
+            Self::Verifier(_) => LoweringCause::FinishedCode,
+            Self::Module { cause, .. } => *cause,
+            Self::PlannerInvariant(_) => LoweringCause::PlannerInvariant,
+        }
+    }
+
+    pub fn code(&self) -> ken_diagnostic::Code {
+        self.cause().code()
+    }
+}
+
+impl ValidatedNativeRunError {
+    pub fn code(&self) -> ken_diagnostic::Code {
+        match self {
+            Self::Validation(_) => LoweringCause::Admission.code(),
+            Self::Backend(error) => error.code(),
+        }
+    }
+}
+
 impl fmt::Display for CraneliftBackendError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -229,7 +302,10 @@ impl fmt::Display for CraneliftBackendError {
                 write!(f, "unsupported runtime-IR lowering: {err}")
             }
             CraneliftBackendError::ResidualRepresentationRequired { site } => {
-                write!(f, "residual representation required at {site}: K cannot be coerced to R")
+                write!(
+                    f,
+                    "residual representation required at {site}: K cannot be coerced to R"
+                )
             }
             CraneliftBackendError::Backend(err) => write!(f, "Cranelift backend failure: {err}"),
             CraneliftBackendError::CapacityExhausted(fault) => {
@@ -283,7 +359,7 @@ impl fmt::Display for BackendFailure {
         match self {
             BackendFailure::Target(msg) => write!(f, "target setup failed: {msg}"),
             BackendFailure::Verifier(msg) => write!(f, "verifier rejected function: {msg}"),
-            BackendFailure::Module(msg) => write!(f, "module operation failed: {msg}"),
+            BackendFailure::Module { reason, .. } => write!(f, "module operation failed: {reason}"),
             BackendFailure::PlannerInvariant(msg) => write!(
                 f,
                 "native static transition planner invariant failed; \
@@ -328,6 +404,35 @@ mod surface_diagnostics_tests {
     }
 
     #[test]
+    fn runtime_cause_codes_match_owning_variant_ledger_rows() {
+        ken_diagnostic::assert_table_matches_ledger(&["native."], LOWERING_CAUSE_TABLE);
+        let causes = [
+            LoweringCause::Fragment,
+            LoweringCause::Capacity,
+            LoweringCause::PlannerInvariant,
+            LoweringCause::FinishedCode,
+            LoweringCause::Admission,
+            LoweringCause::Backend,
+            LoweringCause::ResourceEnforcement,
+        ];
+        let codes = causes.map(|cause| cause.code());
+        let unique: BTreeSet<_> = codes.into_iter().collect();
+        assert_eq!(unique.len(), causes.len());
+    }
+
+    #[test]
+    fn runtime_cause_identity_survives_carrier_and_message_changes() {
+        let first = unsupported(LoweringCause::Capacity, "Call", "first wording");
+        let reworded = unsupported(LoweringCause::Capacity, "Call", "later wording");
+        let other = backend_module(LoweringCause::PlannerInvariant, "first wording".to_string());
+        assert_ne!(first.to_string(), reworded.to_string());
+        assert_eq!(first.code(), reworded.code());
+        assert_eq!(first.code().as_str(), "N0002");
+        assert_eq!(other.code().as_str(), "N0003");
+        assert_ne!(first.code(), other.code());
+    }
+
+    #[test]
     fn backend_failure_renders_every_variant_distinctly() {
         // The expectation `match` below has no `_` arm, so a new
         // `BackendFailure` variant forces an expected-rendering arm to be
@@ -339,7 +444,10 @@ mod surface_diagnostics_tests {
         let cases = [
             BackendFailure::Target("no isa for wasm64".to_string()),
             BackendFailure::Verifier("inst12 has no type".to_string()),
-            BackendFailure::Module("duplicate symbol".to_string()),
+            BackendFailure::Module {
+                reason: "duplicate symbol".to_string(),
+                cause: LoweringCause::Backend,
+            },
             BackendFailure::PlannerInvariant("edge evidence is incomplete".to_string()),
             BackendFailure::NativeResultDecode { token: -7 },
         ];
@@ -348,7 +456,9 @@ mod surface_diagnostics_tests {
             let expected = match case {
                 BackendFailure::Target(msg) => format!("target setup failed: {msg}"),
                 BackendFailure::Verifier(msg) => format!("verifier rejected function: {msg}"),
-                BackendFailure::Module(msg) => format!("module operation failed: {msg}"),
+                BackendFailure::Module { reason: msg, .. } => {
+                    format!("module operation failed: {msg}")
+                }
                 BackendFailure::PlannerInvariant(msg) => format!(
                     "native static transition planner invariant failed; \
                      please report this compiler bug: {msg}"
@@ -374,6 +484,7 @@ mod surface_diagnostics_tests {
     #[test]
     fn unsupported_lowering_renders_construct_then_reason() {
         let err = UnsupportedLowering {
+            cause: LoweringCause::Fragment,
             construct: "Effect",
             reason: "no native lowering".to_string(),
         };
@@ -383,6 +494,7 @@ mod surface_diagnostics_tests {
     #[test]
     fn cranelift_backend_error_prefixes_both_arms() {
         let unsupported = CraneliftBackendError::Unsupported(UnsupportedLowering {
+            cause: LoweringCause::Fragment,
             construct: "Effect",
             reason: "no native lowering".to_string(),
         });
@@ -391,8 +503,10 @@ mod surface_diagnostics_tests {
             "unsupported runtime-IR lowering: Effect: no native lowering"
         );
 
-        let backend =
-            CraneliftBackendError::Backend(BackendFailure::Module("duplicate symbol".to_string()));
+        let backend = CraneliftBackendError::Backend(BackendFailure::Module {
+            reason: "duplicate symbol".to_string(),
+            cause: LoweringCause::Backend,
+        });
         assert_eq!(
             backend.to_string(),
             "Cranelift backend failure: module operation failed: duplicate symbol"
@@ -446,9 +560,11 @@ mod surface_diagnostics_tests {
     fn backend_errors_are_usable_as_std_error_trait_objects() {
         // `impl std::error::Error` on these types is load-bearing for callers
         // that box them; nothing else in the crate exercises it.
-        let boxed: Box<dyn std::error::Error> = Box::new(CraneliftBackendError::Backend(
-            BackendFailure::Module("duplicate symbol".to_string()),
-        ));
+        let boxed: Box<dyn std::error::Error> =
+            Box::new(CraneliftBackendError::Backend(BackendFailure::Module {
+                reason: "duplicate symbol".to_string(),
+                cause: LoweringCause::Backend,
+            }));
         assert_eq!(
             boxed.to_string(),
             "Cranelift backend failure: module operation failed: duplicate symbol"
@@ -456,18 +572,17 @@ mod surface_diagnostics_tests {
 
         let boxed: Box<dyn std::error::Error> =
             Box::new(ValidatedNativeRunError::Validation(validation_error()));
-        assert!(
-            boxed
+        assert!(boxed
             .to_string()
-                .starts_with("runtime artifact validation failed: ")
-        );
+            .starts_with("runtime artifact validation failed: "));
     }
 
     #[test]
     fn error_constructors_build_the_arms_they_name() {
         assert_eq!(
-            unsupported("Effect", "no native lowering"),
+            unsupported(LoweringCause::Fragment, "Effect", "no native lowering"),
             CraneliftBackendError::Unsupported(UnsupportedLowering {
+                cause: LoweringCause::Fragment,
                 construct: "Effect",
                 reason: "no native lowering".to_string(),
             })
@@ -477,8 +592,11 @@ mod surface_diagnostics_tests {
             CraneliftBackendError::Backend(BackendFailure::Target("no isa".to_string()))
         );
         assert_eq!(
-            backend_module("duplicate symbol".to_string()),
-            CraneliftBackendError::Backend(BackendFailure::Module("duplicate symbol".to_string())),
+            backend_module(LoweringCause::Backend, "duplicate symbol".to_string()),
+            CraneliftBackendError::Backend(BackendFailure::Module {
+                reason: "duplicate symbol".to_string(),
+                cause: LoweringCause::Backend
+            }),
             "backend_module must select the Module variant, not Target or Verifier"
         );
     }
@@ -515,12 +633,14 @@ impl NativeSeedEnvironment {
     }
 }
 pub(super) fn unsupported(
+    cause: LoweringCause,
     construct: &'static str,
     reason: impl Into<String>,
 ) -> CraneliftBackendError {
     CraneliftBackendError::Unsupported(UnsupportedLowering {
         construct,
         reason: reason.into(),
+        cause,
     })
 }
 
@@ -528,6 +648,6 @@ pub(super) fn backend(failure: BackendFailure) -> CraneliftBackendError {
     CraneliftBackendError::Backend(failure)
 }
 
-pub(crate) fn backend_module(reason: String) -> CraneliftBackendError {
-    backend(BackendFailure::Module(reason))
+pub(crate) fn backend_module(cause: LoweringCause, reason: String) -> CraneliftBackendError {
+    backend(BackendFailure::Module { reason, cause })
 }
