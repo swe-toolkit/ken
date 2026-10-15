@@ -324,6 +324,18 @@ shipped seed, CI or trusted-base delta is established by §1. Signed
 arithmetic, division, `Float`, rounding, width, intersection and
 hull remain deferred.
 
+The **finite event-trace contract** is pinned in
+**`69-time-and-events.md`** §1 (SPEC-TIME-EVENT-TRACE-CONTRACT).
+`Data.Time.EventTrace` uses ordinary `Event p` values in plain
+`List (Event p)` traces, non-decreasing `Nat` timestamps, half-open
+time windows and total left-biased merging at tied times. The
+three generic D0 laws check window ordering, merge ordering under
+ordered inputs and merge count for any Boolean classifier, even
+without ordered inputs. This is a scratch proof development, not
+a landed catalog module, shipped seed, CI result or measured
+trusted-base delta. Clock effects, wall-clock time, vector clocks,
+infinite streams and window/merge relational laws remain deferred.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
