@@ -103,6 +103,7 @@ where
         false,
         effective_uid,
         report_obligations,
+        |line| eprintln!("{line}"),
     )
     .map(|(outcome, _)| outcome)
 }
@@ -133,11 +134,12 @@ pub fn run_program_effect_observation<H: ken_interp::HostHandler>(
         true,
         effective_uid,
         |_| {},
+        |_| {},
     )
     .map(|(_, observation)| observation.expect("observation requested"))
 }
 
-fn run_program_inner<H, F>(
+fn run_program_inner<H, F, G>(
     source: &str,
     format: SourceFormat,
     arguments: &[Vec<u8>],
@@ -147,10 +149,12 @@ fn run_program_inner<H, F>(
     observe_effects: bool,
     effective_uid: ken_runtime::EffectiveUidSnapshotV1,
     mut report_obligations: F,
+    mut report_terminal_error: G,
 ) -> Result<(ProgramOutcome, Option<ken_runtime::EffectObservation>), RunError>
 where
     H: ken_interp::HostHandler,
     F: FnMut(&[String]),
+    G: FnMut(&str),
 {
     let mut elab_env = ken_elaborator::ElabEnv::new().map_err(RunError::Initialization)?;
     let results = match format {
@@ -176,6 +180,13 @@ where
     let admitted = ken_elaborator::program_admission::admit_checked_main(&elab_env)
         .map_err(map_program_admission_error)?;
     if ken_runtime::admit_root_execution(effective_uid, admitted.allow_root_execution).is_err() {
+        let terminal_error = ken_runtime::TerminalErrorV1::RootExecutionDenied;
+        if !observe_effects {
+            report_terminal_error(&diagnostic_codes::terminal_error_line(
+                &terminal_error,
+                "ken run: root execution denied",
+            ));
+        }
         let exit_status =
             ken_runtime::process_exit_status(ken_runtime::ProcessExitCode::Failure(0)).status;
         return Ok((
@@ -184,7 +195,7 @@ where
                 stdout: Vec::new(),
                 stderr: Vec::new(),
                 filesystem_delta: Vec::new(),
-                terminal_error: Some(ken_runtime::TerminalErrorV1::RootExecutionDenied),
+                terminal_error: Some(terminal_error),
                 effect_trace: Vec::new(),
                 terminal_exit: ken_runtime::TerminalExitClass::ControlledTrap,
                 exit_status,
@@ -223,6 +234,13 @@ where
             else {
                 return Err(RunError::CapabilityRoot(error));
             };
+            let terminal_error = ken_runtime::TerminalErrorV1::HomeRootResolutionFailed(failure);
+            if !observe_effects {
+                report_terminal_error(&diagnostic_codes::terminal_error_line(
+                    &terminal_error,
+                    &format!("ken run: filesystem capability home root unavailable: {error}"),
+                ));
+            }
             let exit_status =
                 ken_runtime::process_exit_status(ken_runtime::ProcessExitCode::Failure(0)).status;
             return Ok((
@@ -231,9 +249,7 @@ where
                     stdout: Vec::new(),
                     stderr: Vec::new(),
                     filesystem_delta: Vec::new(),
-                    terminal_error: Some(ken_runtime::TerminalErrorV1::HomeRootResolutionFailed(
-                        failure,
-                    )),
+                    terminal_error: Some(terminal_error),
                     effect_trace: Vec::new(),
                     terminal_exit: ken_runtime::TerminalExitClass::ControlledTrap,
                     exit_status,
@@ -291,7 +307,12 @@ where
         .map_err(RunError::Io)?;
         Ok((
             ProgramOutcome {
-                exit_status: exit_status(&final_value, success_id, failure_id),
+                exit_status: exit_status_with_reporter(
+                    &final_value,
+                    success_id,
+                    failure_id,
+                    &mut report_terminal_error,
+                ),
             },
             None,
         ))
@@ -436,10 +457,20 @@ fn process_input_value(
     )
 }
 
+#[cfg(test)]
 fn exit_status(
     value: &ken_interp::EvalVal,
     success_id: ken_kernel::GlobalId,
     failure_id: ken_kernel::GlobalId,
+) -> i32 {
+    exit_status_with_reporter(value, success_id, failure_id, |line| eprintln!("{line}"))
+}
+
+fn exit_status_with_reporter(
+    value: &ken_interp::EvalVal,
+    success_id: ken_kernel::GlobalId,
+    failure_id: ken_kernel::GlobalId,
+    mut report_terminal_error: impl FnMut(&str),
 ) -> i32 {
     let exit_code = match value {
         ken_interp::EvalVal::Ctor { id, .. } if *id == success_id => {
@@ -453,7 +484,11 @@ fn exit_status(
     };
     let mapped = ken_runtime::process_exit_status(exit_code);
     if let Some(report) = mapped.trap_report {
-        eprintln!("ken run: {report}");
+        let terminal_error = ken_runtime::TerminalErrorV1::MalformedHostAbiField;
+        report_terminal_error(&diagnostic_codes::terminal_error_line(
+            &terminal_error,
+            &format!("ken run: {report}"),
+        ));
     }
     mapped.status
 }
@@ -813,6 +848,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
             true,
             ken_runtime::EffectiveUidSnapshotV1::scripted(effective_uid),
             |_| {},
+            |_| {},
         )
         .expect("checked program reaches the real interpreter runner");
         (observation.expect("observation requested"), host)
@@ -840,6 +876,81 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
         assert_eq!(allowed.stdout, b"admitted");
         assert_eq!(allowed.effect_trace.len(), 1);
         assert_eq!(allowed_host.trace().len(), 1);
+    }
+
+    #[test]
+    fn pre_program_root_denial_reports_h_code_and_status_one() {
+        let mut host = ken_interp::CaptureHost::new(Vec::new());
+        let mut lines = Vec::new();
+        let (outcome, observation) = run_program_inner(
+            &root_program(false),
+            SourceFormat::Ken,
+            &[],
+            &[],
+            b".",
+            &mut host,
+            false,
+            ken_runtime::EffectiveUidSnapshotV1::scripted(0),
+            |_| {},
+            |line| lines.push(line.to_owned()),
+        )
+        .expect("root denial is a controlled host failure");
+        assert_eq!(outcome.exit_status, 1);
+        assert!(observation.is_none());
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].starts_with("error[H0001]: "), "{lines:?}");
+        assert!(host.trace().is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn missing_effective_user_home_reports_h_code_and_status_one() {
+        let source = root_program(false).replacen(
+            "program capabilities FS APartial",
+            "program capabilities FS APartial \"~/unavailable\"",
+            1,
+        );
+        let mut host = ken_interp::PosixHost::new();
+        let mut lines = Vec::new();
+        let (outcome, observation) = run_program_inner(
+            &source,
+            SourceFormat::Ken,
+            &[],
+            &[],
+            b".",
+            &mut host,
+            false,
+            ken_runtime::EffectiveUidSnapshotV1::scripted(u32::MAX),
+            |_| {},
+            |line| lines.push(line.to_owned()),
+        )
+        .expect("missing home account is a controlled host failure");
+        assert_eq!(outcome.exit_status, 1);
+        assert!(observation.is_none());
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].starts_with("error[H0002]: "), "{lines:?}");
+    }
+
+    #[test]
+    fn malformed_exit_result_reports_a_distinct_host_code() {
+        let success = ken_kernel::GlobalId(1);
+        let failure = ken_kernel::GlobalId(2);
+        // Checked source cannot construct these results; the live fallback
+        // still has a host-carried code when called with malformed values.
+        for value in [
+            ken_interp::EvalVal::Int(7),
+            constructor_value(failure, vec![ken_interp::EvalVal::Int(300)]),
+        ] {
+            let mut lines = Vec::new();
+            assert_eq!(
+                exit_status_with_reporter(&value, success, failure, |line| {
+                    lines.push(line.to_owned())
+                }),
+                1
+            );
+            assert_eq!(lines.len(), 1);
+            assert!(lines[0].starts_with("error[H0003]: "), "{lines:?}");
+        }
     }
 
     #[test]

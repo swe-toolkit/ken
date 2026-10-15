@@ -1,7 +1,9 @@
 //! The `ken` command-line driver.
 
+mod cli_errors;
 mod repl;
 
+use cli_errors::{emit_cli_error, emit_coded_error, CliError};
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
@@ -35,12 +37,12 @@ fn dispatch() -> i32 {
                 0
             }
             Err(RunArgumentError::MissingPath) => {
-                eprintln!("ken run: missing <file> argument");
+                emit_cli_error(CliError::RunMissingFile);
                 eprintln!("Usage: ken run <file.ken> [-- <arguments>...]");
                 1
             }
             Err(RunArgumentError::UnexpectedBeforeSeparator(argument)) => {
-                eprintln!("ken run: unexpected argument before '--': {:?}", argument);
+                emit_cli_error(CliError::RunUnexpectedBeforeSeparator(argument));
                 1
             }
         },
@@ -72,7 +74,7 @@ fn dispatch() -> i32 {
             0
         }
         unknown => {
-            eprintln!("ken: unknown subcommand '{}' — try 'ken help'", unknown);
+            emit_cli_error(CliError::UnknownSubcommand(unknown.to_owned()));
             1
         }
     }
@@ -172,42 +174,39 @@ fn native_build_file(
     extra_argument: bool,
 ) -> i32 {
     let Some(path) = path else {
-        eprintln!("ken native-build: missing <file> argument");
+        emit_cli_error(CliError::NativeBuildMissingFile);
         eprintln!("Usage: ken native-build <file.ken> <output-dir> <resource-profile.json>");
         std::process::exit(1);
     };
     let Some(output_dir) = output_dir else {
-        eprintln!("ken native-build: missing <output-dir> argument");
+        emit_cli_error(CliError::NativeBuildMissingOutputDir);
         eprintln!("Usage: ken native-build <file.ken> <output-dir> <resource-profile.json>");
         return 1;
     };
     let Some(profile_path) = profile_path else {
-        eprintln!("ken native-build: missing <resource-profile.json> argument");
+        emit_cli_error(CliError::NativeBuildMissingResourceProfile);
         return 1;
     };
     if extra_argument {
-        eprintln!("ken native-build: unexpected argument after resource profile");
+        emit_cli_error(CliError::NativeBuildUnexpectedArgument);
         return 1;
     }
     let profile_bytes = match std::fs::read(profile_path) {
         Ok(bytes) => bytes,
         Err(error) => {
-            eprintln!("ken native-build: cannot read resource profile: {error}");
+            emit_cli_error(CliError::NativeBuildResourceProfileRead(error));
             return 1;
         }
     };
     let profile = match parse_native_resource_profile(&profile_bytes) {
         Ok(profile) => profile,
         Err(error) => {
-            eprintln!("ken native-build: invalid resource profile: {error}");
+            emit_cli_error(CliError::NativeBuildInvalidResourceProfile(error));
             return 1;
         }
     };
     let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
-        eprintln!(
-            "ken native-build: cannot read '{}': {error}",
-            path.to_string_lossy()
-        );
+        emit_cli_error(CliError::NativeBuildSourceRead(PathBuf::from(path), error));
         std::process::exit(1);
     });
     let format = if path.to_string_lossy().ends_with(".ken.md") {
@@ -230,7 +229,7 @@ fn native_build_file(
             0
         }
         Err(error) => {
-            eprintln!("ken native-build: {error}");
+            emit_coded_error(error.code(), format_args!("ken native-build: {error}"));
             1
         }
     }
@@ -242,20 +241,20 @@ fn format_files(args: &[OsString]) {
     let mut paths = Vec::new();
     for arg in args {
         let Some(arg) = arg.to_str() else {
-            eprintln!("ken fmt: path is not valid UTF-8: {:?}", arg);
+            emit_cli_error(CliError::FmtPathNotUtf8(arg.clone()));
             std::process::exit(1);
         };
         if arg == "--check" {
             check = true;
         } else if arg.starts_with('-') {
-            eprintln!("ken fmt: unknown option '{arg}'");
+            emit_cli_error(CliError::FmtUnknownOption(arg.to_owned()));
             std::process::exit(1);
         } else {
             paths.push(arg);
         }
     }
     if paths.is_empty() {
-        eprintln!("ken fmt: missing <paths...> argument");
+        emit_cli_error(CliError::FmtMissingPaths);
         eprintln!("Usage: ken fmt [--check] <paths...>");
         std::process::exit(1);
     }
@@ -265,7 +264,7 @@ fn format_files(args: &[OsString]) {
         let source = match std::fs::read_to_string(path) {
             Ok(source) => source,
             Err(error) => {
-                eprintln!("ken fmt: cannot read '{path}': {error}");
+                emit_cli_error(CliError::FmtPathRead(PathBuf::from(path), error));
                 failed = true;
                 continue;
             }
@@ -275,14 +274,17 @@ fn format_files(args: &[OsString]) {
         } else if path.ends_with(".ken") {
             ken_elaborator::layout::format_ken(&source)
         } else {
-            eprintln!("ken fmt: unsupported path '{path}' (expected .ken or .ken.md)");
+            emit_cli_error(CliError::FmtUnsupportedPath(PathBuf::from(path)));
             failed = true;
             continue;
         };
         let formatted = match formatted {
             Ok(formatted) => formatted,
             Err(error) => {
-                eprintln!("ken fmt: formatting error in '{path}': {error:?}");
+                emit_coded_error(
+                    error.code(),
+                    format_args!("ken fmt: formatting error in '{path}': {error:?}"),
+                );
                 failed = true;
                 continue;
             }
@@ -290,12 +292,12 @@ fn format_files(args: &[OsString]) {
 
         if check {
             if formatted != source {
-                eprintln!("ken fmt --check: non-canonical: {path}");
+                emit_cli_error(CliError::FmtNonCanonical(PathBuf::from(path)));
                 failed = true;
             }
         } else if formatted != source {
             if let Err(error) = std::fs::write(path, formatted) {
-                eprintln!("ken fmt: cannot write '{path}': {error}");
+                emit_cli_error(CliError::FmtPathWrite(PathBuf::from(path), error));
                 failed = true;
             }
         }
@@ -352,17 +354,15 @@ fn os_bytes(value: &OsStr) -> Vec<u8> {
 /// module address uses the roots loader and then executes only that entry's
 /// checked-fence roles; every other path retains the direct `.ken.md`/`.ken`
 /// dispatch. Exits 1 on a missing argument, an unreadable file, elaborator init
-/// failure, or an elaboration error, with a message prefixed by `cmd` so a user
-/// sees the subcommand they actually typed, not a borrowed one.
+/// failure, or an elaboration error. Its sole caller is `ken check`.
 fn elaborate_cli_file(
-    cmd: &str,
     path: Option<&OsStr>,
 ) -> (PathBuf, ken_elaborator::ElabEnv, Vec<ken_elaborator::ElabResult>) {
     let path = match path {
         Some(p) => p,
         None => {
-            eprintln!("ken {cmd}: missing <file> argument");
-            eprintln!("Usage: ken {cmd} <file.ken>");
+            emit_cli_error(CliError::CheckMissingFile);
+            eprintln!("Usage: ken check <file.ken>");
             std::process::exit(1);
         }
     };
@@ -370,7 +370,7 @@ fn elaborate_cli_file(
     let src = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("ken {cmd}: cannot read '{}': {}", path.to_string_lossy(), e);
+            emit_cli_error(CliError::CheckSourceRead(PathBuf::from(path), e));
             std::process::exit(1);
         }
     };
@@ -378,7 +378,10 @@ fn elaborate_cli_file(
     let mut elab_env = match ken_elaborator::ElabEnv::new() {
         Ok(e) => e,
         Err(e) => {
-            eprintln!("ken {cmd}: elaborator init failed: {:?}", e);
+            emit_coded_error(
+                e.code(),
+                format_args!("ken check: elaborator init failed: {e:?}"),
+            );
             std::process::exit(1);
         }
     };
@@ -402,17 +405,13 @@ fn elaborate_cli_file(
 
     let results = match results_result {
         Ok(results) => results,
-        Err(ken_elaborator::ElabError::DuplicateDefinition { name, .. })
-            if cmd == "run" && name == "main" =>
-        {
-            eprintln!("ken run: duplicate entrypoint 'main'");
-            std::process::exit(1);
-        }
         Err(e) => {
-            eprintln!(
-                "ken {cmd}: elaboration error in '{}': {:?}",
-                path.to_string_lossy(),
-                e
+            emit_coded_error(
+                e.code(),
+                format_args!(
+                    "ken check: elaboration error in '{}': {e:?}",
+                    path.to_string_lossy()
+                ),
             );
             std::process::exit(1);
         }
@@ -434,7 +433,7 @@ fn elaborate_cli_file(
 /// still how you run it) — `ken run` itself is unchanged, strict, and has no
 /// auto-detect fallthrough to this mode.
 fn check_file(path: Option<&OsStr>) {
-    let (_, _, results) = elaborate_cli_file("check", path);
+    let (_, _, results) = elaborate_cli_file(path);
     let reports = ken_elaborator::render_open_obligations(&results);
     if reports.is_empty() {
         return;
@@ -456,7 +455,7 @@ fn check_file(path: Option<&OsStr>) {
 /// Console IDs are harvested from the elaboration environment (`ElabEnv::globals`).
 fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
     let source = std::fs::read_to_string(path).unwrap_or_else(|error| {
-        eprintln!("ken run: cannot read '{}': {error}", path.to_string_lossy());
+        emit_cli_error(CliError::RunSourceRead(PathBuf::from(path), error));
         std::process::exit(1);
     });
     let format = if path.to_string_lossy().ends_with(".ken.md") {
@@ -468,7 +467,7 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
         .map(|(key, value)| (os_bytes(&key), os_bytes(&value)))
         .collect();
     let cwd = std::env::current_dir().unwrap_or_else(|error| {
-        eprintln!("ken run: cannot read working directory: {error}");
+        emit_cli_error(CliError::RunWorkingDirectoryRead(error));
         std::process::exit(1);
     });
     let mut host = ken_interp::PosixHost::new();
@@ -486,65 +485,53 @@ fn run_file(path: &OsStr, arguments: &[Vec<u8>]) {
         },
     ) {
         Ok(outcome) => std::process::exit(outcome.exit_status),
-        Err(ken_cli::RunError::DuplicateEntrypoint) => {
-            eprintln!("ken run: duplicate entrypoint 'main'");
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::MissingEntrypoint) => {
-            eprintln!(
-                "ken run: missing entrypoint 'main' in '{}'",
-                path.to_string_lossy()
-            );
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::EntrypointAbiUnavailable) => {
-            eprintln!("ken run: entrypoint ABI declarations are unavailable");
-            std::process::exit(2);
-        }
-        Err(ken_cli::RunError::MissingCapability { effect }) => {
-            eprintln!("ken run: MissingCapability {{ effect = {effect} }}");
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::InvalidEntrypoint { authority }) => {
-            eprintln!(
-                "ken run: invalid entrypoint 'main': expected ProcessInput -> \
-                 ProgramCaps {authority} -> HostIO {authority} ExitCode"
-            );
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::ConsoleAbiUnavailable) => {
-            eprintln!("ken run: Console ABI declarations are unavailable");
-            std::process::exit(2);
-        }
-        Err(ken_cli::RunError::RootExecutionObservationUnavailable) => {
-            eprintln!("ken run: effective-UID observation is unavailable");
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::CapabilityRoot(error)) => {
-            eprintln!("ken run: filesystem capability root unavailable: {error}");
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::Initialization(error)) => {
-            eprintln!("ken run: elaborator init failed: {error:?}");
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::Elaboration(error)) => {
-            eprintln!(
-                "ken run: elaboration error in '{}': {error:?}",
-                path.to_string_lossy()
-            );
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::Io(ken_interp::RunIoError::UnknownTree)) => {
-            eprintln!("ken run: program evaluated to an open hole (Unknown)");
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::Io(ken_interp::RunIoError::UnknownEffect(value))) => {
-            eprintln!("ken run: unhandled effect: {value:?}");
-            std::process::exit(1);
-        }
-        Err(ken_cli::RunError::Io(ken_interp::RunIoError::NotAnIOTree(value))) => {
-            eprintln!("ken run: entrypoint did not return an IO tree: {value:?}");
+        Err(error) => {
+            let code = error.code();
+            let message = match &error {
+                ken_cli::RunError::DuplicateEntrypoint => {
+                    "ken run: duplicate entrypoint 'main'".to_owned()
+                }
+                ken_cli::RunError::MissingEntrypoint => format!(
+                    "ken run: missing entrypoint 'main' in '{}'",
+                    path.to_string_lossy()
+                ),
+                ken_cli::RunError::EntrypointAbiUnavailable => {
+                    "ken run: entrypoint ABI declarations are unavailable".to_owned()
+                }
+                ken_cli::RunError::MissingCapability { effect } => {
+                    format!("ken run: MissingCapability {{ effect = {effect} }}")
+                }
+                ken_cli::RunError::InvalidEntrypoint { authority } => format!(
+                    "ken run: invalid entrypoint 'main': expected ProcessInput -> \
+                     ProgramCaps {authority} -> HostIO {authority} ExitCode"
+                ),
+                ken_cli::RunError::ConsoleAbiUnavailable => {
+                    "ken run: Console ABI declarations are unavailable".to_owned()
+                }
+                ken_cli::RunError::RootExecutionObservationUnavailable => {
+                    "ken run: effective-UID observation is unavailable".to_owned()
+                }
+                ken_cli::RunError::CapabilityRoot(source) => {
+                    format!("ken run: filesystem capability root unavailable: {source}")
+                }
+                ken_cli::RunError::Initialization(source) => {
+                    format!("ken run: elaborator init failed: {source:?}")
+                }
+                ken_cli::RunError::Elaboration(source) => format!(
+                    "ken run: elaboration error in '{}': {source:?}",
+                    path.to_string_lossy()
+                ),
+                ken_cli::RunError::Io(ken_interp::RunIoError::UnknownTree) => {
+                    "ken run: program evaluated to an open hole (Unknown)".to_owned()
+                }
+                ken_cli::RunError::Io(ken_interp::RunIoError::UnknownEffect(value)) => {
+                    format!("ken run: unhandled effect: {value:?}")
+                }
+                ken_cli::RunError::Io(ken_interp::RunIoError::NotAnIOTree(value)) => {
+                    format!("ken run: entrypoint did not return an IO tree: {value:?}")
+                }
+            };
+            emit_coded_error(code, message);
             std::process::exit(1);
         }
     }
