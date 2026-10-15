@@ -1,7 +1,7 @@
 ---
 id: SPEC-DIAGNOSTIC-CODE-CONTRACT
 title: "The Architect's DIAG-STABLE-ERROR-CODES D0 rules that a CLI failure code is a pinned identifier, a conformance surface like the verification protocol's, but no spec section states it. Author the normative section: presence, code grammar and domains, stability, the human line, the native cause families, and the machine format"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
