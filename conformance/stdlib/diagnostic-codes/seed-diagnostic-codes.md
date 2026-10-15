@@ -59,6 +59,19 @@ exact family identities already fixed by §1.2.
 - why: this boundary prevents a program's exit status from being read as a
   CLI error identity.
 
+### stdlib/diagnostic-codes/cli-option-and-working-directory-failures-use-c
+- promise class: **durable invariant**
+- spec: `70 §1.1–§1.2`
+- given: (a) `ken fmt --unknown`, and (b) a `ken run` invocation with an
+  absolute, readable source path where a controlled OS/test fixture makes
+  the CLI's current-directory read fail.
+- expect: each front-end failure exits 1 with a C code selected from the
+  active `cli`-owned ledger row for that cause.
+- control: with the same `ken run` source and a readable working directory,
+  root-execution denial is host-carried and uses H, not C.
+- why: option parsing and working-directory reads belong to the CLI carrier;
+  a `ken run` subcommand does not turn them into X or H errors.
+
 ### stdlib/diagnostic-codes/run-missing-main-retains-x0005
 - promise class: **normative compatibility vector**
 - spec: `70 §1.1–§1.3`
@@ -100,12 +113,14 @@ exact family identities already fixed by §1.2.
 ### stdlib/diagnostic-codes/fmt-path-causes-use-cli-domain
 - promise class: **durable invariant**
 - spec: `70 §1.1`, `§1.2`
-- given: two separate `ken fmt --check` invocations: one naming a missing
-  `.ken` path and one naming an existing unsupported-suffix path.
+- given: separate formatter invocations for (a) a missing `.ken` path,
+  (b) an existing unsupported-suffix path, and (c) a readable, formattable
+  path whose write is denied after formatting changes its contents.
 - expect: each is a C-coded front-end path failure. Each code is the active
   `cli`-owned ledger identity for its cause; the seed does not invent a C
   number.
-- control: a valid `.ken` path whose formatting operation returns an
+- control: the same changed source at a writable path is formatted normally.
+  A valid `.ken` path whose formatting operation returns an
   `ElabError::ParseError` uses the ledger code for `elab.parse_error`, not C.
 - why: the front-end owns path decisions only when no other carrier covers
   the failure; a formatter error retains its elaboration carrier.
@@ -180,9 +195,10 @@ exact family identities already fixed by §1.2.
 - expect: valid codes have exactly five ASCII characters: one allowed
   uppercase domain letter and four ASCII digits. `0000` is not assigned;
   per-domain assignments begin at `0001`.
-- refuse each malformed code independently: `E001`, `e0001`, `Q0001`,
-  `E00001`, `E0000`, and a code containing a non-ASCII digit. The valid
-  fixture is the positive control; one malformed row must not mask another.
+- refuse each malformed shape independently: `E001`, `e0001`, `Q0001`,
+  `E00001`, and a code containing a non-ASCII digit. Separately refuse the
+  well-shaped but unassigned `E0000`. The valid fixture is the positive
+  control; one malformed row must not mask another.
 - why: grammar and allowed domains are exact. The fixture rows are synthetic
   validator inputs, not proposed production assignments.
 
@@ -228,13 +244,24 @@ exact family identities already fixed by §1.2.
   non-remeaning over time. The comparison consumes two registry values; it
   does not claim that a current snapshot proves history.
 
+### stdlib/diagnostic-codes/future-machine-view-reuses-code-identity
+- promise class: **normative compatibility vector**
+- spec: `70 §1.4`
+- given: when a future machine representation is delivered, one failure that
+  has both its human stderr line and its machine representation.
+- expect: the machine representation carries the same code string as the
+  human line and ledger identity; it introduces no second code space.
+- control: a different machine-only identifier fails the comparison.
+- why: the machine channel is deferred, but its code identity is not open.
+  This case fixes no JSON fields, CLI flag, or serialization shape.
+
 ## Boundaries not frozen here
 
 - No case pins the position of a coded line, the wording of its message, the
   order or maximum number of elaboration diagnostics, or `ken fmt` path-error
   ordering.
-- No JSON field, new CLI flag, warning format, or separate machine code space
-  is asserted. A future machine format must carry the same code string.
+- No JSON field, new CLI flag, or warning format is asserted. The future
+  machine-view case fixes only the shared code string.
 - Program-authored stderr may contain text matching `error[<code>]: `; the
   prefix alone does not authenticate a tool diagnostic. The status-one pair
   uses a program that writes no stderr and does not claim authentication.
@@ -246,12 +273,12 @@ exact family identities already fixed by §1.2.
 ## Coverage map
 
 - Presence, carrier ownership, and one-code line shape: the status-one pair,
-  the two `fmt` carrier cases, the missing-main case, and the host/native
-  carrier cases.
+  the CLI-option case, the `fmt` carrier cases, the missing-main case, and the
+  host/native carrier cases.
 - Grammar, allowed domains, density, ledger ownership, and retirement:
-  the three registry fixtures.
-- Native family meanings: the seven-row N-code compatibility vector.
+  the four registry fixtures.
+- Native family meanings: the §1.2 N-code compatibility vector.
 - Exit status, open obligations, and the `ken run` carve-out: the program
   outcome, missing-main, and open-obligation cases.
-- Deferred behavior and exclusions: recorded above as non-claims, not tests
-  that freeze an unspecified format or channel.
+- Machine-code identity: the future-machine-view case; deferred formatting
+  shape and other exclusions remain non-claims.
