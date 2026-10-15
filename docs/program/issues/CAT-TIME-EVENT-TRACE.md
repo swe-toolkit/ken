@@ -1,7 +1,7 @@
 ---
 id: CAT-TIME-EVENT-TRACE
 title: "Spec 69 section 1 specifies Data.Time.EventTrace with three proved laws, but no catalog package delivers it. Deliver the package from the Architect's checked D0 at zero trust, factor its generic list proofs into Data.Collections.Derived, and run the seed as an acceptance target"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
