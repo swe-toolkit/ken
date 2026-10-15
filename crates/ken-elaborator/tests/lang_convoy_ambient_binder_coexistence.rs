@@ -84,6 +84,9 @@ const VEC_G2: &str = "theorem vec_g2 (a : Type) (b : Type) (pe : (n : Nat) → V
 const G2_FALSE: &str = "theorem g2_false (a : Type) (pe : (n : Nat) → DualEnv a n → Prop) (n : Nat) (xs : DualEnv a n) (ys : DualEnv a n) (h : pe n ys) (i : DualFin n) : pe n xs = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ h }; DualFS m j ↦ match xs { DualCons k x rest ↦ h } }";
 const H1: &str = "theorem h1 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) (y : a) (h : Equal a (dual_lookup a n xs i) y) : Equal a (dual_lookup a n xs i) y = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ h }; DualFS m j ↦ match xs { DualCons k x rest ↦ h } }";
 const K2: &str = "theorem k2 (a : Type) (pp : a → Prop) (hp : (x : a) → pp x) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : pp (dual_lookup a n xs i) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ hp x }; DualFS m j ↦ match xs { DualCons k x rest ↦ hp (dual_lookup a m rest j) } }";
+const H1_FALSE: &str = "theorem h1_false (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) (y : a) (other : a) (h : Equal a (dual_lookup a n xs i) y) : Equal a (dual_lookup a n xs i) other = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ h }; DualFS m j ↦ match xs { DualCons k x rest ↦ h } }";
+const K2_FALSE: &str = "theorem k2_false (a : Type) (pp : a → Prop) (hp : (x : a) → pp x) (n : Nat) (xs : DualEnv a n) (i : DualFin n) : pp (dual_lookup a n xs i) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ hp x }; DualFS m j ↦ match xs { DualCons k x rest ↦ hp x } }";
+const H9_FALSE: &str = "theorem h9_false_refl (a : Type) (m : Nat) (xs : DualEnv a (Suc m)) (y : a) (h : Equal a (dual_lookup a (Suc m) xs (DualFZ m)) y) : Equal a (dual_lookup a (Suc m) xs (DualFZ m)) y = match xs { DualCons k x rest ↦ Refl }";
 const H6: &str = "theorem h6 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) (y : a) (h : Equal a (dual_lookup a n xs i) y) : Equal a (dual_lookup a n xs i) y = match i { DualFZ m ↦ h; DualFS m j ↦ h }";
 const H7: &str = "theorem h7 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) (y : a) (h : Equal a (dual_lookup a n xs i) y) : Equal a (dual_lookup a n xs i) (dual_lookup a n xs i) = match i { DualFZ m ↦ match xs { DualCons k x rest ↦ Refl }; DualFS m j ↦ match xs { DualCons k x rest ↦ Refl } }";
 const H8: &str = "theorem h8 (a : Type) (n : Nat) (xs : DualEnv a n) (i : DualFin n) (y : a) (h : Equal a (dual_lookup a n xs i) y) : Equal a (dual_lookup a n xs i) y = h";
@@ -126,13 +129,26 @@ fn ac2_existing_context_controls_stay_accepted() {
     });
 }
 
+// MEASURED: both true recursive coordinates check in the same nested
+// index/field match as the convoyed h and recursive call. CLAIMED: the
+// goal and each moved field share the goal's single transport. THE GAP:
+// a false endpoint could still be accepted, guarded by the paired test.
 #[test]
-fn ac3_disagreeing_hypotheses_and_deferred_recursive_coordinates_refuse_typed() {
+fn ac1_ambient_hypothesis_and_recursive_coordinate_check() {
+    on_elaboration_stack(|| {
+        check_true(true, H1);
+        check_true(true, K2);
+    });
+}
+
+#[test]
+fn ac3_disagreeing_hypotheses_and_false_recursive_coordinates_refuse_typed() {
     on_elaboration_stack(|| {
         check_typed_refusal(&h_like("h9_false", true, true));
         check_typed_refusal(G2_FALSE);
-        check_typed_refusal(H1);
-        check_typed_refusal(K2);
+        check_typed_refusal(H1_FALSE);
+        check_typed_refusal(K2_FALSE);
+        check_typed_refusal(H9_FALSE);
     });
 }
 

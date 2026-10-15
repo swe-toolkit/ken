@@ -187,21 +187,19 @@ fn index_companions_under_binders_check() {
     ));
 }
 
-// MEASURED: a false endpoint and two higher-order index-premise witnesses
-// refuse with KernelRejected TypeMismatch, never Internal. CLAIMED: binding
-// repair is fail-closed where the coordinate follow-up R1 is incomplete. THE
-// GAP: R1's direct-body control checks, not the match; unification is separate.
+// MEASURED: the higher-order index-premise witness checks both applied and
+// under a goal binder, while its false endpoint stays a typed refusal.
+// CLAIMED: a moved premise sees the same coordinate as the transported goal.
+// THE GAP: this does not prove arbitrary independent transports convert.
 #[test]
-fn index_premises_and_false_endpoints_refuse_typed() {
+fn index_premises_at_goal_coordinate_check() {
     let g = "(g : Nat → Equal a ({I}) y)";
-    refuses(
-        index_row("i6g", g, "Equal a ({I}) y", "g Zero"),
-        Refusal::KernelTypeMismatch,
-    );
-    refuses(
-        index_row("i6gb", g, "Nat → Equal a ({I}) y", "g"),
-        Refusal::KernelTypeMismatch,
-    );
+    checks(index_row("i6g", g, "Equal a ({I}) y", "g Zero"));
+    checks(index_row("i6gb", g, "Nat → Equal a ({I}) y", "g"));
+}
+
+#[test]
+fn false_index_premise_endpoint_refuses_typed() {
     refuses(
         index_row(
             "i6bf",

@@ -4764,13 +4764,6 @@ fn plan_coherent_frame_motive(
     }))
 }
 
-/// Compute the ordered ambient-context convoy for a dependent match: the
-/// transitive forward-dependency closure of genuine ambient bindings whose type
-/// the root substitution (or an already-included convoy binder) changes.
-/// Returned innermost-first (ascending de Bruijn `var`); the motive telescope
-/// wraps them outermost-first. The scrutinee's own binder is excluded (the
-/// motive already abstracts it). Binders with a recorded generated/arm origin
-/// are excluded; user-local binders remain ambient even within an arm.
 /// True when `term` mentions an index-refinement sentinel or a binder that an
 /// enclosing frame has refined (an active `var_refinements` entry).
 fn mentions_enclosing_refinement(cx: &ElabCtx, term: &Term) -> bool {
@@ -4781,6 +4774,13 @@ fn mentions_enclosing_refinement(cx: &ElabCtx, term: &Term) -> bool {
         })
 }
 
+/// Compute the ordered ambient-context convoy for a dependent match: the
+/// transitive forward-dependency closure of genuine ambient bindings whose type
+/// the root substitution (or an already-included convoy binder) changes.
+/// Returned innermost-first (ascending de Bruijn `var`); the motive telescope
+/// wraps them outermost-first. The scrutinee's own binder is excluded (the
+/// motive already abstracts it). Binders with a recorded generated/arm origin
+/// are excluded; user-local binders remain ambient even within an arm.
 fn compute_context_convoy(
     cx: &ElabCtx,
     frame: &MatchFrame,
@@ -4857,6 +4857,14 @@ fn compute_context_convoy(
 /// indefinitely under neutral scrutinees; this deliberately stops at stuck
 /// `Elim` nodes.
 fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
+    // `whnf` erases an ascription, but the kernel reads one: a `J` infers its
+    // motive and evidence through it. Keep it and simplify underneath.
+    if let Term::Ascript(t, a) = term {
+        return Term::Ascript(
+            Box::new(simplify_branch_goal_unguarded(env, ctx, t)),
+            Box::new(simplify_branch_goal_unguarded(env, ctx, a)),
+        );
+    }
     let reduced = whnf(env, ctx, term);
     if matches!(reduced, Term::Sigma(..)) {
         if let Some((a, t, u)) = stated_equality(env, ctx, term) {
@@ -7788,7 +7796,7 @@ fn build_large_convoy_recursive_method(
     expected_here: &Term,
     sentinel_region: usize,
     premise_domains: &[Term],
-) -> Result<Term, ElabError> {
+) -> Result<Option<Term>, ElabError> {
     let premise_base = cx.active_index_premise_frames.len();
     if !premise_domains.is_empty() {
         cx.active_index_premise_frames
@@ -7810,12 +7818,11 @@ fn build_large_convoy_recursive_method(
         sentinel_region,
     );
     cx.active_index_premise_frames.truncate(premise_base);
-    let goal_j = goal_result?.ok_or_else(|| {
-        ElabError::Internal(
-            "large index convoy could not construct its recursive goal transport".into(),
-        )
-    })?;
-    wrap_premise_lams_finalized(goal_j, premise_domains, sentinel_region, &arm.span)
+    // No goal transport to build: the ordinary branch body checks this arm.
+    let Some(goal_j) = goal_result? else {
+        return Ok(None);
+    };
+    wrap_premise_lams_finalized(goal_j, premise_domains, sentinel_region, &arm.span).map(Some)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -8093,7 +8100,7 @@ fn check_dependent_branch_body(
                 n,
             )?;
         } else {
-            install_index_refinements(
+            install_branch_field_refinements(
                 cx,
                 ind,
                 params,
@@ -8101,18 +8108,22 @@ fn check_dependent_branch_body(
                 scrut_indices,
                 n,
                 outer_scope_depth,
-            )?;
-        }
-        if let Some(premise_slot) = hidden_result_premise_slot {
-            install_hidden_result_variable_refinements(
-                cx,
-                &weaken(scrut_ty, n as i64),
+                equation_convoy,
+                expected_here,
                 concrete,
-                &weaken(scrut_core, n as i64),
-                premise_slot,
-                outer_scope_depth,
+                premise_domains,
+                sentinel_region,
             )?;
         }
+        install_hidden_result_refinements(
+            cx,
+            hidden_result_premise_slot,
+            scrut_ty,
+            concrete,
+            scrut_core,
+            n,
+            outer_scope_depth,
+        )?;
         for (bottom_pos, sentinel, ctor_ty) in convoy_refinements {
             cx.var_refinements.insert(
                 *bottom_pos,
@@ -8213,6 +8224,163 @@ fn check_dependent_branch_body(
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
     outcome
+}
+
+/// Field refinements for one dependent branch. An equation-convoy branch then
+/// rebinds each moved field to its component of the goal's single transport.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn install_branch_field_refinements(
+    cx: &mut ElabCtx,
+    ind: &InductiveDecl,
+    params: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    n: usize,
+    outer_scope_depth: usize,
+    equation_convoy: bool,
+    expected_here: &Term,
+    concrete: &Term,
+    premise_domains: &[Term],
+    sentinel_region: usize,
+) -> Result<Vec<usize>, ElabError> {
+    let installed = install_index_refinements(
+        cx,
+        ind,
+        params,
+        target_indices,
+        scrut_indices,
+        n,
+        outer_scope_depth,
+    )?;
+    if !equation_convoy {
+        return Ok(installed);
+    }
+    let premise_base = cx.active_index_premise_frames.len();
+    if !premise_domains.is_empty() {
+        cx.active_index_premise_frames
+            .push(ActiveIndexPremiseFrame {
+                sentinel_region,
+                premise_domains: premise_domains.to_vec(),
+                install_depth: cx.ctx.len(),
+            });
+    }
+    let result =
+        install_fields_from_goal_transport(cx, expected_here, concrete, ind.params.len(), n);
+    cx.active_index_premise_frames.truncate(premise_base);
+    result.map(|()| installed)
+}
+
+/// The branch's hidden-result refinements. Outlined so the recursive branch
+/// frame does not hold the weakened index terms.
+#[inline(never)]
+fn install_hidden_result_refinements(
+    cx: &mut ElabCtx,
+    hidden_result_premise_slot: Option<usize>,
+    scrut_ty: &Term,
+    concrete: &Term,
+    scrut_core: &Term,
+    n: usize,
+    outer_scope_depth: usize,
+) -> Result<(), ElabError> {
+    if let Some(premise_slot) = hidden_result_premise_slot {
+        install_hidden_result_variable_refinements(
+            cx,
+            &weaken(scrut_ty, n as i64),
+            concrete,
+            &weaken(scrut_core, n as i64),
+            premise_slot,
+            outer_scope_depth,
+        )?;
+    }
+    Ok(())
+}
+
+fn goal_transport_of(term: &Term, concrete: &Term) -> Option<Term> {
+    // Iterative: the goal can be as deep as the nesting that produced it.
+    let mut pending = vec![term];
+    while let Some(term) = pending.pop() {
+        if let Term::Cast(_, _, _, value) = term {
+            if value.as_ref() == concrete {
+                return Some(term.clone());
+            }
+        }
+        pending.extend(term.children());
+    }
+    None
+}
+
+/// An equation-convoy goal sees the constructor through one transport,
+/// `cast (D target) (D scrutinee) e concrete`. Bind each field to the kernel's
+/// component of that transport, so the body and the goal share one producer.
+#[inline(never)]
+fn install_fields_from_goal_transport(
+    cx: &mut ElabCtx,
+    expected_here: &Term,
+    concrete: &Term,
+    param_count: usize,
+    n: usize,
+) -> Result<(), ElabError> {
+    let goal = cx.metas.zonk_term(expected_here);
+    let Some(transport) = goal_transport_of(&goal, concrete) else {
+        return Ok(());
+    };
+    let Some(view) = active_premise_kernel_view_for_context(cx, &cx.ctx)? else {
+        return Ok(());
+    };
+    let (original_len, expanded_len) = (view.embedding.original_len, view.embedding.expanded_len);
+    let transport =
+        view.embedding
+            .translate_from_original(&transport, original_len, expanded_len)?;
+    let reduced = whnf(cx.env, &view.context, &transport);
+    let (head, args) = peel_app(&reduced);
+    if !matches!(head, Term::Constructor { .. }) || args.len() != param_count + n {
+        return Ok(());
+    }
+    for field_j in 0..n {
+        let field_pos = n - 1 - field_j;
+        let value = view.embedding.translate_to_original(
+            &args[param_count + field_j],
+            original_len,
+            expanded_len,
+        )?;
+        if value == Term::var(field_pos) {
+            continue;
+        }
+        let value_ty = kernel_infer_current(cx, &value).map_err(|error| match error {
+            CurrentKernelQueryError::View(error) => error,
+            CurrentKernelQueryError::Kernel(error) => {
+                ElabError::Internal(format!("goal transport field is ill-typed: {error:?}"))
+            }
+        })?;
+        let bottom_pos = cx.ctx.len() - 1 - field_pos;
+        cx.var_refinements
+            .insert(bottom_pos, (value, value_ty, cx.ctx.len()));
+    }
+    Ok(())
+}
+
+/// A named-equation arm binds `scrut = concrete` and checks its body under it.
+/// Outlined so the recursive match frame does not hold the equation's terms.
+#[inline(never)]
+fn check_named_equation_arm(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    scrut_ty: &Term,
+    scrut_core: &Term,
+    concrete: &Term,
+    n: usize,
+    expected_here: &Term,
+) -> Result<Term, ElabError> {
+    let eq_dom = Term::Eq(
+        Box::new(weaken(scrut_ty, n as i64)),
+        Box::new(weaken(scrut_core, n as i64)),
+        Box::new(concrete.clone()),
+    );
+    cx.push_match_binder(eq_dom.clone(), MatchBinderOrigin::GeneratedEquation);
+    let body = check_match_arm_result(cx, arm, &weaken(expected_here, 1), &arm.span)?;
+    cx.ctx.pop();
+    Ok(Term::lam(eq_dom, body))
 }
 
 /// Install the arm's path equation `scrut = concrete` and return the
@@ -8773,7 +8941,9 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     id: cx.env.tt_id(),
                     level_args: Vec::new(),
                 }
-            } else if equation_convoy && expression_mentions_recursive_group(cx, &arm.body) {
+            } else if let Some(method) = if equation_convoy
+                && expression_mentions_recursive_group(cx, &arm.body)
+            {
                 frame_try!(build_large_convoy_recursive_method(
                     cx,
                     arm,
@@ -8786,16 +8956,20 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     sentinel_region,
                     &premise_domains,
                 ))
+            } else {
+                None
+            } {
+                method
             } else if equation.is_some() {
-                let eq_dom = Term::Eq(
-                    Box::new(weaken(&scrut_ty, n as i64)),
-                    Box::new(weaken(&scrut_core, n as i64)),
-                    Box::new(concrete.clone()),
-                );
-                cx.push_match_binder(eq_dom.clone(), MatchBinderOrigin::GeneratedEquation);
-                let body = frame_try!(check_match_arm_result(cx, arm, &weaken(&expected_here, 1), &arm.span));
-                cx.ctx.pop();
-                Term::lam(eq_dom, body)
+                frame_try!(check_named_equation_arm(
+                    cx,
+                    arm,
+                    &scrut_ty,
+                    &scrut_core,
+                    &concrete,
+                    n,
+                    &expected_here,
+                ))
             } else {
                 frame_try!(check_dependent_branch_body(
                     cx,
@@ -10830,26 +11004,6 @@ fn wrap_premise_pis_finalized(
     Ok(term)
 }
 
-/// Build the constructor-refined motive-application type
-/// `Π(index-premises). Π(context-telescope convoy). base_body[amb := binder]`,
-/// as a self-contained type at the `n`-deep field context. This is the shared
-/// shape of the constructor `expected_here` goal AND the direct IH slot in
-/// `wrap_dependent_method_ihs`: both are `motive` applied to a value of the
-/// family at `refined_indices`, so both must carry the same convoy telescope the
-/// motive codomain now generalizes over (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-
-/// REBASE). `refined_core` is the value the scrutinee is refined to (the ctor at
-/// its fields, or a recursive field variable for the IH). Convoy binder
-/// references are emitted as index-refinement sentinels and relocated to their
-/// real de Bruijn positions by `finalize_refined_body`.
-/// The context-telescope convoy's binder types (innermost-first) and their
-/// sentinels, DERIVED from the ONE ordered plan `context_convoy` for one
-/// consumer frame, so the motive, each constructor method, the direct IH, and
-/// (through the sentinels) the final Elim application cannot diverge. Rebases
-/// `scrut_indices[j] -> index_targets[j]` and `scrut_core -> core_target`, and
-/// threads every OTHER convoy binder through its sentinel (all-but-self,
-/// order-independent — an entry's type names only outer convoy binders, never
-/// itself; fixes the indirect `h : p xs` where `h` is innermost yet depends on
-/// the outer `xs`). `frame_depth` = binders between the ambient context and
 /// C1 entries that do not depend on C2 precede every embedded companion;
 /// C2 and the C1 entries that depend on it follow them. Both groups retain
 /// their outermost-first source order.
@@ -10893,6 +11047,26 @@ fn convoy_entries_following_c2(context_convoy: &[ConvoyEntry]) -> Vec<bool> {
     }
 }
 
+/// Build the constructor-refined motive-application type
+/// `Π(index-premises). Π(context-telescope convoy). base_body[amb := binder]`,
+/// as a self-contained type at the `n`-deep field context. This is the shared
+/// shape of the constructor `expected_here` goal AND the direct IH slot in
+/// `wrap_dependent_method_ihs`: both are `motive` applied to a value of the
+/// family at `refined_indices`, so both must carry the same convoy telescope the
+/// motive codomain now generalizes over (LANG-DEPENDENT-MATCH-CONTEXT-TELESCOPE-
+/// REBASE). `refined_core` is the value the scrutinee is refined to (the ctor at
+/// its fields, or a recursive field variable for the IH). Convoy binder
+/// references are emitted as index-refinement sentinels and relocated to their
+/// real de Bruijn positions by `finalize_refined_body`.
+/// The context-telescope convoy's binder types (innermost-first) and their
+/// sentinels, DERIVED from the ONE ordered plan `context_convoy` for one
+/// consumer frame, so the motive, each constructor method, the direct IH, and
+/// (through the sentinels) the final Elim application cannot diverge. Rebases
+/// `scrut_indices[j] -> index_targets[j]` and `scrut_core -> core_target`, and
+/// threads every OTHER convoy binder through its sentinel (all-but-self,
+/// order-independent — an entry's type names only outer convoy binders, never
+/// itself; fixes the indirect `h : p xs` where `h` is innermost yet depends on
+/// the outer `xs`). `frame_depth` = binders between the ambient context and
 /// where these types are stated (`motive_base_depth` for the motive; `n` for a
 /// method/IH). `slot_base` = premises preceding C1 in the enclosing telescope
 /// (0 for the motive; the index-premise count for a method/IH).
