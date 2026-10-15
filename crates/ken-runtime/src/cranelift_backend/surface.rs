@@ -102,6 +102,9 @@ pub struct NativeRuntimeIrComparisonReport {
     pub runtime_ir: RuntimeIrRunReport,
     pub native: Option<CraneliftRunReport>,
     pub verdict: NativeRuntimeIrComparisonVerdict,
+    /// A refusal's typed cause survives conversion to a display-only verdict.
+    /// Agreement has no cause; observation mismatch names backend behavior.
+    pub cause: Option<LoweringCause>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -252,26 +255,34 @@ pub enum BackendFailure {
 }
 
 impl CraneliftBackendError {
-    pub fn code(&self) -> ken_diagnostic::Code {
+    pub fn cause(&self) -> LoweringCause {
         match self {
-            Self::Unsupported(err) => err.cause.code(),
-            Self::ResidualRepresentationRequired { .. } => LoweringCause::Fragment.code(),
-            Self::Backend(err) => err.code(),
+            Self::Unsupported(err) => err.cause,
+            Self::ResidualRepresentationRequired { .. } => LoweringCause::Fragment,
+            Self::Backend(err) => err.cause(),
             Self::CapacityExhausted(_)
             | Self::SelectedCallIntegrity(_)
-            | Self::ProfileMismatch(_) => LoweringCause::ResourceEnforcement.code(),
+            | Self::ProfileMismatch(_) => LoweringCause::ResourceEnforcement,
         }
+    }
+
+    pub fn code(&self) -> ken_diagnostic::Code {
+        self.cause().code()
     }
 }
 
 impl BackendFailure {
-    pub fn code(&self) -> ken_diagnostic::Code {
+    pub fn cause(&self) -> LoweringCause {
         match self {
-            Self::Target(_) | Self::NativeResultDecode { .. } => LoweringCause::Backend.code(),
-            Self::Verifier(_) => LoweringCause::FinishedCode.code(),
-            Self::Module { cause, .. } => cause.code(),
-            Self::PlannerInvariant(_) => LoweringCause::PlannerInvariant.code(),
+            Self::Target(_) | Self::NativeResultDecode { .. } => LoweringCause::Backend,
+            Self::Verifier(_) => LoweringCause::FinishedCode,
+            Self::Module { cause, .. } => *cause,
+            Self::PlannerInvariant(_) => LoweringCause::PlannerInvariant,
         }
+    }
+
+    pub fn code(&self) -> ken_diagnostic::Code {
+        self.cause().code()
     }
 }
 

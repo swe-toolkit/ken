@@ -284,6 +284,7 @@ pub(crate) fn run_runtime_ir_report_with_authority(
                     verdict: NativeRuntimeIrComparisonVerdict::RuntimeIrNativeAgreement {
                         stage: NativeDifferentialStage::RuntimeIrNativeCompare,
                     },
+                    cause: None,
                 }
             } else {
                 NativeRuntimeIrComparisonReport {
@@ -296,6 +297,7 @@ pub(crate) fn run_runtime_ir_report_with_authority(
                     },
                     runtime_ir: run_report,
                     native: Some(native),
+                    cause: Some(LoweringCause::Backend),
                 }
             }
         }
@@ -1122,6 +1124,7 @@ fn runtime_ir_comparison_error_report(
     stage: NativeDifferentialStage,
 ) -> NativeRuntimeIrComparisonReport {
     let example = run_report.target.example.clone();
+    let cause = err.cause();
     let verdict = match err {
         CraneliftBackendError::CapacityExhausted(fault) => {
             NativeRuntimeIrComparisonVerdict::CapacityExhausted(fault)
@@ -1156,5 +1159,6 @@ fn runtime_ir_comparison_error_report(
         runtime_ir: run_report,
         native: None,
         verdict,
+        cause: Some(cause),
     }
 }

@@ -166,6 +166,7 @@ mod tests {
             reason: "linker refused the object".to_string(),
             capacity_failure: None,
             selected_call_integrity: None,
+            comparison_cause: None,
         };
         assert_eq!(packaging.code().as_str(), "N0006");
         assert_eq!(

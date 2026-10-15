@@ -225,6 +225,7 @@ fn nc22_cranelift_agrees_with_runtime_ir_report_for_broad_starter_shapes() {
             stage: NativeDifferentialStage::RuntimeIrNativeCompare,
         }
     );
+    assert_eq!(report.cause, None);
     let native = report.native.expect("native side ran");
     assert_eq!(native.observation, observation);
     assert_eq!(
@@ -288,6 +289,7 @@ fn nc22_imported_dependency_lowers_as_stable_unsupported_native_lane() {
         }
     ));
     assert!(report.native.is_none());
+    assert_eq!(report.cause, Some(LoweringCause::Fragment));
 }
 #[test]
 fn nc22_runtime_ir_report_identity_mismatch_rejects_before_native_lowering() {
@@ -319,6 +321,7 @@ fn nc22_runtime_ir_report_identity_mismatch_rejects_before_native_lowering() {
         }
     ));
     assert!(report.native.is_none());
+    assert_eq!(report.cause, Some(LoweringCause::Admission));
 }
 #[test]
 fn nc22_ambiguous_runtime_ir_report_target_rejects_before_native_lowering() {
@@ -358,6 +361,118 @@ fn nc22_ambiguous_runtime_ir_report_target_rejects_before_native_lowering() {
         }
     ));
     assert!(report.native.is_none());
+}
+/// Durable invariant. MEASURED: the comparison reporter preserves the typed
+/// source error's family while retaining its existing verdict. CLAIMED:
+/// packaging can project the source family instead of treating every failure
+/// as admission. THE GAP: the packaging wrapper must consume this field;
+/// the packaging tests exercise that separate seam.
+#[test]
+fn comparison_report_keeps_typed_causes_when_verdict_erases_source_error() {
+    use crate::cranelift_backend::surface::BackendFailure;
+    let program = nc22_program_with_body(
+        RuntimeExpr::Value(RuntimeValue::Int(1.into())),
+        RuntimeObservation::Returned(RuntimeGroundValue::Int(1.into())),
+    );
+    let run_report = evaluate_runtime_ir_example(
+        &program,
+        &program.examples[0],
+        &RuntimeIrSeedEnvironment::empty(),
+    )
+    .expect("runtime-IR evaluator runs");
+    let same_reason = "a deliberately shared, rewordable message";
+    let cases = [
+        (
+            CraneliftBackendError::CapacityExhausted(ken_host::CapacityExhaustedV1 {
+                scope: ken_host::CapacityScopeV1::Runtime,
+                resource: ken_host::CapacityResourceV1::InvocationEpochs,
+                limit: 0,
+                requested: 1,
+            }),
+            LoweringCause::ResourceEnforcement,
+            "N0007",
+        ),
+        (
+            CraneliftBackendError::SelectedCallIntegrity(
+                ken_host::SelectedCallIntegrityFaultV1::WrongTarget,
+            ),
+            LoweringCause::ResourceEnforcement,
+            "N0007",
+        ),
+        (
+            CraneliftBackendError::ProfileMismatch(
+                crate::boundary_activation::InvocationEpochProfileMismatchV2 {
+                    authorized: 1,
+                    attempted: 2,
+                },
+            ),
+            LoweringCause::ResourceEnforcement,
+            "N0007",
+        ),
+        (
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "fixture",
+                reason: same_reason.into(),
+                cause: LoweringCause::Capacity,
+            }),
+            LoweringCause::Capacity,
+            "N0002",
+        ),
+        (
+            CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct: "fixture",
+                reason: same_reason.into(),
+                cause: LoweringCause::PlannerInvariant,
+            }),
+            LoweringCause::PlannerInvariant,
+            "N0003",
+        ),
+        (
+            CraneliftBackendError::Backend(BackendFailure::Verifier(same_reason.into())),
+            LoweringCause::FinishedCode,
+            "N0004",
+        ),
+        (
+            CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(
+                same_reason.into(),
+            )),
+            LoweringCause::PlannerInvariant,
+            "N0003",
+        ),
+        (
+            CraneliftBackendError::Backend(BackendFailure::Module {
+                reason: same_reason.into(),
+                cause: LoweringCause::Capacity,
+            }),
+            LoweringCause::Capacity,
+            "N0002",
+        ),
+        (
+            CraneliftBackendError::Backend(BackendFailure::Target(same_reason.into())),
+            LoweringCause::Backend,
+            "N0006",
+        ),
+        (
+            CraneliftBackendError::ResidualRepresentationRequired { site: "fixture" },
+            LoweringCause::Fragment,
+            "N0001",
+        ),
+    ];
+    for (source, expected_cause, expected_code) in cases {
+        let report = runtime_ir_comparison_error_report(
+            NativeArtifactIdentity::from_program(&program),
+            run_report.clone(),
+            source,
+            NativeDifferentialStage::NativeLoweringOrExecution,
+        );
+        assert!(report.native.is_none());
+        assert_eq!(report.cause, Some(expected_cause));
+        assert_eq!(report.cause.unwrap().code().as_str(), expected_code);
+        assert!(!matches!(
+            report.verdict,
+            NativeRuntimeIrComparisonVerdict::RuntimeIrNativeAgreement { .. }
+        ));
+    }
 }
 #[test]
 fn nc8_valid_certificate_records_f2_validation_separate_from_f1() {
