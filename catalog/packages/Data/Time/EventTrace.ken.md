@@ -82,22 +82,6 @@ pub fn trace_merge (p : Type) (xs : List (Event p)) (ys : List (Event p)) : List
     Cons x xt ↦ trace_merge_into p x xt (trace_merge p xt) ys
   }
 
-fn trace_merge_into
-      (p : Type)
-      (x : Event p)
-      (xt : List (Event p))
-      (rest : List (Event p) → List (Event p))
-      (ys : List (Event p))
-    : List (Event p) =
-  match ys {
-    Nil ↦ Cons (Event p) x xt;
-    Cons y yt ↦
-      match event_before p x y {
-        True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
-        False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
-      }
-  }
-
 pub theorem trace_window_ordered
       (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
     : time_ordered p tr → time_ordered p (trace_window p lo hi tr) =
@@ -167,6 +151,22 @@ pub theorem trace_merge_count
           (trace_merge p xt)
           (λzs. trace_merge_count p eqf q xt zs)
           ys
+  }
+
+fn trace_merge_into
+      (p : Type)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (ys : List (Event p))
+    : List (Event p) =
+  match ys {
+    Nil ↦ Cons (Event p) x xt;
+    Cons y yt ↦
+      match event_before p x y {
+        True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+        False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+      }
   }
 
 theorem event_before_trans
