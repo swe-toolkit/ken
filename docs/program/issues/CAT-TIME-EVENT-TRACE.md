@@ -48,6 +48,8 @@ outside the module can build events and use every operation.
   own theorem (Architect `evt_2g55q7sr511zx`).
 - **Coupled test.** `catalog_ambient_passthrough_migration_census` in
   `lang_mod_strict_resolution_d0.rs` needs the new package's measured row.
+- **Coupled inventory.** `cat_derived_pub_export.rs` pins Derived's exact
+  public export set, so the moved generic proofs must be added to it.
 - **Known limits.**
   - Pass `map` a named helper, not a λ.
   - A dependent `match` refines only its scrutinee as written (CHECKS
@@ -73,6 +75,8 @@ base, stop and report the mismatch.
    - restates the three law types generically;
    - records `trusted_base()` before and after loading.
 4. The package's measured row in the ambient census.
+5. The moved proofs added to `cat_derived_pub_export.rs`'s inventory,
+   with every existing row unchanged.
 
 ## Acceptance
 
@@ -93,5 +97,5 @@ base, stop and report the mismatch.
 - A law needs an Axiom, or an existing Derived public law or signature
   changes.
 - `trusted_base()` grows on loading either package.
-- A change outside the package, Derived, the census test and the new
-  acceptance target.
+- A change outside the package, Derived, the census test, the Derived
+  export inventory test and the new acceptance target.
