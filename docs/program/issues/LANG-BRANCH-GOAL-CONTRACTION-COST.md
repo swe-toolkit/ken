@@ -47,18 +47,34 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first: the Architect rules the bound, for example head-only
-contraction or contraction that does not enter binders or stuck methods,
-and re-measures `left_head` under it. Then the repair and an acceptance
-row for the repro.
+The Architect's D0 (`evt_1q0gv51yjdkq4`) rules **non-duplicating
+contraction**: `contract_applied_lambdas` contracts `App(Lam(_, body), arg)`
+only when the bound variable occurs at most once in `body` or `arg` is a
+single-node term, so the work is quadratic in the goal. The D0 gives the
+exact elab.rs patch at `48cda520b`.
+
+- **Anchors moved.** The wrapper is at elab.rs:5145 and
+  `contract_applied_lambdas` at :5159-5208.
+- **Premise corrected.** The contraction drives the stored growth. The
+  time goes to kernel conversion of the contracted `refl` witness, so the
+  repro is now refused in about 10 ms rather than accepted.
+- **Repro.** The D0's reconstruction; the report's text is unreachable.
 
 ## Acceptance
 
-- **AC-1.** The repro at n=16 elaborates in a bounded time named by the
-  D0, and its stored declaration grows at most polynomially in n.
+- **AC-1 (bound).** In the debug test profile, in-process
+  `elaborate_file` of the D0 repro at n=16 returns within 1 s. If it
+  returns Ok, the stored `blow` declaration has at most 16384 nodes
+  (64·n², `ty` plus `body` via `Term::children()`). The row asserts the
+  bound, not the refusal. Control in the same row: the linear spelling at
+  n=16 returns Ok within 1 s with at most 16384 stored nodes.
 - **AC-2.** `lang_elaborated_beta_redex_at_kernel_inference` (λ and named
   `left_head`) and the 74-file catalog census are unchanged, per file.
-- **AC-3 (mutation, QA).** Restoring full normalization reddens AC-1.
+- **AC-3 (mutation, QA).** Restoring unconditional contraction reddens
+  both halves of AC-1.
+
+Out of scope (D0 residuals): **R1**, accepting a duplicating λ argument in
+polynomial time; **R2**, a typed elaborator refusal naming the argument.
 
 ## Stop conditions
 
