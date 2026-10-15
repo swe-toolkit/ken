@@ -1,7 +1,7 @@
 ---
 id: SPEC-SERIALIZATION-ROUND-TRIP-CONTRACT
 title: "spec/50-stdlib names a serialization round-trip law (decode after encode is Ok) as a package obligation, but no chapter states it and no catalog codec proves it. Author the serialization chapter with a first exact section: one pure codec whose round trip and malformed-input refusal are proved at zero trust"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

@@ -1,7 +1,7 @@
 ---
 id: LANG-BRANCH-GOAL-DELTA-DUPLICATION
 title: "The branch-goal simplifier whnf-unfolds every node and then re-simplifies both children of an App, so a named helper that duplicates its argument (dupf f x = f x x) nested n deep makes elaboration time and the stored term grow as 2^n through delta rather than beta. 44e4087d1 bounded only beta. Bound the simplifier so branch-goal cost stays polynomial in the source"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1

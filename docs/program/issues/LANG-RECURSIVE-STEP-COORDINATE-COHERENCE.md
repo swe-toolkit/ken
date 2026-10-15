@@ -1,7 +1,7 @@
 ---
 id: LANG-RECURSIVE-STEP-COORDINATE-COHERENCE
 title: "After a nested index match splits, the goal is refined from the scrutinee coordinate to the target coordinate while the fields are cast the other way, so the recursive step of a true Equal proof compares terms neutral at different index variables and is refused. A step-reachable control with no embedded eliminator ends in an Internal error. Put the goal, the fields and the recursive call at one coordinate, with the IH at that coordinate"
-status: active
+status: merged
 owner: language
 size: L
 tier: T1
@@ -31,12 +31,16 @@ user-reachable failures are typed.
   `trusted_base()` unchanged, as is its sibling `dual_option`, and its
   false twin is still refused. Some landing after WIP `1048192afa` turned
   it green.
-- **Two producers act in opposite directions; the live anchor is H1.**
-  H1 is KernelRejected TypeMismatch at its `DualFS` leaf. On the found
-  side, the unfolded `dual_lookup` recursive step casts `rest` from
-  `DualEnv a k` to `DualEnv a m` through `Eq Nat k m`. The expected side's
-  `DualFin` eliminator is stuck on the variable. K2 is KernelRejected
-  TypeMismatch: expected `Eq Nat @5 @9`, found `Eq Nat (Suc @5) (Suc @5)`.
+- **The D0 is ruled** (Architect `evt_5hzbjtwpgm827`, at `44e4087d1`):
+  one coordinate, the scrutinee index m. The "two producers in opposite
+  directions" premise is measured false. The rows fail for three unrelated
+  defects:
+  - H1: `simplify_branch_goal_unguarded` `whnf`s through an `Ascript`, so
+    the field cast's J loses its motive ascription and stays stuck.
+  - K2: `install_index_refinements` casts `rest` a second time, beside the
+    goal's single transport.
+  - The control: `build_large_convoy_recursive_method` reports an empty
+    case (`None`) as `Internal`.
 - **The wall predates the convoy.** The step-reachable control, with
   `Proved` at DualFZ and no embedded xs-eliminator, fails identically on
   base `f7a9a2989` and on the WIP. The error is `Internal("large index
@@ -44,24 +48,17 @@ user-reachable failures are typed.
   elab.rs:7815 in `build_large_convoy_recursive_method` (:7780). Its step
   calls `cong`, which is not in the prelude
   (`Core/Logic/Transport.ken.md:56`).
-- **Prior art to pull at kickoff.** The Coq `depelim` solution and
-  simplification step, and Lean `cases` substituting index equations.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first: the Architect rules the design. The research pull is done
-(`evt_5fcb7m8pk78nx`). Its invariant is a D0 input:
-- a solved index variable is eliminated exactly once, by one transport;
-- that transport's motive abstracts the goal together with every
-  dependent of the variable: convoyed hypotheses, fields and the
-  recursive call's arguments;
-- no dependent is cast separately, in either direction.
-
-Then one coordinate for goal, fields and recursive call after the split,
-with the IH at that coordinate.
+The D0's exact `elab.rs` diff (`evt_5hzbjtwpgm827`, +200/-27): keep the
+`Ascript` node and simplify under it; in an equation-convoy branch, rebind
+each moved field to its component of the goal's transport; let `None` fall
+through to the ordinary branch check. Keep the recursive-cycle frames at or
+below base (`MATCH_STACK_BYTES` stays 3072 KiB; do not re-record it).
 
 **Carried from the convoy WP (Architect `evt_1kc148cfjm929`).** It changes
 no behaviour and needs no gate of its own. In `elab.rs`, move
@@ -71,23 +68,21 @@ doc comment.
 
 ## Acceptance
 
-- **AC-1.** The rows from `LANG-CONVOY-AMBIENT-BINDER-COEXISTENCE` check,
-  with no Axiom and no trust change (Architect `evt_40eh6614dch8`; exact
-  sources in thread `thr_5007397vycb5t`):
-  - H1, whose `DualFS` leaf uses the convoyed `h`;
-  - K2, `pp (dual_lookup a n xs i)` with the recursive call
-    `hp (dual_lookup a m rest j)`.
-
-  CONVOY's typed refusals of the false twins stay refusals.
-- **AC-2.** The step-reachable control, spelled with `cong` in scope (a
-  fixture declaration or an import of `Core.Logic.Transport`), succeeds or
-  returns a typed refusal. No `Internal` reaches the user from
+- **AC-1.** H1 and K2 check with `trusted_base()` unchanged and no Axiom.
+  The false twins H1F, K2F, G2F, H9F and `h9_false` stay refused.
+- **AC-2.** The step-reachable control, spelled with `cong` in scope, is
+  Ok. No `Internal` reaches the user from
   `build_large_convoy_recursive_method`.
-- **AC-3 (control).** These stay green with `trusted_base()` identity
-  pinned: T2, T3 and `dual_option`. The convoy WP's T1, named-row and F4
-  rows, its 61-row suite set and the catalog census are unchanged.
-- **AC-4 (mutation, QA).** Restoring either producer's direction reddens
-  H1 or K2.
+- **AC-3 (control).** T2, T3 and `dual_option` stay Ok with
+  `trusted_base()` identity pinned, and the catalog census is unchanged.
+  The only test deltas are the two named positive ones:
+  - `lang_convoy_ambient_binder_coexistence`: H1 and K2 move from typed
+    refusals to checks;
+  - `lang_convoy_embedded_sentinel_under_binder`: the true goals i6g and
+    i6gb move to a checking test, and i6bf stays a refusal.
+- **AC-4 (mutation, QA).** Reverting each fix singly reddens its row:
+  fix 1 reddens H1, fix 2 reddens K2, fix 3 returns the control to
+  `Internal`. T2, T3 and `dual_option` stay Ok under each.
 
 ## Stop conditions
 
