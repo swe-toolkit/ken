@@ -1,7 +1,7 @@
 ---
 id: LANG-RECURSIVE-STEP-COORDINATE-COHERENCE
 title: "After a nested index match splits, the goal is refined from the scrutinee coordinate to the target coordinate while the fields are cast the other way, so the recursive step of a true Equal proof compares terms neutral at different index variables and is refused. A step-reachable control with no embedded eliminator ends in an Internal error. Put the goal, the fields and the recursive call at one coordinate, with the IH at that coordinate"
-status: ready
+status: active
 owner: language
 size: L
 tier: T1
