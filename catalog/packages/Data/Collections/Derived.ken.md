@@ -2042,17 +2042,17 @@ case-split and arithmetic helpers remain private.
 pub fn starts_after (a : Type) (le : a → a → Bool) (h : a) (xs : List a) : Prop =
   derived_sort_head_ordered a le h xs
 
-pub theorem sorted_cons
+pub theorem list_sorted_cons
       (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
     : is_sorted a le xs → starts_after a le x xs → is_sorted a le (Cons a x xs) =
   derived_sort_sorted_cons a le x xs
 
-pub theorem sorted_tail
+pub theorem list_sorted_tail
       (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
     : is_sorted a le (Cons a x xs) → is_sorted a le xs =
   derived_sort_sorted_tail a le x xs
 
-pub theorem sorted_head
+pub theorem list_sorted_head
       (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
     : is_sorted a le (Cons a x xs) → starts_after a le x xs =
   derived_sort_sorted_head a le x xs
@@ -2182,8 +2182,8 @@ theorem filter_starts_after
             keep
             y
             ys
-            (sorted_tail a le x (Cons a y ys) sorted_input))
-          (sorted_head a le x (Cons a y ys) sorted_input)
+            (list_sorted_tail a le x (Cons a y ys) sorted_input))
+          (list_sorted_head a le x (Cons a y ys) sorted_input)
           (keep y)
           Refl
   }
@@ -2210,7 +2210,7 @@ theorem filter_sorted_cons
                 True ↦ Cons a y (filter a keep ys);
                 False ↦ filter a keep ys
               }))
-          (sorted_cons a le y (filter a keep ys) ih head_before)
+          (list_sorted_cons a le y (filter a keep ys) ih head_before)
           (sym Bool (keep y) True kept);
     False ↦
       λdropped.
@@ -2258,7 +2258,7 @@ pub theorem filter_sorted
           keep
           y
           ys
-          (filter_sorted a le le_trans keep ys (sorted_tail a le y ys sorted_input))
+          (filter_sorted a le le_trans keep ys (list_sorted_tail a le y ys sorted_input))
           (filter_starts_after a le le_trans keep y ys sorted_input)
           (keep y)
           Refl
@@ -2319,19 +2319,17 @@ pub theorem count_cons
 theorem add_right_comm
       (m : Nat) (n : Nat) (k : Nat)
     : Equal Nat (add (add m n) k) (add (add m k) n) =
-  trans
-    Nat
-    (add (add m n) k)
-    (add m (add n k))
-    (add (add m k) n)
-    (sym Nat (add m (add n k)) (add (add m n) k) ((proof assoc for add) m n k))
-    (trans
-      Nat
-      (add m (add n k))
-      (add m (add k n))
-      (add (add m k) n)
-      (cong Nat Nat (add n k) (add k n) (λj. add m j) ((proof comm for add) n k))
-      ((proof assoc for add) m k n))
+  match n {
+    Zero ↦ Refl;
+    Suc rest ↦
+      trans
+        Nat
+        (add (add m (Suc rest)) k)
+        (Suc (add (add m rest) k))
+        (add (add m k) (Suc rest))
+        ((proof suc_l for add) (add m rest) k)
+        (cong Nat Nat (add (add m rest) k) (add (add m k) rest) Suc (add_right_comm m rest k))
+  }
 
 pub theorem count_left_first
       (a : Type)
@@ -2399,48 +2397,48 @@ pub theorem count_right_first
     : Equal Nat
         (count a eqf q (Cons a y merged))
         (add left_count (count a eqf q (Cons a y yt))) =
-  trans
-    Nat
-    (count a eqf q (Cons a y merged))
-    (add (count a eqf q merged) (count a eqf q (Cons a y (Nil a))))
-    (add left_count (count a eqf q (Cons a y yt)))
-    (count_cons a eqf q y merged)
-    (trans
-      Nat
-      (add (count a eqf q merged) (count a eqf q (Cons a y (Nil a))))
-      (add (add left_count (count a eqf q yt)) (count a eqf q (Cons a y (Nil a))))
-      (add left_count (count a eqf q (Cons a y yt)))
-      (cong
-        Nat
-        Nat
-        (count a eqf q merged)
-        (add left_count (count a eqf q yt))
-        (λj. add j (count a eqf q (Cons a y (Nil a))))
-        merged_count)
-      (trans
-        Nat
-        (add (add left_count (count a eqf q yt)) (count a eqf q (Cons a y (Nil a))))
-        (add left_count (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a)))))
-        (add left_count (count a eqf q (Cons a y yt)))
-        (sym
-          Nat
-          (add left_count (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a)))))
-          (add (add left_count (count a eqf q yt)) (count a eqf q (Cons a y (Nil a))))
-          ((proof assoc for add)
-            left_count
-            (count a eqf q yt)
-            (count a eqf q (Cons a y (Nil a)))))
+  match eqf q y eqn : occurrence {
+    True ↦
+      J
+        (λdecision _.
+          Equal
+            Nat
+            (match decision {
+              True ↦ Suc (count a eqf q merged);
+              False ↦ count a eqf q merged
+            })
+            (add
+              left_count
+              (match decision {
+                True ↦ Suc (count a eqf q yt);
+                False ↦ count a eqf q yt
+              })))
         (cong
           Nat
           Nat
-          (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a))))
-          (count a eqf q (Cons a y yt))
-          (λj. add left_count j)
-          (sym
+          (count a eqf q merged)
+          (add left_count (count a eqf q yt))
+          Suc
+          merged_count)
+        (sym Bool (eqf q y) True occurrence);
+    False ↦
+      J
+        (λdecision _.
+          Equal
             Nat
-            (count a eqf q (Cons a y yt))
-            (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a))))
-            (count_cons a eqf q y yt)))))
+            (match decision {
+              True ↦ Suc (count a eqf q merged);
+              False ↦ count a eqf q merged
+            })
+            (add
+              left_count
+              (match decision {
+                True ↦ Suc (count a eqf q yt);
+                False ↦ count a eqf q yt
+              })))
+        merged_count
+        (sym Bool (eqf q y) False occurrence)
+  }
 ```
 
 ### 4.4 CAT-3 D3 — projection-abstraction classes

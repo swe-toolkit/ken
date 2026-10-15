@@ -62,9 +62,9 @@ fn generic_trace_and_derived_laws_check_without_new_trust() {
     assert_eq!(after_derived, baseline, "Derived adds no trusted GlobalId");
     for name in [
         "starts_after",
-        "sorted_cons",
-        "sorted_tail",
-        "sorted_head",
+        "list_sorted_cons",
+        "list_sorted_tail",
+        "list_sorted_head",
         "filter_sorted",
         "count_cons",
         "count_left_first",

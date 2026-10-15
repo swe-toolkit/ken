@@ -41,9 +41,9 @@ import Data.Collections.Derived
   (filter,
     count,
     starts_after,
-    sorted_cons,
-    sorted_tail,
-    sorted_head,
+    list_sorted_cons,
+    list_sorted_tail,
+    list_sorted_head,
     filter_sorted,
     count_left_first,
     count_right_first)
@@ -110,7 +110,7 @@ pub theorem trace_merge_ordered
                     p
                     xt
                     zs
-                    (sorted_tail (Event p) (event_before p) x xt sx)
+                    (list_sorted_tail (Event p) (event_before p) x xt sx)
                     sz)
               (λzs.
                 λhz.
@@ -119,7 +119,7 @@ pub theorem trace_merge_ordered
                     x
                     xt
                     zs
-                    (sorted_head (Event p) (event_before p) x xt sx)
+                    (list_sorted_head (Event p) (event_before p) x xt sx)
                     hz)
               ys
               sx
@@ -312,7 +312,7 @@ theorem trace_merge_into_sorted_cons
                 True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
                 False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
               }))
-          (sorted_cons
+          (list_sorted_cons
             (Event p)
             (event_before p)
             x
@@ -331,7 +331,7 @@ theorem trace_merge_into_sorted_cons
                 True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
                 False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
               }))
-          (sorted_cons
+          (list_sorted_cons
             (Event p)
             (event_before p)
             y
@@ -345,7 +345,7 @@ theorem trace_merge_into_sorted_cons
               rest
               yt
               (event_before_flip p x y comparison)
-              (sorted_head (Event p) (event_before p) y yt sorted_ys)))
+              (list_sorted_head (Event p) (event_before p) y yt sorted_ys)))
           (sym Bool (event_before p x y) False comparison)
   }
 
@@ -394,7 +394,7 @@ theorem trace_merge_into_sorted
               rest_after
               yt
               sorted_xs
-              (sorted_tail (Event p) (event_before p) y yt sorted_ys))
+              (list_sorted_tail (Event p) (event_before p) y yt sorted_ys))
             (event_before p x y)
             Refl
   }
@@ -547,9 +547,11 @@ of natural-number order supplies the reverse comparison when the left
 comparison is false. Head-order evidence is carried through recursive merge.
 
 Occurrence count needs no ordering premise. Its induction splits on the two
-head-comparison outcomes, using generic `count_cons` accounting and checked
-addition associativity and commutativity. The classifier is arbitrary: it may
-ignore its query and need not decide payload equality.
+head-comparison outcomes, using generic `count_cons` accounting. The private
+right-addition shuffle inducts on one addend using the checked successor law;
+the right-head count proof branches on the classifier and lifts its premise
+through `Suc`. The classifier is arbitrary: it may ignore its query and need
+not decide payload equality.
 
 ## 5. Design notes
 
