@@ -2028,6 +2028,421 @@ theorem sort_bool_perm
   }
 ```
 
+#### Filtered order and occurrence counting
+
+Filtered order and occurrence counting are generic properties of lists, not of
+event timestamps. `filter_sorted` preserves sorting across dropped elements
+when the comparator is transitive. The public sorted-cons, tail and head
+bridges reuse the existing private sorted-head proof family. `count_cons`,
+`count_left_first` and `count_right_first` account for a predicate-recognized
+occurrence without requiring a comparator or sorted input; the intermediate
+case-split and arithmetic helpers remain private.
+
+```ken
+pub fn starts_after (a : Type) (le : a → a → Bool) (h : a) (xs : List a) : Prop =
+  derived_sort_head_ordered a le h xs
+
+pub theorem sorted_cons
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : is_sorted a le xs → starts_after a le x xs → is_sorted a le (Cons a x xs) =
+  derived_sort_sorted_cons a le x xs
+
+pub theorem sorted_tail
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : is_sorted a le (Cons a x xs) → is_sorted a le xs =
+  derived_sort_sorted_tail a le x xs
+
+pub theorem sorted_head
+      (a : Type) (le : a → a → Bool) (x : a) (xs : List a)
+    : is_sorted a le (Cons a x xs) → starts_after a le x xs =
+  derived_sort_sorted_head a le x xs
+
+theorem starts_after_trans
+      (a : Type)
+      (le : a → a → Bool)
+      (le_trans : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (x : a)
+      (y : a)
+      (zs : List a)
+    : Equal Bool (le x y) True → starts_after a le y zs → starts_after a le x zs =
+  match zs {
+    Nil ↦ λxy. λyz. Proved;
+    Cons z r ↦ λxy. λyz. le_trans x y z xy yz
+  }
+
+theorem filter_starts_after_cons
+      (a : Type)
+      (le : a → a → Bool)
+      (le_trans : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (keep : a → Bool)
+      (x : a)
+      (y : a)
+      (ys : List a)
+      (ih : starts_after a le y (filter a keep ys))
+      (xy : Equal Bool (le x y) True)
+      (decision : Bool)
+    : Equal Bool (keep y) decision → starts_after a le x (filter a keep (Cons a y ys)) =
+  match decision {
+    True ↦
+      λkept.
+        J
+          (λchoice _.
+            starts_after
+              a
+              le
+              x
+              (match choice {
+                True ↦ Cons a y (filter a keep ys);
+                False ↦ filter a keep ys
+              }))
+          xy
+          (sym Bool (keep y) True kept);
+    False ↦
+      λdropped.
+        J
+          (λchoice _.
+            starts_after
+              a
+              le
+              x
+              (match choice {
+                True ↦ Cons a y (filter a keep ys);
+                False ↦ filter a keep ys
+              }))
+          (starts_after_trans a le le_trans x y (filter a keep ys) xy ih)
+          (sym Bool (keep y) False dropped)
+  }
+
+theorem filter_starts_after
+      (a : Type)
+      (le : a → a → Bool)
+      (le_trans : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (keep : a → Bool)
+      (x : a)
+      (xs : List a)
+    : is_sorted a le (Cons a x xs) → starts_after a le x (filter a keep xs) =
+  match xs {
+    Nil ↦ λsorted_input. Proved;
+    Cons y ys ↦
+      λsorted_input.
+        filter_starts_after_cons
+          a
+          le
+          le_trans
+          keep
+          x
+          y
+          ys
+          (filter_starts_after
+            a
+            le
+            le_trans
+            keep
+            y
+            ys
+            (sorted_tail a le x (Cons a y ys) sorted_input))
+          (sorted_head a le x (Cons a y ys) sorted_input)
+          (keep y)
+          Refl
+  }
+
+theorem filter_sorted_cons
+      (a : Type)
+      (le : a → a → Bool)
+      (keep : a → Bool)
+      (y : a)
+      (ys : List a)
+      (ih : is_sorted a le (filter a keep ys))
+      (head_before : starts_after a le y (filter a keep ys))
+      (decision : Bool)
+    : Equal Bool (keep y) decision → is_sorted a le (filter a keep (Cons a y ys)) =
+  match decision {
+    True ↦
+      λkept.
+        J
+          (λchoice _.
+            is_sorted
+              a
+              le
+              (match choice {
+                True ↦ Cons a y (filter a keep ys);
+                False ↦ filter a keep ys
+              }))
+          (sorted_cons a le y (filter a keep ys) ih head_before)
+          (sym Bool (keep y) True kept);
+    False ↦
+      λdropped.
+        J
+          (λchoice _.
+            is_sorted
+              a
+              le
+              (match choice {
+                True ↦ Cons a y (filter a keep ys);
+                False ↦ filter a keep ys
+              }))
+          ih
+          (sym Bool (keep y) False dropped)
+  }
+
+pub theorem filter_sorted
+      (a : Type)
+      (le : a → a → Bool)
+      (le_trans : (x : a)
+        → (y : a)
+        → (z : a)
+        → Equal
+        Bool
+        (le x y)
+        True
+        → Equal
+        Bool
+        (le y z)
+        True
+        → Equal
+        Bool
+        (le x z)
+        True)
+      (keep : a → Bool)
+      (xs : List a)
+    : is_sorted a le xs → is_sorted a le (filter a keep xs) =
+  match xs {
+    Nil ↦ λsorted_input. Proved;
+    Cons y ys ↦
+      λsorted_input.
+        filter_sorted_cons
+          a
+          le
+          keep
+          y
+          ys
+          (filter_sorted a le le_trans keep ys (sorted_tail a le y ys sorted_input))
+          (filter_starts_after a le le_trans keep y ys sorted_input)
+          (keep y)
+          Refl
+  }
+
+theorem count_cons_case
+      (a : Type) (eqf : a → a → Bool) (q : a) (x : a) (xs : List a) (decision : Bool)
+    : Equal Bool (eqf q x) decision
+      → Equal Nat
+        (count a eqf q (Cons a x xs))
+        (add (count a eqf q xs) (count a eqf q (Cons a x (Nil a)))) =
+  match decision {
+    True ↦
+      λmatched.
+        J
+          (λchoice _.
+            Equal
+              Nat
+              (match choice {
+                True ↦ Suc (count a eqf q xs);
+                False ↦ count a eqf q xs
+              })
+              (add
+                (count a eqf q xs)
+                (match choice {
+                  True ↦ Suc (count a eqf q (Nil a));
+                  False ↦ count a eqf q (Nil a)
+                })))
+          Refl
+          (sym Bool (eqf q x) True matched);
+    False ↦
+      λunmatched.
+        J
+          (λchoice _.
+            Equal
+              Nat
+              (match choice {
+                True ↦ Suc (count a eqf q xs);
+                False ↦ count a eqf q xs
+              })
+              (add
+                (count a eqf q xs)
+                (match choice {
+                  True ↦ Suc (count a eqf q (Nil a));
+                  False ↦ count a eqf q (Nil a)
+                })))
+          Refl
+          (sym Bool (eqf q x) False unmatched)
+  }
+
+pub theorem count_cons
+      (a : Type) (eqf : a → a → Bool) (q : a) (x : a) (xs : List a)
+    : Equal Nat
+        (count a eqf q (Cons a x xs))
+        (add (count a eqf q xs) (count a eqf q (Cons a x (Nil a)))) =
+  count_cons_case a eqf q x xs (eqf q x) Refl
+
+theorem add_right_comm
+      (m : Nat) (n : Nat) (k : Nat)
+    : Equal Nat (add (add m n) k) (add (add m k) n) =
+  trans
+    Nat
+    (add (add m n) k)
+    (add m (add n k))
+    (add (add m k) n)
+    (sym Nat (add m (add n k)) (add (add m n) k) ((proof assoc for add) m n k))
+    (trans
+      Nat
+      (add m (add n k))
+      (add m (add k n))
+      (add (add m k) n)
+      (cong Nat Nat (add n k) (add k n) (λj. add m j) ((proof comm for add) n k))
+      ((proof assoc for add) m k n))
+
+pub theorem count_left_first
+      (a : Type)
+      (eqf : a → a → Bool)
+      (q : a)
+      (x : a)
+      (xt : List a)
+      (merged : List a)
+      (ys : List a)
+      (merged_count : Equal
+        Nat
+        (count a eqf q merged)
+        (add (count a eqf q xt) (count a eqf q ys)))
+    : Equal Nat
+        (count a eqf q (Cons a x merged))
+        (add (count a eqf q (Cons a x xt)) (count a eqf q ys)) =
+  trans
+    Nat
+    (count a eqf q (Cons a x merged))
+    (add (count a eqf q merged) (count a eqf q (Cons a x (Nil a))))
+    (add (count a eqf q (Cons a x xt)) (count a eqf q ys))
+    (count_cons a eqf q x merged)
+    (trans
+      Nat
+      (add (count a eqf q merged) (count a eqf q (Cons a x (Nil a))))
+      (add (add (count a eqf q xt) (count a eqf q ys)) (count a eqf q (Cons a x (Nil a))))
+      (add (count a eqf q (Cons a x xt)) (count a eqf q ys))
+      (cong
+        Nat
+        Nat
+        (count a eqf q merged)
+        (add (count a eqf q xt) (count a eqf q ys))
+        (λj. add j (count a eqf q (Cons a x (Nil a))))
+        merged_count)
+      (trans
+        Nat
+        (add (add (count a eqf q xt) (count a eqf q ys)) (count a eqf q (Cons a x (Nil a))))
+        (add (add (count a eqf q xt) (count a eqf q (Cons a x (Nil a)))) (count a eqf q ys))
+        (add (count a eqf q (Cons a x xt)) (count a eqf q ys))
+        (add_right_comm
+          (count a eqf q xt)
+          (count a eqf q ys)
+          (count a eqf q (Cons a x (Nil a))))
+        (cong
+          Nat
+          Nat
+          (add (count a eqf q xt) (count a eqf q (Cons a x (Nil a))))
+          (count a eqf q (Cons a x xt))
+          (λj. add j (count a eqf q ys))
+          (sym
+            Nat
+            (count a eqf q (Cons a x xt))
+            (add (count a eqf q xt) (count a eqf q (Cons a x (Nil a))))
+            (count_cons a eqf q x xt)))))
+
+pub theorem count_right_first
+      (a : Type)
+      (eqf : a → a → Bool)
+      (q : a)
+      (left_count : Nat)
+      (y : a)
+      (yt : List a)
+      (merged : List a)
+      (merged_count : Equal Nat (count a eqf q merged) (add left_count (count a eqf q yt)))
+    : Equal Nat
+        (count a eqf q (Cons a y merged))
+        (add left_count (count a eqf q (Cons a y yt))) =
+  trans
+    Nat
+    (count a eqf q (Cons a y merged))
+    (add (count a eqf q merged) (count a eqf q (Cons a y (Nil a))))
+    (add left_count (count a eqf q (Cons a y yt)))
+    (count_cons a eqf q y merged)
+    (trans
+      Nat
+      (add (count a eqf q merged) (count a eqf q (Cons a y (Nil a))))
+      (add (add left_count (count a eqf q yt)) (count a eqf q (Cons a y (Nil a))))
+      (add left_count (count a eqf q (Cons a y yt)))
+      (cong
+        Nat
+        Nat
+        (count a eqf q merged)
+        (add left_count (count a eqf q yt))
+        (λj. add j (count a eqf q (Cons a y (Nil a))))
+        merged_count)
+      (trans
+        Nat
+        (add (add left_count (count a eqf q yt)) (count a eqf q (Cons a y (Nil a))))
+        (add left_count (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a)))))
+        (add left_count (count a eqf q (Cons a y yt)))
+        (sym
+          Nat
+          (add left_count (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a)))))
+          (add (add left_count (count a eqf q yt)) (count a eqf q (Cons a y (Nil a))))
+          ((proof assoc for add)
+            left_count
+            (count a eqf q yt)
+            (count a eqf q (Cons a y (Nil a)))))
+        (cong
+          Nat
+          Nat
+          (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a))))
+          (count a eqf q (Cons a y yt))
+          (λj. add left_count j)
+          (sym
+            Nat
+            (count a eqf q (Cons a y yt))
+            (add (count a eqf q yt) (count a eqf q (Cons a y (Nil a))))
+            (count_cons a eqf q y yt)))))
+```
+
 ### 4.4 CAT-3 D3 — projection-abstraction classes
 
 Ordinary class records over the landed right-nested Σ record machinery.
