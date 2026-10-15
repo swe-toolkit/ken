@@ -344,9 +344,17 @@ infinite streams and window/merge relational laws remain deferred.
 - Effect interfaces (`../30-surface/36`):
   `IO`/`FS`/`Net`/`Clock`/`Console`/`Rand` — the **boundary primitive** is
   built-in (`30 §3`); the typed effect surface over it is package Ken.
-- Serialization (`../30-surface/38 §1`): a derivable `Encode`/`Decode` with the
-  **round-trip law** `decode ∘ encode = Ok` provable, plus Merkle hashing for
-  content verification — a package.
+- Serialization (`../30-surface/38 §1`): **`71-serialization.md`** §1
+  (SPEC-SERIALIZATION-ROUND-TRIP-CONTRACT) pins a pure
+  `Data.Serialization.JsonCodec` over the full existing six-constructor
+  `Json` carrier. Opaque `String`/`Int` payload tokens and a structural
+  decoder support four theorems checked in Architect D0: decode
+  after encode, trailing-input refusal, empty-input refusal and
+  stray-array-close refusal. Objects preserve member order and duplicate
+  keys; duplicate-key rejection is deferred. The JSON character/byte
+  and UTF-8 layer, generic `Encode`/`Decode` derivation and Merkle hashing
+  remain separate. §1 specifies a prospective package, not landed
+  catalog code, a shipped conformance seed, CI or a trusted-base delta.
 - A `Stream`/`Iterator` type for lazy iteration (productivity per
   OQ-coinduction) — a package.
 
