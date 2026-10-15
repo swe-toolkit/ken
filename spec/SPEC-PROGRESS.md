@@ -7,7 +7,7 @@ readers use those declarations and their stated scope; this index does not
 invent a separate maturity judgment.
 
 The chapters remain authoritative for their own declarations. This index is a
-measured view of all 76 Markdown files under `spec/` at this update. It is not
+measured view of all 77 Markdown files under `spec/` at this update. It is not
 a build tracker, a next-action queue, or a substitute for the work-package
 nodes under `docs/program/issues/`.
 
@@ -124,6 +124,7 @@ to that same declaration, including its qualifications.
 | `50-stdlib/68-numerical.md` | `DRAFT v0 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT)` | §1 binds exact inclusive intervals over non-negative `Rational`, including inverted-bounds emptiness and structural endpoint equality; point, endpoint-wise sum and product have six generically checked D0 laws. Two new Rational monotonicity exports and the interval package remain a catalog follow-on, not landed; no shipped suite, CI or measured trusted-base delta is claimed. |
 | `50-stdlib/69-time-and-events.md` | `DRAFT v0 (SPEC-TIME-EVENT-TRACE-CONTRACT)` | §1 binds plain `List (Event p)` traces with non-decreasing `Nat` times, half-open windows and left-biased merge ties. Exactly three checked D0 laws preserve window order, ordered-input merge order and arbitrary-classifier merge counts without an order premise. No window/merge relation, membership soundness/completeness, clock effects, catalog delivery or measured trusted-base delta is claimed. |
 | `50-stdlib/70-diagnostic-codes.md` | `DRAFT v0 (SPEC-DIAGNOSTIC-CODE-CONTRACT)` | §1 binds controlled batch `ken` failure-code presence, exact five-character ASCII grammar, carrier-selected C/E/K/X/N/H domains, append-only ledger identity, seven N families, one-code stderr lines and coded-failure exit 1. Admitted `ken run` program outcomes are uncoded; multiple diagnostic lines are allowed; CLI JSON, warnings and elaboration-recovery ordering remain deferred. This tooling interface is not a Ken package; no renderer or shipped seed is claimed. |
+| `50-stdlib/71-serialization.md` | `DRAFT v0 (SPEC-SERIALIZATION-ROUND-TRIP-CONTRACT)` | §1 binds a pure token codec over the existing six-constructor `Json`, with opaque `String`/`Int` payloads, ordered arrays/objects and duplicate keys preserved. Four D0-checked theorems cover decode-after-encode and typed trailing, empty and stray-close refusals; this is Architect-reported scratch evidence, not a delivered codec or seed, CI, or measured trusted-base delta. The JSON text/byte and UTF-8 layer, generic class derivation, duplicate-key rejection, Merkle hashing, error positions and truncation-prefix laws are deferred. |
 | `50-stdlib/README.md` | `DRAFT v0` | Binding standard-package-tier boundary and derivation-path requirement. |
 | `60-security/61-information-flow.md` | `Sec1 + Sec1ct elaborated; implementation-ready for WS-Sec` | Normative for the declared IFC and constant-time discipline; surface spelling remains proposal-level. |
 | `60-security/62-authority.md` | `Sec2 elaborated; implementation-ready for Team Verify (WS-Sec)` | Normative for authority, attenuation, revocation contract, and audit points; spelling and named runtime mechanisms remain qualified. |
@@ -152,7 +153,7 @@ inferred axis value:
   chapter.
 - `_notes/analysis-digest.md` — the background design note declares no status.
 
-The other 73 inputs are classifiable by the operative rule. This report does
+The other 74 inputs are classifiable by the operative rule. This report does
 not repair or add chapter declarations; those declarations are inputs to this
 reconciliation.
 
