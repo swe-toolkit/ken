@@ -6,6 +6,7 @@
 //! at the planner-issued continuation specialization and retains its worker,
 //! context, captures, continuation inputs, and opaque call identity.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::abi::{AbiFrameHeader, AbiSlot, AbiSlotKind};
@@ -1337,13 +1338,13 @@ impl StaticTransitionPlan<'_> {
         // The protocol cloned into the lowerer is this same plan object; the
         // successor's own base_owner is NOT the function that emits it.
         let rows = self.static_response_feasibility_ledger_all()?.map_err(|infeasible| {
-            backend_module(format!(
+            backend_module(LoweringCause::Fragment, format!(
                 "compile-time response specialization is infeasible at {:?}: {}",
                 infeasible.vis_origin(), infeasible.reason(),
             ))
         })?;
         let owners = self.static_response_owner_specializations()?.map_err(|infeasible| {
-            backend_module(format!(
+            backend_module(LoweringCause::Fragment, format!(
                 "compile-time response specialization is infeasible at {:?}: {}",
                 infeasible.vis_origin(), infeasible.reason(),
             ))

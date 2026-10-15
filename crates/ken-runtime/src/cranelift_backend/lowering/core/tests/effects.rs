@@ -1,6 +1,7 @@
 //! Bounded-Nat, host-reply, IO, borrowed-ingress and native-int lowering
 //! tests (RT-SPLIT §10.2 assigns these subjects to `effects`).
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 // RT-SPLIT slice 7, rule 8: dependency declarations carried in for the moved
@@ -40,7 +41,7 @@ fn run_checked_bounded_nat_fixture(
     signature.returns.push(AbiParam::new(types::I64));
     let func_id = module
         .declare_function("px8n_checked_bounded_nat", Linkage::Local, &signature)
-        .map_err(|error| backend_module(error.to_string()))?;
+        .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
     let mut context = module.make_context();
     context.func =
         Function::with_name_signature(UserFuncName::user(0, func_id.as_u32()), signature);
@@ -360,7 +361,7 @@ fn run_checked_bounded_nat_fixture(
     verify_cranelift_function(&context.func, module.isa())?;
     module
         .define_function(func_id, &mut context)
-        .map_err(|error| backend_module(error.to_string()))?;
+        .map_err(|error| backend_module(LoweringCause::Backend, error.to_string()))?;
     let trap_catalog = compiler.static_transition_plan.trap_catalog();
     let carrier_identity_catalog = compiler
         .static_transition_plan

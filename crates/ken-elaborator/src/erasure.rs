@@ -8032,7 +8032,7 @@ mod px7l_tests {
             "ken_d7_1b_marker_gate",
         ) {
             Ok(_) => None,
-            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason })) => {
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. })) => {
                 Some((construct, reason))
             }
             Err(other) => Some(("BackendFailure", format!("{other:?}"))),

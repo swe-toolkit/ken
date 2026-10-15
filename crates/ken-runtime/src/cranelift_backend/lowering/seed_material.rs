@@ -41,6 +41,7 @@
 //! the observed answer does not move, the emitted code is not borrowing this
 //! material regardless of how many objects were minted.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 
 use cranelift_module::{DataDescription, DataId};
@@ -323,7 +324,7 @@ pub(in crate::cranelift_backend) fn mint_seed_material<M: Module>(
                 // borrower a different owner.
                 false,
             )
-            .map_err(|err| backend_module(err.to_string()))?;
+            .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
         #[cfg(test)]
         {
             declared += 1;
@@ -335,7 +336,7 @@ pub(in crate::cranelift_backend) fn mint_seed_material<M: Module>(
         description.set_align(SEED_ALIGN_BYTES);
         module
             .define_data(id, &description)
-            .map_err(|err| backend_module(err.to_string()))?;
+            .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
         // ⛔ Counted HERE, adjacent to `define_data`, and NOT beside the call in
         // an enclosing loop. ⭐ A counter incremented once per iteration
         // compares a collection's length to itself and stays green for every
@@ -355,7 +356,7 @@ pub(in crate::cranelift_backend) fn mint_seed_material<M: Module>(
             // arm indicates the environment is not the type it claims to be,
             // and silently keeping the last object would bind a capture to the
             // wrong value.
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "two seed environment entries claim one symbol".to_string(),
             ));
         }
@@ -383,7 +384,7 @@ fn encode_ground_value(
     let mut out = Vec::new();
     encode_into(value, 0, &mut out)?;
     if out.len() > MAX_SEED_BYTES {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Capacity,
             "Closure",
             format!(
                 "seed ground value encodes to {} bytes, over the {MAX_SEED_BYTES}-byte \
@@ -403,7 +404,7 @@ fn encode_into(
     if depth > MAX_SEED_DEPTH {
         // ⛔ Rejects rather than truncating. A truncated encoding is a *wrong*
         // artifact-static value the reader cannot distinguish from a right one.
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Capacity,
             "Closure",
             format!("seed ground value nests deeper than {MAX_SEED_DEPTH} levels"),
         ));
@@ -461,7 +462,7 @@ fn encode_into(
     // only exceeds the cap after a thousand shallow siblings would otherwise be
     // fully materialized in memory before anything rejected it.
     if out.len() > MAX_SEED_BYTES {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::Capacity,
             "Closure",
             format!("seed ground value exceeds the {MAX_SEED_BYTES}-byte artifact-static limit"),
         ));

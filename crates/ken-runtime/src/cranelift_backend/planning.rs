@@ -6,6 +6,7 @@
 //! module; no logic, signature, or rename changes. No CLIF emission lives
 //! here. Depends only on `surface`.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::surface::{backend, unsupported, BackendFailure, CraneliftBackendError};
@@ -256,8 +257,8 @@ pub(super) fn native_join_plan_for_program(
         [] => Ok(None),
         [bytes] => crate::NativeJoinPlanV1::decode(bytes)
             .map(Some)
-            .map_err(|reason| unsupported("NativeJoinPlanV1", reason)),
-        _ => Err(unsupported(
+            .map_err(|reason| unsupported(LoweringCause::Admission, "NativeJoinPlanV1", reason)),
+        _ => Err(unsupported(LoweringCause::Admission,
             "NativeJoinPlanV1",
             "checked package contains multiple native join plans",
         )),
@@ -279,8 +280,8 @@ pub(super) fn oriented_subcontinuation_plan_for_program(
         [] => Ok(None),
         [bytes] => crate::OrientedSubcontinuationPlanV1::decode(bytes)
             .map(Some)
-            .map_err(|reason| unsupported("OrientedSubcontinuationPlanV1", reason)),
-        _ => Err(unsupported(
+            .map_err(|reason| unsupported(LoweringCause::Admission, "OrientedSubcontinuationPlanV1", reason)),
+        _ => Err(unsupported(LoweringCause::Admission,
             "OrientedSubcontinuationPlanV1",
             "checked package contains multiple oriented subcontinuation plans",
         )),
@@ -404,7 +405,7 @@ mod plan_extraction_tests {
         let err = native_join_plan_for_program(&program).unwrap_err();
         assert_eq!(
             err,
-            unsupported(
+            unsupported(LoweringCause::Admission,
                 "NativeJoinPlanV1",
                 "checked package contains multiple native join plans"
             )
@@ -461,7 +462,7 @@ mod plan_extraction_tests {
         let err = oriented_subcontinuation_plan_for_program(&program).unwrap_err();
         assert_eq!(
             err,
-            unsupported(
+            unsupported(LoweringCause::Admission,
                 "OrientedSubcontinuationPlanV1",
                 "checked package contains multiple oriented subcontinuation plans"
             )
@@ -488,7 +489,7 @@ pub(super) fn collect_checked_subcontinuation_frames(
     match expr {
         RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
             let RuntimeExpr::ComputationalMatch { cases, default, .. } = body.as_ref() else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked subcontinuation marker does not wrap a computational frame",
                 ));
@@ -496,7 +497,7 @@ pub(super) fn collect_checked_subcontinuation_frames(
             let fingerprint =
                 crate::compiler_private_computational_match_frame_fingerprint(cases, default);
             if frames.insert(*frame_id, fingerprint).is_some() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "Runtime IR repeats a checked subcontinuation frame marker",
                 ));
@@ -632,7 +633,7 @@ pub(super) fn collect_checked_oriented_markers(
                 .or_default()
                 .insert(runtime_path.clone())
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     format!(
                         "Runtime IR root {root} repeats checked recursive-call marker {call_template_id} at the same structural path {runtime_path:?}"
@@ -647,7 +648,7 @@ pub(super) fn collect_checked_oriented_markers(
             body,
         } => {
             if slot_template_ids.len() != checked_occurrence_paths.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "computational IH slot marker identity/location arity differs",
                 ));
@@ -661,7 +662,7 @@ pub(super) fn collect_checked_oriented_markers(
                     .or_default()
                     .insert(runtime_path.clone())
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         format!(
                             "Runtime IR root {root} repeats checked computational-IH slot marker {slot_template_id} at the same structural path {runtime_path:?}"
@@ -683,7 +684,7 @@ pub(super) fn collect_checked_oriented_markers(
                 .or_default()
                 .insert(runtime_path.clone())
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     format!(
                         "Runtime IR root {root} repeats checked computational-IH call marker {call_template_id} at the same structural path {runtime_path:?}"
@@ -855,7 +856,7 @@ fn require_exact_marker_locations(
     expected: &CheckedOrientedMarkerSets,
 ) -> Result<(), CraneliftBackendError> {
     if actual.recursive_calls != expected.recursive_calls {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             format!(
                 "checked recursive-call Runtime occurrences differ in declaration {declaration}"
@@ -863,7 +864,7 @@ fn require_exact_marker_locations(
         ));
     }
     if actual.computational_ih_slots != expected.computational_ih_slots {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             format!(
                 "checked computational-IH slot Runtime occurrences differ in declaration {declaration}"
@@ -871,7 +872,7 @@ fn require_exact_marker_locations(
         ));
     }
     if actual.computational_ih_calls != expected.computational_ih_calls {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             format!(
                 "checked computational-IH call Runtime occurrences differ in declaration {declaration}"
@@ -919,7 +920,7 @@ pub(super) fn validate_oriented_subcontinuation_transport(
     match (markers_are_empty, plan) {
         (true, None) => return Ok(()),
         (false, None) => {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "checked subcontinuation markers have no checked plan metadata",
             ));
@@ -933,7 +934,7 @@ pub(super) fn validate_oriented_subcontinuation_transport(
             return Ok(())
         }
         (true, Some(_)) => {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "checked plan has no Runtime frame markers",
             ));
@@ -942,12 +943,12 @@ pub(super) fn validate_oriented_subcontinuation_transport(
     }
     let plan = plan.expect("nonempty marker set has a plan");
     plan.validate()
-        .map_err(|reason| unsupported("OrientedSubcontinuationPlanV1", reason))?;
+        .map_err(|reason| unsupported(LoweringCause::PlannerInvariant, "OrientedSubcontinuationPlanV1", reason))?;
     if !entry_nonframe_markers.recursive_calls.is_empty()
         || !entry_nonframe_markers.computational_ih_slots.is_empty()
         || !entry_nonframe_markers.computational_ih_calls.is_empty()
     {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             "checked recursive/IH marker escaped its declaration into the entry expression",
         ));
@@ -957,27 +958,27 @@ pub(super) fn validate_oriented_subcontinuation_transport(
         require_exact_marker_locations(declaration, markers, &expected)?;
     }
     if markers.len() != plan.frames.len() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             "checked plan and Runtime marker sets differ",
         ));
     }
     for frame in &plan.frames {
         let Some(fingerprint) = markers.remove(&frame.frame_id) else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "checked plan frame marker is missing or transplanted",
             ));
         };
         if fingerprint != frame.runtime_frame_fingerprint {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "checked plan frame fingerprint is stale",
             ));
         }
     }
     if !markers.is_empty() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             "Runtime frame marker has no checked plan entry",
         ));
@@ -1016,7 +1017,7 @@ pub(super) fn validate_oriented_subcontinuation_transport(
         || runtime_ih_slots != plan_ih_slots
         || runtime_ih_calls != plan_ih_calls
     {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             "checked plan and Runtime recursive/IH marker sets differ",
         ));

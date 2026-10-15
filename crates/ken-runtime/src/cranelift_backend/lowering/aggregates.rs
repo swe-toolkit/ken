@@ -35,6 +35,7 @@
 //! only by a crate-wide reference sweep during `D1`, not predicted at
 //! `D0`.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use super::*;
 // The site-operand-substitution `#[cfg(test)]` mutation check reaches these
 // directly; moved to `effects.rs` at `RT-EMITTER-EFFECTS-SPLIT` `D1`.
@@ -395,20 +396,20 @@ impl AggregateAllocationLedger {
     /// records govern.
     pub(super) fn open(&mut self, function: FuncId) -> Result<(), CraneliftBackendError> {
         if self.committed_functions.contains(&function) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {function} is built a second time, so \
                  its events would be recorded twice"
             )));
         }
         if let Some(open) = &self.local {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {} is still open while {function} \
                  starts, so an allocation could be attributed to the wrong body",
                 open.function
             )));
         }
         if !self.opened_functions.insert(function) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {function} opens a second time"
             )));
         }
@@ -426,14 +427,14 @@ impl AggregateAllocationLedger {
         function: FuncId,
     ) -> Result<&mut LocalAggregateEvents, CraneliftBackendError> {
         let local = self.local.as_mut().ok_or_else(|| {
-            backend_module(
+            backend_module(LoweringCause::PlannerInvariant,
                 "aggregate allocation ledger: an allocation was emitted with no open body, so \
                  it belongs to no function's event set"
                     .to_string(),
             )
         })?;
         if local.function != function {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: an allocation in function {function} was recorded \
                  while {} is open",
                 local.function
@@ -451,7 +452,7 @@ impl AggregateAllocationLedger {
     ) -> Result<(), CraneliftBackendError> {
         let local = self.open_body(function)?;
         if !local.events.insert(result) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {function} value {result} is already an \
                  event, so one raw allocation produced two"
             )));
@@ -472,7 +473,7 @@ impl AggregateAllocationLedger {
             // yields one result value, so a second pair at that value means
             // either the wrapper ran twice for one allocation or two
             // allocations share a result -- and neither can be reconciled.
-            Some(previous) => Err(backend_module(format!(
+            Some(previous) => Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {function} value {result} already maps to \
                  {previous:?}, so a second pair to {occurrence:?} is a duplicate or a conflict"
             ))),
@@ -483,13 +484,13 @@ impl AggregateAllocationLedger {
     /// Commit the open body's pairs into the compilation relation.
     pub(super) fn commit(&mut self) -> Result<(), CraneliftBackendError> {
         let local = self.local.take().ok_or_else(|| {
-            backend_module(
+            backend_module(LoweringCause::PlannerInvariant,
                 "aggregate allocation ledger: a body commit ran with no open event set"
                     .to_string(),
             )
         })?;
         if !self.committed_functions.insert(local.function) {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {} commits a second time",
                 local.function
             )));
@@ -500,7 +501,7 @@ impl AggregateAllocationLedger {
         // Both are refusals, and neither is visible from one side alone.
         let related = local.relation.keys().copied().collect::<BTreeSet<_>>();
         if related != local.events {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {} has {} events and {} relation keys, \
                  so dom(R) is not E",
                 local.function,
@@ -522,7 +523,7 @@ impl AggregateAllocationLedger {
                 result,
             };
             if let Some(previous) = self.committed.insert(event, occurrence) {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "aggregate allocation ledger: {event:?} already maps to {previous:?}, so a \
                      committed pair is not unique"
                 )));
@@ -558,7 +559,7 @@ impl AggregateAllocationLedger {
         planned: &[PlannedAggregateOwnership],
     ) -> Result<AggregateRelationClosure, CraneliftBackendError> {
         if let Some(open) = &self.local {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: function {} is still open at the whole-pass \
                  closeout, so its events were never committed",
                 open.function
@@ -568,7 +569,7 @@ impl AggregateAllocationLedger {
         // leaves its events uncommitted, and without this the artifact would
         // look like a body that simply allocated nothing.
         if self.opened_functions != self.committed_functions {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: {} bodies opened but {} committed, so a body's \
                  events were discarded",
                 self.opened_functions.len(),
@@ -581,7 +582,7 @@ impl AggregateAllocationLedger {
         // leaves the event evidence behind, and only this comparison sees it.
         let related = self.committed.keys().copied().collect::<BTreeSet<_>>();
         if related != self.committed_events {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                 "aggregate allocation ledger: the compilation has {} events and {} relation \
                  keys, so dom(R) is not E",
                 self.committed_events.len(),
@@ -607,7 +608,7 @@ impl AggregateAllocationLedger {
         // refused ordinary programs by 1 to 132 records.
         for occurrence in &image {
             if !population.contains(occurrence) {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "aggregate allocation ledger: {occurrence:?} is related by an event but is \
                      not in the planned population"
                 )));
@@ -716,7 +717,7 @@ impl SynthesizedArgument {
             Self::Scalar(value) | Self::Nested(value) | Self::Dynamic(value) => Ok(value),
             Self::SiteOperand { value, .. }
             | Self::HostResponseReferent { value, .. } => Ok(value),
-            Self::WorkerCaptureOperand { .. } => Err(unsupported(
+            Self::WorkerCaptureOperand { .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhCapturedEnvironment",
                 "a checked-IH capture operand reached an ordinary synthesized constructor; \
                  the checked-IH environment emitter must consume its provenance directly",
@@ -951,7 +952,7 @@ impl<'a> Lowering<'a> {
                         .static_transition_plan
                         .boundary_closure_environment_by_record(*record)?;
                     let owner = self.defining_emission_owner.ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryClosureEnvironment",
                             "a represented boundary closure is being transferred outside a declared owner",
                         )
@@ -961,7 +962,7 @@ impl<'a> Lowering<'a> {
                         || environment.params() != params
                         || environment.capture_origins().len() != captures.len()
                     {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryClosureEnvironment",
                             "a represented boundary closure disagrees with its exact owner, code identity, or captured-environment schema",
                         ));
@@ -1273,7 +1274,7 @@ impl<'a> Lowering<'a> {
             record_fields: Option<&[LoweredRecordField]>,
         ) -> Result<(), CraneliftBackendError> {
             let Some(occurrence) = value.source_aggregate_producer() else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     "a source aggregate reached the carrier with no planner-issued producer \
                      occurrence, so it would name no ownership record and could only be given \
@@ -1284,7 +1285,7 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .aggregate_record_view(occurrence)?;
             if planned.shape() != shape {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     format!(
                         "the template is a {shape:?} but its own producer occurrence names a \
@@ -1302,7 +1303,7 @@ impl<'a> Lowering<'a> {
             let (_, class) = Self::carrier_handle_disposition(value)?;
             let planned_class = CarrierAllocationRequest::aggregate_class(planned.shape());
             if class != planned_class {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     format!(
                         "the template's boundary class is {class:?} but its own producer \
@@ -1311,7 +1312,7 @@ impl<'a> Lowering<'a> {
                 ));
             }
             if planned.children().len() != children.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     format!(
                         "the template has {} children but its own producer occurrence names an \
@@ -1342,7 +1343,7 @@ impl<'a> Lowering<'a> {
                         .static_transition_plan
                         .constructor_symbol_identity(producer_origin)?;
                     if *carried != planned_identity {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             lowered_value_kind(value),
                             "the template's carried constructor identity is not the one the \
                              planner resolved at its own producer occurrence's origin",
@@ -1370,7 +1371,7 @@ impl<'a> Lowering<'a> {
                         // against a record the planner planned no schema for.
                         (Some(held), Some(planned)) if held == planned => {}
                         (held, planned) => {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 lowered_value_kind(value),
                                 format!(
                                     "record field {position} carries identity {held:?} but its own \
@@ -1414,7 +1415,7 @@ impl<'a> Lowering<'a> {
                     .contains(&BoundaryReferentOwner::InvocationArena)
                     && planned_child.lifetime != PlannedReferentLifetime::ActivationOwned
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         lowered_value_kind(child),
                         format!(
                             "the ownership record's own fields disagree at child {}: it plans a \
@@ -1444,7 +1445,7 @@ impl<'a> Lowering<'a> {
                     .find(|owner| !planned_child.owners.contains(owner))
                 {
                     let held_lifetime = Self::possible_owners_lifetime(&held_owners);
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         lowered_value_kind(child),
                         format!(
                             "child {} is held with a {held_lifetime:?} referent lifetime and can \
@@ -1469,7 +1470,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 };
                 let Some(child_occurrence) = child.source_aggregate_producer() else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         lowered_value_kind(child),
                         "an aggregate child reached the carrier with no planner-issued producer \
                          occurrence, so its producer class cannot be established",
@@ -1492,7 +1493,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let Some(child_origin) = planned_child.origin else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         lowered_value_kind(child),
                         "a source aggregate's child is an aggregate, but the planner recorded \
                          no source occurrence for it at that position",
@@ -1520,7 +1521,7 @@ impl<'a> Lowering<'a> {
                 // forwarded aggregate a neighbour's certificate, and the carried
                 // occurrence stops matching the position it sits at.
                 if child.source_aggregate_producer() != Some(expected) {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         lowered_value_kind(child),
                         format!(
                             "child {} carries producer occurrence {:?} but the planner planned \
@@ -1598,7 +1599,7 @@ impl<'a> Lowering<'a> {
                     // lane disagrees with its position in the parent is caught here
                     // rather than after both are allocated.
                     let Some(occurrence) = child.source_aggregate_producer() else {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             lowered_value_kind(child),
                             "a source aggregate child reached the carrier with no planner-issued \
                              producer occurrence, so its allocation lane -- and therefore its \
@@ -1620,7 +1621,7 @@ impl<'a> Lowering<'a> {
                 }
                 BoundaryDisposition::ProtocolOnly { why }
                 | BoundaryDisposition::FailClosedForbidden { why } => {
-                    Err(unsupported(lowered_value_kind(child), why))
+                    Err(unsupported(LoweringCause::Fragment, lowered_value_kind(child), why))
                 }
             }
         }
@@ -1717,7 +1718,7 @@ impl<'a> Lowering<'a> {
                         return Ok(field);
                     }
                     let position = u32::try_from(position).map_err(|_| {
-                        backend_module(
+                        backend_module(LoweringCause::Capacity,
                             "unit-boundary environment field exceeds the position space"
                                 .to_string(),
                         )
@@ -1935,7 +1936,7 @@ impl<'a> Lowering<'a> {
                             .static_transition_plan
                             .constructor_symbol_identity(schema_origin)
                             .map_err(|error| {
-                                backend_module(format!(
+                                backend_module(LoweringCause::PlannerInvariant, format!(
                                     "constructor transfer for {constructor} at {:?} has no \
                                      resolved identity: {error}",
                                     schema_origin
@@ -1950,7 +1951,7 @@ impl<'a> Lowering<'a> {
                         if self.static_transition_plan.slot_store_obligation(
                             self.defining_emission_owner, occurrence, identity, position as u32,
                         )?.is_some() {
-                            return Err(unsupported("RecursiveResidual",
+                            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual",
                                 "a source slot constructor reached generic transfer without its creation-site suffix"));
                         }
                     }
@@ -2032,7 +2033,7 @@ impl<'a> Lowering<'a> {
                         // whatever coordinate is in scope here rather than from the
                         // fact that was checked.
                         let Some(identity) = field.identity else {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "Record",
                                 format!(
                                     "record field {position} reached the carrier with no                                  planner-issued identity, so its name would have to be                                  invented at the coordinate it is transferred at"
@@ -2164,7 +2165,7 @@ impl<'a> Lowering<'a> {
                         span.len(),
                     )
                 }
-                Lowered::BorrowedOption { .. } => Err(unsupported(
+                Lowered::BorrowedOption { .. } => Err(unsupported(LoweringCause::Fragment,
                     lowered_value_kind(value),
                     "the carrier producer does not yet emit borrowed ingress: an \
                      `InvocationBorrowed` handle is arena-owned and must clear \
@@ -2193,7 +2194,7 @@ impl<'a> Lowering<'a> {
                         || environment.params() != params
                         || environment.capture_origins().len() != captures.len()
                     {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryClosureEnvironment",
                             "a represented boundary closure changed after unit-result preflight",
                         ));
@@ -2205,7 +2206,7 @@ impl<'a> Lowering<'a> {
                     ..
                 }
                 | Lowered::DeclarationClosure { .. }
-                | Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(
+                | Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(LoweringCause::Fragment,
                     lowered_value_kind(value),
                     "a closure has no durable lane and cannot cross the boundary; \
                      this arm is unreachable because the admissibility walk already \
@@ -2213,7 +2214,7 @@ impl<'a> Lowering<'a> {
                 )),
                 Lowered::StaticResponseDeferred { .. }
                 | Lowered::RecursiveBackedge
-                | Lowered::Trap(_) => Err(unsupported(
+                | Lowered::Trap(_) => Err(unsupported(LoweringCause::Fragment,
                     lowered_value_kind(value),
                     "protocol machinery is never a source value at a boundary",
                 )),
@@ -2332,14 +2333,14 @@ impl<'a> Lowering<'a> {
                 // ever retuned from handle to immediate while this arm still
                 // allocates. The disposition is the authority, so the producer must
                 // fail rather than out-vote it.
-                BoundaryDisposition::RepresentedImmediate { .. } => Err(unsupported(
+                BoundaryDisposition::RepresentedImmediate { .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     "the producer would allocate a handle for a value the sole \
                      disposition authority represents as an immediate",
                 )),
                 BoundaryDisposition::ProtocolOnly { why }
                 | BoundaryDisposition::FailClosedForbidden { why } => {
-                    Err(unsupported(lowered_value_kind(value), why))
+                    Err(unsupported(LoweringCause::Fragment, lowered_value_kind(value), why))
                 }
             }
         }
@@ -2362,19 +2363,19 @@ impl<'a> Lowering<'a> {
         fn carrier_immediate_tag(value: &Lowered) -> Result<BoundaryTag, CraneliftBackendError> {
             match value.boundary_disposition() {
                 BoundaryDisposition::RepresentedImmediate { tag, spill: None } => Ok(tag),
-                BoundaryDisposition::RepresentedImmediate { spill: Some(_), .. } => Err(unsupported(
+                BoundaryDisposition::RepresentedImmediate { spill: Some(_), .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     "a spillable immediate needs the runtime magnitude dispatch, \
                      not a single `make_immediate`",
                 )),
-                BoundaryDisposition::RepresentedHandle { .. } => Err(unsupported(
+                BoundaryDisposition::RepresentedHandle { .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     "the producer would mint an immediate for a value the sole \
                      disposition authority represents as a handle",
                 )),
                 BoundaryDisposition::ProtocolOnly { why }
                 | BoundaryDisposition::FailClosedForbidden { why } => {
-                    Err(unsupported(lowered_value_kind(value), why))
+                    Err(unsupported(LoweringCause::Fragment, lowered_value_kind(value), why))
                 }
             }
         }
@@ -2399,19 +2400,19 @@ impl<'a> Lowering<'a> {
                     tag,
                     spill: Some(class),
                 } => Ok((tag, class)),
-                BoundaryDisposition::RepresentedImmediate { spill: None, .. } => Err(unsupported(
+                BoundaryDisposition::RepresentedImmediate { spill: None, .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     "the producer would emit a magnitude dispatch for a value the \
                      sole disposition authority declares cannot overflow its field",
                 )),
-                BoundaryDisposition::RepresentedHandle { .. } => Err(unsupported(
+                BoundaryDisposition::RepresentedHandle { .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                     lowered_value_kind(value),
                     "the producer would mint an immediate for a value the sole \
                      disposition authority represents as a handle",
                 )),
                 BoundaryDisposition::ProtocolOnly { why }
                 | BoundaryDisposition::FailClosedForbidden { why } => {
-                    Err(unsupported(lowered_value_kind(value), why))
+                    Err(unsupported(LoweringCause::Fragment, lowered_value_kind(value), why))
                 }
             }
         }
@@ -2537,7 +2538,7 @@ impl<'a> Lowering<'a> {
                 return Ok(());
             };
             let function = function.ok_or_else(|| {
-                backend_module(
+                backend_module(LoweringCause::PlannerInvariant,
                     "a governed aggregate allocation ran inside the emission pass with no declared \
                      function open, so its event has no FuncId to be scoped by"
                         .to_string(),
@@ -2582,7 +2583,7 @@ impl<'a> Lowering<'a> {
             let tag = match request {
                 CarrierAllocationRequest::NonAggregate { tag } => {
                     if matches!(class, BoundaryClass::Constructor | BoundaryClass::Record) {
-                        return Err(backend_module(format!(
+                        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                             "a {class:?} carrier was allocated as non-aggregate, so it would name no \
                              planned ownership record and enter neither E nor R"
                         )));
@@ -2592,7 +2593,7 @@ impl<'a> Lowering<'a> {
                 CarrierAllocationRequest::PlannedAggregate { occurrence, shape } => {
                     let expected = CarrierAllocationRequest::aggregate_class(shape);
                     if class != expected {
-                        return Err(backend_module(format!(
+                        return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                             "a planned {shape:?} aggregate was allocated at class {class:?} rather \
                              than {expected:?}"
                         )));
@@ -2618,7 +2619,7 @@ impl<'a> Lowering<'a> {
             let count = builder.ins().iconst(
                 types::I64,
                 i64::try_from(field_count).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "BoundaryCarrier",
                         "a transferred aggregate has more fields than the ABI can name",
                     )
@@ -2809,7 +2810,7 @@ impl<'a> Lowering<'a> {
                 cranelift_codegen::ir::condcodes::IntCC::Equal,
                 marker,
                 i64::try_from(crate::NATIVE_INT_SMALL_TAG_V1).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Fragment,
                         "BoundaryCarrier",
                         "the native `Small` marker is not an ABI word",
                     )
@@ -2875,7 +2876,7 @@ impl<'a> Lowering<'a> {
                 builder,
                 marker,
                 i64::try_from(crate::NATIVE_INT_BIG_TAG_V1).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Fragment,
                         "BoundaryCarrier",
                         "the native `Big` marker is not an ABI word",
                     )
@@ -2885,7 +2886,7 @@ impl<'a> Lowering<'a> {
             let refs = self.carrier_refs()?;
             let arena = self.carrier_arena()?;
             let decoder = self.function_local.native_int_resolve.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryCarrier",
                     "this generated function has no exact-Int decoder",
                 )
@@ -2951,7 +2952,7 @@ impl<'a> Lowering<'a> {
             let region = builder.ins().iconst(
                 types::I64,
                 i64::try_from(crate::boundary_value::BOUNDARY_INT_REGION_LIMBS).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Fragment,
                         "BoundaryCarrier",
                         "the region-limbs marker is not an ABI word",
                     )
@@ -3056,7 +3057,7 @@ impl<'a> Lowering<'a> {
             let length = builder.ins().iconst(
                 types::I64,
                 i64::try_from(content.len()).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "BoundaryCarrier",
                         "a transferred literal is longer than the ABI can name",
                     )
@@ -3264,7 +3265,7 @@ impl<'a> Lowering<'a> {
                     // and only for the alternatives the population happened to
                     // miss.
                     None => {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "DynamicConstructor",
                             format!(
                                 "the selected alternative {} carries no planned occurrence, so its \
@@ -3282,7 +3283,7 @@ impl<'a> Lowering<'a> {
                         self.defining_emission_owner, occurrence, alternative.identity,
                         position as u32,
                     )?.is_some() {
-                        return Err(unsupported("RecursiveResidual",
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual",
                             "a source slot alternative reached generic transfer without its creation-site suffix"));
                     }
                 }
@@ -3529,7 +3530,7 @@ impl<'a> Lowering<'a> {
                         }
                     };
                     let projected = site_operand_witness(&value).ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "Effect",
                             "the carried site-operand projection produced no value witness",
                         )
@@ -3739,7 +3740,7 @@ impl<'a> Lowering<'a> {
             seats: &ClaimedEffectSeats<'_>,
         ) -> Result<(), CraneliftBackendError> {
             if declared.len() != args.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "Constructor",
                     format!(
                         "synthesized aggregate node is planned with {} children but the emitter \
@@ -3751,7 +3752,7 @@ impl<'a> Lowering<'a> {
             }
             for (position, (child, argument)) in declared.iter().zip(args).enumerate() {
                 let position = u32::try_from(position).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "Constructor",
                         "synthesized aggregate arity exceeds the path step space",
                     )
@@ -3922,7 +3923,7 @@ impl<'a> Lowering<'a> {
                     // directly. Reaching the ordinary template reconciler would
                     // invent a specialized representation for that carried link.
                     (SynthesizedAggregateNode::RepeatedAggregateLink { .. }, _) => {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "Constructor",
                             "a repeated response-list link reached the ordinary \
                              synthesized-child reconciler",
@@ -3968,7 +3969,7 @@ impl<'a> Lowering<'a> {
                                             .copied()
                                     })
                                     .ok_or_else(|| {
-                                        unsupported(
+                                        unsupported(LoweringCause::PlannerInvariant,
                                             "BoundaryClosureEnvironment",
                                             "a boundary closure capture has no exact planned source occurrence",
                                         )
@@ -3977,7 +3978,7 @@ impl<'a> Lowering<'a> {
                                 | SynthesizedAggregateRoot::HostResultOk
                                 | SynthesizedAggregateRoot::UnitBoundaryEnvironment
                                 | SynthesizedAggregateRoot::RecursivePositionResidual => {
-                                    return Err(unsupported(
+                                    return Err(unsupported(LoweringCause::PlannerInvariant,
                                         "BoundaryClosureEnvironment",
                                         "a positional closure capture was reconciled under a non-capture aggregate root",
                                     ));
@@ -3989,7 +3990,7 @@ impl<'a> Lowering<'a> {
                     // ⛔ `Absent` marks a host-result arm that builds no aggregate,
                     // so it is never a child of a planned record.
                     (SynthesizedAggregateNode::Absent, _) => {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "Constructor",
                             "a synthesized aggregate is planned with an absent child, so the \
                              tree describes an allocation whose operand is not built",
@@ -4002,7 +4003,7 @@ impl<'a> Lowering<'a> {
                     _ => false,
                 };
                 if !agrees {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Constructor",
                         format!(
                             "synthesized aggregate child {position} is planned as {child:?} but the \
@@ -4030,7 +4031,7 @@ impl<'a> Lowering<'a> {
             worker: &StaticWorkerBinding,
         ) -> Result<CheckedIhCapturedEnvironment, CraneliftBackendError> {
             let owner = self.defining_emission_owner.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
                     "an escaping checked IH is being materialized outside a declared emission owner",
                 )
@@ -4041,19 +4042,19 @@ impl<'a> Lowering<'a> {
                 .checked_ih_captured_environment_record(owner, seat)?
                 .clone();
             if record.shape != PlannedAggregateShape::Constructor {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
                     "the checked-IH captured environment is not planned as a positional aggregate",
                 ));
             }
             let declared = record.declared_children.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
                     "the checked-IH captured environment has no declared positional child model",
                 )
             })?;
             if declared.len() != worker.captures.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
                     format!(
                         "the checked-IH environment declares {} captures but the selected worker carries {}",
@@ -4066,7 +4067,7 @@ impl<'a> Lowering<'a> {
             let mut arguments = Vec::with_capacity(worker.captures.len());
             for (position, value) in worker.captures.iter().cloned().enumerate() {
                 let ordinal = u32::try_from(position).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "CheckedIhCapturedEnvironment",
                         "the checked-IH capture run exceeds the positional identity space",
                     )
@@ -4172,13 +4173,13 @@ impl<'a> Lowering<'a> {
             captures: &[LoweringOperand],
         ) -> Result<CarriedBoundaryWord, CraneliftBackendError> {
             let owner = self.defining_emission_owner.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryClosureEnvironment",
                     "a boundary closure environment is being emitted outside a declared owner",
                 )
             })?;
             if owner != environment.owner() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryClosureEnvironment",
                     "a boundary closure environment descriptor names another emission owner",
                 ));
@@ -4188,13 +4189,13 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .aggregate_record_view(environment.record())?;
             if record.shape() != PlannedAggregateShape::Constructor {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryClosureEnvironment",
                     "a boundary closure environment is not planned as a positional aggregate",
                 ));
             }
             let declared = record.declared_children().ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryClosureEnvironment",
                     "a boundary closure environment has no declared positional child model",
                 )
@@ -4202,7 +4203,7 @@ impl<'a> Lowering<'a> {
             if declared.len() != captures.len()
                 || environment.capture_origins().len() != captures.len()
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryClosureEnvironment",
                     "the boundary closure descriptor, planned record, and captured operand run disagree on arity",
                 ));
@@ -4217,7 +4218,7 @@ impl<'a> Lowering<'a> {
                 .enumerate()
             {
                 let ordinal = u32::try_from(position).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "BoundaryClosureEnvironment",
                         "a boundary closure capture ordinal exceeds the positional identity space",
                     )
@@ -4398,7 +4399,7 @@ impl<'a> Lowering<'a> {
                 planned.iter().zip(&dynamic.alternatives).enumerate()
             {
                 let index = u32::try_from(index).map_err(|_| {
-                    unsupported(
+                    unsupported(LoweringCause::Capacity,
                         "DynamicConstructor",
                         "the alternative population exceeds the path step space",
                     )
@@ -4463,7 +4464,7 @@ impl<'a> Lowering<'a> {
                     if self.dynamic_alternatives_agree(owner, seat, root, dynamic)? {
                         Ok(())
                     } else {
-                        Err(unsupported(
+                        Err(unsupported(LoweringCause::PlannerInvariant,
                             "DynamicConstructor",
                             format!(
                                 "the host-result root at {root:?} disagrees with the planner's \
@@ -4473,7 +4474,7 @@ impl<'a> Lowering<'a> {
                         ))
                     }
                 }
-                (Some(_), _) => Err(unsupported(
+                (Some(_), _) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "DynamicConstructor",
                     format!(
                         "the planner plans a dynamic alternative set at {root:?} but the emitter \
@@ -4481,7 +4482,7 @@ impl<'a> Lowering<'a> {
                         lowered_value_kind(value)
                     ),
                 )),
-                (None, Lowered::DynamicConstructor(_)) => Err(unsupported(
+                (None, Lowered::DynamicConstructor(_)) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "DynamicConstructor",
                     format!(
                         "the emitter built a dynamic alternative set at {root:?}, where the \
@@ -4521,7 +4522,7 @@ impl<'a> Lowering<'a> {
             let (declared_role, declared) =
                 self.static_transition_plan.synthesized_tree_node(seat, &path)?;
             if declared_role != role {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "DynamicConstructor",
                     format!(
                         "alternative {position} is planned as {declared_role:?} but the emitter \
@@ -4556,7 +4557,7 @@ impl<'a> Lowering<'a> {
         ) -> Result<Vec<DynamicConstructorAlternativeV1>, CraneliftBackendError> {
             let roles = self.static_transition_plan.synthesized_io_error_roles();
             if roles.len() != self.process_symbols.io_errors.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "DynamicConstructor",
                     "the closed IOError role inventory does not match the effect symbol population",
                 ));
@@ -4576,7 +4577,7 @@ impl<'a> Lowering<'a> {
                         seat,
                         parent,
                         u32::try_from(position).map_err(|_| {
-                            unsupported(
+                            unsupported(LoweringCause::Capacity,
                                 "DynamicConstructor",
                                 "the IOError alternative population exceeds the path step space",
                             )
@@ -4587,7 +4588,7 @@ impl<'a> Lowering<'a> {
                     )?;
                     Ok(DynamicConstructorAlternativeV1 {
                         tag: i64::try_from(position).map_err(|_| {
-                            unsupported(
+                            unsupported(LoweringCause::Capacity,
                                 "DynamicConstructor",
                                 "the IOError alternative population exceeds the ABI discriminator",
                             )

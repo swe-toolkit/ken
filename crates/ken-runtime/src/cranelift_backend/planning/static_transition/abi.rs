@@ -17,6 +17,7 @@
 //! `RT-FNSPLIT-B2F` performs the atomic switch-over; this node only makes the
 //! contract expressible and checkable before it does.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::collections::BTreeSet;
 
 use super::semantic_ir::{
@@ -1828,7 +1829,7 @@ pub(super) fn result_carrier(
             RuntimeExprShape::ImportedDeclarationRef => {
                 // The one unrepresentable shape, and the reason `B2R` scopes to
                 // the complete **intra-module** callable bundle.
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::Fragment,
                     "ImportedDeclarationRef",
                     "imported declaration requires dependency linking, so it receives no callable \
                      descriptor in the intra-module representation contract",

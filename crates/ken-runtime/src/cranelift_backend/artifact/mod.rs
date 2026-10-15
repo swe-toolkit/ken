@@ -16,6 +16,7 @@ mod tests;
 
 pub(super) mod api;
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -155,7 +156,7 @@ pub(super) fn program_admission(
     program: &RuntimeProgram,
 ) -> Result<crate::NativeProgramAdmission, CraneliftBackendError> {
     crate::native_program_admission(program).map_err(|err| {
-        crate::cranelift_backend::surface::unsupported("checked-role-authority", err.to_string())
+        crate::cranelift_backend::surface::unsupported(LoweringCause::Admission, "checked-role-authority", err.to_string())
     })
 }
 
@@ -295,7 +296,7 @@ fn new_jit_module() -> Result<JITModule, CraneliftBackendError> {
 fn new_object_module(name: &str) -> Result<ObjectModule, CraneliftBackendError> {
     let isa = native_isa()?;
     let builder = ObjectBuilder::new(isa, name.as_bytes().to_vec(), default_libcall_names())
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     Ok(ObjectModule::new(builder))
 }
 

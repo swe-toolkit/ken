@@ -17,6 +17,7 @@
 
 pub(in crate::cranelift_backend) mod core;
 mod residual;
+use crate::cranelift_backend::surface::LoweringCause;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
     RecursiveCarrierSlotKey, Representation};
 mod frame_validation;
@@ -3658,7 +3659,7 @@ impl ConstructorField {
     /// this only spares one sentence from being copied at every site. A reader
     /// that should do something other than refuse must not call it.
     fn static_worker_refusal(edge: &str) -> CraneliftBackendError {
-        unsupported(
+        unsupported(LoweringCause::PlannerInvariant,
             "StaticWorkerBinding",
             format!(
                 "{edge} requires an ordinary specialized constructor field, and this field \
@@ -4202,7 +4203,7 @@ impl CheckedIhApplicationResult {
                     site: "a fresh checked-IH declared-call answer",
                 },
             ),
-            LoweringOperand::Specialized(_) => Err(unsupported(
+            LoweringOperand::Specialized(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "a governed checked-IH continuation call returned a specialized template instead of its Trap-checked runtime Result",
             )),
@@ -4664,7 +4665,7 @@ impl StaticWorkerBinding {
     ) -> Result<&ContinuationCallIdentity, CraneliftBackendError> {
         match &self.discharge {
             ContinuationDischarge::ComposedSourceContinuation(identity) => Ok(identity),
-            ContinuationDischarge::DirectSpecializationCall => Err(unsupported(
+            ContinuationDischarge::DirectSpecializationCall => Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 "an ordinary static-worker binding carries no composed causal authority: its \
                  discharge is a direct specialization call, which answers for no composed \
@@ -4901,7 +4902,7 @@ impl StaticWorkerCallOutcome {
         match self {
             Self::Emitted(operand, emission) => Ok((operand, emission)),
             #[cfg(test)]
-            Self::DeferredPostField(_) => Err(backend_module(
+            Self::DeferredPostField(_) => Err(backend_module(LoweringCause::PlannerInvariant,
                 "a deferred post-field fused call reached a source-machine consumer"
                     .to_string(),
             )),
@@ -5078,7 +5079,7 @@ impl LoweringEnvironmentBinding {
     fn value_at(&self, edge: &'static str) -> Result<&LoweringOperand, CraneliftBackendError> {
         match self {
             LoweringEnvironmentBinding::Value(operand) => Ok(operand),
-            LoweringEnvironmentBinding::StaticWorker(_) => Err(unsupported(
+            LoweringEnvironmentBinding::StaticWorker(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "{edge} is a value-producing position and a static worker binding has no \
@@ -5159,7 +5160,7 @@ impl LoweringOperand {
     fn specialized_at(self, edge: &'static str) -> Result<Lowered, CraneliftBackendError> {
         match self {
             LoweringOperand::Specialized(lowered) => Ok(lowered),
-            LoweringOperand::Carried(_) => Err(unsupported(
+            LoweringOperand::Carried(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "BoundaryCarrier",
                 format!(
                     "{edge} is a specialized-only surface and a carried boundary word has no \
@@ -5179,7 +5180,7 @@ impl LoweringOperand {
     fn specialized_ref_at(&self, edge: &'static str) -> Result<&Lowered, CraneliftBackendError> {
         match self {
             LoweringOperand::Specialized(lowered) => Ok(lowered),
-            LoweringOperand::Carried(_) => Err(unsupported(
+            LoweringOperand::Carried(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "BoundaryCarrier",
                 format!(
                     "{edge} is a specialized-only surface and a carried boundary word has no \
@@ -5531,7 +5532,7 @@ impl StaticWorkerFieldLedger {
         scope: Option<FuncId>,
     ) -> Result<StaticWorkerRecognitionId, CraneliftBackendError> {
         let Some(recognition) = self.recognitions.mint() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Capacity,
                 "StaticWorkerBinding",
                 "the static worker recognition issuer is exhausted; refusing rather than reusing \
                  an identity, because a reused identity would let one constructed field stand in \
@@ -5584,7 +5585,7 @@ impl StaticWorkerFieldLedger {
         scope: Option<FuncId>,
     ) -> Result<StaticWorkerTransportId, CraneliftBackendError> {
         let Some(recognized) = self.recognized.get(&recognition) else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "a static elimination rebound a static worker field carrying recognition \
@@ -5593,7 +5594,7 @@ impl StaticWorkerFieldLedger {
             ));
         };
         if recognized.scope != scope {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "constructor {} at origin {:?} field {} was constructed into one generated \
@@ -5604,7 +5605,7 @@ impl StaticWorkerFieldLedger {
             ));
         }
         if let Some(already) = self.transitioned.get(&recognition) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "constructor {} at origin {:?} field {} was constructed once and rebound \
@@ -5615,7 +5616,7 @@ impl StaticWorkerFieldLedger {
             ));
         }
         let Some(transport) = self.issuer.mint() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Capacity,
                 "StaticWorkerBinding",
                 "the static worker transport issuer is exhausted; refusing rather than reusing \
                  an identity, because a reused identity would let one transport discharge \
@@ -5671,7 +5672,7 @@ impl StaticWorkerFieldLedger {
             return Ok(());
         };
         let Some(minted) = self.minted.get(&transport) else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "an exact-Var call at origin {consumer:?} consumed a static worker naming \
@@ -5680,7 +5681,7 @@ impl StaticWorkerFieldLedger {
             ));
         };
         if minted.scope != scope {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "constructor {} at origin {:?} field {} was transported into one generated \
@@ -5692,7 +5693,7 @@ impl StaticWorkerFieldLedger {
             ));
         }
         if let Some(first) = self.consumed.get(&transport) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "constructor {} at origin {:?} field {} was transported once and consumed \
@@ -5760,7 +5761,7 @@ impl StaticWorkerFieldLedger {
         // occurrence vanish while the first covered for it.
         for (recognition, recognized) in &self.recognized {
             if !self.transitioned.contains_key(recognition) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "constructor {} at origin {:?} transports a static worker in field {} \
@@ -5779,7 +5780,7 @@ impl StaticWorkerFieldLedger {
         }
         for (recognition, transport) in &self.transitioned {
             if !self.recognized.contains_key(recognition) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "transport {transport:?} is recorded as the transition of recognition \
@@ -5792,7 +5793,7 @@ impl StaticWorkerFieldLedger {
             // on their own maps -- so a transport named here and absent from
             // `minted` is an obligation no later loop can see.
             let Some(minted) = self.minted.get(transport) else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "recognition {recognition:?} is recorded as transitioning into transport \
@@ -5809,7 +5810,7 @@ impl StaticWorkerFieldLedger {
             // satisfied. Requiring the transport to name THIS recognition back
             // makes injectivity a consequence rather than another check.
             if minted.recognition != *recognition {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "recognition {recognition:?} is recorded as transitioning into transport \
@@ -5827,7 +5828,7 @@ impl StaticWorkerFieldLedger {
             // `rebind` refuses the second, and this is that refusal restated as
             // a law the close can fail on rather than a property of one writer.
             if self.transitioned.get(&minted.recognition) != Some(transport) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "transport {transport:?} was minted for recognition {:?}, which does not \
@@ -5889,7 +5890,7 @@ impl StaticWorkerFieldLedger {
             // consumption among them is a ledger-shape question, and it is routed
             // rather than taken here.
             if !self.consumed.contains_key(transport) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "constructor {} at origin {:?} field {} (field origin {:?}) was rebound \
@@ -5903,7 +5904,7 @@ impl StaticWorkerFieldLedger {
         }
         for (transport, consumer) in &self.consumed {
             if !self.minted.contains_key(transport) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "an exact-Var call at origin {consumer:?} is recorded as consuming \
@@ -7800,7 +7801,7 @@ impl<'a> Lowering<'a> {
                 record_residual_abi_decode();
                 self.decode_residual_child(builder, residual)
             },
-            LoweringOperand::Specialized(_) => Err(backend_module(
+            LoweringOperand::Specialized(_) => Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis capture did not become a carried word".to_string(),
             )),
         }
@@ -7823,34 +7824,34 @@ impl<'a> Lowering<'a> {
         if !constructor.ends_with("::ITree::Vis") || lowered.len() != 2
             || row.vis_origin() != origin
         {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis member is not its planned binary Vis occurrence".to_string(),
             ));
         }
         let Some(frame) = self.function_local.pending_vis_frame else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis construct has no caller-owned activation record".to_string(),
             ));
         };
         let LoweringOperand::Specialized(Lowered::Closure {
             captures, params, body, ..
         }) = &lowered[1] else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis K is not its planned lexical closure".to_string(),
             ));
         };
         if *body != row.k_body_origin() || params.len() != 1
             || captures.len() != row.captures().len()
         {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis K disagrees with its exact successor row".to_string(),
             ));
         }
         let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
-            backend_module("a pending-Vis construct has no generated function scope".to_string())
+            backend_module(LoweringCause::PlannerInvariant, "a pending-Vis construct has no generated function scope".to_string())
         })?;
         let GraftedSpineFunctionScope::ContinuationContext(context_id) = scope else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis K's continuation inputs lack a context exit".to_string(),
             ));
         };
@@ -7859,13 +7860,13 @@ impl<'a> Lowering<'a> {
                 context.context == context_id && context.members.iter().any(|member| member.origin == origin)
             }))
         }) {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "a pending-Vis construct disagrees with its planned K-context exit".to_string(),
             ));
         }
         let context = self.static_transition_plan.continuation_contexts()?
             .into_iter().find(|context| context.id() == context_id)
-            .ok_or_else(|| backend_module("a pending-Vis source context was not generated".to_string()))?;
+            .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "a pending-Vis source context was not generated".to_string()))?;
         let context_captures = context.captures()?;
         let mut continuation_inputs = Vec::new();
         for (_destination_ordinal, source, _destination_abi_position) in row.continuation_inputs() {
@@ -7875,29 +7876,29 @@ impl<'a> Lowering<'a> {
             let matches = context_captures.iter()
                 .filter(|capture| capture.coordinate == *source).collect::<Vec<_>>();
             let [source_capture] = matches.as_slice() else {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "a pending-Vis continuation input has no unique source context capture".to_string(),
                 ));
             };
             let source_position = context.parameters().checked_add(source_capture.ordinal)
-                .ok_or_else(|| backend_module("pending-Vis source context position exhausted".to_string()))?;
+                .ok_or_else(|| backend_module(LoweringCause::Capacity, "pending-Vis source context position exhausted".to_string()))?;
             let slot = context.slots().get(source_position as usize)
-                .ok_or_else(|| backend_module("a pending-Vis continuation input has no source slot".to_string()))?;
+                .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "a pending-Vis continuation input has no source slot".to_string()))?;
             if slot.kind != AbiSlotKind::Capture || slot.ordinal != source_capture.ordinal {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "a pending-Vis continuation input disagrees with its source context Capture slot".to_string(),
                 ));
             }
             let operand = self.function_local.defining_abi_operands
                 .get(source_position as usize).cloned()
-                .ok_or_else(|| backend_module("a pending-Vis context has no declared continuation input".to_string()))?;
+                .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "a pending-Vis context has no declared continuation input".to_string()))?;
             continuation_inputs.push(operand);
         }
         let offset_at = |base: i32, index: usize| -> Result<i32, CraneliftBackendError> {
             let delta = index.checked_mul(8)
                 .and_then(|bytes| i32::try_from(bytes).ok())
-                .ok_or_else(|| backend_module("pending-Vis record offset exhausted".to_string()))?;
-            base.checked_add(delta).ok_or_else(|| backend_module(
+                .ok_or_else(|| backend_module(LoweringCause::Capacity, "pending-Vis record offset exhausted".to_string()))?;
+            base.checked_add(delta).ok_or_else(|| backend_module(LoweringCause::Capacity,
                 "pending-Vis record slot exceeds addressable range".to_string(),
             ))
         };
@@ -8082,7 +8083,7 @@ impl<'a> Lowering<'a> {
             return Ok(None);
         };
         if matched.next().is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "two installed fused regions claim one redirected invocation seat in one unit, so \
                  which region's continuation inputs this call passes is undetermined",
@@ -8101,7 +8102,7 @@ impl<'a> Lowering<'a> {
                 ..
             } = authority.coordinate
             else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     "a fused region's continuation input names a producer-local coordinate; the \
                      redirected call seat holds an entry ABI operand run and no lexical \
@@ -8110,7 +8111,7 @@ impl<'a> Lowering<'a> {
                 ));
             };
             if source_owner != defining {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     format!(
                         "a fused region's continuation input names entry frame {source_owner:?}, \
@@ -8130,7 +8131,7 @@ impl<'a> Lowering<'a> {
                 .defining_abi_operands
                 .get(source_abi_position as usize)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "StaticContinuationFusion",
                         format!(
                             "a fused region's continuation input names entry ABI position {} \
@@ -8193,7 +8194,7 @@ impl<'a> Lowering<'a> {
             for inst in insts {
                 let emitted = Self::decode_direct_callee(func, *inst)?;
                 if emitted != planned {
-                    return Err(backend_module(format!(
+                    return Err(backend_module(LoweringCause::FinishedCode, format!(
                         "the emitted direct-call target {emitted:?} disagrees with the planner-issued \
                          continuation target {planned:?} for a causal token; the call that was built \
                          is not the call that was planned"
@@ -8209,7 +8210,7 @@ impl<'a> Lowering<'a> {
                 .into_iter()
                 .any(|planned| planned == transport)
             {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "a recorded checked-IH transport call has no planner-issued two-endpoint edge"
                         .to_string(),
                 ));
@@ -8221,7 +8222,7 @@ impl<'a> Lowering<'a> {
             )?;
             let emitted = Self::decode_direct_callee(func, *inst)?;
             if emitted != planned {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "a checked-IH transport instruction calls a different specialization than its source endpoint"
                         .to_string(),
                 ));
@@ -8246,7 +8247,7 @@ impl<'a> Lowering<'a> {
         let mut specialization_callees = BTreeSet::new();
         for unit in self.static_transition_plan.ordinary_continuation_targets()? {
             let id = bundle.continuation(unit).ok_or_else(|| {
-                backend_module(
+                backend_module(LoweringCause::FinishedCode,
                     "a planned ordinary continuation specialization was never forward-declared"
                         .to_string(),
                 )
@@ -8286,7 +8287,7 @@ impl<'a> Lowering<'a> {
             }
         }
         if observed_by_callee != expected_by_callee {
-            return Err(backend_module(format!(
+            return Err(backend_module(LoweringCause::FinishedCode, format!(
                 "the continuation calls this function actually emitted {observed_by_callee:?} are \
                  not the ones recorded against planned causal tokens {expected_by_callee:?}"
             )));
@@ -8371,7 +8372,7 @@ impl<'a> Lowering<'a> {
             };
             // 3 — the recorded call is in the finished stream.
             if !emitted_insts.contains(&record.inst) {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "a claimed composed discharge names an instruction the finished function \
                      does not contain, so it answers with a call this function never made"
                         .to_string(),
@@ -8384,13 +8385,13 @@ impl<'a> Lowering<'a> {
                 .into_iter()
                 .find(|unit| unit.body_occurrence() == record.worker_body_origin)
                 .ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::FinishedCode,
                         "a claimed composed discharge names a worker body with no emittable unit"
                             .to_string(),
                     )
                 })?;
             let planned = bundle.function(unit.function()).ok_or_else(|| {
-                backend_module(
+                backend_module(LoweringCause::FinishedCode,
                     "a claimed composed discharge names a worker unit that was never \
                      forward-declared"
                         .to_string(),
@@ -8398,7 +8399,7 @@ impl<'a> Lowering<'a> {
             })?;
             let decoded = Self::decode_direct_callee(func, record.inst)?;
             if decoded != planned {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::FinishedCode, format!(
                     "a composed discharge's recorded instruction calls {decoded:?}, but the \
                      D8b/D8d target's raw worker is {planned:?}; the call that was made is not \
                      the call the authority stands for"
@@ -8406,7 +8407,7 @@ impl<'a> Lowering<'a> {
             }
             // 4b — the operand contract, reported against declared.
             if record.supplied_operands != record.declared_operands {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::FinishedCode, format!(
                     "a composed discharge supplied {} operands but its D8b/D8d target declares \
                      {}; the raw worker's contract and the call that answers for it disagree",
                     record.supplied_operands, record.declared_operands
@@ -8438,7 +8439,7 @@ impl<'a> Lowering<'a> {
                 record
             };
             let result = record.result.ok_or_else(|| {
-                backend_module(
+                backend_module(LoweringCause::FinishedCode,
                     "a composed discharge's call result was not a carried word, so nothing \
                      returned into source-machine control for it to be"
                         .to_string(),
@@ -8473,7 +8474,7 @@ impl<'a> Lowering<'a> {
                 }
             }
             if !downstream {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::FinishedCode,
                     "a composed discharge's recorded result is not defined at or after its \
                      recorded call in the finished block layout, so the value handed to \
                      source-machine control cannot have come from the call that answered the \
@@ -8483,7 +8484,7 @@ impl<'a> Lowering<'a> {
             }
             let (before, after) = record.source_control;
             if before != after {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::FinishedCode, format!(
                     "a composed discharge ran with {before} live source continuations and \
                      returned into {after}; the result did not return into the continuation \
                      that was in force"
@@ -8546,7 +8547,7 @@ impl<'a> Lowering<'a> {
     /// The carrier helpers, as refs callable inside **this** generated function.
     fn carrier_refs(&self) -> Result<BoundaryCarrierRefs, CraneliftBackendError> {
         self.function_local.boundary_carrier.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "BoundaryCarrier",
                 "this generated function has no boundary-carrier helper refs",
             )
@@ -8578,7 +8579,7 @@ impl<'a> Lowering<'a> {
     /// the reason here.
     fn carrier_arena(&self) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
         self.function_local.boundary_arena.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "BoundaryCarrier",
                 "this generated function has no boundary arena: the activation \
                  -services record that sources it is `S6`/`D6` reland work, and \
@@ -8633,7 +8634,7 @@ impl<'a> Lowering<'a> {
         position: usize,
     ) -> Result<cranelift_codegen::ir::Value, CraneliftBackendError> {
         let position = i64::try_from(position).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "BoundaryCarrier",
                 "a transferred aggregate's child ordinal is outside the ABI's range",
             )
@@ -8826,12 +8827,12 @@ impl<'a> Lowering<'a> {
         let refs = self.carrier_refs()?;
         let boundary_arena = self.carrier_arena()?;
         let native_arena = self.function_local.native_int_arena.ok_or_else(|| {
-            unsupported("NativeResult", "carried Int result has no invocation arena")
+            unsupported(LoweringCause::PlannerInvariant, "NativeResult", "carried Int result has no invocation arena")
         })?;
         let export_parts = self
             .function_local
             .native_int_export_parts
-            .ok_or_else(|| unsupported("NativeResult", "carried Int has no export function"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "NativeResult", "carried Int has no export function"))?;
         let pointer_type = builder.func.dfg.value_type(boundary_arena);
 
         let tag = builder.ins().band_imm(
@@ -9066,10 +9067,10 @@ impl<'a> Lowering<'a> {
                     self.refuse_private_recursive_residual(builder, word)?;
                     Ok(word)
                 }
-                LoweringOperand::Residual(_) => Err(unsupported(
+                LoweringOperand::Residual(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "RecursiveResidual", "an unwrapped transport received a private residual",
                 )),
-                LoweringOperand::Specialized(_) => Err(unsupported(
+                LoweringOperand::Specialized(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "RecursiveResidual", "a transport Child reader has no carried word",
                 )),
             };
@@ -9081,42 +9082,42 @@ impl<'a> Lowering<'a> {
                     site: "a wrapped checked-IH transport Child reader",
                 },
             ),
-            LoweringOperand::Specialized(_) => return Err(unsupported(
+            LoweringOperand::Specialized(_) => return Err(unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "a wrapped transport Child reader has no residual",
             )),
         };
-        let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+        let owner = self.defining_emission_owner.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "a transport Child reader has no emission owner",
         ))?;
         if owner != transport.destination_owner()
             || self.static_transition_plan.checked_ih_environment_transport_at(
                 owner, transport.destination_construct_origin(),
             )? != Some(transport) {
-            return Err(unsupported("RecursiveResidual", "the transport Child reader has no exact planned transport"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the transport Child reader has no exact planned transport"));
         }
         let slot = self.static_transition_plan
             .recursive_carrier_for_specialization(source)?
-            .ok_or_else(|| unsupported("RecursiveResidual", "the transport Child has no planner slot"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the transport Child has no planner slot"))?;
         if residual.slot() != RecursiveCarrierSlotKey::of(slot) {
-            return Err(unsupported("RecursiveResidual", "the transport Child has a foreign issued slot"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the transport Child has a foreign issued slot"));
         }
         let unit = self.static_transition_plan.continuation_units()?.into_iter()
             .find(|unit| unit.id() == source)
-            .ok_or_else(|| unsupported("RecursiveResidual", "the transport Child has no interned constructor"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the transport Child has no interned constructor"))?;
         let edge = slot.edge(source, RecursiveCarrierStoreKind::ConstructEmission,
             unit.producer_construct_origin(), unit.emission_owner())?;
         let RecursiveCarrierChild::ConstructChild { origin, record } = edge.child else {
-            return Err(unsupported("RecursiveResidual", "the construct Child has an unexpected minting record"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the construct Child has an unexpected minting record"));
         };
         if origin != unit.worker_closure_origin() {
-            return Err(unsupported("RecursiveResidual", "the transport Child differs from its construct seat"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the transport Child differs from its construct seat"));
         }
         let child_schema = self.static_transition_plan.aggregate_record_view(record)?;
         if child_schema.shape() != PlannedAggregateShape::Constructor
             || child_schema.declared_children().map(|children| children.len())
                 != Some(disposition.worker_captures as usize)
         {
-            return Err(unsupported("RecursiveResidual", "the construct Child schema disagrees with its W roles"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the construct Child schema disagrees with its W roles"));
         }
         slot.variant(source)?;
         self.decode_residual_child(builder, residual)
@@ -9134,7 +9135,7 @@ impl<'a> Lowering<'a> {
                 .as_ref()
                 .and_then(|plan| plan.frame(frame_id))
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "a planned post-call consumer has no checked frame entry",
                     )
@@ -9142,7 +9143,7 @@ impl<'a> Lowering<'a> {
             if frame.runtime_frame_fingerprint
                 != crate::compiler_private_computational_match_frame_fingerprint(cases, default)
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "a planned post-call consumer no longer denotes its exact checked frame",
                 ));
@@ -9582,21 +9583,21 @@ impl<'a> ClaimedEffectSeats<'a> {
         slot: EffectSeatSlot,
     ) -> Result<(PlannedEffectSeat, &'a LoweringOperand), CraneliftBackendError> {
         let record = *self.claimed.get(&slot).ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "Effect",
                 format!("{slot:?} was not claimed in this visit, so nothing authorizes reading it"),
             )
         })?;
         let operand = match slot {
             EffectSeatSlot::Capability => self.capability.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "Effect",
                     "the capability seat was claimed but no capability operand was lowered",
                 )
             })?,
             EffectSeatSlot::Argument(ordinal) => {
                 self.arguments.get(ordinal as usize).ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "Effect",
                         format!("{slot:?} was claimed but no operand was lowered at it"),
                     )
@@ -9629,7 +9630,7 @@ impl<'a> ClaimedEffectSeats<'a> {
         let (record, operand) = self.operand(slot)?;
         match operand {
             LoweringOperand::Specialized(lowered) => Ok(lowered),
-            LoweringOperand::Carried(_) => Err(unsupported(
+            LoweringOperand::Carried(_) => Err(unsupported(LoweringCause::Fragment,
                 "Effect",
                 format!(
                     "seat {:?} of {:?} needs {:?}, which this release can observe only in a \
@@ -9719,20 +9720,20 @@ fn validate_dynamic_constructor_alternatives<'a>(
     for (tag, constructor) in alternatives {
         count += 1;
         if !tags.insert(tag) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "DynamicConstructor",
                 format!("duplicate alternative tag {tag}"),
             ));
         }
         if !constructors.insert(constructor) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "DynamicConstructor",
                 format!("duplicate alternative constructor {constructor}"),
             ));
         }
     }
     if count == 0 {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "DynamicConstructor",
             "closed alternative table is empty",
         ));
@@ -9758,7 +9759,7 @@ fn select_dynamic_constructor_case<'a>(
         return Ok(Err(default));
     };
     if selected.next().is_some() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "DynamicConstructor",
             format!(
                 "source match duplicates constructor {}",
@@ -9767,7 +9768,7 @@ fn select_dynamic_constructor_case<'a>(
         ));
     }
     if case.binders != alternative.fields.len() {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "DynamicConstructor",
             format!(
                 "case {} expects {} binders but alternative has {} fields",
@@ -9901,7 +9902,7 @@ fn dynamic_host_result_producer_case<'a>(
         return Ok(None);
     };
     if case.binders != 1 {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "ComputationalMatch",
             format!(
                 "dynamic HostResult tree producer case {} expects exactly one binder, got {}",
@@ -9983,7 +9984,7 @@ impl CarriedInvocationCoordinates {
         Ok(Self {
             continuation_origin: segment.selection.static_origin,
             recursive_position: u32::try_from(segment.sibling_position).map_err(|_| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "ContinuationSpecialization",
                     "a carried invocation's sibling position exceeds the planner's recursive                      position width",
                 )
@@ -10033,7 +10034,7 @@ impl RecursiveUnitBodySelection {
             | Self::Labelled { pending_outer_frames, .. } => pending_outer_frames,
         };
         if pending_outer_frames > 0 {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual",
                 "a residual cannot replace a descent under a pending outer continuation",
             ));
@@ -10165,7 +10166,7 @@ impl AffineSpliceCapability {
         if std::mem::replace(&mut self.state, AffineSpliceState::Consumed)
             == AffineSpliceState::Consumed
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuation",
                 "affine splice capability was consumed more than once",
             ));
@@ -10195,7 +10196,7 @@ fn validate_oriented_control_projection(
             | RecursorLayerRole::ExitsScope { origin, .. } => origin,
         };
         if role_origin != producer_origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "control occurrence was transplanted across producer regions",
             ));
@@ -10206,14 +10207,14 @@ fn validate_oriented_control_projection(
                     .insert(instance, source)
                     .is_some_and(|old| old != source)
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "one invocation instance is shared by distinct checked templates",
                     ));
                 }
             }
             (None, Some(_)) => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked invocation source has no affine instance identity",
                 ));
@@ -10222,7 +10223,7 @@ fn validate_oriented_control_projection(
         }
         match (layer.role, layer.semantic_pending) {
             (RecursorLayerRole::SelectsOccurrence { .. }, false) => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "pending selection was misclassified as control-only",
                 ));
@@ -10237,7 +10238,7 @@ fn validate_oriented_control_projection(
         {
             if layer.checked_invocation_id.is_some() {
                 if open_scopes.insert(scope_origin, parent_scope).is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "open control obligation is duplicated",
                     ));
@@ -10247,7 +10248,7 @@ fn validate_oriented_control_projection(
     }
     for parent in open_scopes.values().flatten() {
         if !open_scopes.contains_key(parent) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "open control obligation has a stale or cross-region parent",
             ));
@@ -10303,7 +10304,7 @@ impl RecursorInvocationSegment {
 
     fn validate_open_control_obligations(&self) -> Result<(), CraneliftBackendError> {
         if open_control_obligations(&self.unwind) != self.open_control_obligations {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "open control obligation set changed after affine mint",
             ));
@@ -10367,7 +10368,7 @@ fn checked_invocation_frame_templates(
             .recursive_call(call_template_id)
             .map(|call| call.callee_frame_templates.clone())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic invocation has no checked same-SCC call template",
                 )
@@ -10376,7 +10377,7 @@ fn checked_invocation_frame_templates(
             .computational_ih_call(call_template_id)
             .map(|call| call.callee_frame_templates.clone())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic invocation has no checked computational IH call template",
                 )
@@ -10409,7 +10410,7 @@ fn instantiate_checked_invocation_segment(
             return Ok(());
         };
         let frame = plan.frame(frame_id).ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "dynamic recursive layer has no checked frame entry",
             )
@@ -10420,7 +10421,7 @@ fn instantiate_checked_invocation_segment(
                 &layer.default,
             )
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "dynamic recursive layer does not match its checked frame template",
             ));
@@ -10436,7 +10437,7 @@ fn instantiate_checked_invocation_segment(
             }
             Some(existing) if existing == invocation.invocation_instance_id => {
                 if layer.checked_invocation_source != Some(invocation.source) {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "dynamic invocation source changed after qualification",
                     ));
@@ -10445,7 +10446,7 @@ fn instantiate_checked_invocation_segment(
             Some(_) => return Ok(()),
         }
         if !instantiated.insert(frame_id) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "one invocation instantiates a checked frame template more than once",
             ));
@@ -10468,7 +10469,7 @@ fn instantiate_checked_invocation_segment(
         // `checked_frame_id` is the expected shape of a layer whose transported
         // marker was dropped — and it must never be recovered by inference.
         if layers_without_identity > 0 {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 format!(
                     "computational invocation {:?} has {layers_without_identity} layer(s) with no checked frame identity and does not cover its expected templates: expected={expected:?} instantiated={instantiated:?} actual={actual:?}",
@@ -10476,7 +10477,7 @@ fn instantiate_checked_invocation_segment(
                 ),
             ));
         }
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             format!(
                 "computational invocation {:?} does not carry its exact checked frame sequence: expected={expected:?} instantiated={instantiated:?} actual={actual:?}",
@@ -10510,7 +10511,7 @@ fn instantiate_checked_invocation_segment(
         std::cmp::Reverse(plan.frame(*frame_id).map(|frame| frame.semantic_position))
     });
     if instantiated_order != planned_visit_order {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             format!(
                 "computational invocation {:?} instantiates its checked frames out of their planned occurrence order: planned={planned_visit_order:?} instantiated={instantiated_order:?}",
@@ -10566,7 +10567,7 @@ fn compose_oriented_subcontinuation(
     let invocation = invocation.or(segment.checked_invocation);
     if let Some(invocation) = invocation {
         let plan = plan.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "dynamic invocation has no checked oriented plan",
             )
@@ -10652,7 +10653,7 @@ fn compose_oriented_subcontinuation(
                 )
             })
             .collect::<Vec<_>>();
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             format!(
                 "oriented segment mixes checked and inferred computational frames: {detail:?}; recursive templates: {:?}",
@@ -10672,16 +10673,16 @@ fn compose_oriented_subcontinuation(
 
     let (segment_site_id, input_interface, output_interface, semantic_frames) = if has_planned {
         let plan = plan.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "oriented segment has no checked plan metadata",
             )
         })?;
         plan.validate()
-            .map_err(|reason| unsupported("OrientedSubcontinuationPlanV1", reason))?;
+            .map_err(|reason| unsupported(LoweringCause::PlannerInvariant, "OrientedSubcontinuationPlanV1", reason))?;
         for entry in &mut control_ledger {
             if entry.invocation_id.is_none() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked control occurrence has no affine invocation identity",
                 ));
@@ -10705,7 +10706,7 @@ fn compose_oriented_subcontinuation(
                 .insert((invocation_id, frame_id), layer)
                 .is_some()
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "oriented segment repeats a checked dynamic frame key",
                 ));
@@ -10722,13 +10723,13 @@ fn compose_oriented_subcontinuation(
                 let left = plan.frame(pair[0]).expect("validated frame");
                 let right = plan.frame(pair[1]).expect("validated frame");
                 if left.segment_site_id != right.segment_site_id {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "invocation-local oriented segment crosses checked prompt regions",
                     ));
                 }
                 if left.output_interface != right.input_interface {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "invocation-local oriented segment endpoints do not compose",
                     ));
@@ -10755,7 +10756,7 @@ fn compose_oriented_subcontinuation(
             });
             for pair in retired.windows(2) {
                 if pair[0].1.output_interface != pair[1].1.input_interface {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         format!(
                             "retired flat oriented splice answer endpoints do not compose: left=(instance={}, frame={}, depth={}) right=(instance={}, frame={}, depth={})",
@@ -10775,7 +10776,7 @@ fn compose_oriented_subcontinuation(
         let mut child_by_parent_frame = BTreeMap::new();
         for edge in dynamic_splice_edges {
             if edge.child_invocation_instance_id == edge.parent_invocation_instance_id {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge forms a self-parent cycle",
                 ));
@@ -10783,7 +10784,7 @@ fn compose_oriented_subcontinuation(
             let child_frames = by_id
                 .get(&edge.child_invocation_instance_id)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "dynamic splice edge names a stale child invocation",
                     )
@@ -10791,7 +10792,7 @@ fn compose_oriented_subcontinuation(
             let parent_frames = by_id.get(&edge.parent_invocation_instance_id);
             if parent_frames.is_some_and(|frames| !frames.contains(&edge.parent_frame_template_id))
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge names the wrong static parent frame",
                 ));
@@ -10799,7 +10800,7 @@ fn compose_oriented_subcontinuation(
             let call = plan
                 .computational_ih_call(edge.checked_call_template_id)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "dynamic splice edge names a stale checked call template",
                     )
@@ -10829,13 +10830,13 @@ fn compose_oriented_subcontinuation(
                 || call.callee_segment_site_id != edge.segment_site_id
                 || expected_child_frames != *child_frames
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge disagrees with its checked static parent",
                 ));
             }
             if call.result_interface != call.caller_interface {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice call result does not match its checked caller interface",
                 ));
@@ -10844,7 +10845,7 @@ fn compose_oriented_subcontinuation(
                 .insert(edge.child_invocation_instance_id, edge)
                 .is_some()
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic child invocation carries duplicate affine splice edges",
                 ));
@@ -10861,14 +10862,14 @@ fn compose_oriented_subcontinuation(
                     .insert(key, edge.child_invocation_instance_id)
                     .is_some()
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "sibling dynamic invocations contend for one affine parent edge",
                     ));
                 }
             } else {
                 if edge.parent_invocation_instance_id != 0 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "dynamic splice edge names a stale parent invocation",
                     ));
@@ -10880,7 +10881,7 @@ fn compose_oriented_subcontinuation(
                     )
                     .is_some()
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "sibling dynamic invocations compete for one external parent edge",
                     ));
@@ -10889,7 +10890,7 @@ fn compose_oriented_subcontinuation(
         }
         let roots = if !external_children.is_empty() {
             if edges_by_child.len() != by_id.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge deletion leaves an unparented invocation-local segment",
                 ));
@@ -10909,7 +10910,7 @@ fn compose_oriented_subcontinuation(
                 .collect::<Vec<_>>()
         };
         if roots.is_empty() || (edges_by_child.len() < by_id.len() && roots.len() != 1) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "dynamic splice edges do not form one exact invocation-local tree",
             ));
@@ -10923,13 +10924,13 @@ fn compose_oriented_subcontinuation(
             order: &mut Vec<(u64, u64)>,
         ) -> Result<(), CraneliftBackendError> {
             if completed.contains(&invocation_id) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge is shared across sibling invocation paths",
                 ));
             }
             if !visiting.insert(invocation_id) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edges form a parent cycle",
                 ));
@@ -10968,7 +10969,7 @@ fn compose_oriented_subcontinuation(
             )?;
         }
         if completed.len() != by_id.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "dynamic splice tree leaves an invocation-local segment unreachable",
             ));
@@ -10992,7 +10993,7 @@ fn compose_oriented_subcontinuation(
             .iter()
             .any(|(_, frame, _)| frame.segment_site_id != site)
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "oriented dynamic splice crosses checked prompt regions",
             ));
@@ -11088,7 +11089,7 @@ fn validate_recursor_invocation_install_shape(
         segment.selection.role,
         RecursorLayerRole::SelectsOccurrence { origin } if origin == segment.origin
     ) {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "ComputationalRecursor",
             "recursor selection role does not select the invocation origin",
         ));
@@ -11101,19 +11102,19 @@ fn validate_recursor_invocation_install_shape(
             ..
         } = layer.role
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalRecursor",
                 "recursor unwind role does not exit the invocation origin",
             ));
         };
         if origin != segment.origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalRecursor",
                 "recursor unwind role does not exit the invocation origin",
             ));
         }
         if !scope_origins.insert(scope_origin) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalRecursor",
                 "recursor unwind repeats a selected scope identity",
             ));
@@ -11128,7 +11129,7 @@ fn validate_recursor_invocation_segment(
         segment.selection.role,
         RecursorLayerRole::SelectsOccurrence { origin } if origin == segment.origin
     ) {
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "ComputationalRecursor",
             "recursor selection role does not select the invocation origin",
         ));
@@ -11145,26 +11146,26 @@ fn validate_recursor_invocation_segment(
             parent_scope,
         } = layer.role
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalRecursor",
                 "recursor unwind role does not exit the invocation origin",
             ));
         };
         if origin != segment.origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalRecursor",
                 "recursor unwind role does not exit the invocation origin",
             ));
         }
         if !scope_origins.insert(scope_origin) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalRecursor",
                 "recursor unwind repeats a selected scope identity",
             ));
         }
         if let Some(previous_scope) = previous_scope {
             if parent_scope != Some(previous_scope) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalRecursor",
                     "recursor unwind has a broken selected-scope parent link",
                 ));
@@ -12560,14 +12561,14 @@ impl<'a> Lowering<'a> {
         frame_id: u64,
     ) -> Result<(), CraneliftBackendError> {
         if self.active_subcontinuation_frame.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "nested checked subcontinuation occurrence marker",
             ));
         }
         let invocation_id = self.active_recursive_invocations.last()
             .map_or(0, |instance| instance.invocation_instance_id);
-        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
+        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             "checked Runtime frame marker entered outside a generated Function scope",
         ))?.record(builder, FrameEventKind::Activation, (invocation_id, frame_id))?;
@@ -12600,7 +12601,7 @@ impl<'a> Lowering<'a> {
         self.checked_call_token_events
             .as_mut()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "continuation call token claimed outside a generated Function scope",
                 )
@@ -12618,7 +12619,7 @@ impl<'a> Lowering<'a> {
         self.checked_call_token_events
             .as_mut()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "continuation call token emitted outside a generated Function scope",
                 )
@@ -12632,7 +12633,7 @@ impl<'a> Lowering<'a> {
         body: &RuntimeExpr,
     ) -> Result<CheckedRecursiveInvocationInstance, CraneliftBackendError> {
         if self.pending_recursive_call.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "nested unchecked recursive invocation marker",
             ));
@@ -12642,13 +12643,13 @@ impl<'a> Lowering<'a> {
             .as_ref()
             .and_then(|plan| plan.recursive_call(call_template_id))
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "recursive invocation marker has no checked call template",
                 )
             })?;
         let RuntimeExpr::Call { callee, args } = body else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "recursive invocation marker does not wrap one complete call",
             ));
@@ -12656,7 +12657,7 @@ impl<'a> Lowering<'a> {
         if !matches!(callee.as_ref(), RuntimeExpr::DeclarationRef { symbol } if symbol == &call.callee)
             || args.len() as u64 != call.arity
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "recursive invocation marker callee or arity is stale",
             ));
@@ -12665,7 +12666,7 @@ impl<'a> Lowering<'a> {
             .consumed_recursive_call_templates
             .insert(call_template_id)
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "recursive invocation occurrence marker was consumed twice",
             ));
@@ -12690,13 +12691,13 @@ impl<'a> Lowering<'a> {
         instance: CheckedRecursiveInvocationInstance,
     ) -> Result<(), CraneliftBackendError> {
         if self.pending_recursive_call == Some(instance) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "recursive invocation marker was not consumed by its call",
             ));
         }
         if self.active_recursive_invocations.pop() != Some(instance) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "recursive invocation instance stack is not affine",
             ));
@@ -12742,13 +12743,13 @@ impl<'a> Lowering<'a> {
             })
             .is_some()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "nested computational IH invocation marker",
             ));
         }
         let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation marker has no checked plan",
             )
@@ -12756,19 +12757,19 @@ impl<'a> Lowering<'a> {
         let call = plan
             .computational_ih_call(call_template_id)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "computational IH invocation marker has no checked call template",
                 )
             })?;
         let RuntimeExpr::Call { args, .. } = body else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation marker does not wrap a complete application",
             ));
         };
         let supplied = u64::try_from(args.len()).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation argument count exceeds addressable range",
             )
@@ -12779,7 +12780,7 @@ impl<'a> Lowering<'a> {
         #[cfg(not(test))]
         let relaxed = false;
         if !relaxed && supplied != call.arity {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 format!(
                     "computational IH invocation marker wraps a call of {supplied} arguments but \
@@ -12940,7 +12941,7 @@ impl<'a> Lowering<'a> {
         }
         let call_template_id = pending.call_template_id;
         let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation has no checked plan",
             )
@@ -12948,7 +12949,7 @@ impl<'a> Lowering<'a> {
         let call = plan
             .computational_ih_call(call_template_id)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "computational IH invocation has no checked call template",
                 )
@@ -12956,19 +12957,19 @@ impl<'a> Lowering<'a> {
         let slot = plan
             .computational_ih_slot(call.slot_template_id)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "computational IH call template names a slot template the plan does not hold",
                 )
             })?;
         let supplied = u64::try_from(supplied_arguments).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "OrientedSubcontinuationPlanV1",
                 "static worker call argument count exceeds addressable range",
             )
         })?;
         if supplied != call.arity {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 format!(
                     "the checked computational-IH call template names arity {} but the static \
@@ -12981,7 +12982,7 @@ impl<'a> Lowering<'a> {
             .binder_morphism
             .runtime_index(slot.method_binder_ordinal)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     format!(
                         "the checked computational-IH slot's method ordinal {} is outside the \
@@ -12991,7 +12992,7 @@ impl<'a> Lowering<'a> {
                 )
             })?;
         if planned_runtime_index != binder_index {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 format!(
                     "the checked computational-IH slot maps method ordinal {} to runtime \
@@ -13037,13 +13038,13 @@ impl<'a> Lowering<'a> {
         };
         let call_template_id = pending.call_template_id;
         let Lowered::ComputationalRecursorClosure { invocation, .. } = value else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH marker was applied to an ordinary value",
             ));
         };
         let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation has no checked plan",
             )
@@ -13051,25 +13052,25 @@ impl<'a> Lowering<'a> {
         let call = plan
             .computational_ih_call(call_template_id)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "computational IH invocation has no checked call template",
                 )
             })?;
         if invocation.computational_ih_slot_template_id != Some(call.slot_template_id) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation marker names a different slot",
             ));
         }
         let parent_frame_template_id = call.parent_frame_template_id.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation has no checked static parent",
             )
         })?;
         let segment_site_id = call.parent_segment_site_id.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation has no checked parent segment",
             )
@@ -13085,13 +13086,13 @@ impl<'a> Lowering<'a> {
                 layer.semantic_pending && layer.checked_frame_id == Some(parent_frame_template_id)
             });
         let selected = parents.next().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH closure has no exact checked open parent occurrence",
             )
         })?;
         if parents.next().is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH closure has multiple candidate dynamic parent occurrences",
             ));
@@ -13100,7 +13101,7 @@ impl<'a> Lowering<'a> {
             Some(instance_id) => instance_id,
             None if selected.checked_invocation_source.is_none() => 0,
             None => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     format!(
                         "computational IH closure-selected occurrence has no dynamic parent identity: frame={:?} source={:?} depth={} handles={:?}",
@@ -13116,13 +13117,13 @@ impl<'a> Lowering<'a> {
             .frame(parent_frame_template_id)
             .map(|frame| frame.segment_site_id)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "computational IH closure-selected occurrence names a stale parent frame",
                 )
             })?;
         if selected_site != segment_site_id {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH closure-selected occurrence crosses its checked segment",
             ));
@@ -13157,7 +13158,7 @@ impl<'a> Lowering<'a> {
             )
             .is_some()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "dynamic splice edge identity was minted twice",
             ));
@@ -13184,13 +13185,13 @@ impl<'a> Lowering<'a> {
         open: &OwnedSelectedScope,
     ) -> Result<(), CraneliftBackendError> {
         let edge_id = instance.dynamic_splice_edge.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "source IH invocation has no affine dynamic splice edge",
             )
         })?;
         let edge = self.dynamic_splice_edges.get(&edge_id).ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "source IH invocation names a deleted or already-consumed dynamic splice edge",
             )
@@ -13199,7 +13200,7 @@ impl<'a> Lowering<'a> {
             || edge.parent_invocation_instance_id != open.frame.checked_invocation_id.unwrap_or(0)
             || Some(edge.parent_frame_template_id) != open.frame.checked_frame_id
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "source open occurrence disagrees with the closure-selected dynamic parent",
             ));
@@ -13215,19 +13216,19 @@ impl<'a> Lowering<'a> {
         let mut edges = Vec::with_capacity(segment.dynamic_splice_edges.len());
         for edge_id in &segment.dynamic_splice_edges {
             if !seen.insert(*edge_id) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge handle is duplicated in one invocation carrier",
                 ));
             }
             let edge = self.dynamic_splice_edges.remove(edge_id).ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge was deleted, replayed, or consumed by a sibling",
                 )
             })?;
             if edge.edge_id != *edge_id {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "dynamic splice edge ledger identity is stale",
                 ));
@@ -13267,7 +13268,7 @@ impl<'a> Lowering<'a> {
             unreachable!("IH instance mint validates one recursor closure")
         };
         let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH invocation has no checked plan",
             )
@@ -13291,7 +13292,7 @@ impl<'a> Lowering<'a> {
             return Ok(None);
         };
         let InvocationTemplateRef::SameSccCall(call_template_id) = instance.source else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "same-SCC call consumer received a computational IH invocation",
             ));
@@ -13301,13 +13302,13 @@ impl<'a> Lowering<'a> {
             .as_ref()
             .and_then(|plan| plan.recursive_call(call_template_id))
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "active recursive invocation has no checked template",
                 )
             })?;
         if &call.callee != symbol {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "recursive invocation marker was transplanted to another callee",
             ));
@@ -13329,7 +13330,7 @@ impl<'a> Lowering<'a> {
             .as_ref()
             .and_then(|plan| plan.frame(frame_id))
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked Runtime marker has no transported frame entry",
                 )
@@ -13337,7 +13338,7 @@ impl<'a> Lowering<'a> {
         if frame.runtime_frame_fingerprint
             != crate::compiler_private_computational_match_frame_fingerprint(cases, default)
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "checked Runtime marker no longer denotes its planned frame",
             ));
@@ -13353,12 +13354,12 @@ impl<'a> Lowering<'a> {
         if core::d8n_compile_wide_lifecycle()
             && !self.consumed_subcontinuation_frames.insert((invocation_id, frame_id))
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "checked Runtime frame marker was consumed more than once",
             ));
         }
-        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(
+        self.checked_frame_events.as_mut().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             "checked Runtime frame receipt emitted outside a generated Function scope",
         ))?.record(builder, FrameEventKind::Receipt, (invocation_id, frame_id))?;
@@ -13430,7 +13431,7 @@ impl<'a> Lowering<'a> {
         } = &case.body
         else {
             if checked_frame_id.is_some() && !case.recursive_positions.is_empty() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "checked computational case is missing its IH slot marker",
                 ));
@@ -13438,19 +13439,19 @@ impl<'a> Lowering<'a> {
             return Ok(vec![None; case.recursive_positions.len()]);
         };
         let frame_id = checked_frame_id.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH slot marker is detached from its checked frame",
             )
         })?;
         if slot_template_ids.len() != case.recursive_positions.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH slot marker is not bijective with recursive positions",
             ));
         }
         let plan = self.oriented_subcontinuation_plan.as_ref().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "computational IH slot marker has no checked plan",
             )
@@ -13462,7 +13463,7 @@ impl<'a> Lowering<'a> {
             .zip(case.recursive_positions.iter().copied())
             .map(|(slot_template_id, recursive_position)| {
                 if !seen.insert(slot_template_id) {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "computational IH case repeats a checked slot template",
                     ));
@@ -13470,7 +13471,7 @@ impl<'a> Lowering<'a> {
                 let slot = plan
                     .computational_ih_slot(slot_template_id)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "OrientedSubcontinuationPlanV1",
                             "computational IH case names a stale slot template",
                         )
@@ -13495,7 +13496,7 @@ impl<'a> Lowering<'a> {
                     || slot.constructor != case.constructor
                     || slot.recursive_position != recursive_position as u64
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "computational IH slot constructor/position/frame binding is stale",
                     ));
@@ -13629,7 +13630,7 @@ impl<'a> Lowering<'a> {
         let (selection, unwind) =
             if let Some((_, invocation)) = payload {
                 let splice_caller = splice_caller.ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalRecursor",
                         "recursive payload splice has no active continuation",
                     )
@@ -13641,7 +13642,7 @@ impl<'a> Lowering<'a> {
                     && !source_cursor_is_live
                     && !recursor_invocation_is_checked(&invocation)
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalRecursor",
                         "recursive payload resume cursor is not active",
                     ));
@@ -13677,7 +13678,7 @@ impl<'a> Lowering<'a> {
                     .push(current_layer);
                 if let Some((selected, lineage)) = source_control {
                     if selected.selected_scope.is_none() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ComputationalRecursor",
                             "source recursor invocation is missing its owned selected scope",
                         ));
@@ -13825,7 +13826,7 @@ impl<'a> Lowering<'a> {
                     .find(|site| site.site_id == authority.site_id)
             })
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "NativeJoinPlanV1",
                     "terminal answer authority names a missing checked-root site",
                 )
@@ -13843,7 +13844,7 @@ impl<'a> Lowering<'a> {
             || self.active_subcontinuation_frame.is_some()
             || self.active_join_site.is_some()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "NativeJoinPlanV1",
                 "terminal answer authority does not match the exhausted checked root",
             ));
@@ -13868,7 +13869,7 @@ impl<'a> Lowering<'a> {
         construct: &'static str,
     ) -> Result<(NativeScalarPairV1, ScalarMergeKind), CraneliftBackendError> {
         if join_plan.representation != JoinResultRepresentation::NativeScalarPair {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "carrier-result join reached a native checked-plan merge consumer".to_string(),
             ));
         }
@@ -13934,7 +13935,7 @@ impl<'a> Lowering<'a> {
             return Ok(None);
         };
         if matches!(frame, EliminatorFrame::InvocationReturn) && self.active_join_site.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "NativeJoinPlanV1",
                 "distinguished root cannot consume an active match occurrence marker",
             ));
@@ -13963,7 +13964,7 @@ impl<'a> Lowering<'a> {
             EliminatorFrame::PendingLet(_) | EliminatorFrame::Active(_) => unreachable!(),
         };
         match matches.as_slice() {
-            [] if self.active_join_site.is_some() => Err(unsupported(
+            [] if self.active_join_site.is_some() => Err(unsupported(LoweringCause::PlannerInvariant,
                 "NativeJoinPlanV1",
                 "runtime occurrence has no exact checked join site",
             )),
@@ -13978,7 +13979,7 @@ impl<'a> Lowering<'a> {
                             site.checked_result_type_fingerprint,
                         )
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "NativeJoinPlanV1",
                         "checked join occurrence binding is stale or inconsistent",
                     ));
@@ -13986,7 +13987,7 @@ impl<'a> Lowering<'a> {
                 if !self.consumed_join_sites.insert(site.site_id)
                     && !matches!(frame, EliminatorFrame::InvocationReturn)
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "NativeJoinPlanV1",
                         "checked join occurrence was consumed twice",
                     ));
@@ -13996,7 +13997,7 @@ impl<'a> Lowering<'a> {
                 }
                 Ok(Some(site.clone()))
             }
-            _ => Err(unsupported(
+            _ => Err(unsupported(LoweringCause::PlannerInvariant,
                 "NativeJoinPlanV1",
                 "checked cut identity resolves to multiple plan sites",
             )),
@@ -14013,7 +14014,7 @@ impl<'a> Lowering<'a> {
             .map(|site| site.site_id)
             .collect::<BTreeSet<_>>();
         if planned != self.consumed_join_sites {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "NativeJoinPlanV1",
                 format!(
                     "checked join plan contains an unconsumed or orphan site: planned {planned:?}, consumed {:?}",
@@ -14030,7 +14031,7 @@ impl<'a> Lowering<'a> {
         if self.dynamic_splice_edges.is_empty() {
             return Ok(());
         }
-        Err(unsupported(
+        Err(unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             format!(
                 "checked lowering left affine dynamic splice edges unconsumed: {:?}",
@@ -14044,7 +14045,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<Option<RootTerminalAnswerAuthority>, CraneliftBackendError> {
         let Some(plan) = &self.native_join_plan else {
             return if self.process_object {
-                Err(unsupported(
+                Err(unsupported(LoweringCause::PlannerInvariant,
                     "NativeJoinPlanV1",
                     "process-object lowering has no checked distinguished-root answer authority",
                 ))
@@ -14065,14 +14066,14 @@ impl<'a> Lowering<'a> {
         let site = match roots.as_slice() {
             [] if !self.process_object => return Ok(None),
             [] => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "NativeJoinPlanV1",
                     "process-object lowering has no checked distinguished-root answer authority",
                 ));
             }
             [site] => site,
             _ => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "NativeJoinPlanV1",
                     "checked package contains multiple distinguished root join sites",
                 ));
@@ -14086,13 +14087,13 @@ impl<'a> Lowering<'a> {
                 site.checked_result_type_fingerprint,
             )
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "NativeJoinPlanV1",
                 "distinguished root join occurrence binding is stale or inconsistent",
             ));
         }
         if !self.consumed_join_sites.insert(site.site_id) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "NativeJoinPlanV1",
                 "checked distinguished-root answer authority was consumed more than once",
             ));
@@ -14271,11 +14272,11 @@ impl<'a> Lowering<'a> {
                     })
                     .collect::<Result<Vec<_>, CraneliftBackendError>>()?,
             }),
-            RuntimeValue::ClosureRef { .. } => Err(unsupported(
+            RuntimeValue::ClosureRef { .. } => Err(unsupported(LoweringCause::Fragment,
                 "ClosureRef",
                 "pre-existing closure references are not lowered by the native backend",
             )),
-            RuntimeValue::Unknown => Err(unsupported(
+            RuntimeValue::Unknown => Err(unsupported(LoweringCause::Fragment,
                 "Unknown",
                 "unknown runtime values must reject before backend lowering",
             )),
@@ -14288,7 +14289,7 @@ impl<'a> Lowering<'a> {
         symbol: &str,
     ) -> Result<Lowered, CraneliftBackendError> {
         let value = self.seed_env.values.get(symbol).ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "Closure",
                 format!("capture {symbol} has no runtime value in the seed environment"),
             )
@@ -14353,7 +14354,7 @@ impl<'a> Lowering<'a> {
             .seed_material
             .payload_word(builder, symbol)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "Closure",
                     format!("seed capture {symbol} has no artifact-static material minted for it"),
                 )
@@ -14418,7 +14419,7 @@ impl<'a> Lowering<'a> {
         };
         let limb_count = limbs.len();
         let byte_len = u32::try_from(limbs.len().saturating_mul(std::mem::size_of::<u64>()))
-            .map_err(|_| unsupported("RuntimeValue::Int", "Big Int literal is too large"))?;
+            .map_err(|_| unsupported(LoweringCause::Capacity, "RuntimeValue::Int", "Big Int literal is too large"))?;
         let limbs_slot = builder.create_sized_stack_slot(StackSlotData::new(
             StackSlotKind::ExplicitSlot,
             byte_len,
@@ -14437,14 +14438,14 @@ impl<'a> Lowering<'a> {
         let pointer_type = builder.func.dfg.value_type(
             self.function_local
                 .native_int_arena
-                .ok_or_else(|| unsupported("RuntimeValue::Int", "Big Int has no arena"))?,
+                .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RuntimeValue::Int", "Big Int has no arena"))?,
         );
         let arena = self
             .function_local
             .native_int_arena
             .expect("Big Int arena was checked");
         let helper = self.function_local.native_int_intern.ok_or_else(|| {
-            unsupported("RuntimeValue::Int", "Big Int has no local intern helper")
+            unsupported(LoweringCause::PlannerInvariant, "RuntimeValue::Int", "Big Int has no local intern helper")
         })?;
         let sign = builder
             .ins()
@@ -14475,10 +14476,10 @@ impl<'a> Lowering<'a> {
         value: cranelift_codegen::ir::Value,
     ) -> Result<Lowered, CraneliftBackendError> {
         let arena = self.function_local.native_int_arena.ok_or_else(|| {
-            unsupported("NativeInt", "unsigned Int producer has no invocation arena")
+            unsupported(LoweringCause::PlannerInvariant, "NativeInt", "unsigned Int producer has no invocation arena")
         })?;
         let helper = self.function_local.native_int_intern.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "NativeInt",
                 "unsigned Int producer has no local intern helper",
             )
@@ -14526,7 +14527,7 @@ impl<'a> Lowering<'a> {
                 .ins()
                 .iconst(types::I64, crate::NATIVE_INT_SMALL_TAG_V1 as i64));
         }
-        Err(unsupported(
+        Err(unsupported(LoweringCause::PlannerInvariant,
             "NativeInt",
             "dynamic Int value lost its two-word tag transport",
         ))
@@ -14570,18 +14571,18 @@ impl<'a> Lowering<'a> {
             Lowered::Int {
                 known: Some(value), ..
             } => Ok(RuntimeGroundValue::Int((value).into())),
-            Lowered::Int { known: None, .. } => Err(unsupported(
+            Lowered::Int { known: None, .. } => Err(unsupported(LoweringCause::Fragment,
                 "Result",
                 "native aggregate result contains a non-constant Int field",
             )),
             Lowered::Bool {
                 known: Some(value), ..
             } => Ok(RuntimeGroundValue::Bool(value)),
-            Lowered::Bool { known: None, .. } => Err(unsupported(
+            Lowered::Bool { known: None, .. } => Err(unsupported(LoweringCause::Fragment,
                 "Result",
                 "native aggregate result contains a non-constant Bool field",
             )),
-            Lowered::ProcessExitStatus { .. } => Err(unsupported(
+            Lowered::ProcessExitStatus { .. } => Err(unsupported(LoweringCause::Fragment,
                 "Result",
                 "process exit status cannot escape a native process call",
             )),
@@ -14595,7 +14596,7 @@ impl<'a> Lowering<'a> {
             | Lowered::StructuralNat(_)
             | Lowered::HostResult { .. }
             | Lowered::StaticResponseDeferred { .. }
-            | Lowered::DynamicConstructor(_) => Err(unsupported(
+            | Lowered::DynamicConstructor(_) => Err(unsupported(LoweringCause::Fragment,
                 "Result",
                 "borrowed ingress values cannot escape the native call",
             )),
@@ -14621,19 +14622,19 @@ impl<'a> Lowering<'a> {
                     .map(|field| Ok((field.name, self.ground_value(field.value)?)))
                     .collect::<Result<Vec<_>, CraneliftBackendError>>()?,
             }),
-            Lowered::Closure { .. } | Lowered::DeclarationClosure { .. } => Err(unsupported(
+            Lowered::Closure { .. } | Lowered::DeclarationClosure { .. } => Err(unsupported(LoweringCause::Fragment,
                 "Closure",
                 "closures are callable but not observable ground values in native lowering",
             )),
-            Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(
+            Lowered::ComputationalRecursorClosure { .. } => Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "recursive hypotheses are callable but not observable ground values",
             )),
-            Lowered::RecursiveBackedge => Err(unsupported(
+            Lowered::RecursiveBackedge => Err(unsupported(LoweringCause::Fragment,
                 "DeclarationRef",
                 "a recursive CFG edge cannot escape as a ground value",
             )),
-            Lowered::Trap(trap) => Err(unsupported(
+            Lowered::Trap(trap) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "Trap",
                 format!("trap result must be reported as trapped: {}", trap.message),
             )),
@@ -14690,7 +14691,7 @@ fn expect_two_args(
     args: Vec<Lowered>,
 ) -> Result<(Lowered, Lowered), CraneliftBackendError> {
     let [lhs, rhs]: [Lowered; 2] = args.try_into().map_err(|args: Vec<Lowered>| {
-        unsupported(
+        unsupported(LoweringCause::PlannerInvariant,
             "PrimitiveCall",
             format!("{symbol} expects 2 args, got {}", args.len()),
         )

@@ -23,6 +23,7 @@ pub(in crate::cranelift_backend) use super::*;
 // `compile_expr_into_module` still touches the static directly to reset it,
 // and the `core/tests` glob chain still reaches the accessor by bare name,
 // matching the `boundary`/`source` imports' own re-export shape).
+use crate::cranelift_backend::surface::LoweringCause;
 #[cfg(test)]
 use super::calls::{recursive_position_unit_calls, RECURSIVE_POSITION_UNIT_CALLS};
 
@@ -1239,7 +1240,7 @@ fn recursive_position_construct_argument(
     match args.get(position) {
         Some(argument) => Ok(Some(argument)),
         None if missing_is_noncarrying_match_arm => Ok(None),
-        None => Err(backend_module(
+        None => Err(backend_module(LoweringCause::PlannerInvariant,
             "recursive position is outside its source constructor".to_string(),
         )),
     }
@@ -1292,7 +1293,7 @@ where
     };
     for unit in declared_units {
         if expected != unit {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalMatch",
                 format!(
                     "plain Match branches declare different recursive body units: \
@@ -1317,7 +1318,7 @@ mod branched_scrutinee_unit_body_port_tests {
         let disagreement = agreeing_recursive_body_unit([41_u8, 42])
             .expect_err("mutating one reachable arm unit must refuse");
         match disagreement {
-            CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }) => {
+            CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }) => {
                 assert_eq!(construct, "ComputationalMatch");
                 assert_eq!(
                     reason,
@@ -1907,13 +1908,13 @@ impl CheckedFrameFunctionScope {
     /// Begin one generated `Function`'s consumption transaction.
     pub(super) fn open(compiler: &mut Lowering<'_>) -> Result<Self, CraneliftBackendError> {
         if compiler.active_subcontinuation_frame.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "a checked subcontinuation marker was still active when a generated function                  body began, so that body would consume a frame its caller entered",
             ));
         }
         if compiler.checked_frame_events.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "a generated Function opened a nested checked frame validation scope",
             ));
@@ -1940,7 +1941,7 @@ impl CheckedFrameFunctionScope {
         compiler: &mut Lowering<'_>,
         func: &Function,
     ) -> Result<(), CraneliftBackendError> {
-        let events = compiler.checked_frame_events.take().ok_or_else(|| unsupported(
+        let events = compiler.checked_frame_events.take().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "OrientedSubcontinuationPlanV1",
             "a generated Function closed without its checked frame validation scope",
         ))?;
@@ -1954,7 +1955,7 @@ impl CheckedFrameFunctionScope {
         #[cfg(test)]
         if d8n_compile_wide_lifecycle() {
             if dangling.is_some() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "OrientedSubcontinuationPlanV1",
                     "a generated function body ended with a checked subcontinuation marker still                      active, so it entered a frame nothing consumed",
                 ));
@@ -1963,7 +1964,7 @@ impl CheckedFrameFunctionScope {
         }
         compiler.consumed_subcontinuation_frames = self.enclosing_consumed;
         if dangling.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "a generated function body ended with a checked subcontinuation marker still                  active, so it entered a frame nothing consumed",
             ));
@@ -1980,7 +1981,7 @@ pub(super) struct CheckedTokenFunctionScope;
 impl CheckedTokenFunctionScope {
     pub(super) fn open(compiler: &mut Lowering<'_>) -> Result<Self, CraneliftBackendError> {
         if compiler.checked_call_token_events.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "a generated Function opened a nested continuation call token scope",
             ));
@@ -1995,7 +1996,7 @@ impl CheckedTokenFunctionScope {
         func: &Function,
     ) -> Result<(), CraneliftBackendError> {
         let events = compiler.checked_call_token_events.take().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "OrientedSubcontinuationPlanV1",
                 "a generated Function closed without its continuation call token scope",
             )
@@ -2349,7 +2350,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             variant.schema == RecursiveCarrierMemberSchema::Boxed)) {
         #[cfg(any(test, feature = "px8-ds-test-support"))]
         record_boxed_member_compile_refusal();
-        return Err(unsupported(
+        return Err(unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "a Boxed carrier member has no executed consumer",
         ));
     }
@@ -2358,21 +2359,21 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     // join of the two plans, before fusion or any other install can refuse:
     // source Call shape alone cannot prove the template the emitter consults.
     for (child, _, call_template_id) in static_transition_plan.recursive_ih_force_slot_members() {
-        let oriented = oriented_subcontinuation_plan.as_ref().ok_or_else(|| unsupported(
+        let oriented = oriented_subcontinuation_plan.as_ref().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "CheckedIhFunctionalRepresentation",
             "an IH-force slot child has no oriented plan",
         ))?;
-        let call = oriented.computational_ih_call(call_template_id).ok_or_else(|| unsupported(
+        let call = oriented.computational_ih_call(call_template_id).ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "CheckedIhFunctionalRepresentation",
             "an IH-force slot child has no oriented call template",
         ))?;
         if call.arity != 0 {
-            return Err(unsupported("CheckedIhFunctionalRepresentation", format!(
+            return Err(unsupported(LoweringCause::PlannerInvariant, "CheckedIhFunctionalRepresentation", format!(
                 "IH-force slot child {child:?} was classified functional at plan time but its oriented call template has arity {}",
                 call.arity,
             )));
         }
-        oriented.computational_ih_slot(call.slot_template_id).ok_or_else(|| unsupported(
+        oriented.computational_ih_slot(call.slot_template_id).ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "CheckedIhFunctionalRepresentation",
             "an IH-force slot child names a slot the oriented plan does not hold",
         ))?;
@@ -2713,7 +2714,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     });
     let func_id = module
         .declare_function(function_name, linkage, &sig)
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let native_int_wrapping_mutation = {
         #[cfg(test)]
         {
@@ -2771,7 +2772,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         Some(
             module
                 .declare_function("ken_host_dispatch_v1", Linkage::Import, &host_sig)
-                .map_err(|err| backend_module(err.to_string()))?,
+                .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?,
         )
     } else {
         None
@@ -2786,7 +2787,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     ticket_sig.returns.push(AbiParam::new(types::I64));
     let selected_call_issue = module
         .declare_function("ken_selected_call_v1_issue", Linkage::Import, &ticket_sig)
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     let mut consume_sig = module.make_signature();
     consume_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
     consume_sig.params.push(AbiParam::new(module.target_config().pointer_type()));
@@ -2795,7 +2796,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     consume_sig.returns.push(AbiParam::new(types::I64));
     let selected_call_consume = module
         .declare_function("ken_selected_call_v1_consume", Linkage::Import, &consume_sig)
-        .map_err(|err| backend_module(err.to_string()))?;
+        .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
     // ⭐ `RT-FNSPLIT-B2F` `D1` — forward-declare the WHOLE target-unit bundle
     // before any body (root or unit) is defined. A unit body may call any other
     // unit, so declaring every signature first is what makes the call graph
@@ -2861,7 +2862,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let grafted_spine_validation_inputs = static_transition_plan
         .static_response_feasibility_ledger_all()?
         .map_err(|infeasible| {
-            backend_module(format!(
+            backend_module(LoweringCause::Fragment, format!(
                 "compile-time response specialization is infeasible at {:?}: {}",
                 infeasible.vis_origin(),
                 infeasible.reason(),
@@ -3070,7 +3071,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                 .static_transition_plan
                 .static_response_owner_specializations()?
                 .map_err(|infeasible| {
-                    backend_module(format!(
+                    backend_module(LoweringCause::Fragment, format!(
                         "compile-time response specialization is infeasible at {:?}: {}",
                         infeasible.vis_origin(),
                         infeasible.reason(),
@@ -3086,7 +3087,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
                     call_edges,
                 )?;
             if defined_response_owners != expected_response_owners {
-                return Err(backend_module(format!(
+                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                     "the response-owner body population is incomplete: expected \
                      {expected_response_owners}, defined {defined_response_owners}",
                 )));
@@ -3289,7 +3290,7 @@ impl<'a> Lowering<'a> {
         if arguments == 0 {
             return Ok(());
         }
-        Err(unsupported(
+        Err(unsupported(LoweringCause::Fragment,
             "BoundaryCarrier",
             format!(
                 "a carried recursive hypothesis is an eliminated value, not a callable, \
@@ -3347,7 +3348,7 @@ impl<'a> Lowering<'a> {
         let residual = residual.specialized_ref_at("a pending-let recursor residual")?;
         if let Lowered::BoundedNat(predecessor) = residual {
             if !args.is_empty() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::Fragment,
                     "BoundedNat",
                     "structural Nat recursive hypothesis takes no arguments",
                 ));
@@ -3366,7 +3367,7 @@ impl<'a> Lowering<'a> {
             ..
         } = residual
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "recursive constructor field is not a closure",
             ));
@@ -3381,7 +3382,7 @@ impl<'a> Lowering<'a> {
             })
             .collect::<Result<Vec<_>, _>>()?;
         if params.len() != call_env.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 format!(
                     "recursive field expects {} args but call provides {}",
@@ -3506,7 +3507,7 @@ impl<'a> Lowering<'a> {
             static_origin,
         } = occurrence;
         if eliminators.is_empty() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalMatch",
                 "nested computational producer has no eliminator",
             ));
@@ -3712,7 +3713,7 @@ impl<'a> Lowering<'a> {
                     eliminators,
                 );
                 if self.active_subcontinuation_frame.take().is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "checked subcontinuation marker was not consumed by its frame",
                     ));
@@ -3806,14 +3807,14 @@ impl<'a> Lowering<'a> {
                                     let resume_cursor = invocation.resume_cursor;
                                     let current =
                                         active_recursor_frame(eliminators).ok_or_else(|| {
-                                            unsupported(
+                                            unsupported(LoweringCause::PlannerInvariant,
                                                 "ComputationalRecursor",
                                                 "recursive invocation has no active continuation",
                                             )
                                         })?;
                                     let _resume = find_continuation_cursor(current, resume_cursor)
                                         .ok_or_else(|| {
-                                            unsupported(
+                                            unsupported(LoweringCause::PlannerInvariant,
                                                 "ComputationalRecursor",
                                                 "recursive invocation cursor is not active",
                                             )
@@ -3968,7 +3969,7 @@ impl<'a> Lowering<'a> {
                 let else_expr = self.child_occurrence(static_origin, 2, else_expr)?;
                 let selected = self.lower_expr(builder, scrutinee, producer_env)?;
                 let LoweringOperand::Specialized(Lowered::Bool { value, known }) = selected else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         "tree-producing If scrutinee is not Bool",
                     ));
@@ -4018,7 +4019,7 @@ impl<'a> Lowering<'a> {
                         continue;
                     }
                     let merge = merge.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "join plan omitted a producer If merge despite a continuing \
                              predecessor"
                                 .to_string(),
@@ -4038,7 +4039,7 @@ impl<'a> Lowering<'a> {
                     let unreachable = builder.create_block();
                     builder.switch_to_block(unreachable);
                     let trap = terminal_trap.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "producer If join omitted both a continuing predecessor and a \
                              source trap"
                                 .to_string(),
@@ -4146,7 +4147,7 @@ impl<'a> Lowering<'a> {
             return Ok(None);
         };
         if matched.next().is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "two installed fused regions claim one consumer continuation occurrence in one \
                  unit, so which suffix this seat hands over is undetermined",
@@ -4335,7 +4336,7 @@ impl<'a> Lowering<'a> {
                 // closed it too; this is the consumption-side dual, and it is
                 // the one that sees the stack as it actually stands at delivery.
                 let Some(EliminatorFrame::Computational(head)) = eliminators.first() else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "StaticContinuationFusion",
                         "a composed answer was delivered with no computational frame at the head \
                          of the eliminator stack, so the frame it claims to have discharged is \
@@ -4343,7 +4344,7 @@ impl<'a> Lowering<'a> {
                     ));
                 };
                 if head.static_origin != continuation_origin {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "StaticContinuationFusion",
                         format!(
                             "a composed answer names discharged continuation {continuation_origin:?} \
@@ -4373,7 +4374,7 @@ impl<'a> Lowering<'a> {
         let incoming_route = scrutinee.route;
         let scrutinee = scrutinee.value;
         let Some(eliminator) = eliminators.first().copied() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalMatch",
                 "nested computational producer has no eliminator",
             ));
@@ -4410,7 +4411,7 @@ impl<'a> Lowering<'a> {
         }) = scrutinee
         {
             let EliminatorFrame::Ordinary(frame) = eliminator else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalMatch",
                     "a specialized host result reached a non-ordinary composed eliminator",
                 ));
@@ -4450,7 +4451,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a composed HostResult Match merge despite a continuing predecessor"
                             .to_string(),
                     )
@@ -4478,7 +4479,7 @@ impl<'a> Lowering<'a> {
         }
         if let LoweringOperand::Specialized(Lowered::Bool { value, known }) = scrutinee {
             let EliminatorFrame::Ordinary(frame) = eliminator else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalMatch",
                     "a specialized Bool reached a non-ordinary composed eliminator",
                 ));
@@ -4492,7 +4493,7 @@ impl<'a> Lowering<'a> {
                     case.binders == 0 && case.constructor.ends_with("::Bool::False")
                 });
             let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalMatch",
                     "a composed Bool Match requires zero-binder True and False cases",
                 ));
@@ -4536,7 +4537,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a composed Bool Match merge despite a continuing predecessor"
                             .to_string(),
                     )
@@ -4564,7 +4565,7 @@ impl<'a> Lowering<'a> {
         }
         if let LoweringOperand::Specialized(Lowered::DynamicConstructor(dynamic)) = scrutinee {
             let EliminatorFrame::Ordinary(frame) = eliminator else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalMatch",
                     "a dynamic constructor reached a non-ordinary composed eliminator",
                 ));
@@ -4656,7 +4657,7 @@ impl<'a> Lowering<'a> {
                 // discarding it would be an unsound accept, not a narrower one.
                 EliminatorFrame::Ordinary(frame) => {
                     if let Some(index) = frame.retained_scrutinee_index {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryCarrier",
                             format!(
                                 "a carried producer-call scrutinee reached an ordinary \
@@ -4667,7 +4668,7 @@ impl<'a> Lowering<'a> {
                         ));
                     }
                     if frame.deferred_constructor_case.is_some() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryCarrier",
                             "a carried producer-call scrutinee reached an ordinary eliminator \
                              carrying a deferred constructor case, whose fields are selected \
@@ -4701,7 +4702,7 @@ impl<'a> Lowering<'a> {
                     // measurement.
                     #[cfg(test)]
                     if !suffix.is_empty() && coc_d2_suppress_continuation() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryCarrier",
                             "a carried producer-call scrutinee reached an ordinary eliminator \
                              with further composed eliminators behind it; the carried \
@@ -4719,7 +4720,7 @@ impl<'a> Lowering<'a> {
                         self.carried_suffix_reentries += 1;
                         if self.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
                             self.carried_suffix_reentries -= 1;
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "BoundaryCarrier",
                                 "a carried ordinary elimination's composed suffix exceeded the                                  bounded re-entry depth; the continuation is refused rather than                                  recursing without a measured bound",
                             ));
@@ -4772,7 +4773,7 @@ impl<'a> Lowering<'a> {
                     // members of this population, so this refuses only shapes
                     // outside what was measured.
                     if !eliminators[1..].is_empty() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryCarrier",
                             "a carried scrutinee reached an active continuation frame with \
                              further composed eliminators behind it; the resume consumes the \
@@ -4782,7 +4783,7 @@ impl<'a> Lowering<'a> {
                     }
                     #[cfg(test)]
                     if ccr_d2_suppress_active_route() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "BoundaryCarrier",
                             "a carried scrutinee reached a continuation frame that resumes a \
                              compile-time value rather than eliminating one",
@@ -4804,7 +4805,7 @@ impl<'a> Lowering<'a> {
                 // fail-closed precisely because an empty population is not proof
                 // of permanent unreachability, and building a mechanism here
                 // would be a proof over nothing.
-                EliminatorFrame::PendingLet(_) => Err(unsupported(
+                EliminatorFrame::PendingLet(_) => Err(unsupported(LoweringCause::PlannerInvariant,
                     "BoundaryCarrier",
                     "a carried scrutinee reached a continuation frame that resumes a \
                      compile-time value rather than eliminating one",
@@ -4856,7 +4857,7 @@ impl<'a> Lowering<'a> {
             (&scrutinee, eliminator)
         {
             if !eliminators[1..].is_empty() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalMatch",
                     "a specialized ordinary-live scrutinee reached an active continuation frame \
                      with further composed eliminators behind it; the resume consumes the \
@@ -4878,7 +4879,7 @@ impl<'a> Lowering<'a> {
             args,
         } = scrutinee
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "scrutinee is not a constructor value after ordinary expression lowering",
             ));
@@ -4915,7 +4916,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.argument_binders != args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         format!(
                             "case {} expects {} constructor arguments but value has {}",
@@ -4928,7 +4929,7 @@ impl<'a> Lowering<'a> {
                 let mut seen = BTreeSet::new();
                 for position in case.recursive_positions.iter().copied() {
                     if !seen.insert(position) || position >= args.len() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ComputationalMatch",
                             format!(
                                 "case {} has malformed recursive position {position}",
@@ -5101,7 +5102,7 @@ impl<'a> Lowering<'a> {
                         CheckedCaseBinderRole::InductionHypothesis { recursive_position }
                             if recursive_position as usize == position => {}
                         other => {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Capacity,
                                 "ComputationalMatch",
                                 format!(
                                     "this case's induction-hypothesis prefix would assemble \
@@ -5121,7 +5122,7 @@ impl<'a> Lowering<'a> {
                             field_position: named,
                         } if named as usize == field_position => {}
                         other => {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Capacity,
                                 "ComputationalMatch",
                                 format!(
                                     "this case would bind constructor source position \
@@ -5336,7 +5337,7 @@ impl<'a> Lowering<'a> {
                 // as an out-of-range `Var` at the tail rather than at the member
                 // that moved. Both directions -- short and long -- are refused.
                 if case_env.len() != binder_layout.binder_count() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Capacity,
                         "ComputationalMatch",
                         format!(
                             "this case assembled a {}-member binder run before its frame \
@@ -5459,7 +5460,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.binders != args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Match",
                         format!(
                             "case {} expects {} binders but constructor has {} args",
@@ -5535,7 +5536,7 @@ impl<'a> Lowering<'a> {
         row: &crate::cranelift_backend::planning::DeferredResponseRow,
     ) -> Result<(CarriedBoundaryWord, cranelift_codegen::ir::Value), CraneliftBackendError> {
         let LoweringOperand::Carried(tree) = returned else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response call did not return its existing carrier word",
             ));
@@ -5545,13 +5546,13 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "StaticResponseDeferred",
                     "a unit-less response has no unique nearest static handler owner",
                 )
             })?;
         if self.defining_emission_owner != Some(handler_owner) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response was driven outside its unique nearest static handler owner",
             ));
@@ -5559,13 +5560,13 @@ impl<'a> Lowering<'a> {
         let RuntimeExpr::Construct { args: vis_args, .. } =
             self.static_transition_plan.source_occurrence(vis_origin)?
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response row does not name its source Vis",
             ));
         };
         let [operation_source, k_source] = vis_args.as_slice() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response Vis does not have one operation and one K",
             ));
@@ -5578,13 +5579,13 @@ impl<'a> Lowering<'a> {
             ..
         } = operation_source
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response Vis operation is not its planned coproduct",
             ));
         };
         let [selected_source] = operation_fields.as_slice() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response operation coproduct has no unique selected field",
             ));
@@ -5597,7 +5598,7 @@ impl<'a> Lowering<'a> {
             ..
         } = selected_source
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response row has no selected operation constructor",
             ));
@@ -5611,13 +5612,13 @@ impl<'a> Lowering<'a> {
             body: _,
         } = k_source
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response row has no exact lexical K",
             ));
         };
         if params.len() != 1 {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response K does not accept exactly one HostResult",
             ));
@@ -5697,7 +5698,7 @@ impl<'a> Lowering<'a> {
             builder,
             selected_arity,
             i64::try_from(selected_fields.len()).map_err(|_| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "StaticResponseDeferred",
                     "a unit-less response operation arity exceeds the carrier word",
                 )
@@ -5717,13 +5718,13 @@ impl<'a> Lowering<'a> {
             args: effect_args,
         } = effect.expr
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response row names no host effect",
             ));
         };
         if *effect_operation != row.operation() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response row disagrees with its host effect",
             ));
@@ -5741,7 +5742,7 @@ impl<'a> Lowering<'a> {
             response,
             LoweringOperand::Specialized(Lowered::HostResult { .. })
         ) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response effect did not produce a HostResult",
             ));
@@ -5752,7 +5753,7 @@ impl<'a> Lowering<'a> {
             builder,
             k_fields,
             i64::try_from(captures.len()).map_err(|_| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "StaticResponseDeferred",
                     "a unit-less response K capture count exceeds the carrier word",
                 )
@@ -5773,7 +5774,7 @@ impl<'a> Lowering<'a> {
             None,
         )?;
         let LoweringOperand::Carried(resumed) = resumed else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a unit-less response K did not return its existing carrier result",
             ));
@@ -5820,19 +5821,19 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .admitted_deferred_handler_owner(row)?
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "StaticResponseDeferred",
                     "a Deferred response has no unique nearest static handler owner",
                 )
             })?;
         if self.defining_emission_owner != Some(handler_owner) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a Deferred response was driven outside its unique nearest static handler owner",
             ));
         }
         if row.vis_origin() != vis_origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response row names a different source Vis",
             ));
@@ -5857,7 +5858,7 @@ impl<'a> Lowering<'a> {
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let [operation, k] = lowered_args else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response Vis does not have one operation and one K",
             ));
@@ -5865,13 +5866,13 @@ impl<'a> Lowering<'a> {
         let RuntimeExpr::Construct { args: vis_args, .. } =
             self.static_transition_plan.source_occurrence(vis_origin)?
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response row does not name a source Vis",
             ));
         };
         let [operation_source, k_source] = vis_args.as_slice() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response source does not have one operation and one K",
             ));
@@ -5880,7 +5881,7 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .child_static_origin(vis_origin, 0)?;
         if operation_origin != operation_root_origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response row disagrees with its operation root",
             ));
@@ -5890,13 +5891,13 @@ impl<'a> Lowering<'a> {
             ..
         } = operation_source
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response operation is not its planned coproduct",
             ));
         };
         let [selected_source] = operation_fields.as_slice() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response coproduct has no unique selected field",
             ));
@@ -5909,7 +5910,7 @@ impl<'a> Lowering<'a> {
             ..
         } = selected_source
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response has no selected operation constructor",
             ));
@@ -5950,7 +5951,7 @@ impl<'a> Lowering<'a> {
                     builder,
                     selected_arity,
                     i64::try_from(selected_sources.len()).map_err(|_| {
-                        unsupported(
+                        unsupported(LoweringCause::Capacity,
                             "StaticResponseDeferred",
                             "a handler-owned response operation arity exceeds the carrier word",
                         )
@@ -5972,7 +5973,7 @@ impl<'a> Lowering<'a> {
                     .static_transition_plan
                     .constructor_symbol_identity(operation_origin)?;
                 if *synthesized_identity != Some(expected) || args.len() != 1 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "StaticResponseDeferred",
                         "a specialized handler-owned response disagrees with its operation coproduct",
                     ));
@@ -5985,7 +5986,7 @@ impl<'a> Lowering<'a> {
                     ..
                 } = selected
                 else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "StaticResponseDeferred",
                         "a specialized handler-owned response has no selected operation constructor",
                     ));
@@ -5994,7 +5995,7 @@ impl<'a> Lowering<'a> {
                     .static_transition_plan
                     .constructor_symbol_identity(selected_origin)?;
                 if *synthesized_identity != Some(expected) || args.len() != selected_sources.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "StaticResponseDeferred",
                         "a specialized handler-owned response disagrees with its selected operation",
                     ));
@@ -6009,7 +6010,7 @@ impl<'a> Lowering<'a> {
                     .collect::<Result<Vec<_>, _>>()?
             }
             LoweringOperand::Specialized(_) => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticResponseDeferred",
                     "a handler-owned response operation is neither carried nor a specialized constructor",
                 ));
@@ -6030,7 +6031,7 @@ impl<'a> Lowering<'a> {
             ..
         } = k_source
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response has no exact lexical K",
             ));
@@ -6045,7 +6046,7 @@ impl<'a> Lowering<'a> {
             ..
         }) = k
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response K is not its static closure",
             ));
@@ -6055,7 +6056,7 @@ impl<'a> Lowering<'a> {
             || captures.len() != source_captures.len()
             || *body != expected_k_body
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response K disagrees with its exact source closure",
             ));
@@ -6069,13 +6070,13 @@ impl<'a> Lowering<'a> {
             args,
         } = effect.expr
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response row names no host effect",
             ));
         };
         if *operation != planned_operation {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a driven response row disagrees with its host effect",
             ));
@@ -6103,7 +6104,7 @@ impl<'a> Lowering<'a> {
             response,
             LoweringOperand::Specialized(Lowered::HostResult { .. })
         ) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
                 "a handler-owned response effect did not produce a HostResult",
             ));
@@ -6172,7 +6173,7 @@ impl<'a> Lowering<'a> {
                 ..
             }) => {
                 if params.len() != args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         format!(
                             "tree producer expects {} args but call provides {}",
@@ -6247,13 +6248,13 @@ impl<'a> Lowering<'a> {
                     let (returned, route_control) =
                         self.drive_deferred_no_unit_response_call(builder, returned, &row)?;
                     let Some((first, remaining)) = eliminators.split_first() else {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "StaticResponseDeferred",
                             "a unit-less response call has no receiving eliminator",
                         ));
                     };
                     let EliminatorFrame::Computational(first) = first else {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "StaticResponseDeferred",
                             "a unit-less response call is not received by its computational frame",
                         ));
@@ -6262,7 +6263,7 @@ impl<'a> Lowering<'a> {
                         .iter()
                         .map(|frame| match frame {
                             EliminatorFrame::Computational(frame) => Ok(frame.static_origin),
-                            _ => Err(unsupported(
+                            _ => Err(unsupported(LoweringCause::PlannerInvariant,
                                 "StaticResponseDeferred",
                                 "a handler-owned Deferred response has a non-computational frame before its owner boundary",
                             )),
@@ -6272,13 +6273,13 @@ impl<'a> Lowering<'a> {
                         .static_transition_plan
                         .deferred_response_handler_prefix_len(&row, &remaining_origins)?
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "StaticResponseDeferred",
                                 "a unit-less response subtree has no nearest enclosing handler frame",
                             )
                         })?;
                     let local_remaining = remaining.get(..prefix_len).ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "StaticResponseDeferred",
                             "a handler-owned response prefix exceeds its eliminator stack",
                         )
@@ -6314,14 +6315,14 @@ impl<'a> Lowering<'a> {
                 // rather than reconstructed afterwards.
                 let carried_coordinates = CarriedInvocationCoordinates::of(&invocation)?;
                 let current = active_recursor_frame(eliminators).ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalRecursor",
                         "recursive producer invocation has no active continuation",
                     )
                 })?;
                 let _resume = find_continuation_cursor(current, invocation.resume_cursor)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ComputationalRecursor",
                             "recursive producer invocation cursor is not active",
                         )
@@ -6398,7 +6399,7 @@ impl<'a> Lowering<'a> {
                 let base = base.specialized_at("a recursor residual in a producer call")?;
                 if let Lowered::BoundedNat(predecessor) = base {
                     if !args.is_empty() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::Fragment,
                             "BoundedNat",
                             "structural Nat recursive hypothesis takes no arguments",
                         ));
@@ -6425,13 +6426,13 @@ impl<'a> Lowering<'a> {
                     ..
                 } = base
                 else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         "recursive constructor field is not a closure",
                     ));
                 };
                 if params.len() != args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         format!(
                             "recursive field expects {} args but call provides {}",
@@ -6482,11 +6483,11 @@ impl<'a> Lowering<'a> {
                     eliminators,
                 )
             }
-            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => Err(unsupported(
+            LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "tree producer callee is not a closure",
             )),
-            LoweringOperand::Residual(_) => Err(unsupported(
+            LoweringOperand::Residual(_) => Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "tree producer callee is not a closure",
             )),
@@ -6587,7 +6588,7 @@ impl<'a> Lowering<'a> {
                 self.carried_suffix_reentries += 1;
                 if self.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
                     self.carried_suffix_reentries -= 1;
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "BoundaryCarrier",
                         "a carried producer match's pending eliminators exceeded the bounded re-entry depth",
                     ));
@@ -6612,7 +6613,7 @@ impl<'a> Lowering<'a> {
                 .enumerate()
                 .find(|(_, case)| case.binders == 0 && case.constructor.ends_with("::Bool::False"));
             let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::Fragment,
                     "ComputationalMatch",
                     "Bool tree producer requires True and False cases",
                 ));
@@ -6654,7 +6655,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a producer Bool Match merge despite a \
                          continuing predecessor"
                             .to_string(),
@@ -6723,7 +6724,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a producer HostResult merge despite a \
                          continuing predecessor"
                             .to_string(),
@@ -6787,7 +6788,7 @@ impl<'a> Lowering<'a> {
                 let (arm_origin, lowered) = match case {
                     Some((index, producer_case)) => {
                         if producer_case.binders != fields.len() {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Fragment,
                                 "ComputationalMatch",
                                 "borrowed Option producer arity mismatch",
                             ));
@@ -6812,7 +6813,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a producer BorrowedOption merge despite a \
                          continuing predecessor"
                             .to_string(),
@@ -6893,7 +6894,7 @@ impl<'a> Lowering<'a> {
             constructor, args, ..
         }) = selected
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "tree-producing match scrutinee is not Bool or a constructor",
             ));
@@ -6910,7 +6911,7 @@ impl<'a> Lowering<'a> {
         };
         self.disposition_statically_unselected_match_cases(static_origin, Some(case_index))?;
         if producer_case.binders != args.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "ComputationalMatch",
                 "tree-producing match constructor arity changed",
             ));
@@ -6937,7 +6938,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<(), CraneliftBackendError> {
         let Some(owner) = self.defining_emission_owner else {
             if self.static_transition_plan.has_relay_drive_pair_for_source(source) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "RelayRoute",
                     "a relay-consuming seat for an admitted source has no emission owner",
                 ));
@@ -6957,7 +6958,7 @@ impl<'a> Lowering<'a> {
         // the function parameter remains a runtime value in the finished CLIF:
         // the cold call block stays present for the call/ledger closeout.
         let services = self.function_local.services_pointer.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "RelayRoute",
                 "a relay-consuming function has no services ABI parameter",
             )
@@ -7099,7 +7100,7 @@ impl<'a> Lowering<'a> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "a terminal producer crossing has no destination emission owner",
                 )
@@ -7113,7 +7114,7 @@ impl<'a> Lowering<'a> {
                     .static_transition_plan
                     .child_static_origin(static_origin, transport.recursive_position() as usize)?;
                 if child_origin != transport.seat() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhEnvironmentTransport",
                         "a terminal transport's stable closure seat is not the recursive child being replaced",
                     ));
@@ -7130,7 +7131,7 @@ impl<'a> Lowering<'a> {
                     producer_env,
                 )?;
                 if !matches!(&claimed.answer.value, LoweringOperand::Carried(_)) {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhEnvironmentTransport",
                         "a terminal checked-IH transport did not return the force-materialized carrier word",
                     ));
@@ -7181,7 +7182,7 @@ impl<'a> Lowering<'a> {
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "an active producer crossing has no destination emission owner",
                 )
@@ -7194,7 +7195,7 @@ impl<'a> Lowering<'a> {
                 )?
                 .cloned()
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhEnvironmentTransport",
                         "an active constructor was routed around ordinary lowering but has no authorized transport edge",
                     )
@@ -7203,7 +7204,7 @@ impl<'a> Lowering<'a> {
                 .static_transition_plan
                 .child_static_origin(static_origin, transport.recursive_position() as usize)?;
             if child_origin != transport.seat() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "an active transport's stable closure seat is not the recursive child being replaced",
                 ));
@@ -7252,7 +7253,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.argument_binders != args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         format!(
                             "case {} expects {} constructor arguments but value has {}",
@@ -7265,7 +7266,7 @@ impl<'a> Lowering<'a> {
                 let mut seen = BTreeSet::new();
                 for position in case.recursive_positions.iter().copied() {
                     if !seen.insert(position) || position >= args.len() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ComputationalMatch",
                             format!(
                                 "case {} has malformed recursive position {position}",
@@ -7302,7 +7303,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.binders != args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Match",
                         format!(
                             "case {} expects {} binders but constructor has {} args",
@@ -7561,13 +7562,13 @@ impl<'a> Lowering<'a> {
                                 static_origin,
                                 *frame_origin,
                                 u32::try_from(*case_index).map_err(|_| {
-                                    unsupported(
+                                    unsupported(LoweringCause::Capacity,
                                         "ComputationalMatch",
                                         "continuation alternative exhausted",
                                     )
                                 })?,
                                 u32::try_from(position).map_err(|_| {
-                                    unsupported(
+                                    unsupported(LoweringCause::Capacity,
                                         "ComputationalMatch",
                                         "continuation recursive position exhausted",
                                     )
@@ -7723,9 +7724,9 @@ impl<'a> Lowering<'a> {
                     if let Some(identity) = self.static_transition_plan.continuation_call_binding_for(
                         static_origin,
                         *frame_origin,
-                        u32::try_from(*case_index).map_err(|_| unsupported(
+                        u32::try_from(*case_index).map_err(|_| unsupported(LoweringCause::Capacity,
                             "ComputationalMatch", "case index exceeds addressable range"))?,
-                        u32::try_from(position).map_err(|_| unsupported(
+                        u32::try_from(position).map_err(|_| unsupported(LoweringCause::Capacity,
                             "ComputationalMatch", "recursive position exceeds addressable range"))?,
                     )? {
                         self.branch_unrouted_relay_at_consumer(builder, static_origin, &identity)?;
@@ -7761,7 +7762,7 @@ impl<'a> Lowering<'a> {
         // continuations take the same no-eager-construction rule.
         if let Some(claimed) = continuation_result.take() {
             let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "a claimed continuation result reached a constructor with no emission owner",
                 )
@@ -7782,13 +7783,13 @@ impl<'a> Lowering<'a> {
                     || transport.destination_owner() != destination_owner
                     || transport.destination_construct_origin() != static_origin
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhEnvironmentTransport",
                         "the authorized transport's stable closure seat or destination endpoint disagrees with the crossing being lowered",
                     ));
                 }
                 if !matches!(&claimed.answer.value, LoweringOperand::Carried(_)) {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhEnvironmentTransport",
                         "the force-materialized checked-IH environment did not return a carrier word to its authorized crossing",
                     ));
@@ -7881,7 +7882,7 @@ impl<'a> Lowering<'a> {
                         && case.recursive_positions.as_slice() == [0]
                 });
                 let (Some((zero_index, zero)), Some((suc_index, suc))) = (zero, suc) else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "BoundedNat",
                         "computational Nat requires Zero and one recursive Suc predecessor",
                     ));
@@ -7900,7 +7901,7 @@ impl<'a> Lowering<'a> {
                     case.constructor == self.process_symbols.nat_suc && case.binders == 1
                 });
                 let (Some((zero_index, zero)), Some((suc_index, suc))) = (zero, suc) else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "BoundedNat",
                         "ordinary Nat frame requires exact Zero and Suc predecessor arms",
                     ));
@@ -8079,7 +8080,7 @@ impl<'a> Lowering<'a> {
         let (next, next_kind) =
             self.merge_scalar_branch(builder, &join_plan, suc_lowered, "BoundedNat")?;
         if next_kind != result_kind {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "BoundedNat",
                 "recursive Suc result disagrees with the Zero result kind",
             ));
@@ -8146,7 +8147,7 @@ impl<'a> Lowering<'a> {
             let mut env = env.to_vec();
             if let Some(index) = retained_index {
                 if index > env.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         construct,
                         "retained scrutinee index exceeds the frame environment",
                     ));
@@ -8161,7 +8162,7 @@ impl<'a> Lowering<'a> {
             return Ok(Ok(env));
         };
         if deferred.lowered_prefix.len() != deferred.selected_field {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "Construct",
                 "selected constructor field prefix does not match its binder index",
             ));
@@ -8226,7 +8227,7 @@ impl<'a> Lowering<'a> {
                     return Ok(Err(frame.default.clone()));
                 };
                 if case.argument_binders != constructor_args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "ComputationalMatch",
                         format!(
                             "case {} expects {} constructor arguments but value has {}",
@@ -8239,7 +8240,7 @@ impl<'a> Lowering<'a> {
                 let mut seen = BTreeSet::new();
                 for position in case.recursive_positions.iter().copied() {
                     if !seen.insert(position) || position >= constructor_args.len() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ComputationalMatch",
                             format!(
                                 "case {} has malformed recursive position {position}",
@@ -8372,7 +8373,7 @@ impl<'a> Lowering<'a> {
                     Err(trap) => return Ok(Err(trap)),
                 };
                 if case.binders != constructor_args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Match",
                         format!(
                             "case {} expects {} binders but constructor has {} args",
@@ -8579,10 +8580,10 @@ impl<'a> Lowering<'a> {
         producer_env: &[LoweringEnvironmentBinding],
     ) -> Result<Option<LoweringOperand>, CraneliftBackendError> {
         let alternative = u32::try_from(producer_alternative).map_err(|_| {
-            unsupported("StaticContinuationFusion", "case index exceeds addressable range")
+            unsupported(LoweringCause::Capacity, "StaticContinuationFusion", "case index exceeds addressable range")
         })?;
         let position = u32::try_from(recursive_position).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "StaticContinuationFusion",
                 "recursive position exceeds addressable range",
             )
@@ -8612,19 +8613,19 @@ impl<'a> Lowering<'a> {
         // partial settlement is exactly the state an affine ledger cannot
         // describe.
         let defining = self.defining_unit.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization was dispatched with no unit being defined",
             )
         })?;
         let defining_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization was dispatched with no emission owner bound",
             )
         })?;
         if realization.emission_owner() != defining_owner {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "a fusion-owned outer realization names emission owner {:?} while {defining_owner:?} \
@@ -8635,13 +8636,13 @@ impl<'a> Lowering<'a> {
             ));
         }
         let ledger = self.fusion_claims.as_ref().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization was dispatched with no region claim ledger open",
             )
         })?;
         let claim = ledger.claim(realization.fusion()).ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization has no outstanding region claim; the claim is \
                  spent, replayed or escaped, and dispatching against a consumed claim would \
@@ -8649,7 +8650,7 @@ impl<'a> Lowering<'a> {
             )
         })?;
         if claim.consumer_owner() != defining {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization's region claim names a different consumer than \
                  the unit being defined",
@@ -8660,7 +8661,7 @@ impl<'a> Lowering<'a> {
             || realization.producer_body() != claim.producer_body()
             || realization.producer_body() != claim.redirect().callee_origin()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization does not close against its region claim on \
                  continuation origin, selected case body, or producer/redirect body",
@@ -8688,13 +8689,13 @@ impl<'a> Lowering<'a> {
             });
         }
         let ledger = self.fusion_claims.as_ref().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization was dispatched with no region claim ledger open",
             )
         })?;
         if !fusion_outer_claim_is_outstanding(ledger, realization.fusion()) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer realization's selected region claim is no longer \
                  outstanding after closure; the claim is spent, replayed or escaped, and local \
@@ -8778,7 +8779,7 @@ impl<'a> Lowering<'a> {
             D2F_DEFERRED_POST_FIELD_DIRECT_CALL.with(|cell| cell.borrow_mut().take())
         {
             if d2f_post_field_direct_call_is_excluded() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     "a fused invocation was reintroduced directly at the outer realization's \
                      post-field seam; this seam may lower the selected body locally but may not \
@@ -8824,10 +8825,10 @@ impl<'a> Lowering<'a> {
         eliminators: &[EliminatorFrame<'_>],
     ) -> Result<Option<ClaimedContinuationResult>, CraneliftBackendError> {
         let alternative = u32::try_from(producer_alternative).map_err(|_| {
-            unsupported("ComputationalMatch", "case index exceeds addressable range")
+            unsupported(LoweringCause::Capacity, "ComputationalMatch", "case index exceeds addressable range")
         })?;
         let position = u32::try_from(recursive_position).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "ComputationalMatch",
                 "recursive position exceeds addressable range",
             )
@@ -8863,7 +8864,7 @@ impl<'a> Lowering<'a> {
         d5a_trace(format!("  CLAIM bound identity={identity:?}"));
 
         let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "a continuation result crossing has no destination emission owner",
             )
@@ -8882,7 +8883,7 @@ impl<'a> Lowering<'a> {
                 || transport.source_owner()
                     != ContinuationEmissionOwner::Specialization(identity.target())
             {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "the authorized transport's source endpoint is not the causal continuation target selected at this crossing",
                 ));
@@ -8920,25 +8921,25 @@ impl<'a> Lowering<'a> {
         if transport.source_owner() != ContinuationEmissionOwner::Specialization(identity.target())
             || transport.source_specialization() != identity.target()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "the transport's source owner, source specialization and causal target are not one stable code identity",
             ));
         }
         let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "an authorized transport was reached with no destination emission owner",
             )
         })?;
         if destination_owner != transport.destination_owner() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "the transport was consumed outside its exact destination owner",
             ));
         }
         let defining = self.defining_unit.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "an authorized transport was reached outside a unit definition",
             )
@@ -8954,7 +8955,7 @@ impl<'a> Lowering<'a> {
             .get(&identity)
             .cloned()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "the force-materialization target was not declared into the authorized transport destination",
                 )
@@ -9005,7 +9006,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<CheckedIhCapturedEnvironment, CraneliftBackendError> {
         let identity = transport.source_call_identity();
         let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhCapturedEnvironment",
                 "a checked-IH environment materialization has no destination emission owner",
             )
@@ -9013,7 +9014,7 @@ impl<'a> Lowering<'a> {
         if destination_owner != transport.destination_owner()
             || transport.source_specialization() != identity.target()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhCapturedEnvironment",
                 "the checked-IH environment materialization disagrees with its transport endpoints",
             ));
@@ -9024,7 +9025,7 @@ impl<'a> Lowering<'a> {
             .into_iter()
             .find(|unit| unit.id() == transport.source_specialization())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
                     "the checked-IH environment transport has no source continuation unit",
                 )
@@ -9042,7 +9043,7 @@ impl<'a> Lowering<'a> {
             .count()
             .checked_add(recursive_count)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "CheckedIhCapturedEnvironment",
                     "the checked-IH source constructor field count overflowed",
                 )
@@ -9050,13 +9051,13 @@ impl<'a> Lowering<'a> {
         let selected_index = recursive_count
             .checked_add(unit.recursive_position() as usize)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "CheckedIhCapturedEnvironment",
                     "the checked-IH selected recursive field index overflowed",
                 )
             })?;
         if env.len() < recursive_count.saturating_add(field_count) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhCapturedEnvironment",
                 "the selected case environment is shorter than its IH prefix plus constructor fields",
             ));
@@ -9085,7 +9086,7 @@ impl<'a> Lowering<'a> {
                     || worker.declared_arity != unit.worker_declared_arity()
                     || worker.captures.len() != unit.worker_capture_count()
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhCapturedEnvironment",
                         "the selected worker disagrees with the transport's stable closure identity",
                     ));
@@ -9095,7 +9096,7 @@ impl<'a> Lowering<'a> {
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
 
             | None => {
-                Err(unsupported(
+                Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhCapturedEnvironment",
                     "the selected checked-IH field holds neither its static worker nor its carried captured environment",
                 ))
@@ -9118,21 +9119,21 @@ impl<'a> Lowering<'a> {
         match projection.route() {
             CheckedIhGeneratedEntryRoute::DirectInvocationReturn { .. } => {}
             CheckedIhGeneratedEntryRoute::TailProducerToRet => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhApplicationResult",
                     "a Tail producer route reached the Direct checked-IH application emitter",
                 ));
             }
         }
         if !projection.direct_source_matches_governed_arrival() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct application source record does not equal its validated governed arrival",
             ));
         }
         let identity = transport.source_call_identity().clone();
         let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "a Direct checked-IH application has no destination emission owner",
             )
@@ -9140,7 +9141,7 @@ impl<'a> Lowering<'a> {
         if destination_owner != transport.destination_owner()
             || transport.source_specialization() != identity.target()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct checked-IH application disagrees with its transport endpoints",
             ));
@@ -9151,7 +9152,7 @@ impl<'a> Lowering<'a> {
             .into_iter()
             .find(|unit| unit.id() == transport.source_specialization())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhApplicationResult",
                     "the Direct transport source has no continuation unit",
                 )
@@ -9172,14 +9173,14 @@ impl<'a> Lowering<'a> {
             .count()
             .checked_add(recursive_count)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "CheckedIhApplicationResult",
                     "the Direct source constructor field count overflowed",
                 )
             })?;
         let field_start = recursive_count;
         if env.len() < field_start.saturating_add(field_count) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct case environment is shorter than its IH prefix plus constructor fields",
             ));
@@ -9187,7 +9188,7 @@ impl<'a> Lowering<'a> {
         let selected_index = field_start
             .checked_add(recursive_position as usize)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "CheckedIhApplicationResult",
                     "the Direct selected recursive field index overflowed",
                 )
@@ -9200,7 +9201,7 @@ impl<'a> Lowering<'a> {
                 CheckedIhEnvironmentOperand::Synthesized(*word)
             }
             Some(LoweringEnvironmentBinding::StaticWorker(_)) => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhApplicationResult",
                     "a Direct application requires the carried captured environment, not a static worker",
                 ));
@@ -9208,7 +9209,7 @@ impl<'a> Lowering<'a> {
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
 
             | None => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhApplicationResult",
                     "the Direct application has no carried captured environment at its ruled recursive field",
                 ));
@@ -9222,7 +9223,7 @@ impl<'a> Lowering<'a> {
             || record.declared_children().map(|children| children.len())
                 != Some(worker_capture_count)
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct captured environment record disagrees with the planner-issued worker capture run",
             ));
@@ -9238,7 +9239,7 @@ impl<'a> Lowering<'a> {
             } = role
             {
                 let ContinuationWorkerCaptureSource::Lexical(origin) = source else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhApplicationResult",
                         "a Direct worker capture has no lexical source occurrence",
                     ));
@@ -9255,7 +9256,7 @@ impl<'a> Lowering<'a> {
         match mutation {
             CheckedIhDirectApplicationMutation::PermuteCaptures => {
                 if captures.len() < 2 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhApplicationResult",
                         "the capture-permutation control found no non-degenerate Direct capture population",
                     ));
@@ -9283,7 +9284,7 @@ impl<'a> Lowering<'a> {
                 emitted_call: None,
                 application_result_from_call: false,
             });
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct captured environment has a missing planner-ordered capture",
             ));
@@ -9320,7 +9321,7 @@ impl<'a> Lowering<'a> {
                 } => inputs.push(
                     env.get(field_start + *source_position as usize)
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "CheckedIhApplicationResult",
                                 "a Direct nonrecursive field is outside the selected case environment",
                             )
@@ -9330,13 +9331,13 @@ impl<'a> Lowering<'a> {
                 ),
                 ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, .. } => {
                     let (projected_ordinal, _, operand) = captures.next().ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhApplicationResult",
                             "the Direct capture projection ended before its planner envelope",
                         )
                     })?;
                     if projected_ordinal != *ordinal {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhApplicationResult",
                             "the Direct capture projection is not in planner order",
                         ));
@@ -9346,14 +9347,14 @@ impl<'a> Lowering<'a> {
             }
         }
         if captures.next().is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct capture projection exceeds its planner envelope",
             ));
         }
 
         if continuation_inputs.len() != transport.continuation_input_count() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct continuation-input morphism has the wrong arity",
             ));
@@ -9362,7 +9363,7 @@ impl<'a> Lowering<'a> {
             let destination = transport
                 .continuation_input_index(input.ordinal, input.coordinate)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhApplicationResult",
                         "the Direct transport has no destination for one continuation input",
                     )
@@ -9371,7 +9372,7 @@ impl<'a> Lowering<'a> {
                 CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
                     .get(index as usize)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhApplicationResult",
                             "a Direct lexical input is outside the selected case environment",
                         )
@@ -9384,7 +9385,7 @@ impl<'a> Lowering<'a> {
                     .get(slot as usize)
                     .cloned()
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhApplicationResult",
                             "a Direct entry-frame input is outside the current ABI frame",
                         )
@@ -9402,7 +9403,7 @@ impl<'a> Lowering<'a> {
                     .find(|candidate| *candidate != &identity)
                     .cloned()
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhApplicationResult",
                         "the transport-identity control found no neighboring declared continuation",
                     )
@@ -9425,7 +9426,7 @@ impl<'a> Lowering<'a> {
                 emitted_call: None,
                 application_result_from_call: false,
             });
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct declared-call lookup varied away from the selected transport identity",
             ));
@@ -9436,7 +9437,7 @@ impl<'a> Lowering<'a> {
             .get(&requested_identity)
             .cloned()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhApplicationResult",
                     "the Direct transport target was not declared into the current Function",
                 )
@@ -9455,7 +9456,7 @@ impl<'a> Lowering<'a> {
                 emitted_call: None,
                 application_result_from_call: false,
             });
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct application emitted zero calls for one governed arrival",
             ));
@@ -9495,7 +9496,7 @@ impl<'a> Lowering<'a> {
                 emitted_call: Some(format!("{call:?}")),
                 application_result_from_call: false,
             });
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhApplicationResult",
                 "the Direct application substituted its captured environment for the emitted call Result",
             ));
@@ -9557,7 +9558,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let identity = transport.source_call_identity().clone();
         let destination_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "a checked-IH force transport has no destination emission owner",
             )
@@ -9565,7 +9566,7 @@ impl<'a> Lowering<'a> {
         if destination_owner != transport.destination_owner()
             || transport.source_specialization() != identity.target()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "the checked-IH force transport disagrees with its source or destination endpoint",
             ));
@@ -9576,7 +9577,7 @@ impl<'a> Lowering<'a> {
             .into_iter()
             .find(|unit| unit.id() == transport.source_specialization())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "the transport source has no continuation unit",
                 )
@@ -9594,20 +9595,20 @@ impl<'a> Lowering<'a> {
             .count()
             .checked_add(recursive_count)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "CheckedIhEnvironmentTransport",
                     "the transport source constructor field count overflowed",
                 )
             })?;
         let field_start = recursive_count;
         let fields_end = field_start.checked_add(field_count).ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "CheckedIhEnvironmentTransport",
                 "the transport source case environment range overflowed",
             )
         })?;
         if env.len() < fields_end {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "the selected case environment is shorter than its IH prefix plus constructor field run",
             ));
@@ -9615,7 +9616,7 @@ impl<'a> Lowering<'a> {
         let selected_index = field_start
             .checked_add(unit.recursive_position() as usize)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "CheckedIhEnvironmentTransport",
                     "the selected recursive field index overflowed",
                 )
@@ -9637,7 +9638,7 @@ impl<'a> Lowering<'a> {
             Some(LoweringEnvironmentBinding::Value(LoweringOperand::Specialized(_)))
 
             | None => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "the transport source case environment holds neither its selected static worker nor the already-transported environment word at the ruled recursive field",
                 ));
@@ -9648,7 +9649,7 @@ impl<'a> Lowering<'a> {
             || selected_worker.declared_arity != unit.worker_declared_arity()
             || selected_worker.captures.len() != unit.worker_capture_count()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "the selected worker binding disagrees with the transport's stable closure code identity",
             ));
@@ -9665,7 +9666,7 @@ impl<'a> Lowering<'a> {
                     let binding = env
                         .get(field_start + *source_position as usize)
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "CheckedIhEnvironmentTransport",
                                 "a nonrecursive transport field is outside the selected case environment",
                             )
@@ -9680,7 +9681,7 @@ impl<'a> Lowering<'a> {
                     ordinal, source, ..
                 } => {
                     let ContinuationWorkerCaptureSource::Lexical(origin) = source else {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhEnvironmentTransport",
                             "a checked-IH transport capture has no lexical source occurrence",
                         ));
@@ -9690,7 +9691,7 @@ impl<'a> Lowering<'a> {
                         .get(*ordinal as usize)
                         .cloned()
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "CheckedIhEnvironmentTransport",
                                 "a transport capture ordinal is outside the selected worker's capture run",
                             )
@@ -9709,7 +9710,7 @@ impl<'a> Lowering<'a> {
 
         let inputs_view = unit.continuation_inputs()?;
         if inputs_view.len() != transport.continuation_input_count() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "CheckedIhEnvironmentTransport",
                 "the transport continuation-input morphism has the wrong arity",
             ));
@@ -9719,7 +9720,7 @@ impl<'a> Lowering<'a> {
             let destination = transport
                 .continuation_input_index(input.ordinal, input.coordinate)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "CheckedIhEnvironmentTransport",
                         "the transport has no destination for one declared continuation input",
                     )
@@ -9728,7 +9729,7 @@ impl<'a> Lowering<'a> {
                 CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
                     .get(index as usize)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhEnvironmentTransport",
                             "a transport lexical destination is outside the selected case environment",
                         )
@@ -9741,7 +9742,7 @@ impl<'a> Lowering<'a> {
                     .get(slot as usize)
                     .cloned()
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhEnvironmentTransport",
                             "a transport entry-frame destination is outside the current ABI frame",
                         )
@@ -9756,7 +9757,7 @@ impl<'a> Lowering<'a> {
             .get(&identity)
             .cloned()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "the checked-IH force target was not declared into the transport destination",
                 )
@@ -9830,7 +9831,7 @@ impl<'a> Lowering<'a> {
             .into_iter()
             .find(|unit| unit.id() == transport.source_specialization())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "ComposedReturnForwardRet",
                     "the transport source has no continuation unit",
                 )
@@ -9885,7 +9886,7 @@ impl<'a> Lowering<'a> {
                 builder, LoweringOperand::Residual(residual), transport,
             )?,
             LoweringOperand::Carried(word) => word,
-            LoweringOperand::Specialized(_) => return Err(unsupported(
+            LoweringOperand::Specialized(_) => return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetKMatch",
                 "the InlineNoCall continuation return is not a captured-environment word",
             )),
@@ -9905,7 +9906,7 @@ impl<'a> Lowering<'a> {
                 .into_iter()
                 .find(|unit| unit.id() == transport.source_specialization())
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ComposedReturnRetKMatch",
                         "the transport source has no continuation unit",
                     )
@@ -9930,7 +9931,7 @@ impl<'a> Lowering<'a> {
                 }
                 ContinuationOrdinaryEnvelopeRole::WorkerCapture { ordinal, source, .. } => {
                     let ContinuationWorkerCaptureSource::Lexical(_) = source else {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ComposedReturnRetKMatch",
                             "a continuation worker capture has no lexical source occurrence",
                         ));
@@ -9944,7 +9945,7 @@ impl<'a> Lowering<'a> {
             }
         }
         if inputs_view.len() != transport.continuation_input_count() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetKMatch",
                 "the transport continuation-input morphism has the wrong arity",
             ));
@@ -9953,7 +9954,7 @@ impl<'a> Lowering<'a> {
             let destination = transport
                 .continuation_input_index(input.ordinal, input.coordinate)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ComposedReturnRetKMatch",
                         "the transport has no destination for one declared continuation input",
                     )
@@ -9962,7 +9963,7 @@ impl<'a> Lowering<'a> {
                 CheckedIhTransportInputDestination::LexicalEnvironment(index) => env
                     .get(index as usize)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ComposedReturnRetKMatch",
                             "a transport lexical destination is outside the selected case environment",
                         )
@@ -9975,7 +9976,7 @@ impl<'a> Lowering<'a> {
                     .get(slot as usize)
                     .cloned()
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ComposedReturnRetKMatch",
                             "a transport entry-frame destination is outside the current ABI frame",
                         )
@@ -9989,13 +9990,13 @@ impl<'a> Lowering<'a> {
         // block's input.
         let body_expr = self.retained_body_occurrence(body_origin)?.expr.clone();
         let RuntimeExpr::Construct { args, .. } = &body_expr else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetKMatch",
                 "the continuation body is not an ITree::Ret constructor",
             ));
         };
         let [payload] = args.as_slice() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetKMatch",
                 "the ITree::Ret continuation body does not carry exactly one payload argument",
             ));
@@ -10074,7 +10075,7 @@ impl<'a> Lowering<'a> {
         // rebuilt it would be a second definition of "the same value".
         let coordinate = requested.coordinate;
         let Some(claim) = views.direct_emission else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "a continuation input carries no direct-emission availability claim, so \
@@ -10097,7 +10098,7 @@ impl<'a> Lowering<'a> {
                 // and does not stand in the producer's semantic environment, so
                 // the claim is refused BEFORE any operand run is indexed.
                 let ContinuationEmissionOwner::Predeclared(owner) = defining_owner else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         "a current-lexical availability claim was presented to a generated \
                          emission context, which holds no retained lexical environment for the \
@@ -10107,7 +10108,7 @@ impl<'a> Lowering<'a> {
                     ));
                 };
                 if emission_owner != owner {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "a current-lexical claim names emission owner {emission_owner:?}, \
@@ -10119,7 +10120,7 @@ impl<'a> Lowering<'a> {
                 if seat.emission_origin != emission_origin
                     || seat.producer_result_origin != producer_result_origin
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         "a current-lexical claim is keyed to a different emission occurrence \
                          than the one now emitting, so the binder depth it counted is not the \
@@ -10212,7 +10213,7 @@ impl<'a> Lowering<'a> {
         defining_owner: ContinuationEmissionOwner,
     ) -> Result<u32, CraneliftBackendError> {
         let Some(claim) = views.context_capture else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "a generated context capture carries no context-capture availability claim, \
@@ -10224,7 +10225,7 @@ impl<'a> Lowering<'a> {
             ));
         };
         match claim {
-            ContinuationEnvironmentClaim::CurrentLexical { .. } => Err(unsupported(
+            ContinuationEnvironmentClaim::CurrentLexical { .. } => Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a current-lexical availability claim was presented to the entry-frame capture \
                  consumer, which holds an ABI operand run and no semantic environment; a \
@@ -10262,7 +10263,7 @@ impl<'a> Lowering<'a> {
                 ContinuationEmissionOwner::Predeclared(held),
             ) => {
                 if named != held {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "an entry-frame claim names predeclared frame {named:?}, which is \
@@ -10291,7 +10292,7 @@ impl<'a> Lowering<'a> {
                 ContinuationEmissionOwner::Specialization(held),
             ) => {
                 if specialization != held {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "an entry-frame claim names the generated context of \
@@ -10315,7 +10316,7 @@ impl<'a> Lowering<'a> {
                     .static_transition_plan
                     .continuation_context_for(specialization, worker_body_origin)?
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             "an entry-frame claim names a generated context frame that the \
                              planner never interned, so no declared capture run exists to \
@@ -10342,7 +10343,7 @@ impl<'a> Lowering<'a> {
                     }
                 };
                 if context.id() != claimed_context {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "an entry-frame claim carries generated context {claimed_context:?}, \
@@ -10360,7 +10361,7 @@ impl<'a> Lowering<'a> {
                         continue;
                     }
                     if found.is_some() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             "a generated context declares two members for one continuation \
                              coordinate, so the declared slot is ambiguous; \
@@ -10370,7 +10371,7 @@ impl<'a> Lowering<'a> {
                     found = Some(position);
                 }
                 let position = found.ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "a generated context declares no member for {coordinate:?}, so its \
@@ -10383,13 +10384,13 @@ impl<'a> Lowering<'a> {
                     .ok()
                     .and_then(|position| context.parameters().checked_add(position))
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::Capacity,
                             "ContinuationSpecialization",
                             "generated context capture slot exhausted",
                         )
                     })?;
                 if expected != declared_slot {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "an entry-frame claim declares slot {declared_slot} for \
@@ -10402,7 +10403,7 @@ impl<'a> Lowering<'a> {
                 Ok(())
             }
             (ContinuationFrameIdentity::Predeclared(named), ContinuationEmissionOwner::Specialization(held)) => {
-                Err(unsupported(
+                Err(unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
                         "an entry-frame claim names predeclared frame {named:?} while the frame \
@@ -10415,7 +10416,7 @@ impl<'a> Lowering<'a> {
             (
                 ContinuationFrameIdentity::GeneratedContext { specialization, .. },
                 ContinuationEmissionOwner::Predeclared(held),
-            ) => Err(unsupported(
+            ) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "an entry-frame claim names the generated context of {specialization:?} while the \
@@ -10441,7 +10442,7 @@ impl<'a> Lowering<'a> {
             (
                 ContinuationFrameIdentity::Predeclared(named),
                 ContinuationEmissionOwner::Fusion(held),
-            ) => Err(unsupported(
+            ) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "an entry-frame claim names predeclared frame {named:?} while the frame \
@@ -10453,7 +10454,7 @@ impl<'a> Lowering<'a> {
             (
                 ContinuationFrameIdentity::GeneratedContext { specialization, .. },
                 ContinuationEmissionOwner::Fusion(held),
-            ) => Err(unsupported(
+            ) => Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "an entry-frame claim names the generated context of {specialization:?} \
@@ -10571,7 +10572,7 @@ impl<'a> Lowering<'a> {
             .fusion_outer_realizations()
             .contains_key(identity)
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-owned outer identity reached the shared continuation call funnel; it is                  realized once by the fusion-owned body and has no call edge, so whichever                  projection routed it here is naming a call that does not exist",
             ));
@@ -10748,7 +10749,7 @@ impl<'a> Lowering<'a> {
             .into_iter()
             .find(|unit| unit.id() == identity.target())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     "the claimed target has no projected continuation unit",
                 )
@@ -10802,7 +10803,7 @@ impl<'a> Lowering<'a> {
         // capture is read from it, so a capture taken below is known to have
         // come from the closure the plan selected.
         let selected = fields.get(recursive_position).ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "the ruled recursive position names no field of the planned producer constructor",
             )
@@ -10815,7 +10816,7 @@ impl<'a> Lowering<'a> {
                 ..
             }) => (captures, *body, params.len()),
             LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
                         "the ruled recursive field at position {recursive_position} is not a retained \
@@ -10825,7 +10826,7 @@ impl<'a> Lowering<'a> {
                 ));
             }
             LoweringOperand::Residual(_) => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
                         "the ruled recursive field at position {recursive_position} is not a retained \
@@ -10836,7 +10837,7 @@ impl<'a> Lowering<'a> {
             }
         };
         if selected_body != unit.worker_body_origin() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "the ruled recursive field is a closure over body {selected_body:?}, but this \
@@ -10846,7 +10847,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         if selected_arity != unit.worker_declared_arity() as usize {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "the ruled recursive field is a closure of arity {selected_arity}, but this \
@@ -10856,7 +10857,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         if selected_captures.len() != unit.worker_capture_count() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "the ruled recursive field closes over {} values, but this continuation's \
@@ -10881,7 +10882,7 @@ impl<'a> Lowering<'a> {
                     source_position,
                 } => {
                     if seen_capture {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!(
                                 "the ordinary envelope holds a nonrecursive field at role \
@@ -10894,7 +10895,7 @@ impl<'a> Lowering<'a> {
                     }
                     let source = *source_position as usize;
                     if source == recursive_position {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!(
                                 "the ordinary envelope names source position {source} as a \
@@ -10905,7 +10906,7 @@ impl<'a> Lowering<'a> {
                         ));
                     }
                     let field = fields.get(source).ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!(
                                 "the ordinary envelope names source position {source}, outside \
@@ -10927,7 +10928,7 @@ impl<'a> Lowering<'a> {
                 } => {
                     seen_capture = true;
                     if *closure_origin != unit.worker_closure_origin() {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!(
                                 "the ordinary envelope's capture at role position {role_position} \
@@ -10939,7 +10940,7 @@ impl<'a> Lowering<'a> {
                         ));
                     }
                     if *ordinal != next_capture_ordinal {
-                        return Err(unsupported(
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!(
                                 "the ordinary envelope's capture at role position {role_position} \
@@ -10961,7 +10962,7 @@ impl<'a> Lowering<'a> {
                         }
                     }
                     let capture = selected_captures.get(*ordinal as usize).ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!(
                                 "the ordinary envelope names capture ordinal {ordinal}, outside \
@@ -10981,7 +10982,7 @@ impl<'a> Lowering<'a> {
             }
         }
         if next_capture_ordinal as usize != selected_captures.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "the ordinary envelope consumed {next_capture_ordinal} of the selected \
@@ -11005,7 +11006,7 @@ impl<'a> Lowering<'a> {
         // facts, and comparing the assembled run with the sequence it was
         // assembled from would be an identity.
         if ordinary.len() != unit.ordinary_parameters() as usize {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "the assembled ordinary run holds {} operands but this continuation declares \
@@ -11244,7 +11245,7 @@ impl<'a> Lowering<'a> {
         if let ContinuationOperandEnvironment::CheckedIhTransport(transport) = &operand_environment
         {
             if transport.continuation_input_count() != continuation_inputs_view.len() {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "CheckedIhEnvironmentTransport",
                     "the transport's source-to-destination input morphism and the target continuation's declared input run have different arities",
                 ));
@@ -11379,7 +11380,7 @@ impl<'a> Lowering<'a> {
                 ContinuationOperandEnvironment::CheckedIhTransport(transport) => transport
                     .continuation_input_index(input.ordinal, input.coordinate)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhEnvironmentTransport",
                             format!(
                                 "the transport morphism has no destination environment coordinate for source input ordinal {} at {:?}",
@@ -11405,7 +11406,7 @@ impl<'a> Lowering<'a> {
             // refusal of a coordinate present at two positions of the seat.
             if let Some((seen, _)) = resolved_slots.iter().find(|(_, held)| *held == destination) {
                 if *seen != input.coordinate {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         format!(
                             "two distinct continuation inputs of one emission resolve to the \
@@ -11424,7 +11425,7 @@ impl<'a> Lowering<'a> {
                     CheckedIhTransportInputDestination::LexicalEnvironment(immediate_slot),
                 ) => {
                     let binding = producer_env.get(immediate_slot as usize).ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             format!(
                                 "a continuation input names immediate slot {} outside the emitting \
@@ -11449,7 +11450,7 @@ impl<'a> Lowering<'a> {
                     ContinuationOperandEnvironment::DirectEmission,
                     CheckedIhTransportInputDestination::EntryFrame(_),
                 ) => {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         "the ordinary direct-emission resolver returned an entry-frame coordinate instead of an index into its lexical environment",
                     ));
@@ -11460,7 +11461,7 @@ impl<'a> Lowering<'a> {
                 ) => producer_env
                     .get(index as usize)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhEnvironmentTransport",
                             format!(
                                 "the transport morphism names lexical environment index {index} outside the composed producer environment's {} bindings",
@@ -11479,7 +11480,7 @@ impl<'a> Lowering<'a> {
                     .get(slot as usize)
                     .cloned()
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "CheckedIhEnvironmentTransport",
                             format!(
                                 "the transport morphism names entry-frame slot {slot} outside the destination's {} ABI operands",
@@ -11568,13 +11569,13 @@ impl<'a> Lowering<'a> {
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let identity = identity.clone();
         let defining = self.defining_unit.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-local composition was reached with no unit currently being defined",
             )
         })?;
         let defining_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fusion-local composition was reached with no emission owner bound for the \
                  context currently being defined",
@@ -11589,7 +11590,7 @@ impl<'a> Lowering<'a> {
         // ACTUAL computational stack head, that head's exact origin, and the
         // target's own selected-body continuation origin.
         let Some(EliminatorFrame::Computational(head)) = eliminators.first() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "an Inner composition was reached with no computational frame at the head of the \
                  eliminator stack; the detached-result seat holds none, and this refuses rather \
@@ -11601,7 +11602,7 @@ impl<'a> Lowering<'a> {
             .fusion_composed_edge(&identity)
             .cloned()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     "an Inner composition seat was reached for an identity with no composed edge; \
                      the fork above selected it, so a disagreement here means two authorities \
@@ -11610,7 +11611,7 @@ impl<'a> Lowering<'a> {
             })?;
         let discharged = edge.consumer_continuation_origin();
         if head.static_origin != discharged {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "an Inner composition would answer for continuation {discharged:?} while the \
@@ -11639,7 +11640,7 @@ impl<'a> Lowering<'a> {
             .fusion_compositions
             .as_mut()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     "a fusion-local composition was reached with no composition ledger open; the \
                      realization would then be affine-unaccounted, and an unconsumed plan member \
@@ -11742,14 +11743,14 @@ impl<'a> Lowering<'a> {
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let identity = identity.clone();
         let defining = self.defining_unit.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a required-consumer realization was reached with no unit currently being \
                  defined",
             )
         })?;
         let defining_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a required-consumer realization was reached with no emission owner bound for \
                  the context currently being defined",
@@ -11765,14 +11766,14 @@ impl<'a> Lowering<'a> {
             ContinuationOperandEnvironment::DirectEmission,
         )?;
         let Some(EliminatorFrame::Computational(head)) = eliminators.first() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a required-consumer realization has no computational frame at the head of its \
                  eliminator stack",
             ));
         };
         if head.static_origin != operands.body.continuation_origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "a required-consumer realization would answer for continuation {:?}, but \
@@ -11784,14 +11785,14 @@ impl<'a> Lowering<'a> {
         let source = required.source();
         let suffix = &eliminators[1..];
         let Some(EliminatorFrame::Computational(source_frame)) = suffix.first() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a required-consumer realization has no source-level computational consumer \
                  after the frame its target body discharges",
             ));
         };
         if source_frame.static_origin != source.eliminator_origin() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "a required-consumer realization projects source eliminator {:?}, but the \
@@ -11807,14 +11808,14 @@ impl<'a> Lowering<'a> {
         );
         let Some(EliminatorFrame::Computational(required_frame)) = suffix.get(required_index)
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a required-consumer realization has no computational frame at the projected \
                  consumer level",
             ));
         };
         if required_frame.static_origin != required.eliminator_origin() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "a required-consumer realization projects required eliminator {:?}, but the \
@@ -11872,7 +11873,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<RoutedAnswer, CraneliftBackendError> {
         let identity = identity.clone();
         let defining = self.defining_unit.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a continuation claim was reached with no unit currently being defined",
             )
@@ -11883,7 +11884,7 @@ impl<'a> Lowering<'a> {
         // lowers a raw body and would otherwise be mistaken for that raw body's
         // predeclared owner, which is the whole conflation being removed.
         let defining_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a continuation claim was reached with no emission owner bound for the context \
                  currently being defined",
@@ -11896,7 +11897,7 @@ impl<'a> Lowering<'a> {
             .get(&identity)
             .cloned()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
                         "the claimed continuation target was not declared into this function \
@@ -11934,7 +11935,7 @@ impl<'a> Lowering<'a> {
                     .map(|call| call.function)
                     .find(|function| *function != exact_target.function)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             "the D4 emitted-ref substitution found no other unit-call target \
                              declared into this function; that is a fact about this function's \
@@ -11994,7 +11995,7 @@ impl<'a> Lowering<'a> {
                     })
                     .map(|call| call.function)
                     .ok_or_else(|| {
-                        unsupported(
+                        unsupported(LoweringCause::PlannerInvariant,
                             "ContinuationSpecialization",
                             "the D7 same-shaped redirect found no DISTINCT target with the same \
                              declared arity and capture count declared into this function; per \
@@ -12038,7 +12039,7 @@ impl<'a> Lowering<'a> {
                 .map(|unit| ContinuationEmissionOwner::Predeclared(unit.function()))
                 .find(|owner| *owner != defining_owner)
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",
                         "the D4 wrong-owner control found no planned unit other than the one being \
                          defined; a control with no wrong owner to present must fail loudly rather \
@@ -12051,7 +12052,7 @@ impl<'a> Lowering<'a> {
         #[cfg(not(test))]
         let claimed_owner = defining_owner;
         let ledger = self.continuation_claims.as_mut().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a continuation claim was reached with no open claim ledger",
             )
@@ -12350,7 +12351,7 @@ impl<'a> Lowering<'a> {
             [] => return Ok(lowered),
             [edge] => *edge,
             _ => {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
                         "the detached-result seat projected {} undischarged causal calls onto one \
@@ -12395,7 +12396,7 @@ impl<'a> Lowering<'a> {
             ..
         }) = &lowered
         else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a projected causal call reached the detached-result seat with a unit result that \
                  is not a specialized constructor, so the planned producer constructor it must \
@@ -12406,7 +12407,7 @@ impl<'a> Lowering<'a> {
             .static_transition_plan
             .constructor_symbol_identity(edge.producer_construct_origin)?;
         if *synthesized_identity != Some(planned_identity) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "the unit result at a projected causal edge is not the planner's own constructor \
                  for that edge's producer Construct origin",
@@ -12425,7 +12426,7 @@ impl<'a> Lowering<'a> {
         #[cfg(not(test))]
         let position = edge.recursive_position as usize;
         if position >= args.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 "a projected causal edge names a ruled recursive position outside the planned \
                  constructor's field run",
@@ -12437,7 +12438,7 @@ impl<'a> Lowering<'a> {
             .into_iter()
             .find(|unit| unit.id() == edge.identity.target())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     "the projected target has no continuation unit",
                 )
@@ -12477,7 +12478,7 @@ impl<'a> Lowering<'a> {
         let nonrecursive_declared = ordinary_declared
             .checked_sub(unit.worker_capture_count())
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "ContinuationSpecialization",
                     format!(
                         "this continuation declares {ordinary_declared} ordinary parameters but its \
@@ -12488,7 +12489,7 @@ impl<'a> Lowering<'a> {
                 )
             })?;
         if args.len() != nonrecursive_declared + 1 {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationSpecialization",
                 format!(
                     "the planned producer constructor has {} fields but its continuation declares \
@@ -12587,7 +12588,7 @@ impl<'a> Lowering<'a> {
             return Ok(None);
         };
         if matched.next().is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "two outstanding fused regions claim one consuming call occurrence, so which \
                  region this invocation belongs to is undetermined",
@@ -12618,13 +12619,13 @@ impl<'a> Lowering<'a> {
 
         // ---- CLOSURE, COMPLETE, BEFORE ANY MUTATION.
         let defining = self.defining_unit.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fused consuming call was reached with no unit currently being defined",
             )
         })?;
         let defining_owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fused consuming call was reached with no emission owner bound",
             )
@@ -12674,7 +12675,7 @@ impl<'a> Lowering<'a> {
             || r_target
                 .is_some_and(|target| defining_owner == ContinuationEmissionOwner::Specialization(target));
         if claim.consumer_owner() != defining || !owner_is_lawful {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fused consuming call was reached outside both the claim's consumer owner and \
                  the region's own fused definition; only the external call emitted in the \
@@ -12711,7 +12712,7 @@ impl<'a> Lowering<'a> {
             }
         };
         if checked_consuming_call != claim.consuming_call() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "the selected fused consuming Call occurrence {checked_consuming_call:?} is \
@@ -12724,7 +12725,7 @@ impl<'a> Lowering<'a> {
         if worker.body_origin != claim.producer_body()
             || claim.producer_body() != claim.redirect().callee_origin()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "a fused consuming call's checked worker body {:?} is not the claim's producer \
@@ -12742,7 +12743,7 @@ impl<'a> Lowering<'a> {
         // content of the parameter half, and skipping it for one route is how a
         // second route comes to assemble a different run.
         let visited = visited_arguments.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fused consuming call was reached by a consumer that does not report the \
                  argument origins it visited, so the claim's ordered parameter projection cannot \
@@ -12750,7 +12751,7 @@ impl<'a> Lowering<'a> {
             )
         })?;
         if visited != claim.invocation_parameters() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "a fused consuming call visited argument origins {visited:?} where the \
@@ -12761,7 +12762,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         if inputs.len() != visited.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "a fused consuming call lowered a different number of operands than argument \
                  origins it visited",
@@ -12770,7 +12771,7 @@ impl<'a> Lowering<'a> {
         // The declared fusion target, at the claim-issued seat. Not searched for.
         let seat = claim.seat();
         let target = self.function_local.unit_calls.get(&seat).cloned().ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "this function declares no fused-region target at the claim-issued seat \
@@ -12786,14 +12787,14 @@ impl<'a> Lowering<'a> {
         // target/lookup authority, that constructor gains a claim-independent
         // path, or another writer or map merge can populate a claim seat.
         if !fusion_target_carries_claim_authority(&target, claim, seat) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "the target declared at the claim-issued seat does not carry the claim's own \
                  lookup and call-site authority",
             ));
         }
         if inputs.len() != target.header.parameters as usize {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "a fused consuming call supplies {} ordinary operands but the declared fused \
@@ -12825,7 +12826,7 @@ impl<'a> Lowering<'a> {
                 LoweringOperand::Residual(_) => false,
                 LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => false,
             } {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     format!(
                         "a fused consuming call's ordinary operand at position {position} is a \
@@ -12846,7 +12847,7 @@ impl<'a> Lowering<'a> {
                 ..
             } = input.coordinate
             else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     format!(
                         "the fused region's checked input at ordinal {ordinal} is not an \
@@ -12856,7 +12857,7 @@ impl<'a> Lowering<'a> {
                 ));
             };
             if source_owner != defining {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticContinuationFusion",
                     format!(
                         "the fused region's checked input at ordinal {ordinal} is owned by \
@@ -12870,7 +12871,7 @@ impl<'a> Lowering<'a> {
                 .get(source_abi_position as usize)
                 .cloned()
                 .ok_or_else(|| {
-                    unsupported(
+                    unsupported(LoweringCause::PlannerInvariant,
                         "StaticContinuationFusion",
                         format!(
                             "the fused region's checked input at ordinal {ordinal} names entry ABI \
@@ -12929,7 +12930,7 @@ impl<'a> Lowering<'a> {
             }
         }
         if !fusion_capture_projection_is_exact(claim.inputs(), &captures) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 "the fused call's capture suffix does not preserve the claim's exact ordered \
                  input projection; a capture was dropped, duplicated, reordered or read from \
@@ -12937,7 +12938,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         if captures.len() != target.header.captures as usize {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticContinuationFusion",
                 format!(
                     "the checked input run projects {} captures but the declared fused target \
@@ -13156,7 +13157,7 @@ impl<'a> Lowering<'a> {
         }
 
         let declared_arity = u32::try_from(params.len()).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "StaticWorkerBinding",
                 "source closure parameter count exceeds addressable range",
             )
@@ -13223,7 +13224,7 @@ impl<'a> Lowering<'a> {
         //    builds it from the retained children, so a disagreement means the
         //    two walks diverged rather than that the source is odd.
         if captures.len() != source_capture_count {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "retained definition declares {source_capture_count} lexical captures but \
@@ -13247,7 +13248,7 @@ impl<'a> Lowering<'a> {
             .worker_templates
             .get(&body_origin)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "no raw worker template for body origin {body_origin:?} in this function"
@@ -13266,7 +13267,7 @@ impl<'a> Lowering<'a> {
         // origin to the body origin was checking the wrong end of the pair;
         // both ends are now checked against what each actually names.
         if target.call_site_origin != body_origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "declared unit call is keyed by source body {:?} but the worker body origin \
@@ -13283,7 +13284,7 @@ impl<'a> Lowering<'a> {
 
         // 4. The descriptor's parameter count is the declared arity.
         if target.header.parameters != declared_arity {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "worker descriptor declares {} parameters but the source closure declares \
@@ -13295,13 +13296,13 @@ impl<'a> Lowering<'a> {
 
         // 5. The descriptor's capture count is the capture vector's length.
         let descriptor_captures = usize::try_from(target.header.captures).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "StaticWorkerBinding",
                 "worker descriptor capture count exceeds addressable range",
             )
         })?;
         if descriptor_captures != captures.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "worker descriptor declares {descriptor_captures} captures but {} were \
@@ -13317,7 +13318,7 @@ impl<'a> Lowering<'a> {
         //    derived from it -- a slot run that disagrees with the header is a
         //    descriptor this binding must not carry.
         if target.slots.len() != target.offsets.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "worker descriptor has {} slots but {} offsets",
@@ -13337,7 +13338,7 @@ impl<'a> Lowering<'a> {
             .filter(|slot| matches!(slot.kind, AbiSlotKind::Capture))
             .count();
         if slot_parameters != declared_arity as usize || slot_captures != descriptor_captures {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 format!(
                     "worker descriptor slot run declares {slot_parameters} parameters and \
@@ -13347,7 +13348,7 @@ impl<'a> Lowering<'a> {
             ));
         }
         if target.header.frame_bytes == 0 && !target.slots.is_empty() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticWorkerBinding",
                 "worker descriptor declares a non-empty slot run in a zero-byte frame",
             ));
@@ -13405,7 +13406,7 @@ impl<'a> Lowering<'a> {
         // not have to re-litigate provenance it was handed.
         if let ContinuationDischarge::ComposedSourceContinuation(identity) = &discharge {
             if Some(identity.emission_owner()) != self.defining_emission_owner {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "StaticWorkerBinding",
                     format!(
                         "a composed causal authority names emission owner {:?}, but this binding \
@@ -13621,7 +13622,7 @@ impl<'a> Lowering<'a> {
                 // across a recursive CFG edge means is not ruled. Refusing is
                 // the answer that cannot be wrong.
                 LoweringOperand::Specialized(Lowered::RecursiveBackedge) => {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "StaticWorkerBinding",
                         "a constructor transporting a static worker field also reached a \
                          recursive CFG backedge argument, and collapsing the template to that \
@@ -13636,7 +13637,7 @@ impl<'a> Lowering<'a> {
                 // `transfer_constructor_operands`, and that allocates before it
                 // stores. Refusing here is *before the first allocation*.
                 LoweringOperand::Carried(_) => {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "StaticWorkerBinding",
                         "a constructor transporting a static worker field cannot also carry a \
                          boundary word: the template has no runtime representation, so the \
@@ -13644,7 +13645,7 @@ impl<'a> Lowering<'a> {
                          of any allocation",
                     ));
                 }
-                LoweringOperand::Residual(_) => return Err(unsupported(
+                LoweringOperand::Residual(_) => return Err(unsupported(LoweringCause::Fragment,
                     "StaticWorkerBinding",
                     "a private residual cannot be stored beside a static worker template",
                 )),
@@ -13678,24 +13679,24 @@ impl<'a> Lowering<'a> {
         child_origin: StaticOriginId,
         seat: StaticOriginId,
     ) -> Result<Vec<(RecursiveCarrierRole, CarriedBoundaryWord)>, CraneliftBackendError> {
-        let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+        let owner = self.defining_emission_owner.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "a checked-IH store has no emission owner",
         ))?;
         if owner != disposition.owner {
-            return Err(unsupported("RecursiveResidual", "a checked-IH store has a foreign emission owner"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has a foreign emission owner"));
         }
-        let env = emission_env.ok_or_else(|| unsupported(
+        let env = emission_env.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "a checked-IH store has no selected case environment",
         ))?;
         let unit = self.static_transition_plan.continuation_units()?.into_iter()
             .find(|unit| unit.id() == disposition.specialization)
-            .ok_or_else(|| unsupported("RecursiveResidual", "a checked-IH store has no unit"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has no unit"))?;
         let context = self.static_transition_plan.continuation_contexts()?.into_iter()
             .find(|context| context.id() == disposition.context)
-            .ok_or_else(|| unsupported("RecursiveResidual", "a checked-IH store has no context"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has no context"))?;
         let slot = self.static_transition_plan
             .recursive_carrier_for_specialization(disposition.specialization)?
-            .ok_or_else(|| unsupported("RecursiveResidual", "a checked-IH store has no issued slot"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has no issued slot"))?;
         let variant = slot.variant(disposition.specialization)?;
         let edge = slot.edge(disposition.specialization,
             RecursiveCarrierStoreKind::CheckedIhForce, parent, owner)?;
@@ -13705,13 +13706,13 @@ impl<'a> Lowering<'a> {
             || unit.worker_closure_origin() != seat
             || context.enclosing_specialization() != unit.id()
         {
-            return Err(unsupported("RecursiveResidual", "a checked-IH store changed its issued source schema"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store changed its issued source schema"));
         }
         let frame = self.retained_body_occurrence(unit.continuation_origin())?;
         let RuntimeExpr::ComputationalMatch { cases, .. } = frame.expr else {
-            return Err(unsupported("RecursiveResidual", "a checked-IH store has no computational case"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has no computational case"));
         };
-        let case = cases.get(unit.producer_alternative() as usize).ok_or_else(|| unsupported(
+        let case = cases.get(unit.producer_alternative() as usize).ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "a checked-IH store names a missing selected case",
         ))?;
         let claims = context.captures()?;
@@ -13720,7 +13721,7 @@ impl<'a> Lowering<'a> {
             &unit.ordinary_envelope()?, claims.len(),
         )?;
         if run.len() != env.len() || position as u32 != disposition.position {
-            return Err(unsupported("RecursiveResidual", "a checked-IH store's case environment changed"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store's case environment changed"));
         }
         let mut worker = None;
         let mut inputs = vec![None; claims.len()];
@@ -13728,29 +13729,29 @@ impl<'a> Lowering<'a> {
             match source {
                 super::units::ContinuationCaseBinderSource::InductionHypothesis => {
                     let LoweringEnvironmentBinding::StaticWorker(bound) = &env[index] else {
-                        return Err(unsupported("RecursiveResidual", "a checked-IH store's IH is not a static worker"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store's IH is not a static worker"));
                     };
                     if worker.replace(bound.clone()).is_some() {
-                        return Err(unsupported("RecursiveResidual", "a checked-IH store has two worker bindings"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has two worker bindings"));
                     }
                 }
                 super::units::ContinuationCaseBinderSource::ContinuationInput(ordinal) => {
                     let LoweringEnvironmentBinding::Value(value) = &env[index] else {
-                        return Err(unsupported("RecursiveResidual", "a checked-IH store's input is not a value"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store's input is not a value"));
                     };
-                    let entry = inputs.get_mut(ordinal).ok_or_else(|| unsupported(
+                    let entry = inputs.get_mut(ordinal).ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                         "RecursiveResidual", "a checked-IH input ordinal is outside its issued run",
                     ))?;
                     if entry.replace(value.clone()).is_some() {
-                        return Err(unsupported("RecursiveResidual", "a checked-IH input is bound twice"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH input is bound twice"));
                     }
                 }
                 _ => {}
             }
         }
-        let worker = worker.ok_or_else(|| unsupported("RecursiveResidual", "a checked-IH store has no IH binding"))?;
+        let worker = worker.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has no IH binding"))?;
         if worker.closure_origin != seat || worker.captures.len() != unit.worker_capture_count() {
-            return Err(unsupported("RecursiveResidual", "a checked-IH store's worker disagrees with its minting record"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store's worker disagrees with its minting record"));
         }
         let mut operands = Vec::with_capacity(variant.roles.len().saturating_sub(1));
         if let Some(label) = variant.label {
@@ -13762,7 +13763,7 @@ impl<'a> Lowering<'a> {
         }
         for (ordinal, value) in worker.captures.into_iter().enumerate() {
             let role = RecursiveCarrierRole::WorkerCapture {
-                seat, ordinal: u32::try_from(ordinal).map_err(|_| unsupported(
+                seat, ordinal: u32::try_from(ordinal).map_err(|_| unsupported(LoweringCause::PlannerInvariant,
                     "RecursiveResidual", "a checked-IH worker ordinal exceeds its ABI",
                 ))?,
             };
@@ -13771,11 +13772,11 @@ impl<'a> Lowering<'a> {
         }
         for (ordinal, input) in claims.iter().enumerate() {
             if input.ordinal as usize != ordinal {
-                return Err(unsupported("RecursiveResidual", "checked-IH context claims are out of order"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "checked-IH context claims are out of order"));
             }
             let role = RecursiveCarrierRole::ContinuationInput { ordinal: input.ordinal };
             variant.role_index(role)?;
-            let value = inputs[ordinal].take().ok_or_else(|| unsupported(
+            let value = inputs[ordinal].take().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "a checked-IH context input has no selected case source",
             ))?;
             operands.push((role, value));
@@ -13819,7 +13820,7 @@ impl<'a> Lowering<'a> {
     ) -> Result<Vec<(RecursiveCarrierRole, CarriedBoundaryWord)>, CraneliftBackendError> {
         if let RecursiveResidualChildKind::CheckedIhForce { child: child_origin, seat, .. } = disposition.child {
             if self.static_transition_plan.child_static_origin(parent, position)? != child_origin {
-                return Err(unsupported("RecursiveResidual", "a checked-IH store has a foreign child occurrence"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a checked-IH store has a foreign child occurrence"));
             }
             return self.recursive_residual_checked_ih_fields(
                 builder, parent, position, emission_env, disposition, child_origin, seat,
@@ -13828,34 +13829,34 @@ impl<'a> Lowering<'a> {
         let LoweringOperand::Specialized(Lowered::Closure {
             captures, body, boundary_environment, ..
         }) = child else {
-            return Err(unsupported("RecursiveResidual", "a creation-site residual has no literal lexical-closure capture run"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a creation-site residual has no literal lexical-closure capture run"));
         };
         if captures.len() != disposition.worker_captures as usize {
-            return Err(unsupported("RecursiveResidual", "the creation site's literal worker captures disagree with the issued W run"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation site's literal worker captures disagree with the issued W run"));
         }
         let owner = self.defining_emission_owner.ok_or_else(|| {
-            unsupported("RecursiveResidual", "the creation site has no active emission owner")
+            unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation site has no active emission owner")
         })?;
         if owner != disposition.owner {
-            return Err(unsupported("RecursiveResidual", "the creation site's emission owner differs from its interned specialization"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation site's emission owner differs from its interned specialization"));
         }
         let context = self.static_transition_plan.continuation_contexts()?.into_iter()
             .find(|view| view.id() == disposition.context)
-            .ok_or_else(|| unsupported("RecursiveResidual", "the creation site has no declared generated context"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation site has no declared generated context"))?;
         let unit = self.static_transition_plan.continuation_units()?.into_iter()
             .find(|view| view.id() == disposition.specialization)
-            .ok_or_else(|| unsupported("RecursiveResidual", "the creation site has no interned specialization"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation site has no interned specialization"))?;
         if context.enclosing_specialization() != unit.id()
             || unit.producer_construct_origin() != parent
             || unit.recursive_position() as usize != position
             || unit.emission_owner() != owner
             || unit.worker_body_origin() != *body
         {
-            return Err(unsupported("RecursiveResidual", "the context and its specialization disagree on the creation field"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the context and its specialization disagree on the creation field"));
         }
         let claims = context.captures()?;
         if claims.len() != disposition.context_captures as usize {
-            return Err(unsupported("RecursiveResidual", "the creation site's Capture run disagrees with its issued schema"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation site's Capture run disagrees with its issued schema"));
         }
         let point = self.static_transition_plan.per_emitter_materializations().iter()
             .find(|point| point.specialization == disposition.specialization
@@ -13863,15 +13864,15 @@ impl<'a> Lowering<'a> {
                 && point.recursive_position as usize == position
                 && point.emission_origin == parent && point.owner == owner
                 && point.kind == MaterializationKind::ConstructEmission)
-            .cloned().ok_or_else(|| unsupported(
+            .cloned().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "the creation-site residual has no per-emitter materialization",
             ))?;
         if point.captures.len() != captures.len() + claims.len() {
-            return Err(unsupported("RecursiveResidual", "the creation-site materialization has an incomplete capture run"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation-site materialization has an incomplete capture run"));
         }
         let slot = self.static_transition_plan
             .recursive_carrier_for_specialization(disposition.specialization)?
-            .ok_or_else(|| unsupported("RecursiveResidual", "the creation writer has no issued slot"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation writer has no issued slot"))?;
         let variant = slot.variant(disposition.specialization)?.clone();
         let edge = slot.edge(disposition.specialization, RecursiveCarrierStoreKind::ConstructEmission,
             parent, owner)?;
@@ -13881,9 +13882,9 @@ impl<'a> Lowering<'a> {
             || child_origin != unit.worker_closure_origin()
             || Some(variant.record) != disposition.record
         {
-            return Err(unsupported("RecursiveResidual", "the literal Child disagrees with its governed construct edge"));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the literal Child disagrees with its governed construct edge"));
         }
-        let env = emission_env.ok_or_else(|| unsupported(
+        let env = emission_env.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
             "RecursiveResidual", "the creation site did not retain the emitter's lexical environment",
         ))?;
         let mut operands = Vec::with_capacity(variant.roles.len() - 1);
@@ -13896,7 +13897,7 @@ impl<'a> Lowering<'a> {
         }
         for (index, value) in captures.iter().enumerate() {
             let capture = &point.captures[index];
-            let ordinal = u32::try_from(index).map_err(|_| unsupported(
+            let ordinal = u32::try_from(index).map_err(|_| unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "a literal worker capture ordinal exceeds the carrier ABI",
             ))?;
             let role = RecursiveCarrierRole::WorkerCapture {
@@ -13906,7 +13907,7 @@ impl<'a> Lowering<'a> {
             // operands. A generated owner's source-slot NoClaim is not used
             // as permission or as a way to reconstruct those operands.
             if capture.run != CaptureRun::Worker || capture.ordinal != ordinal {
-                return Err(unsupported("RecursiveResidual", "a literal worker capture is outside its issued role run"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a literal worker capture is outside its issued role run"));
             }
             variant.role_index(role)?;
             operands.push((role, value.clone()));
@@ -13916,10 +13917,10 @@ impl<'a> Lowering<'a> {
             if capture.run != CaptureRun::Context || capture.ordinal != input.ordinal
                 || capture.ordinal as usize != index || capture.source != Some(input.coordinate)
             {
-                return Err(unsupported("RecursiveResidual", "a creation-site Capture ordinal disagrees with its per-emitter source"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a creation-site Capture ordinal disagrees with its per-emitter source"));
             }
             let PerEmitterCaptureClaim::FinalizedFrame(claim) = &capture.claim else {
-                return Err(unsupported("RecursiveResidual", "a creation-site Capture has no finalized emitter-frame claim"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a creation-site Capture has no finalized emitter-frame claim"));
             };
             let claim = *claim;
             let slot = self.resolve_direct_emission_claim(
@@ -13935,12 +13936,12 @@ impl<'a> Lowering<'a> {
             )?;
             let value = match claim {
                 ContinuationEnvironmentClaim::CurrentLexical { .. } => env.get(slot as usize)
-                    .ok_or_else(|| unsupported("RecursiveResidual", "a creation-site lexical claim is outside the emitter environment"))?
+                    .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a creation-site lexical claim is outside the emitter environment"))?
                     .value_at("a creation-site residual Capture")?,
                 ContinuationEnvironmentClaim::EntryFrame { .. } => {
                     operands.push((RecursiveCarrierRole::ContinuationInput { ordinal: input.ordinal },
                         self.function_local.defining_abi_operands.get(slot as usize)
-                            .cloned().ok_or_else(|| unsupported("RecursiveResidual", "a creation-site frame claim is outside its declared ABI run"))?));
+                            .cloned().ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a creation-site frame claim is outside its declared ABI run"))?));
                     continue;
                 }
             };
@@ -14057,7 +14058,7 @@ impl<'a> Lowering<'a> {
                     && self.function_local.static_response_owner.is_none()
                     && self.static_transition_plan.specialized_response_at_vis(origin)
                 {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "StaticResponseDeferred",
                         "a deferred host response is compiler control and can only enter its exact response owner",
                     ));
@@ -14090,13 +14091,13 @@ impl<'a> Lowering<'a> {
                 RecursiveCarrierStore::Boxed(boxed) => IssuedCarrierStore::Boxed(boxed.clone()),
             });
             if store.is_some() && matches!(args[position], LoweringOperand::Residual(_)) {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "RecursiveResidual", "an issued residual slot received an already-residual operand",
                 ));
             }
             let issued = match store {
                 Some(IssuedCarrierStore::Residual(disposition)) => {
-                    let record = disposition.record.ok_or_else(|| unsupported(
+                    let record = disposition.record.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                         "RecursiveResidual", "the creation-site residual has no governed private Record",
                     ))?;
                     let fields = self.recursive_residual_creation_fields(
@@ -14104,41 +14105,41 @@ impl<'a> Lowering<'a> {
                     )?;
                     let slot = self.static_transition_plan
                         .recursive_carrier_for_specialization(disposition.specialization)?
-                        .ok_or_else(|| unsupported("RecursiveResidual", "a residual writer lost its issued slot"))?;
+                        .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a residual writer lost its issued slot"))?;
                     let variant = slot.variant(disposition.specialization)?.clone();
                     if variant.schema != RecursiveCarrierMemberSchema::Residual
                         || (disposition.child == RecursiveResidualChildKind::LexicalClosure
                             && variant.record != record)
                         || fields.len() + 1 != variant.roles.len()
                         || fields.len() + 1 != disposition.field_count() {
-                        return Err(unsupported("RecursiveResidual", "the creation-site record changed after issuance"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the creation-site record changed after issuance"));
                     }
                     Some((record, fields, variant, RecursiveCarrierSlotKey::of(slot)))
                 }
                 Some(IssuedCarrierStore::Boxed(boxed)) => {
-                    let record = boxed.record.ok_or_else(|| unsupported(
+                    let record = boxed.record.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                         "RecursiveResidual", "the boxed creation site has no governed private Record",
                     ))?;
                     let slot = self.static_transition_plan
                         .recursive_carrier_for_specialization(boxed.specialization)?
-                        .ok_or_else(|| unsupported("RecursiveResidual", "a boxed writer lost its issued slot"))?;
+                        .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a boxed writer lost its issued slot"))?;
                     let variant = slot.variant(boxed.specialization)?.clone();
                     let edge = slot.edge(boxed.specialization, RecursiveCarrierStoreKind::ConstructEmission,
-                        origin, owner.ok_or_else(|| unsupported(
+                        origin, owner.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                             "RecursiveResidual", "a boxed writer lost its emission owner",
                         ))?)?;
                     let child_origin = self.static_transition_plan.child_static_origin(origin, position)?;
                     let LoweringOperand::Specialized(Lowered::Closure {
                         boundary_environment: Some(child_record), ..
                     }) = &args[position] else {
-                        return Err(unsupported("RecursiveResidual", "a boxed writer has no ordinary constructor Child"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a boxed writer has no ordinary constructor Child"));
                     };
                     if variant.schema != RecursiveCarrierMemberSchema::Boxed
                         || variant.record != record || variant.label != Some(boxed.label)
                         || variant.roles != [RecursiveCarrierRole::Child, RecursiveCarrierRole::Label]
                         || !matches!(edge.child, RecursiveCarrierChild::ConstructChild { origin, record }
                             if origin == child_origin && record == *child_record) {
-                        return Err(unsupported("RecursiveResidual", "a boxed writer changed its issued Child or variant"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a boxed writer changed its issued Child or variant"));
                     }
                     let slot_key = RecursiveCarrierSlotKey::of(slot);
                     let label = i64::from(boxed.label);
@@ -14191,18 +14192,18 @@ impl<'a> Lowering<'a> {
             };
             if let Some((record, fields, variant, slot_key)) = &residual_fields[position] {
                 if fields.len() + 1 != variant.roles.len() {
-                    return Err(unsupported("RecursiveResidual", "a construct carrier writer changed its issued variant"));
+                    return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a construct carrier writer changed its issued variant"));
                 }
                 let mut assigned = vec![None; variant.roles.len()];
                 assigned[variant.role_index(RecursiveCarrierRole::Child)?] = Some(child);
                 for (role, word) in fields {
                     let index = variant.role_index(*role)?;
                     if assigned[index].replace(*word).is_some() {
-                        return Err(unsupported("RecursiveResidual", "a construct carrier role was supplied twice"));
+                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a construct carrier role was supplied twice"));
                     }
                 }
                 if assigned.iter().any(Option::is_none) {
-                    return Err(unsupported("RecursiveResidual", "a construct carrier role has no operand"));
+                    return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a construct carrier role has no operand"));
                 }
                 let wrapped = self.emit_checked_aggregate_alloc(
                     builder, GovernedAllocationSite::CarriedConstructor,
@@ -14359,10 +14360,10 @@ impl<'a> Lowering<'a> {
             return Ok(None);
         };
         let alternative = u32::try_from(alternative).map_err(|_| {
-            unsupported("ComputationalMatch", "case index exceeds addressable range")
+            unsupported(LoweringCause::Capacity, "ComputationalMatch", "case index exceeds addressable range")
         })?;
         let recursive_position = u32::try_from(position).map_err(|_| {
-            unsupported(
+            unsupported(LoweringCause::Capacity,
                 "ComputationalMatch",
                 "recursive position exceeds addressable range",
             )
@@ -14385,7 +14386,7 @@ impl<'a> Lowering<'a> {
         };
 
         let Lowered::Closure { captures, .. } = lowered else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalMatch",
                 format!(
                     "the planner issued a composed-call target at recursive position \
@@ -14520,7 +14521,7 @@ impl<'a> Lowering<'a> {
         for target in &targets {
             if *target.call_identity() == identity {
                 if paired.is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationDischarge",
                         "two composed-call targets carry one causal identity, so a discharge \
                          cannot say which coordinate it answers for",
@@ -14530,7 +14531,7 @@ impl<'a> Lowering<'a> {
             }
         }
         let paired = paired.ok_or_else(|| {
-            unsupported(
+            unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationDischarge",
                 "a composed discharge presents a causal identity no composed-call target is \
                  paired with, so the authority did not come from the planner target this \
@@ -14543,7 +14544,7 @@ impl<'a> Lowering<'a> {
             .len()
             .checked_add(paired.worker().declared_arity() as usize)
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "ContinuationDischarge",
                     "declared operand run exceeds range",
                 )
@@ -14552,7 +14553,7 @@ impl<'a> Lowering<'a> {
             || paired.worker().declared_arity() != worker.declared_arity
             || paired.worker().captures().len() != worker.captures.len()
         {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationDischarge",
                 format!(
                     "a composed discharge's paired target names worker body {:?} with arity {} \
@@ -14584,7 +14585,7 @@ impl<'a> Lowering<'a> {
         #[cfg(not(test))]
         let claiming = self.defining_emission_owner;
         if claiming != Some(identity.emission_owner()) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ContinuationDischarge",
                 format!(
                     "a composed discharge claims a causal call owned by {:?}, but the function \
@@ -14664,7 +14665,7 @@ impl<'a> Lowering<'a> {
         record_branched_scrutinee_unit_body_entry();
         let eliminator = self.retained_body_occurrence(eliminator_origin)?;
         let RuntimeExpr::ComputationalMatch { scrutinee, cases, .. } = eliminator.expr else {
-            return Err(backend_module(
+            return Err(backend_module(LoweringCause::PlannerInvariant,
                 "recursive-position metadata names a non-computational eliminator".to_string(),
             ));
         };
@@ -14680,10 +14681,10 @@ impl<'a> Lowering<'a> {
         // slot declares R for every member of its exact flow, including any
         // Boxed members. An absent slot retains the ordinary Active descent.
         let case_index = cases.iter().position(|case| &case.constructor == selected_constructor)
-            .ok_or_else(|| unsupported("RecursiveResidual", "the selected constructor is absent from its computational frame"))?;
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the selected constructor is absent from its computational frame"))?;
         let identity = self.static_transition_plan.case_constructor_identity(eliminator_origin, case_index)?;
         let position = u32::try_from(position).map_err(|_| {
-            unsupported("RecursiveResidual", "a recursive position exceeds the planner's ABI")
+            unsupported(LoweringCause::Capacity, "RecursiveResidual", "a recursive position exceeds the planner's ABI")
         })?;
         let candidates = self.static_transition_plan.recursive_residual_candidates(
             eliminator_origin, identity, position,
@@ -14693,7 +14694,7 @@ impl<'a> Lowering<'a> {
         )?;
         if let Some(slot) = slot {
             if slot.flow != candidates {
-                return Err(unsupported("RecursiveResidual", "the gate's candidate flow changed after slot issuance"));
+                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the gate's candidate flow changed after slot issuance"));
             }
         }
         // A residual may replace the Active descent only when the source
@@ -14709,11 +14710,11 @@ impl<'a> Lowering<'a> {
                 // A singleton issued slot has a wrapped member by the slot
                 // issuer's rule; an unwrapped singleton cannot mint Boxed.
                 if slot.variant(*candidate)?.schema != RecursiveCarrierMemberSchema::Residual {
-                    return Err(unsupported("RecursiveResidual", "a singleton residual gate has a boxed member"));
+                    return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a singleton residual gate has a boxed member"));
                 }
                 let body = self.static_transition_plan.continuation_units()?.into_iter()
                     .find(|unit| unit.id() == *candidate)
-                    .ok_or_else(|| unsupported("RecursiveResidual", "the gate's sole candidate has no worker body"))?
+                    .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the gate's sole candidate has no worker body"))?
                     .worker_body_origin();
                 Ok(Some(RecursiveUnitBodySelection::ResidualExact {
                     body, pending_outer_frames,
@@ -14728,7 +14729,7 @@ impl<'a> Lowering<'a> {
                     pending_outer_frames,
                 }))
             }
-            (Some(_), []) => Err(unsupported("RecursiveResidual", "an issued slot has no gate candidates")),
+            (Some(_), []) => Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "an issued slot has no gate candidates")),
         }
     }
 
@@ -14746,9 +14747,9 @@ impl<'a> Lowering<'a> {
     ) -> Result<(), CraneliftBackendError> {
         let slot = self.static_transition_plan.recursive_carrier_slot(
             eliminator, constructor, position,
-        )?.ok_or_else(|| unsupported("RecursiveResidual", "a labelled gate has no planner slot"))?;
+        )?.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "a labelled gate has no planner slot"))?;
         if slot.flow.len() < 2 || residual.slot() != RecursiveCarrierSlotKey::of(slot) {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "RecursiveResidual", "the labelled gate has no matching issued slot",
             ));
         }
@@ -14941,19 +14942,19 @@ impl<'a> Lowering<'a> {
             .iter_mut()
             .filter(|active| active.active_frame_origin == sink.active_frame_origin);
         let Some(active) = matches.next() else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the strict Ret sink has no exact active carried frame",
             ));
         };
         if matches.next().is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the strict Ret sink has more than one exact active carried frame",
             ));
         }
         if active.ret_sink.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the active carried frame received more than one strict Ret sink",
             ));
@@ -14988,34 +14989,34 @@ impl<'a> Lowering<'a> {
             } else {
                 "the strict Ret sink lookup names a different active carried frame"
             };
-            return Err(unsupported("ComposedReturnRetSink", message));
+            return Err(unsupported(LoweringCause::PlannerInvariant, "ComposedReturnRetSink", message));
         };
         if matches.next().is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the strict Ret sink lookup found more than one active carried frame",
             ));
         }
         let Some(sink) = active.ret_sink else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the active carried frame has no installed strict Ret sink",
             ));
         };
         if sink.active_frame_origin != active_frame_origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the installed strict Ret sink belongs to a different active frame",
             ));
         }
         if sink.ret_case_body_origin != ret_case_body_origin {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the installed strict Ret sink belongs to a different Ret case body",
             ));
         }
         if sink.ret_input_field_position != ret_input_field_position {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnRetSink",
                 "the installed strict Ret sink belongs to a different Ret input binder",
             ));
@@ -15070,7 +15071,7 @@ impl<'a> Lowering<'a> {
                 false,
             )
             .map_err(|error| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "ComposedReturnForwardRetAuthority",
                     format!(
                         "the selected forward Ret plan does not match the unique emission sink; \
@@ -15092,7 +15093,7 @@ impl<'a> Lowering<'a> {
                 )
             })?;
         if requested_field != proof.ret_input_field_position() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnForwardRetAuthority",
                 "the selected forward Ret plan does not match the unique emission sink",
             ));
@@ -15150,7 +15151,7 @@ impl<'a> Lowering<'a> {
                         .static_transition_plan
                         .checked_ih_forward_ret_plan_proof(access, transport)?
                         .ok_or_else(|| {
-                            unsupported(
+                            unsupported(LoweringCause::PlannerInvariant,
                                 "ComposedReturnForwardRetAuthority",
                                 "the duplicate-authority control lost its exact Tail plan",
                             )
@@ -15165,12 +15166,12 @@ impl<'a> Lowering<'a> {
         }
         let assessment = self.static_transition_plan
             .strict_ret_sink_assessment(proof.active_frame_origin())?
-            .ok_or_else(|| unsupported(
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnForwardRetAuthority",
                 "a formed Tail plan has no logical Ret input assessment",
             ))?;
         if assessment.ret_case_body_origin != proof.ret_case_body_origin() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComposedReturnForwardRetAuthority",
                 "the selected Tail plan disagrees with its assessed Ret body",
             ));
@@ -15467,7 +15468,7 @@ impl<'a> Lowering<'a> {
         // *around* the scrutinee, which needs a compile-time template for the
         // parent. Refused rather than approximated.
         if eliminator.deferred_constructor_case.is_some() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "BoundaryCarrier",
                 "a carried scrutinee reached a deferred constructor case, which \
                  reconstructs a compile-time constructor around the eliminated value",
@@ -15494,7 +15495,7 @@ impl<'a> Lowering<'a> {
                 .filter(|assessment| assessment.status == StrictRetSinkStatus::Ready)
                 .map(|assessment| {
                     let return_case = eliminator.cases.get(assessment.ret_case_index).ok_or_else(|| {
-                        unsupported("ComposedReturnRetSink", "the Ready Ret case index is absent at emission")
+                        unsupported(LoweringCause::PlannerInvariant, "ComposedReturnRetSink", "the Ready Ret case index is absent at emission")
                     })?;
                     Ok((assessment, return_case))
                 })
@@ -15511,7 +15512,7 @@ impl<'a> Lowering<'a> {
                 )?
                 .static_origin;
             if ret_case_body_origin != assessment.ret_case_body_origin {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComposedReturnRetSink",
                     "the Ready Ret body disagrees with the planned strict sink",
                 ));
@@ -15544,7 +15545,7 @@ impl<'a> Lowering<'a> {
             let mut seen = BTreeSet::new();
             for position in case.recursive_positions.iter().copied() {
                 if !seen.insert(position) || position >= case.argument_binders {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         format!(
                             "case {} has malformed recursive position {position}",
@@ -15578,7 +15579,7 @@ impl<'a> Lowering<'a> {
                 self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
                 #[cfg(feature = "px8-ds-test-support")]
                 {
-                    let emission_owner = self.defining_emission_owner.ok_or_else(|| backend_module(
+                    let emission_owner = self.defining_emission_owner.ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
                         "a validated owner Vis trap has no defining emission owner".to_string(),
                     ))?;
                     crate::cranelift_backend::planning::record_selected_pending_match_emission(
@@ -15591,7 +15592,7 @@ impl<'a> Lowering<'a> {
                 continue;
             }
             let binders = i64::try_from(case.argument_binders).map_err(|_| {
-                unsupported(
+                unsupported(LoweringCause::Capacity,
                     "BoundaryCarrier",
                     "a case binds more constructor arguments than the carrier ABI can count",
                 )
@@ -15630,7 +15631,7 @@ impl<'a> Lowering<'a> {
                 let return_body =
                     return_body.expect("a strict return case has a shared return-body block");
                 let [LoweringOperand::Carried(returned)] = children.as_slice() else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         "the strict return case did not bind one carried payload",
                     ));
@@ -15705,18 +15706,18 @@ impl<'a> Lowering<'a> {
                                     let residual = match children[position] {
                                         LoweringOperand::Residual(residual) => residual,
                                         LoweringOperand::Carried(_) | LoweringOperand::Specialized(_) => {
-                                            return Err(unsupported(
+                                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                                 "RecursiveResidual", "the bound gate child has no issued residual",
                                             ));
                                         }
                                     };
                                     let slot = self.static_transition_plan.recursive_carrier_for_specialization(
                                         disposition.specialization,
-                                    )?.ok_or_else(|| unsupported(
+                                    )?.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
                                         "RecursiveResidual", "the bound gate has no issued slot",
                                     ))?;
                                     if residual.slot() != RecursiveCarrierSlotKey::of(slot) {
-                                        return Err(unsupported("RecursiveResidual", "the bound gate names a foreign slot"));
+                                        return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the bound gate names a foreign slot"));
                                     }
                                     let _ = self.decode_residual_child(builder, residual)?;
                                 }
@@ -15727,12 +15728,12 @@ impl<'a> Lowering<'a> {
                         }) => {
                             selection.require_trivial_residual_continuation()?;
                             if selected as usize != position {
-                                return Err(unsupported("RecursiveResidual", "the selected label names a different recursive field"));
+                                return Err(unsupported(LoweringCause::PlannerInvariant, "RecursiveResidual", "the selected label names a different recursive field"));
                             }
                             let residual = match children[position] {
                                 LoweringOperand::Residual(residual) => residual,
                                 LoweringOperand::Carried(_) | LoweringOperand::Specialized(_) => {
-                                    return Err(unsupported(
+                                    return Err(unsupported(LoweringCause::PlannerInvariant,
                                         "RecursiveResidual", "the labelled gate child has no issued residual",
                                     ));
                                 }
@@ -15779,7 +15780,7 @@ impl<'a> Lowering<'a> {
             let mut frame_env = eliminator.env.to_vec();
             if let Some(retained) = eliminator.retained_scrutinee_index {
                 if retained > frame_env.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         "retained scrutinee index exceeds the frame environment",
                     ));
@@ -15985,7 +15986,7 @@ impl<'a> Lowering<'a> {
             });
             let defaulted = LoweringOperand::Specialized(Lowered::Trap(eliminator.default.clone()));
             if !self.seal_source_trap_branch(builder, &defaulted)? {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalMatch",
                     "the carried computational match's closed default did not seal its branch",
                 ));
@@ -16002,7 +16003,7 @@ impl<'a> Lowering<'a> {
             });
             let defaulted = LoweringOperand::Specialized(Lowered::Trap(eliminator.default.clone()));
             if !self.seal_source_trap_branch(builder, &defaulted)? {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::PlannerInvariant,
                     "ComputationalMatch",
                     "the carried computational match's closed default did not seal its branch",
                 ));
@@ -16166,7 +16167,7 @@ impl<'a> Lowering<'a> {
                 case.binders == 0 && case.constructor.ends_with("::Bool::False")
             });
             let (Some(true_case), Some(false_case)) = (true_case, false_case) else {
-                return Err(unsupported(
+                return Err(unsupported(LoweringCause::Fragment,
                     "Match",
                     "Bool match requires zero-binder True and False cases",
                 ));
@@ -16211,7 +16212,7 @@ impl<'a> Lowering<'a> {
                     continue;
                 }
                 let merge = merge.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "join plan omitted a Bool Match merge despite a continuing \
                          predecessor"
                             .to_string(),
@@ -16231,7 +16232,7 @@ impl<'a> Lowering<'a> {
                 let unreachable = builder.create_block();
                 builder.switch_to_block(unreachable);
                 let trap = terminal_trap.ok_or_else(|| {
-                    backend_module(
+                    backend_module(LoweringCause::PlannerInvariant,
                         "Bool Match join omitted both a continuing predecessor and a \
                          source trap"
                             .to_string(),
@@ -16269,7 +16270,7 @@ impl<'a> Lowering<'a> {
                     operand_kind: refusal_operand_kind,
                 },
             );
-            return Err(unsupported("Match", "scrutinee is not a constructor value"));
+            return Err(unsupported(LoweringCause::Fragment, "Match", "scrutinee is not a constructor value"));
         };
         let Some((index, case)) = cases
             .iter()
@@ -16287,7 +16288,7 @@ impl<'a> Lowering<'a> {
             Some(index),
         )?;
         if case.binders != args.len() {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "Match",
                 format!(
                     "case {} expects {} binders but constructor has {} args",
@@ -16312,7 +16313,7 @@ impl<'a> Lowering<'a> {
             } = body.expr
             {
                 if params.len() != args.len() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "Match",
                         format!(
                             "selected case closure expects {} parameters but the matched \
@@ -16357,7 +16358,7 @@ impl<'a> Lowering<'a> {
                                 site: "a static Match case parameter observation",
                             },
                         ),
-                        LoweringOperand::Specialized(_) => Err(backend_module(
+                        LoweringOperand::Specialized(_) => Err(backend_module(LoweringCause::PlannerInvariant,
                             "a static Match case parameter reached the observation as a compile-time operand"
                                 .to_string(),
                         )),
@@ -16490,7 +16491,7 @@ impl<'a> Lowering<'a> {
                 .map(LoweringOperand::Specialized),
             RuntimeExpr::CheckedJoinSite { site_id, body } => {
                 if self.active_join_site.replace(*site_id).is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "NativeJoinPlanV1",
                         "nested checked join occurrence marker",
                     ));
@@ -16498,7 +16499,7 @@ impl<'a> Lowering<'a> {
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 let result = self.lower_expr(builder, body, env);
                 if self.active_join_site.take().is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "NativeJoinPlanV1",
                         "checked join occurrence marker was not consumed",
                     ));
@@ -16510,7 +16511,7 @@ impl<'a> Lowering<'a> {
                 let body = self.child_occurrence(static_origin, 0, body)?;
                 let result = self.lower_expr(builder, body, env);
                 if self.active_subcontinuation_frame.take().is_some() {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "OrientedSubcontinuationPlanV1",
                         "checked subcontinuation marker was not consumed by its frame",
                     ));
@@ -16578,7 +16579,7 @@ impl<'a> Lowering<'a> {
                     );
                 }
                 let binding = env.get(*index as usize).ok_or_else(|| {
-                    unsupported("Var", format!("no runtime binding for index {index}"))
+                    unsupported(LoweringCause::PlannerInvariant, "Var", format!("no runtime binding for index {index}"))
                 })?;
                 match binding.value_at("a Var in value position")? {
                     LoweringOperand::Residual(residual) => Ok(LoweringOperand::Carried(
@@ -16649,7 +16650,7 @@ impl<'a> Lowering<'a> {
                     return Ok(LoweringOperand::Specialized(Lowered::RecursiveBackedge));
                 }
                 let LoweringOperand::Specialized(Lowered::Bool { value, known }) = lowered_scrutinee else {
-                    return Err(unsupported(
+                    return Err(unsupported(LoweringCause::Fragment,
                         "If",
                         "branch lowering requires a Bool scrutinee",
                     ));
@@ -16691,7 +16692,7 @@ impl<'a> Lowering<'a> {
                         continue;
                     }
                     let merge = merge.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "join plan omitted an If merge despite a continuing predecessor"
                                 .to_string(),
                         )
@@ -16710,7 +16711,7 @@ impl<'a> Lowering<'a> {
                     let unreachable = builder.create_block();
                     builder.switch_to_block(unreachable);
                     let trap = terminal_trap.ok_or_else(|| {
-                        backend_module(
+                        backend_module(LoweringCause::PlannerInvariant,
                             "If join omitted both a continuing predecessor and a source trap"
                                 .to_string(),
                         )
@@ -16738,7 +16739,7 @@ impl<'a> Lowering<'a> {
                         if self.function_local.static_response_owner.is_none() =>
                     {
                         let scope = self.function_local.grafted_spine_scope.ok_or_else(|| {
-                            backend_module("a response operation root is lowered outside a defined function scope".to_string())
+                            backend_module(LoweringCause::PlannerInvariant, "a response operation root is lowered outside a defined function scope".to_string())
                         })?;
                         let site = StaticResponseSite::OperationRoot(static_origin);
                         if self.static_transition_plan
@@ -17012,7 +17013,7 @@ impl<'a> Lowering<'a> {
                     // ── the pre-existing SPECIALIZED route, unchanged ──────
                     LoweringOperand::Specialized(lowered) => {
                         let Lowered::Record { fields, .. } = lowered else {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Fragment,
                                 "Project",
                                 "record projection needs a record value",
                             ));
@@ -17021,7 +17022,7 @@ impl<'a> Lowering<'a> {
                             .into_iter()
                             .find_map(|held| (held.name == *field).then_some(held.value))
                             .map(LoweringOperand::Specialized)
-                            .ok_or_else(|| unsupported("Project", format!("missing field {field}")))
+                            .ok_or_else(|| unsupported(LoweringCause::Fragment, "Project", format!("missing field {field}")))
                     }
                 }
             }
@@ -17135,7 +17136,7 @@ impl<'a> Lowering<'a> {
                 symbol,
                 dependency,
                 dependency_semantic_hash,
-            } => Err(unsupported(
+            } => Err(unsupported(LoweringCause::Fragment,
                 "ImportedDeclarationRef",
                 format!(
                     "imported declaration {symbol} from {dependency} @ {dependency_semantic_hash} requires dependency linking"
@@ -17239,7 +17240,7 @@ impl<'a> Lowering<'a> {
                     } = callee.expr
                     {
                         if params.len() != args.len() {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Fragment,
                                 "Call",
                                 format!(
                                     "closure expects {} args but call provides {}",
@@ -17326,7 +17327,7 @@ impl<'a> Lowering<'a> {
                     } = callee.expr
                     {
                         if params.len() != args.len() {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Fragment,
                                 "Call",
                                 format!(
                                     "closure expects {} args but call provides {}",
@@ -17463,7 +17464,7 @@ impl<'a> Lowering<'a> {
                             })
                             .collect::<Result<Vec<_>, _>>()?;
                         if params.len() != call_inputs.len() {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Fragment,
                                 "Call",
                                 format!(
                                     "closure expects {} args but call provides {}",
@@ -17580,7 +17581,7 @@ impl<'a> Lowering<'a> {
                             base.specialized_at("a recursor residual in a direct call")?;
                         if let Lowered::BoundedNat(predecessor) = base {
                             if !args.is_empty() {
-                                return Err(unsupported(
+                                return Err(unsupported(LoweringCause::Fragment,
                                     "BoundedNat",
                                     "structural Nat recursive hypothesis takes no arguments",
                                 ));
@@ -17602,7 +17603,7 @@ impl<'a> Lowering<'a> {
                             ..
                         } = base
                         else {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Fragment,
                                 "ComputationalMatch",
                                 "recursive constructor field is not a closure",
                             ));
@@ -17617,7 +17618,7 @@ impl<'a> Lowering<'a> {
                             })
                             .collect::<Result<Vec<_>, _>>()?;
                         if params.len() != call_inputs.len() {
-                            return Err(unsupported(
+                            return Err(unsupported(LoweringCause::Fragment,
                                 "ComputationalMatch",
                                 format!(
                                     "recursive field expects {} args but call provides {}",
@@ -17652,10 +17653,10 @@ impl<'a> Lowering<'a> {
                         result
                     }
                     LoweringOperand::Specialized(_) | LoweringOperand::Carried(_) => {
-                        Err(unsupported("Call", "callee is not a closure"))
+                        Err(unsupported(LoweringCause::Fragment, "Call", "callee is not a closure"))
                     }
                     LoweringOperand::Residual(_) => {
-                        Err(unsupported("Call", "callee is not a closure"))
+                        Err(unsupported(LoweringCause::Fragment, "Call", "callee is not a closure"))
                     }
                 }
             }
@@ -17679,7 +17680,7 @@ impl<'a> Lowering<'a> {
                 static_origin,
                 env,
             ),
-            RuntimeExpr::Effect { family, operation, .. } => Err(unsupported(
+            RuntimeExpr::Effect { family, operation, .. } => Err(unsupported(LoweringCause::Fragment,
                 "Effect",
                 format!(
                     "effect {family}.{} is not modeled in the supported native subset",
@@ -17702,13 +17703,13 @@ impl<'a> Lowering<'a> {
             .get(symbol.as_str())
             .copied()
             .ok_or_else(|| {
-                unsupported(
+                unsupported(LoweringCause::PlannerInvariant,
                     "DeclarationRef",
                     format!("{symbol} is not present in the exact RuntimeProgram"),
                 )
             })?;
         let RuntimeDeclarationKind::Transparent { body } = &declaration.kind else {
-            return Err(unsupported(
+            return Err(unsupported(LoweringCause::Fragment,
                 "DeclarationRef",
                 format!("{symbol} is not an executable transparent declaration"),
             ));

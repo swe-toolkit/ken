@@ -4,6 +4,7 @@
 //! knowledge.  The JIT and linked starters own only a zeroed header and its
 //! lifetime; all validation and integer semantics live in the local CLIF graph.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use cranelift_codegen::ir::{
     types, AbiParam, Function, InstBuilder, MemFlags, StackSlotData, StackSlotKind, UserFuncName,
 };
@@ -86,12 +87,12 @@ pub(crate) fn emit_native_int_local_graph<M: Module>(
     malloc_sig.returns.push(AbiParam::new(ptr));
     let malloc = module
         .declare_function("malloc", Linkage::Import, &malloc_sig)
-        .map_err(|e| backend_module(e.to_string()))?;
+        .map_err(|e| backend_module(LoweringCause::Backend, e.to_string()))?;
     let mut free_sig = module.make_signature();
     free_sig.params.push(AbiParam::new(ptr));
     let free = module
         .declare_function("free", Linkage::Import, &free_sig)
-        .map_err(|e| backend_module(e.to_string()))?;
+        .map_err(|e| backend_module(LoweringCause::Backend, e.to_string()))?;
 
     let resolve = declare(module, "ken_native_int_resolve_local", 4, 1)?;
     let intern = declare(module, "ken_native_int_intern_local", 5, 1)?;
@@ -163,7 +164,7 @@ fn declare<M: Module>(
     }
     module
         .declare_function(name, Linkage::Local, &sig)
-        .map_err(|e| backend_module(e.to_string()))
+        .map_err(|e| backend_module(LoweringCause::Backend, e.to_string()))
 }
 
 fn begin<M: Module>(module: &M, id: FuncId, params: usize) -> Function {
@@ -182,7 +183,7 @@ fn finish<M: Module>(
     mut func: Function,
 ) -> Result<(), CraneliftBackendError> {
     verify_function(&func, module.isa())
-        .map_err(|e| backend_module(format!("native Int local helper verification: {e}")))?;
+        .map_err(|e| backend_module(LoweringCause::FinishedCode, format!("native Int local helper verification: {e}")))?;
     #[cfg(test)]
     LOCAL_CLIF_CAPTURE.with(|capture| {
         if let Some(functions) = capture.borrow_mut().as_mut() {
@@ -195,7 +196,7 @@ fn finish<M: Module>(
     std::mem::swap(&mut ctx.func, &mut func);
     module
         .define_function(id, &mut ctx)
-        .map_err(|e| backend_module(e.to_string()))
+        .map_err(|e| backend_module(LoweringCause::Backend, e.to_string()))
 }
 
 fn define_resolve<M: Module>(

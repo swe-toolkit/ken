@@ -4408,7 +4408,7 @@ fn d8g_each_producer_input_mutation_is_caught_by_the_guard_that_owns_it() {
         // error kind.
         let reason = match (&error, mutation) {
             (
-                CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason }),
+                CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. }),
                 D8gMutation::WrongTable,
             ) => {
                 assert_eq!(
@@ -4418,7 +4418,7 @@ fn d8g_each_producer_input_mutation_is_caught_by_the_guard_that_owns_it() {
                 reason.clone()
             }
             (
-                CraneliftBackendError::Backend(BackendFailure::Module(reason)),
+                CraneliftBackendError::Backend(BackendFailure::Module { reason, .. }),
                 D8gMutation::WithholdContextSuffix,
             ) => reason.clone(),
             _ => panic!(
@@ -5052,7 +5052,7 @@ fn d6c_each_moved_selection_input_is_refused_by_the_guard_that_owns_it_before_em
             Err(CraneliftBackendError::Unsupported(unsupported)) => {
                 (unsupported.construct, unsupported.reason.clone())
             }
-            Err(CraneliftBackendError::Backend(BackendFailure::Module(reason))) => {
+            Err(CraneliftBackendError::Backend(BackendFailure::Module { reason, .. })) => {
                 ("Module", reason.clone())
             }
             Err(other) => panic!(
@@ -5222,7 +5222,7 @@ fn d6c_the_sealed_binder_run_refuses_a_miscounted_or_permuted_run_at_its_produce
              be about some other program"
         );
         let reason = match &outcome {
-            Err(CraneliftBackendError::Backend(BackendFailure::Module(reason))) => reason.clone(),
+            Err(CraneliftBackendError::Backend(BackendFailure::Module { reason, .. })) => reason.clone(),
             Err(other) => panic!(
                 "{mutation:?} must be refused by the SEALED RUN's own postcondition, a typed \
                  Module failure. ⛔ A different category means the run was returned malformed and \
@@ -5265,7 +5265,7 @@ fn d6c_the_sealed_binder_run_refuses_a_miscounted_or_permuted_run_at_its_produce
         // the formatted value would accept any failure whose text happened to
         // mention the run, including one raised somewhere that does not own it.
         let governed_reason = match &governed {
-            Err(CraneliftBackendError::Backend(BackendFailure::Module(reason))) => reason.clone(),
+            Err(CraneliftBackendError::Backend(BackendFailure::Module { reason, .. })) => reason.clone(),
             Err(CraneliftBackendError::Backend(other)) => panic!(
                 "{mutation:?} on the governed witness must be refused by the sealed run's own \
                  postcondition, a typed Module failure; got another backend failure: {other:?}"

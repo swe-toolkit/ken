@@ -18,7 +18,7 @@ use super::planning::{
 use super::surface::{BackendFailure, CraneliftBackendError};
 
 fn graph_error(reason: impl Into<String>) -> CraneliftBackendError {
-    CraneliftBackendError::Backend(BackendFailure::Module(reason.into()))
+    CraneliftBackendError::Backend(BackendFailure::Module { reason: reason.into(), cause: crate::cranelift_backend::surface::LoweringCause::PlannerInvariant })
 }
 
 /// The five sealed generated-unit families.

@@ -639,6 +639,28 @@ impl ObjectLinkerPackagingOptions {
     }
 }
 
+impl ObjectLinkerPackagingError {
+    pub fn code(&self) -> ken_diagnostic::Code {
+        use crate::cranelift_backend::surface::LoweringCause;
+        if self.capacity_failure.is_some() || self.selected_call_integrity.is_some() {
+            return LoweringCause::ResourceEnforcement.code();
+        }
+        match self.stage {
+            ObjectLinkerPackagingStage::ResourceProfile
+            | ObjectLinkerPackagingStage::EntrypointPackage
+            | ObjectLinkerPackagingStage::PlatformRuntimeSupport
+            | ObjectLinkerPackagingStage::RuntimeIrRunReport
+            | ObjectLinkerPackagingStage::NativeComparison => LoweringCause::Admission.code(),
+            ObjectLinkerPackagingStage::PlatformTarget
+            | ObjectLinkerPackagingStage::ObjectEmission
+            | ObjectLinkerPackagingStage::Toolchain
+            | ObjectLinkerPackagingStage::LinkerOrFinalizer
+            | ObjectLinkerPackagingStage::SmokeExecution
+            | ObjectLinkerPackagingStage::Hash => LoweringCause::Backend.code(),
+        }
+    }
+}
+
 impl fmt::Display for ObjectLinkerPackagingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}/{}: {}", self.stage, self.field, self.reason)
@@ -2623,7 +2645,6 @@ fn packaging_error(
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::{
         ErasedExecutableCore, ExecutableArgumentPackaging, ExecutableArgumentShape,
         ExecutableDependencyClosure, ExecutableEntrypointPackageMetadata,
@@ -2637,6 +2658,29 @@ mod tests {
         executable_entrypoint_package_for_runtime_contract,
         platform_runtime_support_for_entrypoint, summarize_runtime_ir_program,
     };
+
+    #[test]
+    fn packaging_code_follows_stage_and_typed_resource_refusal_not_reason() {
+        let admitted = packaging_error(
+            ObjectLinkerPackagingStage::EntrypointPackage,
+            "entry",
+            "first wording",
+        );
+        assert_eq!(admitted.code().as_str(), "N0005");
+        let mut backend = packaging_error(
+            ObjectLinkerPackagingStage::LinkerOrFinalizer,
+            "linker",
+            "test-only rewording",
+        );
+        assert_eq!(backend.code().as_str(), "N0006");
+        backend.capacity_failure = Some(ken_host::CapacityExhaustedV1 {
+            scope: ken_host::CapacityScopeV1::Invocation,
+            resource: ken_host::CapacityResourceV1::Words,
+            limit: 1,
+            requested: 2,
+        });
+        assert_eq!(backend.code().as_str(), "N0007");
+    }
 
     fn signed_root_token(identity: u64) -> i64 {
         let magnitude = (identity << crate::cranelift_backend::compiled::ROOT_TRAP_TOKEN_SHIFT)

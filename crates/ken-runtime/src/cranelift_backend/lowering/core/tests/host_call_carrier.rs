@@ -634,7 +634,7 @@ fn rtfp_reason(
 ) -> String {
     match result {
         Ok(_) => panic!("this fixture must reject"),
-        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason })) => {
+        Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. })) => {
             assert_eq!(construct, "OrientedSubcontinuationPlanV1");
             reason
         }
@@ -1809,7 +1809,7 @@ fn d8_dynamic_host_result_merge_enters_materialized_dead_cfg_population() {
     assert!(
         matches!(
             reachable_dead,
-            CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
+            CraneliftBackendError::Backend(BackendFailure::Module { reason: ref detail, .. })
                 if detail.contains("materialized-but-dead source join")
                     && detail.contains("retained a reachable block")
         ),
@@ -1857,8 +1857,7 @@ fn d8_unsupported_carrier_production_publishes_no_unit_function() {
         failure,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "Closure",
-            ref reason,
-        }) if reason.contains("a closure cannot cross the boundary")
+            ref reason, .. }) if reason.contains("a closure cannot cross the boundary")
     ));
     let (declared, defined) =
         crate::cranelift_backend::lowering::units::b2f_last_unit_emission();
@@ -2240,7 +2239,7 @@ fn d8_every_required_join_plan_is_consumed_exactly_once() {
     assert!(
         matches!(
             recursive_revisit_omitted,
-            CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
+            CraneliftBackendError::Backend(BackendFailure::Module { reason: ref detail, .. })
                 if detail.contains("materialized-but-dead source join")
                     && detail.contains("retained a reachable block")
         ),
@@ -2256,7 +2255,7 @@ fn d8_every_required_join_plan_is_consumed_exactly_once() {
     assert!(
         matches!(
             dead_included,
-            CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
+            CraneliftBackendError::Backend(BackendFailure::Module { reason: ref detail, .. })
                 if detail.contains("neither emitted nor statically unselected")
         ),
         "dead-sibling population mutation reached the wrong boundary: {dead_included:?}"
@@ -2312,7 +2311,7 @@ fn d8_every_required_join_plan_is_consumed_exactly_once() {
         assert!(
             matches!(
                 dead_case_omitted,
-                CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
+                CraneliftBackendError::Backend(BackendFailure::Module { reason: ref detail, .. })
                     if detail.contains("neither emitted nor statically unselected")
             ),
             "{route} dead-case omission reached the wrong boundary: {dead_case_omitted:?}"
@@ -2377,7 +2376,7 @@ fn d8_every_required_join_plan_is_consumed_exactly_once() {
     assert!(
         matches!(
             forced_overlap,
-            CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
+            CraneliftBackendError::Backend(BackendFailure::Module { reason: ref detail, .. })
                 if detail.contains("materialized-but-dead source join")
                     && detail.contains("retained a reachable block")
         ),
@@ -2391,7 +2390,7 @@ fn d8_every_required_join_plan_is_consumed_exactly_once() {
     assert!(
         matches!(
             omitted,
-            CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
+            CraneliftBackendError::Backend(BackendFailure::Module { reason: ref detail, .. })
                 if detail.contains("left planned source join")
         ),
         "omission mutation reached the wrong boundary: {omitted:?}"
@@ -2404,7 +2403,7 @@ fn d8_every_required_join_plan_is_consumed_exactly_once() {
     assert!(
         matches!(
             duplicate,
-            CraneliftBackendError::Backend(BackendFailure::Module(ref detail))
+            CraneliftBackendError::Backend(BackendFailure::Module { reason: ref detail, .. })
                 if detail.contains("more than once")
         ),
         "duplicate mutation reached the wrong boundary: {duplicate:?}"

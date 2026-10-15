@@ -30,6 +30,7 @@
 //! in the constants `boundary_value` publishes — never a change scattered
 //! across projections.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::{AbiParam, Function, InstBuilder, MemFlags, UserFuncName, types};
 use cranelift_codegen::verify_function;
@@ -434,7 +435,7 @@ fn declare<M: Module>(
     sig.returns.push(AbiParam::new(types::I64));
     module
         .declare_function(name, Linkage::Local, &sig)
-        .map_err(|e| backend_module(e.to_string()))
+        .map_err(|e| backend_module(LoweringCause::Backend, e.to_string()))
 }
 
 fn begin<M: Module>(module: &M, id: FuncId, params: usize) -> Function {
@@ -453,7 +454,7 @@ fn finish<M: Module>(
     mut func: Function,
 ) -> Result<(), CraneliftBackendError> {
     verify_function(&func, module.isa())
-        .map_err(|e| backend_module(format!("boundary-value local helper verification: {e}")))?;
+        .map_err(|e| backend_module(LoweringCause::FinishedCode, format!("boundary-value local helper verification: {e}")))?;
     #[cfg(test)]
     BOUNDARY_CLIF_CAPTURE.with(|capture| {
         if let Some(functions) = capture.borrow_mut().as_mut() {
@@ -466,7 +467,7 @@ fn finish<M: Module>(
     std::mem::swap(&mut ctx.func, &mut func);
     module
         .define_function(id, &mut ctx)
-        .map_err(|e| backend_module(e.to_string()))
+        .map_err(|e| backend_module(LoweringCause::Backend, e.to_string()))
 }
 
 /// Emit `tag ∈ tags`, where `tags` is a set the plan **derived** from the

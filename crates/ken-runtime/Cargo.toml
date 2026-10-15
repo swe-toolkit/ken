@@ -47,6 +47,7 @@ dasm-c2-observation = []
 checked-ih-realization-observation = []
 
 [dependencies]
+ken-diagnostic = { path = "../ken-diagnostic" }
 ken-host = { path = "../ken-host" }
 ken-runtime-support = { path = "../ken-runtime-support" }
 cranelift-codegen = "0.113.1"

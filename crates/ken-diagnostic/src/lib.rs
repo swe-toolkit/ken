@@ -23,9 +23,9 @@ impl fmt::Display for Code {
     }
 }
 
-/// One append-only ledger: code, meaning label, and active/retired status.
-/// A retired row reserves its code and label forever. Tests in owning crates
-/// check their active rows against the tables accompanying exhaustive matches.
+/// One append-only ledger: code, meaning label, active/retired status, and
+/// owning enum variant. Retired rows reserve their code, label, and last variant.
+/// Owning crates check active rows against exhaustive variant matches.
 pub const LEDGER: &str = include_str!("../codes.tsv");
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,6 +39,7 @@ pub struct Row {
     pub code: &'static str,
     pub label: &'static str,
     pub status: Status,
+    pub variant: &'static str,
 }
 
 fn parse_ledger(input: &'static str) -> Vec<Row> {
@@ -47,8 +48,8 @@ fn parse_ledger(input: &'static str) -> Vec<Row> {
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .map(|line| {
             let fields: Vec<_> = line.split('\t').collect();
-            let [code, label, status] = fields.as_slice() else {
-                panic!("ledger row needs three tab-separated fields: {line:?}");
+            let [code, label, status, variant] = fields.as_slice() else {
+                panic!("ledger row needs four tab-separated fields: {line:?}");
             };
             let status = match *status {
                 "active" => Status::Active,
@@ -59,6 +60,7 @@ fn parse_ledger(input: &'static str) -> Vec<Row> {
                 code,
                 label,
                 status,
+                variant,
             }
         })
         .collect()
@@ -67,6 +69,7 @@ fn parse_ledger(input: &'static str) -> Vec<Row> {
 fn validate_ledger(rows: &[Row]) {
     let mut codes = BTreeSet::new();
     let mut labels = BTreeSet::new();
+    let mut active_variants = BTreeSet::new();
     let mut next = BTreeMap::<char, u32>::new();
     for row in rows {
         assert!(codes.insert(row.code), "code reused: {}", row.code);
@@ -94,6 +97,40 @@ fn validate_ledger(rows: &[Row]) {
             row.label
         );
         let domain = bytes[0] as char;
+        let allowed_owner = match domain {
+            'E' => matches!(owner, "elab" | "compiler" | "native_build"),
+            'K' => owner == "kernel",
+            'X' => matches!(owner, "run" | "run_io"),
+            'N' => owner == "native",
+            'H' => owner == "host",
+            'C' => owner == "cli",
+            _ => unreachable!("domain shape checked above"),
+        };
+        assert!(
+            allowed_owner,
+            "domain {domain} does not own label {}",
+            row.label
+        );
+        let Some((enum_name, variant_name)) = row.variant.split_once("::") else {
+            panic!("variant must be Enum::Variant: {}", row.variant);
+        };
+        assert!(
+            [enum_name, variant_name].into_iter().all(|part| {
+                !part.is_empty()
+                    && part
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            }) && !variant_name.contains("::"),
+            "variant must be Enum::Variant: {}",
+            row.variant
+        );
+        if row.status == Status::Active {
+            assert!(
+                active_variants.insert(row.variant),
+                "active variant reused: {}",
+                row.variant
+            );
+        }
         let number = row.code[1..].parse::<u32>().expect("four ASCII digits");
         let expected = next.entry(domain).or_insert(1);
         assert_eq!(
@@ -113,21 +150,21 @@ pub fn ledger() -> Vec<Row> {
 
 /// Every active row owned by these prefixes has exactly one table entry, and
 /// every table entry is an active ledger row under one of those prefixes.
-pub fn assert_table_matches_ledger(owned_prefixes: &[&str], table: &[(Code, &str)]) {
+pub fn assert_table_matches_ledger(owned_prefixes: &[&str], table: &[(Code, &str, &str)]) {
     assert_table_matches_rows(&ledger(), owned_prefixes, table);
 }
 
-fn assert_table_matches_rows(rows: &[Row], owned_prefixes: &[&str], table: &[(Code, &str)]) {
+fn assert_table_matches_rows(rows: &[Row], owned_prefixes: &[&str], table: &[(Code, &str, &str)]) {
     let owns = |label: &str| {
         owned_prefixes
             .iter()
             .any(|prefix| label.starts_with(prefix))
     };
     let mut table_entries = BTreeSet::new();
-    for (code, label) in table {
+    for (code, label, variant) in table {
         assert!(
-            table_entries.insert((code.as_str(), *label)),
-            "duplicate table entry: {code} {label}"
+            table_entries.insert((code.as_str(), *label, *variant)),
+            "duplicate table entry: {code} {label} {variant}"
         );
         assert!(
             owns(label),
@@ -135,9 +172,12 @@ fn assert_table_matches_rows(rows: &[Row], owned_prefixes: &[&str], table: &[(Co
         );
         assert!(
             rows.iter().any(|row| {
-                row.status == Status::Active && row.code == code.as_str() && row.label == *label
+                row.status == Status::Active
+                    && row.code == code.as_str()
+                    && row.label == *label
+                    && row.variant == *variant
             }),
-            "table entry {code} {label} is not an active ledger row"
+            "table entry {code} {label} {variant} is not an active ledger row"
         );
     }
     for row in rows
@@ -145,10 +185,11 @@ fn assert_table_matches_rows(rows: &[Row], owned_prefixes: &[&str], table: &[(Co
         .filter(|row| row.status == Status::Active && owns(row.label))
     {
         assert!(
-            table_entries.contains(&(row.code, row.label)),
-            "ledger row {} {} has no producing table entry",
+            table_entries.contains(&(row.code, row.label, row.variant)),
+            "ledger row {} {} {} has no producing table entry",
             row.code,
-            row.label
+            row.label,
+            row.variant
         );
     }
 }
@@ -182,8 +223,9 @@ macro_rules! define_error_codes {
             }
         }
         #[cfg(test)]
-        const $table: &[($crate::Code, &str)] = &[
-            $( ($crate::Code::new($code), $label), )*
+        const $table: &[($crate::Code, &str, &str)] = &[
+            $( ($crate::Code::new($code), $label,
+                concat!(stringify!($ty), "::", stringify!($variant))), )*
         ];
     };
     (
@@ -197,8 +239,9 @@ macro_rules! define_error_codes {
             }
         }
         #[cfg(test)]
-        const $table: &[($crate::Code, &str)] = &[
-            $( ($crate::Code::new($code), $label), )*
+        const $table: &[($crate::Code, &str, &str)] = &[
+            $( ($crate::Code::new($code), $label,
+                concat!(stringify!($path), "::", stringify!($variant))), )*
         ];
     };
 }
@@ -219,19 +262,22 @@ mod tests {
 
     #[test]
     fn registry_rejects_independent_malformations() {
-        let good = "E0001\telab.parse_error\tactive\nE0002\telab.unbound_name\tretired\n";
+        let good = "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0002\telab.unbound_name\tretired\tElabError::UnboundName\n";
         let verify = |source| validate_ledger(&parse_ledger(source));
         verify(good);
         // Each control changes only one axis relative to a valid ledger.
         for bad in [
-            "E0001\telab.parse_error\tactive\nE0001\telab.unbound_name\tretired\n",
-            "E0001\telab.parse_error\tactive\nE0002\telab.parse_error\tretired\n",
-            "E0001\telab.parse_error\tactive\nE0003\telab.unbound_name\tretired\n",
-            "E0001\telab.parse_error\tactive\nE0002\telab.unbound_name\tobsolete\n",
-            "E0001\telab.parse_error\tactive\nE0002\telab.unbound_name\n",
-            "E0001\telab.parse_error\tactive\textra\nE0002\telab.unbound_name\tretired\n",
-            "E0001\telab.parse_error\tactive\nK00A1\telab.unbound_name\tretired\n",
-            "E0001\telab.parse_error\tactive\nE0002\t\tretired\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0001\telab.unbound_name\tretired\tElabError::UnboundName\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0002\telab.parse_error\tretired\tElabError::UnboundName\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0003\telab.unbound_name\tretired\tElabError::UnboundName\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0002\telab.unbound_name\tobsolete\tElabError::UnboundName\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0002\telab.unbound_name\tretired\n",
+            "E0001\telab.parse_error\tactive\textra\tElabError::ParseError\nE0002\telab.unbound_name\tretired\tElabError::UnboundName\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nK00A1\telab.unbound_name\tretired\tElabError::UnboundName\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0002\t\tretired\tElabError::UnboundName\n",
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0002\telab.unbound_name\tactive\tElabError::ParseError\n",
+            "K0001\telab.parse_error\tactive\tKernelError::ParseError\n",
+            "E0001\telab.parse_error\tactive\tParseError\n",
         ] {
             assert!(
                 std::panic::catch_unwind(|| verify(bad)).is_err(),
@@ -242,16 +288,30 @@ mod tests {
 
     #[test]
     fn owner_table_rejects_missing_unregistered_and_retired_entries() {
-        let rows =
-            parse_ledger("E0001\telab.parse_error\tactive\nE0002\telab.old_error\tretired\n");
+        let rows = parse_ledger(
+            "E0001\telab.parse_error\tactive\tElabError::ParseError\nE0002\telab.old_error\tretired\tElabError::OldError\n",
+        );
         validate_ledger(&rows);
-        let check = |table: &[(Code, &str)]| assert_table_matches_rows(&rows, &["elab."], table);
-        let valid = [(Code::new("E0001"), "elab.parse_error")];
+        let check =
+            |table: &[(Code, &str, &str)]| assert_table_matches_rows(&rows, &["elab."], table);
+        let valid = [(
+            Code::new("E0001"),
+            "elab.parse_error",
+            "ElabError::ParseError",
+        )];
         check(&valid);
         for bad in [
             vec![],
-            vec![(Code::new("E9999"), "elab.missing")],
-            vec![valid[0], (Code::new("E0002"), "elab.old_error")],
+            vec![(Code::new("E9999"), "elab.missing", "ElabError::Missing")],
+            vec![
+                valid[0],
+                (Code::new("E0002"), "elab.old_error", "ElabError::OldError"),
+            ],
+            vec![(
+                Code::new("E0001"),
+                "elab.parse_error",
+                "ElabError::UnboundName",
+            )],
             vec![valid[0], valid[0]],
         ] {
             assert!(
@@ -259,6 +319,28 @@ mod tests {
                 "invalid table was accepted: {bad:?}"
             );
         }
+        // An in-lockstep pair swap of two generated arms cannot pass the ledger.
+        let two = parse_ledger(
+            "K0001\tkernel.var_out_of_scope\tactive\tKernelError::VarOutOfScope\nK0002\tkernel.type_mismatch\tactive\tKernelError::TypeMismatch\n",
+        );
+        validate_ledger(&two);
+        let swapped = [
+            (
+                Code::new("K0002"),
+                "kernel.type_mismatch",
+                "KernelError::VarOutOfScope",
+            ),
+            (
+                Code::new("K0001"),
+                "kernel.var_out_of_scope",
+                "KernelError::TypeMismatch",
+            ),
+        ];
+        assert!(
+            std::panic::catch_unwind(|| assert_table_matches_rows(&two, &["kernel."], &swapped))
+                .is_err(),
+            "swapped variants must not inherit each other's registered code"
+        );
         // The public entry point reads and validates the production ledger.
         assert!(ledger().iter().any(|row| row.code == "E0001"));
     }

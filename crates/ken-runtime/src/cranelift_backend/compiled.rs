@@ -7,6 +7,7 @@
 //! artifact of compilation and how its result is read back. Depends only on
 //! `surface`.
 
+use crate::cranelift_backend::surface::LoweringCause;
 use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 
@@ -111,14 +112,14 @@ impl CompiledModule<JITModule> {
 
         self.module
             .finalize_definitions()
-            .map_err(|err| backend_module(err.to_string()))?;
+            .map_err(|err| backend_module(LoweringCause::Backend, err.to_string()))?;
         let code = self.module.get_finalized_function(self.func_id);
         // Named native-code-execution boundary. This is tested/validated JIT
         // execution, never a proof and never a host-ABI syscall boundary.
         let mut store = crate::boundary_value::BoundaryValueStore::default();
         for (symbol, identity) in &self.carrier_identity_catalog {
             if !store.issue_carrier_identity(symbol, *identity) {
-                return Err(backend_module(
+                return Err(backend_module(LoweringCause::PlannerInvariant,
                     "compiled carrier identity catalog disagrees with itself".to_string(),
                 ));
             }
@@ -135,11 +136,11 @@ impl CompiledModule<JITModule> {
         let process_root = process_root
             .or_else(|| activation.native_frame_ptr())
             .ok_or_else(|| {
-                backend_module("activation did not publish a launch pointer".to_string())
+                backend_module(LoweringCause::PlannerInvariant, "activation did not publish a launch pointer".to_string())
             })?;
         let services = activation
             .services_ptr()
-            .ok_or_else(|| backend_module("activation did not publish its services".to_string()))?;
+            .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant, "activation did not publish its services".to_string()))?;
         let native = unsafe {
             mem::transmute::<
                 _,
@@ -157,7 +158,7 @@ impl CompiledModule<JITModule> {
                 crate::invocation_tickets::IssuerTerminalFaultV1::Integrity(failure)
                     if token == ken_host::SELECTED_CALL_INTEGRITY_STATUS_V1 =>
                         Err(CraneliftBackendError::SelectedCallIntegrity(failure)),
-                _ => Err(backend_module(
+                _ => Err(backend_module(LoweringCause::PlannerInvariant,
                     "generated status disagrees with the activation-owned selected-call terminal"
                         .to_string(),
                 )),

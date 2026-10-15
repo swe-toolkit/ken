@@ -63,6 +63,20 @@ pub enum NativeAuthorityError {
     UntrustedProgram(NativeTrustError),
 }
 
+impl NativeAuthorityError {
+    pub fn code(&self) -> ken_diagnostic::Code {
+        use crate::cranelift_backend::surface::LoweringCause;
+        match self {
+            Self::MissingRoleRecord
+            | Self::EmptyRole { .. }
+            | Self::DuplicateRole { .. }
+            | Self::MetadataInconsistent { .. }
+            | Self::IoErrorArity { .. } => LoweringCause::Admission.code(),
+            Self::UntrustedProgram(err) => err.code(),
+        }
+    }
+}
+
 impl std::fmt::Display for NativeAuthorityError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -138,6 +152,24 @@ pub enum NativeTrustError {
     UntrustedMetadataPresent { lane: &'static str, detail: String },
     /// Something the package itself marks as not lowerable.
     NotSupported { symbol: String, detail: String },
+}
+
+impl NativeTrustError {
+    pub fn code(&self) -> ken_diagnostic::Code {
+        use crate::cranelift_backend::surface::LoweringCause;
+        match self {
+            Self::MissingRoster
+            | Self::TupleKeysUnpaired { .. }
+            | Self::UnsupportedTrustKind { .. }
+            | Self::DuplicateTarget { .. }
+            | Self::DeltaTargetsUnpaired { .. }
+            | Self::RosterMismatch { .. }
+            | Self::SymbolNotInPackage { .. }
+            | Self::NoncanonicalAssumptionIdentity { .. }
+            | Self::UntrustedMetadataPresent { .. }
+            | Self::NotSupported { .. } => LoweringCause::Admission.code(),
+        }
+    }
 }
 
 impl std::fmt::Display for NativeTrustError {
@@ -661,4 +693,22 @@ fn native_process_symbols_from_record(
 #[cfg(test)]
 pub(crate) fn synthetic_test_legacy_authority() -> NativeProcessSymbols {
     NativeProcessSymbols::legacy_prelude()
+}
+
+#[cfg(test)]
+mod diagnostic_cause_tests {
+    use super::*;
+
+    #[test]
+    fn trust_and_role_authority_share_admission_without_text_classification() {
+        let missing = NativeTrustError::MissingRoster;
+        let rewordable = NativeTrustError::DuplicateTarget {
+            target: "other".to_string(),
+        };
+        let authority = NativeAuthorityError::UntrustedProgram(rewordable.clone());
+        assert_eq!(missing.code().as_str(), "N0005");
+        assert_eq!(rewordable.code(), missing.code());
+        assert_eq!(authority.code(), missing.code());
+        assert_eq!(NativeAuthorityError::MissingRoleRecord.code(), missing.code());
+    }
 }

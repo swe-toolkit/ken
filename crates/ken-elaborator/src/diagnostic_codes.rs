@@ -115,17 +115,17 @@ ken_diagnostic::define_error_codes! {
     Self::Elaboration(error) => error.code(),
 }
 
-// These compiler-driver envelope errors use E; the N domain begins at the
-// back-end cause families in increment 2, which this increment does not code.
+// Keep compiler-driver envelope codes in E; delegate Packaging to its
+// runtime cause family. E0080 remains retired and reserved in the ledger.
 ken_diagnostic::define_error_codes! {
     impl NativeProgramBuildError;
     table NATIVE_PROGRAM_BUILD_ERROR_TABLE;
     Self::Admission(..) => ("E0078", "native_build.admission"),
     Self::Erasure(..) => ("E0079", "native_build.erasure"),
-    Self::Packaging(..) => ("E0080", "native_build.packaging"),
     Self::Unavailable(..) => ("E0081", "native_build.unavailable"),
     ;
     Self::Driver(error) => error.code(),
+    Self::Packaging(error) => error.code(),
 }
 
 #[cfg(test)]
@@ -159,5 +159,20 @@ mod tests {
             assert_eq!(code, inner.code());
         }
         assert_eq!(NativeProgramBuildError::Driver(compiler).code(), code);
+
+        let packaging = ken_runtime::ObjectLinkerPackagingError {
+            stage: ken_runtime::ObjectLinkerPackagingStage::LinkerOrFinalizer,
+            field: "toolchain",
+            reason: "linker refused the object".to_string(),
+            capacity_failure: None,
+            selected_call_integrity: None,
+        };
+        assert_eq!(packaging.code().as_str(), "N0006");
+        assert_eq!(
+            NativeProgramBuildError::Packaging(packaging)
+                .code()
+                .as_str(),
+            "N0006"
+        );
     }
 }

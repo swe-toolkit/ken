@@ -676,6 +676,7 @@ dependencies = [
  "cranelift-module",
  "cranelift-native",
  "cranelift-object",
+ "ken-diagnostic",
  "ken-host",
  "ken-runtime-support",
  "tempfile",
