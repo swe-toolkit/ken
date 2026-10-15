@@ -23,21 +23,48 @@ fn coded_lines(output: &Output) -> Vec<&str> {
         .collect()
 }
 
+fn leading_code_slot(line: &str) -> &str {
+    let (code, _) = line
+        .strip_prefix("error[")
+        .and_then(|rest| rest.split_once("]: "))
+        .unwrap_or_else(|| panic!("missing leading diagnostic slot: {line:?}"));
+    let bytes = code.as_bytes();
+    assert!(
+        bytes.len() == 5
+            && matches!(bytes[0], b'C' | b'E' | b'H' | b'K' | b'N' | b'X')
+            && bytes[1..].iter().all(u8::is_ascii_digit),
+        "malformed leading diagnostic code: {line:?}"
+    );
+    code
+}
+
 fn assert_codes(output: &Output, expected: &[&str]) {
     assert_eq!(output.status.code(), Some(1), "stderr: {:?}", output.stderr);
     let lines = coded_lines(output);
-    assert_eq!(lines.len(), expected.len(), "stderr: {:?}", output.stderr);
-    for code in expected {
-        let prefix = format!("error[{code}]: ");
+    let mut actual: Vec<_> = lines.into_iter().map(leading_code_slot).collect();
+    let mut expected = expected.to_vec();
+    actual.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(actual, expected, "stderr: {:?}", output.stderr);
+}
+
+#[test]
+fn leading_slot_rejects_bad_shape_without_interpreting_message_text() {
+    assert_eq!(
+        leading_code_slot("error[C0003]: error[C0001] is input text"),
+        "C0003"
+    );
+    for malformed in [
+        "error[C001]: message",
+        "error[Q0001]: message",
+        "error[C00001]: message",
+        "error[C0003] : message",
+    ] {
         assert!(
-            lines.iter().any(|line| line.starts_with(&prefix)),
-            "missing {prefix:?} in {lines:?}"
+            std::panic::catch_unwind(|| leading_code_slot(malformed)).is_err(),
+            "bad leading slot was accepted: {malformed:?}"
         );
     }
-    assert!(
-        lines.iter().all(|line| line.matches("error[").count() == 1),
-        "each diagnostic has one code slot: {lines:?}"
-    );
 }
 
 fn write_source(dir: &Path, name: &str, source: &str) -> String {
@@ -62,6 +89,16 @@ fn cli_argument_and_file_failures_have_distinct_c_carriers() {
     let missing = missing.to_str().unwrap();
 
     assert_codes(&run(&["not-a-subcommand"]), &["C0003"]);
+    // A code-shaped spelling in the message is data, not a second code slot.
+    let code_like_subcommand = run(&["error[C0001]"]);
+    assert_codes(&code_like_subcommand, &["C0003"]);
+    assert!(
+        std::str::from_utf8(&code_like_subcommand.stderr)
+            .unwrap()
+            .contains("unknown subcommand 'error[C0001]'"),
+        "stderr: {:?}",
+        code_like_subcommand.stderr
+    );
     let embedded_newline = run(&["unknown\ncommand"]);
     assert_codes(&embedded_newline, &["C0003"]);
     assert!(
