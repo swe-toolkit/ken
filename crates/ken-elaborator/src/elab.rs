@@ -5136,12 +5136,45 @@ fn simplify_branch_goal_keeping_refinements_uncontracted(
     out
 }
 
+/// Occurrences of de Bruijn index `k` in `t`. `Pi`, `Lam`, `Sigma` and the
+/// `Let` body are the binders (`ken_kernel::subst::shift`).
+fn var_occurrences(t: &Term, k: usize) -> usize {
+    match t {
+        Term::Var(i) => usize::from(*i == k),
+        Term::Pi(a, c) | Term::Lam(a, c) | Term::Sigma(a, c) => {
+            var_occurrences(a, k) + var_occurrences(c, k + 1)
+        }
+        Term::Let { ty, val, body } => {
+            var_occurrences(ty, k) + var_occurrences(val, k) + var_occurrences(body, k + 1)
+        }
+        _ => t
+            .children()
+            .into_iter()
+            .map(|c| var_occurrences(c, k))
+            .sum(),
+    }
+}
+
+/// A single-node term: substituting it for a variable does not grow a term.
+fn is_atomic_term(t: &Term) -> bool {
+    matches!(
+        t,
+        Term::Var(_)
+            | Term::Type(_)
+            | Term::Omega(_)
+            | Term::Const { .. }
+            | Term::IndFormer { .. }
+            | Term::Constructor { .. }
+            | Term::IntLit(_)
+    )
+}
+
 /// Reduced branch goals reach kernel check positions (ambient methods,
 /// branch bodies, motives). The kernel never infers a λ, and `whnf` can
 /// substitute a λ argument into head position inside a stuck eliminator's
-/// method. Contract every applied λ here, at the one producer all of those
-/// consumers read. β preserves conversion, and both sides of the embedded
-/// eliminator identity match are outputs of this producer.
+/// method. Contract every non-duplicating applied λ here, at the one producer
+/// all of those consumers read. β preserves conversion, and both sides of the
+/// embedded eliminator identity match are outputs of this producer.
 fn simplify_branch_goal_keeping_refinements(
     env: &GlobalEnv,
     facts: &RefinementFacts,
@@ -5154,18 +5187,23 @@ fn simplify_branch_goal_keeping_refinements(
 }
 
 /// Contract `App(Lam(_, body), arg)` to `body[arg]` throughout a term,
-/// including redexes a contraction exposes. No `_` arm: a new `Term` variant
-/// must decide whether it can carry a redex.
+/// including redexes a contraction exposes, but only when the contraction
+/// cannot duplicate a compound term: the bound variable occurs at most once
+/// in `body`, or `arg` is atomic. Each such step leaves the term no larger,
+/// so the output is no larger than the input and the work is quadratic in
+/// it. A duplicating redex is left in place. No `_` arm: a new `Term`
+/// variant must decide whether it can carry a redex.
 fn contract_applied_lambdas(t: &Term) -> Term {
     let b = |x: &Term| Box::new(contract_applied_lambdas(x));
     match t {
         Term::App(f, a) => {
             let f = contract_applied_lambdas(f);
             let a = contract_applied_lambdas(a);
-            if let Term::Lam(_, body) = &f {
-                contract_applied_lambdas(&subst0(body, &a))
-            } else {
-                Term::app(f, a)
+            match &f {
+                Term::Lam(_, body) if var_occurrences(body, 0) <= 1 || is_atomic_term(&a) => {
+                    contract_applied_lambdas(&subst0(body, &a))
+                }
+                _ => Term::app(f, a),
             }
         }
         Term::Var(_)
