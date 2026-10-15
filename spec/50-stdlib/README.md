@@ -47,9 +47,12 @@ two lower tiers of the surface taxonomy (`../30-surface/30`):
   duplicate prelude postulates. `Equal` is the checked prelude floor definition
   whose body is that native `Eq` (`30 §4`, `§6`).
 
-Everything below is a **package**: imported, derivable, re-checked. Core data
-`Unit`/`Empty`/`Either` plus the core combinators (`id`, `∘`, `const`, `flip`)
-are packages — Ken `data`/defs over the built-ins, not prelude. `Nat`, `Option`,
+The ordinary Ken entries below are **packages**: imported, derivable,
+re-checked. The tooling-facing `ken` command's diagnostic-code contract
+in §5 is the stated exception: a process interface, not an importable
+standard package. Core data `Unit`/`Empty`/`Either` plus the core
+combinators (`id`, `∘`, `const`, `flip`) are packages — Ken `data`/defs
+over the built-ins, not prelude. `Nat`, `Option`,
 `Pair`, and `Result` are deliberate exceptions among core data carriers: source
 must reach their canonical compiler-installed identities because the
 internal-provision contract or public primitive signatures name them; a fresh
@@ -348,6 +351,17 @@ infinite streams and window/merge relational laws remain deferred.
   OQ-coinduction) — a package.
 
 ## 5. Tooling-facing (T-stream)
+
+The **`ken` command's stable diagnostic-code contract** is pinned in
+**`70-diagnostic-codes.md`** §1 (SPEC-DIAGNOSTIC-CODE-CONTRACT).
+It governs controlled batch CLI failures rather than a Ken catalog package:
+codes have exact ASCII grammar and carrier-selected C/E/K/X/N/H domains;
+the one append-only ledger owns their assignments; §1.2 pins seven
+native cause-family meanings. Each coded failure emits a code-bearing
+line to stderr and exits 1; an admitted `ken run` program's outcome
+has no tool code. Multiple one-code lines are possible. CLI JSON,
+warnings, and elaboration-recovery ordering remain deferred; this
+contract does not claim the renderer or black-box seed has landed.
 
 The catalog also seeds the tooling Ken needs to be usable (strategy WS-T): a
 test/property framework (`../30-surface/` doc-tests + property tests, T3), and
