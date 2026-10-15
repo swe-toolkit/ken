@@ -1094,9 +1094,9 @@ mod tests {
     /// **does** reject, the test **is** green — and an **earlier** arm returned
     /// the error while the arm you meant to exercise is unreachable code.
     ///
-    /// ⭐ Asserting the **exact** message rather than `is_err`/`expect_err` is
-    /// the entire mechanism. With `expect_err` every row below reads green and
-    /// teaches nothing.
+    /// Asserting each **exact typed error and reason** rather than only
+    /// `is_err`/`expect_err` is the mechanism. A different rejecting arm must
+    /// make the corresponding row fail.
     ///
     /// Promise class: **durable mutation proof.** Each row names the arm that
     /// actually fired, so a re-ordering of the validator reddens here rather than
@@ -1107,8 +1107,8 @@ mod tests {
         let plan = b2r_plan(&expr);
         let base = &plan.abi;
 
-        let check = |abi: &AbiPlane| -> String {
-            match abi.validate(
+        let check = |abi: &AbiPlane| {
+            abi.validate(
                 &plan.semantic,
                 &plan.nodes,
                 &plan.semantic_sources,
@@ -1117,10 +1117,8 @@ mod tests {
                 &plan.declaration_occurrences.values().copied().collect(),
                 plan.root_entry.expect("root entry"),
                 plan.root_ingress,
-            ) {
-                Ok(()) => "NO WITNESS -- the mutation was accepted".to_string(),
-                Err(err) => format!("{err:?}"),
-            }
+            )
+            .expect_err("the mutation must reach its rejecting arm")
         };
 
         let closure_unit = base
@@ -1183,7 +1181,7 @@ mod tests {
             .child_origins
             .insert((extra.start + extra.len) as usize, borrowed);
         skewed_plane.records[record].child_origins.len += 1;
-        let layout_arm = match lexical_plan.abi.validate(
+        let layout_arm = lexical_plan.abi.validate(
             &skewed_plane,
             &lexical_plan.nodes,
             &lexical_plan.semantic_sources,
@@ -1192,10 +1190,8 @@ mod tests {
             &lexical_plan.declaration_occurrences.values().copied().collect(),
             lexical_plan.root_entry.expect("root entry"),
             lexical_plan.root_ingress,
-        ) {
-            Ok(()) => "NO WITNESS -- the layout skew was accepted".to_string(),
-            Err(err) => format!("{err:?}"),
-        };
+        )
+        .expect_err("the layout skew must reach its rejecting arm");
         measured.push(("edge layout disagreement", layout_arm));
 
         // D5 class 5 -- a recursive-bundle member that is NOT forward-declared.
@@ -1216,15 +1212,10 @@ mod tests {
         );
         let declarations = BTreeMap::new();
         let imported_arm = match plan_static_transition_graph(&imported, &declarations) {
-            Ok(_) => "NO WITNESS -- the imported capture edge planned green".to_string(),
-            Err(err) => format!("{err:?}"),
+            Ok(_) => panic!("the imported capture edge must refuse planning"),
+            Err(error) => error,
         };
         measured.push(("imported capture edge", imported_arm));
-
-        let report = measured
-            .iter()
-            .map(|(class, arm)| format!("{class} => {arm}"))
-            .collect::<Vec<_>>();
         // ⭐ MEASURED, not predicted-then-fitted. The arm named on each row is
         // the one that actually returned. **Five of the six classes reach an arm
         // of this validator's own; exactly ONE is enforced by an earlier arm**
@@ -1251,36 +1242,52 @@ mod tests {
         // silently-inherited defect `AC-11` exists to prevent -- which makes a
         // stale governing comment the same defect one layer up from the code.
         assert_eq!(
-            report,
+            measured,
             vec![
-                // -- reach an arm of their own --
-                "missing capture slot => Backend(PlannerInvariant(\"abi descriptor \
-                 is missing a declared capture slot\"))"
-                    .to_string(),
-                "extra capture slot => Backend(PlannerInvariant(\"abi descriptor \
-                 declares a capture slot its origin does not have\"))"
-                    .to_string(),
-                "implicit caller-env tail => Backend(PlannerInvariant(\"abi frame \
-                 carries an implicit caller-environment tail\"))"
-                    .to_string(),
-                // -- reaches the boundary-layout arm --
-                "edge layout disagreement => Backend(PlannerInvariant(\"boundary \
-                 signature and callee descriptor disagree on the transferred \
-                 capture count\"))"
-                    .to_string(),
-                // -- SUBSUMED: descriptors are dense over the partition before
-                //    any edge resolves, which IS forward-declaration --
-                "callee not forward-declared => Backend(PlannerInvariant(\"abi \
-                 descriptor population is not exact for the function units and \
-                 retained workers\"))"
-                    .to_string(),
-                // -- reaches its own arm, with the EXISTING unsupported result --
-                "imported capture edge => Unsupported(UnsupportedLowering { \
-                 construct: \"ImportedDeclarationRef\", reason: \"imported \
-                 declaration requires dependency linking, so it receives no \
-                 callable descriptor in the intra-module representation \
-                 contract\" })"
-                    .to_string(),
+                // Reach an arm of their own.
+                (
+                    "missing capture slot",
+                    CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(
+                        "abi descriptor is missing a declared capture slot".into(),
+                    )),
+                ),
+                (
+                    "extra capture slot",
+                    CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(
+                        "abi descriptor declares a capture slot its origin does not have".into(),
+                    )),
+                ),
+                (
+                    "implicit caller-env tail",
+                    CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(
+                        "abi frame carries an implicit caller-environment tail".into(),
+                    )),
+                ),
+                // Reaches the boundary-layout arm.
+                (
+                    "edge layout disagreement",
+                    CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(
+                        "boundary signature and callee descriptor disagree on the transferred capture count".into(),
+                    )),
+                ),
+                // Subsumed by the dense descriptor-population check.
+                (
+                    "callee not forward-declared",
+                    CraneliftBackendError::Backend(BackendFailure::PlannerInvariant(
+                        "abi descriptor population is not exact for the function units and retained workers".into(),
+                    )),
+                ),
+                // Reaches its own unsupported arm with a typed fragment cause.
+                (
+                    "imported capture edge",
+                    CraneliftBackendError::Unsupported(
+                        crate::cranelift_backend::surface::UnsupportedLowering {
+                            construct: "ImportedDeclarationRef",
+                            reason: "imported declaration requires dependency linking, so it receives no callable descriptor in the intra-module representation contract".into(),
+                            cause: LoweringCause::Fragment,
+                        },
+                    ),
+                ),
             ],
             "AC-11: the arm that actually fired differs from the one recorded \
              for this class. Either the validator was re-ordered -- in which \

@@ -715,8 +715,11 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
 /// Promise class: durable invariant. An owner whose generated K result is
 /// loaded before the Trap branch must be rejected by the pending-Vis finished
 /// CLIF verifier, not merely by a Ret-only verifier or a runtime trap. The
-/// refusal text is shared with the Ret-only verifier, so the owner's record
-/// tail, not the message, names the pending-Vis arm.
+/// refusal code is shared with the Ret-only verifier, so the owner's record
+/// tail, not the reason, names the pending-Vis arm. MEASURED: a typed N0004
+/// packaging refusal and pending-Vis record tail. CLAIMED: this finished-code
+/// failure is stable under reason rewording. THE GAP: the response-owner
+/// mutation must reach this verifier, not a prior object-emission refusal.
 #[cfg(target_os = "linux")]
 #[test]
 fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
@@ -733,16 +736,15 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     );
     assert_eq!(applications, 1, "the pending-Vis owner must receive the K mutation");
     let error = compiled.expect_err("an unchecked K result must not emit an object");
-    let rendered = format!("{error:?}");
-    assert!(
-        rendered.contains("stage: ObjectEmission")
-            && rendered.contains("checked_process_object")
-            && rendered.contains(
-                "a response K call read Result without the status then Trap-before-Result branches"
-            ),
-        "the exact finished-body verifier must refuse: {error:?}"
-    );
-    // The refusal text is shared with the Ret-only verifier. The refused owner
+    assert_eq!(error.code().as_str(), "N0004", "finished-code cause: {error:?}");
+    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = &error
+    else {
+        panic!("the finished-code verifier must refuse during packaging: {error:?}");
+    };
+    assert_eq!(packaging.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
+    assert_eq!(packaging.field, "checked_process_object");
+    assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::FinishedCode));
+    // The refusal code is shared with the Ret-only verifier. The refused owner
     // is the last one emitted; its planned record tail places it on the
     // pending-Vis verifier.
     let refused = frames.last().expect("the refused owner was emitted");

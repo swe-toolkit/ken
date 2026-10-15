@@ -595,9 +595,9 @@ pub struct ObjectLinkerPackagingError {
     /// One-use selected-call gate refusal, decoded from the same owner-backed
     /// linked terminal rather than inferred from an arbitrary negative token.
     pub selected_call_integrity: Option<ken_host::SelectedCallIntegrityFaultV1>,
-    /// Preserves the comparison's backend cause across its packaging wrapper.
-    /// Other stages are classified by their own typed stage or fault fields.
-    pub comparison_cause: Option<LoweringCause>,
+    /// Preserves a native comparison or object-emission backend cause across
+    /// packaging; other stages use their typed stage or fault fields.
+    pub source_cause: Option<LoweringCause>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -655,11 +655,16 @@ impl ObjectLinkerPackagingError {
             // A missing comparison cause is a broken reporter invariant, not
             // permission to relabel a native failure as package admission.
             ObjectLinkerPackagingStage::NativeComparison => self
-                .comparison_cause
+                .source_cause
                 .unwrap_or(LoweringCause::PlannerInvariant)
                 .code(),
+            // An object-emission I/O failure has no native source cause; a
+            // typed backend refusal does and must not collapse to N0006.
+            ObjectLinkerPackagingStage::ObjectEmission => self
+                .source_cause
+                .unwrap_or(LoweringCause::Backend)
+                .code(),
             ObjectLinkerPackagingStage::PlatformTarget
-            | ObjectLinkerPackagingStage::ObjectEmission
             | ObjectLinkerPackagingStage::Toolchain
             | ObjectLinkerPackagingStage::LinkerOrFinalizer
             | ObjectLinkerPackagingStage::SmokeExecution
@@ -718,7 +723,8 @@ pub fn package_starter_executable_artifact_with_options(
     // must not admit a program whose trust fails to close against its own
     // pre-source roster.
     let admission = crate::native_program_admission(program).map_err(|err| {
-        packaging_native_comparison_error(
+        packaging_error_with_cause(
+            ObjectLinkerPackagingStage::NativeComparison,
             LoweringCause::Admission,
             "checked_role_authority",
             err.to_string(),
@@ -824,7 +830,8 @@ fn package_starter_executable_artifact_with_authority(
             stage: NativeDifferentialStage::RuntimeIrNativeCompare,
         } => {}
         verdict => {
-            return Err(packaging_native_comparison_error(
+            return Err(packaging_error_with_cause(
+                ObjectLinkerPackagingStage::NativeComparison,
                 native_comparison
                     .cause
                     .unwrap_or(LoweringCause::PlannerInvariant),
@@ -1119,8 +1126,9 @@ pub fn build_bound_process_starter_executable_artifact(
         STARTER_ENTRY_SYMBOL,
     )
     .map_err(|err| {
-        packaging_error(
+        packaging_error_with_cause(
             ObjectLinkerPackagingStage::ObjectEmission,
+            err.cause(),
             "checked_process_object",
             err.to_string(),
         )
@@ -1610,7 +1618,7 @@ fn smoke_executable(
                             reason: format!("linked starter refused authentic named capacity: {fault:?}"),
                             capacity_failure: Some(fault),
                             selected_call_integrity: None,
-                            comparison_cause: None,
+                            source_cause: None,
                         });
                     }
                     Some(ken_host::TerminalErrorV1::SelectedCallIntegrity(fault))
@@ -1622,7 +1630,7 @@ fn smoke_executable(
                             reason: format!("linked starter rejected a selected call ticket: {fault:?}"),
                             capacity_failure: None,
                             selected_call_integrity: Some(fault),
-                            comparison_cause: None,
+                            source_cause: None,
                         });
                     }
                     _ => {}
@@ -2650,17 +2658,18 @@ fn packaging_error(
         reason: reason.into(),
         capacity_failure: None,
         selected_call_integrity: None,
-        comparison_cause: None,
+        source_cause: None,
     }
 }
 
-fn packaging_native_comparison_error(
+fn packaging_error_with_cause(
+    stage: ObjectLinkerPackagingStage,
     cause: LoweringCause,
     field: &'static str,
     reason: impl Into<String>,
 ) -> ObjectLinkerPackagingError {
-    let mut error = packaging_error(ObjectLinkerPackagingStage::NativeComparison, field, reason);
-    error.comparison_cause = Some(cause);
+    let mut error = packaging_error(stage, field, reason);
+    error.source_cause = Some(cause);
     error
 }
 
@@ -2714,7 +2723,8 @@ mod tests {
             (LoweringCause::Backend, "N0006"),
             (LoweringCause::ResourceEnforcement, "N0007"),
         ] {
-            let comparison = packaging_native_comparison_error(
+            let comparison = packaging_error_with_cause(
+                ObjectLinkerPackagingStage::NativeComparison,
                 cause,
                 "native_runtime_ir_comparison",
                 "identical reason at every comparison family",
@@ -2722,7 +2732,20 @@ mod tests {
             assert_eq!(comparison.code().as_str(), expected_code);
             assert!(comparison.capacity_failure.is_none());
             assert!(comparison.selected_call_integrity.is_none());
+            let emission = packaging_error_with_cause(
+                ObjectLinkerPackagingStage::ObjectEmission,
+                cause,
+                "checked_process_object",
+                "identical reason at every emission family",
+            );
+            assert_eq!(emission.code().as_str(), expected_code);
         }
+        assert_eq!(
+            packaging_error(ObjectLinkerPackagingStage::ObjectEmission, "object_path", "I/O")
+                .code()
+                .as_str(),
+            "N0006",
+        );
         let uncategorized = packaging_error(
             ObjectLinkerPackagingStage::NativeComparison,
             "missing_cause",
@@ -2764,7 +2787,7 @@ mod tests {
         .expect_err("different reported and native observations must disagree");
         assert_eq!(err.stage, ObjectLinkerPackagingStage::NativeComparison);
         assert_eq!(err.field, "native_runtime_ir_comparison");
-        assert_eq!(err.comparison_cause, Some(LoweringCause::Backend));
+        assert_eq!(err.source_cause, Some(LoweringCause::Backend));
         assert_eq!(err.code().as_str(), "N0006");
     }
 
@@ -2813,7 +2836,7 @@ mod tests {
         .expect_err("zero invocation epochs refuses the native comparison");
         assert_eq!(err.stage, ObjectLinkerPackagingStage::NativeComparison);
         assert_eq!(err.field, "native_runtime_ir_comparison");
-        assert_eq!(err.comparison_cause, Some(LoweringCause::ResourceEnforcement));
+        assert_eq!(err.source_cause, Some(LoweringCause::ResourceEnforcement));
         assert!(err.capacity_failure.is_none());
         assert!(err.selected_call_integrity.is_none());
         assert_eq!(err.code().as_str(), "N0007");
