@@ -1152,17 +1152,22 @@ fn elab_type_named_variable(
     span: &Span,
 ) -> Result<Term, ElabError> {
     if let Some((term, _)) = infer_virtual_pattern_alias(cx, index, name, span)? {
-        Ok(term)
-    } else {
-        cx.surface_var(index)
-            .map(|(_, actual_index)| Term::var(actual_index))
-            .ok_or_else(|| {
-                ElabError::Internal(format!(
-                    "type variable '{}' at {}-{} is out of range",
-                    name, span.start, span.end
-                ))
-            })
+        return Ok(term);
     }
+    let (position, actual_index) = cx.surface_var(index).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "type variable '{}' at {}-{} is out of range",
+            name, span.start, span.end
+        ))
+    })?;
+    if let Some((raw_term, _, install_depth)) = cx.var_refinements.get(&position) {
+        let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+            ElabError::Internal("index-refined type variable escaped its branch context".into())
+        })? as i64;
+        let core = weaken(raw_term, growth);
+        return Ok(scoped_premise_binding(cx, &core)?.map_or(core, |(term, _)| term));
+    }
+    Ok(Term::var(actual_index))
 }
 
 fn elab_type_in_slot(
@@ -1366,7 +1371,8 @@ fn prepare_let_rhs(
 /// endpoints by the intervening context growth before applying the same
 /// `scrutinee -> target` substitution as `refine_branch_goal`. Apply it to the
 /// RHS core and its recorded type in lockstep: the fresh binder itself is not
-/// in scope in either, and it is not added to `var_refinements`.
+/// in scope in either, and it is not added to `var_refinements`. An own-leaf
+/// transport collapsed to its raw field no longer blocks that leaf.
 #[inline(never)]
 fn refine_let_rhs(
     cx: &ElabCtx,
@@ -1384,14 +1390,93 @@ fn refine_let_rhs(
         for leaf in &frame.leaves {
             let scrutinee = weaken(&leaf.scrutinee, growth);
             let target = weaken(&leaf.target, growth);
-            let candidate_ty = subst_term_generalize(rhs_ty, &scrutinee, &target);
+            let (core_try, ty_try) =
+                collapse_own_leaf_field_transports(cx, rhs_core, rhs_ty, &scrutinee, &target)?;
+            if !let_leaf_dependency_closed(cx, [&core_try, &ty_try], &scrutinee)? {
+                continue;
+            }
+            let candidate_ty = subst_term_generalize(&ty_try, &scrutinee, &target);
             if candidate_ty != *rhs_ty {
-                *rhs_core = subst_term_generalize(rhs_core, &scrutinee, &target);
+                *rhs_core = subst_term_generalize(&core_try, &scrutinee, &target);
                 *rhs_ty = candidate_ty;
             }
         }
     }
     Ok(())
+}
+
+/// Under the leaf `scrutinee -> target`, an installed field transport that is
+/// that leaf's own one-step cast of a raw field is the identity once the leaf
+/// is applied: rewriting its target type gives back its source type. Replace
+/// each such transport by the field it casts, so the leaf moves the let to the
+/// field's own coordinate instead of being skipped. Chained or Omega
+/// transports are left in place, and the dependency check still decides them.
+fn collapse_own_leaf_field_transports(
+    cx: &ElabCtx,
+    rhs_core: &Term,
+    rhs_ty: &Term,
+    scrutinee: &Term,
+    target: &Term,
+) -> Result<(Term, Term), ElabError> {
+    let (mut core, mut ty) = (rhs_core.clone(), rhs_ty.clone());
+    for (raw_term, _, install_depth) in cx.var_refinements.values() {
+        let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+            ElabError::Internal("let refinement alias escaped its branch context".into())
+        })? as i64;
+        let alias = weaken(raw_term, growth);
+        let Term::Cast(from, to, _, field) = &alias else {
+            continue;
+        };
+        if !matches!(**field, Term::Var(_))
+            || subst_term_generalize(to, scrutinee, target) != **from
+        {
+            continue;
+        }
+        core = subst_term_generalize(&core, &alias, field);
+        ty = subst_term_generalize(&ty, &alias, field);
+    }
+    Ok((core, ty))
+}
+
+/// A leaf may refine a fresh `let` only when nothing the substitution cannot
+/// rewrite depends on its scrutinee: no context variable the let mentions,
+/// other than the scrutinee, and no installed field transport it mentions,
+/// has a type that mentions the scrutinee. Rewriting the scrutinee alone
+/// would move the let off the coordinate its dependents are typed at. An
+/// own-leaf field transport was collapsed before this dependency check.
+#[inline(never)]
+fn let_leaf_dependency_closed(
+    cx: &ElabCtx,
+    terms: [&Term; 2],
+    scrutinee: &Term,
+) -> Result<bool, ElabError> {
+    let marker = Term::var(1usize << 50);
+    let mentions = |hay: &Term, needle: &Term| subst_term_generalize(hay, needle, &marker) != *hay;
+    for index in 0..cx.ctx.len() {
+        let var = Term::var(index);
+        if var == *scrutinee || !terms.iter().any(|t| mentions(t, &var)) {
+            continue;
+        }
+        let Some(stored) = cx.ctx.lookup(index) else {
+            continue;
+        };
+        if mentions(&weaken(stored, index as i64 + 1), scrutinee) {
+            return Ok(false);
+        }
+    }
+    for (raw_term, raw_ty, install_depth) in cx.var_refinements.values() {
+        let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+            ElabError::Internal("let refinement alias escaped its branch context".into())
+        })? as i64;
+        let alias = weaken(raw_term, growth);
+        if matches!(alias, Term::Var(_)) || !terms.iter().any(|t| mentions(t, &alias)) {
+            continue;
+        }
+        if mentions(&weaken(raw_ty, growth), scrutinee) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// Spec 22 §3: relate a let binder to its RHS for obligations inside the body.
