@@ -4869,7 +4869,7 @@ fn simplify_branch_goal_unguarded(env: &GlobalEnv, ctx: &Context, term: &Term) -
         );
     }
     let reduced = whnf(env, ctx, term);
-    if !charge_branch_goal_budget(&reduced) {
+    if !charge_branch_goal_budget() {
         return term.clone();
     }
     if matches!(reduced, Term::Sigma(..)) {
@@ -5121,11 +5121,12 @@ mod stated_equality_cycle_tests {
     }
 }
 
-/// Work allowance for one branch-goal simplification, in reduct nodes: a
-/// fixed allowance plus a per-node allowance on the goal. Each `whnf` reduct
-/// the simplifier visits is charged by its size, so the work and the result
-/// are linear in the goal. A goal whose simplification exceeds it is used
-/// unsimplified, which is convertible to the simplified form.
+/// Each simplifier visit costs one unit, and each visit emits at most one node
+/// of the result, so the work and the result are bounded by a fixed allowance
+/// plus a per-node allowance on the goal. A goal that exhausts it is used
+/// unsimplified. That goal is convertible to the simplified form but not
+/// route-neutral: consumers such as `plan_coherent_frame_motive` dispatch on
+/// its syntax, so a goal above the allowance may be refused.
 const BRANCH_GOAL_BUDGET_BASE: usize = 16384;
 const BRANCH_GOAL_BUDGET_PER_NODE: usize = 64;
 
@@ -5139,15 +5140,16 @@ fn branch_goal_budget_spent() -> bool {
     BRANCH_GOAL_BUDGET.with(|budget| budget.get() == Some(0))
 }
 
-/// Charge a reduct against the running allowance. False once it is spent.
-fn charge_branch_goal_budget(reduct: &Term) -> bool {
+/// Charge one simplifier visit against the running allowance. False once it
+/// is spent. Each visit emits at most one node of the result, so the work and
+/// the result are both bounded by the allowance.
+fn charge_branch_goal_budget() -> bool {
     BRANCH_GOAL_BUDGET.with(|budget| match budget.get() {
         None => true,
         Some(left) => {
-            let cost = bounded_term_size(reduct, left.saturating_add(1));
-            let rest = left.saturating_sub(cost);
+            let rest = left.saturating_sub(1);
             budget.set(Some(rest));
-            cost <= left && rest > 0
+            rest > 0
         }
     })
 }
