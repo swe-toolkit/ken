@@ -51,6 +51,7 @@ pub use static_transition::{
     with_per_emitter_availability_diagnostics, PerEmitterAvailabilityDiagnostic,
     PerEmitterCaptureDiagnostic, PerEmitterMaterializationDiagnostic, PerEmitterOwnerDiagnostic,
     with_suppressed_execute_then_resume_response, with_suppressed_relay_promotion,
+    with_mixed_relay_refusal_observations, MixedRelayRefusalObservation,
     with_worker_prefix_deferrals,
     CheckedIhContinuationInheritanceMutation, CheckedIhContinuationInheritanceObservation,
     CheckedIhGeneratedEntryAdmissionMutation, CheckedIhGeneratedEntryAdmissionObservation,

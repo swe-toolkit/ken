@@ -143,6 +143,8 @@ pub use responses::{
     with_mixed_owner_execute_then_resume_overpromotion,
     with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
     with_suppressed_relay_promotion,
+    with_mixed_relay_refusal_observations,
+    MixedRelayRefusalObservation,
     with_pending_checked_ret_sink_applications, StaticResponseContextDemandMutation,
 };
 pub(in crate::cranelift_backend) use units::{

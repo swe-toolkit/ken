@@ -792,6 +792,8 @@ pub fn retained_unit_call_target_mutation_is_exact() -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StaticResponseCallerRetargetMutation {
     RestoreSelectedKTarget,
+    /// Only the exact pre-schema relay-promoted source edge loses its owner.
+    RestoreRelayPromotedKTarget,
     RemoveSelectedCaller,
     RetargetToDifferentResponseOwner,
 }
@@ -876,6 +878,34 @@ pub fn with_static_response_caller_retarget_mutation<T>(
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug)]
+pub struct RelayOwnerCoverageRefusalObservation {
+    pub source: u32,
+    pub source_lowered: bool,
+    pub selected_caller: String,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static RELAY_OWNER_COVERAGE_REFUSALS:
+        std::cell::RefCell<Option<Vec<RelayOwnerCoverageRefusalObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_relay_owner_coverage_refusal_observations<T>(operation: impl FnOnce() -> T)
+    -> (T, Vec<RelayOwnerCoverageRefusalObservation>)
+{
+    RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| {
+        assert!(slot.borrow().is_none(), "relay coverage observations cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| slot.borrow_mut().take().unwrap());
+    (result, observations)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -2063,10 +2093,18 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
         if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
             .with(std::cell::Cell::get)
         {
+            if mutation == StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget
+                && !plan.has_pre_schema_relay_promotion(
+                    identity.producer_construct_origin(), identity,
+                )
+            {
+                return Ok(response);
+            }
             STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
                 .with(|count| count.set(count.get() + 1));
             return match mutation {
-                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget => bundle
+                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget
+                | StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget => bundle
                     .continuation(identity.target())
                     .ok_or_else(|| {
                         backend_module(LoweringCause::PlannerInvariant,
@@ -7922,6 +7960,18 @@ impl ContinuationClaimLedger {
                 if !plan.has_pre_schema_relay_promotion(source, owner.selected_caller())
                     || lowered_construct_origins.contains(&source)
                 {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if plan.has_pre_schema_relay_promotion(source, owner.selected_caller()) {
+                        RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| {
+                            if let Some(rows) = slot.borrow_mut().as_mut() {
+                                rows.push(RelayOwnerCoverageRefusalObservation {
+                                    source: source.ticket_body_ordinal(),
+                                    source_lowered: lowered_construct_origins.contains(&source),
+                                    selected_caller: format!("{:?}", owner.selected_caller()),
+                                });
+                            }
+                        });
+                    }
                     return Err(backend_module(LoweringCause::PlannerInvariant, format!(
                         "a forward-declared response owner has no verified selected incoming call: \
                          owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}, source_lowered={}",

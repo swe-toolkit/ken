@@ -1,0 +1,24 @@
+program capabilities FS AFull
+
+proc rt_direct_read (cap : Cap AFull) (pending : HostIO AFull ExitCode)
+  : HostIO AFull ExitCode visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    ExitCode ExitCode
+    (Vis (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      ExitCode (InL (FSOp AFull) AmbientOp
+        (ReadFile AFull cap (bytes_encode "source")))
+      (\first. pending))
+    (\outcome. host_exit AFull outcome)
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    MkProgramCaps cap |-> rt_direct_read cap
+      (Vis (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        ExitCode (InL (FSOp AFull) AmbientOp
+          (ReadFile AFull cap (bytes_encode "source")))
+        (\second. host_exit AFull (Failure 72)))
+  }

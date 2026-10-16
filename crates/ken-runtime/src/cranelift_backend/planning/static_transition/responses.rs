@@ -1069,6 +1069,35 @@ pub fn with_suppressed_relay_promotion<T>(operation: impl FnOnce() -> T) -> (T, 
     (result, applications)
 }
 
+/// Typed test-only evidence of a mixed-owner relay refusal at the planner
+/// producer; no diagnostic wording or source-number snapshot is its oracle.
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug)]
+pub struct MixedRelayRefusalObservation {
+    pub source: u32,
+    pub edge_identity: String,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static MIXED_RELAY_REFUSALS:
+        std::cell::RefCell<Option<Vec<MixedRelayRefusalObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_mixed_relay_refusal_observations<T>(operation: impl FnOnce() -> T)
+    -> (T, Vec<MixedRelayRefusalObservation>)
+{
+    MIXED_RELAY_REFUSALS.with(|slot| {
+        assert!(slot.borrow().is_none(), "mixed relay observations cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = MIXED_RELAY_REFUSALS.with(|slot| slot.borrow_mut().take().unwrap());
+    (result, observations)
+}
+
 // Route-B precision control for `RT-WRITEALL-SUCCESS-PLANE-CLOSE`. Production
 // promotes only exclusively-predeclared transport groups. This mutation removes
 // that ownership restriction and counts every mixed-owner response it actually
@@ -3517,6 +3546,15 @@ impl StaticTransitionPlan<'_> {
                                 ContinuationEmissionOwner::Predeclared(_))
                     );
                     if !exclusively_predeclared {
+                        #[cfg(feature = "px8-ds-test-support")]
+                        MIXED_RELAY_REFUSALS.with(|slot| {
+                            if let Some(rows) = slot.borrow_mut().as_mut() {
+                                rows.push(MixedRelayRefusalObservation {
+                                    source: source.0,
+                                    edge_identity: format!("{identity:?}"),
+                                });
+                            }
+                        });
                         return Err(planner_error(format!(
                             "relay source {source:?} has a mixed-owner transport stage"
                         )));

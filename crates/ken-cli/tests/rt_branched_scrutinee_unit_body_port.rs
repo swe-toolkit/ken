@@ -373,3 +373,43 @@ fn suppressing_relay_promotion_refuses_the_forwarded_read_before_lowering() {
     assert_eq!(packaging.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
     assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::PlannerInvariant));
 }
+
+/// Promise class: durable invariant. MEASURED: the reached source Construct
+/// lowers while a mutation retargets only its selected response-owner call
+/// to the original K, so object closeout refuses. CLAIMED: a relay owner
+/// lacking an incoming call may be discharged only when its source was never
+/// lowered in any generated function. THE GAP: the mutation must change the
+/// actual resolved callee, not only falsify the coverage detector; its
+/// application count comes from exact target resolution.
+#[test]
+fn lowering_relay_source_without_entering_owner_refuses_coverage() {
+    with_stack_floor("rt-relay-lowered-without-owner", || {
+        let source = BRANCHED_SCRUTINEE_SOURCE.replacen(
+            "(MkBufferWindow (8 : Int) (4 : Int))",
+            "(MkBufferWindow (0 : Int) (4 : Int))", 1,
+        );
+        assert_ne!(source, BRANCHED_SCRUTINEE_SOURCE);
+        let root = tempfile::tempdir().expect("temporary native-build root");
+        let ((built, applications), coverage) =
+            ken_runtime::with_relay_owner_coverage_refusal_observations(|| {
+                ken_runtime::with_static_response_caller_retarget_mutation(
+                    ken_runtime::StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget,
+                    || ken_cli::build_native_program(
+                        &source, ken_cli::SourceFormat::Ken,
+                        "rt_relay_lowered_without_owner", root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    ),
+                )
+            });
+        assert!(applications > 0, "the reached relay must select its owner call");
+        assert_eq!(coverage.len(), 1, "the exact relay owner coverage guard must refuse");
+        assert!(coverage[0].source_lowered, "the source Construct must actually lower");
+        assert!(!coverage[0].selected_caller.is_empty(), "the guard checks an exact incoming edge");
+        let error = built.expect_err("a lowered relay source without its owner must refuse");
+        assert_eq!(error.code().as_str(), "N0003");
+        let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = error
+        else { panic!("the missing owner call must refuse during native object closeout") };
+        assert_eq!(packaging.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
+        assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::PlannerInvariant));
+    });
+}
