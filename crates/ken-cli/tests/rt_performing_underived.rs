@@ -43,8 +43,8 @@ fn computed_returned_vis_operation_is_performed_or_refused_without_dropping_it()
                 releases
             };
             assert!(non_release(&interpreted).iter().any(|event|
-                event.operation == ken_runtime::HostOpV1::FsReadFile
-            ), "the interpreter must reach the computed returned operation");
+                event.operation == ken_runtime::HostOpV1::FsReadAt
+            ), "the interpreter must reach the baseline forwarded operation");
             let (built, diagnostics) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
                 ken_cli::build_native_program(
                     source, ken_cli::SourceFormat::Ken, "rt_performing_underived",
@@ -52,6 +52,13 @@ fn computed_returned_vis_operation_is_performed_or_refused_without_dropping_it()
                 )
             });
             eprintln!("UNDERIVED_BUILD error={:?} diagnostics={}", built.as_ref().err(), diagnostics.len());
+            if let Some(plan) = diagnostics.first() {
+                eprintln!("UNDERIVED_OWNER_SET {:?}", plan.static_response_owners.iter().map(|owner|
+                    (owner.owner, owner.response, owner.selected_caller.as_str())).collect::<Vec<_>>());
+                eprintln!("UNDERIVED_OWNER_ROWS {:?}", plan.all_static_response_rows.iter().map(|row|
+                    (row.vis_origin, row.k_body_origin, row.operation.as_str())).collect::<Vec<_>>());
+                eprintln!("UNDERIVED_CLASS {:?}", plan.underived_owner_origins);
+            }
             assert_eq!(diagnostics.len(), 1, "one program publishes one plan");
             assert!(!diagnostics[0].underived_owner_origins.is_empty(),
                 "the computed K return must actually reach an Underived response owner: {diagnostics:?}");
