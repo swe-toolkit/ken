@@ -1,7 +1,7 @@
 ---
 id: CAT-SERIALIZATION-JSON-TOKEN-CODEC
 title: "Spec 71 section 1 specifies a JSON token codec over the existing Json carrier, with four proved laws, but no catalog package delivers it. Deliver Data.Serialization.JsonCodec from the Architect's checked D0 at zero trust, and correct the Json design note that promises duplicate-key rejection"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

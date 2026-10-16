@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-BOUNDED-SEARCH
 title: "Spec 72 covers choosing a best candidate from a given list, but not the search half of the optimization/search layer: finding the least natural number below a bound that satisfies a decidable predicate. Author section 2 with a find operation whose soundness, leastness and completeness are proved at zero trust"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

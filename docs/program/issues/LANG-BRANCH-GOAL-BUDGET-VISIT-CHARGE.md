@@ -1,7 +1,7 @@
 ---
 id: LANG-BRANCH-GOAL-BUDGET-VISIT-CHARGE
 title: "a04ec5865 bounds the branch-goal simplifier, but it charges each visited reduct its full size and then charges the reduct's children again, so the charge is quadratic on a spine. A true theorem with a large non-duplicating closed list now exhausts the allowance and is refused as raw KernelRejected. Charge one unit per simplifier visit"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T2

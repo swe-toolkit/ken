@@ -1,7 +1,7 @@
 ---
 id: DIAG-STDERR-LINE-PRESENCE
 title: "Spec 70 section 1.1 makes a diagnostic one whole stderr line, but a coded line that follows program stderr output without a trailing newline starts mid-line, so a line-based consumer sees exit 1 and no code. A non-UTF-8 or empty subcommand prints help and exits 0 instead of failing with C0003. Repair both front-end presence defects"
-status: active
+status: merged
 owner: runtime
 size: S
 tier: T2

@@ -1,0 +1,72 @@
+---
+id: LANG-ELAB-NATIVE-STACK-DEPTH
+title: "Elaborator term walkers recurse on the native stack with depth equal to term depth and no guard. Once LANG-BRANCH-GOAL-BUDGET-VISIT-CHARGE removes the false refusal that capped goal size, a dependent-match goal with a closed spine about 160 deep aborts ken check with an uncoded stack overflow on the default 8 MiB stack. Close the class so a deep goal yields Ok or a typed refusal"
+status: ready
+owner: verify
+size: M
+tier: T1
+gate: architect
+depends_on: [LANG-BRANCH-GOAL-BUDGET-VISIT-CHARGE]
+blocks: []
+github: null
+origin: "Architect merge review of LANG-BRANCH-GOAL-BUDGET-VISIT-CHARGE 4c1c69369 (evt_304zd75enpcqr): pre-existing overflow exposed by the repair, not a merge blocker, follow-up WP recommended. Steward-filed per COORDINATION section 2."
+---
+
+# A deep goal is checked or refused, never aborted
+
+## Objective
+
+`ken check` on a dependent-match goal with a deep closed spine returns Ok
+or a coded refusal. It never dies of a native stack overflow.
+
+## Settled inputs (Architect `evt_304zd75enpcqr`, on `4c1c69369`)
+
+- **Repro.** Theorem `r1` from
+  `lang_branch_goal_budget_visit_charge.rs`, with `build K Nil`, on an
+  8 MiB thread. Debug K=160 aborts with rc 134; at 16 MiB it is Ok in
+  3.3s. Release is Ok through K=640 on 8 MiB. A literal list at K=160
+  and K=320 also aborts in debug.
+- **Site.** lldb on the debug K=160 abort: 318 of 357 frames are in
+  `refresh_embedded_elim_evidence` (elab.rs:3571), called from
+  `plan_coherent_frame_motive` (:4747). It is a structural recursion over
+  the simplified goal, about 26 KiB per Cons pair in debug, with no depth
+  guard.
+- **Class, not site.** The Architect ruled against bounding that one
+  walker alone. Any elaborator walker that recurses on the native stack
+  with depth equal to term depth has the same defect.
+- **Stack today.** `ken-cli` runs elaboration on the main thread (8 MiB)
+  and spawns no sized thread. Sized threads exist in elaborator test
+  helpers (compiler_driver.rs:9030 `on_native_stack`, checked_core.rs:5912)
+  and in `ken-verify` scenario.rs:661.
+- **Two candidate closures (not yet ruled).** (a) Run `ken check` and
+  `ken run` elaboration on a sized worker thread. (b) A depth bound on the
+  walkers, refusing with a typed error. A sized thread moves the cliff
+  rather than removing it, so the D0 must say what happens past it.
+
+Treat anchors as perishable. If a settled input is false on the landed
+base, stop and report the mismatch.
+
+## Deliverable
+
+D0 first, on the landed base with LANG-BRANCH-GOAL-BUDGET-VISIT-CHARGE
+merged. The Architect measures which walkers a deep closed spine reaches
+(by backtrace, not by reading), rules (a), (b) or both, and names the
+depth or stack size and the refusal code. Then implement the ruling.
+
+## Acceptance
+
+- **AC-1.** `r1` at K=160, debug, through `ken check` or an 8 MiB thread,
+  is Ok or a coded refusal, with `trusted_base()` unchanged.
+- **AC-2.** A spine past the D0's ruled limit, on each walker the D0
+  census names, returns a coded refusal or Ok, not an abort. The rows
+  that check today stay Ok, including release K=640.
+- **AC-3 (mutation, QA).** Removing the closure returns debug K=160 on
+  8 MiB to the rc 134 abort.
+
+## Stop conditions
+
+- Any kernel, conversion or `trusted_base()` change.
+- A goal that checks today is refused.
+- The census finds walkers outside the elaborator, such as the kernel
+  checker, on the deep-spine path. That scope returns to the Architect
+  and the operator.

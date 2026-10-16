@@ -1,7 +1,7 @@
 ---
 id: CAT-OPTIMIZATION-ARGMIN
 title: "Spec 72 section 1 specifies a least-cost candidate selector over NonEmpty with seven proved laws, but no catalog package delivers it. Deliver Algorithm.Optimization.Argmin from the Architect's checked D0 at zero trust, and publish the two Nat-order bridges it needs in Data.Numeric.Nat.Order"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
@@ -75,10 +75,16 @@ base, stop and report the mismatch.
 - **AC-2.** The seed's positives pass from a client module, and each
   negative is refused at its own theorem. The census passes with the new
   row, and every other row is unchanged.
-- **AC-3 (mutation, QA).**
-  - Selecting a later tie reddens the earliest-tie case.
-  - Reversing the cost order reddens the strict-minimum case.
-  - Always keeping the head reddens the strict-minimum case.
+- **AC-3 (mutation, QA).** Apply each mutant to the production `argmin`.
+  The package then fails to check. Because that rejection comes from a
+  law proof and is not attributable, also run the seed's positives from a
+  client against a scratch operation-only projection: the candidate's
+  production `fn` bodies verbatim (identity checked against the
+  candidate), proofs excluded, not committed. The named seed row must
+  redden:
+  - selecting a later tie reddens the earliest-tie case;
+  - reversing the cost order reddens the strict-minimum case;
+  - always keeping the head reddens the strict-minimum case.
 
 ## Stop conditions
 

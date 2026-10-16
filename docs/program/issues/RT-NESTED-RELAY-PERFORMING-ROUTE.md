@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-RELAY-PERFORMING-ROUTE
 title: "After RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT a forwarded host op with no performing route stops native at a planned relay trap where the interpreter performs it (FsReadAt), so native refuses a valid program the interpreter runs. Emit an outer member that performs the forwarded op and retire the traps (route C)"
-status: ready
+status: active
 owner: runtime
 size: L
 tier: T1
@@ -24,10 +24,13 @@ relay trap.
 
 - **The traps.** Increment (i) plans a typed relay trap for each route-none
   (pair, identity) (`MissingRuntimeMetadata`, "relay: forwarded host op
-  <op> from source <origin> has no performing route"). Three consuming
-  seats emit it: terminal transport, detached result, and the ownerless
-  source. R4 makes an admitted pair with no planned call edge a planner
-  refusal.
+  <op> from source <origin> has no performing route"). On `5c0afeffa` five
+  callsites consume it (terminal transport, active transport, claim,
+  fusion and detached result), plus the ownerless early guard. The runtime
+  ring's AC-0 measured source 768 / Spec(2) / FsReadAt reaching the claim
+  consumer (`lowering/core.rs:7737`), so the earlier three-seat list was
+  not exhaustive (`evt_77jsfk2hdrn9g`). R4 makes an admitted pair with no
+  planned call edge a planner refusal.
 - **AC-MAIN is a transition sentinel.**
   `branched_scrutinee_forwarded_read_is_performed_or_refused`
   (`crates/ken-cli/tests/rt_branched_scrutinee_unit_body_port.rs`) asserts
@@ -57,17 +60,25 @@ emission point at D0.
 
 ## Acceptance
 
-- **AC-0 (measure).** On the landed base: the route-none population per
-  (pair, identity) from the D0 table, the seat each reaches, and for each
-  seat a fixture that reaches it.
+- **AC-0 (measure).** On the landed base, a complete census of the
+  route-none (pair, identity) population in the D0 table and the consumer
+  each reaches, over all five callsites and the ownerless guard. It ends
+  as a reached/not-reached table per consumer, with the record counts and
+  the units that produced them; for px8ta, the Closure refusal point and
+  its record count. Do not build fixtures for not-reached consumers: the
+  table is the D0 input, and the Architect rules per consumer whether a
+  fixture is constructible or the consumer is unreachable by a cited
+  guard (`evt_234a783np26tf`). Instrumentation is disposable and not
+  committed.
 - **AC-1.** AC-MAIN asserts parity. Native performs `FsReadAt`, and its
   non-release events equal the interpreter's in order, with releases
   compared as a set through the shared helpers.
-- **AC-2 (witnesses).** One row per seat (terminal transport, detached
-  result, ownerless source) and one `Excluded{Underived}` owner row. Each
-  is performed or refused, and each reddens when its seat is mutated.
-  The px8ta relay inside the Closure-refused artifact is either reached
-  by a row or named as unreachable, with the measurement.
+- **AC-2 (witnesses).** One row per consumer that AC-0 shows reachable,
+  and one `Excluded{Underived}` owner row. Each is performed or refused,
+  and each reddens when its consumer's guard is mutated. Each consumer
+  the D0 rules unreachable is named with its guard instead. The px8ta
+  relay inside the Closure-refused artifact is either reached by a row or
+  named as unreachable per the D0.
 - **AC-3 (control).** Rows 01-36 and the four AC-MAIN controls keep
   parity under the fleet release rule.
 
