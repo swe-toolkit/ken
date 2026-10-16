@@ -546,6 +546,25 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // Argmin imports NonEmpty, Derived membership, Nat Order and Or.
+            // The provider closure retains eight compiler conveniences under
+            // the strict-floor probe; neither Nat bridge adds an assumption.
+            "Algorithm.Optimization.Argmin".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // With its own Dec-family imports, this package now reaches the
             // strict-floor census. Its conjunction names remain prelude-bound
             // until the separate collections slice moves And and is_sorted.
