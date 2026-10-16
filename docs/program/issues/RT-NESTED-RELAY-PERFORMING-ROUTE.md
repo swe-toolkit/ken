@@ -62,18 +62,23 @@ emission point at D0.
 
 - **AC-0 (measure).** On the landed base, a complete census of the
   route-none (pair, identity) population in the D0 table and the consumer
-  each reaches, over all five callsites and the ownerless guard. For each
-  consumer, a fixture that reaches it, or a measured "unreachable on this
-  base". Instrumentation is disposable and not committed.
+  each reaches, over all five callsites and the ownerless guard. It ends
+  as a reached/not-reached table per consumer, with the record counts and
+  the units that produced them; for px8ta, the Closure refusal point and
+  its record count. Do not build fixtures for not-reached consumers: the
+  table is the D0 input, and the Architect rules per consumer whether a
+  fixture is constructible or the consumer is unreachable by a cited
+  guard (`evt_234a783np26tf`). Instrumentation is disposable and not
+  committed.
 - **AC-1.** AC-MAIN asserts parity. Native performs `FsReadAt`, and its
   non-release events equal the interpreter's in order, with releases
   compared as a set through the shared helpers.
 - **AC-2 (witnesses).** One row per consumer that AC-0 shows reachable,
   and one `Excluded{Underived}` owner row. Each is performed or refused,
   and each reddens when its consumer's guard is mutated. Each consumer
-  that AC-0 marks unreachable is named with its measurement instead.
-  The px8ta relay inside the Closure-refused artifact is either reached
-  by a row or named as unreachable, with the measurement.
+  the D0 rules unreachable is named with its guard instead. The px8ta
+  relay inside the Closure-refused artifact is either reached by a row or
+  named as unreachable per the D0.
 - **AC-3 (control).** Rows 01-36 and the four AC-MAIN controls keep
   parity under the fleet release rule.
 
