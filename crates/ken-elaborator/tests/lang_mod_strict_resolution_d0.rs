@@ -1320,6 +1320,24 @@ fn catalog_ambient_passthrough_migration_census() {
                 .collect(),
         ),
         (
+            // EventTrace imports generic Derived list proofs; the eight
+            // inherited compiler conveniences remain ambient in Strict.
+            "Data.Time.EventTrace".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             "Tooling.Testing.Property".to_string(),
             [
                 "And",
