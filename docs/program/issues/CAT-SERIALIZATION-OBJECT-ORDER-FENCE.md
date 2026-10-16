@@ -1,7 +1,7 @@
 ---
 id: CAT-SERIALIZATION-OBJECT-ORDER-FENCE
 title: "Nothing pins the JSON token encoder's object member order, key placement or duplicate retention (spec 71 section 1.2): a consistent reversal passes every law and seed row. Add the closed Refl theorems the codec WP wrongly said could not be written, and correct the Json.ken.md sentence that still puts duplicate-key rejection in decoding"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
