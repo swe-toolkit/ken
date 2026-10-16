@@ -23,6 +23,16 @@ impl fmt::Display for Code {
     }
 }
 
+/// Produce one physical diagnostic line even when an input path or message
+/// contains a line terminator. The free-text message is not a stable ABI.
+pub fn render_line(code: Code, message: impl fmt::Display) -> String {
+    let message = message
+        .to_string()
+        .replace('\r', "\\r")
+        .replace('\n', "\\n");
+    format!("error[{code}]: {message}")
+}
+
 /// One append-only ledger: code, meaning label, active/retired status, and
 /// owning enum variant. Retired rows reserve their code, label, and last variant.
 /// Owning crates check active rows against exhaustive variant matches.
@@ -258,6 +268,10 @@ mod tests {
         );
         assert_eq!(Code::new("E0001").to_string(), "E0001");
         assert_eq!(Code::new("E0001").as_str(), "E0001");
+        assert_eq!(
+            render_line(Code::new("C0003"), "bad\nsubcommand\rname"),
+            "error[C0003]: bad\\nsubcommand\\rname"
+        );
     }
 
     #[test]
