@@ -30,7 +30,7 @@ fn r1_program(depth: usize, with_main: bool) -> String {
 // The child process main thread has exactly an 8-MiB stack, independently
 // of its caller's limit. The production worker is separately stated at
 // 256 MiB. RUST_MIN_STACK is removed so neither path inherits ambient policy.
-fn invoke(command: &str, path: &Path) -> Output {
+fn invoke(command: &str, path: &Path, additional_paths: &[&Path]) -> Output {
     #[cfg(unix)]
     let mut ken = {
         let mut shell = Command::new("sh");
@@ -46,6 +46,7 @@ fn invoke(command: &str, path: &Path) -> Output {
 
     ken.arg(command)
         .arg(path)
+        .args(additional_paths)
         .env_remove("RUST_MIN_STACK")
         .output()
         .expect("spawn Ken CLI")
@@ -64,7 +65,7 @@ fn fixture(depth: usize, with_main: bool) -> (tempfile::TempDir, std::path::Path
 #[test]
 fn shallow_goal_control_checks_on_eight_mib_main() {
     let (_dir, path) = fixture(0, false);
-    let output = invoke("check", &path);
+    let output = invoke("check", &path, &[]);
     assert!(
         output.status.success(),
         "shallow ken check must pass: status={:?} stderr={}",
@@ -80,7 +81,7 @@ fn shallow_goal_control_checks_on_eight_mib_main() {
 #[test]
 fn deep_goal_checks_through_cli_worker() {
     let (_dir, path) = fixture(160, false);
-    let output = invoke("check", &path);
+    let output = invoke("check", &path, &[]);
     assert!(
         output.status.success(),
         "K=160 ken check must return Ok: status={:?} stderr={}",
@@ -97,7 +98,7 @@ fn deep_goal_checks_through_cli_worker() {
 #[test]
 fn deep_goal_runs_through_cli_worker() {
     let (_dir, path) = fixture(160, true);
-    let output = invoke("run", &path);
+    let output = invoke("run", &path, &[]);
     assert!(
         output.status.success(),
         "K=160 ken run must return Ok: status={:?} stderr={}",
@@ -118,11 +119,100 @@ fn deep_goal_runs_through_cli_worker() {
 #[test]
 fn release_goal_at_six_forty_still_checks() {
     let (_dir, path) = fixture(640, false);
-    let output = invoke("check", &path);
+    let output = invoke("check", &path, &[]);
     assert!(
         output.status.success(),
         "release K=640 ken check must still pass: status={:?} stderr={}",
         output.status,
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+// Same bounded resource profile as verify_entry_abi_checked_identity.rs.
+const NATIVE_RESOURCE_PROFILE: &str = "{\"runtime\":{\"invocation_epochs\":1024},\"call_events\":{\"event_generations\":2048,\"live_pending_slots\":1024},\"invocation\":{\"nodes\":100000,\"words\":100000,\"data_bytes\":1000000,\"native_int_limbs\":100000},\"persistent\":{\"nodes\":100000,\"words\":100000,\"data_bytes\":1000000,\"native_int_limbs\":100000}}";
+
+fn build_and_run_deep_goal(depth: usize) {
+    let (_dir, source) = fixture(depth, true);
+    let output = tempfile::tempdir().expect("native-build output directory");
+    let profile = output.path().join("profile.json");
+    let artifact_dir = output.path().join("artifact");
+    std::fs::write(&profile, NATIVE_RESOURCE_PROFILE).expect("write native resource profile");
+    let built = invoke("native-build", &source, &[&artifact_dir, &profile]);
+    assert!(
+        built.status.success(),
+        "K={depth} native-build must succeed: status={:?} stderr={}",
+        built.status,
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let artifact = String::from_utf8(built.stdout).expect("native executable path is UTF-8");
+    let executable = std::path::Path::new(artifact.trim());
+    assert!(
+        executable.starts_with(&artifact_dir),
+        "native-build must name the built artifact inside {artifact_dir:?}: {artifact:?}"
+    );
+    let run = Command::new(executable)
+        .output()
+        .expect("run emitted native program");
+    assert!(
+        run.status.success(),
+        "K={depth} native program must exit successfully: stderr={}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(run.stdout, b"stack worker reached main\n");
+}
+
+/// MEASURED: native-build compiles and runs the K=0 version of the same
+/// program on a CLI child with an 8-MiB main-thread stack. CLAIMED: the
+/// native-build fixture and profile are valid without the deep spine.
+/// THE GAP: K=0 alone does not exercise the stack-consuming walker.
+#[test]
+fn shallow_goal_native_build_control() {
+    build_and_run_deep_goal(0);
+}
+
+/// MEASURED: native-build compiles the K=160 dependent goal and its emitted
+/// program prints the real main output. CLAIMED: native-build elaboration
+/// shares the 256-MiB CLI worker instead of aborting on the 8-MiB main stack.
+/// THE GAP: this is a bounded source; behavior beyond the worker cliff is AC-2.
+#[test]
+fn deep_goal_native_build_uses_cli_worker() {
+    build_and_run_deep_goal(160);
+}
+
+/// MEASURED: the CLI runs `help` under a 128-MiB virtual-address limit but
+/// reports C0022 and exits 1 when that same limit prevents its 256-MiB worker
+/// reservation. CLAIMED: worker-spawn failure is a coded CLI-front-end error.
+/// THE GAP: this probes Linux RLIMIT_AS; other spawn failures share the same
+/// `Err` arm but are not independently forced here.
+#[cfg(target_os = "linux")]
+#[test]
+fn worker_spawn_failure_is_coded() {
+    let (_dir, path) = fixture(0, false);
+    let invoke_limited = |command| {
+        Command::new("sh")
+            .arg("-c")
+            .arg("ulimit -c 0; ulimit -s 8192 || exit 77; ulimit -v 131072 || exit 78; exec \"$@\"")
+            .arg("ken-native-stack-spawn-failure")
+            .arg(env!("CARGO_BIN_EXE_ken"))
+            .arg(command)
+            .arg(&path)
+            .env_remove("RUST_MIN_STACK")
+            .output()
+            .expect("spawn limited Ken CLI")
+    };
+    let help = invoke_limited("help");
+    assert!(
+        help.status.success(),
+        "the limit must allow the CLI to start: status={:?} stderr={}",
+        help.status,
+        String::from_utf8_lossy(&help.stderr)
+    );
+    let check = invoke_limited("check");
+    assert_eq!(check.status.code(), Some(1), "{check:?}");
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(
+        stderr.starts_with("error[C0022]: ken: cannot spawn elaboration worker: "),
+        "worker-spawn failure must have its registered code: {stderr}"
+    );
+    assert_eq!(stderr.lines().count(), 1, "no uncoded panic: {stderr}");
 }

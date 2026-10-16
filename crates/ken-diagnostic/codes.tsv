@@ -133,6 +133,7 @@ C0018	cli.check_missing_file	active	CliError::CheckMissingFile
 C0019	cli.check_source_read	active	CliError::CheckSourceRead
 C0020	cli.run_source_read	active	CliError::RunSourceRead
 C0021	cli.run_working_directory_read	active	CliError::RunWorkingDirectoryRead
+C0022	cli.elaboration_worker_spawn	active	CliError::ElaborationWorkerSpawn
 H0001	host.root_execution_denied	active	TerminalErrorV1::RootExecutionDenied
 H0002	host.home_root_resolution_failed	active	TerminalErrorV1::HomeRootResolutionFailed
 H0003	host.malformed_host_abi_field	active	TerminalErrorV1::MalformedHostAbiField

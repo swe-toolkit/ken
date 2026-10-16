@@ -28,6 +28,7 @@ pub(crate) enum CliError {
     CheckSourceRead(PathBuf, io::Error),
     RunSourceRead(PathBuf, io::Error),
     RunWorkingDirectoryRead(io::Error),
+    ElaborationWorkerSpawn(io::Error),
 }
 
 ken_diagnostic::define_error_codes! {
@@ -54,6 +55,7 @@ ken_diagnostic::define_error_codes! {
     Self::CheckSourceRead(..) => ("C0019", "cli.check_source_read"),
     Self::RunSourceRead(..) => ("C0020", "cli.run_source_read"),
     Self::RunWorkingDirectoryRead(..) => ("C0021", "cli.run_working_directory_read"),
+    Self::ElaborationWorkerSpawn(..) => ("C0022", "cli.elaboration_worker_spawn"),
     ;
 }
 
@@ -123,6 +125,9 @@ impl fmt::Display for CliError {
             Self::RunWorkingDirectoryRead(error) => {
                 write!(f, "ken run: cannot read working directory: {error}")
             }
+            Self::ElaborationWorkerSpawn(error) => {
+                write!(f, "ken: cannot spawn elaboration worker: {error}")
+            }
         }
     }
 }
@@ -159,6 +164,12 @@ mod tests {
                 .code()
                 .as_str(),
             "C0021"
+        );
+        assert_eq!(
+            CliError::ElaborationWorkerSpawn(io::Error::from(io::ErrorKind::OutOfMemory))
+                .code()
+                .as_str(),
+            "C0022"
         );
     }
 }
