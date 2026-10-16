@@ -24,7 +24,8 @@ cover that subset by ordinary structural recursion.
 ## 2. Definition
 
 Arrays contain JSON values directly. Objects are ordered lists of string/value
-pairs; duplicate-key rejection belongs to decoding rather than to the carrier.
+pairs, and repeated keys are kept in order. The token codec preserves them
+(spec 71 §1.2); duplicate-key rejection is deferred (§1.4).
 
 ```ken
 import Data.Collections.Derived (length)

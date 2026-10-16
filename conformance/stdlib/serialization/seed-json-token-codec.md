@@ -123,6 +123,18 @@ theorem round_trip_nested :
 theorem encode_array_order :
   Equal (List JsonToken) (json_encode ordered_array) expected_array_tokens = Refl
 
+theorem encode_number_tokens :
+  Equal (List JsonToken) (json_encode number_value) expected_number_tokens = Refl
+
+theorem encode_string_tokens :
+  Equal (List JsonToken) (json_encode string_value) expected_string_tokens = Refl
+
+theorem encode_object_order :
+  Equal (List JsonToken) (json_encode ordered_object) expected_object_tokens = Refl
+
+theorem encode_duplicate_members :
+  Equal (List JsonToken) (json_encode duplicate_object) expected_duplicate_tokens = Refl
+
 theorem law_trailing_first_extra :
   Equal (Result JsonError Json)
     (json_decode
@@ -186,20 +198,19 @@ theorem malformed_mismatched_close :
 ### Token output preserves array and object order
 
 - spec: `spec/50-stdlib/71-serialization.md` §1.2.
-- promise class: durable invariant.
+- promise class: normative compatibility vector.
 - given: `ordered_array`, `ordered_object`, and `duplicate_object`.
-- expect: scalar outputs equal their one-token
-  `expected_number_tokens` and `expected_string_tokens`; the array
-  output equals `expected_array_tokens`. Object outputs equal
-  `expected_object_tokens` and `expected_duplicate_tokens`.
+- expect: checked closed theorems establish the one-token scalar
+  outputs, the ordered array, the ordered object and both duplicate
+  members against their independently stated expected token vectors.
 - measured: exact scalar and array token lists, plus object token
   vectors with distinct member values and a repeated key.
 - claimed: arrays and object members are emitted in list order, each
   key precedes its value, and duplicate keys are not removed.
-- gap: the number, string and object vectors are source-shaped
-  black-box expectations; this seed does not add a String comparator
-  or claim an independent key-equality oracle. The closed array equation
-  has no opaque payloads.
+- gap: these checked closed theorems pin the stated fixtures, not every
+  possible object or scalar payload. The seed adds no String comparator
+  or independent key-equality oracle; the opaque payload constants occur
+  on both sides of each token equation.
 - why: reversing either object member moves its distinct Boolean value;
   deduplicating the repeated key changes the token count.
 
@@ -293,14 +304,40 @@ theorem reject_keyless_object_value :
     (Ok JsonError Json (JsonObject (Nil (Pair String Json)))) = Proved
 ```
 
+### Reversed object members are not the encoder's output
+
+- spec: `spec/50-stdlib/71-serialization.md` §1.2.
+- promise class: normative compatibility vector.
+- given: `ordered_object` with distinct keys and Boolean values.
+- expect: the following reversed token list is refused at its own `Refl`.
+- measured: the false vector moves each key with its value and changes
+  no payload or delimiter.
+- claimed: `json_encode` emits object members in their list order.
+- gap: one closed object does not establish order for all objects.
+- why: the positive `encode_object_order` fixes the forward token order;
+  a consistent encoder/decoder reversal cannot satisfy both claims.
+
+```ken
+-- Refused: the object encoder does not reverse its input member list.
+theorem reject_reversed_members :
+  Equal (List JsonToken) (json_encode ordered_object)
+    (Cons JsonToken TokObjectOpen
+      (Cons JsonToken (TokKey second_key)
+        (Cons JsonToken (TokBool False)
+          (Cons JsonToken (TokKey first_key)
+            (Cons JsonToken (TokBool True)
+              (Cons JsonToken TokObjectClose (Nil JsonToken))))))) = Refl
+```
+
 ## Coverage boundary
 
 The seed exercises each constructor, one round-trip assertion per
 constructor, a nested value, ordered and repeated object members,
 the four public law interfaces, and representative typed refusals.
-The scalar, array and ordered-object vectors state exact expected
-tokens and key placement without introducing trusted String comparison.
-The closed array equation has no opaque payloads. These cases do not
-establish the D0 proof bodies, a shipped
-module or seed, JSON text/byte behavior, complete malformed-input
-classification, a measured trusted-base delta, CI, or publication.
+The scalar, array, ordered-object and duplicate-member vectors are
+checked closed theorems for exact token output and key placement; they
+introduce no trusted String comparison. The scalar and object equations
+carry bound opaque payloads, while the array equation has none. These
+cases do not establish the D0 proof bodies, a shipped module or seed,
+JSON text/byte behavior, complete malformed-input classification, a
+measured trusted-base delta, CI, or publication.

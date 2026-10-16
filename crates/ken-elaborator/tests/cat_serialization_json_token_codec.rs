@@ -1,7 +1,7 @@
 //! JSON token codec clients: spec/50-stdlib/71-serialization.md §1.
 //! Source: conformance/stdlib/serialization/seed-json-token-codec.md.
-//! Promise class: durable invariant. Exact seed token/error vectors pin the
-//! contract's order and refusal behavior; generic client laws pin the types.
+//! Promise classes: normative compatibility vectors pin the exact token
+//! order; durable invariants pin generic laws and typed refusals.
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -121,11 +121,12 @@ theorem client_stray_close (more : List JsonToken) :
 "#;
 
 /// SOURCE: conformance/stdlib/serialization/seed-json-token-codec.md positives.
-/// PROMISE CLASS: durable invariant.
+/// PROMISE CLASS: normative compatibility vector for exact token order;
+/// durable invariant for the round-trip and malformed-input claims.
 /// MEASURED: the seed's complete positive Ken fence elaborates through a
 /// client import of the public token constructors, errors, operations and
-/// laws; the array-order assertion has the proof terminal required by its
-/// nonempty-list equality, while scalar and object fixtures remain distinct.
+/// laws; checked closed theorems fix scalar, array, ordered-object and
+/// duplicate-member token vectors with distinct member values.
 /// CLAIMED: all six constructors, order, repeated keys, nested values and
 /// representative typed malformed inputs behave as specified.
 /// THE GAP: these finite vectors do not replace generic checked proofs;
@@ -146,6 +147,10 @@ fn complete_seed_positive_client_checks() {
         "round_trip_duplicate_object",
         "round_trip_nested",
         "encode_array_order",
+        "encode_number_tokens",
+        "encode_string_tokens",
+        "encode_object_order",
+        "encode_duplicate_members",
         "law_trailing_first_extra",
         "law_empty",
         "law_stray_close",
@@ -162,12 +167,14 @@ fn complete_seed_positive_client_checks() {
 }
 
 /// SOURCE: conformance/stdlib/serialization/seed-json-token-codec.md refusals.
-/// PROMISE CLASS: durable invariant.
+/// PROMISE CLASS: normative compatibility vector for object order;
+/// durable invariant for the other refusals.
 /// MEASURED: after the same full positive client passes, each seed negative
-/// checks alone and kernel-rejects with TypeMismatch inside its own theorem.
-/// CLAIMED: the false reversed-array result, accepted trailing prefix and
-/// discarded keyless object value cannot be justified by the codec.
-/// THE GAP: these three counterexamples do not classify every malformed input.
+/// checks alone and refuses with TypeMismatch inside its own theorem; the
+/// reversed-object Refl is refused before kernel admission.
+/// CLAIMED: the false reversed-array and reversed-object results, accepted
+/// trailing prefix and discarded keyless object value cannot be justified.
+/// THE GAP: these four counterexamples do not classify every malformed input.
 #[test]
 fn each_false_seed_result_is_refused_at_its_own_theorem() {
     let programs = seed_programs();
@@ -175,25 +182,38 @@ fn each_false_seed_result_is_refused_at_its_own_theorem() {
         (programs[1], "reject_reversed_array"),
         (programs[2], "reject_trailing_prefix"),
         (programs[3], "reject_keyless_object_value"),
+        (programs[4], "reject_reversed_members"),
     ] {
         let mut env = codec_env();
         env.elaborate_file(programs[0])
             .expect("positive seed must check before a negative is submitted");
-        match env.elaborate_file(negative) {
+        let span = match env.elaborate_file(negative) {
             Err(ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 span,
-            }) => {
-                let start = negative.find("theorem ").expect("false theorem");
-                assert!(
-                    negative[start..].starts_with(&format!("theorem {name}"))
-                        && span.start >= start
-                        && span.end <= negative.len()
-                        && span.start < span.end,
-                    "{name}: refusal must target its own false theorem, got {span:?}"
-                );
+            }) if name != "reject_reversed_members" => span,
+            Err(ElabError::TypeMismatch { span, reason })
+                if name == "reject_reversed_members"
+                    && reason == "Refl: the two sides of the goal are not convertible" =>
+            {
+                span
             }
             other => panic!("{name}: expected typed refusal at its theorem, got {other:?}"),
+        };
+        let start = negative.find("theorem ").expect("false theorem");
+        assert!(
+            negative[start..].starts_with(&format!("theorem {name}"))
+                && span.start >= start
+                && span.end <= negative.len()
+                && span.start < span.end,
+            "{name}: refusal must target its own false theorem, got {span:?}"
+        );
+        if name == "reject_reversed_members" {
+            assert_eq!(
+                &negative[span.start..span.end],
+                "Refl",
+                "the reversed-member refusal must be at its own Refl"
+            );
         }
     }
 }
