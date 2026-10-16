@@ -1500,6 +1500,28 @@ fn let_equation(cx: &ElabCtx<'_>, rhs_ty: &Term, rhs_core: &Term) -> Option<Term
     })
 }
 
+/// The kernel's Let rule checks the body with the value substituted
+/// (check.rs:398, :580), and an introduction form cannot be inferred
+/// (check.rs:470). Keep the let's type on a stored introduction value.
+fn ascribe_introduction_let_value(val: Term, ty: &Term) -> Term {
+    fn introduction_tail(term: &Term) -> bool {
+        match term {
+            Term::Let { body, .. } => introduction_tail(body),
+            Term::Lam(_, _)
+            | Term::Pair(_, _)
+            | Term::Refl(_)
+            | Term::QuotClass(_)
+            | Term::TruncProj(_) => true,
+            _ => false,
+        }
+    }
+    if introduction_tail(&val) {
+        Term::Ascript(Box::new(val), Box::new(ty.clone()))
+    } else {
+        val
+    }
+}
+
 /// Check a local `let` outside `check`'s always-paid recursive frame. The
 /// helper remains live only for an actual `RLet`; unrelated deep match trees
 /// pay the original single-call dispatch frame.
@@ -1525,6 +1547,7 @@ fn check_let(
     cx.path_conditions.truncate(path_base);
     cx.ctx.pop();
     let body_core = body_result?;
+    let rhs_core = ascribe_introduction_let_value(rhs_core, &rhs_ty);
     Ok(Term::Let {
         ty: Box::new(rhs_ty),
         val: Box::new(rhs_core),
@@ -12050,6 +12073,7 @@ fn infer_let(
     cx.ctx.pop();
     let (body_core, body_ty) = body_result?;
     let result_ty = subst0(&body_ty, &rhs_core);
+    let rhs_core = ascribe_introduction_let_value(rhs_core, &rhs_ty);
     Ok((
         Term::Let {
             ty: Box::new(rhs_ty),
