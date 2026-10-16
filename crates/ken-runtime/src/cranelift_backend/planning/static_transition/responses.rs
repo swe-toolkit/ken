@@ -32,7 +32,7 @@ use super::{
 };
 use crate::cranelift_backend::grafted_spine_control_graph::GraftedSpineFunctionScope;
 use crate::cranelift_backend::backend_module;
-use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeTrap, RuntimeTrapCode, RuntimeValue};
+use crate::{CheckedComputationalIHInvocationKind, HostOpV1, RuntimeExpr, RuntimeSymbol, RuntimeValue};
 
 /// A response site that may carry a `StaticResponseDeferred` placeholder.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1047,6 +1047,28 @@ pub fn suppressed_execute_then_resume_response_is_exact() -> bool {
     SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
 }
 
+// Separate from execute-then-resume suppression: a relay can require its
+// performing owner even where ordinary composed-stage promotion is disabled.
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static SUPPRESS_RELAY_PROMOTION: std::cell::Cell<bool> =
+        const { std::cell::Cell::new(false) };
+    static SUPPRESS_RELAY_PROMOTION_APPLICATIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_suppressed_relay_promotion<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    SUPPRESS_RELAY_PROMOTION.with(|slot| {
+        assert!(!slot.replace(true), "relay promotion mutations cannot nest");
+    });
+    SUPPRESS_RELAY_PROMOTION_APPLICATIONS.with(|slot| slot.set(0));
+    let result = operation();
+    SUPPRESS_RELAY_PROMOTION.with(|slot| slot.set(false));
+    let applications = SUPPRESS_RELAY_PROMOTION_APPLICATIONS.with(std::cell::Cell::get);
+    (result, applications)
+}
+
 // Route-B precision control for `RT-WRITEALL-SUCCESS-PLANE-CLOSE`. Production
 // promotes only exclusively-predeclared transport groups. This mutation removes
 // that ownership restriction and counts every mixed-owner response it actually
@@ -1296,6 +1318,9 @@ mod relay_settlement;
 /// admitted owner's returned set omits it. Admitted only with a planned route
 /// or planned trap at every planner-issued call edge that consumes the source;
 /// each consuming seat branches to that trap when the route is absent.
+pub(in crate::cranelift_backend) type RelayPromotionKey =
+    (StaticOriginId, ContinuationEmissionOwner, ContinuationCallIdentity);
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct RelayDrivePair {
     pub(in crate::cranelift_backend) source: StaticOriginId,
@@ -1315,12 +1340,10 @@ pub(in crate::cranelift_backend) struct EmittedRelayMember {
     member: StaticResponseContinuationId,
 }
 
-/// Route metadata for one admitted pair at one planner-issued call edge.
-/// Absence of an entry edge carries an independently catalogued trap.
+/// One performing clause, selected before lowering at an exact pair/edge.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct RelayRoute {
-    pub(in crate::cranelift_backend) relay_route: Option<EmittedRelayMember>,
-    pub(in crate::cranelift_backend) no_route_trap: Option<RuntimeTrap>,
+    pub(in crate::cranelift_backend) relay_route: EmittedRelayMember,
 }
 
 impl StaticTransitionPlan<'_> {
@@ -1331,6 +1354,9 @@ impl StaticTransitionPlan<'_> {
         &self,
     ) -> Result<BTreeMap<(StaticOriginId, ContinuationEmissionOwner, ContinuationCallIdentity), RelayRoute>, CraneliftBackendError> {
         if self.relay_drive_pairs.is_empty() {
+            if !self.pre_schema_relay_promotions.is_empty() {
+                return Err(planner_error("pre-schema relay promotion has no installed pair"));
+            }
             return Ok(BTreeMap::new());
         }
         let candidates = self.return_protocol_candidate_rows()?;
@@ -1452,6 +1478,24 @@ impl StaticTransitionPlan<'_> {
                 "an admitted relay pair has no planned call edge (source {source:?})",
             )));
         }
+        // This edge set comes from the installed pairs and BOTH actual route
+        // enumeration loops, never from the pre-schema fixpoint. In particular
+        // an unrepresentable active-transport destination cannot be inferred.
+        for (source, owner, identity) in &self.pre_schema_relay_promotions {
+            if !pair_edges.get(&(*source, *owner))
+                .is_some_and(|edges| edges.contains(identity))
+            {
+                return Err(planner_error(format!(
+                    "promoted relay at {source:?} has no installed pair edge"
+                )));
+            }
+            let Some((selected_owner, row)) = by_edge.get(identity) else {
+                return Err(planner_error("promoted relay has no selected response owner at its edge"));
+            };
+            if row.vis_origin() != *source || selected_owner.selected_caller() != identity {
+                return Err(planner_error("promoted relay edge selects another response source"));
+            }
+        }
         let mut routes = BTreeMap::new();
         for (&key, pair) in &self.relay_drive_pairs {
             let source_rows = candidates.iter()
@@ -1490,46 +1534,36 @@ impl StaticTransitionPlan<'_> {
                     // operation only when that selector is a function.
                     select(minting_owner.0, minting_owner.1, pair)?
                 };
-                let no_route_trap = relay_route.is_none().then(|| RuntimeTrap {
-                    code: RuntimeTrapCode::MissingRuntimeMetadata,
-                    message: format!(
-                        "relay: forwarded host op {:?} from source {:?} has no performing route",
-                        pair.operation, pair.source,
-                    ),
-                });
+                let member = relay_route.ok_or_else(|| planner_error(format!(
+                    "relay: forwarded host op {:?} from source {:?} has no performing route at its exact edge",
+                    pair.operation, pair.source,
+                )))?;
+                if self.pre_schema_relay_promotions.contains(&(
+                    pair.source, pair.owner, identity.clone(),
+                )) {
+                    let (selected_owner, selected_row) = by_edge.get(identity)
+                        .ok_or_else(|| planner_error("promoted relay lost its selected response owner"))?;
+                    if member.owner != selected_owner.id() || member.member != selected_row.id() {
+                        return Err(planner_error("promoted relay edge did not select its own performing owner"));
+                    }
+                }
                 routes.insert((pair.source, pair.owner, identity.clone()),
-                    RelayRoute { relay_route, no_route_trap });
+                    RelayRoute { relay_route: member });
             }
         }
         Ok(routes)
     }
 
-    /// An ownerless consuming seat cannot use an admitted source's relay
-    /// metadata, regardless of which owner minted its pair.
-    pub(in crate::cranelift_backend) fn has_relay_drive_pair_for_source(
+    /// The lowering coverage ledger may discharge an unentered response owner
+    /// only for an explicitly promoted source whose Construct was never lowered.
+    pub(in crate::cranelift_backend) fn has_pre_schema_relay_promotion(
         &self,
         source: StaticOriginId,
-    ) -> bool {
-        self.relay_drive_pairs.keys().any(|(paired, _)| *paired == source)
-    }
-
-    /// Admission remains `relay_drive_pair`. Lowering supplies its exact
-    /// planner-issued call identity; it never discovers a route locally.
-    pub(in crate::cranelift_backend) fn relay_route(
-        &self,
-        source: StaticOriginId,
-        owner: ContinuationEmissionOwner,
         identity: &ContinuationCallIdentity,
-    ) -> Result<Option<&RelayRoute>, CraneliftBackendError> {
-        if self.relay_drive_pair(source, owner)?.is_none() {
-            return Ok(None);
-        }
-        let route = self.relay_routes.get(&(source, owner, identity.clone())).ok_or_else(||
-            planner_error("an admitted relay pair has no planned route or trap for its selected call"))?;
-        match (&route.relay_route, &route.no_route_trap) {
-            (Some(_), None) | (None, Some(_)) => Ok(Some(route)),
-            _ => Err(planner_error("a relay route must name exactly one member or trap")),
-        }
+    ) -> bool {
+        self.pre_schema_relay_promotions.iter().any(|(paired, _, edge)|
+            *paired == source && edge == identity
+        )
     }
 
     pub(in crate::cranelift_backend) fn build_relay_drive_pairs(
@@ -3388,8 +3422,13 @@ impl StaticTransitionPlan<'_> {
             )
         })?;
         let has_unitless_response = !phase_a.deferred.is_empty();
-        let (specialized, mut deferred) =
-            self.static_response_phase_b_split(phase_a.demands, has_unitless_response)?;
+        let (specialized, mut deferred) = self.static_response_phase_b_split_over(
+            phase_a.demands,
+            has_unitless_response,
+            &self.pre_schema_transport_sources,
+            &self.pre_schema_relay_promotions,
+            true,
+        )?;
         deferred.extend(phase_a.deferred);
         deferred.sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));
         let contexts = self.continuation_contexts.clone();
@@ -3402,6 +3441,110 @@ impl StaticTransitionPlan<'_> {
         self.static_response_deferred = deferred;
         self.static_response_plan_installed = true;
         Ok(())
+    }
+
+    /// Close relay promotion over would-be owners before any actual owner is
+    /// installed. Each iteration recomputes the phase-B split on the final
+    /// phase-A demands and contexts, then admits pairs against those candidate
+    /// rows and the already-installed host-effect-seat authority. Neither the
+    /// scratch plan nor its non-counting split writes into the live plan.
+    pub(in crate::cranelift_backend) fn derive_pre_schema_relay_promotions(
+        &self,
+    ) -> Result<BTreeSet<RelayPromotionKey>, CraneliftBackendError> {
+        if self.static_response_infeasible.is_some() {
+            return Ok(BTreeSet::new());
+        }
+        let phase_a = self.static_response_phase_a.as_ref().ok_or_else(|| {
+            planner_error("relay preselection ran before response phase A")
+        })?;
+        let calls = self.continuation_calls()?;
+        let mut promoted = BTreeSet::new();
+        loop {
+            let mut candidate = self.clone();
+            let (specialized, mut deferred) = self.static_response_phase_b_split_over(
+                phase_a.demands.clone(),
+                !phase_a.deferred.is_empty(),
+                &self.pre_schema_transport_sources,
+                &promoted,
+                false,
+            )?;
+            deferred.extend(phase_a.deferred.iter().cloned());
+            candidate.static_response_continuations = self.resolve_static_response_context_demands(
+                specialized, &self.continuation_contexts, phase_a.preexisting_count,
+            )?;
+            candidate.static_response_deferred = deferred;
+            candidate.static_response_plan_installed = true;
+            let pairs = candidate.build_relay_drive_pairs()?;
+            let mut next = promoted.clone();
+            for (&(source, owner), pair) in &pairs {
+                let minting = candidate.static_response_continuations.iter()
+                    .find(|row| row.id() == pair.minting_row)
+                    .ok_or_else(|| planner_error("relay pair has no hypothetical minting owner"))?;
+                let protocol = candidate.returned_vis_protocol(minting.vis_origin())?;
+                let already_performed =
+                    (minting.effect_origin() == pair.effect_origin
+                        && minting.operation() == pair.operation)
+                        || protocol.contexts.iter().flat_map(|context| &context.members)
+                            .filter_map(|member| member.successor.as_ref())
+                            .any(|successor| successor.effect_origin() == pair.effect_origin
+                                && successor.operation() == pair.operation);
+                if already_performed {
+                    continue;
+                }
+                for call in calls.iter().filter(|call| call.producer_construct_origin() == source) {
+                    let identity = call.identity();
+                    let Some(demand) = phase_a.demands.iter().find(|demand|
+                        demand.vis_origin == source && demand.k_identity == identity
+                    ) else { continue };
+                    if !self.pre_schema_transport_sources.contains(&identity) {
+                        continue;
+                    }
+                    let Some(deferred) = candidate.deferred_response_at_vis(source)? else {
+                        continue;
+                    };
+                    if deferred.sub_case() != DeferredResponseSubCase::UnconsumedTransportCaller
+                        || candidate.bounded_deferred_response_handler_owner(&deferred)?.is_some()
+                        || candidate.admitted_deferred_handler_owner(&deferred)?.is_some()
+                    {
+                        continue;
+                    }
+                    let exclusively_predeclared = matches!(
+                        identity.emission_owner(), ContinuationEmissionOwner::Predeclared(_)
+                    ) && !phase_a.demands.iter().any(|other|
+                        other.producer_call_origin == demand.producer_call_origin
+                            && self.pre_schema_transport_sources.contains(&other.k_identity)
+                            && !matches!(other.k_identity.emission_owner(),
+                                ContinuationEmissionOwner::Predeclared(_))
+                    );
+                    if !exclusively_predeclared {
+                        return Err(planner_error(format!(
+                            "relay source {source:?} has a mixed-owner transport stage"
+                        )));
+                    }
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if SUPPRESS_RELAY_PROMOTION.with(std::cell::Cell::get) {
+                        SUPPRESS_RELAY_PROMOTION_APPLICATIONS.with(|slot| slot.set(slot.get() + 1));
+                        continue;
+                    }
+                    if next.iter().any(|(previous_source, previous_owner, previous_identity)|
+                        *previous_source == source && *previous_identity == identity
+                            && *previous_owner != owner
+                    ) {
+                        return Err(planner_error(format!(
+                            "relay source {source:?} and one incoming edge name two minting owners"
+                        )));
+                    }
+                    next.insert((source, owner, identity));
+                }
+            }
+            if next == promoted {
+                return Ok(promoted);
+            }
+            if next.len() > phase_a.demands.len() {
+                return Err(planner_error("relay promotion exceeded the finite response demand population"));
+            }
+            promoted = next;
+        }
     }
 
     /// Preselect phase-B callers from phase-A demands and the ownership-free
@@ -3421,29 +3564,10 @@ impl StaticTransitionPlan<'_> {
             phase_a.demands.clone(),
             !phase_a.deferred.is_empty(),
             transport_sources,
+            &self.pre_schema_relay_promotions,
             false,
         )?;
         Ok(specialized.into_iter().map(|demand| demand.k_identity).collect())
-    }
-
-    /// The phase-B Deferred/Specialized split. In an eligible response plane, a
-    /// transport-source K's existing checked-IH transport emission is the real
-    /// selected incoming owner call:
-    /// it assembles the existing Parameter/Capture frame, calls the owner
-    /// synchronously, and receives the existing Result word. The suppression
-    /// control restores P2 at this exact classification producer.
-    fn static_response_phase_b_split(
-        &self,
-        demands: Vec<StaticResponseContextDemand>,
-        has_unitless_response: bool,
-    ) -> Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), CraneliftBackendError>
-    {
-        self.static_response_phase_b_split_over(
-            demands,
-            has_unitless_response,
-            &self.checked_ih_environment_transport_source_identities(),
-            true,
-        )
     }
 
     fn static_response_phase_b_split_over(
@@ -3451,6 +3575,7 @@ impl StaticTransitionPlan<'_> {
         demands: Vec<StaticResponseContextDemand>,
         has_unitless_response: bool,
         transport_sources: &BTreeSet<ContinuationCallIdentity>,
+        relay_promotions: &BTreeSet<RelayPromotionKey>,
         count_install_applications: bool,
     ) -> Result<(Vec<StaticResponseContextDemand>, Vec<DeferredResponseRow>), CraneliftBackendError>
     {
@@ -3549,6 +3674,15 @@ impl StaticTransitionPlan<'_> {
             let exclusively_predeclared_stage = transport_producer_owners
                 .get(&demand.producer_call_origin)
                 .is_some_and(|owners| *owners == (true, false));
+            let relay_promote = relay_promotions.iter().any(|(source, _, edge)|
+                *source == demand.vis_origin && *edge == demand.k_identity
+            );
+            if relay_promote && (!transport_source || !exclusively_predeclared_stage) {
+                return Err(planner_error(format!(
+                    "relay promotion at {:?} has no exclusively predeclared transport source",
+                    demand.vis_origin,
+                )));
+            }
             #[cfg(feature = "px8-ds-test-support")]
             if count_install_applications
                 && overpromote_mixed
@@ -3568,6 +3702,7 @@ impl StaticTransitionPlan<'_> {
             // their prior promotion. Single-stage groups retain their existing
             // route.
             if transport_source
+                && !relay_promote
                 && (suppress_execute
                     || !requires_execute_then_resume
                     || (has_unitless_response
@@ -3647,9 +3782,9 @@ impl StaticTransitionPlan<'_> {
     /// closed-derivation invariant (RECUT 2, HS5, AC-9). Phase A is re-derived
     /// from the causal-prefix context population (the argument); phase B's
     /// Specialized/Deferred split is re-derived from the SAME finalized post-:1251
-    /// transport records the install read, so both halves are closed by
-    /// same-state re-derivation and a phase-unstable or over-admitting input can
-    /// no longer pass.
+    /// pre-schema transport and relay identities the install read, so both
+    /// halves are closed by same-state re-derivation and a phase-unstable or
+    /// over-admitting input can no longer pass.
     pub(super) fn validate_static_response_context_plan(
         &self,
         causal_contexts: &[PlannedContinuationContext],
@@ -3687,13 +3822,17 @@ impl StaticTransitionPlan<'_> {
         // Phase A re-derivation: the owner-less context-entry plane over has-K-unit.
         let (mut expected_contexts, preexisting_count) =
             self.response_context_union(causal_contexts, &demands)?;
+        // Phase B re-derivation uses the same pre-schema transport and relay
+        // identities that preselection and the real phase-B install consumed.
         // Phase B re-derivation: a P1-bearing eligible plane gives each
         // exclusively-predeclared group an owner while mixed-owner groups retain
         // P2; P1-free composed planes preserve their existing promotion. A
         // single-stage plane or the suppression control retains P2. P1 stays on
         // main lowering outside the demand population.
-        let (specialized, mut expected_deferred) =
-            self.static_response_phase_b_split(demands, !p1_deferred.is_empty())?;
+        let (specialized, mut expected_deferred) = self.static_response_phase_b_split_over(
+            demands, !p1_deferred.is_empty(), &self.pre_schema_transport_sources,
+            &self.pre_schema_relay_promotions, false,
+        )?;
         expected_deferred.extend(p1_deferred);
         expected_deferred
             .sort_by_key(|row| (row.vis_origin, row.operation_root_origin, row.operation));

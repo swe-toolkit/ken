@@ -3365,6 +3365,10 @@ struct Lowering<'a> {
     /// duplicate claims are checked by the separate Function-local token
     /// lattice rather than compile-time visitation order.
     continuation_claims: Option<units::ContinuationClaimLedger>,
+    /// Every source Construct that actually entered one of the three lowering
+    /// evaluators in any generated function of this artifact. This is a
+    /// producer-side coverage ledger, not a candidate-disposition proxy.
+    lowered_construct_origins: BTreeSet<StaticOriginId>,
     /// **`RT-LEXICAL-R3-FUSION-EMITTER` `D3`** — the SIBLING affine ledger for
     /// the fusion-local realizations `F`, held over the same span as
     /// `continuation_claims` and opened and closed on the same boundary.

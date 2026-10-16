@@ -2883,6 +2883,7 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         pending_vis_record_protocol,
         response_owner_settlements,
         continuation_claims: None,
+        lowered_construct_origins: BTreeSet::new(),
         fusion_compositions: None,
         static_worker_fields: StaticWorkerFieldLedger::default(),
         // `D2f` — the preflighted ledger, moved in whole. Handed over rather
@@ -3898,15 +3899,17 @@ impl<'a> Lowering<'a> {
                     eliminators,
                 )
                 .map(ProducerTrampolineStep::ordinary),
-            RuntimeExpr::Construct { constructor, args } => self
-                .lower_computational_producer_construct(
+            RuntimeExpr::Construct { constructor, args } => {
+                self.lowered_construct_origins.insert(static_origin);
+                self.lower_computational_producer_construct(
                     builder,
                     static_origin,
                     constructor,
                     args,
                     producer_env,
                     eliminators,
-                ),
+                )
+            },
             RuntimeExpr::Match {
                 scrutinee,
                 cases: producer_cases,
@@ -6926,63 +6929,6 @@ impl<'a> Lowering<'a> {
         self.lower_computational_producer_expr(builder, body, &case_env, eliminators)
     }
 
-    /// A pair without a planned performing member cannot execute a consuming
-    /// seat silently. Preserve lowering of the call path even when the runtime
-    /// arm takes the planner's trap: that descent also discharges call and
-    /// generated-entry obligations in this function and its callees.
-    fn branch_unrouted_relay_at_consumer(
-        &mut self,
-        builder: &mut FunctionBuilder<'_>,
-        source: StaticOriginId,
-        identity: &ContinuationCallIdentity,
-    ) -> Result<(), CraneliftBackendError> {
-        let Some(owner) = self.defining_emission_owner else {
-            if self.static_transition_plan.has_relay_drive_pair_for_source(source) {
-                return Err(unsupported(LoweringCause::PlannerInvariant,
-                    "RelayRoute",
-                    "a relay-consuming seat for an admitted source has no emission owner",
-                ));
-            }
-            return Ok(());
-        };
-        let trap = self
-            .static_transition_plan
-            .relay_route(source, owner, identity)?
-            .and_then(|route| route.no_route_trap.clone());
-        let Some(trap) = trap else {
-            return Ok(());
-        };
-        // All generated units already load their native-int and boundary
-        // arenas through this ABI parameter. A valid invocation therefore
-        // carries a non-null services pointer. Unlike a constant predicate,
-        // the function parameter remains a runtime value in the finished CLIF:
-        // the cold call block stays present for the call/ledger closeout.
-        let services = self.function_local.services_pointer.ok_or_else(|| {
-            unsupported(LoweringCause::PlannerInvariant,
-                "RelayRoute",
-                "a relay-consuming function has no services ABI parameter",
-            )
-        })?;
-        let valid_invocation = builder.ins().icmp_imm(
-            cranelift_codegen::ir::condcodes::IntCC::NotEqual,
-            services,
-            0,
-        );
-        let trap_block = builder.create_block();
-        let call_block = builder.create_block();
-        builder
-            .ins()
-            .brif(valid_invocation, trap_block, &[], call_block, &[]);
-        builder.switch_to_block(trap_block);
-        builder.seal_block(trap_block);
-        let status = self.emit_current_trap(builder, &trap)?;
-        builder.ins().return_(&[status]);
-        self.record_checked_frame_terminal(builder, FrameTerminalKind::Abort)?;
-        builder.switch_to_block(call_block);
-        builder.seal_block(call_block);
-        Ok(())
-    }
-
     fn lower_computational_producer_construct<'b>(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -7119,11 +7065,6 @@ impl<'a> Lowering<'a> {
                         "a terminal transport's stable closure seat is not the recursive child being replaced",
                     ));
                 }
-                self.branch_unrouted_relay_at_consumer(
-                    builder,
-                    static_origin,
-                    transport.source_call_identity(),
-                )?;
                 let claimed = self.call_checked_ih_environment_transport(
                     builder,
                     &transport,
@@ -7209,11 +7150,6 @@ impl<'a> Lowering<'a> {
                     "an active transport's stable closure seat is not the recursive child being replaced",
                 ));
             }
-            self.branch_unrouted_relay_at_consumer(
-                builder,
-                static_origin,
-                transport.source_call_identity(),
-            )?;
             let claimed = self.call_checked_ih_environment_transport(
                 builder,
                 &transport,
@@ -7717,21 +7653,9 @@ impl<'a> Lowering<'a> {
                 // them, so a continuation whose selected worker had
                 // captures was called with its declared parameter tail
                 // unfilled.
-                // A claim with a planned binding consumes the Vis constructor.
-                // Branch to the runtime trap before the call, but still lower
-                // the call path to preserve its downstream compiler obligations.
-                if self.continuation_claims.is_some() {
-                    if let Some(identity) = self.static_transition_plan.continuation_call_binding_for(
-                        static_origin,
-                        *frame_origin,
-                        u32::try_from(*case_index).map_err(|_| unsupported(LoweringCause::Capacity,
-                            "ComputationalMatch", "case index exceeds addressable range"))?,
-                        u32::try_from(position).map_err(|_| unsupported(LoweringCause::Capacity,
-                            "ComputationalMatch", "recursive position exceeds addressable range"))?,
-                    )? {
-                        self.branch_unrouted_relay_at_consumer(builder, static_origin, &identity)?;
-                    }
-                }
+                // A claim with a planned binding consumes the Vis constructor;
+                // every admitted relay edge was required to have a performing
+                // owner during planning, before this lowering seat runs.
                 if let Some(returned) = self.claim_and_call_continuation(
                     builder,
                     static_origin,
@@ -8702,7 +8626,6 @@ impl<'a> Lowering<'a> {
                  descent would realize one region twice",
             ));
         }
-        self.branch_unrouted_relay_at_consumer(builder, producer_construct_origin, &identity)?;
         // ---- THE ACTION IS NON-CALLING. Architect `evt_5edhqyyhw4585`.
         //
         // ⚠ **The direct call this seat used to attempt is WITHDRAWN, and the
@@ -12526,9 +12449,6 @@ impl<'a> Lowering<'a> {
         // slice is the honest input and the composition seat refuses on it.
         // Passing the retained-frame seat's stack, or fabricating one, would be
         // exactly the inference the ruling forbids.
-        self.branch_unrouted_relay_at_consumer(
-            builder, edge.producer_construct_origin, &identity,
-        )?;
         Ok(self
             .claim_and_call_resolved_continuation(
                 builder, &identity, &field_run, position, unit_env, &[],
@@ -16721,6 +16641,7 @@ impl<'a> Lowering<'a> {
                 self.finish_planned_join(builder, merge, &join_plan, merge_kind, "If")
             }
             RuntimeExpr::Construct { constructor, args } => {
+                self.lowered_construct_origins.insert(static_origin);
                 self.static_transition_plan.reject_reached_admitted_relay(
                     static_origin, constructor, args, self.defining_emission_owner,
                 )?;

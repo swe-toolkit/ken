@@ -295,6 +295,7 @@ impl<'src> Planner<'src> {
                 case_emissions: Vec::new(),
                 aggregate_ownership: Vec::new(),
                 pre_schema_transport_sources: BTreeSet::new(),
+                pre_schema_relay_promotions: BTreeSet::new(),
                 preselected_response_callers: BTreeSet::new(),
                 recursive_residual_dispositions: Vec::new(),
                 recursive_carrier_boxed_stores: Vec::new(),
@@ -1452,6 +1453,8 @@ impl<'src> Planner<'src> {
         validate_host_effect_seat_plan(&self.plan, &self.plan.host_effect_seats)?;
         self.plan.pre_schema_transport_sources =
             derive_checked_ih_transport_source_population(&self.plan)?;
+        self.plan.pre_schema_relay_promotions =
+            self.plan.derive_pre_schema_relay_promotions()?;
         self.plan.preselected_response_callers =
             self.plan.preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
         self.plan.recursive_residual_dispositions = build_recursive_residual_dispositions(&self.plan)?;
@@ -1552,12 +1555,6 @@ impl<'src> Planner<'src> {
         // including the refreshed checked-IH transport population. The trap
         // catalogue exists before any lowering consumes the selected fact.
         self.plan.relay_routes = self.plan.build_relay_routes()?;
-        let relay_traps = self.plan.relay_routes.values()
-            .filter_map(|route| route.no_route_trap.as_ref().cloned())
-            .collect::<Vec<_>>();
-        for trap in &relay_traps {
-            self.intern_trap(trap)?;
-        }
         // After response-owner phase B the actual transport destinations are
         // final. The census only records unavailable captures; unlike the
         // interned specialization's own availability, it refuses no program.

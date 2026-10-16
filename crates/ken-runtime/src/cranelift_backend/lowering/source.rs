@@ -2484,6 +2484,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 constructor,
                 mut args,
             } => {
+                self.lowered_construct_origins.insert(static_origin);
                 // `RT-SRCMACHINE-CTOR-RECOGNITION-ARM` -- ask the same
                 // classifier as direct descent before the source
                 // machine lowers any field. D1 established that every

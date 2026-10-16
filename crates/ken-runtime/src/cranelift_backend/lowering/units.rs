@@ -7884,6 +7884,7 @@ impl ContinuationClaimLedger {
         &self,
         plan: &StaticTransitionPlan<'_>,
         dispositions: &BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+        lowered_construct_origins: &BTreeSet<StaticOriginId>,
     ) -> Result<(), CraneliftBackendError> {
         let owners = plan
             .static_response_owner_specializations()?
@@ -7894,7 +7895,7 @@ impl ContinuationClaimLedger {
                     infeasible.reason(),
                 ))
             })?;
-        let required_new_contexts = plan
+        let response_rows = plan
             .static_response_feasibility_ledger_all()?
             .map_err(|infeasible| {
                 backend_module(LoweringCause::Fragment, format!(
@@ -7902,23 +7903,33 @@ impl ContinuationClaimLedger {
                     infeasible.vis_origin(),
                     infeasible.reason(),
                 ))
-            })?
-            .into_iter()
+            })?;
+        let required_new_contexts = response_rows.iter()
             .filter(|row| !row.context_was_preexisting())
             .map(|row| row.k_context())
             .collect::<BTreeSet<_>>();
         let mut called_new_contexts = BTreeSet::new();
         for owner in owners {
             if !self.response_owner_calls.contains_key(owner.selected_caller()) {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "a forward-declared response owner has no verified selected incoming call: \
-                     owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}",
-                    owner.id(),
-                    owner.k_context(),
-                    owner.context_was_preexisting(),
-                    owner.selected_caller(),
-                    dispositions.get(owner.selected_caller()),
-                )));
+                let source = response_rows.iter()
+                    .find(|row| row.id() == owner.response())
+                    .map(|row| row.vis_origin())
+                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                        "response owner has no installed response row".to_string()))?;
+                // Only a relay-promoted owner may be unentered, and only when
+                // no evaluator lowered its source Construct in ANY Function.
+                // `disposition=None` alone proves neither of those facts.
+                if !plan.has_pre_schema_relay_promotion(source, owner.selected_caller())
+                    || lowered_construct_origins.contains(&source)
+                {
+                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
+                        "a forward-declared response owner has no verified selected incoming call: \
+                         owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}, source_lowered={}",
+                        owner.id(), owner.k_context(), owner.context_was_preexisting(),
+                        owner.selected_caller(), dispositions.get(owner.selected_caller()),
+                        lowered_construct_origins.contains(&source),
+                    )));
+                }
             }
             if self.composed.contains(owner.selected_caller()) {
                 return Err(backend_module(LoweringCause::PlannerInvariant,
@@ -8596,6 +8607,7 @@ pub(super) fn close_continuation_claim_ledger(
         .validate_response_owner_call_coverage(
             &compiler.static_transition_plan,
             &candidates.settled,
+            &compiler.lowered_construct_origins,
         )?;
     // `D2` — the order, and it is the mechanism rather than a style choice.
     // Totality and disjointness FIRST, then the derived subset, then the
