@@ -1,7 +1,7 @@
 ---
 id: DIAG-N-CAUSE-SITE-RECLASSIFICATION
 title: "Some native guards that a correct compiler hits on a large but well-formed program are coded N0003 (planner invariant, compiler defect) instead of N0002 (capacity), against spec 70 section 1.2. A 65-deep Let reaches one of them. Census every planner_error and PlannerInvariant site by the Architect's cause predicate, and retag the capacity guards to N0002"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T2
