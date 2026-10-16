@@ -843,7 +843,7 @@ impl<'a> Lowering<'a> {
                     ));
                 };
                 if ok_case.1.binders != 1 || err_case.1.binders != 1 {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "HostResult",
                         "carried Result cases must each bind exactly one selected payload",
                     ));

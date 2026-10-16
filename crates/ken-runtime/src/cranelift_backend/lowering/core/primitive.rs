@@ -215,7 +215,7 @@ impl<'a> Lowering<'a> {
             ),
             "uint8_to_int" | "int_to_uint8_raw" | "int_to_uint64_raw" => {
                 let [value]: [Lowered; 1] = lowered_args.try_into().map_err(|args: Vec<_>| {
-                    unsupported(LoweringCause::Fragment,
+                    unsupported(LoweringCause::PlannerInvariant,
                         "PrimitiveCall",
                         format!(
                             "{} expects one argument, got {}",
@@ -255,7 +255,7 @@ impl<'a> Lowering<'a> {
             "bytes_decode" => self.lower_bytes_decode(lowered_args, &primitive.partiality),
             "list_char_to_string" => {
                 let [value]: [Lowered; 1] = lowered_args.try_into().map_err(|args: Vec<_>| {
-                    unsupported(LoweringCause::Fragment,
+                    unsupported(LoweringCause::PlannerInvariant,
                         "PrimitiveCall",
                         format!(
                             "list_char_to_string expects one argument, got {}",
@@ -432,7 +432,7 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(LoweringCause::Fragment,
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 format!("not_bool expects 1 arg, got {}", args.len()),
             )
@@ -566,7 +566,7 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(LoweringCause::Fragment,
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 format!("bytes_length expects 1 arg, got {}", args.len()),
             )
@@ -754,7 +754,7 @@ impl<'a> Lowering<'a> {
             ));
         };
         let [bytes, start, len]: [Lowered; 3] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(LoweringCause::Fragment,
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 format!("bytes_slice expects 3 args, got {}", args.len()),
             )
@@ -813,7 +813,7 @@ impl<'a> Lowering<'a> {
 
     fn lower_bytes_encode(&mut self, args: Vec<Lowered>) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(LoweringCause::Fragment,
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 format!("bytes_encode expects 1 arg, got {}", args.len()),
             )
@@ -839,7 +839,7 @@ impl<'a> Lowering<'a> {
             ));
         };
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(LoweringCause::Fragment,
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 format!("bytes_decode expects 1 arg, got {}", args.len()),
             )
@@ -879,7 +879,7 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(LoweringCause::Fragment,
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 format!("byte_length expects 1 arg, got {}", args.len()),
             )
@@ -908,7 +908,7 @@ impl<'a> Lowering<'a> {
         args: Vec<Lowered>,
     ) -> Result<Lowered, CraneliftBackendError> {
         let [arg]: [Lowered; 1] = args.try_into().map_err(|args: Vec<Lowered>| {
-            unsupported(LoweringCause::Fragment,
+            unsupported(LoweringCause::PlannerInvariant,
                 "PrimitiveCall",
                 format!("char_length expects 1 arg, got {}", args.len()),
             )

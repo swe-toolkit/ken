@@ -33,6 +33,107 @@ use crate::cranelift_backend::artifact::native_isa_for_lowering_tests as native_
 use crate::cranelift_backend::artifact::native_platform_target_name_for_lowering_tests as native_platform_target_name;
 use crate::fnv1a_64;
 
+/// Promise class: normative compatibility vector for the N0002 capacity
+/// family. A value-flow producer at depths 0, 63, and 64 compiles; depths 65
+/// and 66 reach the bounded planner walk and refuse as capacity, not as a
+/// compiler-defect invariant. No text of the refusal is part of the oracle.
+/// The whole compile at depths 64/65 overflows a stated 4 MiB test thread but
+/// passes at 8 MiB; 16 MiB provisions at least twice that measured passing
+/// threshold, independently of the ambient RUST_MIN_STACK/test-harness stack.
+#[test]
+fn value_flow_producer_first_excess_is_capacity() {
+    std::thread::Builder::new()
+        .name("ncause-depth".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            let nested_lets = |depth| {
+                (0..depth).fold(RuntimeExpr::Value(RuntimeValue::Bool(true)), |body, _| {
+                    RuntimeExpr::Let {
+                        value: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(false))),
+                        body: Box::new(body),
+                    }
+                })
+            };
+            let compile = |depth| {
+                compile_expr_into_module(
+                    new_jit_module().expect("JIT module constructs"),
+                    "ncause_bounded_producer_let",
+                    Linkage::Local,
+                    &nested_lets(depth),
+                    &NativeSeedEnvironment::empty(
+                        crate::boundary_resource_profile::starter_smoke_profile(),
+                    ),
+                    BTreeMap::new(),
+                    None,
+                    false,
+                    Some(&crate::NativeProcessSymbols::legacy_prelude()),
+                    None,
+                    None,
+                )
+            };
+            for depth in [0, 63, 64] {
+                compile(depth).unwrap_or_else(|error| {
+                    panic!("value-flow depth {depth} must fit the planner bound: {error:?}")
+                });
+            }
+            for depth in [65, 66] {
+                let error = match compile(depth) {
+                    Err(error) => error,
+                    Ok(_) => panic!("value-flow depth {depth} must refuse before emission"),
+                };
+                assert_eq!(error.code().as_str(), "N0002", "depth {depth}: {error:?}");
+                assert!(matches!(
+                    error,
+                    CraneliftBackendError::Unsupported(UnsupportedLowering {
+                        cause: LoweringCause::Capacity,
+                        ..
+                    })
+                ));
+            }
+        })
+        .expect("start stated-stack test thread")
+        .join()
+        .expect("value-flow fixture must not panic");
+}
+
+/// Promise class: normative compatibility vector for malformed runtime-IR
+/// call arity, which checked source cannot construct as an unsaturated call.
+#[test]
+fn malformed_closure_call_arity_is_planner_invariant() {
+    let source = RuntimeExpr::Call {
+        callee: Box::new(RuntimeExpr::LexicalClosure {
+            captures: Vec::new(),
+            params: vec!["input".to_string()],
+            body: Box::new(RuntimeExpr::Value(RuntimeValue::Bool(true))),
+        }),
+        args: Vec::new(),
+    };
+    let error = match compile_expr_into_module(
+        new_jit_module().expect("JIT module constructs"),
+        "ncause_malformed_closure_call",
+        Linkage::Local,
+        &source,
+        &NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile()),
+        BTreeMap::new(),
+        None,
+        false,
+        Some(&crate::NativeProcessSymbols::legacy_prelude()),
+        None,
+        None,
+    ) {
+        Ok(_) => panic!("an unsaturated runtime-IR call must refuse"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code().as_str(), "N0003", "{error:?}");
+    assert!(matches!(
+        error,
+        CraneliftBackendError::Unsupported(UnsupportedLowering {
+            cause: LoweringCause::PlannerInvariant,
+            ..
+        })
+    ));
+}
+
 fn test_synthesized_constructor_identity() -> ConstructorIdentity {
     inert_test_plan()
         .synthesized_constructor_identity(SynthesizedConstructorRole::Fixed(
@@ -822,11 +923,12 @@ fn nested_computational_outer_arity_rejects_specifically() {
         "ken_px7n_wrong_outer_arity",
     )
     .expect_err("the outer aggregate payload must remain bound");
+    assert_eq!(err.code().as_str(), "N0003", "{err:?}");
     assert!(matches!(
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason, .. }) if reason == "case ctor:fixture::Aggregate::Ok expects 0 constructor arguments but value has 1"
+            cause: LoweringCause::PlannerInvariant, reason, .. }) if reason == "case ctor:fixture::Aggregate::Ok expects 0 constructor arguments but value has 1"
     ));
 }
 #[test]
@@ -1185,11 +1287,12 @@ fn constructor_field_outer_arity_rejects_before_field_lowering() {
         "ken_px7p_constructor_field_outer_arity",
     )
     .expect_err("the selected constructor case must bind every field exactly");
+    assert_eq!(err.code().as_str(), "N0003", "{err:?}");
     assert!(matches!(
         err,
         CraneliftBackendError::Unsupported(UnsupportedLowering {
             construct: "ComputationalMatch",
-            reason, .. }) if reason == "case ctor:fixture::Envelope::Wrap expects 1 constructor arguments but value has 2"
+            cause: LoweringCause::PlannerInvariant, reason, .. }) if reason == "case ctor:fixture::Envelope::Wrap expects 1 constructor arguments but value has 2"
     ));
 }
 #[test]

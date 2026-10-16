@@ -26,8 +26,8 @@ use crate::cranelift_backend::lowering::units::{
 
 /// Promise class: durable invariant. The real producer-Match consumer is
 /// called on a planned Match whose scrutinee is bound to a carried word, with
-/// one pending invocation-return frame. MEASURED: depth 8 enters its case
-/// lowering and returns its declared trap; depth 9 refuses at the R6 guard.
+/// one pending invocation-return frame. MEASURED: empty preloaded depth and
+/// observed depths 7/8 enter the declared trap; observed depths 9/10 refuse.
 /// CLAIMED: the producer route admits the limit and fails closed on the first
 /// excess. THE GAP: depth is preloaded in a test Lowering, not constructed
 /// from eight nested source Matches. The empty-case default shows guard
@@ -50,9 +50,15 @@ fn carried_producer_match_reentry_admits_limit_and_refuses_first_excess() {
     let seed_env = NativeSeedEnvironment::empty(
         crate::boundary_resource_profile::starter_smoke_profile(),
     );
+    // One invocation increases the observed depth before the guard: preloaded
+    // 0 is the empty input, L-2 observes L-1, L-1 observes L, and L/L+1
+    // observe the first and a farther excess, respectively.
     for (depth, rejected) in [
+        (0, false),
+        (CARRIED_SUFFIX_REENTRY_LIMIT - 2, false),
         (CARRIED_SUFFIX_REENTRY_LIMIT - 1, false),
         (CARRIED_SUFFIX_REENTRY_LIMIT, true),
+        (CARRIED_SUFFIX_REENTRY_LIMIT + 1, true),
     ] {
         let mut lowering = super::constructors::bare_carrier_test_lowering(&seed_env, plan.clone());
         lowering.carried_suffix_reentries = depth;
@@ -72,9 +78,12 @@ fn carried_producer_match_reentry_admits_limit_and_refuses_first_excess() {
         );
         assert_eq!(lowering.carried_suffix_reentries, depth, "balanced R6 guard");
         if rejected {
+            if let Err(error) = &result {
+                assert_eq!(error.code().as_str(), "N0002", "depth {depth}: {error:?}");
+            }
             assert!(matches!(result,
                 Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    construct: "BoundaryCarrier", reason, .. })) if reason == "a carried producer match's pending eliminators exceeded the bounded re-entry depth"
+                    construct: "BoundaryCarrier", cause: LoweringCause::Capacity, reason, .. })) if reason == "a carried producer match's pending eliminators exceeded the bounded re-entry depth"
             ), "the first excess must refuse at the producer guard");
         } else {
             assert!(matches!(result,
@@ -87,9 +96,9 @@ fn carried_producer_match_reentry_admits_limit_and_refuses_first_excess() {
 
 /// Promise class: durable invariant. The same planned carried Match is
 /// consumed through the *ordinary* producer-stack arm, with one nonempty
-/// composed suffix. At depth 8 its declared default is reached; at depth 9
-/// only that arm's exact fail-closed refusal is returned. The test preloads
-/// nesting depth rather than claiming to construct eight source frames.
+/// composed suffix. An empty preload and observed depths 7/8 enter its
+/// default; observed depths 9/10 return only that arm's refusal. The test
+/// preloads nesting depth rather than constructing eight source frames.
 #[test]
 fn carried_ordinary_suffix_reentry_admits_limit_and_refuses_first_excess() {
     let source = RuntimeExpr::Match {
@@ -108,8 +117,11 @@ fn carried_ordinary_suffix_reentry_admits_limit_and_refuses_first_excess() {
         crate::boundary_resource_profile::starter_smoke_profile(),
     );
     for (depth, rejected) in [
+        (0, false),
+        (CARRIED_SUFFIX_REENTRY_LIMIT - 2, false),
         (CARRIED_SUFFIX_REENTRY_LIMIT - 1, false),
         (CARRIED_SUFFIX_REENTRY_LIMIT, true),
+        (CARRIED_SUFFIX_REENTRY_LIMIT + 1, true),
     ] {
         let mut lowering = super::constructors::bare_carrier_test_lowering(&seed_env, plan.clone());
         lowering.carried_suffix_reentries = depth;
@@ -141,9 +153,12 @@ fn carried_ordinary_suffix_reentry_admits_limit_and_refuses_first_excess() {
         );
         assert_eq!(lowering.carried_suffix_reentries, depth, "balanced D2 guard");
         if rejected {
+            if let Err(error) = &result {
+                assert_eq!(error.code().as_str(), "N0002", "depth {depth}: {error:?}");
+            }
             assert!(matches!(result,
                 Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    construct: "BoundaryCarrier", reason, .. })) if reason.contains("a carried ordinary elimination's composed suffix exceeded")
+                    construct: "BoundaryCarrier", cause: LoweringCause::Capacity, reason, .. })) if reason.contains("a carried ordinary elimination's composed suffix exceeded")
             ), "the first excess must refuse at the ordinary guard");
         } else {
             assert!(matches!(result,

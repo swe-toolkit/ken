@@ -14,7 +14,7 @@ use super::occurrences::StaticOriginId;
 use super::continuations::{ContinuationSpecializationId, StaticContinuationFusionId};
 use super::responses::{StaticResponseContinuation, StaticResponseContinuationId};
 use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit, PredeclaredFunctionId};
-use super::{planner_error, CraneliftBackendError, StaticTransitionPlan};
+use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::RuntimeExpr;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -122,16 +122,16 @@ impl PendingVisRecordProtocol {
             return Ok(None);
         };
         let bytes = |words: u32| -> Result<u32, CraneliftBackendError> {
-            words.checked_mul(8).ok_or_else(|| planner_error("pending-Vis frame word count exhausted"))
+            words.checked_mul(8).ok_or_else(|| planner_capacity_error("pending-Vis frame word count exhausted"))
         };
         let captures = base_bytes.checked_add(bytes(1)?)
-            .ok_or_else(|| planner_error("pending-Vis discriminant offset exhausted"))?;
+            .ok_or_else(|| planner_capacity_error("pending-Vis discriminant offset exhausted"))?;
         let continuation_inputs = captures.checked_add(bytes(width.captures)?)
-            .ok_or_else(|| planner_error("pending-Vis capture offset exhausted"))?;
+            .ok_or_else(|| planner_capacity_error("pending-Vis capture offset exhausted"))?;
         let frame_bytes = continuation_inputs.checked_add(bytes(width.continuation_inputs)?)
-            .ok_or_else(|| planner_error("pending-Vis frame size exhausted"))?;
+            .ok_or_else(|| planner_capacity_error("pending-Vis frame size exhausted"))?;
         let addressable = |offset: u32| i32::try_from(offset)
-            .map_err(|_| planner_error("pending-Vis frame offset exceeds addressable range"));
+            .map_err(|_| planner_capacity_error("pending-Vis frame offset exceeds addressable range"));
         Ok(Some(PendingVisFrameRegion {
             discriminant: addressable(base_bytes)?,
             captures: addressable(captures)?,
@@ -232,13 +232,13 @@ impl StaticTransitionPlan<'_> {
                     return Err(planner_error("a relay entered a non-relay pending-Vis protocol"));
                 }
                 if row.id().ordinal() == u32::MAX {
-                    return Err(planner_error("pending-Vis discriminant exhausted"));
+                    return Err(planner_capacity_error("pending-Vis discriminant exhausted"));
                 }
                 width.captures = width.captures.max(u32::try_from(row.captures().len())
-                    .map_err(|_| planner_error("pending-Vis capture run exhausted"))?);
+                    .map_err(|_| planner_capacity_error("pending-Vis capture run exhausted"))?);
                 width.continuation_inputs = width.continuation_inputs.max(
                     u32::try_from(row.continuation_inputs().len())
-                        .map_err(|_| planner_error("pending-Vis continuation input run exhausted"))?
+                        .map_err(|_| planner_capacity_error("pending-Vis continuation input run exhausted"))?
                 );
                 if let Some(previous) = members.insert(member.origin, row.clone()) {
                     if previous.id() != row.id() {
@@ -533,6 +533,106 @@ mod tests {
     };
     use crate::{NativeProcessSymbols, RuntimeValue};
     use std::collections::BTreeMap;
+
+    /// Promise class: normative compatibility vector for the N0002 capacity
+    /// family. Each reachable arithmetic guard sees its immediate predecessor,
+    /// limit, first excess, empty input, and a farther excess. Every frame is
+    /// present. At the four u32 arithmetic ceilings, an input that passes that
+    /// guard may still fail a later addition or the i32 addressability ceiling;
+    /// labels explain that ordering without pinning unstable error prose.
+    #[test]
+    fn pending_vis_frame_region_reports_capacity_at_each_width_guard() {
+        let frame = PendingVisFrameOwner::Unit(PredeclaredFunctionId::for_test(0));
+        let region = |base_bytes, captures, continuation_inputs| {
+            let protocol = PendingVisRecordProtocol {
+                owners: BTreeMap::new(),
+                members: BTreeMap::new(),
+                frames: BTreeMap::from([(
+                    frame,
+                    PendingVisFrameWidth {
+                        captures,
+                        continuation_inputs,
+                    },
+                )]),
+            };
+            protocol.frame_region(frame, base_bytes)
+        };
+        let fits = |label, base_bytes, captures, continuation_inputs| {
+            assert!(
+                region(base_bytes, captures, continuation_inputs)
+                    .unwrap_or_else(|error| panic!("{label} must fit: {error:?}"))
+                    .is_some(),
+                "{label}: the frame must exist"
+            );
+        };
+        let refuses_at = |label, base_bytes, captures, continuation_inputs, guard: &str| {
+            let error = region(base_bytes, captures, continuation_inputs)
+                .expect_err("the planned width must refuse");
+            assert_eq!(error.code().as_str(), "N0002", "{label}, expected {guard}: {error:?}");
+            let CraneliftBackendError::Unsupported(error) = error else {
+                panic!("{label}: capacity must retain the Unsupported carrier");
+            };
+            assert_eq!(
+                error.cause,
+                crate::cranelift_backend::surface::LoweringCause::Capacity,
+                "{label}: the carrier's cause must be capacity"
+            );
+            // The guard label above names the arithmetic expectation, not an
+            // assertion about unstable refusal text. An individual cause
+            // revert establishes which site's first-excess case is reached.
+        };
+
+        fits("empty frame", 0, 0, 0);
+        let max_words = u32::MAX / 8;
+        // The first neighbor below the checked-multiply ceiling fits the
+        // whole frame; the ceiling itself passes multiplication but exceeds
+        // the later frame-size addition.
+        fits("word limit - 1", 0, 0, max_words - 1);
+        refuses_at("word limit", 0, 0, max_words,
+            "pending-Vis frame size exhausted");
+        refuses_at("word limit + 1", 0, 0, max_words + 1,
+            "pending-Vis frame word count exhausted");
+        refuses_at("word oversized", 0, 0, u32::MAX,
+            "pending-Vis frame word count exhausted");
+
+        let max_discriminant_base = u32::MAX - 8;
+        refuses_at("discriminant limit - 1", max_discriminant_base - 1, 0, 0,
+            "pending-Vis frame offset exceeds addressable range");
+        refuses_at("discriminant limit", max_discriminant_base, 0, 0,
+            "pending-Vis frame offset exceeds addressable range");
+        refuses_at("discriminant limit + 1", max_discriminant_base + 1, 0, 0,
+            "pending-Vis discriminant offset exhausted");
+        refuses_at("discriminant oversized", u32::MAX, 0, 0,
+            "pending-Vis discriminant offset exhausted");
+
+        fits("two captured words", 0, 2, 0);
+        let max_capture_base = u32::MAX - 8 - 2 * 8;
+        refuses_at("capture limit - 1", max_capture_base - 1, 2, 0,
+            "pending-Vis frame offset exceeds addressable range");
+        refuses_at("capture limit", max_capture_base, 2, 0,
+            "pending-Vis frame offset exceeds addressable range");
+        refuses_at("capture limit + 1", max_capture_base + 1, 2, 0,
+            "pending-Vis capture offset exhausted");
+        refuses_at("capture oversized", max_capture_base + 8, 2, 0,
+            "pending-Vis capture offset exhausted");
+
+        fits("empty continuation run", 0, 1, 0);
+        let max_continuation_words = (u32::MAX - 16) / 8;
+        fits("frame size limit - 1", 0, 1, max_continuation_words - 1);
+        fits("frame size limit", 0, 1, max_continuation_words);
+        refuses_at("frame size limit + 1", 0, 1, max_continuation_words + 1,
+            "pending-Vis frame size exhausted");
+        refuses_at("frame size oversized", 0, 1, max_words,
+            "pending-Vis frame size exhausted");
+
+        let max_addressable_base = (i32::MAX as u32) - 8;
+        fits("addressable limit - 1", max_addressable_base - 1, 0, 0);
+        fits("addressable limit", max_addressable_base, 0, 0);
+        refuses_at("addressable limit + 1", max_addressable_base + 1, 0, 0,
+            "pending-Vis frame offset exceeds addressable range");
+        refuses_at("addressable oversized", (i32::MAX as u32) + 1, 0, 0,
+            "pending-Vis frame offset exceeds addressable range");
+    }
 
     /// Promise class: durable invariant. The outer result is a generated
     /// call, not a Vis site. Its callee's returned construct is the only Vis
