@@ -91,9 +91,11 @@ reached by promoting its P2 demand in `static_response_phase_b_split_over`.
   derived at construction.rs:1447 from inputs final there, as a least
   fixpoint over the would-be owner population. After pairs exist, the
   plan checks the pre-schema promoted set equals the pair-derived set; a
-  mismatch is a planner error. If the derivation needs any reorder,
-  including hoisting `host_effect_seats` above :1447, stop with the exact
-  diff.
+  mismatch is a planner error. One reorder is authorized (operator
+  2026-10-16, "a, with the Architect's review first"): moving
+  `build_host_effect_seat_plan` and `validate_host_effect_seat_plan` from
+  :1459-1460 to just after `join_results`, once the Architect has reviewed
+  it. Any other reorder is a stop with the exact diff.
 - **AC-1.** AC-MAIN asserts parity. Native performs `FsReadAt`, and its
   non-release events equal the interpreter's in order, with releases
   compared as a set through the shared helpers.

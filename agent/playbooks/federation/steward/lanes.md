@@ -68,7 +68,7 @@ test." **2026-09-30** ("concur with recs"): the Char-route WP to Verify;
 LANG-REFINED next on Language. Later ("concur with recs"): after SIBLING-GOAL,
 REFINEMENT-INTRODUCTION then INDEX-REFINEMENT-POSITIONAL, both before
 L1-ACCEPTANCE-ROWS; kernel nested-Cast node after the spine-retry repair. **2026-10-07:**
-"agreed, refinements should be real kernel types" (`evt_5se8p7fp024b5`).
+"agreed, refinements should be real kernel types" (`evt_5se8p7fp024b5`). **2026-10-16, RELAY seat-plan hoist:** "a, with the Architect's review first".
 
 ## Current state
 
