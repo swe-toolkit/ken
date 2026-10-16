@@ -55,21 +55,43 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first: the Architect's census of every `planner_error` site and every
-`LoweringCause::PlannerInvariant` site, each classified by the predicate.
-Fold in increment 2's residual Fragment sites that read as arity
-invariants. Then the retags, each through `planner_capacity_error` or
-`LoweringCause::Capacity`.
+The Architect's D0 census (`evt_6tm3jf3y8s1f2`, on `e17020310`) is
+`architect/work` `16633e5e2:notes/diag-ncause-census-e17020310.tsv`, with
+2504 rows. It rules three kinds of change, each limited to the cause or
+carrier:
+
+- **18 retags to N0002,** each through `planner_capacity_error`,
+  `LoweringCause::Capacity`, or, for `grafted_spine_control_graph.rs`, a
+  sibling helper that keeps the `BackendFailure::Module` carrier.
+- **31 Fragment arity sites to N0003**
+  (`LoweringCause::Fragment` → `LoweringCause::PlannerInvariant`).
+- **Kept sites:** the other 118 Fragment sites stay N0001, and 2327 sites
+  stay N0003.
+
+The returned_vis lines are corrected there: :125, :128, :130, :132, :134,
+:235, :238 and :241, with :229 and :232 kept.
 
 ## Acceptance
 
-- **AC-1.** For each retagged site, a program, or a unit fixture where
-  no program reaches the guard, produces N0002 where `967c82d77` produces
-  N0003. The census states each site's reach as program-reachable or
-  fixture-only.
+- **AC-1.** Each retagged site's evidence depends on its reach.
+  - **A reachable site:** a program, or a unit fixture where no program
+    reaches the guard, produces N0002 where `967c82d77` produces N0003.
+    This covers abi.rs:2424 (a program: a 65-deep `Let`), core.rs:4723 and
+    :6591 (fixtures in `lowering/core/tests/control.rs`, plus a cause
+    assert), returned_vis.rs:125-134, and :235 if a fixture can mint the
+    row.
+  - **The census names 9 sites with no reachable witness:**
+    returned_vis.rs:238 and :241 (and :235 if no fixture can mint it),
+    grafted_spine_control_graph.rs:432, :806 and :810,
+    selected_pending_calls.rs:831, :832 and :870, and units.rs:2312.
+    Evidence for these is the census row plus a diff limited to the cause
+    or carrier substitution, which QA checks against the census.
+  - **The Fragment rows** read AC-1 with N0003 as the target and N0001 as
+    the base, with fixture reach.
 - **AC-2.** Each site kept at N0003 has a one-line invariant argument in
   the census. The `codes.tsv` ledger is unchanged.
-- **AC-3 (mutation, QA).** Reverting one retag reddens its AC-1 row.
+- **AC-3 (mutation, QA).** Reverting one retag reddens its AC-1 row. This
+  does not apply to the no-witness rows.
 
 ## Stop conditions
 
