@@ -35,9 +35,16 @@ client outside the module can encode, decode and match every error.
   associativity and right identity and `Core.Logic.Transport`'s `cong`,
   `sym` and `trans`. The opaque `String` and `Int` payloads are never
   inspected.
-- **The D0 development is not persisted.** No codec file is on
-  `architect/work` under `notes/`. Section 1.4 records the D0 as
-  Architect-reported scratch results.
+- **The D0 artifact.** It is on `architect/work` at `c85bd8fea`,
+  `notes/json-codec-d0-JsonCodec.ken.md` (Architect `evt_6bzzqc5ag8qsk`).
+  It checks at `caa206278` with no Axiom, and it is arranged lede first.
+  The private carriers `JsonFrame` and `JsonStep` must precede
+  `json_decode`.
+- **The landed seed has one failing positive.** `encode_array_order`
+  (seed :123-124) proves a closed `Cons`-list equation with `Proved`. On
+  a `Cons` list `Equal` does not compute to `Top`, so it needs `Refl`.
+  With that one token changed, all positives pass and each negative is
+  refused at its own theorem.
 - **The design-note obligation.** `Json.ken.md` section 5 says the
   decoder will reject duplicate keys. Spec 71 section 1.4 defers that
   rejection and preserves repeated keys, so the note must be corrected.
@@ -54,9 +61,10 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-0. Before implementation, the leader asks the Architect to commit the D0
-   development to `architect/work` under `notes/`, unless it has already
-   been committed.
+0. In `conformance/stdlib/serialization/seed-json-token-codec.md`,
+   change `expected_array_tokens = Proved` to `expected_array_tokens =
+   Refl` at :124, and change nothing else in the seed. The
+   conformance-validator votes on the exact tip for this path.
 1. The package at `catalog/packages/Data/Serialization/JsonCodec.ken.md`,
    with the D0's declarations and proof bodies and the four laws as
    public theorems, lede first.
@@ -92,4 +100,4 @@ base, stop and report the mismatch.
   `Int` payload.
 - `trusted_base()` grows on loading the package.
 - A change outside the new package, `Json.ken.md`'s design note, the
-  census test and the new acceptance target.
+  census test, the new acceptance target and the one seed token.
