@@ -1,7 +1,7 @@
 ---
 id: LANG-ELAB-NATIVE-STACK-DEPTH
 title: "Elaborator term walkers recurse on the native stack with depth equal to term depth and no guard. Once LANG-BRANCH-GOAL-BUDGET-VISIT-CHARGE removes the false refusal that capped goal size, a dependent-match goal with a closed spine about 160 deep aborts ken check with an uncoded stack overflow on the default 8 MiB stack. Close the class so a deep goal yields Ok or a typed refusal"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
