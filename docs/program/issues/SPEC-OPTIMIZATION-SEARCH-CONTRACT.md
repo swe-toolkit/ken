@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-SEARCH-CONTRACT
 title: "No optimization or search contract exists in spec/50-stdlib, so the catalog's next roadmap layer after serialization has nothing to build against. Author its chapter with a first exact section: choosing a best candidate from a finite list by a natural cost, with membership and optimality proved at zero trust"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
