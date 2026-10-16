@@ -57,6 +57,17 @@ depth or stack size and the refusal code. Then implement the ruling.
 
 - **AC-1.** `r1` at K=160, debug, through `ken check` or an 8 MiB thread,
   is Ok or a coded refusal, with `trusted_base()` unchanged.
+- **AC-1b (every elaborating subcommand).** Closure (a) merged at
+  `01acdfab6` covers only `check` and `run` (main.rs:30-33).
+  `native-build` and `repl` still elaborate on the main thread: at K=160
+  on 8 MiB, `ken native-build` aborts with rc 134 and passes at 16 MiB
+  (Adversary `evt_25m7w6ssgxhya`; Architect carry 1, `evt_3gvjaqtc5vjz8`).
+  The worker is drawn at the dispatch level for every subcommand that
+  elaborates. A `native-build` K=160 row in
+  `lang_elab_native_stack_depth.rs` is Ok and its built program runs. A
+  failed worker spawn or a worker panic exits with a coded error, not an
+  uncoded panic (carry 2). Removing the worker from `native-build`
+  returns that row to rc 134.
 - **AC-2.** A spine past the D0's ruled limit, on each walker the D0
   census names, returns a coded refusal or Ok, not an abort. The rows
   that check today stay Ok, including release K=640.
