@@ -3643,6 +3643,10 @@ pub trait HostHandler {
 
     fn console_read(&mut self, stream: ConsoleStream, limit: usize) -> io::Result<HostRead>;
     fn console_write(&mut self, stream: ConsoleStream, bytes: &[u8]) -> io::Result<()>;
+    /// If this host's last write to `stream` left it mid-line, end the line.
+    fn console_finish_line(&mut self, _stream: ConsoleStream) -> io::Result<()> {
+        Ok(())
+    }
     fn console_flush(&mut self, stream: ConsoleStream) -> io::Result<()>;
     fn console_is_terminal(&mut self, stream: ConsoleStream) -> bool;
 
@@ -3753,6 +3757,7 @@ fn readlinkat_bytes(parent: &RootedHandle, leaf: &[u8]) -> io::Result<Vec<u8>> {
 pub struct PosixHost {
     #[cfg(target_os = "linux")]
     root: RootedHandle,
+    stderr_mid_line: bool,
 }
 
 impl PosixHost {
@@ -3767,12 +3772,17 @@ impl PosixHost {
                 .expect("interpreter target ABI identity");
             let path = ken_host::RootPath::new(path).expect("validate filesystem capability root");
             let root = ken_host::open_root(&path).expect("open filesystem capability root");
-            Self { root }
+            Self {
+                root,
+                stderr_mid_line: false,
+            }
         }
         #[cfg(not(target_os = "linux"))]
         {
             let _ = path;
-            Self {}
+            Self {
+                stderr_mid_line: false,
+            }
         }
     }
 
@@ -3937,12 +3947,26 @@ impl HostHandler for PosixHost {
     fn console_write(&mut self, stream: ConsoleStream, bytes: &[u8]) -> io::Result<()> {
         match stream {
             ConsoleStream::Stdout => io::stdout().lock().write_all(bytes),
-            ConsoleStream::Stderr => io::stderr().lock().write_all(bytes),
+            ConsoleStream::Stderr => {
+                io::stderr().lock().write_all(bytes)?;
+                if !bytes.is_empty() {
+                    self.stderr_mid_line = bytes.last() != Some(&b'\n');
+                }
+                Ok(())
+            }
             ConsoleStream::Stdin => Err(io::Error::new(
                 io::ErrorKind::Unsupported,
                 "stream is not writable",
             )),
         }
+    }
+
+    fn console_finish_line(&mut self, stream: ConsoleStream) -> io::Result<()> {
+        if matches!(stream, ConsoleStream::Stderr) && self.stderr_mid_line {
+            self.stderr_mid_line = false;
+            io::stderr().lock().write_all(b"\n")?;
+        }
+        Ok(())
     }
 
     fn console_flush(&mut self, stream: ConsoleStream) -> io::Result<()> {

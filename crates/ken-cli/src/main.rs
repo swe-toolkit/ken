@@ -26,7 +26,19 @@ fn main() {
 
 fn dispatch() -> i32 {
     let args: Vec<OsString> = std::env::args_os().collect();
-    match args.get(1).and_then(|s| s.to_str()).unwrap_or("") {
+    let subcommand = match args.get(1) {
+        None => "help",
+        Some(arg) => match arg.to_str() {
+            Some(arg) if !arg.is_empty() => arg,
+            _ => {
+                emit_cli_error(CliError::UnknownSubcommand(
+                    arg.to_string_lossy().into_owned(),
+                ));
+                return 1;
+            }
+        },
+    };
+    match subcommand {
         "repl" => {
             repl::run();
             0
@@ -69,7 +81,7 @@ fn dispatch() -> i32 {
             println!("{}", ken_interp::describe());
             0
         }
-        "" | "--help" | "-h" | "help" => {
+        "--help" | "-h" | "help" => {
             print_help();
             0
         }
