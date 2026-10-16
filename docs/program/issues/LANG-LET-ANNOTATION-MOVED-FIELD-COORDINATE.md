@@ -25,14 +25,15 @@ mentions a moved field elaborates, and no such row reaches the user as
 - **Rows.** The Architect's probe extends the RSC test file's FIXTURES
   with `dual_len`. In the DualFS/DualCons arm:
   - r1, r1pp: `let ih : <goal at rest j> = <rec> … in ih` return
-    `Internal` at elab.rs:10756.
+    `Internal` at elab.rs:10821, in
+    `active_premise_kernel_view_for_context_with` (:10645), on a04ec5865.
   - r2, r2pi: `let ih : pp (dual_lookup a m rest j) = hp … in ih` and the
     Π-typed form are KernelRejected with K2's signature.
   - r2len (`let u : Equal Nat (dual_len a m rest) … = Refl`) is Ok.
   - The false twins r1f and r2f are refused, and the controls are Ok.
 - **Producer (a).** `elab_type_named_variable` (:1148) is the only
   `RVarTy` resolver (:1263), and it returns the raw field. The
-  expression-side resolvers (:11553, :1815) return fix 2's component. The
+  expression-side resolvers (:11618, :1815) return fix 2's component. The
   ruling gives a prototype that consults `var_refinements`.
 - **Producer (b).** `refine_let_rhs` (:1371) applies the
   scrutinee-to-target substitution inside the field's transport, which
@@ -43,7 +44,7 @@ mentions a moved field elaborates, and no such row reaches the user as
   breaks ds5b `intervening_let_fresh_binder_inherits_branch_index_refinement`,
   which needs the substitution on an outer variable. So (b)'s repair is
   conditional.
-- **The :10756 guard stays N0003.** It detects an inconsistent earlier
+- **The :10821 guard stays N0003.** It detects an inconsistent earlier
   stage. Close the producer, not the guard.
 
 Treat anchors as perishable. If a settled input is false on the landed
@@ -75,4 +76,4 @@ implement (a) and (b) together.
 ## Stop conditions
 
 - Any kernel, conversion or `trusted_base()` change.
-- The repair needs the :10756 guard retyped.
+- The repair needs the :10821 guard retyped.
