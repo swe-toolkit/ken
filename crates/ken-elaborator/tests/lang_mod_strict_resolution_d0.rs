@@ -565,6 +565,15 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // BoundedSearch imports Nat Order and Transport; its proof invariant
+            // retains the compiler's conjunction vocabulary under strict mode.
+            "Algorithm.Optimization.BoundedSearch".to_string(),
+            ["And", "and_fst", "and_intro", "and_snd"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        ),
+        (
             // With its own Dec-family imports, this package now reaches the
             // strict-floor census. Its conjunction names remain prelude-bound
             // until the separate collections slice moves And and is_sorted.
