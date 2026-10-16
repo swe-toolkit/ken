@@ -121,7 +121,7 @@ theorem round_trip_nested :
     (Ok JsonError Json nested_value) = json_decode_encode nested_value
 
 theorem encode_array_order :
-  Equal (List JsonToken) (json_encode ordered_array) expected_array_tokens = Proved
+  Equal (List JsonToken) (json_encode ordered_array) expected_array_tokens = Refl
 
 theorem law_trailing_first_extra :
   Equal (Result JsonError Json)

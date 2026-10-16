@@ -1291,6 +1291,25 @@ fn catalog_ambient_passthrough_migration_census() {
             .collect(),
         ),
         (
+            // JsonCodec imports the canonical Json carrier, Derived's list
+            // laws, and Transport. Strict mode retains the same compiler
+            // conveniences inherited through that provider closure.
+            "Data.Serialization.JsonCodec".to_string(),
+            [
+                "And",
+                "Unit",
+                "and_fst",
+                "and_intro",
+                "and_snd",
+                "eqChar",
+                "is_sorted",
+                "leqChar",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect(),
+        ),
+        (
             // Validation now declares its EffectfulClasses, LawfulFunctors,
             // Transport, and NonEmpty dependencies. Its transparent package
             // boundary loads while the census retains compiler conveniences.
