@@ -44,24 +44,35 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-D0 first: the Architect rules the bound, for example head-only `whnf`
-without re-simplifying a duplicated argument, and re-measures the
-`LANG-BRANCH-GOAL-CONTRACTION-COST` rows under it. Then the repair, with
-an acceptance row for this repro beside the existing λ row.
+The repair the Architect's D0 rules (`evt_2yxvr07dmkd0b`, on `45c3bd6db`):
+a work allowance for each branch-goal simplification of
+16384 + 64·|goal| reduct nodes. Each `whnf` reduct that
+`simplify_branch_goal_unguarded` visits is charged by its node count. On
+exhaustion, both sites in
+`simplify_branch_goal_keeping_refinements_uncontracted` fall back to the
+original goal. The state is thread-local, so the recursive frame does not
+grow. The D0 gives the code, and it rejects head-only `whnf`, equal-argument
+detection and a size-ratio guard. Acceptance rows for `dupf` and `dup2`
+go beside the existing λ rows.
 
 ## Acceptance
 
-- **AC-1.** The `dupf` repro at n=16 returns within the bound the D0
-  names, and if Ok stores at most 64·n² nodes. Control: the `linf` repro
-  at n=16 returns Ok within the same bounds.
-- **AC-2.** `lang_branch_goal_contraction_cost.rs`,
-  `lang_elaborated_beta_redex_at_kernel_inference` and the catalog census
-  are unchanged, per file.
-- **AC-3 (mutation, QA).** Restoring the unguarded re-simplification
-  reddens AC-1.
+- **AC-1.** In a debug build, `dupf` and `dup2`
+  (`dup2 f x = f (Suc x) (Suc (Suc x))`) at n=16 each return in under 1 s,
+  and if Ok each stores at most 64·n² nodes. Control: `linf` at n=16 is Ok
+  within the same bounds. Below the allowance, `dupf` at n=8 stores more
+  nodes than `linf` at n=8 (D0: 2288 > 312), which excludes a fix that
+  never simplifies.
+- **AC-2.** Unchanged, per file: `lang_branch_goal_contraction_cost.rs`,
+  `lang_elaborated_beta_redex_at_kernel_inference`,
+  `elab_recursive_frame_budget` and the catalog census.
+- **AC-3 (mutation, QA).** An unbounded allowance reddens the `dupf` and
+  `dup2` rows. A zero allowance reddens the below-allowance row.
 
 ## Stop conditions
 
 - Any kernel, conversion or `trusted_base()` change.
 - A previously checking catalog file or test stops checking under the
   bound: stop to the Architect.
+- Out of scope: the cost inside one kernel `whnf` call, which is kernel
+  domain.
