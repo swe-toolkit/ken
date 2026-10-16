@@ -65,9 +65,12 @@ depth or stack size and the refusal code. Then implement the ruling.
   The worker is drawn at the dispatch level for every subcommand that
   elaborates. A `native-build` K=160 row in
   `lang_elab_native_stack_depth.rs` is Ok and its built program runs. A
-  failed worker spawn or a worker panic exits with a coded error, not an
-  uncoded panic (carry 2). Removing the worker from `native-build`
-  returns that row to rc 134.
+  failed worker spawn is a CLI front-end failure: it exits with a new
+  appended `C` code (spec 70 §1.2), with its row in
+  `crates/ken-diagnostic/codes.tsv` and `CLI_ERROR_TABLE` (carry 2). A
+  worker panic is an implementation panic, which spec 70 §1.1 excludes
+  from coding; it is propagated once, without a second panic message.
+  Removing the worker from `native-build` returns that row to rc 134.
 - **AC-2.** A spine past the D0's ruled limit, on each walker the D0
   census names, returns a coded refusal or Ok, not an abort. The rows
   that check today stay Ok, including release K=640.
