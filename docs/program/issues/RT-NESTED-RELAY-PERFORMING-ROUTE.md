@@ -54,9 +54,26 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-AC-0 first. Then route (C): for each route-none pair, an outer member that
-performs the forwarded op, with the traps retired. The Architect rules the
-emission point at D0.
+Route (C) as ruled at D0 (`evt_5pktec6dv6wxx`, base `5c0afeffa`): the
+emission point is the source's own execute-then-resume response owner,
+reached by promoting its P2 demand in `static_response_phase_b_split_over`.
+- (a) Promote a demand iff it is a transport source that would otherwise
+  go P2 `UnconsumedTransportCaller`, its `vis_origin` is the source of an
+  admitted relay pair, no Deferred handler owner exists for it, and its
+  stage is exclusively predeclared. Key on the pair and edge identity,
+  never an origin number.
+- (b) A relay-promoted owner passes `validate_response_owner_call_coverage`
+  iff its selected caller is verified, or a lowering ledger over every
+  construct-lowering path records its source construct as never lowered.
+  `disposition=None` is not that ledger.
+- (c) A relay source in a mixed-owner stage is a typed planner refusal
+  naming the source.
+- (d) A route-none at `build_relay_routes` after promotion is a typed
+  planner refusal. Delete `branch_unrouted_relay_at_consumer`, its call
+  sites, and the trap interning at construction.rs:1556-1562.
+- (e) Relay promotion is separate from execute-then-resume suppression.
+  px8f's suppressed expectation becomes the measured
+  `[BufferAllocate, FsOpen]`.
 
 ## Acceptance
 
@@ -69,16 +86,32 @@ emission point at D0.
   table is the D0 input, and the Architect rules per consumer whether a
   fixture is constructible or the consumer is unreachable by a cited
   guard (`evt_234a783np26tf`). Instrumentation is disposable and not
-  committed.
+  committed. Done: `evt_dm6hsc4mm1ng`.
+- **AC-0' (measure, before any build).** The relay-source set for (a) is
+  derived at construction.rs:1447 from inputs final there, as a least
+  fixpoint over the would-be owner population. After pairs exist, the
+  plan checks the pre-schema promoted set equals the pair-derived set; a
+  mismatch is a planner error. One reorder is authorized (operator
+  2026-10-16, "a, with the Architect's review first"): moving
+  `build_host_effect_seat_plan` and `validate_host_effect_seat_plan` from
+  :1459-1460 to just after `join_results`, once the Architect has reviewed
+  it. Any other reorder is a stop with the exact diff.
 - **AC-1.** AC-MAIN asserts parity. Native performs `FsReadAt`, and its
   non-release events equal the interpreter's in order, with releases
   compared as a set through the shared helpers.
-- **AC-2 (witnesses).** One row per consumer that AC-0 shows reachable,
-  and one `Excluded{Underived}` owner row. Each is performed or refused,
-  and each reddens when its consumer's guard is mutated. Each consumer
-  the D0 rules unreachable is named with its guard instead. The px8ta
-  relay inside the Closure-refused artifact is either reached by a row or
-  named as unreachable per the D0.
+- **AC-2 (witnesses).** The traps are gone, so the per-seat rows become:
+  - planner refusal: the relay-promotion suppression mutant turns AC-MAIN
+    back red, and a mixed-owner relay source compiles to the typed
+    refusal;
+  - coverage discharge: cap41_endpoint, cap41_offset_endpoint and
+    read_window compile and keep their terminals, and a mutant that
+    lowers the source without entering its owner trips the gate;
+  - one `Excluded{Underived}` owner fixture (a shape from the D0 list),
+    native against the interpreter. If native drops an op the
+    interpreter performs, stop to the Architect;
+  - the ignored px8ta real-same-depth row, run once under route (C): a
+    witness if it reaches route assembly, otherwise named unreached with
+    that measurement.
 - **AC-3 (control).** Rows 01-36 and the four AC-MAIN controls keep
   parity under the fleet release rule.
 

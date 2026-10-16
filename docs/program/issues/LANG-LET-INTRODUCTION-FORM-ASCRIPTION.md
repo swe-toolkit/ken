@@ -1,7 +1,7 @@
 ---
 id: LANG-LET-INTRODUCTION-FORM-ASCRIPTION
 title: "An annotated let whose value is an introduction form is refused when its body applies it: the kernel's Let rule checks the body with the value substituted, so let f : T = λu. e in f a becomes the unannotated redex (λu. e) a, and the kernel cannot infer it. Keep the annotation on the substituted value"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1

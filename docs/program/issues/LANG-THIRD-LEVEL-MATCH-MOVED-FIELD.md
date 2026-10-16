@@ -1,7 +1,7 @@
 ---
 id: LANG-THIRD-LEVEL-MATCH-MOVED-FIELD
 title: "A true proof with a third-level match inside a nested recursive step's DualFS/DualCons arm is refused: matching j fails with a cast-proof mismatch, and matching rest under an Equal goal fails with NotAFunction on an elim head. Neither is a regression, and the let-annotation repair does not reach them. Measure both mechanisms and repair them"
-status: ready
+status: draft
 owner: language
 size: M
 tier: T1
