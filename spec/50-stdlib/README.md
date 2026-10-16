@@ -339,6 +339,18 @@ a landed catalog module, shipped seed, CI result or measured
 trusted-base delta. Clock effects, wall-clock time, vector clocks,
 infinite streams and window/merge relational laws remain deferred.
 
+The **finite least-cost selection contract** is pinned in
+**`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT).
+`Algorithm.Optimization.Argmin` selects the earliest minimum under a
+`Nat` cost from the existing `NonEmpty a`, with no `DecEq a`. Seven
+Architect-D0-checked laws establish membership, minimum cost, the
+absence of a cheaper member, head-on-tie, and the three exact
+selection equations. The prospective catalog module, conformance
+seed, CI and measured trusted-base delta are not established by §1.
+Continuous or implicit search, heuristics, approximation, argmax,
+arbitrary-order or multi-objective costs, top-k, empty-list selection
+and complexity claims remain deferred.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
