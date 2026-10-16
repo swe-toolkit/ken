@@ -34,8 +34,8 @@ use crate::cranelift_backend::artifact::native_platform_target_name_for_lowering
 use crate::fnv1a_64;
 
 /// Promise class: normative compatibility vector for the N0002 capacity
-/// family. A valid value-flow producer at depth 64 compiles, while one more
-/// Let reaches the bounded planner walk and refuses as capacity, not as a
+/// family. A value-flow producer at depths 0, 63, and 64 compiles; depths 65
+/// and 66 reach the bounded planner walk and refuse as capacity, not as a
 /// compiler-defect invariant. No text of the refusal is part of the oracle.
 /// The whole compile at depths 64/65 overflows a stated 4 MiB test thread but
 /// passes at 8 MiB; 16 MiB provisions at least twice that measured passing
@@ -71,19 +71,25 @@ fn value_flow_producer_first_excess_is_capacity() {
                     None,
                 )
             };
-            compile(64).expect("a value-flow chain at the declared bound compiles");
-            let error = match compile(65) {
-                Err(error) => error,
-                Ok(_) => panic!("the first excess must refuse before emission"),
-            };
-            assert_eq!(error.code().as_str(), "N0002", "{error:?}");
-            assert!(matches!(
-                error,
-                CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    cause: LoweringCause::Capacity,
-                    ..
-                })
-            ));
+            for depth in [0, 63, 64] {
+                compile(depth).unwrap_or_else(|error| {
+                    panic!("value-flow depth {depth} must fit the planner bound: {error:?}")
+                });
+            }
+            for depth in [65, 66] {
+                let error = match compile(depth) {
+                    Err(error) => error,
+                    Ok(_) => panic!("value-flow depth {depth} must refuse before emission"),
+                };
+                assert_eq!(error.code().as_str(), "N0002", "depth {depth}: {error:?}");
+                assert!(matches!(
+                    error,
+                    CraneliftBackendError::Unsupported(UnsupportedLowering {
+                        cause: LoweringCause::Capacity,
+                        ..
+                    })
+                ));
+            }
         })
         .expect("start stated-stack test thread")
         .join()
