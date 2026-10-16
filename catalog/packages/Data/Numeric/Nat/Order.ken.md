@@ -393,6 +393,30 @@ pub proof false_reverse_leq for lt_nat
         }
     }
 
+pub proof true_leq for lt_nat
+      (m : Nat) (n : Nat)
+    : Equal Bool (lt_nat m n) True → IsTrue (leq_nat m n) =
+  λh.
+    (proof trans for leq_nat)
+      m
+      (Suc m)
+      n
+      (leq_nat_successor_bound m)
+      ((proof to_leq_suc for lt_nat) m n h)
+
+pub proof leq_not_lt for lt_nat
+      (m : Nat)
+    : (n : Nat) → IsTrue (leq_nat m n) → Equal Bool (lt_nat n m) False =
+  match m {
+    Zero ↦ λn. λh. Proved;
+    Suc m2 ↦
+      λn.
+        match n {
+          Zero ↦ λh. absurd h;
+          Suc n2 ↦ λh. (proof leq_not_lt for lt_nat) m2 n2 h
+        }
+  }
+
 pub proof self_suc for lt_nat (n : Nat) : Equal Bool (lt_nat n (Suc n)) True =
   match n {
     Zero ↦ Proved;
@@ -530,9 +554,11 @@ reuse the premise at smaller arguments.
 
 The attached strict-order laws connect `lt_nat` to `leq_nat`, prove
 transitivity and successor bounds, and exclude impossible zero and empty
-cases. The successor and right-weakening laws make the elementary steps of the
-canonical order available to other packages. Addition recurses on its second
-argument. Its first bound carries an induction hypothesis through a successor
+cases. A true strict comparison entails the non-strict comparison; a
+non-strict comparison excludes a strict comparison in reverse. The successor
+and right-weakening laws make the elementary steps of the canonical order
+available to other packages. Addition recurses on its second argument. Its
+first bound carries an induction hypothesis through a successor
 using the canonical order's transitivity; the second bound reduces directly to
 its induction hypothesis.
 
@@ -598,6 +624,16 @@ const max_of_two_and_three : Nat = max (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))
 
 theorem order_example_zero_lt_one : Equal Bool (lt_nat Zero (Suc Zero)) True =
   (proof self_suc for lt_nat) Zero
+
+theorem order_example_strict_entails_nonstrict
+      (m : Nat) (n : Nat)
+    : Equal Bool (lt_nat m n) True → IsTrue (leq_nat m n) =
+  (proof true_leq for lt_nat) m n
+
+theorem order_example_nonstrict_excludes_reverse
+      (m : Nat) (n : Nat)
+    : IsTrue (leq_nat m n) → Equal Bool (lt_nat n m) False =
+  (proof leq_not_lt for lt_nat) m n
 
 const compare_two_three : OrdResult = compare (Suc (Suc Zero)) (Suc (Suc (Suc Zero)))
 
@@ -853,7 +889,7 @@ argument and its bridge exposes the canonical successor relation.
 1. **Public API.** This facade re-exports `Ord`, `IsTrue`, `bool_or`, and
    `leq_nat` with their provider identities. It exports its defined-at `min`,
    `max`, `sub`, `compare`, and `lt_nat` operations; their three zero computation
-   facts; twelve attached `lt_nat` proofs; the successor and right-weakening
+   facts; fourteen attached `lt_nat` proofs; the successor and right-weakening
    laws; two non-strict addition bounds and `leq_nat_suc_add_right`; the two
    positive-right-multiplication order transports; the six `min`/`max` bounds;
    the three `compare` agreements; and the five inductive
