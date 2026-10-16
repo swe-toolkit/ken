@@ -119,6 +119,7 @@ use super::occurrences::{
 use super::responses::{
     publish_checked_ih_post_call_consumers, validate_checked_ih_post_call_consumers,
 };
+use super::returned_vis::{ExcludedSettlement, ResponseOwnerSettlement};
 use super::semantic_ir::{
     build_bool_constructor_inventory, build_semantic_plane,
     build_synthesized_constructor_inventory, positioned_sources, RuntimeExprShape,
@@ -1528,6 +1529,26 @@ impl<'src> Planner<'src> {
         // ownership source (e) reads its successor rows.
         self.plan.relay_drive_pairs = self.plan.build_relay_drive_pairs()?;
         self.plan.pending_vis_settlements = self.plan.build_pending_vis_settlements()?;
+        // An Underived owner's returned-Vis set could not be derived, so the
+        // Ret-only emission's premise (its K returns only Ret) is unproven: a
+        // returned Vis would be dropped silently (forced AC-MAIN owner 890).
+        // Refuse the plane before any artifact exists.
+        if let Some((owner, reason)) = self
+            .plan
+            .pending_vis_settlements
+            .owners
+            .iter()
+            .find_map(|(owner, settlement)| match settlement {
+                ResponseOwnerSettlement::Excluded {
+                    reason: ExcludedSettlement::Underived(reason),
+                } => Some((owner, reason)),
+                _ => None,
+            })
+        {
+            return Err(planner_capacity_error(format!(
+                "response owner {owner:?} has an underivable returned-Vis protocol: {reason}",
+            )));
+        }
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing

@@ -143,6 +143,10 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
                         assert_eq!(native.exit_status, interpreted.exit_status);
                         assert_eq!(native.terminal_exit, interpreted.terminal_exit);
                         assert_eq!(native.terminal_error, interpreted.terminal_error);
+                        assert!(
+                            forced_owner.is_none(),
+                            "an Underived owner must refuse before artifact emission"
+                        );
                     }
                     Err(error) => {
                         assert!(forced_owner.is_some(), "unforced AC-MAIN must build: {error:?}");
@@ -156,6 +160,10 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
                         assert!(
                             packaging.source_cause.is_some(),
                             "the refusal needs a typed native cause: {packaging:?}"
+                        );
+                        assert!(
+                            error.to_string().contains("underivable returned-Vis protocol"),
+                            "each forced owner must refuse at the Underived settlement guard: {error:?}"
                         );
                         if diagnostics.is_empty() {
                             assert!(
