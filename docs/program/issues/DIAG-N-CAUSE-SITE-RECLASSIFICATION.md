@@ -73,25 +73,31 @@ The returned_vis lines are corrected there: :125, :128, :130, :132, :134,
 
 ## Acceptance
 
-- **AC-1.** Each retagged site's evidence depends on its reach.
+- **AC-1.** Evidence is per site, and depends on reach.
   - **A reachable site:** a program, or a unit fixture where no program
-    reaches the guard, produces N0002 where `967c82d77` produces N0003.
-    This covers abi.rs:2424 (a program: a 65-deep `Let`), core.rs:4723 and
-    :6591 (fixtures in `lowering/core/tests/control.rs`, plus a cause
-    assert), returned_vis.rs:125-134, and :235 if a fixture can mint the
-    row.
-  - **The census names 9 sites with no reachable witness:**
-    returned_vis.rs:238 and :241 (and :235 if no fixture can mint it),
-    grafted_spine_control_graph.rs:432, :806 and :810,
+    reaches the guard, produces the target code where `967c82d77`
+    produces the base code. For a retag to N0002 the target is N0002 and
+    the base N0003. For a Fragment row the target is N0003 and the base
+    N0001. The reachable N0002 sites are abi.rs:2424 (a program: a
+    65-deep `Let`), core.rs:4723 and :6591 (fixtures in
+    `lowering/core/tests/control.rs`, plus a cause assert), and
+    returned_vis.rs:125-134. A Fragment row is reachable when a
+    test-only, hand-built inconsistent `RuntimeExpr` reaches its guard.
+  - **A no-witness site:** the census row plus a diff limited to the
+    cause or carrier substitution, which QA checks against the census.
+    These are the 9 N0002 sites the census names: returned_vis.rs:235,
+    :238 and :241, grafted_spine_control_graph.rs:432, :806 and :810,
     selected_pending_calls.rs:831, :832 and :870, and units.rs:2312.
-    Evidence for these is the census row plus a diff limited to the cause
-    or carrier substitution, which QA checks against the census.
-  - **The Fragment rows** read AC-1 with N0003 as the target and N0001 as
-    the base, with fixture reach.
+    The Fragment rows the census marks `n/a (invariant)` are no-witness
+    sites too.
+  - **Test-only fixtures are in scope.** Malformed-plan fixtures in test
+    code do not breach the cause-only scope. Do not widen a production
+    constructor's visibility to build one: a site that needs it, such as
+    returned_vis.rs:235, is a no-witness site.
 - **AC-2.** Each site kept at N0003 has a one-line invariant argument in
   the census. The `codes.tsv` ledger is unchanged.
 - **AC-3 (mutation, QA).** Reverting one retag reddens its AC-1 row. This
-  does not apply to the no-witness rows.
+  does not apply to the no-witness sites.
 
 ## Stop conditions
 
