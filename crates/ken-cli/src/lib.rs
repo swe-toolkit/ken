@@ -294,7 +294,7 @@ where
             Some(observation),
         ))
     } else {
-        let final_value = ken_interp::run_io(
+        let final_value = match ken_interp::run_io(
             tree,
             host,
             &console_ids,
@@ -303,15 +303,23 @@ where
             Some(&coproduct_ids),
             &elab_env.env,
             &mut store,
-        )
-        .map_err(RunError::Io)?;
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = host.console_finish_line(ken_interp::ConsoleStream::Stderr);
+                return Err(RunError::Io(error));
+            }
+        };
         Ok((
             ProgramOutcome {
                 exit_status: exit_status_with_reporter(
                     &final_value,
                     success_id,
                     failure_id,
-                    &mut report_terminal_error,
+                    |line| {
+                        let _ = host.console_finish_line(ken_interp::ConsoleStream::Stderr);
+                        report_terminal_error(line)
+                    },
                 ),
             },
             None,
@@ -935,8 +943,8 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     fn malformed_exit_result_reports_a_distinct_host_code() {
         let success = ken_kernel::GlobalId(1);
         let failure = ken_kernel::GlobalId(2);
-        // Checked source cannot construct these results; the live fallback
-        // still has a host-carried code when called with malformed values.
+        // The live fallback has a host-carried code for malformed values;
+        // checked source can reach it when a Failure payload stays stuck.
         for value in [
             ken_interp::EvalVal::Int(7),
             constructor_value(failure, vec![ken_interp::EvalVal::Int(300)]),
