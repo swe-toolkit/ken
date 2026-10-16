@@ -7,6 +7,12 @@ use cli_errors::{emit_cli_error, emit_coded_error, CliError};
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
+// K=160's debug goal overflows an 8 MiB stack and checks at 16 MiB. The
+// Architect ruled 256 MiB for the CLI's elaboration/checking worker: at least
+// 240 MiB above that passing bound, and independent of the caller's stack.
+// This moves the cliff; handling exhaustion past it is a separate AC-2 ruling.
+const CLI_ELABORATION_STACK_BYTES: usize = 256 * 1024 * 1024;
+
 fn main() {
     // `RT-MATCH-RECURSOR-CONSUMERS` 4a.1. The census scope wraps the whole
     // dispatch, and `dispatch` RETURNS its exit code instead of taking the exit
@@ -16,9 +22,25 @@ fn main() {
     // case `AC-1` cares about, so losing its rows to an early `exit` would
     // hollow out the census.
     //
-    // With no session in the environment, or with the feature off, this is a
-    // direct call to `dispatch` and nothing else happens.
-    let exit_code = ken_runtime::with_child_match_recursor_census(dispatch);
+    // Keep the census scope on the same thread as dispatch: its rows are
+    // thread-local. The check/run worker owns the whole CLI path, so both
+    // elaboration and the kernel re-check happen on its stated stack. A future
+    // subprocess boundary can enclose the same invocation without changing
+    // the elaboration path. Other subcommands retain their original thread.
+    let needs_elaboration_stack = std::env::args_os()
+        .nth(1)
+        .is_some_and(|arg| matches!(arg.to_str(), Some("check" | "run")));
+    let exit_code = if needs_elaboration_stack {
+        std::thread::Builder::new()
+            .name("ken-elaboration".into())
+            .stack_size(CLI_ELABORATION_STACK_BYTES)
+            .spawn(|| ken_runtime::with_child_match_recursor_census(dispatch))
+            .expect("spawn ken check/run elaboration worker")
+            .join()
+            .expect("ken check/run elaboration worker panicked")
+    } else {
+        ken_runtime::with_child_match_recursor_census(dispatch)
+    };
     if exit_code != 0 {
         std::process::exit(exit_code);
     }
