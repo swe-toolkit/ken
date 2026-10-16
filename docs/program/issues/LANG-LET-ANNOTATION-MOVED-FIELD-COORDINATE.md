@@ -1,7 +1,7 @@
 ---
 id: LANG-LET-ANNOTATION-MOVED-FIELD-COORDINATE
 title: "In a nested recursive step, a let annotation that mentions a moved field is typed at a different coordinate from the body, so a true proof returns Internal (R1) or K2's pre-fix refusal (R2). Type positions ignore var_refinements, and refine_let_rhs then rewrites the field's transport. Repair both as one atomic pair"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1
