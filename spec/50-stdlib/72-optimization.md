@@ -168,3 +168,111 @@ lexicographic costs, top-k and stable multi-result selection, and an
 `Option`-returning selector for a possibly empty `List` are deferred.
 The right-fold description is not a machine-checked complexity result;
 all asymptotic and resource claims remain deferred.
+
+## 2. Least witness below a finite bound
+
+> **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).**
+> Three general laws were checked in Architect D0; the catalog module
+> and this section's conformance seed are not delivered here.
+
+### 2.1 Carrier and result
+
+The catalog Section remains `Algorithm.Optimization`. Its prospective
+module `Algorithm.Optimization.BoundedSearch`, at
+`catalog/packages/Algorithm/Optimization/BoundedSearch.ken.md`, exports:
+
+```ken
+pub fn find_below (p : Nat → Bool) (bound : Nat) : Option Nat
+```
+
+The search domain is the **finite, explicitly bounded** range of natural
+numbers `0 ≤ n < bound`. For a Boolean predicate `p`, `find_below`
+returns `Some Nat n` for the **least** `n` in that range with
+`p n = True`; if no such `n` exists, it returns `None Nat`. At bound
+`Zero`, the range is empty and the result is `None Nat`. The carrier
+`Option Nat` is the existing prelude sum with `None` and `Some`:
+neither a new container nor an equality decision on predicates is
+introduced. Unlike §1's `argmin`, the operation receives a finite
+numeric bound and a predicate, not an already populated `NonEmpty a`.
+This does not specify infinite or unconstrained implicit search.
+
+The contract is **extensional**. In particular, it does not prescribe
+search direction, recursion shape, early exit, a predicate-call count,
+or an asymptotic or resource bound. Implementations satisfying the
+three laws below may use different evaluation strategies.
+
+### 2.2 Three checked laws
+
+The module must export checked proof bodies, not postulates or unproved
+goals, for exactly these three generic theorem interfaces. The
+result-equality premises connect each claim to the actual `Option`
+result, and `Data.Numeric.Nat.Order.lt_nat` supplies strict order:
+
+```ken
+pub theorem find_below_sound
+      (p : Nat → Bool) (bound : Nat) (n : Nat)
+    : Equal (Option Nat) (find_below p bound) (Some Nat n)
+      → And (Equal Bool (lt_nat n bound) True) (Equal Bool (p n) True)
+
+pub theorem find_below_least
+      (p : Nat → Bool) (bound : Nat) (n : Nat)
+    : Equal (Option Nat) (find_below p bound) (Some Nat n)
+      → (m : Nat) → Equal Bool (lt_nat m n) True → Equal Bool (p m) False
+
+pub theorem find_below_complete
+      (p : Nat → Bool) (bound : Nat)
+    : Equal (Option Nat) (find_below p bound) (None Nat)
+      → (m : Nat) → Equal Bool (lt_nat m bound) True → Equal Bool (p m) False
+```
+
+`find_below_sound` establishes both the strict upper bound and the
+predicate hit whenever a result is `Some n`. `find_below_least` rules
+out any earlier hit: **every** `m < n` has `p m = False`.
+`find_below_complete` rules out **every** hit within the bound when
+the result is `None`. Together, these laws determine the returned
+value or its absence; they do not add a witness for a result reported
+as `None`, an unconstrained search domain, or a cost guarantee.
+
+For a discriminating finite instance, take `p n` to mean `2 < n`.
+Bound `10` returns `Some 3`, **not** `Some 5` even though `5` also
+satisfies `p`: the smaller witness `3` beats it. `None` at bound `10`
+is false because `3` is a hit. Bound `3` returns `None` because none
+of `0, 1, 2` satisfies `p`, and bound `Zero` also returns `None`.
+A claimed `Some 2` at bound `3` is false for a different reason:
+`p 2 = False`. These are behavioral illustrations, not a claim that
+the separately owned conformance seed has been committed or run.
+
+### 2.3 Proof evidence and boundary
+
+Architect D0 on landed base `0cd98b0cd` reported `ken check` rc 0 for
+a 167-line development of the operation and all three general laws,
+with zero `Axiom`, `postulate`, `primitive`, or opaque declarations. The
+D0 positive client seeds checked; three individually appended false
+claims were refused at their own declarations. Mutating the
+implementation to prefer a later witness, never report a witness, or
+include the bound made the proof development fail, and restoring each
+mutation restored rc 0. These are **Architect-reported scratch
+results**, not a shipped catalog module or §2 conformance seed, CI,
+or a measured `trusted_base()` delta.
+
+The D0 proof route inducts over the finite bound with a private
+outcome invariant: a missing result means no hit below the bound; a
+found result carries proofs that its witness is below the bound,
+satisfies the predicate, and has no earlier hit.
+Transport along the result equality yields the three public laws
+without requiring a new `Option` injectivity or discrimination law.
+The proof of the missing case also uses the private Nat fact that
+`m < Suc b` but not `m < b` forces `m = b`. Splitting on a
+**separately bound `Bool` variable** rather than matching dependently
+on an indirectly computed `p b` avoids assuming a refinement the
+elaborator does not provide. These explain the D0 evidence; no
+private helper is a fourth public law or a mandated implementation
+strategy.
+
+The `Option`-returning selector over a possibly empty `List` deferred
+by §1 remains deferred. It would wrap `argmin` after distinguishing
+`Nil` from `Cons`, not search a numeric range; if authorized later,
+it belongs as a §1 extension, not as another §2 operation. General
+implicit or infinite search, heuristics and approximations, arbitrary
+candidate orders, and machine-checked performance guarantees remain
+outside this bounded contract.

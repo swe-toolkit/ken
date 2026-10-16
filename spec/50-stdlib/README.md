@@ -351,6 +351,18 @@ Continuous or implicit search, heuristics, approximation, argmax,
 arbitrary-order or multi-objective costs, top-k, empty-list selection
 and complexity claims remain deferred.
 
+The **finite bounded-search contract** is pinned in
+**`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).
+`Algorithm.Optimization.BoundedSearch.find_below` takes a Boolean
+predicate over `Nat` and a finite bound, returning `Some` with the
+least satisfying index below it or `None` when none exists. Three
+Architect-D0-checked generic laws give soundness, leastness and
+completeness. No search direction, predicate-call count, recursion
+shape or complexity guarantee is normative. The D0 checks are
+scratch evidence, not a delivered catalog module or §2 conformance
+seed, CI, or a measured trusted-base delta. An `Option` selector over
+a possibly empty list remains a deferred §1 extension, not part of §2.
+
 ## 4. I/O, effects, serialization
 
 - Effect interfaces (`../30-surface/36`):
