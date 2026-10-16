@@ -1,7 +1,7 @@
 ---
 id: CAT-OPTIMIZATION-ARGMIN
 title: "Spec 72 section 1 specifies a least-cost candidate selector over NonEmpty with seven proved laws, but no catalog package delivers it. Deliver Algorithm.Optimization.Argmin from the Architect's checked D0 at zero trust, and publish the two Nat-order bridges it needs in Data.Numeric.Nat.Order"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
