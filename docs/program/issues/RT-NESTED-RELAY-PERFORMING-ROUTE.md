@@ -106,9 +106,13 @@ reached by promoting its P2 demand in `static_response_phase_b_split_over`.
   - coverage discharge: cap41_endpoint, cap41_offset_endpoint and
     read_window compile and keep their terminals, and a mutant that
     lowers the source without entering its owner trips the gate;
-  - one `Excluded{Underived}` owner fixture (a shape from the D0 list),
-    native against the interpreter. If native drops an op the
-    interpreter performs, stop to the Architect;
+  - an Underived-owner witness by classification forced at the protocol
+    producer (`returned_vis_protocol`) for each installed AC-MAIN owner,
+    native against the interpreter (Architect `evt_5fevwxrfy8knk`). A
+    natural user-source Underived owner was not constructed: the
+    measured installed owners' K worker bodies are prelude wrappers
+    (`evt_3e2bxfp79n9yc`). If native drops an op the interpreter
+    performs, stop to the Architect;
   - the ignored px8ta real-same-depth row, run once under route (C): a
     witness if it reaches route assembly, otherwise named unreached with
     that measurement.
