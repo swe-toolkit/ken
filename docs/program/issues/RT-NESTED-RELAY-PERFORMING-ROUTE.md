@@ -119,6 +119,22 @@ reached by promoting its P2 demand in `static_response_phase_b_split_over`.
 - **AC-3 (control).** Rows 01-36 and the four AC-MAIN controls keep
   parity under the fleet release rule.
 
+## Hard-stop inventory (§1b)
+
+§1a: the Underived-owner settlement chain is at 1 (Architect
+`evt_27ernsj0ttshz`); the route chain is at 0.
+
+1. An `Excluded{Underived}` owner is emitted on the Ret-only arm although
+   its K may return a Vis: the arm is keyed on "derivation failed", which
+   the emitter treats as "no returned Vis" (units.rs:4663). Forced owner
+   890 on AC-MAIN drops `FsReadAt` silently, with promotion suppressed as
+   well, so main has the defect. Ruled: refuse the plane at plan
+   construction, after `build_pending_vis_settlements` (construction.rs
+   :1530), with `planner_capacity_error` "underivable returned-Vis
+   protocol"; forced 890 and forced 768 both refuse; deleting the refusal
+   is QA's AC-3 mutation for this guard. A native row green on main that
+   newly refuses with that text is a stop to the Architect.
+
 ## Stop conditions
 
 - The repair restructures the planner's build order: return to the
