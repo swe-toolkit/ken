@@ -274,8 +274,8 @@ with a fractional part or exponent are outside the accepted domain rather than
 a silent widening or narrowing of the round-trip claim.
 
 **Objects preserve order and duplicates structurally.** The carrier can
-represent any ordered member list. The decoder's typed boundary will reject
-duplicate keys; the carrier itself does not add a malformed internal state.
+represent any ordered member list. Token decoding preserves repeated keys;
+duplicate-key rejection is deferred to a separate layer.
 
 **The structural size fold follows the carrier.** Array elements and object
 members are traversed without flattening or projection-based self-calls. The
