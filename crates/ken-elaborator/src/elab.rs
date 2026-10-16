@@ -1152,17 +1152,22 @@ fn elab_type_named_variable(
     span: &Span,
 ) -> Result<Term, ElabError> {
     if let Some((term, _)) = infer_virtual_pattern_alias(cx, index, name, span)? {
-        Ok(term)
-    } else {
-        cx.surface_var(index)
-            .map(|(_, actual_index)| Term::var(actual_index))
-            .ok_or_else(|| {
-                ElabError::Internal(format!(
-                    "type variable '{}' at {}-{} is out of range",
-                    name, span.start, span.end
-                ))
-            })
+        return Ok(term);
     }
+    let (position, actual_index) = cx.surface_var(index).ok_or_else(|| {
+        ElabError::Internal(format!(
+            "type variable '{}' at {}-{} is out of range",
+            name, span.start, span.end
+        ))
+    })?;
+    if let Some((raw_term, _, install_depth)) = cx.var_refinements.get(&position) {
+        let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+            ElabError::Internal("index-refined type variable escaped its branch context".into())
+        })? as i64;
+        let core = weaken(raw_term, growth);
+        return Ok(scoped_premise_binding(cx, &core)?.map_or(core, |(term, _)| term));
+    }
+    Ok(Term::var(actual_index))
 }
 
 fn elab_type_in_slot(
@@ -1384,6 +1389,9 @@ fn refine_let_rhs(
         for leaf in &frame.leaves {
             let scrutinee = weaken(&leaf.scrutinee, growth);
             let target = weaken(&leaf.target, growth);
+            if !let_leaf_dependency_closed(cx, [&*rhs_core, &*rhs_ty], &scrutinee)? {
+                continue;
+            }
             let candidate_ty = subst_term_generalize(rhs_ty, &scrutinee, &target);
             if candidate_ty != *rhs_ty {
                 *rhs_core = subst_term_generalize(rhs_core, &scrutinee, &target);
@@ -1392,6 +1400,46 @@ fn refine_let_rhs(
         }
     }
     Ok(())
+}
+
+/// A leaf may refine a fresh `let` only when nothing the substitution cannot
+/// rewrite depends on its scrutinee: no context variable the let mentions,
+/// other than the scrutinee, and no installed field transport it mentions,
+/// has a type that mentions the scrutinee. Rewriting the scrutinee alone
+/// would move the let off the coordinate its dependents are typed at.
+#[inline(never)]
+fn let_leaf_dependency_closed(
+    cx: &ElabCtx,
+    terms: [&Term; 2],
+    scrutinee: &Term,
+) -> Result<bool, ElabError> {
+    let marker = Term::var(1usize << 50);
+    let mentions = |hay: &Term, needle: &Term| subst_term_generalize(hay, needle, &marker) != *hay;
+    for index in 0..cx.ctx.len() {
+        let var = Term::var(index);
+        if var == *scrutinee || !terms.iter().any(|t| mentions(t, &var)) {
+            continue;
+        }
+        let Some(stored) = cx.ctx.lookup(index) else {
+            continue;
+        };
+        if mentions(&weaken(stored, index as i64 + 1), scrutinee) {
+            return Ok(false);
+        }
+    }
+    for (raw_term, raw_ty, install_depth) in cx.var_refinements.values() {
+        let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
+            ElabError::Internal("let refinement alias escaped its branch context".into())
+        })? as i64;
+        let alias = weaken(raw_term, growth);
+        if matches!(alias, Term::Var(_)) || !terms.iter().any(|t| mentions(t, &alias)) {
+            continue;
+        }
+        if mentions(&weaken(raw_ty, growth), scrutinee) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// Spec 22 §3: relate a let binder to its RHS for obligations inside the body.
