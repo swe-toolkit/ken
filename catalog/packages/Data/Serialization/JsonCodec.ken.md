@@ -31,7 +31,9 @@ uses them; the frame transitions and proof machinery follow the public laws.
 import Data.Serialization.Json
   (Json, JsonNull, JsonBool, JsonNumber, JsonString, JsonArray, JsonObject)
 
-import Data.Collections.Derived (list_append)
+import Data.Collections.Derived (list_append, length)
+
+import Core.Classes.LawfulClasses (leq_nat)
 
 import Core.Logic.Transport (cong, sym, trans)
 
@@ -133,7 +135,7 @@ pub theorem json_decode_encode
         (json_encode value)
         ((proof right_unit for list_append) JsonToken (json_encode value))))
     (encode_run
-      (Suc (token_count (json_encode value)))
+      (Suc (length JsonToken (json_encode value)))
       value
       (Nil JsonToken)
       (Nil JsonFrame)
@@ -146,7 +148,7 @@ pub theorem json_decode_trailing
         (json_decode (list_append JsonToken (json_encode value) (Cons JsonToken extra more)))
         (Err JsonError Json (TrailingToken extra)) =
   encode_run
-    (Suc (token_count (json_encode value)))
+    (Suc (length JsonToken (json_encode value)))
     value
     (Cons JsonToken extra more)
     (Nil JsonFrame)
@@ -277,15 +279,7 @@ fn json_resume (step : JsonStep) (rest : List JsonToken) : Result JsonError Json
     StepDone value ↦ json_finish rest value
   }
 
-fn within (n : Nat) (tokens : List JsonToken) : Bool =
-  match tokens {
-    Nil ↦ True;
-    Cons head rest ↦
-      match n {
-        Zero ↦ False;
-        Suc m ↦ within m rest
-      }
-  }
+fn within (n : Nat) (tokens : List JsonToken) : Bool = leq_nat (length JsonToken tokens) n
 
 theorem within_cons_append_left
       (m : Nat) (x : JsonToken) (y : JsonToken) (xs : List JsonToken) (ys : List JsonToken)
@@ -314,15 +308,9 @@ theorem within_drop_second
     Suc k ↦ λfits. within_tail k y rest fits
   }
 
-fn token_count (tokens : List JsonToken) : Nat =
-  match tokens {
-    Nil ↦ Zero;
-    Cons head rest ↦ Suc (token_count rest)
-  }
-
 theorem within_count
       (tokens : List JsonToken)
-    : Equal Bool (within (token_count tokens) tokens) True =
+    : Equal Bool (within (length JsonToken tokens) tokens) True =
   match tokens {
     Nil ↦ Proved;
     Cons head rest ↦ within_count rest
