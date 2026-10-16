@@ -74,7 +74,7 @@ fn carried_producer_match_reentry_admits_limit_and_refuses_first_excess() {
         if rejected {
             assert!(matches!(result,
                 Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    construct: "BoundaryCarrier", reason, .. })) if reason == "a carried producer match's pending eliminators exceeded the bounded re-entry depth"
+                    construct: "BoundaryCarrier", cause: LoweringCause::Capacity, reason, .. })) if reason == "a carried producer match's pending eliminators exceeded the bounded re-entry depth"
             ), "the first excess must refuse at the producer guard");
         } else {
             assert!(matches!(result,
@@ -143,7 +143,7 @@ fn carried_ordinary_suffix_reentry_admits_limit_and_refuses_first_excess() {
         if rejected {
             assert!(matches!(result,
                 Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
-                    construct: "BoundaryCarrier", reason, .. })) if reason.contains("a carried ordinary elimination's composed suffix exceeded")
+                    construct: "BoundaryCarrier", cause: LoweringCause::Capacity, reason, .. })) if reason.contains("a carried ordinary elimination's composed suffix exceeded")
             ), "the first excess must refuse at the ordinary guard");
         } else {
             assert!(matches!(result,

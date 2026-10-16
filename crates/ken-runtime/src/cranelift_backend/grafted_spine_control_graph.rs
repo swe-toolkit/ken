@@ -21,6 +21,10 @@ fn graph_error(reason: impl Into<String>) -> CraneliftBackendError {
     CraneliftBackendError::Backend(BackendFailure::Module { reason: reason.into(), cause: crate::cranelift_backend::surface::LoweringCause::PlannerInvariant })
 }
 
+fn graph_capacity_error(reason: impl Into<String>) -> CraneliftBackendError {
+    CraneliftBackendError::Backend(BackendFailure::Module { reason: reason.into(), cause: crate::cranelift_backend::surface::LoweringCause::Capacity })
+}
+
 /// The five sealed generated-unit families.
 ///
 /// There is intentionally no open or numeric variant. Adding a sixth family
@@ -429,7 +433,7 @@ impl GraftedSpineControlGraphBuilder {
         let mut allocate = |kind, nodes: &mut BTreeMap<_, _>| {
             let id = GraftedSpineLocalNodeId(next);
             next = next.checked_add(1).ok_or_else(|| {
-                graph_error("one generated function exhausted grafted-spine local node ids")
+                graph_capacity_error("one generated function exhausted grafted-spine local node ids")
             })?;
             nodes.insert(id, kind);
             Ok::<_, CraneliftBackendError>(id)
@@ -803,11 +807,11 @@ impl GraftedSpineControlGraph {
             changed = false;
             iterations = iterations
                 .checked_add(1)
-                .ok_or_else(|| graph_error("grafted-spine summary iteration count overflowed"))?;
+                .ok_or_else(|| graph_capacity_error("grafted-spine summary iteration count overflowed"))?;
             let bound = node_count
                 .checked_mul(terminal_count.saturating_add(1))
                 .and_then(|n| n.checked_add(1))
-                .ok_or_else(|| graph_error("grafted-spine summary bound overflowed"))?;
+                .ok_or_else(|| graph_capacity_error("grafted-spine summary bound overflowed"))?;
             if iterations > bound {
                 return Err(graph_error(
                     "grafted-spine well-nested summaries did not converge",

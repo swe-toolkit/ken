@@ -1511,7 +1511,7 @@ layer_origin={:?} layer_role={:?} next_top={:?}",
                                         Some(case_index),
                                     )?;
                                     if case.binders != args.len() {
-                                        return Err(unsupported(LoweringCause::Fragment,
+                                        return Err(unsupported(LoweringCause::PlannerInvariant,
                                             "Match",
                                             format!(
                                     "case {} expects {} binders but constructor has {} args",
@@ -1951,7 +1951,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                                 unreachable!("a selected source case has a constructor value")
                             };
                             if case.argument_binders != args.len() {
-                                return Err(unsupported(LoweringCause::Fragment,
+                                return Err(unsupported(LoweringCause::PlannerInvariant,
                                     "ComputationalMatch",
                                     format!(
                                         "case {} expects {} constructor arguments but value has {}",
@@ -3467,7 +3467,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
             for descriptor in &descriptors {
                 let (_, arity) = descriptor.borrowed.expect("admitted family");
                 if cases[descriptor.index].binders != arity {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
                         format!(
                             "{} borrowed arity mismatch",
@@ -4507,7 +4507,7 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                 boundary_environment,
             } => {
                 if params.len() != args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Call",
                         format!(
                             "closure expects {} args but call provides {}",
@@ -5424,7 +5424,7 @@ recursive_position={:?} returned[{}] still_installed_top={:?}",
                         ));
                     };
                     if params.len() != args.len() {
-                        return Err(unsupported(LoweringCause::Fragment,
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
                             "ComputationalMatch",
                             format!(
                                 "recursive field expects {} args but call provides {}",

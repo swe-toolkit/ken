@@ -2309,7 +2309,7 @@ pub(super) fn continuation_case_binder_run(
         .checked_add(argument_binders)
         .and_then(|partial| partial.checked_add(continuation_inputs))
         .ok_or_else(|| {
-            backend_module(LoweringCause::PlannerInvariant, format!(
+            backend_module(LoweringCause::Capacity, format!(
                 "this case's binder run would hold {} induction hypotheses + {argument_binders} \
                  constructor arguments + {continuation_inputs} continuation inputs, which \
                  overflows this platform's index width",

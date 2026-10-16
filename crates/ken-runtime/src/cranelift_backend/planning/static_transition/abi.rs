@@ -2421,7 +2421,7 @@ fn producers_of(
     depth: usize,
 ) -> Result<Vec<StaticOriginId>, CraneliftBackendError> {
     if depth > MAX_PRODUCER_DEPTH {
-        return Err(planner_error(
+        return Err(planner_capacity_error(
             "value-flow producer chain is deeper than the walk admits",
         ));
     }

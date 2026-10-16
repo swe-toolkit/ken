@@ -1737,6 +1737,7 @@ fn r3_fused_target_authority_validator_is_wired_to_both_real_selectors() {
             &error,
             Some(CraneliftBackendError::Unsupported(UnsupportedLowering {
                 construct,
+                cause: crate::cranelift_backend::surface::LoweringCause::PlannerInvariant,
                 reason, .. })) if *construct == "ComputationalMatch" && reason.contains(
                 "case ctor:fixture::D2gOut::Node expects 1 constructor arguments but value has 2"
             )

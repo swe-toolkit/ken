@@ -14,6 +14,112 @@ use crate::{
     RuntimeObservation, UnsupportedLowering,
 };
 
+/// Promise class: normative compatibility vector for the N0003 planner-
+/// invariant family. Hand-built inconsistent primitive calls bypass checked
+/// signature admission and reach each arity guard with zero arguments; valid
+/// primitive source fixtures below exercise the ordinary admitted path.
+#[test]
+fn malformed_primitive_arity_is_a_planner_invariant_at_each_guard() {
+    let seed =
+        NativeSeedEnvironment::empty(crate::boundary_resource_profile::starter_smoke_profile());
+    let mut lowering = super::super::tests::control::root_authority_test_lowering(&seed);
+    let mut function = Function::new();
+    let mut context = FunctionBuilderContext::new();
+    let mut builder = FunctionBuilder::new(&mut function, &mut context);
+    let entry = builder.create_block();
+    builder.switch_to_block(entry);
+    let option = RuntimePartiality::SafeOption {
+        none: "ctor:fixture::None".to_string(),
+        some: "ctor:fixture::Some".to_string(),
+        obligation: None,
+    };
+    let result = RuntimePartiality::SafeResult {
+        err: "ctor:fixture::Err".to_string(),
+        ok: "ctor:fixture::Ok".to_string(),
+        error: "ctor:fixture::InvalidUtf8".to_string(),
+    };
+    let wrong_arity = [
+        (
+            "uint8_to_int",
+            lowering
+                .lower_primitive_call(
+                    &mut builder,
+                    &RuntimePrimitive {
+                        symbol: "uint8_to_int".to_string(),
+                        partiality: RuntimePartiality::Total,
+                    },
+                    &[],
+                    StaticOriginId::for_test(0),
+                    &[],
+                )
+                .map(|_| ()),
+        ),
+        (
+            "list_char_to_string",
+            lowering
+                .lower_primitive_call(
+                    &mut builder,
+                    &RuntimePrimitive {
+                        symbol: "list_char_to_string".to_string(),
+                        partiality: RuntimePartiality::Total,
+                    },
+                    &[],
+                    StaticOriginId::for_test(0),
+                    &[],
+                )
+                .map(|_| ()),
+        ),
+        (
+            "not_bool",
+            lowering.lower_bool_not(&mut builder, vec![]).map(|_| ()),
+        ),
+        (
+            "bytes_length",
+            lowering
+                .lower_bytes_length(&mut builder, vec![])
+                .map(|_| ()),
+        ),
+        (
+            "bytes_slice",
+            lowering.lower_bytes_slice(vec![], &option).map(|_| ()),
+        ),
+        (
+            "bytes_encode",
+            lowering.lower_bytes_encode(vec![]).map(|_| ()),
+        ),
+        (
+            "bytes_decode",
+            lowering.lower_bytes_decode(vec![], &result).map(|_| ()),
+        ),
+        (
+            "byte_length",
+            lowering
+                .lower_string_byte_length(&mut builder, vec![])
+                .map(|_| ()),
+        ),
+        (
+            "char_length",
+            lowering
+                .lower_string_char_length(&mut builder, vec![])
+                .map(|_| ()),
+        ),
+    ];
+    for (symbol, returned) in wrong_arity {
+        let error = returned.expect_err("the checked signature rules out this arity");
+        assert_eq!(error.code().as_str(), "N0003", "{symbol}: {error:?}");
+        assert!(
+            matches!(
+                error,
+                CraneliftBackendError::Unsupported(UnsupportedLowering {
+                    cause: LoweringCause::PlannerInvariant,
+                    ..
+                })
+            ),
+            "{symbol}: the native carrier remains Unsupported"
+        );
+    }
+}
+
 #[test]
 fn ground_string_ingress_normalizes_before_boundary_observation() {
     // A returned String may be NFC-normalized by the boundary serializer,

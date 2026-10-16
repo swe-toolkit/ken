@@ -3382,7 +3382,7 @@ impl<'a> Lowering<'a> {
             })
             .collect::<Result<Vec<_>, _>>()?;
         if params.len() != call_env.len() {
-            return Err(unsupported(LoweringCause::Fragment,
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalMatch",
                 format!(
                     "recursive field expects {} args but call provides {}",
@@ -4720,7 +4720,7 @@ impl<'a> Lowering<'a> {
                         self.carried_suffix_reentries += 1;
                         if self.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
                             self.carried_suffix_reentries -= 1;
-                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                            return Err(unsupported(LoweringCause::Capacity,
                                 "BoundaryCarrier",
                                 "a carried ordinary elimination's composed suffix exceeded the                                  bounded re-entry depth; the continuation is refused rather than                                  recursing without a measured bound",
                             ));
@@ -4916,7 +4916,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.argument_binders != args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         format!(
                             "case {} expects {} constructor arguments but value has {}",
@@ -5460,7 +5460,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.binders != args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
                         format!(
                             "case {} expects {} binders but constructor has {} args",
@@ -6173,7 +6173,7 @@ impl<'a> Lowering<'a> {
                 ..
             }) => {
                 if params.len() != args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         format!(
                             "tree producer expects {} args but call provides {}",
@@ -6432,7 +6432,7 @@ impl<'a> Lowering<'a> {
                     ));
                 };
                 if params.len() != args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         format!(
                             "recursive field expects {} args but call provides {}",
@@ -6588,7 +6588,7 @@ impl<'a> Lowering<'a> {
                 self.carried_suffix_reentries += 1;
                 if self.carried_suffix_reentries > CARRIED_SUFFIX_REENTRY_LIMIT {
                     self.carried_suffix_reentries -= 1;
-                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                    return Err(unsupported(LoweringCause::Capacity,
                         "BoundaryCarrier",
                         "a carried producer match's pending eliminators exceeded the bounded re-entry depth",
                     ));
@@ -6788,7 +6788,7 @@ impl<'a> Lowering<'a> {
                 let (arm_origin, lowered) = match case {
                     Some((index, producer_case)) => {
                         if producer_case.binders != fields.len() {
-                            return Err(unsupported(LoweringCause::Fragment,
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "ComputationalMatch",
                                 "borrowed Option producer arity mismatch",
                             ));
@@ -6911,7 +6911,7 @@ impl<'a> Lowering<'a> {
         };
         self.disposition_statically_unselected_match_cases(static_origin, Some(case_index))?;
         if producer_case.binders != args.len() {
-            return Err(unsupported(LoweringCause::Fragment,
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "ComputationalMatch",
                 "tree-producing match constructor arity changed",
             ));
@@ -7253,7 +7253,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.argument_binders != args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         format!(
                             "case {} expects {} constructor arguments but value has {}",
@@ -7303,7 +7303,7 @@ impl<'a> Lowering<'a> {
                     Some(case_index),
                 )?;
                 if case.binders != args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
                         format!(
                             "case {} expects {} binders but constructor has {} args",
@@ -8227,7 +8227,7 @@ impl<'a> Lowering<'a> {
                     return Ok(Err(frame.default.clone()));
                 };
                 if case.argument_binders != constructor_args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ComputationalMatch",
                         format!(
                             "case {} expects {} constructor arguments but value has {}",
@@ -8373,7 +8373,7 @@ impl<'a> Lowering<'a> {
                     Err(trap) => return Ok(Err(trap)),
                 };
                 if case.binders != constructor_args.len() {
-                    return Err(unsupported(LoweringCause::Fragment,
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
                         "Match",
                         format!(
                             "case {} expects {} binders but constructor has {} args",
@@ -16288,7 +16288,7 @@ impl<'a> Lowering<'a> {
             Some(index),
         )?;
         if case.binders != args.len() {
-            return Err(unsupported(LoweringCause::Fragment,
+            return Err(unsupported(LoweringCause::PlannerInvariant,
                 "Match",
                 format!(
                     "case {} expects {} binders but constructor has {} args",
@@ -17240,7 +17240,7 @@ impl<'a> Lowering<'a> {
                     } = callee.expr
                     {
                         if params.len() != args.len() {
-                            return Err(unsupported(LoweringCause::Fragment,
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "Call",
                                 format!(
                                     "closure expects {} args but call provides {}",
@@ -17327,7 +17327,7 @@ impl<'a> Lowering<'a> {
                     } = callee.expr
                     {
                         if params.len() != args.len() {
-                            return Err(unsupported(LoweringCause::Fragment,
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "Call",
                                 format!(
                                     "closure expects {} args but call provides {}",
@@ -17464,7 +17464,7 @@ impl<'a> Lowering<'a> {
                             })
                             .collect::<Result<Vec<_>, _>>()?;
                         if params.len() != call_inputs.len() {
-                            return Err(unsupported(LoweringCause::Fragment,
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "Call",
                                 format!(
                                     "closure expects {} args but call provides {}",
@@ -17618,7 +17618,7 @@ impl<'a> Lowering<'a> {
                             })
                             .collect::<Result<Vec<_>, _>>()?;
                         if params.len() != call_inputs.len() {
-                            return Err(unsupported(LoweringCause::Fragment,
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
                                 "ComputationalMatch",
                                 format!(
                                     "recursive field expects {} args but call provides {}",

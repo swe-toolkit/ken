@@ -14,7 +14,7 @@ use super::occurrences::StaticOriginId;
 use super::continuations::{ContinuationSpecializationId, StaticContinuationFusionId};
 use super::responses::{StaticResponseContinuation, StaticResponseContinuationId};
 use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit, PredeclaredFunctionId};
-use super::{planner_error, CraneliftBackendError, StaticTransitionPlan};
+use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::RuntimeExpr;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -122,16 +122,16 @@ impl PendingVisRecordProtocol {
             return Ok(None);
         };
         let bytes = |words: u32| -> Result<u32, CraneliftBackendError> {
-            words.checked_mul(8).ok_or_else(|| planner_error("pending-Vis frame word count exhausted"))
+            words.checked_mul(8).ok_or_else(|| planner_capacity_error("pending-Vis frame word count exhausted"))
         };
         let captures = base_bytes.checked_add(bytes(1)?)
-            .ok_or_else(|| planner_error("pending-Vis discriminant offset exhausted"))?;
+            .ok_or_else(|| planner_capacity_error("pending-Vis discriminant offset exhausted"))?;
         let continuation_inputs = captures.checked_add(bytes(width.captures)?)
-            .ok_or_else(|| planner_error("pending-Vis capture offset exhausted"))?;
+            .ok_or_else(|| planner_capacity_error("pending-Vis capture offset exhausted"))?;
         let frame_bytes = continuation_inputs.checked_add(bytes(width.continuation_inputs)?)
-            .ok_or_else(|| planner_error("pending-Vis frame size exhausted"))?;
+            .ok_or_else(|| planner_capacity_error("pending-Vis frame size exhausted"))?;
         let addressable = |offset: u32| i32::try_from(offset)
-            .map_err(|_| planner_error("pending-Vis frame offset exceeds addressable range"));
+            .map_err(|_| planner_capacity_error("pending-Vis frame offset exceeds addressable range"));
         Ok(Some(PendingVisFrameRegion {
             discriminant: addressable(base_bytes)?,
             captures: addressable(captures)?,
@@ -232,13 +232,13 @@ impl StaticTransitionPlan<'_> {
                     return Err(planner_error("a relay entered a non-relay pending-Vis protocol"));
                 }
                 if row.id().ordinal() == u32::MAX {
-                    return Err(planner_error("pending-Vis discriminant exhausted"));
+                    return Err(planner_capacity_error("pending-Vis discriminant exhausted"));
                 }
                 width.captures = width.captures.max(u32::try_from(row.captures().len())
-                    .map_err(|_| planner_error("pending-Vis capture run exhausted"))?);
+                    .map_err(|_| planner_capacity_error("pending-Vis capture run exhausted"))?);
                 width.continuation_inputs = width.continuation_inputs.max(
                     u32::try_from(row.continuation_inputs().len())
-                        .map_err(|_| planner_error("pending-Vis continuation input run exhausted"))?
+                        .map_err(|_| planner_capacity_error("pending-Vis continuation input run exhausted"))?
                 );
                 if let Some(previous) = members.insert(member.origin, row.clone()) {
                     if previous.id() != row.id() {
@@ -533,6 +533,49 @@ mod tests {
     };
     use crate::{NativeProcessSymbols, RuntimeValue};
     use std::collections::BTreeMap;
+
+    /// Promise class: normative compatibility vector for the N0002 capacity
+    /// family, with a durable guard-boundary fixture for each of the five
+    /// reachable frame-region checks. Every frame is present, so no missing-
+    /// frame success can make an error assertion vacuous. The discriminant
+    /// and frame offsets grow independently of the word counts.
+    #[test]
+    fn pending_vis_frame_region_reports_capacity_at_each_width_guard() {
+        let frame = PendingVisFrameOwner::Unit(PredeclaredFunctionId::for_test(0));
+        let region = |base_bytes, captures, continuation_inputs| {
+            let protocol = PendingVisRecordProtocol {
+                owners: BTreeMap::new(),
+                members: BTreeMap::new(),
+                frames: BTreeMap::from([(
+                    frame,
+                    PendingVisFrameWidth {
+                        captures,
+                        continuation_inputs,
+                    },
+                )]),
+            };
+            protocol.frame_region(frame, base_bytes)
+        };
+        for (guard, base_bytes, captures, continuation_inputs) in [
+            ("frame word count", 0, u32::MAX, 0),
+            ("discriminant offset", u32::MAX, 0, 0),
+            ("capture offset", u32::MAX - 15, 2, 0),
+            ("frame size", 0, 1, u32::MAX / 8),
+            ("addressable offset", (i32::MAX as u32) + 1, 0, 0),
+        ] {
+            let error = region(base_bytes, captures, continuation_inputs)
+                .expect_err("the planned width exceeds its integer representation");
+            assert_eq!(error.code().as_str(), "N0002", "{guard}: {error:?}");
+            assert!(
+                matches!(error, CraneliftBackendError::Unsupported(_)),
+                "{guard}: capacity remains an Unsupported carrier"
+            );
+        }
+        assert!(region(0, 0, 0).expect("the empty tail fits").is_some());
+        assert!(region((i32::MAX as u32) - 8, 0, 0)
+            .expect("the final addressable offset fits")
+            .is_some());
+    }
 
     /// Promise class: durable invariant. The outer result is a generated
     /// call, not a Vis site. Its callee's returned construct is the only Vis

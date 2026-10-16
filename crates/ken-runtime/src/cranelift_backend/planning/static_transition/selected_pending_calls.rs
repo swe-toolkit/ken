@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_error, unsupported,
+    occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_capacity_error, planner_error, unsupported,
     CheckedCaseBinderLayout, CheckedCaseBinderRole, ContinuationEmissionOwner,
     CraneliftBackendError, PredeclaredFunctionId,
     ResolvedContinuationCallee, ResponseDisposition, RuntimeExpr, StaticOriginId,
@@ -828,8 +828,8 @@ fn pending_free_indices(
 ) -> Result<(), CraneliftBackendError> {
     let visit = |expr, depth, free: &mut BTreeSet<u32>| pending_free_indices(expr, depth, free);
     let increase = |depth: u32, by: usize| -> Result<u32, CraneliftBackendError> {
-        depth.checked_add(u32::try_from(by).map_err(|_| planner_error("pending binder count exceeds u32"))?)
-            .ok_or_else(|| planner_error("pending binder depth exceeds u32"))
+        depth.checked_add(u32::try_from(by).map_err(|_| planner_capacity_error("pending binder count exceeds u32"))?)
+            .ok_or_else(|| planner_capacity_error("pending binder depth exceeds u32"))
     };
     match expr {
         RuntimeExpr::CheckedJoinSite { body, .. }
@@ -867,7 +867,7 @@ fn pending_free_indices(
             visit(scrutinee, depth, free)?;
             for case in cases {
                 let binders = case.argument_binders.checked_add(case.recursive_positions.len())
-                    .ok_or_else(|| planner_error("pending computational binder count overflow"))?;
+                    .ok_or_else(|| planner_capacity_error("pending computational binder count overflow"))?;
                 visit(&case.body, increase(depth, binders)?, free)?;
             }
         }
