@@ -147,6 +147,8 @@ pub use responses::{
     MixedRelayRefusalObservation,
     with_pending_checked_ret_sink_applications, StaticResponseContextDemandMutation,
 };
+#[cfg(feature = "px8-ds-test-support")]
+pub use returned_vis::with_forced_underived_owner;
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
 };
