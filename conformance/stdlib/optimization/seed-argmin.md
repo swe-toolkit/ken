@@ -30,8 +30,7 @@ import Data.Collections.Derived
   (list_elem, list_elem_head, list_elem_later)
 
 import Data.Collections.NonEmpty
-  (NonEmpty, nonempty_cons, nonempty_singleton, nonempty_to_list,
-   nonempty_to_list_shape)
+  (NonEmpty, nonempty_cons, nonempty_singleton, nonempty_to_list)
 
 import Data.Numeric.Nat.Order (lt_nat)
 
@@ -39,7 +38,7 @@ const one : Nat = Suc Zero
 const two : Nat = Suc one
 const three : Nat = Suc two
 const five : Nat = Suc (Suc (Suc (Suc (Suc Zero))))
-const nine : Nat = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))
+const nine : Nat = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))
 
 fn seed_cost (n : Nat) : Nat =
   match n {
@@ -78,15 +77,10 @@ theorem seed_tie_earliest
 
 theorem tie_two_member
     : list_elem Nat two (nonempty_to_list Nat tie_input) =
-  J
-    (λl _. list_elem Nat two l
-      → list_elem Nat two (nonempty_to_list Nat tie_input))
-    (λmember. member)
-    (nonempty_to_list_shape Nat tie_input)
-    (list_elem_later Nat two three
-      (Cons Nat two (Cons Nat Zero (Cons Nat one (Nil Nat))))
-      (list_elem_head Nat two
-        (Cons Nat Zero (Cons Nat one (Nil Nat)))))
+  list_elem_later Nat two three
+    (Cons Nat two (Cons Nat Zero (Cons Nat one (Nil Nat))))
+    (list_elem_head Nat two
+      (Cons Nat Zero (Cons Nat one (Nil Nat))))
 
 theorem seed_law_member
     : list_elem Nat
@@ -127,14 +121,14 @@ theorem seed_law_keeps_head
         (argmin Nat seed_cost
           (nonempty_cons Nat one (Cons Nat three (Nil Nat))))
         one =
-  argmin_keeps_head Nat seed_cost one three (Nil Nat) Refl
+  argmin_keeps_head Nat seed_cost one three (Nil Nat) Proved
 
 theorem seed_law_takes_tail
     : Equal Nat
         (argmin Nat seed_cost
           (nonempty_cons Nat three (Cons Nat one (Nil Nat))))
         (argmin Nat seed_cost (nonempty_cons Nat one (Nil Nat))) =
-  argmin_takes_tail Nat seed_cost three one (Nil Nat) Refl
+  argmin_takes_tail Nat seed_cost three one (Nil Nat) Proved
 ```
 
 The `argmin_least` and `argmin_no_cheaper` instances use candidate `2`,
