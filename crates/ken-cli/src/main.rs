@@ -23,14 +23,17 @@ fn main() {
     // hollow out the census.
     //
     // Keep the census scope on the same thread as dispatch: its rows are
-    // thread-local. Every elaborating subcommand owns its whole CLI path on
-    // the stated stack, including the kernel re-check. A future subprocess
-    // boundary can enclose the same invocation without changing elaboration.
-    // Non-elaborating subcommands retain their original thread.
-    let needs_elaboration_stack = std::env::args_os().nth(1).is_some_and(|arg| {
-        matches!(arg.to_str(), Some("check" | "run" | "native-build" | "repl"))
+    // thread-local. Every Ken-source-parsing subcommand owns its whole CLI
+    // path on the stated stack; check/run/native-build also kernel re-check.
+    // A future subprocess boundary can enclose the same invocation without
+    // changing the parsing path. Version/help retain their original thread.
+    let needs_source_parser_stack = std::env::args_os().nth(1).is_some_and(|arg| {
+        matches!(
+            arg.to_str(),
+            Some("check" | "run" | "native-build" | "repl" | "fmt")
+        )
     });
-    let exit_code = if needs_elaboration_stack {
+    let exit_code = if needs_source_parser_stack {
         let worker = std::thread::Builder::new()
             .name("ken-elaboration".into())
             .stack_size(CLI_ELABORATION_STACK_BYTES)
