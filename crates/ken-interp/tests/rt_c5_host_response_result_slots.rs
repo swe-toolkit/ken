@@ -413,45 +413,39 @@ fn acquired_file(f: &mut Fixture, host: &mut CaptureHost) -> EvalVal {
     let tree = f.acquire_file_with(cap, b"conformance/fs/fixtures/three-lines.txt");
     let ty = f.ty("Result FileError (Resource ResourceKind.FsHandle)");
     let response = f.capture_first(tree, &ty, host);
-    // ResourceToken identity is deliberately outside eq_type_eq's structural
-    // cases: the C5 slot claim is checked here; no cast reduction is claimed
-    // for an opaque token payload. The Err row tests the full cast below.
-    resource_token(
-        f,
-        &response,
-        "FileError",
-        "(Resource ResourceKind.FsHandle)",
-    )
+    // ResourceToken identity is outside eq_type_eq's comparable ground cases.
+    // Only extract this prerequisite; success slots have separate controls.
+    resource_token(&response, &f.ids)
 }
 
 fn acquired_buffer(f: &mut Fixture, host: &mut CaptureHost) -> EvalVal {
     let tree = f.acquire_buffer_tree(8);
     let ty = f.ty("Result ResourceError (Resource ResourceKind.Buffer)");
     let response = f.capture_first(tree, &ty, host);
-    resource_token(
-        f,
-        &response,
-        "ResourceError",
-        "(Resource ResourceKind.Buffer)",
-    )
+    resource_token(&response, &f.ids)
 }
 
-fn resource_token(f: &mut Fixture, result: &EvalVal, e: &str, a: &str) -> EvalVal {
+fn resource_token(result: &EvalVal, ids: &ConsoleIds) -> EvalVal {
     match result {
-        EvalVal::Ctor { id, args, .. } if *id == f.ids.ok_id => {
-            assert_eq!(args[0], f.eval_expr(e), "successful resource error slot");
-            assert_eq!(
-                args[1],
-                f.eval_expr(a),
-                "successful resource payload type slot"
-            );
-            match &args[2] {
-                token @ EvalVal::ResourceToken(_) => token.clone(),
-                other => panic!("acquire did not yield a resource token: {other:?}"),
-            }
-        }
+        EvalVal::Ctor { id, args, .. } if *id == ids.ok_id => match &args[2] {
+            token @ EvalVal::ResourceToken(_) => token.clone(),
+            other => panic!("acquire did not yield a resource token: {other:?}"),
+        },
         other => panic!("acquire did not succeed: {other:?}"),
     }
+}
+
+fn assert_resource_success_slots(f: &mut Fixture, result: &EvalVal, e: &str, a: &str) {
+    resource_token(result, &f.ids);
+    let EvalVal::Ctor { args, .. } = result else {
+        unreachable!()
+    };
+    assert_eq!(args[0], f.eval_expr(e), "successful resource error slot");
+    assert_eq!(
+        args[1],
+        f.eval_expr(a),
+        "successful resource payload type slot"
+    );
 }
 
 #[test]
@@ -590,13 +584,45 @@ fn fs_resource_error_resource_mapping() {
 }
 
 #[test]
+fn fs_successful_file_token_has_checked_slots() {
+    let mut f = Fixture::new();
+    let mut host = host();
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let cap = EvalVal::Cap(PosixHost::new_at(root).mint_fs_cap(AUTH_FULL));
+    let tree = f.acquire_file_with(cap, b"conformance/fs/fixtures/three-lines.txt");
+    let ty = f.ty("Result FileError (Resource ResourceKind.FsHandle)");
+    let response = f.capture_first(tree, &ty, &mut host);
+    assert_resource_success_slots(
+        &mut f,
+        &response,
+        "FileError",
+        "(Resource ResourceKind.FsHandle)",
+    );
+}
+
+#[test]
+fn fs_successful_buffer_token_has_checked_slots() {
+    let mut f = Fixture::new();
+    let mut host = host();
+    let tree = f.acquire_buffer_tree(8);
+    let ty = f.ty("Result ResourceError (Resource ResourceKind.Buffer)");
+    let response = f.capture_first(tree, &ty, &mut host);
+    assert_resource_success_slots(
+        &mut f,
+        &response,
+        "ResourceError",
+        "(Resource ResourceKind.Buffer)",
+    );
+}
+
+#[test]
 fn fs_successful_mapping_token_has_checked_slots() {
     let mut f = Fixture::new();
     let mut host = host();
     let tree = f.acquire_mapping_tree(8);
     let ty = f.ty("Result ResourceError (Resource ResourceKind.Mapping)");
     let response = f.capture_first(tree, &ty, &mut host);
-    resource_token(
+    assert_resource_success_slots(
         &mut f,
         &response,
         "ResourceError",
