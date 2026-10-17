@@ -1,7 +1,7 @@
 ---
 id: RT-NESTED-RELAY-PERFORMING-ROUTE
 title: "After RT-NESTED-RELAY-VIS-NATIVE-SETTLEMENT a forwarded host op with no performing route stops native at a planned relay trap where the interpreter performs it (FsReadAt), so native refuses a valid program the interpreter runs. Emit an outer member that performs the forwarded op and retire the traps (route C)"
-status: active
+status: merged
 owner: runtime
 size: L
 tier: T1
