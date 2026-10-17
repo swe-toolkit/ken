@@ -21,31 +21,32 @@ A closed, well-typed, ground cast `cast A A refl a` evaluates to `a` when
 
 ## Settled inputs (Architect `evt_7nf6ds3er67t1`, read at `ba9cdda70`)
 
-- **The gap.** `eq_type_eq` in `crates/ken-interp/src/eval.rs` has no
-  `Pair` arm and cannot compare closures. So a closed, checked, reflexive
-  cast over `F (p : Σ ...)` or `F (f : Nat → Nat)` falls to `_ => false`,
-  and `cast_reduce` returns `Unknown`. This is the same §3.6 violation QA
-  found for String indices under `RT-C5-PRIMITIVE-TYPE-ARGUMENTS`.
+- **The gap.** `eq_type_eq` in `crates/ken-interp/src/eval.rs` cannot
+  compare closures. So a closed, checked, reflexive cast over
+  `F (f : Nat → Nat)` falls to `_ => false`, and `cast_reduce` returns
+  `Unknown`. A `Pair` arm has landed (eval.rs:1475-1482 at `1a84b2378`),
+  so a Σ index with comparable components already reduces. A Σ index with a
+  function component fails through it as the function case (AC-0,
+  `evt_5wt6v7dyzxehf`).
 - **No value-comparison arm can close the function case.** Spec 42 §1:
   "runtime closures are not compared by representation or identity".
 - **The Architect's candidate is a proof-directed C5 rule**: a canonical
   `refl` proof licenses the cast. Whether that is sound for proof values
   under Ω proof irrelevance is an open question. It is not ruled.
-- A `Pair` arm would compare components structurally, so it may not need
-  the proof-directed rule. AC-0 settles which shapes need which mechanism.
 
 ## Deliverable
 
-`cast_reduce` returns `a` for every closed, checked, reflexive cast over a
-Σ-indexed or function-indexed family. The rule for that is argued sound at
-D0 and ruled by the Architect. An open index still fails closed.
+`cast_reduce` returns `a` for every closed, checked, reflexive cast whose
+index carries a function value, bare, under `Pair` or in the All-support
+witness's predicate slot. The rule for that is argued sound at D0 and ruled
+by the Architect. An open index still fails closed.
 
 ## Acceptance
 
 - **AC-0 (probe, then D0; no build).**
-  - Write both counterexamples as closed, kernel-checked, reflexive casts
-    at the landed base, one Σ-indexed and one function-indexed, and show
-    each evaluates to `Unknown` (Check 4).
+  - Done at `1a84b2378` (Steward correction `evt_5z1qfsy58wva6`; probe
+    `evt_5wt6v7dyzxehf`): a Σ positive control reduces to `a`; a
+    function-indexed and a Σ-with-function cast evaluate to `Unknown`.
   - Include the generated All-support witness (`lift_recursive_value`,
     eval.rs ~:909/:941). Its predicate slot carries the eliminator's motive,
     a function value, and RT-C5-PRODUCER-TYPE-SLOTS left it unfilled
@@ -56,7 +57,8 @@ D0 and ruled by the Architect. An open index still fails closed.
     Ω proof irrelevance.
   - The Architect rules before any build. Research may be called on the
     proof-directed rule.
-- **AC-1.** Both counterexamples evaluate to `a`. For each new arm or rule,
+- **AC-1.** Both function-bearing counterexamples evaluate to `a`, and the
+  Σ positive control stays `a`. For each new arm or rule,
   a differing-index negative stays `Unknown`.
 - **AC-2 (controls).** Removing each new arm or rule returns its positive to
   `Unknown`. `neutral_inductive_type_app_index_does_not_cast` stays green
