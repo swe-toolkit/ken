@@ -5,8 +5,10 @@
 > half-open windows and left-biased merging, with three generically
 > checked Architect D0 laws. Section 2 adds two generically checked D0
 > window-membership laws and two checked generic list-filter prerequisites.
-> D0 scratch evidence does not establish delivery of the §2 EventTrace
-> laws, a §2 conformance seed, CI, or a measured trusted-base delta.
+> This WP authors the §2 conformance seed; its execution against the
+> shipped catalog awaits implementation of §2's EventTrace laws. D0
+> scratch execution is not shipped seed execution, CI, or a measured
+> landed trusted-base delta.
 
 ## 1. Finite event traces over natural times
 

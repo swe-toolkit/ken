@@ -360,8 +360,10 @@ merge ordering and arbitrary-classifier merge count; its catalog module
 and seed are present on the base. §2 adds two D0-checked generic
 window-membership laws using Ω-valued `list_elem`, supported by two
 checked generic filter theorems in `Data.Collections.Derived` on this
-candidate. D0 scratch execution does not establish delivery of §2's
-EventTrace laws, seed, CI or a landed trust delta. Clock effects, wall-
+candidate. This WP authors the §2 seed, whose execution against the
+shipped catalog awaits §2 EventTrace-law implementation. D0 scratch
+execution does not establish shipped seed execution, CI or a landed
+trust delta. Clock effects, wall-
 clock time, vector clocks, infinite streams and window/merge relational
 laws remain deferred.
 
