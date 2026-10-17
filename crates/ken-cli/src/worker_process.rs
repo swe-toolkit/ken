@@ -44,7 +44,15 @@ pub(crate) fn role() -> Role {
     let [fault, pid, fault_dev, fault_ino, lifeline, life_dev, life_ino] = fields[..] else {
         return Role::Parent;
     };
-    let (Ok(fault), Ok(pid), Ok(fault_dev), Ok(fault_ino), Ok(lifeline), Ok(life_dev), Ok(life_ino)) = (
+    let (
+        Ok(fault),
+        Ok(pid),
+        Ok(fault_dev),
+        Ok(fault_ino),
+        Ok(lifeline),
+        Ok(life_dev),
+        Ok(life_ino),
+    ) = (
         fault.parse::<RawFd>(),
         pid.parse::<libc::pid_t>(),
         fault_dev.parse::<u64>(),
@@ -52,7 +60,8 @@ pub(crate) fn role() -> Role {
         lifeline.parse::<RawFd>(),
         life_dev.parse::<u64>(),
         life_ino.parse::<u64>(),
-    ) else {
+    )
+    else {
         return Role::Parent;
     };
     // Holding both named pipes is the child evidence; no descendant inherits

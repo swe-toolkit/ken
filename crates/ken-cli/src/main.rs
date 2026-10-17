@@ -52,7 +52,9 @@ fn main() {
     #[cfg(unix)]
     if needs_source_parser_stack {
         match worker_process::role() {
-            worker_process::Role::Child(fd) => worker_process::enter_child(fd),
+            worker_process::Role::Child { fault, lifeline } => {
+                worker_process::enter_child(fault, lifeline)
+            }
             worker_process::Role::Parent => {
                 let exit_code = worker_process::run_parent();
                 if exit_code != 0 {
