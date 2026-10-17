@@ -1,0 +1,59 @@
+program capabilities FS AFull
+fn leaf_body (_resource : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) =
+  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn lk_leaf (_u : Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
+  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+
+fn lk_ret (br : ResourceBodyResult Unit Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
+  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) br
+
+fn body_result
+  (outcome : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull (ResourceBodyResult Unit Unit) =
+  match outcome {
+    Ok (ResourceBracketOk unit) |->
+      Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit);
+    Ok bracket |->
+      Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit);
+    Err error |->
+      Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyErr Unit Unit MkUnit)
+  }
+
+fn after_root
+  (outcome : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode =
+  match outcome {
+    Ok (ResourceBracketOk unit) |-> host_exit AFull Success;
+    Ok _ |-> host_exit AFull (Failure 82);
+    Err error |-> host_exit AFull (Failure 84)
+  }
+
+proc lk_release (tag : String) (br : ResourceBodyResult Unit Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [Console] =
+  bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) Unit (ResourceBodyResult Unit Unit)
+    (host_console AFull Unit (print_line tag))
+    (\_u. lk_ret br)
+
+proc lk_after_open (tag : String)
+  (body : Unit -> HostIO AFull (ResourceBodyResult Unit Unit)) (u : Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [Console] =
+  bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyResult Unit Unit)
+    (body u) (\br. lk_release tag br)
+
+proc lk_bracket (open_tag : String) (close_tag : String)
+  (body : Unit -> HostIO AFull (ResourceBodyResult Unit Unit))
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [Console] =
+  bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) Unit (ResourceBodyResult Unit Unit)
+    (host_console AFull Unit (print_line open_tag))
+    (\u. lk_after_open close_tag body u)
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS, Console] =
+  match caps {
+    MkProgramCaps cap |-> bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+        (withResource AFull Unit Unit cap (bytes_encode "held-0.bin") ResourceMetadata
+          (\resource. bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyResult Unit Unit) (lk_bracket "o1" "c1" lk_leaf) (\br. lk_ret br)))
+        (\outcome. after_root outcome)
+  }

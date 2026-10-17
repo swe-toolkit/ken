@@ -1,0 +1,6 @@
+program capabilities FS AFull
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [Console] =
+  bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) Unit ExitCode (host_console AFull Unit (print_line "x"))
+    (\_u. bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) Unit ExitCode (host_console AFull Unit (print_line "y"))
+      (\_v. host_exit AFull Success))
