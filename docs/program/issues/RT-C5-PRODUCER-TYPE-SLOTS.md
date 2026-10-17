@@ -1,7 +1,7 @@
 ---
 id: RT-C5-PRODUCER-TYPE-SLOTS
 title: "C5 regularity for values built by the interpreter's own producers: a closed, checked, reflexive cast whose index is a list produced by string_to_list_char, bytes_to_list, a directory listing or a bytes slice evaluates to its value instead of Unknown, because those producers fill the constructor type-parameter slot with the same comparable value source-built lists carry"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: architect
