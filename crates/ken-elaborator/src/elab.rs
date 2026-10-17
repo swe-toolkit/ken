@@ -6026,6 +6026,59 @@ fn premise_proof_in_scope(cx: &ElabCtx<'_>, goal: &Term) -> Option<Term> {
     })
 }
 
+fn collect_level_vars(term: &Term, out: &mut Vec<u32>) {
+    fn level(l: &Level, out: &mut Vec<u32>) {
+        match l {
+            Level::Zero => {}
+            Level::Suc(inner) => level(inner, out),
+            Level::Max(a, b) => {
+                level(a, out);
+                level(b, out);
+            }
+            Level::Var(LevelVar(m)) => out.push(*m),
+        }
+    }
+    match term {
+        Term::Type(l) | Term::Omega(l) => level(l, out),
+        Term::Const { level_args, .. }
+        | Term::IndFormer { level_args, .. }
+        | Term::Constructor { level_args, .. }
+        | Term::Elim { level_args, .. } => {
+            for l in level_args {
+                level(l, out);
+            }
+        }
+        _ => {}
+    }
+    for child in term.children() {
+        collect_level_vars(child, out);
+    }
+}
+
+/// Substitute only solved level metas at an obligation mint. Final declaration
+/// zonking remains the only place that defaults unconstrained metas to Zero.
+fn zonk_obligation_levels(cx: &ElabCtx<'_>, term: &Term) -> Term {
+    cx.metas.zonk_term_with(term, false)
+}
+
+/// Close a hole over its declaration's still-unsolved level metas in id order.
+/// A level variable with another origin cannot be a parameter of this hole.
+fn obligation_level_params(cx: &ElabCtx<'_>, closed: &Term) -> Result<Vec<LevelVar>, ElabError> {
+    let mut vars = Vec::new();
+    collect_level_vars(closed, &mut vars);
+    vars.sort_unstable();
+    vars.dedup();
+    if let Some(m) = vars
+        .iter()
+        .find(|m| !matches!(cx.metas.metas.get(**m as usize), Some(None)))
+    {
+        return Err(ElabError::Internal(format!(
+            "obligation goal mentions level variable {m}, not an unsolved metavariable of its declaration"
+        )));
+    }
+    Ok(vars.into_iter().map(LevelVar).collect())
+}
+
 /// The single mint point for obligation holes recorded in an `ElabCtx`'s
 /// `cx.obligations`: `requires` premises, partial-primitive side conditions
 /// (`+` overflow, `/` and `%` nonzero), refinement introductions, and
@@ -6048,7 +6101,7 @@ fn declare_obligation_hole(
     closed: Term,
     span: &Span,
     kind: ObligationKind,
-) -> Result<GlobalId, ElabError> {
+) -> Result<(GlobalId, Vec<Level>), ElabError> {
     if cx.premise_holes == PremiseHoles::Refused {
         return Err(match kind {
             ObligationKind::Requires => {
@@ -6064,7 +6117,10 @@ fn declare_obligation_hole(
             }
         });
     }
-    let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), vec![], closed.clone())
+    let closed = zonk_obligation_levels(cx, &closed);
+    let level_params = obligation_level_params(cx, &closed)?;
+    let level_args = level_params.iter().copied().map(Level::Var).collect();
+    let hole_id = declare_postulate(cx.env, cx.owner_label.clone(), level_params, closed.clone())
         .map_err(|error| ElabError::KernelRejected {
             error,
             span: span.clone(),
@@ -6077,15 +6133,16 @@ fn declare_obligation_hole(
         kind,
     });
     cx.obl_counter += 1;
-    Ok(hole_id)
+    Ok((hole_id, level_args))
 }
 
 fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
     let closed = close_goal(&cx.ctx, &[], goal);
-    let hole_id = declare_obligation_hole(cx, closed, span, ObligationKind::Requires)?;
+    let (hole_id, level_args) =
+        declare_obligation_hole(cx, closed, span, ObligationKind::Requires)?;
     Ok((0..cx.ctx.len())
         .rev()
-        .fold(Term::const_(hole_id, vec![]), |proof, index| {
+        .fold(Term::const_(hole_id, level_args), |proof, index| {
             Term::app(proof, Term::var(index))
         }))
 }
@@ -13462,13 +13519,14 @@ fn emit_refinement_predicate_with(
 ) -> Result<(), ElabError> {
     let conditions = admissible_path_conditions(cx);
     let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, None);
+    let closed = zonk_obligation_levels(cx, &closed);
     let proof = (0..hypotheses.len() + conditions.len())
         .map(Term::var)
         .chain(std::iter::once(Term::const_(cx.env.tt_id(), vec![])))
         .find_map(|candidate| {
             let (_, certificate) =
                 close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, Some(candidate));
-            let certificate = certificate?;
+            let certificate = zonk_obligation_levels(cx, &certificate?);
             kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
                 .ok().map(|_| certificate)
         });
@@ -13477,7 +13535,7 @@ fn emit_refinement_predicate_with(
         // channel records nothing, so the environment is left unchanged.
         return Ok(());
     }
-    let hole_id = declare_obligation_hole(cx, closed, span, kind)?;
+    let (hole_id, _) = declare_obligation_hole(cx, closed, span, kind)?;
     if let Some(proof) = proof {
         ken_kernel::check::admit_bodies(cx.env, &[(hole_id, proof)])
             .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
@@ -18665,9 +18723,10 @@ pub(crate) fn elaborate_space_decl(
                 debug_assert_eq!(cx.ctx.len() - 1, result_position);
                 cx.ctx.pop();
 
-                let closed = close_goal(&cx.ctx, &[], goal);
+                let closed = zonk_obligation_levels(&cx, &close_goal(&cx.ctx, &[], goal));
+                let level_params = obligation_level_params(&cx, &closed)?;
                 let hole_id =
-                    declare_postulate(cx.env, qualified_name.clone(), vec![], closed.clone())
+                    declare_postulate(cx.env, qualified_name.clone(), level_params, closed.clone())
                         .map_err(|error| ElabError::KernelRejected {
                             error,
                             span: ensures.span().clone(),

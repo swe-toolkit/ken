@@ -573,20 +573,32 @@ fn local_head_data_field_refuses_false_and_accepts_plain() {
 }
 
 #[test]
-fn unannotated_higher_order_head_is_fail_closed_without_changing_plain_type() {
-    // F-F: a separate, baseline universe-level hole-closure gap. This test
-    // pins fail-closed handling, not a claimed successful introduction.
+fn unannotated_higher_order_head_closes_its_one_refinement_goal() {
+    // MEASURED: the checked hole quantifies the unsolved head level and the
+    // typed binder. CLAIMED: one refinement introduction is reported without
+    // losing its predicate. THE GAP: a later solve must also reach uses of
+    // that hole, pinned by LANG-OBLIGATION-HOLE-LEVEL-META-CLOSURE's AC-2.
     let mut refined = ElabEnv::new().expect("prelude");
     refined
         .elaborate_decl("def Five = {v : Int | Equal Int v 5}")
         .expect("alias");
-    let error = refined
+    let result = refined
         .elaborate_decl_v1("fn h (f : Five → Type) (n : Int) (x : f n) : Int = 0")
-        .expect_err("an unzonked universe in an obligation must not erase it");
-    assert!(
-        matches!(error, ElabError::KernelRejected { .. }),
-        "F-F remains a separate fail-closed kernel rejection: {error:?}"
+        .expect("the unannotated head's level belongs to the hole");
+    assert_eq!(result.obligations.len(), 1);
+    let hole = &result.obligations[0];
+    assert!(refined.is_open_hole(hole.hole_id));
+    let params = refined
+        .env
+        .lookup(hole.hole_id)
+        .expect("declared hole")
+        .level_params();
+    assert_eq!(params.len(), 1, "one unannotated head level");
+    let head = Term::pi(
+        Term::const_(refined.globals["Five"], vec![]),
+        Term::ty(ken_kernel::Level::Var(params[0])),
     );
+    assert_closed_local_head_goal(&refined, &result, head);
 
     let mut plain = ElabEnv::new().expect("prelude");
     plain
