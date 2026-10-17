@@ -7,6 +7,9 @@ use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::process::{Command, Output};
 
+#[cfg(unix)]
+const FAULT_MARKER: &str = "KEN_CLI_WORKER_CHILD_FAULT_FD";
+
 fn r1_program(depth: usize, with_main: bool) -> String {
     let n = (0..depth).fold(String::from("Zero"), |n, _| format!("Suc ({n})"));
     let left = format!(
@@ -46,6 +49,8 @@ fn ken_child_command() -> Command {
     #[cfg(not(unix))]
     let mut ken = Command::new(env!("CARGO_BIN_EXE_ken"));
     ken.env_remove("RUST_MIN_STACK");
+    #[cfg(unix)]
+    ken.env_remove(FAULT_MARKER);
     ken
 }
 
@@ -204,6 +209,7 @@ fn worker_spawn_failure_is_coded() {
             .arg(command)
             .arg(&path)
             .env_remove("RUST_MIN_STACK")
+            .env_remove(FAULT_MARKER)
             .output()
             .expect("spawn limited Ken CLI")
     };
@@ -584,4 +590,92 @@ fn external_abort_does_not_claim_worker_stack_overflow() {
 fn external_kill_propagates_signal() {
     let output = externally_signal_worker("KILL");
     assert_eq!(output.status.signal(), Some(9), "{output:?}");
+}
+
+/// MEASURED: a caller-set invalid marker cannot turn a million-deep check
+/// into the old uncoded rc134 abort; it returns one final C0023, no stdout.
+/// CLAIMED: the child role is not inferred from mere marker presence.
+/// THE GAP: valid-but-foreign and parent-claimed markers need separate rows.
+#[cfg(unix)]
+#[test]
+fn invalid_inherited_worker_marker_still_reports_overflow() {
+    let (_dir, path) = million_nested_nat();
+    let output = ken_child_command()
+        .arg("check")
+        .arg(&path)
+        .env(FAULT_MARKER, "invalid")
+        .output()
+        .expect("check with inherited invalid marker");
+    assert_c0023(&output, "N=1M check, invalid inherited marker");
+    assert!(
+        output.stdout.is_empty(),
+        "invalid marker must not leak stdout"
+    );
+}
+
+/// MEASURED: fd 1 with a foreign pid cannot claim the child role, returns
+/// C0023 and never writes its fault byte to stdout. CLAIMED: the parent-pid
+/// check precedes any recorder installation. THE GAP: a deliberate direct
+/// parent that passes a matching own pipe can still forge the protocol.
+#[cfg(unix)]
+#[test]
+fn foreign_parent_worker_marker_still_reports_overflow() {
+    let (_dir, path) = million_nested_nat();
+    let foreign_pid = if std::process::id() == 1 { 2 } else { 1 };
+    let output = ken_child_command()
+        .arg("check")
+        .arg(&path)
+        .env(FAULT_MARKER, format!("1:{foreign_pid}:0:0"))
+        .output()
+        .expect("check with foreign parent and fd 1");
+    assert_c0023(&output, "N=1M check, foreign parent and fd 1");
+    assert!(
+        output.stdout.is_empty(),
+        "fault byte must never reach stdout"
+    );
+}
+
+/// MEASURED: a marker claiming the actual parent but an fd 1 pipe with the
+/// wrong dev/ino fails before parsing with one C0022 and zero stdout bytes.
+/// CLAIMED: a parent-claimed broken channel is rejected rather than running
+/// unsupervised. THE GAP: no test can prove a deliberate full forgery absent.
+#[cfg(unix)]
+#[test]
+fn parent_claimed_wrong_pipe_identity_is_coded() {
+    let (_dir, path) = million_nested_nat();
+    let marker = format!("1:{}:0:0", std::process::id());
+    let output = ken_child_command()
+        .arg("check")
+        .arg(&path)
+        .env(FAULT_MARKER, marker)
+        .output()
+        .expect("check with parent-claimed wrong pipe identity");
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert!(
+        output.stdout.is_empty(),
+        "protocol fault must not write stdout"
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr).as_ref(),
+        "error[C0022]: ken: cannot spawn elaboration worker: the worker marker names no pipe from this process's parent\n",
+        "protocol fault must be one registered diagnostic"
+    );
+}
+
+/// MEASURED: N=400 still checks after an invalid inherited marker is
+/// discarded. CLAIMED: malformed env cannot cause a blanket C0022 refusal;
+/// normal shallow checks still run in the authenticated child. THE GAP:
+/// this one source is not a substitute for the million-deep error row.
+#[cfg(unix)]
+#[test]
+fn invalid_inherited_worker_marker_preserves_check_control() {
+    let (_dir, path, _) = nested_nat_fixture(400);
+    let output = ken_child_command()
+        .arg("check")
+        .arg(&path)
+        .env(FAULT_MARKER, "invalid")
+        .output()
+        .expect("check bounded source with invalid inherited marker");
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    assert!(output.stdout.is_empty(), "check must not run a program");
 }

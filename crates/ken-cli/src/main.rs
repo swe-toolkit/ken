@@ -51,14 +51,21 @@ fn main() {
     });
     #[cfg(unix)]
     if needs_source_parser_stack {
-        if worker_process::is_child() {
-            worker_process::enter_child();
-        } else {
-            let exit_code = worker_process::run_parent();
-            if exit_code != 0 {
-                std::process::exit(exit_code);
+        match worker_process::role() {
+            worker_process::Role::Child(fd) => worker_process::enter_child(fd),
+            worker_process::Role::Parent => {
+                let exit_code = worker_process::run_parent();
+                if exit_code != 0 {
+                    std::process::exit(exit_code);
+                }
+                return;
             }
-            return;
+            worker_process::Role::ProtocolFault => {
+                emit_cli_error(CliError::ElaborationWorkerSpawn(std::io::Error::other(
+                    "the worker marker names no pipe from this process's parent",
+                )));
+                std::process::exit(1);
+            }
         }
     }
     let exit_code = if needs_source_parser_stack {

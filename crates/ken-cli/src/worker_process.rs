@@ -18,11 +18,58 @@ use std::process::Command;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::OnceLock;
 
-/// Present only in the child's environment: the side channel's descriptor.
+/// Present only in the child's environment: `<fd>:<parent pid>:<dev>:<ino>`,
+/// naming the pipe writer the parent created for this child.
 const WORKER_CHILD_VAR: &str = "KEN_CLI_WORKER_CHILD_FAULT_FD";
 
-pub(crate) fn is_child() -> bool {
-    std::env::var_os(WORKER_CHILD_VAR).is_some()
+pub(crate) enum Role {
+    /// The marker names this process's parent and a pipe this process holds.
+    Child(RawFd),
+    /// No marker, or one this process's parent did not write.
+    Parent,
+    /// This process's parent wrote a marker naming no pipe it holds.
+    ProtocolFault,
+}
+
+/// Read and always remove the marker, so no descendant inherits it. Only a
+/// marker naming the actual parent and the identity of an open pipe makes
+/// this process a child; anything else re-enters the parent boundary.
+pub(crate) fn role() -> Role {
+    let marker = std::env::var_os(WORKER_CHILD_VAR);
+    std::env::remove_var(WORKER_CHILD_VAR);
+    let Some(marker) = marker.as_deref().and_then(OsStr::to_str) else {
+        return Role::Parent;
+    };
+    let fields: Vec<&str> = marker.split(':').collect();
+    let [fd, pid, dev, ino] = fields[..] else {
+        return Role::Parent;
+    };
+    let (Ok(fd), Ok(pid), Ok(dev), Ok(ino)) = (
+        fd.parse::<RawFd>(),
+        pid.parse::<libc::pid_t>(),
+        dev.parse::<u64>(),
+        ino.parse::<u64>(),
+    ) else {
+        return Role::Parent;
+    };
+    // SAFETY: getppid(2) has no preconditions and cannot fail.
+    if pid != unsafe { libc::getppid() } {
+        return Role::Parent;
+    }
+    match pipe_identity(fd) {
+        Some(identity) if identity == (dev, ino) => Role::Child(fd),
+        _ => Role::ProtocolFault,
+    }
+}
+
+/// `(st_dev, st_ino)` of `fd` when it is an open FIFO.
+fn pipe_identity(fd: RawFd) -> Option<(u64, u64)> {
+    // SAFETY: fstat(2) fills the zeroed local buffer or fails on a bad fd.
+    let mut stat: libc::stat = unsafe { std::mem::zeroed() };
+    if unsafe { libc::fstat(fd, &mut stat) } != 0 || stat.st_mode & libc::S_IFMT != libc::S_IFIFO {
+        return None;
+    }
+    Some((stat.st_dev as u64, stat.st_ino as u64))
 }
 
 /// Parent: run this invocation in a child process and return its exit code.
@@ -42,9 +89,12 @@ pub(crate) fn run_parent() -> i32 {
             (reader, writer)
         };
         let fd = writer.as_raw_fd();
+        let (dev, ino) = pipe_identity(fd)
+            .ok_or_else(|| std::io::Error::other("the worker pipe has no FIFO identity"))?;
+        let marker = format!("{fd}:{}:{dev}:{ino}", std::process::id());
         let child = Command::new(executable)
             .args(std::env::args_os().skip(1))
-            .env(WORKER_CHILD_VAR, fd.to_string())
+            .env(WORKER_CHILD_VAR, marker)
             .spawn()?;
         drop(writer);
         Ok((child, reader))
@@ -87,19 +137,9 @@ static FAULT_FD: AtomicI32 = AtomicI32::new(-1);
 static PREVIOUS_SEGV: OnceLock<libc::sigaction> = OnceLock::new();
 static PREVIOUS_BUS: OnceLock<libc::sigaction> = OnceLock::new();
 
-/// Child: forget the marker, keep the side channel from user subprocesses,
-/// and chain a recorder in front of the runtime's fault handler. Call before
-/// the worker thread is spawned.
-pub(crate) fn enter_child() {
-    let fd = std::env::var_os(WORKER_CHILD_VAR);
-    std::env::remove_var(WORKER_CHILD_VAR);
-    let Some(fd) = fd
-        .as_deref()
-        .and_then(OsStr::to_str)
-        .and_then(|s| s.parse::<RawFd>().ok())
-    else {
-        return;
-    };
+/// Child: keep the side channel from user subprocesses, and chain a recorder
+/// in front of the runtime's fault handler. Call before the worker spawns.
+pub(crate) fn enter_child(fd: RawFd) {
     // SAFETY: plain descriptor-flag and signal-disposition calls on this
     // process before any other thread exists.
     unsafe {
