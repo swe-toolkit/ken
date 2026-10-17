@@ -5,8 +5,9 @@ Spec: `spec/50-stdlib/69-time-and-events.md` §2.
 Frame: `docs/program/issues/SPEC-TIME-WINDOW-MEMBERSHIP.md`.
 
 This source-shaped client targets the two generic window-membership laws. Its
-closed trace uses function-valued payloads, so no payload equality decision is
-introduced. The window includes the event at `lo` and excludes the event at
+membership-law instances use function-valued payloads, so no payload equality
+decision is introduced. The exact-output oracle uses a separate Bool-payload
+trace. The window includes the event at `lo` and excludes the event at
 `hi`; the positive law instances exercise the lower boundary. A refused block
 tries to establish membership for the upper-bound event using a false bound
 fact. These cases instantiate the generic laws; they do not establish their
@@ -19,9 +20,10 @@ executed shipped seed. They do not claim catalog delivery, a measured
 
 ## Closed fixtures and boundary results
 
-The events share a function payload but have distinct times. The input trace
-contains the lower-bound event, an interior event, and the upper-bound event;
-`trace_window` should retain exactly the first two.
+The membership-law input uses one function payload at distinct times. It
+contains the lower-bound event, an interior event, and the upper-bound event.
+The exact-output check uses a separate Bool-payload `first_order_input` with
+those same times.
 
 ```ken
 import Core.Classes.LawfulClasses (leq_nat)
@@ -46,9 +48,10 @@ const input : List (Event (Nat → Nat)) =
   Cons (Event (Nat → Nat)) at_lo
     (Cons (Event (Nat → Nat)) at_middle
       (Cons (Event (Nat → Nat)) at_hi (Nil (Event (Nat → Nat)))))
-const selected : List (Event (Nat → Nat)) =
-  Cons (Event (Nat → Nat)) at_lo
-    (Cons (Event (Nat → Nat)) at_middle (Nil (Event (Nat → Nat))))
+const first_order_input : List (Event Bool) =
+  Cons (Event Bool) (MkEvent Bool lo True)
+    (Cons (Event Bool) (MkEvent Bool middle False)
+      (Cons (Event Bool) (MkEvent Bool hi True) (Nil (Event Bool))))
 
 theorem lower_endpoint_is_included :
   Equal Bool (event_in_window (Nat → Nat) lo hi at_lo) True = Proved
@@ -57,24 +60,28 @@ theorem upper_endpoint_is_excluded :
   Equal Bool (event_in_window (Nat → Nat) lo hi at_hi) False = Proved
 
 theorem window_selects_exactly_the_half_open_range :
-  Equal (List (Event (Nat → Nat)))
-    (trace_window (Nat → Nat) lo hi input) selected = Refl
+  Equal (List (Event Bool))
+    (trace_window Bool lo hi first_order_input)
+    (Cons (Event Bool) (MkEvent Bool lo True)
+      (Cons (Event Bool) (MkEvent Bool middle False) (Nil (Event Bool)))) = Refl
 ```
 
 ### stdlib/time-and-events/window-membership-boundaries
 
 - spec: `spec/50-stdlib/69-time-and-events.md` §§2.1–2.3.
-- given: `input` and the half-open window `[lo, hi)`.
-- expect: the exact window is `[at_lo, at_middle]`; the event at `lo` is
-  included and the event at `hi` is excluded.
+- given: `first_order_input` and the half-open window `[lo, hi)`.
+- expect: the exact window contains the events at `lo` and `middle`, with Bool
+  payloads `True` and `False`; the event at `hi` is excluded.
 - why: the two endpoint events and in-range control make either endpoint
   change observable in the exact output.
-- measured: Architect's D0 scratch client reports the exact `[at_lo, at_middle]`
-  result for a closed `[lo, hi)` window.
+- measured: Architect reports this exact Bool-payload block rc 0 and its
+  keep-`hi` mutation rc 1 on a candidate scratch tree with D0 EventTrace laws.
 - claimed: this fixture includes `lo`, excludes `hi`, and retains the interior
   event.
 - the gap: the D0 result and this closed instance do not establish the
   behavior for every trace, payload, or pair of bounds.
+- limitation: an exact list equality over function payloads is not closed by
+  `Refl` on this base; function payloads remain in the membership-law cases.
 
 ## Closed instances of both laws
 
