@@ -6,7 +6,7 @@ owner: spec
 size: S
 tier: T1
 gate: architect
-depends_on: [SPEC-NUMERICAL-INTERVAL-HULL]
+depends_on: []
 blocks: [LANG-SOLVED-INDEX-SUBSTITUTION]
 github: null
 origin: "Architect G2 ruling on LANG-SOLVED-INDEX-SUBSTITUTION (evt_44mfvbvp38fjy, item d), made blocking by evt_2hy029razcfgq: after elimination, secrestpp depends on it. Spec leader front-desk reading evt_7qmn27nc7th3m: the constructor-coordinate reading, scoped to indexed-match branch substitution. Steward-filed per COORDINATION section 2."
