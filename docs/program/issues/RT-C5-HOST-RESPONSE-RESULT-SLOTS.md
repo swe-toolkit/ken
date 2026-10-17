@@ -58,6 +58,20 @@ unavailable authority keeps `Unknown`.
   `Unknown`. `neutral_inductive_type_app_index_does_not_cast` stays green
   and unedited.
 
+## AC-0 ruling (Architect `evt_4tde2bd6a2t4m`, on `dc4f53614`)
+
+The authority is the Vis node's own checked response family, `args[1]`,
+applied to the **unpeeled** op. The new `result_reply_slots` computes it in
+`run_io_with_effect_recorder` before `peel_coproduct`, and the computed slots
+are threaded to `fs_dispatch`, `reify_host_reply_v1` and `ambient_dispatch`,
+not the op. Applied to the peeled op the family gives a closure. AC-1 is 14
+`run_io` CaptureHost rows: the 12 `fs_resp` pairs, plus (IOError,
+ReadResult) and (IOError, Unit). They come with plain-versus-coproduct axis
+rows, a preflight Err row, and a differing-content negative each.
+(IOError, Bytes) is unreachable at base, and its refusal is measured. The
+ruling's code and added stops are operative. The `ambient_dispatch` Unit-arm
+wrapping is carried to RT-AMBIENT-UNIT-REPLY-SHAPE.
+
 ## Stop conditions
 
 - Any edit to `eq_type_eq` or `cast_reduce`, or any name or spelling lookup.
