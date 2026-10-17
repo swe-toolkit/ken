@@ -112,6 +112,7 @@ fn safe_bytes_option_and_result_slots_agree_with_source_values() {
         "const decodeDifferent : Result Utf8Error String = Ok Utf8Error String \"b\"",
         "const decodeErrorSource : Result Utf8Error String = Err Utf8Error String InvalidUtf8",
     ]);
+    let mut missed = Vec::new();
     for (produced, source, different) in [
         ("atProduced", "atSource", "atDifferent"),
         ("sliceProduced", "sliceSource", "sliceDifferent"),
@@ -120,10 +121,9 @@ fn safe_bytes_option_and_result_slots_agree_with_source_values() {
         let got = value(&elab, &mut store, produced);
         let expected = value(&elab, &mut store, source);
         let negative = value(&elab, &mut store, different);
-        assert!(
-            eq_type_eq(&got, &expected),
-            "{produced}: producer={got:?}, source={expected:?}"
-        );
+        if !eq_type_eq(&got, &expected) {
+            missed.push(format!("{produced}: producer={got:?}, source={expected:?}"));
+        }
         assert!(
             !eq_type_eq(&got, &negative),
             "{produced}: changed content must disagree"
@@ -138,14 +138,16 @@ fn safe_bytes_option_and_result_slots_agree_with_source_values() {
     );
     let err_source = value(&elab, &mut store, "decodeErrorSource");
     let ok_source = value(&elab, &mut store, "decodeSource");
-    assert!(
-        eq_type_eq(&err, &err_source),
-        "decode Err: producer={err:?}, source={err_source:?}"
-    );
+    if !eq_type_eq(&err, &err_source) {
+        missed.push(format!(
+            "decode Err: producer={err:?}, source={err_source:?}"
+        ));
+    }
     assert!(
         !eq_type_eq(&err, &ok_source),
         "Err and Ok contents must disagree"
     );
+    assert!(missed.is_empty(), "{}", missed.join("; "));
 }
 
 /// Promise class: durable C5 regularity for the directory and FileError path
