@@ -107,18 +107,6 @@ fn process_input_lists_and_product_use_checked_field_types() {
     ] {
         let (term, source_value) = source(&elab, &mut store, good);
         let (_, different) = source(&elab, &mut store, bad);
-        assert_eq!(
-            produced, source_value,
-            "{name}: producer/source slot or payload mismatch"
-        );
-        assert_eq!(
-            other_produced, different,
-            "{name}: negative producer/source must agree"
-        );
-        assert_ne!(
-            produced, other_produced,
-            "{name}: negative must vary content"
-        );
         let result = cast_index(
             &elab,
             &mut store,
@@ -130,6 +118,18 @@ fn process_input_lists_and_product_use_checked_field_types() {
         assert!(
             matches!(result, EvalVal::Ctor { id, .. } if id == elab.globals[ctor]),
             "{name}: evaluator cast did not reach its constructor: {result:?}"
+        );
+        assert_eq!(
+            produced, source_value,
+            "{name}: producer/source slot or payload mismatch"
+        );
+        assert_eq!(
+            other_produced, different,
+            "{name}: negative producer/source must agree"
+        );
+        assert_ne!(
+            produced, other_produced,
+            "{name}: negative must vary content"
         );
         assert_eq!(
             cast_index(&elab, &mut store, family, ctor, other_produced, term),
