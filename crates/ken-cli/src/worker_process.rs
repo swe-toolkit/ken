@@ -18,22 +18,22 @@ use std::process::Command;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::OnceLock;
 
-/// Present only in the child's environment: `<fd>:<parent pid>:<dev>:<ino>`,
-/// naming the pipe writer the parent created for this child.
+/// The child's inherited channels: `<fault fd>:<parent pid>:<fault dev>:
+/// <fault ino>:<lifeline fd>:<lifeline dev>:<lifeline ino>`.
 const WORKER_CHILD_VAR: &str = "KEN_CLI_WORKER_CHILD_FAULT_FD";
 
 pub(crate) enum Role {
-    /// The marker names this process's parent and a pipe this process holds.
-    Child(RawFd),
-    /// No marker, or one this process's parent did not write.
+    /// The marker names two pipes this process holds.
+    Child { fault: RawFd, lifeline: RawFd },
+    /// No marker, or one naming pipes this process does not hold and not
+    /// written by its parent.
     Parent,
-    /// This process's parent wrote a marker naming no pipe it holds.
+    /// This process's parent wrote a marker naming pipes it does not hold.
     ProtocolFault,
 }
 
-/// Read and always remove the marker, so no descendant inherits it. Only a
-/// marker naming the actual parent and the identity of an open pipe makes
-/// this process a child; anything else re-enters the parent boundary.
+/// Remove the marker before any child process starts. Holding both named
+/// pipes authenticates this child even when its parent died before `role()`.
 pub(crate) fn role() -> Role {
     let marker = std::env::var_os(WORKER_CHILD_VAR);
     std::env::remove_var(WORKER_CHILD_VAR);
@@ -41,24 +41,32 @@ pub(crate) fn role() -> Role {
         return Role::Parent;
     };
     let fields: Vec<&str> = marker.split(':').collect();
-    let [fd, pid, dev, ino] = fields[..] else {
+    let [fault, pid, fault_dev, fault_ino, lifeline, life_dev, life_ino] = fields[..] else {
         return Role::Parent;
     };
-    let (Ok(fd), Ok(pid), Ok(dev), Ok(ino)) = (
-        fd.parse::<RawFd>(),
+    let (Ok(fault), Ok(pid), Ok(fault_dev), Ok(fault_ino), Ok(lifeline), Ok(life_dev), Ok(life_ino)) = (
+        fault.parse::<RawFd>(),
         pid.parse::<libc::pid_t>(),
-        dev.parse::<u64>(),
-        ino.parse::<u64>(),
+        fault_dev.parse::<u64>(),
+        fault_ino.parse::<u64>(),
+        lifeline.parse::<RawFd>(),
+        life_dev.parse::<u64>(),
+        life_ino.parse::<u64>(),
     ) else {
         return Role::Parent;
     };
-    // SAFETY: getppid(2) has no preconditions and cannot fail.
-    if pid != unsafe { libc::getppid() } {
-        return Role::Parent;
+    // Holding both named pipes is the child evidence; no descendant inherits
+    // them. A dead parent changes getppid but closes the lifeline writer.
+    if pipe_identity(fault) == Some((fault_dev, fault_ino))
+        && pipe_identity(lifeline) == Some((life_dev, life_ino))
+    {
+        return Role::Child { fault, lifeline };
     }
-    match pipe_identity(fd) {
-        Some(identity) if identity == (dev, ino) => Role::Child(fd),
-        _ => Role::ProtocolFault,
+    // SAFETY: getppid(2) has no preconditions and cannot fail.
+    if pid == unsafe { libc::getppid() } {
+        Role::ProtocolFault
+    } else {
+        Role::Parent
     }
 }
 
@@ -88,18 +96,39 @@ pub(crate) fn run_parent() -> i32 {
             libc::fcntl(fds[0], libc::F_SETFD, libc::FD_CLOEXEC);
             (reader, writer)
         };
+        // The parent owns the lifeline writer for all of run_parent. Exec of
+        // the worker child closes that writer; only its reader is inherited.
+        let mut life_fds = [0 as RawFd; 2];
+        let (lifeline_reader, lifeline_writer) = unsafe {
+            if libc::pipe(life_fds.as_mut_ptr()) == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            let read = std::fs::File::from_raw_fd(life_fds[0]);
+            let write = std::fs::File::from_raw_fd(life_fds[1]);
+            if libc::fcntl(life_fds[1], libc::F_SETFD, libc::FD_CLOEXEC) == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            (read, write)
+        };
         let fd = writer.as_raw_fd();
         let (dev, ino) = pipe_identity(fd)
             .ok_or_else(|| std::io::Error::other("the worker pipe has no FIFO identity"))?;
-        let marker = format!("{fd}:{}:{dev}:{ino}", std::process::id());
+        let life_fd = lifeline_reader.as_raw_fd();
+        let (life_dev, life_ino) = pipe_identity(life_fd)
+            .ok_or_else(|| std::io::Error::other("the lifeline has no FIFO identity"))?;
+        let marker = format!(
+            "{fd}:{}:{dev}:{ino}:{life_fd}:{life_dev}:{life_ino}",
+            std::process::id()
+        );
         let child = Command::new(executable)
             .args(std::env::args_os().skip(1))
             .env(WORKER_CHILD_VAR, marker)
             .spawn()?;
         drop(writer);
-        Ok((child, reader))
+        drop(lifeline_reader);
+        Ok((child, reader, lifeline_writer))
     })();
-    let (mut child, mut reader) = match spawned {
+    let (mut child, mut reader, _lifeline_writer) = match spawned {
         Ok(spawned) => spawned,
         Err(error) => {
             emit_cli_error(CliError::ElaborationWorkerSpawn(error));
@@ -137,17 +166,33 @@ static FAULT_FD: AtomicI32 = AtomicI32::new(-1);
 static PREVIOUS_SEGV: OnceLock<libc::sigaction> = OnceLock::new();
 static PREVIOUS_BUS: OnceLock<libc::sigaction> = OnceLock::new();
 
-/// Child: keep the side channel from user subprocesses, and chain a recorder
-/// in front of the runtime's fault handler. Call before the worker spawns.
-pub(crate) fn enter_child(fd: RawFd) {
-    // SAFETY: plain descriptor-flag and signal-disposition calls on this
-    // process before any other thread exists.
+/// Child: keep both channels from user subprocesses; chain the fault
+/// recorder and start the lifeline watcher before the worker thread spawns.
+pub(crate) fn enter_child(fault: RawFd, lifeline: RawFd) {
+    // SAFETY: descriptor flags and handler dispositions are set before any
+    // child thread exists, including the watcher started below.
     unsafe {
-        libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC);
-        FAULT_FD.store(fd, Ordering::Relaxed);
+        libc::fcntl(fault, libc::F_SETFD, libc::FD_CLOEXEC);
+        libc::fcntl(lifeline, libc::F_SETFD, libc::FD_CLOEXEC);
+        FAULT_FD.store(fault, Ordering::Relaxed);
         install(libc::SIGSEGV, &PREVIOUS_SEGV);
         install(libc::SIGBUS, &PREVIOUS_BUS);
     }
+    // The parent never writes the lifeline. EOF or an error means its only
+    // writer closed; a signal interruption is retried, not misclassified.
+    std::thread::spawn(move || {
+        let mut byte = 0u8;
+        loop {
+            // SAFETY: a one-byte read into a local buffer.
+            let n = unsafe { libc::read(lifeline, (&mut byte as *mut u8).cast(), 1) };
+            if n == -1 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINTR) {
+                continue;
+            }
+            break;
+        }
+        // SAFETY: kill(2) on this process's own pid.
+        unsafe { libc::kill(libc::getpid(), libc::SIGKILL) };
+    });
 }
 
 unsafe fn install(signal: libc::c_int, previous: &OnceLock<libc::sigaction>) {
