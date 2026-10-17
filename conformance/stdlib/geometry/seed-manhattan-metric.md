@@ -92,6 +92,43 @@ not computed by `manhattan`. The theorem instances exercise the public
 law results; the generic client has no free assumptions beyond its explicit
 zero-distance premise.
 
+## Triangle inequality on closed detours
+
+### stdlib/geometry/manhattan-triangle
+
+- spec: `spec/50-stdlib/67-geometry.md` §2.1.
+- promise class: durable invariant.
+- given: the strict detour `(0,0) → (3,2) → (1,1)` and the tight
+  monotone detour `(0,0) → (1,1) → (2,3)`.
+- expect: direct distance `2`, strict-detour leg sum `8`, the direct
+  bound accepted, the reverse bound false, and tight-path sum `5`.
+- measured: fixed operation values and one instance of the generic
+  `manhattan_triangle` theorem.
+- claimed: the direct distance is at most the sum along either detour.
+- gap: closed instances do not establish the generic law.
+- why: strict slack distinguishes the inequality's direction, while
+  the monotone path confirms equality is permitted.
+
+## Zero distance identifies equal points
+
+### stdlib/geometry/manhattan-zero-equal
+
+- spec: `spec/50-stdlib/67-geometry.md` §2.1.
+- promise class: durable invariant.
+- given: a generic client with an explicit zero-distance premise,
+  the closed instance `far` to itself, and distinct points `(0,1)`
+  and `(1,0)`.
+- expect: the generic client returns point equality; the closed
+  instance derives `Equal Point far far`; the distinct pair has
+  distance `2`.
+- measured: one generic use and one closed use of
+  `manhattan_zero_equal`, plus an opposing nonzero-distance control.
+- claimed: zero distance forces equality of both point coordinates.
+- gap: a closed zero-distance premise for distinct points cannot be
+  supplied; these instances do not prove the generic theorem.
+- why: the generic client tests the law at its full type, and the
+  distinct-pair value distinguishes a false zero-distance claim.
+
 ## Refusals
 
 Each refusal is considered separately against the unchanged positive
