@@ -11906,7 +11906,14 @@ fn infer_ascription(
     } else {
         check(cx, e, &ty_core, e.span())?
     };
-    Ok((e_core, ty_core))
+    Ok(ascribed_inference(e_core, ty_core))
+}
+
+/// Retain the checked type on introduction forms returned in infer position.
+/// Outlining keeps the recursive infer cycle's stack frame unchanged.
+#[inline(never)]
+fn ascribed_inference(e_core: Term, ty_core: Term) -> (Term, Term) {
+    (ascribe_introduction_let_value(e_core, &ty_core), ty_core)
 }
 
 #[inline(never)]

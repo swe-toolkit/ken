@@ -709,7 +709,9 @@ infer(Γ, e) → (Term, Type):
     RAsc(e, t):                                       -- 11 §1 ascription
       A := elabType(Γ, t)
       e' := check(Γ, e, A)
-      return (e', A)                                  -- ascription erased after check
+      if introTail(e'): return (Ascript(e', A), A)    -- kept: the kernel cannot
+                                                      -- infer an introduction form
+      return (e', A)                                  -- otherwise erased after check
     RUniv(Some n):  return (Univ(n), Univ(suc n))     -- 12 §1 U-Type
     RUniv(None):    u := freshLevelMeta()
                     return (Univ(u), Univ(suc u))     -- 12 §4 (solved in §5.7)
@@ -754,6 +756,14 @@ elabType(Γ, t) → Term:                                -- type-position elabor
     RCon(c):        return constOf(Σ, c)              -- base type by name (11 §4)
     RVarTy(i):      return Var(i)                     -- a type-position bound variable
 ```
+
+`introTail(e')` holds when the tail of `e'` (`e'` itself, or recursively the
+body of a core `let`) is an introduction form the kernel checks but cannot
+infer (18 §3.1): a λ, pair, reflexivity proof, quotient class, or truncation
+element. Its checked type is retained for later kernel inference; other
+checked ascriptions are erased. No surface expression elaborates to a
+quotient class yet, so that arm has no surface witness; the work that adds a
+surface quotient-class introduction adds its RAsc conformance case.
 
 **`Axiom` is a checking-mode elaborator intercept, not a kernel term.** The
 intercept runs before ordinary constructor lookup and requires the `expected`
