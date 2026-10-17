@@ -1,6 +1,6 @@
-//! The CLI must check a deep dependent goal on its sized elaboration worker.
-//! Promise class: durable CLI acceptance, spec 33 §8.3 and 39 §2.1. A
-//! 256-MiB worker moves the native-stack cliff; behavior past it is held AC-2.
+//! Deep CLI parsing and checking use a sized worker instead of the main stack.
+//! Promise class: durable CLI acceptance, spec 33 §8.3, 39 §2.1 and 70 §1.
+//! A 256-MiB worker moves the native-stack cliff; behavior past it is AC-2.
 
 use std::path::Path;
 use std::process::{Command, Output};
@@ -215,4 +215,81 @@ fn worker_spawn_failure_is_coded() {
         "worker-spawn failure must have its registered code: {stderr}"
     );
     assert_eq!(stderr.lines().count(), 1, "no uncoded panic: {stderr}");
+}
+
+fn nested_nat_source(depth: usize) -> String {
+    let spine = (0..depth).fold(String::from("Zero"), |term, _| format!("Suc ({term})"));
+    format!("const deep : Nat = {spine}\n")
+}
+
+fn nested_nat_fixture(depth: usize) -> (tempfile::TempDir, std::path::PathBuf, String) {
+    let dir = tempfile::tempdir().expect("nested Nat fixture directory");
+    let path = dir.path().join("deep_nat.ken");
+    let source = nested_nat_source(depth);
+    std::fs::write(&path, &source).expect("write nested Nat fixture");
+    (dir, path, source)
+}
+
+fn check_then_format_nested_nat(depth: usize) {
+    let (_dir, path, source) = nested_nat_fixture(depth);
+    let checked = invoke("check", &path, &[]);
+    assert!(
+        checked.status.success(),
+        "N={depth} ken check must accept the same source: status={:?} stderr={}",
+        checked.status,
+        String::from_utf8_lossy(&checked.stderr)
+    );
+
+    let formatted = invoke("fmt", Path::new("--check"), &[&path]);
+    let stderr = String::from_utf8_lossy(&formatted.stderr);
+    match formatted.status.code() {
+        Some(0) => {}
+        Some(1) => assert!(
+            stderr.lines().any(|line| line.starts_with("error[C0016]:")),
+            "N={depth} formatter refusal must be coded C0016: {stderr}"
+        ),
+        _ => panic!(
+            "N={depth} fmt must return Ok or coded C0016, not an abort: status={:?} stderr={stderr}",
+            formatted.status
+        ),
+    }
+    assert_eq!(
+        std::fs::read_to_string(&path).expect("re-read nested fixture"),
+        source,
+        "fmt --check must never rewrite the input"
+    );
+}
+
+/// MEASURED: a shorter N=200 spine parses and formats under the same 8-MiB
+/// main-thread limit. CLAIMED: the Ken fixture is well formed and the format
+/// path can return a coded result even without the newly covered worker.
+/// THE GAP: this control cannot detect the N=400 stack cliff.
+#[test]
+fn shallower_nested_nat_format_control() {
+    check_then_format_nested_nat(200);
+}
+
+/// MEASURED: N=400 checks, then fmt --check returns Ok or C0016 on an
+/// 8-MiB-main-thread child. CLAIMED: fmt's recursive parser now shares the
+/// 256-MiB CLI worker rather than aborting at the old main-thread cliff.
+/// THE GAP: the worker moves the cliff; AC-2 beyond it is operator-held.
+#[test]
+fn deep_nested_nat_format_uses_cli_worker() {
+    check_then_format_nested_nat(400);
+}
+
+/// MEASURED: the same nesting form at N=4000 still checks successfully.
+/// CLAIMED: moving fmt onto the worker leaves check's earlier successful
+/// deeper row intact. THE GAP: this does not bound the format algorithm's
+/// time or establish its behavior at N=4000.
+#[test]
+fn deeper_nested_nat_still_checks() {
+    let (_dir, path, _) = nested_nat_fixture(4000);
+    let checked = invoke("check", &path, &[]);
+    assert!(
+        checked.status.success(),
+        "N=4000 ken check must still pass: status={:?} stderr={}",
+        checked.status,
+        String::from_utf8_lossy(&checked.stderr)
+    );
 }
