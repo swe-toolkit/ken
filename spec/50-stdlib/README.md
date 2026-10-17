@@ -293,15 +293,22 @@ exported as catalog theorems; neither awaits
 No rational or `Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §1 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT).
-`Algorithm.SymbolicAlgebra.NatPolynomial` is the specified catalog
-module, not a landed export. `Expr` has natural constants, `Nat`-indexed
-variables, addition and multiplication under a total environment.
-Ordered distributed `Monomial` lists support reification and
-normalization with five generically checked D0 laws, including
-soundness and idempotence. No sorting, merging, canonical semantic
-equality decision, signed/field arithmetic, or CAT delivery is
-claimed.
+**`66-symbolic-algebra.md`** §§1–2 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY). The §1
+`Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
+are landed: `Expr` has natural constants, `Nat`-indexed variables,
+addition and multiplication under a total environment. Ordered
+distributed `Monomial` lists support reification and normalization
+with five checked laws but are not canonical for semantic equality.
+§2 specifies a separate recursive Horner `Poly` with collapsed
+constant-headed zero tails, `canonicalize`, and the Boolean `poly_eq`
+decision. Five additional Architect-D0-checked generic laws give
+canonicalization soundness/completeness and both directions of the
+decision, including refusal of a `False` answer under universally
+equal evaluation. The §2 development and trust measurement are
+Architect-reported scratch evidence, not a delivered §2 catalog
+extension, shipped §2 seed, or CI. A sorted-list normal form and
+signed/field arithmetic remain outside this contract.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §1 (SPEC-GEOMETRY-EXACT-CONTRACT).

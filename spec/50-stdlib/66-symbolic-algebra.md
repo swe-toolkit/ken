@@ -141,3 +141,139 @@ normal forms and a decision procedure for semantic equality are
 also deferred, as are dimension-indexed environments, substitution,
 composition, and derivatives. None is silently supplied by the
 `Nat` distributive normalizer in §1.
+
+## 2. Canonical polynomial form and semantic equality
+
+> **Section 2 status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY).**
+> Architect D0 checked five additional generic laws. This section
+> specifies an extension of the existing module, not a claim that its
+> §2 code or seed has landed.
+
+### 2.1 Recursive canonical carrier
+
+`Algorithm.SymbolicAlgebra.NatPolynomial` extends its §1 `Expr` and
+`Monomial` interface with the following public carrier and operations:
+
+```ken
+pub data Poly = PConst Nat | PHorner Poly Poly
+export PConst, PHorner
+
+pub fn eval_poly (env : Nat → Nat) (p : Poly) : Nat
+pub fn canonicalize (e : Expr) : Poly
+pub fn poly_eq (e1 : Expr) (e2 : Expr) : Bool
+```
+
+`PConst c` denotes the constant `c`. `PHorner p q` denotes the value
+of `p` with every variable index shifted up by one, plus the value of
+`q` multiplied by variable `Zero`. Equivalently, the head `p` is
+interpreted under `v ↦ env (Suc v)`, while `q` and variable `Zero`
+use `env` itself. Thus the head cannot depend on variable `Zero`.
+This interpretation is over the same **total** `Nat → Nat`
+environments and natural-number arithmetic as §1.
+
+A **canonical** `Poly` has canonical children and contains no node
+`PHorner (PConst c) (PConst Zero)`: that node represents merely the
+constant `c` and is collapsed to `PConst c`. This prohibition does
+**not** eliminate `PHorner (PConst Zero) q`, which can represent
+variable `Zero` multiplied by `q`, or a zero second child when the
+first child is itself a `PHorner`, which shifts a nonconstant
+polynomial to higher variable indices. The public constructors can
+also build noncanonical `Poly` values; it is `canonicalize` that
+produces the canonical shape.
+
+Monomial order in this carrier is **structural**, not a sorted list
+comparison. Variable `Zero` is outermost; the repeated second-child
+Horner spine represents its powers in ascending order; coefficients
+are recursively polynomials in higher-index variables. Like terms
+occupy the same coefficient position and merge there by natural
+addition. With `Nat` coefficients there is no cancellation requiring
+signed arithmetic. `canonicalize` starts from §1's distributed
+`monomials e`, collects their coefficients into this Horner shape,
+and collapses the redundant constant-headed zero tails. It does
+not change §1's `normalize : Expr → Expr`, whose ordered distributed
+lists remain noncanonical for semantic equality.
+
+`poly_eq` compares the **canonical** results for two expressions,
+returning `True` for equal forms and `False` for unequal forms.
+Coefficient equality is decidable using both directions of the
+existing natural-number `leq_nat`, not a new kernel equality rule.
+Structural comparison and canonicity helpers are private; no
+`DecEq Expr` or public theorem about arbitrary noncanonical `Poly`
+values is added.
+
+### 2.2 Exactly five checked-law obligations
+
+The module must export checked proof bodies, not postulates or open
+goals, for exactly these five new laws. `Equal Poly` compares the
+resulting canonical forms; `IsTrue` is the proposition that the
+Boolean answer is `True`. Equal evaluation is quantified over
+**every** total environment, not merely a finite test set.
+
+```ken
+pub theorem canonicalize_sound (env : Nat → Nat) (e : Expr)
+  : Equal Nat (eval_poly env (canonicalize e)) (eval env e)
+
+pub theorem canonicalize_complete (e1 : Expr) (e2 : Expr)
+    (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+  : Equal Poly (canonicalize e1) (canonicalize e2)
+
+pub theorem poly_eq_sound (e1 : Expr) (e2 : Expr)
+    (h : IsTrue (poly_eq e1 e2)) (env : Nat → Nat)
+  : Equal Nat (eval env e1) (eval env e2)
+
+pub theorem poly_eq_complete (e1 : Expr) (e2 : Expr)
+    (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+  : IsTrue (poly_eq e1 e2)
+
+pub theorem poly_eq_false_refutes (e1 : Expr) (e2 : Expr)
+    (hf : Equal Bool (poly_eq e1 e2) False)
+    (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+  : Bottom
+```
+
+`canonicalize_sound` preserves evaluation. The converse here is
+about **two expressions**: if their evaluations agree at every
+environment, `canonicalize_complete` identifies their canonical
+`Poly` values. The decision's `True` answer therefore entails
+agreement at every environment (`poly_eq_sound`), and universal
+agreement forces `True` (`poly_eq_complete`). A `False` answer is
+incompatible with such a universal proof
+(`poly_eq_false_refutes`); this law does not supply a particular
+environment witnessing inequality. The stronger intermediate fact
+used in D0 about positive environments is **private** and is not a
+sixth public law.
+
+For example, `x₀+x₀` and `2·x₀` have distinct §1 ordered monomial
+lists, but both yield `PHorner (PConst Zero) (PConst 2)` and
+`poly_eq` returns `True`. In contrast, `x₀` and
+`x₁` differ when variable `Zero` is assigned `1` and variable `1`
+is assigned `0`, so `poly_eq` returns `False`; an `IsTrue` claim for
+that pair must be refused. These distinct observations rule out
+both syntactic-expression comparison as the decision and a constant
+Boolean answer. They describe the intended conformance cases, not
+a claim that the separately owned §2 seed has shipped or run.
+
+### 2.3 Evidence, trust, and remaining boundary
+
+On base `bc711b1e0`, Architect D0 reported `ken check` rc 0 for the
+in-module Horner development and all five generic laws. Architect
+also measured five new checked transparent theorem bodies, zero
+`Axiom`/postulate/admit in that development, and a scratch
+`trusted_base()` comparison of **114 before and 114 after** loading
+the module on its five providers. Closed positive examples checked;
+a false equality claim on `x₀` and `x₁` was kernel-rejected. Those
+are **Architect-reported scratch measurements**, not execution of a
+committed §2 catalog extension, a delivered §2 conformance seed,
+CI, or an author-measured trust delta.
+
+The completeness proof in D0 distinguishes canonical heads using
+positivity of `Nat` coefficients and cancellation, then recurses on
+the Horner children. It does not establish a sorted-monomial-list
+route, which was not attempted. No new kernel form, surface form,
+primitive, or funext assumption is required. §1's ordered-list
+`normalize` remains only a sound, idempotent distributor; this §2
+carrier supplies a separate canonical representation and equality
+decision. Sorted-list canonicalization, subtraction and signed
+coefficients, division, factoring, field-dependent operations,
+dimension-indexed environments, substitution, composition, and
+derivatives remain outside this contract.
