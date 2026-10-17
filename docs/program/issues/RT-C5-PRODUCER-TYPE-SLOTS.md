@@ -1,7 +1,7 @@
 ---
 id: RT-C5-PRODUCER-TYPE-SLOTS
 title: "C5 regularity for values built by the interpreter's own producers: a closed, checked, reflexive cast whose index is a list produced by string_to_list_char, bytes_to_list, a directory listing or a bytes slice evaluates to its value instead of Unknown, because those producers fill the constructor type-parameter slot with the same comparable value source-built lists carry"
-status: ready
+status: active
 owner: runtime
 size: S
 gate: architect
@@ -61,6 +61,34 @@ fails closed.
 - **AC-2 (control).** Reverting the repair returns the producer rows to
   `Unknown`. `neutral_inductive_type_app_index_does_not_cast` stays green and
   unedited.
+
+## AC-0 ruling (Architect `evt_7rtbs5j2730es`, on `5386dc871`)
+
+The repair is at the producers: each slot is the interpreter's own `eval` of
+a checked type term the producer already holds, keyed by GlobalId, with the
+existing filler as fallback. There is no `eq_type_eq` arm. Five writer groups
+are in scope: the two list primitives, the Bytes results (`bytes_at`,
+`bytes_slice`, `bytes_decode`), the directory listing and `file_error_value`,
+and `ken-cli` `process_input_value`. The ruling's per-writer code, AC-1 rows,
+required slot negative and consumer sweep are operative. Host `make_result`
+is cut to RT-C5-HOST-RESPONSE-RESULT-SLOTS. The All-support witnesses stay
+unfilled and go to RT-C5-COMPOUND-HIGHER-ORDER-INDICES AC-0.
+
+The List UInt8 view-to-source row is evaluator-level, not kernel-checked
+(Architect `evt_6dvag1bfyn3s8`). It asserts `eq_type_eq(view, source)`,
+`cast_reduce` to `MkCIBytes`, and a `bytes_encode "b"` negative, and it
+reddens when `build_list_uint8` is reverted to `Unknown`. The five
+kernel-checked casts stay exactly as AC-0 ran them.
+
+## Hard-stop inventory (§1b)
+
+§1a: the slot-authority chain is at 1 (Architect `evt_6dvag1bfyn3s8`).
+
+1. An AC row required a kernel-checked equality between a producer view
+   and its source form that the kernel cannot convert. The trigger is
+   kernel reducibility of the producer primitive: `bytes_to_list` and
+   `bytes_encode` do not reduce in the kernel, while `string_to_list_char`
+   on a literal does.
 
 ## Stop conditions
 
