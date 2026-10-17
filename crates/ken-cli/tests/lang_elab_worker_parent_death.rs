@@ -182,8 +182,11 @@ fn parent_kill_stops_run_child_and_delayed_effect() {
     let effect = std::fs::read(&effect_path).expect("read delayed effect output");
     stop_straggler(child);
     assert_eq!(status.signal(), Some(libc::SIGKILL), "{status:?}");
+    assert!(
+        effect.is_empty(),
+        "effect after parent SIGKILL: {effect:?}; child_gone_within_2s={gone}"
+    );
     assert!(gone, "child {child} persisted after parent SIGKILL");
-    assert!(effect.is_empty(), "effect after parent SIGKILL: {effect:?}");
 }
 
 /// MEASURED: a parent SIGTERM is observed as TERM by its caller; its child
