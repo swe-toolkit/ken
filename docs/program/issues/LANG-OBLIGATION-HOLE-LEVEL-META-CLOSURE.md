@@ -1,7 +1,7 @@
 ---
 id: LANG-OBLIGATION-HOLE-LEVEL-META-CLOSURE
 title: "A refinement obligation emitted while an unannotated Type parameter's level metavariable is unsolved closes over LevelVar(0) and is declared with no level parameters, so fn k (A : Type) (n : Int) : Int = use5 n is rejected by the kernel. Declare the hole over a level-closed context"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1
