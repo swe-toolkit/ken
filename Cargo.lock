@@ -604,6 +604,7 @@ dependencies = [
  "ken-interp",
  "ken-kernel",
  "ken-runtime",
+ "libc",
  "serde_json",
  "tempfile",
 ]
