@@ -17,7 +17,7 @@ use ken_kernel::{
         all_support_evidence_positions, iota_reduct, method_type, peel_app, peel_pi,
         recursive_shapes, RecursiveArgumentShape,
     },
-    infer as kernel_infer_raw,
+    infer as kernel_infer_raw, recorded_eq_endpoints,
     subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
@@ -12939,20 +12939,23 @@ fn infer_j(
     eq_expr: &RExpr,
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
-    // eq : Eq A a b — recover A, a, b. Zonked before the whnf match: a bare
-    // surface `(a:Type)` parameter can still carry an unresolved universe
-    // metavariable this far into elaboration (the same latent trap fixed for
-    // `check_match_dependent` — [[gate-widening-exposes-latent-bugs-in-newly-reachable-code]]).
+    // eq : Eq A a b — prefer its recorded formation: observational whnf
+    // reduces Eq at Pi/Sigma carriers away from Eq. Zonk before either read:
+    // a bare surface `(a:Type)` may still carry an unresolved universe meta.
     let (eq_core, eq_ty) = infer(cx, eq_expr)?;
     let eq_ty = cx.metas.zonk_term(&eq_ty);
-    let eq_ty_wh = whnf(cx.env, &cx.ctx, &eq_ty);
-    let (a_ty, a, b) = match eq_ty_wh {
-        Term::Eq(at, x, y) => (*at, *x, *y),
-        _ => {
-            return Err(ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: "J's third argument must have an `Eq` type".into(),
-            })
+    let recorded_endpoints = recorded_eq_endpoints(cx.env, &eq_ty);
+    let (a_ty, a, b) = if let Some((at, x, y)) = &recorded_endpoints {
+        (at.clone(), x.clone(), y.clone())
+    } else {
+        match whnf(cx.env, &cx.ctx, &eq_ty) {
+            Term::Eq(at, x, y) => (*at, *x, *y),
+            _ => {
+                return Err(ElabError::TypeMismatch {
+                    span: span.clone(),
+                    reason: "J's third argument must have an `Eq` type".into(),
+                })
+            }
         }
     };
 
@@ -12999,12 +13002,17 @@ fn infer_j(
     let base_core = check(cx, base_expr, &base_expected_ty, span)?;
 
     let result_ty = Term::app(Term::app(motive_lam, b.clone()), eq_core.clone());
-    // Record the exact Eq formation the surface rule used. The kernel's J
-    // reader must not re-derive endpoints from an Eq head's later reduct.
-    let eq_recorded = Term::Ascript(
-        Box::new(eq_core),
-        Box::new(Term::Eq(Box::new(a_ty), Box::new(a), Box::new(b))),
-    );
+    // Reify the recorded Eq head: the inferred type may be a β-redex whose
+    // function is a bare lambda, which the kernel cannot infer when checking
+    // an ascription. It checks this Eq formation against the evidence's type.
+    let eq_recorded = if recorded_endpoints.is_some() && matches!(eq_core, Term::Ascript(..)) {
+        eq_core
+    } else {
+        Term::Ascript(
+            Box::new(eq_core),
+            Box::new(Term::Eq(Box::new(a_ty), Box::new(a), Box::new(b))),
+        )
+    };
     let term_j = Term::J(
         Box::new(motive_core),
         Box::new(base_core),

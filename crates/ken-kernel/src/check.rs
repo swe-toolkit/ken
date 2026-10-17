@@ -854,6 +854,15 @@ pub(crate) fn eq_formation_head(env: &GlobalEnv, ty: &Term) -> Term {
     }
 }
 
+/// Recover an Eq formation without reducing the equality head. Consumers
+/// must still submit the recorded type to kernel checking before trusting it.
+pub fn recorded_eq_endpoints(env: &GlobalEnv, ty: &Term) -> Option<(Term, Term, Term)> {
+    match eq_formation_head(env, ty) {
+        Term::Eq(a, x, y) => Some((*a, *x, *y)),
+        _ => None,
+    }
+}
+
 /// Read J's recorded Eq endpoints. A checked ascription is authoritative:
 /// reducing its Eq head could instead expose a different Eq or a Sigma.
 /// For an unrecorded proof, retain the old whnf-and-Eq demand exactly.
