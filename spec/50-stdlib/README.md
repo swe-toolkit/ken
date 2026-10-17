@@ -351,16 +351,19 @@ refute structural hull commutativity. Signed arithmetic, division,
 sub-distributivity remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §1 (SPEC-TIME-EVENT-TRACE-CONTRACT).
-`Data.Time.EventTrace` uses ordinary `Event p` values in plain
-`List (Event p)` traces, non-decreasing `Nat` timestamps, half-open
-time windows and total left-biased merging at tied times. The
-three generic D0 laws check window ordering, merge ordering under
-ordered inputs and merge count for any Boolean classifier, even
-without ordered inputs. This is a scratch proof development, not
-a landed catalog module, shipped seed, CI result or measured
-trusted-base delta. Clock effects, wall-clock time, vector clocks,
-infinite streams and window/merge relational laws remain deferred.
+**`69-time-and-events.md`** §1 (SPEC-TIME-EVENT-TRACE-CONTRACT) and
+§2 (SPEC-TIME-WINDOW-MEMBERSHIP). `Data.Time.EventTrace` uses ordinary
+`Event p` values in plain `List (Event p)` traces, non-decreasing `Nat`
+timestamps, half-open time windows and left-biased merging at tied
+times. §1's three generic laws cover window ordering, ordered-input
+merge ordering and arbitrary-classifier merge count; its catalog module
+and seed are present on the base. §2 adds two D0-checked generic
+window-membership laws using Ω-valued `list_elem`, supported by two
+checked generic filter theorems in `Data.Collections.Derived` on this
+candidate. D0 scratch execution does not establish delivery of §2's
+EventTrace laws, seed, CI or a landed trust delta. Clock effects, wall-
+clock time, vector clocks, infinite streams and window/merge relational
+laws remain deferred.
 
 The **finite least-cost selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT).

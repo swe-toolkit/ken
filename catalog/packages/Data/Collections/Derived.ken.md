@@ -152,6 +152,11 @@ Membership in a generic list is an Ω proposition rather than a Boolean test
 or a position. Its truncated disjunction permits proofs about members without
 supplying an equality decision or extracting a list index. These lemmas lift
 membership through mapping, append, concatenated mapping, and equality.
+The filter theorems also characterize membership after selection without
+deciding equality on the element type: a selected member was present in
+the input and satisfies the predicate, and an input member satisfying
+the predicate is selected. Their `And` is the ambient Ω conjunction,
+not the imported Type-valued `Conj` carrier.
 
 ```ken
 pub fn list_elem (a : Type) (x : a) (xs : List a) : Omega =
@@ -288,6 +293,165 @@ pub theorem list_elem_transport
                     (list_elem_transport a x y same rest later))
             })
           member
+  }
+
+pub theorem list_elem_filter_sound
+      (a : Type) (keep : a → Bool) (x : a) (xs : List a)
+    : list_elem a x (filter a keep xs) → And (list_elem a x xs) (Equal Bool (keep x) True) =
+  match xs {
+    Nil ↦ λmember. absurd member;
+    Cons h rest ↦
+      λmember.
+        list_elem_filter_sound_cons
+          a
+          keep
+          x
+          h
+          rest
+          (list_elem_filter_sound a keep x rest)
+          (keep h)
+          Refl
+          member
+  }
+
+pub theorem list_elem_filter_complete
+      (a : Type) (keep : a → Bool) (x : a) (xs : List a)
+    : list_elem a x xs → Equal Bool (keep x) True → list_elem a x (filter a keep xs) =
+  match xs {
+    Nil ↦ λmember. λkept. absurd member;
+    Cons h rest ↦
+      λmember.
+        λkept.
+          elim_trunc
+            (list_elem a x (filter a keep (Cons a h rest)))
+            (λcase.
+              match case {
+                Inl same ↦
+                  list_elem_filter_cons_head
+                    a
+                    keep
+                    x
+                    h
+                    rest
+                    same
+                    (keep h)
+                    Refl
+                    (trans
+                      Bool
+                      (keep h)
+                      (keep x)
+                      True
+                      (cong a Bool h x keep (sym a x h same))
+                      kept);
+                Inr later ↦
+                  list_elem_filter_cons_later
+                    a
+                    keep
+                    x
+                    h
+                    rest
+                    (list_elem_filter_complete a keep x rest later kept)
+                    (keep h)
+                    Refl
+              })
+            member
+  }
+
+fn filter_keep_step (a : Type) (h : a) (kept : List a) (decision : Bool) : List a =
+  match decision {
+    True ↦ Cons a h kept;
+    False ↦ kept
+  }
+
+theorem list_elem_filter_sound_cons
+      (a : Type)
+      (keep : a → Bool)
+      (x : a)
+      (h : a)
+      (rest : List a)
+      (ih : list_elem
+        a
+        x
+        (filter a keep rest)
+        → And
+        (list_elem a x rest)
+        (Equal Bool (keep x) True))
+      (decision : Bool)
+    : Equal Bool (keep h) decision
+      → list_elem a x (filter_keep_step a h (filter a keep rest) decision)
+      → And (list_elem a x (Cons a h rest)) (Equal Bool (keep x) True) =
+  match decision {
+    True ↦
+      λkept.
+        λmember.
+          elim_trunc
+            (And (list_elem a x (Cons a h rest)) (Equal Bool (keep x) True))
+            (λcase.
+              match case {
+                Inl same ↦
+                  and_intro
+                    (list_elem a x (Cons a h rest))
+                    (Equal Bool (keep x) True)
+                    (trunc_intro (Inl (Equal a x h) (list_elem a x rest) same))
+                    (trans Bool (keep x) (keep h) True (cong a Bool x h keep same) kept);
+                Inr later ↦
+                  and_intro
+                    (list_elem a x (Cons a h rest))
+                    (Equal Bool (keep x) True)
+                    (list_elem_later
+                      a
+                      x
+                      h
+                      rest
+                      (and_fst (list_elem a x rest) (Equal Bool (keep x) True) (ih later)))
+                    (and_snd (list_elem a x rest) (Equal Bool (keep x) True) (ih later))
+              })
+            member;
+    False ↦
+      λkept.
+        λmember.
+          and_intro
+            (list_elem a x (Cons a h rest))
+            (Equal Bool (keep x) True)
+            (list_elem_later
+              a
+              x
+              h
+              rest
+              (and_fst (list_elem a x rest) (Equal Bool (keep x) True) (ih member)))
+            (and_snd (list_elem a x rest) (Equal Bool (keep x) True) (ih member))
+  }
+
+theorem list_elem_filter_cons_head
+      (a : Type)
+      (keep : a → Bool)
+      (x : a)
+      (h : a)
+      (rest : List a)
+      (same : Equal a x h)
+      (decision : Bool)
+    : Equal Bool (keep h) decision
+      → Equal Bool decision True
+      → list_elem a x (filter_keep_step a h (filter a keep rest) decision) =
+  match decision {
+    True ↦
+      λkept. λyes. trunc_intro (Inl (Equal a x h) (list_elem a x (filter a keep rest)) same);
+    False ↦ λkept. λyes. absurd yes
+  }
+
+theorem list_elem_filter_cons_later
+      (a : Type)
+      (keep : a → Bool)
+      (x : a)
+      (h : a)
+      (rest : List a)
+      (later : list_elem a x (filter a keep rest))
+      (decision : Bool)
+    : Equal Bool (keep h) decision
+      → list_elem a x (filter_keep_step a h (filter a keep rest) decision) =
+  match decision {
+    True ↦ λkept. list_elem_later a x h (filter a keep rest) later;
+    False ↦ λkept. later
   }
 ```
 
