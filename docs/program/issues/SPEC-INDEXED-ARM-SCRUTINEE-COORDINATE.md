@@ -1,7 +1,7 @@
 ---
 id: SPEC-INDEXED-ARM-SCRUTINEE-COORDINATE
 title: "Inside an indexed match arm, the user names of a variable scrutinee and its bare-variable solved index still denote the pre-match coordinate, so a body that reuses them, such as dual_lookup a (Suc q) rest j, is refused with DualFin (Suc q) vs DualFin k. The Spec front desk reads them as denoting the constructor coordinate. State that rule in spec 34 section 3.3"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
