@@ -82,7 +82,7 @@ depth or stack size and the refusal code. Then implement the ruling.
   N=400 in `lang_elab_native_stack_depth.rs` returns rc 0 or the coded
   C0016, and removing `fmt` from the predicate returns that row to rc
   134. `fmt` running time grows faster than linear at large N; that is
-  out of scope here.
+  out of scope here. Merged at `4573c8222`.
 - **AC-2.** A spine past the D0's ruled limit, on each walker the D0
   census names, returns a coded refusal or Ok, not an abort. The rows
   that check today stay Ok, including release K=640.
