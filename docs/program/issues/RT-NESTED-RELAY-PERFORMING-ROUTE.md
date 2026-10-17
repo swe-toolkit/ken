@@ -122,7 +122,8 @@ reached by promoting its P2 demand in `static_response_phase_b_split_over`.
 ## Hard-stop inventory (§1b)
 
 §1a: the Underived-owner settlement chain is at 1 (Architect
-`evt_27ernsj0ttshz`); the route chain is at 0.
+`evt_27ernsj0ttshz`); the route chain (emission point, promotion
+authority) is at 1 (Architect `evt_7ve4vnpycf74t`).
 
 1. An `Excluded{Underived}` owner is emitted on the Ret-only arm although
    its K may return a Vis: the arm is keyed on "derivation failed", which
@@ -134,6 +135,24 @@ reached by promoting its P2 demand in `static_response_phase_b_split_over`.
    protocol"; forced 890 and forced 768 both refuse; deleting the refusal
    is QA's AC-3 mutation for this guard. A native row green on main that
    newly refuses with that text is a stop to the Architect.
+2. A single-authority suppression control kept a retired runtime-trap
+   oracle after a second authority, relay promotion, came to overlap it.
+   The overlap is keyed on test-seam authority. On `8cdada507`, CI run
+   `39002598310` reddened two native rows at `differential(
+   "fs-write-at-offset-single", ...)`: the ETR-only artifact returns the
+   untyped `-1` of the pending-Vis unknown-member exit (units.rs:3377).
+   Ruled: no production guard. Test-only changes in `rt_parity_native.rs`:
+   - `suppressing_both_materialization_authorities_refuses_at_the_relay_edge`
+     builds with both suppressions and expects the Packaging refusal
+     carrying `EXECUTE_THEN_RESUME_SUPPRESSED_RELAY_TRAP`, with relay
+     applications = 1;
+   - an ETR-only sibling row builds Ok, and a relay-only sibling row builds
+     Ok with 0 applications;
+   - the outer-carried control keeps only its residual sentinel,
+     `site_a_none_arrivals == 3`, on an ETR-only build.
+   A relay-only refusal or nonzero applications, or a different sentinel
+   count, is a stop to the Architect. The untyped `-1` is carried, out of
+   scope.
 
 ## Stop conditions
 
