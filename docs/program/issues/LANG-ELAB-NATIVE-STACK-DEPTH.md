@@ -83,16 +83,27 @@ depth or stack size and the refusal code. Then implement the ruling.
   C0016, and removing `fmt` from the predicate returns that row to rc
   134. `fmt` running time grows faster than linear at large N; that is
   out of scope here. Merged at `4573c8222`.
-- **AC-2 (operator 2026-10-17, option 1).** Past the 256 MiB worker
-  limit, elaboration runs in a child process, and a stack-overflow death of
-  the child is reported by the parent as a coded refusal. The refusal is a
-  new appended `C` code (spec 70 §1.2), with its rows in `codes.tsv` and
-  `CLI_ERROR_TABLE`. A spine past the limit, on each walker the D0 census
-  names, returns that refusal or Ok, never an abort. The rows that check
-  today stay Ok, including release K=640. The Architect rules the mechanism
-  before the build. No kernel bounds are added.
-- **AC-3 (mutation, QA).** Removing the closure returns debug K=160 on
-  8 MiB to the rc 134 abort.
+- **AC-2 (operator 2026-10-17, option 1; mechanism ruled by the Architect
+  `evt_2cwbjvme2q90v`).** On unix, the worker subcommands (`check`, `run`,
+  `native-build`, `repl`, `fmt`) re-execute the binary as a child that
+  runs the unchanged 256 MiB worker, with inherited stdio. The parent
+  reports `C0023` exactly when the child died of SIGABRT after a recorded
+  guard fault. It propagates every other exit, and a spawn or wait failure
+  is `C0022`. `C0023` is appended to `codes.tsv` and `CLI_ERROR_TABLE`
+  (spec 70 §1.2). The rows, in `lang_elab_native_stack_depth.rs`, are:
+  - **A.** N=1,000,000 through all five subcommands, both profiles: rc 1
+    with one last-line `C0023`. Only the parser reaches the production
+    limit; the elaborator and kernel walkers exhaust memory first.
+  - **B (debug).** With `KEN_CLI_DEBUG_WORKER_STACK_KIB` lowered,
+    `refresh_embedded_elim_evidence`, kernel `Term::clone` and the parser
+    each return `C0023`. The 1048576 KiB clamp keeps rc 0.
+  - **C.** The rows that are Ok today stay Ok through the child, including
+    release K=640, AC-1c N=400 `C0016` and the `C0022` spawn row.
+  - **D (linux).** An external ABRT gives rc 134 without `C0023`, and KILL
+    gives 137.
+- **AC-3 (mutation, QA).** The ruling's M1-M4 (no recorder install, no
+  fault-record test, no `cfg(unix)` block, knob ignored) each redden their
+  rows. Removing the worker still returns debug K=160 on 8 MiB to rc 134.
 
 ## Stop conditions
 
