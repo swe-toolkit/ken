@@ -46,6 +46,11 @@ D0 and ruled by the Architect. An open index still fails closed.
   - Write both counterexamples as closed, kernel-checked, reflexive casts
     at the landed base, one Σ-indexed and one function-indexed, and show
     each evaluates to `Unknown` (Check 4).
+  - Include the generated All-support witness (`lift_recursive_value`,
+    eval.rs ~:909/:941). Its predicate slot carries the eliminator's motive,
+    a function value, and RT-C5-PRODUCER-TYPE-SLOTS left it unfilled
+    (Architect `evt_7rtbs5j2730es` item 6). Its unit row there pins
+    `eq_type_eq(&w, &w) == false`.
   - Propose the mechanism for each shape, with a soundness argument that
     names what the evaluator may and may not read from a proof value under
     Ω proof irrelevance.

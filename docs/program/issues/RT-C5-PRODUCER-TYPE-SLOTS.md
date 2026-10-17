@@ -62,6 +62,18 @@ fails closed.
   `Unknown`. `neutral_inductive_type_app_index_does_not_cast` stays green and
   unedited.
 
+## AC-0 ruling (Architect `evt_7rtbs5j2730es`, on `5386dc871`)
+
+The repair is at the producers: each slot is the interpreter's own `eval` of
+a checked type term the producer already holds, keyed by GlobalId, with the
+existing filler as fallback. There is no `eq_type_eq` arm. Five writer groups
+are in scope: the two list primitives, the Bytes results (`bytes_at`,
+`bytes_slice`, `bytes_decode`), the directory listing and `file_error_value`,
+and `ken-cli` `process_input_value`. The ruling's per-writer code, AC-1 rows,
+required slot negative and consumer sweep are operative. Host `make_result`
+is cut to RT-C5-HOST-RESPONSE-RESULT-SLOTS. The All-support witnesses stay
+unfilled and go to RT-C5-COMPOUND-HIGHER-ORDER-INDICES AC-0.
+
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change (an operator question).
