@@ -3449,9 +3449,9 @@ pub struct ListCharIds {
 /// `inRangeBool` itself (that would need re-entering the Ken reduction,
 /// avoided here) — that agreement is a trusted bridge maintained by audit; if
 /// `inRangeBool` is ever narrowed, this range must be updated in lockstep.
-/// No precedent exists for a native prim re-invoking `eval` on elaborated
-/// terms mid-reduction — native + checked, the `neg_intN` posture, not
-/// demoted and not bare-trusted.
+/// The scalar decode remains native + checked, the `neg_intN` posture, not
+/// demoted or bare-trusted. Its constructor type slot is supplied separately
+/// by evaluating the primitive's checked result type.
 fn build_list_char(
     s: &str,
     ids: &ListCharIds,
