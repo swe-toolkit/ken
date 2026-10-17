@@ -1,7 +1,8 @@
 # Natural-coefficient polynomials
 
-Ordered monomials expose the structure produced by distributing a polynomial
-expression over natural numbers. The five laws are kernel-checked generic proofs.
+Ordered monomials expose the result of distributing natural-coefficient
+polynomials. A separate recursive Horner form collects like terms and decides
+semantic equality. Both representations have kernel-checked generic laws.
 
 ## Contents
 
@@ -19,7 +20,9 @@ A symbolic sum or product can be evaluated under a total environment without
 requiring variable bounds. Distribution into monomials gives an inspectable,
 ordered representation of that computation. A coefficient stores the
 predecessor of a positive natural number; a zero constant contributes no
-monomial. The representation does not sort variables or collect like terms.
+monomial. The ordered monomial representation does not sort variables or collect like
+terms. A canonical Horner representation supports equality of expressions
+that differ in their syntax and distributed monomial lists.
 
 ## 2. Definition
 
@@ -29,12 +32,21 @@ operations interpret either carrier, distribute products into monomial lists,
 reify those lists and normalize by reification. The carriers and their five
 constructors are exported alongside the public functions and laws; internal
 products and proof bridges remain private. Public laws lead the definition,
-so a reader can find each contract before its supporting proofs.
+so a reader can find each contract before its supporting proofs. The
+additional `Poly` carrier stores coefficients in a recursive Horner form;
+`canonicalize` builds it from distributed monomials, and `poly_eq` decides
+whether two expressions denote the same value under every total environment.
+Its three operations and five public laws follow the original definitions in
+the same module; the remaining Horner helpers and proof invariants are private.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
 
+import Core.Classes.LawfulClasses (IsTrue, bool_and, leq_nat)
+
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l, mul_add_distrib_r)
+
+import Data.Numeric.Nat.Order (sub, leq_nat_add_left_bound, leq_nat_add_right_bound)
 
 import Data.Collections.Derived (list_append)
 
@@ -619,6 +631,1361 @@ theorem monomial_expr_sound
           (monomial_expr_sound env k rest))
         (mul_swap_left (env v) (Suc k) (var_product env rest))
   }
+
+pub data Poly = PConst Nat | PHorner Poly Poly
+
+export PConst, PHorner
+
+pub fn eval_poly (env : Nat → Nat) (p : Poly) : Nat =
+  match p {
+    PConst c ↦ c;
+    PHorner p0 q ↦ add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero))
+  }
+
+pub fn canonicalize (e : Expr) : Poly = canon (monomials_poly (monomials e))
+
+pub fn poly_eq (e1 : Expr) (e2 : Expr) : Bool = poly_same (canonicalize e1) (canonicalize e2)
+
+pub theorem canonicalize_sound
+      (env : Nat → Nat) (e : Expr)
+    : Equal Nat (eval_poly env (canonicalize e)) (eval env e) =
+  trans
+    Nat
+    (eval_poly env (canon (monomials_poly (monomials e))))
+    (eval_poly env (monomials_poly (monomials e)))
+    (eval env e)
+    (canon_sound (monomials_poly (monomials e)) env)
+    (trans
+      Nat
+      (eval_poly env (monomials_poly (monomials e)))
+      (eval_monomials env (monomials e))
+      (eval env e)
+      (monomials_poly_sound (monomials e) env)
+      (monomials_sound env e))
+
+pub theorem canonicalize_complete
+      (e1 : Expr) (e2 : Expr) (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+    : Equal Poly (canonicalize e1) (canonicalize e2) =
+  poly_complete
+    (canonicalize e1)
+    (canonicalize e2)
+    (canon_canonical (monomials_poly (monomials e1)))
+    (canon_canonical (monomials_poly (monomials e2)))
+    (λenv.
+      λhe.
+        trans
+          Nat
+          (eval_poly env (canonicalize e1))
+          (eval env e1)
+          (eval_poly env (canonicalize e2))
+          (canonicalize_sound env e1)
+          (trans
+            Nat
+            (eval env e1)
+            (eval env e2)
+            (eval_poly env (canonicalize e2))
+            (h env)
+            (sym
+              Nat
+              (eval_poly env (canonicalize e2))
+              (eval env e2)
+              (canonicalize_sound env e2))))
+
+pub theorem poly_eq_sound
+      (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2)) (env : Nat → Nat)
+    : Equal Nat (eval env e1) (eval env e2) =
+  trans
+    Nat
+    (eval env e1)
+    (eval_poly env (canonicalize e1))
+    (eval env e2)
+    (sym Nat (eval_poly env (canonicalize e1)) (eval env e1) (canonicalize_sound env e1))
+    (trans
+      Nat
+      (eval_poly env (canonicalize e1))
+      (eval_poly env (canonicalize e2))
+      (eval env e2)
+      (cong
+        Poly
+        Nat
+        (canonicalize e1)
+        (canonicalize e2)
+        (λp. eval_poly env p)
+        (poly_same_sound (canonicalize e1) (canonicalize e2) h))
+      (canonicalize_sound env e2))
+
+pub theorem poly_eq_complete
+      (e1 : Expr) (e2 : Expr) (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+    : IsTrue (poly_eq e1 e2) =
+  J
+    (λy _. IsTrue (poly_same (canonicalize e1) y))
+    (poly_same_refl (canonicalize e1))
+    (canonicalize_complete e1 e2 h)
+
+pub theorem poly_eq_false_refutes
+      (e1 : Expr)
+      (e2 : Expr)
+      (hf : Equal Bool (poly_eq e1 e2) False)
+      (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+    : Bottom =
+  trans
+    Bool
+    False
+    (poly_eq e1 e2)
+    True
+    (sym Bool (poly_eq e1 e2) False hf)
+    (poly_eq_complete e1 e2 h)
+
+fn shift_env (env : Nat → Nat) (v : Nat) : Nat = env (Suc v)
+
+fn add_const (c : Nat) (p : Poly) : Poly =
+  match p {
+    PConst d ↦ PConst (add c d);
+    PHorner p0 q ↦ PHorner (add_const c p0) q
+  }
+
+fn add_poly (p : Poly) (r : Poly) : Poly =
+  match p {
+    PConst c ↦ add_const c r;
+    PHorner p0 q ↦
+      match r {
+        PConst d ↦ PHorner (add_const d p0) q;
+        PHorner r0 s ↦ PHorner (add_poly p0 r0) (add_poly q s)
+      }
+  }
+
+fn var_poly (v : Nat) (c : Nat) : Poly =
+  match v {
+    Zero ↦ PHorner (PConst Zero) (PConst c);
+    Suc w ↦ PHorner (var_poly w c) (PConst Zero)
+  }
+
+fn mul_var (p : Poly) (v : Nat) : Poly =
+  match p {
+    PConst c ↦ var_poly v c;
+    PHorner p0 q ↦
+      match v {
+        Zero ↦ PHorner (PConst Zero) (PHorner p0 q);
+        Suc w ↦ PHorner (mul_var p0 w) (mul_var q (Suc w))
+      }
+  }
+
+fn vars_poly (vs : List Nat) (k : Nat) : Poly =
+  match vs {
+    Nil ↦ PConst (Suc k);
+    Cons v rest ↦ mul_var (vars_poly rest k) v
+  }
+
+fn monomials_poly (ms : List Monomial) : Poly =
+  match ms {
+    Nil ↦ PConst Zero;
+    Cons m rest ↦
+      match m {
+        Mono k vs ↦ add_poly (vars_poly vs k) (monomials_poly rest)
+      }
+  }
+
+fn mk_horner (p : Poly) (q : Poly) : Poly =
+  match q {
+    PConst c ↦
+      match c {
+        Zero ↦
+          match p {
+            PConst d ↦ PConst d;
+            PHorner p1 q1 ↦ PHorner (PHorner p1 q1) (PConst Zero)
+          };
+        Suc c1 ↦ PHorner p (PConst (Suc c1))
+      };
+    PHorner q1 q2 ↦ PHorner p (PHorner q1 q2)
+  }
+
+fn canon (p : Poly) : Poly =
+  match p {
+    PConst c ↦ PConst c;
+    PHorner p0 q ↦ mk_horner (canon p0) (canon q)
+  }
+
+fn nondegenerate (p : Poly) (q : Poly) : Bool =
+  match q {
+    PConst c ↦
+      match c {
+        Zero ↦
+          match p {
+            PConst d ↦ False;
+            PHorner p1 q1 ↦ True
+          };
+        Suc c1 ↦ True
+      };
+    PHorner q1 q2 ↦ True
+  }
+
+fn is_canonical (p : Poly) : Bool =
+  match p {
+    PConst c ↦ True;
+    PHorner p0 q ↦ bool_and (nondegenerate p0 q) (bool_and (is_canonical p0) (is_canonical q))
+  }
+
+fn is_zero_poly (p : Poly) : Bool =
+  match p {
+    PConst c ↦
+      match c {
+        Zero ↦ True;
+        Suc c1 ↦ False
+      };
+    PHorner p0 q ↦ False
+  }
+
+fn nat_same (a : Nat) (b : Nat) : Bool = bool_and (leq_nat a b) (leq_nat b a)
+
+fn poly_same (p : Poly) (r : Poly) : Bool =
+  match p {
+    PConst c ↦
+      match r {
+        PConst d ↦ nat_same c d;
+        PHorner r0 s ↦ False
+      };
+    PHorner p0 q ↦
+      match r {
+        PConst d ↦ False;
+        PHorner r0 s ↦ bool_and (poly_same p0 r0) (poly_same q s)
+      }
+  }
+
+fn cons_env (x : Nat) (g : Nat → Nat) (v : Nat) : Nat =
+  match v {
+    Zero ↦ x;
+    Suc w ↦ g w
+  }
+
+fn one_env (v : Nat) : Nat = Suc Zero
+
+theorem add_cong
+      (a1 : Nat) (a2 : Nat) (b1 : Nat) (b2 : Nat) (p : Equal Nat a1 a2) (q : Equal Nat b1 b2)
+    : Equal Nat (add a1 b1) (add a2 b2) =
+  trans
+    Nat
+    (add a1 b1)
+    (add a2 b1)
+    (add a2 b2)
+    (cong Nat Nat a1 a2 (λt. add t b1) p)
+    (cong Nat Nat b1 b2 (λt. add a2 t) q)
+
+theorem add_interchange
+      (a : Nat) (b : Nat) (c : Nat) (d : Nat)
+    : Equal Nat (add (add a b) (add c d)) (add (add a c) (add b d)) =
+  trans
+    Nat
+    (add (add a b) (add c d))
+    (add a (add b (add c d)))
+    (add (add a c) (add b d))
+    (sym
+      Nat
+      (add a (add b (add c d)))
+      (add (add a b) (add c d))
+      ((proof assoc for add) a b (add c d)))
+    (trans
+      Nat
+      (add a (add b (add c d)))
+      (add a (add c (add b d)))
+      (add (add a c) (add b d))
+      (cong
+        Nat
+        Nat
+        (add b (add c d))
+        (add c (add b d))
+        (λt. add a t)
+        (trans
+          Nat
+          (add b (add c d))
+          (add (add b c) d)
+          (add c (add b d))
+          ((proof assoc for add) b c d)
+          (trans
+            Nat
+            (add (add b c) d)
+            (add (add c b) d)
+            (add c (add b d))
+            (cong Nat Nat (add b c) (add c b) (λt. add t d) ((proof comm for add) b c))
+            (sym Nat (add c (add b d)) (add (add c b) d) ((proof assoc for add) c b d)))))
+      ((proof assoc for add) a c (add b d)))
+
+theorem add_swap_tail
+      (d : Nat) (a : Nat) (m : Nat)
+    : Equal Nat (add (add d a) m) (add (add a m) d) =
+  trans
+    Nat
+    (add (add d a) m)
+    (add (add a d) m)
+    (add (add a m) d)
+    (cong Nat Nat (add d a) (add a d) (λt. add t m) ((proof comm for add) d a))
+    (trans
+      Nat
+      (add (add a d) m)
+      (add a (add d m))
+      (add (add a m) d)
+      (sym Nat (add a (add d m)) (add (add a d) m) ((proof assoc for add) a d m))
+      (trans
+        Nat
+        (add a (add d m))
+        (add a (add m d))
+        (add (add a m) d)
+        (cong Nat Nat (add d m) (add m d) (λt. add a t) ((proof comm for add) d m))
+        ((proof assoc for add) a m d)))
+
+theorem mul_swap_right
+      (q : Nat) (y : Nat) (x : Nat)
+    : Equal Nat (mul (mul q y) x) (mul (mul q x) y) =
+  trans
+    Nat
+    (mul (mul q y) x)
+    (mul q (mul y x))
+    (mul (mul q x) y)
+    (sym Nat (mul q (mul y x)) (mul (mul q y) x) ((proof assoc for mul) q y x))
+    (trans
+      Nat
+      (mul q (mul y x))
+      (mul q (mul x y))
+      (mul (mul q x) y)
+      (cong Nat Nat (mul y x) (mul x y) (λt. mul q t) ((proof comm for mul) y x))
+      ((proof assoc for mul) q x y))
+
+theorem mul_rotate
+      (a : Nat) (b : Nat) (c : Nat)
+    : Equal Nat (mul (mul a b) c) (mul a (mul c b)) =
+  trans
+    Nat
+    (mul (mul a b) c)
+    (mul a (mul b c))
+    (mul a (mul c b))
+    (sym Nat (mul a (mul b c)) (mul (mul a b) c) ((proof assoc for mul) a b c))
+    (cong Nat Nat (mul b c) (mul c b) (λt. mul a t) ((proof comm for mul) b c))
+
+theorem add_const_sound
+      (p : Poly)
+    : (env : Nat → Nat)
+      → (c : Nat)
+      → Equal Nat (eval_poly env (add_const c p)) (add c (eval_poly env p)) =
+  match p {
+    PConst d ↦ λenv. λc. Refl;
+    PHorner p0 q ↦
+      λenv.
+        λc.
+          trans
+            Nat
+            (add
+              (eval_poly (shift_env env) (add_const c p0))
+              (mul (eval_poly env q) (env Zero)))
+            (add (add c (eval_poly (shift_env env) p0)) (mul (eval_poly env q) (env Zero)))
+            (add c (add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero))))
+            (cong
+              Nat
+              Nat
+              (eval_poly (shift_env env) (add_const c p0))
+              (add c (eval_poly (shift_env env) p0))
+              (λt. add t (mul (eval_poly env q) (env Zero)))
+              (add_const_sound p0 (shift_env env) c))
+            (sym
+              Nat
+              (add c (add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero))))
+              (add (add c (eval_poly (shift_env env) p0)) (mul (eval_poly env q) (env Zero)))
+              ((proof assoc for add)
+                c
+                (eval_poly (shift_env env) p0)
+                (mul (eval_poly env q) (env Zero))))
+  }
+
+theorem add_poly_sound
+      (p : Poly)
+    : (r : Poly)
+      → (env : Nat → Nat)
+      → Equal Nat (eval_poly env (add_poly p r)) (add (eval_poly env p) (eval_poly env r)) =
+  match p {
+    PConst c ↦ λr. λenv. add_const_sound r env c;
+    PHorner p0 q ↦
+      λr.
+        match r {
+          PConst d ↦
+            λenv.
+              trans
+                Nat
+                (add
+                  (eval_poly (shift_env env) (add_const d p0))
+                  (mul (eval_poly env q) (env Zero)))
+                (add (add d (eval_poly (shift_env env) p0)) (mul (eval_poly env q) (env Zero)))
+                (add (add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero))) d)
+                (cong
+                  Nat
+                  Nat
+                  (eval_poly (shift_env env) (add_const d p0))
+                  (add d (eval_poly (shift_env env) p0))
+                  (λt. add t (mul (eval_poly env q) (env Zero)))
+                  (add_const_sound p0 (shift_env env) d))
+                (add_swap_tail
+                  d
+                  (eval_poly (shift_env env) p0)
+                  (mul (eval_poly env q) (env Zero)));
+          PHorner r0 s ↦
+            λenv.
+              trans
+                Nat
+                (add
+                  (eval_poly (shift_env env) (add_poly p0 r0))
+                  (mul (eval_poly env (add_poly q s)) (env Zero)))
+                (add
+                  (add (eval_poly (shift_env env) p0) (eval_poly (shift_env env) r0))
+                  (add (mul (eval_poly env q) (env Zero)) (mul (eval_poly env s) (env Zero))))
+                (add
+                  (add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero)))
+                  (add (eval_poly (shift_env env) r0) (mul (eval_poly env s) (env Zero))))
+                (add_cong
+                  (eval_poly (shift_env env) (add_poly p0 r0))
+                  (add (eval_poly (shift_env env) p0) (eval_poly (shift_env env) r0))
+                  (mul (eval_poly env (add_poly q s)) (env Zero))
+                  (add (mul (eval_poly env q) (env Zero)) (mul (eval_poly env s) (env Zero)))
+                  (add_poly_sound p0 r0 (shift_env env))
+                  (trans
+                    Nat
+                    (mul (eval_poly env (add_poly q s)) (env Zero))
+                    (mul (add (eval_poly env q) (eval_poly env s)) (env Zero))
+                    (add (mul (eval_poly env q) (env Zero)) (mul (eval_poly env s) (env Zero)))
+                    (cong
+                      Nat
+                      Nat
+                      (eval_poly env (add_poly q s))
+                      (add (eval_poly env q) (eval_poly env s))
+                      (λt. mul t (env Zero))
+                      (add_poly_sound q s env))
+                    (mul_add_distrib_l (eval_poly env q) (eval_poly env s) (env Zero))))
+                (add_interchange
+                  (eval_poly (shift_env env) p0)
+                  (eval_poly (shift_env env) r0)
+                  (mul (eval_poly env q) (env Zero))
+                  (mul (eval_poly env s) (env Zero)))
+        }
+  }
+
+theorem var_poly_sound
+      (v : Nat)
+    : (env : Nat → Nat) → (c : Nat) → Equal Nat (eval_poly env (var_poly v c)) (mul c (env v)) =
+  match v {
+    Zero ↦ λenv. λc. (proof zero_l for add) (mul c (env Zero));
+    Suc w ↦
+      λenv.
+        λc.
+          add_cong
+            (eval_poly (shift_env env) (var_poly w c))
+            (mul c (env (Suc w)))
+            (mul Zero (env Zero))
+            Zero
+            (var_poly_sound w (shift_env env) c)
+            ((proof zero_l for mul) (env Zero))
+  }
+
+theorem mul_var_sound
+      (p : Poly)
+    : (v : Nat)
+      → (env : Nat → Nat)
+      → Equal Nat (eval_poly env (mul_var p v)) (mul (eval_poly env p) (env v)) =
+  match p {
+    PConst c ↦ λv. λenv. var_poly_sound v env c;
+    PHorner p0 q ↦
+      λv.
+        match v {
+          Zero ↦ λenv. (proof zero_l for add) (mul (eval_poly env (PHorner p0 q)) (env Zero));
+          Suc w ↦
+            λenv.
+              trans
+                Nat
+                (add
+                  (eval_poly (shift_env env) (mul_var p0 w))
+                  (mul (eval_poly env (mul_var q (Suc w))) (env Zero)))
+                (add
+                  (mul (eval_poly (shift_env env) p0) (env (Suc w)))
+                  (mul (mul (eval_poly env q) (env (Suc w))) (env Zero)))
+                (mul
+                  (add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero)))
+                  (env (Suc w)))
+                (add_cong
+                  (eval_poly (shift_env env) (mul_var p0 w))
+                  (mul (eval_poly (shift_env env) p0) (env (Suc w)))
+                  (mul (eval_poly env (mul_var q (Suc w))) (env Zero))
+                  (mul (mul (eval_poly env q) (env (Suc w))) (env Zero))
+                  (mul_var_sound p0 w (shift_env env))
+                  (cong
+                    Nat
+                    Nat
+                    (eval_poly env (mul_var q (Suc w)))
+                    (mul (eval_poly env q) (env (Suc w)))
+                    (λt. mul t (env Zero))
+                    (mul_var_sound q (Suc w) env)))
+                (trans
+                  Nat
+                  (add
+                    (mul (eval_poly (shift_env env) p0) (env (Suc w)))
+                    (mul (mul (eval_poly env q) (env (Suc w))) (env Zero)))
+                  (add
+                    (mul (eval_poly (shift_env env) p0) (env (Suc w)))
+                    (mul (mul (eval_poly env q) (env Zero)) (env (Suc w))))
+                  (mul
+                    (add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero)))
+                    (env (Suc w)))
+                  (cong
+                    Nat
+                    Nat
+                    (mul (mul (eval_poly env q) (env (Suc w))) (env Zero))
+                    (mul (mul (eval_poly env q) (env Zero)) (env (Suc w)))
+                    (λt. add (mul (eval_poly (shift_env env) p0) (env (Suc w))) t)
+                    (mul_swap_right (eval_poly env q) (env (Suc w)) (env Zero)))
+                  (sym
+                    Nat
+                    (mul
+                      (add (eval_poly (shift_env env) p0) (mul (eval_poly env q) (env Zero)))
+                      (env (Suc w)))
+                    (add
+                      (mul (eval_poly (shift_env env) p0) (env (Suc w)))
+                      (mul (mul (eval_poly env q) (env Zero)) (env (Suc w))))
+                    (mul_add_distrib_l
+                      (eval_poly (shift_env env) p0)
+                      (mul (eval_poly env q) (env Zero))
+                      (env (Suc w)))))
+        }
+  }
+
+theorem vars_poly_sound
+      (vs : List Nat)
+    : (k : Nat)
+      → (env : Nat → Nat)
+      → Equal Nat (eval_poly env (vars_poly vs k)) (eval_monomial env (Mono k vs)) =
+  match vs {
+    Nil ↦ λk. λenv. sym Nat (mul (Suc k) (Suc Zero)) (Suc k) ((proof one_r for mul) (Suc k));
+    Cons v rest ↦
+      λk.
+        λenv.
+          trans
+            Nat
+            (eval_poly env (mul_var (vars_poly rest k) v))
+            (mul (eval_poly env (vars_poly rest k)) (env v))
+            (mul (Suc k) (mul (env v) (var_product env rest)))
+            (mul_var_sound (vars_poly rest k) v env)
+            (trans
+              Nat
+              (mul (eval_poly env (vars_poly rest k)) (env v))
+              (mul (mul (Suc k) (var_product env rest)) (env v))
+              (mul (Suc k) (mul (env v) (var_product env rest)))
+              (cong
+                Nat
+                Nat
+                (eval_poly env (vars_poly rest k))
+                (mul (Suc k) (var_product env rest))
+                (λt. mul t (env v))
+                (vars_poly_sound rest k env))
+              (mul_rotate (Suc k) (var_product env rest) (env v)))
+  }
+
+theorem monomials_poly_sound
+      (ms : List Monomial)
+    : (env : Nat → Nat)
+      → Equal Nat (eval_poly env (monomials_poly ms)) (eval_monomials env ms) =
+  match ms {
+    Nil ↦ λenv. Proved;
+    Cons m rest ↦
+      match m {
+        Mono k vs ↦
+          λenv.
+            trans
+              Nat
+              (eval_poly env (add_poly (vars_poly vs k) (monomials_poly rest)))
+              (add (eval_poly env (vars_poly vs k)) (eval_poly env (monomials_poly rest)))
+              (add (eval_monomial env (Mono k vs)) (eval_monomials env rest))
+              (add_poly_sound (vars_poly vs k) (monomials_poly rest) env)
+              (add_cong
+                (eval_poly env (vars_poly vs k))
+                (eval_monomial env (Mono k vs))
+                (eval_poly env (monomials_poly rest))
+                (eval_monomials env rest)
+                (vars_poly_sound vs k env)
+                (monomials_poly_sound rest env))
+      }
+  }
+
+theorem mk_horner_sound
+      (q : Poly)
+    : (p : Poly)
+      → (env : Nat → Nat)
+      → Equal Nat (eval_poly env (mk_horner p q)) (eval_poly env (PHorner p q)) =
+  match q {
+    PConst c ↦
+      match c {
+        Zero ↦
+          λp.
+            match p {
+              PConst d ↦
+                λenv.
+                  sym
+                    Nat
+                    (add d (mul Zero (env Zero)))
+                    d
+                    (cong
+                      Nat
+                      Nat
+                      (mul Zero (env Zero))
+                      Zero
+                      (λt. add d t)
+                      ((proof zero_l for mul) (env Zero)));
+              PHorner p1 q1 ↦ λenv. Refl
+            };
+        Suc c1 ↦ λp. λenv. Refl
+      };
+    PHorner q1 q2 ↦ λp. λenv. Refl
+  }
+
+theorem canon_sound
+      (p : Poly)
+    : (env : Nat → Nat) → Equal Nat (eval_poly env (canon p)) (eval_poly env p) =
+  match p {
+    PConst c ↦ λenv. Refl;
+    PHorner p0 q ↦
+      λenv.
+        trans
+          Nat
+          (eval_poly env (mk_horner (canon p0) (canon q)))
+          (eval_poly env (PHorner (canon p0) (canon q)))
+          (eval_poly env (PHorner p0 q))
+          (mk_horner_sound (canon q) (canon p0) env)
+          (add_cong
+            (eval_poly (shift_env env) (canon p0))
+            (eval_poly (shift_env env) p0)
+            (mul (eval_poly env (canon q)) (env Zero))
+            (mul (eval_poly env q) (env Zero))
+            (canon_sound p0 (shift_env env))
+            (cong
+              Nat
+              Nat
+              (eval_poly env (canon q))
+              (eval_poly env q)
+              (λt. mul t (env Zero))
+              (canon_sound q env)))
+  }
+
+theorem mk_horner_canonical
+      (q : Poly)
+    : (p : Poly)
+      → IsTrue (is_canonical p)
+      → IsTrue (is_canonical q)
+      → IsTrue (is_canonical (mk_horner p q)) =
+  match q {
+    PConst c ↦
+      match c {
+        Zero ↦
+          λp.
+            match p {
+              PConst d ↦ λhp. λhq. Proved;
+              PHorner p1 q1 ↦
+                λhp.
+                  λhq. (proof intro for bool_and) (is_canonical (PHorner p1 q1)) True hp Proved
+            };
+        Suc c1 ↦ λp. λhp. λhq. (proof intro for bool_and) (is_canonical p) True hp Proved
+      };
+    PHorner q1 q2 ↦
+      λp.
+        λhp.
+          λhq. (proof intro for bool_and) (is_canonical p) (is_canonical (PHorner q1 q2)) hp hq
+  }
+
+theorem canon_canonical (p : Poly) : IsTrue (is_canonical (canon p)) =
+  match p {
+    PConst c ↦ Proved;
+    PHorner p0 q ↦
+      mk_horner_canonical (canon q) (canon p0) (canon_canonical p0) (canon_canonical q)
+  }
+
+theorem suc_leq_self (a : Nat) : IsTrue (leq_nat (Suc a) a) → Bottom =
+  match a {
+    Zero ↦ λh. h;
+    Suc a2 ↦ λh. suc_leq_self a2 h
+  }
+
+theorem mul_positive
+      (a : Nat) (b : Nat)
+    : IsTrue (leq_nat (Suc Zero) a)
+      → IsTrue (leq_nat (Suc Zero) b)
+      → IsTrue (leq_nat (Suc Zero) (mul a b)) =
+  match b {
+    Zero ↦ λha. λhb. absurd hb;
+    Suc b2 ↦
+      λha.
+        λhb.
+          (proof trans for leq_nat)
+            (Suc Zero)
+            a
+            (add (mul a b2) a)
+            ha
+            (leq_nat_add_right_bound (mul a b2) a)
+  }
+
+theorem mul_ge_right
+      (q : Nat) (k : Nat)
+    : IsTrue (leq_nat (Suc Zero) q) → IsTrue (leq_nat k (mul q k)) =
+  match q {
+    Zero ↦ λh. absurd h;
+    Suc q2 ↦
+      λh.
+        J
+          (λy _. IsTrue (leq_nat k y))
+          (leq_nat_add_right_bound (mul k q2) k)
+          ((proof comm for mul) k (Suc q2))
+  }
+
+theorem mul_cancel_positive
+      (a : Nat) (b : Nat) (x : Nat)
+    : IsTrue (leq_nat (Suc Zero) x) → Equal Nat (mul a x) (mul b x) → Equal Nat a b =
+  match x {
+    Zero ↦ λhx. λh. absurd hx;
+    Suc k ↦ λhx. λh. (proof cancel_r for mul) a b k h
+  }
+
+theorem add_cancel_right
+      (a : Nat) (b : Nat)
+    : (c : Nat) → Equal Nat (add a c) (add b c) → Equal Nat a b =
+  λc.
+    match c {
+      Zero ↦ λh. h;
+      Suc c2 ↦
+        λh.
+          add_cancel_right
+            a
+            b
+            c2
+            (cong Nat Nat (Suc (add a c2)) (Suc (add b c2)) (λn. sub n (Suc Zero)) h)
+    }
+
+theorem add_cancel_left
+      (a : Nat) (b : Nat) (c : Nat) (h : Equal Nat (add a b) (add a c))
+    : Equal Nat b c =
+  add_cancel_right
+    b
+    c
+    a
+    (trans
+      Nat
+      (add b a)
+      (add a b)
+      (add c a)
+      ((proof comm for add) b a)
+      (trans Nat (add a b) (add a c) (add c a) h ((proof comm for add) a c)))
+
+theorem remainder_unique
+      (x : Nat) (a : Nat) (b : Nat) (m : Nat)
+    : (n : Nat)
+      → IsTrue (leq_nat (Suc a) x)
+      → IsTrue (leq_nat (Suc b) x)
+      → Equal Nat (add a (mul x m)) (add b (mul x n))
+      → Equal Nat a b =
+  match m {
+    Zero ↦
+      λn.
+        match n {
+          Zero ↦ λha. λhb. λh. h;
+          Suc n2 ↦
+            λha.
+              λhb.
+                λh.
+                  absurd
+                    (suc_leq_self
+                      a
+                      ((proof trans for leq_nat)
+                        (Suc a)
+                        x
+                        a
+                        ha
+                        (J
+                          (λy _. IsTrue (leq_nat x y))
+                          ((proof trans for leq_nat)
+                            x
+                            (add (mul x n2) x)
+                            (add b (add (mul x n2) x))
+                            (leq_nat_add_right_bound (mul x n2) x)
+                            (leq_nat_add_right_bound b (add (mul x n2) x)))
+                          (sym Nat a (add b (add (mul x n2) x)) h))))
+        };
+    Suc m2 ↦
+      λn.
+        match n {
+          Zero ↦
+            λha.
+              λhb.
+                λh.
+                  absurd
+                    (suc_leq_self
+                      b
+                      ((proof trans for leq_nat)
+                        (Suc b)
+                        x
+                        b
+                        hb
+                        (J
+                          (λy _. IsTrue (leq_nat x y))
+                          ((proof trans for leq_nat)
+                            x
+                            (add (mul x m2) x)
+                            (add a (add (mul x m2) x))
+                            (leq_nat_add_right_bound (mul x m2) x)
+                            (leq_nat_add_right_bound a (add (mul x m2) x)))
+                          h)));
+          Suc n2 ↦
+            λha.
+              λhb.
+                λh.
+                  remainder_unique
+                    x
+                    a
+                    b
+                    m2
+                    n2
+                    ha
+                    hb
+                    (add_cancel_right
+                      (add a (mul x m2))
+                      (add b (mul x n2))
+                      x
+                      (trans
+                        Nat
+                        (add (add a (mul x m2)) x)
+                        (add a (add (mul x m2) x))
+                        (add (add b (mul x n2)) x)
+                        (sym
+                          Nat
+                          (add a (add (mul x m2) x))
+                          (add (add a (mul x m2)) x)
+                          ((proof assoc for add) a (mul x m2) x))
+                        (trans
+                          Nat
+                          (add a (add (mul x m2) x))
+                          (add b (add (mul x n2) x))
+                          (add (add b (mul x n2)) x)
+                          h
+                          ((proof assoc for add) b (mul x n2) x))))
+        }
+  }
+
+theorem cons_positive
+      (x : Nat)
+      (g : Nat → Nat)
+      (hx : IsTrue (leq_nat (Suc Zero) x))
+      (hg : (v : Nat) → IsTrue (leq_nat (Suc Zero) (g v)))
+    : (v : Nat) → IsTrue (leq_nat (Suc Zero) (cons_env x g v)) =
+  λv.
+    match v {
+      Zero ↦ hx;
+      Suc w ↦ hg w
+    }
+
+theorem shift_cons_eval
+      (x : Nat) (g : Nat → Nat) (p : Poly)
+    : Equal Nat (eval_poly (shift_env (cons_env x g)) p) (eval_poly g p) =
+  cong (Nat → Nat) Nat (shift_env (cons_env x g)) g (λe. eval_poly e p) (λv. Refl)
+
+theorem horner_positive
+      (q : Poly)
+    : (p0 : Poly)
+      → (IsTrue
+          (is_canonical p0)
+          → Equal
+          Bool
+          (is_zero_poly p0)
+          False
+          → (env : Nat → Nat)
+          → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+          → IsTrue
+          (leq_nat (Suc Zero) (eval_poly env p0)))
+      → (IsTrue
+          (is_canonical q)
+          → Equal
+          Bool
+          (is_zero_poly q)
+          False
+          → (env : Nat → Nat)
+          → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+          → IsTrue
+          (leq_nat (Suc Zero) (eval_poly env q)))
+      → IsTrue (is_canonical (PHorner p0 q))
+      → (env : Nat → Nat)
+      → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+      → IsTrue (leq_nat (Suc Zero) (eval_poly env (PHorner p0 q))) =
+  match q {
+    PConst c ↦
+      match c {
+        Zero ↦
+          λp0.
+            match p0 {
+              PConst d ↦ λihp. λihq. λhc. absurd hc;
+              PHorner a b ↦
+                λihp.
+                  λihq.
+                    λhc.
+                      λenv.
+                        λhpos.
+                          (proof trans for leq_nat)
+                            (Suc Zero)
+                            (eval_poly (shift_env env) (PHorner a b))
+                            (add
+                              (eval_poly (shift_env env) (PHorner a b))
+                              (mul Zero (env Zero)))
+                            (ihp
+                              ((proof left for bool_and) (is_canonical (PHorner a b)) True hc)
+                              Proved
+                              (shift_env env)
+                              (λv. hpos (Suc v)))
+                            (leq_nat_add_left_bound
+                              (eval_poly (shift_env env) (PHorner a b))
+                              (mul Zero (env Zero)))
+            };
+        Suc c1 ↦
+          λp0.
+            λihp.
+              λihq.
+                λhc.
+                  λenv.
+                    λhpos.
+                      (proof trans for leq_nat)
+                        (Suc Zero)
+                        (mul (Suc c1) (env Zero))
+                        (add (eval_poly (shift_env env) p0) (mul (Suc c1) (env Zero)))
+                        (mul_positive (Suc c1) (env Zero) Proved (hpos Zero))
+                        (leq_nat_add_right_bound
+                          (eval_poly (shift_env env) p0)
+                          (mul (Suc c1) (env Zero)))
+      };
+    PHorner q1 q2 ↦
+      λp0.
+        λihp.
+          λihq.
+            λhc.
+              λenv.
+                λhpos.
+                  (proof trans for leq_nat)
+                    (Suc Zero)
+                    (mul (eval_poly env (PHorner q1 q2)) (env Zero))
+                    (add
+                      (eval_poly (shift_env env) p0)
+                      (mul (eval_poly env (PHorner q1 q2)) (env Zero)))
+                    (mul_positive
+                      (eval_poly env (PHorner q1 q2))
+                      (env Zero)
+                      (ihq
+                        ((proof right for bool_and)
+                          (is_canonical p0)
+                          (is_canonical (PHorner q1 q2))
+                          hc)
+                        Proved
+                        env
+                        hpos)
+                      (hpos Zero))
+                    (leq_nat_add_right_bound
+                      (eval_poly (shift_env env) p0)
+                      (mul (eval_poly env (PHorner q1 q2)) (env Zero)))
+  }
+
+theorem canonical_positive
+      (p : Poly)
+    : IsTrue (is_canonical p)
+      → Equal Bool (is_zero_poly p) False
+      → (env : Nat → Nat)
+      → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+      → IsTrue (leq_nat (Suc Zero) (eval_poly env p)) =
+  match p {
+    PConst c ↦
+      match c {
+        Zero ↦ λhc. λhz. absurd hz;
+        Suc c1 ↦ λhc. λhz. λenv. λhpos. Proved
+      };
+    PHorner p0 q ↦
+      λhc. λhz. horner_positive q p0 (canonical_positive p0) (canonical_positive q) hc
+  }
+
+theorem nonzero_horner_exceeds
+      (a : Nat) (q : Nat) (b : Nat)
+    : IsTrue (leq_nat (Suc Zero) q) → Equal Nat (add a (mul q (Suc b))) b → Bottom =
+  λhq.
+    λh.
+      suc_leq_self
+        b
+        (J
+          (λy _. IsTrue (leq_nat (Suc b) y))
+          ((proof trans for leq_nat)
+            (Suc b)
+            (mul q (Suc b))
+            (add a (mul q (Suc b)))
+            (mul_ge_right q (Suc b) hq)
+            (leq_nat_add_right_bound a (mul q (Suc b))))
+          h)
+
+theorem horner_const
+      (q : Poly)
+    : (p0 : Poly)
+      → ((b : Nat)
+          → IsTrue
+          (is_canonical p0)
+          → ((env : Nat → Nat)
+            → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+            → Equal
+            Nat
+            (eval_poly env p0)
+            b)
+          → Equal
+          Poly
+          p0
+          (PConst b))
+      → (b : Nat)
+      → IsTrue (is_canonical (PHorner p0 q))
+      → ((env : Nat → Nat)
+          → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+          → Equal
+          Nat
+          (eval_poly env (PHorner p0 q))
+          b)
+      → Equal Poly (PHorner p0 q) (PConst b) =
+  match q {
+    PConst c ↦
+      match c {
+        Zero ↦
+          λp0.
+            match p0 {
+              PConst d ↦ λihc. λb. λhc. λh. absurd hc;
+              PHorner a e ↦
+                λihc.
+                  λb.
+                    λhc.
+                      λh.
+                        absurd
+                          (ihc
+                            b
+                            ((proof left for bool_and) (is_canonical (PHorner a e)) True hc)
+                            (λg.
+                              λhg.
+                                trans
+                                  Nat
+                                  (eval_poly g (PHorner a e))
+                                  (eval_poly (shift_env (cons_env (Suc Zero) g)) (PHorner a e))
+                                  b
+                                  (sym
+                                    Nat
+                                    (eval_poly
+                                      (shift_env (cons_env (Suc Zero) g))
+                                      (PHorner a e))
+                                    (eval_poly g (PHorner a e))
+                                    (shift_cons_eval (Suc Zero) g (PHorner a e)))
+                                  (h
+                                    (cons_env (Suc Zero) g)
+                                    (cons_positive (Suc Zero) g Proved hg))))
+            };
+        Suc c1 ↦
+          λp0.
+            λihc.
+              λb.
+                λhc.
+                  λh.
+                    absurd
+                      (nonzero_horner_exceeds
+                        (eval_poly (shift_env (cons_env (Suc b) one_env)) p0)
+                        (Suc c1)
+                        b
+                        Proved
+                        (h
+                          (cons_env (Suc b) one_env)
+                          (cons_positive (Suc b) one_env Proved (λv. Proved))))
+      };
+    PHorner q1 q2 ↦
+      λp0.
+        λihc.
+          λb.
+            λhc.
+              λh.
+                absurd
+                  (nonzero_horner_exceeds
+                    (eval_poly (shift_env (cons_env (Suc b) one_env)) p0)
+                    (eval_poly (cons_env (Suc b) one_env) (PHorner q1 q2))
+                    b
+                    (canonical_positive
+                      (PHorner q1 q2)
+                      ((proof right for bool_and)
+                        (is_canonical p0)
+                        (is_canonical (PHorner q1 q2))
+                        hc)
+                      Proved
+                      (cons_env (Suc b) one_env)
+                      (cons_positive (Suc b) one_env Proved (λv. Proved)))
+                    (h
+                      (cons_env (Suc b) one_env)
+                      (cons_positive (Suc b) one_env Proved (λv. Proved))))
+  }
+
+theorem const_complete
+      (q : Poly)
+    : (b : Nat)
+      → IsTrue (is_canonical q)
+      → ((env : Nat → Nat)
+          → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+          → Equal
+          Nat
+          (eval_poly env q)
+          b)
+      → Equal Poly q (PConst b) =
+  match q {
+    PConst c ↦ λb. λhc. λh. cong Nat Poly c b PConst (h one_env (λv. Proved));
+    PHorner p0 q0 ↦ horner_const q0 p0 (const_complete p0)
+  }
+
+theorem poly_complete
+      (p : Poly)
+    : (r : Poly)
+      → IsTrue (is_canonical p)
+      → IsTrue (is_canonical r)
+      → ((env : Nat → Nat)
+          → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+          → Equal
+          Nat
+          (eval_poly env p)
+          (eval_poly env r))
+      → Equal Poly p r =
+  match p {
+    PConst c ↦
+      λr.
+        λhp.
+          λhr.
+            λh.
+              sym
+                Poly
+                r
+                (PConst c)
+                (const_complete r c hr (λenv. λhe. sym Nat c (eval_poly env r) (h env he)));
+    PHorner p1 q1 ↦
+      λr.
+        match r {
+          PConst d ↦ λhp. λhr. λh. const_complete (PHorner p1 q1) d hp h;
+          PHorner p2 q2 ↦
+            λhp.
+              λhr.
+                λh.
+                  let
+                    hc1 : IsTrue (bool_and (is_canonical p1) (is_canonical q1)) =
+                      (proof right for bool_and)
+                        (nondegenerate p1 q1)
+                        (bool_and (is_canonical p1) (is_canonical q1))
+                        hp;
+                    hc2 : IsTrue (bool_and (is_canonical p2) (is_canonical q2)) =
+                      (proof right for bool_and)
+                        (nondegenerate p2 q2)
+                        (bool_and (is_canonical p2) (is_canonical q2))
+                        hr;
+                    agree_head : (g : Nat → Nat)
+                      → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (g v)))
+                      → Equal Nat
+                      (eval_poly g p1)
+                      (eval_poly g p2) =
+                      λg.
+                        λhg.
+                          let
+                            separating_value : Nat =
+                              Suc (add (eval_poly g p1) (eval_poly g p2));
+                            separating_env : Nat → Nat = cons_env separating_value g
+                          in
+                            remainder_unique
+                              separating_value
+                              (eval_poly g p1)
+                              (eval_poly g p2)
+                              (eval_poly separating_env q1)
+                              (eval_poly separating_env q2)
+                              (leq_nat_add_left_bound (eval_poly g p1) (eval_poly g p2))
+                              (leq_nat_add_right_bound (eval_poly g p1) (eval_poly g p2))
+                              (trans
+                                Nat
+                                (add
+                                  (eval_poly g p1)
+                                  (mul separating_value (eval_poly separating_env q1)))
+                                (add
+                                  (eval_poly (shift_env separating_env) p1)
+                                  (mul (eval_poly separating_env q1) separating_value))
+                                (add
+                                  (eval_poly g p2)
+                                  (mul separating_value (eval_poly separating_env q2)))
+                                (add_cong
+                                  (eval_poly g p1)
+                                  (eval_poly (shift_env separating_env) p1)
+                                  (mul separating_value (eval_poly separating_env q1))
+                                  (mul (eval_poly separating_env q1) separating_value)
+                                  (sym
+                                    Nat
+                                    (eval_poly (shift_env separating_env) p1)
+                                    (eval_poly g p1)
+                                    (shift_cons_eval separating_value g p1))
+                                  ((proof comm for mul)
+                                    separating_value
+                                    (eval_poly separating_env q1)))
+                                (trans
+                                  Nat
+                                  (add
+                                    (eval_poly (shift_env separating_env) p1)
+                                    (mul (eval_poly separating_env q1) separating_value))
+                                  (add
+                                    (eval_poly (shift_env separating_env) p2)
+                                    (mul (eval_poly separating_env q2) separating_value))
+                                  (add
+                                    (eval_poly g p2)
+                                    (mul separating_value (eval_poly separating_env q2)))
+                                  (h
+                                    separating_env
+                                    (cons_positive separating_value g Proved hg))
+                                  (add_cong
+                                    (eval_poly (shift_env separating_env) p2)
+                                    (eval_poly g p2)
+                                    (mul (eval_poly separating_env q2) separating_value)
+                                    (mul separating_value (eval_poly separating_env q2))
+                                    (shift_cons_eval separating_value g p2)
+                                    ((proof comm for mul)
+                                      (eval_poly separating_env q2)
+                                      separating_value))));
+                    agree_tail : (env : Nat → Nat)
+                      → ((v : Nat) → IsTrue (leq_nat (Suc Zero) (env v)))
+                      → Equal Nat
+                      (eval_poly env q1)
+                      (eval_poly env q2) =
+                      λenv.
+                        λhe.
+                          mul_cancel_positive
+                            (eval_poly env q1)
+                            (eval_poly env q2)
+                            (env Zero)
+                            (he Zero)
+                            (add_cancel_left
+                              (eval_poly (shift_env env) p2)
+                              (mul (eval_poly env q1) (env Zero))
+                              (mul (eval_poly env q2) (env Zero))
+                              (trans
+                                Nat
+                                (add
+                                  (eval_poly (shift_env env) p2)
+                                  (mul (eval_poly env q1) (env Zero)))
+                                (add
+                                  (eval_poly (shift_env env) p1)
+                                  (mul (eval_poly env q1) (env Zero)))
+                                (add
+                                  (eval_poly (shift_env env) p2)
+                                  (mul (eval_poly env q2) (env Zero)))
+                                (cong
+                                  Nat
+                                  Nat
+                                  (eval_poly (shift_env env) p2)
+                                  (eval_poly (shift_env env) p1)
+                                  (λt. add t (mul (eval_poly env q1) (env Zero)))
+                                  (sym
+                                    Nat
+                                    (eval_poly (shift_env env) p1)
+                                    (eval_poly (shift_env env) p2)
+                                    (agree_head (shift_env env) (λv. he (Suc v)))))
+                                (h env he)))
+                  in
+                    trans
+                      Poly
+                      (PHorner p1 q1)
+                      (PHorner p2 q1)
+                      (PHorner p2 q2)
+                      (cong
+                        Poly
+                        Poly
+                        p1
+                        p2
+                        (λt. PHorner t q1)
+                        (poly_complete
+                          p1
+                          p2
+                          ((proof left for bool_and) (is_canonical p1) (is_canonical q1) hc1)
+                          ((proof left for bool_and) (is_canonical p2) (is_canonical q2) hc2)
+                          agree_head))
+                      (cong
+                        Poly
+                        Poly
+                        q1
+                        q2
+                        (λt. PHorner p2 t)
+                        (poly_complete
+                          q1
+                          q2
+                          ((proof right for bool_and) (is_canonical p1) (is_canonical q1) hc1)
+                          ((proof right for bool_and) (is_canonical p2) (is_canonical q2) hc2)
+                          agree_tail))
+        }
+  }
+
+theorem poly_same_sound (p : Poly) : (r : Poly) → IsTrue (poly_same p r) → Equal Poly p r =
+  match p {
+    PConst c ↦
+      λr.
+        match r {
+          PConst d ↦
+            λh.
+              cong
+                Nat
+                Poly
+                c
+                d
+                PConst
+                ((proof antisym for leq_nat)
+                  c
+                  d
+                  ((proof left for bool_and) (leq_nat c d) (leq_nat d c) h)
+                  ((proof right for bool_and) (leq_nat c d) (leq_nat d c) h));
+          PHorner r0 s ↦ λh. absurd h
+        };
+    PHorner p0 q ↦
+      λr.
+        match r {
+          PConst d ↦ λh. absurd h;
+          PHorner r0 s ↦
+            λh.
+              trans
+                Poly
+                (PHorner p0 q)
+                (PHorner r0 q)
+                (PHorner r0 s)
+                (cong
+                  Poly
+                  Poly
+                  p0
+                  r0
+                  (λt. PHorner t q)
+                  (poly_same_sound
+                    p0
+                    r0
+                    ((proof left for bool_and) (poly_same p0 r0) (poly_same q s) h)))
+                (cong
+                  Poly
+                  Poly
+                  q
+                  s
+                  (λt. PHorner r0 t)
+                  (poly_same_sound
+                    q
+                    s
+                    ((proof right for bool_and) (poly_same p0 r0) (poly_same q s) h)))
+        }
+  }
+
+theorem poly_same_refl (p : Poly) : IsTrue (poly_same p p) =
+  match p {
+    PConst c ↦
+      (proof intro for bool_and)
+        (leq_nat c c)
+        (leq_nat c c)
+        ((proof refl for leq_nat) c)
+        ((proof refl for leq_nat) c);
+    PHorner p0 q ↦
+      (proof intro for bool_and)
+        (poly_same p0 p0)
+        (poly_same q q)
+        (poly_same_refl p0)
+        (poly_same_refl q)
+  }
 ```
 
 ## 3. Using it
@@ -636,6 +2003,26 @@ const example_expr : Expr = EAdd (EVar Zero) (EConst (Suc Zero))
 theorem example_normalize_sound
     : Equal Nat (eval example_env (normalize example_expr)) (eval example_env example_expr) =
   normalize_sound example_env example_expr
+```
+
+Use `canonicalize` when structural agreement of the distributed list is not
+enough. The following two expressions differ syntactically but represent the
+same polynomial; their canonical forms agree and `poly_eq` answers `True`.
+
+```ken example
+const double_variable_by_addition : Expr = EAdd (EVar Zero) (EVar Zero)
+
+const double_variable_by_product : Expr = EMul (EConst (Suc (Suc Zero))) (EVar Zero)
+
+theorem example_canonical_equality
+    : Equal Poly
+        (canonicalize double_variable_by_addition)
+        (canonicalize double_variable_by_product) =
+  Refl
+
+theorem example_decision
+    : IsTrue (poly_eq double_variable_by_addition double_variable_by_product) =
+  Proved
 ```
 
 ## 4. Laws & proofs
@@ -656,6 +2043,18 @@ list induction using the monomial-expression evaluation lemma.
 arbitrary expressions, lists and environments; the closed example only
 illustrates one use site.
 
+`canonicalize_sound` relates the Horner evaluator to the expression evaluator.
+`canonicalize_complete` proves the converse at the form level: agreement under
+all total environments identifies the same canonical `Poly`. The private
+canonicity predicate and positivity lemmas prove that a nonzero canonical
+polynomial remains positive under positive environments. The completeness
+proof separates Horner heads with a sufficiently large value for variable
+zero, cancels the positive multiplier to identify tails, and recurses over
+both children. `poly_eq_sound` and `poly_eq_complete` link structural comparison
+to semantic equality; `poly_eq_false_refutes` rules out a false answer when a
+proof of agreement under every environment is supplied. It does not construct
+an environment witnessing inequality.
+
 ## 5. Design notes
 
 A variable index is a `Nat`, and the evaluator's environment is a total
@@ -665,7 +2064,16 @@ A variable index is a `Nat`, and the evaluator's environment is a total
 without assuming a new arithmetic rule. Distribution retains repetitions
 and order; equal evaluation does not imply equal monomial lists. In
 particular, `x₀+x₀` and `2·x₀` can evaluate equally but remain structurally
-distinct. No canonicalization or semantic-equality decision is promised.
+distinct. The §1 `normalize : Expr → Expr` remains this ordered, noncanonical
+operation; §2's separate `canonicalize : Expr → Poly` merges like terms.
+
+A `PHorner p q` reads `p` with variable indices shifted upward and adds `q`
+multiplied by variable zero. Collapsing `PHorner (PConst c) (PConst Zero)`
+removes a redundant constant node. The zero second child must remain when the
+first child is nonconstant, because shifting a variable still changes its
+index. Public constructors may build noncanonical values; `canonicalize`
+produces canonical ones. Comparison uses both natural-number order directions
+for coefficient equality, not a new trusted equality primitive.
 
 ## 6. References
 
@@ -673,16 +2081,28 @@ distinct. No canonicalization or semantic-equality decision is promised.
   Wikipedia; background on polynomial terms and coefficient domains. The
   natural-number carrier here is not a field and this representation does
   not collect terms.
+- [Horner's method](https://en.wikipedia.org/wiki/Horner%27s_method) —
+  Wikipedia; orientation on nested polynomial representations. This module's
+  recursive form indexes multiple variables and is not an evaluation-cost
+  guarantee.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §1 and
-[seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md)
-specify the public surface and closed observations. Public names are `Expr`,
-`Monomial`, their five constructors, six functions and five theorems. The
-source uses checked `Core.Logic.Transport`, `Data.Numeric.Nat.Arithmetic`
-and `Data.Collections.Derived` definitions; its sixteen private functions
-and lemmas handle products, lists and proof rearrangements. The exact
-`trusted_base()` comparison belongs to the root-loaded acceptance target.
-No new Axiom, postulate, primitive or `Float` is introduced; inherited
-trust from the prelude and dependencies remains distinct from local trust.
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–2 and
+its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md)
+and [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md)
+specify the public surface and closed observations. The public API comprises
+`Expr`, `Monomial`, `Poly`, their exported constructors, nine operations, and
+ten checked theorems; the Horner operations add no new public helper. Definition
+locates the implementations and law statements; Using it gives client idioms;
+Laws & proofs traces the two proof families; Design notes separates their
+representations and limits.
+
+The source derives evaluation from the checked natural arithmetic, logic
+transport, Boolean conjunction, natural order and list-append definitions.
+Private functions and lemmas implement distribution, Horner collection,
+canonicity, positivity, and proof rearrangements. The root-loaded acceptance
+target compares exact trusted-`GlobalId` sets before and after loading the
+package on its providers. The extension adds no Axiom, postulate, primitive,
+or foreign operation; inherited trust from the prelude and dependencies
+remains distinct from local trust.
