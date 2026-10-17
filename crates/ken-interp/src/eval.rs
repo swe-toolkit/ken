@@ -1035,6 +1035,57 @@ mod nested_lift_coordinate_tests {
         );
         assert_eq!(negative, EvalVal::Neutral);
     }
+
+    /// Promise class: durable fail-closed boundary for a lifted witness with
+    /// a function-valued predicate; comparing it is not C5 ground equality.
+    #[test]
+    fn generated_all_support_predicate_stays_noncomparable() {
+        let mut elab = ken_elaborator::ElabEnv::new().expect("prelude");
+        let guest = one_constructor_family(&mut elab.env, false);
+        let guest_ctor = elab.env.inductive(guest).unwrap().constructors[0].id;
+        let list_nil = elab.prelude_env.nil_id;
+        let list = elab.env.constructor(list_nil).unwrap().0.id;
+        assert!(elab
+            .env
+            .all_support(list, 0, ken_kernel::AllSupportSort::Type)
+            .is_some());
+        let guest_type = Term::indformer(guest, vec![]);
+        let shape = RecursiveShape::Former {
+            former: list,
+            level_args: vec![],
+            arguments: vec![ken_kernel::inductive::RecursiveFormerArgument {
+                term: guest_type.clone(),
+                shape: Some(Box::new(RecursiveShape::Direct {
+                    index_exprs: vec![],
+                })),
+            }],
+        };
+        let mut store = EvalStore::new();
+        let list_value = make_ctor(
+            list_nil,
+            vec![EvalVal::IndFormerVal { id: guest }],
+            &mut store,
+        );
+        let motive = Term::lam(guest_type.clone(), guest_type);
+        let witness = lift_recursive_value(
+            &[],
+            &shape,
+            list_value,
+            guest,
+            &[],
+            &[],
+            &motive,
+            &[Term::constructor(guest_ctor, vec![])],
+            Some(ken_kernel::AllSupportSort::Type),
+            &elab.env,
+            &mut store,
+        );
+        let EvalVal::Ctor { args, .. } = &witness else {
+            panic!("expected intrinsic All-support constructor, got {witness:?}");
+        };
+        assert!(matches!(args.first(), Some(EvalVal::Neutral)));
+        assert!(!eq_type_eq(&witness, &witness));
+    }
 }
 
 /// Peel `n` outer `Term::Lam` binders, returning the remaining inner term.
@@ -1612,6 +1663,10 @@ mod ds5b_cast_regular_tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "producer_type_slot_tests.rs"]
+mod producer_type_slot_tests;
 
 #[cfg(test)]
 mod primitive_type_cast_tests {
@@ -3026,7 +3081,11 @@ pub fn checked_type_value(ty: &Term, globals: &GlobalEnv, store: &mut EvalStore)
 }
 
 /// Extract exactly the parameter slots of an unindexed checked family.
-pub fn type_value_slots(ty: &EvalVal, family: GlobalId, globals: &GlobalEnv) -> Option<Vec<EvalVal>> {
+pub fn type_value_slots(
+    ty: &EvalVal,
+    family: GlobalId,
+    globals: &GlobalEnv,
+) -> Option<Vec<EvalVal>> {
     let decl = globals.inductive(family)?;
     if !decl.indices.is_empty() {
         return None;
@@ -3058,6 +3117,7 @@ fn list_element_slot(
     primitive_result_type(primitive_id, globals)
         .map(|ty| checked_type_value(ty, globals, store))
         .and_then(|ty| type_value_slots(&ty, list, globals))
+        .filter(|slots| slots.len() == 1)
         .and_then(|mut slots| slots.pop())
         .unwrap_or(EvalVal::Unknown)
 }
@@ -3392,7 +3452,12 @@ pub struct ListCharIds {
 /// No precedent exists for a native prim re-invoking `eval` on elaborated
 /// terms mid-reduction — native + checked, the `neg_intN` posture, not
 /// demoted and not bare-trusted.
-fn build_list_char(s: &str, ids: &ListCharIds, elem_type: EvalVal, store: &mut EvalStore) -> EvalVal {
+fn build_list_char(
+    s: &str,
+    ids: &ListCharIds,
+    elem_type: EvalVal,
+    store: &mut EvalStore,
+) -> EvalVal {
     let mut acc = make_ctor(ids.nil_id, vec![elem_type.clone()], store);
     for c in s.chars().rev() {
         let cp = c as u32;
@@ -5561,14 +5626,11 @@ fn file_error_value(
             let family = globals.constructor(fs.some_id)?.0.id;
             type_value_slots(ty, family, globals)
         })
+        .filter(|slots| slots.len() == 1)
         .and_then(|mut slots| slots.pop())
         .unwrap_or(EvalVal::Unknown);
     let operation = make_ctor(operation_id, vec![], store);
-    let path = make_ctor(
-        fs.some_id,
-        vec![elem, EvalVal::Bytes(path.to_vec())],
-        store,
-    );
+    let path = make_ctor(fs.some_id, vec![elem, EvalVal::Bytes(path.to_vec())], store);
     make_ctor(fs.mk_file_error_id, vec![operation, path, error], store)
 }
 
@@ -6785,24 +6847,24 @@ fn reify_host_reply_v1(
                 .map(|ctor| checked_type_value(checked_codomain(&ctor.type_), globals, store))
                 .unwrap_or(EvalVal::Unknown);
             entries.into_iter().rev().fold(
-            make_ctor(fs.nil_id, vec![elem.clone()], store),
-            |tail, entry| {
-                let kind = match entry.kind {
-                    ken_host::FsNodeKindV1::File => fs.k_file_id,
-                    ken_host::FsNodeKindV1::Directory => fs.k_directory_id,
-                    ken_host::FsNodeKindV1::Symlink => fs.k_symlink_id,
-                    ken_host::FsNodeKindV1::Other => fs.k_other_id,
-                };
-                let kind = make_ctor(kind, vec![], store);
-                let value = make_ctor(
-                    fs.mk_dir_entry_id,
-                    vec![EvalVal::Bytes(entry.name), kind],
-                    store,
-                );
-                make_ctor(fs.cons_id, vec![elem.clone(), value, tail], store)
-            },
+                make_ctor(fs.nil_id, vec![elem.clone()], store),
+                |tail, entry| {
+                    let kind = match entry.kind {
+                        ken_host::FsNodeKindV1::File => fs.k_file_id,
+                        ken_host::FsNodeKindV1::Directory => fs.k_directory_id,
+                        ken_host::FsNodeKindV1::Symlink => fs.k_symlink_id,
+                        ken_host::FsNodeKindV1::Other => fs.k_other_id,
+                    };
+                    let kind = make_ctor(kind, vec![], store);
+                    let value = make_ctor(
+                        fs.mk_dir_entry_id,
+                        vec![EvalVal::Bytes(entry.name), kind],
+                        store,
+                    );
+                    make_ctor(fs.cons_id, vec![elem.clone(), value, tail], store)
+                },
             )
-        },
+        }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ResourceAcquired {
             ..
         }) => EvalVal::ResourceToken(resource_token.ok_or(())?),
@@ -6890,7 +6952,14 @@ fn reify_host_reply_v1(
                     make_ctor(ids.capabilitydenied_id, vec![], store)
                 }
             };
-            let file_error = file_error_value(operation_id, &error.relative_path, cause, fs, globals, store);
+            let file_error = file_error_value(
+                operation_id,
+                &error.relative_path,
+                cause,
+                fs,
+                globals,
+                store,
+            );
             return Ok(make_result(false, file_error, ids, store));
         }
         ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(error)) => {
@@ -8042,7 +8111,16 @@ mod px5b_effect_observation_tests {
         store: &mut EvalStore,
     ) -> EvalVal {
         fs_dispatch(
-            op_id, args, host, resources, revocation, fs, ids, &GlobalEnv::new(), store, None,
+            op_id,
+            args,
+            host,
+            resources,
+            revocation,
+            fs,
+            ids,
+            &GlobalEnv::new(),
+            store,
+            None,
         )
         .expect("recognized FS operation")
         .expect("FS reply reifies")

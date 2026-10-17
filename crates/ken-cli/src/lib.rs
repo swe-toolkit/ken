@@ -448,6 +448,7 @@ fn process_input_value(
             .and_then(|(field, family)| {
                 type_value_slots(&checked_type_value(field, env, store), family, env)
             })
+            .filter(|slots| slots.len() == 1)
             .and_then(|mut slots| slots.pop())
             .unwrap_or(EvalVal::Unknown)
     };
@@ -456,6 +457,7 @@ fn process_input_value(
     let prod_slots = env
         .constructor(roles.mkprod_id)
         .and_then(|(decl, _)| type_value_slots(&env_elem, decl.id, env))
+        .filter(|slots| slots.len() == 2)
         .unwrap_or_else(|| vec![EvalVal::Unknown, EvalVal::Unknown]);
     let arguments = list_value(
         elab_env.prelude_env.nil_id,
@@ -571,6 +573,10 @@ pub fn build_eval_store(elab_env: &ken_elaborator::ElabEnv) -> ken_interp::EvalS
     });
     store
 }
+
+#[cfg(test)]
+#[path = "process_input_type_slot_tests.rs"]
+mod process_input_type_slot_tests;
 
 #[cfg(test)]
 mod entrypoint_tests {
