@@ -24,13 +24,12 @@ fn refused(env: &mut ElabEnv, source: &str) -> ElabError {
     error
 }
 
-/// MEASURED: applying an ascribed λ and an ascribed let-tail λ checks, and
-/// the kernel-admitted application heads retain their checked ascriptions.
-/// CLAIMED: the inferred head is kernel-inferable even after leaving the
-/// ascription producer. THE GAP: other infer-position consumers and all
-/// introduction forms are not exhaustively instantiated here.
+/// MEASURED: applying an ascribed λ checks, and the kernel-admitted
+/// application head retains its checked type. CLAIMED: infer-position RAsc
+/// does not strand a bare λ at kernel inference. THE GAP: the let-tail
+/// recurrence and other introduction forms are separate cases below.
 #[test]
-fn ascribed_lambda_and_let_tail_apply_in_infer_position() {
+fn ascribed_lambda_applies_in_infer_position() {
     let mut env = ElabEnv::new().expect("prelude");
     let root = checked(
         &mut env,
@@ -46,7 +45,14 @@ fn ascribed_lambda_and_let_tail_apply_in_infer_position() {
         ),
         "the checked application keeps the head's type"
     );
+}
 
+/// MEASURED: a let-tail λ under RAsc checks as an application head with the
+/// whole Let ascribed. CLAIMED: introTail recurses through Let bodies.
+/// THE GAP: root introductions do not by themselves exercise this branch.
+#[test]
+fn ascribed_let_tail_lambda_applies_in_infer_position() {
+    let mut env = ElabEnv::new().expect("prelude");
     let tail = checked(
         &mut env,
         "fn u2 (x : Nat) : Nat = ((let c : Nat = x in λu. c) : (u : Nat) → Nat) Zero",
@@ -66,9 +72,9 @@ fn ascribed_lambda_and_let_tail_apply_in_infer_position() {
 }
 
 /// MEASURED: the adversary's exact Refl application checks with no additional
-/// postulate. CLAIMED: the ruled predicate covers proof introductions as well
-/// as lambdas. THE GAP: pair/quotient/truncation introduction forms are reached
-/// through the same existing helper but not individually exercised here.
+/// postulate. CLAIMED: a proof-returning λ is also accepted as an applied
+/// ascription. THE GAP: its introduction tail is Lam, not Refl; the distinct
+/// direct Refl/Pair/TruncProj terminals have their own rows below.
 #[test]
 fn ascribed_refl_application_proves_without_new_trust() {
     let mut env = ElabEnv::new().expect("prelude");

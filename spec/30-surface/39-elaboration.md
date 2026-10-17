@@ -757,10 +757,13 @@ elabType(Γ, t) → Term:                                -- type-position elabor
     RVarTy(i):      return Var(i)                     -- a type-position bound variable
 ```
 
-`introTail` holds for a core λ, pair, reflexivity proof, quotient class, or
-truncation introduction, and recursively for a `let` whose body has such a
-tail. Its checked type is retained for later kernel inference; other checked
-ascriptions are erased.
+`introTail(e')` holds when the tail of `e'` (`e'` itself, or recursively the
+body of a core `let`) is an introduction form the kernel checks but cannot
+infer (18 §3.1): a λ, pair, reflexivity proof, quotient class, or truncation
+element. Its checked type is retained for later kernel inference; other
+checked ascriptions are erased. No surface expression elaborates to a
+quotient class yet, so that arm has no surface witness; the work that adds a
+surface quotient-class introduction adds its RAsc conformance case.
 
 **`Axiom` is a checking-mode elaborator intercept, not a kernel term.** The
 intercept runs before ordinary constructor lookup and requires the `expected`

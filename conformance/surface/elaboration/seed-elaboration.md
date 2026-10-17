@@ -478,11 +478,19 @@ cases preserve `trusted_base()`; none creates a proof assumption.
 - why: the changed producer does not preserve every ascription; only the
   introduction-tail population requires a checked type at later inference.
 
-`QuotClass` is the fifth core terminal named by `introTail`, but this base
-has no surface quotient-class expression or check arm: `Expr`/`RExpr` contain
-no quotient introduction and the elaborator only traverses existing
-`Term::QuotClass` nodes. No surface input can make RAsc return that core
-terminal today. This is a **coverage blocker**, not an executable black-box
-case or a license to invent quotient syntax. The normative five-arm claim
-needs an Architect/Spec ruling on that unreachable terminal before this WP
-can claim complete source-level conformance coverage.
+### surface/elaboration/inferred-ascribed-quotient-class (deferred)
+- spec: `39 §5.4` RAsc `introTail`; `18 §3.1`; Architect ruling
+  `evt_725fm8j8sdspx`
+- status: **DEFERRED — no surface quotient-class introduction yet.**
+- given: no current source input. `Expr` and `RExpr` have no quotient-class
+  constructor; elaboration only rebuilds existing `Term::QuotClass` nodes,
+  so none reaches RAsc. A kernel core-only test bypasses this boundary.
+- expect: **not yet executable or covered**. When a surface quotient-class
+  introduction is added, its source expression under an ascription in infer
+  position must emit `Ascript(QuotClass(value), checkedType)` and pass kernel
+  re-check; that feature adds the real black-box witness here.
+- why: `introTail` follows the kernel's five-form not-inferable set, while
+  this arm is vacuous for today's source language. The spec's explicit
+  surface-vacuity sentence limits the currently testable claim to the four
+  source-reachable terminals without dropping QuotClass from the definition
+  or the shared implementation predicate.
