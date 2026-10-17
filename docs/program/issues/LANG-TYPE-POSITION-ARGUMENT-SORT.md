@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-ARGUMENT-SORT
 title: "A declaration with an unannotated Type binder used under a Type 0 former, such as (A : Type) (o : Option A), is refused at its obligation with Type 0 vs Type u0: elab_type builds type-position applications unchecked, so the binder's level meta is consistent only through the final zonk's Zero default, and the obligation hole generalizes it. Record the argument's sort equation at the producer, and solve level metas without defaulting"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
