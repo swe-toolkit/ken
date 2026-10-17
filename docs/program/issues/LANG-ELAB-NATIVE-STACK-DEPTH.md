@@ -83,9 +83,14 @@ depth or stack size and the refusal code. Then implement the ruling.
   C0016, and removing `fmt` from the predicate returns that row to rc
   134. `fmt` running time grows faster than linear at large N; that is
   out of scope here. Merged at `4573c8222`.
-- **AC-2.** A spine past the D0's ruled limit, on each walker the D0
-  census names, returns a coded refusal or Ok, not an abort. The rows
-  that check today stay Ok, including release K=640.
+- **AC-2 (operator 2026-10-17, option 1).** Past the 256 MiB worker
+  limit, elaboration runs in a child process, and a stack-overflow death of
+  the child is reported by the parent as a coded refusal. The refusal is a
+  new appended `C` code (spec 70 §1.2), with its rows in `codes.tsv` and
+  `CLI_ERROR_TABLE`. A spine past the limit, on each walker the D0 census
+  names, returns that refusal or Ok, never an abort. The rows that check
+  today stay Ok, including release K=640. The Architect rules the mechanism
+  before the build. No kernel bounds are added.
 - **AC-3 (mutation, QA).** Removing the closure returns debug K=160 on
   8 MiB to the rc 134 abort.
 

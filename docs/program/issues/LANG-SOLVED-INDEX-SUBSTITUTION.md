@@ -1,7 +1,7 @@
 ---
 id: LANG-SOLVED-INDEX-SUBSTITUTION
 title: "A solved match index is moved per variable by cast aliases whose proofs stay pinned to the raw index premise, so a nested match cannot abstract the index, a match on an alias takes the equation convoy at a stuck eliminator, and a written sibling type disagrees with its unmoved field. Eliminate a solved leaf with a variable side by substitution and one J transport of the reverted arm"
-status: draft
+status: ready
 owner: language
 size: L
 tier: T1
@@ -9,7 +9,7 @@ gate: architect
 depends_on: [LANG-LET-ANNOTATION-MOVED-FIELD-COORDINATE]
 blocks: []
 github: null
-origin: "Architect D0 for LANG-THIRD-LEVEL-MATCH-MOVED-FIELD (evt_3nbk4bv8c7kpe), which also covers the Adversary finding on 8e9e2c2c7 (evt_563avf72ddez3, ruled real evt_1ndrpz0mg3fan). The ruled change outgrows that M node; restructuring returns to the operator to size (2026-09-21). Steward-filed per COORDINATION section 2."
+origin: "Architect D0 for LANG-THIRD-LEVEL-MATCH-MOVED-FIELD (evt_3nbk4bv8c7kpe), which also covers the Adversary finding on 8e9e2c2c7 (evt_563avf72ddez3, ruled real evt_1ndrpz0mg3fan). The ruled change outgrows that M node; restructuring returns to the operator to size (2026-09-21); operator authorized 2026-10-17. Steward-filed per COORDINATION section 2."
 ---
 
 # A solved index is eliminated, not aliased
