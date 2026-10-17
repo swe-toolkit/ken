@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY
 title: "Spec 66 normalizes a Nat polynomial expression to a distributed sum of monomials, but its normal form is not canonical: two expressions equal under every environment can normalize to different terms, and no operation decides their equality. Author section 2: a canonical sorted and merged normal form and a decision procedure for semantic equality, proved sound and complete at zero trust"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
