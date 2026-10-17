@@ -401,8 +401,11 @@ than duplicating them here.
 
 These are surface-source → public elaboration output → kernel-check cases under
 `39 §5.4`. The earlier `ascription-on-lambda` case checks a λ against an
-expected Π; it does not exercise an ascription returned by `infer`. Here
-`introTail` is observed at that boundary, not inferred from a source scan.
+expected Π and pins the root `Ascript` returned by RAsc in inference
+position. It does not test that returned core as a later application head.
+The cases below add later-consumer observations and distinguish the
+source-reachable terminal forms; `introTail` is observed on emitted core,
+not inferred from a source scan.
 The emitted core is part of the observable: a case that accepts with a naked
 introduction instead of the specified `Ascript` does not pass. All accepted
 cases preserve `trusted_base()`; none creates a proof assumption.
