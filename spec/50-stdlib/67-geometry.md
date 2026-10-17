@@ -155,3 +155,86 @@ and rotation are deferred. Euclidean and floating-point distances,
 the Manhattan triangle inequality, box area, dimensions other than
 two, a canonical empty-box representation and point-set equality of
 boxes are also deferred. None follows from the six laws above.
+
+## 2. Manhattan metric laws on natural points
+
+> **Section 2 status: DRAFT v0 (SPEC-GEOMETRY-MANHATTAN-METRIC).**
+> Architect D0 checked the two new generic laws below on the landed
+> §1 base. This is a contract for a future catalog extension, not a
+> claim that its §2 source or conformance seed has shipped.
+
+### 2.1 Triangle inequality and zero-distance identity
+
+`Algorithm.Geometry.NatBox` extends §1's `Point`, `manhattan` and
+six checked laws with exactly these two public, checked theorem
+bodies. The signatures below are the D0-checked statements:
+
+```ken
+pub theorem manhattan_triangle (p : Point) (q : Point) (r : Point) :
+  IsTrue (leq_nat (manhattan p r) (add (manhattan p q) (manhattan q r)))
+
+pub theorem manhattan_zero_equal (p : Point) (q : Point) :
+  Equal Nat (manhattan p q) Zero → Equal Point p q
+```
+
+The triangle law bounds the direct Manhattan distance from `p` to
+`r` by the sum of distances along **any** detour through `q`. Its
+comparison is the existing `leq_nat` converted to a proposition by
+`IsTrue`; there is no new numeric carrier, order relation or
+primitive. The bound includes both tight paths and strict slack.
+For example, `p=(0,0)`, `q=(3,2)` and `r=(1,1)` yield direct
+distance `2` and detour sum `5+3=8`. A reverse inequality is not
+promised: `8 ≤ 2` is false in that example. A monotone detour can
+instead be tight, for example `(0,0)` through `(1,1)` to `(2,3)`.
+
+The identity law says a zero distance forces the two **points** to
+be equal, including equality of both natural coordinates. Together
+with §1's `manhattan_self`, it establishes zero distance exactly for
+equal points, but does **not** add a separate converse theorem:
+Architect D0 did not check such an additional law. For the distinct
+points `(0,1)` and `(1,0)`, the distance is `2`, not `Zero`; an
+attempt to assert zero for that pair must be refused. This is not
+`Eq Box` or point-set equality of boxes, and it leaves the §1 box
+operations and empty-box behavior unchanged.
+
+### 2.2 Visibility, evidence and remaining scope
+
+The per-axis triangle and zero-distance lemmas and their subtraction,
+addition and point-equality helpers are **private** proof structure,
+not further public laws. For any natural coordinates `a`, `b`, `c`,
+the per-axis triangle bounds `axis_distance a c` by
+`add (axis_distance a b) (axis_distance b c)`; the zero lemma turns
+`Equal Nat (axis_distance a b) Zero` into `Equal Nat a b`. In
+particular, §1's existing private `axis_distance` need not become
+public. D0 checked a public-only client against the two theorems;
+a client attempt to access `axis_distance` was refused as
+`UnresolvedCon axis_distance`. The implementation can extend its
+own **private imports** from the existing `Data.Numeric.Nat.Order`
+and `Core.Logic.Transport` for proved order bounds and equality
+transport. It must not clone the public Nat bounds or expose an
+axis helper to make these statements usable. Both public signatures
+refer only to the existing `Point`, `manhattan`, `add`, `leq_nat`,
+`IsTrue` and `Equal` interface.
+
+On base `3573ec369`, Architect D0 reported `ken check` rc 0 for the
+generic in-module triangle and identity proofs in a **scratch copy**
+of `NatBox`, with no new `Axiom`, primitive or postulate lines. The
+existing `cat_geometry_nat_box` Rust test ran 3/3 against that
+scratch module; its `trusted_base()` identity sets matched before
+and after loading it, with counts **114 → 114**. A public-only
+scratch client checked, including a strict-slack detour, a tight
+path and both law instances. Separate negative clients rejected a
+false reverse-detour bound and false zero distance or equality for
+distinct points; four mutated proof steps also failed. These are
+**Architect-reported scratch results**, not an author-run Ken check,
+shipped §2 catalog proof, executed §2 conformance seed, CI result,
+or trust measurement on a landed §2 module.
+
+The §1 Nat Order `greatest for min` and `least for max` exports and
+§1 `NatBox` package are present on this landed base; the older §1
+follow-on wording records its prior D0 situation, not the current
+state. Section 2 adds no new prerequisite publication or change to
+§1's public helper boundary. Signed coordinates and orientation,
+Euclidean or floating-point distance, box area, dimensions beyond
+two, canonical empty boxes and point-set equality of boxes remain
+outside this metric extension.
