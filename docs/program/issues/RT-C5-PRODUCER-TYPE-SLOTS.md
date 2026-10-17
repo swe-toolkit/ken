@@ -74,6 +74,22 @@ required slot negative and consumer sweep are operative. Host `make_result`
 is cut to RT-C5-HOST-RESPONSE-RESULT-SLOTS. The All-support witnesses stay
 unfilled and go to RT-C5-COMPOUND-HIGHER-ORDER-INDICES AC-0.
 
+The List UInt8 view-to-source row is evaluator-level, not kernel-checked
+(Architect `evt_6dvag1bfyn3s8`). It asserts `eq_type_eq(view, source)`,
+`cast_reduce` to `MkCIBytes`, and a `bytes_encode "b"` negative, and it
+reddens when `build_list_uint8` is reverted to `Unknown`. The five
+kernel-checked casts stay exactly as AC-0 ran them.
+
+## Hard-stop inventory (§1b)
+
+§1a: the slot-authority chain is at 1 (Architect `evt_6dvag1bfyn3s8`).
+
+1. An AC row required a kernel-checked equality between a producer view
+   and its source form that the kernel cannot convert. The trigger is
+   kernel reducibility of the producer primitive: `bytes_to_list` and
+   `bytes_encode` do not reduce in the kernel, while `string_to_list_char`
+   on a literal does.
+
 ## Stop conditions
 
 - Any kernel, `trusted_base()` or spec change (an operator question).
