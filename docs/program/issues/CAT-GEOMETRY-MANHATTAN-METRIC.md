@@ -1,7 +1,7 @@
 ---
 id: CAT-GEOMETRY-MANHATTAN-METRIC
 title: "Spec 67 section 2 states that Manhattan distance on natural points is a metric, with a proved triangle inequality and zero-distance identity, but Algorithm.Geometry.NatBox delivers only section 1. Deliver section 2 from the Architect's checked D0 at zero trust, with its seed as an acceptance target"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

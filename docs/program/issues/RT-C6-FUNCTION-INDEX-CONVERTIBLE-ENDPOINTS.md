@@ -54,6 +54,12 @@ in `crates/ken-interp`.
   an opaque-`idN` row.
 - **AC-1.** Rows 5 and 6 evaluate to their value. A non-convertible twin
   stays Unknown.
+- **AC-1b (Architect `evt_4a0d1dbmpbdqt`, Adversary F1).**
+  `cast (CFn idf) (CFn idf) (Refl (CFn idf)) (MkCFn idf)`, called through
+  the catalog's `Core.Logic.Transport.cast` (a J body with bound endpoints,
+  reaching `eval_j_by_endpoints`), evaluates to `MkCFn idf`, and the
+  interpreter equals kernel whnf. A rule keyed on the call site's spelling
+  does not pass this row.
 - **AC-2 (mutation, QA).** Removing the rule returns rows 5 and 6 to
   Unknown, while the C5 rows stay values.
 
