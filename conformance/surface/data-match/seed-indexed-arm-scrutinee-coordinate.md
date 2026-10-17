@@ -5,15 +5,15 @@ Spec: `spec/30-surface/34-data-match.md` §3.3.
 Frame: `docs/program/issues/SPEC-INDEXED-ARM-SCRUTINEE-COORDINATE.md`.
 
 This seed pins the constructor-coordinate reading inside an indexed match arm.
-It preserves the three D0 rows and adds a derived row for solved-index-name
-substitution, which the D0 rows do not isolate. The rule is elaboration-time
-name substitution only: it binds no scrutinee equation and adds no kernel
-conversion. The packed-equation fork remains open in
+It preserves the three D0 rows and adds Architect-measured `u11_k` for the
+solved-index-name substitution axis, which the D0 rows do not isolate. The rule
+is elaboration-time name substitution only: it binds no scrutinee equation and
+adds no kernel conversion. The packed-equation fork remains open in
 `OQ-indexed-scrutinee-evidence`.
 
-The accepted rule row is **RED-UNTIL**
-`LANG-SOLVED-INDEX-SUBSTITUTION` AC-1b. Current main refuses it; this seed does
-not present it as passing against current main.
+The rule-discriminating rows are **RED-UNTIL**
+`LANG-SOLVED-INDEX-SUBSTITUTION` AC-1b. Current main refuses them; this seed
+does not present them as passing against current main.
 
 ## Shared fixture
 
@@ -91,33 +91,32 @@ is `j = DualFS q j2` and `k = Suc q`.
 - the gap: because it does not use `j` or `k` in its body, it cannot distinguish
   the old and new readings.
 
-## surface/data-match/indexed-arm-scrutinee-coordinate-solved-index-k
+## surface/data-match/indexed-arm-scrutinee-coordinate-u11-k
 
 - spec: `spec/30-surface/34-data-match.md` §3.3.
 - promise class: durable invariant, pending the named implementation gate.
 - given:
 
   ```ken
-  fn index_coordinate_k (a : Type) (k : Nat) (j : DualFin k)
-    (rest : DualEnv a k) : DualEnv a (Suc k) =
+  fn u11k (a : Type) (k : Nat) (j : DualFin k)
+    (rest : DualEnv a k) : a =
     match j {
-      DualFZ q ↦
-        DualCons k (dual_lookup a (Suc q) rest (DualFZ q)) rest;
-      DualFS q j2 ↦
-        DualCons k (dual_lookup a (Suc q) rest (DualFS q j2)) rest
+      DualFZ q ↦ dual_lookup a k rest (DualFZ q);
+      DualFS q j2 ↦ dual_lookup a k rest (DualFS q j2)
     }
   ```
 
 - expect under the rule: accepts. In each arm, `k` denotes the constructor's
-  target index `Suc q`; `DualCons` then consumes `rest : DualEnv a (Suc q)` and
-  constructs the branch result at `DualEnv a (Suc (Suc q))`.
-- expected before AC-1b: rejects because `k` retains its pre-match meaning, so
-  `DualCons k` requires `rest : DualEnv a k`. This additional row is derived
-  from the fixture signatures; it was not measured by Architect's D0 probe or
-  independently executed by CV.
-- claimed: the solved-index-name substitution works independently of the
-  `u11_mixed` scrutinee-name substitution.
-- the gap: this closed instance does not establish the rule for every indexed
+  target index `Suc q`, so the body becomes the corresponding `u11_new` call.
+- measured on the checked base by Architect's scratch probe: refuses with a
+  `DualFin k` versus `DualFin (Suc q)` type mismatch because `k` retains its
+  pre-match meaning.
+- status: **RED-UNTIL** `LANG-SOLVED-INDEX-SUBSTITUTION` AC-1b; do not count
+  current-main refusal as conformance to the specified behavior.
+- why: the body spells the constructor but uses the bare solved-index name `k`
+  as the lookup index, isolating index-name substitution from `u11_mixed`'s
+  scrutinee-name substitution.
+- the gap: the closed instance does not establish the rule for every indexed
   family or solved index.
 
 ## surface/data-match/indexed-arm-scrutinee-coordinate-r1
@@ -149,9 +148,13 @@ is `j = DualFS q j2` and `k = Suc q`.
 Architect's D0 report records that the three D0 rows were elaborated and
 kernel-checked by a scratch `arch_coord_probe` on base
 `71a6dfb6ceb1c42572f54f699e5bb2af91a99901`: `u11_mixed` refused,
-`u11_new` accepted, and `r1` refused. These are reported D0 scratch results,
-not execution of this conformance seed as a shipped test and not execution of
-the implementation after AC-1b. No CI, landing, or publication is claimed.
+`u11_new` accepted, and `r1` refused. Architect's fresh review also reports
+that `u11_k` refuses on this base with `DualFin k` versus
+`DualFin (Suc q)`. Under the rule, `u11_k` becomes the `u11_new` body; this
+supports its expected acceptance but is not a measurement of the post-AC-1b
+implementation. These are Architect-reported scratch results, not execution
+of this conformance seed as a shipped test. No CI, landing, or publication
+is claimed.
 
 Provenance is limited to the Ken-owned Spec, conformance conventions and WP
 frame, plus the Architect's first-party D0 ruling. No external references,
