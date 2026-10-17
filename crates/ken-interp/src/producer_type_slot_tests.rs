@@ -39,6 +39,39 @@ fn value(elab: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
     eval(&[], &body, &elab.env, store)
 }
 
+/// Promise class: durable fail-closed authority boundary. MEASURED: an
+/// unavailable checked result, wrong owner or wrong arity gives no type slot.
+/// CLAIMED: the caller retains its existing Unknown/Neutral fallback rather
+/// than treating an unrelated family as a List element. THE GAP: the helper
+/// checks shape, not the slot's type; only checked producer terms may feed it.
+/// Each producer row below tests an available authority independently.
+#[test]
+fn type_slots_require_the_checked_owner_and_exact_parameter_arity() {
+    let (elab, mut store) = fixture(&[]);
+    let ids = store.list_char_ids.clone().expect("List identities");
+    let list = elab.prelude_env.list_id;
+    let value = EvalVal::IndTypeApp {
+        id: list,
+        args: Rc::new(vec![EvalVal::Int(1)]),
+    };
+    assert_eq!(
+        list_element_slot(elab.prelude_env.byte_length_id, &ids, &elab.env, &mut store),
+        EvalVal::Unknown,
+        "a checked Int result cannot supply a List element"
+    );
+    assert!(type_value_slots(&EvalVal::Unknown, list, &elab.env).is_none());
+    assert!(type_value_slots(&value, elab.prelude_env.option_id, &elab.env).is_none());
+    assert!(type_value_slots(
+        &EvalVal::IndTypeApp {
+            id: list,
+            args: Rc::new(vec![])
+        },
+        list,
+        &elab.env,
+    )
+    .is_none());
+}
+
 /// Promise class: durable invariant. MEASURED: typed producer and source list
 /// structures agree; equal-content lists with different element types disagree.
 /// CLAIMED: a missing or defaulted element slot cannot make C5 admit a false
