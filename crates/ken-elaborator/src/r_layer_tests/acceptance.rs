@@ -131,16 +131,25 @@ fn let_ascription_roundtrip() {
 #[test]
 fn ascription_on_lambda() {
     let mut env = mk_env();
-    let (core, _ty) = env
+    let (core, ty) = env
         .elaborate_expr(
             "ascription_on_lambda",
             "(\\A . \\x . x) : (A : Type) -> (x : A) -> A",
         )
         .expect("ascription-on-lambda should elaborate");
 
-    // Same image as id's body: Lam(Univ 0, Lam(Var 0, Var 0))
-    let expected = Term::lam(Term::ty(lv(0)), Term::lam(Term::var(0), Term::var(0)));
+    // The checked payload matches id's λ body; RAsc retains its Π type in
+    // infer position so a later kernel inference can recognize that payload.
+    let expected_ty = Term::pi(Term::ty(lv(0)), Term::pi(Term::var(0), Term::var(1)));
+    let expected = Term::Ascript(
+        Box::new(Term::lam(
+            Term::ty(lv(0)),
+            Term::lam(Term::var(0), Term::var(0)),
+        )),
+        Box::new(expected_ty.clone()),
+    );
     assert_eq!(core, expected, "ascription-on-lambda core mismatch");
+    assert_eq!(ty, expected_ty, "ascription-on-lambda type mismatch");
 }
 
 /// `surface/elaboration/base-type-app` (oracle) — Nat from base environment
@@ -673,8 +682,16 @@ fn existing_invariants_still_green() {
             "(\\A . \\x . x) : (A : Type) -> (x : A) -> A",
         )
         .expect("should accept");
-    // core is Lam(Univ 0, Lam(Var 0, Var 0)) — no metas.
-    let expected = Term::lam(Term::ty(lv(0)), Term::lam(Term::var(0), Term::var(0)));
+    // The inferred core retains the ascription around the checked λ, and
+    // both the payload and its Π type have explicit, defaulted levels.
+    let expected_ty = Term::pi(Term::ty(lv(0)), Term::pi(Term::var(0), Term::var(1)));
+    let expected = Term::Ascript(
+        Box::new(Term::lam(
+            Term::ty(lv(0)),
+            Term::lam(Term::var(0), Term::var(0)),
+        )),
+        Box::new(expected_ty.clone()),
+    );
     assert_eq!(core, expected, "existing-invariants: core mismatch");
-    assert_eq!(ty, Term::pi(Term::ty(lv(0)), Term::pi(Term::var(0), Term::var(1))));
+    assert_eq!(ty, expected_ty);
 }
