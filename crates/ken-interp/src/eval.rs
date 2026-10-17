@@ -2846,6 +2846,13 @@ fn eval_in_erasure_scope(
             let bv = eval(env, b, globals, store);
             let ev = eval(env, e, globals, store);
             let tv = eval(env, t, globals, store);
+            if a == b
+                && ![&av, &bv, &ev, &tv]
+                    .iter()
+                    .any(|v| matches!(v, EvalVal::Unknown))
+            {
+                return tv;
+            }
             cast_reduce(av, bv, ev, tv)
         }
 
