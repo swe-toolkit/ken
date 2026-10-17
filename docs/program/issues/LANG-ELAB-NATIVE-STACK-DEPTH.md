@@ -1,7 +1,7 @@
 ---
 id: LANG-ELAB-NATIVE-STACK-DEPTH
 title: "Elaborator term walkers recurse on the native stack with depth equal to term depth and no guard. Once LANG-BRANCH-GOAL-BUDGET-VISIT-CHARGE removes the false refusal that capped goal size, a dependent-match goal with a closed spine about 160 deep aborts ken check with an uncoded stack overflow on the default 8 MiB stack. Close the class so a deep goal yields Ok or a typed refusal"
-status: ready
+status: active
 owner: verify
 size: M
 tier: T1
@@ -57,6 +57,21 @@ depth or stack size and the refusal code. Then implement the ruling.
 
 - **AC-1.** `r1` at K=160, debug, through `ken check` or an 8 MiB thread,
   is Ok or a coded refusal, with `trusted_base()` unchanged.
+- **AC-1b (every elaborating subcommand).** Closure (a) merged at
+  `01acdfab6` covers only `check` and `run` (main.rs:30-33).
+  `native-build` and `repl` still elaborate on the main thread: at K=160
+  on 8 MiB, `ken native-build` aborts with rc 134 and passes at 16 MiB
+  (Adversary `evt_25m7w6ssgxhya`; Architect carry 1, `evt_3gvjaqtc5vjz8`).
+  The worker is drawn at the dispatch level for every subcommand that
+  elaborates. A `native-build` K=160 row in
+  `lang_elab_native_stack_depth.rs` is Ok and its built program runs. A
+  failed worker spawn is a CLI front-end failure: it exits with a new
+  appended `C` code (spec 70 §1.2), with its row in
+  `crates/ken-diagnostic/codes.tsv` and `CLI_ERROR_TABLE` (carry 2). A
+  worker panic is an implementation panic, which spec 70 §1.1 excludes
+  from coding; it is propagated once, without a second panic message.
+  Removing the worker from `native-build` returns that row to rc 134.
+  Merged at `15661b590`.
 - **AC-2.** A spine past the D0's ruled limit, on each walker the D0
   census names, returns a coded refusal or Ok, not an abort. The rows
   that check today stay Ok, including release K=640.

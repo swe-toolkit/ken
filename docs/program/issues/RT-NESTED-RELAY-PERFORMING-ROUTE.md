@@ -106,14 +106,34 @@ reached by promoting its P2 demand in `static_response_phase_b_split_over`.
   - coverage discharge: cap41_endpoint, cap41_offset_endpoint and
     read_window compile and keep their terminals, and a mutant that
     lowers the source without entering its owner trips the gate;
-  - one `Excluded{Underived}` owner fixture (a shape from the D0 list),
-    native against the interpreter. If native drops an op the
-    interpreter performs, stop to the Architect;
+  - an Underived-owner witness by classification forced at the protocol
+    producer (`returned_vis_protocol`) for each installed AC-MAIN owner,
+    native against the interpreter (Architect `evt_5fevwxrfy8knk`). A
+    natural user-source Underived owner was not constructed: the
+    measured installed owners' K worker bodies are prelude wrappers
+    (`evt_3e2bxfp79n9yc`). If native drops an op the interpreter
+    performs, stop to the Architect;
   - the ignored px8ta real-same-depth row, run once under route (C): a
     witness if it reaches route assembly, otherwise named unreached with
     that measurement.
 - **AC-3 (control).** Rows 01-36 and the four AC-MAIN controls keep
   parity under the fleet release rule.
+
+## Hard-stop inventory (§1b)
+
+§1a: the Underived-owner settlement chain is at 1 (Architect
+`evt_27ernsj0ttshz`); the route chain is at 0.
+
+1. An `Excluded{Underived}` owner is emitted on the Ret-only arm although
+   its K may return a Vis: the arm is keyed on "derivation failed", which
+   the emitter treats as "no returned Vis" (units.rs:4663). Forced owner
+   890 on AC-MAIN drops `FsReadAt` silently, with promotion suppressed as
+   well, so main has the defect. Ruled: refuse the plane at plan
+   construction, after `build_pending_vis_settlements` (construction.rs
+   :1530), with `planner_capacity_error` "underivable returned-Vis
+   protocol"; forced 890 and forced 768 both refuse; deleting the refusal
+   is QA's AC-3 mutation for this guard. A native row green on main that
+   newly refuses with that text is a stop to the Architect.
 
 ## Stop conditions
 

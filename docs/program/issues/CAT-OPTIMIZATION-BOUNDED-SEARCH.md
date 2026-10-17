@@ -1,7 +1,7 @@
 ---
 id: CAT-OPTIMIZATION-BOUNDED-SEARCH
 title: "Spec 72 section 2 specifies find_below, the least Nat below a bound that satisfies a Boolean predicate, with three proved laws, but no catalog package delivers it. Deliver Algorithm.Optimization.BoundedSearch from the Architect's checked D0 at zero trust"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
