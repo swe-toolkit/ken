@@ -109,12 +109,14 @@ elaborates, and checks (frame Acceptance 2; `39 §5.1`).
 - spec: `39 §5.4` (ascription: check `e` against the ascribed type); `18 §3`
   (`(t:A)`: check `A ⇐ Type ℓ`, then `t ⇐ A`); `13 §1`
 - given: `(\A . \x . x) : (A : Type) -> (x : A) -> A`
-- expect: **Ok**. The two λs check against the binary Π; core
-  `Lam(Univ 0, Lam(Var 0, Var 0))`, the same image as `id`'s body.
-- why: type ascription drives **checking** mode (`18 §3`); a polymorphic
-  identity written as a bare λ checks against its ascribed Π. (Corrected from
-  the brief's single `\x . x`, which under-saturates the binary Π — pinned as
-  a reject in AC3.)
+- expect: **Ok**. The two λs check against the binary Π; in inference
+  position the emitted core is `Ascript(Lam(Univ 0, Lam(Var 0, Var 0)), A)`
+  where `A` is the checked binary Π. The inner λ image matches `id`'s body;
+  the ascription remains until the kernel checks it.
+- why: type ascription drives **checking** mode on its payload (`18 §3`),
+  then retains the inferred result's checked type on this introduction form.
+  (Corrected from the brief's single `\x . x`, which under-saturates the
+  binary Π — pinned as a reject in AC3.)
 
 ### surface/elaboration/base-type-app (oracle)
 - spec: `39 §5.4` (`Con` → environment lookup); `13 §1`; `18 §3`
@@ -392,3 +394,95 @@ than duplicating them here.
   from an implementation that rejects local names everywhere. Together with
   `let-rhs-binder-is-out-of-scope`, changing only where the occurrence appears
   flips the verdict.
+
+---
+
+## LANG-ASCRIPTION-INTRODUCTION-INFERENCE — infer-position RAsc
+
+These are surface-source → public elaboration output → kernel-check cases under
+`39 §5.4`. The earlier `ascription-on-lambda` case checks a λ against an
+expected Π; it does not exercise an ascription returned by `infer`. Here
+`introTail` is observed at that boundary, not inferred from a source scan.
+The emitted core is part of the observable: a case that accepts with a naked
+introduction instead of the specified `Ascript` does not pass. All accepted
+cases preserve `trusted_base()`; none creates a proof assumption.
+
+### surface/elaboration/inferred-ascribed-lambda-head
+- spec: `39 §5.4` RAsc; `13 §1`; `18 §3`
+- given: `fn u1 (x : Nat) : Nat = ((λu. x) : (u : Nat) → Nat) Zero`
+- expect: **accepts**; the checked application's head is
+  `Ascript(Lam(Nat, x), (u:Nat)→Nat)`, not a naked λ. `ken run` of the
+  same `u1` applied to `Zero` and `Suc Zero` returns its respective
+  input; neither use changes the trusted base.
+- why: application infers its head, and the kernel cannot infer a bare λ.
+  Removing the RAsc wrap changes this accepted case to the named kernel
+  introduction-form refusal.
+
+### surface/elaboration/inferred-ascribed-let-tail-lambda
+- spec: `39 §5.4` RAsc `introTail`; `11 §1` Let; `13 §1`
+- given: `fn u2 (x : Nat) : Nat =
+  ((let c : Nat = x in λu. c) : (u : Nat) → Nat) Zero`
+- expect: **accepts**; the application head retains
+  `Ascript(Let(Nat, x, Lam(Nat, c)), (u:Nat)→Nat)`, with the type on
+  the **whole** Let, not only its RHS. The result is `x`.
+- why: `introTail` follows Let bodies. A root-only λ predicate loses the
+  type on a checked let whose tail is an introduction.
+
+### surface/elaboration/inferred-ascribed-pair-projection
+- spec: `39 §5.4` RAsc `introTail`; `13 §2–§3`
+- given: `fn pair_head (x : Nat) : Nat =
+  ((x, True) : (v : Nat) × Bool).1`
+- expect: **accepts**; the inferred projection's scrutinee retains an
+  ascription on the checked Pair at its Σ type, and the result is `x`.
+  The already-inferable pair has its own inner ascription; the RAsc
+  boundary preserves the *outer* checked ascription rather than dropping it.
+- why: a pair in the domain of projection is an introduction tail reached
+  through an infer-position consumer, independent of the λ head case.
+
+### surface/elaboration/inferred-ascribed-refl
+- spec: `39 §5.4` RAsc `introTail`; `16 §2`; `18 §3`
+- given: `theorem refl_direct (x : Nat) : Equal Nat x x =
+  (Refl : Equal Nat x x)`
+- expect: **accepts**; the open `x` keeps the goal Eq-shaped, and the
+  checked theorem body is `Ascript(Refl(x), Equal Nat x x)`, not bare
+  `Refl`. The kernel re-checks the body without a new assumption.
+- why: the direct ascription in the body takes RAsc through inference, with
+  no inferred-let RHS that could wrap a bare Refl independently.
+
+### surface/elaboration/inferred-ascribed-truncation
+- spec: `39 §5.4` RAsc `introTail`; `16 §6`
+- given: `theorem trunc_direct (x : Bool) : ‖Bool‖ =
+  (trunc_intro x : ‖Bool‖)`
+- expect: **accepts**; the theorem body is
+  `Ascript(TruncProj(x), ‖Bool‖)`, and kernel re-check preserves the
+  given type. The standalone expression `(trunc_intro True : ‖Bool‖)`
+  likewise infers a core `Ascript(TruncProj(True), ‖Bool‖)`.
+- why: the checked-only truncation introduction supplies a fourth distinct
+  source-reachable terminal for `introTail` at this RAsc producer.
+
+### surface/elaboration/inferred-ascribed-wrong-type-twins
+- spec: `39 §5.4` RAsc; `18 §3` kernel checking
+- given: `fn asc_bad_value (x : Nat) : Nat =
+  ((λu. True) : (u : Nat) → Nat) Zero` and
+  `fn asc_bad_result (x : Nat) : Bool =
+  ((λu. x) : (u : Nat) → Nat) Zero`
+- expect: both **reject** with kernel `TypeMismatch`, not the old
+  introduction-form refusal; no new trust or accepted wrong-type body.
+- why: retaining the checked ascription must not mask an ill-typed λ body
+  or a declaration return mismatch.
+
+### surface/elaboration/inferred-ascribed-non-introduction-control
+- spec: `39 §5.4` RAsc otherwise branch
+- given: `fn asc_plain (x : Nat) : Nat = (x : Nat)`
+- expect: **accepts** with core body `Var(0)`, not `Ascript(Var(0), Nat)`.
+- why: the changed producer does not preserve every ascription; only the
+  introduction-tail population requires a checked type at later inference.
+
+`QuotClass` is the fifth core terminal named by `introTail`, but this base
+has no surface quotient-class expression or check arm: `Expr`/`RExpr` contain
+no quotient introduction and the elaborator only traverses existing
+`Term::QuotClass` nodes. No surface input can make RAsc return that core
+terminal today. This is a **coverage blocker**, not an executable black-box
+case or a license to invent quotient syntax. The normative five-arm claim
+needs an Architect/Spec ruling on that unreachable terminal before this WP
+can claim complete source-level conformance coverage.

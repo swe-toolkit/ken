@@ -78,6 +78,102 @@ fn ascribed_refl_application_proves_without_new_trust() {
     );
 }
 
+/// MEASURED: the pair's infer-position ascription remains visible under an
+/// inferred projection and carries Pair as its checked core. CLAIMED: the pair
+/// introTail arm is reachable at this producer. THE GAP: the pair's existing
+/// infer helper also emits an inner ascription; this pins the outer retention.
+#[test]
+fn pair_projection_keeps_the_ascribed_introduction_head() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let pair = checked(
+        &mut env,
+        "fn pair_head (x : Nat) : Nat = ((x, True) : (v : Nat) × Bool).1",
+    );
+    assert!(
+        matches!(pair,
+            Term::Lam(_, body) if matches!(&*body,
+                Term::Proj1(pair) if matches!(&**pair,
+                    Term::Ascript(inner, _) if matches!(&**inner,
+                        Term::Ascript(value, _) if matches!(&**value, Term::Pair(_, _))
+                    )
+                )
+            )
+        ),
+        "pair projection retains its checked type at inference"
+    );
+}
+
+/// MEASURED: the existing polymorphic λ ascription now emits an outer
+/// Ascript around the checked binary λ core in infer position. CLAIMED: the
+/// older conformance case remains true after updating its output shape.
+/// THE GAP: the applied-lambda rows separately require a later kernel infer.
+#[test]
+fn existing_polymorphic_lambda_ascription_keeps_its_checked_type() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let trust = env.env.trusted_base();
+    let (term, _) = env
+        .elaborate_expr("poly_asc", "(\\A . \\x . x) : (A : Type) -> (x : A) -> A")
+        .expect("existing polymorphic ascription");
+    assert!(matches!(term,
+        Term::Ascript(value, _) if matches!(&*value,
+            Term::Lam(_, inner) if matches!(&**inner, Term::Lam(_, _))
+        )
+    ));
+    assert_eq!(env.env.trusted_base(), trust);
+}
+
+/// MEASURED: an ascribed Refl under an open binder stays Ascript(Refl),
+/// without an inferred-let value that could wrap its RHS a second time.
+/// CLAIMED: Refl keeps its checked type at RAsc. THE GAP: the downstream
+/// checker may also accept bare Refl when given an expected Eq type.
+#[test]
+fn open_refl_ascription_keeps_the_inferred_type() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let refl = checked(
+        &mut env,
+        "theorem refl_direct (x : Nat) : Equal Nat x x = (Refl : Equal Nat x x)",
+    );
+    assert!(matches!(refl,
+        Term::Lam(_, body) if matches!(&*body,
+            Term::Ascript(value, _) if matches!(&**value, Term::Refl(_))
+        )
+    ));
+    checked(
+        &mut env,
+        "theorem refl_let (x : Nat) : Equal Nat x x = let p = (Refl : Equal Nat x x) in p",
+    );
+}
+
+/// MEASURED: standalone infer returns Ascript(TruncProj); an unannotated let
+/// also admits the same source form. CLAIMED: the truncation introduction
+/// terminal retains its checked type at RAsc. THE GAP: quotient-class
+/// introductions have no corresponding source constructor on this base.
+#[test]
+fn standalone_truncation_ascription_keeps_the_inferred_type() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let trust = env.env.trusted_base();
+    let (truncation, _) = env
+        .elaborate_expr("trunc_infer", "(trunc_intro True : ‖Bool‖)")
+        .expect("standalone truncation in infer position");
+    assert!(matches!(truncation,
+        Term::Ascript(value, _) if matches!(&*value, Term::TruncProj(_))
+    ));
+    assert_eq!(env.env.trusted_base(), trust);
+    let direct = checked(
+        &mut env,
+        "theorem trunc_direct (x : Bool) : ‖Bool‖ = (trunc_intro x : ‖Bool‖)",
+    );
+    assert!(matches!(direct,
+        Term::Lam(_, body) if matches!(&*body,
+            Term::Ascript(value, _) if matches!(&**value, Term::TruncProj(_))
+        )
+    ));
+    checked(
+        &mut env,
+        "theorem trunc_let (x : Bool) : ‖Bool‖ = let p = (trunc_intro x : ‖Bool‖) in p",
+    );
+}
+
 /// MEASURED: the two wrong-type twins reach the kernel's TypeMismatch rather
 /// than the old infer-introduction refusal. CLAIMED: preserving an ascription
 /// does not allow ill-typed introduction forms to pass. THE GAP: the kernel
