@@ -340,16 +340,16 @@ impl Fixture {
         };
         assert!(*id == self.ids.ok_id || *id == self.ids.err_id);
         assert_eq!(args.len(), 3, "Result slots + payload");
-        let e_val = self.eval_expr(e);
-        let a_val = self.eval_expr(a);
-        assert_eq!(args[0], e_val, "error slot from checked family");
-        assert_eq!(args[1], a_val, "success slot from checked family");
         let proof = self.reflexive_probe(response.clone(), e, a);
         assert!(
             matches!(proof, EvalVal::Ctor { id, .. }
             if id == self.id("MkRtHostIndex")),
             "checked reflexive cast did not reduce for {e}/{a}: {proof:?}"
         );
+        let e_val = self.eval_expr(e);
+        let a_val = self.eval_expr(a);
+        assert_eq!(args[0], e_val, "error slot from checked family");
+        assert_eq!(args[1], a_val, "success slot from checked family");
 
         let different = self.alternative_error(e, &args[2]);
         assert_ne!(different, args[2], "negative must really change content");
@@ -455,17 +455,19 @@ fn resource_token(f: &mut Fixture, result: &EvalVal, e: &str, a: &str) -> EvalVa
 }
 
 #[test]
-fn fs_file_error_bytes_plain_and_hostio_inl() {
+fn fs_file_error_bytes_plain_fs() {
     let mut f = Fixture::new();
-    let mut host = CaptureHost::new(Vec::new());
-    host.insert_directory(b"root".to_vec());
-    host.insert_file(b"root/data".to_vec(), b"first".to_vec());
-    let full = f.full();
-    let tree = f.call("read_bytes", [full, f.cap(), Fixture::bytes(b"root/data")]);
+    let mut host = host();
+    let tree = f.fs_action("read_bytes", [Fixture::bytes(b"root/data")]);
     let response = f.verify_pair(tree, "FileError", "Bytes", &mut host);
     assert!(matches!(&response, EvalVal::Ctor { id, args, .. }
-        if *id == f.ids.ok_id && matches!(args.get(2), Some(EvalVal::Bytes(b)) if b == b"first")));
+        if *id == f.ids.ok_id && matches!(args.get(2), Some(EvalVal::Bytes(b)) if b == b"file-first")));
+}
 
+#[test]
+fn fs_file_error_bytes_hostio_inl() {
+    let mut f = Fixture::new();
+    let mut host = host();
     let action = f.fs_action("read_bytes", [Fixture::bytes(b"root/data")]);
     let response_ty = f.eval_expr("Result FileError Bytes");
     let full = f.full();
@@ -478,12 +480,13 @@ fn fs_file_error_bytes_plain_and_hostio_inl() {
         if *id == f.coproduct.inl_id),
         "HostIO read must dispatch unpeeled InL"
     );
-    let host_response = f.verify_pair(injected, "FileError", "Bytes", &mut host);
-    assert_eq!(response, host_response, "plain FS and HostIO InL agree");
+    let response = f.verify_pair(injected, "FileError", "Bytes", &mut host);
+    assert!(matches!(&response, EvalVal::Ctor { id, args, .. }
+        if *id == f.ids.ok_id && matches!(args.get(2), Some(EvalVal::Bytes(b)) if b == b"file-first")));
 }
 
 #[test]
-fn fs_file_error_unit_and_preflight_error() {
+fn fs_file_error_unit() {
     let mut f = Fixture::new();
     let mut host = host();
     let policy = f.ctor("CreateNew");
@@ -497,6 +500,12 @@ fn fs_file_error_unit_and_preflight_error() {
     );
     let response = f.verify_pair(tree, "FileError", "Unit", &mut host);
     assert!(matches!(response, EvalVal::Ctor { id, .. } if id == f.ids.ok_id));
+}
+
+#[test]
+fn fs_file_error_unit_preflight_error_without_host_call() {
+    let mut f = Fixture::new();
+    let mut host = host();
     let before = host.fs_trace().len();
     let preflight = f.fs_action(
         "change_mode",
@@ -661,16 +670,21 @@ fn fs_resource_error_bytes() {
 }
 
 #[test]
-fn ambient_io_error_read_result_plain_and_host_console() {
+fn ambient_io_error_read_result_plain_io() {
     let mut f = Fixture::new();
     let stdin = f.ctor("Stdin");
     let action = f.call("read", [stdin, EvalVal::Int(20)]);
-    let mut plain_host = host();
-    let response = f.verify_pair(action, "IOError", "ReadResult", &mut plain_host);
+    let mut host = host();
+    let response = f.verify_pair(action, "IOError", "ReadResult", &mut host);
     assert!(matches!(&response, EvalVal::Ctor { id, args, .. }
         if *id == f.ids.ok_id && matches!(&args[2], EvalVal::Ctor { id, args, .. }
             if *id == f.ids.chunk_id && matches!(&args[0], EvalVal::Bytes(bytes)
                 if bytes == b"ambient-first"))));
+}
+
+#[test]
+fn ambient_io_error_read_result_host_console() {
+    let mut f = Fixture::new();
     let stdin = f.ctor("Stdin");
     let action = f.call("read", [stdin, EvalVal::Int(20)]);
     let full = f.full();
@@ -691,11 +705,12 @@ fn ambient_io_error_read_result_plain_and_host_console() {
         if *id == f.coproduct.inl_id),
         "host_console op must be InR(InL(Read))"
     );
-    let host_response = f.verify_pair(injected, "IOError", "ReadResult", &mut host());
-    assert_eq!(
-        response, host_response,
-        "plain IO and HostIO host_console agree"
-    );
+    let mut host = host();
+    let response = f.verify_pair(injected, "IOError", "ReadResult", &mut host);
+    assert!(matches!(&response, EvalVal::Ctor { id, args, .. }
+        if *id == f.ids.ok_id && matches!(&args[2], EvalVal::Ctor { id, args, .. }
+            if *id == f.ids.chunk_id && matches!(&args[0], EvalVal::Bytes(bytes)
+                if bytes == b"ambient-first"))));
 }
 
 #[test]
