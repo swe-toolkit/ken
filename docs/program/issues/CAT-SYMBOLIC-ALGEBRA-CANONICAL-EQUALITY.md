@@ -1,7 +1,7 @@
 ---
 id: CAT-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY
 title: "Spec 66 section 2 specifies a canonical Horner form and a proved Boolean decision of polynomial equality for Algorithm.SymbolicAlgebra.NatPolynomial, but the package delivers only section 1. Deliver section 2 from the Architect's checked D0 at zero trust, with the constructor exports a client needs, and its seed as an acceptance target"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

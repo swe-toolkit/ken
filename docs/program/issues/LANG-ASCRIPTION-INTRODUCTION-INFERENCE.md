@@ -1,7 +1,7 @@
 ---
 id: LANG-ASCRIPTION-INTRODUCTION-INFERENCE
 title: "An ascribed introduction form in infer position is refused by the kernel: infer_ascription erases the ascription after checking, so ((λu. x) : (u : Nat) → Nat) Zero reaches the kernel as the redex (λu. x) Zero, which it cannot infer. Keep the ascription on an introduction-form core, the criterion of the let fix, and amend spec 39 section 5.4"
-status: active
+status: merged
 owner: language
 size: S
 tier: T2
