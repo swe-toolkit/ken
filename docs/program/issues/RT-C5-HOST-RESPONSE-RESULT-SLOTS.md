@@ -1,7 +1,7 @@
 ---
 id: RT-C5-HOST-RESPONSE-RESULT-SLOTS
 title: "C5 regularity for host replies: make_result fills the type slots of every host-built Result e a with Unknown, so a closed, checked, reflexive cast whose index is a host reply evaluates to Unknown. Derive the slots by evaluating the checked response function at the dispatched op value, never by a per-op table"
-status: active
+status: merged
 owner: runtime
 size: M
 gate: architect
