@@ -71,6 +71,7 @@ depth or stack size and the refusal code. Then implement the ruling.
   worker panic is an implementation panic, which spec 70 §1.1 excludes
   from coding; it is propagated once, without a second panic message.
   Removing the worker from `native-build` returns that row to rc 134.
+  Merged at `15661b590`.
 - **AC-2.** A spine past the D0's ruled limit, on each walker the D0
   census names, returns a coded refusal or Ok, not an abort. The rows
   that check today stay Ok, including release K=640.
