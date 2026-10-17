@@ -432,12 +432,15 @@ cases preserve `trusted_base()`; none creates a proof assumption.
 - spec: `39 §5.4` RAsc `introTail`; `13 §2–§3`
 - given: `fn pair_head (x : Nat) : Nat =
   ((x, True) : (v : Nat) × Bool).1`
-- expect: **accepts**; the inferred projection's scrutinee retains an
-  ascription on the checked Pair at its Σ type, and the result is `x`.
-  The already-inferable pair has its own inner ascription; the RAsc
-  boundary preserves the *outer* checked ascription rather than dropping it.
-- why: a pair in the domain of projection is an introduction tail reached
-  through an infer-position consumer, independent of the λ head case.
+- expect: **accepts**; the projection's scrutinee is
+  `Ascript(Ascript(Pair(x, True), (v:Nat)×Bool), (v:Nat)×Bool)`. The inner
+  ascription is RAsc's retained checked type on the checked Pair; the outer
+  one is the positional projection's own wrap of its inferred base. The
+  result is `x`.
+- why: checking a pair against Σ emits a bare Pair, so the inner ascription
+  is observable only if RAsc retains it. Removing the RAsc wrap leaves the
+  projection's wrap alone, so this row pins the emitted core shape; its
+  kernel acceptance does not depend on RAsc.
 
 ### surface/elaboration/inferred-ascribed-refl
 - spec: `39 §5.4` RAsc `introTail`; `16 §2`; `18 §3`

@@ -84,10 +84,10 @@ fn ascribed_refl_application_proves_without_new_trust() {
     );
 }
 
-/// MEASURED: the pair's infer-position ascription remains visible under an
-/// inferred projection and carries Pair as its checked core. CLAIMED: the pair
-/// introTail arm is reachable at this producer. THE GAP: the pair's existing
-/// infer helper also emits an inner ascription; this pins the outer retention.
+/// MEASURED: the projection's scrutinee is a doubly ascribed checked Pair.
+/// CLAIMED: RAsc retains its checked type on the Pair (the inner Ascript);
+/// the outer Ascript is infer_positional_proj's own wrap of its base.
+/// THE GAP: kernel acceptance here does not depend on RAsc, only the shape.
 #[test]
 fn pair_projection_keeps_the_ascribed_introduction_head() {
     let mut env = ElabEnv::new().expect("prelude");
