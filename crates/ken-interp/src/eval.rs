@@ -3098,6 +3098,22 @@ pub fn type_value_slots(
     }
 }
 
+/// A Vis node carries its checked response family as its second ITree type
+/// parameter. Apply it to the unpeeled operation: after a coproduct peel, the
+/// checked family expects a different operation type and cannot supply slots.
+/// A non-Result response or unavailable authority retains make_result's filler.
+fn result_reply_slots(
+    response_family: Option<&EvalVal>,
+    op: &EvalVal,
+    ids: &ConsoleIds,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Option<Vec<EvalVal>> {
+    let result = globals.constructor(ids.ok_id).map(|(decl, _)| decl.id)?;
+    let ty = apply(response_family?.clone(), op.clone(), globals, store);
+    type_value_slots(&ty, result, globals).filter(|slots| slots.len() == 2)
+}
+
 fn primitive_result_type<'a>(id: GlobalId, globals: &'a GlobalEnv) -> Option<&'a Term> {
     let Decl::Primitive { ty, .. } = globals.lookup(id)? else {
         return None;
@@ -5634,19 +5650,23 @@ fn file_error_value(
     make_ctor(fs.mk_file_error_id, vec![operation, path, error], store)
 }
 
-/// Build a `Result e a` response `EvalVal` (`Result`'s 2 type
-/// params fill `args[0..2]` as `Unknown`, mirroring every other landed
-/// prelude ctor's type-param-then-payload shape — `ctor_arity` = params.len()
-/// + args.len()). Untyped at this layer regardless — `make_result` puts
-/// `payload` at position 2 for both `Ok`/`Err` ctors, unaffected by which
-/// static field type the surface ascription assigns.
-fn make_result(ok: bool, payload: EvalVal, ids: &ConsoleIds, store: &mut EvalStore) -> EvalVal {
+/// Build a host `Result e a` with the checked response-family parameters in
+/// slots 0 and 1. When no valid result type was available at the Vis site,
+/// preserve the previous Unknown filler. The payload stays in slot 2 for both
+/// Ok and Err; a payload's runtime shape does not authorize its type slots.
+fn make_result(
+    ok: bool,
+    payload: EvalVal,
+    slots: Option<&[EvalVal]>,
+    ids: &ConsoleIds,
+    store: &mut EvalStore,
+) -> EvalVal {
     let ctor_id = if ok { ids.ok_id } else { ids.err_id };
-    make_ctor(
-        ctor_id,
-        vec![EvalVal::Unknown, EvalVal::Unknown, payload],
-        store,
-    )
+    let (e, a) = match slots {
+        Some([e, a]) => (e.clone(), a.clone()),
+        _ => (EvalVal::Unknown, EvalVal::Unknown),
+    };
+    make_ctor(ctor_id, vec![e, a, payload], store)
 }
 
 fn decode_stream(value: &EvalVal, ids: &ConsoleIds) -> Option<ConsoleStream> {
@@ -6282,6 +6302,7 @@ fn fs_dispatch<H: HostHandler>(
     fs: &FSIds,
     ids: &ConsoleIds,
     globals: &GlobalEnv,
+    reply_slots: Option<&[EvalVal]>,
     store: &mut EvalStore,
     recorder: Option<&mut EffectTraceRecorder>,
 ) -> Option<Result<EvalVal, ()>> {
@@ -6387,7 +6408,7 @@ fn fs_dispatch<H: HostHandler>(
         let Some(mode) = mode.filter(|mode| mode & !0o7777 == 0) else {
             let cause = make_ctor(ids.invalidinput_id, vec![], store);
             let error = file_error_value(fs.op_change_mode_id, &path, cause, fs, globals, store);
-            return Some(Ok(make_result(false, error, ids, store)));
+            return Some(Ok(make_result(false, error, reply_slots, ids, store)));
         };
         (
             ken_host::HostOpV1::FsChangeMode,
@@ -6439,7 +6460,7 @@ fn fs_dispatch<H: HostHandler>(
             Ok(capacity) => capacity,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         (
@@ -6452,7 +6473,7 @@ fn fs_dispatch<H: HostHandler>(
             Ok(length) => length,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         let protection = match args.get(2) {
@@ -6474,7 +6495,7 @@ fn fs_dispatch<H: HostHandler>(
             Ok(length) => length,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         let protection = match args.get(3) {
@@ -6496,14 +6517,14 @@ fn fs_dispatch<H: HostHandler>(
             Ok(start) => start,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         let length = match narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds) {
             Ok(length) => length,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         (
@@ -6516,7 +6537,7 @@ fn fs_dispatch<H: HostHandler>(
             Ok(start) => start,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         (
@@ -6533,7 +6554,7 @@ fn fs_dispatch<H: HostHandler>(
                 Ok(file_offset) => file_offset,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);
-                    return Some(Ok(make_result(false, error, ids, store)));
+                    return Some(Ok(make_result(false, error, reply_slots, ids, store)));
                 }
             };
         let buffer_start =
@@ -6541,14 +6562,14 @@ fn fs_dispatch<H: HostHandler>(
                 Ok(buffer_start) => buffer_start,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);
-                    return Some(Ok(make_result(false, error, ids, store)));
+                    return Some(Ok(make_result(false, error, reply_slots, ids, store)));
                 }
             };
         let length = match narrow_host_u64(args.get(5)?, ken_host::ResourceErrorV1::InvalidBounds) {
             Ok(length) => length,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         (
@@ -6566,7 +6587,7 @@ fn fs_dispatch<H: HostHandler>(
                 Ok(file_offset) => file_offset,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);
-                    return Some(Ok(make_result(false, error, ids, store)));
+                    return Some(Ok(make_result(false, error, reply_slots, ids, store)));
                 }
             };
         let buffer_start =
@@ -6574,14 +6595,14 @@ fn fs_dispatch<H: HostHandler>(
                 Ok(buffer_start) => buffer_start,
                 Err(error) => {
                     let error = resource_error_value_v1(error, fs, ids, store);
-                    return Some(Ok(make_result(false, error, ids, store)));
+                    return Some(Ok(make_result(false, error, reply_slots, ids, store)));
                 }
             };
         let length = match narrow_host_u64(args.get(5)?, ken_host::ResourceErrorV1::InvalidBounds) {
             Ok(length) => length,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         (
@@ -6598,14 +6619,14 @@ fn fs_dispatch<H: HostHandler>(
             Ok(start) => start,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         let length = match narrow_host_u64(args.get(3)?, ken_host::ResourceErrorV1::InvalidBounds) {
             Ok(length) => length,
             Err(error) => {
                 let error = resource_error_value_v1(error, fs, ids, store);
-                return Some(Ok(make_result(false, error, ids, store)));
+                return Some(Ok(make_result(false, error, reply_slots, ids, store)));
             }
         };
         (
@@ -6758,6 +6779,7 @@ fn fs_dispatch<H: HostHandler>(
             fs,
             ids,
             globals,
+            reply_slots,
             store,
         )
     });
@@ -6812,6 +6834,7 @@ fn reify_host_reply_v1(
     fs: &FSIds,
     ids: &ConsoleIds,
     globals: &GlobalEnv,
+    reply_slots: Option<&[EvalVal]>,
     store: &mut EvalStore,
 ) -> Result<EvalVal, ()> {
     validate_transfer_request_bound(request, &outcome)?;
@@ -6960,20 +6983,20 @@ fn reify_host_reply_v1(
                 globals,
                 store,
             );
-            return Ok(make_result(false, file_error, ids, store));
+            return Ok(make_result(false, file_error, reply_slots, ids, store));
         }
         ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(error)) => {
             let io = io_error_identity_value(error, ids, store);
             let error = make_ctor(fs.resource_host_io_id, vec![io], store);
-            return Ok(make_result(false, error, ids, store));
+            return Ok(make_result(false, error, reply_slots, ids, store));
         }
         ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Resource(error)) => {
             let error = resource_error_value_v1(error, fs, ids, store);
-            return Ok(make_result(false, error, ids, store));
+            return Ok(make_result(false, error, reply_slots, ids, store));
         }
         _ => return Err(()),
     };
-    Ok(make_result(true, value, ids, store))
+    Ok(make_result(true, value, reply_slots, ids, store))
 }
 
 fn ambient_dispatch<H: HostHandler>(
@@ -6983,6 +7006,7 @@ fn ambient_dispatch<H: HostHandler>(
     resources: &mut ken_host::ResourceTableV1,
     ids: &ConsoleIds,
     clock_ids: Option<&ClockIds>,
+    reply_slots: Option<&[EvalVal]>,
     store: &mut EvalStore,
     recorder: Option<&mut EffectTraceRecorder>,
 ) -> Result<EvalVal, ()> {
@@ -7004,15 +7028,15 @@ fn ambient_dispatch<H: HostHandler>(
     match reply.outcome {
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ReadChunk(bytes)) => {
             let chunk = make_ctor(ids.chunk_id, vec![EvalVal::Bytes(bytes)], store);
-            Ok(make_result(true, chunk, ids, store))
+            Ok(make_result(true, chunk, reply_slots, ids, store))
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ReadEof) => {
             let eof = make_ctor(ids.eof_id, vec![], store);
-            Ok(make_result(true, eof, ids, store))
+            Ok(make_result(true, eof, reply_slots, ids, store))
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Unit) => {
             let unit = make_ctor(ids.unit_id, vec![], store);
-            Ok(make_result(true, unit, ids, store))
+            Ok(make_result(true, unit, reply_slots, ids, store))
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Bool(value)) => {
             Ok(make_ctor(
@@ -7029,9 +7053,9 @@ fn ambient_dispatch<H: HostHandler>(
                 store,
             ))
         }
-        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Bytes(bytes)) => {
-            Ok(make_result(true, EvalVal::Bytes(bytes), ids, store))
-        }
+        ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::Bytes(bytes)) => Ok(
+            make_result(true, EvalVal::Bytes(bytes), reply_slots, ids, store),
+        ),
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::MonotonicInstant(
             bytes,
         )) => {
@@ -7044,7 +7068,7 @@ fn ambient_dispatch<H: HostHandler>(
         }
         ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(error)) => {
             let error = io_error_identity_value(error, ids, store);
-            Ok(make_result(false, error, ids, store))
+            Ok(make_result(false, error, reply_slots, ids, store))
         }
         _ => Err(()),
     }
@@ -7272,6 +7296,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                 }));
                             }
                         };
+                        let reply_slots = result_reply_slots(args.get(1), &op, ids, globals, store);
                         // D3 coproduct peel: strip InL/InR down to the innermost
                         // base tag BEFORE dispatch — effect-blind, a no-op when
                         // `coproduct_ids` is absent or the op carries no wrapper.
@@ -7302,6 +7327,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                     &mut resources,
                                     ids,
                                     clock_ids,
+                                    reply_slots.as_deref(),
                                     store,
                                     recorder.as_deref_mut(),
                                 )
@@ -7330,6 +7356,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                     &mut resources,
                                     ids,
                                     clock_ids,
+                                    reply_slots.as_deref(),
                                     store,
                                     recorder.as_deref_mut(),
                                 )
@@ -7354,6 +7381,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                     &mut resources,
                                     ids,
                                     clock_ids,
+                                    reply_slots.as_deref(),
                                     store,
                                     recorder.as_deref_mut(),
                                 )
@@ -7378,6 +7406,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                     &mut resources,
                                     ids,
                                     clock_ids,
+                                    reply_slots.as_deref(),
                                     store,
                                     recorder.as_deref_mut(),
                                 )
@@ -7401,6 +7430,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                         &mut resources,
                                         ids,
                                         Some(clock),
+                                        reply_slots.as_deref(),
                                         store,
                                         recorder.as_deref_mut(),
                                     )
@@ -7416,6 +7446,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                             fs,
                                             ids,
                                             globals,
+                                            reply_slots.as_deref(),
                                             store,
                                             recorder.as_deref_mut(),
                                         )
@@ -7745,6 +7776,7 @@ mod px5b_effect_observation_tests {
             fs,
             ids,
             &GlobalEnv::new(),
+            None,
             store,
         )
     }
@@ -8095,6 +8127,7 @@ mod px5b_effect_observation_tests {
             &fs,
             &ids,
             &GlobalEnv::new(),
+            None,
             &mut store,
             recorder,
         )
@@ -8119,6 +8152,7 @@ mod px5b_effect_observation_tests {
             fs,
             ids,
             &GlobalEnv::new(),
+            None,
             store,
             None,
         )
@@ -10143,6 +10177,7 @@ mod px5b_effect_observation_tests {
                 &mut resources,
                 &ids,
                 Some(&clock),
+                None,
                 &mut store,
                 None,
             )
@@ -10240,6 +10275,7 @@ mod px5b_effect_observation_tests {
                 &mut resources,
                 &ids,
                 Some(&clock),
+                None,
                 &mut store,
                 None,
             )
@@ -10444,6 +10480,7 @@ mod px5b_effect_observation_tests {
             &mut resources,
             &ids,
             Some(&clock),
+            None,
             &mut store,
             Some(&mut recorder),
         )
@@ -10455,6 +10492,7 @@ mod px5b_effect_observation_tests {
             &mut resources,
             &ids,
             Some(&clock),
+            None,
             &mut store,
             Some(&mut recorder),
         )

@@ -187,8 +187,9 @@ fn safe_bytes_option_and_result_slots_agree_with_source_values() {
 /// producers. MEASURED: a real reified directory reply and a constructed
 /// FileError path agree with checked source counterparts, and differing paths
 /// disagree. CLAIMED: the producer uses the checked constructor field type,
-/// not a guessed List or Option parameter. THE GAP: outer host Result slots
-/// are still Unknown and intentionally excluded into a separate WP.
+/// not a guessed List or Option parameter. THE GAP: this direct reifier
+/// fixture has no Vis response family and retains Unknown outer Result slots;
+/// the checked host driver's outer slots are exercised separately.
 #[test]
 fn fs_directory_and_file_error_path_slots_agree_with_source() {
     let (elab, mut store) = fixture(&[
@@ -216,6 +217,7 @@ fn fs_directory_and_file_error_path_slots_agree_with_source() {
         &fs,
         &ids,
         &elab.env,
+        None,
         &mut store,
     )
     .expect("directory reply reifies");
