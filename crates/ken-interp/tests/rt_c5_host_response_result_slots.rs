@@ -1,6 +1,7 @@
-//! C5 host-response slots: real checked Vis families and CaptureHost dispatch.
-//! Promise class: durable invariant. The sole unavailable Entropy operation is
-//! a labelled transition sentinel, retired when that operation is promoted.
+//! C5 host-response slots (spec/40-runtime/42-evaluation.md §3.6): checked
+//! Vis families drive real CaptureHost replies. Promise class: durable
+//! invariant. Entropy's unavailable random-bytes operation is a labelled
+//! transition sentinel, retired when that operation is promoted.
 
 use std::path::PathBuf;
 
@@ -752,10 +753,10 @@ fn ambient_io_error_unit() {
     assert_eq!(host.stdout(), b"written");
 }
 
-/// Transition sentinel: entropy random bytes is RepresentedUnavailable. Once
-/// that host op is promoted, replace this refusal with the fifteenth pair row.
+/// Transition sentinel: EntropyRandomBytes is RepresentedUnavailable. When
+/// promoted, retire this refusal and add its IOError/Bytes response row.
 #[test]
-fn entropy_bytes_stays_unavailable_not_a_fifteenth_row() {
+fn entropy_random_bytes_stays_unavailable_until_promotion() {
     let mut f = Fixture::new();
     let action = f.call("random_bytes", [EvalVal::Int(8)]);
     let full = f.full();
