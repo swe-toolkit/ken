@@ -2512,7 +2512,8 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         // must originate as a kernel `Eq A t u` / transparent equality alias with
         // `t`/`u` CONVERTIBLE. If observational equality reduces that equality
         // to Sigma-shaped component obligations before checking sees the Eq
-        // head, synthesize the corresponding component proof. This remains
+        // head, synthesize the corresponding component proof. At a Pi reduct,
+        // retain the recorded Eq formation for reflexivity. This remains
         // gated to an equality-origin target; it is not a general Sigma/And
         // proof search or coercion.
         // Surface sugar only: `Refl` is a bare `ConId` the resolver emits as
@@ -2523,6 +2524,8 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
             if matches!(exp_wh, Term::Eq(..))
                 || (matches!(exp_wh, Term::Sigma(..))
                     && states_equality(cx.env, &cx.ctx, expected))
+                || (matches!(exp_wh, Term::Pi(..))
+                    && recorded_eq_endpoints(cx.env, expected).is_some())
             {
                 synth_refl_proof(cx.env, &cx.ctx, expected, rspan)
             } else {
@@ -2750,6 +2753,19 @@ fn synth_refl_proof(
             let snd = synth_generated_index_evidence(env, ctx, &snd_ty, span)?;
             Ok(Term::pair(fst, snd))
         }
+        Term::Pi(..) => match recorded_eq_endpoints(env, expected) {
+            Some((a_ty, t, u)) if convert(env, ctx, &a_ty, &t, &u) => {
+                Ok(Term::Refl(Box::new(t)))
+            }
+            Some(_) => Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "Refl: the two sides of the goal are not convertible".into(),
+            }),
+            None => Err(ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "Refl expects an `Eq`-shaped goal".into(),
+            }),
+        },
         _ => Err(ElabError::TypeMismatch {
             span: span.clone(),
             reason: "Refl expects an `Eq`-shaped goal".into(),
