@@ -23,21 +23,28 @@ fn main() {
     // hollow out the census.
     //
     // Keep the census scope on the same thread as dispatch: its rows are
-    // thread-local. The check/run worker owns the whole CLI path, so both
-    // elaboration and the kernel re-check happen on its stated stack. A future
-    // subprocess boundary can enclose the same invocation without changing
-    // the elaboration path. Other subcommands retain their original thread.
-    let needs_elaboration_stack = std::env::args_os()
-        .nth(1)
-        .is_some_and(|arg| matches!(arg.to_str(), Some("check" | "run")));
+    // thread-local. Every elaborating subcommand owns its whole CLI path on
+    // the stated stack, including the kernel re-check. A future subprocess
+    // boundary can enclose the same invocation without changing elaboration.
+    // Non-elaborating subcommands retain their original thread.
+    let needs_elaboration_stack = std::env::args_os().nth(1).is_some_and(|arg| {
+        matches!(arg.to_str(), Some("check" | "run" | "native-build" | "repl"))
+    });
     let exit_code = if needs_elaboration_stack {
-        std::thread::Builder::new()
+        let worker = std::thread::Builder::new()
             .name("ken-elaboration".into())
             .stack_size(CLI_ELABORATION_STACK_BYTES)
             .spawn(|| ken_runtime::with_child_match_recursor_census(dispatch))
-            .expect("spawn ken check/run elaboration worker")
-            .join()
-            .expect("ken check/run elaboration worker panicked")
+            .unwrap_or_else(|error| {
+                emit_cli_error(CliError::ElaborationWorkerSpawn(error));
+                std::process::exit(1);
+            });
+        match worker.join() {
+            Ok(exit_code) => exit_code,
+            // The worker's panic hook already printed the failure. Propagating
+            // without invoking the hook again keeps its one diagnostic.
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
     } else {
         ken_runtime::with_child_match_recursor_census(dispatch)
     };
