@@ -60,9 +60,12 @@ its dependents (later fields, hidden result variables, the goal),
 elaborate the arm against real binders, and close the method with one J
 transport of the reverted arm. This replaces, on that path:
 `install_index_refinements` capability 1,
-`install_hidden_result_variable_refinements` (:9880),
-`install_plain_declared_index_aliases` (:8117) and
+`install_hidden_result_variable_refinements` (:9880) and
 `install_fields_from_goal_transport` (:8469).
+`install_plain_declared_index_aliases` stays on its current path: it is not
+on the variable-side-leaf path (Architect `evt_7ppfqyymvx6qn` Q3). The
+Architect's design ruling there (R1: the generalized-goal telescope engine
+with a dependency-closure selector and one J per leaf) is the build route.
 
 Retained: leaf projection, injectivity and conflict leaves; the convoy
 machinery; the kernel; the cast-alias path for a leaf with no variable
