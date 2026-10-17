@@ -62,9 +62,11 @@ as a test target. No kernel, trust or spec change.
 - **AC-1.** The ruling's table as exact rows, each with its hole count,
   parameter count and goal head.
 - **AC-2.** The 11 suites the ruling names stay green.
-- **AC-3 (mutation, QA).** Deleting the S1 call reddens r1-r7, c6 and n1
-  with `Type 0 vs Type u0`. Reverting S2 to `zonk_level` reddens only n1,
-  with `Type 0 vs Type u2`.
+- **AC-3 (mutation, QA; Architect `evt_75p7jq6a4w9hf`).**
+  - Deleting the S1 call reddens r1-r7 and c6 with `Type 0 vs Type u0`, and
+    n1 with `Type u0 vs Type u2`. n3 and n4 may also go red.
+  - Reverting both S2 zonks to `zonk_level` reddens only n1 among the 17
+    rows, with `Type 0 vs Type u2`.
 
 ## Stop conditions
 
