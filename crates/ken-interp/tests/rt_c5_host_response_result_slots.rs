@@ -7,8 +7,8 @@ use std::path::PathBuf;
 
 use ken_elaborator::capabilities::{Cap, AUTH_FULL};
 use ken_interp::{
-    apply, eval, CaptureHost, ConsoleIds, CoproductIds, EvalStore, EvalVal, FSIds, PosixHost,
-    RunIoError,
+    apply, eval, CaptureHost, ConsoleIds, ConsoleStream, CoproductIds, EvalStore, EvalVal, FSIds,
+    PosixHost, RunIoError,
 };
 use ken_kernel::{Context, GlobalId, Term};
 
@@ -326,6 +326,61 @@ impl Fixture {
         }
     }
 
+    fn different_content(&mut self, e: &str, a: &str, ok: bool, actual: &EvalVal) -> EvalVal {
+        if !ok {
+            return self.alternative_error(e, actual);
+        }
+        match a {
+            "Bytes" => match actual {
+                EvalVal::Bytes(bytes) => {
+                    let alternate = if bytes == b"different-content" {
+                        b"other-content".as_slice()
+                    } else {
+                        b"different-content".as_slice()
+                    };
+                    Self::bytes(alternate)
+                }
+                other => panic!("Ok Bytes has wrong payload: {other:?}"),
+            },
+            "ReadResult" => {
+                let EvalVal::Ctor { id, args, .. } = actual else {
+                    panic!("expected checked Chunk payload: {actual:?}")
+                };
+                assert_eq!(*id, self.ids.chunk_id, "fixture read must be Chunk");
+                let alternative = if args[0] == Self::bytes(b"different-content") {
+                    b"other-content".as_slice()
+                } else {
+                    b"different-content".as_slice()
+                };
+                self.construct("Chunk", [Self::bytes(alternative)])
+            }
+            "FileMetadata" => {
+                let EvalVal::Ctor { id, args, .. } = actual else {
+                    panic!("expected FileMetadata: {actual:?}")
+                };
+                assert_eq!(*id, self.fs.mk_file_metadata_id);
+                let size = if args[0] == EvalVal::Int(100) {
+                    101
+                } else {
+                    100
+                };
+                self.construct("MkFileMetadata", [EvalVal::Int(size), args[1].clone()])
+            }
+            "(List DirEntry)" => {
+                assert!(
+                    matches!(actual, EvalVal::Ctor { id, .. }
+                    if *id == self.fs.cons_id),
+                    "fixture directory must be nonempty"
+                );
+                let dir_entry = self.eval_expr("DirEntry");
+                self.construct("Nil", [dir_entry])
+            }
+            other => {
+                panic!("Ok {other} has no same-constructor content negative; select a host Err row")
+            }
+        }
+    }
+
     // MEASURED: for each checked response type, R(unpeeled op) equals an
     // independently elaborated source Result; its actual host response drives
     // a kernel-checked reflexive cast, whereas a different same-typed content
@@ -341,33 +396,49 @@ impl Fixture {
         };
         assert!(*id == self.ids.ok_id || *id == self.ids.err_id);
         assert_eq!(args.len(), 3, "Result slots + payload");
-        let proof = self.reflexive_probe(response.clone(), e, a);
-        assert!(
-            matches!(proof, EvalVal::Ctor { id, .. }
-            if id == self.id("MkRtHostIndex")),
-            "checked reflexive cast did not reduce for {e}/{a}: {proof:?}"
-        );
         let e_val = self.eval_expr(e);
         let a_val = self.eval_expr(a);
+        let expected = self.construct(
+            "MkRtHostIndex",
+            [e_val.clone(), a_val.clone(), response.clone()],
+        );
+        let proof = self.reflexive_probe(response.clone(), e, a);
+        assert_eq!(
+            proof, expected,
+            "cast must preserve the entire checked witness for {e}/{a}"
+        );
         assert_eq!(args[0], e_val, "error slot from checked family");
         assert_eq!(args[1], a_val, "success slot from checked family");
 
-        let different = self.alternative_error(e, &args[2]);
+        let is_ok = *id == self.ids.ok_id;
+        let different = self.different_content(e, a, is_ok, &args[2]);
         assert_ne!(different, args[2], "negative must really change content");
-        let alternate = self.construct("Err", [e_val.clone(), a_val.clone(), different]);
-        assert_ne!(
-            alternate, response,
-            "differing-content negative must differ"
+        let ctor_name = if is_ok { "Ok" } else { "Err" };
+        let alternate = self.construct(ctor_name, [e_val.clone(), a_val.clone(), different]);
+        let EvalVal::Ctor {
+            id: alternate_id,
+            args: alternate_args,
+            ..
+        } = &alternate
+        else {
+            panic!("same-constructor alternate Result not a constructor: {alternate:?}")
+        };
+        assert_eq!(*alternate_id, *id, "only the Result payload may change");
+        assert_eq!(alternate_args[0], args[0], "error type held fixed");
+        assert_eq!(alternate_args[1], args[1], "success type held fixed");
+        assert_ne!(alternate_args[2], args[2], "payload content must change");
+        let alternate_witness = self.construct(
+            "MkRtHostIndex",
+            [e_val.clone(), a_val.clone(), alternate.clone()],
         );
         let alternate_cast = self.reflexive_probe(alternate.clone(), e, a);
-        assert!(
-            matches!(alternate_cast, EvalVal::Ctor { id, .. }
-            if id == self.id("MkRtHostIndex")),
-            "alternate cast={alternate_cast:?}, alternate={alternate:?}, response={response:?}"
+        assert_eq!(
+            alternate_cast, alternate_witness,
+            "alternate cast must preserve changed content of {e}/{a}"
         );
         assert_ne!(
             proof, alternate_cast,
-            "the checked index must distinguish content"
+            "checked index must distinguish changed content"
         );
 
         let wrong_e = if e == "FileError" {
@@ -488,13 +559,16 @@ fn fs_file_error_unit() {
     let tree = f.fs_action(
         "write_file",
         [
-            Fixture::bytes(b"root/new"),
+            Fixture::bytes(b"root/data"),
             policy,
             Fixture::bytes(b"written"),
         ],
     );
     let response = f.verify_pair(tree, "FileError", "Unit", &mut host);
-    assert!(matches!(response, EvalVal::Ctor { id, .. } if id == f.ids.ok_id));
+    assert!(
+        matches!(response, EvalVal::Ctor { id, .. } if id == f.ids.err_id),
+        "existing path must give a host Err with another FileError as negative"
+    );
 }
 
 #[test]
@@ -746,11 +820,13 @@ fn ambient_io_error_unit() {
     let stdout = f.ctor("Stdout");
     let tree = f.call("write", [stdout, Fixture::bytes(b"written")]);
     let mut host = host();
+    host.close(ConsoleStream::Stdout);
     let response = f.verify_pair(tree, "IOError", "Unit", &mut host);
-    assert!(matches!(&response, EvalVal::Ctor { id, args, .. }
-        if *id == f.ids.ok_id && matches!(&args[2], EvalVal::Ctor { id, .. }
-            if *id == f.ids.unit_id)));
-    assert_eq!(host.stdout(), b"written");
+    assert!(
+        matches!(response, EvalVal::Ctor { id, .. } if id == f.ids.err_id),
+        "closed stream must give BrokenPipe, not a Unit success"
+    );
+    assert!(host.stdout().is_empty());
 }
 
 /// Transition sentinel: EntropyRandomBytes is RepresentedUnavailable. When
