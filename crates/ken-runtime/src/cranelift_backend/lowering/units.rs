@@ -792,6 +792,8 @@ pub fn retained_unit_call_target_mutation_is_exact() -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StaticResponseCallerRetargetMutation {
     RestoreSelectedKTarget,
+    /// Only the exact pre-schema relay-promoted source edge loses its owner.
+    RestoreRelayPromotedKTarget,
     RemoveSelectedCaller,
     RetargetToDifferentResponseOwner,
 }
@@ -876,6 +878,34 @@ pub fn with_static_response_caller_retarget_mutation<T>(
 #[cfg(feature = "px8-ds-test-support")]
 pub fn static_response_caller_retarget_mutation_is_exact() -> bool {
     STATIC_RESPONSE_CALLER_RETARGET_MUTATION.with(std::cell::Cell::get).is_none()
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+#[derive(Clone, Debug)]
+pub struct RelayOwnerCoverageRefusalObservation {
+    pub source: u32,
+    pub source_lowered: bool,
+    pub selected_caller: String,
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static RELAY_OWNER_COVERAGE_REFUSALS:
+        std::cell::RefCell<Option<Vec<RelayOwnerCoverageRefusalObservation>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_relay_owner_coverage_refusal_observations<T>(operation: impl FnOnce() -> T)
+    -> (T, Vec<RelayOwnerCoverageRefusalObservation>)
+{
+    RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| {
+        assert!(slot.borrow().is_none(), "relay coverage observations cannot nest");
+        *slot.borrow_mut() = Some(Vec::new());
+    });
+    let result = operation();
+    let observations = RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| slot.borrow_mut().take().unwrap());
+    (result, observations)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -2063,10 +2093,18 @@ pub(in crate::cranelift_backend) fn resolved_continuation_call_target(
         if let Some(mutation) = STATIC_RESPONSE_CALLER_RETARGET_MUTATION
             .with(std::cell::Cell::get)
         {
+            if mutation == StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget
+                && !plan.has_pre_schema_relay_promotion(
+                    identity.producer_construct_origin(), identity,
+                )
+            {
+                return Ok(response);
+            }
             STATIC_RESPONSE_CALLER_RETARGET_APPLICATIONS
                 .with(|count| count.set(count.get() + 1));
             return match mutation {
-                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget => bundle
+                StaticResponseCallerRetargetMutation::RestoreSelectedKTarget
+                | StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget => bundle
                     .continuation(identity.target())
                     .ok_or_else(|| {
                         backend_module(LoweringCause::PlannerInvariant,
@@ -7884,6 +7922,7 @@ impl ContinuationClaimLedger {
         &self,
         plan: &StaticTransitionPlan<'_>,
         dispositions: &BTreeMap<ContinuationCallIdentity, CandidateDisposition>,
+        lowered_construct_origins: &BTreeSet<StaticOriginId>,
     ) -> Result<(), CraneliftBackendError> {
         let owners = plan
             .static_response_owner_specializations()?
@@ -7894,7 +7933,7 @@ impl ContinuationClaimLedger {
                     infeasible.reason(),
                 ))
             })?;
-        let required_new_contexts = plan
+        let response_rows = plan
             .static_response_feasibility_ledger_all()?
             .map_err(|infeasible| {
                 backend_module(LoweringCause::Fragment, format!(
@@ -7902,23 +7941,45 @@ impl ContinuationClaimLedger {
                     infeasible.vis_origin(),
                     infeasible.reason(),
                 ))
-            })?
-            .into_iter()
+            })?;
+        let required_new_contexts = response_rows.iter()
             .filter(|row| !row.context_was_preexisting())
             .map(|row| row.k_context())
             .collect::<BTreeSet<_>>();
         let mut called_new_contexts = BTreeSet::new();
         for owner in owners {
             if !self.response_owner_calls.contains_key(owner.selected_caller()) {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "a forward-declared response owner has no verified selected incoming call: \
-                     owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}",
-                    owner.id(),
-                    owner.k_context(),
-                    owner.context_was_preexisting(),
-                    owner.selected_caller(),
-                    dispositions.get(owner.selected_caller()),
-                )));
+                let source = response_rows.iter()
+                    .find(|row| row.id() == owner.response())
+                    .map(|row| row.vis_origin())
+                    .ok_or_else(|| backend_module(LoweringCause::PlannerInvariant,
+                        "response owner has no installed response row".to_string()))?;
+                // Only a relay-promoted owner may be unentered, and only when
+                // no evaluator lowered its source Construct in ANY Function.
+                // `disposition=None` alone proves neither of those facts.
+                if !plan.has_pre_schema_relay_promotion(source, owner.selected_caller())
+                    || lowered_construct_origins.contains(&source)
+                {
+                    #[cfg(feature = "px8-ds-test-support")]
+                    if plan.has_pre_schema_relay_promotion(source, owner.selected_caller()) {
+                        RELAY_OWNER_COVERAGE_REFUSALS.with(|slot| {
+                            if let Some(rows) = slot.borrow_mut().as_mut() {
+                                rows.push(RelayOwnerCoverageRefusalObservation {
+                                    source: source.ticket_body_ordinal(),
+                                    source_lowered: lowered_construct_origins.contains(&source),
+                                    selected_caller: format!("{:?}", owner.selected_caller()),
+                                });
+                            }
+                        });
+                    }
+                    return Err(backend_module(LoweringCause::PlannerInvariant, format!(
+                        "a forward-declared response owner has no verified selected incoming call: \
+                         owner={:?}, context={:?}, preexisting={}, caller={:?}, disposition={:?}, source_lowered={}",
+                        owner.id(), owner.k_context(), owner.context_was_preexisting(),
+                        owner.selected_caller(), dispositions.get(owner.selected_caller()),
+                        lowered_construct_origins.contains(&source),
+                    )));
+                }
             }
             if self.composed.contains(owner.selected_caller()) {
                 return Err(backend_module(LoweringCause::PlannerInvariant,
@@ -8596,6 +8657,7 @@ pub(super) fn close_continuation_claim_ledger(
         .validate_response_owner_call_coverage(
             &compiler.static_transition_plan,
             &candidates.settled,
+            &compiler.lowered_construct_origins,
         )?;
     // `D2` — the order, and it is the mechanism rather than a style choice.
     // Totality and disjointness FIRST, then the derived subset, then the

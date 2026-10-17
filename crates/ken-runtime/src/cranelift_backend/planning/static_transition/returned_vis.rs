@@ -17,6 +17,26 @@ use super::units::{EmittableCallEdge, EmittableCallKind, EmittableUnit, Predecla
 use super::{planner_capacity_error, planner_error, CraneliftBackendError, StaticTransitionPlan};
 use crate::RuntimeExpr;
 
+#[cfg(feature = "px8-ds-test-support")]
+thread_local! {
+    static FORCED_UNDERIVED_OWNER_VIS: std::cell::Cell<Option<u32>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Test-only: `returned_vis_protocol` fails for exactly one installed owner
+/// Vis origin, at the protocol's single producer, so every reader sees what a
+/// genuinely underivable owner produces. The program IR is unchanged.
+#[cfg(feature = "px8-ds-test-support")]
+pub fn with_forced_underived_owner<T>(owner_vis: u32, operation: impl FnOnce() -> T) -> T {
+    FORCED_UNDERIVED_OWNER_VIS.with(|slot| {
+        assert!(slot.get().is_none(), "forced Underived owners cannot nest");
+        slot.set(Some(owner_vis));
+    });
+    let result = operation();
+    FORCED_UNDERIVED_OWNER_VIS.with(|slot| slot.set(None));
+    result
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct ReturnedVisMember {
     pub(in crate::cranelift_backend) origin: StaticOriginId,
@@ -430,6 +450,12 @@ impl StaticTransitionPlan<'_> {
             .iter()
             .find(|row| row.vis_origin() == owner_vis)
             .ok_or_else(|| planner_error("returned-Vis protocol names no installed owner row"))?;
+        #[cfg(feature = "px8-ds-test-support")]
+        if FORCED_UNDERIVED_OWNER_VIS.with(std::cell::Cell::get) == Some(owner_vis.0) {
+            return Err(planner_error(
+                "test-forced underivable returned-Vis protocol",
+            ));
+        }
         let candidate_rows = self.return_protocol_candidate_rows()?;
         let contexts = self.continuation_contexts()?;
         let units = self.emittable_units()?;

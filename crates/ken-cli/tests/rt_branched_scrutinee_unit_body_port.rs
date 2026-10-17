@@ -236,27 +236,21 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
     );
 }
 
-/// Promise class: transition sentinel for increment (i)
-/// (spec/40-runtime/45-native-backend.md, RT-NESTED-RELAY AC-MAIN). Until a
-/// performing route is implemented, the consuming seat must take the planned
-/// typed trap rather than silently omit the forwarded operation. The future
-/// performing-route WP deliberately flips this pin and redefines the outcome.
-///
-/// MEASURED: interpreter FsReadAt after the exact native pre-read effect prefix;
-/// native terminates in a planned MissingRuntimeMetadata trap naming the read.
-/// Releases are compared as a set because disposal order is not effect order.
-/// CLAIMED: this reached, still unrouted relay cannot silently drop its read.
-/// THE GAP: a typed trap could arise at an unrelated seat; the planned trap's
-/// forwarded-op message and its nonzero catalog identity identify this seat.
+/// Promise class: durable invariant. MEASURED: native and interpreter observe
+/// the same ordered non-release events, including FsReadAt and its result,
+/// and the same release set and terminal outcome. CLAIMED: a reached relay
+/// performs the host operation through its exact native response owner.
+/// THE GAP: the interpreter's independent effect observation must include the
+/// read; the assertion below establishes that before comparing both paths.
 #[test]
-fn branched_scrutinee_forwarded_read_is_performed_or_refused() {
+fn branched_scrutinee_forwarded_read_matches_interpreter() {
     with_stack_floor(
-        "branched_scrutinee_forwarded_read_is_performed_or_refused",
-        branched_scrutinee_forwarded_read_is_performed_or_refused_body,
+        "branched_scrutinee_forwarded_read_matches_interpreter",
+        branched_scrutinee_forwarded_read_matches_interpreter_body,
     );
 }
 
-fn branched_scrutinee_forwarded_read_is_performed_or_refused_body() {
+fn branched_scrutinee_forwarded_read_matches_interpreter_body() {
     use std::os::unix::ffi::OsStrExt as _;
 
     let source = BRANCHED_SCRUTINEE_SOURCE.replacen(
@@ -278,7 +272,7 @@ fn branched_scrutinee_forwarded_read_is_performed_or_refused_body() {
         root.path(),
         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
     )
-    .expect("the forwarded read has a planned native route or a planned trap");
+    .expect("the forwarded read has a planned performing owner");
     let native = ken_runtime::run_bound_process_effect_observation(
         &compiled.artifact,
         &ken_runtime::NativeEffectRunOptionsV1 {
@@ -341,35 +335,81 @@ fn branched_scrutinee_forwarded_read_is_performed_or_refused_body() {
     );
     assert_eq!(release_set(&native), release_set(&interpreted));
     let native_ops = non_release(&native);
-    assert_eq!(
-        native_ops,
-        interpreter_ops[..native_ops.len().min(interpreter_ops.len())]
+    assert_eq!(native_ops, interpreter_ops, "the relay must perform FsReadAt");
+    assert_eq!(native.exit_status, interpreted.exit_status);
+    assert_eq!(native.terminal_exit, interpreted.terminal_exit);
+    assert_eq!(native.terminal_error, interpreted.terminal_error);
+}
+
+/// Promise class: durable invariant. MEASURED: disabling the exact relay
+/// promotion on a fixture with a reached forwarded read records an actual
+/// suppression and refuses the native build at the planner boundary. CLAIMED:
+/// the read's performing owner is necessary, not inferred by lowering. THE
+/// GAP: the control must reach the relay promotion producer; the application
+/// count and the unchanged baseline parity fixture discriminate that case.
+#[test]
+fn suppressing_relay_promotion_refuses_the_forwarded_read_before_lowering() {
+    let source = BRANCHED_SCRUTINEE_SOURCE.replacen(
+        "(MkBufferWindow (8 : Int) (4 : Int))",
+        "(MkBufferWindow (0 : Int) (4 : Int))",
+        1,
     );
-    assert_eq!(native_ops.len() + 1, interpreter_ops.len());
-    assert_eq!(
-        native.exit_status, 1,
-        "missing route must fail, not return success"
-    );
-    assert_eq!(
-        native.terminal_exit,
-        ken_runtime::TerminalExitClass::ControlledTrap
-    );
-    let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-        native.terminal_error.as_ref()
-    else {
-        panic!("the forwarded read needs a typed planned trap: {native:?}");
-    };
-    assert_ne!(provenance.planned_identity, 0);
-    assert_eq!(
-        provenance.trap.code,
-        ken_runtime::RuntimeTrapCode::MissingRuntimeMetadata,
-    );
-    assert!(
-        provenance
-            .trap
-            .message
-            .contains("relay: forwarded host op FsReadAt")
-            && provenance.trap.message.contains("has no performing route"),
-        "the planned trap names the consuming seat: {provenance:?}"
-    );
+    assert_ne!(source, BRANCHED_SCRUTINEE_SOURCE);
+    let root = tempfile::tempdir().expect("temporary native-build root");
+    let (result, applications) = ken_runtime::with_suppressed_relay_promotion(|| {
+        ken_cli::build_native_program(
+            &source,
+            ken_cli::SourceFormat::Ken,
+            "rt_branched_relay_promotion_suppressed",
+            root.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    assert!(applications > 0, "the mutation must reach a relay source");
+    let error = result.expect_err("a forwarded read with no performer must refuse before lowering");
+    assert_eq!(error.code().as_str(), "N0003");
+    let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = error
+    else { panic!("the refusal must come from native planning") };
+    assert_eq!(packaging.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
+    assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::PlannerInvariant));
+}
+
+/// Promise class: durable invariant. MEASURED: the reached source Construct
+/// lowers while a mutation retargets only its selected response-owner call
+/// to the original K, so object closeout refuses. CLAIMED: a relay owner
+/// lacking an incoming call may be discharged only when its source was never
+/// lowered in any generated function. THE GAP: the mutation must change the
+/// actual resolved callee, not only falsify the coverage detector; its
+/// application count comes from exact target resolution.
+#[test]
+fn lowering_relay_source_without_entering_owner_refuses_coverage() {
+    with_stack_floor("rt-relay-lowered-without-owner", || {
+        let source = BRANCHED_SCRUTINEE_SOURCE.replacen(
+            "(MkBufferWindow (8 : Int) (4 : Int))",
+            "(MkBufferWindow (0 : Int) (4 : Int))", 1,
+        );
+        assert_ne!(source, BRANCHED_SCRUTINEE_SOURCE);
+        let root = tempfile::tempdir().expect("temporary native-build root");
+        let ((built, applications), coverage) =
+            ken_runtime::with_relay_owner_coverage_refusal_observations(|| {
+                ken_runtime::with_static_response_caller_retarget_mutation(
+                    ken_runtime::StaticResponseCallerRetargetMutation::RestoreRelayPromotedKTarget,
+                    || ken_cli::build_native_program(
+                        &source, ken_cli::SourceFormat::Ken,
+                        "rt_relay_lowered_without_owner", root.path(),
+                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                    ),
+                )
+            });
+        assert!(applications > 0, "the reached relay must select its owner call");
+        assert_eq!(coverage.len(), 1, "the exact relay owner coverage guard must refuse");
+        assert!(coverage[0].source_lowered, "the source Construct must actually lower");
+        assert!(!coverage[0].selected_caller.is_empty(), "the guard checks an exact incoming edge");
+        let error = built.expect_err("a lowered relay source without its owner must refuse");
+        assert_eq!(error.code().as_str(), "N0003");
+        let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = error
+        else { panic!("the missing owner call must refuse during native object closeout") };
+        assert_eq!(packaging.stage, ken_runtime::ObjectLinkerPackagingStage::ObjectEmission);
+        assert_eq!(packaging.source_cause, Some(ken_runtime::LoweringCause::PlannerInvariant));
+    });
 }

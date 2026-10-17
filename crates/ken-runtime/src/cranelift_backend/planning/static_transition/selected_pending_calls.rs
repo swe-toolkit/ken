@@ -1687,16 +1687,23 @@ mod tests {
                 RuntimeExpr::Construct { constructor: response_ctor, args: Vec::new() },
                 RuntimeExpr::LexicalClosure {
                     captures: Vec::new(), params: vec!["x".to_owned()],
+                    // This fixture compares resolved callee kinds, not a
+                    // partial returned-Vis protocol. Both K tails return Ret;
+                    // an unclassified Var would now correctly refuse the plan.
                     body: Box::new(RuntimeExpr::ComputationalMatch {
                         scrutinee: Box::new(RuntimeExpr::Var(0)),
                         cases: vec![
                             crate::RuntimeComputationalMatchCase {
                                 constructor: ret_ctor.clone(), argument_binders: 1,
-                                recursive_positions: Vec::new(), body: RuntimeExpr::Var(0),
+                                recursive_positions: Vec::new(), body: RuntimeExpr::Construct {
+                                    constructor: ret_ctor.clone(), args: vec![RuntimeExpr::Var(0)],
+                                },
                             },
                             crate::RuntimeComputationalMatchCase {
                                 constructor: vis_ctor, argument_binders: 2,
-                                recursive_positions: vec![1], body: RuntimeExpr::Var(0),
+                                recursive_positions: vec![1], body: RuntimeExpr::Construct {
+                                    constructor: ret_ctor.clone(), args: vec![RuntimeExpr::Var(0)],
+                                },
                             },
                         ],
                         default: crate::RuntimeTrap {

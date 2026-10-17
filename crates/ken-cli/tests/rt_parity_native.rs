@@ -4219,9 +4219,29 @@ fn assert_generated_entry_capsule_mutation_child() {
     }
 }
 
-const EXECUTE_THEN_RESUME_REKEY_CHILD: &str = "KEN_RT_EXECUTE_THEN_RESUME_REKEY_CHILD";
-const EXECUTE_THEN_RESUME_SUPPRESSED_RELAY_TRAP: &str =
+// The planner's exact-edge refusal when neither materialization authority
+// selects the performing response owner. This text is not a runtime trap oracle.
+const MATERIALIZATION_SUPPRESSED_RELAY_REFUSAL: &str =
     "relay: forwarded host op BufferAllocate from source StaticOriginId(1288) has no performing route";
+const EXECUTE_THEN_RESUME_REKEY_CHILD: &str = "KEN_RT_EXECUTE_THEN_RESUME_REKEY_CHILD";
+
+// Build only: suppressing ETR can leave a mixed response-owner plane that
+// refuses during native execution. That raw terminal is not an oracle here.
+fn build_write_stage_for_materialization_control() -> Result<
+    ken_elaborator::compiler_driver::NativeProgramBuildOutput,
+    ken_elaborator::compiler_driver::NativeProgramBuildError,
+> {
+    let root = output_dir("fs-write-at-offset-single");
+    std::fs::write(root.path().join("source"), b"ab").unwrap();
+    let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_write_writable_stage");
+    ken_cli::build_native_program(
+        &source,
+        ken_cli::SourceFormat::Ken,
+        "rt_parity_fs_write_at_offset_single",
+        root.path(),
+        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+    )
+}
 
 fn assert_execute_then_resume_rekey_child() {
     use ken_runtime::StaticResponseOwnerBodyMutation as OwnerMutation;
@@ -4229,30 +4249,21 @@ fn assert_execute_then_resume_rekey_child() {
     let mode = std::env::var(EXECUTE_THEN_RESUME_REKEY_CHILD)
         .expect("execute-then-resume rekey child mode");
     if mode == "outer-carried" {
-        let (Differential { interpreted, native }, residual_counters) =
-            ken_runtime::with_residual_lowering_counters(|| {
-                ken_runtime::with_suppressed_execute_then_resume_response(|| {
-                    differential("fs-write-at-offset-single", "rt_write_writable_stage")
-                })
-            });
+        let (built, residual_counters) = ken_runtime::with_residual_lowering_counters(|| {
+            ken_runtime::with_suppressed_execute_then_resume_response(
+                build_write_stage_for_materialization_control,
+            )
+        });
+        built.expect("ETR-only suppression still lowers the residual");
         eprintln!("RT_RESIDUAL_LOWERING_COUNTERS {residual_counters:?}");
         // Promise class: transition sentinel. Three source-constructor R
         // arrivals currently require K fields. A changed count reopens the
         // G533-to-G355 Ret, closure523 capture and S6 Match514 review; the
         // I-1 ABI-kind issuance review retires or revalidates this sentinel.
         // It does not prove every constructor store has this representation.
-        assert_eq!(residual_counters.site_a_none_arrivals, 3,
-            "id41's issued R arrivals must decode at ordinary constructor fields");
-        assert_eq!(interpreted.exit_status, 0);
-        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-            native.terminal_error.as_ref()
-        else {
-            panic!("materialization suppression did not restore the pre-effect trap");
-        };
-        assert_eq!(provenance.trap.code, ken_runtime::RuntimeTrapCode::MissingRuntimeMetadata);
         assert_eq!(
-            provenance.trap.message.as_str(),
-            EXECUTE_THEN_RESUME_SUPPRESSED_RELAY_TRAP
+            residual_counters.site_a_none_arrivals, 3,
+            "id41's issued R arrivals must decode at ordinary constructor fields"
         );
         assert!(
             ken_runtime::suppressed_execute_then_resume_response_is_exact(),
@@ -4372,16 +4383,17 @@ generated_entry_split_checked_case!(
 // one independently mutated fact of the execute-then-resume response edge:
 // materialization, exact K context, no raw-worker substitution, exactly-one K,
 // K-Result identity, tail order, Trap-before-Result, and exact Ret identity.
-// Outer-carried suppression now pins the exact pre-effect relay trap, not the
-// downstream ResourceBodyResult default that the missing route used to reach.
+// Outer-carried ETR-only suppression is a build-only residual transition
+// sentinel. It no longer asserts the retired pre-effect runtime relay trap:
+// the exact-edge planner refusal requires suppressing relay promotion too.
 //
-// MEASURED: every mode mutates the production classification or one finished
-// response-owner instruction/value relation and the unchanged write fixture
-// flips from clean InvalidOffset to its exact refusal/trap. CLAIMED: the unified
-// response edge retains at least the old eight dimensions of mutation power.
-// THE GAP: the mapping transfers properties, not historical capsule spellings;
-// the positive write pair and the owner-body exact-error controls independently
-// pin denotation and which verifier arm fires.
+// MEASURED: outer-carried compiles and records three residual arrivals; the
+// other modes mutate finished response-owner instruction/value relations and
+// the unchanged write fixture turns red. CLAIMED: the unified response edge
+// retains those independently varied dimensions of mutation power. THE GAP:
+// the positive write pair and owner-body exact-error controls separately pin
+// denotation and the specific verifier arms; the outer-carried count is only
+// a labelled transition sentinel, not proof of native runtime parity.
 generated_entry_checked_case!(
     generated_entry_capsule_outer_carried,
     EXECUTE_THEN_RESUME_REKEY_CHILD,
@@ -6133,59 +6145,65 @@ fn fs_write_at_malformed_offset_without_write_right_narrows_to_invalid_offset() 
     });
 }
 
-/// Promise class: durable invariant. The P2-to-Specialized promotion is the
-/// materialization step that makes the read-then-write continuation execute.
+/// Promise class: durable invariant. The two response-owner materialization
+/// authorities must not fabricate a performing route when both are suppressed.
 ///
-/// MEASURED: suppressing that classification at its production site leaves the
-/// interpreter unchanged but restores native's exact pre-effect
-/// `MissingRuntimeMetadata` relay trap, with neither BufferAllocate nor
-/// FsReadAt reached.
-/// CLAIMED: the existing transport-source response-owner call is causally
-/// necessary for execute-then-resume. THE GAP: this proves materialization, not
-/// the per-owner once/order property; finished-CLIF owner verification and its
-/// 0/2/wrong-order controls pin that independently.
+/// MEASURED: on the same checked write fixture, ETR-only and relay-only each
+/// build, while suppressing both reaches one relay-promotion site and refuses
+/// before artifact emission at the exact BufferAllocate edge with typed planner
+/// cause. CLAIMED: route C requires an installed performing owner at that edge.
+/// THE GAP: the adjacent unsuppressed parity test pins the positive execution;
+/// these build-only controls assert the refusal, not effect execution or an
+/// unclassified native runtime terminal under ETR-only suppression.
 #[test]
-fn suppressing_execute_then_resume_restores_the_pre_effect_write_trap() {
-    in_large_stack_thread("rt-parity-write-execute-suppressed", || {
-        let Differential {
-            interpreted,
-            native,
-        } = ken_runtime::with_suppressed_execute_then_resume_response(|| {
-            differential("fs-write-at-offset-single", "rt_write_writable_stage")
+fn suppressing_both_materialization_authorities_refuses_at_the_relay_edge() {
+    in_large_stack_thread("rt-parity-write-both-suppressed", || {
+        let (relay_only, relay_only_applications) = ken_runtime::with_suppressed_relay_promotion(
+            build_write_stage_for_materialization_control,
+        );
+        assert_eq!(
+            relay_only_applications, 0,
+            "an unsuppressed ETR plane has no relay-only promotion to suppress"
+        );
+        relay_only.expect("relay-only suppression must still build the write stage");
+
+        let etr_only = ken_runtime::with_suppressed_execute_then_resume_response(
+            build_write_stage_for_materialization_control,
+        );
+        etr_only.expect("ETR-only suppression must still build the write stage");
+        assert!(ken_runtime::suppressed_execute_then_resume_response_is_exact());
+
+        let (both, relay_applications) = ken_runtime::with_suppressed_relay_promotion(|| {
+            ken_runtime::with_suppressed_execute_then_resume_response(
+                build_write_stage_for_materialization_control,
+            )
         });
-        assert_eq!(interpreted.exit_status, 0, "interpreter remains the oracle");
-        assert_eq!(interpreted.terminal_error, None);
-        let Some(ken_runtime::TerminalErrorV1::RuntimeTrap(provenance)) =
-            native.terminal_error.as_ref()
+        assert_eq!(
+            relay_applications, 1,
+            "one source requires independent relay promotion under ETR suppression"
+        );
+        let error = both.expect_err("both authorities suppressed must refuse before emission");
+        assert_eq!(error.code().as_str(), "N0003");
+        let ken_elaborator::compiler_driver::NativeProgramBuildError::Packaging(packaging) = error
         else {
-            panic!("suppression must restore native's pre-effect trap: {native:?}");
+            panic!("both suppressed must refuse in the native planner")
         };
         assert_eq!(
-            provenance.trap.code,
-            ken_runtime::RuntimeTrapCode::MissingRuntimeMetadata
+            packaging.stage,
+            ken_runtime::ObjectLinkerPackagingStage::ObjectEmission
         );
         assert_eq!(
-            provenance.trap.message.as_str(),
-            EXECUTE_THEN_RESUME_SUPPRESSED_RELAY_TRAP,
-            "suppression reached the wrong trap: {provenance:?}"
+            packaging.source_cause,
+            Some(ken_runtime::LoweringCause::PlannerInvariant)
         );
-        for skipped in [
-            ken_runtime::HostOpV1::BufferAllocate,
-            ken_runtime::HostOpV1::FsReadAt,
-            ken_runtime::HostOpV1::FsWriteAt,
-        ] {
-            assert!(
-                native
-                    .effect_trace
-                    .iter()
-                    .all(|event| event.operation != skipped),
-                "suppression must stop before {skipped:?}: {native:?}"
-            );
-        }
         assert!(
-            ken_runtime::suppressed_execute_then_resume_response_is_exact(),
-            "the execute-then-resume suppression hook did not restore"
+            packaging
+                .reason
+                .contains(MATERIALIZATION_SUPPRESSED_RELAY_REFUSAL),
+            "wrong exact-edge refusal: {}",
+            packaging.reason
         );
+        assert!(ken_runtime::suppressed_execute_then_resume_response_is_exact());
     });
 }
 

@@ -1258,8 +1258,8 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 .collect::<Vec<_>>();
             assert_eq!(
                 suppressed_specialized,
-                vec!["FsOpen"],
-                "suppression must remove both execute-then-resume owners"
+                vec!["BufferAllocate", "FsOpen"],
+                "suppression removes execute-then-resume owners but retains the independent relay performer"
             );
             let suppressed_p2 = suppressed
                 .static_response_deferred
@@ -1273,10 +1273,9 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 suppressed_p2,
                 std::collections::BTreeMap::from([
                     ("FsReadAt", 1),
-                    ("BufferAllocate", 1),
                     ("ResourceRelease", 3),
                 ]),
-                "restoring the veto must reopen the ordinary groups as P2"
+                "the veto reopens ordinary groups as P2 but not the relay performer"
             );
             assert!(
                 ken_runtime::suppressed_execute_then_resume_response_is_exact(),
@@ -1302,9 +1301,8 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 "the over-promoted plan must reach the lowering refusal"
             );
             assert_eq!(
-                applications, 6,
-                "the mutation must over-promote all three mixed-owner responses in both the \
-                 install and its closed re-derivation"
+                applications, 3,
+                "only the real phase-B install counts its three mixed-owner over-promotions"
             );
             assert!(
                 ken_runtime::mixed_owner_execute_then_resume_overpromotion_is_exact(),

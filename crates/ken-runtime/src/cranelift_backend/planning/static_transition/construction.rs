@@ -119,6 +119,7 @@ use super::occurrences::{
 use super::responses::{
     publish_checked_ih_post_call_consumers, validate_checked_ih_post_call_consumers,
 };
+use super::returned_vis::{ExcludedSettlement, ResponseOwnerSettlement};
 use super::semantic_ir::{
     build_bool_constructor_inventory, build_semantic_plane,
     build_synthesized_constructor_inventory, positioned_sources, RuntimeExprShape,
@@ -295,6 +296,7 @@ impl<'src> Planner<'src> {
                 case_emissions: Vec::new(),
                 aggregate_ownership: Vec::new(),
                 pre_schema_transport_sources: BTreeSet::new(),
+                pre_schema_relay_promotions: BTreeSet::new(),
                 preselected_response_callers: BTreeSet::new(),
                 recursive_residual_dispositions: Vec::new(),
                 recursive_carrier_boxed_stores: Vec::new(),
@@ -1442,22 +1444,22 @@ impl<'src> Planner<'src> {
         finalize_continuation_availability_plan(&mut self.plan)?;
         self.plan.join_results =
             build_join_result_plan(&self.plan, functionized_units, forced_carrier_joins)?;
-        self.plan.pre_schema_transport_sources =
-            derive_checked_ih_transport_source_population(&self.plan)?;
-        self.plan.preselected_response_callers =
-            self.plan.preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
-        self.plan.recursive_residual_dispositions = build_recursive_residual_dispositions(&self.plan)?;
-        self.plan.recursive_carrier_boxed_stores = build_recursive_carrier_boxed_stores(&self.plan)?;
         // The host effect seat plane reads only `source_occurrences` (fixed at
         // scheduling) and `occurrence_authorities` (written once, above), so it
         // is final here. It must precede the aggregate ownership plan: ownership
         // source (e) reads the pending-Vis protocol, whose successor gate reads
         // this plane. Installed after phase B, ownership was derived against an
         // empty seat plane and the whole-plan closure re-derived 48 more records.
-        // It stays after `join_results`: a seat's consumer phase is a fact about
-        // the child's planned result representation.
         self.plan.host_effect_seats = build_host_effect_seat_plan(&self.plan)?;
         validate_host_effect_seat_plan(&self.plan, &self.plan.host_effect_seats)?;
+        self.plan.pre_schema_transport_sources =
+            derive_checked_ih_transport_source_population(&self.plan)?;
+        self.plan.pre_schema_relay_promotions =
+            self.plan.derive_pre_schema_relay_promotions()?;
+        self.plan.preselected_response_callers =
+            self.plan.preselect_static_response_callers(&self.plan.pre_schema_transport_sources)?;
+        self.plan.recursive_residual_dispositions = build_recursive_residual_dispositions(&self.plan)?;
+        self.plan.recursive_carrier_boxed_stores = build_recursive_carrier_boxed_stores(&self.plan)?;
         // `D7` — the aggregate occurrence population is built HERE, last, and
         // deliberately not beside the occurrence authorities it also reads.
         //
@@ -1527,6 +1529,26 @@ impl<'src> Planner<'src> {
         // ownership source (e) reads its successor rows.
         self.plan.relay_drive_pairs = self.plan.build_relay_drive_pairs()?;
         self.plan.pending_vis_settlements = self.plan.build_pending_vis_settlements()?;
+        // An Underived owner's returned-Vis set could not be derived, so the
+        // Ret-only emission's premise (its K returns only Ret) is unproven: a
+        // returned Vis would be dropped silently (forced AC-MAIN owner 890).
+        // Refuse the plane before any artifact exists.
+        if let Some((owner, reason)) =
+            self.plan
+                .pending_vis_settlements
+                .owners
+                .iter()
+                .find_map(|(owner, settlement)| match settlement {
+                    ResponseOwnerSettlement::Excluded {
+                        reason: ExcludedSettlement::Underived(reason),
+                    } => Some((owner, reason)),
+                    _ => None,
+                })
+        {
+            return Err(planner_capacity_error(format!(
+                "response owner {owner:?} has an underivable returned-Vis protocol: {reason}",
+            )));
+        }
         // Execute-then-resume promotes the former P2 transport-source responses
         // to ordinary response owners. Owner assignment changes which closure
         // environments cross an emitted boundary, so refresh the two existing
@@ -1554,12 +1576,6 @@ impl<'src> Planner<'src> {
         // including the refreshed checked-IH transport population. The trap
         // catalogue exists before any lowering consumes the selected fact.
         self.plan.relay_routes = self.plan.build_relay_routes()?;
-        let relay_traps = self.plan.relay_routes.values()
-            .filter_map(|route| route.no_route_trap.as_ref().cloned())
-            .collect::<Vec<_>>();
-        for trap in &relay_traps {
-            self.intern_trap(trap)?;
-        }
         // After response-owner phase B the actual transport destinations are
         // final. The census only records unavailable captures; unlike the
         // interned specialization's own availability, it refuses no program.

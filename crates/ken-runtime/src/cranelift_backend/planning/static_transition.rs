@@ -142,8 +142,13 @@ pub use responses::{
     suppressed_execute_then_resume_response_is_exact,
     with_mixed_owner_execute_then_resume_overpromotion,
     with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
+    with_suppressed_relay_promotion,
+    with_mixed_relay_refusal_observations,
+    MixedRelayRefusalObservation,
     with_pending_checked_ret_sink_applications, StaticResponseContextDemandMutation,
 };
+#[cfg(feature = "px8-ds-test-support")]
+pub use returned_vis::with_forced_underived_owner;
 pub(in crate::cranelift_backend) use units::{
     EmittableCallKind, PredeclaredFunctionId,
 };
@@ -718,6 +723,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// Representation-independent transport sources, derived before residual
     /// issuance and checked against both post-ownership transport builds.
     pre_schema_transport_sources: BTreeSet<ContinuationCallIdentity>,
+    /// Pre-schema relay sources promoted at their exact incoming edge and
+    /// minting owner. The installed pair/route plane independently verifies it.
+    pre_schema_relay_promotions: BTreeSet<responses::RelayPromotionKey>,
     /// Phase-A response demands selected against those fixed transport sources.
     /// Phase B must resolve exactly this caller set before any lowering.
     preselected_response_callers: BTreeSet<ContinuationCallIdentity>,
@@ -1162,6 +1170,8 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub returned_vis_protocols: Vec<ReturnedVisProtocolObservation>,
     /// Only members remaining after admitted relays are projected out.
     pub settled_returned_vis_protocols: Vec<(u32, Vec<u32>)>,
+    /// Exact owner source origins whose returned-Vis settlement is Underived.
+    pub underived_owner_origins: Vec<u32>,
     pub static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
@@ -1409,6 +1419,15 @@ fn record_static_response_feasibility_diagnostic(
                         (owner.owner.0, owner.contexts.iter().flat_map(|context| &context.members)
                             .map(|member| member.origin.0).collect())
                     }).collect()).unwrap_or_default(),
+                underived_owner_origins: plan.pending_vis_settlements.owners.iter()
+                    .filter_map(|(owner_id, settlement)| {
+                        matches!(settlement, ResponseOwnerSettlement::Excluded {
+                            reason: returned_vis::ExcludedSettlement::Underived(_),
+                        }).then(|| plan.static_response_continuations.iter()
+                            .find(|row| row.id() == *owner_id)
+                            .expect("settled response owner has an installed row")
+                            .vis_origin().0)
+                    }).collect(),
                 static_response_rows,
                 static_response_infeasible,
                 all_static_response_rows,
