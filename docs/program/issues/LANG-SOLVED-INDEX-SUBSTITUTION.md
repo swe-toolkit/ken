@@ -59,13 +59,20 @@ For a leaf with a variable side, substitute the solved variable through
 its dependents (later fields, hidden result variables, the goal),
 elaborate the arm against real binders, and close the method with one J
 transport of the reverted arm. This replaces, on that path:
-`install_index_refinements` capability 1,
-`install_hidden_result_variable_refinements` (:9880) and
-`install_fields_from_goal_transport` (:8469).
-`install_plain_declared_index_aliases` stays on its current path: it is not
-on the variable-side-leaf path (Architect `evt_7ppfqyymvx6qn` Q3). The
-Architect's design ruling there (R1: the generalized-goal telescope engine
-with a dependency-closure selector and one J per leaf) is the build route.
+`install_index_refinements` capability 1 and
+`install_fields_from_goal_transport` (:8469), on field-variable leaves only.
+The build route is R1: the generalized-goal telescope engine with a
+dependency-closure selector and one J per leaf (Architect
+`evt_7ppfqyymvx6qn`).
+- **Eliminated (Architect `evt_6gq7rm62sy7qf`):** only a leaf whose field
+  side is a constructor-field variable (`target = Var(v)`, `v < n`). When
+  both sides are fields, eliminate the later-bound one.
+- **Retained on today's path:** a leaf whose only variable is the outer
+  scrutinee index, which belongs to the motive and convoy path. So do
+  `install_hidden_result_variable_refinements` and
+  `install_plain_declared_index_aliases`.
+- A method that mixes variable and non-variable leaf plans is a stop to
+  report.
 
 Retained: leaf projection, injectivity and conflict leaves; the convoy
 machinery; the kernel; the cast-alias path for a leaf with no variable
@@ -94,3 +101,13 @@ no change without them.
 - A leaf class outside AC-0's census with no retained path.
 - A local repair for one producer in place of the elimination: that is
   the next entry on the same predicate, not this node.
+
+## Hard-stop inventory (§1b)
+
+§1a: the variable-side leaf elimination chain is at 1 (Architect
+`evt_6gq7rm62sy7qf`).
+
+1. A leaf whose only variable is the outer scrutinee index was routed to
+   elimination, whose dependency closure (here `xs : DualEnv a n`) is
+   necessarily outside the method. Keyed on which side of the leaf is a
+   variable.
