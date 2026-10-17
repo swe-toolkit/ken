@@ -36,7 +36,6 @@ no expected endpoint is computed by calling `interval_hull` or
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue)
-import Core.Logic.And (And)
 import Data.Numeric.Rational (Rational, MkRational)
 import Algorithm.Numeric.RationalInterval
   (Interval, MkInterval, interval_contains, interval_hull,

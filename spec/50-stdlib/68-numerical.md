@@ -235,8 +235,10 @@ No minimality or empty-operand preservation law is claimed.
 
 The prospective extension must provide checked generic proof bodies
 for exactly these four **public interval laws**. `IsTrue` turns
-Boolean membership into a proposition; `And` combines the two
-intersection conclusions. No premise assumes ordered endpoints.
+Boolean membership into a proposition. `And` here is the ambient
+Ω-valued conjunction with `and_intro` and its two projections,
+not the distinct `Type`-valued `Core.Logic.And` carrier. No premise
+assumes ordered endpoints.
 
 ```ken
 pub theorem interval_hull_contains_left (i : Interval) (j : Interval) (x : Rational) :
