@@ -101,9 +101,18 @@ depth or stack size and the refusal code. Then implement the ruling.
     release K=640, AC-1c N=400 `C0016` and the `C0022` spawn row.
   - **D (linux).** An external ABRT gives rc 134 without `C0023`, and KILL
     gives 137.
+  - **E (child authentication, Architect `evt_79312na4nzy20`).** The child
+    role requires a marker `<fd>:<parent pid>:<dev>:<ino>` that names this
+    process's actual parent and an open FIFO with that identity. An
+    inherited `invalid` marker and a foreign `1:1:0:0` marker each give
+    `C0023`. A parent-claimed marker with the wrong identity gives `C0022`
+    before any work, with stdout byte-clean. The test helper clears the
+    variable, with `RUST_MIN_STACK`, for every other row.
 - **AC-3 (mutation, QA).** The ruling's M1-M4 (no recorder install, no
-  fault-record test, no `cfg(unix)` block, knob ignored) each redden their
-  rows. Removing the worker still returns debug K=160 on 8 MiB to rc 134.
+  fault-record test, no `cfg(unix)` block, knob ignored) and M5-M7
+  (presence-only detection, no identity comparison, no `getppid`
+  comparison) each redden their rows. Removing the worker still returns
+  debug K=160 on 8 MiB to rc 134.
 
 ## Stop conditions
 
@@ -112,3 +121,11 @@ depth or stack size and the refusal code. Then implement the ruling.
 - The census finds walkers outside the elaborator, such as the kernel
   checker, on the deep-spine path. That scope returns to the Architect
   and the operator.
+
+## Hard-stop inventory (§1b)
+
+§1a: the AC-2 process-boundary chain is at 1 (Architect `evt_79312na4nzy20`).
+
+1. Child role taken from the presence of `KEN_CLI_WORKER_CHILD_FAULT_FD`,
+   keyed on an inherited environment value rather than on the parent that
+   created the channel.

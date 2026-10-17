@@ -1,7 +1,7 @@
 ---
 id: RT-C5-COMPOUND-HIGHER-ORDER-INDICES
 title: "C5 canonicity for compound and higher-order indices: a closed, checked, reflexive cast over a Sigma-indexed or function-indexed family evaluates to its value instead of Unknown, by a rule whose soundness is argued before it is built"
-status: active
+status: merged
 owner: runtime
 size: S
 gate: architect
