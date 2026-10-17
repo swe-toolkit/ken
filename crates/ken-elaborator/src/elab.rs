@@ -315,19 +315,300 @@ impl MetaCtx {
 
 // ----- level unification -----
 
-/// IMPORTANT: check raw `Level::Var` BEFORE `zonk_level` — zonking maps `None`
-/// metas to `Level::Zero`, masking unsolved metas as concrete zeros.
+/// An open solution cannot contain the meta being solved, including beneath
+/// `Suc` or `Max`; otherwise later zonking would recurse indefinitely.
+fn level_mentions_var(level: &Level, meta: u32) -> bool {
+    match level {
+        Level::Zero => false,
+        Level::Var(LevelVar(m)) => *m == meta,
+        Level::Suc(inner) => level_mentions_var(inner, meta),
+        Level::Max(a, b) => level_mentions_var(a, meta) || level_mentions_var(b, meta),
+    }
+}
+
+/// Check raw `Level::Var` before zonking. A solution must preserve unsolved
+/// partners rather than turning them into Zero before the declaration's final
+/// zonk; otherwise obligations cannot close over their actual level metas.
 fn unify_levels(metas: &mut MetaCtx, l1: &Level, l2: &Level) {
     match (l1, l2) {
         (Level::Var(LevelVar(m)), _) if metas.metas[*m as usize].is_none() => {
-            let val = metas.zonk_level(l2);
-            metas.metas[*m as usize] = Some(val);
+            let val = metas.zonk_level_with(l2, false);
+            if !level_mentions_var(&val, *m) {
+                metas.metas[*m as usize] = Some(val);
+            }
         }
         (_, Level::Var(LevelVar(m))) if metas.metas[*m as usize].is_none() => {
-            let val = metas.zonk_level(l1);
-            metas.metas[*m as usize] = Some(val);
+            let val = metas.zonk_level_with(l1, false);
+            if !level_mentions_var(&val, *m) {
+                metas.metas[*m as usize] = Some(val);
+            }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod type_position_argument_sort_tests {
+    use super::level_mentions_var;
+    use crate::{ElabEnv, ElabError};
+    use ken_kernel::{KernelError, Level, LevelVar, Term};
+
+    const USE5: &str = "fn use5 (x : {v : Int | Equal Int v 5}) : Int = x";
+    const NEED: &str = "fn need (x : Int) : Int requires Equal Int x 5 = x";
+
+    #[derive(Clone, Copy)]
+    enum Head {
+        TypeZero,
+        TypeZeroWithSecondFree,
+        TypeZeroWithThirdFree,
+        TypeVar,
+        LocalFormer,
+        TypeOneFormer,
+    }
+
+    // MEASURED: the checked declaration produces exactly the named open hole,
+    // with the expected quantified context and the expected hole-level arity.
+    // CLAIMED: its type-position sort equations were recorded before minting.
+    // THE GAP: an unrelated type-position solve could satisfy a single row;
+    // the distinct former, binder and obligation sites below vary those axes.
+    fn row(source: &str, producer: &str, holes: usize, params: usize, head: Head) {
+        let mut env = ElabEnv::new().expect("prelude");
+        env.elaborate_decl(USE5).expect("use5");
+        env.elaborate_decl(NEED).expect("need");
+        let result = env.elaborate_decl_v1(source).expect(source);
+        assert_eq!(result.obligations.len(), holes, "{producer}: {source}");
+        if holes == 0 {
+            return;
+        }
+        let obligation = &result.obligations[0];
+        assert!(env.is_open_hole(obligation.hole_id), "{producer}: {source}");
+        let decl = env
+            .env
+            .lookup(obligation.hole_id)
+            .expect("hole declaration");
+        let level_params = decl.level_params();
+        assert_eq!(level_params.len(), params, "{producer}: {source}");
+        let Term::Pi(first, _) = &obligation.goal_closed else {
+            panic!(
+                "{producer}: expected quantified goal, got {:?}",
+                obligation.goal_closed
+            )
+        };
+        match head {
+            Head::TypeZero | Head::TypeZeroWithSecondFree | Head::TypeZeroWithThirdFree => {
+                assert_eq!(**first, Term::ty(Level::Zero), "{producer}: {source}");
+                if matches!(
+                    head,
+                    Head::TypeZeroWithSecondFree | Head::TypeZeroWithThirdFree
+                ) {
+                    let Term::Pi(_, rest) = &obligation.goal_closed else {
+                        unreachable!()
+                    };
+                    let Term::Pi(second, rest) = rest.as_ref() else {
+                        panic!("{producer}: missing second binder")
+                    };
+                    match head {
+                        Head::TypeZeroWithSecondFree => assert_eq!(
+                            **second,
+                            Term::ty(Level::Var(level_params[0])),
+                            "{producer}: the free binder must be B"
+                        ),
+                        Head::TypeZeroWithThirdFree => {
+                            assert_eq!(**second, Term::ty(Level::Zero), "{producer}: B is forced");
+                            let Term::Pi(third, _) = rest.as_ref() else {
+                                panic!("{producer}: missing third binder")
+                            };
+                            assert_eq!(
+                                **third,
+                                Term::ty(Level::Var(level_params[0])),
+                                "{producer}: only C is free"
+                            );
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+            }
+            Head::TypeVar => assert!(
+                matches!(first.as_ref(), Term::Type(Level::Var(m)) if level_params.contains(m)),
+                "{producer}: {source}: {first:?}"
+            ),
+            Head::LocalFormer => {
+                let Term::Pi(domain, codomain) = first.as_ref() else {
+                    panic!("{producer}: expected a local Pi former: {first:?}")
+                };
+                let (Term::Type(Level::Var(a)), Term::Type(Level::Var(b))) =
+                    (domain.as_ref(), codomain.as_ref())
+                else {
+                    panic!("{producer}: former's domain/codomain must stay open: {first:?}")
+                };
+                assert_ne!(a, b, "{producer}: distinct sorts");
+                assert!(
+                    level_params.contains(a) && level_params.contains(b),
+                    "{producer}: {first:?}"
+                );
+            }
+            Head::TypeOneFormer => {
+                let one = Term::ty(Level::Suc(Box::new(Level::Zero)));
+                assert_eq!(**first, Term::pi(one.clone(), one), "{producer}: {source}");
+            }
+        }
+    }
+
+    macro_rules! accepted {
+        ($name:ident, $source:literal, $producer:literal, $holes:expr, $params:expr, $head:expr) => {
+            #[test]
+            fn $name() {
+                row($source, $producer, $holes, $params, $head);
+            }
+        };
+    }
+
+    accepted!(
+        r1_equal_use5,
+        "fn k (A : Type) (x : A) (h : Equal A x x) (n : Int) : Int = use5 n",
+        "refinement",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        r2_option_use5,
+        "fn k (A : Type) (o : Option A) (n : Int) : Int = use5 n",
+        "refinement",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        r3_option_need,
+        "fn k (A : Type) (o : Option A) (n : Int) : Int = need n",
+        "requires",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        r4_option_div,
+        "fn k (A : Type) (o : Option A) (n : Int) (d : Int) : Int = n / d",
+        "partial primitive",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        r5_option_match,
+        "fn k (A : Type) (o : Option A) (n : Int) : Int = match o { None ↦ use5 n; Some a ↦ 0 }",
+        "match arm",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        r6_mixed_free_forced,
+        "fn k (A : Type) (B : Type) (o : Option A) (n : Int) : Int = use5 n",
+        "mixed binders",
+        1,
+        1,
+        Head::TypeZeroWithSecondFree
+    );
+    accepted!(
+        r7_equal_need,
+        "fn k (A : Type) (x : A) (h : Equal A x x) (n : Int) : Int = need n",
+        "requires",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        c1_no_obligation,
+        "fn k (A : Type) (o : Option A) (n : Int) : Int = n",
+        "no obligation",
+        0,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        c2_type0_twin,
+        "fn k (A : Type 0) (o : Option A) (n : Int) : Int = use5 n",
+        "annotated",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        c3_wp_row,
+        "fn k (A : Type) (n : Int) : Int = use5 n",
+        "free binder",
+        1,
+        1,
+        Head::TypeVar
+    );
+    accepted!(
+        c4_solved_after,
+        "fn k (a : Type) (n : Int) : Type 1 = let q : Int = need n in a",
+        "late solve",
+        1,
+        1,
+        Head::TypeVar
+    );
+    accepted!(
+        c6_list_poly,
+        "fn k (A : Type) (xs : List A) (n : Int) : Int = use5 n",
+        "polymorphic List",
+        1,
+        0,
+        Head::TypeZero
+    );
+    accepted!(
+        n1_local_former,
+        "fn k (F : Type → Type) (A : Type) (y : F A) (n : Int) : Int = use5 n",
+        "local former",
+        1,
+        2,
+        Head::LocalFormer
+    );
+    accepted!(
+        n3_type1_former_twin,
+        "fn k (F : Type 1 → Type 1) (A : Type) (y : F A) (n : Int) : Int = use5 n",
+        "Type 1 former",
+        1,
+        0,
+        Head::TypeOneFormer
+    );
+    accepted!(n4_two_forced_one_free, "fn k (A : Type) (B : Type) (C : Type) (o : Option A) (p : Option B) (n : Int) : Int = use5 n", "two forced binders", 1, 1, Head::TypeZeroWithThirdFree);
+
+    #[test]
+    fn occurs_check_reaches_suc_and_both_max_children() {
+        let target = Level::Var(LevelVar(2));
+        let other = Level::Var(LevelVar(3));
+        let nested = Level::Max(
+            Box::new(Level::Suc(Box::new(other.clone()))),
+            Box::new(Level::Suc(Box::new(target.clone()))),
+        );
+        assert!(level_mentions_var(&nested, 2));
+        assert!(!level_mentions_var(&nested, 1));
+        assert!(level_mentions_var(
+            &Level::Max(Box::new(target), Box::new(other)),
+            2
+        ));
+    }
+
+    #[test]
+    fn c5_type1_argument_is_not_cumulative() {
+        let mut env = ElabEnv::new().expect("prelude");
+        let error = env
+            .elaborate_decl_v1("fn k (A : Type 1) (o : Option A) (n : Int) : Int = n")
+            .expect_err("non-cumulative mismatch must reject");
+        assert!(
+            matches!(
+                error,
+                ElabError::KernelRejected {
+                    error: KernelError::TypeMismatch { .. },
+                    ..
+                }
+            ),
+            "{error:?}"
+        );
     }
 }
 
@@ -1261,6 +1542,7 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
         RType::RApp(f, a, span) => {
             let f_k = elab_type(cx, f)?;
             let a_k = elab_type(cx, a)?;
+            unify_type_position_argument_sort(cx, &f_k, &a_k);
             introduce_type_position_argument(cx, &f_k, &a_k, span)?;
             Ok(Term::app(f_k, a_k))
         }
@@ -11810,6 +12092,33 @@ fn infer_named_local_variable(
         .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
     let ty = weaken(ty_stored, (actual_index as i64) + 1);
     Ok((Term::var(actual_index), ty))
+}
+
+/// Non-cumulative universes (12 §3): a type-position argument's sort equals
+/// its former's domain sort. `elab_type` builds the application unchecked, so
+/// record that level equation here, as term-position checking does; otherwise
+/// an unsolved meta is consistent only through the final zonk's Zero default.
+fn unify_type_position_argument_sort(cx: &mut ElabCtx<'_>, function: &Term, argument: &Term) {
+    let (head, previous_args) = peel_app(function);
+    let Ok(mut ty) = kernel_infer_in_context_open(cx, &cx.ctx, &head) else {
+        return;
+    };
+    for arg in &previous_args {
+        let Term::Pi(_, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
+            return;
+        };
+        ty = subst0(&codomain, arg);
+    }
+    let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &ty) else {
+        return;
+    };
+    if !matches!(*domain, Term::Type(_)) {
+        return;
+    }
+    let Ok(argument_ty) = kernel_infer_in_context_open(cx, &cx.ctx, argument) else {
+        return;
+    };
+    unify_types(&mut cx.metas, &domain, &argument_ty);
 }
 
 /// An application in a written type owes the same refinement introduction as
