@@ -386,12 +386,8 @@ fn apply_entrypoint(
         &elab_env.env,
         store,
     );
-    tree = ken_interp::apply(
-        tree,
-        process_input_value(elab_env, arguments, environment, cwd),
-        &elab_env.env,
-        store,
-    );
+    let input = process_input_value(elab_env, arguments, environment, cwd, store);
+    tree = ken_interp::apply(tree, input, &elab_env.env, store);
 
     // SECURITY: the FS authority comes only from the parsed root declaration.
     // AFull remains coarse and is not path-confined until CA4/I-5. Console is
@@ -419,12 +415,13 @@ fn apply_entrypoint(
 fn list_value(
     nil_id: ken_kernel::GlobalId,
     cons_id: ken_kernel::GlobalId,
+    elem: ken_interp::EvalVal,
     values: impl IntoIterator<Item = ken_interp::EvalVal>,
 ) -> ken_interp::EvalVal {
     let values: Vec<_> = values.into_iter().collect();
     values.into_iter().rev().fold(
-        constructor_value(nil_id, vec![ken_interp::EvalVal::Unknown]),
-        |tail, head| constructor_value(cons_id, vec![ken_interp::EvalVal::Unknown, head, tail]),
+        constructor_value(nil_id, vec![elem.clone()]),
+        |tail, head| constructor_value(cons_id, vec![elem.clone(), head, tail]),
     )
 }
 
@@ -433,18 +430,45 @@ fn process_input_value(
     arguments: &[Vec<u8>],
     environment: &[(Vec<u8>, Vec<u8>)],
     cwd: &[u8],
+    store: &mut ken_interp::EvalStore,
 ) -> ken_interp::EvalVal {
+    use ken_interp::eval::{checked_type_value, type_value_slots};
+    use ken_interp::EvalVal;
+
+    let env = &elab_env.env;
+    let roles = &elab_env.prelude_env;
+    let fields = env
+        .constructor(roles.runtime_roles.process_input)
+        .and_then(|(decl, index)| decl.constructors.get(index))
+        .map(|ctor| ctor.args.as_slice());
+    let list_family = env.constructor(roles.nil_id).map(|(decl, _)| decl.id);
+    let list_elem = |field: Option<&ken_kernel::Term>, store: &mut ken_interp::EvalStore| {
+        field
+            .zip(list_family)
+            .and_then(|(field, family)| {
+                type_value_slots(&checked_type_value(field, env, store), family, env)
+            })
+            .and_then(|mut slots| slots.pop())
+            .unwrap_or(EvalVal::Unknown)
+    };
+    let arg_elem = list_elem(fields.and_then(|fields| fields.first()), store);
+    let env_elem = list_elem(fields.and_then(|fields| fields.get(1)), store);
+    let prod_slots = env
+        .constructor(roles.mkprod_id)
+        .and_then(|(decl, _)| type_value_slots(&env_elem, decl.id, env))
+        .unwrap_or_else(|| vec![EvalVal::Unknown, EvalVal::Unknown]);
     let arguments = list_value(
         elab_env.prelude_env.nil_id,
         elab_env.prelude_env.cons_id,
+        arg_elem,
         arguments.iter().cloned().map(ken_interp::EvalVal::Bytes),
     );
     let environment = environment.iter().cloned().map(|(key, value)| {
         constructor_value(
             elab_env.prelude_env.mkprod_id,
             vec![
-                ken_interp::EvalVal::Unknown,
-                ken_interp::EvalVal::Unknown,
+                prod_slots[0].clone(),
+                prod_slots[1].clone(),
                 ken_interp::EvalVal::Bytes(key),
                 ken_interp::EvalVal::Bytes(value),
             ],
@@ -453,6 +477,7 @@ fn process_input_value(
     let environment = list_value(
         elab_env.prelude_env.nil_id,
         elab_env.prelude_env.cons_id,
+        env_elem,
         environment,
     );
     constructor_value(

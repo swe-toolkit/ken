@@ -410,7 +410,7 @@ mod nfc_construction_tests {
         ids: &ListCharIds,
         store: &mut EvalStore,
     ) -> ken_elaborator::NfcString {
-        let chars = build_list_char(value, ids, store);
+        let chars = build_list_char(value, ids, EvalVal::Unknown, store);
         let raw = list_char_to_evalval_string(&chars, ids).expect("well-formed List Char");
         ken_elaborator::NfcString::new(raw)
     }
@@ -528,7 +528,7 @@ mod nfc_construction_tests {
         let ids = list_ids(&env);
         let mut store = EvalStore::new();
 
-        let decomposed = build_list_char("e\u{301}", &ids, &mut store);
+        let decomposed = build_list_char("e\u{301}", &ids, EvalVal::Unknown, &mut store);
         let raw = list_char_to_evalval_string(&decomposed, &ids).expect("well-formed List Char");
         let from_list = ken_elaborator::NfcString::new(raw);
         assert_eq!(from_list.as_str(), "\u{E9}");
@@ -2883,7 +2883,8 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
                         if let Some(ids) = store.list_char_ids.clone() {
                             if *symbol == "string_to_list_char" {
                                 if let [EvalVal::Str(s)] = args.as_slice() {
-                                    return build_list_char(s, &ids, store);
+                                    let elem = list_element_slot(id, &ids, globals, store);
+                                    return build_list_char(s, &ids, elem, store);
                                 }
                             } else if *symbol == "list_char_to_string" {
                                 if let [v] = args.as_slice() {
@@ -2894,7 +2895,8 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
                                 }
                             } else if *symbol == "bytes_to_list" {
                                 if let [EvalVal::Bytes(bytes)] = args.as_slice() {
-                                    return build_list_uint8(bytes, &ids, store);
+                                    let elem = list_element_slot(id, &ids, globals, store);
+                                    return build_list_uint8(bytes, &ids, elem, store);
                                 }
                             } else if *symbol == "list_to_bytes" {
                                 if let [v] = args.as_slice() {
@@ -3011,15 +3013,53 @@ pub fn apply(f: EvalVal, u: EvalVal, globals: &GlobalEnv, store: &mut EvalStore)
     }
 }
 
+fn checked_codomain(mut ty: &Term) -> &Term {
+    while let Term::Pi(_, codomain) = ty {
+        ty = codomain;
+    }
+    ty
+}
+
+/// Evaluate a checked type by the same interpreter path as a source type term.
+pub fn checked_type_value(ty: &Term, globals: &GlobalEnv, store: &mut EvalStore) -> EvalVal {
+    eval(&[], ty, globals, store)
+}
+
+/// Extract exactly the parameter slots of an unindexed checked family.
+pub fn type_value_slots(ty: &EvalVal, family: GlobalId, globals: &GlobalEnv) -> Option<Vec<EvalVal>> {
+    let decl = globals.inductive(family)?;
+    if !decl.indices.is_empty() {
+        return None;
+    }
+    match ty {
+        EvalVal::IndTypeApp { id, args } if *id == family && args.len() == decl.params.len() => {
+            Some((**args).clone())
+        }
+        _ => None,
+    }
+}
+
 fn primitive_result_type<'a>(id: GlobalId, globals: &'a GlobalEnv) -> Option<&'a Term> {
     let Decl::Primitive { ty, .. } = globals.lookup(id)? else {
         return None;
     };
-    let mut result = ty;
-    while let Term::Pi(_, codomain) = result {
-        result = codomain;
-    }
-    Some(result)
+    Some(checked_codomain(ty))
+}
+
+fn list_element_slot(
+    primitive_id: GlobalId,
+    ids: &ListCharIds,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
+    let Some(list) = globals.constructor(ids.nil_id).map(|(decl, _)| decl.id) else {
+        return EvalVal::Unknown;
+    };
+    primitive_result_type(primitive_id, globals)
+        .map(|ty| checked_type_value(ty, globals, store))
+        .and_then(|ty| type_value_slots(&ty, list, globals))
+        .and_then(|mut slots| slots.pop())
+        .unwrap_or(EvalVal::Unknown)
 }
 
 fn type_application(term: &Term) -> Option<(GlobalId, Vec<&Term>)> {
@@ -3051,7 +3091,11 @@ fn reduce_safe_bytes_primitive(
     let Some(result_decl) = globals.inductive(result_family) else {
         return EvalVal::Neutral;
     };
-    let type_args = || vec![EvalVal::Neutral; result_params.len()];
+    let slots = primitive_result_type(primitive_id, globals)
+        .map(|ty| checked_type_value(ty, globals, store))
+        .and_then(|ty| type_value_slots(&ty, result_family, globals))
+        .unwrap_or_else(|| vec![EvalVal::Neutral; result_params.len()]);
+    let type_args = || slots.clone();
 
     match (symbol, args) {
         ("bytes_at", [EvalVal::Bytes(bytes), EvalVal::Int(index)]) => {
@@ -3325,8 +3369,8 @@ impl ConsoleIds {
 /// `list_char_to_string` (`37 §2.3`). `List` has one type param, so `Nil`'s
 /// `Ctor.args = [type_param]` and `Cons`'s `Ctor.args = [type_param, head,
 /// tail]` (`prelude.rs`'s `cons_app` helper — `Cons` is always applied to the
-/// element type first). The type-param slot carries no runtime information
-/// (type parameters are carried as `EvalVal::Unknown` fillers).
+/// element type first). The producer obtains the element type from its
+/// checked primitive result, falling back to `Unknown` without that authority.
 #[derive(Clone)]
 pub struct ListCharIds {
     pub nil_id: GlobalId,
@@ -3348,8 +3392,8 @@ pub struct ListCharIds {
 /// No precedent exists for a native prim re-invoking `eval` on elaborated
 /// terms mid-reduction — native + checked, the `neg_intN` posture, not
 /// demoted and not bare-trusted.
-fn build_list_char(s: &str, ids: &ListCharIds, store: &mut EvalStore) -> EvalVal {
-    let mut acc = make_ctor(ids.nil_id, vec![EvalVal::Unknown], store);
+fn build_list_char(s: &str, ids: &ListCharIds, elem_type: EvalVal, store: &mut EvalStore) -> EvalVal {
+    let mut acc = make_ctor(ids.nil_id, vec![elem_type.clone()], store);
     for c in s.chars().rev() {
         let cp = c as u32;
         debug_assert!(
@@ -3358,7 +3402,7 @@ fn build_list_char(s: &str, ids: &ListCharIds, store: &mut EvalStore) -> EvalVal
             cp
         );
         let elem = EvalVal::Int(cp as i64);
-        acc = make_ctor(ids.cons_id, vec![EvalVal::Unknown, elem, acc], store);
+        acc = make_ctor(ids.cons_id, vec![elem_type.clone(), elem, acc], store);
     }
     acc
 }
@@ -3398,12 +3442,17 @@ fn list_char_to_evalval_string(v: &EvalVal, ids: &ListCharIds) -> Option<String>
 }
 
 /// Expose an immutable byte buffer as its structural `List UInt8` view.
-fn build_list_uint8(bytes: &[u8], ids: &ListCharIds, store: &mut EvalStore) -> EvalVal {
-    let mut acc = make_ctor(ids.nil_id, vec![EvalVal::Unknown], store);
+fn build_list_uint8(
+    bytes: &[u8],
+    ids: &ListCharIds,
+    elem_type: EvalVal,
+    store: &mut EvalStore,
+) -> EvalVal {
+    let mut acc = make_ctor(ids.nil_id, vec![elem_type.clone()], store);
     for byte in bytes.iter().rev() {
         acc = make_ctor(
             ids.cons_id,
-            vec![EvalVal::Unknown, EvalVal::Int(i64::from(*byte)), acc],
+            vec![elem_type.clone(), EvalVal::Int(i64::from(*byte)), acc],
             store,
         );
     }
@@ -5498,12 +5547,26 @@ fn file_error_value(
     path: &[u8],
     error: EvalVal,
     fs: &FSIds,
+    globals: &GlobalEnv,
     store: &mut EvalStore,
 ) -> EvalVal {
+    let option_bytes = globals
+        .constructor(fs.mk_file_error_id)
+        .and_then(|(decl, index)| decl.constructors.get(index))
+        .and_then(|ctor| ctor.args.get(1))
+        .map(|ty| checked_type_value(ty, globals, store));
+    let elem = option_bytes
+        .as_ref()
+        .and_then(|ty| {
+            let family = globals.constructor(fs.some_id)?.0.id;
+            type_value_slots(ty, family, globals)
+        })
+        .and_then(|mut slots| slots.pop())
+        .unwrap_or(EvalVal::Unknown);
     let operation = make_ctor(operation_id, vec![], store);
     let path = make_ctor(
         fs.some_id,
-        vec![EvalVal::Unknown, EvalVal::Bytes(path.to_vec())],
+        vec![elem, EvalVal::Bytes(path.to_vec())],
         store,
     );
     make_ctor(fs.mk_file_error_id, vec![operation, path, error], store)
@@ -6156,6 +6219,7 @@ fn fs_dispatch<H: HostHandler>(
     revocation: &mut ken_host::RevocationDomain,
     fs: &FSIds,
     ids: &ConsoleIds,
+    globals: &GlobalEnv,
     store: &mut EvalStore,
     recorder: Option<&mut EffectTraceRecorder>,
 ) -> Option<Result<EvalVal, ()>> {
@@ -6260,7 +6324,7 @@ fn fs_dispatch<H: HostHandler>(
         let mode = eval_to_bigint(args.get(3)?).and_then(|mode| mode.to_u16());
         let Some(mode) = mode.filter(|mode| mode & !0o7777 == 0) else {
             let cause = make_ctor(ids.invalidinput_id, vec![], store);
-            let error = file_error_value(fs.op_change_mode_id, &path, cause, fs, store);
+            let error = file_error_value(fs.op_change_mode_id, &path, cause, fs, globals, store);
             return Some(Ok(make_result(false, error, ids, store)));
         };
         (
@@ -6631,6 +6695,7 @@ fn fs_dispatch<H: HostHandler>(
             operation_id,
             fs,
             ids,
+            globals,
             store,
         )
     });
@@ -6684,6 +6749,7 @@ fn reify_host_reply_v1(
     operation_id: GlobalId,
     fs: &FSIds,
     ids: &ConsoleIds,
+    globals: &GlobalEnv,
     store: &mut EvalStore,
 ) -> Result<EvalVal, ()> {
     validate_transfer_request_bound(request, &outcome)?;
@@ -6712,8 +6778,14 @@ fn reify_host_reply_v1(
         }
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::DirectoryEntries(
             entries,
-        )) => entries.into_iter().rev().fold(
-            make_ctor(fs.nil_id, vec![EvalVal::Unknown], store),
+        )) => {
+            let elem = globals
+                .constructor(fs.mk_dir_entry_id)
+                .and_then(|(decl, index)| decl.constructors.get(index))
+                .map(|ctor| checked_type_value(checked_codomain(&ctor.type_), globals, store))
+                .unwrap_or(EvalVal::Unknown);
+            entries.into_iter().rev().fold(
+            make_ctor(fs.nil_id, vec![elem.clone()], store),
             |tail, entry| {
                 let kind = match entry.kind {
                     ken_host::FsNodeKindV1::File => fs.k_file_id,
@@ -6727,9 +6799,10 @@ fn reify_host_reply_v1(
                     vec![EvalVal::Bytes(entry.name), kind],
                     store,
                 );
-                make_ctor(fs.cons_id, vec![EvalVal::Unknown, value, tail], store)
+                make_ctor(fs.cons_id, vec![elem.clone(), value, tail], store)
             },
-        ),
+            )
+        },
         ken_host::CanonicalOutcomeV1::Success(ken_host::CanonicalReplyV1::ResourceAcquired {
             ..
         }) => EvalVal::ResourceToken(resource_token.ok_or(())?),
@@ -6817,7 +6890,7 @@ fn reify_host_reply_v1(
                     make_ctor(ids.capabilitydenied_id, vec![], store)
                 }
             };
-            let file_error = file_error_value(operation_id, &error.relative_path, cause, fs, store);
+            let file_error = file_error_value(operation_id, &error.relative_path, cause, fs, globals, store);
             return Ok(make_result(false, file_error, ids, store));
         }
         ken_host::CanonicalOutcomeV1::Error(ken_host::SemanticErrorV1::Io(error)) => {
@@ -7273,6 +7346,7 @@ fn run_io_with_effect_recorder<H: HostHandler>(
                                             &mut revocation,
                                             fs,
                                             ids,
+                                            globals,
                                             store,
                                             recorder.as_deref_mut(),
                                         )
@@ -7580,6 +7654,31 @@ mod px0_target_classification_tests {
 #[cfg(test)]
 mod px5b_effect_observation_tests {
     use super::*;
+
+    // These synthetic-identity reifier fixtures have no checked constructor
+    // declarations. Preserve their previous fail-closed filler behavior.
+    fn reify_host_reply_v1(
+        outcome: ken_host::CanonicalOutcomeV1,
+        resource_token: Option<ken_host::ResourceTokenV1>,
+        span_origin: Option<ken_host::ResourceTokenV1>,
+        request: &ken_host::CanonicalRequestV1,
+        operation_id: GlobalId,
+        fs: &FSIds,
+        ids: &ConsoleIds,
+        store: &mut EvalStore,
+    ) -> Result<EvalVal, ()> {
+        super::reify_host_reply_v1(
+            outcome,
+            resource_token,
+            span_origin,
+            request,
+            operation_id,
+            fs,
+            ids,
+            &GlobalEnv::new(),
+            store,
+        )
+    }
 
     #[derive(Default)]
     struct PositionedWriteCountBackend<const WRITTEN: usize> {
@@ -7926,6 +8025,7 @@ mod px5b_effect_observation_tests {
             &mut revocation,
             &fs,
             &ids,
+            &GlobalEnv::new(),
             &mut store,
             recorder,
         )
@@ -7942,7 +8042,7 @@ mod px5b_effect_observation_tests {
         store: &mut EvalStore,
     ) -> EvalVal {
         fs_dispatch(
-            op_id, args, host, resources, revocation, fs, ids, store, None,
+            op_id, args, host, resources, revocation, fs, ids, &GlobalEnv::new(), store, None,
         )
         .expect("recognized FS operation")
         .expect("FS reply reifies")
