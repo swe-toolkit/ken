@@ -1,9 +1,9 @@
 ---
 id: RT-C5-COMPOUND-HIGHER-ORDER-INDICES
 title: "C5 canonicity for compound and higher-order indices: a closed, checked, reflexive cast over a Sigma-indexed or function-indexed family evaluates to its value instead of Unknown, by a rule whose soundness is argued before it is built"
-status: ready
+status: active
 owner: runtime
-size: M
+size: S
 gate: architect
 tier: T1
 depends_on: [RT-C5-PRIMITIVE-TYPE-ARGUMENTS]
@@ -36,33 +36,28 @@ A closed, well-typed, ground cast `cast A A refl a` evaluates to `a` when
 
 ## Deliverable
 
-`cast_reduce` returns `a` for every closed, checked, reflexive cast whose
-index carries a function value, bare, under `Pair` or in the All-support
-witness's predicate slot. The rule for that is argued sound at D0 and ruled
-by the Architect. An open index still fails closed.
+The Architect's D0 ruling (`evt_1p1wrct6dcx9`): in the `Term::Cast` arm of
+`eval_in_erasure_scope`, a cast whose two endpoint terms are identical, with
+no Unknown operand, returns its payload. This is the kernel's regularity
+step (obs.rs:899-904), and it mirrors J's `lhs == rhs` rule. It reads no
+proof value and compares no closures. The ruling's three lines are the
+whole change; `cast_reduce`, `eq_type_eq`, J, the kernel and the spec are
+unchanged. Convertible but non-identical endpoints (the ruling's rows 5 and
+6) are `RT-C6-FUNCTION-INDEX-CONVERTIBLE-ENDPOINTS`, and the All-support
+two-slot fill is not owed.
 
 ## Acceptance
 
-- **AC-0 (probe, then D0; no build).**
-  - Done at `1a84b2378` (Steward correction `evt_5z1qfsy58wva6`; probe
-    `evt_5wt6v7dyzxehf`): a Σ positive control reduces to `a`; a
-    function-indexed and a Σ-with-function cast evaluate to `Unknown`.
-  - Include the generated All-support witness (`lift_recursive_value`,
-    eval.rs ~:909/:941). Its predicate slot carries the eliminator's motive,
-    a function value, and RT-C5-PRODUCER-TYPE-SLOTS left it unfilled
-    (Architect `evt_7rtbs5j2730es` item 6). Its unit row there pins
-    `eq_type_eq(&w, &w) == false`.
-  - Propose the mechanism for each shape, with a soundness argument that
-    names what the evaluator may and may not read from a proof value under
-    Ω proof irrelevance.
-  - The Architect rules before any build. Research may be called on the
-    proof-directed rule.
-- **AC-1.** Both function-bearing counterexamples evaluate to `a`, and the
-  Σ positive control stays `a`. For each new arm or rule,
-  a differing-index negative stays `Unknown`.
-- **AC-2 (controls).** Removing each new arm or rule returns its positive to
-  `Unknown`. `neutral_inductive_type_app_index_does_not_cast` stays green
-  and unedited.
+- **AC-0.** Done: probe `evt_5wt6v7dyzxehf`, D0 `evt_1p1wrct6dcx9`.
+- **AC-1.** The ruling's rows 2 and 3 (bare function and Σ-with-function
+  index) evaluate to their value. Row 1 (Σ positive control) stays a value,
+  and row 4 (differing endpoints, unchecked) stays `Unknown`.
+- **AC-2 (controls).** Removing the arm returns rows 2 and 3 to `Unknown`
+  while row 1 stays a value. An identical-endpoint cast with an Unknown
+  operand stays `Unknown`. If no closed checked term evaluates to Unknown,
+  record the guard as spec 42 §4 defense with no constructible row.
+  `neutral_inductive_type_app_index_does_not_cast` stays green and
+  unedited.
 
 ## Stop conditions
 

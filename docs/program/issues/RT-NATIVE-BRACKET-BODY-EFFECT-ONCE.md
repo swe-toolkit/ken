@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-BRACKET-BODY-EFFECT-ONCE
 title: "The native backend re-performs body effects inside any checked bracket: a withResource or withBuffer body that prints x then y prints x y y natively and x y in the interpreter, and a third print gives x y z y z z. A native route both performs a checked Vis in place and returns it as a construct that the enclosing route performs again. Make each checked Vis occurrence perform exactly once per dynamic arrival, in program order, and measure the px8ta LIFO row on the repaired base"
-status: ready
+status: active
 owner: runtime
 size: M
 tier: T1

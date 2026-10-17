@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-MANHATTAN-METRIC
 title: "Spec 67 defines Manhattan distance on natural points and proves symmetry and self-zero, but defers the triangle inequality, so manhattan is not yet a metric and no client can bound a detour. Author section 2: the triangle inequality and zero-distance identity of indiscernibles, proved generically at zero trust"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
