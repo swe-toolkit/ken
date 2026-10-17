@@ -311,16 +311,22 @@ extension, shipped §2 seed, or CI. A sorted-list normal form and
 signed/field arithmetic remain outside this contract.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §1 (SPEC-GEOMETRY-EXACT-CONTRACT).
-`Algorithm.Geometry.NatBox` specifies two-coordinate `Nat` points and
-closed axis-aligned boxes, including inverted-corner empty boxes and
-structural corner equality. Coordinatewise intersection and hull,
-point membership and Manhattan distance carry six generically
-checked D0 laws. The public `greatest for min` and `least for max`
-exports remain a **catalog follow-on**, not a landed prerequisite.
-No geometry catalog delivery, signed-coordinate geometry, Euclidean
-or floating-point distance, box area, or measured trusted-base delta
-is claimed.
+**`67-geometry.md`** §§1–2 (SPEC-GEOMETRY-EXACT-CONTRACT;
+SPEC-GEOMETRY-MANHATTAN-METRIC). The §1
+`Algorithm.Geometry.NatBox` module, closed seed and required public
+Nat Order bounds have landed. Two-coordinate `Nat` points and closed
+axis-aligned boxes (including inverted-corner empty boxes) have
+point membership, intersection, hull and Manhattan distance with
+six §1 checked laws. §2 specifies exactly two additional generically
+proved D0 laws: the detour triangle bound and zero-distance equality
+of points. The latter combines with §1's `manhattan_self`, with no
+separate converse theorem. Axis helpers remain private. Architect
+measured scratch `ken check` and an existing Rust test against the
+scratch §2 module: `trusted_base()` identities 114 → 114 on that
+copy, not a landed §2 catalog extension, shipped §2 seed or CI.
+Signed-coordinate geometry, Euclidean and floating-point distance,
+box area, other dimensions and point-set equality of boxes remain
+outside this contract.
 
 The **exact rational-interval contract** is pinned in
 **`68-numerical.md`** §1 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT).
