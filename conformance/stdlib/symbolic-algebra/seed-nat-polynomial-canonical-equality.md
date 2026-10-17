@@ -61,9 +61,9 @@ theorem equal_x0_sum_and_two_times_x0 (env : Nat → Nat)
       (mul one (env Zero))
       (λn. add n n)
       (sym Nat
-        (env Zero)
         (mul one (env Zero))
-        ((proof one_l for mul) (env Zero)))
+        (env Zero)
+        ((proof one_l for mul) (env Zero))))
     (sym
       Nat
       (mul two (env Zero))
