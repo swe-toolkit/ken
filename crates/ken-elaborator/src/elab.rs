@@ -796,6 +796,8 @@ enum MatchBinderOrigin {
     Scrutinee,
     ConvoyRebound { original: usize },
     GeneralizedDependent { original: usize },
+    /// A dependent rebound by solved-field substitution, still a method field.
+    SolvedFieldRebound { original: usize },
     GeneratedEquation,
     UserLocal,
 }
@@ -1079,7 +1081,8 @@ impl<'e> ElabCtx<'e> {
         if let Some(frame) = self.match_frames.last_mut() {
             let outer = match origin {
                 MatchBinderOrigin::ConvoyRebound { original }
-                | MatchBinderOrigin::GeneralizedDependent { original } => Some(original),
+                | MatchBinderOrigin::GeneralizedDependent { original }
+                | MatchBinderOrigin::SolvedFieldRebound { original } => Some(original),
                 MatchBinderOrigin::Field
                 | MatchBinderOrigin::Ih
                 | MatchBinderOrigin::Scrutinee
@@ -5520,6 +5523,10 @@ fn compute_context_convoy(
             }
         }
     }
+    // A match-origin binder is carried only across a variable that this
+    // motive actually abstracts, not a free variable inside a compound index.
+    let mut substituted: Vec<Term> = scrut_indices.iter()
+        .filter(|idx| matches!(idx, Term::Var(_))).cloned().collect();
     let mut convoy = Vec::new();
     // An inner binder may depend on an earlier convoy entry without mentioning
     // the index itself, so walk outermost first and then reverse for the motive.
@@ -5539,9 +5546,14 @@ fn compute_context_convoy(
         {
             continue;
         }
+        let mut origin_bound = false;
         if let Some(origin) = cx.match_binder_origin(bottom_pos)? {
-            if origin != MatchBinderOrigin::UserLocal {
-                continue;
+            match origin {
+                MatchBinderOrigin::UserLocal => {}
+                MatchBinderOrigin::Field | MatchBinderOrigin::SolvedFieldRebound { .. } => {
+                    origin_bound = true;
+                }
+                _ => continue,
             }
         }
         let (occurrence, ambient_ty) = if let Some(pair) = refinement {
@@ -5552,11 +5564,11 @@ fn compute_context_convoy(
             };
             (Term::var(var), weaken(raw_ty, (var as i64) + 1))
         };
-        if dependencies
-            .iter()
-            .any(|dependency| scrut_occurs(&ambient_ty, dependency))
-        {
+        let seeds = if origin_bound { &substituted } else { &dependencies };
+        if seeds.iter().any(|dependency| scrut_occurs(&ambient_ty, dependency)) {
             let raw = Term::var(var);
+            if !substituted.contains(&raw) { substituted.push(raw.clone()); }
+            if !substituted.contains(&occurrence) { substituted.push(occurrence.clone()); }
             if !dependencies.contains(&raw) {
                 dependencies.push(raw);
             }
@@ -7479,6 +7491,7 @@ fn check_match_dependent_refined_fallback(
         scrut_indices,
         n,
         expected_here,
+        false,
     )?;
     check_generalized_branch_goal(
         cx,
@@ -7527,6 +7540,16 @@ fn check_generalized_branch_goal(
          frame.enclosing_telescope.clone())
     };
     let attempt = (|| {
+        let solved_sources: HashSet<usize> = restorations.iter().flat_map(|restoration| {
+            match restoration {
+                BranchGoalRestoration::Generalized { solved: Some(_), binders, .. } => binders
+                    .iter().filter_map(|binder| match binder.source {
+                        GeneralizedGoalSource::Original(position) => Some(position),
+                        GeneralizedGoalSource::Premise { .. } => None,
+                    }).collect::<Vec<_>>(),
+                _ => Vec::new(),
+            }
+        }).collect();
         let mut inner_goal = goal_refined;
         let mut domains = Vec::new();
         let mut premise_binders = Vec::new();
@@ -7545,7 +7568,9 @@ fn check_generalized_branch_goal(
                 let domain = *domain;
                 let origin = match binder.source {
                     GeneralizedGoalSource::Original(original) => {
-                        if cx.match_frames.last().is_some_and(|frame| {
+                        if solved_sources.contains(&original) {
+                            MatchBinderOrigin::SolvedFieldRebound { original }
+                        } else if cx.match_frames.last().is_some_and(|frame| {
                             frame.convoy_originals.contains(&original)
                         }) {
                             MatchBinderOrigin::ConvoyRebound { original }
@@ -7574,6 +7599,56 @@ fn check_generalized_branch_goal(
                 domains.push(domain);
                 inner_goal = *codomain;
             }
+        }
+        // Install only the solved variable after the complete dependency
+        // closure is rebound. The dependents themselves must keep their fresh
+        // kernel-context binders, never a new type ascribed to an old Var.
+        for restoration in &restorations {
+            let BranchGoalRestoration::Generalized { solved: Some(solved), .. } = restoration else {
+                continue;
+            };
+            let length = cx.ctx.len();
+            let index = length.checked_sub(1 + solved.position).ok_or_else(|| {
+                ElabError::Internal("solved-index variable escaped its method".into())
+            })?;
+            let raw_type = cx.metas.zonk_term(&weaken(
+                cx.ctx.lookup(index).expect("solved variable in context"),
+                (index + 1) as i64,
+            ));
+            let replacement = cx.metas.zonk_term(&weaken(
+                &solved.replacement, (length - original_depth) as i64,
+            ));
+            let zonked_ctx = Context {
+                types: cx.ctx.types.iter().map(|ty| cx.metas.zonk_term(ty)).collect(),
+            };
+            let replacement_type = kernel_infer_in_zonked_current(cx, &zonked_ctx, &replacement)
+                .map_err(|error| ElabError::Internal(format!(
+                    "solved-index replacement cannot be inferred: {error:?}"
+                )))?;
+            if !convert_type(cx.env, &zonked_ctx, &replacement_type, &raw_type) {
+                return Err(ElabError::Internal(
+                    "solved-index replacement does not have the eliminated variable's type".into(),
+                ));
+            }
+            let variable = Term::var(index);
+            for position in 0..original_depth {
+                if position == solved.position || cx.var_refinements.contains_key(&position) {
+                    continue;
+                }
+                let remaining_index = length - 1 - position;
+                let type_here = weaken(
+                    cx.ctx.lookup(remaining_index).expect("original binder in context"),
+                    (remaining_index + 1) as i64,
+                );
+                if scrut_occurs(&type_here, &variable) {
+                    return Err(ElabError::Internal(
+                        "solved-index dependency has an unredirected live binder".into(),
+                    ));
+                }
+            }
+            cx.var_refinements.insert(
+                solved.position, (replacement, raw_type, cx.ctx.len()),
+            );
         }
         let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
             inner_goal
@@ -7640,10 +7715,27 @@ fn check_generalized_branch_goal(
 
 /// A branch-goal restoration is classified once, where the refined goal is
 /// produced. Replay consumes this tag without re-classifying the goal.
+struct SolvedIndexSubstitution {
+    /// Bottom-relative original binder, stable as fresh binders are pushed.
+    position: usize,
+    /// Other leaf endpoint at the original method-context depth.
+    replacement: Term,
+}
+
 enum BranchGoalRestoration {
     Generalized {
         whole: Box<BranchGoalRestoration>,
         binders: Vec<GeneralizedGoalBinder>,
+        solved: Option<SolvedIndexSubstitution>,
+    },
+    /// One direct J transports the entire reverted dependent telescope.
+    SolvedJ {
+        index_type: Term,
+        from: Term,
+        to: Term,
+        family_at_y: Term,
+        sort: Term,
+        equality: Term,
     },
     TypeCast {
         source_type: Term,
@@ -7664,11 +7756,30 @@ enum BranchGoalRestoration {
 impl BranchGoalRestoration {
     fn apply(self, value: Term) -> Term {
         match self {
-            Self::Generalized { whole, binders } => binders
+            Self::Generalized { whole, binders, .. } => binders
                 .into_iter()
                 .fold(whole.apply(value), |function, binder| {
                     Term::app(function, binder.source_value)
                 }),
+            Self::SolvedJ { index_type, from, to, family_at_y, sort, equality } => {
+                let proof_domain = Term::Eq(
+                    Box::new(weaken(&index_type, 1)),
+                    Box::new(weaken(&from, 1)),
+                    Box::new(Term::var(0)),
+                );
+                let motive = Term::Ascript(
+                    Box::new(Term::lam(
+                        index_type.clone(),
+                        Term::lam(proof_domain.clone(), family_at_y),
+                    )),
+                    Box::new(Term::pi(index_type.clone(), Term::pi(proof_domain, sort))),
+                );
+                let proof = Term::Ascript(
+                    Box::new(equality),
+                    Box::new(Term::Eq(Box::new(index_type), Box::new(from), Box::new(to))),
+                );
+                Term::J(Box::new(motive), Box::new(value), Box::new(proof))
+            },
             Self::TypeCast {
                 source_type,
                 target_type,
@@ -7702,9 +7813,30 @@ impl BranchGoalRestoration {
             embedding.translate_to_original(term, embedding.original_len, embedding.expanded_len)
         };
         Ok(match self {
-            Self::Generalized { whole, binders } => Self::Generalized {
+            Self::Generalized { whole, binders, solved } => Self::Generalized {
                 whole: Box::new(whole.translate_to_original(embedding)?),
                 binders,
+                solved,
+            },
+            Self::SolvedJ { index_type, from, to, family_at_y, sort, equality } => {
+                let proof_domain = Term::Eq(
+                    Box::new(weaken(&index_type, 1)),
+                    Box::new(weaken(&from, 1)),
+                    Box::new(Term::var(0)),
+                );
+                let wrapped = Term::lam(
+                    index_type.clone(), Term::lam(proof_domain, family_at_y),
+                );
+                let Term::Lam(_, inner) = translate(&wrapped)? else { unreachable!() };
+                let Term::Lam(_, family_at_y) = *inner else { unreachable!() };
+                Self::SolvedJ {
+                    index_type: translate(&index_type)?,
+                    from: translate(&from)?,
+                    to: translate(&to)?,
+                    family_at_y: *family_at_y,
+                    sort,
+                    equality: translate(&equality)?,
+                }
             },
             Self::TypeCast {
                 source_type,
@@ -8903,6 +9035,39 @@ fn check_constructor_convoy_branch(
     debug_assert_eq!(cx.hidden_positions.pop(), Some(position));
     cx.ctx.pop();
     attempt.map(|body| Term::lam(branch_equation, body))
+/// Only constructor-field variable leaves are eliminated. Outer-index-only
+/// leaves and non-variable leaves retain their proof-carrying alias path.
+fn method_has_variable_side_leaves(
+    cx: &ElabCtx<'_>,
+    ind: &InductiveDecl,
+    params: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    n: usize,
+    sentinel_region: usize,
+) -> Result<bool, ElabError> {
+    let zonked_ctx = Context {
+        types: cx.ctx.types.iter().map(|ty| cx.metas.zonk_term(ty)).collect(),
+    };
+    let pairs = method_index_premise_pairs(ind, params, target_indices, scrut_indices, n);
+    let Some(leaves) = project_method_index_premises(cx, &zonked_ctx, &pairs, sentinel_region)? else {
+        return Ok(false);
+    };
+    let mut variable = false;
+    let mut other = false;
+    for leaf in &leaves {
+        if matches!(leaf.target, Term::Var(v) if v < n) {
+            variable = true;
+        } else {
+            other = true;
+        }
+    }
+    if variable && other {
+        return Err(ElabError::Internal(
+            "solved-index method mixes variable and non-variable leaf plans".into(),
+        ));
+    }
+    Ok(variable)
 }
 
 /// Check an ordinary dependent-match arm outside the wide method-construction
@@ -8939,6 +9104,13 @@ fn check_dependent_branch_body(
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
+    let variable_side = if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
+        false
+    } else {
+        method_has_variable_side_leaves(
+            cx, ind, params, target_indices, scrut_indices, n, sentinel_region,
+        )?
+    };
     let path_base = cx.path_conditions.len();
     if !branch_convoy {
         push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n, 0);
@@ -8949,13 +9121,13 @@ fn check_dependent_branch_body(
         n, expected_here, premise_domains, hidden_result_premise_slot,
         scrut_ty, concrete, scrut_core, sentinel_region,
         convoy_refinements, equation_convoy, recursive_field_index_path,
-        outer_scope_depth,
+        outer_scope_depth, variable_side,
     ).and_then(|(goal, preserve_nested_goal)| {
         complete_dependent_branch_body(
             cx, arm, match_span, ind, params, target_indices, scrut_indices,
             n, expected_here, premise_domains, scrut_ty, concrete, scrut_core,
             sentinel_region, equation_convoy, recursive_field_index_path,
-            branch_convoy, path_base, &goal, preserve_nested_goal,
+            branch_convoy, path_base, &goal, preserve_nested_goal, variable_side,
         )
     });
 
@@ -8993,6 +9165,7 @@ fn prepare_dependent_branch_body(
     equation_convoy: bool,
     recursive_field_index_path: RecursiveFieldIndexPath,
     outer_scope_depth: usize,
+    variable_side: bool,
 ) -> Result<(Term, bool), ElabError> {
     if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
         install_plain_declared_index_aliases(
@@ -9006,7 +9179,7 @@ fn prepare_dependent_branch_body(
             concrete,
             n,
         )?;
-    } else {
+    } else if !variable_side {
         install_branch_field_refinements(
             cx,
             ind,
@@ -9032,10 +9205,20 @@ fn prepare_dependent_branch_body(
         outer_scope_depth,
     )?;
     for (bottom_pos, sentinel, ctor_ty) in convoy_refinements {
+        let rebound_original = match cx.match_binder_origin(*bottom_pos)? {
+            Some(MatchBinderOrigin::SolvedFieldRebound { original }) => Some(original),
+            _ => None,
+        };
         cx.var_refinements.insert(
             *bottom_pos,
             (sentinel.clone(), ctor_ty.clone(), cx.ctx.len()),
         );
+        if let Some(original) = rebound_original {
+            cx.var_refinements.insert(
+                original,
+                (sentinel.clone(), ctor_ty.clone(), cx.ctx.len()),
+            );
+        }
     }
 
     let preserve_nested_goal =
@@ -9112,11 +9295,22 @@ fn complete_dependent_branch_body(
     path_base: usize,
     expected_unrefined: &Term,
     preserve_nested_goal: bool,
+    variable_side: bool,
 ) -> Result<Term, ElabError> {
     let obligation_base = cx.obligations.len();
     // The simplified goal retains every refinement root while exposing
     // ordinary heads needed by dependent matches and their index convoy.
-    let attempt = if branch_convoy {
+    let attempt = if variable_side {
+        let (goal, restorations) = refine_branch_goal(
+            cx, ind, params, target_indices, scrut_indices, n, expected_here, true,
+        )?;
+        return check_generalized_branch_goal(
+            cx, arm, goal, restorations, expected_here,
+            equation_convoy || preserve_nested_goal,
+        ).and_then(|checked| {
+            wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
+        });
+    } else if branch_convoy {
         check_constructor_convoy_branch(
             cx, arm, scrut_ty, scrut_core, concrete, n, expected_unrefined, path_base,
         )
@@ -10688,6 +10882,81 @@ fn generalized_goal_binders(
     Ok(selected)
 }
 
+/// Revert every later binder whose declared type depends on a solved index,
+/// including transitive dependents and generated equation premises. Unlike
+/// goal-only generalization, this includes a field used solely by the body
+/// (for example `rest` and then `h` with a constant `Nat` result).
+fn solved_index_dependency_binders(
+    cx: &ElabCtx<'_>,
+    view: &ActivePremiseKernelView,
+    eliminated: &Term,
+) -> Result<Vec<(Term, Term, GeneralizedGoalBinder)>, ElabError> {
+    let len = view.context.len();
+    let original_len = view.embedding.original_len;
+    let method_start = cx.match_frames.last().ok_or_else(|| {
+        ElabError::Internal("solved index lost its owning method frame".into())
+    })?.start_level;
+    let owner_region = cx.match_frames.last().expect("owner above").sentinel_region;
+    let mut dependencies = vec![eliminated.clone()];
+    let mut selected = Vec::new();
+    for (position, source) in view.embedding.expanded_sources.iter().enumerate() {
+        let index = len - 1 - position;
+        let mut current_type = weaken(
+            view.context.lookup(index).expect("expanded position in range"),
+            (index + 1) as i64,
+        );
+        let mut value = Term::var(index);
+        if let ExpandedBindingSource::Original(original) = source {
+            if let Some((alias, ty, install_depth)) = cx.var_refinements.get(original) {
+                let growth = original_len.checked_sub(*install_depth).ok_or_else(|| {
+                    ElabError::Internal("solved-index alias escaped its installing context".into())
+                })?;
+                value = view.embedding.translate_from_original(
+                    &cx.metas.zonk_term(&weaken(alias, growth as i64)), original_len, len,
+                )?;
+                current_type = view.embedding.translate_from_original(
+                    &cx.metas.zonk_term(&weaken(ty, growth as i64)), original_len, len,
+                )?;
+            }
+        }
+        if !dependencies.iter().any(|dependent| scrut_occurs(&current_type, dependent)) {
+            continue;
+        }
+        match source {
+            ExpandedBindingSource::Original(original) if *original < method_start => {
+                return Err(ElabError::Internal(
+                    "solved-index dependency closure crosses outside the method".into(),
+                ));
+            }
+            ExpandedBindingSource::Premise { sentinel_region, .. } => {
+                if *sentinel_region != owner_region {
+                    return Err(ElabError::Internal(
+                        "solved-index premise closure crosses outside the method".into(),
+                    ));
+                }
+                // Its Eq proof is reconstructed as Refl at the use coordinate;
+                // it cannot be a dependent binder in the reverted telescope.
+                continue;
+            }
+            _ => {}
+        }
+        let source_original = view.embedding.translate_to_original(&value, original_len, len)?;
+        let binder_source = match source {
+            ExpandedBindingSource::Original(original) => GeneralizedGoalSource::Original(*original),
+            ExpandedBindingSource::Premise { sentinel_region, premise_slot } => {
+                GeneralizedGoalSource::Premise { region: *sentinel_region, slot: *premise_slot }
+            }
+        };
+        selected.push((
+            current_type,
+            value,
+            GeneralizedGoalBinder { source: binder_source, source_value: source_original },
+        ));
+        dependencies.push(Term::var(index));
+    }
+    Ok(selected)
+}
+
 /// Capability 3: does the branch's own CHECKING GOAL (not a context
 /// variable) depend on the scrutinee's un-refined outer index? A branch
 /// that constructs a FRESH value (e.g. `VNil Nat` against goal `Vec Nat n`,
@@ -10709,6 +10978,7 @@ fn refine_branch_goal(
     scrut_indices: &[Term],
     n: usize,
     expected_here: &Term,
+    eliminate_variable_side: bool,
 ) -> Result<(Term, Vec<BranchGoalRestoration>), ElabError> {
     let zonked_ctx = Context {
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
@@ -10758,7 +11028,30 @@ fn refine_branch_goal(
         let target = from_original(&leaf.target)?;
         let scrutinee = from_original(&leaf.scrutinee)?;
         let proof = from_original(&leaf.proof)?;
-        let binders = generalized_goal_binders(cx, view, &goal_expanded, &scrutinee, &target)?;
+        // The field side wins when both endpoints are variables. All such
+        // dependents must be real rebound binders, not casts of their old Vars.
+        let eliminated_original = if eliminate_variable_side {
+            match (&leaf.target, &leaf.scrutinee) {
+                (Term::Var(v), _) if *v < n => Some((*v, &leaf.scrutinee)),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        let (old, new) = if let Some((field_or_scrut, _)) = eliminated_original {
+            if matches!(&leaf.target, Term::Var(v) if *v == field_or_scrut && *v < n) {
+                (&target, &scrutinee)
+            } else {
+                (&scrutinee, &target)
+            }
+        } else {
+            (&scrutinee, &target)
+        };
+        let binders = if eliminated_original.is_some() {
+            solved_index_dependency_binders(cx, view, old)?
+        } else {
+            generalized_goal_binders(cx, view, &goal_expanded, old, new)?
+        };
         let mut generalized = goal_expanded.clone();
         // Wrap inside-out to retain the outer-first telescope order; replace
         // the actual binder value before rewriting the index leaf. This is
@@ -10773,8 +11066,46 @@ fn refine_branch_goal(
                 ),
             );
         }
-        let candidate = subst_term_generalize(&generalized, &scrutinee, &target);
-        if candidate == generalized {
+        let mut candidate = subst_term_generalize(&generalized, old, new);
+        // The original premise proves the J's equality outside its motive.
+        // Inside the motive it is re-derived from the J proof parameter;
+        // at the reflexive base coordinate this derivation reduces to Refl.
+        let mut solved_premises = Vec::new();
+        if eliminated_original.is_some() {
+            let owner_region = cx.match_frames.last().expect("solved method").sentinel_region;
+            for (position, source) in view.embedding.expanded_sources.iter().enumerate() {
+                let ExpandedBindingSource::Premise { sentinel_region, .. } = source else {
+                    continue;
+                };
+                if *sentinel_region != owner_region { continue; }
+                let raw = Term::var(expanded_len - 1 - position);
+                let premise_ty = weaken(
+                    view.context.lookup(expanded_len - 1 - position).expect("premise in view"),
+                    (expanded_len - position) as i64,
+                );
+                if !scrut_occurs(&premise_ty, old) { continue; }
+                let Term::Eq(carrier, first, second) = &premise_ty else {
+                    return Err(ElabError::Internal("solved premise is not an Eq".into()));
+                };
+                let lhs = subst_term_generalize(first, old, new);
+                let rhs = subst_term_generalize(second, old, new);
+                if !convert(cx.env, &view.context, carrier, &lhs, &rhs) {
+                    return Err(ElabError::Internal("solved premise does not become reflexive".into()));
+                }
+                let premise_sort = kernel_infer_raw(cx.env, &view.context, &premise_ty)
+                    .map_err(|error| ElabError::Internal(format!(
+                        "solved premise has no sort: {error:?}"
+                    )))?;
+                let Term::Omega(level) = whnf(cx.env, &view.context, &premise_sort) else {
+                    return Err(ElabError::Internal("solved premise is not a proposition".into()));
+                };
+                candidate = subst_term_generalize(
+                    &candidate, &raw, &Term::Refl(Box::new(lhs.clone())),
+                );
+                solved_premises.push((raw, premise_ty, lhs, level));
+            }
+        }
+        if candidate == generalized && eliminated_original.is_none() {
             continue;
         }
         let level_ty = kernel_infer_raw(cx.env, &view.context, &candidate).map_err(|error| {
@@ -10783,21 +11114,70 @@ fn refine_branch_goal(
             ))
         })?;
         let classifier = whnf(cx.env, &view.context, &level_ty);
-        let restoration = classify_branch_goal_restoration(
-            cx.env,
-            &view.context,
-            &index_ty,
-            &target,
-            &scrutinee,
-            &candidate,
-            &generalized,
-            classifier,
-            proof,
-        )?;
+        let restoration = if let Some((var_index, _)) = eliminated_original {
+            let equality = if matches!(&leaf.target, Term::Var(v) if *v == var_index && *v < n) {
+                let level_ty = kernel_infer_raw(cx.env, &view.context, &index_ty).map_err(
+                    |error| ElabError::Internal(format!(
+                        "solved-index equality type has no sort: {error:?}"
+                    )),
+                )?;
+                let Term::Type(level) = whnf(cx.env, &view.context, &level_ty) else {
+                    return Err(ElabError::Internal(
+                        "solved-index equality is not Type-classified".into(),
+                    ));
+                };
+                build_sym(cx.env, &view.context, &index_ty, level, &target, &scrutinee, proof)
+            } else {
+                proof
+            };
+            let mut family_at_y = subst_term_generalize(
+                &weaken(&generalized, 2), &weaken(old, 2), &Term::var(1),
+            );
+            for (raw, premise_ty, lhs, level) in &solved_premises {
+                let generic_premise = subst_term_generalize(
+                    &weaken(premise_ty, 2), &weaken(old, 2), &Term::var(1),
+                );
+                let premise_family_at_y = subst_term_generalize(
+                    &weaken(premise_ty, 4), &weaken(old, 4), &Term::var(1),
+                );
+                let (derived, _) = build_family_omega_transport(
+                    &weaken(&index_ty, 2), &weaken(new, 2), &Term::var(1),
+                    &premise_family_at_y, &generic_premise, level.clone(),
+                    Term::Refl(Box::new(weaken(lhs, 2))), Term::var(0),
+                );
+                family_at_y = subst_term_generalize(
+                    &family_at_y, &weaken(raw, 2), &derived,
+                );
+            }
+            BranchGoalRestoration::SolvedJ {
+                index_type: index_ty,
+                from: new.clone(),
+                to: old.clone(),
+                family_at_y,
+                sort: classifier,
+                equality,
+            }
+        } else {
+            classify_branch_goal_restoration(
+                cx.env, &view.context, &index_ty, &target, &scrutinee,
+                &candidate, &generalized, classifier, proof,
+            )?
+        };
         let restoration = restoration.translate_to_original(embedding)?;
+        let solved = eliminated_original.map(|(var_index, _)| {
+            SolvedIndexSubstitution {
+                position: original_len - 1 - var_index,
+                replacement: if matches!(&leaf.target, Term::Var(v) if *v == var_index && *v < n) {
+                    leaf.scrutinee.clone()
+                } else {
+                    leaf.target.clone()
+                },
+            }
+        });
         restorations.push(BranchGoalRestoration::Generalized {
             whole: Box::new(restoration),
             binders: binders.into_iter().map(|(_, _, binder)| binder).collect(),
+            solved,
         });
         goal = embedding.translate_to_original(&candidate, original_len, expanded_len)?;
     }
