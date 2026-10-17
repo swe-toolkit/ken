@@ -1533,17 +1533,17 @@ impl<'src> Planner<'src> {
         // Ret-only emission's premise (its K returns only Ret) is unproven: a
         // returned Vis would be dropped silently (forced AC-MAIN owner 890).
         // Refuse the plane before any artifact exists.
-        if let Some((owner, reason)) = self
-            .plan
-            .pending_vis_settlements
-            .owners
-            .iter()
-            .find_map(|(owner, settlement)| match settlement {
-                ResponseOwnerSettlement::Excluded {
-                    reason: ExcludedSettlement::Underived(reason),
-                } => Some((owner, reason)),
-                _ => None,
-            })
+        if let Some((owner, reason)) =
+            self.plan
+                .pending_vis_settlements
+                .owners
+                .iter()
+                .find_map(|(owner, settlement)| match settlement {
+                    ResponseOwnerSettlement::Excluded {
+                        reason: ExcludedSettlement::Underived(reason),
+                    } => Some((owner, reason)),
+                    _ => None,
+                })
         {
             return Err(planner_capacity_error(format!(
                 "response owner {owner:?} has an underivable returned-Vis protocol: {reason}",

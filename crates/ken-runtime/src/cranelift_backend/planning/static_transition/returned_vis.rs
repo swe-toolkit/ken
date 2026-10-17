@@ -452,7 +452,9 @@ impl StaticTransitionPlan<'_> {
             .ok_or_else(|| planner_error("returned-Vis protocol names no installed owner row"))?;
         #[cfg(feature = "px8-ds-test-support")]
         if FORCED_UNDERIVED_OWNER_VIS.with(std::cell::Cell::get) == Some(owner_vis.0) {
-            return Err(planner_error("test-forced underivable returned-Vis protocol"));
+            return Err(planner_error(
+                "test-forced underivable returned-Vis protocol",
+            ));
         }
         let candidate_rows = self.return_protocol_candidate_rows()?;
         let contexts = self.continuation_contexts()?;
