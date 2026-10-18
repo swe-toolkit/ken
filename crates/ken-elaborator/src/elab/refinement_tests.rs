@@ -66,6 +66,7 @@ fn open_subset_proof_under_recursive_nat_split_refuses_without_minting_a_hole() 
     let goal = Term::const_(cx.env.bottom_id(), vec![]);
     let error = emit_subset_evidence(
         &mut cx, goal, &Span::zero(), ObligationKind::RefinementIntroduction,
+        None,
     ).expect_err("recursive split has no convoy evidence");
     assert!(matches!(error, ElabError::NonConvoyableRefinementSplit { .. }), "{error:?}");
     assert!(cx.obligations.is_empty(), "refusal must precede hole admission");

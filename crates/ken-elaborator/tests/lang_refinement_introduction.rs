@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use ken_elaborator::{v2_extract, ElabEnv, ElabError, ObligationKind, ProvKind};
-use ken_kernel::{GlobalId, Level, Term};
+use ken_kernel::{check, convert_type, Context, GlobalId, KernelError, Level, Term};
 
 fn arbitrary_predicate(env: &mut ElabEnv) {
     let int = Term::const_(env.globals["Int"], vec![]);
@@ -211,9 +211,14 @@ fn named_return_over_a_match_is_realized_per_leaf() {
                 Term::app(is_scalar.clone(), Term::IntLit(value.into())),
             ),
         );
-        assert_eq!(
-            obligation.goal_closed, expected,
-            "{branch}: scalar goal must use its own leaf"
+        assert!(
+            convert_type(
+                &env.env,
+                &Context::new(),
+                &obligation.goal_closed,
+                &expected
+            ),
+            "{branch}: checked scalar predicate must concern its own leaf"
         );
         assert!(
             !env.is_open_hole(obligation.hole_id),
@@ -243,9 +248,14 @@ fn named_return_over_a_match_is_realized_per_leaf() {
                 Term::pi(equation, Term::app(is_scalar.clone(), value)),
             ),
         );
-        assert_eq!(
-            obligation.goal_closed, expected,
-            "{branch}: widen must use its own leaf"
+        assert!(
+            convert_type(
+                &env.env,
+                &Context::new(),
+                &obligation.goal_closed,
+                &expected
+            ),
+            "{branch}: checked widening predicate must concern its own leaf"
         );
         assert_eq!(
             env.is_open_hole(obligation.hole_id),
@@ -415,12 +425,32 @@ fn distinct_refinement_aliases_do_not_share_an_int_carrier_key() {
         negative.obligations[0].goal_closed, expected_neg,
         "Neg must emit Not (P 5), not the predicate of another Int alias"
     );
-    let expected_pos = Term::app(p, Term::const_(env.globals["negative"], vec![]));
+    let negative_core = Term::const_(env.globals["negative"], vec![]);
+    let negative_ty = Term::const_(env.globals["Neg"], vec![]);
+    let expected_pos = Term::app(
+        p,
+        Term::proj1(Term::Ascript(
+            Box::new(negative_core.clone()),
+            Box::new(negative_ty),
+        )),
+    );
     assert_eq!(
         conversion.obligations[0].goal_closed, expected_pos,
-        "Pos must emit P negative when converting from Neg"
+        "Pos requires P of Neg's checked carrier projection"
     );
     assert!(env.is_open_hole(conversion.obligations[0].hole_id));
+    assert!(
+        matches!(
+            check(
+                &env.env,
+                &Context::new(),
+                &negative_core,
+                &Term::const_(env.globals["Pos"], vec![])
+            ),
+            Err(KernelError::TypeMismatch { .. })
+        ),
+        "a Neg value cannot be reused as Pos without a checked pair"
+    );
 }
 
 #[test]
@@ -429,21 +459,24 @@ fn mutually_recursive_source_introductions_keep_alias_identity() {
     arbitrary_predicate(&mut env);
     env.elaborate_decl("def Pos = { x : Int | P x }")
         .expect("alias");
-    let results = env
+    let before_id = env.env.next_global_id();
+    let before_globals = env.globals.clone();
+    let failure = env
         .elaborate_file_v1(
             "fn left (n : Nat) : Pos = match n { Zero |-> 5 ; Suc m |-> right m }\n\
          fn right (n : Nat) : Pos = match n { Zero |-> 6 ; Suc m |-> left m }",
         )
-        .expect("mutual source group");
-    assert_eq!(results.len(), 2);
-    for result in &results {
-        assert_eq!(
-            result.obligations.len(),
-            1,
-            "each base case introduces Pos once"
-        );
-        assert!(env.is_open_hole(result.obligations[0].hole_id));
-    }
+        .expect_err("open base evidence under recursive splits cannot convoy");
+    assert!(
+        matches!(failure, ElabError::NonConvoyableRefinementSplit { .. }),
+        "recursive open-hole demand must refuse by type: {failure:?}"
+    );
+    assert_eq!(
+        env.env.next_global_id(),
+        before_id,
+        "refused group admitted globals"
+    );
+    assert_eq!(env.globals, before_globals, "refused group retained names");
 }
 
 #[test]
