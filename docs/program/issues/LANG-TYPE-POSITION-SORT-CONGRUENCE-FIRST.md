@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-SORT-CONGRUENCE-FIRST
 title: "The type-position sort walk whnf's both sides whenever an open level meta is present, so a former argument over an expensive alias applied to a bare Type, such as T2 NN Type, still takes exponential time after the inert-case guard. Link congruence-first: unify a same-head spine, and reduce only on a head mismatch"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
