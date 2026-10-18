@@ -133,8 +133,13 @@ on the current base before measuring, and reports any that moved.
   unchanged. Derived and ArgParse timing stay within 10%, re-measured
   against the candidate's own base (the census's +0.05% is scratch
   evidence only).
-- **AC-E (evidence).** Every landed package's emitted core is
-  byte-identical to base. An introduction under a `let`, an `if`, a
+- **AC-E (evidence).** Every landed package's owned declarations emit
+  raw kernel core identical to base modulo global-id renaming, except the
+  introduction, refinement-binder and K-a Char classes, each difference
+  attributed (Architect `evt_cq3bk2mfr7gn`, which gives the procedure: the
+  introduction class totals the census's 16 sites in 6 closures, and any
+  unattributed difference is a stop). The Minimisation row below asserts
+  its timing. An introduction under a `let`, an `if`, a
   literal and a non-recursive constructor branch each checks; one under an
   indexed split is a typed refusal. A Minimisation-shaped `let` whose RHS
   is a fixed point checks within base time when an introduction consumes
