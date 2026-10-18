@@ -144,16 +144,41 @@ on the current base before measuring, and reports any that moved.
   indexed split is a typed refusal. A Minimisation-shaped `let` whose RHS
   is a fixed point checks when an introduction consumes it; emit
   `Refl(rhs)` unascribed whenever `rhs` infers. Its timing criterion
-  (Architect `evt_6yhfdb723hhy0`): the work that scales with the RHS is
-  not multiplied. With `blow n = match n { Zero ↦ Zero; Suc m ↦ plus
-  (blow m) (blow m) }` and `fn carried (u : Nat) : { x : Nat | Equal Nat
-  x (blow K) } = let value = blow K in value`, `carried` at K=12 takes at
-  most 1.10× its own base's time, median of 3, same binary profile. The
-  paired failing configuration is `3c58dc6ab` at 2.74×. The neutral
-  `slow n` row stays as a shape and admission row, with no timing
-  assertion. Before repairing, attribute the multiplier by one-at-a-time
-  disposable deletions; a multiplier inside the kernel's single final
-  check is the stop below.
+  (Architect `evt_7cc79te990727`, replacing the 1.10× bound of
+  `evt_6yhfdb723hhy0`, which no lawful configuration meets). Three kernel
+  queries are mandatory, each once: `admit_bodies` on the obligation, the
+  site pair `kernel_check_current`, and the final declaration admission.
+  Reusing a kernel verdict to skip one is out of scope. The rows use
+  `blow n = match n { Zero ↦ Zero; Suc m ↦ plus (blow m) (blow m) }` with
+  `pad` unused leading binders `(u0 : Nat) …`: LET is `fn carried (u0 ..)
+  : { x : Nat | Equal Nat x (blow K) } = let value = blow K in value`, and
+  OPEN is the same signature with body `u0`. Debug build, median of 3,
+  base `7ac7a5cd1` measured in the same run. The repair is in
+  `emit_subset_evidence`:
+  - **S1.** The certificate chain keeps its order and first-found
+    selection, because the certificate feeds
+    `demanded_refinement_splits`.
+  - **S2.** Each candidate is decided in order before `kernel_check_raw`.
+    Accept a `Var(i)` without probing when `recorded_eq_endpoints` of its
+    type equals that of the goal after zonk. Reject without probing only
+    by one exhaustive match, with no `_` arm, over the (candidate whnf
+    head, goal whnf head) pair, grounded in conv.rs `convert_type`, with
+    the goal's whnf computed lazily at most once per call. Never reject on
+    an unreduced Eq head. Otherwise probe.
+  - **S3.** Delete the explicit pre-admission `kernel_check_raw` on the
+    closed body; `admit_bodies` checks the same body at the same type.
+  - **G1 (S3, paired).** Restoring the pre-check makes LET K=12 at least
+    0.5 s slower.
+  - **G2 (S2).** For LET and OPEN at K=12, pad8 takes at most 1.10× pad0.
+    Pristine `9e8959da7` measures 1.35× and 4.98×; base is flat.
+  - **G3.** LET K=12 pad0 takes at most 2.25× its own base. Pristine is
+    2.75×, and each single repair is 2.34× or 2.35×.
+  - **G4 (S1).** `fn f (h : Equal Nat Zero Zero) : { x : Nat | Equal Nat
+    Zero Zero } = Zero` emits `tt` as the pair's proof. Paired: an
+    identity-first mutant selects `h` and turns the row red. The 78-root
+    raw parity shows no new difference against `9e8959da7`.
+  - AC-S 5/5, nested_domain 9/9, up_to_whnf 3/3, the landed suite and
+    the earlier Eq-head ACs stay green on the final bytes.
 - **AC-3.** Kernel QA reviews the K-a lines.
 - **AC-S (Architect `evt_2399h0mk7asd9`, replacing `evt_1pm2qvb169bfm`).**
   `unify_sorts_walk` gains a `Sigma/Sigma` arm with the Pi arm's domain
@@ -173,9 +198,9 @@ on the current base before measuring, and reports any that moved.
 
 - Any kernel line beyond K-a, any conversion change, or any
   `trusted_base()` change.
-- The AC-E fixed-point multiplier sits inside the kernel's single final
-  check, or its repair needs a kernel conversion change: stop with the
-  attribution table. It is a trust-root change for the operator.
+- Meeting G1 to G4 needs a kernel change, such as a kernel-side memo of
+  checked judgements or a conversion change: stop with the measurements.
+  It is a trust-root change for the operator.
 
 ## Hard-stop inventory (§1b)
 
