@@ -44,10 +44,10 @@ fn fast_row(name: &str, source: &str) {
 
 /// MEASURED: five named same-constant type-position rows accept without an
 /// obligation and elaborate below 2s at depth 16; removing only congruence's
-/// fast return makes each exceed 2s. CLAIMED: sort-linking can use head
-/// congruence before delta. THE GAP: timing alone could hide a skipped link;
-/// the matched, nonidentical, discarded and result-shape rows exercise distinct
-/// argument positions and kernel-check the admitted declaration.
+/// fast return makes each exceed 2s. CLAIMED: same-head type-position sorts
+/// need not reduce the alias to link levels. THE GAP: acceptance and timing do
+/// not independently expose links at discarded positions; the checked-core
+/// catalog comparison and the design review bound that residual.
 #[test]
 fn meta_bearing_former_argument_avoids_delta() {
     fast_row(
@@ -88,11 +88,11 @@ fn eq_endpoints_with_meta_bearing_alias_avoid_delta() {
     );
 }
 
-/// A genuinely non-convertible spine must roll back tentative level links
-/// before the old whnf-first path handles its equal branch results. Small K
-/// exercises rollback without the exponential cost of the K=16 cost rows.
+/// A non-convertible argument pair cannot use same-head conversion. At K=4
+/// the declaration must still accept with no obligation, like whnf-first;
+/// acceptance alone does not establish that the tentative links were restored.
 #[test]
-fn nonconverting_spine_falls_back_without_refusal_or_obligation() {
+fn nonconverting_spine_still_accepts_at_small_depth() {
     let mut env = environment(4);
     let source =
         "fn k (F : T2 NN Type -> Type) (x : T2 (Suc NN) Type) (o : F x) (n : Int) : Int = n";
