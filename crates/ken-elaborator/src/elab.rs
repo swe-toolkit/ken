@@ -12337,6 +12337,93 @@ fn unify_sorts_walk(
     }
 }
 
+/// Erase every level in a term to the same constant for the spine gate's
+/// necessary-condition test. Keep this match exhaustive: a new term former
+/// must not bypass a level-bearing position when it is introduced.
+fn erase_levels(t: &Term) -> Term {
+    fn box_erase(t: &Term) -> Box<Term> {
+        Box::new(erase_levels(t))
+    }
+    fn list_erase(terms: &[Term]) -> Vec<Term> {
+        terms.iter().map(erase_levels).collect()
+    }
+    fn levels_zero(levels: &[Level]) -> Vec<Level> {
+        levels.iter().map(|_| Level::Zero).collect()
+    }
+    match t {
+        Term::Type(_) => Term::Type(Level::Zero),
+        Term::Omega(_) => Term::Omega(Level::Zero),
+        Term::Var(i) => Term::Var(*i),
+        Term::Const { id, level_args } => Term::Const {
+            id: *id,
+            level_args: levels_zero(level_args),
+        },
+        Term::IntLit(value) => Term::IntLit(value.clone()),
+        Term::IndFormer { id, level_args } => Term::IndFormer {
+            id: *id,
+            level_args: levels_zero(level_args),
+        },
+        Term::Constructor { id, level_args } => Term::Constructor {
+            id: *id,
+            level_args: levels_zero(level_args),
+        },
+        Term::Elim {
+            fam,
+            level_args,
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+        } => Term::Elim {
+            fam: *fam,
+            level_args: levels_zero(level_args),
+            params: list_erase(params),
+            motive: box_erase(motive),
+            methods: list_erase(methods),
+            indices: list_erase(indices),
+            scrut: box_erase(scrut),
+        },
+        Term::Pi(a, b) => Term::Pi(box_erase(a), box_erase(b)),
+        Term::Lam(a, b) => Term::Lam(box_erase(a), box_erase(b)),
+        Term::App(f, a) => Term::App(box_erase(f), box_erase(a)),
+        Term::Sigma(a, b) => Term::Sigma(box_erase(a), box_erase(b)),
+        Term::Pair(a, b) => Term::Pair(box_erase(a), box_erase(b)),
+        Term::Proj1(p) => Term::Proj1(box_erase(p)),
+        Term::Proj2(p) => Term::Proj2(box_erase(p)),
+        Term::Let { ty, val, body } => Term::Let {
+            ty: box_erase(ty),
+            val: box_erase(val),
+            body: box_erase(body),
+        },
+        Term::Ascript(value, ty) => Term::Ascript(box_erase(value), box_erase(ty)),
+        Term::Eq(ty, a, b) => Term::Eq(box_erase(ty), box_erase(a), box_erase(b)),
+        Term::Refl(value) => Term::Refl(box_erase(value)),
+        Term::Cast(a, b, eq, value) => {
+            Term::Cast(box_erase(a), box_erase(b), box_erase(eq), box_erase(value))
+        }
+        Term::J(motive, method, eq) => Term::J(box_erase(motive), box_erase(method), box_erase(eq)),
+        Term::Quot(ty, relation, equiv) => {
+            Term::Quot(box_erase(ty), box_erase(relation), box_erase(equiv))
+        }
+        Term::QuotClass(value) => Term::QuotClass(box_erase(value)),
+        Term::QuotElim {
+            motive,
+            method,
+            respect,
+            scrut,
+        } => Term::QuotElim {
+            motive: box_erase(motive),
+            method: box_erase(method),
+            respect: box_erase(respect),
+            scrut: box_erase(scrut),
+        },
+        Term::Trunc(ty) => Term::Trunc(box_erase(ty)),
+        Term::TruncProj(value) => Term::TruncProj(box_erase(value)),
+        Term::Absurd(motive, proof) => Term::Absurd(box_erase(motive), box_erase(proof)),
+    }
+}
+
 /// Kernel conversion tries a same-constant, same-arity spine argument-wise
 /// before any delta (`conv_struct_path`). Mirror that order: link each pair,
 /// keep the links only if every pair then converts, otherwise restore them
@@ -12359,6 +12446,13 @@ fn sort_walk_same_constant_spine(
         || expected_args.len() != actual_args.len()
     {
         return false;
+    }
+    // A failed level-erased pair cannot be rescued by a level link. Test in
+    // source order so a failed argument does not walk its expensive siblings.
+    for (expected_arg, actual_arg) in expected_args.iter().zip(&actual_args) {
+        if !convert_type(env, ctx, &erase_levels(expected_arg), &erase_levels(actual_arg)) {
+            return false;
+        }
     }
     let saved = metas.metas.clone();
     for (expected_level, actual_level) in expected_levels.iter().zip(&actual_levels) {

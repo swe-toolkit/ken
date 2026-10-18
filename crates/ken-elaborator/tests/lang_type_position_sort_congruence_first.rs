@@ -3,7 +3,7 @@
 //! Architect D0 evt_h497bj8yv4jk). The kernel rechecks every accepted type.
 
 use ken_elaborator::{ElabEnv, ElabError};
-use ken_kernel::KernelError;
+use ken_kernel::{convert_type, Context, KernelError, Term};
 use std::time::{Duration, Instant};
 
 const DEPTH: usize = 16;
@@ -106,6 +106,28 @@ fn nonconverting_spine_still_accepts_at_small_depth() {
     );
 }
 
+/// MEASURED: the non-converting `Suc NN` argument at K=16 still accepts
+/// without an obligation in under 2s. CLAIMED: gate failure avoids a second
+/// expensive walk before the unchanged whnf fallback. THE GAP: a K=4
+/// acceptance alone cannot observe this cost boundary.
+#[test]
+fn nonconverting_spine_fallback_suc_is_bounded_at_depth_sixteen() {
+    let mut env = environment(16);
+    let source =
+        "fn k (F : T2 NN Type -> Type) (x : T2 (Suc NN) Type) (o : F x) (n : Int) : Int = n";
+    let started = Instant::now();
+    let result = env
+        .elaborate_decl_v1(source)
+        .unwrap_or_else(|error| panic!("fallback_suc: {error:?}"));
+    let elapsed = started.elapsed();
+    eprintln!("sort-spine-gate row=fallback_suc depth=16 elapsed={elapsed:?}");
+    assert!(
+        result.obligations.is_empty(),
+        "fallback_suc adds no obligations"
+    );
+    assert!(elapsed < LIMIT, "fallback_suc: {elapsed:?} >= {LIMIT:?}");
+}
+
 /// MEASURED: a same-constant, duplicating alias nested twenty levels around
 /// a bare universe elaborates below 2s even when every Nat argument differs
 /// syntactically by a transparent name. CLAIMED: linking same-head spines
@@ -151,8 +173,8 @@ fn spine_gate_env(swapped: bool) -> ElabEnv {
     env
 }
 
-fn h_tower(swapped: bool, flag: &str, leaf: &str) -> String {
-    (0..GATE_DEPTH).fold(leaf.to_string(), |term, _| {
+fn h_tower(depth: usize, swapped: bool, flag: &str, leaf: &str) -> String {
+    (0..depth).fold(leaf.to_string(), |term, _| {
         if swapped {
             format!("H ({term}) {flag}")
         } else {
@@ -161,12 +183,23 @@ fn h_tower(swapped: bool, flag: &str, leaf: &str) -> String {
     })
 }
 
-fn h_row(swapped: bool, lhs: &str, rhs: &str, left_leaf: &str, right_leaf: &str) -> String {
+fn h_row_at(
+    depth: usize,
+    swapped: bool,
+    lhs: &str,
+    rhs: &str,
+    left_leaf: &str,
+    right_leaf: &str,
+) -> String {
     format!(
         "fn k (F : {} -> Type) (x : {}) (o : F x) (n : Int) : Int = n",
-        h_tower(swapped, lhs, left_leaf),
-        h_tower(swapped, rhs, right_leaf)
+        h_tower(depth, swapped, lhs, left_leaf),
+        h_tower(depth, swapped, rhs, right_leaf)
     )
+}
+
+fn h_row(swapped: bool, lhs: &str, rhs: &str, left_leaf: &str, right_leaf: &str) -> String {
+    h_row_at(GATE_DEPTH, swapped, lhs, rhs, left_leaf, right_leaf)
 }
 
 /// MEASURED: twenty nested aliases discard a Bool argument that differs on
@@ -188,21 +221,52 @@ fn discarded_bool_first_pair_avoids_exponential_walk() {
     assert!(elapsed < LIMIT, "R1: {elapsed:?} >= {LIMIT:?}");
 }
 
-/// The failing pair is last after swapping the alias parameters. If the
-/// parent also exceeds 2s on this shape, kernel recheck is the suspected
-/// cost and this WP stops rather than hiding it in elaboration.
+/// MEASURED: full elaboration of the failing-last-pair sibling is compared
+/// at K=14 and K=16 against direct kernel conversion of those same towers.
+/// CLAIMED: the elaborator contributes only a bounded factor above unavoidable
+/// kernel cost. THE GAP: a flat absolute time cannot prove this at K=20,
+/// because kernel conversion itself is exponential in the swapped shape.
 #[test]
-fn discarded_bool_last_pair_avoids_exponential_walk() {
-    let mut env = spine_gate_env(true);
-    let source = h_row(true, "True", "False", "Type", "Type");
-    let started = Instant::now();
-    let result = env
-        .elaborate_decl_v1(&source)
-        .unwrap_or_else(|error| panic!("R1-swap: {error:?}"));
-    let elapsed = started.elapsed();
-    eprintln!("sort-spine-gate row=R1-swap depth={GATE_DEPTH} elapsed={elapsed:?}");
-    assert!(result.obligations.is_empty(), "R1-swap adds no obligations");
-    assert!(elapsed < LIMIT, "R1-swap: {elapsed:?} >= {LIMIT:?}");
+fn discarded_bool_last_pair_cost_is_bounded_by_kernel_conversion() {
+    let mut ratios = Vec::new();
+    for depth in [14, 16] {
+        let mut env = spine_gate_env(true);
+        let left = h_tower(depth, true, "True", "Type");
+        let right = h_tower(depth, true, "False", "Type");
+        let ll = env
+            .elaborate_decl_v1(&format!("const LL : Type 1 = {left}"))
+            .expect("left checked tower");
+        let rr = env
+            .elaborate_decl_v1(&format!("const RR : Type 1 = {right}"))
+            .expect("right checked tower");
+        let started_kernel = Instant::now();
+        let converted = convert_type(
+            &env.env,
+            &Context::new(),
+            &Term::const_(ll.def_id, vec![]),
+            &Term::const_(rr.def_id, vec![]),
+        );
+        let kernel_elapsed = started_kernel.elapsed();
+        assert!(converted, "LL and RR must convert at K={depth}");
+
+        let source = h_row_at(depth, true, "True", "False", "Type", "Type");
+        let started_full = Instant::now();
+        let result = env
+            .elaborate_decl_v1(&source)
+            .unwrap_or_else(|error| panic!("R1-swap K={depth}: {error:?}"));
+        let full_elapsed = started_full.elapsed();
+        assert!(result.obligations.is_empty(), "R1-swap adds no obligations");
+        let ratio = full_elapsed.as_secs_f64() / kernel_elapsed.as_secs_f64();
+        eprintln!("sort-spine-gate row=R1-swap depth={depth} full={full_elapsed:?} kernel={kernel_elapsed:?} ratio={ratio:.3}");
+        assert!(ratio <= 4.0, "R1-swap K={depth}: ratio {ratio:.3} > 4");
+        ratios.push(ratio);
+    }
+    assert!(
+        ratios[1] <= 1.25 * ratios[0],
+        "R1-swap ratio grows from {:.3} at K=14 to {:.3} at K=16",
+        ratios[0],
+        ratios[1]
+    );
 }
 
 /// MEASURED: nonconvertible leaf types still refuse K0004, and the refusal
