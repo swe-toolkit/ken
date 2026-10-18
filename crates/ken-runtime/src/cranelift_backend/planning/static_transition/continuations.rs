@@ -8364,58 +8364,55 @@ impl<'src> StaticTransitionPlan<'src> {
     /// no "first match": the population is returned whole, and a consumer that
     /// cannot resolve it to one member must fail rather than choose (`D5a`
     /// contract 3).
+    /// Every projected causal call with its binding before fusion settles
+    /// which identities are composed or realized by a fusion-owned body. This
+    /// superset may mark pending-Vis frames, but must never drive an emitter's
+    /// detached-result seat: it does not distinguish O from I or R.
+    pub(in crate::cranelift_backend) fn prefusion_continuation_result_edges(
+        &self,
+    ) -> Result<Vec<ContinuationResultEdge>, CraneliftBackendError> {
+        self.continuation_calls()?
+            .into_iter()
+            .map(|call| {
+                let identity = self
+                    .continuation_call_binding_for(
+                        call.producer_construct_origin(),
+                        call.continuation_origin(),
+                        call.producer_alternative(),
+                        call.recursive_position(),
+                    )?
+                    .ok_or_else(|| {
+                        planner_error(
+                            "a projected causal call has no binding under its own four-field \
+                             selector, so its result edge cannot be projected",
+                        )
+                    })?;
+                Ok(ContinuationResultEdge {
+                    producer_result_origin: call.producer_result_origin(),
+                    producer_construct_origin: call.producer_construct_origin(),
+                    recursive_position: call.recursive_position(),
+                    identity,
+                })
+            })
+            .collect()
+    }
+
     pub(in crate::cranelift_backend) fn continuation_result_edges_owned_by(
         &self,
         emission_owner: ContinuationEmissionOwner,
     ) -> Result<Vec<ContinuationResultEdge>, CraneliftBackendError> {
-        let mut edges = Vec::new();
-        for call in self.continuation_calls()? {
-            // `D5a`: keyed on the EMISSION owner, never on provenance. A unit
-            // that merely contains the producer text is not thereby able to
-            // emit the call.
-            if call.emission_owner() != emission_owner {
-                continue;
-            }
-            let identity = self
-                .continuation_call_binding_for(
-                    call.producer_construct_origin(),
-                    call.continuation_origin(),
-                    call.producer_alternative(),
-                    call.recursive_position(),
-                )?
-                .ok_or_else(|| {
-                    planner_error(
-                        "a projected causal call has no binding under its own four-field \
-                         selector, so its result edge cannot be projected",
-                    )
-                })?;
-            // `RT-LEXICAL-R3-FUSION-EMITTER` `D3` — `O` ONLY.
-            //
-            // `evt_6bm54j10w1n88`: an `R` identity is realized once by the
-            // fusion-owned body and must never reach a call seat at all, and an
-            // `I` identity is realized at its own call edge by
-            // `compose_continuation_locally`. Projecting either as a residual
-            // result edge hands the detached-result seat a causal call for
-            // something that will never be a call -- which is exactly the
-            // refusal the armed compile stopped at.
-            //
-            // ⛔ Narrowed at the projection, not filtered at the seat. The seat
-            // rejects a multi-member projection outright, so a class it must
-            // ignore has to be absent rather than skipped, and one authority
-            // over which edges are ordinary is the whole point of `O`.
-            if self.fusion_composed_calls.contains_key(&identity)
-                || self.fusion_outer_realizations.contains_key(&identity)
-            {
-                continue;
-            }
-            edges.push(ContinuationResultEdge {
-                producer_result_origin: call.producer_result_origin(),
-                producer_construct_origin: call.producer_construct_origin(),
-                recursive_position: call.recursive_position(),
-                identity,
-            });
-        }
-        Ok(edges)
+        Ok(self
+            .prefusion_continuation_result_edges()?
+            .into_iter()
+            .filter(|edge| {
+                // `D5a`: keyed on the EMISSION owner, never on provenance.
+                edge.identity.emission_owner() == emission_owner
+                    // `RT-LEXICAL-R3-FUSION-EMITTER` `D3`: only O reaches a
+                    // detached-result seat; I and R are discharged elsewhere.
+                    && !self.fusion_composed_calls.contains_key(&edge.identity)
+                    && !self.fusion_outer_realizations.contains_key(&edge.identity)
+            })
+            .collect())
     }
 
 }

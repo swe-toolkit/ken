@@ -266,15 +266,27 @@ impl StaticTransitionPlan<'_> {
                     }
                 }
             }
-            // The owner calls its K contexts. The result walk's generated
-            // Call edges add exact raw unit targets. Other function classes
-            // stay unmarked; a returned-Vis producer outside a marked frame
-            // refuses at its construct instead of silently allocating there.
+            // The owner calls its K contexts. Source-result Call edges mark
+            // exact raw units; detached continuation grafts need their own
+            // continuation frame to carry a member minted below the worker
+            // back to the owner. At this construction phase fusion is not yet
+            // installed, so this pre-fusion population deliberately marks a
+            // superset. It never selects or emits a response member.
+            let member_origins = protocol.contexts.iter()
+                .flat_map(|context| &context.members)
+                .map(|member| member.origin)
+                .collect::<BTreeSet<_>>();
+            let graft_frames = self.prefusion_continuation_result_edges()?
+                .into_iter()
+                .filter(|edge| member_origins.contains(&edge.producer_construct_origin))
+                .map(|edge| PendingVisFrameOwner::Continuation(edge.identity.target()))
+                .collect::<BTreeSet<_>>();
             let chain = std::iter::once(PendingVisFrameOwner::ResponseOwner(owner.id()))
                 .chain(protocol.contexts.iter().map(|context|
                     PendingVisFrameOwner::Context(context.context)))
                 .chain(protocol.contexts.iter().flat_map(|context|
-                    context.returning_units.iter().copied().map(PendingVisFrameOwner::Unit)));
+                    context.returning_units.iter().copied().map(PendingVisFrameOwner::Unit)))
+                .chain(graft_frames);
             for frame in chain {
                 let entry = frames.entry(frame).or_insert(width);
                 entry.captures = entry.captures.max(width.captures);

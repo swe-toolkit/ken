@@ -1,0 +1,13 @@
+program capabilities FS AFull
+fn done (_u : Unit) : HostIO AFull (ResourceBodyResult Unit Unit) =
+  Ret (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (ResourceBodyResult Unit Unit) (ResourceBodyOk Unit Unit MkUnit)
+fn fin (outcome : Result ResourceError (ResourceBracketResult Unit Unit)) : HostIO AFull ExitCode =
+  match outcome { Ok (ResourceBracketOk _) |-> host_exit AFull Success; Ok _ |-> host_exit AFull (Failure 92); Err _ |-> host_exit AFull (Failure 91) }
+proc main (_input : ProcessInput) (_caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS, Console] =
+  bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) (Result ResourceError (ResourceBracketResult Unit Unit)) ExitCode
+    (withBuffer AFull Unit Unit (2 : Int) (\_b.
+      bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) Unit (ResourceBodyResult Unit Unit) (host_console AFull Unit (print_line "x"))
+        (\_u. bind (Coproduct (FSOp AFull) AmbientOp) (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp) Unit (ResourceBodyResult Unit Unit) (host_console AFull Unit (print_line "y"))
+          (\_v. done MkUnit))))
+    (\outcome. fin outcome)
