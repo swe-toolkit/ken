@@ -1,10 +1,13 @@
 # Finite directed graphs and dependency order
 
-> **Status: DRAFT v0 (SPEC-GRAPHS-DEPENDENCY-CONTRACT).** Section 1 is
-> normative for a finite directed graph, checked reachability, and a
-> topological-order-or-real-cycle result in one ordinary `Algorithm.Graphs`
-> package. The contract does not claim catalog delivery. It introduces no
-> kernel, trust, or surface-syntax change and does not revise §61 §2.
+> **Status: DRAFT v0 (SPEC-GRAPHS-DEPENDENCY-CONTRACT §1;
+> SPEC-GRAPHS-CYCLE-REFUTES-ORDER §2).** Section 1 binds finite graphs,
+> checked reachability, and a topological-order-or-real-cycle result in
+> `Algorithm.Graphs.Dependency`; its catalog package is present on the
+> base. Section 2 adds three checked generic laws and this WP authors
+> a §2 conformance seed. Scratch execution of seed blocks is not shipped
+> harness execution or CI. No kernel, trust, or surface-syntax change
+> or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -293,9 +296,68 @@ CAT-delivery, acceptance-test, or CI results.
 
 Strongly connected components, shortest paths, weighted edges, a
 successor-list adaptor, and maximal or lexicographically least
-orders remain outside §1. So does an exported **cycle-refutes-order**
-theorem: it would need checked irreflexivity and transitivity of
-`before`, and no §1 consumer requires it. The result still never
-presents a missing edge as a cycle witness or a non-covering list as
-a topological order. These exclusions do not change the existing
-`Data.Finite.Finite`, Dfa, or formal-languages reachability contracts.
+orders remain outside §1. The two `OrderOrCycle` outcomes are
+**exclusive**: §2 proves that a `Cycle q g` refutes every `TopoOrder q d g`.
+The refutation uses only the order's `all_edges_forward` field, not its
+coverage or uniqueness fields. The result still never presents a
+missing edge as a cycle witness or a non-covering list as a topological
+order. These exclusions do not change the existing `Data.Finite.Finite`,
+Dfa, or formal-languages reachability contracts.
+
+## 2. A cycle refutes every dependency order
+
+The following three public laws add checked proof bodies to
+`Algorithm.Graphs.Dependency`; they are not axioms. `before` is the
+§1.3 Boolean scan. Its irreflexivity and transitivity hold for every
+list and any `d : DecEq q`, with **no** premise of list uniqueness,
+vertex coverage or `d.sound`/`d.complete`:
+
+```ken
+pub theorem before_irreflexive
+  (q : Type) (d : DecEq q) (x : q) (xs : List q) :
+  Equal Bool (before q d x x xs) False
+
+pub theorem before_transitive
+  (q : Type) (d : DecEq q) (x : q) (y : q) (z : q)
+  (xs : List q) :
+  Equal Bool (before q d x y xs) True →
+  Equal Bool (before q d y z xs) True →
+  Equal Bool (before q d x z xs) True
+```
+
+These laws are about the scan's ordering decisions, not a claim that
+`d.eq` decides equality correctly without its dictionary laws. Each
+occurrence of a query is compared through the same `d.eq` function.
+With an order's forward-edge field, the first edge of a cycle puts its
+start before the next vertex; transitivity carries this fact along
+the return walk and would put the start before itself. Irreflexivity
+makes that impossible. Even a self-loop has a first edge, so its
+return walk may be `WalkHere` without weakening the refutation:
+
+```ken
+pub theorem cycle_refutes_order
+  (q : Type) (d : DecEq q) (g : Graph q) :
+  TopoOrder q d g → Cycle q g → Bottom
+```
+
+The `Bottom` here is the existing empty type used by §1's private
+order proofs. A client with both evidence values eliminates their
+contradiction with `cycle_refutes_order`; `HasCycle` thus excludes an
+order for that same graph and `d`. This is stronger than merely
+reporting whichever constructor the total operation chose. The
+proof needs only `all_edges_forward`, even though a `TopoOrder` also
+carries checked coverage and uniqueness. The private `walk_before`,
+`before_contains_later`, and Boolean step lemmas support the public
+proofs without adding further public laws. Their Boolean case splits
+reuse the catalog's existing private `before_step` helper; no second
+scan helper is introduced.
+
+The Architect's generic D0 client on base `55d1ab578` checked with
+rc 0 and no new `Axiom`. Five independent mutations, including a
+false reflexive order claim and an invalid cycle-edge proof, were
+kernel-rejected. The §2 seed is authored in this WP; its positive
+and refused blocks were exercised separately as scratch clients, not
+by a shipped harness or CI. Those checks do not establish a measured
+landed `trusted_base()` delta. Reachability, finite enumeration, and §1's
+choice behavior remain unchanged; the deferred graph operations in
+§1.4 remain outside this section.

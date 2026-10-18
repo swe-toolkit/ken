@@ -248,13 +248,18 @@ location relation or generic byte-concatenation theorem is claimed.
 Specifying §§5–6 does not claim their catalog builds have landed.
 
 The **Layer-3 graphs and dependency contract** is pinned in
-**`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT). A graph has
-Boolean directed adjacency over any carrier; explicit `Finite q` permits
-decidable predicate reachability through §61 §2's existing Dfa fixed point,
-with a checked `Walk` witness rather than a raw word that may stutter.
-`DecEq q` enters only for a complete, duplicate-free topological list or
-a genuine cycle result; both branches carry checked evidence. The chapter
-does not claim its catalog build has landed or add a second fixed point.
+**`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT) and §2
+(SPEC-GRAPHS-CYCLE-REFUTES-ORDER). A graph has Boolean directed adjacency
+over any carrier; explicit `Finite q` permits decidable predicate
+reachability through §61 §2's existing Dfa fixed point, with a checked
+`Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
+duplicate-free topological list or a genuine cycle; the §1 catalog
+package is present on the base. §2 adds three checked generic laws:
+`before` is irreflexive and transitive for any list, and a cycle refutes
+every topological order by its forward-edge field alone. This WP
+includes the §2 seed, whose blocks CV exercised only as scratch clients;
+shipped seed-harness execution, CI and a landed trust-delta measurement
+are not established. No second fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–3 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;

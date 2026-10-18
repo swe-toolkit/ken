@@ -203,6 +203,57 @@ pub theorem ordered_forward
     MkTopoOrder xs unique complete forward ↦ forward
   }
 
+pub theorem before_irreflexive
+      (q : Type) (d : DecEq q) (x : q) (xs : List q)
+    : Equal Bool (before q d x x xs) False =
+  match xs {
+    Nil ↦ Proved;
+    Cons head tail ↦
+      irreflexive_step q d x head tail (d.eq x head) (before_irreflexive q d x tail)
+  }
+
+pub theorem before_transitive
+      (q : Type) (d : DecEq q) (x : q) (y : q) (z : q) (xs : List q)
+    : Equal Bool (before q d x y xs) True
+      → Equal Bool (before q d y z xs) True
+      → Equal Bool (before q d x z xs) True =
+  match xs {
+    Nil ↦ λxy. λyz. absurd xy;
+    Cons head tail ↦
+      transitive_step
+        q
+        d
+        x
+        y
+        z
+        head
+        tail
+        (d.eq x head)
+        (d.eq y head)
+        (d.eq z head)
+        (before_transitive q d x y z tail)
+  }
+
+pub theorem cycle_refutes_order
+      (q : Type) (d : DecEq q) (g : Graph q)
+    : TopoOrder q d g → Cycle q g → Bottom =
+  λorder.
+    λcycle.
+      match order {
+        MkTopoOrder xs unique cover forward ↦
+          match cycle {
+            MkCycle s next first back ↦
+              absurd
+                (trans
+                  Bool
+                  False
+                  (before q d s s xs)
+                  True
+                  (sym Bool (before q d s s xs) False (before_irreflexive q d s xs))
+                  (walk_before q d g xs forward s next s back (forward s next first)))
+          }
+      }
+
 pub data OrderOrCycle (q : Type) (d : DecEq q) (g : Graph q) : Type where {
   HasOrder : TopoOrder q d g → OrderOrCycle q d g;
   HasCycle : Cycle q g → OrderOrCycle q d g
@@ -323,7 +374,12 @@ repeats vertices. Deduplication produces a unique list, and the imported
 `Derived.sort` permutation law preserves its coverage and uniqueness. Its
 sorted law combines with strict rank growth to prove that every edge points
 forward. The two membership laws connect `contains` to `Derived.list_elem`
-using `DecEq.sound` and `DecEq.complete`.
+using `DecEq.sound` and `DecEq.complete`. Irreflexivity and transitivity
+of `before` use only repeated calls to the same `d.eq` and need no
+uniqueness or coverage premise. The first edge of a `Cycle` and its
+return `Walk` would force an order to place its start before itself;
+only the `all_edges_forward` field is needed to derive the contradiction.
+The Boolean step proofs reuse the private `before_step` scan helper.
 
 ```ken
 fn graph_step_from (q : Type) (s : q) (x : q) (b : Bool) : q =
@@ -1722,6 +1778,131 @@ theorem before_cons
         (before_step q d x y head tail (d.eq x head) (d.eq y head)) =
   Refl
 
+theorem irreflexive_step
+      (q : Type) (d : DecEq q) (x : q) (head : q) (tail : List q) (xb : Bool)
+    : Equal Bool (before q d x x tail) False
+      → Equal Bool (before_step q d x x head tail xb xb) False =
+  match xb {
+    True ↦ λrest. Proved;
+    False ↦ λrest. rest
+  }
+
+theorem before_contains_later
+      (q : Type) (d : DecEq q) (y : q) (z : q) (xs : List q)
+    : Equal Bool (before q d y z xs) True → Equal Bool (contains q d z xs) True =
+  match xs {
+    Nil ↦ λyz. absurd yz;
+    Cons head tail ↦
+      contains_step
+        q
+        d
+        y
+        z
+        head
+        tail
+        (d.eq y head)
+        (d.eq z head)
+        (before_contains_later q d y z tail)
+  }
+
+theorem contains_step
+      (q : Type)
+      (d : DecEq q)
+      (y : q)
+      (z : q)
+      (head : q)
+      (tail : List q)
+      (yb : Bool)
+      (zb : Bool)
+      (rest : Equal Bool (before q d y z tail) True → Equal Bool (contains q d z tail) True)
+    : Equal Bool (before_step q d y z head tail yb zb) True
+      → Equal Bool (bool_or zb (contains q d z tail)) True =
+  match yb {
+    True ↦
+      match zb {
+        True ↦ λyz. absurd yz;
+        False ↦ λyz. yz
+      };
+    False ↦
+      match zb {
+        True ↦ λyz. absurd yz;
+        False ↦ λyz. rest yz
+      }
+  }
+
+theorem transitive_step
+      (q : Type)
+      (d : DecEq q)
+      (x : q)
+      (y : q)
+      (z : q)
+      (head : q)
+      (tail : List q)
+      (xb : Bool)
+      (yb : Bool)
+      (zb : Bool)
+      (rest : Equal
+        Bool
+        (before q d x y tail)
+        True
+        → Equal
+        Bool
+        (before q d y z tail)
+        True
+        → Equal
+        Bool
+        (before q d x z tail)
+        True)
+    : Equal Bool (before_step q d x y head tail xb yb) True
+      → Equal Bool (before_step q d y z head tail yb zb) True
+      → Equal Bool (before_step q d x z head tail xb zb) True =
+  match xb {
+    True ↦
+      match yb {
+        True ↦ λxy. λyz. absurd xy;
+        False ↦
+          match zb {
+            True ↦ λxy. λyz. absurd yz;
+            False ↦ λxy. λyz. before_contains_later q d y z tail yz
+          }
+      };
+    False ↦
+      match yb {
+        True ↦ λxy. λyz. absurd xy;
+        False ↦
+          match zb {
+            True ↦ λxy. λyz. absurd yz;
+            False ↦ λxy. λyz. rest xy yz
+          }
+      }
+  }
+
+theorem walk_before
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (xs : List q)
+      (forward : all_edges_forward q d g xs)
+      (x : q)
+      (a : q)
+      (b : q)
+      (walk : Walk q g a b)
+    : Equal Bool (before q d x a xs) True → Equal Bool (before q d x b xs) True =
+  match walk {
+    WalkHere ↦ λxa. xa;
+    WalkStep u v e prefix ↦
+      λxa.
+        before_transitive
+          q
+          d
+          x
+          u
+          v
+          xs
+          (walk_before q d g xs forward x a u prefix xa)
+          (forward u v e)
+  }
+
 theorem member_tail_if_neq
       (q : Type) (d : DecEq q) (x : q) (head : q) (tail : List q)
     : Equal Bool (d.eq x head) False → list_elem q x (Cons q head tail) → list_elem q x tail =
@@ -1946,12 +2127,13 @@ cycle edges; it does not duplicate reachability's fixed point.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §1](../../../../spec/50-stdlib/62-graphs.md)
-and its [seed](../../../../conformance/stdlib/graphs/seed-dependency.md).
-The public API is the graph, path and certificate types, their constructors,
-the predicate-reachability decision and witness, the dependency-order
-operation, five list/order predicates, and seven kernel-checked laws. Every
-other helper is private to this package.
+The behavioral contract is [graphs §§1–2](../../../../spec/50-stdlib/62-graphs.md).
+The existing [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
+covers its original operations and laws; the §2 seed is a separate
+conformance deliverable. The public API is the graph, path and certificate
+types, their constructors, the predicate-reachability decision and witness,
+the dependency-order operation, five list/order predicates, and ten
+kernel-checked laws. Every other helper is private to this package.
 
 | Reader task | Section |
 |---|---|
@@ -1964,6 +2146,7 @@ soundness/completeness laws, `Finite` coverage, and `Derived.sort` and its
 sorted/permutation laws. The local graph encoding and all search and ordering
 helpers are checked terms. The package adds no `Axiom`, primitive, foreign
 binding, postulate or `trusted_base()` entry; this does not erase inherited
-assumptions of imported providers. The graph seed and the targeted acceptance
-suite exercise the ten behavior cases, generic law clients, exact public
-ownership and the package-local trust delta.
+assumptions of imported providers. The existing graph seed and targeted
+acceptance suite exercise the §1 behavior cases, generic law clients,
+exact public ownership and the package-local trust delta; neither
+establishes execution of the §2 seed.
