@@ -65,9 +65,19 @@ rows below as a test target beside the SORT-UP-TO-WHNF rows.
     bare `Type` is `Type ?l`, so the base refusal was incidental to the
     missing level link. Reverting the walk returns this row to K0004.
 - **AC-4.** Every landed catalog package emits byte-identical core.
+- **AC-T1 (amendment 1, durable timing; Architect `evt_brr6pry2jfxy` on
+  Adversary `evt_c3e61b3kpxd3`).** The walk returns early through
+  `sort_walk_is_inert` before any whnf when the zonked sides are
+  identical or carry no open level meta (an out-of-range meta counts as
+  open). The ruling's code is the text. With `T NN` an alias over an
+  exponential `blow` at K=16, rows fa, eq, nested and fa_ne (as in the
+  ruling) each elaborate in under 2s. Paired: deleting only the early
+  return makes each exceed 2s.
+- **AC-T2.** Under the guard every row above keeps its outcome.
 
 ## Stop conditions
 
 - Any change to `unify_types` or a term-position site.
+- Congruence-first linking, or any change to which levels are linked.
 - A walk that needs to assign a term meta, not only link levels.
 - Any kernel or `trusted_base()` change.
