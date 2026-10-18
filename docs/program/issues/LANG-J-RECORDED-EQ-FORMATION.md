@@ -35,8 +35,11 @@ origin: "Adversary M8 finding F2 on 02b64897f (evt_5vdbykfmgw6v7); Architect rul
   - Export a kernel helper `pub fn recorded_eq_endpoints(env, &ty) ->
     Option<(Term, Term, Term)>` that wraps `eq_formation_head` and returns
     the endpoints of a `Term::Eq` head.
-  - `infer_j` reads `(A, a, b)` from the zonked `eq_ty` through the
-    helper first, and falls back to today's whnf match.
+  - `infer_j` takes `(A, a, b)` from today's whnf match first. Only
+    where whnf does not yield `Term::Eq` (the Π and Σ carriers base
+    refuses) does it read them through the helper (amendment 1,
+    Architect `evt_35zvrpyjqj31j`). A program base admits keeps its
+    endpoints, ascription and core byte for byte.
   - When the endpoints came from the formation, emit
     `Term::Ascript(eq_core, Term::Eq(A, a, b))` from the recorded
     endpoints, or reuse `eq_core` when it is already an `Ascript`. The raw
@@ -77,6 +80,11 @@ below as a test target.
   :15654) as reading a recording or not. Repair only those that the same
   refusal reaches, and name any other as a candidate for a separate node.
   The Refl gate and `synth_refl_proof` are such a site, repaired here.
+- **AC-5 (amendment 1, respin).** `r_layer_tests::cat_tier_d_parsing_group_import`
+  is 9/9, including the six publisher-named rows. A nested-J row whose
+  evidence whnf's to a different Eq (the Arguments shape:
+  `Eq (Option A) (Some a) (Some b)` consumed at `A`) checks, and fails
+  with the recorded-first order restored.
 - **AC-4 (mutation, QA).** Removing the helper read returns `jf` to the
   refusal while `jn` stays green. Removing the `Term::Pi(..)` gate clause
   returns `jf` and `rp` to "Eq-shaped goal" while `jn` and `js` stay
@@ -91,9 +99,16 @@ below as a test target.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 1 (Architect `evt_7ae8w6d6bgy84`).
+§1a: 2 (Architect `evt_7ae8w6d6bgy84`, `evt_35zvrpyjqj31j`).
 
 1. The ruled witness reached a second whnf-before-Eq-match site (the
    surface Refl gate), and the ruled ascription operand was the unreified
    inferred type. Keyed on the whnf or inferred spelling of the Eq type
    instead of its recorded formation.
+2. The ruled recorded-first J read replaced the base whnf endpoints for
+   evidence whose whnf already is an Eq (a constructor-injectivity
+   reduct, `Some a = Some b` to `a = b`), breaking a landed nested-J
+   consumer, `Capability.Process.Arguments`
+   `argument_slice_location_complete_at`. Keyed on preferring the
+   recording unconditionally, instead of only where the base route
+   refuses.

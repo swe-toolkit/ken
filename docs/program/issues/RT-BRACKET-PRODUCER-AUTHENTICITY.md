@@ -57,6 +57,26 @@ claims neither console Vis 441 nor 460.
   return to the Steward** (an operator question).
   `wp/KERNEL-NORMALIZE-ORIGIN-TRACE` stays unmoved.
 
+**D0-2 result: (b′)** (`evt_7m579fj57c8h6` on `f894d9c9f`; Architect
+`evt_41yjkr1kp0egs`). `normalize` returns only a Term (conv.rs:495), so
+no producer chain maps. This is the third stop on the source-occurrence
+requirement, and that requirement is dropped for px8ta.
+
+**D0-3, option D, withdrawn** (Architect `evt_7bcyrfavc68e5`).
+`leaf_dispatch` has no Vis or root input, and carrying instance identity
+there is the route parked at hard stop 7. Option K (a kernel origin
+observer) is not taken.
+
+**D0-4 result: option C's enabler holds** (Architect `evt_14r9629fb5mzp`,
+scratch on `f894d9c9f`). A confined finalizer constructor gives one
+private release per instance (2/3/1/1 in the four bodies), each tied to
+its own acquire's Ok binder. A public early release stays separate,
+source cannot name the constructor, and the regions extract before
+erasure. Estimated at about 177 lines over 7 paths, with no kernel or
+`trusted_base()` change. Child 1 by route C waits on the operator's
+umbrella authorization (`evt_360c971y74gy6`, `evt_28p8pa97c35w4`); §3,
+§6 and AC-5 are rewritten for C on a yes.
+
 **Prohibitions:** no lookup widening or added declaration lane for the
 depth-3 claim; no order or shape guess and no `HostOpV1` port discovery;
 no Mapping or operation carve-out. px8ta stays `#[ignore]`d. The `(H)`

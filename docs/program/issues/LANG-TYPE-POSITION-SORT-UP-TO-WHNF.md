@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-SORT-UP-TO-WHNF
 title: "The type-position sort link compares types syntactically, so an Eq endpoint or former argument whose sort is written through a transparent alias, such as const Small : Type 1 = Type 0, or a former with a higher-order domain links no level and is refused with K0004 once an obligation follows. Link levels by unifying both sides in whnf, for every domain shape, in one helper"
-status: ready
+status: active
 owner: language
 size: S
 tier: T2
