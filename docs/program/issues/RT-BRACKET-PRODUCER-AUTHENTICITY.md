@@ -57,6 +57,27 @@ claims neither console Vis 441 nor 460.
   return to the Steward** (an operator question).
   `wp/KERNEL-NORMALIZE-ORIGIN-TRACE` stays unmoved.
 
+**D0-2 result: (b′)** (`evt_7m579fj57c8h6` on `f894d9c9f`; Architect
+`evt_41yjkr1kp0egs`). `normalize` returns only a Term (conv.rs:495), so
+no producer chain maps. This is the third stop on the source-occurrence
+requirement, and that requirement is dropped for px8ta.
+
+**D0-3, instance-keyed settlement (Steward decision `evt_4q70hczj83mn8`,
+the Architect's option D).** Scratch only, on `f894d9c9f`. Re-key the
+single generic native settlement case from the template's shared
+`effect_origin` onto `(vis_origin, operation_root_origin)`, with no
+region or authenticity claim. Measure: (1) the function and key that
+build the generic case; (2) the re-keyed collapse; (3) d2 native release
+order against the interpreter, expected [2,1]; (4) whether d3's
+`ContinuationSpecialization` refusal (core.rs ~:11268) clears, and if
+not, report it as `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`'s work; (5)
+two RELEASE-ORDER-PARITY depth-2 nests and its two depth-3 nests stay
+green; (6) the lookalike's native output against the interpreter's. The
+Architect rules whether D holds and its size; the Steward then frames the
+implementation node. Option K (a kernel origin observer) is not taken.
+Option C (a confined finalizer constructor) is kept on file for the
+umbrella.
+
 **Prohibitions:** no lookup widening or added declaration lane for the
 depth-3 claim; no order or shape guess and no `HostOpV1` port discovery;
 no Mapping or operation carve-out. px8ta stays `#[ignore]`d. The `(H)`
