@@ -177,7 +177,7 @@ static PREVIOUS_BUS: OnceLock<libc::sigaction> = OnceLock::new();
 
 /// Child: keep both channels from user subprocesses; chain the fault
 /// recorder and start the lifeline watcher before the worker thread spawns.
-pub(crate) fn enter_child(fault: RawFd, lifeline: RawFd) {
+pub(crate) fn enter_child(fault: RawFd, lifeline: RawFd) -> std::io::Result<()> {
     // SAFETY: descriptor flags and handler dispositions are set before any
     // child thread exists, including the watcher started below.
     unsafe {
@@ -189,19 +189,26 @@ pub(crate) fn enter_child(fault: RawFd, lifeline: RawFd) {
     }
     // The parent never writes the lifeline. EOF or an error means its only
     // writer closed; a signal interruption is retried, not misclassified.
-    std::thread::spawn(move || {
-        let mut byte = 0u8;
-        loop {
-            // SAFETY: a one-byte read into a local buffer.
-            let n = unsafe { libc::read(lifeline, (&mut byte as *mut u8).cast(), 1) };
-            if n == -1 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINTR) {
-                continue;
+    // The fixed, local stack is independent of ambient RUST_MIN_STACK. A
+    // watcher needs only its read/kill frame; failure to start is a coded
+    // worker-boundary error rather than an uncoded spawn panic.
+    std::thread::Builder::new()
+        .name("ken-lifeline".into())
+        .stack_size(64 * 1024)
+        .spawn(move || {
+            let mut byte = 0u8;
+            loop {
+                // SAFETY: a one-byte read into a local buffer.
+                let n = unsafe { libc::read(lifeline, (&mut byte as *mut u8).cast(), 1) };
+                if n == -1 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINTR) {
+                    continue;
+                }
+                break;
             }
-            break;
-        }
-        // SAFETY: kill(2) on this process's own pid.
-        unsafe { libc::kill(libc::getpid(), libc::SIGKILL) };
-    });
+            // SAFETY: kill(2) on this process's own pid.
+            unsafe { libc::kill(libc::getpid(), libc::SIGKILL) };
+        })?;
+    Ok(())
 }
 
 unsafe fn install(signal: libc::c_int, previous: &OnceLock<libc::sigaction>) {

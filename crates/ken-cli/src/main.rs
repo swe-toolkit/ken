@@ -53,7 +53,10 @@ fn main() {
     if needs_source_parser_stack {
         match worker_process::role() {
             worker_process::Role::Child { fault, lifeline } => {
-                worker_process::enter_child(fault, lifeline)
+                if let Err(error) = worker_process::enter_child(fault, lifeline) {
+                    emit_cli_error(CliError::ElaborationWorkerSpawn(error));
+                    std::process::exit(1);
+                }
             }
             worker_process::Role::Parent => {
                 let exit_code = worker_process::run_parent();
