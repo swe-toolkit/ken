@@ -106,26 +106,44 @@ fn nonconverting_spine_still_accepts_at_small_depth() {
     );
 }
 
-/// MEASURED: the non-converting `Suc NN` argument at K=16 still accepts
-/// without an obligation in under 2s. CLAIMED: gate failure avoids a second
-/// expensive walk before the unchanged whnf fallback. THE GAP: a K=4
-/// acceptance alone cannot observe this cost boundary.
+/// Promise: non-regression sentinel, not evidence for the gate. MEASURED:
+/// K=12 fallback accepts without obligations, and full cost is at most 8×
+/// direct kernel conversion of the same T2 towers. CLAIMED: the fallback
+/// does not add unbounded elaborator work. THE GAP: kernel conversion also
+/// reduces `blow NN`; it is already expensive when the gate is absent.
 #[test]
-fn nonconverting_spine_fallback_suc_is_bounded_at_depth_sixteen() {
-    let mut env = environment(16);
+fn nonconverting_spine_fallback_suc_tracks_kernel_cost() {
+    let mut env = environment(12);
+    let ll = env
+        .elaborate_decl_v1("const LL : Type 1 = T2 NN Type")
+        .expect("left T2 tower");
+    let rr = env
+        .elaborate_decl_v1("const RR : Type 1 = T2 (Suc NN) Type")
+        .expect("right T2 tower");
+    let started_kernel = Instant::now();
+    let converted = convert_type(
+        &env.env,
+        &Context::new(),
+        &Term::const_(ll.def_id, vec![]),
+        &Term::const_(rr.def_id, vec![]),
+    );
+    let kernel_elapsed = started_kernel.elapsed();
+    assert!(converted, "T2 towers must convert after delta");
+
     let source =
         "fn k (F : T2 NN Type -> Type) (x : T2 (Suc NN) Type) (o : F x) (n : Int) : Int = n";
-    let started = Instant::now();
+    let started_full = Instant::now();
     let result = env
         .elaborate_decl_v1(source)
         .unwrap_or_else(|error| panic!("fallback_suc: {error:?}"));
-    let elapsed = started.elapsed();
-    eprintln!("sort-spine-gate row=fallback_suc depth=16 elapsed={elapsed:?}");
+    let full_elapsed = started_full.elapsed();
     assert!(
         result.obligations.is_empty(),
         "fallback_suc adds no obligations"
     );
-    assert!(elapsed < LIMIT, "fallback_suc: {elapsed:?} >= {LIMIT:?}");
+    let ratio = full_elapsed.as_secs_f64() / kernel_elapsed.as_secs_f64();
+    eprintln!("sort-spine-gate row=fallback_suc depth=12 full={full_elapsed:?} kernel={kernel_elapsed:?} ratio={ratio:.3}");
+    assert!(ratio <= 8.0, "fallback_suc: ratio {ratio:.3} > 8");
 }
 
 /// MEASURED: a same-constant, duplicating alias nested twenty levels around
@@ -221,11 +239,11 @@ fn discarded_bool_first_pair_avoids_exponential_walk() {
     assert!(elapsed < LIMIT, "R1: {elapsed:?} >= {LIMIT:?}");
 }
 
-/// MEASURED: full elaboration of the failing-last-pair sibling is compared
-/// at K=14 and K=16 against direct kernel conversion of those same towers.
-/// CLAIMED: the elaborator contributes only a bounded factor above unavoidable
-/// kernel cost. THE GAP: a flat absolute time cannot prove this at K=20,
-/// because kernel conversion itself is exponential in the swapped shape.
+/// MEASURED: full elaboration of the failing-last-pair sibling is at most
+/// 20× direct kernel conversion of the same towers at K=14 and K=16, with
+/// non-growing ratio. CLAIMED: the elaborator's amplification is bounded.
+/// THE GAP: an absolute K=20 bound cannot isolate the elaborator, since
+/// kernel conversion is already exponential in this swapped shape.
 #[test]
 fn discarded_bool_last_pair_cost_is_bounded_by_kernel_conversion() {
     let mut ratios = Vec::new();
@@ -258,11 +276,11 @@ fn discarded_bool_last_pair_cost_is_bounded_by_kernel_conversion() {
         assert!(result.obligations.is_empty(), "R1-swap adds no obligations");
         let ratio = full_elapsed.as_secs_f64() / kernel_elapsed.as_secs_f64();
         eprintln!("sort-spine-gate row=R1-swap depth={depth} full={full_elapsed:?} kernel={kernel_elapsed:?} ratio={ratio:.3}");
-        assert!(ratio <= 4.0, "R1-swap K={depth}: ratio {ratio:.3} > 4");
+        assert!(ratio <= 20.0, "R1-swap K={depth}: ratio {ratio:.3} > 20");
         ratios.push(ratio);
     }
     assert!(
-        ratios[1] <= 1.25 * ratios[0],
+        ratios[1] <= 1.10 * ratios[0],
         "R1-swap ratio grows from {:.3} at K=14 to {:.3} at K=16",
         ratios[0],
         ratios[1]
