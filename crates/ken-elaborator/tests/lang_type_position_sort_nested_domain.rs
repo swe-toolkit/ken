@@ -130,3 +130,75 @@ fn bare_nested_big_links_former_domain_to_type_one() {
         "f's checked domain must be Type 1, not a defaulted Type 0"
     );
 }
+
+// The source is deliberately expensive only if the type-position sort walk
+// reduces T NN. The kernel can check these identical or convertible former
+// domains without reducing T NN; fa_ne differs only by an identity wrapper.
+const TIMING_LIMIT: std::time::Duration = std::time::Duration::from_secs(2);
+const TIMING_DEPTH: usize = 16;
+
+fn timed_type_position_row(name: &str, source: &str) {
+    let mut env = ElabEnv::new().expect("prelude");
+    for declaration in [
+        "fn plus (a : Nat) (b : Nat) : Nat = match a { Zero |-> b; Suc p |-> Suc (plus p b) }",
+        "fn blow (n : Nat) : Nat = match n { Zero |-> Zero; Suc m |-> plus (blow m) (blow m) }",
+        "fn T (n : Nat) : Type = match blow n { Zero |-> Int; Suc m |-> Int }",
+        "fn idn (n : Nat) : Nat = n",
+    ] {
+        env.elaborate_decl(declaration)
+            .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
+    }
+    let nat = (0..TIMING_DEPTH).fold(String::from("Zero"), |term, _| format!("Suc ({term})"));
+    env.elaborate_decl(&format!("const NN : Nat = {nat}"))
+        .expect("closed Nat depth fixture");
+    let started = std::time::Instant::now();
+    let result = env
+        .elaborate_decl_v1(source)
+        .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+    let elapsed = started.elapsed();
+    eprintln!("sort-walk timing row={name} depth={TIMING_DEPTH} elapsed={elapsed:?}");
+    assert!(
+        result.obligations.is_empty(),
+        "{name}: no obligations expected"
+    );
+    assert!(
+        elapsed < TIMING_LIMIT,
+        "{name}: type-position bookkeeping reduced an inert exponential alias: {elapsed:?} >= {TIMING_LIMIT:?}"
+    );
+}
+
+/// Promise: durable performance boundary. MEASURED: a closed, repeated alias
+/// in the former-argument route checks in under two seconds after the fixture
+/// is loaded. CLAIMED: sort-linking does not reduce an inert alias. THE GAP:
+/// identity alone is weaker; fa_ne below checks a nonidentical convertible pair.
+#[test]
+fn inert_former_argument_avoids_exponential_whnf() {
+    timed_type_position_row(
+        "fa",
+        "fn k (F : T NN -> Type) (x : T NN) (o : F x) (n : Int) : Int = n",
+    );
+}
+
+#[test]
+fn inert_equality_endpoints_avoid_exponential_whnf() {
+    timed_type_position_row(
+        "eq",
+        "fn k (x y : T NN) (p : Eq (T NN) x y) (n : Int) : Int = n",
+    );
+}
+
+#[test]
+fn inert_nested_former_avoids_exponential_whnf() {
+    timed_type_position_row(
+        "nested",
+        "fn k (G : (T NN -> Type) -> Type) (F : T NN -> Type) (o : G F) (n : Int) : Int = n",
+    );
+}
+
+#[test]
+fn inert_convertible_nonidentical_former_avoids_exponential_whnf() {
+    timed_type_position_row(
+        "fa_ne",
+        "fn k (F : T NN -> Type) (x : T (idn NN)) (o : F x) (n : Int) : Int = n",
+    );
+}

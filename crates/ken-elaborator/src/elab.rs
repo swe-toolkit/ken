@@ -12281,6 +12281,9 @@ fn unify_sorts_walk(
     env: &GlobalEnv, metas: &mut MetaCtx, ctx: &mut Context, expected: &Term, actual: &Term,
 ) {
     let expected = metas.zonk_term_with(expected, false);
+    if sort_walk_is_inert(metas, &expected, &metas.zonk_term_with(actual, false)) {
+        return;
+    }
     let expected = whnf(env, ctx, &expected);
     let actual = whnf(env, ctx, actual);
     match (&expected, &actual) {
@@ -12296,6 +12299,22 @@ fn unify_sorts_walk(
         }
         _ => unify_types(metas, &expected, &actual),
     }
+}
+
+/// The walk can only solve an open level meta (`unify_levels`), and whnf adds
+/// no level variable: admitted globals are level-closed (`check_level_closure`)
+/// and delta substitutes the head's own level arguments. Identical sides, or
+/// sides with no open level meta, are therefore skipped before any reduction.
+fn sort_walk_is_inert(metas: &MetaCtx, expected: &Term, actual: &Term) -> bool {
+    if expected == actual {
+        return true;
+    }
+    let mut vars = Vec::new();
+    collect_level_vars(expected, &mut vars);
+    collect_level_vars(actual, &mut vars);
+    !vars
+        .into_iter()
+        .any(|m| metas.metas.get(m as usize).map_or(true, Option::is_none))
 }
 
 /// `Eq A a b` requires `a, b : A` (16 §2.1) and universes are non-cumulative
