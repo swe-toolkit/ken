@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-PRODUCER-AUTHENTICITY
-title: "CHILD 1 of 3 of RT-BRACKET-CONTROL-REGION-IR. The checked bracket producer and its AUTHENTICITY boundary. Capture the exact canonical template-call occurrence through checked lowering and wrap THAT occurrence; the compiler marker must be NON-RESOLVABLE FROM SOURCE; and the PRODUCER marks the acquire, final-settlement, outcome-merge and resume roles ITSELF, before inlining (the body-to-settlement edge replacing the former acquired-body mark is defined only after RT-BRACKET-SOURCE-EDGE D0; full rewrite required before restart). Two shapes are REJECTED ON MEASUREMENT and must not be retried: ordinary prelude `proc` declarations as markers, because a Ken program can name `private_checked_resource_bracket_*` and the claimed compiler-private authority is therefore FORGEABLE (AC-4 unmet); and locating ports by scanning the expanded Runtime expression for an acquisition `HostOpV1` plus every `ResourceRelease`, because a LAWFUL PUBLIC EARLY RELEASE inside the bracket body adds a release and makes the finalizer port AMBIGUOUS. `HostOpV1` may VALIDATE already-marked ports; it may never DISCOVER which expression becomes a region. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
+title: "CHILD 1 of 3 of RT-BRACKET-CONTROL-REGION-IR, by route C (operator 2026-10-18). The checked bracket producer and its AUTHENTICITY boundary: the canonical producer releases through a confined finalizer constructor, PrivateBracketRelease, that source cannot name, and each bracket region is extracted from the normalized plane before erasure as that constructor plus the Ok binder of its own acquire. Two shapes are REJECTED ON MEASUREMENT and must not be retried: ordinary prelude proc declarations as markers (forgeable), and locating ports by scanning for an acquisition HostOpV1 plus every ResourceRelease (a lawful public early release makes the finalizer ambiguous). HostOpV1 may VALIDATE already-extracted ports; it may never DISCOVER them. THIS CHILD DOES NOT LAND ALONE: it is a held, reviewed input assembled by child 3."
 status: active
 owner: runtime
 size: M
@@ -12,12 +12,11 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r, which ruled RT-BRACKET-CONTROL-REGION-IR MIS-SIZED and directed a retained-work recut into three ordered children. The Steward owns the recut; the mis-sizing was the Steward's, not the ring's. The producer-authenticity boundary alone needs a finished design, controls and review before the planner or lowerer can safely depend on it. Retained work is preserved at evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee on wp/RT-BRACKET-CONTROL-REGION-IR, parented on pre-registration commit c22f4861d which stays unchanged. That checkpoint is EVIDENCE AND REUSABLE WORK, NEVER A CANDIDATE."
 ---
 
-> **STARTABLE FOR ITS D0 ONLY (Architect `evt_2xjrx0gd29z3g`, on
-> `f555f4a37`).** The build is not startable. After the D0, outcome (a)
-> has the Steward rewrite section 3's body-to-settlement edge on the
-> identity the D0 names, and the build then waits for the operator's cost
-> call on the umbrella program. Checkpoint `4b4c8565c` stays a held input:
-> never moved, rebased or landed.
+> **STARTABLE: route C authorized** (operator 2026-10-18: "concur with
+> rec on px8ta decision", on `evt_360c971y74gy6` and `evt_28p8pa97c35w4`:
+> the umbrella with child 1 by route C; children 2 and 3 sized after
+> child 1). Checkpoint `4b4c8565c` stays a held input: never moved,
+> rebased or landed.
 
 ## 0. D0: settlement instance identity (scratch, lands nothing)
 
@@ -73,9 +72,9 @@ private release per instance (2/3/1/1 in the four bodies), each tied to
 its own acquire's Ok binder. A public early release stays separate,
 source cannot name the constructor, and the regions extract before
 erasure. Estimated at about 177 lines over 7 paths, with no kernel or
-`trusted_base()` change. Child 1 by route C waits on the operator's
-umbrella authorization (`evt_360c971y74gy6`, `evt_28p8pa97c35w4`); §3,
-§6 and AC-5 are rewritten for C on a yes.
+`trusted_base()` change. The operator authorized route C on
+2026-10-18; §3, §6 and AC-5 below are rewritten for it, and AC-9 adds the
+multi-leaf population D0-4 did not have.
 
 **Prohibitions:** no lookup widening or added declaration lane for the
 depth-3 claim; no order or shape guess and no `HostOpV1` port discovery;
@@ -108,23 +107,24 @@ the px8ta chain is 0.
    `ResourceRelease` breaks on a LAWFUL PUBLIC EARLY RELEASE inside the bracket
    body: the extra release makes the finalizer port ambiguous.
 
-## 3. Deliverable
+## 3. Deliverable (route C, Architect `evt_14r9629fb5mzp`)
 
-- **Exact occurrence capture.** Preserve the exact canonical template-call
-  occurrence through checked lowering and wrap the result of THAT occurrence.
-  If normalization would erase the call, record its exact checked occurrence
-  path in the compiler-owned plan BEFORE normalization and consume that path
-  exactly once during erasure.
-- **A compiler-only marker identity, not resolvable from source.** Injected
-  after source elaboration, or carried in a checked compiler side plane. Not a
-  public declaration.
-- **Producer-marked roles.** The producer marks acquire, final settlement,
-  outcome merge and resume ITSELF, before inlining. `HostOpV1` may validate
-  those marked ports afterward; it may never discover them. The former
-  `acquired body` mark is withdrawn (2026-09-24): its successor, the
-  body-to-settlement edge, is defined only after `RT-BRACKET-SOURCE-EDGE` D0,
-  and this child's deliverable and ACs must be rewritten before any restart.
-  Held child-1 evidence is preserved.
+- **A confined finalizer constructor.** The canonical `withResource`
+  producer's final settlement releases through `PrivateBracketRelease`, a
+  constructor that source cannot name (D0-4: bare and qualified spellings
+  refuse for Decl and File entry). A public early `release` stays the
+  ordinary public constructor. Both checked IDs map to the existing
+  `HostOpV1::ResourceRelease`.
+- **Regions extracted on the normalized plane, before erasure.** A
+  collector runs on the `ken_kernel::normalize` output. Each region is
+  one `PrivateBracketRelease` occurrence group keyed by its operand, the
+  `Resource` binder of its own `Ok` arm, whose scrutinee is its own
+  acquire Vis's continuation binder. No source-occurrence map is needed,
+  and none is built.
+- **Group by `Ok` binder, never by count.** Normalization copies the
+  finalizer once per Ret leaf of the body, so one region can own N
+  finalizer instances under one binder. That group is the outcome-merge
+  role.
 - **Reference evaluation unwraps `body` unchanged.**
 
 ## 4. Acceptance criteria
@@ -179,9 +179,13 @@ the px8ta chain is 0.
     argued.** AC-8 runs the byte-identical sweep over a two-producer program
     and reads 2, so the instrument does distinguish 1 from 2. What is
     unconstructible is a FALSE 2 on the AC-4 fixture.
-- **AC-5.** No port is selected by `HostOpV1`, name, expression resemblance, or
-  a `ResourceRelease` search. Validation by `HostOpV1` is permitted and must be
-  shown to be validation, not selection.
+- **AC-5.** Regions come only from the confined constructor and its `Ok`
+  binder on the normalized plane. No port is selected by `HostOpV1`, name,
+  expression resemblance, or a `ResourceRelease` search. Validation by
+  `HostOpV1` is permitted and must be shown to be validation, not
+  selection: a mutation that maps `PrivateBracketRelease` to a different
+  host op is refused at validation, and one that drops the constructor
+  from extraction yields no region.
 - **AC-6.** Reference evaluation unwraps `body` unchanged, shown by a control
   that would fail if it did not.
 - **AC-7.** The marker is metadata: no runtime value, no public Ken syntax, no
@@ -190,6 +194,12 @@ the px8ta chain is 0.
   distinct occurrences, each settling exactly once. This is what defeats the
   refuted section 2 selector. It is a SEPARATE claim from AC-4 and does not
   discharge it.
+- **AC-9 (multi-leaf body, D0-4's unmeasured population).** A bracket
+  body with more than one Ret leaf, such as a `match`, yields one region
+  whose finalizer instances (one per leaf) share one `Ok` binder. A
+  control with two nested brackets and a multi-leaf inner body yields
+  exactly two regions. Paired failing configuration: grouping by
+  occurrence instead of by binder yields one region per leaf.
 
 ## 5. Stop condition
 
@@ -203,10 +213,14 @@ then the operator.
 
 ## 6. Scope
 
-Checked erasure and prelude production, the compiler-owned occurrence plan,
-`ir.rs` for the wrapper, and the reference evaluator unwrap. **No new carrier,
-return protocol, KRET lane, host operation, dispatcher reorder, trace sort or
-fallback.**
+The prelude producer and its confined constructor, the driver op map
+(both IDs to the existing `ResourceRelease`), the normalized-plane
+collector, the interpreter op ids, the reference evaluator unwrap, and the
+test rosters. Measured enabler about 177 lines over 7 paths. **No new
+host operation or ABI field, and no kernel, `trusted_base()`, carrier,
+return protocol, KRET lane, dispatcher reorder, trace sort or fallback.**
+px8ta stays `#[ignore]`d: its depth-2 order and depth-3 refusal belong to
+children 2 and 3.
 
 ## 7. Symptom inventory
 
