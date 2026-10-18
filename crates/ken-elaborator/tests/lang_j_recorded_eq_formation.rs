@@ -172,6 +172,42 @@ fn j_nat_carrier_control_stays_checked() {
 }
 
 #[test]
+fn nested_j_consumes_constructor_injectivity_reduct_at_field_carrier() {
+    // MEASURED: the checked body has two J terms and no new trust.
+    // CLAIMED: an Eq(Option Nat) between matching Some constructors is read
+    // at its whnf Eq(Nat) endpoints, not its original Option formation.
+    // THE GAP: a successful Pi-carrier J alone cannot distinguish this order;
+    // restoring recorded-first must reject this same nested source.
+    let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base();
+    let result = env
+        .elaborate_decl_v1(
+            "theorem j_option_injective (x y a b : Nat) \
+         (hxy : Equal Nat x y) \
+         (h : Equal (Option Nat) (Some Nat a) (Some Nat b)) \
+         : Equal Nat b a = \
+         J (\\b' _. Equal Nat b' a) Refl \
+           (J (\\x' _. Equal (Option Nat) (Some Nat a) (Some Nat b)) h hxy)",
+        )
+        .expect("nested J must consume the field-carrier equality");
+    assert!(result.obligations.is_empty(), "unexpected proof holes");
+    let (_, body) = env
+        .env
+        .transparent_body(result.def_id)
+        .expect("checked body");
+    let mut pending = vec![&body];
+    let mut count = 0;
+    while let Some(node) = pending.pop() {
+        if matches!(node, Term::J(..)) {
+            count += 1;
+        }
+        pending.extend(node.children());
+    }
+    assert_eq!(count, 2, "the checked nested J route must be reached");
+    assert_eq!(env.env.trusted_base(), before, "no new trust");
+}
+
+#[test]
 fn non_equality_witness_is_still_refused_without_trust() {
     let mut env = ElabEnv::new().expect("prelude");
     let before = env.env.trusted_base();

@@ -13114,24 +13114,23 @@ fn infer_j(
     eq_expr: &RExpr,
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
-    // eq : Eq A a b — prefer its recorded formation: observational whnf
-    // reduces Eq at Pi/Sigma carriers away from Eq. Zonk before either read:
-    // a bare surface `(a:Type)` may still carry an unresolved universe meta.
+    // Base route first: when observational whnf yields an Eq, its endpoints
+    // are what an existing motive consumes (including constructor-injectivity
+    // reducts). Only where that route refuses a Pi/Sigma equality do we read
+    // the recorded formation. Zonk before either read to resolve open levels.
     let (eq_core, eq_ty) = infer(cx, eq_expr)?;
     let eq_ty = cx.metas.zonk_term(&eq_ty);
-    let recorded_endpoints = recorded_eq_endpoints(cx.env, &eq_ty);
-    let (a_ty, a, b) = if let Some((at, x, y)) = &recorded_endpoints {
-        (at.clone(), x.clone(), y.clone())
-    } else {
-        match whnf(cx.env, &cx.ctx, &eq_ty) {
-            Term::Eq(at, x, y) => (*at, *x, *y),
-            _ => {
+    let (a_ty, a, b, from_recording) = match whnf(cx.env, &cx.ctx, &eq_ty) {
+        Term::Eq(at, x, y) => (*at, *x, *y, false),
+        _ => match recorded_eq_endpoints(cx.env, &eq_ty) {
+            Some((at, x, y)) => (at, x, y, true),
+            None => {
                 return Err(ElabError::TypeMismatch {
                     span: span.clone(),
                     reason: "J's third argument must have an `Eq` type".into(),
                 })
             }
-        }
+        },
     };
 
     let motive_body_expr = match motive_expr {
@@ -13180,7 +13179,7 @@ fn infer_j(
     // Reify the recorded Eq head: the inferred type may be a β-redex whose
     // function is a bare lambda, which the kernel cannot infer when checking
     // an ascription. It checks this Eq formation against the evidence's type.
-    let eq_recorded = if recorded_endpoints.is_some() && matches!(eq_core, Term::Ascript(..)) {
+    let eq_recorded = if from_recording && matches!(eq_core, Term::Ascript(..)) {
         eq_core
     } else {
         Term::Ascript(
