@@ -2068,8 +2068,11 @@ pub fn checked_char_literal(env: &GlobalEnv, scalar: u32) -> KernelResult<Term> 
         Box::new(Term::IntLit((c as u32).into())),
         Box::new(Term::const_(env.tt_id(), vec![])),
     );
-    check(env, &Context::new(), &term, &Term::const_(char_type, vec![]))?;
-    Ok(term)
+    let char_ty = Term::const_(char_type, vec![]);
+    check(env, &Context::new(), &term, &char_ty)?;
+    // A checked pair is an introduction form: an outer application (notably
+    // Cons Char in the String view) must be able to infer its argument type.
+    Ok(Term::Ascript(Box::new(term), Box::new(char_ty)))
 }
 
 /// `declare_deceq_certificate` — register a decidable-equality certificate

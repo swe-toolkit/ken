@@ -5,7 +5,7 @@
 //! coverage controls pin the fail-closed and open-column boundaries.
 
 use ken_elaborator::{error::ElabError, ArmDeadCause, ElabEnv, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 fn elaborate(env: &mut ElabEnv, source: &str) -> GlobalId {
@@ -43,7 +43,11 @@ fn store_for(env: &ElabEnv) -> EvalStore {
 }
 
 fn eval_value(env: &ElabEnv, id: GlobalId) -> EvalVal {
-    eval(&[], body(env, id), &env.env, &mut store_for(env))
+    let Some(Decl::Transparent { body, ty, .. }) = env.env.lookup(id) else {
+        panic!("expected admitted checked declaration: {id:?}")
+    };
+    eval_checked(body, ty, &env.env, &mut store_for(env))
+        .expect("typed interpreter must erase the checked result and its arguments")
 }
 
 fn eval_nat(env: &ElabEnv, id: GlobalId) -> usize {

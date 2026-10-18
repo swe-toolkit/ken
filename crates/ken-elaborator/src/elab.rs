@@ -14465,6 +14465,14 @@ fn coerce_refinement(
         let typed = Term::Ascript(Box::new(core), Box::new(source));
         return coerce_refinement(cx, Term::proj1(typed), &carrier, &target, span);
     }
+    // A let binder is an independent variable in the elaborator's local
+    // context, but the kernel checks its body after substituting the RHS.
+    // Neither side is a subset here: defer this ordinary conversion to that
+    // final kernel check rather than reject convertible-by-let proof goals.
+    // An actually mismatched body is still rejected by the kernel's Let rule.
+    if cx.path_conditions.iter().any(|frame| matches!(frame.kind, SplitKind::Let)) {
+        return Ok(core);
+    }
     Err(ElabError::TypeMismatch {
         span: span.clone(), reason: "source and target types do not convert".into(),
     })
