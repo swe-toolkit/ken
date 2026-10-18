@@ -12,16 +12,16 @@ this seed.
 
 ## Closed fixtures
 
-The acyclic graph has only the edge `True → False`; the public dependency
-operation supplies the positive order control. The two-cycle has both opposite
-edges, and the self-loop has one real loop edge.
+The acyclic graph has only the edge `True → False`; `forward_order` is an
+explicit checked order control. The two-cycle has both opposite edges, and the
+self-loop has one real loop edge.
 
 ```ken
 import Core.Classes.LawfulClasses (DecEq, DecEq_instance_Bool)
 import Data.Finite.Finite (bool_finite)
 import Algorithm.Graphs.Dependency
   (Graph, MkGraph, Cycle, MkCycle, WalkHere, WalkStep, TopoOrder,
-   OrderOrCycle, dependency_order_or_cycle, ordered_vertices,
+   MkTopoOrder, OrderOrCycle, dependency_order_or_cycle, ordered_vertices,
    before, before_irreflexive, before_transitive, cycle_refutes_order)
 
 data Vertex3 : Type where {
@@ -110,6 +110,16 @@ const forward : Graph Bool = MkGraph Bool
 const forward_result : OrderOrCycle Bool DecEq_instance_Bool forward =
   dependency_order_or_cycle Bool bool_finite DecEq_instance_Bool forward
 
+const forward_order : TopoOrder Bool DecEq_instance_Bool forward =
+  MkTopoOrder Bool DecEq_instance_Bool forward
+    (Cons Bool True (Cons Bool False (Nil Bool)))
+    Proved
+    (λx. match x { True ↦ Proved; False ↦ Proved })
+    (λx. λy. match x {
+      True ↦ match y { True ↦ λe. absurd e; False ↦ λe. Proved };
+      False ↦ match y { True ↦ λe. absurd e; False ↦ λe. absurd e }
+    })
+
 const two_cycle : Graph Bool = MkGraph Bool
   (λu. λv. match u {
     True ↦ match v { True ↦ False; False ↦ True };
@@ -142,11 +152,6 @@ theorem self_loop_refutes_every_order :
   λorder.
     cycle_refutes_order
       Bool DecEq_instance_Bool self_loop order self_loop_witness
-
-const refuse_cycle_on_acyclic_graph : Cycle Bool forward =
-  MkCycle Bool forward False True Proved
-    (WalkStep Bool forward True True False Proved
-      (WalkHere Bool forward True))
 ```
 
 ### stdlib/graphs/before-irreflexive-closed-instance
@@ -199,16 +204,65 @@ const refuse_cycle_on_acyclic_graph : Cycle Bool forward =
 ### stdlib/graphs/acyclic-graph-has-a-checked-order
 
 - spec: `spec/50-stdlib/62-graphs.md` §1.3 and §2.
-- given: `forward`, with only the edge `True → False`, and
+- given: `forward`, `forward_order`, and
   `forward_result = dependency_order_or_cycle Bool bool_finite
   DecEq_instance_Bool forward`.
-- expect: `HasOrder order` with `[True, False]`; its public
-  uniqueness, coverage, and forward-edge fields check, including
-  `before True False = True`.
-- claimed: a positive acyclic control supplies a genuine order on
-  the same graph used by the forged-cycle refusal.
+- expect: the explicit `forward_order` on `[True, False]` checks its
+  uniqueness, coverage, and forward-edge fields, including
+  `before True False = True`; the operation result is expected to be
+  `HasOrder order` with the same list.
+- claimed: a positive acyclic control supplies a genuine checked order
+  on the same graph used by the refused constructions.
 - the gap: this two-vertex control does not decide order for every
   acyclic graph.
+
+### stdlib/graphs/refuse-reversed-order-on-acyclic-graph
+
+- spec: `spec/50-stdlib/62-graphs.md` §1.3 and §2.
+- given: the `forward` graph and the same `MkTopoOrder` fields as
+  `forward_order`, but with `[False, True]`.
+- expect: the block is refused at `all_edges_forward`: the actual
+  `True → False` edge is backward in the proposed list.
+- claimed: the order must respect every actual graph edge.
+- the gap: one reversed list does not establish refusal of every
+  invalid order.
+
+```ken
+const refuse_reversed_forward_order :
+  TopoOrder Bool DecEq_instance_Bool forward =
+  MkTopoOrder Bool DecEq_instance_Bool forward
+    (Cons Bool False (Cons Bool True (Nil Bool)))
+    Proved
+    (λx. match x { True ↦ Proved; False ↦ Proved })
+    (λx. λy. match x {
+      True ↦ match y { True ↦ λe. absurd e; False ↦ λe. Proved };
+      False ↦ match y { True ↦ λe. absurd e; False ↦ λe. absurd e }
+    })
+```
+
+### stdlib/graphs/refuse-order-on-two-cycle
+
+- spec: `spec/50-stdlib/62-graphs.md` §2.
+- given: the `two_cycle` graph and the same `MkTopoOrder` fields as
+  `forward_order`.
+- expect: the block is refused at `all_edges_forward`: the actual
+  `False → True` edge is backward in `[True, False]`.
+- claimed: a checked order cannot coexist with the closed two-cycle.
+- the gap: this one candidate order does not establish the generic
+  cycle-refutes-order theorem.
+
+```ken
+const refuse_order_on_two_cycle :
+  TopoOrder Bool DecEq_instance_Bool two_cycle =
+  MkTopoOrder Bool DecEq_instance_Bool two_cycle
+    (Cons Bool True (Cons Bool False (Nil Bool)))
+    Proved
+    (λx. match x { True ↦ Proved; False ↦ Proved })
+    (λx. λy. match x {
+      True ↦ match y { True ↦ λe. absurd e; False ↦ λe. Proved };
+      False ↦ match y { True ↦ λe. absurd e; False ↦ λe. absurd e }
+    })
+```
 
 ### stdlib/graphs/refuse-cycle-with-an-absent-edge
 
@@ -216,19 +270,27 @@ const refuse_cycle_on_acyclic_graph : Cycle Bool forward =
 - given: the acyclic `forward` graph and a proposed `Cycle` whose
   first edge is `False → True`, absent from `forward`; its return
   walk uses the actual `True → False` edge.
-- expect: the block is refused at the first-edge proof: the graph
-  computes `edge forward False True` as `False`, so `Proved` cannot
-  inhabit `Equal Bool False True`. The separate positive control
-  expects an order for this same acyclic graph.
+- expect: when appended alone to the positive client, the block is
+  refused at the first-edge proof: `edge forward False True` computes
+  to `False`, so `Proved` cannot inhabit `Equal Bool False True`.
 - claimed: `Cycle` cannot be forged from a walk and a proof of an
   edge the graph does not supply.
 - the gap: this single absent-edge block does not establish refusal
   for every invalid cycle construction.
 
+```ken
+const refuse_cycle_on_acyclic_graph : Cycle Bool forward =
+  MkCycle Bool forward False True Proved
+    (WalkStep Bool forward True True False Proved
+      (WalkHere Bool forward True))
+```
+
 Architect's AC-0 results checked the three generic law forms and
 rejected the reported false-law mutations on scratch. CV separately
-checked the positive source block as a temporary catalog client with
-an existing `ken` binary: rc 0. Adding the refused declaration returned
-rc 1, `K0004`. These scratch clients do not execute this shipped seed or
-establish catalog delivery. No Cargo test, CI result, publication,
-landing, or post-publication `trusted_base()` measurement is claimed.
+checked the positive fixture fence as a temporary catalog client with
+an existing `ken` binary: rc 0. Appending each refused block alone to
+that positive client returned rc 1, `K0004`: the reversed order, the
+order on `two_cycle`, and the absent-edge `Cycle`. These scratch clients
+do not execute this shipped seed or establish catalog delivery. No
+Cargo test, CI result, publication, landing, or post-publication
+`trusted_base()` measurement is claimed.
