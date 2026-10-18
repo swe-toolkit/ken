@@ -1,7 +1,7 @@
 ---
 id: LANG-J-RECORDED-EQ-FORMATION
 title: "Surface J refuses evidence whose Eq carrier is a Pi or Sigma type, with J's third argument must have an Eq type: infer_j whnf's the evidence type before matching Term::Eq, and observational whnf reduces Eq at a Pi carrier away. Read the endpoints from the recorded Eq formation first, and ascribe the evidence so the kernel reads the same recording"
-status: active
+status: merged
 owner: language
 size: S
 tier: T2
