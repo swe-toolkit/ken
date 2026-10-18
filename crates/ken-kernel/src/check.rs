@@ -1925,25 +1925,26 @@ pub fn register_checked_string_carrier(env: &mut GlobalEnv, id: GlobalId) -> Ker
     Ok(())
 }
 
-/// Char's current core carrier is a checked transparent alias convertible to
-/// Int. The source refinement predicate is erased at this boundary; each
-/// literal payload is independently validated as a Unicode scalar below.
+/// The checked Char carrier is a subset Σ over Int, not Int itself. Its
+/// second component is an Ω proposition, whose closed witness is checked for
+/// every scalar at literal admission; the registration never trusts a bare
+/// integer as a value of Char.
 pub fn register_checked_char_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
     let int_type = env
         .int_lit_type()
         .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
+    let char_ty = Term::const_(id, vec![]);
+    let Term::Sigma(carrier, predicate) = whnf(env, &Context::new(), &char_ty) else {
+        return Err(KernelError::Msg("Char literal carrier must be a subset Sigma".into()));
+    };
+    let mut ctx = Context::new();
+    ctx.push((*carrier).clone());
     if env.checked_char_type().is_some()
         || !matches!(env.lookup(id), Some(Decl::Transparent { .. }))
-        || !convert_type(
-            env,
-            &Context::new(),
-            &Term::const_(id, vec![]),
-            &Term::const_(int_type, vec![]),
-        )
+        || !convert_type(env, &Context::new(), &carrier, &Term::const_(int_type, vec![]))
+        || !matches!(classify(env, &ctx, &predicate), Ok(Sort::Omega(_)))
     {
-        return Err(KernelError::Msg(
-            "invalid or duplicate Char literal carrier".into(),
-        ));
+        return Err(KernelError::Msg("invalid or duplicate Char literal carrier".into()));
     }
     env.install_checked_char_carrier(id);
     Ok(())
@@ -1980,23 +1981,19 @@ pub fn register_literal_char_view(
             "literal String carrier must be an opaque primitive type".into(),
         ));
     }
-    let int_type = env
-        .int_lit_type()
-        .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
     let char_ty = Term::const_(char_type, vec![]);
-    // Char's checked core alias converts to Int; scalar validity is separately
-    // enforced at every checked literal admission (Rust `char::from_u32`).
+    let Term::Sigma(carrier, predicate) = whnf(env, &Context::new(), &char_ty) else {
+        return Err(KernelError::Msg("literal Char carrier must be a subset Sigma".into()));
+    };
+    let int_type = env.int_lit_type()
+        .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
+    let mut ctx = Context::new();
+    ctx.push((*carrier).clone());
     if !matches!(env.lookup(char_type), Some(Decl::Transparent { .. }))
-        || !convert_type(
-            env,
-            &Context::new(),
-            &char_ty,
-            &Term::const_(int_type, vec![]),
-        )
+        || !convert_type(env, &Context::new(), &carrier, &Term::const_(int_type, vec![]))
+        || !matches!(classify(env, &ctx, &predicate), Ok(Sort::Omega(_)))
     {
-        return Err(KernelError::Msg(
-            "literal Char carrier must be a checked Int-compatible alias".into(),
-        ));
+        return Err(KernelError::Msg("literal Char carrier must be a checked subset Sigma".into()));
     }
     let list_ty = Term::app(Term::indformer(list_type, vec![]), char_ty.clone());
     let expected_op = Term::pi(Term::const_(string_type, vec![]), list_ty.clone());
@@ -2019,9 +2016,19 @@ pub fn register_literal_char_view(
     let nil_term = Term::app(Term::constructor(nil, vec![]), char_ty.clone());
     let sample = apply_args(
         Term::constructor(cons, vec![]),
-        &[char_ty, Term::IntLit(65u32.into()), nil_term],
+        &[char_ty, checked_char_literal(env, 65)?, nil_term],
     );
     check(env, &Context::new(), &sample, &list_ty)?;
+    // Registration may follow earlier checked String literals. Check their
+    // prospective view elements now; later literals are checked at admission.
+    // No view is installed if any element fails its exact subset predicate.
+    for number in 0..env.next_global_id().0 {
+        if let Some(literal) = env.checked_literal(GlobalId(number)) {
+            for scalar in literal.as_str().chars() {
+                checked_char_literal(env, scalar as u32)?;
+            }
+        }
+    }
     env.install_literal_char_view(char_type, operation, nil, cons);
     Ok(())
 }
@@ -2034,28 +2041,34 @@ pub fn declare_checked_string_literal(env: &mut GlobalEnv, raw: &str) -> KernelR
         .ok_or_else(|| KernelError::Msg("literal String carrier is not registered".into()))?;
     let ty = Term::const_(ty_id, vec![]);
     let normalized: String = raw.nfc().collect();
+    // Every element the literal view may expose must be checked at Char
+    // before this String literal enters the environment. WHNF is not a
+    // certificate verifier; checking here prevents the view from forging a
+    // proof of a false Char predicate.
+    if env.has_literal_char_view() {
+        for scalar in normalized.chars() {
+            checked_char_literal(env, scalar as u32)?;
+        }
+    }
     let id = declare_primitive(env, vec![], ty, PrimReduction::Literal)?;
     env.install_checked_literal(id, CheckedStringLiteral(normalized));
     Ok(id)
 }
 
-/// A surface Char literal is an IntLit in the current core, but only a valid
-/// Unicode scalar at the checked, Int-compatible Char carrier may be emitted.
-/// The value lives in the Term itself, so derived `charToInt := λc.c` and
-/// direct use share one normal form without an extra reduction rule.
+/// A valid Unicode scalar inhabits Char only as a checked subset pair. The
+/// closed `tt` witness is checked at the exact scalar's predicate, rather than
+/// granting an unchecked proof to any integer payload.
 pub fn checked_char_literal(env: &GlobalEnv, scalar: u32) -> KernelResult<Term> {
     let c = char::from_u32(scalar)
         .ok_or_else(|| KernelError::Msg(format!("invalid Unicode scalar U+{scalar:X}")))?;
     let char_type = env
         .checked_char_type()
         .ok_or_else(|| KernelError::Msg("literal Char carrier is not registered".into()))?;
-    let term = Term::IntLit((c as u32).into());
-    check(
-        env,
-        &Context::new(),
-        &term,
-        &Term::const_(char_type, vec![]),
-    )?;
+    let term = Term::Pair(
+        Box::new(Term::IntLit((c as u32).into())),
+        Box::new(Term::const_(env.tt_id(), vec![])),
+    );
+    check(env, &Context::new(), &term, &Term::const_(char_type, vec![]))?;
     Ok(term)
 }
 

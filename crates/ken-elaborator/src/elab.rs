@@ -23,6 +23,12 @@ use ken_kernel::{
     Term,
 };
 
+#[path = "elab/refinement_snapshot.rs"]
+mod refinement_snapshot;
+#[cfg(test)]
+#[path = "elab/refinement_tests.rs"]
+mod refinement_tests;
+
 use crate::ast::{
     BinOp, DefKeyword, Fixity, FixityAssoc, LiteralPat, NumLit, RecursiveResultSelector,
 };
@@ -166,7 +172,7 @@ impl ElabResult {
 
 // ----- level meta context -----
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct MetaCtx {
     metas: Vec<Option<Level>>,
     defaulted: Cell<bool>,
@@ -828,6 +834,7 @@ enum MatchBinderOrigin {
 /// One checked arm's provenance, target and embedding into its enclosing
 /// telescope. An absent enclosing level means this binder is new to the arm;
 /// it is not permission to reconstruct identity from its type or position.
+#[derive(Clone)]
 struct MatchFrame {
     start_level: usize,
     sentinel_region: usize,
@@ -908,6 +915,20 @@ struct RecursiveSelf {
     psi: Term,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SplitKind { Let, If, Literal, Constructor, NonConvoyable }
+
+#[derive(Clone, Debug)]
+struct PathFrame {
+    condition: Term,
+    install_depth: usize,
+    split_id: u64,
+    kind: SplitKind,
+    /// Bottom-relative position of a checked equation binder, if this split
+    /// has already been retried with its convoy.
+    witness_position: Option<usize>,
+}
+
 struct ElabCtx<'e> {
     env: &'e mut GlobalEnv,
     /// Required semantic-owner label for every checking-mode `Axiom` minted
@@ -938,7 +959,10 @@ struct ElabCtx<'e> {
     refinement_slot: RefinementSlot,
     /// Logical branch equations for refinement obligations; never used as
     /// unchecked evidence in the emitted program.
-    path_conditions: Vec<(Term, usize)>,
+    path_conditions: Vec<PathFrame>,
+    next_split_id: u64,
+    active_splits: Vec<u64>,
+    convoy_splits: HashSet<u64>,
     /// One-shot result-position channel. Never visible to a subterm check.
     result_predicates: Vec<ResultPredicate>,
     /// The typeclass registry, when available — needed only for `.field`
@@ -1060,6 +1084,19 @@ enum SurfaceBindingTarget {
 }
 
 impl<'e> ElabCtx<'e> {
+    fn mint_split(&mut self) -> u64 {
+        let id = self.next_split_id;
+        self.next_split_id += 1;
+        id
+    }
+
+    fn push_path(&mut self, condition: Term, install_depth: usize, kind: SplitKind) {
+        let split_id = self.active_splits.last().copied().unwrap_or_else(|| self.mint_split());
+        self.path_conditions.push(PathFrame {
+            condition, install_depth, split_id, kind, witness_position: None,
+        });
+    }
+
     fn fresh_aux_sentinel_region(&mut self) -> Result<usize, ElabError> {
         // Method/arm regions are stack-depth keyed for existing motive replay;
         // auxiliary source-field premises live in a disjoint checked namespace.
@@ -1178,6 +1215,9 @@ impl<'e> ElabCtx<'e> {
             type_introductions: true,
             refinement_slot: RefinementSlot::None,
             path_conditions: Vec::new(),
+            next_split_id: 0,
+            active_splits: Vec::new(),
+            convoy_splits: HashSet::new(),
             result_predicates: Vec::new(),
             class_env: None,
             standard_operators: None,
@@ -1364,6 +1404,7 @@ fn or_binder_type_error(mismatch: OrBinderTypeMismatch) -> ElabError {
     }
 }
 
+#[derive(Clone)]
 struct PatternAliasTypeFrame {
     aliases: HashMap<(usize, usize), MatrixAliasType>,
     /// Only slots originating inside `RPatKind::Or` require cross-alternative
@@ -1730,16 +1771,14 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             Ok(Term::sigma(a_core, b_core))
         }
 
-        // Refinement lowers to the carrier type (`21 §6.3`): `{x:A|φ}` → `A`.
-        // The predicate φ is tracked separately; obligation emitted at introduction.
-        RType::RRefine(_, carrier, _phi, span) => match slot {
-            RefinementSlot::Outermost | RefinementSlot::Signature { result: true } => {
-                elab_type(cx, carrier)
-            }
-            _ => Err(ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: "a refinement nested inside a type is not supported yet: only a binder's, field's or result's own annotation may be refined".into(),
-            }),
+        // Refinements are genuine subset Σ types. The predicate is checked at
+        // Ω under the carrier binder, irrespective of its nesting position.
+        RType::RRefine(_, carrier, phi, _) => {
+            let carrier = elab_type(cx, carrier)?;
+            cx.ctx.push(carrier.clone());
+            let predicate = elab_prop_at_omega(cx, phi, phi.span());
+            cx.ctx.pop();
+            Ok(Term::sigma(carrier, predicate?))
         },
 
         // `‖A‖` — propositional truncation formation in annotation position
@@ -1971,7 +2010,7 @@ fn check_let(
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
     let path_base = cx.path_conditions.len();
     if let Some(equation) = equation {
-        cx.path_conditions.push((equation, cx.ctx.len()));
+        cx.push_path(equation, cx.ctx.len(), SplitKind::Let);
     }
     let body_result = check_result_position(cx, body, &weaken(expected, 1), span, result_predicates);
     cx.path_conditions.truncate(path_base);
@@ -2077,17 +2116,17 @@ fn check_if(
     let condition_core = elaborate_if_condition(cx, condition)?;
     let base = cx.path_conditions.len();
     let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
-    cx.path_conditions.push((Term::Eq(
+    cx.push_path(Term::Eq(
         Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
         Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
-    ), cx.ctx.len()));
+    ), cx.ctx.len(), SplitKind::If);
     let then_result = check_result_position(cx, then_branch, expected, then_branch.span(), result_predicates);
     cx.path_conditions.truncate(base);
     let then_core = then_result?;
-    cx.path_conditions.push((Term::Eq(
+    cx.push_path(Term::Eq(
         Box::new(bool_ty), Box::new(condition_core.clone()),
         Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
-    ), cx.ctx.len()));
+    ), cx.ctx.len(), SplitKind::If);
     let else_result = check_result_position(cx, else_branch, expected, else_branch.span(), result_predicates);
     cx.path_conditions.truncate(base);
     let else_core = else_result?;
@@ -2104,17 +2143,17 @@ fn infer_if(
     let condition_core = elaborate_if_condition(cx, condition)?;
     let base = cx.path_conditions.len();
     let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
-    cx.path_conditions.push((Term::Eq(
+    cx.push_path(Term::Eq(
         Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
         Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
-    ), cx.ctx.len()));
+    ), cx.ctx.len(), SplitKind::If);
     let then_result = infer(cx, then_branch);
     cx.path_conditions.truncate(base);
     let (then_core, result_ty) = then_result?;
-    cx.path_conditions.push((Term::Eq(
+    cx.push_path(Term::Eq(
         Box::new(bool_ty), Box::new(condition_core.clone()),
         Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
-    ), cx.ctx.len()));
+    ), cx.ctx.len(), SplitKind::If);
     let else_result = check(cx, else_branch, &result_ty, else_branch.span());
     cx.path_conditions.truncate(base);
     let else_core = else_result?;
@@ -2493,8 +2532,11 @@ fn check_refined_number_literal(
     expected: &Term,
     span: &Span,
 ) -> Result<Term, ElabError> {
-    let core = elab_num_lit_checked(cx, literal, expected, span)?;
-    let inferred = Term::const_(cx.numeric_env.int_id, vec![]);
+    let carrier = subset_refinement(cx, expected).map_or_else(|| expected.clone(), |(ty, _)| ty);
+    let core = elab_num_lit_checked(cx, literal, &carrier, span)?;
+    let inferred = kernel_infer_raw(cx.env, &cx.ctx, &core).map_err(|error| {
+        ElabError::KernelRejected { error, span: span.clone() }
+    })?;
     emit_refinement_introduction(cx, expected, &inferred, core, span, None)
 }
 
@@ -2505,7 +2547,8 @@ fn check_refined_string_literal(
     expected: &Term,
     span: &Span,
 ) -> Result<Term, ElabError> {
-    let (core, inferred) = elab_str_lit(cx, literal, Some(expected), span)?;
+    let carrier = subset_refinement(cx, expected).map_or_else(|| expected.clone(), |(ty, _)| ty);
+    let (core, inferred) = elab_str_lit(cx, literal, Some(&carrier), span)?;
     emit_refinement_introduction(cx, expected, &inferred, core, span, None)
 }
 
@@ -7838,6 +7881,7 @@ fn finish_dependent_elim(
     embedded_method_convoy: &[EmbeddedConvoyCompanion],
     add_hidden_equation: bool,
     recursive_field_index_path: RecursiveFieldIndexPath,
+    branch_convoy: bool,
     expected: &Term,
     span: &Span,
 ) -> Result<Term, ElabError> {
@@ -7875,6 +7919,11 @@ fn finish_dependent_elim(
     }
     for index in convoy_entry_order(context_convoy, true) {
         elim = Term::app(elim, context_convoy[index].occurrence.clone());
+    }
+    if branch_convoy {
+        elim = Term::app(elim, Term::Refl(Box::new(Term::Ascript(
+            Box::new(scrut_core.clone()), Box::new(scrut_ty.clone()),
+        ))));
     }
     if add_hidden_equation {
         let hidden_equation = Term::Eq(
@@ -8772,6 +8821,7 @@ fn check_dependent_branch_body(
     convoy_refinements: &[(usize, Term, Term)],
     equation_convoy: bool,
     recursive_field_index_path: RecursiveFieldIndexPath,
+    branch_convoy: bool,
 ) -> Result<Term, ElabError> {
     let outer_scope_depth = cx.ctx.len() - n;
     let var_refinement_snapshot = cx.var_refinements.clone();
@@ -8779,7 +8829,15 @@ fn check_dependent_branch_body(
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
-    let path_base = push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n, 0);
+    let path_base = cx.path_conditions.len();
+    let branch_equation = Term::Eq(
+        Box::new(weaken(scrut_ty, n as i64)),
+        Box::new(weaken(scrut_core, n as i64)),
+        Box::new(concrete.clone()),
+    );
+    if !branch_convoy {
+        push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n, 0);
+    }
 
     let outcome = (|| {
         if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
@@ -8874,10 +8932,24 @@ fn check_dependent_branch_body(
                 });
         }
         let obligation_base = cx.obligations.len();
+        let checked_goal = if branch_convoy {
+            let position = cx.ctx.len();
+            cx.push_match_binder(branch_equation.clone(), MatchBinderOrigin::GeneratedEquation);
+            cx.hidden_positions.push(position);
+            let split_id = *cx.active_splits.last().expect("convoy has an owning split");
+            cx.path_conditions.push(PathFrame {
+                condition: weaken(&branch_equation, 1),
+                install_depth: cx.ctx.len(),
+                split_id,
+                kind: SplitKind::Constructor,
+                witness_position: Some(position),
+            });
+            weaken(&expected_unrefined, 1)
+        } else { expected_unrefined.clone() };
         // The simplified goal retains every refinement root while exposing
         // ordinary heads needed by dependent matches and their index convoy.
-        let attempt = check_match_arm_result(cx, arm, &expected_unrefined, &arm.span).and_then(|checked| {
-            kernel_check_current(cx, &checked, &expected_unrefined)
+        let attempt = check_match_arm_result(cx, arm, &checked_goal, &arm.span).and_then(|checked| {
+            kernel_check_current(cx, &checked, &checked_goal)
                 .map(|()| checked)
                 .map_err(|error| match error {
                     CurrentKernelQueryError::View(error) => error,
@@ -8887,9 +8959,18 @@ fn check_dependent_branch_body(
                     },
                 })
         });
+        if branch_convoy {
+            cx.path_conditions.truncate(path_base);
+            let position = cx.ctx.len() - 1;
+            debug_assert_eq!(cx.hidden_positions.pop(), Some(position));
+            cx.ctx.pop();
+        }
         let checked = match attempt {
             Ok(checked) => checked,
-            Err(error) if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared => {
+            Err(error) if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
+                || branch_convoy
+                || matches!(&error, ElabError::RefinementSplitDemand { .. }
+                    | ElabError::NonConvoyableRefinementSplit { .. }) => {
                 cx.obligations.truncate(obligation_base);
                 return Err(error);
             }
@@ -8918,7 +8999,9 @@ fn check_dependent_branch_body(
     cx.active_index_refinements
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
-    outcome
+    outcome.map(|body| if branch_convoy {
+        Term::lam(branch_equation, body)
+    } else { body })
 }
 
 /// Field refinements for one dependent branch. An equation-convoy branch then
@@ -9098,7 +9181,7 @@ fn push_branch_path_condition(
     );
     // Matrix buckets install an equation before their method's field binders
     // are entered; the proposition already names those future binders.
-    cx.path_conditions.push((path_eq, cx.ctx.len() + future_fields));
+    cx.push_path(path_eq, cx.ctx.len() + future_fields, SplitKind::Constructor);
     path_base
 }
 
@@ -9344,6 +9427,37 @@ fn open_checked_constructor_arm_frame(
     cx.require_constructor_field_ownership(start_level, ctor.args.len())
 }
 
+/// A checked constructor split may convoy only when its method fields stay
+/// unsplit; a nested pattern is owned by the matrix compiler instead.
+fn row_leaves_fields_unsplit(pattern: &RPattern) -> bool {
+    match &pattern.kind {
+        RPatKind::Ctor(_, fields) | RPatKind::CheckedCtor(_, _, fields) => fields.iter()
+            .all(|field| matches!(field.kind, RPatKind::Var(_, _) | RPatKind::Wild)),
+        RPatKind::Wild | RPatKind::Var(_, _) => true,
+        RPatKind::As(inner, _, _) => row_leaves_fields_unsplit(inner),
+        RPatKind::Or(alternatives) => alternatives.iter().all(row_leaves_fields_unsplit),
+        RPatKind::Tuple(_) | RPatKind::Record(_) | RPatKind::Literal(_, _) => false,
+    }
+}
+
+/// Give each method a checked equation binder for its actual constructor,
+/// while preserving the original dependent motive behind that binder.
+fn subset_constructor_motive(motive: Term, scrut_ty: &Term, scrut_core: &Term) -> Term {
+    let Term::Ascript(_, motive_ty) = &motive else {
+        unreachable!("checked dependent motives are ascribed")
+    };
+    let equation = Term::Eq(
+        Box::new(weaken(scrut_ty, 1)),
+        Box::new(weaken(scrut_core, 1)),
+        Box::new(Term::var(0)),
+    );
+    let result = Term::app(weaken(&motive, 2), Term::var(1));
+    Term::Ascript(
+        Box::new(Term::lam(scrut_ty.clone(), Term::pi(equation, result))),
+        motive_ty.clone(),
+    )
+}
+
 /// Check `match scrut { C₁ p… => e₁ ; … }` against a KNOWN `expected` goal
 /// that may reference the scrutinee (a per-branch-varying `Ω`- or `Type`-
 /// motive) — the K4/AC4 dependent-elimination path. Only FLAT constructor
@@ -9351,6 +9465,33 @@ fn open_checked_constructor_arm_frame(
 /// narrower than `infer_match`'s general nested-pattern compiler.
 #[inline(never)]
 fn check_match_dependent(
+    cx: &mut ElabCtx,
+    scrut: &RExpr,
+    equation: Option<&str>,
+    arms: &[RMatchArm],
+    expected: &Term,
+    span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = check_match_dependent_once(cx, scrut, equation, arms, expected, span, predicates);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            check_match_dependent_once(cx, scrut, equation, arms, expected, span, predicates)
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[inline(never)]
+fn check_match_dependent_once(
     cx: &mut ElabCtx,
     scrut: &RExpr,
     equation: Option<&str>,
@@ -9485,7 +9626,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         span,
         &frame,
     )?;
-    let (motive, hidden_group_result_refinement) =
+    let (base_motive, hidden_group_result_refinement) =
         finish_checked_dependent_motive::<MAY_REFINE_GROUP_RESULT>(
             cx,
             &ind,
@@ -9501,6 +9642,22 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             span,
             &mut motive_plan,
         )?;
+    let branch_convoy = cx.active_splits.last()
+        .is_some_and(|id| cx.convoy_splits.contains(id));
+    if branch_convoy {
+        let permitted = equation.is_none() && ind.indices.is_empty()
+            && ind.constructors.iter().all(|ctor| {
+                recursive_shapes(cx.env, ctor, ind.id, ind.params.len())
+                    .is_ok_and(|shapes| shapes.is_empty())
+            }) && cx.path_conditions.iter().all(|frame| frame.install_depth <= cx.ctx.len())
+            && arms.iter().all(|arm| row_leaves_fields_unsplit(&arm.pat));
+        if !permitted {
+            return Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() });
+        }
+    }
+    let motive = if branch_convoy {
+        Box::new(subset_constructor_motive(*base_motive, &scrut_ty, &scrut_core))
+    } else { base_motive };
     let expected = &motive_plan.expected;
     let context_convoy = motive_plan.context_convoy.as_slice();
     let embedded_method_convoy = motive_plan.embedded_method_convoy.as_slice();
@@ -9686,6 +9843,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                     &convoy_refinements,
                     equation_convoy,
                     recursive_field_index_path,
+                    branch_convoy,
                 ))
             }
         } else {
@@ -9770,6 +9928,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         embedded_method_convoy,
         equation.is_some() || hidden_group_result_refinement,
         recursive_field_index_path,
+        branch_convoy,
         expected,
         span,
     )
@@ -12757,7 +12916,7 @@ fn infer_let(
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
     let path_base = cx.path_conditions.len();
     if let Some(equation) = equation {
-        cx.path_conditions.push((equation, cx.ctx.len()));
+        cx.push_path(equation, cx.ctx.len(), SplitKind::Let);
     }
     let body_result = infer(cx, body);
     cx.path_conditions.truncate(path_base);
@@ -14049,15 +14208,71 @@ fn absorb_obligations(dst: &mut Vec<Obligation>, src: Vec<Obligation>) {
 /// `Z xs : Ix Zero`. It is no proposition in the branch context, so it cannot
 /// be an obligation hypothesis. Dropping only such ill-typed indexed-family
 /// equations strengthens the goal; other path conditions remain unchanged.
-fn admissible_path_conditions(cx: &ElabCtx<'_>) -> Vec<Term> {
-    cx.path_conditions.iter().filter_map(|(condition, install_depth)| {
-        let growth = cx.ctx.len().checked_sub(*install_depth)
+fn admissible_path_frames(cx: &ElabCtx<'_>) -> Vec<PathFrame> {
+    cx.path_conditions.iter().filter_map(|frame| {
+        let growth = cx.ctx.len().checked_sub(frame.install_depth)
             .expect("path condition consumed before its field binders were entered");
-        let here = weaken(condition, growth as i64);
+        let here = weaken(&frame.condition, growth as i64);
         let heterogeneous = is_indexed_family_equation(cx.env, &here)
             && kernel_infer_raw(cx.env, &cx.ctx, &here).is_err();
-        (!heterogeneous).then_some(here)
+        (!heterogeneous).then(|| PathFrame {
+            condition: here,
+            install_depth: cx.ctx.len(),
+            ..frame.clone()
+        })
     }).collect()
+}
+
+fn admissible_path_conditions(cx: &ElabCtx<'_>) -> Vec<Term> {
+    admissible_path_frames(cx).into_iter().map(|frame| frame.condition).collect()
+}
+
+/// Peel the actual evidence, not the telescope of the obligation that would
+/// have been minted if evidence were absent. `lower_binders` inspects every
+/// term former through the kernel's complete shift; a closed proof therefore
+/// demands no path binder, while an open hole demands every admissible one.
+fn demanded_refinement_splits(
+    frames: &[PathFrame], evidence: Option<&Term>, ctx_depth: usize,
+) -> Vec<u64> {
+    let evidence = evidence.map(|term| {
+        let mut peeled = term;
+        while let Term::Ascript(inner, _) = peeled { peeled = inner; }
+        peeled
+    });
+    let mut demanded = Vec::new();
+    for frame in frames {
+        let used = match (evidence, frame.witness_position) {
+            (None, _) => true,
+            (Some(proof), Some(position)) if position < ctx_depth => {
+                lower_binders(proof, 1, ctx_depth - 1 - position).is_err()
+            }
+            (Some(_), _) => false,
+        };
+        if used && !demanded.contains(&frame.split_id) {
+            demanded.push(frame.split_id);
+        }
+    }
+    demanded
+}
+
+fn convoyable_frame(cx: &ElabCtx<'_>, frame: &PathFrame, span: &Span) -> Result<bool, ElabError> {
+    if frame.kind != SplitKind::Constructor {
+        return Ok(matches!(frame.kind, SplitKind::If | SplitKind::Literal));
+    }
+    let Term::Eq(carrier, _, _) = &frame.condition else { return Ok(false) };
+    let (head, _) = peel_app(carrier);
+    let Term::IndFormer { id, .. } = head else { return Ok(false) };
+    let Some(inductive) = cx.env.inductive(id) else { return Ok(false) };
+    if !inductive.indices.is_empty() { return Ok(false); }
+    for ctor in &inductive.constructors {
+        if !recursive_shapes(cx.env, ctor, id, inductive.params.len())
+            .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?
+            .is_empty()
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn is_indexed_family_equation(env: &GlobalEnv, condition: &Term) -> bool {
@@ -14121,31 +14336,129 @@ fn emit_refinement_introduction(
     inferred_ty: &Term,
     core: Term,
     span: &Span,
-    literal: Option<&RType>,
+    _literal: Option<&RType>,
 ) -> Result<Term, ElabError> {
-    let named = match cx.metas.zonk_term(expected) {
-        Term::Const { id, .. } => {
-            let facts = cx.refinement_facts;
-            let root = facts.refinement_root(id);
-            let reused = root.is_some()
-                && matches!(cx.metas.zonk_term(inferred_ty),
-                    Term::Const { id: source, .. } if facts.refinement_root(source) == root);
-            if reused {
-                None
-            } else {
-                facts.refinement_predicate(id).cloned()
-            }
+    coerce_refinement(cx, core, inferred_ty, expected, span)
+}
+
+/// Classify a refinement by its kernel type and Ω codomain, never by the
+/// spelling or the declaration identity of a transparent alias. A relevant
+/// Sigma (including a record) must not acquire forgetful coercions.
+fn subset_refinement(cx: &ElabCtx<'_>, ty: &Term) -> Option<(Term, Term)> {
+    let Term::Sigma(carrier, predicate) = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(ty)) else {
+        return None;
+    };
+    let mut ctx = cx.ctx.clone();
+    ctx.push((*carrier).clone());
+    let sort = kernel_infer_raw(cx.env, &ctx, &predicate).ok()?;
+    matches!(whnf(cx.env, &ctx, &sort), Term::Omega(_))
+        .then(|| ((*carrier).clone(), (*predicate).clone()))
+}
+
+#[inline(never)]
+fn coerce_refinement(
+    cx: &mut ElabCtx<'_>, core: Term, source: &Term, target: &Term, span: &Span,
+) -> Result<Term, ElabError> {
+    unify_types(&mut cx.metas, source, target);
+    let source = cx.metas.zonk_term(source);
+    let target = cx.metas.zonk_term(target);
+    if convert_type(cx.env, &cx.ctx, &source, &target) {
+        return Ok(core);
+    }
+    if let Some((carrier, predicate)) = subset_refinement(cx, &target) {
+        let value = coerce_refinement(cx, core, &source, &carrier, span)?;
+        let goal = apply_refinement_predicate(Term::lam(carrier, predicate), value.clone());
+        let proof = emit_subset_evidence(cx, goal, span, ObligationKind::RefinementIntroduction)?;
+        let pair = Term::Pair(Box::new(value), Box::new(proof));
+        kernel_check_current(cx, &pair, &target).map_err(|error| match error {
+            CurrentKernelQueryError::View(error) => error,
+            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                error, span: span.clone(),
+            },
+        })?;
+        return Ok(pair);
+    }
+    if let Some((carrier, _)) = subset_refinement(cx, &source) {
+        let typed = Term::Ascript(Box::new(core), Box::new(source));
+        return coerce_refinement(cx, Term::proj1(typed), &carrier, &target, span);
+    }
+    Err(ElabError::TypeMismatch {
+        span: span.clone(), reason: "source and target types do not convert".into(),
+    })
+}
+
+/// Select the proof actually stored in the pair. Only a checked, usable term
+/// is evidence: a proposition closed over a path equation is not a witness.
+#[inline(never)]
+fn emit_subset_evidence(
+    cx: &mut ElabCtx<'_>, goal: Term, span: &Span, kind: ObligationKind,
+) -> Result<Term, ElabError> {
+    let frames = admissible_path_frames(cx);
+    let conditions: Vec<_> = frames.iter().map(|frame| frame.condition.clone()).collect();
+    let goal = cx.metas.zonk_term(&goal);
+    let certificate = std::iter::once(Term::const_(cx.env.tt_id(), vec![]))
+        .chain((0..cx.ctx.len()).map(Term::var))
+        .chain((0..cx.ctx.len()).filter_map(|index| {
+            let ty = cx.ctx.lookup(index)?;
+            let ty = weaken(ty, (index + 1) as i64);
+            let Term::Sigma(carrier, predicate) = whnf(cx.env, &cx.ctx, &ty) else { return None };
+            let mut ctx = cx.ctx.clone();
+            ctx.push((*carrier).clone());
+            let sort = kernel_infer_raw(cx.env, &ctx, &predicate).ok()?;
+            matches!(whnf(cx.env, &ctx, &sort), Term::Omega(_))
+                .then(|| Term::proj2(Term::var(index)))
+        }))
+        .find(|proof| kernel_check_raw(cx.env, &cx.ctx, proof, &goal).is_ok());
+    let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), &[], None);
+    let closed = zonk_obligation_levels(cx, &closed);
+    // A certificate's own evidence determines split demand. In particular,
+    // the hole's telescope does not turn an independent certificate into an
+    // open hole merely because its obligation records path hypotheses.
+    let demanded = demanded_refinement_splits(&frames, certificate.as_ref(), cx.ctx.len());
+    if let Some(ref proof) = certificate {
+        if cx.premise_holes == PremiseHoles::Refused {
+            return Ok(proof.clone());
         }
-        _ => None,
-    };
-    let predicate = if let Some(literal) = literal {
-        literal_result_predicate(cx, literal, expected)?.map(|p| p.predicate)
-    } else {
-        named
-    };
-    let Some(predicate) = predicate else { return Ok(core) };
-    emit_refinement_predicate(cx, predicate, core.clone(), span)?;
-    Ok(core)
+    }
+    if let Some(frame) = frames.iter().rev().find(|frame| {
+        demanded.contains(&frame.split_id) && frame.witness_position.is_none()
+    }) {
+        return match frame.kind {
+            SplitKind::If | SplitKind::Literal | SplitKind::Constructor
+                if convoyable_frame(cx, frame, span)? =>
+                    Err(ElabError::RefinementSplitDemand {
+                        split_id: frame.split_id, span: span.clone(),
+                    }),
+            SplitKind::Let | SplitKind::NonConvoyable | SplitKind::If
+            | SplitKind::Literal | SplitKind::Constructor =>
+                Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() }),
+        };
+    }
+    let (hole, levels) = declare_obligation_hole(cx, closed.clone(), span, kind)?;
+    if let Some(proof) = certificate {
+        let lifted = weaken(&proof, conditions.len() as i64);
+        let (_, body) = close_refinement_goal_with(cx, &conditions, goal, &[], Some(lifted));
+        let body = zonk_obligation_levels(cx, &body.expect("selected certificate has a body"));
+        kernel_check_raw(cx.env, &Context::new(), &body, &closed).map_err(|error| {
+            ElabError::KernelRejected { error, span: span.clone() }
+        })?;
+        ken_kernel::check::admit_bodies(cx.env, &[(hole, body)]).map_err(|error| {
+            ElabError::KernelRejected { error, span: span.clone() }
+        })?;
+        return Ok(proof);
+    }
+    let mut applied = Term::const_(hole, levels);
+    for index in (0..cx.ctx.len()).rev() {
+        applied = Term::app(applied, Term::var(index));
+    }
+    for frame in &frames {
+        let position = frame.witness_position.expect("open hole passed the evidence gate");
+        applied = Term::app(applied, Term::var(cx.ctx.len() - 1 - position));
+    }
+    kernel_check_raw(cx.env, &cx.ctx, &applied, &goal).map_err(|error| {
+        ElabError::KernelRejected { error, span: span.clone() }
+    })?;
+    Ok(applied)
 }
 
 fn apply_refinement_predicate(predicate: Term, value: Term) -> Term {
@@ -17398,28 +17711,11 @@ fn elaborate_associated_rdecl(
             })
         }
         RDeclKind::TypeAlias { ty } => {
-            if let Some((span, reason)) = alias_nested_refinement(ty) {
-                return Err(ElabError::TypeMismatch { span: span.clone(), reason: reason.into() });
-            }
-            // A named refinement keeps its transparent carrier body; only its
-            // GlobalId records the predicate. A literal never mints an alias.
-            let (alias_body, predicate) = {
+            let alias_body = {
                 let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, &*refinement_facts, rdecl.name.clone())
                     .with_preconditions(preconditions, PremiseHoles::Refused);
                 let body = elab_type_in_slot(&mut cx, ty, RefinementSlot::Outermost)?;
-                let predicate = if let RType::RRefine(_, _, phi, _) = ty {
-                    cx.ctx.push(body.clone());
-                    let checked = elab_prop_at_omega(&mut cx, phi, phi.span())?;
-                    cx.ctx.pop();
-                    Some(Term::lam(body.clone(), cx.metas.zonk_term(&checked)))
-                } else {
-                    None
-                };
-                (cx.metas.zonk_term(&body), predicate)
-            };
-            let alias_root = match &alias_body {
-                Term::Const { id: target, .. } => refinement_facts.refinement_root(*target),
-                _ => None,
+                cx.metas.zonk_term(&body)
             };
             let alias_ty = Term::ty(Level::Zero);
             let id = declare_def(env, vec![], alias_ty, alias_body).map_err(|e| {
@@ -17429,11 +17725,6 @@ fn elaborate_associated_rdecl(
                 }
             })?;
             globals.insert(rdecl.name.clone(), id);
-            if let Some(predicate) = predicate {
-                refinement_facts.refinement_predicates.insert(id, predicate);
-            } else if let Some(root) = alias_root {
-                refinement_facts.refinement_aliases.insert(id, root);
-            }
             Ok(ElabResult {
                 name: rdecl.name.clone(),
                 def_id: id,
@@ -21308,6 +21599,7 @@ fn finish_pattern_alias_term_frame(
 /// Compiles to `Term::Elim` with one method per constructor in declaration order.
 /// Constant-motive variant: return type inferred from the first arm, checked
 /// consistent across all arms by kernel type-checking the Elim.
+#[derive(Clone)]
 struct MatrixEntry {
     root_frame_depth: usize,
     outer_ctx_len: usize,
@@ -21320,6 +21612,7 @@ struct MatrixEntry {
     literal_plans: HashMap<(usize, usize, usize), MatrixLiteralPlan>,
 }
 
+#[derive(Clone)]
 struct MatrixFirstLeaf {
     body: Term,
     result: Term,
@@ -21352,6 +21645,7 @@ impl MatrixEntry {
     }
 }
 
+#[derive(Clone)]
 struct IndexedMatchRootFrame {
     outer: Context,
     ind: InductiveDecl,
@@ -22682,10 +22976,10 @@ fn consume_literal_column(row: RowState) -> RowState {
 /// A later literal is reached only when all earlier comparisons were false.
 fn push_literal_branch_condition(cx: &mut ElabCtx<'_>, condition: Term, truth: bool) {
     let chosen = if truth { cx.numeric_env.bool_true_id } else { cx.numeric_env.bool_false_id };
-    cx.path_conditions.push((Term::Eq(
+    cx.push_path(Term::Eq(
         Box::new(Term::indformer(cx.numeric_env.bool_id, vec![])),
         Box::new(condition), Box::new(Term::constructor(chosen, vec![])),
-    ), cx.ctx.len()));
+    ), cx.ctx.len(), SplitKind::Literal);
 }
 
 #[inline(never)]

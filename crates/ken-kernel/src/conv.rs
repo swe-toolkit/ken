@@ -243,7 +243,10 @@ fn whnf_progress_mode(
                                                         Term::constructor(cons, vec![]),
                                                         char_ty.clone(),
                                                     ),
-                                                    Term::IntLit((scalar as u32).into()),
+                                                    Term::Pair(
+                                                        Box::new(Term::IntLit((scalar as u32).into())),
+                                                        Box::new(Term::const_(env.tt_id(), vec![])),
+                                                    ),
                                                 ),
                                                 result,
                                             );

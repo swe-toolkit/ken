@@ -80,6 +80,8 @@ E0078	native_build.admission	active	NativeProgramBuildError::Admission
 E0079	native_build.erasure	active	NativeProgramBuildError::Erasure
 E0080	native_build.packaging	retired	NativeProgramBuildError::Packaging
 E0081	native_build.unavailable	active	NativeProgramBuildError::Unavailable
+E0082	elab.refinement_split_demand	active	ElabError::RefinementSplitDemand
+E0083	elab.non_convoyable_refinement_split	active	ElabError::NonConvoyableRefinementSplit
 K0001	kernel.var_out_of_scope	active	KernelError::VarOutOfScope
 K0002	kernel.k2_reserved_former	active	KernelError::K2ReservedFormer
 K0003	kernel.universe_inconsistency	active	KernelError::UniverseInconsistency

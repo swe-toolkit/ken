@@ -65,6 +65,8 @@ ken_diagnostic::define_error_codes! {
     Self::PremiseWithoutObligationChannel { .. } => ("E0036", "elab.premise_without_obligation_channel"),
     Self::ObligationWithoutChannel { .. } => ("E0037", "elab.obligation_without_channel"),
     Self::TypeMismatch { .. } => ("E0038", "elab.type_mismatch"),
+    Self::RefinementSplitDemand { .. } => ("E0082", "elab.refinement_split_demand"),
+    Self::NonConvoyableRefinementSplit { .. } => ("E0083", "elab.non_convoyable_refinement_split"),
     Self::LambdaVsNonFunction { .. } => ("E0039", "elab.lambda_vs_non_function"),
     Self::NotAFunction { .. } => ("E0040", "elab.not_a_function"),
     Self::LevelConflict { .. } => ("E0041", "elab.level_conflict"),
