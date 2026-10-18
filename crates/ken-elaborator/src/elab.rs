@@ -12260,13 +12260,19 @@ fn unify_type_position_argument_sort(cx: &mut ElabCtx<'_>, function: &Term, argu
     let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &ty) else {
         return;
     };
-    if !matches!(*domain, Term::Type(_)) {
-        return;
-    }
     let Ok(argument_ty) = kernel_infer_in_context_open(cx, &cx.ctx, argument) else {
         return;
     };
-    unify_types(&mut cx.metas, &domain, &argument_ty);
+    unify_sorts_up_to_whnf(cx, &domain, &argument_ty);
+}
+
+/// Type-position terms are built unchecked; a non-cumulative sort (12 §3) is
+/// recorded by linking the levels of two types that must be convertible.
+fn unify_sorts_up_to_whnf(cx: &mut ElabCtx<'_>, expected: &Term, actual: &Term) {
+    let expected = cx.metas.zonk_term_with(expected, false);
+    let expected = whnf(cx.env, &cx.ctx, &expected);
+    let actual = whnf(cx.env, &cx.ctx, actual);
+    unify_types(&mut cx.metas, &expected, &actual);
 }
 
 /// `Eq A a b` requires `a, b : A` (16 §2.1) and universes are non-cumulative
@@ -12276,8 +12282,7 @@ fn unify_eq_endpoint_sort(cx: &mut ElabCtx<'_>, carrier: &Term, endpoint: &Term)
     let Ok(endpoint_ty) = kernel_infer_in_context_open(cx, &cx.ctx, endpoint) else {
         return;
     };
-    let carrier = cx.metas.zonk_term_with(carrier, false);
-    unify_types(&mut cx.metas, &carrier, &endpoint_ty);
+    unify_sorts_up_to_whnf(cx, carrier, &endpoint_ty);
 }
 
 /// An application in a written type owes the same refinement introduction as
