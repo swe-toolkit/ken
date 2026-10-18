@@ -2428,7 +2428,20 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     let private_mapping_read_view_id = elab.globals["PrivateMappingReadView"];
     let private_mapping_write_view_id = elab.globals["PrivateMappingWriteView"];
     let private_mapping_acquire_file_id = elab.globals["PrivateMappingAcquireFile"];
-    Ok(PreludeOperationIds { private_fs_open_id, private_fs_handle_metadata_id, private_resource_release_id, private_bracket_release_id, private_buffer_allocate_id, private_fs_read_at_id, private_fs_write_at_id, private_buffer_freeze_id, private_mapping_allocate_id, private_mapping_read_view_id, private_mapping_write_view_id, private_mapping_acquire_file_id })
+    Ok(PreludeOperationIds {
+        private_fs_open_id,
+        private_fs_handle_metadata_id,
+        private_resource_release_id,
+        private_bracket_release_id,
+        private_buffer_allocate_id,
+        private_fs_read_at_id,
+        private_fs_write_at_id,
+        private_buffer_freeze_id,
+        private_mapping_allocate_id,
+        private_mapping_read_view_id,
+        private_mapping_write_view_id,
+        private_mapping_acquire_file_id,
+    })
 }
 
 #[inline(never)]

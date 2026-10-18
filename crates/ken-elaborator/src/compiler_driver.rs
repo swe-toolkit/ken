@@ -28,8 +28,8 @@ use crate::program_admission::{admit_checked_main, CheckedMainDescriptor, Progra
 use crate::{ElabEnv, ElabError, ElabResult};
 
 mod bracket_regions;
-pub use bracket_regions::NormalizedBracketRegion;
 use bracket_regions::collect_normalized_bracket_regions;
+pub use bracket_regions::NormalizedBracketRegion;
 
 const PRODUCER: &str = "ken-elaborator:compiler-driver:nc10";
 const KERNEL_REF: &str = "ken-kernel:current";
@@ -2565,10 +2565,17 @@ pub fn prepare_native_program_sources(
     let mut bracket_regions = Vec::new();
     let ok_method = normalization_env
         .inductive(env.prelude_env.result_id)
-        .and_then(|result| result.constructors.iter().position(|ctor| ctor.id == env.prelude_env.ok_id))
-        .ok_or_else(|| NativeProgramBuildError::Driver(
-            CompilerDriverError::MissingStableSymbol { id: env.prelude_env.ok_id }
-        ))?;
+        .and_then(|result| {
+            result
+                .constructors
+                .iter()
+                .position(|ctor| ctor.id == env.prelude_env.ok_id)
+        })
+        .ok_or_else(|| {
+            NativeProgramBuildError::Driver(CompilerDriverError::MissingStableSymbol {
+                id: env.prelude_env.ok_id,
+            })
+        })?;
     // Recursive barriers give this normalization its own immutable environment.
     let mut normalized_omega_memo = crate::omega_erasure::ClassifyMemo::new();
     for symbol in &executable_declarations {
@@ -2601,11 +2608,15 @@ pub fn prepare_native_program_sources(
             ken_kernel::normalize(&normalization_env, &ken_kernel::Context::new(), body);
         // Extract only from the actual normalized body, before rewriting its
         // checked declaration or erasing it. A group is keyed by the Ok
-        // resource binder; each Ret leaf may contain a separate finalizer.
+        // resource binder. The current linear bind has one static finalizer
+        // per binder even when its body has several dynamic Ret leaves.
         bracket_regions.extend(
             collect_normalized_bracket_regions(
-                symbol, &normalized_body, &env.prelude_env,
-                env.prelude_env.resource_id, ok_method,
+                symbol,
+                &normalized_body,
+                &env.prelude_env,
+                env.prelude_env.resource_id,
+                ok_method,
             )
             .map_err(NativeProgramBuildError::Driver)?,
         );
@@ -4091,7 +4102,8 @@ fn checked_host_spine_v1(
         operations.insert(resolve_id(id)?, operation);
     }
     validate_bracket_release_host_operation(
-        &resolve_id(prelude.private_bracket_release_id)?, &operations,
+        &resolve_id(prelude.private_bracket_release_id)?,
+        &operations,
     )?;
     Ok(crate::erasure::CheckedHostSpineV1 {
         ret: resolve_id(roles.ret)?,

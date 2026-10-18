@@ -11,8 +11,10 @@ use crate::prelude::PreludeEnv;
 use super::{term_application_spine_exact, CompilerDriverError};
 
 /// Paths address children in one normalized declaration, not runtime values.
-/// The Ok resource binder is the region key; multiple finalizer leaves may
-/// share it. This is compiler-private preparation, not a host or runtime ABI.
+/// The Ok resource binder is the region key. The current linear bind places
+/// one static finalizer per binder even if several dynamic Ret leaves reach
+/// it; a future normalizer may copy that continuation. This is compiler-only
+/// preparation, not a host or runtime ABI.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NormalizedBracketRegion {
     pub owner: StableSymbol,
@@ -69,7 +71,11 @@ impl<'a> Collector<'a> {
         matches!(head, Term::Const { id, .. } if *id == self.resource_id) && args.len() == 1
     }
 
-    fn acquire<'t>(&self, term: &'t Term, path: &[usize]) -> Result<Option<Acquire<'t>>, CompilerDriverError> {
+    fn acquire<'t>(
+        &self,
+        term: &'t Term,
+        path: &[usize],
+    ) -> Result<Option<Acquire<'t>>, CompilerDriverError> {
         let Some((vis, args)) = constructor_head(term) else {
             return Ok(None);
         };
@@ -127,12 +133,27 @@ impl<'a> Collector<'a> {
         }))
     }
 
-    fn ok_arm(&self, term: &Term, index: usize, child: &Term, path: &[usize],
-        binders: &[Binder<'_>], acquires: &[Acquire<'_>]) -> Result<Option<OkArm>, CompilerDriverError> {
-        let Term::Elim { fam, params, methods, scrut, .. } = term else {
+    fn ok_arm(
+        &self,
+        term: &Term,
+        index: usize,
+        child: &Term,
+        path: &[usize],
+        binders: &[Binder<'_>],
+        acquires: &[Acquire<'_>],
+    ) -> Result<Option<OkArm>, CompilerDriverError> {
+        let Term::Elim {
+            fam,
+            params,
+            methods,
+            scrut,
+            ..
+        } = term
+        else {
             return Ok(None);
         };
-        if *fam != self.prelude.result_id || index != params.len() + 1 + self.ok_method
+        if *fam != self.prelude.result_id
+            || index != params.len() + 1 + self.ok_method
             || methods.len() <= self.ok_method
         {
             return Ok(None);
@@ -165,8 +186,13 @@ impl<'a> Collector<'a> {
         }))
     }
 
-    fn finalizer(&mut self, term: &Term, path: &[usize], binders: &[Binder<'_>],
-        ok_arms: &[OkArm]) -> Result<(), CompilerDriverError> {
+    fn finalizer(
+        &mut self,
+        term: &Term,
+        path: &[usize],
+        binders: &[Binder<'_>],
+        ok_arms: &[OkArm],
+    ) -> Result<(), CompilerDriverError> {
         let Some((head, args)) = constructor_head(term) else {
             return Ok(());
         };
@@ -179,7 +205,11 @@ impl<'a> Collector<'a> {
         let Some(binder) = binders.iter().rev().nth(*index) else {
             return Err(self.invalid(path, "finalizer resource variable has no binder"));
         };
-        let Some(ok) = ok_arms.iter().rev().find(|ok| ok.resource_binder_path == binder.path) else {
+        let Some(ok) = ok_arms
+            .iter()
+            .rev()
+            .find(|ok| ok.resource_binder_path == binder.path)
+        else {
             return Err(self.invalid(path, "finalizer operand lacks its acquire Ok binder"));
         };
         let (_, kind) = term_application_spine_exact(binder.ty);
@@ -188,23 +218,29 @@ impl<'a> Collector<'a> {
         }
         // A lexical binder path identifies exactly one Ok arm in this term.
         // It is not a count, constructor identity, enclosing declaration or
-        // HostOpV1 key; several finalizer leaves can belong to this one arm.
-        let region = self.regions.entry(ok.resource_binder_path.clone()).or_insert_with(|| {
-            NormalizedBracketRegion {
+        // HostOpV1 key; the key would also group copied finalizer leaves.
+        let region = self
+            .regions
+            .entry(ok.resource_binder_path.clone())
+            .or_insert_with(|| NormalizedBracketRegion {
                 owner: self.owner.clone(),
                 acquire_vis_path: ok.acquire_vis_path.clone(),
                 acquire_response_binder_path: ok.acquire_response_binder_path.clone(),
                 ok_resource_binder_path: ok.resource_binder_path.clone(),
                 finalizer_paths: Vec::new(),
-            }
-        });
+            });
         region.finalizer_paths.push(path.to_vec());
         Ok(())
     }
 
-    fn visit<'t>(&mut self, term: &'t Term, path: &mut Vec<usize>,
-        binders: &mut Vec<Binder<'t>>, acquires: &mut Vec<Acquire<'t>>,
-        ok_arms: &mut Vec<OkArm>) -> Result<(), CompilerDriverError> {
+    fn visit<'t>(
+        &mut self,
+        term: &'t Term,
+        path: &mut Vec<usize>,
+        binders: &mut Vec<Binder<'t>>,
+        acquires: &mut Vec<Acquire<'t>>,
+        ok_arms: &mut Vec<OkArm>,
+    ) -> Result<(), CompilerDriverError> {
         let acquire = self.acquire(term, path)?;
         let pushed_acquire = acquire.is_some();
         if let Some(acquire) = acquire {
@@ -213,23 +249,36 @@ impl<'a> Collector<'a> {
         self.finalizer(term, path, binders, ok_arms)?;
         for (index, child) in term.children().into_iter().enumerate() {
             let binder_ty = match term {
-                Term::Pi(ty, _) | Term::Lam(ty, _) | Term::Sigma(ty, _) if index == 1 => Some(ty.as_ref()),
+                Term::Pi(ty, _) | Term::Lam(ty, _) | Term::Sigma(ty, _) if index == 1 => {
+                    Some(ty.as_ref())
+                }
                 Term::Let { ty, .. } if index == 2 => Some(ty.as_ref()),
                 _ => None,
             };
             let ok = self.ok_arm(term, index, child, path, binders, acquires)?;
             let pushed_ok = ok.is_some();
-            if let Some(ok) = ok { ok_arms.push(ok); }
+            if let Some(ok) = ok {
+                ok_arms.push(ok);
+            }
             if let Some(ty) = binder_ty {
-                binders.push(Binder { path: path.clone(), ty });
+                binders.push(Binder {
+                    path: path.clone(),
+                    ty,
+                });
             }
             path.push(index);
             self.visit(child, path, binders, acquires, ok_arms)?;
             path.pop();
-            if binder_ty.is_some() { binders.pop(); }
-            if pushed_ok { ok_arms.pop(); }
+            if binder_ty.is_some() {
+                binders.pop();
+            }
+            if pushed_ok {
+                ok_arms.pop();
+            }
         }
-        if pushed_acquire { acquires.pop(); }
+        if pushed_acquire {
+            acquires.pop();
+        }
         Ok(())
     }
 }
@@ -242,9 +291,19 @@ pub(super) fn collect_normalized_bracket_regions(
     ok_method: usize,
 ) -> Result<Vec<NormalizedBracketRegion>, CompilerDriverError> {
     let mut collector = Collector {
-        owner, prelude, resource_id, ok_method, regions: BTreeMap::new(),
+        owner,
+        prelude,
+        resource_id,
+        ok_method,
+        regions: BTreeMap::new(),
     };
-    collector.visit(term, &mut Vec::new(), &mut Vec::new(), &mut Vec::new(), &mut Vec::new())?;
+    collector.visit(
+        term,
+        &mut Vec::new(),
+        &mut Vec::new(),
+        &mut Vec::new(),
+        &mut Vec::new(),
+    )?;
     Ok(collector.regions.into_values().collect())
 }
 
@@ -271,38 +330,68 @@ mod tests {
         prelude.private_fs_open_id = GlobalId(105);
         prelude.private_bracket_release_id = GlobalId(106);
         prelude.resource_id = GlobalId(107);
-        let resource = app(Term::const_(prelude.resource_id, vec![]),
-            [Term::constructor(GlobalId(108), vec![])]);
-        let response = app(Term::indformer(prelude.result_id, vec![]),
-            [Term::const_(GlobalId(109), vec![]), resource.clone()]);
-        let release = app(Term::constructor(prelude.private_bracket_release_id, vec![]),
-            [Term::const_(GlobalId(110), vec![]), Term::constructor(GlobalId(108), vec![]), Term::var(0)]);
+        let resource = app(
+            Term::const_(prelude.resource_id, vec![]),
+            [Term::constructor(GlobalId(108), vec![])],
+        );
+        let response = app(
+            Term::indformer(prelude.result_id, vec![]),
+            [Term::const_(GlobalId(109), vec![]), resource.clone()],
+        );
+        let release = app(
+            Term::constructor(prelude.private_bracket_release_id, vec![]),
+            [
+                Term::const_(GlobalId(110), vec![]),
+                Term::constructor(GlobalId(108), vec![]),
+                Term::var(0),
+            ],
+        );
         let selected = Term::Elim {
-            fam: prelude.result_id, level_args: vec![],
+            fam: prelude.result_id,
+            level_args: vec![],
             params: vec![Term::const_(GlobalId(109), vec![]), resource.clone()],
             motive: Box::new(Term::ty(ken_kernel::Level::Zero)),
-            methods: vec![Term::var(0), Term::lam(resource.clone(), Term::pair(release.clone(), release))],
-            indices: vec![], scrut: Box::new(Term::var(0)),
+            methods: vec![
+                Term::var(0),
+                Term::lam(resource.clone(), Term::pair(release.clone(), release)),
+            ],
+            indices: vec![],
+            scrut: Box::new(Term::var(0)),
         };
-        let operation = app(Term::constructor(prelude.inl_id, vec![]), [
-            Term::ty(ken_kernel::Level::Zero),
-            Term::ty(ken_kernel::Level::Zero),
-            app(Term::constructor(prelude.private_fs_open_id, vec![]),
-                [Term::const_(GlobalId(110), vec![])]),
-        ]);
-        let tree = app(Term::constructor(prelude.vis_id, vec![]), [
-            Term::ty(ken_kernel::Level::Zero), Term::ty(ken_kernel::Level::Zero),
-            Term::ty(ken_kernel::Level::Zero), operation, Term::lam(response, selected),
-        ]);
-        let owner = StableSymbol::new(crate::checked_core::SymbolNamespace::Declaration,
-            vec!["synthetic-collector".to_string()]);
-        let grouped = collect_normalized_bracket_regions(&owner, &tree, &prelude,
-            prelude.resource_id, 1).expect("both leaves have one Ok binder");
+        let operation = app(
+            Term::constructor(prelude.inl_id, vec![]),
+            [
+                Term::ty(ken_kernel::Level::Zero),
+                Term::ty(ken_kernel::Level::Zero),
+                app(
+                    Term::constructor(prelude.private_fs_open_id, vec![]),
+                    [Term::const_(GlobalId(110), vec![])],
+                ),
+            ],
+        );
+        let tree = app(
+            Term::constructor(prelude.vis_id, vec![]),
+            [
+                Term::ty(ken_kernel::Level::Zero),
+                Term::ty(ken_kernel::Level::Zero),
+                Term::ty(ken_kernel::Level::Zero),
+                operation,
+                Term::lam(response, selected),
+            ],
+        );
+        let owner = StableSymbol::new(
+            crate::checked_core::SymbolNamespace::Declaration,
+            vec!["synthetic-collector".to_string()],
+        );
+        let grouped =
+            collect_normalized_bracket_regions(&owner, &tree, &prelude, prelude.resource_id, 1)
+                .expect("both leaves have one Ok binder");
         assert_eq!(grouped.len(), 1);
         assert_eq!(grouped[0].finalizer_paths.len(), 2);
         prelude.private_bracket_release_id = GlobalId(111);
-        let absent = collect_normalized_bracket_regions(&owner, &tree, &prelude,
-            prelude.resource_id, 1).expect("omitting the constructor yields no region");
+        let absent =
+            collect_normalized_bracket_regions(&owner, &tree, &prelude, prelude.resource_id, 1)
+                .expect("omitting the constructor yields no region");
         assert!(absent.is_empty());
     }
 }
