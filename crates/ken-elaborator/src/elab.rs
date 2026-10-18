@@ -14540,6 +14540,49 @@ fn coerce_refinement(
     })
 }
 
+/// Only rigid, disjoint WHNF type heads can refuse without conversion.
+/// Opaque constants, inductive formers and a stuck Eq cannot unfold further;
+/// every other head is conservatively submitted to the kernel below.
+#[derive(Clone, Copy)]
+enum EvidenceTypeHead {
+    OpaqueConst(GlobalId),
+    IndFormer,
+    Eq,
+    Other,
+}
+
+fn evidence_type_head(env: &GlobalEnv, ty: &Term) -> EvidenceTypeHead {
+    match ty {
+        Term::Const { id, .. } if env.transparent_body(*id).is_none() => {
+            EvidenceTypeHead::OpaqueConst(*id)
+        }
+        Term::Const { .. } => EvidenceTypeHead::Other,
+        Term::IndFormer { .. } => EvidenceTypeHead::IndFormer,
+        Term::Eq(..) => EvidenceTypeHead::Eq,
+        Term::Type(_) | Term::Omega(_) | Term::Var(_) | Term::IntLit(_)
+        | Term::Constructor { .. } | Term::Elim { .. } | Term::Pi(..)
+        | Term::Lam(..) | Term::App(..) | Term::Sigma(..) | Term::Pair(..)
+        | Term::Proj1(..) | Term::Proj2(..) | Term::Let { .. }
+        | Term::Ascript(..) | Term::Refl(..) | Term::Cast(..)
+        | Term::J(..) | Term::Quot(..) | Term::QuotClass(..)
+        | Term::QuotElim { .. } | Term::Trunc(..) | Term::TruncProj(..)
+        | Term::Absurd(..) => EvidenceTypeHead::Other,
+    }
+}
+
+fn evidence_heads_refuse(env: &GlobalEnv, candidate: &Term, goal: &Term) -> bool {
+    match (evidence_type_head(env, candidate), evidence_type_head(env, goal)) {
+        (EvidenceTypeHead::OpaqueConst(_), EvidenceTypeHead::Eq)
+        | (EvidenceTypeHead::IndFormer, EvidenceTypeHead::Eq) => true,
+        (EvidenceTypeHead::OpaqueConst(left), EvidenceTypeHead::OpaqueConst(right))
+            if left != right => true,
+        (EvidenceTypeHead::OpaqueConst(_) | EvidenceTypeHead::IndFormer
+         | EvidenceTypeHead::Eq | EvidenceTypeHead::Other,
+         EvidenceTypeHead::OpaqueConst(_) | EvidenceTypeHead::IndFormer
+         | EvidenceTypeHead::Eq | EvidenceTypeHead::Other) => false,
+    }
+}
+
 /// Select the proof actually stored in the pair. Only a checked, usable term
 /// is evidence: a proposition closed over a path equation is not a witness.
 #[inline(never)]
@@ -14556,6 +14599,7 @@ fn emit_subset_evidence(
         .filter(|frame| frame.witness_position.is_none())
         .map(|frame| frame.condition.clone()).collect();
     let goal = cx.metas.zonk_term(&goal);
+    let mut goal_whnf = None;
     let certificate = std::iter::once(Term::const_(cx.env.tt_id(), vec![]))
         .chain((0..cx.ctx.len()).map(Term::var))
         .chain((0..cx.ctx.len()).filter_map(|index| {
@@ -14569,7 +14613,32 @@ fn emit_subset_evidence(
                 .then(|| Term::proj2(Term::var(index)))
         }))
         .chain(direct_evidence)
-        .find(|proof| kernel_check_raw(cx.env, &cx.ctx, proof, &goal).is_ok());
+        .find(|proof| {
+            // Keep first-found order: the selected proof also sets split demand.
+            // A local with the same recorded Eq formation has a convertible
+            // type without evaluating the observational Eq head.
+            if let Term::Var(index) = proof {
+                if let Some(ty) = cx.ctx.lookup(*index) {
+                    let inferred = cx.metas.zonk_term(&weaken(ty, (*index + 1) as i64));
+                    if let (Some(actual), Some(expected)) = (
+                        recorded_eq_endpoints(cx.env, &inferred),
+                        recorded_eq_endpoints(cx.env, &goal),
+                    ) {
+                        if actual == expected {
+                            return true;
+                        }
+                    }
+                }
+            }
+            if let Ok(inferred) = kernel_infer_raw(cx.env, &cx.ctx, proof) {
+                let actual = whnf(cx.env, &cx.ctx, &inferred);
+                let expected = goal_whnf.get_or_insert_with(|| whnf(cx.env, &cx.ctx, &goal));
+                if evidence_heads_refuse(cx.env, &actual, expected) {
+                    return false;
+                }
+            }
+            kernel_check_raw(cx.env, &cx.ctx, proof, &goal).is_ok()
+        });
     let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), &[], None);
     let closed = zonk_obligation_levels(cx, &closed);
     // A certificate's own evidence determines split demand. In particular,
@@ -14600,9 +14669,8 @@ fn emit_subset_evidence(
         let lifted = weaken(&proof, conditions.len() as i64);
         let (_, body) = close_refinement_goal_with(cx, &conditions, goal, &[], Some(lifted));
         let body = zonk_obligation_levels(cx, &body.expect("selected certificate has a body"));
-        kernel_check_raw(cx.env, &Context::new(), &body, &closed).map_err(|error| {
-            ElabError::KernelRejected { error, span: span.clone() }
-        })?;
+        // The hole was declared at `closed`; admission checks this exact
+        // body against the same type under empty Γ before publishing it.
         ken_kernel::check::admit_bodies(cx.env, &[(hole, body)]).map_err(|error| {
             ElabError::KernelRejected { error, span: span.clone() }
         })?;
