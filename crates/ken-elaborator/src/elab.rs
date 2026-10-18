@@ -14493,6 +14493,16 @@ fn coerce_refinement(
     cx: &mut ElabCtx<'_>, core: Term, source: &Term, target: &Term, span: &Span,
 ) -> Result<Term, ElabError> {
     unify_types(&mut cx.metas, source, target);
+    if source == target {
+        // Syntactic identity is definitional equality; no reduction needed.
+        return Ok(core);
+    }
+    if matches!(source, Term::Eq(..)) || matches!(target, Term::Eq(..)) {
+        // Eq inhabits Ω; a subset-Σ carrier is a Type. Neither introduction
+        // nor forgetting applies at this head, so this is ordinary conversion,
+        // judged by the enclosing declaration's kernel check (as main does).
+        return Ok(core);
+    }
     let source = cx.metas.zonk_term(source);
     let target = cx.metas.zonk_term(target);
     if convert_type(cx.env, &cx.ctx, &source, &target) {
