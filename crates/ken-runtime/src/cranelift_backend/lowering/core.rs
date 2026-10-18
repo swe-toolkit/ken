@@ -12442,60 +12442,6 @@ impl<'a> Lowering<'a> {
                 ))
             })
             .collect::<Result<Vec<_>, CraneliftBackendError>>()?;
-        // This detached graft consumes its producer Vis as the worker's input.
-        // If the same function minted an owner member for that exact row,
-        // consume the member here too: the owner must not perform this Vis
-        // again after the worker has performed it inline. The record is local
-        // to this function; a member minted elsewhere cannot be cleared here.
-        let pending_row = self
-            .pending_vis_record_protocol
-            .as_ref()
-            .and_then(|protocol| protocol.members.get(&edge.producer_construct_origin))
-            .map(|row| row.id());
-        let minted = self
-            .function_local
-            .pending_vis_producer_sites
-            .iter()
-            .filter(|site| Some(site.row) == pending_row && pending_row.is_some())
-            .collect::<Vec<_>>();
-        match minted.as_slice() {
-            [] if pending_row.is_some() => {
-                return Err(unsupported(
-                    LoweringCause::PlannerInvariant,
-                    "ContinuationSpecialization",
-                    "a grafted Vis member was not minted in this function",
-                ));
-            }
-            [] => {}
-            [_] => {
-                let frame = self.function_local.pending_vis_frame.ok_or_else(|| {
-                    unsupported(
-                        LoweringCause::PlannerInvariant,
-                        "ContinuationSpecialization",
-                        "a grafted Vis member has no local activation record",
-                    )
-                })?;
-                let zero = builder.ins().iconst(types::I64, 0);
-                let cleared = builder.ins().store(
-                    MemFlags::trusted(),
-                    zero,
-                    frame.slots,
-                    frame.region.discriminant,
-                );
-                self.function_local.pending_vis_slot_stores.push(PendingVisSlotStore {
-                    inst: cleared,
-                    offset: frame.region.discriminant,
-                    source: PendingVisStoreSource::Cleared,
-                });
-            }
-            _ => {
-                return Err(unsupported(
-                    LoweringCause::PlannerInvariant,
-                    "ContinuationSpecialization",
-                    "two pending members were minted for one grafted Vis in this function",
-                ));
-            }
-        }
         // `D3` — the detached-result seat holds NO eliminator stack: the active
         // computational frame is already gone by the time the result exists.
         // Architect `evt_43ng4f578mdvv` is explicit that a detached-result
