@@ -196,7 +196,9 @@ while drafting. Resolved items move to an ADR (`../docs/adr/`).
 - **Current rule.** Unindexed families bind a scrutinee equation through a
   convoy; indexed families bind none and retain only index refinement. No
   packed equality is generated (`20-verification/21 §6.3`, `22 §3`,
-  `30-surface/34 §3.3`).
+  `30-surface/34 §3.3`). The constructor-coordinate reading of arm names
+  (`30-surface/34 §3.3`) is decided: it is arm-local substitution, not a
+  term-backed equation. It does not settle this packed-equality fork.
 - **Affects.** Indexed `match` elaboration, V2 path evidence and any future
   conformance row for packed equality.
 
