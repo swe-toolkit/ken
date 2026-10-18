@@ -17,7 +17,7 @@ use ken_kernel::{
         all_support_evidence_positions, iota_reduct, method_type, peel_app, peel_pi,
         recursive_shapes, RecursiveArgumentShape,
     },
-    infer as kernel_infer_raw,
+    infer as kernel_infer_raw, recorded_eq_endpoints,
     subst::{shift, subst0, subst_levels, subst_outer, subst_tel, weaken},
     whnf, ConstructorDecl, Context, Decl, GlobalEnv, GlobalId, InductiveDecl, Level, LevelVar,
     Term,
@@ -2660,25 +2660,15 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         // must originate as a kernel `Eq A t u` / transparent equality alias with
         // `t`/`u` CONVERTIBLE. If observational equality reduces that equality
         // to Sigma-shaped component obligations before checking sees the Eq
-        // head, synthesize the corresponding component proof. This remains
+        // head, synthesize the corresponding component proof. At a Pi reduct,
+        // retain the recorded Eq formation for reflexivity. This remains
         // gated to an equality-origin target; it is not a general Sigma/And
         // proof search or coercion.
         // Surface sugar only: `Refl` is a bare `ConId` the resolver emits as
         // an `RCon` on scope miss (never registered as a real global), so
         // this must be checked BEFORE the generic `RCon` global lookup.
         RExpr::RCon(name, rspan) if name == SUGAR_REFL => {
-            let exp_wh = whnf(cx.env, &cx.ctx, expected);
-            if matches!(exp_wh, Term::Eq(..))
-                || (matches!(exp_wh, Term::Sigma(..))
-                    && states_equality(cx.env, &cx.ctx, expected))
-            {
-                synth_refl_proof(cx.env, &cx.ctx, expected, rspan)
-            } else {
-                Err(ElabError::TypeMismatch {
-                    span: rspan.clone(),
-                    reason: "Refl expects an `Eq`-shaped goal".into(),
-                })
-            }
+            check_refl_sugar(cx.env, &cx.ctx, expected, rspan)
         }
         // `Axiom` — an EXPLICIT, visible postulate of the expected type
         // (`declare_postulate`, `Decl::Opaque`). The honest surface spelling
@@ -2875,6 +2865,48 @@ fn check_match_result(
     }
 }
 
+#[inline(never)]
+fn check_refl_sugar(
+    env: &GlobalEnv,
+    ctx: &Context,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    let exp_wh = whnf(env, ctx, expected);
+    if matches!(exp_wh, Term::Eq(..))
+        || (matches!(exp_wh, Term::Sigma(..)) && states_equality(env, ctx, expected))
+        || (matches!(exp_wh, Term::Pi(..)) && recorded_eq_endpoints(env, expected).is_some())
+    {
+        synth_refl_proof(env, ctx, expected, span)
+    } else {
+        Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "Refl expects an `Eq`-shaped goal".into(),
+        })
+    }
+}
+
+#[inline(never)]
+fn synth_refl_pi_proof(
+    env: &GlobalEnv,
+    ctx: &Context,
+    expected: &Term,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    match recorded_eq_endpoints(env, expected) {
+        Some((a_ty, t, u)) if convert(env, ctx, &a_ty, &t, &u) => Ok(Term::Refl(Box::new(t))),
+        Some(_) => Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "Refl: the two sides of the goal are not convertible".into(),
+        }),
+        None => Err(ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "Refl expects an `Eq`-shaped goal".into(),
+        }),
+    }
+}
+
+#[inline(never)]
 fn synth_refl_proof(
     env: &GlobalEnv,
     ctx: &Context,
@@ -2898,6 +2930,7 @@ fn synth_refl_proof(
             let snd = synth_generated_index_evidence(env, ctx, &snd_ty, span)?;
             Ok(Term::pair(fst, snd))
         }
+        Term::Pi(..) => synth_refl_pi_proof(env, ctx, expected, span),
         _ => Err(ElabError::TypeMismatch {
             span: span.clone(),
             reason: "Refl expects an `Eq`-shaped goal".into(),
@@ -13081,6 +13114,40 @@ fn infer_elim_trunc(
     Ok((elim, p_core))
 }
 
+#[inline(never)]
+fn j_evidence_endpoints(
+    env: &GlobalEnv,
+    ctx: &Context,
+    eq_ty: &Term,
+    span: &Span,
+) -> Result<(Term, Term, Term, bool), ElabError> {
+    // Prefer the base WHNF endpoint route. Recorded formation is used only
+    // when observational WHNF does not retain an Eq head.
+    match whnf(env, ctx, eq_ty) {
+        Term::Eq(at, x, y) => Ok((*at, *x, *y, false)),
+        _ => recorded_eq_endpoints(env, eq_ty)
+            .map(|(at, x, y)| (at, x, y, true))
+            .ok_or_else(|| ElabError::TypeMismatch {
+                span: span.clone(),
+                reason: "J's third argument must have an `Eq` type".into(),
+            }),
+    }
+}
+
+#[inline(never)]
+fn ascribe_j_evidence(eq_core: Term, a_ty: Term, a: Term, b: Term, from_recording: bool) -> Term {
+    // An inferred beta-redex type need not be inferable in ascription position;
+    // the kernel checks the reconstructed Eq formation against the evidence.
+    if from_recording && matches!(eq_core, Term::Ascript(..)) {
+        eq_core
+    } else {
+        Term::Ascript(
+            Box::new(eq_core),
+            Box::new(Term::Eq(Box::new(a_ty), Box::new(a), Box::new(b))),
+        )
+    }
+}
+
 /// `J motive base eq` — elaborates directly to the kernel's existing
 /// `Term::J` (`34 §3.4`; kernel target `check.rs::infer_j`, already in
 /// `trusted_base()`). Unlike `Refl`/`absurd`/`Proved` (checked-mode, the motive
@@ -13096,6 +13163,7 @@ fn infer_elim_trunc(
 /// checked against `motive a (refl a)` built the same UNREDUCED-application
 /// way `check.rs::infer_j` itself does (`Term::app` twice, no manual
 /// substitution — `check`'s own whnf handles the redex).
+#[inline(never)]
 fn infer_j(
     cx: &mut ElabCtx,
     motive_expr: &RExpr,
@@ -13103,22 +13171,9 @@ fn infer_j(
     eq_expr: &RExpr,
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
-    // eq : Eq A a b — recover A, a, b. Zonked before the whnf match: a bare
-    // surface `(a:Type)` parameter can still carry an unresolved universe
-    // metavariable this far into elaboration (the same latent trap fixed for
-    // `check_match_dependent` — [[gate-widening-exposes-latent-bugs-in-newly-reachable-code]]).
     let (eq_core, eq_ty) = infer(cx, eq_expr)?;
     let eq_ty = cx.metas.zonk_term(&eq_ty);
-    let eq_ty_wh = whnf(cx.env, &cx.ctx, &eq_ty);
-    let (a_ty, a, b) = match eq_ty_wh {
-        Term::Eq(at, x, y) => (*at, *x, *y),
-        _ => {
-            return Err(ElabError::TypeMismatch {
-                span: span.clone(),
-                reason: "J's third argument must have an `Eq` type".into(),
-            })
-        }
-    };
+    let (a_ty, a, b, from_recording) = j_evidence_endpoints(cx.env, &cx.ctx, &eq_ty, span)?;
 
     let motive_body_expr = match motive_expr {
         RExpr::RLam(_, inner, _) => match inner.as_ref() {
@@ -13163,12 +13218,7 @@ fn infer_j(
     let base_core = check(cx, base_expr, &base_expected_ty, span)?;
 
     let result_ty = Term::app(Term::app(motive_lam, b.clone()), eq_core.clone());
-    // Record the exact Eq formation the surface rule used. The kernel's J
-    // reader must not re-derive endpoints from an Eq head's later reduct.
-    let eq_recorded = Term::Ascript(
-        Box::new(eq_core),
-        Box::new(Term::Eq(Box::new(a_ty), Box::new(a), Box::new(b))),
-    );
+    let eq_recorded = ascribe_j_evidence(eq_core, a_ty, a, b, from_recording);
     let term_j = Term::J(
         Box::new(motive_core),
         Box::new(base_core),
