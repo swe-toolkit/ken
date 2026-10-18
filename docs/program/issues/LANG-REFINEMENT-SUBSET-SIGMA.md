@@ -142,8 +142,18 @@ on the current base before measuring, and reports any that moved.
   its timing. An introduction under a `let`, an `if`, a
   literal and a non-recursive constructor branch each checks; one under an
   indexed split is a typed refusal. A Minimisation-shaped `let` whose RHS
-  is a fixed point checks within base time when an introduction consumes
-  it; emit `Refl(rhs)` unascribed whenever `rhs` infers.
+  is a fixed point checks when an introduction consumes it; emit
+  `Refl(rhs)` unascribed whenever `rhs` infers. Its timing criterion
+  (Architect `evt_6yhfdb723hhy0`): the work that scales with the RHS is
+  not multiplied. With `blow n = match n { Zero ↦ Zero; Suc m ↦ plus
+  (blow m) (blow m) }` and `fn carried (u : Nat) : { x : Nat | Equal Nat
+  x (blow K) } = let value = blow K in value`, `carried` at K=12 takes at
+  most 1.10× its own base's time, median of 3, same binary profile. The
+  paired failing configuration is `3c58dc6ab` at 2.74×. The neutral
+  `slow n` row stays as a shape and admission row, with no timing
+  assertion. Before repairing, attribute the multiplier by one-at-a-time
+  disposable deletions; a multiplier inside the kernel's single final
+  check is the stop below.
 - **AC-3.** Kernel QA reviews the K-a lines.
 - **AC-S (Architect `evt_2399h0mk7asd9`, replacing `evt_1pm2qvb169bfm`).**
   `unify_sorts_walk` gains a `Sigma/Sigma` arm with the Pi arm's domain
@@ -163,9 +173,9 @@ on the current base before measuring, and reports any that moved.
 
 - Any kernel line beyond K-a, any conversion change, or any
   `trusted_base()` change.
-- The AC-E fixed-point row needs a kernel conversion-order change
-  (Refl's ascription defeating the `a == b` fast path, conv.rs ~:1129):
-  stop with the measurement. It is a trust-root change for the operator.
+- The AC-E fixed-point multiplier sits inside the kernel's single final
+  check, or its repair needs a kernel conversion change: stop with the
+  attribution table. It is a trust-root change for the operator.
 
 ## Hard-stop inventory (§1b)
 
