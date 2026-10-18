@@ -1,11 +1,14 @@
 # Finite event traces over natural times
 
-> **Status: DRAFT v0 (SPEC-TIME-EVENT-TRACE-CONTRACT).** Section 1
-> binds finite events, half-open windows and left-biased merging, with
-> exactly three generically checked Architect D0 laws. This is a
-> normative contract for a prospective ordinary Ken package, not a
-> claim of catalog delivery, a shipped conformance suite, CI, or a
-> measured trusted-base delta.
+> **Status: DRAFT v0 (SPEC-TIME-EVENT-TRACE-CONTRACT §1;
+> SPEC-TIME-WINDOW-MEMBERSHIP §2).** Section 1 binds finite events,
+> half-open windows and left-biased merging, with three generically
+> checked Architect D0 laws. Section 2 adds two generically checked D0
+> window-membership laws and two checked generic list-filter prerequisites.
+> This WP authors the §2 conformance seed; its execution against the
+> shipped catalog awaits implementation of §2's EventTrace laws. D0
+> scratch execution is not shipped seed execution, CI, or a measured
+> landed trusted-base delta.
 
 ## 1. Finite event traces over natural times
 
@@ -166,3 +169,106 @@ Wall-clock time, durations and units, and causality between processes
 lazy streams, strictly increasing traces, deduplication, k-way
 merge and time over an arbitrary `Ord` are deferred too. None is
 implicitly proved by the three finite-list laws.
+
+## 2. Exact membership in a time window
+
+### 2.1 Membership without payload comparison
+
+The membership proposition is the existing `list_elem` from
+`Data.Collections.Derived`. For any `a : Type`, it is an Ω-valued,
+truncated disjunction of equality with the current head and membership
+in the tail:
+
+```ken
+pub fn list_elem (a : Type) (x : a) (xs : List a) : Omega =
+  match xs {
+    Nil ↦ Bottom;
+    Cons y rest ↦ ‖ Or (Equal a x y) (list_elem a x rest) ‖
+  }
+```
+
+Window membership uses `list_elem (Event p)`, including when `p` is a
+function type; it does not require `DecEq p`, `Ord p` or a Boolean
+comparison of payloads. The proposition establishes whether an event
+occurs, not how many times it occurs. Repeated events are all retained by
+`filter`, but the laws below do not state their multiplicities; §1.3's
+`trace_merge_count` remains the separate count law.
+
+### 2.2 Generic filter prerequisites
+
+`Data.Collections.Derived` exports two **checked generic theorems** for
+its existing `filter` and `list_elem`, with proof bodies rather than
+assumptions. They hold for every element type, predicate, query and list:
+
+```ken
+pub theorem list_elem_filter_sound
+  (a : Type) (keep : a → Bool) (x : a) (xs : List a) :
+  list_elem a x (filter a keep xs) →
+  And (list_elem a x xs) (Equal Bool (keep x) True)
+
+pub theorem list_elem_filter_complete
+  (a : Type) (keep : a → Bool) (x : a) (xs : List a) :
+  list_elem a x xs → Equal Bool (keep x) True →
+  list_elem a x (filter a keep xs)
+```
+
+`And` here and below is the ambient **Ω-valued** conjunction, introduced
+by `and_intro` and projected by `and_fst` and `and_snd`, not the
+Type-valued `Core.Logic.And` carrier. Soundness transports a kept
+member back to the input and proves its predicate true; completeness
+transports an input member with a true predicate into the filtered
+list. No equality decision on `a` is involved. Their private helpers
+case-split the computed `keep h` through a named Boolean decision; none
+is a new public law.
+
+### 2.3 Two checked generic window laws
+
+`Data.Time.EventTrace` exports exactly these **two additional checked
+proofs** over the existing §1 operations. A member of the window must
+occur in the input and satisfy each half-open bound separately:
+
+```ken
+pub theorem trace_window_member_sound
+  (p : Type) (lo : Nat) (hi : Nat)
+  (tr : List (Event p)) (e : Event p) :
+  list_elem (Event p) e (trace_window p lo hi tr) →
+  And
+    (list_elem (Event p) e tr)
+    (And
+      (Equal Bool (leq_nat lo (event_time p e)) True)
+      (Equal Bool (lt_nat (event_time p e) hi) True))
+```
+
+Conversely, membership in the input together with both Boolean bound
+facts supplies membership in the window. There is no ordering premise:
+
+```ken
+pub theorem trace_window_member_complete
+  (p : Type) (lo : Nat) (hi : Nat)
+  (tr : List (Event p)) (e : Event p) :
+  list_elem (Event p) e tr →
+  Equal Bool (leq_nat lo (event_time p e)) True →
+  Equal Bool (lt_nat (event_time p e) hi) True →
+  list_elem (Event p) e (trace_window p lo hi tr)
+```
+
+The package imports `list_elem`, `list_elem_filter_sound` and
+`list_elem_filter_complete` from `Data.Collections.Derived`, and
+`and_true` from `Core.Classes.LawfulClasses` to join the two bound
+facts for the filter-completeness proof. It does **not** import
+`Core.Logic.And (And)`; both law statements use the ambient Ω `And`.
+The two generic filter proofs and these two instantiated window proofs
+checked on the Architect's D0 scratch tree on base `a0e9a1d30`, rc 0,
+without a new `Axiom`. That is evidence of a checked proof development,
+not delivery of these laws in the EventTrace catalog package or a
+measured `trusted_base()` delta on a published artifact.
+
+These laws characterize **membership**, not an equality of lists or
+multiplicity. Filtering retains input order as specified in §1.2, and
+`trace_window_ordered` in §1.3 is the existing order law; §2 adds no
+second ordering law. The §1.3 exclusion of window-membership laws from
+its three checked claims describes §1, not these additional §2 claims.
+For `lo ≥ hi`, both completeness bound facts cannot hold for an event,
+and soundness over the empty window has an empty premise; neither case
+requires an extra public law. Window/merge distribution and the other
+§1.4 deferred topics remain deferred.
