@@ -42,8 +42,8 @@ with a neutral Cast's equality proof.
   failures are pins of today's behaviour,
   `cast_congruence_compares_all_four_fields_directionally` (conv.rs
   ~:2868) and `nonrecursive_delta_retry_failed_spines_have_linear_structural_entries`
-  (~:1623). k2c_conversion 59/59, obs_type_eq_structural 23/23 and
-  acceptance 14/14 are unchanged.
+  (~:1623). k2c_conversion 23/23, obs_type_eq_structural 14/14 and
+  acceptance 59/59 are unchanged.
 
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
