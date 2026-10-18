@@ -29,17 +29,17 @@ turn those natural numerators and the checked positive `total` into exact
 ## 2. Definition
 
 The public declarations follow the exact-distribution contract: the carrier
-and observations, the five named event and score builders, nine natural laws,
-then two Rational adapters and nine value laws. Private list inductions and
-natural-arithmetic rearrangements connect the laws to the stored entries.
-Every proof is a checked term.
+and observations, the six named event and score builders, nine §1 natural laws
+and three §4 natural laws, then two Rational adapters and nine value laws.
+Private list inductions and natural-arithmetic rearrangements connect the laws
+to the stored entries. Every proof is a checked term.
 
 ```ken
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_r, mul_add_distrib_l)
 
 import Core.Classes.LawfulClasses (bool_not, bool_or, bool_and, bool_cases, leq_nat)
 
-import Data.Numeric.Nat.Order (leq_nat_add_left_bound)
+import Data.Numeric.Nat.Order (leq_nat_add_left_bound, leq_nat_mul_right_mono)
 
 import Data.Numeric.Rational
   (Rational,
@@ -116,6 +116,9 @@ pub fn always_false (q : Type) (x : q) : Bool = False
 
 pub fn event_union (q : Type) (p : q → Bool) (r : q → Bool) (x : q) : Bool = bool_or (p x) (r x)
 
+pub fn event_intersection (q : Type) (p : q → Bool) (r : q → Bool) (x : q) : Bool =
+  bool_and (p x) (r x)
+
 pub fn constant_one (q : Type) (x : q) : Nat = Suc Zero
 
 pub fn score_add (q : Type) (f : q → Nat) (g : q → Nat) (x : q) : Nat = add (f x) (g x)
@@ -184,6 +187,31 @@ pub theorem expectation_weight_ext
       (same : (x : q) → Equal Nat (f x) (g x))
     : Equal Nat (expectation_weight q d f) (expectation_weight q d g) =
   expectation_list_ext q (entries q d) f g same
+
+pub theorem inclusion_exclusion
+      (q : Type) (d : ExactDistribution q) (p : q → Bool) (r : q → Bool)
+    : Equal Nat
+        (add (event_mass q d (event_union q p r)) (event_mass q d (event_intersection q p r)))
+        (add (event_mass q d p) (event_mass q d r)) =
+  event_union_overlap q (entries q d) p r
+
+pub theorem event_mass_mono
+      (q : Type)
+      (d : ExactDistribution q)
+      (p : q → Bool)
+      (r : q → Bool)
+      (implies : (x : q) → Equal Bool (p x) True → Equal Bool (r x) True)
+    : Equal Bool (leq_nat (event_mass q d p) (event_mass q d r)) True =
+  event_weight_mono q (entries q d) p r implies
+
+pub theorem expectation_weight_mono
+      (q : Type)
+      (d : ExactDistribution q)
+      (f : q → Nat)
+      (g : q → Nat)
+      (bounded : (x : q) → Equal Bool (leq_nat (f x) (g x)) True)
+    : Equal Bool (leq_nat (expectation_weight q d f) (expectation_weight q d g)) True =
+  expectation_list_mono q (entries q d) f g bounded
 
 pub fn probability (q : Type) (d : ExactDistribution q) (event : q → Bool) : Rational =
   MkRational (event_mass q d event) (one_less_total q d)
@@ -441,7 +469,10 @@ theorem two_atom_probability_denominator
 sure and unit laws follow list induction; a per-atom Boolean partition and
 reassociation of `add` prove the complement law. Disjoint union is obtained
 from an overlap decomposition: a pointwise proof that every overlap is false
-makes its mass zero. `expectation_linearity` distributes multiplication over
+makes its mass zero. The additive inclusion-exclusion law reuses that same
+decomposition without disjointness. The two monotonicity laws lift checked
+pointwise Boolean implication and natural order through each list entry.
+`expectation_linearity` distributes multiplication over
 the sum of two scores. Both extensionality laws transport the checked
 pointwise premise under the head atom's contribution and combine it with the
 induction hypothesis for the tail. The Rational laws use the stored positive
@@ -513,6 +544,140 @@ fn choose_weight (w : Nat) (b : Bool) : Nat =
   match b {
     True ↦ w;
     False ↦ Zero
+  }
+
+theorem add_right_mono
+      (a : Nat) (b : Nat) (c : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (add a c) (add b c)) True =
+  match c {
+    Zero ↦ ab;
+    Suc c2 ↦ add_right_mono a b c2 ab
+  }
+
+theorem add_left_mono
+      (c : Nat) (a : Nat) (b : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (add c a) (add c b)) True =
+  trans
+    Bool
+    (leq_nat (add c a) (add c b))
+    (leq_nat (add a c) (add b c))
+    True
+    (trans
+      Bool
+      (leq_nat (add c a) (add c b))
+      (leq_nat (add a c) (add c b))
+      (leq_nat (add a c) (add b c))
+      (cong Nat Bool (add c a) (add a c) (λz. leq_nat z (add c b)) ((proof comm for add) c a))
+      (cong Nat Bool (add c b) (add b c) (leq_nat (add a c)) ((proof comm for add) c b)))
+    (add_right_mono a b c ab)
+
+theorem add_both_mono
+      (a : Nat)
+      (b : Nat)
+      (c : Nat)
+      (e : Nat)
+      (ab : Equal Bool (leq_nat a b) True)
+      (ce : Equal Bool (leq_nat c e) True)
+    : Equal Bool (leq_nat (add a c) (add b e)) True =
+  (proof trans for leq_nat)
+    (add a c)
+    (add b c)
+    (add b e)
+    (add_right_mono a b c ab)
+    (add_left_mono b c e ce)
+
+theorem choose_weight_mono
+      (w : Nat) (b : Bool)
+    : (c : Bool)
+      → (Equal Bool b True → Equal Bool c True)
+      → Equal Bool (leq_nat (choose_weight w b) (choose_weight w c)) True =
+  bool_cases
+    b
+    (λv.
+      (c0 : Bool)
+        → (Equal Bool v True → Equal Bool c0 True)
+        → Equal Bool
+        (leq_nat (choose_weight w v) (choose_weight w c0))
+        True)
+    (λc0.
+      bool_cases
+        c0
+        (λv.
+          (Equal Bool True True → Equal Bool v True)
+          → Equal Bool (leq_nat (choose_weight w True) (choose_weight w v)) True)
+        (λh. (proof refl for leq_nat) w)
+        (λh. absurd (h Proved)))
+    (λc0. λh. Proved)
+
+theorem event_weight_mono
+      (q : Type)
+      (xs : List (Pair q Nat))
+      (p : q → Bool)
+      (r : q → Bool)
+      (implies : (x : q) → Equal Bool (p x) True → Equal Bool (r x) True)
+    : Equal Bool (leq_nat (event_weight q xs p) (event_weight q xs r)) True =
+  match xs {
+    Nil ↦ Proved;
+    Cons entry rest ↦
+      let
+        x = pair_fst q Nat entry;
+        w = pair_snd q Nat entry
+      in
+        add_both_mono
+          (choose_weight w (p x))
+          (choose_weight w (r x))
+          (event_weight q rest p)
+          (event_weight q rest r)
+          (choose_weight_mono w (p x) (r x) (implies x))
+          (event_weight_mono q rest p r implies)
+  }
+
+theorem mul_right_mono_any
+      (a : Nat) (b : Nat) (w : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (mul a w) (mul b w)) True =
+  match w {
+    Zero ↦ Proved;
+    Suc k ↦ leq_nat_mul_right_mono a b k ab
+  }
+
+theorem mul_left_mono
+      (w : Nat) (a : Nat) (b : Nat) (ab : Equal Bool (leq_nat a b) True)
+    : Equal Bool (leq_nat (mul w a) (mul w b)) True =
+  trans
+    Bool
+    (leq_nat (mul w a) (mul w b))
+    (leq_nat (mul a w) (mul b w))
+    True
+    (trans
+      Bool
+      (leq_nat (mul w a) (mul w b))
+      (leq_nat (mul a w) (mul w b))
+      (leq_nat (mul a w) (mul b w))
+      (cong Nat Bool (mul w a) (mul a w) (λz. leq_nat z (mul w b)) ((proof comm for mul) w a))
+      (cong Nat Bool (mul w b) (mul b w) (leq_nat (mul a w)) ((proof comm for mul) w b)))
+    (mul_right_mono_any a b w ab)
+
+theorem expectation_list_mono
+      (q : Type)
+      (xs : List (Pair q Nat))
+      (f : q → Nat)
+      (g : q → Nat)
+      (bounded : (x : q) → Equal Bool (leq_nat (f x) (g x)) True)
+    : Equal Bool (leq_nat (expectation_list q xs f) (expectation_list q xs g)) True =
+  match xs {
+    Nil ↦ Proved;
+    Cons entry rest ↦
+      let
+        x = pair_fst q Nat entry;
+        w = pair_snd q Nat entry
+      in
+        add_both_mono
+          (mul w (f x))
+          (mul w (g x))
+          (expectation_list q rest f)
+          (expectation_list q rest g)
+          (mul_left_mono w (f x) (g x) (bounded x))
+          (expectation_list_mono q rest f g bounded)
   }
 
 theorem point_partition
@@ -609,8 +774,6 @@ theorem complement_partition
               (complement_partition q rest event)))
   }
 
-fn event_overlap (q : Type) (p : q → Bool) (r : q → Bool) (x : q) : Bool = bool_and (p x) (r x)
-
 theorem point_union_overlap
       (w : Nat) (b : Bool) (c : Bool)
     : Equal Nat
@@ -648,7 +811,9 @@ theorem point_union_overlap
 theorem event_union_overlap
       (q : Type) (xs : List (Pair q Nat)) (p : q → Bool) (r : q → Bool)
     : Equal Nat
-        (add (event_weight q xs (event_union q p r)) (event_weight q xs (event_overlap q p r)))
+        (add
+          (event_weight q xs (event_union q p r))
+          (event_weight q xs (event_intersection q p r)))
         (add (event_weight q xs p) (event_weight q xs r)) =
   match xs {
     Nil ↦ Proved;
@@ -658,7 +823,7 @@ theorem event_union_overlap
         b = p (pair_fst q Nat entry);
         c = r (pair_fst q Nat entry);
         tail_union = event_weight q rest (event_union q p r);
-        tail_overlap = event_weight q rest (event_overlap q p r);
+        tail_overlap = event_weight q rest (event_intersection q p r);
         tail_p = event_weight q rest p;
         tail_r = event_weight q rest r
       in
@@ -762,7 +927,7 @@ theorem disjoint_event_additivity
         (add (event_weight q xs p) (event_weight q xs r)) =
   let
     lhs = event_weight q xs (event_union q p r);
-    overlap = event_weight q xs (event_overlap q p r);
+    overlap = event_weight q xs (event_intersection q p r);
     rhs = add (event_weight q xs p) (event_weight q xs r)
   in
     trans
@@ -785,7 +950,7 @@ theorem disjoint_event_additivity
             overlap
             Zero
             (λz. add lhs z)
-            (excluded_event_zero q xs (event_overlap q p r) (λx. disjoint x)))
+            (excluded_event_zero q xs (event_intersection q p r) (λx. disjoint x)))
           Refl))
       (event_union_overlap q xs p r)
 
@@ -938,11 +1103,13 @@ proper common-denominator construction remains outside this package.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [statistics §§1, 3](../../../../spec/50-stdlib/63-statistics.md),
+The behavioral contract is
+[statistics §§1, 3–4](../../../../spec/50-stdlib/63-statistics.md),
 with the original [natural seed](../../../../conformance/stdlib/statistics/seed-exact-distribution.md)
 and the [Rational seed](../../../../conformance/stdlib/statistics/seed-rational-values.md).
-The public surface adds `probability`, `expectation` and nine proved value laws
-to the existing distribution, natural observations, builders and nine laws.
+The public surface includes `probability`, `expectation` and nine proved value
+laws alongside the §1 distribution, natural observations, builders and nine
+laws; §4 adds `event_intersection` and three proved natural-weight laws.
 The finite-list sums, Boolean partitions and arithmetic rearrangements remain
 private to this package.
 
@@ -953,7 +1120,8 @@ private to this package.
 | Review laws and trust | [Laws & proofs](#4-laws--proofs), [Trust & derivation](#7-trust--derivation) |
 
 The derivation imports `Data.Numeric.Nat.Arithmetic` for `add`, `mul` and
-its checked arithmetic laws; `Data.Numeric.Nat.Order` for the mass bound;
+its checked arithmetic laws; `Data.Numeric.Nat.Order` for the mass bound
+and checked multiplication order;
 `Data.Numeric.Rational` for exact values, operations, order and equivalence;
 `Core.Classes.LawfulClasses` for Boolean operations, cases and `leq_nat`;
 `Core.Classes.EffectfulClasses.compose` for the complement; and

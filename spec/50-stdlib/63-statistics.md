@@ -2,11 +2,15 @@
 
 > **Status: DRAFT v0 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
 > SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT;
-> SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT).** Sections 1–3 are normative:
+> SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT;
+> SPEC-STATISTICS-EVENT-MASS-INCLUSION-EXCLUSION §4).** Sections 1–4 are
+> normative:
 > §1 specifies positive natural-weight atom lists in
 > `Algorithm.Statistics.Exact`; §2 specifies exact empirical observations
 > of `NonEmpty q` in `Algorithm.Statistics.Empirical`; §3 specifies their
-> exact Rational-valued probability, expectation, and mean adapters.
+> exact Rational-valued probability, expectation, and mean adapters;
+> §4 adds event intersection, inclusion-exclusion, and two monotonicity
+> laws for the existing natural numerators.
 > This contract adds no kernel, syntax, primitive, `Float`, `Axiom`, or
 > `trusted_base()` entry. A specification is not CAT delivery.
 
@@ -93,8 +97,9 @@ expectation requires a separate rational-number contract.
 
 Ken's theorem types cannot introduce an inline `λ` in a function
 argument. These five named builders are public because the law types
-below use them. `bool_not`, `bool_or`, and `bool_and` belong to the
-existing lawful-class package; `compose` belongs to
+below use them; §4 adds a sixth, `event_intersection`.
+`bool_not`, `bool_or`, and `bool_and` belong to the existing
+lawful-class package; `compose` belongs to
 `Core.Classes.EffectfulClasses`, not to this package:
 
 ```ken
@@ -207,7 +212,12 @@ representation, sums, and all nine law bodies with the then-existing
 Ken checker; that feasibility evidence did **not** itself deliver the
 catalog package
 or run conformance. The landed Exact package now exports the nine
-checked laws; §3 adds separate value-typed obligations.
+checked laws; §3 adds separate value-typed obligations. Section 4
+adds a public intersection builder and three checked natural-weight
+laws on this same carrier, without changing a §1 law or requiring
+an additional assumption. The Architect's §4 D0 check is feasibility
+evidence, not landed catalog, conformance-seed execution, CI, or a
+measured landed trust delta.
 
 `pure` and `bind`, including monad laws, are deferred **as a pair**.
 Flattening atoms naïvely is not a probability-preserving bind when
@@ -573,11 +583,12 @@ second complement builder or change Rational.
 
 ### 3.4 Trust boundary and exclusions
 
-The ruled public inventory is **eleven Exact declarations** (two
-operations and nine proved laws) and **four Empirical declarations**
-(one operation and three proved laws). No other public name or
-existing-declaration change is required; there is no duplicate
-Nat-order congruence helper. All value equalities use
+For §3's Rational-valued adapters, the ruled public inventory is
+**eleven Exact declarations** (two operations and nine proved laws) and
+**four Empirical declarations** (one operation and three proved laws).
+No other public name or existing-declaration change is required *by
+§3*; §4 separately adds natural-weight declarations. There is no
+duplicate Nat-order congruence helper. All value equalities use
 `rational_equiv`, not carrier identity. Sections 1–2's raw natural
 numerators remain available unchanged. The D0
 checked both extended source-shaped modules and a separate imported
@@ -596,3 +607,75 @@ structural `Equal Rational` for differently spelled fractions,
 `Float`, and approximate statistics remain outside §3. No law may
 be justified by an `Axiom`, primitive, new surface or kernel rule,
 or unchecked proof assumption.
+
+## 4. Event intersection, inclusion-exclusion and monotonicity
+
+This section extends the natural-weight observations of §1 without
+changing their carrier or the nine landed §1 laws. An intersection
+is a named Boolean event: the theorem types cannot put an inline
+lambda in a function argument. It is public for callers of the
+inclusion-exclusion law, and uses the existing `bool_and` rather
+than a second intersection representation:
+
+```ken
+pub fn event_intersection
+  (q : Type) (p : q → Bool) (r : q → Bool) (x : q) : Bool =
+  bool_and (p x) (r x)
+```
+
+The former private overlap builder is renamed to this public
+builder, not retained as another spelling. The pointwise
+`bool_and` premise of the landed `disjoint_mass` remains unchanged;
+it is definitionally the intersection event at each atom. No
+`DecEq q` or second enumeration is needed. Repeated entries still
+contribute their weights separately to the intersection and to
+each other event mass.
+
+For any two events, their union mass **plus** their intersection
+mass equals the sum of their individual masses. This additive
+natural-number form accounts for overlap without subtraction or
+a disjointness hypothesis:
+
+```ken
+pub theorem inclusion_exclusion
+  (q : Type) (d : ExactDistribution q) (p : q → Bool) (r : q → Bool) :
+  Equal Nat
+    (add (event_mass q d (event_union q p r))
+      (event_mass q d (event_intersection q p r)))
+    (add (event_mass q d p) (event_mass q d r))
+```
+
+The remaining laws compare numerators with `leq_nat`, expressing
+the proposition as a checked equation to `True`. If every atom
+selected by `p` is also selected by `r`, its `p` mass does not
+exceed its `r` mass. If every `f x` is no greater than `g x`,
+the weighted expectation numerator for `f` does not exceed that
+for `g`:
+
+```ken
+pub theorem event_mass_mono
+  (q : Type) (d : ExactDistribution q) (p : q → Bool) (r : q → Bool)
+  (implies : (x : q) → Equal Bool (p x) True → Equal Bool (r x) True) :
+  Equal Bool (leq_nat (event_mass q d p) (event_mass q d r)) True
+
+pub theorem expectation_weight_mono
+  (q : Type) (d : ExactDistribution q) (f : q → Nat) (g : q → Nat)
+  (bounded : (x : q) → Equal Bool (leq_nat (f x) (g x)) True) :
+  Equal Bool
+    (leq_nat (expectation_weight q d f) (expectation_weight q d g)) True
+```
+
+These pointwise premises are required for arbitrary atoms, not
+inferred from totals or function extensionality; no additional
+premise enters either law. All three laws are checked proofs over
+the same list, with private `add_right_mono`, `add_left_mono`,
+`add_both_mono`, `choose_weight_mono`, `event_weight_mono`,
+`mul_right_mono_any`, `mul_left_mono`, and
+`expectation_list_mono` as proof steps, not public obligations. The
+only additional explicit import is `leq_nat_mul_right_mono` from
+the already imported `Data.Numeric.Nat.Order` provider; no new
+ambient name is required. The Architect's D0 checked these generic
+law forms with no `Axiom` and an empty `trusted_base()` delta, and
+rejected weakened premises and incorrect overlap equations. That
+scratch feasibility result is not a shipped §4 conformance seed,
+seed-harness execution, CI, or a measured landed trust delta.
