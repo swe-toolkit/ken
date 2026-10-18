@@ -12569,7 +12569,9 @@ fn unify_sorts_walk(
     let expected = whnf(env, ctx, &expected);
     let actual = whnf(env, ctx, actual);
     match (&expected, &actual) {
-        (Term::Pi(a, b), Term::Pi(c, d)) | (Term::Lam(a, b), Term::Lam(c, d)) => {
+        (Term::Pi(a, b), Term::Pi(c, d))
+        | (Term::Lam(a, b), Term::Lam(c, d))
+        | (Term::Sigma(a, b), Term::Sigma(c, d)) => {
             unify_sorts_walk(env, metas, ctx, failed, a, c);
             ctx.push(metas.zonk_term_with(a, false));
             unify_sorts_walk(env, metas, ctx, failed, b, d);
@@ -12579,6 +12581,10 @@ fn unify_sorts_walk(
             unify_sorts_walk(env, metas, ctx, failed, f, g);
             unify_sorts_walk(env, metas, ctx, failed, a, b);
         }
+        // A carrier-typed value enters a subset-Σ position only by its pair
+        // introduction, whose first component has the carrier's sort. Σ never
+        // converts with a non-Σ head, so the link matters only at that site.
+        (Term::Sigma(carrier, _), _) => unify_sorts_walk(env, metas, ctx, failed, carrier, &actual),
         _ => unify_types(metas, &expected, &actual),
     }
 }
@@ -12690,10 +12696,29 @@ fn introduce_type_position_argument(
     let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &ty) else {
         return Ok(argument.clone());
     };
+    // These rigid heads cannot reduce to subset Σ, even when nested level
+    // metas are solved later. Transparent aliases still take the classifier:
+    // a deferred alias head may expose a subset after its own delta step.
+    if matches!(domain.as_ref(), Term::Pi(..) | Term::IndFormer { .. }
+        | Term::Var(..) | Term::Type(..) | Term::Omega(..) | Term::Eq(..)) {
+        return Ok(argument.clone());
+    }
+    // Already-typed arguments need no introduction, even when the domain is
+    // a transparent alias to a subset. Compare before forcing that alias:
+    // a closed, inert type family can be exponentially costly to unfold.
+    let inferred = kernel_infer_current(cx, argument);
+    if let Ok(argument_ty) = &inferred {
+        unify_types(&mut cx.metas, &domain, argument_ty);
+        let domain_zonked = cx.metas.zonk_term(&domain);
+        let argument_zonked = cx.metas.zonk_term(argument_ty);
+        if convert_type(cx.env, &cx.ctx, &domain_zonked, &argument_zonked) {
+            return Ok(argument.clone());
+        }
+    }
     if subset_refinement(cx, &domain).is_none() {
         return Ok(argument.clone());
     }
-    let argument_ty = kernel_infer_current(cx, argument).map_err(unchecked)?;
+    let argument_ty = inferred.map_err(unchecked)?;
     coerce_refinement(cx, argument.clone(), &argument_ty, &domain, span)
 }
 
@@ -14580,8 +14605,11 @@ fn emit_subset_evidence(
     // Every demanded frame has a term binder by this point. Those terms
     // were applied with Γ above; no proposition-only condition argument is
     // added to the checked pair's proof.
-    kernel_check_raw(cx.env, &cx.ctx, &applied, &goal).map_err(|error| {
-        ElabError::KernelRejected { error, span: span.clone() }
+    kernel_check_current(cx, &applied, &goal).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error, span: span.clone(),
+        },
     })?;
     Ok(applied)
 }
