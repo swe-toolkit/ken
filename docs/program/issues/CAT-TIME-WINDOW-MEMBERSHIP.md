@@ -1,7 +1,7 @@
 ---
 id: CAT-TIME-WINDOW-MEMBERSHIP
 title: "Spec 69 section 2 specifies two window-membership laws over trace_window, and Data.Collections.Derived carries their two generic filter prerequisites, but Data.Time.EventTrace does not export the laws. Add trace_window_member_sound and trace_window_member_complete at zero trust from the Architect's checked D0, and run the section 2 seed as an acceptance target"
-status: draft
+status: ready
 owner: foundation
 size: S
 tier: T2
