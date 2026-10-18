@@ -4,9 +4,10 @@
 > SPEC-GRAPHS-CYCLE-REFUTES-ORDER §2).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
-> base. Section 2 adds three checked generic laws to the candidate, not
-> a shipped §2 seed or CI result. No kernel, trust, or surface-syntax
-> change or revision to §61 §2 is required.
+> base. Section 2 adds three checked generic laws and this WP authors
+> a §2 conformance seed. Scratch execution of seed blocks is not shipped
+> harness execution or CI. No kernel, trust, or surface-syntax change
+> or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -354,8 +355,9 @@ scan helper is introduced.
 The Architect's generic D0 client on base `55d1ab578` checked with
 rc 0 and no new `Axiom`. Five independent mutations, including a
 false reflexive order claim and an invalid cycle-edge proof, were
-kernel-rejected. That is scratch evidence for the three law forms,
-not a claim of a shipped §2 conformance seed, CI, or a measured
-`trusted_base()` delta. Reachability, finite enumeration, and §1's
+kernel-rejected. The §2 seed is authored in this WP; its positive
+and refused blocks were exercised separately as scratch clients, not
+by a shipped harness or CI. Those checks do not establish a measured
+landed `trusted_base()` delta. Reachability, finite enumeration, and §1's
 choice behavior remain unchanged; the deferred graph operations in
 §1.4 remain outside this section.

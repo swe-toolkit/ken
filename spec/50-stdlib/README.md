@@ -256,9 +256,10 @@ reachability through §61 §2's existing Dfa fixed point, with a checked
 duplicate-free topological list or a genuine cycle; the §1 catalog
 package is present on the base. §2 adds three checked generic laws:
 `before` is irreflexive and transitive for any list, and a cycle refutes
-every topological order by its forward-edge field alone. The §2 seed,
-shipped §2 catalog execution and CI are not established by the D0 scratch
-measurement or this candidate. No second fixed point is added.
+every topological order by its forward-edge field alone. This WP
+includes the §2 seed, whose blocks CV exercised only as scratch clients;
+shipped seed-harness execution, CI and a landed trust-delta measurement
+are not established. No second fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–3 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
