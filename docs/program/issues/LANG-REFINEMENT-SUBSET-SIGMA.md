@@ -140,6 +140,12 @@ on the current base before measuring, and reports any that moved.
   is a fixed point checks within base time when an introduction consumes
   it; emit `Refl(rhs)` unascribed whenever `rhs` infers.
 - **AC-3.** Kernel QA reviews the K-a lines.
+- **AC-S (carried, Architect `evt_1pm2qvb169bfm`).** The type-position
+  sort walk `unify_sorts_walk` has no `Sigma` arm, so under W5 an alias
+  nested in a refined domain's carrier links no level. If this build
+  reaches it, add a `Sigma` arm with the Pi arm's domain push and pop,
+  with the row `(F : {x : Small | φ} -> Type) (a : Type) (o : F a)`.
+  Otherwise report it for a separate node.
 
 ## Stop conditions
 
