@@ -613,10 +613,10 @@ fn invalid_inherited_worker_marker_still_reports_overflow() {
     );
 }
 
-/// MEASURED: fd 1 with a foreign pid cannot claim the child role, returns
-/// C0023 and never writes its fault byte to stdout. CLAIMED: the parent-pid
-/// check precedes any recorder installation. THE GAP: a deliberate direct
-/// parent that passes a matching own pipe can still forge the protocol.
+/// MEASURED: the old four-field marker is malformed and returns C0023
+/// without writing a fault byte to stdout. CLAIMED: the revised parser does
+/// not treat a legacy or foreign marker as child authority. THE GAP: a
+/// well-formed foreign seven-field marker needs an independent row.
 #[cfg(unix)]
 #[test]
 fn foreign_parent_worker_marker_still_reports_overflow() {
@@ -635,6 +635,28 @@ fn foreign_parent_worker_marker_still_reports_overflow() {
     );
 }
 
+/// MEASURED: a seven-field marker naming no held pipes and a foreign pid
+/// starts a fresh supervised parent and ends in C0023 with empty stdout.
+/// CLAIMED: marker shape and pid alone do not grant child authority.
+/// THE GAP: P0 separately checks real held pipes after the parent dies.
+#[cfg(unix)]
+#[test]
+fn well_formed_foreign_marker_without_pipes_reports_overflow() {
+    let (_dir, path) = million_nested_nat();
+    let foreign_pid = if std::process::id() == 1 { 2 } else { 1 };
+    let output = ken_child_command()
+        .arg("check")
+        .arg(&path)
+        .env(FAULT_MARKER, format!("1:{foreign_pid}:0:0:2:0:0"))
+        .output()
+        .expect("check with foreign seven-field marker");
+    assert_c0023(&output, "N=1M check, well-formed foreign marker");
+    assert!(
+        output.stdout.is_empty(),
+        "foreign marker must not write stdout"
+    );
+}
+
 /// MEASURED: a marker claiming the actual parent but an fd 1 pipe with the
 /// wrong dev/ino fails before parsing with one C0022 and zero stdout bytes.
 /// CLAIMED: a parent-claimed broken channel is rejected rather than running
@@ -643,7 +665,7 @@ fn foreign_parent_worker_marker_still_reports_overflow() {
 #[test]
 fn parent_claimed_wrong_pipe_identity_is_coded() {
     let (_dir, path) = million_nested_nat();
-    let marker = format!("1:{}:0:0", std::process::id());
+    let marker = format!("1:{}:0:0:2:0:0", std::process::id());
     let output = ken_child_command()
         .arg("check")
         .arg(&path)
