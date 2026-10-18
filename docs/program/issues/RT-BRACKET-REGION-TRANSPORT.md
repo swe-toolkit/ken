@@ -35,17 +35,27 @@ from Runtime IR.
   reader is the test accessor `bracket_regions()`.
 - **The erasure collision.** `RuntimeExpr::Effect` carries `HostOpV1`
   only (ken-runtime-support ir.rs ~:764), and both checked release IDs
-  lower to `HostOpV1::ResourceRelease`. Erasure still sees the checked
-  constructor at `lower_checked_host_computation` (erasure.rs ~:3735), so
-  it can mark the finalizer by checked identity.
+  lower to `HostOpV1::ResourceRelease`. The static arm of
+  `lower_checked_host_computation` sees none of the finalizers (measured
+  `evt_59wt0vsvvcp1p`). Each finalizer reaches erasure as a private
+  constructor `RuntimeExpr::Construct` from `lower_body_term_with_plans`,
+  and the release is dispatched dynamically through `Vis`. The marker's
+  subject is that `Construct` (Architect `evt_48knx3bsxhaxr`).
+- **The binding key (amendment 1, Architect `evt_48knx3bsxhaxr`).** It is
+  (owner `StableSymbol`, preorder node id). The id is the Ω-erasure
+  plan's `Term::children` preorder, the same numbering that the decoder
+  binds to canonical bytes (checked_core.rs ~:3145-3195, :5177), from one
+  traversal shared with the collector. Erasure's edge tags stay out of the
+  binding. At the bound node, the decoded `ConstructorReference` must be
+  the confined `PrivateBracketRelease` by checked constructor id. The id
+  is transient: not serialized, not in the canonical bytes or their hash,
+  and not a runtime value. Constraints 1 to 7 of that ruling are
+  operative.
 - **The precedent.** The oriented markers (`CheckedRecursiveInvocation`,
   `CheckedComputationalIH*`) carry a `checked_occurrence_path` template
   computed on `normalized_bodies`, and
   `bind_oriented_runtime_marker_locations` (erasure.rs ~:1942) binds each
   template exactly, refusing an unbound one.
-- **The coordinate seam.** The collector's paths are `Term::children`
-  indices, while erasure uses its own edge tags (erasure.rs ~:2771-2937).
-  So the binding compares two independent walks.
 - **Authorized form.** The marker is umbrella-D1 compiler IR: a
   `#[doc(hidden)]` compiler-private Runtime-IR wrapper, not a runtime
   value, syntax, effect, host op or ABI field.
@@ -60,6 +70,7 @@ base, stop and report the mismatch.
 ## Deliverable
 
 One marker variant in ir.rs, its minting and exact binding in erasure, the
+transient preorder id on the decoded view in `checked_core.rs`, the
 `compiler_driver` handoff of `bracket_regions` into erasure, and the
 collector arity hardening below.
 
@@ -71,6 +82,9 @@ collector arity hardening below.
   - collector regions equal bound Runtime markers, one to one;
   - every marked finalizer binds to exactly one region;
   - the public `release` effects stay unmarked.
+  - paired: shifting the collector's id by +1 refuses by name on the
+    multi-leaf row, and binding by ordinal swaps nested-2's inner and
+    outer finalizers.
 - **AC-1 (paired).** Minting by `HostOpV1::ResourceRelease` instead
   over-marks the early-release fixture: 3 markers where 1 is expected.
   This is a prediction; run it.
@@ -88,3 +102,5 @@ collector arity hardening below.
   kernel change: stop to the operator.
 - A region that cannot be bound exactly from the two walks: stop with the
   row. Do not fall back to selecting by `HostOpV1`.
+- One declaration body lowered twice, so that one region meets two
+  `Construct`s with the same id: stop with the row. Do not deduplicate.
