@@ -9,7 +9,7 @@ mod catalog_or;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{check, Context, Decl, GlobalId, KernelError, Term};
+use ken_kernel::{Decl, GlobalId, KernelError, Term};
 use std::collections::{BTreeSet, HashSet};
 
 const PARSING_KEN_MD: &str =
@@ -1468,17 +1468,10 @@ fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
     let leq = env.globals["LessEqNat"];
     let source_length = env.globals["source_length"];
     let suc = env.prelude_env.suc_id;
-    assert_eq!(extracted.reject_ranges.len(), 1, "one over-end reject fixture");
     let over_end = extracted.reject_ranges.iter().any(|range| {
         let err = env
             .elaborate_file(&PARSING_KEN_MD[range.clone()])
             .expect_err("a reject fence must not elaborate");
-        // Checked subset types may expose this mismatched result at the
-        // elaborator boundary before a core body reaches the kernel.
-        if matches!(&err, ElabError::TypeMismatch { reason, .. }
-            if reason == "source and target types do not convert") {
-            return true;
-        }
         let ElabError::KernelRejected {
             error: KernelError::TypeMismatch { expected, found },
             ..
@@ -1519,36 +1512,12 @@ fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
             && *found == true_endpoint
             && *expected == false_endpoint
     });
-    assert!(over_end, "the over-end Parsing fixture must reject by type mismatch");
-
-    // Independent typed control: a real proof of length <= length cannot
-    // inhabit Suc(length) <= length. This pins the exact end-bound relation
-    // even when the surface fixture fails before kernel body admission.
-    let source_ty = Term::const_(env.globals["Source"], vec![]);
-    let mut ctx = Context::new();
-    ctx.push(source_ty);
-    let length = Term::app(Term::const_(source_length, vec![]), Term::var(0));
-    let true_endpoint = Term::app(
-        Term::app(Term::const_(leq, vec![]), length.clone()), length.clone(),
+    assert!(
+        over_end,
+        "a rejected Parsing fence must reach TypeMismatch with expected \
+         LessEqNat (Suc (source_length s)) (source_length s) and found \
+         LessEqNat (source_length s) (source_length s), not an unrelated error"
     );
-    let false_endpoint = Term::app(
-        Term::app(
-            Term::const_(leq, vec![]),
-            Term::app(Term::constructor(suc, vec![]), length.clone()),
-        ),
-        length,
-    );
-    ctx.push(true_endpoint.clone());
-    let proof = Term::var(0);
-    check(&env.env, &ctx, &proof, &ken_kernel::subst::weaken(&true_endpoint, 1))
-        .expect("the premise itself is checked");
-    let wrong = ken_kernel::subst::weaken(&false_endpoint, 1);
-    assert!(matches!(
-        check(&env.env, &ctx, &proof, &wrong),
-        Err(KernelError::TypeMismatch { expected, found })
-            if expected == Box::new(wrong)
-            && found == Box::new(ken_kernel::subst::weaken(&true_endpoint, 1))
-    ));
 }
 
 #[test]

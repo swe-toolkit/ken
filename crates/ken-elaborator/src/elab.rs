@@ -14535,9 +14535,13 @@ fn coerce_refinement(
     if cx.path_conditions.iter().any(|frame| matches!(frame.kind, SplitKind::Let)) {
         return Ok(core);
     }
-    Err(ElabError::TypeMismatch {
-        span: span.clone(), reason: "source and target types do not convert".into(),
-    })
+    kernel_check_current(cx, &core, &target).map_err(|error| match error {
+        CurrentKernelQueryError::View(error) => error,
+        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+            error, span: span.clone(),
+        },
+    })?;
+    Ok(core)
 }
 
 /// Only rigid, disjoint WHNF type heads can refuse without conversion.

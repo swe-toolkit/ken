@@ -103,8 +103,8 @@ fn type_application_preserves_a_refinement_inside_an_alias() {
     let before = env.env.next_global_id();
     let error = env.elaborate_decl_v1("const forged : L = Cons Int 5 (Nil Int)")
         .expect_err("List Int must not convert under the List former to List Five");
-    assert!(matches!(error, ElabError::TypeMismatch { .. }
-        | ElabError::KernelRejected { .. }), "List former mismatch: {error:?}");
+    assert!(matches!(error, ElabError::KernelRejected { .. }),
+        "List former mismatch must reach the kernel: {error:?}");
     assert_eq!(env.env.next_global_id(), before, "forged container admitted a global");
     let checked = env.elaborate_decl_v1("const xs : L = Cons Five 5 (Nil Five)")
         .expect("the constructor field introduces a checked Five pair");

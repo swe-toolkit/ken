@@ -54,7 +54,7 @@ fn logical_conjunction_under_let_is_not_a_subset_coercion() {
     .expect_err("a false second conjunct has no checked proof");
     assert!(matches!(failure, ElabError::KernelRejected {
         error: KernelError::TypeMismatch { .. }, ..
-    } | ElabError::TypeMismatch { .. }), "invalid conjunction: {failure:?}");
+    }), "invalid conjunction: {failure:?}");
     assert_eq!(env.env.next_global_id(), before);
     assert!(!env.globals.contains_key("and_bad"));
 }

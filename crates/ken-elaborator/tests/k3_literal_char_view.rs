@@ -244,7 +244,7 @@ fn neutral_bound_string_and_char_do_not_compute_or_fabricate_a_witness() {
                 ken_elaborator::ElabError::KernelRejected {
                     error: KernelError::TypeMismatch { .. },
                     ..
-                } | ken_elaborator::ElabError::TypeMismatch { .. }
+                }
             ),
             "neutral boundary rejected for another reason: {failure:?}"
         );
@@ -296,7 +296,7 @@ fn checked_unicode_scalar_nfc_and_non_ascii_witness_refusal() {
             ken_elaborator::ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 ..
-            } | ken_elaborator::ElabError::TypeMismatch { .. }
+            }
         ),
         "unexpected non-ASCII refusal: {failure:?}"
     );

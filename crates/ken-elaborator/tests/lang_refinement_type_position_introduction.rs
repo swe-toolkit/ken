@@ -29,10 +29,19 @@ fn nested_literal_type_argument_does_not_coerce_under_list() {
         let mut env = ElabEnv::new().expect("prelude");
         let source =
             format!("const xs : List ({{ x : Int | Equal Int x 5 }}) = Cons Int {value} (Nil Int)");
+        let before = env.env.next_global_id();
         let error = env
             .elaborate_decl_v1(&source)
             .expect_err("List Int cannot become List of a subset Σ");
-        assert!(matches!(error, ElabError::TypeMismatch { .. }), "{value}: {error:?}");
+        assert!(matches!(&error, ElabError::KernelRejected {
+            error: ken_kernel::KernelError::TypeMismatch { expected, found }, ..
+        } if matches!((expected.as_ref(), found.as_ref()),
+            (Term::App(expected_head, refined), Term::App(found_head, plain))
+            if expected_head == found_head && matches!(refined.as_ref(), Term::Sigma(..))
+                && plain.as_ref() == &Term::const_(env.globals["Int"], vec![]))),
+            "{value}: List subset must differ from List Int at the kernel: {error:?}");
+        assert_eq!(env.env.next_global_id(), before);
+        assert!(!env.globals.contains_key("xs"));
     }
 }
 
