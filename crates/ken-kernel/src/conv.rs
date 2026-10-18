@@ -1407,10 +1407,11 @@ fn conv_struct_deferred(
         (Term::Proj2(p1), Term::Proj2(p2)) => {
             conv_struct_path_memo(env, ctx, p1, p2, child_path, retry_memo)
         }
-        // Neutral Cast congruence (`16 §3.2`, `17 §3.3`): all four fields are
-        // structural. In particular `e` is deliberately not skipped by proof
-        // irrelevance because this type-agnostic path has no trusted field type.
-        (Term::Cast(a1, b1, e1, t1), Term::Cast(a2, b2, e2, t2)) => {
+        // Neutral Cast congruence (`16 §3.1`, §8.2): the equality proof is
+        // always at `Eq (Type l) A B : Ω`, so this position needs no inferred
+        // type. The enclosing conversion is called only on well-typed terms;
+        // source, target and value remain structurally significant.
+        (Term::Cast(a1, b1, _e1, t1), Term::Cast(a2, b2, _e2, t2)) => {
             conv_struct_deferred(
                 env,
                 ctx,
@@ -1429,8 +1430,7 @@ fn conv_struct_deferred(
                 WhnfProgress::default(),
                 child_path,
                 retry_memo,
-            ) && conv_struct_path_memo(env, ctx, e1, e2, child_path, retry_memo)
-                && conv_struct_path_memo(env, ctx, t1, t2, child_path, retry_memo)
+            ) && conv_struct_path_memo(env, ctx, t1, t2, child_path, retry_memo)
         }
         // Quotient congruence (`16 §5`, `17 §3.3`): quotient types compare
         // their carriers and relations structurally. Class introductions
@@ -1672,8 +1672,8 @@ mod tests {
                 "cast" => Term::Cast(
                     Box::new(static_neutral.clone()),
                     Box::new(ty.clone()),
-                    Box::new(deep),
                     Box::new(static_neutral.clone()),
+                    Box::new(deep),
                 ),
                 _ => unreachable!(),
             };
@@ -2860,12 +2860,11 @@ mod tests {
         ));
     }
 
-    /// Durable invariant (`16 §3.2`, `17 §3.3`): neutral Cast congruence
-    /// recursively compares A, B, proof, and value. Every field independently
-    /// accepts a non-syntactic equality and rejects a distinct term in both
-    /// directions; the neutral endpoints keep the outer Cast from reducing.
+    /// Durable structural-path pin (`16 §3.1`, §8.2): neutral Cast skips
+    /// the proof fixed at Ω by formation. This synthetic fixture isolates
+    /// raw congruence; the checked integration test establishes typed reach.
     #[test]
-    fn cast_congruence_compares_all_four_fields_directionally() {
+    fn cast_congruence_skips_proof_and_compares_other_fields_directionally() {
         let env = GlobalEnv::new();
         let mut ctx = Context::new();
         for _ in 0..10 {
@@ -2895,12 +2894,7 @@ mod tests {
             ),
             (
                 "Cast equality proof e",
-                cast_term(
-                    a.clone(),
-                    b.clone(),
-                    beta_identity(Term::Type(Level::zero()), e.clone()),
-                    t.clone(),
-                ),
+                cast_term(a.clone(), b.clone(), other.clone(), t.clone()),
                 cast_term(a.clone(), b.clone(), e.clone(), t.clone()),
             ),
             (
@@ -2916,7 +2910,27 @@ mod tests {
         ] {
             assert_structural_verdict(&env, &ctx, left, right, true, field);
         }
+    }
 
+    /// Durable structural-path negative control (`16 §3.1`, §8.2): even
+    /// with an irrelevant Cast proof, independently changing A, B, or t
+    /// must not make the syntactic Cast fields congruent. These deliberately
+    /// synthetic terms isolate the raw arm; genuinely distinct B endpoints
+    /// cannot both inhabit a shared result type for a typed `convert` call.
+    #[test]
+    fn cast_congruence_retains_source_target_and_value() {
+        let env = GlobalEnv::new();
+        let mut ctx = Context::new();
+        for _ in 0..10 {
+            ctx.push(Term::Type(Level::zero()));
+        }
+        let (a, b, e, t, other) = (
+            Term::var(9),
+            Term::var(8),
+            Term::var(7),
+            Term::var(6),
+            Term::var(5),
+        );
         let baseline = cast_term(a.clone(), b.clone(), e.clone(), t.clone());
         for (field, changed) in [
             (
@@ -2926,10 +2940,6 @@ mod tests {
             (
                 "Cast target type B",
                 cast_term(a.clone(), other.clone(), e.clone(), t.clone()),
-            ),
-            (
-                "Cast equality proof e",
-                cast_term(a.clone(), b.clone(), other.clone(), t.clone()),
             ),
             ("Cast value t", cast_term(a, b, e, other)),
         ] {
@@ -4731,10 +4741,7 @@ mod tests {
                     nt.clone(),
                     Term::lam(
                         nt.clone(),
-                        Term::lam(
-                            nt.clone(),
-                            Term::lam(top.clone(), Term::lam(top, tt)),
-                        ),
+                        Term::lam(nt.clone(), Term::lam(top.clone(), Term::lam(top, tt))),
                     ),
                 ),
             ),
