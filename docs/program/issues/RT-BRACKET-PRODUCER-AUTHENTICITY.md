@@ -62,21 +62,20 @@ claims neither console Vis 441 nor 460.
 no producer chain maps. This is the third stop on the source-occurrence
 requirement, and that requirement is dropped for px8ta.
 
-**D0-3, instance-keyed settlement (Steward decision `evt_4q70hczj83mn8`,
-the Architect's option D).** Scratch only, on `f894d9c9f`. Re-key the
-single generic native settlement case from the template's shared
-`effect_origin` onto `(vis_origin, operation_root_origin)`, with no
-region or authenticity claim. Measure: (1) the function and key that
-build the generic case; (2) the re-keyed collapse; (3) d2 native release
-order against the interpreter, expected [2,1]; (4) whether d3's
-`ContinuationSpecialization` refusal (core.rs ~:11268) clears, and if
-not, report it as `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED`'s work; (5)
-two RELEASE-ORDER-PARITY depth-2 nests and its two depth-3 nests stay
-green; (6) the lookalike's native output against the interpreter's. The
-Architect rules whether D holds and its size; the Steward then frames the
-implementation node. Option K (a kernel origin observer) is not taken.
-Option C (a confined finalizer constructor) is kept on file for the
-umbrella.
+**D0-3, option D, withdrawn** (Architect `evt_7bcyrfavc68e5`).
+`leaf_dispatch` has no Vis or root input, and carrying instance identity
+there is the route parked at hard stop 7. Option K (a kernel origin
+observer) is not taken.
+
+**D0-4 result: option C's enabler holds** (Architect `evt_14r9629fb5mzp`,
+scratch on `f894d9c9f`). A confined finalizer constructor gives one
+private release per instance (2/3/1/1 in the four bodies), each tied to
+its own acquire's Ok binder. A public early release stays separate,
+source cannot name the constructor, and the regions extract before
+erasure. Estimated at about 177 lines over 7 paths, with no kernel or
+`trusted_base()` change. Child 1 by route C waits on the operator's
+umbrella authorization (`evt_360c971y74gy6`, `evt_28p8pa97c35w4`); §3,
+§6 and AC-5 are rewritten for C on a yes.
 
 **Prohibitions:** no lookup widening or added declaration lane for the
 depth-3 claim; no order or shape guess and no `HostOpV1` port discovery;
