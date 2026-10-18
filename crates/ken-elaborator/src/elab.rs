@@ -14431,6 +14431,11 @@ fn subset_refinement(cx: &ElabCtx<'_>, ty: &Term) -> Option<(Term, Term)> {
     let Term::Sigma(carrier, predicate) = whnf(cx.env, &cx.ctx, &cx.metas.zonk_term(ty)) else {
         return None;
     };
+    let carrier_sort = kernel_infer_raw(cx.env, &cx.ctx, &carrier).ok()?;
+    if !matches!(whnf(cx.env, &cx.ctx, &carrier_sort), Term::Type(_)) {
+        // `And P Q` is an Ω-classified Sigma, not a subset of values.
+        return None;
+    }
     let mut ctx = cx.ctx.clone();
     ctx.push((*carrier).clone());
     let sort = kernel_infer_raw(cx.env, &ctx, &predicate).ok()?;
@@ -18279,7 +18284,10 @@ fn compute_ordered_field_values(
             .ok_or_else(|| ElabError::Internal(format!("instance missing field '{}'", fname)))?;
         let mut args: Vec<Term> = Vec::new();
         if has_param {
-            args.push(head_core.clone());
+            // The head was elaborated under type parameters alone. Field
+            // checking also binds every `where` dictionary above those
+            // parameters, so its head must be weakened into that context.
+            args.push(weaken(head_core, constraints.len() as i64));
         }
         args.extend(values.iter().cloned());
         let expected = ken_kernel::subst::subst_tel(&field_types[i], &args);

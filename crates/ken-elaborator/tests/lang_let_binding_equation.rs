@@ -1,8 +1,8 @@
 //! Durable invariants for spec/20-verification/22 §3 and §5: a let binds its
 //! equation with checked evidence in core, not only in obligation contexts.
 
-use ken_elaborator::{ElabEnv, ElabResult, Obligation, ObligationKind};
-use ken_kernel::{check::check, Context, Decl, Level, Term};
+use ken_elaborator::{ElabEnv, ElabError, ElabResult, Obligation, ObligationKind};
+use ken_kernel::{check::check, Context, Decl, KernelError, Level, Term};
 
 fn fixture() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
@@ -15,6 +15,48 @@ fn fixture() -> ElabEnv {
     env.elaborate_decl("def QPos = { x : Int | Q x }")
         .expect("checked named refinement");
     env
+}
+
+/// A non-subset comparison beneath a let may be deferred to kernel ζ, but
+/// this must not admit an actually mistyped body or allocate its declaration.
+#[test]
+fn let_conversion_deferral_rejects_wrong_body_at_final_kernel_check() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("fn good_let (n : Int) : Int = let r = n in r")
+        .expect("let substitution preserves a correctly typed result");
+    let before = env.env.next_global_id();
+    let failure = env
+        .elaborate_decl("fn bad_let (n : Int) : Bool = let r = n in r")
+        .expect_err("an Int let body cannot inhabit Bool");
+    assert!(matches!(failure, ElabError::KernelRejected {
+        error: KernelError::TypeMismatch { .. }, ..
+    }), "deferred wrong body must be rejected by the final kernel: {failure:?}");
+    assert_eq!(env.env.next_global_id(), before, "wrong body was admitted");
+    assert!(!env.globals.contains_key("bad_let"));
+}
+
+/// A logical conjunction is an Ω-classified Sigma, not a value subset.
+/// Its proof can cross a let only through the kernel's checked substitution;
+/// it must not be rebuilt by refinement introduction or carrier forgetting.
+#[test]
+fn logical_conjunction_under_let_is_not_a_subset_coercion() {
+    let mut env = fixture();
+    env.elaborate_decl(
+        "theorem and_let (n : Int) (h : Q n) : And (Q n) (Q n) = \
+         let r = n in and_intro (Q r) (Q r) h h",
+    )
+    .expect("a logical conjunction checks after the let RHS substitutes");
+    let before = env.env.next_global_id();
+    let failure = env.elaborate_decl(
+        "theorem and_bad (n : Int) (m : Int) (h : Q n) : And (Q n) (Q m) = \
+         let r = n in and_intro (Q r) (Q r) h h",
+    )
+    .expect_err("a false second conjunct has no checked proof");
+    assert!(matches!(failure, ElabError::KernelRejected {
+        error: KernelError::TypeMismatch { .. }, ..
+    } | ElabError::TypeMismatch { .. }), "invalid conjunction: {failure:?}");
+    assert_eq!(env.env.next_global_id(), before);
+    assert!(!env.globals.contains_key("and_bad"));
 }
 
 fn int_ty(env: &ElabEnv) -> Term {

@@ -13,6 +13,7 @@
 mod catalog_or;
 
 use ken_elaborator::ElabEnv;
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::env::{Context, Decl as KernelDecl};
 use ken_kernel::term::Term;
 use ken_kernel::{check, whnf, KernelError};
@@ -25,42 +26,13 @@ fn mk_env_with_package() -> ElabEnv {
     env
 }
 
-/// Walk a right-nested `Pair` chain (a class instance's record VALUE) and
-/// return field `idx`'s own SOURCE term exactly as elaborated, no `whnf`
-/// (mirrors `es4_classes_acceptance.rs::field_raw` — duplicated locally
-/// since that helper is private to its own test binary).
-fn field_raw(whole: &Term, idx: usize) -> Term {
-    let mut cur = whole.clone();
-    for _ in 0..idx {
-        cur = match cur {
-            Term::Pair(_, b) => *b,
-            other => panic!("expected a Pair chain at depth {}, got {:?}", idx, other),
-        };
-    }
-    match cur {
-        Term::Pair(a, _) => *a,
-        other => panic!("expected a Pair at depth {}, got {:?}", idx, other),
-    }
-}
-
-/// Builds `proj1(proj2^idx(Const(id)))` — the exact shape a `.field`
-/// projection produces (mirrors `es4_classes_acceptance.rs::expected_field_proj`).
-fn expected_field_proj(id: ken_kernel::GlobalId, idx: usize) -> Term {
-    let mut cur = Term::const_(id, vec![]);
-    for _ in 0..idx {
-        cur = Term::proj2(cur);
-    }
-    Term::proj1(cur)
-}
-
 // ─────────────────────────────────────────────────────────────────────────
-// `DecEq Char` — rides free by transport from `DecEq Int` (ADR 0013's
-// stated Layer-1 consequence), the same shape as the pre-existing
-// `Ord Char` transport.
+// `DecEq Char` — checks a subset equality lift from the projected Int
+// carriers, reusing the named Int certificate without adding new trust.
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Promise class: durable checked-identity invariant. Owner-resolved DecEq
-/// Char projects DecEq Int's fields and adds no fresh trust.
+/// Promise class: durable checked behavior. Owner-resolved DecEq Char
+/// compares checked pairs and adds no fresh trust.
 #[test]
 fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
     let mut env = mk_env_with_package();
@@ -83,28 +55,24 @@ fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
         id
     };
     let id = instance_id("Char");
-    let dec_eq_int_id = instance_id("Int");
+    assert!(lawful_owned.contains(&instance_id("Int")));
     assert!(matches!(env.env.lookup(id), Some(KernelDecl::Transparent { .. })));
-    let (_, body) = env
-        .env
-        .transparent_body(id)
-        .expect("DecEq Char instance is transparent");
-
-    for (name, idx) in [("eq", 0), ("sound", 1), ("complete", 2)] {
-        let raw = field_raw(&body, idx);
-        let expected = expected_field_proj(dec_eq_int_id, idx);
+    let eq = Term::proj1(Term::const_(id, vec![]));
+    let bool_ty = Term::indformer(env.globals["Bool"], vec![]);
+    let a = ken_kernel::check::checked_char_literal(&env.env, 65).unwrap();
+    let b = ken_kernel::check::checked_char_literal(&env.env, 66).unwrap();
+    for (x, y, expected) in [(&a, &a, true), (&a, &b, false)] {
+        let term = Term::app(Term::app(eq.clone(), (*x).clone()), (*y).clone());
+        check(&env.env, &Context::new(), &term, &bool_ty)
+            .expect("DecEq Char operates on checked subset pairs");
         assert_eq!(
-            raw, expected,
-            "DecEq Char's '{}' must be a direct `.`-projection off DecEq_instance_Int's \
-             own field {} (honest transport), not a fresh construction",
-            name, idx
+            eval_checked(&term, &bool_ty, &env.env, &mut EvalStore::new()).unwrap(),
+            EvalVal::Bool(expected),
         );
     }
 
-    // Zero-NEW-delta by transport: the raw (unreduced) projection syntax
-    // doesn't itself mention any trusted_base Const (it only reaches
-    // `Const{dec_eq_int_id}`, which is Transparent, not trusted) — same
-    // shape as `Ord_instance_Char`'s own zero-NEW-delta.
+    // The instance is admitted only after kernel-checking its sound and
+    // complete fields at Equal Char, not merely at Equal Int.
     let mut delta = ken_elaborator::trusted_base_delta(&env.env, id);
     delta.remove(&env.class_env.record_nil_val_id);
     assert!(

@@ -46,38 +46,15 @@
 //! kernel-completeness gap — no proof obligation in this codebase needs a
 //! sound positional arm.
 //!
-//! **`Ord Char` (WP lawful-classes-lane, re-homed from the Decimal/Char
-//! DEMOTE): by TRANSPORT from `Ord Int`, not a fresh proof.** `Char =
-//! {c:Int | isScalar c}` erases to `Int` (`21 §6.3`) — a canonical,
-//! one-value-per-codepoint carrier — so `Ord Char`'s laws ARE `Ord Int`'s
-//! laws; every field (`leq`/`refl`/`antisym`/`trans`/`total`) is a direct
-//! `.`-projection off `Ord_instance_Int` (`33 §5.2` eta), zero-NEW-delta,
-//! never a fresh postulate. This gave K6 its first REAL customer: writing
-//! `leq = leqChar` (a separately-defined const that also reduces to
-//! `leq_int`, just via a different name) made the kernel re-check FAIL —
-//! `refl`'s expected codomain `IsTrue (leqChar x x)` and the transported
-//! term's own inferred codomain `IsTrue ((Ord_instance_Int).leq x x)` both
-//! whnf to a STUCK `Term::Eq(Bool, <neutral leq-app>, True)` (the operand is
-//! neutral on a free variable — `leq_int` only fires on literals), and
-//! `conv_struct` has no Eq×Eq congruence arm at all, so two
-//! syntactically-different-but-fully-reducible-to-identical stuck operands
-//! are rejected. Unlike the `Eq Bool` `sym`/`trans` case (which needed the
-//! UNSOUND cross-wise arm and was never closable via K6), THIS pair would
-//! have been closed by a SOUND, POSITIONAL congruence arm — K6's
-//! previously-customerless sound fix now has a real use. No kernel change
-//! was needed to ship, though: transporting `leq` itself via the SAME
-//! `.`-projection (`leq = (Ord_instance_Int).leq`, not `leqChar`) makes
-//! every later field's expected type and the transported proof's own
-//! inferred type share the LITERALLY IDENTICAL term, so the two sides are
-//! syntactically equal after whnf and the missing congruence arm is never
-//! reached. See the `.ken` source's own comment for the full mechanism
-//! grounding. `Num`/`DecEq Decimal` (the other two re-homed obligations)
-//! do NOT get this same transport treatment — Decimal's non-canonical
-//! `(coeff, exp)` carrier makes it genuinely unsound (`decimalEq` is an
-//! `Eq`, not a `DecEq`, on that carrier: it reduces `True` on structurally
-//! distinct pairs denoting the same value, so postulating `sound`/
-//! `complete` would inhabit `Bottom`) — caught and re-deferred before
-//! landing, not covered by this file.
+//! `Ord Char` lifts `Ord Int` along the checked projection from
+//! `Σ(c:Int).isScalar c` to `Int`. It shares the `Int` comparator and order
+//! laws at the projected carrier; antisymmetry constructs a checked
+//! `Equal Char` from carrier equality and Ω proof reflexivity. It introduces
+//! no new postulate but inherits `Ord Int`'s four named axioms. This is not
+//! the former carrier-erasure/direct-field-projection construction.
+//! `Num`/`DecEq Decimal` cannot use the same transport: Decimal's
+//! non-canonical `(coeff, exp)` representation may compare equal at the
+//! value layer without being structurally equal.
 
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
@@ -248,33 +225,6 @@ fn field_value(env: &ken_kernel::GlobalEnv, whole: &Term, idx: usize) -> Term {
         cur = Term::proj2(cur);
     }
     ken_kernel::whnf(env, &ken_kernel::Context::new(), &Term::proj1(cur))
-}
-
-/// Like `field_value`, but returning the field's own SOURCE term exactly as
-/// elaborated — no `whnf` at all. `whole` (an instance's transparent body)
-/// is itself a literal `Term::Pair` chain (`build_pair_chain`,
-/// `ken-elaborator/src/elab.rs`), one `Pair` per field in order, so this
-/// destructures it directly rather than building an unreduced
-/// `Proj1(Proj2^idx(whole))` (which would need its OWN reduction step to
-/// reach the field). Used to confirm a field's own SOURCE shape (e.g. "this
-/// is a `.`-projection referencing another instance") rather than what it
-/// reduces to — whnf-ing a transported law field runs straight through to
-/// the referenced instance's OWN stored value (honestly reaching its
-/// `Axiom`, if any), which is the wrong thing to inspect when the question
-/// is "did THIS decl mint a fresh postulate," not "what does this field's
-/// value bottom out at."
-fn field_raw(whole: &Term, idx: usize) -> Term {
-    let mut cur = whole.clone();
-    for _ in 0..idx {
-        cur = match cur {
-            Term::Pair(_, b) => *b,
-            other => panic!("expected a Pair chain at depth {}, got {:?}", idx, other),
-        };
-    }
-    match cur {
-        Term::Pair(a, _) => *a,
-        other => panic!("expected a Pair at depth {}, got {:?}", idx, other),
-    }
 }
 
 /// Builds `proj1(proj2^idx(Const(id)))` — the exact shape `.field`
@@ -683,50 +633,39 @@ fn eq_and_deceq_int_instances_are_the_ds6a_certificate_posture() {
 // AC-char-ord-law-lifting — `Ord Char` by TRANSPORT from `Ord Int` (re-homed
 // from the Decimal/Char DEMOTE, WP lawful-classes-lane). `Char` is a checked
 // `Σ(c:Int).isScalar c` subset (`21 §6.3`) whose first projection is Int;
-// the sound realization is honest transport of `Ord Int`'s own fields via
-// `.`-projection, not a fresh proof and not a fresh postulate. The
-// discriminator is HONESTY (every field present and real), not zero-delta
-// outright (`Ord Int`'s pre-existing `Axiom`s are still honestly there, one
-// projection-hop away) — `stdlib/classes/char-ord-laws-carried-not-stubbed`.
+// the sound realization applies `Ord Int` laws to the projected carrier
+// and constructs checked subset equality. The discriminator is an admitted
+// law with a working comparator and no newly minted axiom, not direct
+// field identity; the four existing `Ord Int` axioms remain inherited.
 // `Num`/`DecEq Decimal` do NOT get this same treatment — Decimal's
 // non-canonical `(coeff, exp)` carrier makes that transport genuinely
 // unsound (`decimalEq` is an `Eq`, not a `DecEq`, on that carrier) — caught
 // and re-deferred before landing, not covered by this file.
 // ─────────────────────────────────────────────────────────────────────────
 
-/// Promise class: durable checked-identity invariant. Owned Ord Char
-/// transports each field from owned Ord Int rather than minting new trust.
+/// Promise class: durable checked behavior. Owned Ord Char checks its laws,
+/// orders checked scalar pairs and mints no additional trust.
 #[test]
 fn char_ord_laws_carried_not_stubbed_transport_accepts() {
     let (env, lawful_owned) = mk_env_with_lawful_owned();
     let id = lawful_instance_id(&env, &lawful_owned, "Ord", "Char");
-    let ord_int_id = lawful_instance_id(&env, &lawful_owned, "Ord", "Int");
     assert!(matches!(env.env.lookup(id), Some(KernelDecl::Transparent { .. })));
     let (_, body) = env.env.transparent_body(id).expect("Ord Char instance is transparent");
-
-    // Every field is PRESENT and its own SOURCE shape is a direct
-    // `.`-projection off `Ord_instance_Int` — an honest transport, never a
-    // fresh postulate minted by `Ord_instance_Char`'s own decl. (whnf-ing
-    // these would run straight through to whatever `Ord Int`'s own field
-    // bottoms out at — honestly reaching its `Axiom` for the law fields —
-    // which is the transport working as intended, not what this assertion
-    // is checking; see `field_raw`'s doc comment.)
-    for (name, idx) in [("leq", 0), ("refl", 1), ("antisym", 2), ("trans", 3), ("total", 4)] {
-        let raw = field_raw(&body, idx);
-        let expected = expected_field_proj(ord_int_id, idx);
-        assert!(
-            raw == expected,
-            "Ord Char's '{}' must be a direct `.`-projection off Ord_instance_Int's \
-             own field {} (honest transport) — not a fresh construction of its own. \
-             Got {:?}, expected {:?}",
-            name, idx, raw, expected
-        );
-    }
-
-    // `leq` itself, once reduced, must NOT be opaque — it bottoms out at
-    // the real `int_leq`/`leq_int` reduction path, not a postulate.
     let leq_val = field_value(&env.env, &body, 0);
-    assert!(!is_opaque_const(&env.env, &leq_val), "Ord Char's 'leq' must reduce to a real op, not a postulate");
+    assert!(!is_opaque_const(&env.env, &leq_val), "Ord Char's comparator must be computed, not postulated");
+    let lhs = ken_kernel::check::checked_char_literal(&env.env, 65).unwrap();
+    let later = ken_kernel::check::checked_char_literal(&env.env, 66).unwrap();
+    let char_ty = Term::const_(env.globals["Char"], vec![]);
+    for (x, y, bool_ctor) in [(&lhs, &later, "True"), (&later, &lhs, "False")] {
+        ken_kernel::check(&env.env, &ken_kernel::Context::new(), x, &char_ty)
+            .expect("ordered operand is a checked Char pair");
+        let observed = ken_kernel::whnf(
+            &env.env,
+            &ken_kernel::Context::new(),
+            &Term::app(Term::app(leq_val.clone(), (*x).clone()), (*y).clone()),
+        );
+        assert_eq!(observed, Term::constructor(env.globals[bool_ctor], vec![]));
+    }
 
     // Zero-NEW-delta by transport (NOT a claim of zero-delta outright — Ord
     // Int's own Axioms are still honestly there, reachable one projection
@@ -765,8 +704,12 @@ fn char_ord_laws_reject_missing_law_field() {
         .expect("package prefix (classes + Int/Bool instances) must elaborate");
 
     let r = env.elaborate_decl(
-        "instance Ord Char { leq = (Ord_instance_Int).leq ; refl = (Ord_instance_Int).refl ; \
-         antisym = (Ord_instance_Int).antisym ; trans = (Ord_instance_Int).trans }",
+        "instance Ord Char { leq = lawful_char_leq ; \
+         refl = λx.(Ord_instance_Int).refl (charToInt x) ; \
+         antisym = λx.λy.λp.λq.lawful_char_to_int_injective x y \
+         ((Ord_instance_Int).antisym (charToInt x) (charToInt y) p q) ; \
+         trans = λx.λy.λz.λp.λq.(Ord_instance_Int).trans \
+         (charToInt x) (charToInt y) (charToInt z) p q }",
     );
     assert!(
         r.is_err(),

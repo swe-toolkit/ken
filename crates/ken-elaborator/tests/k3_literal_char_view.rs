@@ -4,8 +4,8 @@
 use std::path::PathBuf;
 
 use ken_elaborator::ElabEnv;
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
-use ken_kernel::{check, convert, normalize, whnf, Context, KernelError, Term};
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal, ListCharIds};
+use ken_kernel::{check, convert, whnf, Context, KernelError, Term};
 
 fn checked_ascii_client(env: &mut ElabEnv) -> Result<(), (String, ken_elaborator::ElabError)> {
     assert!(!env.globals.contains_key("map"), "map is not prelude-owned");
@@ -74,7 +74,7 @@ fn fresh_ascii_literal_closes_generic_checked_finite_code_witness() {
         .unwrap()
         .1;
     let reduced = whnf(&env.env, &Context::new(), &string_view(&env, body));
-    assert_eq!(list_int_heads(&env, reduced), Some(vec![120; 256]));
+    assert_eq!(list_char_heads(&env, reduced), Some(vec![120; 256]));
 }
 
 #[test]
@@ -96,14 +96,14 @@ fn deep_checked_literal_view_admits_a_list_on_the_default_sized_stack() {
                 let body = env.env.transparent_body(env.globals[&format!("deep_{length}")])
                     .unwrap().1.clone();
                 let view = string_view(&env, body);
-                let reduced = normalize(&env.env, &Context::new(), &view);
+                let reduced = whnf(&env.env, &Context::new(), &view);
                 let list_char = Term::app(
                     Term::indformer(env.prelude_env.list_id, vec![]),
                     Term::const_(env.globals["Char"], vec![]),
                 );
                 let checked = ken_kernel::declare_def(&mut env.env, vec![], list_char.clone(), reduced.clone())
                     .expect("ordinary kernel definition must independently check every Cons tail");
-                assert_eq!(list_int_heads(&env, reduced), Some(vec![120; length]));
+                assert_eq!(list_char_heads(&env, reduced), Some(vec![120; length]));
                 assert!(env.env.transparent_body(checked).is_some());
             }
             for name in ["left", "right"] {
@@ -161,9 +161,11 @@ fn string_view(env: &ElabEnv, literal: Term) -> Term {
     )
 }
 
-fn list_int_heads(env: &ElabEnv, mut view: Term) -> Option<Vec<u32>> {
+fn list_char_heads(env: &ElabEnv, mut view: Term) -> Option<Vec<u32>> {
     let mut codes = Vec::new();
+    let char_ty = Term::const_(env.globals["Char"], vec![]);
     loop {
+        view = whnf(&env.env, &Context::new(), &view);
         let (head, args) = ken_kernel::inductive::peel_app(&view);
         if matches!(head, Term::Constructor { id, .. } if id == env.prelude_env.nil_id)
             && args.len() == 1
@@ -175,7 +177,19 @@ fn list_int_heads(env: &ElabEnv, mut view: Term) -> Option<Vec<u32>> {
         {
             return None;
         }
-        let Term::IntLit(code) = &args[1] else {
+        let Term::Ascript(pair, annotated_ty) = &args[1] else {
+            return None;
+        };
+        if annotated_ty.as_ref() != &char_ty {
+            return None;
+        }
+        let Term::Pair(carrier, proof) = pair.as_ref() else {
+            return None;
+        };
+        if proof.as_ref() != &Term::const_(env.env.tt_id(), vec![]) {
+            return None;
+        }
+        let Term::IntLit(code) = carrier.as_ref() else {
             return None;
         };
         codes.push(code.to_string().parse::<u32>().ok()?);
@@ -185,7 +199,7 @@ fn list_int_heads(env: &ElabEnv, mut view: Term) -> Option<Vec<u32>> {
 
 fn scalars(env: &ElabEnv, literal: &Term) -> Vec<u32> {
     let next_id = env.env.next_global_id();
-    let reduced = normalize(
+    let reduced = whnf(
         &env.env,
         &Context::new(),
         &string_view(env, literal.clone()),
@@ -199,8 +213,8 @@ fn scalars(env: &ElabEnv, literal: &Term) -> Vec<u32> {
     let list_char = Term::app(Term::indformer(env.prelude_env.list_id, vec![]), char_ty);
     check(&env.env, &Context::new(), &reduced, &list_char)
         .expect("the produced List Char must independently kernel-typecheck");
-    list_int_heads(env, reduced)
-        .expect("literal view must be a typed Nil/Cons spine of IntLit scalars")
+    list_char_heads(env, reduced)
+        .expect("literal view must be a typed Nil/Cons spine of checked Char pairs")
 }
 
 #[test]
@@ -210,13 +224,17 @@ fn neutral_bound_string_and_char_do_not_compute_or_fabricate_a_witness() {
     let string_var = string_view(&env, Term::var(0));
     assert_eq!(whnf(&env.env, &ctx, &string_var), string_var);
     let char_to_int = Term::app(Term::const_(env.globals["charToInt"], vec![]), Term::var(0));
-    assert_eq!(whnf(&env.env, &ctx, &char_to_int), Term::var(0));
+    assert_eq!(
+        whnf(&env.env, &ctx, &char_to_int),
+        Term::proj1(Term::var(0))
+    );
     checked_ascii_client(&mut env).unwrap();
     let cases = [
         "fn no_ascii_from_neutral_string (s : String) : AllAsciiCodes (map Char Int charToInt (string_to_list_char s)) = fresh_k3_ascii",
         "fn no_ascii_from_neutral_char (c : Char) : AsciiCode (charToInt c) = MkAsciiCode 65 Ascii65 Proved",
     ];
     for source in cases {
+        let before = env.env.next_global_id();
         let failure = env
             .elaborate_decl(source)
             .expect_err("neutral argument must not acquire a finite witness");
@@ -226,9 +244,14 @@ fn neutral_bound_string_and_char_do_not_compute_or_fabricate_a_witness() {
                 ken_elaborator::ElabError::KernelRejected {
                     error: KernelError::TypeMismatch { .. },
                     ..
-                }
+                } | ken_elaborator::ElabError::TypeMismatch { .. }
             ),
             "neutral boundary rejected for another reason: {failure:?}"
+        );
+        assert_eq!(
+            env.env.next_global_id(),
+            before,
+            "rejected witness admitted a global"
         );
     }
 }
@@ -264,6 +287,7 @@ fn checked_unicode_scalar_nfc_and_non_ascii_witness_refusal() {
         .clone();
     assert_eq!(scalars(&env, &empty), Vec::<u32>::new());
     checked_ascii_client(&mut env).unwrap();
+    let before_refusal = env.env.next_global_id();
     let failure = env.elaborate_decl("const not_ascii : AllAsciiCodes (map Char Int charToInt (string_to_list_char composed)) = SomeCodes 233 (Cons Int 128578 (Nil Int)) (MkAsciiCode 233 Ascii65 Proved) (SomeCodes 128578 (Nil Int) (MkAsciiCode 128578 Ascii122 Proved) NoCodes)")
         .expect_err("non-ASCII scalar cannot equal an ASCII decoder result");
     assert!(
@@ -272,9 +296,14 @@ fn checked_unicode_scalar_nfc_and_non_ascii_witness_refusal() {
             ken_elaborator::ElabError::KernelRejected {
                 error: KernelError::TypeMismatch { .. },
                 ..
-            }
+            } | ken_elaborator::ElabError::TypeMismatch { .. }
         ),
         "unexpected non-ASCII refusal: {failure:?}"
+    );
+    assert_eq!(
+        env.env.next_global_id(),
+        before_refusal,
+        "rejected code admitted a global"
     );
     let before = env.env.next_global_id();
     assert!(ken_kernel::check::checked_char_literal(&env.env, 0xD800).is_err());
@@ -350,7 +379,7 @@ fn occurrences_convert_from_values_not_literal_ids_and_other_ops_remain_neutral(
         &second_head(&vc)
     ));
     assert_eq!(
-        list_int_heads(&env, normalize(&env.env, &Context::new(), &va)),
+        list_char_heads(&env, whnf(&env.env, &Context::new(), &va)),
         Some(vec![45, 45])
     );
     // No implicit whole-String equality or unrelated primitive evaluation.
@@ -432,17 +461,26 @@ fn checked_char_literal_and_view_head_reduce_via_derived_char_to_int() {
         .unwrap()
         .1
         .clone();
+    let char_ty = Term::const_(env.globals["Char"], vec![]);
+    check(&env.env, &Context::new(), &direct, &char_ty)
+        .expect("the direct Char pair is independently checked");
     assert_eq!(
         direct,
-        Term::IntLit(946u32.into()),
-        "a checked Char literal is directly a type-preserving core IntLit"
+        Term::Ascript(
+            Box::new(Term::pair(
+                Term::IntLit(946u32.into()),
+                Term::const_(env.env.tt_id(), vec![]),
+            )),
+            Box::new(char_ty),
+        ),
+        "a checked Char literal carries its scalar proof"
     );
     let direct_code = Term::app(Term::const_(env.globals["charToInt"], vec![]), direct);
     assert_eq!(
         whnf(&env.env, &Context::new(), &direct_code),
         Term::IntLit(946u32.into())
     );
-    let view = normalize(&env.env, &Context::new(), &string_view(&env, from_string));
+    let view = whnf(&env.env, &Context::new(), &string_view(&env, from_string));
     let (_, parts) = ken_kernel::inductive::peel_app(&view);
     let from_head = Term::app(
         Term::const_(env.globals["charToInt"], vec![]),
@@ -479,12 +517,17 @@ fn interpreter_view_and_codes_use_the_kernel_checked_payload() {
     store
         .num_values
         .insert(id, EvalVal::Str(ken_elaborator::NfcString::new("WRONG")));
-    let observed = eval(
-        &[],
+    let list_char = Term::app(
+        Term::indformer(env.prelude_env.list_id, vec![]),
+        Term::const_(env.globals["Char"], vec![]),
+    );
+    let observed = eval_checked(
         &string_view(&env, Term::const_(id, vec![])),
+        &list_char,
         &env.env,
         &mut store,
-    );
+    )
+    .expect("the checked view erases proof fields before interpretation");
     let mut codes = Vec::new();
     let mut cursor = &observed;
     loop {
