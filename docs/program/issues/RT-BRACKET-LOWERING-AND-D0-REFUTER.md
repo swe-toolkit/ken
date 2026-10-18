@@ -1,6 +1,6 @@
 ---
 id: RT-BRACKET-LOWERING-AND-D0-REFUTER
-title: "CHILD 3 of 3 of RT-BRACKET-CONTROL-REGION-IR, AND THE ONLY ONE THAT ROUTES A CANDIDATE. The lowering consumer, the D0 EQUIVALENCE REFUTER, and closeout. Lowering receives ONLY a validated BracketSettlementControlView and consumes settlement, outcome merge and resume in order; an affine compiler ledger closes over exact region and edge identities. D0 IS NOT A CENSUS: it compares interpreter and linked-native normalized observation tuples over five mandatory rows and requires three compile-preserving mutations, and it CAN REFUTE THE REPRESENTATION where population equality provably cannot. ASSEMBLE CHILD 1 AND CHILD 2 HERE AND ROUTE ONLY THE COMBINED TREE AS ONE ATOMIC CANDIDATE -- children 1 and 2 are held, reviewed inputs and never independently landed products. Closeout un-ignores px8ta_oriented_subcontinuation::public_two_three_level_brackets_finish_and_release_lifo on BOTH its blockers and removes an order-excluding helper ONLY after both engines agree."
+title: "CHILD 3 of RT-BRACKET-CONTROL-REGION-IR (after 1, 2a and 2b), AND THE ONLY ONE THAT ROUTES A CANDIDATE. The lowering consumer, the D0 EQUIVALENCE REFUTER, and closeout. Lowering receives ONLY a validated BracketSettlementControlView and consumes settlement, outcome merge and resume in order; an affine compiler ledger closes over exact region and edge identities. D0 IS NOT A CENSUS: it compares interpreter and linked-native normalized observation tuples over five mandatory rows and requires three compile-preserving mutations, and it CAN REFUTE THE REPRESENTATION where population equality provably cannot. ASSEMBLE CHILDREN 1, 2a AND 2b HERE AND ROUTE ONLY THE COMBINED TREE AS ONE ATOMIC CANDIDATE -- children 1, 2a and 2b are held, reviewed inputs and never independently landed products. Closeout un-ignores px8ta_oriented_subcontinuation::public_two_three_level_brackets_finish_and_release_lifo on BOTH its blockers and removes an order-excluding helper ONLY after both engines agree."
 status: draft
 owner: runtime
 size: L
@@ -12,7 +12,7 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. THIS IS THE LARGEST OF THE THREE CHILDREN AND THE STEWARD MIS-SIZED THE PARENT TWICE BEFORE; the split point if it proves too big is named in section 6 rather than discovered, and the Steward recuts at the FIRST audit here rather than the second. Pre-registration commit c22f4861d already satisfies the sequencing half of AC-14 and must be preserved; evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee is EVIDENCE, NEVER A CANDIDATE."
 ---
 
-> # NOT STARTABLE YET. It depends on child 2 being accepted.
+> # NOT STARTABLE YET. It depends on child 2b being accepted.
 > #
 > # **`D0` can still stop the whole chain, and that is its job.**
 > # Do NOT answer a `D0` failure with a larger census. That move cost seven hard
@@ -107,8 +107,9 @@ THE GAP:  closed only for the exercised path plus region/edge closure, never by
   non-bracket regression control, never as bracket-ownership input.
 - **AC-7.** The order-excluding helper is removed only AFTER both engines agree,
   never before.
-- **AC-8.** One atomic candidate carrying children 1, 2 and 3. No partial
-  landing.
+- **AC-8.** One atomic candidate carrying children 1 (route C,
+  `c462fe831`), 2a, 2b and 3. No partial landing (Architect sizing D0
+  `evt_51cm672pdy1r1`).
 
 ## 4. Stop condition
 
@@ -116,6 +117,11 @@ THE GAP:  closed only for the exercised path plus region/edge closure, never by
 `D0` observation differs between the engines, either behavioral mutation stays
 green, a marked region is ambiguous, or the existing typed result path cannot
 carry the sequence.
+
+**STOP if depth 3 still refuses on `ContinuationSpecialization` after
+`BracketOwned` lowering.** Do not widen `function_local.continuation_calls`
+(Architect `evt_51cm672pdy1r1`). That `BracketOwned` lowering clears both
+px8ta blockers is a prediction; this stop is how it is tested.
 
 On the last one, **do not reopen `RT-PLANNER-KRET-GRAFTED-SPINE`** and do not
 invent a return protocol inside it. **No census, narrowed matrix, carve-out,

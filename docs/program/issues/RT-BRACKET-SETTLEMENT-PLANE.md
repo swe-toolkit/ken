@@ -1,18 +1,18 @@
 ---
 id: RT-BRACKET-SETTLEMENT-PLANE
-title: "CHILD 2 of 3 of RT-BRACKET-CONTROL-REGION-IR. The settlement plane and its CLOSURE. Consume ONLY authenticated ports from child 1; partition marked settlement instances out of the RAW exact response occurrence/context inventory BEFORE the ordinary demand classifier and pass only the ordinary partition into the existing filtered/Phase-B machinery; key every region instance by its exact call/return context beside its source ports; build the parent forest; close the body-exit set at exactly returned value, returned body error and controlled trap; and rebuild the whole plane INDEPENDENTLY at plan close and require exact equality. NO OLD CLASSIFIER PREDICATE MAY KEEP A BRACKET ROW ALIVE LONG ENOUGH TO EXCLUDE IT -- that was the `bracket_release_only_suffix` carve-out and it is gone. A first-match `find_map` keyed on `effect_origin` projects one ID for a shared static origin and collapses repeated lowering contexts; parent edges and the ledger must NEVER be built on a first-match ID. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
-status: ready
+title: "CHILD 2b of RT-BRACKET-CONTROL-REGION-IR. The settlement plane and its CLOSURE. Consume ONLY the bound region markers from child 2a (RT-BRACKET-REGION-TRANSPORT); partition marked settlement instances out of the RAW exact response occurrence/context inventory BEFORE the ordinary demand classifier and pass only the ordinary partition into the existing filtered/Phase-B machinery; key every region instance by its exact call/return context beside its source ports; build the parent forest; close the body-exit set at exactly returned value, returned body error and controlled trap; and rebuild the whole plane INDEPENDENTLY at plan close and require exact equality. NO OLD CLASSIFIER PREDICATE MAY KEEP A BRACKET ROW ALIVE LONG ENOUGH TO EXCLUDE IT -- that was the `bracket_release_only_suffix` carve-out and it is gone. A first-match `find_map` keyed on `effect_origin` projects one ID for a shared static origin and collapses repeated lowering contexts; parent edges and the ledger must NEVER be built on a first-match ID. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
+status: draft
 owner: runtime
-size: M
+size: L
 gate: none
 tier: T1
-depends_on: [RT-BRACKET-PRODUCER-AUTHENTICITY]
+depends_on: [RT-BRACKET-REGION-TRANSPORT]
 blocks: [RT-BRACKET-LOWERING-AND-D0-REFUTER]
 github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. Retained work to be REBASED ONTO THE ACCEPTED PRODUCER rather than rebuilt: the raw-response-occurrence partition ahead of the ordinary demand classifier, and the explicit response-context key that replaced the earlier first-match-only design. Both are preserved at evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee, which is EVIDENCE, NEVER A CANDIDATE."
 ---
 
-> # AUTHORIZED AND STARTABLE. Build it.
+> # NOT STARTABLE YET. It depends on child 2a's held tip.
 > #
 > # **This child does NOT land on its own.** It produces a reviewed checkpoint
 > # that child 3 assembles. No QA handoff as a candidate, no publication, no
@@ -20,23 +20,37 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 
 ## 1. What is settled. Do not re-derive.
 
-- **Retained, rebase rather than rebuild:** the raw-inventory partition ahead of
-  the ordinary demand classifier, and the explicit response-context key.
-- **`bracket_release_only_suffix` is GONE and must not return in any form.** It
-  was an operation-based carve-out inside the old response-owner route.
-- Ports arrive ALREADY AUTHENTICATED from child 1. This child never discovers a
-  port and never re-derives authority.
-- **CHILD 1 IS ACCEPTED. Build on `4b4c8565c543c148039ea06ac798c7c91eda2ce8`**
-  -- QA approved at that tip in `evt_4z54qy2pvmw0f`, EIGHT commits from
-  `a4d12698a` (measured). It delivers injected post-elaboration marker
-  identities NOT resolvable from source, exact canonical call-occurrence
-  capture, and producer-marked acquire / body / settlement / outcome-merge /
-  resume roles. `HostOpV1` may VALIDATE a marked port and may NEVER discover
-  one; that rule is INHERITED, not re-litigated here.
-- **DO NOT DELETE, RESET OR FORCE-MOVE `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.**
-  It is the ONLY ref holding child 1's accepted tip, it was never pushed, and
-  child 3 assembles from it. Releasing a branch means dropping the holder, not
-  removing the name. Cut child 2's work on its own branch.
+Re-sized on route C by the Architect's sizing D0 `evt_51cm672pdy1r1`,
+against child 1 at `c462fe831`.
+
+- **Build on child 2a's held tip over `c462fe831`.** Ports arrive from
+  2a's bound Runtime-IR region markers. This child never discovers a port,
+  never selects by `HostOpV1`, and never re-derives authority.
+- **Route C discharges:** port authenticity, the static acquire to Ok
+  binder to finalizer pairing per region, and lexical nesting inside one
+  declaration by path prefix.
+- **Route C does not discharge, so this child delivers:**
+  - instances: one static region under two call/return contexts mints
+    two instances;
+  - cross-declaration parents: a bracket body that calls a function
+    containing a bracket is not lexical nesting;
+  - the three closed body exits;
+  - outcome-merge and resume ports, defined structurally from the
+    finalizer Vis's own continuation (`\settled. Ret ...` in
+    `release_if_live`, prelude.rs ~:2819), never by search.
+- **Design reference, ported by hand, not rebased.** Evidence checkpoint
+  `81f222b7f` is 641 commits behind main, and 21 of its 26 paths have
+  changed since. Its minting (`mark_checked_resource_brackets`) selects by
+  `HostOpV1::ResourceRelease` and is NOT reusable. Its downstream is:
+  `BracketResponseContextKey`, `BracketSettlementRegion`,
+  `bind_bracket_response_coordinates`, the Phase-A partition
+  (responses.rs:2775) and `ResponseDisposition::BracketOwned` (:735).
+  The plan is built before Phase A (construction.rs:1406).
+- **Route D's child 1 (`4b4c8565c`) contributes nothing** and stays held.
+  Never delete, reset or move `wp/RT-BRACKET-PRODUCER-AUTHENTICITY` or
+  `wp/RT-BRACKET-PRODUCER-AUTHENTICITY-route-C`. Cut this child's work on
+  its own branch.
+- **`bracket_release_only_suffix` is GONE and must not return in any form.**
 
 ## 2. Deliverable
 

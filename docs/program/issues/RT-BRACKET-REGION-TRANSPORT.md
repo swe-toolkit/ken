@@ -1,0 +1,90 @@
+---
+id: RT-BRACKET-REGION-TRANSPORT
+title: "CHILD 2a of RT-BRACKET-CONTROL-REGION-IR, by route C. Child 1's bracket regions are computed on the normalized plane and then dropped (compiler_driver binds them to _), and after erasure the confined finalizer lowers to the same HostOpV1::ResourceRelease as a public release, so nothing downstream can tell them apart. Carry each region across erasure as one compiler-private Runtime-IR bracket marker, bound exactly to its region, so the settlement plane reads ports from markers and never from HostOpV1. THIS CHILD DOES NOT LAND ALONE: it is a held, reviewed input assembled by child 3."
+status: ready
+owner: runtime
+size: M
+gate: none
+tier: T1
+depends_on: [RT-BRACKET-PRODUCER-AUTHENTICITY]
+blocks: [RT-BRACKET-SETTLEMENT-PLANE]
+github: null
+origin: "Operator 2026-10-18 (\"concur with rec on px8ta decision\": route C child 1, children 2 and 3 sized after it). Architect sizing D0 evt_51cm672pdy1r1 on child 1 at c462fe831 (Architect approval as a held input evt_2hz1a3x9tzp8k, Decision dec_1ngs256pczqdk) found the region-transport seam that neither child-2 nor child-3 frame named, and cut it as its own child. Steward-filed per COORDINATION section 2."
+---
+
+> **AUTHORIZED AND STARTABLE.** This child does NOT land on its own. Its
+> reviewed tip is a held input that child 3 assembles. No publication and
+> no partial landing.
+
+# Bracket regions survive erasure as bound markers
+
+## Objective
+
+Every route-C bracket region reaches Runtime IR as exactly one
+compiler-private marker on its finalizer occurrence, bound one-to-one to
+the region the collector found, so child 2b can read authenticated ports
+from Runtime IR.
+
+## Settled inputs (Architect `evt_51cm672pdy1r1`, on `c462fe831`)
+
+- **Build on `c462fe831`** (`wp/RT-BRACKET-PRODUCER-AUTHENTICITY-route-C`),
+  on this child's own branch. Never move, reset or delete that ref, or
+  `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
+- **The drop.** `complete_native_program_preparation` destructures the
+  regions as `bracket_regions: _` (compiler_driver.rs ~:3062). The only
+  reader is the test accessor `bracket_regions()`.
+- **The erasure collision.** `RuntimeExpr::Effect` carries `HostOpV1`
+  only (ken-runtime-support ir.rs ~:764), and both checked release IDs
+  lower to `HostOpV1::ResourceRelease`. Erasure still sees the checked
+  constructor at `lower_checked_host_computation` (erasure.rs ~:3735), so
+  it can mark the finalizer by checked identity.
+- **The precedent.** The oriented markers (`CheckedRecursiveInvocation`,
+  `CheckedComputationalIH*`) carry a `checked_occurrence_path` template
+  computed on `normalized_bodies`, and
+  `bind_oriented_runtime_marker_locations` (erasure.rs ~:1942) binds each
+  template exactly, refusing an unbound one.
+- **The coordinate seam.** The collector's paths are `Term::children`
+  indices, while erasure uses its own edge tags (erasure.rs ~:2771-2937).
+  So the binding compares two independent walks.
+- **Authorized form.** The marker is umbrella-D1 compiler IR: a
+  `#[doc(hidden)]` compiler-private Runtime-IR wrapper, not a runtime
+  value, syntax, effect, host op or ABI field.
+- **Visibility.** `RuntimeExpr` is `pub` and reaches ken-cli,
+  ken-elaborator, ken-interp, ken-runtime and ken-runtime-support. The
+  precedent `CheckedSubcontinuationFrame` is matched in four of them, so
+  the cross-crate exhaustiveness sweep is owed, by grep.
+
+Treat anchors as perishable. If a settled input is false on the landed
+base, stop and report the mismatch.
+
+## Deliverable
+
+One marker variant in ir.rs, its minting and exact binding in erasure, the
+`compiler_driver` handoff of `bracket_regions` into erasure, and the
+collector arity hardening below.
+
+## Acceptance
+
+- **AC-0 (D0, run first).** On the c462fe831 test population (single plus
+  the console lookalike, two public early releases, multi-leaf, nested-2,
+  triple) plus Buffer, anonymous Mapping and FileBacked-in-FS:
+  - collector regions equal bound Runtime markers, one to one;
+  - every marked finalizer binds to exactly one region;
+  - the public `release` effects stay unmarked.
+- **AC-1 (paired).** Minting by `HostOpV1::ResourceRelease` instead
+  over-marks the early-release fixture: 3 markers where 1 is expected.
+  This is a prediction; run it.
+- **AC-2.** A region with no marker, a marker with no region, and a
+  region bound twice each reach an exact named refusal.
+- **AC-3 (arity hardening).** A hand-built collector row with
+  `PrivateBracketRelease` under-applied (2 args) refuses with E0082.
+  Paired: at `c462fe831` the same row returns `Ok` with 0 regions.
+- **AC-4.** The cross-crate `RuntimeExpr` match sweep is complete by grep,
+  and runtime behaviour on the population is unchanged.
+
+## Stop conditions
+
+- A marker that needs a host op, an ABI field, a runtime value or a
+  kernel change: stop to the operator.
+- A region that cannot be bound exactly from the two walks: stop with the
+  row. Do not fall back to selecting by `HostOpV1`.
