@@ -20,11 +20,15 @@ A natural numerator and a syntactically positive denominator suffice to
 represent every non-negative rational. The constructor preserves the supplied
 spelling; equality of values is instead stated by equality of cross products.
 No normal form, quotient, rounding, or floating comparison is required.
+`rational_min` and `rational_max` select one stored rational by exact value order;
+their six checked bounds support interval hull and intersection.
 
 ## 2. Definition
 
 The second constructor field is the denominator's predecessor: `MkRational n k`
 represents `n/(Suc k)`. All exported calculations preserve that positivity.
+Min and max compare exact values and return an original operand; neither
+normalizes its spelling.
 
 ```ken
 import Core.Logic.Transport (sym, trans, cong)
@@ -580,6 +584,104 @@ pub theorem rational_mul_mono
           }
       }
   }
+
+pub fn rational_min (x : Rational) (y : Rational) : Rational =
+  rational_pick (rational_leq x y) x y
+
+pub fn rational_max (x : Rational) (y : Rational) : Rational =
+  rational_pick (rational_leq x y) y x
+
+pub proof leq_left for rational_min
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq (rational_min x y) x) =
+  pick_leq_first (rational_leq x y) x y Refl
+
+pub proof leq_right for rational_min
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq (rational_min x y) y) =
+  pick_leq_second (rational_leq x y) x y Refl
+
+pub proof greatest for rational_min
+      (x : Rational) (y : Rational) (k : Rational)
+    : IsTrue (rational_leq k x)
+      → IsTrue (rational_leq k y)
+      → IsTrue (rational_leq k (rational_min x y)) =
+  pick_greatest (rational_leq x y) x y k
+
+pub proof left_leq for rational_max
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq x (rational_max x y)) =
+  pick_max_first (rational_leq x y) x y Refl
+
+pub proof right_leq for rational_max
+      (x : Rational) (y : Rational)
+    : IsTrue (rational_leq y (rational_max x y)) =
+  pick_max_second (rational_leq x y) x y Refl
+
+pub proof least for rational_max
+      (x : Rational) (y : Rational) (k : Rational)
+    : IsTrue (rational_leq x k)
+      → IsTrue (rational_leq y k)
+      → IsTrue (rational_leq (rational_max x y) k) =
+  λhx. λhy. pick_least (rational_leq x y) y x k hy hx
+
+fn rational_pick (b : Bool) (x : Rational) (y : Rational) : Rational =
+  match b {
+    True ↦ x;
+    False ↦ y
+  }
+
+theorem pick_leq_first
+      (b : Bool) (x : Rational) (y : Rational)
+    : Equal Bool (rational_leq x y) b → IsTrue (rational_leq (rational_pick b x y) x) =
+  match b {
+    True ↦ λh. (proof refl for rational_leq) x;
+    False ↦ λh. (proof total for rational_leq) x y h
+  }
+
+theorem pick_leq_second
+      (b : Bool) (x : Rational) (y : Rational)
+    : Equal Bool (rational_leq x y) b → IsTrue (rational_leq (rational_pick b x y) y) =
+  match b {
+    True ↦ λh. h;
+    False ↦ λh. (proof refl for rational_leq) y
+  }
+
+theorem pick_max_first
+      (b : Bool) (x : Rational) (y : Rational)
+    : Equal Bool (rational_leq x y) b → IsTrue (rational_leq x (rational_pick b y x)) =
+  match b {
+    True ↦ λh. h;
+    False ↦ λh. (proof refl for rational_leq) x
+  }
+
+theorem pick_max_second
+      (b : Bool) (x : Rational) (y : Rational)
+    : Equal Bool (rational_leq x y) b → IsTrue (rational_leq y (rational_pick b y x)) =
+  match b {
+    True ↦ λh. (proof refl for rational_leq) y;
+    False ↦ λh. (proof total for rational_leq) x y h
+  }
+
+theorem pick_greatest
+      (b : Bool) (x : Rational) (y : Rational) (k : Rational)
+    : IsTrue (rational_leq k x)
+      → IsTrue (rational_leq k y)
+      → IsTrue (rational_leq k (rational_pick b x y)) =
+  match b {
+    True ↦ λhx. λhy. hx;
+    False ↦ λhx. λhy. hy
+  }
+
+theorem pick_least
+      (b : Bool) (x : Rational) (y : Rational) (k : Rational)
+    : IsTrue (rational_leq x k)
+      → IsTrue (rational_leq y k)
+      → IsTrue (rational_leq (rational_pick b x y) k) =
+  match b {
+    True ↦ λhx. λhy. hx;
+    False ↦ λhx. λhy. hy
+  }
 ```
 
 ## 3. Using it
@@ -618,6 +720,13 @@ totality and the actual false comparison force the reverse comparison.
 Addition and multiplication preserve paired rational inequalities: the
 monotonicity proofs distribute and permute natural cross products, lift both
 input bounds through non-negative factors, and reassemble checked Nat order.
+
+Min and max choose a stored operand after one rational comparison. Each
+comparison branch discharges its own bounds from reflexivity, the checked
+false-comparison converse, or the caller's hypotheses. A private Boolean pick
+binds the computed comparison explicitly, so a dependent match refines that
+exact occurrence. The six public attached proofs expose both operand bounds
+and the greatest-lower/least-upper properties without adding assumptions.
 
 Commutativity and multiplicative associativity lift the matching natural-number
 algebra to both numerator and denominator. Additive associativity expands the
@@ -1416,6 +1525,9 @@ constructor never accepts a denominator equal to zero, even when multiplication
 forms an unreduced representation. Equivalence and all algebraic equations
 compare values; different carrier spellings are not asserted to have structural
 `Equal Rational` proofs. The Boolean order uses the canonical Nat relation.
+Value-equivalent but structurally distinct inputs may yield different stored
+spellings under
+min/max when argument order changes; no structural commutativity is claimed.
 
 ## 6. References
 
@@ -1427,15 +1539,16 @@ compare values; different carrier spellings are not asserted to have structural
   — normative carrier, algebra and trust boundaries for this package.
 - **Ken specification** —
   [Exact numerical intervals](../../../../spec/50-stdlib/68-numerical.md)
-  — the two-input rational monotonicity obligations used by intervals.
+  — monotonicity and min/max order obligations used by intervals.
 
 ## 7. Trust & derivation
 
 1. **Public API.** The exported constructor, projections, value constants,
    natural embedding, equivalence, three arithmetic/order operations and the
    checked equations and order laws of specification §§1–2.2 appear above.
-   `rational_add_mono` and `rational_mul_mono` add the checked two-input
-   monotonicity required by exact intervals.
+   `rational_add_mono` and `rational_mul_mono` supply checked two-input
+   monotonicity. `rational_min` and `rational_max` add six attached order
+   proofs required by interval hull and intersection.
 2. **Source map.** [Definition](#2-definition) lists the exported values and
    laws; [Laws & proofs](#4-laws--proofs) explains and carries the private
    derivation, including the cross-product monotonicity helpers;
@@ -1445,6 +1558,8 @@ compare values; different carrier spellings are not asserted to have structural
    Order transitivity additionally uses the Nat positive-factor monotonicity
    and cancellation laws; totality uses the canonical Nat totality proof.
    Paired-input monotonicity uses only checked Nat add and multiply laws.
+   Comparison selection uses rational order reflexivity and totality, with
+   private pick helpers connecting each Boolean branch to its bounds.
 4. **Trusted-base delta.** Zero: all exported theorems carry checked proof
    terms. Nat and equality imports retain their existing trusted base; this
    package adds no `Axiom`, postulate, primitive or floating point.
