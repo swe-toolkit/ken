@@ -1,7 +1,7 @@
 ---
 id: LANG-EQ-SUGAR-ENDPOINT-SORT
 title: "A declaration with an Eq type-position binder over an unannotated Type, such as (a : Type) (h : Eq Type a a), is refused at its obligation with Type u1 vs Type u0, and a Type 1 carrier is refused outright: elab_type's SUGAR_EQ arm builds Term::Eq unchecked, so the endpoints' sort is never recorded against the carrier. Record it, zonking the carrier without defaulting"
-status: active
+status: merged
 owner: language
 size: S
 tier: T2
