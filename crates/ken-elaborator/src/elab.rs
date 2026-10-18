@@ -9511,6 +9511,37 @@ fn subset_constructor_motive(motive: Term, scrut_ty: &Term, scrut_core: &Term) -
     )
 }
 
+/// A nested matrix motive already has a pending tail telescope. Place this
+/// split's equation *after* that tail: the method compiler must first bind
+/// every pending field/IH/equation, then introduce the current method proof.
+fn subset_matrix_motive_after_tail(
+    motive: Term, scrut_ty: &Term, scrut_core: &Term, tail_len: usize,
+    span: &Span,
+) -> Result<Term, ElabError> {
+    fn append(body: Term, left: usize, equation: &Term) -> Option<Term> {
+        if left == 0 {
+            return Some(Term::pi(equation.clone(), weaken(&body, 1)));
+        }
+        let Term::Pi(domain, codomain) = body else { return None };
+        Some(Term::pi(*domain, append(*codomain, left - 1, equation)?))
+    }
+    let Term::Ascript(inner, motive_ty) = motive else {
+        return Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() });
+    };
+    let Term::Lam(domain, body) = *inner else {
+        return Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() });
+    };
+    let equation = Term::Eq(
+        Box::new(weaken(scrut_ty, (tail_len + 1) as i64)),
+        Box::new(weaken(scrut_core, (tail_len + 1) as i64)),
+        Box::new(Term::var(tail_len)),
+    );
+    let body = append(*body, tail_len, &equation).ok_or_else(|| {
+        ElabError::NonConvoyableRefinementSplit { span: span.clone() }
+    })?;
+    Ok(Term::Ascript(Box::new(Term::lam(*domain, body)), motive_ty))
+}
+
 /// Check `match scrut { C₁ p… => e₁ ; … }` against a KNOWN `expected` goal
 /// that may reference the scrutinee (a per-branch-varying `Ω`- or `Type`-
 /// motive) — the K4/AC4 dependent-elimination path. Only FLAT constructor
@@ -21466,10 +21497,10 @@ fn infer_virtual_pattern_alias(
 }
 
 #[inline(never)]
-fn finish_pattern_alias_frame(
+fn finish_pattern_alias_frame<T>(
     cx: &mut ElabCtx,
-    raw_methods_result: Result<Vec<Option<Term>>, ElabError>,
-) -> Result<Vec<Option<Term>>, ElabError> {
+    raw_methods_result: Result<T, ElabError>,
+) -> Result<T, ElabError> {
     let type_frame = cx.pattern_alias_type_frames.pop()
         .expect("infer_match alias-type frame must balance");
     if let Some(mismatch) = type_frame.type_mismatch {
@@ -21562,6 +21593,8 @@ struct IndexedMatchRootFrame {
 enum ColKind {
     Real,
     Ih,
+    /// A checked constructor-convoy equation from the owning method type.
+    Equation(u64),
 }
 
 /// The core occurrence of one pending pattern-matrix column.
@@ -22302,7 +22335,7 @@ fn tail_codomain(
         return Ok(weaken(ret_ty_base, depth_before_tail as i64));
     }
     match tail_col_kinds[0] {
-        ColKind::Ih => {
+        ColKind::Ih | ColKind::Equation(_) => {
             let ih_ty = tail_col_types[0].clone();
             let rest = tail_codomain(
                 cx,
@@ -23924,6 +23957,51 @@ fn compile_match_matrix(
     }
 
     match col_kinds[0] {
+        ColKind::Equation(split_id) => {
+            let proof_ty = col_types[0].clone();
+            let Some(frame_pos) = cx.path_conditions.iter().rposition(|frame| {
+                frame.split_id == split_id && frame.kind == SplitKind::Constructor
+            }) else {
+                return Err(ElabError::NonConvoyableRefinementSplit { span: top_span.clone() });
+            };
+            let frame = &cx.path_conditions[frame_pos];
+            let Some(growth) = cx.ctx.len().checked_sub(frame.install_depth) else {
+                return Err(ElabError::NonConvoyableRefinementSplit { span: top_span.clone() });
+            };
+            let expected = weaken(&frame.condition, growth as i64);
+            let (Term::Eq(old_ty, old_left, old_right), Term::Eq(new_ty, new_left, new_right)) =
+                (&expected, &proof_ty) else {
+                return Err(ElabError::NonConvoyableRefinementSplit { span: top_span.clone() });
+            };
+            // A later matrix split specializes the outer constructor's field.
+            // Its method type replaces `C field` by `C Concrete`; the checked
+            // equation must keep the same scrutinee and constructor head.
+            if !convert_type(cx.env, &cx.ctx, old_ty, new_ty)
+                || !convert_type(cx.env, &cx.ctx, old_left, new_left)
+                || peel_app(old_right).0 != peel_app(new_right).0
+            {
+                return Err(ElabError::NonConvoyableRefinementSplit { span: top_span.clone() });
+            }
+            let position = cx.ctx.len();
+            let previous = (frame.condition.clone(), frame.install_depth, frame.witness_position);
+            cx.path_conditions[frame_pos].condition = proof_ty.clone();
+            cx.path_conditions[frame_pos].install_depth = position;
+            cx.path_conditions[frame_pos].witness_position = Some(position);
+            cx.push_match_binder(proof_ty.clone(), MatchBinderOrigin::GeneratedEquation);
+            cx.hidden_positions.push(position);
+            let rows = rows.into_iter().map(RowState::under_core_binder).collect();
+            let inner = compile_match_matrix(
+                cx, arms, &col_types[1..], &col_kinds[1..], rows,
+                real_depth_so_far, top_span, root_frame_depth,
+                ret_ty_slot, arm_used, subsumed_by,
+            );
+            (cx.path_conditions[frame_pos].condition,
+                cx.path_conditions[frame_pos].install_depth,
+                cx.path_conditions[frame_pos].witness_position) = previous;
+            debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+            cx.ctx.pop();
+            Ok(Term::lam(proof_ty, inner?))
+        }
         ColKind::Ih => {
             if ret_ty_slot.is_none() {
                 let entry = cx.matrix_entries.last_mut().ok_or_else(|| {
@@ -24181,12 +24259,13 @@ fn compile_match_matrix(
                     Term::IndFormer { level_args, .. } => level_args,
                     _ => unreachable!("nested split head is an inductive former"),
                 },
-                Some(&col_types[0]), Some(&split_span), &predicates,
+                Some(&col_types[0]), Some(&split_span), &Term::var(0), &predicates,
             );
             let hidden = cx.hidden_positions.pop();
             debug_assert_eq!(hidden, Some(cx.ctx.len() - 1));
             cx.ctx.pop();
-            let raw_methods: Vec<Term> = raw_methods_result?
+            let (raw_methods, nested_convoy) = raw_methods_result?;
+            let raw_methods: Vec<Term> = raw_methods
                 .into_iter()
                 .map(|method| method.expect("nested constructor coverage checked in bucket builder"))
                 .collect();
@@ -24202,6 +24281,12 @@ fn compile_match_matrix(
                 col_types, col_kinds, ret_ty_base,
                 &split_span, top_span,
             )?;
+            let motive = if nested_convoy {
+                subset_matrix_motive_after_tail(
+                    motive, &weaken(&col_types[0], 1),
+                    &Term::var(0), col_types.len() - 1, &split_span,
+                )?
+            } else { motive };
             let args = params0.iter().map(|p| weaken(p, 1)).collect::<Vec<_>>();
             let mut elim = Term::Elim {
                 fam: d_id0,
@@ -24258,6 +24343,24 @@ fn compile_match_matrix(
                         })?;
                 }
             }
+            let elim = if nested_convoy {
+                // The inner split equation is *after* the pending tail in
+                // its motive. Apply every tail argument first, and only then
+                // supply Refl for the split binder. This includes an outer
+                // matrix convoy equation when the split is nested in a field.
+                let tail_len = col_types.len() - 1;
+                let mut applied = weaken(&elim, tail_len as i64);
+                for index in (0..tail_len).rev() {
+                    applied = Term::app(applied, Term::var(index));
+                }
+                let mut body = Term::app(
+                    applied, Term::Refl(Box::new(Term::var(tail_len))),
+                );
+                for domain in col_types[1..].iter().rev() {
+                    body = Term::lam(domain.clone(), body);
+                }
+                body
+            } else { elim };
             Ok(Term::lam(col_types[0].clone(), elim))
         }
     }
@@ -24325,7 +24428,72 @@ fn build_ctor_buckets(
     split_level_args: &[Level],
     split_column_type: Option<&Term>,
     split_span: Option<&Span>,
+    split_core: &Term,
     predicates: &[ResultPredicate],
+) -> Result<(Vec<Option<Term>>, bool), ElabError> {
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let saved_result = ret_ty_slot.clone();
+    let saved_used = arm_used.to_vec();
+    let saved_subsumed = subsumed_by.to_vec();
+    let first = build_ctor_buckets_once(
+        cx, arms, ind0, d_id0, m0, params0, rows.clone(), tail_col_types,
+        tail_col_kinds, real_depth_so_far, top_span, root_frame_depth,
+        ret_ty_slot, arm_used, subsumed_by, allow_index_omission, indexed_root,
+        tail_under_split, split_level_args, split_column_type, split_span,
+        split_core, predicates, split_id, false,
+    );
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            *ret_ty_slot = saved_result;
+            arm_used.clone_from_slice(&saved_used);
+            subsumed_by.clone_from_slice(&saved_subsumed);
+            build_ctor_buckets_once(
+                cx, arms, ind0, d_id0, m0, params0, rows, tail_col_types,
+                tail_col_kinds, real_depth_so_far, top_span, root_frame_depth,
+                ret_ty_slot, arm_used, subsumed_by, allow_index_omission, indexed_root,
+                tail_under_split, split_level_args, split_column_type, split_span,
+                split_core, predicates, split_id, true,
+            ).map(|methods| (methods, true))
+        }
+        other => other.map(|methods| (methods, false)),
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn build_ctor_buckets_once(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    ind0: &InductiveDecl,
+    d_id0: GlobalId,
+    m0: usize,
+    params0: &[Term],
+    rows: Vec<RowState>,
+    tail_col_types: &[Term],
+    tail_col_kinds: &[ColKind],
+    real_depth_so_far: usize,
+    top_span: &Span,
+    root_frame_depth: usize,
+    ret_ty_slot: &mut Option<Term>,
+    arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
+    allow_index_omission: bool,
+    indexed_root: bool,
+    tail_under_split: bool,
+    split_level_args: &[Level],
+    split_column_type: Option<&Term>,
+    split_span: Option<&Span>,
+    split_core: &Term,
+    predicates: &[ResultPredicate],
+    split_id: u64,
+    convoy: bool,
 ) -> Result<Vec<Option<Term>>, ElabError> {
     let mut methods: Vec<Option<Term>> = vec![None; ind0.constructors.len()];
     let mut nested_motive: Option<Term> = None;
@@ -24437,7 +24605,15 @@ fn build_ctor_buckets(
             }
         }
         let motive = if let Some(motive) = nested_motive.as_ref().or(domain_only_motive.as_ref()) {
-            Some(motive.clone())
+            Some(if convoy {
+                let transformed = subset_matrix_motive_after_tail(
+                    motive.clone(),
+                    &weaken(split_column_type.expect("nested split type"), 1),
+                    split_core, tail_col_types.len(),
+                    split_span.expect("nested split span"),
+                )?;
+                transformed
+            } else { motive.clone() })
         } else if indexed_root {
             cx.indexed_match_roots.last().and_then(|root| root.motive.as_deref()).cloned()
         } else if !tail_under_split {
@@ -24454,12 +24630,19 @@ fn build_ctor_buckets(
                     weaken(ret, 1), ret_level, Vec::new(), Term::var(0), false,
                 );
                 let Term::Elim { motive, .. } = elim else { unreachable!() };
-                *motive
+                if convoy {
+                    subset_constructor_motive(*motive, &scrut_ty, split_core)
+                } else { *motive }
             })
         } else {
             None
         };
-        let mut new_col_types = if let Some(motive) = motive.as_ref() {
+        if convoy && motive.is_none() {
+            return Err(ElabError::NonConvoyableRefinementSplit {
+                span: top_span.clone(),
+            });
+        }
+        let (mut new_col_types, equation_type) = if let Some(motive) = motive.as_ref() {
             let params = if tail_under_split {
                 params0[..m0].iter().map(|p| weaken(p, 1)).collect::<Vec<_>>()
             } else {
@@ -24483,14 +24666,22 @@ fn build_ctor_buckets(
                 domains.push(*domain);
                 method_ty = *rest;
             }
-            domains
+            let equation = if convoy {
+                let Term::Pi(domain, _) = whnf(cx.env, &telescope_ctx, &method_ty) else {
+                    return Err(ElabError::NonConvoyableRefinementSplit {
+                        span: top_span.clone(),
+                    });
+                };
+                Some(*domain)
+            } else { None };
+            (domains, equation)
         } else {
             if tail_under_split {
                 return Err(ElabError::Internal("split tail has no derived telescope".into()));
             }
             let mut types = field_types0;
             types.extend(std::iter::repeat(Term::ty(Level::Zero)).take(p_ihs0));
-            types
+            (types, None)
         };
         if !tail_under_split {
             new_col_types.extend_from_slice(tail_col_types);
@@ -24498,6 +24689,10 @@ fn build_ctor_buckets(
         let mut new_col_kinds: Vec<ColKind> = vec![ColKind::Real; n_args0];
         new_col_kinds.extend(std::iter::repeat(ColKind::Ih).take(p_ihs0));
         new_col_kinds.extend_from_slice(tail_col_kinds);
+        if let Some(equation) = equation_type {
+            new_col_types.push(equation);
+            new_col_kinds.push(ColKind::Equation(split_id));
+        }
 
         let base = cx.ctx.len();
         cx.match_frames.push(MatchFrame::new(
@@ -25434,7 +25629,7 @@ fn infer_match_with_predicates(
         });
     }
     let result = (|| {
-    let (raw_methods, ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
+    let ((raw_methods, root_convoy), ret_ty_slot, arm_used, subsumed_by) = compile_matrix_entry(
         cx, root_frame_depth, seed, arms.len(),
         |cx, slot, used, subsumed| {
             let rows = build_alias_rows(cx, arms, &scrut_core, &scrut_ty);
@@ -25460,6 +25655,7 @@ fn infer_match_with_predicates(
                     },
                     None,
                     None,
+                    &scrut_core,
                     predicates,
                 )
             })();
@@ -25487,6 +25683,9 @@ fn infer_match_with_predicates(
 
     let ret_ty = ret_ty_slot.unwrap_or_else(|| Term::ty(Level::Zero));
     if indexed {
+        if root_convoy {
+            return Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() });
+        }
         let Term::IndFormer { level_args, .. } = &head else {
             unreachable!("inductive scrutinee head checked above")
         };
@@ -25532,7 +25731,7 @@ fn infer_match_with_predicates(
     let Term::IndFormer { level_args, .. } = head else {
         unreachable!("inductive scrutinee head checked above")
     };
-    let elim = matrix_family_elim(
+    let mut elim = matrix_family_elim(
         &ind,
         d_id,
         &level_args,
@@ -25541,9 +25740,16 @@ fn infer_match_with_predicates(
         weaken(&ret_ty, 1),
         ret_level,
         raw_methods,
-        scrut_core,
+        scrut_core.clone(),
         false,
     );
+    if root_convoy {
+        let Term::Elim { motive, .. } = &mut elim else { unreachable!() };
+        *motive = Box::new(subset_constructor_motive(
+            motive.as_ref().clone(), &scrut_ty, &scrut_core,
+        ));
+        elim = Term::app(elim, Term::Refl(Box::new(scrut_core)));
+    }
 
     Ok((elim, ret_ty))
     })();

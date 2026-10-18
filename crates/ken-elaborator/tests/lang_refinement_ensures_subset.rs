@@ -1,7 +1,7 @@
 //! Contract results are checked subset Σ values, not detached obligations.
 
 use ken_elaborator::{ElabEnv, ElabError, ObligationKind};
-use ken_kernel::{Decl, Level, Term};
+use ken_kernel::{Decl, GlobalId, Level, Term};
 
 /// Promise class: durable result-representation invariant.
 /// MEASURED: the admitted function's kernel type has a subset-Σ result and
@@ -179,6 +179,84 @@ fn let_result_pair_uses_a_checked_rhs_equality() {
     let Term::Pi(_, rest) = rest.as_ref() else { panic!("let binder") };
     assert!(matches!(rest.as_ref(), Term::Pi(eq, _)
         if matches!(eq.as_ref(), Term::Eq(..))), "one checked let equation binder");
+}
+
+/// Promise class: durable nonrecursive constructor-matrix convoy invariant.
+/// MEASURED: a nested Bool pattern beneath a two-constructor wrapper emits
+/// three checked result pairs, with open holes consuming both split equations
+/// where the nested pattern demands them. CLAIMED: general-matrix splits
+/// provide checked evidence at the actual result leaves. THE GAP: inspect
+/// each method's final Refl application and the hole's binder telescope;
+/// obligation counts alone would pass with an unchecked path assumption.
+#[test]
+fn nested_constructor_result_pairs_replay_checked_split_equations() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("data Slot = Filled Bool | Vacant")
+        .expect("finite, nonrecursive wrapper");
+    let int = Term::const_(env.globals["Int"], vec![]);
+    env.declare_postulate_raw("P", Term::pi(int, Term::omega(Level::Zero)))
+        .expect("opaque result predicate");
+    let result = env.elaborate_decl_v1(
+        "fn nested_subset (s : Slot) : Int ensures P result = match s { Filled True |-> 5 ; Filled False |-> 6 ; Vacant |-> 7 }",
+    ).expect("nested checked result pairs");
+    assert_eq!(result.obligations.len(), 3);
+    assert!(result.obligations.iter().all(|o|
+        matches!(o.kind, ObligationKind::Ensures) && env.is_open_hole(o.hole_id)));
+    fn refl_elim_count(term: &Term, family: GlobalId) -> usize {
+        let here = if let Term::App(head, witness) = term {
+            let mut function = head.as_ref();
+            while let Term::App(prior, _) = function { function = prior; }
+            usize::from(matches!(function, Term::Elim { fam, .. } if *fam == family)
+                && matches!(witness.as_ref(), Term::Refl(_)))
+        } else { 0 };
+        here + term.children().iter().map(|child| refl_elim_count(child, family)).sum::<usize>()
+    }
+    fn proof_pair_carries_hole(term: &Term, hole: GlobalId) -> bool {
+        fn contains(term: &Term, hole: GlobalId) -> bool {
+            matches!(term, Term::Const { id, .. } if *id == hole)
+                || term.children().iter().any(|child| contains(child, hole))
+        }
+        matches!(term, Term::Pair(_, proof) if contains(proof, hole))
+            || term.children().iter().any(|child| proof_pair_carries_hole(child, hole))
+    }
+    let Decl::Transparent { body: Term::Lam(_, body), .. } =
+        env.env.lookup(result.def_id).expect("checked nested result") else { panic!("function") };
+    assert_eq!(refl_elim_count(body, env.globals["Slot"]), 1,
+        "root split consumes its own checked equation");
+    assert_eq!(refl_elim_count(body, env.globals["Bool"]), 1,
+        "nested split consumes its own checked equation after the root tail");
+    for (obligation, split_types) in result.obligations.iter().zip([
+        vec![env.globals["Slot"], env.globals["Bool"]],
+        vec![env.globals["Slot"], env.globals["Bool"]],
+        vec![env.globals["Slot"]],
+    ]) {
+        let mut actual = Vec::new();
+        let mut goal = &obligation.goal_closed;
+        while let Term::Pi(domain, body) = goal {
+            if let Term::Eq(carrier, _, _) = domain.as_ref() {
+                let Term::IndFormer { id, .. } = carrier.as_ref() else {
+                    panic!("constructor equation carrier: {carrier:?}");
+                };
+                actual.push(*id);
+            }
+            goal = body;
+        }
+        assert_eq!(actual, split_types, "only the witnessed splits appear in the hole context");
+        assert!(proof_pair_carries_hole(body, obligation.hole_id),
+            "the exact recorded obligation is the pair's proof");
+    }
+
+    let closed = env.elaborate_decl_v1(
+        "fn nested_closed (s : Slot) : Int ensures Equal Int result result = match s { Filled True |-> 5 ; Filled False |-> 6 ; Vacant |-> 7 }",
+    ).expect("each branch has a closed reflexive certificate");
+    let Decl::Transparent { body: Term::Lam(_, body), .. } =
+        env.env.lookup(closed.def_id).expect("checked closed result") else { panic!("function") };
+    assert_eq!(closed.obligations.len(), 3);
+    assert!(closed.obligations.iter().all(|o| !env.is_open_hole(o.hole_id)));
+    assert_eq!(refl_elim_count(body, env.globals["Slot"]), 0,
+        "closed certificates need no outer convoy");
+    assert_eq!(refl_elim_count(body, env.globals["Bool"]), 0,
+        "closed certificates need no inner convoy");
 }
 
 /// Promise class: transition sentinel for inferred contract carriers.
