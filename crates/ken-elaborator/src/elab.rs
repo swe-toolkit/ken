@@ -1732,7 +1732,7 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             let f_k = elab_type(cx, f)?;
             let a_k = elab_type(cx, a)?;
             unify_type_position_argument_sort(cx, &f_k, &a_k);
-            introduce_type_position_argument(cx, &f_k, &a_k, span)?;
+            let a_k = introduce_type_position_argument(cx, &f_k, &a_k, span)?;
             Ok(Term::app(f_k, a_k))
         }
 
@@ -1823,12 +1823,7 @@ fn prepare_let_rhs(
     match ty_opt {
         Some(ty) => {
             let ty_core = elab_type_in_slot(cx, ty, RefinementSlot::Outermost)?;
-            let predicate = literal_result_predicate(cx, ty, &ty_core)?;
-            let rhs_core = if let Some(predicate) = predicate {
-                check_result_position(cx, rhs, &ty_core, span, &[predicate])?
-            } else {
-                check(cx, rhs, &ty_core, span)?
-            };
+            let rhs_core = check(cx, rhs, &ty_core, span)?;
             Ok((rhs_core, ty_core))
         }
         None => infer(cx, rhs),
@@ -2261,15 +2256,6 @@ fn check_record(
         let field_expected = subst_tel(&field_types[index], &args);
         let value = if let Some((_, expr, _)) = fields.iter().find(|(given, _, _)| given == name) {
             let value = check(cx, expr, &field_expected, expr.span())?;
-            if let Some(template) = cx.refinement_facts
-                .record_field_predicates.get(&owner_id)
-                .and_then(|predicates| predicates.get(index))
-                .and_then(Option::as_ref)
-                .cloned()
-            {
-                let predicate = subst_outer(&template, args.len(), &args, 0);
-                emit_refinement_predicate(cx, predicate, value.clone(), expr.span())?;
-            }
             value
         } else {
             let mut projected = base_core.clone().expect("update base established");
@@ -12598,16 +12584,14 @@ fn unify_eq_endpoint_sort(cx: &mut ElabCtx<'_>, carrier: &Term, endpoint: &Term)
     unify_sorts_up_to_whnf(cx, carrier, &endpoint_ty);
 }
 
-/// An application in a written type owes the same refinement introduction as
-/// a value call. The already-checked global identity selects literal parameter
-/// or constructor-field facts; named domains use the value route's alias-root
-/// reuse rule. A missing obligation channel refuses rather than erasing.
+/// Written type applications use the same outermost checked coercion as term
+/// calls. A typed refinement argument must be present in the emitted core;
+/// recording a detached obligation for an unchanged carrier would forge it.
 #[inline(never)]
 fn introduce_type_position_argument(
     cx: &mut ElabCtx<'_>, function: &Term, argument: &Term, span: &Span,
-) -> Result<(), ElabError> {
-    if !cx.type_introductions { return Ok(()); }
-    emit_call_refinements(cx, function, argument, span)?;
+) -> Result<Term, ElabError> {
+    if !cx.type_introductions { return Ok(argument.clone()); }
     let (head, previous_args) = peel_app(function);
     // Relevance belongs to the head's Pi domain, not its variant. The aligned
     // resolver context supplies local heads; checked globals supply the rest.
@@ -12616,23 +12600,23 @@ fn introduce_type_position_argument(
         span: span.clone(),
         reason: "cannot check an argument's refinement in type position".into(),
     };
-    let mut ty = kernel_infer_current(cx, &head).map_err(unchecked)?;
+    let Ok(mut ty) = kernel_infer_current(cx, &head) else {
+        return Ok(argument.clone());
+    };
     for arg in &previous_args {
         let Term::Pi(_, codomain) = whnf(cx.env, &cx.ctx, &ty) else {
-            return Ok(());
+            return Ok(argument.clone());
         };
         ty = subst0(&codomain, arg);
     }
     let Term::Pi(domain, _) = whnf(cx.env, &cx.ctx, &ty) else {
-        return Ok(());
+        return Ok(argument.clone());
     };
-    let named = matches!(cx.metas.zonk_term(&domain),
-        Term::Const { id, .. } if cx.refinement_facts.refinement_predicate(id).is_some());
-    if !named {
-        return Ok(());
+    if subset_refinement(cx, &domain).is_none() {
+        return Ok(argument.clone());
     }
     let argument_ty = kernel_infer_current(cx, argument).map_err(unchecked)?;
-    emit_refinement_introduction(cx, &domain, &argument_ty, argument.clone(), span, None).map(|_| ())
+    coerce_refinement(cx, argument.clone(), &argument_ty, &domain, span)
 }
 
 /// A direct call can introduce a checked argument at a source-refined
@@ -12686,12 +12670,7 @@ fn infer_ascription(
     _span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let ty_core = elab_type_in_slot(cx, ty, RefinementSlot::Outermost)?;
-    let predicate = literal_result_predicate(cx, ty, &ty_core)?;
-    let e_core = if let Some(predicate) = predicate {
-        check_result_position(cx, e, &ty_core, e.span(), &[predicate])?
-    } else {
-        check(cx, e, &ty_core, e.span())?
-    };
+    let e_core = check(cx, e, &ty_core, e.span())?;
     Ok(ascribed_inference(e_core, ty_core))
 }
 
@@ -12886,7 +12865,6 @@ fn infer_application(
     match f_ty_wh {
         Term::Pi(dom, cod) => {
             let a_core = check(cx, a, &dom, span)?;
-            emit_call_refinements(cx, &f_core, &a_core, span)?;
             let result_ty = subst0(&cod, &a_core);
             Ok((Term::app(f_core, a_core), result_ty))
         }
@@ -19736,90 +19714,14 @@ pub(crate) fn innermost_refine_pred(ty: &RType) -> Option<&RExpr> {
     }
 }
 
-/// The only admission route for a written callable signature. Its carrier
-/// erasure and literal-parameter facts are produced in one scope: an eligible
-/// spine domain cannot be admitted without collecting its predicate.
-/// The returned core is NOT zonked: an unsolved universe level must stay a
-/// meta until the declaration's own scope end, where the body may solve it.
-/// Metas are level-only, so the raw core has the same Pi spine the collector
-/// reads.
+/// The only admission route for a written callable signature. The raw
+/// checked core retains refined domains and codomains as subset Σ types;
+/// level metas remain unsolved until the declaration body can constrain them.
 #[must_use]
 fn elab_signature(
     cx: &mut ElabCtx<'_>, ty: &RType, result: bool,
-) -> Result<(Term, Vec<Option<Term>>), ElabError> {
-    let core = elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })?;
-    let params = collect_refined_params(cx, ty, &core)?;
-    Ok((core, params))
-}
-
-fn record_refined_params(facts: &mut RefinementFacts, id: GlobalId, params: Vec<Option<Term>>) {
-    if params.iter().any(Option::is_some) {
-        facts.refined_params.insert(id, params);
-    }
-}
-
-/// A source-refined parameter still has a carrier Π domain. Its direct
-/// application carries the introduction obligation; callee recognition and
-/// higher-order preservation belong to LANG-REFINED-PARAM-REQUIRES-DESUGAR.
-#[inline(never)]
-fn collect_refined_params(
-    cx: &mut ElabCtx<'_>, declared: &RType, core: &Term,
-) -> Result<Vec<Option<Term>>, ElabError> {
-    let base = cx.ctx.len();
-    let result = (|| {
-        let mut params = Vec::new();
-        // One entry per core Pi binder; only dependent Pi binds in the
-        // resolver context. Never re-elaborate a signature domain here.
-        let mut bound = Vec::new();
-        let (mut current, mut telescope) = (declared, core);
-        loop {
-            let (domain, codomain, binds) = match current {
-                RType::RPi(_, domain, codomain, _) => (domain.as_ref(), codomain.as_ref(), true),
-                RType::RArr(domain, codomain, _) | RType::REffectArr(domain, _, codomain, _) =>
-                    (domain.as_ref(), codomain.as_ref(), false),
-                _ => break,
-            };
-            let Term::Pi(core_domain, core_codomain) = telescope else {
-                return Err(ElabError::Internal(
-                    "a signature's source spine and its core telescope disagree".into()));
-            };
-            let carrier = lower_over_anonymous(core_domain, &bound);
-            let predicate = if let RType::RRefine(_, _, phi, _) = domain {
-                cx.ctx.push(carrier.clone());
-                let checked = elab_prop_at_omega(cx, phi, phi.span());
-                cx.ctx.pop();
-                Some(lift_over_anonymous(&Term::lam(carrier.clone(), checked?), &bound))
-            } else { None };
-            params.push(predicate);
-            if binds { cx.ctx.push(carrier); }
-            bound.push(binds);
-            current = codomain;
-            telescope = core_codomain;
-        }
-        Ok(params)
-    })();
-    cx.ctx.types.truncate(base);
-    result
-}
-
-/// Re-scope a term written under resolver binders to the core telescope.
-/// Each anonymous binder is inserted at its position, counting all inside it.
-fn lift_over_anonymous(term: &Term, bound: &[bool]) -> Term {
-    let mut lifted = term.clone();
-    for (position, &binds) in bound.iter().rev().enumerate() {
-        if !binds { lifted = shift(&lifted, 1, position) }
-    }
-    lifted
-}
-
-/// Inverse of the lift on terms that cannot mention anonymous binders.
-fn lower_over_anonymous(term: &Term, bound: &[bool]) -> Term {
-    let n = bound.len();
-    let mut lowered = term.clone();
-    for (index, &binds) in bound.iter().enumerate() {
-        if !binds { lowered = shift(&lowered, -1, n - 1 - index) }
-    }
-    lowered
+) -> Result<Term, ElabError> {
+    elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })
 }
 
 fn elaborate_v0(
