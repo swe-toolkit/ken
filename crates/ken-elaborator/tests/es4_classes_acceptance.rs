@@ -680,10 +680,10 @@ fn eq_and_deceq_int_instances_are_the_ds6a_certificate_posture() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// AC-transport — `Ord Char` by TRANSPORT from `Ord Int` (re-homed from the
-// Decimal/Char DEMOTE, WP lawful-classes-lane). `Char = {c:Int|isScalar c}`
-// is a canonical, refinement-erased carrier (`21 §6.3`), so the sound
-// realization is honest transport of `Ord Int`'s own fields via
+// AC-char-ord-law-lifting — `Ord Char` by TRANSPORT from `Ord Int` (re-homed
+// from the Decimal/Char DEMOTE, WP lawful-classes-lane). `Char` is a checked
+// `Σ(c:Int).isScalar c` subset (`21 §6.3`) whose first projection is Int;
+// the sound realization is honest transport of `Ord Int`'s own fields via
 // `.`-projection, not a fresh proof and not a fresh postulate. The
 // discriminator is HONESTY (every field present and real), not zero-delta
 // outright (`Ord Int`'s pre-existing `Axiom`s are still honestly there, one

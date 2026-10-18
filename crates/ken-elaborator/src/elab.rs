@@ -1989,18 +1989,72 @@ fn check_let(
     span: &Span,
     result_predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            check_let_once(cx, ty_opt, rhs, body, expected, span, result_predicates)
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[inline(never)]
+fn check_let_once(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr,
+    expected: &Term, span: &Span, result_predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
     let (mut rhs_core, mut rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     refine_let_rhs(cx, &mut rhs_core, &mut rhs_ty)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
+    let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
     let path_base = cx.path_conditions.len();
-    if let Some(equation) = equation {
-        cx.push_path(equation, cx.ctx.len(), SplitKind::Let);
+    if let Some(equation) = &equation {
+        cx.push_path(equation.clone(), cx.ctx.len(), SplitKind::Let);
     }
-    let body_result = check_result_position(cx, body, &weaken(expected, 1), span, result_predicates);
+    if convoy {
+        let Some(equation) = &equation else {
+            cx.ctx.pop();
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(), reason: "let result has no informative checked equation".into(),
+            });
+        };
+        let position = cx.ctx.len();
+        cx.push_match_binder(equation.clone(), MatchBinderOrigin::GeneratedEquation);
+        cx.hidden_positions.push(position);
+        cx.path_conditions.last_mut().expect("let path installed").witness_position = Some(position);
+    }
+    let checked = check_result_position(
+        cx, body, &weaken(expected, if convoy { 2 } else { 1 }), span, result_predicates,
+    );
     cx.path_conditions.truncate(path_base);
+    if convoy {
+        debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+        cx.ctx.pop();
+    }
     cx.ctx.pop();
-    let body_core = body_result?;
+    let body_core = checked?;
+    let body_core = if let Some(eq) = equation.filter(|_| convoy) {
+        let rhs_witness = if kernel_infer_raw(cx.env, &cx.ctx, &rhs_core).is_ok() {
+            rhs_core.clone()
+        } else {
+            ascribe_introduction_let_value(rhs_core.clone(), &rhs_ty)
+        };
+        let function = Term::Ascript(
+            Box::new(Term::lam(eq.clone(), body_core)),
+            Box::new(Term::pi(eq, weaken(expected, 2))),
+        );
+        Term::app(function, Term::Refl(Box::new(weaken(&rhs_witness, 1))))
+    } else { body_core };
     let rhs_core = ascribe_introduction_let_value(rhs_core, &rhs_ty);
     Ok(Term::Let {
         ty: Box::new(rhs_ty),
@@ -2032,6 +2086,19 @@ fn make_if_elim(
     result_ty: &Term,
     span: &Span,
 ) -> Result<Term, ElabError> {
+    make_if_elim_with_convoy(cx, condition, then_branch, else_branch, result_ty, span, false)
+}
+
+#[inline(never)]
+fn make_if_elim_with_convoy(
+    cx: &mut ElabCtx<'_>,
+    condition: Term,
+    then_branch: Term,
+    else_branch: Term,
+    result_ty: &Term,
+    span: &Span,
+    convoy: bool,
+) -> Result<Term, ElabError> {
     let classifier = kernel_infer_in_context_open(cx, &cx.ctx, result_ty).map_err(|error| match error {
         CurrentKernelQueryError::View(error) => error,
         CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
@@ -2049,8 +2116,18 @@ fn make_if_elim(
         }
     };
     let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
+    let motive_body = if convoy {
+        let equation = Term::Eq(
+            Box::new(weaken(&bool_ty, 1)),
+            Box::new(weaken(&condition, 1)),
+            Box::new(Term::var(0)),
+        );
+        Term::pi(equation, weaken(result_ty, 2))
+    } else {
+        weaken(result_ty, 1)
+    };
     let motive = Term::Ascript(
-        Box::new(Term::lam(bool_ty.clone(), weaken(result_ty, 1))),
+        Box::new(Term::lam(bool_ty.clone(), motive_body)),
         Box::new(Term::pi(bool_ty, weaken(&motive_sort, 1))),
     );
     let bool_decl = cx
@@ -2078,15 +2155,16 @@ fn make_if_elim(
         ));
     }
     debug_assert!(bool_decl.indices.is_empty());
-    Ok(Term::Elim {
+    let elim = Term::Elim {
         fam: cx.numeric_env.bool_id,
         level_args: vec![],
         params: vec![],
         motive: Box::new(motive),
         methods,
         indices: vec![],
-        scrut: Box::new(condition),
-    })
+        scrut: Box::new(condition.clone()),
+    };
+    Ok(if convoy { Term::app(elim, Term::Refl(Box::new(condition))) } else { elim })
 }
 
 fn check_if(
@@ -2098,24 +2176,74 @@ fn check_if(
     span: &Span,
     result_predicates: &[ResultPredicate],
 ) -> Result<Term, ElabError> {
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = check_if_once(cx, condition, then_branch, else_branch, expected, span, result_predicates);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            check_if_once(cx, condition, then_branch, else_branch, expected, span, result_predicates)
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[inline(never)]
+fn check_if_once(
+    cx: &mut ElabCtx<'_>,
+    condition: &RExpr,
+    then_branch: &RExpr,
+    else_branch: &RExpr,
+    expected: &Term,
+    span: &Span,
+    result_predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
     let condition_core = elaborate_if_condition(cx, condition)?;
+    let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
+    let then_core = check_if_branch(
+        cx, &condition_core, cx.numeric_env.bool_true_id,
+        then_branch, expected, result_predicates, convoy,
+    )?;
+    let else_core = check_if_branch(
+        cx, &condition_core, cx.numeric_env.bool_false_id,
+        else_branch, expected, result_predicates, convoy,
+    )?;
+    make_if_elim_with_convoy(cx, condition_core, then_core, else_core, expected, span, convoy)
+}
+
+#[inline(never)]
+fn check_if_branch(
+    cx: &mut ElabCtx<'_>, condition: &Term, constructor: GlobalId,
+    branch: &RExpr, expected: &Term, predicates: &[ResultPredicate], convoy: bool,
+) -> Result<Term, ElabError> {
     let base = cx.path_conditions.len();
-    let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
-    cx.push_path(Term::Eq(
-        Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
-        Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
-    ), cx.ctx.len(), SplitKind::If);
-    let then_result = check_result_position(cx, then_branch, expected, then_branch.span(), result_predicates);
+    let equation = Term::Eq(
+        Box::new(Term::indformer(cx.numeric_env.bool_id, vec![])),
+        Box::new(condition.clone()), Box::new(Term::constructor(constructor, vec![])),
+    );
+    cx.push_path(equation.clone(), cx.ctx.len(), SplitKind::If);
+    if convoy {
+        let position = cx.ctx.len();
+        cx.push_match_binder(equation.clone(), MatchBinderOrigin::GeneratedEquation);
+        cx.hidden_positions.push(position);
+        cx.path_conditions.last_mut().expect("branch path installed").witness_position = Some(position);
+    }
+    let checked = if convoy {
+        check_result_position(cx, branch, &weaken(expected, 1), branch.span(), predicates)
+    } else {
+        check_result_position(cx, branch, expected, branch.span(), predicates)
+    };
     cx.path_conditions.truncate(base);
-    let then_core = then_result?;
-    cx.push_path(Term::Eq(
-        Box::new(bool_ty), Box::new(condition_core.clone()),
-        Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
-    ), cx.ctx.len(), SplitKind::If);
-    let else_result = check_result_position(cx, else_branch, expected, else_branch.span(), result_predicates);
-    cx.path_conditions.truncate(base);
-    let else_core = else_result?;
-    make_if_elim(cx, condition_core, then_core, else_core, expected, span)
+    if convoy {
+        debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+        cx.ctx.pop();
+    }
+    checked.map(|body| if convoy { Term::lam(equation, body) } else { body })
 }
 
 fn infer_if(
@@ -12786,17 +12914,69 @@ fn infer_let(
     body: &RExpr,
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = infer_let_once(cx, ty_opt, rhs, body, span);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            infer_let_once(cx, ty_opt, rhs, body, span)
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[inline(never)]
+fn infer_let_once(
+    cx: &mut ElabCtx,
+    ty_opt: &Option<RType>, rhs: &RExpr, body: &RExpr, span: &Span,
+) -> Result<(Term, Term), ElabError> {
     let (rhs_core, rhs_ty) = prepare_let_rhs(cx, ty_opt, rhs, span)?;
     let equation = let_equation(cx, &rhs_ty, &rhs_core);
+    let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
     cx.push_match_binder(rhs_ty.clone(), MatchBinderOrigin::UserLocal);
     let path_base = cx.path_conditions.len();
-    if let Some(equation) = equation {
-        cx.push_path(equation, cx.ctx.len(), SplitKind::Let);
+    if let Some(eq) = &equation {
+        cx.push_path(eq.clone(), cx.ctx.len(), SplitKind::Let);
     }
-    let body_result = infer(cx, body);
+    if convoy {
+        let Some(eq) = &equation else {
+            cx.ctx.pop();
+            return Err(ElabError::TypeMismatch {
+                span: span.clone(), reason: "inferred let has no informative checked equation".into(),
+            });
+        };
+        let position = cx.ctx.len();
+        cx.push_match_binder(eq.clone(), MatchBinderOrigin::GeneratedEquation);
+        cx.hidden_positions.push(position);
+        cx.path_conditions.last_mut().expect("let path installed").witness_position = Some(position);
+    }
+    let inferred = infer(cx, body);
     cx.path_conditions.truncate(path_base);
+    if convoy {
+        debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+        cx.ctx.pop();
+    }
     cx.ctx.pop();
-    let (body_core, body_ty) = body_result?;
+    let (body_core, body_ty) = inferred?;
+    let (body_core, body_ty) = if let Some(eq) = equation.filter(|_| convoy) {
+        let ty_without_proof = lower_binders(&body_ty, 1, 0).map_err(|_| ElabError::TypeMismatch {
+            span: span.clone(), reason: "inferred let result type depends on its equation proof".into(),
+        })?;
+        let rhs_witness = if kernel_infer_raw(cx.env, &cx.ctx, &rhs_core).is_ok() {
+            rhs_core.clone()
+        } else { ascribe_introduction_let_value(rhs_core.clone(), &rhs_ty) };
+        let function = Term::Ascript(
+            Box::new(Term::lam(eq.clone(), body_core)),
+            Box::new(Term::pi(eq, body_ty)),
+        );
+        (Term::app(function, Term::Refl(Box::new(weaken(&rhs_witness, 1)))), ty_without_proof)
+    } else { (body_core, body_ty) };
     let result_ty = subst0(&body_ty, &rhs_core);
     let rhs_core = ascribe_introduction_let_value(rhs_core, &rhs_ty);
     Ok((
@@ -14146,7 +14326,7 @@ fn demanded_refinement_splits(
 
 fn convoyable_frame(cx: &ElabCtx<'_>, frame: &PathFrame, span: &Span) -> Result<bool, ElabError> {
     if frame.kind != SplitKind::Constructor {
-        return Ok(matches!(frame.kind, SplitKind::If | SplitKind::Literal));
+        return Ok(matches!(frame.kind, SplitKind::Let | SplitKind::If | SplitKind::Literal));
     }
     let Term::Eq(carrier, _, _) = &frame.condition else { return Ok(false) };
     let (head, _) = peel_app(carrier);
@@ -14267,7 +14447,13 @@ fn emit_subset_evidence(
     direct_evidence: Option<Term>,
 ) -> Result<Term, ElabError> {
     let frames = admissible_path_frames(cx);
-    let conditions: Vec<_> = frames.iter().map(|frame| frame.condition.clone()).collect();
+    // A convoy equation already has a real binder in Γ. Closing it once
+    // more in the hole's extra condition telescope duplicates the premise
+    // and leaves a redundant, unchecked logical assumption next to its
+    // checked witness. Only unbound path frames need an extra Π domain.
+    let conditions: Vec<_> = frames.iter()
+        .filter(|frame| frame.witness_position.is_none())
+        .map(|frame| frame.condition.clone()).collect();
     let goal = cx.metas.zonk_term(&goal);
     let certificate = std::iter::once(Term::const_(cx.env.tt_id(), vec![]))
         .chain((0..cx.ctx.len()).map(Term::var))
@@ -14298,7 +14484,7 @@ fn emit_subset_evidence(
         demanded.contains(&frame.split_id) && frame.witness_position.is_none()
     }) {
         return match frame.kind {
-            SplitKind::If | SplitKind::Literal | SplitKind::Constructor
+            SplitKind::Let | SplitKind::If | SplitKind::Literal | SplitKind::Constructor
                 if convoyable_frame(cx, frame, span)? =>
                     Err(ElabError::RefinementSplitDemand {
                         split_id: frame.split_id, span: span.clone(),
@@ -14325,10 +14511,9 @@ fn emit_subset_evidence(
     for index in (0..cx.ctx.len()).rev() {
         applied = Term::app(applied, Term::var(index));
     }
-    for frame in &frames {
-        let position = frame.witness_position.expect("open hole passed the evidence gate");
-        applied = Term::app(applied, Term::var(cx.ctx.len() - 1 - position));
-    }
+    // Every demanded frame has a term binder by this point. Those terms
+    // were applied with Γ above; no proposition-only condition argument is
+    // added to the checked pair's proof.
     kernel_check_raw(cx.env, &cx.ctx, &applied, &goal).map_err(|error| {
         ElabError::KernelRejected { error, span: span.clone() }
     })?;
@@ -20271,6 +20456,16 @@ fn elaborate_view_with_spec(
         // calls see the full type and all body holes share the admission rollback.
         let param_count = view_param_count(rdecl);
         let all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
+        if rdecl.ty.is_none() && !all_ensures.is_empty() {
+            // The erased parameter annotations in an untyped ViewDecl do not
+            // supply the result carrier needed to stage a checked Σ. An
+            // obligation on the inferred bare result would be detached from
+            // its definition and therefore falsely promise a contract.
+            return Err(ElabError::TypeMismatch {
+                span: rdecl.span.clone(),
+                reason: "ensures requires an explicit result type for a checked subset Σ".into(),
+            });
+        }
         let literal_return = rdecl.ty.as_ref().and_then(innermost_refine_pred).is_some();
         if literal_return && rdecl.ty.as_ref().and_then(refine_return_depth) != Some(param_count) {
             return Err(ElabError::TypeMismatch {
@@ -20496,41 +20691,6 @@ fn elaborate_view_with_spec(
                     .collect(),
             )
         };
-
-        // A type-inferred declaration has no expected carrier until after its
-        // body is inferred. Keep its existing straight-line fallback separate
-        // from the checked contract path; no annotated contract uses it.
-        if pre_admit_id.is_none() && !all_ensures.is_empty() {
-            let mut ens_ctx = Context::new();
-            for requirement in &req_cores { ens_ctx.push(requirement.clone()); }
-            let mut result_ctx = ens_ctx.clone();
-            result_ctx.push(result_ty_under_requires.clone());
-            for ens in &all_ensures {
-                let (psi, nested) = elab_in_ctx_at_omega(
-                    env, globals, num_values, numeric_env, &*refinement_facts, class_env, provenance,
-                    standard_operators, preconditions, local_dicts, &result_ctx,
-                    &req_cores, 0, ens, &rdecl.span, &rdecl.name,
-                )?;
-                absorb_obligations(&mut decl_obligations, nested);
-                let value = if matches!(
-                    whnf(env, &ens_ctx, &result_ty_under_requires), Term::Pi(..)
-                ) {
-                    Term::Ascript(
-                        Box::new(_body_inner.clone()),
-                        Box::new(result_ty_under_requires.clone()),
-                    )
-                } else { _body_inner.clone() };
-                let closed = close_goal(&ens_ctx, &[], subst0(&psi, &value));
-                let hole_id = declare_postulate(env, rdecl.name.clone(), vec![], closed.clone())
-                    .map_err(|error| ElabError::KernelRejected {
-                        error, span: rdecl.span.clone(),
-                    })?;
-                decl_obligations.push(Obligation {
-                    id: decl_obligations.len() as u32, hole_id, goal_closed: closed,
-                    span: rdecl.span.clone(), kind: ObligationKind::Ensures,
-                });
-            }
-        }
 
         // Phase 4's full contract type and body were built before staging.
         let id = if let Some(pre_id) = pre_admit_id {
@@ -22711,12 +22871,53 @@ fn consume_literal_column(row: RowState) -> RowState {
 /// a proof or refinement to `cx`.
 /// Boolean comparator decisions are the path facts of a literal matrix.
 /// A later literal is reached only when all earlier comparisons were false.
-fn push_literal_branch_condition(cx: &mut ElabCtx<'_>, condition: Term, truth: bool) {
+fn literal_branch_equation(cx: &ElabCtx<'_>, condition: Term, truth: bool) -> Term {
     let chosen = if truth { cx.numeric_env.bool_true_id } else { cx.numeric_env.bool_false_id };
-    cx.push_path(Term::Eq(
+    Term::Eq(
         Box::new(Term::indformer(cx.numeric_env.bool_id, vec![])),
         Box::new(condition), Box::new(Term::constructor(chosen, vec![])),
-    ), cx.ctx.len(), SplitKind::Literal);
+    )
+}
+
+fn push_literal_branch_condition(
+    cx: &mut ElabCtx<'_>, condition: Term, truth: bool, convoy: bool,
+) {
+    let equation = literal_branch_equation(cx, condition, truth);
+    cx.push_path(equation.clone(), cx.ctx.len(), SplitKind::Literal);
+    if convoy {
+        let position = cx.ctx.len();
+        cx.push_match_binder(equation, MatchBinderOrigin::GeneratedEquation);
+        cx.hidden_positions.push(position);
+        cx.path_conditions.last_mut().expect("literal path installed").witness_position = Some(position);
+    }
+}
+
+/// Rebuild the nested comparator chain with checked equations. Each fallback
+/// inhabits the previous comparator's *false* proof binder, so its method
+/// must be assembled inside that exact context before applying Refl to the
+/// outermost Bool eliminator.
+#[inline(never)]
+fn assemble_literal_convoy(
+    cx: &mut ElabCtx<'_>, compiled: &[(Term, Term)], fallback: &Term,
+    result_ty: &Term, span: &Span, depth: usize,
+) -> Result<Term, ElabError> {
+    let Some(((condition, branch), rest)) = compiled.split_first() else {
+        return Ok(fallback.clone());
+    };
+    let condition = weaken(condition, depth as i64);
+    let here_result = weaken(result_ty, depth as i64);
+    let then_eq = literal_branch_equation(cx, condition.clone(), true);
+    let else_eq = literal_branch_equation(cx, condition.clone(), false);
+    let position = cx.ctx.len();
+    cx.push_match_binder(else_eq.clone(), MatchBinderOrigin::GeneratedEquation);
+    cx.hidden_positions.push(position);
+    let next = assemble_literal_convoy(cx, rest, fallback, result_ty, span, depth + 1);
+    debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+    cx.ctx.pop();
+    make_if_elim_with_convoy(
+        cx, condition, Term::lam(then_eq, branch.clone()),
+        Term::lam(else_eq, next?), &here_result, span, true,
+    )
 }
 
 #[inline(never)]
@@ -22734,6 +22935,51 @@ fn compile_literal_column(
     arm_used: &mut [bool],
     subsumed_by: &mut [Vec<usize>],
 ) -> Result<Term, ElabError> {
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let saved_result = ret_ty_slot.clone();
+    let saved_used = arm_used.to_vec();
+    let saved_subsumed = subsumed_by.to_vec();
+    let first = compile_literal_column_once(
+        cx, arms, col_types, col_kinds, rows.clone(), real_depth_so_far,
+        top_span, root_frame_depth, ret_ty_slot, arm_used, subsumed_by,
+    );
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            *ret_ty_slot = saved_result;
+            arm_used.clone_from_slice(&saved_used);
+            subsumed_by.clone_from_slice(&saved_subsumed);
+            compile_literal_column_once(
+                cx, arms, col_types, col_kinds, rows, real_depth_so_far,
+                top_span, root_frame_depth, ret_ty_slot, arm_used, subsumed_by,
+            )
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[inline(never)]
+#[allow(clippy::too_many_arguments)]
+fn compile_literal_column_once(
+    cx: &mut ElabCtx,
+    arms: &[RMatchArm],
+    col_types: &[Term],
+    col_kinds: &[ColKind],
+    rows: Vec<RowState>,
+    real_depth_so_far: usize,
+    top_span: &Span,
+    root_frame_depth: usize,
+    ret_ty_slot: &mut Option<Term>,
+    arm_used: &mut [bool],
+    subsumed_by: &mut [Vec<usize>],
+) -> Result<Term, ElabError> {
+    let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
     let current_is_live = rows[0].real_occurrences[0].live;
     let outer_occurrence = rows[0].real_occurrences[0].term.clone();
     let surface_binder = rows[0].real_occurrences[0].surface_binder;
@@ -22807,6 +23053,7 @@ fn compile_literal_column(
 
         let mut compiled = Vec::with_capacity(groups.len());
         let mut prior_conditions: Vec<Term> = Vec::new();
+        let proof_base = cx.ctx.len();
         for (value, plan) in &groups {
             let branch_rows = rows
                 .iter()
@@ -22821,22 +23068,34 @@ fn compile_literal_column(
             let condition = plan.condition(cx, Term::var(0))?;
             let path_base = cx.path_conditions.len();
             for earlier in &prior_conditions {
-                push_literal_branch_condition(cx, earlier.clone(), false);
+                push_literal_branch_condition(
+                    cx, weaken(earlier, (cx.ctx.len() - proof_base) as i64), false, convoy,
+                );
             }
-            push_literal_branch_condition(cx, condition.clone(), true);
+            push_literal_branch_condition(
+                cx, weaken(&condition, (cx.ctx.len() - proof_base) as i64), true, convoy,
+            );
             let checked = compile_match_matrix(
                 cx, arms, &col_types[1..], &col_kinds[1..], branch_rows,
                 real_depth_so_far + 1, top_span, root_frame_depth,
                 ret_ty_slot, arm_used, subsumed_by,
             );
             cx.path_conditions.truncate(path_base);
+            if convoy {
+                while cx.ctx.len() > proof_base {
+                    debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+                    cx.ctx.pop();
+                }
+            }
             let body = checked?;
             compiled.push((condition.clone(), body));
             prior_conditions.push(condition);
         }
         let path_base = cx.path_conditions.len();
         for earlier in &prior_conditions {
-            push_literal_branch_condition(cx, earlier.clone(), false);
+            push_literal_branch_condition(
+                cx, weaken(earlier, (cx.ctx.len() - proof_base) as i64), false, convoy,
+            );
         }
         let fallback = compile_match_matrix(
             cx, arms, &col_types[1..], &col_kinds[1..], residual_rows,
@@ -22844,6 +23103,12 @@ fn compile_literal_column(
             ret_ty_slot, arm_used, subsumed_by,
         );
         cx.path_conditions.truncate(path_base);
+        if convoy {
+            while cx.ctx.len() > proof_base {
+                debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+                cx.ctx.pop();
+            }
+        }
         let mut body = fallback?;
         let ret_ty = ret_ty_slot
             .as_ref()
@@ -22856,8 +23121,12 @@ fn compile_literal_column(
             &ret_ty,
             real_depth_so_far + 1,
         )?;
-        for (condition, then_branch) in compiled.into_iter().rev() {
-            body = make_if_elim(cx, condition, then_branch, body, &branch_ty, top_span)?;
+        if convoy {
+            body = assemble_literal_convoy(cx, &compiled, &body, &branch_ty, top_span, 0)?;
+        } else {
+            for (condition, then_branch) in compiled.into_iter().rev() {
+                body = make_if_elim(cx, condition, then_branch, body, &branch_ty, top_span)?;
+            }
         }
         Ok((body, branch_ty))
     })();

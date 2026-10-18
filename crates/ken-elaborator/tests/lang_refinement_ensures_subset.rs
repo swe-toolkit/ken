@@ -1,7 +1,7 @@
 //! Contract results are checked subset Σ values, not detached obligations.
 
 use ken_elaborator::{ElabEnv, ElabError, ObligationKind};
-use ken_kernel::{Decl, Term};
+use ken_kernel::{Decl, Level, Term};
 
 /// Promise class: durable result-representation invariant.
 /// MEASURED: the admitted function's kernel type has a subset-Σ result and
@@ -117,4 +117,86 @@ fn recursive_open_ensures_without_a_convoy_refuses() {
     assert!(matches!(error, ElabError::NonConvoyableRefinementSplit { .. }), "{error:?}");
     assert_eq!(env.env.next_global_id(), start_id, "failed clause rolls back the staged self");
     assert!(!env.globals.contains_key("rec_subset"));
+}
+
+/// Promise class: durable conditional result-Σ convoy invariant.
+/// MEASURED: each branch of an opaque postcondition has one open checked
+/// pair hole, with exactly its own Eq Bool path binder. CLAIMED: a real
+/// branch witness, not a proposition-only path, reaches each checked pair.
+/// THE GAP: the emitted conditional must apply its motive to `Refl b`;
+/// counting obligations alone would not establish that term evidence.
+#[test]
+fn conditional_result_pairs_bind_one_checked_equation_per_branch() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let int = Term::const_(env.globals["Int"], vec![]);
+    env.declare_postulate_raw("P", Term::pi(int, Term::omega(Level::Zero)))
+        .expect("opaque postcondition");
+    let result = env.elaborate_decl_v1(
+        "fn branch_subset (b : Bool) : Int ensures P result = if b then 5 else 6",
+    ).expect("one checked pair in each conditional method");
+    let Decl::Transparent { body: Term::Lam(_, body), .. } =
+        env.env.lookup(result.def_id).expect("admitted result") else { panic!("checked function") };
+    assert!(matches!(body.as_ref(), Term::App(elim, proof)
+        if matches!(elim.as_ref(), Term::Elim { .. })
+            && matches!(proof.as_ref(), Term::Refl(_))),
+        "the checked convoy is applied to its source scrutinee proof");
+    assert_eq!(result.obligations.len(), 2);
+    for (obligation, constructor) in result.obligations.iter().zip(["True", "False"]) {
+        assert!(matches!(obligation.kind, ObligationKind::Ensures));
+        assert!(env.is_open_hole(obligation.hole_id));
+        let Term::Pi(_, goal) = &obligation.goal_closed else { panic!("parameter binder") };
+        let Term::Pi(eq, _) = goal.as_ref() else { panic!("convoy equation binder") };
+        assert!(matches!(eq.as_ref(), Term::Eq(_, _, right)
+            if right.as_ref() == &Term::constructor(env.globals[constructor], vec![])));
+    }
+}
+
+/// Promise class: durable let-result-evidence invariant.
+/// MEASURED: an opaque postcondition on a let-bound value has one open hole
+/// whose path equation is represented once by a checked Γ proof binder.
+/// CLAIMED: an introduction under let does not invent a logical-only fact.
+/// THE GAP: the emitted let body must apply its proof lambda to Refl(rhs);
+/// observing the obligation telescope alone cannot witness that argument.
+#[test]
+fn let_result_pair_uses_a_checked_rhs_equality() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let int = Term::const_(env.globals["Int"], vec![]);
+    env.declare_postulate_raw("P", Term::pi(int, Term::omega(Level::Zero)))
+        .expect("opaque postcondition");
+    let result = env.elaborate_decl_v1(
+        "fn let_subset (n : Int) : Int ensures P result = let r = n in r",
+    ).expect("checked let with equality witness");
+    let Decl::Transparent { body: Term::Lam(_, body), .. } =
+        env.env.lookup(result.def_id).expect("admitted result") else { panic!("checked function") };
+    assert!(matches!(body.as_ref(), Term::Let { body, .. }
+        if matches!(body.as_ref(), Term::App(_, proof)
+            if matches!(proof.as_ref(), Term::Refl(_)))),
+        "the let body applies checked Refl(rhs) to its proof binder");
+    let [obligation] = result.obligations.as_slice() else { panic!("one result leaf") };
+    assert!(matches!(obligation.kind, ObligationKind::Ensures));
+    assert!(env.is_open_hole(obligation.hole_id));
+    let Term::Pi(_, rest) = &obligation.goal_closed else { panic!("parameter") };
+    let Term::Pi(_, rest) = rest.as_ref() else { panic!("let binder") };
+    assert!(matches!(rest.as_ref(), Term::Pi(eq, _)
+        if matches!(eq.as_ref(), Term::Eq(..))), "one checked let equation binder");
+}
+
+/// Promise class: transition sentinel for inferred contract carriers.
+/// MEASURED: a source without a result annotation refuses at the contract
+/// boundary without admitting a bare function or detached obligation.
+/// CLAIMED: until return inference can preserve parameter annotations and
+/// build a checked result Σ, it cannot falsely advertise an `ensures` proof.
+/// THE GAP: the same clause is admitted with an explicit `: Int` above;
+/// retire this sentinel when the inference path gains a checked Σ result.
+#[test]
+fn unannotated_ensures_refuses_instead_of_detaching_its_proof() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let start = env.env.next_global_id();
+    let error = env.elaborate_decl_v1(
+        "fn no_result_type (n : Int) ensures Equal Int result n = n",
+    ).expect_err("cannot promise a detached postcondition");
+    assert!(matches!(error, ElabError::TypeMismatch { reason, .. }
+        if reason == "ensures requires an explicit result type for a checked subset Σ"));
+    assert_eq!(env.env.next_global_id(), start);
+    assert!(!env.globals.contains_key("no_result_type"));
 }

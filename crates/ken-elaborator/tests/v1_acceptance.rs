@@ -5,7 +5,7 @@
 //! postulates for predicates (NonNeg, Equal, etc.) declared via
 //! `declare_postulate_raw`.
 
-use ken_elaborator::{ElabEnv, ElabError, Span};
+use ken_elaborator::{ElabEnv, ElabError, ObligationKind, Span};
 use ken_kernel::{Context, Level, Term};
 
 // ----- test helpers -----
@@ -94,64 +94,56 @@ fn unwrap_pi_chain(ty: &Term) -> Vec<Term> {
     result
 }
 
-/// verify/spec-syntax/ensures-emits-obligation-not-sigma
-///
-/// `fn abs (n : Nat) : Nat ensures NonNeg n = n`
-/// → core body is bare Nat value (not Σ); one obligation emitted.
+/// Promise class: durable checked-result invariant for written `ensures`.
+/// MEASURED: the admitted result type is a subset Σ and its transparent body
+/// pairs the returned Nat with the applied, visible obligation hole.
+/// CLAIMED: `ensures` is part of the kernel-checked result, not a detached VC.
+/// THE GAP: both the admitted type and its own returned proof are inspected.
 #[test]
-fn ensures_emits_obligation_not_sigma() {
+fn ensures_has_a_checked_subset_result_and_one_visible_obligation() {
     let mut env = mk_env();
     decl_nat_pred(&mut env, "NonNeg");
-
-    let res = env
-        .elaborate_decl_v1("fn abs (n : Nat) : Nat ensures NonNeg n = n")
+    let res = env.elaborate_decl_v1("fn abs (n : Nat) : Nat ensures NonNeg n = n")
         .expect("ensures should elaborate");
-
-    // Exactly one obligation hole
-    assert_eq!(res.obligations.len(), 1, "one ensures → one obligation");
-
-    let id = res.def_id;
-    // Core type: Pi(Nat, Nat) — NOT Pi(Nat, Sigma(Nat, NonNeg))
-    let ty = env.env.const_type(id).expect("has type").1;
-    let nat_id = *env.globals.get("Nat").unwrap();
-    let nat = Term::indformer(nat_id, vec![]);
-    let expected_ty = Term::pi(nat.clone(), weaken(&nat, 1));
-    assert_eq!(ty, expected_ty, "ensures does not change the carrier type");
-
-    // Core body: Lam(Nat, Var(0)) — the identity (returns n)
-    let body = env.env.transparent_body(id).expect("transparent").1;
-    let expected_body = Term::lam(nat, Term::var(0));
-    assert_eq!(body, expected_body, "ensures body is bare carrier");
-
-    // The obligation hole is in trusted_base (= unknown status)
-    let hole_id = res.obligations[0].hole_id;
-    assert!(
-        env.is_open_hole(hole_id),
-        "ensures obligation is in trusted_base (unknown)"
-    );
+    let [obligation] = res.obligations.as_slice() else { panic!("one ensures obligation") };
+    assert!(matches!(obligation.kind, ObligationKind::Ensures));
+    let nat = Term::indformer(env.globals["Nat"], vec![]);
+    let predicate = Term::const_(env.globals["NonNeg"], vec![]);
+    let expected_ty = Term::pi(nat.clone(), Term::sigma(
+        nat.clone(), Term::app(predicate, Term::var(1)),
+    ));
+    assert_eq!(env.env.const_type(res.def_id).expect("checked type").1, expected_ty);
+    let body = env.env.transparent_body(res.def_id).expect("transparent body").1;
+    assert!(matches!(body, Term::Lam(_, pair) if matches!(pair.as_ref(), Term::Pair(value, proof)
+        if value.as_ref() == &Term::var(0)
+            && proof.as_ref() == &Term::app(Term::const_(obligation.hole_id, vec![]), Term::var(0)))));
+    assert!(env.is_open_hole(obligation.hole_id), "an open proof stays visible");
 }
 
-/// verify/spec-syntax/refinement-lowers-to-carrier
-///
-/// `fn mkPos (n : Nat) : { k : Nat | NonNeg k } = n`
-/// → core return type is `Nat` (carrier), not `Sigma(Nat, NonNeg)`.
+/// Promise class: durable literal-result refinement invariant.
+/// MEASURED: the checked return type retains `Σ Nat (NonNeg result)` and
+/// the body constructs a pair with a visible introduction obligation.
+/// CLAIMED: an explicit refinement is not erased to its Nat carrier.
+/// THE GAP: the obligation is linked to this admitted body's proof field.
 #[test]
-fn refinement_lowers_to_carrier() {
+fn refined_return_is_a_checked_subset_with_its_own_proof() {
     let mut env = mk_env();
     decl_nat_pred(&mut env, "NonNeg");
-
-    // Refinement type in return-type position: lowers to carrier Nat, no Sigma formed.
-    let res = env
-        .elaborate_decl_v1("fn mkPos (n : Nat) : { k : Nat | NonNeg k } = n")
-        .expect("refinement return type should lower to carrier");
-
-    let id = res.def_id;
-    // Core type: Pi(Nat, Nat) — carrier Nat, not Sigma(Nat, NonNeg)
-    let ty = env.env.const_type(id).expect("has type").1;
-    let nat_id = *env.globals.get("Nat").unwrap();
-    let nat = Term::indformer(nat_id, vec![]);
-    let expected_ty = Term::pi(nat.clone(), weaken(&nat, 1));
-    assert_eq!(ty, expected_ty, "refinement lowers to carrier: Pi(Nat,Nat)");
+    let res = env.elaborate_decl_v1("fn mkPos (n : Nat) : { k : Nat | NonNeg k } = n")
+        .expect("checked refined return");
+    let [obligation] = res.obligations.as_slice() else { panic!("one introduction") };
+    assert!(matches!(obligation.kind, ObligationKind::RefinementIntroduction));
+    let nat = Term::indformer(env.globals["Nat"], vec![]);
+    let predicate = Term::const_(env.globals["NonNeg"], vec![]);
+    let expected_ty = Term::pi(nat.clone(), Term::sigma(
+        nat, Term::app(predicate, Term::var(0)),
+    ));
+    assert_eq!(env.env.const_type(res.def_id).expect("checked type").1, expected_ty);
+    let body = env.env.transparent_body(res.def_id).expect("transparent body").1;
+    assert!(matches!(body, Term::Lam(_, pair) if matches!(pair.as_ref(), Term::Pair(value, proof)
+        if value.as_ref() == &Term::var(0)
+            && proof.as_ref() == &Term::app(Term::const_(obligation.hole_id, vec![]), Term::var(0)))));
+    assert!(env.is_open_hole(obligation.hole_id));
 }
 
 /// verify/spec-syntax/non-omega-predicate-surface-error
