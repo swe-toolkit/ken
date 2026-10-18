@@ -12619,46 +12619,6 @@ fn introduce_type_position_argument(
     coerce_refinement(cx, argument.clone(), &argument_ty, &domain, span)
 }
 
-/// A direct call can introduce a checked argument at a source-refined
-/// parameter or constructor field; the recursive `infer` frame does not carry
-/// the predicate lookup's transient application spine.
-#[inline(never)]
-fn emit_call_refinements(
-    cx: &mut ElabCtx<'_>,
-    function: &Term,
-    argument: &Term,
-    span: &Span,
-) -> Result<(), ElabError> {
-    let (head, previous_args) = peel_app(function);
-    let template = match head {
-        Term::Const { id, .. } => cx
-            .refinement_facts
-            .refined_params.get(&id)
-            .and_then(|params| params.get(previous_args.len())),
-        // A constructor spine starts with its family parameters; the field
-        // predicates are indexed by constructor argument position.
-        Term::Constructor { id, .. } => {
-            let params = cx
-                .env
-                .constructor(id)
-                .map_or(0, |(family, _)| family.params.len());
-            previous_args.len().checked_sub(params).and_then(|field| {
-                cx.refinement_facts
-                    .constructor_field_predicates.get(&id)
-                    .and_then(|fields| fields.get(field))
-            })
-        }
-        _ => None,
-    }
-    .and_then(Option::as_ref)
-    .cloned();
-    if let Some(template) = template {
-        let instantiated = subst_outer(&template, previous_args.len(), &previous_args, 0);
-        emit_refinement_predicate(cx, instantiated, argument.clone(), span)?;
-    }
-    Ok(())
-}
-
 /// `(e : T)`. An ascription at a source refinement introduces its predicate
 /// obligation. Outlined so the recursive `infer` frame does not hold the
 /// kernel query.
@@ -14291,23 +14251,6 @@ fn close_refinement_goal_with(
 }
 
 #[inline(never)]
-fn literal_result_predicate(
-    cx: &mut ElabCtx<'_>, literal: &RType, expected: &Term,
-) -> Result<Option<ResultPredicate>, ElabError> {
-    let RType::RRefine(_, _, phi, _) = literal else { return Ok(None) };
-    let carrier = cx.metas.zonk_term(expected);
-    let install_depth = cx.ctx.len();
-    cx.ctx.push(carrier.clone());
-    let checked = elab_prop_at_omega(cx, phi, phi.span());
-    cx.ctx.pop();
-    Ok(Some(ResultPredicate {
-        predicate: Term::lam(carrier, checked?), install_depth,
-        kind: ObligationKind::RefinementIntroduction,
-        recursive_self: None,
-    }))
-}
-
-#[inline(never)]
 fn emit_refinement_introduction(
     cx: &mut ElabCtx<'_>,
     expected: &Term,
@@ -14444,14 +14387,6 @@ fn apply_refinement_predicate(predicate: Term, value: Term) -> Term {
         Term::Lam(_, body) => subst0(&body, &value),
         other => Term::app(other, value),
     }
-}
-
-#[inline(never)]
-fn emit_refinement_predicate(
-    cx: &mut ElabCtx<'_>, predicate: Term, core: Term, span: &Span,
-) -> Result<(), ElabError> {
-    let goal = apply_refinement_predicate(predicate, core);
-    emit_refinement_predicate_with(cx, goal, &[], span, ObligationKind::RefinementIntroduction)
 }
 
 #[inline(never)]
@@ -17949,27 +17884,17 @@ fn elab_record_decl_checked(
     rdecl: &RDecl,
     fields: &[RRecordField],
 ) -> Result<ElabResult, ElabError> {
-    let (field_types, predicates) = {
+    let field_types = {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, rdecl.name.clone())
             .with_preconditions(preconditions, PremiseHoles::Refused);
         let mut types = Vec::new();
-        let mut predicates = Vec::with_capacity(fields.len());
         for field in fields {
             let ty = elab_type_in_slot(&mut cx, &field.ty, RefinementSlot::Outermost)?;
             let ty = cx.metas.zonk_term(&ty);
-            let predicate = if let RType::RRefine(_, _, phi, _) = &field.ty {
-                cx.ctx.push(ty.clone());
-                let checked = elab_prop_at_omega(&mut cx, phi, phi.span());
-                cx.ctx.pop();
-                Some(Term::lam(ty.clone(), cx.metas.zonk_term(&checked?)))
-            } else {
-                None
-            };
-            predicates.push(predicate);
             cx.ctx.push(ty.clone());
             types.push(ty);
         }
-        (types, predicates)
+        types
     };
 
     let sigma_chain = build_sigma_chain(&field_types, class_env.record_nil_id);
@@ -17995,10 +17920,6 @@ fn elab_record_decl_checked(
         fields.iter().map(|field| field.name.clone()).collect(),
         field_types,
     );
-    if predicates.iter().any(Option::is_some) {
-        facts.record_field_predicates.insert(id, predicates);
-    }
-
     Ok(ElabResult {
         name: rdecl.name.clone(),
         def_id: id,
@@ -19720,8 +19641,15 @@ pub(crate) fn innermost_refine_pred(ty: &RType) -> Option<&RExpr> {
 #[must_use]
 fn elab_signature(
     cx: &mut ElabCtx<'_>, ty: &RType, result: bool,
-) -> Result<Term, ElabError> {
-    elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })
+) -> Result<(Term, Vec<Option<Term>>), ElabError> {
+    let core = elab_type_in_slot(cx, ty, RefinementSlot::Signature { result })?;
+    Ok((core, Vec::new()))
+}
+
+fn record_refined_params(facts: &mut RefinementFacts, id: GlobalId, params: Vec<Option<Term>>) {
+    if params.iter().any(Option::is_some) {
+        facts.refined_params.insert(id, params);
+    }
 }
 
 fn elaborate_v0(
@@ -20445,17 +20373,14 @@ fn elaborate_view_with_spec(
         // Annotated contracts stage before checking their body so recursive
         // calls see the full type and all body holes share the admission rollback.
         let param_count = view_param_count(rdecl);
-        let mut all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
+        let all_ensures: Vec<&RExpr> = rdecl.ensures.iter().collect();
         let literal_return = rdecl.ty.as_ref().and_then(innermost_refine_pred).is_some();
-        if let Some(phi) = rdecl.ty.as_ref().and_then(|ty| innermost_refine_pred(ty)) {
-            if rdecl.ty.as_ref().and_then(refine_return_depth) != Some(param_count) {
-                return Err(ElabError::TypeMismatch {
-                    span: rdecl.span.clone(),
-                    reason: "a refinement under a function-valued return type is not supported yet"
-                        .into(),
-                });
-            }
-            all_ensures.push(phi);
+        if literal_return && rdecl.ty.as_ref().and_then(refine_return_depth) != Some(param_count) {
+            return Err(ElabError::TypeMismatch {
+                span: rdecl.span.clone(),
+                reason: "a refinement under a function-valued return type is not supported yet"
+                    .into(),
+            });
         }
         let mut decl_obligations = Vec::new();
         let (
