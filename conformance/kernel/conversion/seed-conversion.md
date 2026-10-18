@@ -337,6 +337,20 @@ reference interpreter can ground them, rather than locked unground here.)
   prop-indexed family `P x`. Distinct `p`,`q` make the test fail on any checker
   that compares the skipped argument.
 
+### conversion/cast-omega-proof-position (soundness)
+- spec: `16 §3.1` (Cast formation), `§8.2` (Ω proof irrelevance)
+- given: distinct open `A B : Type 0`, `x y : A`, and distinct open
+  `p q : Eq (Type 0) A B`. Check both `cast A B p x` and `cast A B q x`
+  at `B`; compare them at `B`. Compare `cast A B p x` with
+  `cast A B q y` separately at `B`.
+- expect: the first pair is **convertible (true)**; the second is **not
+  convertible (false)**.
+- why: neutral endpoints keep both Casts stuck, while Cast formation fixes
+  `p` and `q` at the same Ω-classified equality proposition. The structural
+  path skips that proof position without skipping the Type-valued operand.
+  Both pairs are checked before conversion, so proof irrelevance never
+  licenses comparing ill-typed terms.
+
 ---
 
 ## Acceptance criterion: obs conversions decide via the unified path (item 5)
