@@ -179,6 +179,17 @@ on the current base before measuring, and reports any that moved.
     raw parity shows no new difference against `9e8959da7`.
   - AC-S 5/5, nested_domain 9/9, up_to_whnf 3/3, the landed suite and
     the earlier Eq-head ACs stay green on the final bytes.
+- **AC-H (Architect `evt_14f63z3dtk1s3`).** The terminal arm of
+  `coerce_refinement` asks the kernel through `kernel_check_current` in
+  place of its bare `TypeMismatch`; the Let and direct-Eq arms stay above
+  it. No landed test is weakened: `cat5_parsing_package.rs` is byte
+  identical to main, and any other landed-test edit that tolerates an
+  elaborator `TypeMismatch` is reverted or justified in the handoff.
+  - **H1.** The landed hull and cat5 tests pass byte-identical to main.
+  - **H2 (paired).** Restoring the bare-reason arm turns H1 red.
+  - **H3.** `fn f (n : Nat) : { x : Bool | Equal Bool x True } = n`
+    refuses with `KernelRejected(TypeMismatch)` with Nat and Bool heads.
+    Paired: the bare arm gives `ElabError::TypeMismatch`.
 - **AC-3.** Kernel QA reviews the K-a lines.
 - **AC-S (Architect `evt_2399h0mk7asd9`, replacing `evt_1pm2qvb169bfm`).**
   `unify_sorts_walk` gains a `Sigma/Sigma` arm with the Pi arm's domain
@@ -205,7 +216,8 @@ on the current base before measuring, and reports any that moved.
 ## Hard-stop inventory (§1b)
 
 §1a: ctor-field staging 1 (Architect `evt_4b6ktd7c5xqxx`, from
-`evt_290erhrm8bnaf`); AC-S sort link 1 (`evt_2399h0mk7asd9`).
+`evt_290erhrm8bnaf`); AC-S sort link 1 (`evt_2399h0mk7asd9`);
+ordinary-mismatch deferral boundary 1 (`evt_14f63z3dtk1s3`).
 
 1. The two-pass provisional family was taken from the raw carrier
    lowering (`data::elab_*_data_decl`). It was keyed on that lowering
@@ -220,3 +232,11 @@ on the current base before measuring, and reports any that moved.
    nor the walk matched. Fix: a Σ/Σ arm plus a Σ-carrier arm in
    `unify_sorts_walk`. Keyed on the refinement being represented by its
    carrier (Architect `evt_25zg89vfk8ksw`).
+3. `coerce_refinement` refused an ordinary (non-refinement) mismatch on
+   its own judgment, where main defers to the kernel. The refusal's
+   carve-outs were keyed on the proposition's spelling (direct Eq head,
+   Architect `evt_7rxrymmzb344v`); `IsTrue`, a transparent alias of Eq,
+   fell outside (landed `cat_numeric_interval_hull`). Fix: the failure
+   path asks the kernel in the current context; no elaborator verdict
+   (Architect `evt_14f63z3dtk1s3`). It shares no predicate with entries
+   1 and 2.
