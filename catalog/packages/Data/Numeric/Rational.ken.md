@@ -33,7 +33,7 @@ normalizes its spelling.
 ```ken
 import Core.Logic.Transport (sym, trans, cong)
 
-import Core.Classes.LawfulClasses (bool_or, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, bool_or, leq_nat)
 
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_l, mul_add_distrib_r)
 
