@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-PRODUCER-AUTHENTICITY
 title: "CHILD 1 of 3 of RT-BRACKET-CONTROL-REGION-IR. The checked bracket producer and its AUTHENTICITY boundary. Capture the exact canonical template-call occurrence through checked lowering and wrap THAT occurrence; the compiler marker must be NON-RESOLVABLE FROM SOURCE; and the PRODUCER marks the acquire, final-settlement, outcome-merge and resume roles ITSELF, before inlining (the body-to-settlement edge replacing the former acquired-body mark is defined only after RT-BRACKET-SOURCE-EDGE D0; full rewrite required before restart). Two shapes are REJECTED ON MEASUREMENT and must not be retried: ordinary prelude `proc` declarations as markers, because a Ken program can name `private_checked_resource_bracket_*` and the claimed compiler-private authority is therefore FORGEABLE (AC-4 unmet); and locating ports by scanning the expanded Runtime expression for an acquisition `HostOpV1` plus every `ResourceRelease`, because a LAWFUL PUBLIC EARLY RELEASE inside the bracket body adds a release and makes the finalizer port AMBIGUOUS. `HostOpV1` may VALIDATE already-marked ports; it may never DISCOVER which expression becomes a region. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
@@ -12,10 +12,45 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r, which ruled RT-BRACKET-CONTROL-REGION-IR MIS-SIZED and directed a retained-work recut into three ordered children. The Steward owns the recut; the mis-sizing was the Steward's, not the ring's. The producer-authenticity boundary alone needs a finished design, controls and review before the planner or lowerer can safely depend on it. Retained work is preserved at evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee on wp/RT-BRACKET-CONTROL-REGION-IR, parented on pre-registration commit c22f4861d which stays unchanged. That checkpoint is EVIDENCE AND REUSABLE WORK, NEVER A CANDIDATE."
 ---
 
-> **NOT STARTABLE (2026-09-24).** Its section 5 STOP followed the kernel
-> trace's Ret STOP. The source role is being redesigned under
-> `RT-BRACKET-SOURCE-EDGE` (operator 2026-09-24). This child's reviewed
-> checkpoint `4b4c8565c` stays a held input: never moved, rebased or landed.
+> **STARTABLE FOR ITS D0 ONLY (Architect `evt_2xjrx0gd29z3g`, on
+> `f555f4a37`).** The build is not startable. After the D0, outcome (a)
+> has the Steward rewrite section 3's body-to-settlement edge on the
+> identity the D0 names, and the build then waits for the operator's cost
+> call on the umbrella program. Checkpoint `4b4c8565c` stays a held input:
+> never moved, rebased or landed.
+
+## 0. D0: settlement instance identity (scratch, lands nothing)
+
+This D0 covers both px8ta blockers. They share one predicate: a bracket's
+settlement runs on a shared, unowned Deferred route keyed by its template,
+not by the instance's exact call/return context. Depth 2 shows it as
+order, and depth 3 as a cross-specialization claim. The rows are px8ta
+depths 2 and 3 and the `o1 c1 c1` lookalike.
+
+1. **Re-measure the routes on `f555f4a37`.** Per row, report the route
+   class (Deferred, owner, call and effect sharing) of the two settlement
+   releases and of the depth-3 claim for construct 737.
+2. **Name the collapse point.** Name the exact function and key at which
+   the two normalized release sites become one lowered `ResourceRelease`
+   case.
+3. **The deciding question.** At that point, does an exact call/return
+   context distinguish the two settlement instances? List each candidate
+   (specialization id, continuation-call identity, response owner) with
+   its value for both instances.
+
+**Outcomes, both first-class:**
+
+- **(a) A context distinguishes them.** It is the instance identity.
+- **(b) None does.** The identity must be minted at normalization and
+  carried through lowering, which then builds one settlement case per
+  region. That is a lowering restructure: **stop and return to the
+  Steward.**
+
+**Prohibitions:** no lookup widening or added declaration lane for the
+depth-3 claim; no order or shape guess and no `HostOpV1` port discovery;
+no Mapping or operation carve-out. px8ta stays `#[ignore]`d. The `(H)`
+probe caution in `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED` stands. §1a for
+the px8ta chain is 0.
 
 ## 1. What is settled. Do not re-derive.
 
