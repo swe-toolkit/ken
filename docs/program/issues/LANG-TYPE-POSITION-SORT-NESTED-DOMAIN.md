@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-SORT-NESTED-DOMAIN
 title: "The type-position sort link whnf's only the head of each side, so an alias nested inside a structured former domain, such as g : (Small -> Type) -> Type with Small := Type 0, links no level and the argument is refused with TypeMismatch, while its unaliased twin checks. Link sorts by walking both sides structurally, with whnf at each node"
-status: ready
+status: active
 owner: language
 size: S
 tier: T2
