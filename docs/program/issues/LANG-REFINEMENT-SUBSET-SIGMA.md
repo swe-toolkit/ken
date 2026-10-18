@@ -53,14 +53,21 @@ on the current base before measuring, and reports any that moved.
     rolls back its branches and re-elaborates them with the convoy on, at
     most once per split. (B), always-bind, is out: M4 = 1 and 33 kernel
     rejections. (A) passed M1, M2 and the retry bound.
-  - **Demand criterion (amendment 1).** A condition is demanded only if
-    its binder is free in the introduction's evidence term. A
-    certificate found at elaboration demands only the conditions it
-    mentions, so `isScalar 32` demands nothing. An open hole is applied
-    to its conditions and demands them all. Closing the hole over a
-    condition is not a demand: base closes every hole over every
-    admissible condition, which made ArgParse demand the recursive `Doc`
-    split and admit 0/7.
+  - **Demand criterion (amendments 1 and 2, Architect
+    `evt_5zp1649t8qn9n`).** The ruling's text:
+    1. An introduction with a selected certificate demands exactly the
+       enclosing splits whose condition binders are free in the peeled
+       certificate evidence (`lower_binders` of the actual term). A
+       closed certificate demands none and is emitted directly as the
+       subset-Σ pair.
+    2. An introduction with no certificate is an open hole. It demands
+       every admissible condition it is closed over. Convoyable splits
+       (`let`, `if`, literal, non-recursive non-indexed constructor
+       branch) are discharged as the frame's evidence rules state.
+    3. An open hole whose demand reaches a non-convoyable split
+       (recursive, or indexed without heterogeneous equations) is a
+       typed refusal, never `Internal`. Recursive families stay with
+       `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`.
 
 ## Deliverable
 
@@ -85,20 +92,23 @@ on the current base before measuring, and reports any that moved.
 
 ## Acceptance
 
-- **AC-0b (census, scratch, first; amendment 1).** On prototype (A)
-  with the corrected criterion, for each of the 6 catalog closures with
-  introductions: count the introductions under a split, and classify
-  each as certificate with no condition used, certificate using a
-  condition (name the split family), or open hole (name the enclosing
-  split families). Report admit or refuse per closure, with ArgParse's 7
-  runs timed against AC-2's 10% bound if it admits.
-  - **Zero open holes under a non-convoyable split** (recursive, or
-    indexed without heterogeneous equations): the criterion change is in
-    this WP and the build proceeds on (A).
-  - **Any such hole:** stop to the Steward with the count. The scope
-    call is between dropping those conditions from the hole's closed type
-    (strengthening, with a typed refusal if then unprovable) and ordering
-    `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW` first.
+- **AC-0b (census; closed, build-go, Architect `evt_5zp1649t8qn9n` on
+  `evt_19xr1vssp79k7`).** 78 scanned, 6 closures with introductions, 16
+  introductions, all closed certificates, 0 open holes under a
+  non-convoyable split. The build resumes from checkpoint `569f52f19`.
+  The certificate-with-condition and open-hole classes have no catalog
+  population, so amendment 2 pins them with synthetic rows:
+  - **AC-0b-1.** A durable classifier row with three nested-`Bool` cases:
+    an outer-used certificate demands only its split, a closed
+    certificate demands neither, and an open hole demands both. Paired
+    failing configuration: demand read off the hole telescope makes the
+    closed-certificate case demand both.
+  - **AC-0b-2.** One open hole under a recursive split gives the typed
+    refusal, not `Internal`. Paired failing configuration: removing the
+    gate admits it or panics.
+  - **AC-0b-3.** At the candidate, the six closures stay admitted with 16
+    pairs kernel-checked, and the certificate-discard mutation refuses
+    the five `Doc` closures while Console stays admitted.
 - **AC-0 (D0, measure only; closed `evt_1j5wf5kfe127q`).**
   - (a) Introductions by closure class.
   - (b) Every elaborator site that whnf's an inferred type to inspect its
@@ -120,7 +130,9 @@ on the current base before measuring, and reports any that moved.
     caller.
 - **AC-2.** Population delta 0 (76/32 roots, 55/20 packages), apart from
   explicit-conversion migrations AC-0(c) lists. Runtime parity is
-  unchanged. Derived and ArgParse timing stay within 10%.
+  unchanged. Derived and ArgParse timing stay within 10%, re-measured
+  against the candidate's own base (the census's +0.05% is scratch
+  evidence only).
 - **AC-E (evidence).** Every landed package's emitted core is
   byte-identical to base. An introduction under a `let`, an `if`, a
   literal and a non-recursive constructor branch each checks; one under an
