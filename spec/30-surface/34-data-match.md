@@ -668,7 +668,21 @@ hypothesis `(_ : Eq A s (cₖ field̄))` through a dependent convoy (`21 §6.3`,
 For an **indexed** family `D ī`, the scrutinee and branch constructor may
 inhabit `D ī` and `D īₖ` respectively: no scrutinee equation is bound.
 Only the checked **index refinement** of `§3.2` specializes that branch's
-motive and path context. AC6's value-equation assertion applies to
+motive and path context.
+
+When the indexed `match` scrutinee is a variable `s : D ī`, each
+`cₖ field̄` arm substitutes the constructor coordinate
+for uses of the source names `s` and any solved index that was a bare
+variable at the match site: inside that arm, `s` denotes `cₖ field̄`
+and each such index name denotes its corresponding constructor target
+index `īₖ`. This arm-local elaboration-time name substitution binds
+no scrutinee equation and adds no kernel conversion. Other ordinary
+parameters retain their meanings, and outside the arm, including after
+the `match`, the scrutinee and index names retain their original
+meanings. The rule does not assign a constructor-coordinate reading to
+a non-variable scrutinee or to an index that was not a bare variable.
+
+AC6's value-equation assertion applies to
 unindexed families; indexed-family cases pin index refinement separately.
 A packed equation over `Σ ī. D ī` is an open design item (`../90`,
 `OQ-indexed-scrutinee-evidence`), not a rule here.

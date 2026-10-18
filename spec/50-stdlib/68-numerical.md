@@ -181,3 +181,162 @@ deferred. Floating point, rounding modes and outward rounding,
 width and diameter, interval intersection and hull, normalized
 endpoint spellings, inclusion isotonicity, and sub-distributivity
 are also outside §1. None is established by the six laws above.
+
+## 2. Hull and intersection by containment
+
+> **Section 2 status: DRAFT v0 (SPEC-NUMERICAL-INTERVAL-HULL).**
+> Architect D0 checked the two operations and four generic laws below
+> on the landed §1 base. Its Rational additions and interval proofs
+> were in scratch copies, not published §2 catalog packages.
+
+### 2.1 Endpoint formulas and empty results
+
+`Algorithm.Numeric.RationalInterval` adds two total operations:
+
+```ken
+pub fn interval_hull (i : Interval) (j : Interval) : Interval
+pub fn interval_intersect (i : Interval) (j : Interval) : Interval
+```
+
+For `i = MkInterval a b` and `j = MkInterval c d`, their exact
+results are:
+
+- `interval_hull i j = MkInterval (rational_min a c)
+  (rational_max b d)`. The chosen lower bound is a minimum of the
+  two lowers, and the chosen upper bound is a maximum of the uppers.
+- `interval_intersect i j = MkInterval (rational_max a c)
+  (rational_min b d)`. The chosen lower bound is a maximum of the
+  two lowers, and the chosen upper bound is a minimum of the uppers.
+
+Each operation uses the existing exact Boolean `rational_leq` order,
+not a comparison of stored numerator and denominator fields. The
+min/max operations select **stored Rational values** rather than
+normalizing them. If `rational_leq x y` is `True`, the minimum
+selects `x` and the maximum selects `y`; otherwise they select
+`y` and `x`, respectively. Equivalent values with different
+spellings need not produce structurally equal endpoints after
+swapping the arguments. These scalar operations and their
+order proofs are the separate Rational obligations in §2.3.
+
+Intersection returns an `Interval`, **not** an `Option Interval`.
+Disjoint inputs can give inverted bounds, already the ordinary
+empty-interval representation in §1.1. For example, `[0,1/2]`
+intersected with `[2,3]` produces `[2,1/2]`, with no members.
+Their hull is `[0,3]`, containing endpoints from each interval as
+well as gap points such as `1`; it excludes `4`. The operations
+remain total for inverted inputs. Hull encloses any existing
+members, but with an empty operand its endpoint formula need not
+produce the least *member set* enclosing the operands: the empty
+operand can still influence a stored bound. For example, the hull
+of empty `[4,3]` and nonempty `[0,1]` is `[0,3]`, not `[0,1]`.
+No minimality or empty-operand preservation law is claimed.
+
+### 2.2 Four checked containment laws
+
+The prospective extension must provide checked generic proof bodies
+for exactly these four **public interval laws**. `IsTrue` turns
+Boolean membership into a proposition. `And` here is the ambient
+Ω-valued conjunction with `and_intro` and its two projections,
+not the distinct `Type`-valued `Core.Logic.And` carrier. No premise
+assumes ordered endpoints.
+
+```ken
+pub theorem interval_hull_contains_left (i : Interval) (j : Interval) (x : Rational) :
+  IsTrue (interval_contains i x) → IsTrue (interval_contains (interval_hull i j) x)
+
+pub theorem interval_hull_contains_right (i : Interval) (j : Interval) (x : Rational) :
+  IsTrue (interval_contains j x) → IsTrue (interval_contains (interval_hull i j) x)
+
+pub theorem interval_intersect_sound (i : Interval) (j : Interval) (x : Rational) :
+  IsTrue (interval_contains (interval_intersect i j) x)
+  → And (IsTrue (interval_contains i x)) (IsTrue (interval_contains j x))
+
+pub theorem interval_intersect_complete (i : Interval) (j : Interval) (x : Rational) :
+  IsTrue (interval_contains i x) → IsTrue (interval_contains j x)
+  → IsTrue (interval_contains (interval_intersect i j) x)
+```
+
+The hull laws carry each input's membership into the envelope.
+Intersection soundness projects any result member into **both**
+inputs; completeness admits any common member to the result. These
+are membership implications, not equations between stored
+intervals. The D0 checked the proofs by splitting the endpoints
+and the two sides of Boolean membership, using existing rational
+order transitivity with the §2.3 bounds. In particular, soundness
+and completeness still apply when an input or result is empty:
+without a member their corresponding implications have no false
+witness to assert. Overlapping `[1/2,2]` and `[1,3]` intersect to
+`[1,2]`; `1` and `3/2` are common members, but `1/2` is not in
+their intersection.
+
+These laws do **not** assert structural `Equal Interval` for
+commutativity, idempotence or associativity of either operation.
+No such law was proved by containment in D0 either. In particular,
+the hull of the points at `half` and `two_quarters` stores
+`half` as its lower bound and `two_quarters` as its upper bound;
+swapping the arguments stores the reverse. Here `half = 1/2`
+and `two_quarters = 2/4` are `rational_equiv` but not
+structurally `Equal Rational`. The two hulls' structural equality
+was **refused** by D0 with both `Refl` and `Proved`. Extensional
+claims beyond the four displayed membership laws are not added.
+
+### 2.3 Rational catalog prerequisites and evidence
+
+`Data.Numeric.Rational` must separately export the following
+operations and **six order proofs**. They are Rational catalog
+obligations, not additional interval laws and not delivered in
+this spec WP. Their comparison-based selection behavior is stated
+in §2.1; the proofs have the Architect-checked public types:
+
+```ken
+pub fn rational_min (x : Rational) (y : Rational) : Rational
+pub fn rational_max (x : Rational) (y : Rational) : Rational
+
+pub proof leq_left for rational_min (x : Rational) (y : Rational) :
+  IsTrue (rational_leq (rational_min x y) x)
+pub proof leq_right for rational_min (x : Rational) (y : Rational) :
+  IsTrue (rational_leq (rational_min x y) y)
+pub proof greatest for rational_min (x : Rational) (y : Rational) (k : Rational) :
+  IsTrue (rational_leq k x) → IsTrue (rational_leq k y)
+  → IsTrue (rational_leq k (rational_min x y))
+
+pub proof left_leq for rational_max (x : Rational) (y : Rational) :
+  IsTrue (rational_leq x (rational_max x y))
+pub proof right_leq for rational_max (x : Rational) (y : Rational) :
+  IsTrue (rational_leq y (rational_max x y))
+pub proof least for rational_max (x : Rational) (y : Rational) (k : Rational) :
+  IsTrue (rational_leq x k) → IsTrue (rational_leq y k)
+  → IsTrue (rational_leq (rational_max x y) k)
+```
+
+The existing public `refl`, `trans` and `total for rational_leq`
+remain unchanged. The D0 checked the six new proofs in a scratch
+Rational copy without an import change there; its private
+`rational_pick` and `pick_*` helpers are proof structure, **not**
+public APIs. A dependent match on a computed rational comparison
+does not itself refine the needed occurrence, so the D0 helpers
+bind the Boolean result explicitly with an equality premise. The
+interval module adds only the two min/max names to its existing
+§1 Rational import list, then uses their six public proofs. It must
+not clone the Rational ordering functions or proofs locally.
+
+On base `e07a73535`, Architect reported `ken check` rc 0 for both
+scratch modules, four generic interval laws, and a separate
+16-assertion closed positive client. Four independently appended
+negative clients each rejected: false outside-hull membership,
+disjoint/overlap false intersection membership, and structural
+equality of the swapped hulls. Positive structural controls checked
+for the two differing hull spellings. The scratch source had no
+new `Axiom`, kernel/surface change, primitive or signed carrier.
+A mutated `leq_left for rational_min` also failed to check. These
+are **Architect-reported scratch results**, not an author-run Ken
+check, shipped §2 catalog module or seed, Cargo test, CI result
+or `trusted_base()` before/after measurement.
+
+The §1 Rational monotonicity exports, interval package and §1 seed
+are present on this landed base; §1.4's follow-on wording records
+its earlier D0 state. The §2 Rational min/max exports and interval
+extension remain catalog follow-ons. Signed interval arithmetic,
+division, floating-point rounding, width, normalized endpoint
+spellings, arbitrary-pair inclusion isotonicity and
+sub-distributivity remain deferred.

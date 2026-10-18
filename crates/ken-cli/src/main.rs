@@ -2,6 +2,8 @@
 
 mod cli_errors;
 mod repl;
+#[cfg(unix)]
+mod worker_process;
 
 use cli_errors::{emit_cli_error, emit_coded_error, CliError};
 use std::ffi::{OsStr, OsString};
@@ -10,8 +12,22 @@ use std::path::{Path, PathBuf};
 // K=160's debug goal overflows an 8 MiB stack and checks at 16 MiB. The
 // Architect ruled 256 MiB for the CLI's elaboration/checking worker: at least
 // 240 MiB above that passing bound, and independent of the caller's stack.
-// This moves the cliff; handling exhaustion past it is a separate AC-2 ruling.
+// The Unix process boundary below turns exhaustion past it into C0023.
 const CLI_ELABORATION_STACK_BYTES: usize = 256 * 1024 * 1024;
+
+/// Debug builds only: a test may LOWER the worker stack so that a walker the
+/// D0 census names overflows within a test's time and memory. Release builds
+/// have no such input.
+fn elaboration_stack_bytes() -> usize {
+    #[cfg(debug_assertions)]
+    if let Some(kib) = std::env::var("KEN_CLI_DEBUG_WORKER_STACK_KIB")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+    {
+        return kib.saturating_mul(1024).min(CLI_ELABORATION_STACK_BYTES);
+    }
+    CLI_ELABORATION_STACK_BYTES
+}
 
 fn main() {
     // `RT-MATCH-RECURSOR-CONSUMERS` 4a.1. The census scope wraps the whole
@@ -25,18 +41,37 @@ fn main() {
     // Keep the census scope on the same thread as dispatch: its rows are
     // thread-local. Every Ken-source-parsing subcommand owns its whole CLI
     // path on the stated stack; check/run/native-build also kernel re-check.
-    // A future subprocess boundary can enclose the same invocation without
-    // changing the parsing path. Version/help retain their original thread.
+    // The Unix child boundary encloses this invocation without changing its
+    // parsing path. Version/help retain their original thread.
     let needs_source_parser_stack = std::env::args_os().nth(1).is_some_and(|arg| {
         matches!(
             arg.to_str(),
             Some("check" | "run" | "native-build" | "repl" | "fmt")
         )
     });
+    #[cfg(unix)]
+    if needs_source_parser_stack {
+        match worker_process::role() {
+            worker_process::Role::Child(fd) => worker_process::enter_child(fd),
+            worker_process::Role::Parent => {
+                let exit_code = worker_process::run_parent();
+                if exit_code != 0 {
+                    std::process::exit(exit_code);
+                }
+                return;
+            }
+            worker_process::Role::ProtocolFault => {
+                emit_cli_error(CliError::ElaborationWorkerSpawn(std::io::Error::other(
+                    "the worker marker names no pipe from this process's parent",
+                )));
+                std::process::exit(1);
+            }
+        }
+    }
     let exit_code = if needs_source_parser_stack {
         let worker = std::thread::Builder::new()
             .name("ken-elaboration".into())
-            .stack_size(CLI_ELABORATION_STACK_BYTES)
+            .stack_size(elaboration_stack_bytes())
             .spawn(|| ken_runtime::with_child_match_recursor_census(dispatch))
             .unwrap_or_else(|error| {
                 emit_cli_error(CliError::ElaborationWorkerSpawn(error));

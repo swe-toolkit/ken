@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-SUBSET-SIGMA
 title: "Refinements are carrier types, so List Int is accepted as List Five, a lambda checked at a named refinement over a Pi carrier emits no obligation, and a refined binder converts with its carrier. Elaborate refinements to the core subset Σ, introduce by pair plus obligation, forget by Proj1, and retire the carrier guard machinery"
-status: draft
+status: active
 owner: language
 size: L
 tier: T1
@@ -28,8 +28,8 @@ refined value is a kernel type mismatch, not a missed obligation.
   `register_checked_char_carrier` (`check.rs:1919`), `checked_char_literal`
   (`check.rs:2033`), and the literal String view (`conv.rs` ~221).
 
-This frame is `draft` until its three dependencies land. It is re-anchored
-then.
+All three dependencies have landed. AC-0 re-verifies every anchor above
+on the current base before measuring, and reports any that moved.
 
 - **Evidence at the consumer (Architect `evt_41fxwysr833vv`).** No term
   applies a refinement hole on base (elab.rs ~:11666, ~:11779), so every

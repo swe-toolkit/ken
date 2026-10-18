@@ -361,8 +361,13 @@ mod type_position_argument_sort_tests {
         TypeZero,
         TypeZeroWithSecondFree,
         TypeZeroWithThirdFree,
+        TypeZeroWithThirdOne,
         TypeVar,
+        TypeVarWithSecondShared,
+        TypeVarWithSecondFree,
         LocalFormer,
+        LocalFormerShared,
+        LocalFormerZeroDomain,
         TypeOneFormer,
     }
 
@@ -375,7 +380,12 @@ mod type_position_argument_sort_tests {
         let mut env = ElabEnv::new().expect("prelude");
         env.elaborate_decl(USE5).expect("use5");
         env.elaborate_decl(NEED).expect("need");
+        let trusted_before = env.env.trusted_base();
         let result = env.elaborate_decl_v1(source).expect(source);
+        let mut expected_trust = trusted_before;
+        expected_trust.extend(result.obligations.iter().map(|hole| hole.hole_id));
+        assert_eq!(env.env.trusted_base(), expected_trust,
+            "{producer}: only reported open holes may extend trust");
         assert_eq!(result.obligations.len(), holes, "{producer}: {source}");
         if holes == 0 {
             return;
@@ -395,7 +405,8 @@ mod type_position_argument_sort_tests {
             )
         };
         match head {
-            Head::TypeZero | Head::TypeZeroWithSecondFree | Head::TypeZeroWithThirdFree => {
+            Head::TypeZero | Head::TypeZeroWithSecondFree | Head::TypeZeroWithThirdFree
+            | Head::TypeZeroWithThirdOne => {
                 assert_eq!(**first, Term::ty(Level::Zero), "{producer}: {source}");
                 if matches!(
                     head,
@@ -427,25 +438,63 @@ mod type_position_argument_sort_tests {
                         _ => unreachable!(),
                     }
                 }
+                if matches!(head, Head::TypeZeroWithThirdOne) {
+                    let Term::Pi(_, after_first) = &obligation.goal_closed else { unreachable!() };
+                    let Term::Pi(_, after_second) = after_first.as_ref() else {
+                        panic!("{producer}: missing Eq binder")
+                    };
+                    let Term::Pi(third, _) = after_second.as_ref() else {
+                        panic!("{producer}: missing Type 1 binder")
+                    };
+                    assert_eq!(**third, Term::ty(Level::Suc(Box::new(Level::Zero))));
+                }
             }
-            Head::TypeVar => assert!(
-                matches!(first.as_ref(), Term::Type(Level::Var(m)) if level_params.contains(m)),
-                "{producer}: {source}: {first:?}"
-            ),
-            Head::LocalFormer => {
+            Head::TypeVar | Head::TypeVarWithSecondShared | Head::TypeVarWithSecondFree => {
+                let Term::Type(Level::Var(first_level)) = first.as_ref() else {
+                    panic!("{producer}: expected open Type carrier: {first:?}")
+                };
+                assert!(level_params.contains(first_level), "{producer}: {source}: {first:?}");
+                if !matches!(head, Head::TypeVar) {
+                    let Term::Pi(_, after_first) = &obligation.goal_closed else { unreachable!() };
+                    let Term::Pi(second, _) = after_first.as_ref() else {
+                        panic!("{producer}: missing second type binder")
+                    };
+                    let Term::Type(Level::Var(second_level)) = second.as_ref() else {
+                        panic!("{producer}: expected second open Type: {second:?}")
+                    };
+                    assert!(level_params.contains(second_level));
+                    match head {
+                        Head::TypeVarWithSecondShared => assert_eq!(first_level, second_level),
+                        Head::TypeVarWithSecondFree => assert_ne!(first_level, second_level),
+                        _ => unreachable!(),
+                    }
+                }
+            }
+            Head::LocalFormer | Head::LocalFormerShared | Head::LocalFormerZeroDomain => {
                 let Term::Pi(domain, codomain) = first.as_ref() else {
                     panic!("{producer}: expected a local Pi former: {first:?}")
                 };
-                let (Term::Type(Level::Var(a)), Term::Type(Level::Var(b))) =
-                    (domain.as_ref(), codomain.as_ref())
-                else {
-                    panic!("{producer}: former's domain/codomain must stay open: {first:?}")
-                };
-                assert_ne!(a, b, "{producer}: distinct sorts");
-                assert!(
-                    level_params.contains(a) && level_params.contains(b),
-                    "{producer}: {first:?}"
-                );
+                match head {
+                    Head::LocalFormerZeroDomain => {
+                        assert_eq!(**domain, Term::ty(Level::Zero));
+                        assert!(matches!(codomain.as_ref(), Term::Type(Level::Var(b))
+                            if level_params.contains(b)), "{producer}: {first:?}");
+                    }
+                    _ => {
+                        let (Term::Type(Level::Var(a)), Term::Type(Level::Var(b))) =
+                            (domain.as_ref(), codomain.as_ref())
+                        else {
+                            panic!("{producer}: former's domain/codomain must stay open: {first:?}")
+                        };
+                        assert!(level_params.contains(a) && level_params.contains(b),
+                            "{producer}: {first:?}");
+                        if matches!(head, Head::LocalFormerShared) {
+                            assert_eq!(a, b, "{producer}: linked sorts");
+                        } else {
+                            assert_ne!(a, b, "{producer}: distinct sorts");
+                        }
+                    }
+                }
             }
             Head::TypeOneFormer => {
                 let one = Term::ty(Level::Suc(Box::new(Level::Zero)));
@@ -576,6 +625,103 @@ mod type_position_argument_sort_tests {
         Head::TypeOneFormer
     );
     accepted!(n4_two_forced_one_free, "fn k (A : Type) (B : Type) (C : Type) (o : Option A) (p : Option B) (n : Int) : Int = use5 n", "two forced binders", 1, 1, Head::TypeZeroWithThirdFree);
+
+    // Promise class: durable typed-admission/refusal invariant (12 §3, 16 §2.1).
+    // MEASURED: each declaration's kernel admission, open obligation arity and
+    // first quantified goal type. CLAIMED: Eq's two endpoints impose the
+    // carrier sort before obligation creation. THE GAP: a different producer
+    // could force one row; the free, forced, mixed, former and no-hole rows
+    // vary independent endpoint and declaration contexts.
+    accepted!(eq_explicit_type0_use5,
+        "fn k (a : Type) (h : Eq (Type 0) a a) (n : Int) : Int = use5 n",
+        "Eq annotated", 1, 0, Head::TypeZero);
+    accepted!(eq_bare_type_use5,
+        "fn k (a : Type) (h : Eq Type a a) (n : Int) : Int = use5 n",
+        "Eq bare", 1, 1, Head::TypeVar);
+    accepted!(eq_bare_type_need,
+        "fn k (a : Type) (h : Eq Type a a) (n : Int) : Int = need n",
+        "Eq requires", 1, 1, Head::TypeVar);
+    accepted!(eq_bare_type_div,
+        "fn k (a : Type) (h : Eq Type a a) (n : Int) (d : Int) : Int = n / d",
+        "Eq partial", 1, 1, Head::TypeVar);
+    accepted!(eq_two_endpoints_share_sort,
+        "fn k (a : Type) (b : Type) (h : Eq Type a b) (n : Int) : Int = use5 n",
+        "Eq shared endpoints", 1, 1, Head::TypeVarWithSecondShared);
+    accepted!(eq_former_two_sorts,
+        "fn k (f : Type -> Type) (h : Eq (Type -> Type) f f) (n : Int) : Int = use5 n",
+        "Eq former", 1, 2, Head::LocalFormer);
+    accepted!(eq_unrelated_b_stays_free,
+        "fn k (a : Type) (b : Type) (h : Eq Type a a) (n : Int) : Int = use5 n",
+        "Eq unrelated", 1, 2, Head::TypeVarWithSecondFree);
+    accepted!(eq_mixed_explicit_universe_carriers,
+        "fn k (a : Type 0) (h : Eq Type a a) (b : Type 1) (h2 : Eq Type b b) (n : Int) : Int = use5 n",
+        "Eq mixed carriers", 1, 0, Head::TypeZeroWithThirdOne);
+    accepted!(eq_no_obligation,
+        "fn k (a : Type) (h : Eq Type a a) (n : Int) : Int = n",
+        "Eq no obligation", 0, 0, Head::TypeZero);
+    accepted!(eq_annotated_twin,
+        "fn k (a : Type 0) (h : Eq (Type 0) a a) (n : Int) : Int = use5 n",
+        "Eq annotated twin", 1, 0, Head::TypeZero);
+    accepted!(eq_theorem_control,
+        "theorem t (a : Type) (h : Eq Type a a) : Eq Type a a = h",
+        "Eq theorem", 0, 0, Head::TypeZero);
+    accepted!(eq_value_carrier_control,
+        "fn k (a : Type) (x : a) (h : Eq a x x) (n : Int) : Int = use5 n",
+        "Eq value carrier", 1, 1, Head::TypeVar);
+    accepted!(eq_type_and_int_force_zero,
+        "fn k (a : Type) (h : Eq Type a Int) (n : Int) : Int = use5 n",
+        "Eq Int endpoint", 1, 0, Head::TypeZero);
+    accepted!(eq_type1_declaration_no_obligation,
+        "fn k (b : Type 1) (h : Eq Type b b) (n : Int) : Int = n",
+        "Eq Type 1", 0, 0, Head::TypeZero);
+    accepted!(eq_type1_theorem_no_obligation,
+        "theorem t (b : Type 1) (h : Eq Type b b) : Eq Type b b = h",
+        "Eq Type 1 theorem", 0, 0, Head::TypeZero);
+    accepted!(eq_type_int_no_obligation,
+        "fn k (a : Type) (h : Eq Type a Int) (n : Int) : Int = n",
+        "Eq Int control", 0, 0, Head::TypeZero);
+    accepted!(eq_applied_former_shares_sort,
+        "fn k (f : Type -> Type) (a : Type) (h : Eq Type (f a) a) (n : Int) : Int = use5 n",
+        "Eq applied former", 1, 1, Head::LocalFormerShared);
+    accepted!(eq_chained_former_forced_domain,
+        "fn k (F : Type -> Type) (a : Type) (o : F a) (q : F Int) (n : Int) : Int = use5 n",
+        "chained former", 1, 1, Head::LocalFormerZeroDomain);
+    accepted!(eq_chained_former_no_obligation,
+        "fn k (F : Type -> Type) (a : Type) (o : F a) (q : F Int) (n : Int) : Int = n",
+        "chained former control", 0, 0, Head::TypeZero);
+    accepted!(eq_chained_former_reversed,
+        "fn k (F : Type -> Type) (a : Type) (q : F Int) (o : F a) (n : Int) : Int = use5 n",
+        "chained former reversed", 1, 1, Head::LocalFormerZeroDomain);
+
+    macro_rules! rejected_eq_sort {
+        ($name:ident, $source:literal, $expected:expr, $found:expr) => {
+            #[test]
+            fn $name() {
+                let mut env = ElabEnv::new().expect("prelude");
+                let trust = env.env.trusted_base();
+                let error = env.elaborate_decl_v1($source).expect_err("non-cumulative Eq accepted");
+                match error {
+                    ElabError::KernelRejected {
+                        error: KernelError::TypeMismatch { expected, found }, ..
+                    } => {
+                        assert_eq!(*expected, $expected, "wrong expected sort");
+                        assert_eq!(*found, $found, "wrong endpoint sort");
+                    }
+                    other => panic!("expected kernel sort mismatch, got {other:?}"),
+                }
+                assert_eq!(env.env.trusted_base(), trust, "rejection added trust");
+            }
+        };
+    }
+    rejected_eq_sort!(eq_explicit_type0_rejects_type1,
+        "fn k (a : Type 1) (h : Eq (Type 0) a a) (n : Int) : Int = n",
+        Term::ty(Level::Zero), Term::ty(Level::Suc(Box::new(Level::Zero))));
+    rejected_eq_sort!(eq_type1_and_int_rejected,
+        "fn k (a : Type 1) (h : Eq Type a Int) (n : Int) : Int = n",
+        Term::ty(Level::Suc(Box::new(Level::Zero))), Term::ty(Level::Zero));
+    rejected_eq_sort!(eq_chained_former_type1_and_int_rejected,
+        "fn k (F : Type -> Type) (a : Type 1) (o : F a) (q : F Int) (n : Int) : Int = n",
+        Term::ty(Level::Suc(Box::new(Level::Zero))), Term::ty(Level::Zero));
 
     #[test]
     fn occurs_check_reaches_suc_and_both_max_children() {
@@ -1536,6 +1682,8 @@ fn elab_type(cx: &mut ElabCtx, ty: &RType) -> Result<Term, ElabError> {
             let a_ty_k = elab_type(cx, args[0])?;
             let a_k = elab_type(cx, args[1])?;
             let b_k = elab_type(cx, args[2])?;
+            unify_eq_endpoint_sort(cx, &a_ty_k, &a_k);
+            unify_eq_endpoint_sort(cx, &a_ty_k, &b_k);
             Ok(Term::Eq(Box::new(a_ty_k), Box::new(a_k), Box::new(b_k)))
         }
 
@@ -12135,6 +12283,17 @@ fn unify_type_position_argument_sort(cx: &mut ElabCtx<'_>, function: &Term, argu
         return;
     };
     unify_types(&mut cx.metas, &domain, &argument_ty);
+}
+
+/// `Eq A a b` requires `a, b : A` (16 §2.1) and universes are non-cumulative
+/// (12 §3). `elab_type` builds the equality unchecked, so record each
+/// endpoint's sort against the carrier here, as `infer_eq` does by checking.
+fn unify_eq_endpoint_sort(cx: &mut ElabCtx<'_>, carrier: &Term, endpoint: &Term) {
+    let Ok(endpoint_ty) = kernel_infer_in_context_open(cx, &cx.ctx, endpoint) else {
+        return;
+    };
+    let carrier = cx.metas.zonk_term_with(carrier, false);
+    unify_types(&mut cx.metas, &carrier, &endpoint_ty);
 }
 
 /// An application in a written type owes the same refinement introduction as
