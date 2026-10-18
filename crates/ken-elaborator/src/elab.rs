@@ -12268,11 +12268,34 @@ fn unify_type_position_argument_sort(cx: &mut ElabCtx<'_>, function: &Term, argu
 
 /// Type-position terms are built unchecked; a non-cumulative sort (12 §3) is
 /// recorded by linking the levels of two types that must be convertible.
+/// Reduction must reach nested domains as well as the heads of both types.
 fn unify_sorts_up_to_whnf(cx: &mut ElabCtx<'_>, expected: &Term, actual: &Term) {
-    let expected = cx.metas.zonk_term_with(expected, false);
-    let expected = whnf(cx.env, &cx.ctx, &expected);
-    let actual = whnf(cx.env, &cx.ctx, actual);
-    unify_types(&mut cx.metas, &expected, &actual);
+    let mut ctx = cx.ctx.clone();
+    unify_sorts_walk(cx.env, &mut cx.metas, &mut ctx, expected, actual);
+}
+
+/// This is only a level-linking walk for the two type-position callers; the
+/// term-position unifier and any term metas remain outside it.
+#[inline(never)]
+fn unify_sorts_walk(
+    env: &GlobalEnv, metas: &mut MetaCtx, ctx: &mut Context, expected: &Term, actual: &Term,
+) {
+    let expected = metas.zonk_term_with(expected, false);
+    let expected = whnf(env, ctx, &expected);
+    let actual = whnf(env, ctx, actual);
+    match (&expected, &actual) {
+        (Term::Pi(a, b), Term::Pi(c, d)) | (Term::Lam(a, b), Term::Lam(c, d)) => {
+            unify_sorts_walk(env, metas, ctx, a, c);
+            ctx.push(metas.zonk_term_with(a, false));
+            unify_sorts_walk(env, metas, ctx, b, d);
+            ctx.pop();
+        }
+        (Term::App(f, a), Term::App(g, b)) => {
+            unify_sorts_walk(env, metas, ctx, f, g);
+            unify_sorts_walk(env, metas, ctx, a, b);
+        }
+        _ => unify_types(metas, &expected, &actual),
+    }
 }
 
 /// `Eq A a b` requires `a, b : A` (16 §2.1) and universes are non-cumulative
