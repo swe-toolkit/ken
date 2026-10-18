@@ -31,16 +31,29 @@ its work and effects, as it did before AC-2.
 - **Repros (Adversary).** R1: `ken check` on a long elaboration, parent
   KILLed, child keeps running. R2: `ken run` writes its effect 15 s after
   the parent's SIGKILL. R3: `ken repl` after TERM leaves the child alive.
-- **The ruled mechanism: a lifeline pipe.**
-  1. In the parent, before spawn, create a second pipe with FD_CLOEXEC
-     on its write end, so only the parent holds it. Pass the read end to
-     the child, authenticated like the fault fd by extending the marker
-     with its `fd:dev:ino`. The parent keeps the write end open until it
-     returns.
-  2. In the child, in `enter_child` before the worker spawns, set
-     FD_CLOEXEC on the read end. Spawn one thread that blocks in
-     `read(lifeline)`, and on EOF or error calls
-     `libc::kill(libc::getpid(), libc::SIGKILL)`.
+- **The ruled mechanism: a lifeline pipe, with the child authenticated by
+  the pipes it holds (Architect `evt_3m6y438gmkd8v`, superseding the
+  `getppid` check).** A child whose parent dies before `role()` is
+  reparented, so a `getppid` comparison sends it down the re-exec path and
+  it never reaches the lifeline.
+  1. The marker has 7 fields: `<fault fd>:<parent pid>:<fault dev>:<fault
+     ino>:<lifeline fd>:<lifeline dev>:<lifeline ino>`. `run_parent`
+     creates the lifeline pipe, sets FD_CLOEXEC on its write end before
+     spawn, leaves the read end inheritable, and holds the writer through
+     every exit, including the early `return 1` paths.
+  2. `role()` returns `Child { fault, lifeline }` when both pipe identities
+     match. Otherwise it returns `ProtocolFault` when the marker pid is
+     `getppid()`, and `Parent` when it is not. A malformed marker gives
+     `Parent`.
+  3. `enter_child(fault, lifeline)` sets FD_CLOEXEC on both descriptors,
+     installs the recorders as today, and then spawns the watcher before it
+     returns. The watcher retries `read(lifeline)` on EINTR and, on EOF or
+     any other result, calls `libc::kill(libc::getpid(), libc::SIGKILL)`.
+     `main.rs` passes both descriptors.
+- **Boundary.** The child is gone within watcher-scheduling latency of the
+  parent's death, in the startup window as in the steady state. It is not
+  "zero instructions after parent death". A synchronous `poll` before
+  returning was rejected, because no row can show it does anything.
 - **Rejected:** PR_SET_PDEATHSIG (Linux only, fires on the forking
   thread's death) and signal forwarding (misses SIGKILL and the
   early-return path, and is redundant since the caller observes the
@@ -53,14 +66,23 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-The lifeline in `crates/ken-cli/src/worker_process.rs`, plus `main.rs`
-only if the marker plumbing needs it, and one test file in
-`crates/ken-cli/tests`. No elaborator, kernel or runtime change.
+The lifeline in `crates/ken-cli/src/worker_process.rs` and the `main.rs`
+arm, one new test file in `crates/ken-cli/tests`, and the AC-2 Row E
+fixtures in `tests/lang_elab_native_stack_depth.rs` moved to the 7-field
+spelling where they build a well-formed marker. No elaborator, kernel or
+runtime change.
 
 ## Acceptance
 
-Each row is red on `f06db5ab4` and green after the repair.
+Rows P0-P3 are red on `f06db5ab4` and green after the repair.
 
+- **P0 (parent died before `role()`).** The harness creates both pipes
+  with raw `libc::pipe`, sets FD_CLOEXEC on the lifeline write end and
+  closes it before spawn. It writes the 7-field marker with the correct fds
+  and identities and the pid of a spawned-and-reaped process, then spawns
+  `ken run` on the delayed-effect fixture. The child dies by SIGKILL, the
+  effect file is never written, and no worker output appears. No hold hook
+  is added to production code.
 - **P1 (KILL).** `ken run` on R2's delayed-effect program. Once the
   child exists, SIGKILL the parent pid. Within 2 s the child pid is gone,
   and after the effect's deadline its output was never written.
@@ -69,11 +91,24 @@ Each row is red on `f06db5ab4` and green after the repair.
 - **P3 (check).** R1: `ken check` on a long elaboration, parent KILLed.
   The child is gone within 2 s.
 - **Controls.** A normal `ken run` keeps its exit code and output.
-  AC-2 rows A-E (C0023 overflow, C0022 protocol fault) are unchanged.
-- **Mutation (QA).** Removing the watcher thread's spawn turns P1-P3 red
-  while A-E stay green.
+  AC-2 rows A-E (C0023 overflow, C0022 protocol fault) are unchanged. A
+  foreign `1:1:0:0` is now malformed and still gives `Parent` and a fresh
+  parent (C0023).
+- **E′.** A well-formed 7-field marker naming pipes the process does not
+  hold, with a pid that is not its parent's, gives `Parent`.
+- **Parent-claimed wrong identity.** The 7-field form with the real
+  parent's pid and a wrong pipe identity gives `ProtocolFault`, C0022.
+- **Mutations (QA).** Removing the watcher thread's spawn turns P1-P3 red
+  while A-E stay green. Restoring the `getppid` comparison ahead of the
+  identity check turns P0 red: the child re-executes as a parent and the
+  effect is written. Each mutation is restored byte-identically.
 
 ## Stop conditions
 
 - Any elaborator, kernel, runtime or `trusted_base()` change.
 - A target where the lifeline cannot be authenticated like the fault fd.
+
+## Hard-stop inventory (§1b)
+
+§1a: 0. The pre-`role()` interleaving (`evt_4wes0t9y97fj4`) was a ruling
+question answered before building (`evt_3m6y438gmkd8v`).

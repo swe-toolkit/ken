@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-MEMBERSHIP
 title: "Spec 69 section 1 proves that trace_window and trace_merge preserve time order and that merge preserves counts, but states no window-membership law: nothing proves that the window keeps exactly the events of the trace whose time lies in [lo, hi). Rule from a checked D0 which window-membership soundness and completeness laws hold at zero trust, and state them as section 2 with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1

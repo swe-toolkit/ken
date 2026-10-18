@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-HULL
 title: "Spec 68 section 1 proves interval enclosure for addition and multiplication over non-negative rationals, but section 1.4 defers interval hull and intersection. Rule from a checked D0 which hull and intersection laws hold at zero trust, and state them as section 2 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
