@@ -1,7 +1,7 @@
 # Finite event traces
 
 Finite events with natural-number times support half-open windows and a
-left-biased two-list merge with checked ordering and occurrence-count laws.
+left-biased two-list merge with checked ordering, count and membership laws.
 
 ## Contents
 
@@ -18,18 +18,20 @@ left-biased two-list merge with checked ordering and occurrence-count laws.
 A finite trace is an ordinary list of events, so callers can carry ordered
 or unordered input without wrapping it in another type. Each event records
 a given `Nat` timestamp and an arbitrary payload. Windowing filters the
-existing trace; merging compares current heads and preserves each input's
-relative order. Neither operation reads a clock or sorts unordered input.
+existing trace; checked membership laws characterize which events remain.
+Merging compares current heads and preserves each input's relative order.
+Neither operation reads a clock or sorts unordered input.
 
 ## 2. Definition
 
-The public carrier, operations and three generic laws lead the checked source.
+The public carrier, operations and five generic laws lead the checked source.
 The private recursive merge helper and proof lemmas follow them. Windowing
 includes the lower bound but excludes the upper; a merge tie favors the left
-input without examining payloads.
+input without examining payloads. Membership uses Ω-valued `list_elem`, so
+neither a payload equality decision nor an ordering premise is needed.
 
 ```ken
-import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, leq_nat)
+import Core.Classes.LawfulClasses (IsTrue, and_true, bool_and, bool_or, leq_nat)
 
 import Core.Logic.Transport (cong, sym, trans)
 
@@ -40,6 +42,9 @@ import Data.Numeric.Nat.Order (lt_nat)
 import Data.Collections.Derived
   (filter,
     count,
+    list_elem,
+    list_elem_filter_sound,
+    list_elem_filter_complete,
     starts_after,
     list_sorted_cons,
     list_sorted_tail,
@@ -86,6 +91,62 @@ pub theorem trace_window_ordered
       (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p))
     : time_ordered p tr → time_ordered p (trace_window p lo hi tr) =
   filter_sorted (Event p) (event_before p) (event_before_trans p) (event_in_window p lo hi) tr
+
+pub theorem trace_window_member_sound
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p)) (e : Event p)
+    : list_elem (Event p) e (trace_window p lo hi tr)
+      → And
+        (list_elem (Event p) e tr)
+        (And
+          (Equal Bool (leq_nat lo (event_time p e)) True)
+          (Equal Bool (lt_nat (event_time p e) hi) True)) =
+  λmember.
+    let
+      filtered_evidence =
+        list_elem_filter_sound (Event p) (event_in_window p lo hi) e tr member;
+      window_bounds : Equal Bool (event_in_window p lo hi e) True =
+        and_snd
+          (list_elem (Event p) e tr)
+          (Equal Bool (event_in_window p lo hi e) True)
+          filtered_evidence
+    in
+      and_intro
+        (list_elem (Event p) e tr)
+        (And
+          (Equal Bool (leq_nat lo (event_time p e)) True)
+          (Equal Bool (lt_nat (event_time p e) hi) True))
+        (and_fst
+          (list_elem (Event p) e tr)
+          (Equal Bool (event_in_window p lo hi e) True)
+          filtered_evidence)
+        (and_intro
+          (Equal Bool (leq_nat lo (event_time p e)) True)
+          (Equal Bool (lt_nat (event_time p e) hi) True)
+          ((proof left for bool_and)
+            (leq_nat lo (event_time p e))
+            (lt_nat (event_time p e) hi)
+            window_bounds)
+          ((proof right for bool_and)
+            (leq_nat lo (event_time p e))
+            (lt_nat (event_time p e) hi)
+            window_bounds))
+
+pub theorem trace_window_member_complete
+      (p : Type) (lo : Nat) (hi : Nat) (tr : List (Event p)) (e : Event p)
+    : list_elem (Event p) e tr
+      → Equal Bool (leq_nat lo (event_time p e)) True
+      → Equal Bool (lt_nat (event_time p e) hi) True
+      → list_elem (Event p) e (trace_window p lo hi tr) =
+  λmember.
+    λabove.
+      λbelow.
+        list_elem_filter_complete
+          (Event p)
+          (event_in_window p lo hi)
+          e
+          tr
+          member
+          (and_true (leq_nat lo (event_time p e)) (lt_nat (event_time p e) hi) above below)
 
 pub theorem trace_merge_ordered
       (p : Type) (xs : List (Event p))
@@ -542,6 +603,15 @@ theorem event_left_tie_example
 Filtering preserves order by transitivity of the timestamp comparison even
 when intervening entries disappear. The generic sorted-filter proof and its
 sorted-cons, head and tail bridges are reused from the collections provider.
+
+Window membership reuses generic filter soundness and completeness from the
+collections provider. Soundness projects an input-member witness and the
+predicate fact, then separates the lower and strict upper timestamp bounds.
+The filter evidence is shared rather than reproved for each projection.
+Completeness joins the two bounds using checked Boolean conjunction and
+applies generic filter completeness. Membership is Ω-valued even for a payload
+without decidable equality; neither law requires the trace to be ordered.
+
 The merge-order proof considers which input head precedes the other; totality
 of natural-number order supplies the reverse comparison when the left
 comparison is false. Head-order evidence is carried through recursive merge.
@@ -559,9 +629,13 @@ not decide payload equality.
 of a separate trace wrapper. Unordered inputs remain legal; only the
 order-preservation laws ask for ordered inputs. The timestamp order is
 non-decreasing, admitting tied events. `trace_window` is half-open; equal or
-inverted bounds select no events. The merge's tie rule is part of its
+inverted bounds select no events. Membership in a window supplies two separate
+facts: its timestamp meets the inclusive lower and strict upper bound. The
+merge's tie rule is part of its
 computation, not a consequence of the count law. No clock, duration, signed
-time, infinite stream, or causality property is provided here.
+time, infinite stream, or causality property is provided here. Membership
+claims occurrence without counting duplicates; the separate count law concerns
+merging, not window multiplicity.
 
 ## 6. References
 
@@ -570,16 +644,16 @@ time, infinite stream, or causality property is provided here.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and three checked law contracts.
+  — the carrier, half-open boundary, left-bias and five checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
-  — generic filtering, sorted-list bridges and occurrence counting.
+  — generic filtering, list membership, sorted bridges and counting.
 
 ## 7. Trust & derivation
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the three laws form the package surface.
+   `trace_merge`, and the five laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -587,10 +661,13 @@ time, infinite stream, or causality property is provided here.
    derived `filter`; merging is structurally recursive on two lists; count
    preservation uses derived `count` and checked addition laws. Generic list
    lemmas are owned by the collections provider, not copied into this package.
-4. **Trusted-base delta.** Zero: all three exported laws have checked proof
+   Window membership instantiates its two generic filter proofs and projects
+   both half-open timestamp bounds.
+4. **Trusted-base delta.** Zero: all five exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
-   [seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md)
-   supplies independently stated closed values and one false claimed result;
-   these clients complement, not replace, the generic proofs.
+   [trace seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md)
+   and [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md)
+   supply independent closed values and refused claims; these clients
+   complement, not replace, the generic proofs.
