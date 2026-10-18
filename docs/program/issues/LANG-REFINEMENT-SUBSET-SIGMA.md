@@ -148,3 +148,16 @@ on the current base before measuring, and reports any that moved.
 - The AC-E fixed-point row needs a kernel conversion-order change
   (Refl's ascription defeating the `a == b` fast path, conv.rs ~:1129):
   stop with the measurement. It is a trust-root change for the operator.
+
+## Hard-stop inventory (§1b)
+
+§1a: 1 (Architect `evt_4b6ktd7c5xqxx`, from `evt_290erhrm8bnaf`).
+
+1. The two-pass provisional family was taken from the raw carrier
+   lowering (`data::elab_*_data_decl`). It was keyed on that lowering
+   being well-typed, and W5 makes it ill-typed for any field or index
+   that applies a refined-parameter former (`Box five`: expected
+   `Σ Int Eq5`, found `Int`). Corrected to a family head with zero
+   constructors (the `family_probe` idiom, but in the same env), with
+   every field, parameter, index and result going through the shared
+   elaborator.
