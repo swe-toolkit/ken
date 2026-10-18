@@ -104,3 +104,34 @@ fn nonconverting_spine_still_accepts_at_small_depth() {
         "fallback adds no obligations"
     );
 }
+
+/// MEASURED: a same-constant, duplicating alias nested twenty levels around
+/// a bare universe elaborates below 2s even when every Nat argument differs
+/// syntactically by a transparent name. CLAIMED: linking same-head spines
+/// prevents repeated unfolding throughout the nested domain. THE GAP:
+/// acceptance alone is insufficient; removing only the production fast return
+/// must make this unchanged row exceed the same threshold.
+#[test]
+fn duplicating_alias_with_different_nat_spelling_avoids_exponential_whnf() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("fn D (u : Nat) (a : Type 1) : Type 1 = a -> a")
+        .expect("duplicating alias");
+    env.elaborate_decl("const z : Nat = Zero")
+        .expect("closed alias for Zero");
+    const DEPTH: usize = 20;
+    let nested =
+        |nat: &str| (0..DEPTH).fold(String::from("Type"), |term, _| format!("D {nat} ({term})"));
+    let source = format!(
+        "fn k (F : {} -> Type) (x : {}) (o : F x) (n : Int) : Int = n",
+        nested("Zero"),
+        nested("z")
+    );
+    let started = Instant::now();
+    let result = env
+        .elaborate_decl_v1(&source)
+        .unwrap_or_else(|error| panic!("bare_z: {error:?}"));
+    let elapsed = started.elapsed();
+    eprintln!("sort-congruence row=bare_z depth={DEPTH} elapsed={elapsed:?}");
+    assert!(result.obligations.is_empty(), "bare_z adds no obligations");
+    assert!(elapsed < LIMIT, "bare_z: {elapsed:?} >= {LIMIT:?}");
+}
