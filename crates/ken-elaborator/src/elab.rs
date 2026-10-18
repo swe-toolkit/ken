@@ -28,6 +28,9 @@ mod refinement_snapshot;
 #[cfg(test)]
 #[path = "elab/refinement_tests.rs"]
 mod refinement_tests;
+#[cfg(test)]
+#[path = "elab/subset_sigma_census.rs"]
+mod subset_sigma_census;
 
 use crate::ast::{
     BinOp, DefKeyword, Fixity, FixityAssoc, LiteralPat, NumLit, RecursiveResultSelector,
@@ -14423,6 +14426,8 @@ fn coerce_refinement(
                 error, span: span.clone(),
             },
         })?;
+        #[cfg(test)]
+        subset_sigma_census::record_pair(cx, &pair, &target, span);
         return Ok(pair);
     }
     if let Some((carrier, _)) = subset_refinement(cx, &source) {
