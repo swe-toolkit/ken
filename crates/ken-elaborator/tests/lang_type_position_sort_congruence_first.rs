@@ -2,7 +2,8 @@
 //! Promise class: durable sort-linking and cost boundary (spec 12 §3, 39 §2;
 //! Architect D0 evt_h497bj8yv4jk). The kernel rechecks every accepted type.
 
-use ken_elaborator::ElabEnv;
+use ken_elaborator::{ElabEnv, ElabError};
+use ken_kernel::KernelError;
 use std::time::{Duration, Instant};
 
 const DEPTH: usize = 16;
@@ -134,4 +135,97 @@ fn duplicating_alias_with_different_nat_spelling_avoids_exponential_whnf() {
     eprintln!("sort-congruence row=bare_z depth={DEPTH} elapsed={elapsed:?}");
     assert!(result.obligations.is_empty(), "bare_z adds no obligations");
     assert!(elapsed < LIMIT, "bare_z: {elapsed:?} >= {LIMIT:?}");
+}
+
+const GATE_DEPTH: usize = 20;
+
+fn spine_gate_env(swapped: bool) -> ElabEnv {
+    let mut env = ElabEnv::new().expect("prelude");
+    let declaration = if swapped {
+        "fn H (b : Type 1) (a : Bool) : Type 1 = b -> Int"
+    } else {
+        "fn H (a : Bool) (b : Type 1) : Type 1 = b -> Int"
+    };
+    env.elaborate_decl(declaration)
+        .expect("discarded Bool alias");
+    env
+}
+
+fn h_tower(swapped: bool, flag: &str, leaf: &str) -> String {
+    (0..GATE_DEPTH).fold(leaf.to_string(), |term, _| {
+        if swapped {
+            format!("H ({term}) {flag}")
+        } else {
+            format!("H {flag} ({term})")
+        }
+    })
+}
+
+fn h_row(swapped: bool, lhs: &str, rhs: &str, left_leaf: &str, right_leaf: &str) -> String {
+    format!(
+        "fn k (F : {} -> Type) (x : {}) (o : F x) (n : Int) : Int = n",
+        h_tower(swapped, lhs, left_leaf),
+        h_tower(swapped, rhs, right_leaf)
+    )
+}
+
+/// MEASURED: twenty nested aliases discard a Bool argument that differs on
+/// each side; this accepted declaration has no obligations and checks in
+/// under 2s. CLAIMED: a failing first spine pair cannot cause a speculative
+/// walk of the next, nested pair. THE GAP: neither acceptance nor elapsed time
+/// alone establishes the gate; deleting it must cross the 2s boundary.
+#[test]
+fn discarded_bool_first_pair_avoids_exponential_walk() {
+    let mut env = spine_gate_env(false);
+    let source = h_row(false, "True", "False", "Type", "Type");
+    let started = Instant::now();
+    let result = env
+        .elaborate_decl_v1(&source)
+        .unwrap_or_else(|error| panic!("R1: {error:?}"));
+    let elapsed = started.elapsed();
+    eprintln!("sort-spine-gate row=R1 depth={GATE_DEPTH} elapsed={elapsed:?}");
+    assert!(result.obligations.is_empty(), "R1 adds no obligations");
+    assert!(elapsed < LIMIT, "R1: {elapsed:?} >= {LIMIT:?}");
+}
+
+/// The failing pair is last after swapping the alias parameters. If the
+/// parent also exceeds 2s on this shape, kernel recheck is the suspected
+/// cost and this WP stops rather than hiding it in elaboration.
+#[test]
+fn discarded_bool_last_pair_avoids_exponential_walk() {
+    let mut env = spine_gate_env(true);
+    let source = h_row(true, "True", "False", "Type", "Type");
+    let started = Instant::now();
+    let result = env
+        .elaborate_decl_v1(&source)
+        .unwrap_or_else(|error| panic!("R1-swap: {error:?}"));
+    let elapsed = started.elapsed();
+    eprintln!("sort-spine-gate row=R1-swap depth={GATE_DEPTH} elapsed={elapsed:?}");
+    assert!(result.obligations.is_empty(), "R1-swap adds no obligations");
+    assert!(elapsed < LIMIT, "R1-swap: {elapsed:?} >= {LIMIT:?}");
+}
+
+/// MEASURED: nonconvertible leaf types still refuse K0004, and the refusal
+/// arrives under 2s at K=20. CLAIMED: the gate does not silently admit the
+/// mismatched leaf. THE GAP: the same kernel diagnostic is owed on the parent,
+/// even though its sort walk reaches it more slowly.
+#[test]
+fn mismatched_nested_leaf_refuses_without_exponential_walk() {
+    let mut env = spine_gate_env(false);
+    let source = h_row(false, "True", "True", "Type", "(Type -> Type)");
+    let started = Instant::now();
+    let result = env.elaborate_decl_v1(&source);
+    let elapsed = started.elapsed();
+    eprintln!("sort-spine-gate row=R2 depth={GATE_DEPTH} elapsed={elapsed:?}");
+    assert!(
+        matches!(
+            result,
+            Err(ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            })
+        ),
+        "R2 must refuse K0004: {result:?}"
+    );
+    assert!(elapsed < LIMIT, "R2: {elapsed:?} >= {LIMIT:?}");
 }
