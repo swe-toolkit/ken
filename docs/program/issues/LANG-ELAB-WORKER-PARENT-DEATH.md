@@ -1,7 +1,7 @@
 ---
 id: LANG-ELAB-WORKER-PARENT-DEATH
 title: "Since LANG-ELAB-NATIVE-STACK-DEPTH AC-2, a signal sent to the ken CLI pid alone kills only the parent: the re-exec child is reparented, keeps running with the caller's stdio, and ken run performs host effects after its supervisor killed it. Tie the child's life to the parent with an authenticated lifeline pipe whose EOF kills the child"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T2
