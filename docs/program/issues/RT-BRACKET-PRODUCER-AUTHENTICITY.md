@@ -27,24 +27,35 @@ not by the instance's exact call/return context. Depth 2 shows it as
 order, and depth 3 as a cross-specialization claim. The rows are px8ta
 depths 2 and 3 and the `o1 c1 c1` lookalike.
 
-1. **Re-measure the routes on `f555f4a37`.** Per row, report the route
-   class (Deferred, owner, call and effect sharing) of the two settlement
-   releases and of the depth-3 claim for construct 737.
-2. **Name the collapse point.** Name the exact function and key at which
-   the two normalized release sites become one lowered `ResourceRelease`
-   case.
-3. **The deciding question.** At that point, does an exact call/return
-   context distinguish the two settlement instances? List each candidate
-   (specialization id, continuation-call identity, response owner) with
-   its value for both instances.
+**First D0, done (Architect `evt_yj783ca8pd2d`).** On `f555f4a37` each
+settlement instance has its own Vis (depth 2: 515, 639; depth 3: 515, 737,
+863), and each Deferred row keeps its own `vis_origin` and
+`operation_root_origin`. The pairing is lost where native lowering keys on
+the shared `effect_origin` 190. The erasure host-op leaf is generic by
+design and is not the plane to test.
+
+**D0-2, the authenticated tie.** For each checked producer occurrence (a
+distinct `withResource` call of template `g587`/`bind g249`, with its
+argument-5 settlement continuation), follow it to exactly one settlement
+Vis through normalization and erasure, using only checked occurrence
+provenance. Acquisition order, nesting depth, origin-number order,
+`HostOpV1` shape and token `target` order are forbidden as the tie. Report
+per row: producer occurrence, settlement Vis, `operation_root_origin`,
+Phase-A token, the mechanism carrying each arrow, and the first arrow that
+cannot be carried. The lookalike's tie yields one region (Vis 421) and
+claims neither console Vis 441 nor 460.
 
 **Outcomes, both first-class:**
 
-- **(a) A context distinguishes them.** It is the instance identity.
-- **(b) None does.** The identity must be minted at normalization and
-  carried through lowering, which then builds one settlement case per
-  region. That is a lowering restructure: **stop and return to the
-  Steward.**
+- **(a′) Every arrow carries.** The Steward rewrites section 3's
+  body-to-settlement edge on the settlement-Vis occurrence. Its region is
+  minted from that Vis's Phase-A call/return context as an opaque
+  `BracketSettlementId`; child 2 carries it into the Deferred row, and
+  child 3 pairs lowering by region, not by `effect_origin`.
+- **(b′) The producer-to-Vis arrow breaks at normalization.** That is a
+  normalization restructure in kernel-normalize territory: **stop and
+  return to the Steward** (an operator question).
+  `wp/KERNEL-NORMALIZE-ORIGIN-TRACE` stays unmoved.
 
 **Prohibitions:** no lookup widening or added declaration lane for the
 depth-3 claim; no order or shape guess and no `HostOpV1` port discovery;
