@@ -17414,34 +17414,6 @@ fn elaborate_associated_rdecl(
     declared_fixity: Option<(Fixity, Span)>,
     rdecl: &RDecl,
 ) -> Result<ElabResult, ElabError> {
-    if matches!(
-        rdecl.kind,
-        RDeclKind::View {
-            keyword: DefKeyword::Fn | DefKeyword::Const,
-            ..
-        }
-    ) {
-        if let Some(ty) = &rdecl.ty {
-            // `.with_classes` is load-bearing even though this pre-pass throws
-            // its result away. It exists only to run `ensure_not_omega_type`,
-            // but it ELABORATES the declared type to get there -- so a
-            // telescope containing `(q : d.Query)` reaches `infer_proj` HERE,
-            // ahead of the real elaboration in `elaborate_v0` (which has had
-            // the class env all along). Without it the projection's
-            // name-to-index lookup has no field list and a well-formed binding
-            // is refused by a sort pre-check.
-            let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, &*refinement_facts, rdecl.name.clone())
-                .deferring_type_introductions()
-                .with_classes(&*class_env, provenance, standard_operators)
-                .with_preconditions(preconditions, PremiseHoles::Refused);
-            // This pre-pass checks sort but admits no definition. Match the
-            // admitting signature's domain/result permissions and collect its
-            // templates rather than rejecting a legitimate refined return.
-            let (ty, _) = elab_signature(&mut cx, ty, innermost_refine_pred(ty).is_some())?;
-            let ty_core = cx.metas.zonk_term(&ty);
-            ensure_not_omega_type(cx.env, &Context::new(), &ty_core, &rdecl.span)?;
-        }
-    }
     match &rdecl.kind {
         RDeclKind::View { constraints, .. } => {
             let effect_row_type = check_view_visits_row(rdecl)?;
@@ -18933,15 +18905,22 @@ fn elaborate_data_with_refinements(
     );
     let result = (|| {
         let mark = ken_kernel::env_mark(env);
-        let provisional = data::elab_data_decl(
-            env, globals, ctor_decl_spans, name, type_params, ctors, span,
-        )?;
-        let provisional_ids = family_constructor_ids(env, provisional)?;
-        let after_provisional = env.declarations().len();
+        let decls_at_mark = env.declarations().len();
+        let provisional = ken_kernel::declare_inductive(env, |_| ken_kernel::InductiveSpec {
+            level_params: vec![],
+            params: vec![Term::ty(Level::Zero); type_params.len()],
+            indices: vec![],
+            level: Level::Zero,
+            constructors: vec![],
+        }).map_err(|error| ElabError::KernelRejected {
+            error, span: span.clone(),
+        })?;
+        globals.insert(name.to_string(), provisional);
+        let decls_after_head = env.declarations().len();
         let field_types = elaborate_legacy_constructor_field_types(
             env, globals, num_values, numeric_env, facts, type_params.len(), ctors, name,
         )?;
-        if env.declarations().len() != after_provisional {
+        if env.declarations().len() != decls_after_head || decls_after_head <= decls_at_mark {
             return Err(ElabError::ObligationWithoutChannel { span: span.clone() });
         }
         ken_kernel::rollback_to_mark(env, mark)
@@ -18952,7 +18931,7 @@ fn elaborate_data_with_refinements(
             env, globals, ctor_decl_spans, name, type_params, ctors,
             Some(&field_types), span,
         )?;
-        if family_constructor_ids(env, id)? != provisional_ids {
+        if id != provisional {
             return Err(ElabError::Internal("family ids moved across provisional rollback".into()));
         }
         Ok(id)
@@ -18999,15 +18978,29 @@ fn elaborate_explicit_data_with_refinements(
     );
     let result = (|| {
         let mark = ken_kernel::env_mark(env);
-        let provisional = data::elab_explicit_data_decl(
-            env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
+        let decls_at_mark = env.declarations().len();
+        let (parameter_types, index_types) = elaborate_explicit_family_telescope(
+            env, globals, num_values, numeric_env, facts, params, indices, name,
         )?;
-        let provisional_ids = family_constructor_ids(env, provisional)?;
-        let after_provisional = env.declarations().len();
+        if env.declarations().len() != decls_at_mark {
+            return Err(ElabError::ObligationWithoutChannel { span: span.clone() });
+        }
+        let provisional = ken_kernel::declare_inductive(env, |_| ken_kernel::InductiveSpec {
+            level_params: vec![],
+            params: parameter_types.clone(),
+            indices: index_types.clone(),
+            level: level.map(level_from_nat).unwrap_or(Level::Zero),
+            constructors: vec![],
+        }).map_err(|error| ElabError::KernelRejected {
+            error, span: span.clone(),
+        })?;
+        globals.insert(name.to_string(), provisional);
+        let decls_after_head = env.declarations().len();
         let checked = elaborate_explicit_inductive_types(
-            env, globals, num_values, numeric_env, facts, params, indices, ctors, name,
+            env, globals, num_values, numeric_env, facts,
+            &parameter_types, &index_types, ctors, name,
         )?;
-        if env.declarations().len() != after_provisional {
+        if env.declarations().len() != decls_after_head || decls_after_head <= decls_at_mark {
             return Err(ElabError::ObligationWithoutChannel { span: span.clone() });
         }
         ken_kernel::rollback_to_mark(env, mark)
@@ -19018,8 +19011,8 @@ fn elaborate_explicit_data_with_refinements(
             env, globals, ctor_decl_spans, name, params, indices, level, ctors,
             Some(&checked), span,
         )?;
-        if family_constructor_ids(env, id)? != provisional_ids {
-            return Err(ElabError::Internal("family ids moved across provisional rollback".into()));
+        if id != provisional {
+            return Err(ElabError::Internal("family id moved across provisional rollback".into()));
         }
         Ok(id)
     })();
@@ -19030,15 +19023,6 @@ fn elaborate_explicit_data_with_refinements(
         (*globals, *num_values, *ctor_decl_spans, *facts) = snapshot;
     }
     result
-}
-
-fn family_constructor_ids(env: &GlobalEnv, id: GlobalId) -> Result<Vec<GlobalId>, ElabError> {
-    let family = env.inductive(id).ok_or_else(|| {
-        ElabError::Internal("provisional family is missing after kernel admission".into())
-    })?;
-    Ok(std::iter::once(id)
-        .chain(family.constructors.iter().map(|ctor| ctor.id))
-        .collect())
 }
 
 #[inline(never)]
@@ -19068,7 +19052,7 @@ fn elaborate_legacy_constructor_field_types(
 }
 
 #[inline(never)]
-fn elaborate_explicit_inductive_types(
+fn elaborate_explicit_family_telescope(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
@@ -19076,35 +19060,47 @@ fn elaborate_explicit_inductive_types(
     facts: &RefinementFacts,
     params: &[crate::resolve::RTelescopeEntry],
     indices: &[crate::resolve::RTelescopeEntry],
+    owner: &str,
+) -> Result<(Vec<Term>, Vec<Term>), ElabError> {
+    let no_preconditions = HashMap::new();
+    let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string())
+        .with_preconditions(&no_preconditions, PremiseHoles::Refused);
+    let mut parameter_types = Vec::with_capacity(params.len());
+    let mut index_types = Vec::with_capacity(indices.len());
+    for entry in params {
+        let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
+        let ty = cx.metas.zonk_term(&ty);
+        cx.ctx.push(ty.clone());
+        parameter_types.push(ty);
+    }
+    for entry in indices {
+        let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
+        let ty = cx.metas.zonk_term(&ty);
+        cx.ctx.push(ty.clone());
+        index_types.push(ty);
+    }
+    Ok((parameter_types, index_types))
+}
+
+#[inline(never)]
+fn elaborate_explicit_inductive_types(
+    env: &mut GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    facts: &RefinementFacts,
+    parameter_types: &[Term],
+    index_types: &[Term],
     ctors: &[crate::resolve::RExplicitCtorDecl],
     owner: &str,
 ) -> Result<data::CheckedInductiveTypes, ElabError> {
     let no_preconditions = HashMap::new();
-    let (parameter_types, index_types) = {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string())
-            .with_preconditions(&no_preconditions, PremiseHoles::Refused);
-        let mut parameter_types = Vec::with_capacity(params.len());
-        let mut index_types = Vec::with_capacity(indices.len());
-        for entry in params {
-            let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
-            let ty = cx.metas.zonk_term(&ty);
-            cx.ctx.push(ty.clone());
-            parameter_types.push(ty);
-        }
-        for entry in indices {
-            let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
-            let ty = cx.metas.zonk_term(&ty);
-            cx.ctx.push(ty.clone());
-            index_types.push(ty);
-        }
-        (parameter_types, index_types)
-    };
     let mut fields = Vec::with_capacity(ctors.len());
     let mut results = Vec::with_capacity(ctors.len());
     for ctor in ctors {
         let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string())
             .with_preconditions(&no_preconditions, PremiseHoles::Refused);
-        for ty in &parameter_types {
+        for ty in parameter_types {
             cx.ctx.push(ty.clone());
         }
         let mut args = Vec::with_capacity(ctor.args.len());
@@ -19118,7 +19114,7 @@ fn elaborate_explicit_inductive_types(
         fields.push(args);
     }
     Ok(data::CheckedInductiveTypes {
-        params: parameter_types, indices: index_types, fields, results,
+        params: parameter_types.to_vec(), indices: index_types.to_vec(), fields, results,
     })
 }
 
@@ -19731,15 +19727,10 @@ fn elaborate_v0(
             params.into_iter().map(|p| p.map(|p| cx.metas.zonk_term(&p))).collect::<Vec<_>>(),
         )
     };
-    if rdecl.ty.is_none()
-        && matches!(
-            rdecl.kind,
-            RDeclKind::View {
-                keyword: DefKeyword::Fn | DefKeyword::Const,
-                ..
-            }
-        )
-    {
+    if matches!(
+        rdecl.kind,
+        RDeclKind::View { keyword: DefKeyword::Fn | DefKeyword::Const, .. }
+    ) {
         ensure_not_omega_type(env, &Context::new(), &ty_core, &rdecl.span)?;
     }
     let id =
@@ -19849,6 +19840,11 @@ fn elaborate_recursive_view(
         )
     };
 
+    // The actual, checked signature is the sort gate for recursive views;
+    // a prior elaboration without subset introductions cannot classify it.
+    if matches!(rdecl.kind, RDeclKind::View { keyword: DefKeyword::Fn | DefKeyword::Const, .. }) {
+        ensure_not_omega_type(env, &Context::new(), &ty_core, &rdecl.span)?;
+    }
     // 2. Stage a checked opaque placeholder so the body can self-reference.
     let pending =
         ken_kernel::stage_placeholders(env, vec![(rdecl.name.clone(), vec![], ty_core.clone())])
@@ -20450,6 +20446,7 @@ fn elaborate_view_with_spec(
             };
             let (param_types, carrier_result, full_ty) =
                 build_contract_type(&carrier_ty, param_count, &req_cores)?;
+            ensure_not_omega_type(env, &Context::new(), &full_ty, &rdecl.span)?;
             let result_ty_under_requires = weaken(&carrier_result, req_cores.len() as i64);
             let staged = ken_kernel::stage_placeholders(
                 env,

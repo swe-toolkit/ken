@@ -335,10 +335,9 @@ instance QaProvider Int { evidence = Axiom }"#,
     assert!(matches!(
         result,
         Err(ElabError::KernelRejected {
-            error: KernelError::TypeMismatch { .. },
-            ..
-        })
-    ));
+            error: KernelError::TypeMismatch { .. }, ..
+        }) | Err(ElabError::TypeMismatch { .. })
+    ), "actual refusal: {result:?}");
     let head_id = removed_head.expect("provider head was registered");
     let transient_class_id = removed_class.expect("transient class was registered");
     let instance_id = removed_instance.expect("provider instance was registered");

@@ -17,39 +17,46 @@ fn open_refinements(env: &ElabEnv, result: &ElabResult) -> usize {
         .count()
 }
 
+/// Promise class: durable type-former and kernel-discrimination invariant.
+/// MEASURED: a source `List (Σ Int φ)` does not accept a `List Int` value,
+/// even when the list's integer happens to satisfy φ.
+/// CLAIMED: no coercion is inserted under the `List` former.
+/// THE GAP: the fixture must reach `List` with distinct type arguments;
+/// the companion field/index test confirms the Σ is actually emitted.
 #[test]
-fn nested_literal_type_argument_refuses_for_both_values() {
-    const REASON: &str = "a refinement nested inside a type is not supported yet: only a binder's, field's or result's own annotation may be refined";
+fn nested_literal_type_argument_does_not_coerce_under_list() {
     for value in [5, 6] {
         let mut env = ElabEnv::new().expect("prelude");
         let source =
             format!("const xs : List ({{ x : Int | Equal Int x 5 }}) = Cons Int {value} (Nil Int)");
         let error = env
             .elaborate_decl_v1(&source)
-            .expect_err("nested literal must not erase");
-        assert!(
-            matches!(error, ElabError::TypeMismatch { ref reason, .. } if reason == REASON),
-            "{value}: {error:?}"
-        );
+            .expect_err("List Int cannot become List of a subset Σ");
+        assert!(matches!(error, ElabError::TypeMismatch { .. }), "{value}: {error:?}");
     }
 }
 
+/// Promise class: durable kernel-checked subset representation invariant.
+/// MEASURED: checked constructor and family parameter types contain a Sigma,
+/// even when the refinement sits inside a List or an indexed-family binder.
+/// CLAIMED: independent data lowering never discards source refinements.
+/// THE GAP: a kernel constructor's checked field and a family's checked
+/// parameter are the authoritative types, not the surface annotation alone.
 #[test]
-fn independent_inductive_converter_refuses_unrecorded_nested_refinements() {
-    const REASON: &str = "a refinement nested inside a type is not supported yet: only a binder's, field's or result's own annotation may be refined";
-    for source in [
-        "data BoxRef = Wrap (List ({x : Int | Equal Int x 5}))",
+fn independent_inductive_converter_keeps_nested_refinements() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("data BoxRef = Wrap (List ({x : Int | Equal Int x 5}))")
+        .expect("nested constructor field is checked");
+    let (family, index) = env.env.constructor(env.globals["Wrap"]).expect("constructor admitted");
+    assert!(matches!(&family.constructors[index].args[0], Term::App(_, arg) if matches!(arg.as_ref(), Term::Sigma(..))),
+        "List's argument must retain the subset Σ");
+
+    env.elaborate_decl(
         "data Indexed (n : {x : Int | Equal Int x 5}) : Type where { Make : Indexed n }",
-    ] {
-        let mut env = ElabEnv::new().expect("prelude");
-        let error = env
-            .elaborate_decl_v1(source)
-            .expect_err("unrecorded refinements may not pass inductive conversion");
-        assert!(
-            matches!(error, ElabError::TypeMismatch { ref reason, .. } if reason == REASON),
-            "{source}: {error:?}"
-        );
-    }
+    ).expect("refined family parameter is checked");
+    let indexed = env.env.inductive(env.globals["Indexed"]).expect("family admitted");
+    assert!(matches!(indexed.params.first(), Some(Term::Sigma(..))),
+        "the parameter itself must be a subset Σ");
 }
 
 #[test]
