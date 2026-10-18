@@ -1,7 +1,7 @@
 ---
 id: RT-NATIVE-BRACKET-SEAT-CLEAR-NECESSITY
 title: "RT-NATIVE-BRACKET-BODY-EFFECT-ONCE added a seat clear in lowering/core.rs that no measured row needs: removing it alone leaves F1 and F2 green, because the graft-frame copy-up already prevents the double perform. Either pin the clear with a row the graft frames do not cover, or remove it and its two refusal arms once a census shows its population is contained in the graft-frame population"
-status: ready
+status: closed
 owner: runtime
 size: S
 tier: T1
@@ -13,6 +13,12 @@ origin: "Architect approval of RT-NATIVE-BRACKET-BODY-EFFECT-ONCE f555f4a37 (evt
 ---
 
 # The seat clear is either necessary or gone
+
+**Closed, discharged by removal (Architect `evt_4bvfyaxb4tjte`).** The
+seat clear broke px7m's owner-return path (cleared member 3 to 0, then
+trap -1), so the BODY-EFFECT respin returns `lowering/core.rs` to the
+base blob, removing the clear and both refusal arms. The respin's QA pins
+the graft frames with a `.chain(graft_frames)` mutation instead.
 
 ## Objective
 
