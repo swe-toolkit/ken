@@ -48,6 +48,12 @@ base, stop and report the mismatch.
 - **AC-1b.** fa_meta_ne, discard, small_arg and eq_meta (the D0's
   fixtures) at K=16 each elaborate in under 2s. Paired: deleting the
   same-constant fast return makes each exceed 2s.
+- **AC-1c (Architect `evt_11dta2bhe2ktt`, Adversary
+  `evt_4kp6rb0add1bz`).** bare_z at K=20 elaborates in under 2s:
+  `fn D (u : Nat) (a : Type 1) : Type 1 = a -> a`, `const z : Nat = Zero`,
+  and `fn k (F : <D Zero nested K deep around Type> -> Type)
+  (x : <D z nested K deep around Type>) (o : F x) (n : Int) : Int = n`.
+  Paired: deleting the same-constant early return makes it exceed 2s.
 - **AC-C.** discard accepts with no obligations, fallback_suc at K=4
   accepts on the restore path, and the fixed `Type 0` nested Big row
   stays K0004.
