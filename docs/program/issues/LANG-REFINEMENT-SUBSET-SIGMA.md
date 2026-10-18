@@ -145,12 +145,19 @@ on the current base before measuring, and reports any that moved.
   is a fixed point checks within base time when an introduction consumes
   it; emit `Refl(rhs)` unascribed whenever `rhs` infers.
 - **AC-3.** Kernel QA reviews the K-a lines.
-- **AC-S (carried, Architect `evt_1pm2qvb169bfm`).** The type-position
-  sort walk `unify_sorts_walk` has no `Sigma` arm, so under W5 an alias
-  nested in a refined domain's carrier links no level. If this build
-  reaches it, add a `Sigma` arm with the Pi arm's domain push and pop,
-  with the row `(F : {x : Small | φ} -> Type) (a : Type) (o : F a)`.
-  Otherwise report it for a separate node.
+- **AC-S (Architect `evt_2399h0mk7asd9`, replacing `evt_1pm2qvb169bfm`).**
+  `unify_sorts_walk` gains a `Sigma/Sigma` arm with the Pi arm's domain
+  push and pop, and a Σ-carrier arm `(Term::Sigma(carrier, _), _)` that
+  walks the carrier against the actual. Both sit inside the walk; the
+  ruling's text is the code. Rows, with `const Big : Type 2 = Type 1` and
+  `F : ({x : Big | Top}) -> Type`:
+  - b1 `(a : Type)` and b2 `(a : {x : Type | Top})` are admitted.
+  - b3 `(a : Type 1)` is admitted and b5 `(a : Type 0)` refused
+    (controls).
+  - Paired: deleting the Σ-carrier arm refuses b1, and dropping the
+    `Sigma/Sigma` pattern refuses b2.
+  - The `Small` twins pass by the level's Zero default and are not
+    evidence.
 
 ## Stop conditions
 
@@ -162,7 +169,8 @@ on the current base before measuring, and reports any that moved.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 1 (Architect `evt_4b6ktd7c5xqxx`, from `evt_290erhrm8bnaf`).
+§1a: ctor-field staging 1 (Architect `evt_4b6ktd7c5xqxx`, from
+`evt_290erhrm8bnaf`); AC-S sort link 1 (`evt_2399h0mk7asd9`).
 
 1. The two-pass provisional family was taken from the raw carrier
    lowering (`data::elab_*_data_decl`). It was keyed on that lowering
@@ -172,3 +180,8 @@ on the current base before measuring, and reports any that moved.
    constructors (the `family_probe` idiom, but in the same env), with
    every field, parameter, index and result going through the shared
    elaborator.
+2. The type-position sort link was keyed on the domain being the carrier
+   type. W5 makes a refined domain Σ, which neither the carrier compare
+   nor the walk matched. Fix: a Σ/Σ arm plus a Σ-carrier arm in
+   `unify_sorts_walk`. Keyed on the refinement being represented by its
+   carrier (Architect `evt_25zg89vfk8ksw`).

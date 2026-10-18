@@ -121,9 +121,10 @@ the px8ta chain is 0.
   `Resource` binder of its own `Ok` arm, whose scrutinee is its own
   acquire Vis's continuation binder. No source-occurrence map is needed,
   and none is built.
-- **Group by `Ok` binder, never by count.** Normalization copies the
-  finalizer once per Ret leaf of the body, so one region can own N
-  finalizer instances under one binder. That group is the outcome-merge
+- **Group by `Ok` binder, never by count.** `bind` is linear in its
+  continuation and the release is built at one site, so each `Ok` binder
+  owns exactly one static finalizer serving every dynamic Ret leaf of the
+  body (Architect `evt_31249h63pja2n`). That region is the outcome-merge
   role.
 - **Reference evaluation unwraps `body` unchanged.**
 
@@ -194,12 +195,19 @@ the px8ta chain is 0.
   distinct occurrences, each settling exactly once. This is what defeats the
   refuted section 2 selector. It is a SEPARATE claim from AC-4 and does not
   discharge it.
-- **AC-9 (multi-leaf body, D0-4's unmeasured population).** A bracket
-  body with more than one Ret leaf, such as a `match`, yields one region
-  whose finalizer instances (one per leaf) share one `Ok` binder. A
-  control with two nested brackets and a multi-leaf inner body yields
-  exactly two regions. Paired failing configuration: grouping by
-  occurrence instead of by binder yields one region per leaf.
+- **AC-9 (multi-leaf body; reframed, Architect `evt_31249h63pja2n`).**
+  On `rt_bracket_region_multileaf.ken`, single and nested:
+  - **AC-9a.** The single multi-leaf body gives exactly 1 region with
+    exactly 1 static finalizer under its `Ok` binder, the continuation
+    both `Ret BodyOk` and `Ret BodyErr` reach. The count is asserted as 1,
+    not at least 1.
+  - **AC-9b.** The nested body gives exactly 2 regions with 1 finalizer
+    each, the inner one attributed to the `Ok` binder its `resource`
+    argument resolves to.
+  - **Paired controls on AC-9b**, each restored: (P1) keying regions by
+    owner declaration or by the constructor symbol alone gives 1 region;
+    (P2) keying a finalizer by its outermost enclosing `Ok` binder gives
+    1 region holding 2 finalizers.
 
 ## 5. Stop condition
 
