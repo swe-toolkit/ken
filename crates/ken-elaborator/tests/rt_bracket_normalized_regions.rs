@@ -67,3 +67,18 @@ fn nested_brackets_with_multiple_inner_ret_leaves_have_two_binder_groups() {
         outer.ok_resource_binder_path != inner.ok_resource_binder_path
             && inner.ok_resource_binder_path.starts_with(&outer.ok_resource_binder_path))));
 }
+
+/// Promise class: durable owner disambiguation. Three canonical producers
+/// inside one checked declaration retain three acquire→Ok→finalizer triples;
+/// a depth-two sample alone would not exercise the third nested owner.
+#[test]
+fn three_nested_producers_keep_three_binder_regions() {
+    let source = include_str!("fixtures/rt_bracket_region_multileaf.ken")
+        .replace("__ROOT_BODY__", "(\\resource. level_two_body cap terminal resource)");
+    let rows = regions(&source);
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows.iter().map(|row| &row.ok_resource_binder_path)
+        .collect::<std::collections::BTreeSet<_>>().len(), 3);
+    assert_eq!(rows.iter().map(|row| &row.acquire_vis_path)
+        .collect::<std::collections::BTreeSet<_>>().len(), 3);
+}
