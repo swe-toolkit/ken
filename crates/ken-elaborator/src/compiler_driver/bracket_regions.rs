@@ -186,20 +186,18 @@ impl<'a> Collector<'a> {
         if !self.is_resource_type(binder.ty) || kind[0] != args[1] {
             return Err(self.invalid(path, "finalizer kind differs from Ok resource"));
         }
-        let region = self.regions.entry(binder.path.clone()).or_insert_with(|| {
+        // A lexical binder path identifies exactly one Ok arm in this term.
+        // It is not a count, constructor identity, enclosing declaration or
+        // HostOpV1 key; several finalizer leaves can belong to this one arm.
+        let region = self.regions.entry(ok.resource_binder_path.clone()).or_insert_with(|| {
             NormalizedBracketRegion {
                 owner: self.owner.clone(),
                 acquire_vis_path: ok.acquire_vis_path.clone(),
                 acquire_response_binder_path: ok.acquire_response_binder_path.clone(),
-                ok_resource_binder_path: binder.path.clone(),
+                ok_resource_binder_path: ok.resource_binder_path.clone(),
                 finalizer_paths: Vec::new(),
             }
         });
-        if region.acquire_vis_path != ok.acquire_vis_path
-            || region.acquire_response_binder_path != ok.acquire_response_binder_path
-        {
-            return Err(self.invalid(path, "Ok binder has conflicting acquisitions"));
-        }
         region.finalizer_paths.push(path.to_vec());
         Ok(())
     }
