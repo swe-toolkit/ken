@@ -278,3 +278,38 @@ fn unannotated_ensures_refuses_instead_of_detaching_its_proof() {
     assert_eq!(env.env.next_global_id(), start);
     assert!(!env.globals.contains_key("no_result_type"));
 }
+
+/// Promise class: durable checked-let equality invariant.
+/// MEASURED: a recursive neutral call is the RHS of a let whose body
+/// introduces a subset. Its equation witness is raw Refl(rhs) when the RHS
+/// already infers, and the final function is kernel-checked with no hole.
+/// CLAIMED: checked let evidence does not force an expensive fixed-point RHS
+/// through conversion before comparing it to itself.
+/// THE GAP: timing must be compared against the exact candidate base; this
+/// test pins only the proof shape and admission, not a performance threshold.
+#[test]
+fn recursive_fixed_point_rhs_witness_stays_unascribed() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl_v1(
+        "fn slow (n : Nat) : Int = match n { Zero ↦ 5; Suc k ↦ slow k }")
+        .expect("recursive, neutral RHS producer");
+    let result = env.elaborate_decl_v1(
+        "fn carried (n : Nat) : { x : Int | Equal Int x (slow n) } = let value = slow n in value")
+        .expect("checked let introduction does not expand the fixed-point RHS");
+    assert_eq!(result.obligations.len(), 1, "one checked introduction");
+    assert!(!env.is_open_hole(result.obligations[0].hole_id),
+        "let equation and reflexivity must close the proof");
+    let Some(Decl::Transparent { body, ty, .. }) = env.env.lookup(result.def_id) else {
+        panic!("checked let result")
+    };
+    let Term::Lam(_, let_body) = body else { panic!("function body") };
+    let Term::Let { body: evidence, .. } = let_body.as_ref() else {
+        panic!("let with checked equation")
+    };
+    let Term::App(_, witness) = evidence.as_ref() else { panic!("equality witness") };
+    assert!(matches!(witness.as_ref(), Term::Refl(rhs)
+        if !matches!(rhs.as_ref(), Term::Ascript(..))),
+        "already-inferable RHS must enter Refl without an Ascript: {witness:?}");
+    ken_kernel::check(&env.env, &ken_kernel::Context::new(), body, ty)
+        .expect("kernel rechecks the complete subset-introducing function");
+}
