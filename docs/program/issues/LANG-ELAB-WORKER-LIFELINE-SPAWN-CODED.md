@@ -1,7 +1,7 @@
 ---
 id: LANG-ELAB-WORKER-LIFELINE-SPAWN-CODED
 title: "The lifeline watcher LANG-ELAB-WORKER-PARENT-DEATH added starts with a bare std::thread::spawn, which reads RUST_MIN_STACK and panics on failure, so the child exits 101 uncoded where base gave C0022 or rc 0. Give the watcher a fixed stack, make enter_child fallible, and refuse with C0022"
-status: ready
+status: active
 owner: verify
 size: S
 tier: T2

@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-SORT-NESTED-DOMAIN
 title: "The type-position sort link whnf's only the head of each side, so an alias nested inside a structured former domain, such as g : (Small -> Type) -> Type with Small := Type 0, links no level and the argument is refused with TypeMismatch, while its unaliased twin checks. Link sorts by walking both sides structurally, with whnf at each node"
-status: ready
+status: active
 owner: language
 size: S
 tier: T2
@@ -56,12 +56,28 @@ rows below as a test target beside the SORT-UP-TO-WHNF rows.
 - **AC-2 (paired failing configuration).** Each AC-1 row with the walk
   replaced by the head-only whnf gives today's `TypeMismatch`.
 - **AC-3.** The SORT-UP-TO-WHNF rows a1, a3, a5, g3 and its four
-  `Big := Type 1` negatives keep their outcomes. A nested `Big` twin of
-  n1 keeps the outcome it has on the base.
+  `Big := Type 1` negatives keep their outcomes. For the nested `Big`
+  twin of n1 (Architect `evt_4wf8nv27wwrqy`, `evt_3031bnxwcrzq9`; operative
+  `evt_9aq3qzbwfdb5`):
+  - With `f : Type 0 -> Type`, it gives K0004 on base and candidate.
+  - With a bare `f : Type -> Type`, it checks with one obligation, and
+    its admitted kernel type shows `f`'s domain solved to `Type 1`. A
+    bare `Type` is `Type ?l`, so the base refusal was incidental to the
+    missing level link. Reverting the walk returns this row to K0004.
 - **AC-4.** Every landed catalog package emits byte-identical core.
+- **AC-T1 (amendment 1, durable timing; Architect `evt_brr6pry2jfxy` on
+  Adversary `evt_c3e61b3kpxd3`).** The walk returns early through
+  `sort_walk_is_inert` before any whnf when the zonked sides are
+  identical or carry no open level meta (an out-of-range meta counts as
+  open). The ruling's code is the text. With `T NN` an alias over an
+  exponential `blow` at K=16, rows fa, eq, nested and fa_ne (as in the
+  ruling) each elaborate in under 2s. Paired: deleting only the early
+  return makes each exceed 2s.
+- **AC-T2.** Under the guard every row above keeps its outcome.
 
 ## Stop conditions
 
 - Any change to `unify_types` or a term-position site.
+- Congruence-first linking, or any change to which levels are linked.
 - A walk that needs to assign a term meta, not only link levels.
 - Any kernel or `trusted_base()` change.
