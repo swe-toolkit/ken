@@ -262,18 +262,21 @@ shipped seed-harness execution, CI and a landed trust-delta measurement
 are not established. No second fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
-**`63-statistics.md`** §§1–3 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
+**`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
 SPEC-STATISTICS-EMPIRICAL-SAMPLE-CONTRACT;
-SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT). `Algorithm.Statistics.Exact`
+SPEC-STATISTICS-RATIONAL-VALUES-CONTRACT;
+SPEC-STATISTICS-EVENT-MASS-INCLUSION-EXCLUSION). `Algorithm.Statistics.Exact`
 stores natural-weight atoms with checked positive total, without
 `Finite q` or `DecEq q`; its nine §1 laws govern natural numerators.
 `Algorithm.Statistics.Empirical` reads an existing `NonEmpty q`, keeping
 repeated observations as distinct unit-weight entries under seven §2
 laws. Section 3 adds value-typed probability, expectation, and
 empirical mean to those same modules, with twelve further checked-law
-obligations and no §3 CAT delivery claim. `pure`/`bind`, uniform
-enumeration, approximate statistics, and `Float` results remain
-deferred.
+obligations and no §3 CAT delivery claim. Section 4 adds a public
+intersection event and three proved natural-weight laws for overlapping
+events, event implication, and ordered scores; no §4 seed or CI result
+is claimed at the AC-1 stage. `pure`/`bind`, uniform enumeration,
+approximate statistics, and `Float` results remain deferred.
 
 The separate **non-negative exact rational contract** is pinned in
 **`64-rational.md`** (SPEC-NUMERIC-RATIONAL-CONTRACT).
