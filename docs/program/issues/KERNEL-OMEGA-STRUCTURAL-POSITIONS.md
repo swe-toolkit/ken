@@ -1,7 +1,7 @@
 ---
 id: KERNEL-OMEGA-STRUCTURAL-POSITIONS
 title: "Structural conversion compares a neutral Cast's proof argument syntactically, although Cast's formation fixes it at an Omega type, so two Casts that differ only in their equality proof do not convert. Spec 16 sections 1.2 and 8.2 already make Omega contents definitionally irrelevant. Skip the positions that are Omega by formation on the structural path"
-status: draft
+status: active
 owner: kernel
 size: S
 tier: T1
