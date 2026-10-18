@@ -2026,7 +2026,8 @@ fn check_let_once(
 }
 
 fn elaborate_if_condition(cx: &mut ElabCtx<'_>, condition: &RExpr) -> Result<Term, ElabError> {
-    let (condition_core, _) = infer(cx, condition)?;
+    let (condition_core, condition_ty) = infer(cx, condition)?;
+    let (condition_core, _) = forget_subset_at_elimination_head(cx, condition_core, condition_ty);
     let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
     match kernel_check_current(cx, &condition_core, &bool_ty) {
         Ok(()) => {}
@@ -2887,9 +2888,7 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
                     cx.assumptions.truncate(assumption_base);
                     body_result.map(|body_core| Term::lam(domain, body_core))
                 }
-                _ => Err(ElabError::LambdaVsNonFunction {
-                    span: lam_span.clone(),
-                }),
+                _ => check_lambda_at_subset(cx, expr, expected, lam_span),
             }
         }
         RExpr::RLet(_name, ty_opt, rhs, body, span) => {
@@ -2924,6 +2923,26 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         }
         _ => check_inferred_with_group_transport(cx, expr, expected),
     }
+}
+
+/// A lambda checked at a subset of a Pi is a new value of the carrier,
+/// not a function whose codomain may silently discard the predicate. Check
+/// it at the full Pi first, then introduce one kernel-checked subset pair.
+#[inline(never)]
+fn check_lambda_at_subset(
+    cx: &mut ElabCtx<'_>, expr: &RExpr, expected: &Term, span: &Span,
+) -> Result<Term, ElabError> {
+    let Some((carrier, _)) = subset_refinement(cx, expected) else {
+        return Err(ElabError::LambdaVsNonFunction { span: span.clone() });
+    };
+    if !matches!(whnf(cx.env, &cx.ctx, &carrier), Term::Pi(..)) {
+        return Err(ElabError::LambdaVsNonFunction { span: span.clone() });
+    }
+    let function = check(cx, expr, &carrier, span)?;
+    // The checked lambda is not inferable at an Eq endpoint unless its
+    // already-checked Pi type is retained as an explicit core ascription.
+    let function = Term::Ascript(Box::new(function), Box::new(carrier.clone()));
+    coerce_refinement(cx, function, &carrier, expected, span)
 }
 
 /// Match setup and motive construction run with no result predicate. Only
@@ -9234,6 +9253,7 @@ fn infer_dependent_match_scrutinee(
     scrutinee: &RExpr,
 ) -> Result<(Box<Term>, Box<Term>), ElabError> {
     let (core, inferred) = infer(cx, scrutinee)?;
+    let (core, inferred) = forget_subset_at_elimination_head(cx, core, inferred);
     let inferred = whnf(cx.env, &cx.ctx, &inferred);
     Ok((Box::new(core), Box::new(inferred)))
 }
@@ -12879,6 +12899,7 @@ fn infer_application(
         return Ok(call);
     }
     let (f_core, f_ty) = infer(cx, f)?;
+    let (f_core, f_ty) = forget_subset_at_elimination_head(cx, f_core, f_ty);
     let f_ty_wh = whnf(cx.env, &cx.ctx, &f_ty);
     match f_ty_wh {
         Term::Pi(dom, cod) => {
@@ -12887,6 +12908,22 @@ fn infer_application(
             Ok((Term::app(f_core, a_core), result_ty))
         }
         _ => Err(ElabError::NotAFunction { span: span.clone() }),
+    }
+}
+
+/// At an elimination head, a subset can expose its carrier only by
+/// projecting the checked pair. Keep its inferred type on the core base
+/// so this works even when the base was an introduction form.
+#[inline(never)]
+fn forget_subset_at_elimination_head(
+    cx: &ElabCtx<'_>, core: Term, ty: Term,
+) -> (Term, Term) {
+    match subset_refinement(cx, &ty) {
+        Some((carrier, _)) => (
+            Term::proj1(Term::Ascript(Box::new(core), Box::new(ty))),
+            carrier,
+        ),
+        None => (core, ty),
     }
 }
 
@@ -13572,6 +13609,19 @@ fn infer_j(
 /// its own self-projection off the SAME base (works whether `base` is a
 /// concrete instance value or an opaque bound variable like a `where`-
 /// supplied dictionary).
+fn named_projection_owner(cx: &ElabCtx<'_>, ty: &Term) -> bool {
+    let id = match ty {
+        Term::App(head, _) => match head.as_ref() {
+            Term::Const { id, .. } => Some(*id),
+            _ => None,
+        },
+        Term::Const { id, .. } => Some(*id),
+        _ => None,
+    };
+    id.is_some_and(|id| cx.class_env
+        .is_some_and(|classes| classes.projection_by_type_id(id).is_some()))
+}
+
 fn infer_proj(
     cx: &mut ElabCtx,
     base: &RExpr,
@@ -13579,6 +13629,13 @@ fn infer_proj(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let (base_core, base_ty) = infer(cx, base)?;
+    // A named record can itself contain an Ω field, but that does not make
+    // `.field` a request to discard the record's named projection owner.
+    let (base_core, base_ty) = if named_projection_owner(cx, &base_ty) {
+        (base_core, base_ty)
+    } else {
+        forget_subset_at_elimination_head(cx, base_core, base_ty)
+    };
     // Deliberately inspect `base_ty` AS ELABORATED (never `whnf`'d): a named
     // owner type is itself `Decl::Transparent`, so `whnf` would eagerly unfold
     // it straight through into the raw Sigma chain — losing exactly the owner
@@ -13909,6 +13966,7 @@ fn elab_binop(
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
     let (lhs_core, lhs_ty) = infer(cx, lhs)?;
+    let (lhs_core, lhs_ty) = forget_subset_at_elimination_head(cx, lhs_core, lhs_ty);
     let lhs_ty_wh = whnf(cx.env, &cx.ctx, &lhs_ty);
 
     match op {
@@ -25145,6 +25203,11 @@ fn infer_record_match(
     }
 
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
+    let (scrut_core, scrut_ty) = if named_projection_owner(cx, &scrut_ty) {
+        (scrut_core, scrut_ty)
+    } else {
+        forget_subset_at_elimination_head(cx, scrut_core, scrut_ty)
+    };
     record_pattern_projection(cx, &scrut_ty, span)?;
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
@@ -25280,6 +25343,7 @@ fn infer_or_match(
     }
 
     let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
+    let (scrut_core, scrut_ty_raw) = forget_subset_at_elimination_head(cx, scrut_core, scrut_ty_raw);
     let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
     let (head, _) = peel_app(&scrut_ty);
     let inductive = if let Term::IndFormer { id, .. } = head {
@@ -25400,6 +25464,14 @@ fn infer_literal_match(
     }
 
     let (scrut_core, scrut_ty) = infer(cx, scrut)?;
+    // Char itself is a checked subset, but its literal comparator is
+    // registered at Char. Keep that exact checked view; other subset
+    // scrutinees expose the carrier when the literal plan inspects it.
+    let (scrut_core, scrut_ty) = if literal_expected_is(cx, &scrut_ty, cx.numeric_env.char_id) {
+        (scrut_core, scrut_ty)
+    } else {
+        forget_subset_at_elimination_head(cx, scrut_core, scrut_ty)
+    };
     let root_frame_depth = cx.indexed_match_roots.len();
     let seed = check_mode_result_seed(cx, expected);
     let (body_core, ret_ty_slot, arm_used, subsumed_by) = compile_result_matrix_entry(
@@ -25482,8 +25554,9 @@ fn infer_match_with_predicates(
         return infer_tuple_match(cx, scrut, arms, span, expected, predicates);
     }
 
-    // 1. Infer scrutinee.
+    // 1. Infer the checked scrutinee and forget a subset only at this head.
     let (scrut_core, scrut_ty_raw) = infer(cx, scrut)?;
+    let (scrut_core, scrut_ty_raw) = forget_subset_at_elimination_head(cx, scrut_core, scrut_ty_raw);
     let scrut_ty = whnf(cx.env, &cx.ctx, &scrut_ty_raw);
 
     // 2. Peel the type-former application: D p₀ … pₘ₋₁.
