@@ -3,7 +3,7 @@
 //! Architect n1 ruling evt_1tp17m3dsgqcj).
 
 use ken_elaborator::{ElabEnv, ElabError, ObligationKind};
-use ken_kernel::KernelError;
+use ken_kernel::{Decl, KernelError, Level, Term};
 
 const USE5: &str = "fn use5 (x : {v : Int | Equal Int v 5}) : Int = x";
 const SMALL: &str = "const Small : Type 1 = Type 0";
@@ -77,15 +77,16 @@ fn head_alias_and_unaliased_former_controls_stay_checkable() {
     );
 }
 
-/// A Type 1 alias cannot be linked to the Type 0 domain by conversion.
+/// Promise: durable invariant. A fixed Type 0 cannot stand in for Big's
+/// Type 1 domain; the kernel rejects this independently of level inference.
 #[test]
-fn nested_big_sort_stays_refused() {
+fn fixed_zero_domain_against_nested_big_stays_refused() {
     let mut env = environment(Some(BIG));
     let error = env
         .elaborate_decl_v1(
-            "fn k (g : (Big -> Type) -> Type) (f : Type -> Type) (x : g f) (n : Int) : Int = use5 n",
+            "fn k (g : (Big -> Type) -> Type) (f : Type 0 -> Type) (x : g f) (n : Int) : Int = use5 n",
         )
-        .expect_err("a non-cumulative nested domain must refuse");
+        .expect_err("a non-cumulative fixed domain must refuse");
     assert!(
         matches!(
             error,
@@ -95,5 +96,37 @@ fn nested_big_sort_stays_refused() {
             }
         ),
         "{error:?}"
+    );
+}
+
+/// Promise: durable invariant. The bare domain is an inferred universe, not
+/// fixed Type 0. The admitted kernel type records its lawful Type 1 solution;
+/// acceptance alone could otherwise conceal a dropped constraint.
+#[test]
+fn bare_nested_big_links_former_domain_to_type_one() {
+    let mut env = environment(Some(BIG));
+    let source =
+        "fn k (g : (Big -> Type) -> Type) (f : Type -> Type) (x : g f) (n : Int) : Int = use5 n";
+    let result = env
+        .elaborate_decl_v1(source)
+        .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    assert_eq!(result.obligations.len(), 1);
+    assert!(env.is_open_hole(result.obligations[0].hole_id));
+    let Some(Decl::Transparent { ty, .. }) = env.env.lookup(result.def_id) else {
+        panic!("k must be a checked transparent definition");
+    };
+    let Term::Pi(_, after_g) = ty else {
+        panic!("k has a g binder: {ty:?}");
+    };
+    let Term::Pi(f_ty, _) = after_g.as_ref() else {
+        panic!("k has an f binder: {after_g:?}");
+    };
+    let Term::Pi(f_domain, _) = f_ty.as_ref() else {
+        panic!("f is a former: {f_ty:?}");
+    };
+    assert_eq!(
+        f_domain.as_ref(),
+        &Term::ty(Level::Suc(Box::new(Level::Zero))),
+        "f's checked domain must be Type 1, not a defaulted Type 0"
     );
 }
