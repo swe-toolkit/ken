@@ -1,7 +1,7 @@
 ---
 id: SPEC-STATISTICS-EVENT-MASS-INCLUSION-EXCLUSION
 title: "Spec 63 section 1.3 proves event mass additive only for pointwise-disjoint events, and states no monotonicity: nothing proves that a weaker event has at least the mass of a stronger one, or relates the masses of overlapping events. Rule from a checked D0 inclusion-exclusion and the monotonicity of event mass and expectation weight, at zero trust, and state them as a section 4 with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
