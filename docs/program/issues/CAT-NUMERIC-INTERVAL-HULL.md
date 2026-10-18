@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-INTERVAL-HULL
 title: "Spec 68 section 2 specifies interval hull and intersection with four containment laws over six new Rational min/max order proofs, but no catalog package delivers them. Export rational_min and rational_max with their proofs from Data.Numeric.Rational, extend Algorithm.Numeric.RationalInterval from the Architect's checked D0 at zero trust, and run the section 2 seed as an acceptance target"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
