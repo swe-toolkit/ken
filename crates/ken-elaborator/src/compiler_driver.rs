@@ -27,6 +27,10 @@ use crate::extract::{v2_extract_with_suffixes, ObligationTriple, ProvKind};
 use crate::program_admission::{admit_checked_main, CheckedMainDescriptor, ProgramAdmissionError};
 use crate::{ElabEnv, ElabError, ElabResult};
 
+mod bracket_regions;
+pub use bracket_regions::NormalizedBracketRegion;
+use bracket_regions::collect_normalized_bracket_regions;
+
 const PRODUCER: &str = "ken-elaborator:compiler-driver:nc10";
 const KERNEL_REF: &str = "ken-kernel:current";
 const SPEC_REF: &str = "docs/program/wp/NC10-compiler-driver-target-selection.md";
@@ -528,6 +532,14 @@ pub enum CompilerDriverError {
         section: &'static str,
         symbol: StableSymbol,
     },
+    InvalidBracketRegion {
+        symbol: StableSymbol,
+        path: Vec<usize>,
+        reason: &'static str,
+    },
+    InvalidBracketReleaseHostOperation {
+        found: Option<ken_host::HostOpV1>,
+    },
     CheckedCoreBodyView {
         section: &'static str,
         symbol: StableSymbol,
@@ -559,6 +571,12 @@ impl fmt::Display for CompilerDriverError {
             CompilerDriverError::EmptySourceSet => write!(f, "compiler source set is empty"),
             CompilerDriverError::Io(err) => write!(f, "compiler input I/O failed: {err}"),
             CompilerDriverError::Elaboration(err) => write!(f, "elaboration failed: {err:?}"),
+            CompilerDriverError::InvalidBracketRegion { symbol, path, reason } => {
+                write!(f, "normalized bracket region in {symbol} at {path:?}: {reason}")
+            }
+            CompilerDriverError::InvalidBracketReleaseHostOperation { found } => {
+                write!(f, "PrivateBracketRelease must map to ResourceRelease, found {found:?}")
+            }
             CompilerDriverError::Package(err) => err.fmt(f),
             CompilerDriverError::OmegaErasurePlan { symbol, reason } => {
                 write!(f, "checked Ω erasure plan for {symbol} failed: {reason}")
@@ -2544,6 +2562,13 @@ pub fn prepare_native_program_sources(
             .remove(symbol);
     }
     let mut normalized_bodies = BTreeMap::new();
+    let mut bracket_regions = Vec::new();
+    let ok_method = normalization_env
+        .inductive(env.prelude_env.result_id)
+        .and_then(|result| result.constructors.iter().position(|ctor| ctor.id == env.prelude_env.ok_id))
+        .ok_or_else(|| NativeProgramBuildError::Driver(
+            CompilerDriverError::MissingStableSymbol { id: env.prelude_env.ok_id }
+        ))?;
     // Recursive barriers give this normalization its own immutable environment.
     let mut normalized_omega_memo = crate::omega_erasure::ClassifyMemo::new();
     for symbol in &executable_declarations {
@@ -2574,6 +2599,16 @@ pub fn prepare_native_program_sources(
         };
         let normalized_body =
             ken_kernel::normalize(&normalization_env, &ken_kernel::Context::new(), body);
+        // Extract only from the actual normalized body, before rewriting its
+        // checked declaration or erasing it. A group is keyed by the Ok
+        // resource binder; each Ret leaf may contain a separate finalizer.
+        bracket_regions.extend(
+            collect_normalized_bracket_regions(
+                symbol, &normalized_body, &env.prelude_env,
+                env.prelude_env.resource_id, ok_method,
+            )
+            .map_err(NativeProgramBuildError::Driver)?,
+        );
         normalized_bodies.insert(symbol.clone(), normalized_body.clone());
         let normalized_declaration = Decl::Transparent {
             id: *id,
@@ -2798,6 +2833,7 @@ pub fn prepare_native_program_sources(
         runtime_program: Box::new(runtime_program),
         selected,
         open_obligation_reports,
+        bracket_regions,
     })
 }
 
@@ -2826,9 +2862,16 @@ pub struct NativeProgramPreparationV1 {
     runtime_program: Box<ken_runtime::RuntimeProgram>,
     selected: Vec<SelectedTargetReport>,
     open_obligation_reports: Vec<String>,
+    bracket_regions: Vec<NormalizedBracketRegion>,
 }
 
 impl NativeProgramPreparationV1 {
+    /// Checked normalized-term regions retained for the next compiler phase.
+    /// No host operation or Runtime expression participates in their selection.
+    pub fn bracket_regions(&self) -> &[NormalizedBracketRegion] {
+        &self.bracket_regions
+    }
+
     #[cfg(test)]
     pub(crate) fn checked_package_for_test(&self) -> &CheckedCorePackage {
         &self.package
@@ -3013,6 +3056,7 @@ fn complete_native_program_preparation(
         runtime_program,
         selected,
         open_obligation_reports,
+        bracket_regions: _,
     } = preparation;
     let package = *package;
     let plan = *plan;
@@ -3922,6 +3966,16 @@ fn native_entrypoint_plan(
     })
 }
 
+fn validate_bracket_release_host_operation(
+    bracket_symbol: &StableSymbol,
+    operations: &BTreeMap<StableSymbol, ken_host::HostOpV1>,
+) -> Result<(), CompilerDriverError> {
+    match operations.get(bracket_symbol).copied() {
+        Some(ken_host::HostOpV1::ResourceRelease) => Ok(()),
+        found => Err(CompilerDriverError::InvalidBracketReleaseHostOperation { found }),
+    }
+}
+
 fn checked_host_spine_v1(
     prelude: &crate::prelude::PreludeEnv,
     symbols: &BTreeMap<GlobalId, StableSymbol>,
@@ -4036,6 +4090,9 @@ fn checked_host_spine_v1(
     ] {
         operations.insert(resolve_id(id)?, operation);
     }
+    validate_bracket_release_host_operation(
+        &resolve_id(prelude.private_bracket_release_id)?, &operations,
+    )?;
     Ok(crate::erasure::CheckedHostSpineV1 {
         ret: resolve_id(roles.ret)?,
         vis: resolve_id(roles.vis)?,
@@ -5917,6 +5974,33 @@ mod tests {
         ClassInstanceMetadata, ObligationMetadata, ObligationStatus,
     };
     use crate::erasure::erase_checked_core_package_for_target;
+
+    /// Promise class: durable checked-ID-to-host-op validation. The negative
+    /// map changes the actual private finalizer entry, not the identity used
+    /// to extract a normalized region; missing and wrong mappings both refuse.
+    #[test]
+    fn bracket_finalizer_host_mapping_refuses_wrong_or_absent_operation() {
+        let bracket = StableSymbol::new(
+            SymbolNamespace::Declaration,
+            vec!["prelude".to_string(), "PrivateBracketRelease".to_string()],
+        );
+        let mut operations = BTreeMap::new();
+        operations.insert(bracket.clone(), ken_host::HostOpV1::ResourceRelease);
+        validate_bracket_release_host_operation(&bracket, &operations)
+            .expect("the actual release operation is admitted");
+        operations.insert(bracket.clone(), ken_host::HostOpV1::ConsoleWrite);
+        assert!(matches!(
+            validate_bracket_release_host_operation(&bracket, &operations),
+            Err(CompilerDriverError::InvalidBracketReleaseHostOperation {
+                found: Some(ken_host::HostOpV1::ConsoleWrite)
+            })
+        ));
+        operations.remove(&bracket);
+        assert!(matches!(
+            validate_bracket_release_host_operation(&bracket, &operations),
+            Err(CompilerDriverError::InvalidBracketReleaseHostOperation { found: None })
+        ));
+    }
 
     /// Promise class: durable invariant. MEASURED: an unscoped kernel
     /// declaration makes stable-symbol projection fail with its exact ID.
