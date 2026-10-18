@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-CYCLE-REFUTES-ORDER
 title: "Spec 62 section 1 decides OrderOrCycle but excludes the theorem that makes its two outcomes exclusive: nothing proves that a graph with a Cycle has no TopoOrder, so HasCycle does not refute every order. Rule from a checked D0 the cycle-refutes-order law and the irreflexivity and transitivity of before it needs, at zero trust, and state them as section 2 with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
