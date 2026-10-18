@@ -18904,9 +18904,10 @@ fn elaborate_foreign_decl(
     })
 }
 
-/// A malformed literal field is found after kernel admission, because its
-/// predicate is surface-only. Rewind that one declaration and all of its
-/// constructor/numeric/side-table registrations on failure.
+/// The first, carrier-only family provisions exactly the checked family and
+/// constructor identities used while elaborating full subset-Σ field types.
+/// The enclosing declaration transaction owns failure rollback; successful
+/// provisional admission is rolled back here before real kernel admission.
 #[allow(clippy::too_many_arguments)]
 #[inline(never)]
 fn elaborate_data_with_refinements(
@@ -18931,11 +18932,29 @@ fn elaborate_data_with_refinements(
         facts.clone(),
     );
     let result = (|| {
-        let id = data::elab_data_decl(env, globals, ctor_decl_spans, name, type_params, ctors, span)?;
-        register_legacy_constructor_fields(
-            env, globals, num_values, numeric_env, facts,
-            type_params.len(), ctors, name,
+        let mark = ken_kernel::env_mark(env);
+        let provisional = data::elab_data_decl(
+            env, globals, ctor_decl_spans, name, type_params, ctors, span,
         )?;
+        let provisional_ids = family_constructor_ids(env, provisional)?;
+        let after_provisional = env.declarations().len();
+        let field_types = elaborate_legacy_constructor_field_types(
+            env, globals, num_values, numeric_env, facts, type_params.len(), ctors, name,
+        )?;
+        if env.declarations().len() != after_provisional {
+            return Err(ElabError::ObligationWithoutChannel { span: span.clone() });
+        }
+        ken_kernel::rollback_to_mark(env, mark)
+            .map_err(|error| ElabError::Internal(format!("provisional family rollback: {error}")))?;
+        *globals = snapshot.0.clone();
+        *ctor_decl_spans = snapshot.2.clone();
+        let id = data::elab_data_decl_with_field_types(
+            env, globals, ctor_decl_spans, name, type_params, ctors,
+            Some(&field_types), span,
+        )?;
+        if family_constructor_ids(env, id)? != provisional_ids {
+            return Err(ElabError::Internal("family ids moved across provisional rollback".into()));
+        }
         Ok(id)
     })();
     if result.is_err() {
@@ -18979,12 +18998,29 @@ fn elaborate_explicit_data_with_refinements(
         facts.clone(),
     );
     let result = (|| {
-        let id = data::elab_explicit_data_decl(
+        let mark = ken_kernel::env_mark(env);
+        let provisional = data::elab_explicit_data_decl(
             env, globals, ctor_decl_spans, name, params, indices, level, ctors, span,
         )?;
-        register_explicit_constructor_fields(
+        let provisional_ids = family_constructor_ids(env, provisional)?;
+        let after_provisional = env.declarations().len();
+        let checked = elaborate_explicit_inductive_types(
             env, globals, num_values, numeric_env, facts, params, indices, ctors, name,
         )?;
+        if env.declarations().len() != after_provisional {
+            return Err(ElabError::ObligationWithoutChannel { span: span.clone() });
+        }
+        ken_kernel::rollback_to_mark(env, mark)
+            .map_err(|error| ElabError::Internal(format!("provisional family rollback: {error}")))?;
+        *globals = snapshot.0.clone();
+        *ctor_decl_spans = snapshot.2.clone();
+        let id = data::elab_explicit_data_decl_with_types(
+            env, globals, ctor_decl_spans, name, params, indices, level, ctors,
+            Some(&checked), span,
+        )?;
+        if family_constructor_ids(env, id)? != provisional_ids {
+            return Err(ElabError::Internal("family ids moved across provisional rollback".into()));
+        }
         Ok(id)
     })();
     if result.is_err() {
@@ -18996,110 +19032,94 @@ fn elaborate_explicit_data_with_refinements(
     result
 }
 
-#[inline(never)]
-fn register_legacy_constructor_fields(
-    env: &mut GlobalEnv,
-    globals: &HashMap<String, GlobalId>,
-    num_values: &mut HashMap<GlobalId, NumericLitVal>,
-    numeric_env: &NumericEnv,
-    facts: &mut RefinementFacts,
-    param_count: usize,
-    ctors: &[crate::resolve::RCtorDecl],
-    owner: &str,
-) -> Result<(), ElabError> {
-    for ctor in ctors {
-        if !ctor.args.iter().any(rtype_has_application_or_refinement) {
-            continue;
-        }
-        let id = globals[&ctor.name];
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string());
-        for _ in 0..param_count {
-            cx.ctx.push(Term::ty(Level::Zero));
-        }
-        let args = ctor.args.iter().collect::<Vec<_>>();
-        let predicates = collect_constructor_field_predicates(&mut cx, &args)?;
-        facts.constructor_field_predicates.insert(id, predicates);
-    }
-    Ok(())
+fn family_constructor_ids(env: &GlobalEnv, id: GlobalId) -> Result<Vec<GlobalId>, ElabError> {
+    let family = env.inductive(id).ok_or_else(|| {
+        ElabError::Internal("provisional family is missing after kernel admission".into())
+    })?;
+    Ok(std::iter::once(id)
+        .chain(family.constructors.iter().map(|ctor| ctor.id))
+        .collect())
 }
 
 #[inline(never)]
-fn register_explicit_constructor_fields(
+fn elaborate_legacy_constructor_field_types(
     env: &mut GlobalEnv,
     globals: &HashMap<String, GlobalId>,
     num_values: &mut HashMap<GlobalId, NumericLitVal>,
     numeric_env: &NumericEnv,
-    facts: &mut RefinementFacts,
+    facts: &RefinementFacts,
+    param_count: usize,
+    ctors: &[crate::resolve::RCtorDecl],
+    owner: &str,
+) -> Result<Vec<Vec<Term>>, ElabError> {
+    ctors.iter().map(|ctor| {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string())
+            .with_preconditions(&HashMap::new(), PremiseHoles::Refused);
+        for _ in 0..param_count {
+            cx.ctx.push(Term::ty(Level::Zero));
+        }
+        ctor.args.iter().enumerate().map(|(j, ty)| {
+            // Legacy source arguments are resolved in [Δp], without earlier
+            // fields. Insert the j binders only after elaboration, once.
+            let term = elab_type_in_slot(&mut cx, ty, RefinementSlot::Outermost)?;
+            Ok(weaken(&cx.metas.zonk_term(&term), j as i64))
+        }).collect::<Result<Vec<_>, _>>()
+    }).collect()
+}
+
+#[inline(never)]
+fn elaborate_explicit_inductive_types(
+    env: &mut GlobalEnv,
+    globals: &HashMap<String, GlobalId>,
+    num_values: &mut HashMap<GlobalId, NumericLitVal>,
+    numeric_env: &NumericEnv,
+    facts: &RefinementFacts,
     params: &[crate::resolve::RTelescopeEntry],
     indices: &[crate::resolve::RTelescopeEntry],
     ctors: &[crate::resolve::RExplicitCtorDecl],
     owner: &str,
-) -> Result<(), ElabError> {
-    // Check each family entry once, under every preceding binder. The
-    // resolver binds anonymous indices too. An undischarged refinement has
-    // no obligation channel and rolls the entire declaration back.
-    {
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string());
-        for entry in params.iter().chain(indices) {
-            let ty = elab_type(&mut cx, &entry.ty)?;
-            cx.ctx.push(ty);
+) -> Result<data::CheckedInductiveTypes, ElabError> {
+    let no_preconditions = HashMap::new();
+    let (parameter_types, index_types) = {
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string())
+            .with_preconditions(&no_preconditions, PremiseHoles::Refused);
+        let mut parameter_types = Vec::with_capacity(params.len());
+        let mut index_types = Vec::with_capacity(indices.len());
+        for entry in params {
+            let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
+            let ty = cx.metas.zonk_term(&ty);
+            cx.ctx.push(ty.clone());
+            parameter_types.push(ty);
         }
-    }
+        for entry in indices {
+            let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
+            let ty = cx.metas.zonk_term(&ty);
+            cx.ctx.push(ty.clone());
+            index_types.push(ty);
+        }
+        (parameter_types, index_types)
+    };
+    let mut fields = Vec::with_capacity(ctors.len());
+    let mut results = Vec::with_capacity(ctors.len());
     for ctor in ctors {
-        let result_applies = ctor.result.as_ref().is_some_and(rtype_has_application_or_refinement);
-        if !result_applies
-            && !ctor.args.iter().any(|arg| rtype_has_application_or_refinement(&arg.ty))
-        {
-            continue;
+        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string())
+            .with_preconditions(&no_preconditions, PremiseHoles::Refused);
+        for ty in &parameter_types {
+            cx.ctx.push(ty.clone());
         }
-        let id = globals[&ctor.name];
-        let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, facts, owner.to_string());
-        // Parameter types were checked above. Replay them only to build the
-        // constructor's resolver context, never to introduce twice.
-        cx.type_introductions = false;
-        for param in params {
-            let ty = elab_type(&mut cx, &param.ty)?;
-            cx.ctx.push(ty);
+        let mut args = Vec::with_capacity(ctor.args.len());
+        for arg in &ctor.args {
+            let ty = elab_type_in_slot(&mut cx, &arg.ty, RefinementSlot::Outermost)?;
+            let ty = cx.metas.zonk_term(&ty);
+            cx.ctx.push(ty.clone());
+            args.push(ty);
         }
-        cx.type_introductions = true;
-        let args = ctor.args.iter().map(|arg| &arg.ty).collect::<Vec<_>>();
-        let predicates = collect_constructor_field_predicates(&mut cx, &args)?;
-        if let Some(result) = &ctor.result {
-            elab_type(&mut cx, result)?;
-        }
-        facts.constructor_field_predicates.insert(id, predicates);
+        results.push(ctor.result.as_ref().map(|ty| elab_type(&mut cx, ty)).transpose()?);
+        fields.push(args);
     }
-    Ok(())
-}
-
-/// Constructor fields are already bare carriers in the kernel declaration.
-/// Check each field's type applications here after that declaration is built;
-/// a discharged refinement needs no obligation channel, but an undischarged
-/// one refuses and the wrapper rolls back the entire declaration. Keep only
-/// literal field predicates indexed by checked constructor and argument.
-/// Earlier refined fields are not installed as path hypotheses in this pass:
-/// applications depending on their predicates refuse, rather than inheriting
-/// the broader hypothesis environment other systems may provide.
-#[inline(never)]
-fn collect_constructor_field_predicates(
-    cx: &mut ElabCtx<'_>,
-    args: &[&RType],
-) -> Result<Vec<Option<Term>>, ElabError> {
-    let mut result = Vec::with_capacity(args.len());
-    for arg in args {
-        let carrier = elab_type_in_slot(cx, arg, RefinementSlot::Outermost)?;
-        let predicate = if let RType::RRefine(_, _, phi, _) = arg {
-            cx.ctx.push(carrier.clone());
-            let checked = elab_prop_at_omega(cx, phi, phi.span());
-            cx.ctx.pop();
-            Some(Term::lam(carrier.clone(), cx.metas.zonk_term(&checked?)))
-        } else {
-            None
-        };
-        result.push(predicate);
-        cx.ctx.push(carrier);
-    }
-    Ok(result)
+    Ok(data::CheckedInductiveTypes {
+        params: parameter_types, indices: index_types, fields, results,
+    })
 }
 
 fn declared_named_return_id(
