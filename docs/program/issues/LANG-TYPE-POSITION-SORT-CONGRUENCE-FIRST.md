@@ -43,6 +43,14 @@ base, stop and report the mismatch.
   whether any is unsound to keep when δ would have discarded it.
 - **AC-1.** fa_meta at K=16 elaborates in under 2s, with a paired
   whnf-first configuration that exceeds it.
+- **AC-0 closed, build-go** (Architect D0 `evt_h497bj8yv4jk`; amendment
+  1, operative `evt_6jh2j9sz1zf99`).
+- **AC-1b.** fa_meta_ne, discard, small_arg and eq_meta (the D0's
+  fixtures) at K=16 each elaborate in under 2s. Paired: deleting the
+  same-constant fast return makes each exceed 2s.
+- **AC-C.** discard accepts with no obligations, fallback_suc at K=4
+  accepts on the restore path, and the fixed `Type 0` nested Big row
+  stays K0004.
 - **AC-2.** The SORT-UP-TO-WHNF and SORT-NESTED-DOMAIN rows keep their
   outcomes, and the catalog emits byte-identical core.
 
