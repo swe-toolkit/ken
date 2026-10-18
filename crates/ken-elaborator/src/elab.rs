@@ -894,8 +894,7 @@ struct ResultPredicate {
     /// `lambda result. psi` in the context at `install_depth`.
     predicate: Term,
     install_depth: usize,
-    kind: ObligationKind,
-    recursive_self: Option<RecursiveSelf>,
+    span: Span,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -904,15 +903,6 @@ enum RefinementSlot {
     None,
     Outermost,
     Signature { result: bool },
-}
-
-#[derive(Clone)]
-struct RecursiveSelf {
-    id: GlobalId,
-    params: usize,
-    requires: usize,
-    /// The proposition in the parameter, requirement, result telescope.
-    psi: Term,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2607,11 +2597,26 @@ fn check_with_result_predicates(
         RExpr::RMatch { scrut, equation, arms, span } =>
             check_match_result(cx, scrut, equation.as_deref(), arms, expected, span, &predicates),
         _ => {
-            let core = check(cx, expr, expected, span)?;
+            let (carrier, _) = subset_refinement(cx, expected).ok_or_else(|| {
+                ElabError::TypeMismatch {
+                    span: span.clone(), reason: "ensures result is not a subset Σ".into(),
+                }
+            })?;
+            let value = check(cx, expr, &carrier, span)?;
+            let mut proofs = Vec::with_capacity(predicates.len());
             for predicate in &predicates {
-                emit_result_predicate(cx, predicate, &core, expected, span)?;
+                proofs.push(emit_result_predicate(cx, predicate, &value, &carrier)?);
             }
-            Ok(core)
+            let proof = proofs.into_iter().rev().reduce(|rest, first| Term::pair(first, rest))
+                .expect("a pending result has at least one ensures clause");
+            let pair = Term::pair(value, proof);
+            kernel_check_current(cx, &pair, expected).map_err(|error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error, span: span.clone(),
+                },
+            })?;
+            Ok(pair)
         }
     }
 }
@@ -5124,10 +5129,8 @@ fn ordinary_coherent_frame_plan(
 }
 
 #[inline(never)]
-fn boxed_simplify_branch_goal(
-    env: &GlobalEnv, facts: &RefinementFacts, ctx: &Context, term: &Term,
-) -> Box<Term> {
-    Box::new(simplify_branch_goal_keeping_refinements(env, facts, ctx, term))
+fn boxed_simplify_branch_goal(env: &GlobalEnv, ctx: &Context, term: &Term) -> Box<Term> {
+    Box::new(simplify_branch_goal(env, ctx, term))
 }
 
 #[inline(never)]
@@ -5168,9 +5171,7 @@ fn plan_coherent_frame_motive(
             frame,
         );
     }
-    let expanded_expected = boxed_simplify_branch_goal(
-        cx.env, cx.refinement_facts, &zonked_ctx, original_expected,
-    );
+    let expanded_expected = boxed_simplify_branch_goal(cx.env, &zonked_ctx, original_expected);
     // The equation convoy carries the goal's dependence on the scrutinee
     // across the index equation. A syntactic Eq keeps its pre-widening route;
     // any other proposition is convoyed only when it mentions the scrutinee.
@@ -5293,9 +5294,7 @@ fn plan_coherent_frame_motive(
         let mut goal_elims = Vec::new();
         collect_outer_embedded_elims(embedded_expected, &mut goal_elims);
         for entry in &mut context_convoy {
-            let expanded_ty = boxed_simplify_branch_goal(
-                cx.env, cx.refinement_facts, &zonked_ctx, &entry.ambient_ty,
-            );
+            let expanded_ty = boxed_simplify_branch_goal(cx.env, &zonked_ctx, &entry.ambient_ty);
             let mut type_elims = Vec::new();
             collect_outer_embedded_elims(&expanded_ty, &mut type_elims);
             for (local, candidate) in type_elims.iter().enumerate() {
@@ -5780,37 +5779,6 @@ fn simplify_branch_goal_within_budget(env: &GlobalEnv, ctx: &Context, term: &Ter
     (left != Some(0)).then_some(simplified)
 }
 
-/// Keep checked refinement identities rigid while exposing beta/iota and
-/// ordinary transparent heads needed by dependent branch goals.
-#[inline(never)]
-fn simplify_branch_goal_keeping_refinements_uncontracted(
-    env: &GlobalEnv, facts: &RefinementFacts, ctx: &Context, term: &Term,
-) -> Term {
-    let mut roots = Vec::new();
-    collect_refinement_consts(facts, term, &mut roots);
-    if roots.is_empty() {
-        return simplify_branch_goal_within_budget(env, ctx, term).unwrap_or_else(|| term.clone());
-    }
-    let k = roots.len();
-    let mut extended = ctx.clone();
-    for root in &roots {
-        let Term::Const { id, level_args } = root else { unreachable!("collected Const") };
-        let (params, ty) = env.const_type(*id).expect("refinement constant is declared");
-        extended.push(subst_levels(&ty, params, level_args));
-    }
-    let substitutions: Vec<(Term, Term)> = roots.iter().enumerate()
-        .map(|(i, root)| (root.clone(), Term::var(k - 1 - i)))
-        .collect();
-    let abstracted = subst_term_generalize_many(&weaken(term, k as i64), &substitutions);
-    let Some(mut out) = simplify_branch_goal_within_budget(env, &extended, &abstracted) else {
-        return term.clone();
-    };
-    for root in roots.iter().rev() {
-        out = subst0(&out, root);
-    }
-    out
-}
-
 /// Occurrences of de Bruijn index `k` in `t`. `Pi`, `Lam`, `Sigma` and the
 /// `Let` body are the binders (`ken_kernel::subst::shift`).
 fn var_occurrences(t: &Term, k: usize) -> usize {
@@ -5850,15 +5818,10 @@ fn is_atomic_term(t: &Term) -> bool {
 /// method. Contract every non-duplicating applied λ here, at the one producer
 /// all of those consumers read. β preserves conversion, and both sides of the
 /// embedded eliminator identity match are outputs of this producer.
-fn simplify_branch_goal_keeping_refinements(
-    env: &GlobalEnv,
-    facts: &RefinementFacts,
-    ctx: &Context,
-    term: &Term,
-) -> Term {
-    contract_applied_lambdas(&simplify_branch_goal_keeping_refinements_uncontracted(
-        env, facts, ctx, term,
-    ))
+fn simplify_branch_goal(env: &GlobalEnv, ctx: &Context, term: &Term) -> Term {
+    let reduced = simplify_branch_goal_within_budget(env, ctx, term)
+        .unwrap_or_else(|| term.clone());
+    contract_applied_lambdas(&reduced)
 }
 
 /// Contract `App(Lam(_, body), arg)` to `body[arg]` throughout a term,
@@ -5937,20 +5900,6 @@ fn contract_applied_lambdas(t: &Term) -> Term {
             scrut: b(scrut),
         },
         Term::Absurd(x, y) => Term::Absurd(b(x), b(y)),
-    }
-}
-
-/// Enumerate distinct checked Const uses, including those below binders and
-/// applications. `children()` covers every kernel Term form without a default.
-fn collect_refinement_consts(facts: &RefinementFacts, term: &Term, roots: &mut Vec<Term>) {
-    let mut pending = vec![term];
-    while let Some(node) = pending.pop() {
-        if let Term::Const { id, .. } = node {
-            if facts.refinement_root(*id).is_some() && !roots.contains(node) {
-                roots.push(node.clone());
-            }
-        }
-        pending.extend(node.children());
     }
 }
 
@@ -7128,9 +7077,7 @@ fn check_match_with_lift_with_predicates(
             &weaken(scrut_core, total as i64),
             &concrete,
         );
-        let expected_here = simplify_branch_goal_keeping_refinements(
-            cx.env, cx.refinement_facts, &cx.ctx, &source_expected,
-        );
+        let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &source_expected);
         cx.match_frames.last_mut().expect("lifted arm frame").refined_target = Some(expected_here.clone());
         let mut scrut_ty = Term::indformer(host.id, host_level_args.to_vec());
         for param in host_params {
@@ -7299,9 +7246,7 @@ fn check_structured_constructor_method(
         &weaken(scrut_core, total as i64),
         &concrete,
     );
-    let expected_here = simplify_branch_goal_keeping_refinements(
-        cx.env, cx.refinement_facts, &cx.ctx, &source_expected,
-    );
+    let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &source_expected);
     cx.match_frames.last_mut().expect("structured arm frame").refined_target = Some(expected_here.clone());
     let mut scrut_ty = Term::indformer(ind.id, level_args.to_vec());
     for param in params {
@@ -7432,9 +7377,7 @@ fn check_generalized_branch_goal(
         let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
             goal_refined
         } else {
-            simplify_branch_goal_keeping_refinements(
-                cx.env, cx.refinement_facts, &cx.ctx, &goal_refined,
-            )
+            simplify_branch_goal(cx.env, &cx.ctx, &goal_refined)
         };
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         for restoration in restorations.into_iter().rev() {
@@ -7504,9 +7447,7 @@ fn check_generalized_branch_goal(
         let expected = if preserve_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
             inner_goal
         } else {
-            simplify_branch_goal_keeping_refinements(
-                cx.env, cx.refinement_facts, &cx.ctx, &inner_goal,
-            )
+            simplify_branch_goal(cx.env, &cx.ctx, &inner_goal)
         };
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         kernel_check_current(cx, &body, &expected).map_err(|error| match error {
@@ -8876,9 +8817,7 @@ fn check_dependent_branch_body(
         {
                 expected_here.clone()
             } else {
-                simplify_branch_goal_keeping_refinements(
-                    cx.env, cx.refinement_facts, &cx.ctx, expected_here,
-                )
+                simplify_branch_goal(cx.env, &cx.ctx, expected_here)
             };
         cx.match_frames.last_mut().ok_or_else(|| {
             ElabError::Internal("dependent arm has no owning match frame".into())
@@ -9833,9 +9772,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
                 ))
             }
         } else {
-            let expected_here = simplify_branch_goal_keeping_refinements(
-                cx.env, cx.refinement_facts, &cx.ctx, &expected_here,
-            );
+            let expected_here = simplify_branch_goal(cx.env, &cx.ctx, &expected_here);
             let missing = missing_pattern_witness(cx, ctor.id);
             frame_try!(synthesize_omitted_index_method(
                 cx,
@@ -14013,15 +13950,31 @@ mod omega_clause_gate_tests {
     }
 }
 
+/// Conjoin clauses at Ω beneath exactly one result carrier. A nested Sigma
+/// here binds the preceding proof, so later clauses are weakened across it.
+fn ensured_result_type(carrier: &Term, predicates: &[ResultPredicate]) -> Term {
+    let conjunction = predicates.iter().rev().fold(None, |tail: Option<Term>, clause| {
+        let Term::Lam(_, psi) = &clause.predicate else {
+            unreachable!("prepared ensures predicate is a result lambda")
+        };
+        Some(match tail {
+            Some(tail) => Term::sigma(psi.as_ref().clone(), weaken(&tail, 1)),
+            None => psi.as_ref().clone(),
+        })
+    });
+    conjunction.map_or_else(|| carrier.clone(), |proof| Term::sigma(carrier.clone(), proof))
+}
+
 fn build_contract_type(
     carrier_ty: &Term,
     param_count: usize,
     requires: &[Term],
+    result_under_requires: &Term,
 ) -> Result<(Vec<Term>, Term, Term), ElabError> {
     let (param_types, carrier_result) = split_params(carrier_ty, param_count).ok_or_else(|| {
         ElabError::Internal("declaration parameter telescope is shorter than its source arity".into())
     })?;
-    let mut full_ty = weaken(&carrier_result, requires.len() as i64);
+    let mut full_ty = result_under_requires.clone();
     for requirement in requires.iter().rev() {
         full_ty = Term::pi(requirement.clone(), full_ty);
     }
@@ -14037,10 +13990,11 @@ fn check_contract_body(
     carrier_ty: &Term,
     param_count: usize,
     requires: &[Term],
+    result_under_requires: &Term,
     span: &Span,
     result_predicates: &[ResultPredicate],
 ) -> Result<(Term, Term), ElabError> {
-    let (param_types, carrier_result) = split_params(carrier_ty, param_count).ok_or_else(|| {
+    let (param_types, _) = split_params(carrier_ty, param_count).ok_or_else(|| {
         ElabError::Internal("declaration parameter telescope is shorter than its source arity".into())
     })?;
     let start_depth = cx.ctx.len();
@@ -14073,8 +14027,9 @@ fn check_contract_body(
             cx.ctx.push(requirement.clone());
             cx.hidden_positions.push(position);
         }
-        let body_ty = weaken(&carrier_result, requires.len() as i64);
-        let body_inner = check_result_position(cx, current, &body_ty, span, result_predicates)?;
+        let body_inner = check_result_position(
+            cx, current, result_under_requires, span, result_predicates,
+        )?;
         let mut full_body = body_inner.clone();
         for requirement in requires.iter().rev() {
             full_body = Term::lam(requirement.clone(), full_body);
@@ -14159,10 +14114,6 @@ fn admissible_path_frames(cx: &ElabCtx<'_>) -> Vec<PathFrame> {
             ..frame.clone()
         })
     }).collect()
-}
-
-fn admissible_path_conditions(cx: &ElabCtx<'_>) -> Vec<Term> {
-    admissible_path_frames(cx).into_iter().map(|frame| frame.condition).collect()
 }
 
 /// Peel the actual evidence, not the telescope of the obligation that would
@@ -14289,7 +14240,7 @@ fn coerce_refinement(
     if let Some((carrier, predicate)) = subset_refinement(cx, &target) {
         let value = coerce_refinement(cx, core, &source, &carrier, span)?;
         let goal = apply_refinement_predicate(Term::lam(carrier, predicate), value.clone());
-        let proof = emit_subset_evidence(cx, goal, span, ObligationKind::RefinementIntroduction)?;
+        let proof = emit_subset_evidence(cx, goal, span, ObligationKind::RefinementIntroduction, None)?;
         let pair = Term::Pair(Box::new(value), Box::new(proof));
         kernel_check_current(cx, &pair, &target).map_err(|error| match error {
             CurrentKernelQueryError::View(error) => error,
@@ -14313,6 +14264,7 @@ fn coerce_refinement(
 #[inline(never)]
 fn emit_subset_evidence(
     cx: &mut ElabCtx<'_>, goal: Term, span: &Span, kind: ObligationKind,
+    direct_evidence: Option<Term>,
 ) -> Result<Term, ElabError> {
     let frames = admissible_path_frames(cx);
     let conditions: Vec<_> = frames.iter().map(|frame| frame.condition.clone()).collect();
@@ -14329,6 +14281,7 @@ fn emit_subset_evidence(
             matches!(whnf(cx.env, &ctx, &sort), Term::Omega(_))
                 .then(|| Term::proj2(Term::var(index)))
         }))
+        .chain(direct_evidence)
         .find(|proof| kernel_check_raw(cx.env, &cx.ctx, proof, &goal).is_ok());
     let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), &[], None);
     let closed = zonk_obligation_levels(cx, &closed);
@@ -14389,82 +14342,13 @@ fn apply_refinement_predicate(predicate: Term, value: Term) -> Term {
     }
 }
 
-#[inline(never)]
-fn emit_refinement_predicate_with(
-    cx: &mut ElabCtx<'_>, goal: Term, hypotheses: &[Term],
-    span: &Span, kind: ObligationKind,
-) -> Result<(), ElabError> {
-    let conditions = admissible_path_conditions(cx);
-    let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, None);
-    let closed = zonk_obligation_levels(cx, &closed);
-    let proof = (0..hypotheses.len() + conditions.len())
-        .map(Term::var)
-        .chain(std::iter::once(Term::const_(cx.env.tt_id(), vec![])))
-        .find_map(|candidate| {
-            let (_, certificate) =
-                close_refinement_goal_with(cx, &conditions, goal.clone(), hypotheses, Some(candidate));
-            let certificate = zonk_obligation_levels(cx, &certificate?);
-            kernel_check_raw(cx.env, &Context::new(), &certificate, &closed)
-                .ok().map(|_| certificate)
-        });
-    if proof.is_some() && cx.premise_holes == PremiseHoles::Refused {
-        // Discharged where it is generated; a context with no obligation
-        // channel records nothing, so the environment is left unchanged.
-        return Ok(());
-    }
-    let (hole_id, _) = declare_obligation_hole(cx, closed, span, kind)?;
-    if let Some(proof) = proof {
-        ken_kernel::check::admit_bodies(cx.env, &[(hole_id, proof)])
-            .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?;
-    }
-    Ok(())
-}
-
-/// Do not walk into a leaf's own binders: their indices do not belong to the
-/// obligation context. A direct, fully-applied staged self is the only IH.
-#[inline(never)]
-fn recursive_call_hypotheses(rs: &RecursiveSelf, leaf: &Term) -> Vec<Term> {
-    fn collect(rs: &RecursiveSelf, term: &Term, out: &mut Vec<Term>) {
-        let mut args = Vec::new();
-        let mut head = term;
-        while let Term::App(f, arg) = head {
-            args.push(arg.as_ref().clone());
-            head = f;
-        }
-        if matches!(head, Term::Const { id, .. } if *id == rs.id)
-            && args.len() == rs.params + rs.requires
-        {
-            args.reverse();
-            let with_args = subst_outer(&rs.psi, args.len(), &args, 1);
-            let hypothesis = subst0(&with_args, term);
-            if !out.contains(&hypothesis) {
-                out.push(hypothesis);
-            }
-        }
-        match term {
-            Term::Pi(dom, _) | Term::Lam(dom, _) | Term::Sigma(dom, _) =>
-                collect(rs, dom, out),
-            Term::Let { ty, val, .. } => {
-                collect(rs, ty, out);
-                collect(rs, val, out);
-            }
-            other => {
-                for child in other.children() {
-                    collect(rs, child, out);
-                }
-            }
-        }
-    }
-    let mut hypotheses = Vec::new();
-    collect(rs, leaf, &mut hypotheses);
-    hypotheses
-}
-
+/// A direct result already returned from a subset-typed call has a checked
+/// proof projection. Do not replace it with a proposition-only recursive IH.
 #[inline(never)]
 fn emit_result_predicate(
     cx: &mut ElabCtx<'_>, predicate: &ResultPredicate, leaf: &Term,
-    result_ty: &Term, span: &Span,
-) -> Result<(), ElabError> {
+    result_ty: &Term,
+) -> Result<Term, ElabError> {
     let growth = cx.ctx.len().checked_sub(predicate.install_depth).ok_or_else(|| {
         ElabError::Internal("result predicate escaped its installation context".into())
     })?;
@@ -14474,10 +14358,11 @@ fn emit_result_predicate(
         leaf.clone()
     };
     let goal = apply_refinement_predicate(weaken(&predicate.predicate, growth as i64), value);
-    let hypotheses = predicate.recursive_self.as_ref()
-        .map(|self_info| recursive_call_hypotheses(self_info, leaf))
-        .unwrap_or_default();
-    emit_refinement_predicate_with(cx, goal, &hypotheses, span, predicate.kind.clone())
+    let direct = match leaf {
+        Term::Proj1(pair) => Some(Term::proj2(pair.as_ref().clone())),
+        _ => None,
+    };
+    emit_subset_evidence(cx, goal, &predicate.span, ObligationKind::Ensures, direct)
 }
 
 // ----- declaration elaboration -----
@@ -20338,7 +20223,6 @@ fn prepare_contract_ensures(
     param_types: &[Term],
     requires: &[Term],
     result_ty: &Term,
-    recursive_id: Option<GlobalId>,
 ) -> Result<(Vec<ResultPredicate>, Vec<Obligation>), ElabError> {
     let mut param_ctx = Context::new();
     for param in param_types { param_ctx.push(param.clone()); }
@@ -20356,12 +20240,9 @@ fn prepare_contract_ensures(
         )?;
         absorb_obligations(&mut obligations, nested_obligations);
         predicates.push(ResultPredicate {
-            predicate: Term::lam(result_ty.clone(), psi.clone()),
+            predicate: Term::lam(result_ty.clone(), psi),
             install_depth,
-            kind: ObligationKind::Ensures,
-            recursive_self: recursive_id.map(|id| RecursiveSelf {
-                id, params: param_types.len(), requires: requires.len(), psi,
-            }),
+            span: ens.span().clone(),
         });
     }
     Ok((predicates, obligations))
@@ -20444,10 +20325,24 @@ fn elaborate_view_with_spec(
                 absorb_obligations(&mut decl_obligations, std::mem::take(&mut cx.obligations));
                 (carrier_ty, params, assumptions, req_cores)
             };
-            let (param_types, carrier_result, full_ty) =
-                build_contract_type(&carrier_ty, param_count, &req_cores)?;
+            let (param_types, carrier_result) = split_params(&carrier_ty, param_count)
+                .ok_or_else(|| ElabError::Internal(
+                    "declaration parameter telescope is shorter than its source arity".into(),
+                ))?;
+            let source_result = weaken(&carrier_result, req_cores.len() as i64);
+            // The result predicate is checked before staging the self name:
+            // recursive calls in the body must see the *final* Σ result type.
+            let (predicates, psi_obligations) = prepare_contract_ensures(
+                env, globals, num_values, numeric_env, &*refinement_facts, class_env, provenance,
+                standard_operators, preconditions, local_dicts, rdecl,
+                &all_ensures, &param_types, &req_cores, &source_result,
+            )?;
+            absorb_obligations(&mut decl_obligations, psi_obligations);
+            let result_ty_under_requires = ensured_result_type(&source_result, &predicates);
+            let (_, _, full_ty) = build_contract_type(
+                &carrier_ty, param_count, &req_cores, &result_ty_under_requires,
+            )?;
             ensure_not_omega_type(env, &Context::new(), &full_ty, &rdecl.span)?;
-            let result_ty_under_requires = weaken(&carrier_result, req_cores.len() as i64);
             let staged = ken_kernel::stage_placeholders(
                 env,
                 vec![(rdecl.name.clone(), vec![], full_ty.clone())],
@@ -20463,17 +20358,8 @@ fn elaborate_view_with_spec(
             }
             pending = Some(staged);
             globals.insert(rdecl.name.clone(), id);
-            // The checked signature and facts share this staged identity;
-            // recursive calls in ensures or the body already see the params.
             record_refined_params(refinement_facts, id, params);
             recorded_pending = Some(id);
-            let (predicates, psi_obligations) = prepare_contract_ensures(
-                env, globals, num_values, numeric_env, &*refinement_facts, class_env, provenance,
-                standard_operators, preconditions, local_dicts, rdecl,
-                &all_ensures, &param_types, &req_cores, &result_ty_under_requires,
-                is_recursive.then_some(id),
-            )?;
-            absorb_obligations(&mut decl_obligations, psi_obligations);
             let (full_body, body_inner) = {
                 let mut cx =
                     ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, rdecl.name.clone())
@@ -20488,6 +20374,7 @@ fn elaborate_view_with_spec(
                     &carrier_ty,
                     param_count,
                     &req_cores,
+                    &result_ty_under_requires,
                     &rdecl.span,
                     &predicates,
                 )?;
@@ -20521,15 +20408,21 @@ fn elaborate_view_with_spec(
                         param_count,
                         &rdecl.requires,
                     )?;
-                    let (param_types, carrier_result, full_ty) =
-                        build_contract_type(&carrier_ty, param_count, &req_cores)?;
+                    let (_, carrier_result) = split_params(&carrier_ty, param_count)
+                        .ok_or_else(|| ElabError::Internal(
+                            "declaration parameter telescope is shorter than its source arity".into(),
+                        ))?;
                     let result_ty_under_requires = weaken(&carrier_result, req_cores.len() as i64);
+                    let (param_types, _, full_ty) = build_contract_type(
+                        &carrier_ty, param_count, &req_cores, &result_ty_under_requires,
+                    )?;
                     let (full_body, body_inner) = check_contract_body(
                         &mut cx,
                         &rdecl.body,
                         &carrier_ty,
                         param_count,
                         &req_cores,
+                        &result_ty_under_requires,
                         &rdecl.span,
                         &[],
                     )?;
