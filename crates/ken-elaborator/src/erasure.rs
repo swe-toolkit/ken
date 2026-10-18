@@ -3735,8 +3735,8 @@ fn lower_checked_host_computation(
                 } else {
                     (None, runtime_args)
                 };
-            // `PrivateResourceRelease` is indexed by its resource kind in the
-            // checked family, but that index is type-level protocol evidence,
+            // Both checked release constructors are indexed by resource kind
+            // in the checked family, but that index is type-level protocol evidence,
             // not a second runtime operand.  The canonical host operation still
             // receives exactly the opaque resource token it has always used.
             let semantic_args = if decoded.operation == ken_host::HostOpV1::ResourceRelease {

@@ -25,6 +25,7 @@ fn system_resource_is_opaque_and_only_the_bracket_mints_it() {
         "PrivateFsHandleMetadata",
         "PrivateBufferAllocate",
         "PrivateResourceRelease",
+        "PrivateBracketRelease",
         "PrivateResourceTraceIdentity",
         "private_resource_acquire",
         "private_with_resource_after_open",

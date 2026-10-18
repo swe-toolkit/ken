@@ -4014,6 +4014,10 @@ fn checked_host_spine_v1(
             ken_host::HostOpV1::ResourceRelease,
         ),
         (
+            prelude.private_bracket_release_id,
+            ken_host::HostOpV1::ResourceRelease,
+        ),
+        (
             prelude.private_mapping_allocate_id,
             ken_host::HostOpV1::MappingAllocate,
         ),

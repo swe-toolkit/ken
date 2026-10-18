@@ -157,6 +157,10 @@ fn resource_laws_have_exact_independent_checked_clients() {
             env.prelude_env.private_resource_release_id,
         ),
         (
+            "PrivateBracketRelease",
+            env.prelude_env.private_bracket_release_id,
+        ),
+        (
             "PrivateBufferHandle",
             env.prelude_env.private_buffer_handle_id,
         ),
@@ -416,7 +420,7 @@ fn resource_laws_have_exact_independent_checked_clients() {
             (Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result o (ResourceBracketResult e r))
-              (InL (FSOp a) AmbientOp (PrivateResourceRelease a kind resource))
+              (InL (FSOp a) AmbientOp (PrivateBracketRelease a kind resource))
               (private_resource_release_result a o e r body_result)) =
           resource_release_settles a o e r kind resource body_result"#,
     );

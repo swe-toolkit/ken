@@ -320,6 +320,7 @@ pub fn empty_prelude_env() -> PreludeEnv {
         private_buffer_span_id: z,
         private_transfer_count_id: z,
         private_resource_release_id: z,
+        private_bracket_release_id: z,
         private_resource_trace_identity_id: z,
         fs_handle_id: z,
         resource_host_io_id: z,
@@ -483,6 +484,7 @@ pub struct PreludeEnv {
     pub private_buffer_span_id: GlobalId,
     pub private_transfer_count_id: GlobalId,
     pub private_resource_release_id: GlobalId,
+    pub private_bracket_release_id: GlobalId,
     /// Module-private two-limb constructor for the opaque trace identity.
     pub private_resource_trace_identity_id: GlobalId,
     pub fs_handle_id: GlobalId,
@@ -807,7 +809,7 @@ fn register_resource_bracket_laws(elab: &mut ElabEnv) -> Result<(), ElabError> {
             (Vis (Coproduct (FSOp a) AmbientOp)
               (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp)
               (Result o (ResourceBracketResult e r))
-              (InL (FSOp a) AmbientOp (PrivateResourceRelease a kind resource))
+              (InL (FSOp a) AmbientOp (PrivateBracketRelease a kind resource))
               (private_resource_release_result a o e r body_result)) =
           resource_refl (HostIO a (Result o (ResourceBracketResult e r)))
             (release_if_live a o e r kind resource body_result)"#,
@@ -848,6 +850,7 @@ struct PreludeOperationIds {
     private_fs_open_id: GlobalId,
     private_fs_handle_metadata_id: GlobalId,
     private_resource_release_id: GlobalId,
+    private_bracket_release_id: GlobalId,
     private_buffer_allocate_id: GlobalId,
     private_fs_read_at_id: GlobalId,
     private_fs_write_at_id: GlobalId,
@@ -877,6 +880,7 @@ struct PreludeResourceIds {
     private_buffer_span_id: GlobalId,
     private_transfer_count_id: GlobalId,
     private_resource_release_id: GlobalId,
+    private_bracket_release_id: GlobalId,
     private_resource_trace_identity_id: GlobalId,
     fs_handle_id: GlobalId,
     resource_host_io_id: GlobalId,
@@ -2327,6 +2331,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
                 named(vec![cap_a(), bytes_t.clone(), int_t.clone()]),
                 named(vec![cap_a(), bytes_t.clone(), resource_open_mode_t]),
                 named(vec![resource_fs_handle_t.clone()]),
+                named(vec![resource_kind_t.clone(), resource_of_latest_kind_t.clone()]),
                 named(vec![resource_kind_t, resource_of_latest_kind_t]),
                 named(vec![int_t.clone()]),
                 named(vec![
@@ -2393,6 +2398,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
         "PrivateFsOpen",
         "PrivateFsHandleMetadata",
         "PrivateResourceRelease",
+        "PrivateBracketRelease",
         "PrivateBufferAllocate",
         "PrivateFsReadAt",
         "PrivateFsWriteAt",
@@ -2410,6 +2416,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     let private_fs_open_id = elab.globals["PrivateFsOpen"];
     let private_fs_handle_metadata_id = elab.globals["PrivateFsHandleMetadata"];
     let private_resource_release_id = elab.globals["PrivateResourceRelease"];
+    let private_bracket_release_id = elab.globals["PrivateBracketRelease"];
     let private_buffer_allocate_id = elab.globals["PrivateBufferAllocate"];
     let private_fs_read_at_id = elab.globals["PrivateFsReadAt"];
     let private_fs_write_at_id = elab.globals["PrivateFsWriteAt"];
@@ -2418,7 +2425,7 @@ fn register_prelude_fs_operation_carrier(elab: &mut ElabEnv, seed: &PreludeResou
     let private_mapping_read_view_id = elab.globals["PrivateMappingReadView"];
     let private_mapping_write_view_id = elab.globals["PrivateMappingWriteView"];
     let private_mapping_acquire_file_id = elab.globals["PrivateMappingAcquireFile"];
-    Ok(PreludeOperationIds { private_fs_open_id, private_fs_handle_metadata_id, private_resource_release_id, private_buffer_allocate_id, private_fs_read_at_id, private_fs_write_at_id, private_buffer_freeze_id, private_mapping_allocate_id, private_mapping_read_view_id, private_mapping_write_view_id, private_mapping_acquire_file_id })
+    Ok(PreludeOperationIds { private_fs_open_id, private_fs_handle_metadata_id, private_resource_release_id, private_bracket_release_id, private_buffer_allocate_id, private_fs_read_at_id, private_fs_write_at_id, private_buffer_freeze_id, private_mapping_allocate_id, private_mapping_read_view_id, private_mapping_write_view_id, private_mapping_acquire_file_id })
 }
 
 #[inline(never)]
@@ -2448,6 +2455,7 @@ fn register_prelude_resource_shapes(elab: &mut ElabEnv, type0: &Term) -> Result<
         private_buffer_span_id: buffer.private_buffer_span_id,
         private_transfer_count_id: buffer.private_transfer_count_id,
         private_resource_release_id: op.private_resource_release_id,
+        private_bracket_release_id: op.private_bracket_release_id,
         private_resource_trace_identity_id: seed.private_resource_trace_identity_id,
         fs_handle_id: seed.fs_handle_id,
         resource_host_io_id: seed.resource_host_io_id,
@@ -2478,6 +2486,7 @@ fn register_prelude_fs_operations(elab: &mut ElabEnv) -> Result<(), ElabError> {
            PrivateFsOpen cap path mode |-> Result FileError (Resource ResourceKind.FsHandle); \
            PrivateFsHandleMetadata resource |-> Result ResourceError FileMetadata; \
            PrivateResourceRelease kind resource |-> Result ResourceError Unit; \
+           PrivateBracketRelease kind resource |-> Result ResourceError Unit; \
            PrivateBufferAllocate capacity |-> Result ResourceError (Resource ResourceKind.Buffer); \
            PrivateFsReadAt file file_offset buffer buffer_start length |-> Result ResourceError ReadProgress; \
            PrivateFsWriteAt file file_offset buffer buffer_start length span_origin |-> Result ResourceError WriteProgress; \
@@ -2793,7 +2802,7 @@ fn register_prelude_brackets(elab: &mut ElabEnv) -> Result<(), ElabError> {
          Vis (Coproduct (FSOp a) AmbientOp) \
            (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
            (Result o (ResourceBracketResult e r)) \
-           (InL (FSOp a) AmbientOp (PrivateResourceRelease a kind resource)) \
+           (InL (FSOp a) AmbientOp (PrivateBracketRelease a kind resource)) \
            (\\settled. Ret (Coproduct (FSOp a) AmbientOp) \
              (resp_coproduct (FSOp a) AmbientOp (fs_resp a) ambient_resp) \
              (Result o (ResourceBracketResult e r)) \
@@ -2950,6 +2959,7 @@ fn register_prelude_program(elab: &mut ElabEnv, auth_t: &Term, cap_id: GlobalId)
         "buffer_span_origin",
         "write_all_advance_span",
         "PrivateResourceRelease",
+        "PrivateBracketRelease",
         "PrivateResourceTraceIdentity",
         "private_resource_acquire",
         "private_with_resource_after_open",
@@ -3353,6 +3363,7 @@ fn assemble_prelude_env(runtime_roles: Box<CanonicalRuntimeRoles>, core: Prelude
         private_buffer_span_id: fs_ids.private_buffer_span_id,
         private_transfer_count_id: fs_ids.private_transfer_count_id,
         private_resource_release_id: fs_ids.private_resource_release_id,
+        private_bracket_release_id: fs_ids.private_bracket_release_id,
         private_resource_trace_identity_id: fs_ids.private_resource_trace_identity_id,
         fs_handle_id: fs_ids.fs_handle_id,
         resource_host_io_id: fs_ids.resource_host_io_id,
