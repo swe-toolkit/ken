@@ -12317,6 +12317,9 @@ fn unify_sorts_walk(
     if sort_walk_is_inert(metas, &expected, &metas.zonk_term_with(actual, false)) {
         return;
     }
+    if sort_walk_same_constant_spine(env, metas, ctx, &expected, actual) {
+        return;
+    }
     let expected = whnf(env, ctx, &expected);
     let actual = whnf(env, ctx, actual);
     match (&expected, &actual) {
@@ -12332,6 +12335,54 @@ fn unify_sorts_walk(
         }
         _ => unify_types(metas, &expected, &actual),
     }
+}
+
+/// Kernel conversion tries a same-constant, same-arity spine argument-wise
+/// before any delta (`conv_struct_path`). Mirror that order: link each pair,
+/// keep the links only if every pair then converts, otherwise restore them
+/// and let the caller reduce. A constant that ignores an argument still has
+/// that argument's levels linked, as kernel congruence would equate it.
+fn sort_walk_same_constant_spine(
+    env: &GlobalEnv, metas: &mut MetaCtx, ctx: &mut Context, expected: &Term, actual: &Term,
+) -> bool {
+    let (Term::Const { id: expected_id, level_args: expected_levels }, expected_args) =
+        peel_app(expected)
+    else {
+        return false;
+    };
+    let (Term::Const { id: actual_id, level_args: actual_levels }, actual_args) = peel_app(actual)
+    else {
+        return false;
+    };
+    if expected_id != actual_id
+        || expected_levels.len() != actual_levels.len()
+        || expected_args.len() != actual_args.len()
+    {
+        return false;
+    }
+    let saved = metas.metas.clone();
+    for (expected_level, actual_level) in expected_levels.iter().zip(&actual_levels) {
+        unify_levels(metas, expected_level, actual_level);
+    }
+    for (expected_arg, actual_arg) in expected_args.iter().zip(&actual_args) {
+        unify_sorts_walk(env, metas, ctx, expected_arg, actual_arg);
+    }
+    let levels_agree = expected_levels.iter().zip(&actual_levels).all(|(e, a)| {
+        metas.zonk_level_with(e, false) == metas.zonk_level_with(a, false)
+    });
+    let arguments_convert = levels_agree
+        && expected_args.iter().zip(&actual_args).all(|(e, a)| {
+            convert_type(
+                env,
+                ctx,
+                &metas.zonk_term_with(e, false),
+                &metas.zonk_term_with(a, false),
+            )
+        });
+    if !arguments_convert {
+        metas.metas = saved;
+    }
+    arguments_convert
 }
 
 /// The walk can only solve an open level meta (`unify_levels`), and whnf adds
