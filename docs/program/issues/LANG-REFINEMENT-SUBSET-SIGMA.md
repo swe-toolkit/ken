@@ -34,8 +34,9 @@ on the current base before measuring, and reports any that moved.
 - **Evidence at the consumer (Architect `evt_41fxwysr833vv`).** No term
   applies a refinement hole on base (elab.rs ~:11666, ~:11779), so every
   program without a subset-Σ introduction elaborates byte-identically.
-  The introduction requests evidence for exactly the conditions its hole
-  is closed over, from each condition's frame record:
+  The introduction requests evidence only for the conditions whose
+  binders are free in its **evidence term** (amendment 1 below), from
+  each condition's frame record:
   - `let`: `refl rhs` at the introduction's argument position; its type
     checks there after kernel `Let` substitution (check.rs ~:398-401). No
     inner Ω `Let`.
@@ -46,9 +47,20 @@ on the current base before measuring, and reports any that moved.
     `59eaccce2`, which never lands; reuse its components).
   - Indexed family: a typed refusal.
   - Recursive family: `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`.
-  - How demand is expressed is ruled at D0, with measurement. The
-    Architect leans to deferred re-elaboration of the enclosing split on a
-    typed demand; a pre-scan keyed on spelling is out.
+  - **Demand mechanism (amendment 1, Architect `evt_6tq4e1qs4zx5w` on
+    D0 `evt_7y18marcqgv6d`): (A), deferred re-elaboration.** A split
+    keyed by an identity minted at split entry catches a typed demand,
+    rolls back its branches and re-elaborates them with the convoy on, at
+    most once per split. (B), always-bind, is out: M4 = 1 and 33 kernel
+    rejections. (A) passed M1, M2 and the retry bound.
+  - **Demand criterion (amendment 1).** A condition is demanded only if
+    its binder is free in the introduction's evidence term. A
+    certificate found at elaboration demands only the conditions it
+    mentions, so `isScalar 32` demands nothing. An open hole is applied
+    to its conditions and demands them all. Closing the hole over a
+    condition is not a demand: base closes every hole over every
+    admissible condition, which made ArgParse demand the recursive `Doc`
+    split and admit 0/7.
 
 ## Deliverable
 
@@ -73,7 +85,21 @@ on the current base before measuring, and reports any that moved.
 
 ## Acceptance
 
-- **AC-0 (D0, measure only).**
+- **AC-0b (census, scratch, first; amendment 1).** On prototype (A)
+  with the corrected criterion, for each of the 6 catalog closures with
+  introductions: count the introductions under a split, and classify
+  each as certificate with no condition used, certificate using a
+  condition (name the split family), or open hole (name the enclosing
+  split families). Report admit or refuse per closure, with ArgParse's 7
+  runs timed against AC-2's 10% bound if it admits.
+  - **Zero open holes under a non-convoyable split** (recursive, or
+    indexed without heterogeneous equations): the criterion change is in
+    this WP and the build proceeds on (A).
+  - **Any such hole:** stop to the Steward with the count. The scope
+    call is between dropping those conditions from the hole's closed type
+    (strengthening, with a typed refusal if then unprovable) and ordering
+    `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW` first.
+- **AC-0 (D0, measure only; closed `evt_1j5wf5kfe127q`).**
   - (a) Introductions by closure class.
   - (b) Every elaborator site that whnf's an inferred type to inspect its
     head.
