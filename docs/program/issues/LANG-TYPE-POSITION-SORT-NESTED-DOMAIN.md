@@ -56,8 +56,14 @@ rows below as a test target beside the SORT-UP-TO-WHNF rows.
 - **AC-2 (paired failing configuration).** Each AC-1 row with the walk
   replaced by the head-only whnf gives today's `TypeMismatch`.
 - **AC-3.** The SORT-UP-TO-WHNF rows a1, a3, a5, g3 and its four
-  `Big := Type 1` negatives keep their outcomes. A nested `Big` twin of
-  n1 keeps the outcome it has on the base.
+  `Big := Type 1` negatives keep their outcomes. For the nested `Big`
+  twin of n1 (Architect `evt_4wf8nv27wwrqy`, `evt_3031bnxwcrzq9`; operative
+  `evt_9aq3qzbwfdb5`):
+  - With `f : Type 0 -> Type`, it gives K0004 on base and candidate.
+  - With a bare `f : Type -> Type`, it checks with one obligation, and
+    its admitted kernel type shows `f`'s domain solved to `Type 1`. A
+    bare `Type` is `Type ?l`, so the base refusal was incidental to the
+    missing level link. Reverting the walk returns this row to K0004.
 - **AC-4.** Every landed catalog package emits byte-identical core.
 
 ## Stop conditions
