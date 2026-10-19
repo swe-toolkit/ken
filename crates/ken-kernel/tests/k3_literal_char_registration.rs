@@ -5,7 +5,7 @@ use ken_kernel::check::{
     checked_char_literal, declare_checked_string_literal, register_checked_char_carrier,
     register_checked_int_lit_carrier, register_checked_string_carrier,
 };
-use ken_kernel::{declare_primitive, GlobalEnv, Level, PrimReduction, Term};
+use ken_kernel::{declare_primitive, GlobalEnv, KernelError, Level, LevelVar, PrimReduction, Term};
 
 fn opaque_type(env: &mut GlobalEnv) -> ken_kernel::GlobalId {
     declare_primitive(
@@ -31,6 +31,60 @@ fn checked_string_literal_normalizes_immutable_payload_and_refuses_absent_carrie
         Term::const_(string_ty, vec![])
     );
     assert_eq!(env.checked_literal(id).unwrap().as_str(), "é");
+}
+
+#[test]
+fn polymorphic_char_carrier_cannot_register_a_closed_literal_view() {
+    let mut env = GlobalEnv::new();
+    let int_ty = opaque_type(&mut env);
+    register_checked_int_lit_carrier(&mut env, int_ty).unwrap();
+    let sigma = Term::sigma(
+        Term::const_(int_ty, vec![]),
+        Term::const_(env.top_id(), vec![]),
+    );
+    let polymorphic = ken_kernel::declare_def(
+        &mut env,
+        vec![LevelVar(0)],
+        Term::ty(Level::Zero),
+        sigma.clone(),
+    )
+    .expect("a declared, level-polymorphic subset is valid even if its body ignores that level");
+    assert!(matches!(
+        ken_kernel::infer(
+            &env,
+            &ken_kernel::Context::new(),
+            &Term::const_(polymorphic, vec![])
+        ),
+        Err(KernelError::LevelArityMismatch {
+            expected: 1,
+            found: 0
+        })
+    ));
+    let before = env.next_global_id();
+    assert!(
+        matches!(
+            register_checked_char_carrier(&mut env, polymorphic),
+            Err(KernelError::Msg(message)) if message == "invalid or duplicate Char literal carrier"
+        ),
+        "a literal cannot inhabit a Char reference with omitted level arguments"
+    );
+    assert_eq!(env.next_global_id(), before);
+    assert!(
+        checked_char_literal(&env, 65).is_err(),
+        "refusal must not install the invalid carrier"
+    );
+
+    let monomorphic =
+        ken_kernel::declare_def(&mut env, vec![], Term::ty(Level::Zero), sigma).unwrap();
+    register_checked_char_carrier(&mut env, monomorphic).unwrap();
+    let scalar = checked_char_literal(&env, 65).unwrap();
+    ken_kernel::check(
+        &env,
+        &ken_kernel::Context::new(),
+        &scalar,
+        &Term::const_(monomorphic, vec![]),
+    )
+    .expect("the later monomorphic carrier remains available after refusal");
 }
 
 #[test]

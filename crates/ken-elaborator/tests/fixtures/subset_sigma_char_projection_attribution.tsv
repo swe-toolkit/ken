@@ -1,0 +1,91 @@
+# SUBSET-SIGMA K-a Char projection: source-attributed ambient census exception.
+# Baseline: main 3282eadd8; unchanged WP-4 census partitions 78 green roots,
+# with 63 ambient and 15 clean, zero residuals. Prior names use its expected
+# vector; clean roots have no prior ambient names.
+# Closure: actual roots loader ModuleState.loaded_units after each successful
+# root load at candidate 94a9fa5. To reproduce, root-load each listed entry
+# in a disposable in-crate test and inspect whether loaded_units contains
+# Core.Classes.LawfulClasses (including the owner root itself); compare
+# closure && !prior_charToInt to changed.
+# The disposable measurement asserted this equivalence for all 78 roots.
+# Changed: unchanged candidate census failure versus baseline expected vector.
+# 47 new charToInt, 4 preexisting charToInt, 27 without either or closure.
+root	baseline_admitted	prior_charToInt	closure_has_LawfulClasses	census_adds_charToInt
+Algorithm.FormalLanguages.Dfa	true	false	true	true
+Algorithm.FormalLanguages.Minimisation	true	false	true	true
+Algorithm.FormalLanguages.Nfa	true	false	true	true
+Algorithm.FormalLanguages.Reachability	true	false	true	true
+Algorithm.FormalLanguages.Regex	true	false	true	true
+Algorithm.Geometry.NatBox	true	false	true	true
+Algorithm.Graphs.Dependency	true	false	true	true
+Algorithm.LinearAlgebra.NatMatrix	true	false	false	false
+Algorithm.Numeric.Gcd	true	false	true	true
+Algorithm.Numeric.RationalInterval	true	false	true	true
+Algorithm.Optimization.Argmin	true	false	true	true
+Algorithm.Optimization.BoundedSearch	true	false	true	true
+Algorithm.Searching.OrderedSearch	true	false	true	true
+Algorithm.Sorting.InsertionSort	true	false	true	true
+Algorithm.Statistics.Empirical	true	false	true	true
+Algorithm.Statistics.Exact	true	false	true	true
+Algorithm.SymbolicAlgebra.NatPolynomial	true	false	true	true
+Application.CommandLine.ArgParse	true	true	true	false
+Application.Configuration.Decoder	true	false	true	true
+Application.Input.Schema	true	false	true	true
+Capability.Console.Text	true	false	false	false
+Capability.Diagnostics.Core	true	false	true	true
+Capability.Diagnostics.Render	true	false	true	true
+Capability.Filesystem.Authority	true	false	false	false
+Capability.Filesystem.Errors	true	false	false	false
+Capability.Filesystem.Path.Posix	true	false	true	true
+Capability.Formatting.Doc	true	false	true	true
+Capability.Parsing.Cursor	true	false	true	true
+Capability.Parsing.Decoder	true	false	true	true
+Capability.Parsing.Lexer	true	false	true	true
+Capability.Parsing.Numeric	true	true	true	false
+Capability.Parsing.Parsing	true	true	true	false
+Capability.Process.Arguments	true	false	true	true
+Capability.Process.Environment	true	false	false	false
+Capability.Process.Exit	true	false	false	false
+Capability.Process.WorkingDirectory	true	false	false	false
+Capability.System.Buffer	true	false	false	false
+Capability.System.Error	true	false	false	false
+Capability.System.IO	true	false	false	false
+Capability.System.Resource	true	false	false	false
+Capability.Time.WallClock	true	false	false	false
+Core.Classes.EffectfulClasses	true	false	true	true
+Core.Classes.LawfulClasses	true	false	true	true
+Core.Classes.LawfulFunctors	true	false	true	true
+Core.Classes.Membership	true	false	true	true
+Core.Function.Combinators	true	false	false	false
+Core.Logic.And	true	false	false	false
+Core.Logic.Compare	true	false	false	false
+Core.Logic.EmptyDec	true	false	true	true
+Core.Logic.Not	true	false	false	false
+Core.Logic.Or	true	false	false	false
+Core.Logic.OrdResult	true	false	false	false
+Core.Logic.Transport	true	false	false	false
+Core.Operators.Standard	true	false	true	true
+Data.Binary.BytesKeys	true	false	true	true
+Data.Binary.BytesPrimitiveContracts	true	true	true	false
+Data.Collections.Deque	true	false	true	true
+Data.Collections.Derived	true	false	true	true
+Data.Collections.List	true	false	false	false
+Data.Collections.Map	true	false	true	true
+Data.Collections.NonEmpty	true	false	true	true
+Data.Collections.PriorityQueue	true	false	true	true
+Data.Finite.Finite	true	false	true	true
+Data.Numeric.Nat.Arithmetic	true	false	false	false
+Data.Numeric.Nat.Order	true	false	true	true
+Data.Numeric.Rational	true	false	true	true
+Data.Serialization.Json	true	false	true	true
+Data.Serialization.JsonCodec	true	false	true	true
+Data.Sums.Combinators	true	false	false	false
+Data.Sums.Validation	true	false	true	true
+Data.Text.Codec	true	false	false	false
+Data.Text.StringBijection	true	false	false	false
+Data.Text.StringKeys	true	false	true	true
+Data.Time.EventTrace	true	false	true	true
+Data.Vector.Vector	true	false	false	false
+Tooling.Testing.Property	true	false	true	true
+Tooling.Verification.FoKripke	true	false	false	false
+Tooling.Verification.ProofErasureBoundaryChecker	true	false	false	false

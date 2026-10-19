@@ -1930,6 +1930,17 @@ pub fn register_checked_string_carrier(env: &mut GlobalEnv, id: GlobalId) -> Ker
 /// every scalar at literal admission; the registration never trusts a bare
 /// integer as a value of Char.
 pub fn register_checked_char_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
+    // Every literal and String view uses Char with no level arguments. An
+    // unfolded polymorphic body is not a valid closed Char reference.
+    if env.checked_char_type().is_some()
+        || !matches!(
+            env.lookup(id),
+            Some(Decl::Transparent { level_params, ty, .. }) if level_params.is_empty()
+                && matches!(whnf(env, &Context::new(), ty), Term::Type(_))
+        )
+    {
+        return Err(KernelError::Msg("invalid or duplicate Char literal carrier".into()));
+    }
     let int_type = env
         .int_lit_type()
         .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
@@ -1939,9 +1950,7 @@ pub fn register_checked_char_carrier(env: &mut GlobalEnv, id: GlobalId) -> Kerne
     };
     let mut ctx = Context::new();
     ctx.push((*carrier).clone());
-    if env.checked_char_type().is_some()
-        || !matches!(env.lookup(id), Some(Decl::Transparent { .. }))
-        || !convert_type(env, &Context::new(), &carrier, &Term::const_(int_type, vec![]))
+    if !convert_type(env, &Context::new(), &carrier, &Term::const_(int_type, vec![]))
         || !matches!(classify(env, &ctx, &predicate), Ok(Sort::Omega(_)))
     {
         return Err(KernelError::Msg("invalid or duplicate Char literal carrier".into()));
@@ -2210,6 +2219,33 @@ mod tests {
         .unwrap();
         assert_eq!(env.checked_string_type(), None);
         assert_string_carrier_refused_unchanged(&mut env, polymorphic);
+    }
+
+    #[test]
+    fn polymorphic_char_refusal_keeps_the_registered_carrier_empty() {
+        let mut env = GlobalEnv::new();
+        let int_ty = declare_primitive(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        register_checked_int_lit_carrier(&mut env, int_ty).unwrap();
+        let sigma = Term::sigma(
+            Term::const_(int_ty, vec![]),
+            Term::const_(env.top_id(), vec![]),
+        );
+        let polymorphic =
+            declare_def(&mut env, vec![LevelVar(0)], Term::ty(Level::Zero), sigma).unwrap();
+        assert_eq!(env.checked_char_type(), None);
+        assert_eq!(
+            register_checked_char_carrier(&mut env, polymorphic),
+            Err(KernelError::Msg(
+                "invalid or duplicate Char literal carrier".into()
+            )),
+        );
+        assert_eq!(env.checked_char_type(), None);
     }
 
     #[test]
