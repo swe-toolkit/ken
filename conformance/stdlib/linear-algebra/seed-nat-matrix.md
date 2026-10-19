@@ -1,35 +1,43 @@
 # Dimension-safe natural matrix operations
 
 Format: `../../README.md`.
-Spec: `spec/50-stdlib/65-linear-algebra.md` §§1–2.
+Spec: `spec/50-stdlib/65-linear-algebra.md` §§1–3.
 
-These twelve cases are **authored behavioral oracles**. The catalog's
-`Algorithm.LinearAlgebra.NatMatrix` publishes the §1 operations and
-five checked theorems; the two generic §2 laws are checked in the
-Architect's scratch D0 (named private helper, no added `Axiom`) but
-not yet exported by the catalog. The positive block below was
-extracted verbatim to scratch `SeedPositive.ken` (SHA256
-`9ea54b100399c24cfaa282b36f16a8a45072189b054ebe65784c4efb276a819d`):
-all thirteen closed assertions checked, rc=0, against the **landed**
-§1 package. The positive code plus only the rejected call became
-`SeedNegative.ken` (SHA256
-`07e666c9bffdd00a2894820cf4fce094e034d022ed52db82d6383f21c0a800f0`):
-rc=1 `KernelRejected TypeMismatch`. Three one-change controls on the
-same positive source also reject: dot expected five changed to six
-(`SeedBadDot.ken`, SHA256
-`2cc4f8a080c9f78596335603738e8c24e6eebcc967df276855344b267e586c90`),
-rc=1 `KernelRejected TypeMismatch`; factor-three scale's expected six
-changed to five (`SeedBadFactor.ken`, SHA256
-`5e8e22e66a2f6deb070342a1b3d7c6f4faa4eebd54909d9654e743c69dd5145c`),
-rc=1 `TypeMismatch`; and the association oracle's inner `c22` on
-one side changed to `expected22` (`SeedBadAssoc.ken`, SHA256
-`5a9719d6473428733ba0d6b051d87806f9a1d2259b58aba888e9cc89d6cc5dbd`),
-rc=1 `TypeMismatch`. These source-shaped checks used `ken check` with
-`/workspaces/ken/.worktrees/spec-author/target/debug/ken`, built from
-base `e940e481c` by `scripts/ken-cargo build -p ken-cli --bin ken`
-(rc=0). They do not establish generic laws, delivery of §2 theorems,
-execution of a shipped conformance suite, Cargo test results, CI, or
-publication. Every case has promise class **durable invariant**.
+These sixteen cases are **authored behavioral oracles**, each with
+promise class **durable invariant**. The catalog publishes the §1
+operations and five checked §1 laws; its two generic §2 laws are also
+landed. Section 3 specifies `matrix_vector_product`, `transpose_product`,
+and public `dot_scale`. The two generic §3 laws have D0-checked bodies,
+but their catalog exports and the public `dot_scale` export are not yet
+delivered. The three §3 positive cases below are closed instances using
+the already-published operations; they do not establish either generic
+law or the public helper export. Each refusal uses a separate checker
+input, and the unreversed-order refusal includes a same-input positive
+control for the required reversed order.
+
+The positive block was extracted to scratch `SeedPositive.ken`
+(SHA256
+`897ade308686f22fd4cfc386858f7a6471d7266c8187b90e3d4d359ea4bae603`);
+its sixteen closed assertions checked. The temporary roots-loaded
+`cat_linear_algebra_ac2_scratch` test target ran four checks through
+`scripts/ken-cargo`; all four passed. The positive block and reversed-order
+control passed; the
+wrong-inner input returned `KernelRejected TypeMismatch`;
+the unreversed equation returned `TypeMismatch` with reason
+`Refl expects an Eq-shaped goal`. The scratch sources were
+`SeedUnreversedControl.ken` (SHA256
+`a18762f5da1ce36a22dfaaa02bf44d79519edd76e6023cfa576bfe57af90541b`),
+`SeedBadInner.ken` (SHA256
+`d39dc61dec0592edb51f2e80d3bd869bbe2edcf6dd7bb5ba92f2a570c94623f6`),
+and `SeedUnreversed.ken` (SHA256
+`9e92d693613f8affc8b8141741e08dbf720db5c3840e111a7c7dd2236fddeeac`).
+
+A direct single-file `ken check` cannot resolve these clients' package
+imports (`E0012 UnboundName Data.Vector.Vector`); the temporary test used
+`ElabEnv::elaborate_module_from_roots` followed by `elaborate_file`.
+This scratch check does not establish shipped seed-harness execution,
+generic §3 law delivery, an existing catalog test-suite result, CI,
+publication, or landing.
 
 ## Shared fixtures and closed oracles
 
@@ -128,6 +136,26 @@ theorem transpose_intermediate_oracle : Equal (Vec (Vec Nat two) three)
 
 theorem transpose_round_trip_oracle : Equal (Vec (Vec Nat three) two)
   (transpose three two (transpose two three a23)) a23 = Refl
+
+theorem matrix_vector_product_oracle : Equal (Vec Nat two)
+  (matrix_vector two two
+    (matrix_product two three two a23 b32)
+    (v2 Zero one))
+  (matrix_vector two three a23
+    (matrix_vector three two b32 (v2 Zero one))) = Refl
+
+theorem transpose_product_oracle : Equal (Vec (Vec Nat two) two)
+  (transpose two two (matrix_product two three two a23 b32))
+  (matrix_product two three two
+    (transpose three two b32)
+    (transpose two three a23)) = Refl
+
+theorem matrix_vector_product_identity_control : Equal (Vec Nat two)
+  (matrix_vector two three
+    (matrix_product two three three a23 (identity three))
+    (v3 Zero one Zero))
+  (matrix_vector two three a23
+    (matrix_vector three three (identity three) (v3 Zero one Zero))) = Refl
 ```
 
 The nonempty closed vector equalities check using `Refl`. The
@@ -135,8 +163,8 @@ zero-length scaling case uses `Proved`, as the catalog's
 `map_vnil` does; `Equal Nat` in the direct dot oracle also takes
 `Proved`. Neither asserts a generic Vec extensionality law. The
 closed §2 rows illustrate, but do not themselves prove, universal
-left identity or associativity; their generic proof evidence is
-separate D0 work.
+left identity or associativity; those generic checked theorems are
+separately landed in the catalog.
 
 ## A direct dot product pins the public operation
 
@@ -170,8 +198,8 @@ separate D0 work.
 - claimed: the public identity constructor places one exactly on
   the diagonal and zero off it.
 - the gap: this finite fixture is not a generic left or right
-  identity theorem; §2's left identity has separate generic proof
-  evidence, not yet catalog publication.
+  identity theorem. The generic `matrix_identity_left` theorem is
+  independently checked and landed in the catalog.
 - why: diagonal placement is checked directly rather than inferred
   only from the product with one selected matrix.
 
@@ -265,8 +293,8 @@ separate D0 work.
 - claimed: the exact product joins equal inner dimensions and
   preserves the outer dimensions without truncating either input.
 - the gap: a single pair of matrices does not prove the generic dot
-  laws or §2's matrix-product associativity. Generic proof evidence
-  for the latter is separate from this closed result.
+  laws or §2's matrix-product associativity theorem. The latter's
+  checked catalog proof is separate from this closed result.
 - why: treating the rows of `b32` as its columns, dropping its last
   row, or confusing the two outer dimensions changes at least one
   expected cell.
@@ -286,9 +314,10 @@ separate D0 work.
   and a non-square left operand.
 - claimed: the public generic `matrix_identity_right` theorem has a
   concrete nondegenerate witness. This case does not test the left side.
-- the gap: a closed result cannot discharge the universal right
-  identity proof or §2's generic left-identity obligation; the left
-  case below is separately indexed and checked.
+- the gap: this closed result does not establish the generic
+  `matrix_identity_right` theorem. The generic right- and left-identity
+  theorems are separately checked and landed; the left case below is
+  a separate closed witness.
 - why: replacing the diagonal with all ones or losing the second
   row changes the result. A square-only oracle would not reveal a
   mistaken assumption that both outer dimensions must be equal.
@@ -306,11 +335,11 @@ separate D0 work.
   checks with `Refl`.
 - measured: a left unit matrix sized to the **row** dimension,
   distinct from the right-identity fixture's column-sized unit.
-- claimed: the checked generic `matrix_identity_left` obligation
+- claimed: the landed generic `matrix_identity_left` theorem
   preserves arbitrary well-typed input matrices, including those
   with unequal outer dimensions.
-- the gap: one 2×3 value does not prove the generic law or export it
-  from the catalog; the §2 D0 proof supplies the former, not the latter.
+- the gap: one 2×3 value does not establish the generic theorem;
+  its checked proof is separate from this closed witness.
 - why: a wrong-side implementation that accepts only square
   operands or swaps row and column dimensions cannot satisfy this
   typed, non-square left-identity equality.
@@ -332,9 +361,9 @@ separate D0 work.
 - claimed: the generic §2 associativity law respects order and
   inner indices across all composable matrices.
 - the gap: closed equality alone could pass for two identically wrong
-  products. The independently pinned intermediate limits, but does
-  not eliminate, that finite-fixture gap; the generic checked D0
-  proof and follow-on catalog publication are distinct obligations.
+  products. The independently pinned intermediate limits, but do
+  not eliminate, that finite-fixture gap; the generic checked
+  catalog theorem is distinct evidence.
 - why: changing the inner right operand in one parenthesization
   rejects this equality, while a shape mismatch is refused by shared
   indices rather than cast to a common matrix type.
@@ -362,6 +391,81 @@ separate D0 work.
 - why: a wrong but involutive entry permutation could pass the round
   trip alone, yet fail the independently stated intermediate rows.
 
+## Matrix-vector compatibility composes a non-square product
+
+### stdlib/linear-algebra/nat-matrix-vector-product-2x3-3x2
+
+- spec: `spec/50-stdlib/65-linear-algebra.md` §3.
+- promise class: durable invariant.
+- given: `a23` (2×3), `b32` (3×2), and `x = [0, 1]`.
+- expect: `matrix_vector_product_oracle` checks `(a23 · b32)x =
+  a23(b32x)` as an `Equal (Vec Nat two)` proposition, with `Refl`.
+- measured: both evaluation routes on non-square operands with
+  distinct inner and vector dimensions.
+- claimed: a closed instance of the generic `matrix_vector_product`
+  law from §3.
+- the gap: this finite example does not establish the generic law
+  or its public catalog export.
+- why: the independently shaped routes use the same 2×3 and 3×2
+  factors, and the expected vector is computed from `[0, 1]`.
+
+## Transpose-product compatibility reverses the factors
+
+### stdlib/linear-algebra/nat-transpose-product-2x3-3x2
+
+- spec: `spec/50-stdlib/65-linear-algebra.md` §3.
+- promise class: durable invariant.
+- given: the same non-square `a23` and `b32`.
+- expect: `transpose_product_oracle` checks `(a23 · b32)ᵀ =
+  b32ᵀ · a23ᵀ` as a `Vec (Vec Nat two) two` equality with `Refl`.
+- measured: transpose of the 2×3 by 3×2 product against the
+  transposed factors in the required reverse order.
+- claimed: a closed instance of the generic `transpose_product`
+  law from §3.
+- the gap: a finite instance neither proves the universal law nor
+  establishes its catalog export.
+- why: the product and transpose cases above independently pin the
+  input product and row/column orientation; this case composes them.
+
+## The matrix-vector law has an identity control
+
+### stdlib/linear-algebra/nat-matrix-vector-product-identity-3
+
+- spec: `spec/50-stdlib/65-linear-algebra.md` §3.
+- promise class: durable invariant.
+- given: `a23`, `identity three` as its right factor, and
+  `x = [0, 1, 0]`.
+- expect: `matrix_vector_product_identity_control` checks the law
+  with `identity three` on the right as an `Equal (Vec Nat two)`
+  proposition, with `Refl`.
+- measured: the compatibility relation with the identity matrix as
+  the right factor and the same length-three input vector.
+- claimed: a positive identity control for the matrix-vector
+  product law, not a generic proof of it.
+- the gap: this identity instance does not establish the law for
+  arbitrary matrices or the catalog export.
+- why: the right identity leaves the vector unchanged before the
+  non-square left matrix acts on it.
+
+## Transpose-product order is not interchangeable
+
+### stdlib/linear-algebra/nat-transpose-product-unreversed-2x2
+
+- spec: `spec/50-stdlib/65-linear-algebra.md` §3.
+- promise class: durable invariant.
+- given: `s1 = [[1, 2], [3, 0]]` and `s2 = [[0, 1], [2, 3]]`.
+- expect: `transpose_product_reversed_square_control` checks with
+  `Refl`; the unreversed equality is refused when asserted with
+  `Refl`, as `TypeMismatch`.
+- measured: the same square operands and product on both statements;
+  only the order of the transposed factors changes.
+- claimed: transpose reverses product order; `s1ᵀ · s2ᵀ` is not a
+  substitute for `s2ᵀ · s1ᵀ`.
+- the gap: this counterexample refutes the unreversed equation on
+  these values; it does not prove the generic reversed-order law.
+- why: `(s1 · s2)ᵀ = [[4, 0], [7, 3]]`, while the unreversed
+  `s1ᵀ · s2ᵀ = [[3, 11], [0, 4]]`.
+
 ## A wrong inner dimension is refused
 
 ### stdlib/linear-algebra/nat-wrong-right-inner-dimension
@@ -388,14 +492,47 @@ separate D0 work.
   terms and pass a same-shape happy path, whereas this input must
   never reach the computation.
 
-The negative fixture belongs in a **separate** checker input from the
-accepted cases, to prevent an expected rejection from obscuring
-their success:
+Each refusal is checked in a separate input from the accepted block
+and from the other refusal. The unreversed-order input includes its
+own successful reversed-order control on the same operands, so only
+factor order changes:
+
+Wrong-inner-dimension input:
 
 ```ken
 const bad_product : Vec (Vec Nat two) two =
   matrix_product two three two a23 expected22
 ```
+
+Unreversed-order input, appended to the shared fixture block:
+
+```ken
+const s1 : Vec (Vec Nat two) two =
+  VCons (Vec Nat two) one (v2 one two)
+    (VCons (Vec Nat two) Zero (v2 three Zero)
+      (VNil (Vec Nat two)))
+const s2 : Vec (Vec Nat two) two =
+  VCons (Vec Nat two) one (v2 Zero one)
+    (VCons (Vec Nat two) Zero (v2 two three)
+      (VNil (Vec Nat two)))
+
+theorem transpose_product_reversed_square_control
+    : Equal (Vec (Vec Nat two) two)
+        (transpose two two (matrix_product two two two s1 s2))
+        (matrix_product two two two
+          (transpose two two s2)
+          (transpose two two s1)) = Refl
+
+theorem transpose_product_unreversed_refused
+    : Equal (Vec (Vec Nat two) two)
+        (transpose two two (matrix_product two two two s1 s2))
+        (matrix_product two two two
+          (transpose two two s1)
+          (transpose two two s2)) = Refl
+```
+
+The reversed-order control checks; the final false `Refl` is expected
+to be refused with `TypeMismatch`.
 
 ## Coverage boundary
 
@@ -403,8 +540,10 @@ These cases exercise direct dot and identity values, aligned vector
 addition, factor-two and factor-three plus empty vector scaling,
 ordered matrix-vector multiplication, exact matrix products, left
 and right identity, two parenthesizations of a product, transpose
-orientation and involution, and one real type-index refusal. They do
-not assert a source-text census, a floating approximation, a generic
-proof from closed instances, or delivery of the §2 public theorems.
-The D0 generic proofs, this seed, and follow-on catalog publication
-remain distinct evidence.
+orientation and involution, both §3 compatibility laws on non-square
+values, an identity-factor control, and two refusals. They do not
+assert a source-text census, a floating approximation, or a generic
+proof from closed instances. The §1–2 generic theorems are landed in
+the catalog; §3 D0 proofs, this seed's finite examples, and future
+public catalog exports are distinct evidence. Shipped seed execution,
+CI, publication, and landing are not established.
