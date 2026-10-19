@@ -92,6 +92,18 @@ against child 1 at `c462fe831`.
 
 ## 2. Deliverable
 
+**Edge and population model (Architect `evt_4yq7wzsteew9v`, operative;
+the ruling's text is the model).** No new interprocedural graph and no
+reuse of `continuation_result_positions`. Body is a static per-region set
+of `StaticOriginId`s from the fixed forward walk E1 to E6 with terminals T1
+to T4. An instance is a static region paired with one
+`BracketResponseContextKey` of a response row on one of its S origins,
+never a call site. The parent is the minimal containing Body. The
+independent rebuild re-scans the marks and walks `RuntimeExpr` directly.
+Its six-part D0 runs on all 13 regions before any §2 code. Each stop it
+names is a stop. AC-3 needs a constructed control if no region has two
+keys.
+
 A private `BracketSettlementPlan` on `StaticTransitionPlan`, one
 `BracketSettlementRegion` per INSTANCE:
 
