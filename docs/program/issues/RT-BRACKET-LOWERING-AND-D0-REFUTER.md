@@ -149,6 +149,10 @@ File-backed-in-FS's bracket emission is masked at 2b by the earlier
 `FSOp` unavailable-lane refusal (Architect `evt_274rqjw2c74k2`). Child
 3's D0 exercises that owner's claim once the lane exists, or names a
 substitute source that reaches the claim.
+Relay admission lost through a marked S is S's ownership, so lowering
+claims or re-settles it (Architect `evt_392v8fmvem7z0`): relay 352 on
+nested-two's owner0, forwarding Q1 S743, and on file-backed-in-FS's owner0,
+forwarding Q1 S645. Child 3's D0 counts both.
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 
