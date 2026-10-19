@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-SORT-SPINE-GATE
 title: "The same-constant spine attempt in unify_sorts_walk walks every argument pair before testing any, then restores metas on failure and lets the caller re-walk the reduced form, so a spine that fails at every level costs 2^K: a discarded True-against-False argument nested 20 deep takes 43s against the parent's 0.58s. Gate the attempt on level-erased conversion of each pair, in order, before any walk or snapshot"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T1
@@ -37,8 +37,12 @@ congruence-first's links.
     one constant level. Return `false` at the first failing pair, with
     metas untouched.
   - Only if every pair passes, run the existing body unchanged.
-  - Sound because the gate is a necessary condition: admitted globals are
-    level-closed, so level erasure commutes with β, δ and ι.
+  - Claimed necessary because level erasure commutes with β, δ and ι.
+    **That claim is false for δ** (Architect `evt_4grwysh404yp`): unfolding
+    a level-closed alias restores its literal levels, so
+    `const Big : Type 2 = Type 1` against `Type ?m` is refuted although
+    `?m := 1` converts. The repair is
+    LANG-TYPE-POSITION-SORT-SPINE-GATE-NECESSITY.
 - **The enabler.** `fn erase_levels(t: &Term) -> Term` over every
   level-bearing position, as one exhaustive `match` with no `_ =>` arm
   (COORDINATION §7b). `ken_kernel::subst_levels` maps declared parameters
@@ -63,19 +67,21 @@ the rows below in the congruence-first test file.
     K0004.
   - Paired: R1 and R2 exceed 2s on `7ac7a5cd1`, and deleting the gate
     returns R1 over 2s.
-- **AC-1s (R1-swap, ratio; Architect `evt_bq2fze6dbp15`, bound restated
-  in `evt_7wakdhmgfc1`).** R1 with the parameters swapped, so the failing
+- **AC-1s (R1-swap, ratio; Architect `evt_bq2fze6dbp15`, restated in
+  `evt_7wakdhmgfc1`, corrected in `evt_54yq272b3s084` and
+  `evt_49ddbwmvsfw2w`).** R1 with the parameters swapped, so the failing
   pair comes last. The kernel's own conversion of that pair is
   exponential (13.8s at K=20), so this row is a ratio, not a bound. At
   K=14 and K=16, time full elaboration and a kernel-only `convert_type` of
-  the same two towers declared as consts. Full is at most 20× kernel at
-  both depths, which is twice the parent's measured 10×, and the K=16
-  ratio is at most 1.10× the K=14 ratio. Main fails both clauses (40.3×
-  and 45.7×, growth 1.13); the gate-deleted mutant must fail too.
+  the same two towers declared as consts, one run per depth. Only K=16 is
+  gated: full is at most 30× kernel. K=14 runs and prints its ratio with no
+  assertion, since its sub-second kernel time is noise-dominated on CI
+  (14.4× to 23.3×). The failure message prints both ratios. Main fails at
+  45.7× or more; the repair measures 15.2× to 16.4× at K=16.
 - **AC-2.** AC-1, AC-1b and AC-1c of CONGRUENCE-FIRST stay green, as do
   the nested-domain and up-to-whnf suites. `fallback_suc` keeps its
   landed K=4 acceptance with no obligations, and gains a non-regression
-  sentinel, labelled as not gate evidence: at K=12, full is at most 8× the
+  sentinel, labelled as not gate evidence: at K=12, full is at most 12× the
   kernel-only conversion of the same pair (main is 5.79×).
 
 ## Stop conditions

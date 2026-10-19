@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-REGION-TRANSPORT
 title: "CHILD 2a of RT-BRACKET-CONTROL-REGION-IR, by route C. Child 1's bracket regions are computed on the normalized plane and then dropped (compiler_driver binds them to _), and after erasure the confined finalizer lowers to the same HostOpV1::ResourceRelease as a public release, so nothing downstream can tell them apart. Carry each region across erasure as one compiler-private Runtime-IR bracket marker, bound exactly to its region, so the settlement plane reads ports from markers and never from HostOpV1. THIS CHILD DOES NOT LAND ALONE: it is a held, reviewed input assembled by child 3."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
@@ -95,6 +95,29 @@ collector arity hardening below.
   Paired: at `c462fe831` the same row returns `Ok` with 0 regions.
 - **AC-4.** The cross-crate `RuntimeExpr` match sweep is complete by grep,
   and runtime behaviour on the population is unchanged.
+
+- **AC-5 (amendment 2, Architect `evt_3jksek4xvf2wk`; the acquire mark).**
+  The settlement plane needs a runtime acquire, and 2a's accepted tip
+  `370168a48` locates only the finalizer.
+  - Build on a new branch `wp/RT-BRACKET-REGION-TRANSPORT-acquire` from
+    `370168a48`; that ref and its approval stay as they are, and the
+    approval does not carry to the new tip.
+  - Erasure binds one Acquire mark per region by the 2a mechanism,
+    `(owner, preorder node id)`, validated by checked constructor id in the
+    collector's `acquire()` set. Its subject is the acquire's selected
+    operation `Construct`: `injection[2]` under `args[3]` of the Vis at
+    `acquire_vis_path`.
+  - The form is the existing variant with a closed
+    `CheckedBracketMarkRole { Acquire, Finalizer }` on
+    `CheckedBracketRegionMarker`, not a second `RuntimeExpr` variant. The
+    region key is `(owner, ok_resource_binder_path)`.
+  - The bijection extends to exactly one Acquire mark and at least one
+    Finalizer mark per region, all with an equal key. An unbound acquire,
+    a second Acquire mark and an Acquire mark with no region each reach a
+    named refusal.
+  - Paired: deleting the Acquire mark reaches that refusal, never a
+    fallback to an enclosing Vis. The consumer sweep for the new role is
+    complete by grep.
 
 ## Stop conditions
 

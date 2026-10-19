@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-SETTLEMENT-PLANE
 title: "CHILD 2b of RT-BRACKET-CONTROL-REGION-IR. The settlement plane and its CLOSURE. Consume ONLY the bound region markers from child 2a (RT-BRACKET-REGION-TRANSPORT); partition marked settlement instances out of the RAW exact response occurrence/context inventory BEFORE the ordinary demand classifier and pass only the ordinary partition into the existing filtered/Phase-B machinery; key every region instance by its exact call/return context beside its source ports; build the parent forest; close the body-exit set at exactly returned value, returned body error and controlled trap; and rebuild the whole plane INDEPENDENTLY at plan close and require exact equality. NO OLD CLASSIFIER PREDICATE MAY KEEP A BRACKET ROW ALIVE LONG ENOUGH TO EXCLUDE IT -- that was the `bracket_release_only_suffix` carve-out and it is gone. A first-match `find_map` keyed on `effect_origin` projects one ID for a shared static origin and collapses repeated lowering contexts; parent edges and the ledger must NEVER be built on a first-match ID. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -12,7 +12,7 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. Retained work to be REBASED ONTO THE ACCEPTED PRODUCER rather than rebuilt: the raw-response-occurrence partition ahead of the ordinary demand classifier, and the explicit response-context key that replaced the earlier first-match-only design. Both are preserved at evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee, which is EVIDENCE, NEVER A CANDIDATE."
 ---
 
-> # NOT STARTABLE YET. It depends on child 2a's held tip.
+> # STARTABLE. Child 2a is accepted as a held input at `370168a48`.
 > #
 > # **This child does NOT land on its own.** It produces a reviewed checkpoint
 > # that child 3 assembles. No QA handoff as a candidate, no publication, no
@@ -23,9 +23,47 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 Re-sized on route C by the Architect's sizing D0 `evt_51cm672pdy1r1`,
 against child 1 at `c462fe831`.
 
-- **Build on child 2a's held tip over `c462fe831`.** Ports arrive from
-  2a's bound Runtime-IR region markers. This child never discovers a port,
-  never selects by `HostOpV1`, and never re-derives authority.
+- **Build on child 2a's held tip `370168a48`**
+  (`wp/RT-BRACKET-REGION-TRANSPORT`, over `c462fe831`; runtime QA
+  `evt_7rvyzxzk7s17e`, Architect `evt_3drtxbpcrzv1c`), on this child's own
+  branch. Never move, reset or delete that ref. Ports arrive from 2a's
+  bound Runtime-IR region markers, `RuntimeExpr::CheckedBracketFinalizer`,
+  keyed by (owner, checked preorder node id). **Amendment (Architect
+  `evt_3jksek4xvf2wk`):** the runtime acquire is a second bound mark,
+  delivered by 2a's AC-5 on `wp/RT-BRACKET-REGION-TRANSPORT-acquire`; build
+  on that tip once it is reviewed. Every other port is positional from the
+  two anchors (Architect `evt_719gp6pcxtycd`, replacing AcquireK,
+  dispatch and Resume in `evt_3jksek4xvf2wk` and `evt_45cep98adh4qp`).
+  Each step has one successor, so there is no predicate choice and no
+  search:
+  - **K.** Static route: the body of the `Let` whose value is the marked
+    `Effect`. Generic route: `A.args[1]`, which must be a
+    `LexicalClosure` with one parameter; K is its body.
+  - **Spine walk.** From K, step into the body of each
+    `CheckedSubcontinuationFrame` or `CheckedJoinSite`, and into the
+    scrutinee of each `ComputationalMatch`, collecting those folds. D is
+    the first other node. Measured depth: 1 fold top-level, 2 nested
+    inner.
+  - **Conditions.** Stop with the row unless all seven hold:
+    1. D is a `Match` on `Var(0)` with exactly two cases, the acquire
+       result family's Err and Ok by checked constructor identity.
+    2. The folds are non-empty; F is the innermost.
+    3. Resume is F's case whose constructor is the checked HostIO `Ret`.
+    4. AcquireErr is D's Err body, a one-argument `Ret` `Construct`.
+    5. The Body entry is D's Ok body.
+    6. Settlement S is the Vis two levels above the Finalizer mark
+       (mark at `S.arg0.arg0`), and the mark's path from K has the spine
+       path plus D's Ok case as a prefix.
+    7. OutcomeMerge is `S.arg1`, a `LexicalClosure` with one parameter.
+  - **D0 before any build.** Run the walk on all 13 regions of the 2a
+    census (9 cases). Per region report the route, the fold count,
+    conditions 1 to 7, and for each nested pair whether the child's
+    Resume lies in the parent's Body subtree. A failed condition is a
+    stop with the row; do not widen the walk.
+  - Body and exits are source-return graph sets per instance, and the
+    parent is the region whose Body is the least superset.
+  - This child never discovers a port, never selects by `HostOpV1`, and
+    never re-derives authority.
 - **Route C discharges:** port authenticity, the static acquire to Ok
   binder to finalizer pairing per region, and lexical nesting inside one
   declaration by path prefix.
