@@ -228,6 +228,18 @@ before and after on a package-backed and a synthetic fixture; swapping
 refuse on single-resource; and the struct-literal and destructure sweep is
 re-run across `crates/` at the base.
 
+**Also admitted: two refusing `BracketOwned` arms (Architect
+`evt_7sk4q84kqc3xx`), and nothing else in lowering.** At the two total
+matches over `ResponseDisposition`, in `lowering/core.rs`
+(`response_disposition_at_operation_root`) and `lowering/effects.rs`
+(`response_disposition_at_effect`), add one arm
+`Some(ResponseDisposition::BracketOwned(_))` that returns a
+`LoweringCause::PlannerInvariant` refusal, with the ruling's text. No
+Deferred fall-through and no wildcard; the existing three-way arm stays
+byte-identical. Child 3 replaces these arms with real lowering. Owed:
+`-p ken-runtime --lib` checks clean, and each lowering file's diff is
+exactly the one arm.
+
 **A CROSS-CRATE exhaustiveness sweep is owed ONLY IF THE TYPE IS VISIBLE
 OUTSIDE `ken-runtime`. CHECK VISIBILITY FIRST -- do not inherit the answer.**
 Measured at `dda3ff6d7`: `ResponseDisposition` and `StaticTransitionPlan` are
