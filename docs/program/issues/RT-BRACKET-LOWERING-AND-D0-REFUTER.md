@@ -166,8 +166,12 @@ D0-E measured all 13 regions Continuation-keyed (Architect
 `evt_1r37j7z3dgpbm`). Each S settles in place at S when its region or a
 plane ancestor has an owner-returned exit (11 regions); otherwise it is
 Deferred on the existing residual route, claimed in the ledger
-(multi-leaf, anonymous mapping). A buildability probe over the in-place
-S precedes D0.
+(multi-leaf, anonymous mapping). Both Construct lowering arms, ordinary
+and computational producer, settle an in-place S through one helper over
+the existing `drive_response_at_source`; a Deferred S on the producer arm
+refuses (Architect `evt_7rss2x6c15xsf`). A per-lowering instrument over
+px8ta depths 2 and 3, the nine sources and the five
+`rt_native_bracket_body_once` tests precedes D0.
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 
@@ -179,3 +183,11 @@ so that seam leaves neither half an inert precursor.
 **The Steward recuts at the FIRST audit here, not the second.** The parent node
 was carried through two audits before the cut was ruled the defect, and that
 delay is the Steward's error, not the ring's.
+
+## Hard-stop inventory (§1b)
+
+§1a (emission seam): 1 (Architect `evt_7rss2x6c15xsf`). §1a (assembly): 0.
+
+1. Marked S reached on the computational producer Construct arm
+   (core.rs:3912/6965), which the in-place gate did not cover. Keyed on
+   the Construct lowering arm (fan-in).
