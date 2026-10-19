@@ -1,11 +1,12 @@
 # Polynomial expressions over natural coefficients
 
-> **Status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT).** Section 1
-> specifies the `Nat` polynomial expressions, ordered distributed
-> monomials, and five generic laws checked in Architect D0. This is
-> not a claim that `Algorithm.SymbolicAlgebra.NatPolynomial` has
-> landed, that the authored seed ran as a delivered suite, or that
-> the trusted-base delta was measured.
+> **Status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT §1;
+> SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY §2;
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION §3).** The §1 ordered monomial
+> laws and §2 canonical Horner laws, catalog package, and seeds are
+> present on main. Section 3 specifies substitution and two checked
+> law obligations from Architect D0; its code and seed are not yet
+> delivered. Scratch evidence is not shipped harness execution or CI.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -136,18 +137,20 @@ seed check are separate from catalog publication, execution of a
 shipped seed, Cargo tests, and CI.
 
 Subtraction and signed coefficients, division, factoring, and any
-field-dependent operation are deferred. Canonical sorted/merged
-normal forms and a decision procedure for semantic equality are
-also deferred, as are dimension-indexed environments, substitution,
-composition, and derivatives. None is silently supplied by the
-`Nat` distributive normalizer in §1.
+field-dependent operation are deferred. Section 1's distributed list
+is not a canonical form or an equality decision: §2 supplies a
+separate Horner representation and decision, now landed, while
+sorted-list canonicalization remains deferred. Dimension-indexed
+environments, composition of substitutions, and derivatives remain
+outside §§1–3. Substitution is specified separately in §3; it is
+not silently supplied by the `Nat` distributive normalizer in §1.
 
 ## 2. Canonical polynomial form and semantic equality
 
 > **Section 2 status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY).**
-> Architect D0 checked five additional generic laws. This section
-> specifies an extension of the existing module, not a claim that its
-> §2 code or seed has landed.
+> Architect D0 checked five additional generic laws. The §2 catalog
+> code and authored seed have since landed; this historical D0 alone
+> does not establish shipped seed-harness execution or CI.
 
 ### 2.1 Recursive canonical carrier
 
@@ -250,8 +253,8 @@ lists, but both yield `PHorner (PConst Zero) (PConst 2)` and
 is assigned `0`, so `poly_eq` returns `False`; an `IsTrue` claim for
 that pair must be refused. These distinct observations rule out
 both syntactic-expression comparison as the decision and a constant
-Boolean answer. They describe the intended conformance cases, not
-a claim that the separately owned §2 seed has shipped or run.
+Boolean answer. The §2 seed is present on main; these observations
+do not establish its shipped harness execution or CI.
 
 ### 2.3 Evidence, trust, and remaining boundary
 
@@ -262,9 +265,10 @@ also measured five new checked transparent theorem bodies, zero
 `trusted_base()` comparison of **114 before and 114 after** loading
 the module on its five providers. Closed positive examples checked;
 a false equality claim on `x₀` and `x₁` was kernel-rejected. Those
-are **Architect-reported scratch measurements**, not execution of a
-committed §2 catalog extension, a delivered §2 conformance seed,
-CI, or an author-measured trust delta.
+are **Architect-reported scratch measurements**. The §2 catalog
+extension and seed are now present on main; those D0 measurements
+do not establish shipped seed-harness execution, CI, or a measured
+landed trust delta.
 
 The completeness proof in D0 distinguishes canonical heads using
 positivity of `Nat` coefficients and cancellation, then recurses on
@@ -275,5 +279,88 @@ primitive, or funext assumption is required. §1's ordered-list
 carrier supplies a separate canonical representation and equality
 decision. Sorted-list canonicalization, subtraction and signed
 coefficients, division, factoring, field-dependent operations,
-dimension-indexed environments, substitution, composition, and
-derivatives remain outside this contract.
+dimension-indexed environments, composition of substitutions,
+and derivatives remain outside §§1–3. Section 3 specifies
+substitution without changing §2's canonical carrier or decision.
+
+## 3. Substitution and evaluation under a composed environment
+
+An expression substitution is a total function `s : Nat → Expr`.
+`substitute s e` replaces each variable of the **original** `Expr`
+by its image under `s`; it preserves the constant, addition, and
+multiplication constructors and their operand order. An inserted
+`s v` is not recursively substituted a second time. This is a
+single simultaneous substitution, not composition of two
+substitutions. Both operations below are public:
+
+```ken
+pub fn compose_env (env : Nat → Nat) (s : Nat → Expr) (v : Nat) : Nat =
+  eval env (s v)
+
+pub fn substitute (s : Nat → Expr) (e : Expr) : Expr =
+  match e {
+    EConst c ↦ EConst c;
+    EVar v ↦ s v;
+    EAdd a b ↦ EAdd (substitute s a) (substitute s b);
+    EMul a b ↦ EMul (substitute s a) (substitute s b)
+  }
+```
+
+`compose_env env s` is a total **natural-valued environment**:
+it evaluates each replacement expression under `env` before the
+original expression looks up that variable. It is not an
+`Expr`-valued composition of substitutions. Ken's theorem types
+cannot use an inline lambda as a function argument here, so the
+named public builder is required by the evaluation law's type.
+
+The module must provide checked proof bodies for exactly two new
+public laws. Evaluation under the substitution is evaluation of
+the original expression under the composed environment, for every
+environment, substitution and expression:
+
+```ken
+pub theorem eval_substitute
+  (env : Nat → Nat) (s : Nat → Expr) (e : Expr) :
+  Equal Nat (eval env (substitute s e)) (eval (compose_env env s) e)
+```
+
+A `True` answer from §2's canonical `poly_eq` remains `True` after
+the same substitution is applied to both expressions. This law
+uses `IsTrue` in the **forward direction only**:
+
+```ken
+pub theorem poly_eq_substitute
+  (s : Nat → Expr) (e1 : Expr) (e2 : Expr)
+  (h : IsTrue (poly_eq e1 e2)) :
+  IsTrue (poly_eq (substitute s e1) (substitute s e2))
+```
+
+There is no converse. Before substitution, `poly_eq (EVar Zero)
+(EVar (Suc Zero))` is `False`; if `s v = EConst Zero` for every
+variable, the substituted pair is equal and `poly_eq` is `True`.
+Thus substitution may identify expressions that were distinct under
+some environments. The forward proof uses `poly_eq_sound` under
+the named composed environment, the evaluation law in both
+directions, and `poly_eq_complete`. It requires no function
+extensionality or assumption about a particular environment.
+The existing `add_cong` and new `mul_cong` are private proof steps,
+not further public laws or trusted premises.
+
+For a closed illustration, let `env v = Suc v`, let `s Zero` be
+`EAdd (EVar Zero) (EConst (Suc Zero))`, and let `s (Suc v)` be
+`EMul (EVar (Suc Zero)) (EVar Zero)`. Evaluating the substituted
+`EAdd (EVar Zero) (EVar (Suc Zero))` gives `4`; evaluating that
+original expression under the uncomposed `env` gives `3`. The
+latter is **not** a valid replacement for `compose_env env s`.
+These finite values illustrate the law and its refusal boundary;
+they are not a proof of either universally quantified theorem.
+
+The Architect's D0 on base `de3dc65b8` checked both generic law
+bodies, generic clients, and the closed discrimination above, with
+no `Axiom` and identical `trusted_base()` sets of 114 entries before
+and after loading the edited package. That is scratch feasibility,
+not §3 catalog publication, a delivered §3 conformance seed,
+shipped seed-harness execution, CI, or a measured landed trust delta.
+No subtraction, signed coefficient, division, new primitive, kernel
+rule, surface feature, or expansion of the catalog's ambient-name
+census is required. Composition of substitutions remains deferred.
