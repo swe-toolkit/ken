@@ -145,6 +145,10 @@ every owner in `PendingVisSettlements.bracket_exits`, whatever its ordinary
 class (Protocol, RetOnly, `Excluded{Relay}`, `Excluded{Underived}`), and
 replaces 2b's emission refusal for them. Its D0 counts that no S is
 emitted by any ordinary arm (Architect `evt_5yqxd0jyc9bjj`).
+File-backed-in-FS's bracket emission is masked at 2b by the earlier
+`FSOp` unavailable-lane refusal (Architect `evt_274rqjw2c74k2`). Child
+3's D0 exercises that owner's claim once the lane exists, or names a
+substitute source that reaches the claim.
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 

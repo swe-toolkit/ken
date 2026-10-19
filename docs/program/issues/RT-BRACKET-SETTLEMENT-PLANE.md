@@ -152,6 +152,9 @@ AcquireErr -----------------------------------------------> Resume
   its bracket exits in `PendingVisSettlements.bracket_exits`, never as an
   owner settlement class. No other ordinary structure changes except by
   removal of S's own ownership.
+  Relay admission (`settled_relay_owners`) is a non-ownership role: it
+  may change only through an input traced to a marked S origin, and any
+  other change is an advancing stop (Architect `evt_274rqjw2c74k2`).
 - **Instance identity.** Each region carries its exact call/return context key
   beside its source ports, and EVERY disposition and control-view query uses
   that key.
