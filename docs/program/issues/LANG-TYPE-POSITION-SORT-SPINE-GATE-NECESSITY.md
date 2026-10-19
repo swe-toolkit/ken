@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-SORT-SPINE-GATE-NECESSITY
 title: "SPINE-GATE's level-erased gate is not a necessary condition: delta-unfolding a level-closed alias restores its literal levels, so const Big : Type 2 = Type 1 against Type ?m is refuted although ?m := 1 converts. A discarded-result declaration accepted before the gate is now refused at K=2, and three alias rows are back on 2^K growth (14.5s to 21.9s at K=16). Gate only meta-free pairs, and memoize failed spine attempts within one walk"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T1
