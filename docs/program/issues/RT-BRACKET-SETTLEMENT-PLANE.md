@@ -153,9 +153,18 @@ AcquireErr -----------------------------------------------> Resume
   control graph -- never origin proximity, never numeric depth. For child `C` of
   parent `P`, `C.Resume` lies inside `P.Body`, so the graph contains
   `C.Settlement -> C.Resume -> P.BodyExit -> P.Settlement`.
-- **Body exits close at exactly three:** returned value, returned body error,
-  controlled trap. All three enter the same settlement node. Acquisition failure
-  alone bypasses settlement.
+- **Body exits close at exactly three classes (Architect
+  `evt_4hqrrtzpypd83`).** Returned value and returned body error are the
+  two checked `ResourceBodyResult` constructors on the one T1 edge Body ->
+  S; record each T1 as carrying both, and split them at OutcomeMerge. No
+  exit class is read from the `Result` match on `settled`. Controlled trap
+  is a declared class with zero edges: Runtime IR has no Trap -> S edge and
+  §5 forbids a new return protocol, so a `Trap` in any Body walk refuses as
+  "body trap has no settlement edge", with a constructed control. Trap
+  settlement is not delivered by route C: child 3 also forbids a new return
+  protocol and inherits this refusal. A later runtime node delivers it when
+  a measured program needs a reachable Body trap to settle. Acquisition
+  failure alone bypasses settlement.
 - **Independent rebuild at plan close** from checked markers plus the final
   source-return graph, required EXACTLY equal. It is a second derivation, not a
   re-read of the first.

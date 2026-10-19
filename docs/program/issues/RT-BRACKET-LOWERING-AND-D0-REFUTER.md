@@ -133,6 +133,10 @@ pending obligation or fallback.** It comes to the Steward and then the operator.
 the px8ta closeout. **No new carrier, return protocol, KRET lane, host
 operation, dispatcher reorder, trace sort or fallback.**
 
+A `Trap` in a bracket Body stays refused by 2b's "body trap has no
+settlement edge" (Architect `evt_4hqrrtzpypd83`). Trap settlement needs a
+return protocol, so it is out of scope here and goes to a later node.
+
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 
 Split at the lowering/observation seam: the lowering consumer plus the affine
