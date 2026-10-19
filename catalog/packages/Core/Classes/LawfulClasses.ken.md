@@ -629,8 +629,8 @@ instance. See §5 for the equality-lift boundary.
 
 ```ken
 theorem lawful_char_to_int_injective
-    (x : Char) (y : Char)
-    (p : Equal Int (charToInt x) (charToInt y)) : Equal Char x y =
+      (x : Char) (y : Char) (p : Equal Int (charToInt x) (charToInt y))
+    : Equal Char x y =
   (p, Refl)
 
 fn lawful_char_leq (x : Char) (y : Char) : Bool =
@@ -641,8 +641,7 @@ instance Ord Char {
   refl = λx.(Ord_instance_Int).refl (charToInt x);
   antisym = λx.λy.λp.λq.lawful_char_to_int_injective x y
     ((Ord_instance_Int).antisym (charToInt x) (charToInt y) p q);
-  trans = λx.λy.λz.λp.λq.(Ord_instance_Int).trans
-    (charToInt x) (charToInt y) (charToInt z) p q;
+  trans = λx.λy.λz.λp.λq.(Ord_instance_Int).trans (charToInt x) (charToInt y) (charToInt z) p q;
   total = λx.λy.(Ord_instance_Int).total (charToInt x) (charToInt y)
 }
 ```
@@ -663,8 +662,7 @@ instance DecEq Char {
   eq = lawful_char_eq;
   sound = λx.λy.λp.lawful_char_to_int_injective x y
     ((DecEq_instance_Int).sound (charToInt x) (charToInt y) p);
-  complete = λx.λy.λp.(DecEq_instance_Int).complete
-    (charToInt x) (charToInt y) p.1
+  complete = λx.λy.λp.(DecEq_instance_Int).complete (charToInt x) (charToInt y) p.1
 }
 ```
 
