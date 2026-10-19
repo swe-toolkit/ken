@@ -166,38 +166,34 @@ cherry-picked or rebased. The marked S's Phase A demand is retained and
 resolved in Phase B into a disjoint `bracket_rows` table outside the
 plane, keyed by `BracketSettlementId`; no Phase B classifier sees it.
 D0-E measured all 13 regions Continuation-keyed (Architect
-`evt_1r37j7z3dgpbm`). **Settlement site (recut, Architect `evt_7r2aae0wx4hm6`,
-`evt_7cxs93bqhfct9`; Research `evt_13kknengs4121`).** An S whose region
+`evt_1r37j7z3dgpbm`).
+
+**Settlement authority (recut, Architect `evt_7r2aae0wx4hm6`, R8
+`evt_4y4mx4cda73sc`; Research `evt_13kknengs4121`).** An S whose region
 or a plane ancestor has an owner-returned exit (11 regions) settles in
-**one planned bracket response-owner site**, and every lowered copy of S
-transfers into it. Which owner lowers the copy no longer matters (the
-producer trampoline emits S under foreign owners, for example S649 under
-Specialization(1) with K Specialization(0), and one owner emits several
-static copies).
-- **Plan.** One owner specialization per Continuation `bracket_rows`
-  row, by the `static_response_owner_specializations` slot derivation,
-  in a map keyed by `BracketSettlementId` outside
-  `static_response_feasibility_ledger_all`, with `StaticResponseOwnerId`s
-  after the ordinary owners.
-- **Owner body.** The existing response-owner shape: the host effect
-  under base-owner authority, then the K-context call. The effect claim
-  moves into it, and source (f) of the seat owners is `row.base_owner()`.
-- **Each copy** (both arms, through `settle_bracket_at_source`) lowers
-  the arguments and the owner frame inputs, consumes settlement, calls
-  the region's declared owner, then consumes outcome merge and resume.
-  The producer arm feeds the call result to its eliminators.
-- **Guard.** The R7 drive-site owner check is removed. A transfer-target
-  check refuses a region with no declared owner.
-- **D0 before the build** (scratch, separate processes, px8ta depths 2
-  and 3 plus the nine sources): the frame inputs build at every InPlace
-  copy; each row's key set equals its owner's slot set; and every
-  consumer keyed by `StaticResponseContinuationId` or
-  `StaticResponseOwnerId` is classified for collision.
+place at every lowered copy. **A marked S's host effect lowers under its
+row's planned base-owner authority at every copy; K resumes lexically.**
+The producer trampoline emits S under foreign owners (S649 under
+Specialization(1), K Specialization(0)), and which owner lowers a copy
+keys nothing about the effect.
+- `drive_response_at_source` binds `row.base_owner()` authority around
+  the host effect only, releasing it before any error propagates;
+  `settle_bracket_at_source` supplies it and the handler-owned driver
+  passes none.
+- Source (f) of the seat owners is `row.base_owner()`, with R6c's
+  fail-closed check for empty `bracket_rows`. R7's drive-site owner
+  check is removed.
+- The transfer to a planned response-owner site is withdrawn: its K
+  frame cannot be built at a foreign producer copy (D0
+  `evt_3xbvjtkeg15c5`).
+- Before the build, a sweep classifies every owner reader reached inside
+  `lower_process_host_effect` and the two aggregate gate consumers. Any
+  answer that depends on the physical function is a stop.
 
 The other regions (multi-leaf, anonymous mapping) are Deferred on the
 existing residual route, claimed in the ledger. **Retained:** route C
 `c462fe831`, 2a `c18c8db68`, 2b `09d607a10`, `bracket_rows` keyed by
-`BracketSettlementId` (R2), the counting ledger over static transfers
+`BracketSettlementId` (R2), the counting ledger over static lowerings
 (R6a), the claimed Deferred producer route (R6b, `evt_32mpqmy5v0y6s`),
 and the per-lowering instrument over px8ta depths 2 and 3, the nine
 sources and the five `rt_native_bracket_body_once` tests. Release
@@ -218,8 +214,9 @@ delay is the Steward's error, not the ring's.
 
 ## Hard-stop inventory (§1b)
 
-§1a (emission seam): 3 (Architect `evt_7r2aae0wx4hm6`); resumed on
-recut (b) `evt_7cxs93bqhfct9`; the next Research trigger is the 6th.
+§1a (emission seam): 3 (Architect `evt_7r2aae0wx4hm6`); resumed under
+R8 `evt_4y4mx4cda73sc`, where a build wall is the 4th; the next Research
+trigger is the 6th.
 §1a (assembly): 0.
 
 1. Marked S reached on the computational producer Construct arm
