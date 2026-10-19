@@ -1,4 +1,4 @@
-//! Canonical natural polynomials: spec/50-stdlib/66-symbolic-algebra.md §2.
+//! Canonical natural polynomials: spec/50-stdlib/66-symbolic-algebra.md §§2–3.
 //! Source: conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md.
 //! Promise class: durable invariant. Independent equal-pair and unequal-pair
 //! observations distinguish canonical comparison from ordered-list comparison
@@ -7,7 +7,11 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{ElabEnv, ElabError};
+use ken_elaborator::parser::parse_decls;
+use ken_elaborator::{
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, KenMdFenceRole,
+    Type as SourceType,
+};
 use ken_kernel::{Decl, KernelError};
 
 const PACKAGE: &str = "Algorithm.SymbolicAlgebra.NatPolynomial";
@@ -15,6 +19,20 @@ const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md"
 ));
+const SUBSTITUTION_SEED: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md"
+));
+
+fn substitution_seed_sources() -> Vec<&'static str> {
+    extract_ken_md(SUBSTITUTION_SEED)
+        .expect("shipped substitution seed Ken fences parse")
+        .fences
+        .into_iter()
+        .filter(|fence| fence.role == KenMdFenceRole::Source)
+        .map(|fence| &SUBSTITUTION_SEED[fence.body_range])
+        .collect()
+}
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -216,5 +234,255 @@ fn unequal_variable_false_theorem_is_kernel_refused_on_same_positive_pair() {
             );
         }
         other => panic!("expected kernel TypeMismatch for false IsTrue, got {other:?}"),
+    }
+}
+
+/// SOURCE: spec/50-stdlib/66-symbolic-algebra.md §3.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: after the five explicit §1–2 providers, the exact trusted
+/// GlobalId set is unchanged. All four §3 exports are package-owned and
+/// transparent; a client consumes both generic laws at arbitrary inputs and
+/// cannot import the new private congruence helper.
+/// CLAIMED: substitution and its forward equality law add checked public
+/// definitions without enlarging the trusted base or public helper surface.
+/// THE GAP: finite seed oracles and the refusal are tested separately below.
+#[test]
+fn section_three_generic_substitution_laws_are_checked_without_new_trust() {
+    let mut env = ElabEnv::new().expect("compiler base");
+    for provider in [
+        "Core.Logic.Transport",
+        "Data.Numeric.Nat.Arithmetic",
+        "Data.Collections.Derived",
+        "Core.Classes.LawfulClasses",
+        "Data.Numeric.Nat.Order",
+    ] {
+        env.elaborate_module_from_roots(&[root()], provider)
+            .unwrap_or_else(|error| panic!("{provider} roots-loads: {error:?}"));
+    }
+    let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    let owned = env
+        .elaborate_module_from_roots(&[root()], PACKAGE)
+        .expect("§3 checked bodies and package roots-load");
+    let after = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    eprintln!(
+        "§3 trusted_base() count: before={}, after={}",
+        before.len(),
+        after.len()
+    );
+    assert_eq!(after, before, "§3 adds no trusted GlobalId");
+    for public in [
+        "compose_env",
+        "substitute",
+        "eval_substitute",
+        "poly_eq_substitute",
+    ] {
+        let id = env.globals[&format!("{PACKAGE}.{public}")];
+        assert!(owned.contains(&id), "{public} must belong to NatPolynomial");
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{public} must have a checked body"
+        );
+    }
+    env.elaborate_file(SUBSTITUTION_GENERIC_CLIENT)
+        .expect("§3 independent generic law clients consume their stated propositions");
+    match env.elaborate_file(&format!("import {PACKAGE} (mul_cong)")) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, format!("{PACKAGE}.mul_cong"));
+        }
+        other => panic!("congruence helper must remain private: {other:?}"),
+    }
+}
+
+const SUBSTITUTION_GENERIC_CLIENT: &str = r#"
+import Algorithm.SymbolicAlgebra.NatPolynomial
+  (Expr, eval, poly_eq, compose_env, substitute,
+   eval_substitute, poly_eq_substitute)
+
+theorem client_eval_substitute
+    (env : Nat → Nat) (s : Nat → Expr) (e : Expr) :
+  Equal Nat (eval env (substitute s e))
+    (eval (compose_env env s) e) =
+  eval_substitute env s e
+
+theorem client_poly_eq_substitute
+    (s : Nat → Expr) (e1 : Expr) (e2 : Expr)
+    (h : IsTrue (poly_eq e1 e2)) :
+  IsTrue (poly_eq (substitute s e1) (substitute s e2)) =
+  poly_eq_substitute s e1 e2 h
+"#;
+
+/// SOURCE: conformance/stdlib/symbolic-algebra/
+/// seed-nat-polynomial-substitution.md positive fences.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: every shipped positive fence checks from a roots-loaded client,
+/// including the distinct values 4/3, composed value 4, identity mapping,
+/// forward poly equality, and a pair made equal by substitution.
+/// CLAIMED: the public operations and generic laws match the closed seed
+/// behavior rather than substituting twice or preserving a false decision.
+/// THE GAP: generic laws are kernel-checked above; finite oracles are not a
+/// proof that every environment and expression gives the claimed result.
+#[test]
+fn shipped_substitution_seed_positive_cases_check() {
+    let mut sources = substitution_seed_sources();
+    sources
+        .pop()
+        .expect("separate uncomposed-env refusal fence");
+    assert!(!sources.is_empty(), "seed needs positive source fences");
+    let mut env = loaded_package();
+    for positive in sources {
+        env.elaborate_file(positive)
+            .expect("each shipped substitution positive program checks");
+    }
+}
+
+// Closed false equalities can both reduce to Bottom, so checking convertibility
+// of a proposed negative goal is insufficient. Instead compare parsed Ken
+// proposition trees, discarding only spans; obtain the two endpoints from the
+// checker-accepted positive controls on the SAME substitution and environment.
+fn type_shape(ty: &SourceType) -> String {
+    match ty {
+        SourceType::TCon(name, _) => format!("constructor:{name}"),
+        SourceType::TVar(name, _) => format!("variable:{name}"),
+        SourceType::TApp(function, argument, _) => {
+            format!("({} {})", type_shape(function), type_shape(argument))
+        }
+        other => panic!("unsupported shape in closed substitution seed: {other:?}"),
+    }
+}
+
+fn application<'a>(ty: &'a SourceType, name: &str) -> Option<Vec<&'a SourceType>> {
+    let mut args = Vec::new();
+    let mut head = ty;
+    while let SourceType::TApp(function, argument, _) = head {
+        args.push(argument.as_ref());
+        head = function;
+    }
+    args.reverse();
+    match head {
+        SourceType::TVar(found, _) | SourceType::TCon(found, _) if found == name => Some(args),
+        _ => None,
+    }
+}
+
+fn assert_uncomposed_proposition(shared: &str, refused: &str) {
+    let positive_decls = parse_decls(shared).expect("negative fixture's controls parse");
+    let equalities = positive_decls
+        .iter()
+        .filter_map(|decl| match decl {
+            SourceDecl::TheoremDecl { theorem, .. } => {
+                let args = application(theorem, "Equal")?;
+                let [carrier, lhs, rhs] = args.as_slice() else {
+                    return None;
+                };
+                let eval = application(lhs, "eval")?;
+                let [env, arg] = eval.as_slice() else {
+                    return None;
+                };
+                Some((*carrier, *lhs, *rhs, *env, *arg))
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let substituted = equalities
+        .iter()
+        .find_map(|(carrier, lhs, value, env, arg)| {
+            let args = application(arg, "substitute")?;
+            let [replacement, original] = args.as_slice() else {
+                return None;
+            };
+            Some((*carrier, *lhs, *value, *env, *replacement, *original))
+        })
+        .expect("positive substitution value control on original operands");
+    let (carrier, substituted_eval, value, env, replacement, original) = substituted;
+    let original_eval = equalities
+        .iter()
+        .find(|(_, _, _, same_env, arg)| {
+            type_shape(same_env) == type_shape(env) && type_shape(arg) == type_shape(original)
+        })
+        .map(|(_, lhs, _, _, _)| *lhs)
+        .expect("positive uncomposed value control on original operands");
+    let composed = equalities
+        .iter()
+        .find(|(_, _, same_value, candidate_env, arg)| {
+            let Some(args) = application(candidate_env, "compose_env") else {
+                return false;
+            };
+            let [inner_env, s] = args.as_slice() else {
+                return false;
+            };
+            type_shape(inner_env) == type_shape(env)
+                && type_shape(s) == type_shape(replacement)
+                && type_shape(arg) == type_shape(original)
+                && type_shape(same_value) == type_shape(value)
+        });
+    assert!(
+        composed.is_some(),
+        "positive composed-environment control checks"
+    );
+    let negative_decls = parse_decls(refused).expect("refusal Ken parses");
+    let [SourceDecl::TheoremDecl {
+        theorem: negative_goal,
+        body: Expr::ECon(proof, _),
+        ..
+    }] = negative_decls.as_slice()
+    else {
+        panic!("refused block must be one theorem with its proof");
+    };
+    assert_eq!(proof, "Proved", "negative claim must attempt its proof");
+    let snippet = |ty: &SourceType| &shared[ty.span().start..ty.span().end];
+    let expected = format!(
+        "theorem expected_uncomposed : Equal ({}) ({}) ({}) = Proved",
+        snippet(carrier),
+        snippet(substituted_eval),
+        snippet(original_eval)
+    );
+    let expected_decls = parse_decls(&expected).expect("derived uncomposed equality parses");
+    let [SourceDecl::TheoremDecl {
+        theorem: expected_goal,
+        ..
+    }] = expected_decls.as_slice()
+    else {
+        panic!("expected uncomposed equality is one theorem");
+    };
+    assert_eq!(
+        type_shape(negative_goal),
+        type_shape(expected_goal),
+        "refused theorem must state uncomposed evaluation on positive control operands"
+    );
+}
+
+/// SOURCE: conformance/stdlib/symbolic-algebra/
+/// seed-nat-polynomial-substitution.md negative fence.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the three closed control theorems check first, and the actual
+/// separate refused theorem is structurally the uncomposed evaluation claim
+/// built from their positive operands; its own `Proved` is rejected with a
+/// kernel TypeMismatch at the final theorem, not at an earlier declaration.
+/// CLAIMED: on this fixture evaluation after substitution is not evaluation
+/// under the original environment, unlike under the composed environment.
+/// THE GAP: one closed counterexample does not decide arbitrary substitutions.
+#[test]
+fn shipped_uncomposed_env_refuses_on_the_same_positive_operands() {
+    let mut sources = substitution_seed_sources();
+    let negative = sources
+        .pop()
+        .expect("separate uncomposed-env refusal fence");
+    let declarations = parse_decls(negative).expect("negative fixture Ken parses");
+    let Some(SourceDecl::TheoremDecl { span, .. }) = declarations.last() else {
+        panic!("negative fixture ends in its uncomposed-env theorem");
+    };
+    let (shared, refused) = negative.split_at(span.start);
+    assert_uncomposed_proposition(shared, refused);
+    let mut env = loaded_package();
+    env.elaborate_file(shared)
+        .expect("all negative-fixture value and composed controls check first");
+    match env.elaborate_file(refused) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            span,
+        }) if span.start < span.end && span.end <= refused.len() => {}
+        other => {
+            panic!("uncomposed-environment proposition must refuse at its own proof: {other:?}")
+        }
     }
 }

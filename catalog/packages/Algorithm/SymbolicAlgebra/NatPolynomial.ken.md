@@ -2,7 +2,9 @@
 
 Ordered monomials expose the result of distributing natural-coefficient
 polynomials. A separate recursive Horner form collects like terms and decides
-semantic equality. Both representations have kernel-checked generic laws.
+semantic equality. Substitution replaces variables in a single pass and
+preserves evaluation and a positive equality decision under every total
+environment. These operations have kernel-checked generic laws.
 
 ## Contents
 
@@ -38,6 +40,11 @@ additional `Poly` carrier stores coefficients in a recursive Horner form;
 whether two expressions denote the same value under every total environment.
 Its three operations and five public laws follow the original definitions in
 the same module; the remaining Horner helpers and proof invariants are private.
+Substitution is a simultaneous single pass: an inserted expression is not
+substituted again. `compose_env` evaluates each variable's replacement under
+the original environment, and two laws relate that operation to evaluation
+and the forward direction of polynomial equality. These laws do not claim
+that substitution preserves a `False` answer.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -736,6 +743,68 @@ pub theorem poly_eq_false_refutes
     (sym Bool (poly_eq e1 e2) False hf)
     (poly_eq_complete e1 e2 h)
 
+pub fn compose_env (env : Nat → Nat) (s : Nat → Expr) (v : Nat) : Nat = eval env (s v)
+
+pub fn substitute (s : Nat → Expr) (e : Expr) : Expr =
+  match e {
+    EConst c ↦ EConst c;
+    EVar v ↦ s v;
+    EAdd a b ↦ EAdd (substitute s a) (substitute s b);
+    EMul a b ↦ EMul (substitute s a) (substitute s b)
+  }
+
+pub theorem eval_substitute
+      (env : Nat → Nat) (s : Nat → Expr) (e : Expr)
+    : Equal Nat (eval env (substitute s e)) (eval (compose_env env s) e) =
+  match e {
+    EConst c ↦ Refl;
+    EVar v ↦ Refl;
+    EAdd a b ↦
+      add_cong
+        (eval env (substitute s a))
+        (eval (compose_env env s) a)
+        (eval env (substitute s b))
+        (eval (compose_env env s) b)
+        (eval_substitute env s a)
+        (eval_substitute env s b);
+    EMul a b ↦
+      mul_cong
+        (eval env (substitute s a))
+        (eval (compose_env env s) a)
+        (eval env (substitute s b))
+        (eval (compose_env env s) b)
+        (eval_substitute env s a)
+        (eval_substitute env s b)
+  }
+
+pub theorem poly_eq_substitute
+      (s : Nat → Expr) (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq (substitute s e1) (substitute s e2)) =
+  poly_eq_complete
+    (substitute s e1)
+    (substitute s e2)
+    (λenv.
+      let composed : Nat → Nat =
+        compose_env env s
+      in
+        trans
+          Nat
+          (eval env (substitute s e1))
+          (eval composed e1)
+          (eval env (substitute s e2))
+          (eval_substitute env s e1)
+          (trans
+            Nat
+            (eval composed e1)
+            (eval composed e2)
+            (eval env (substitute s e2))
+            (poly_eq_sound e1 e2 h composed)
+            (sym
+              Nat
+              (eval env (substitute s e2))
+              (eval composed e2)
+              (eval_substitute env s e2))))
+
 fn shift_env (env : Nat → Nat) (v : Nat) : Nat = env (Suc v)
 
 fn add_const (c : Nat) (p : Poly) : Poly =
@@ -869,6 +938,17 @@ theorem add_cong
     (add a2 b2)
     (cong Nat Nat a1 a2 (λt. add t b1) p)
     (cong Nat Nat b1 b2 (λt. add a2 t) q)
+
+theorem mul_cong
+      (a1 : Nat) (a2 : Nat) (b1 : Nat) (b2 : Nat) (p : Equal Nat a1 a2) (q : Equal Nat b1 b2)
+    : Equal Nat (mul a1 b1) (mul a2 b2) =
+  trans
+    Nat
+    (mul a1 b1)
+    (mul a2 b1)
+    (mul a2 b2)
+    (cong Nat Nat a1 a2 (λt. mul t b1) p)
+    (cong Nat Nat b1 b2 (λt. mul a2 t) q)
 
 theorem add_interchange
       (a : Nat) (b : Nat) (c : Nat) (d : Nat)
@@ -2055,6 +2135,14 @@ to semantic equality; `poly_eq_false_refutes` rules out a false answer when a
 proof of agreement under every environment is supplied. It does not construct
 an environment witnessing inequality.
 
+`eval_substitute` follows the expression constructors: constant and variable
+cases reduce directly, while the sum and product cases lift both induction
+hypotheses with private addition and multiplication congruence. In
+`poly_eq_substitute`, `poly_eq_sound` supplies equality under the composed
+environment; `eval_substitute` transports each side to the substituted
+expression, and `poly_eq_complete` yields the `True` decision. No proof of a
+reverse implication is used or claimed.
+
 ## 5. Design notes
 
 A variable index is a `Nat`, and the evaluator's environment is a total
@@ -2066,6 +2154,10 @@ and order; equal evaluation does not imply equal monomial lists. In
 particular, `x₀+x₀` and `2·x₀` can evaluate equally but remain structurally
 distinct. The §1 `normalize : Expr → Expr` remains this ordered, noncanonical
 operation; §2's separate `canonicalize : Expr → Poly` merges like terms.
+Substitution preserves the original expression constructors and inserts each
+variable's image once;
+evaluating the original expression under `compose_env` gives the same result
+as evaluating its substitution under the given environment.
 
 A `PHorner p q` reads `p` with variable indices shifted upward and adds `q`
 multiplied by variable zero. Collapsing `PHorner (PConst c) (PConst Zero)`
@@ -2088,21 +2180,24 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–2 and
-its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md)
-and [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md)
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–3 and
+its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
+[canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
+and [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md)
 specify the public surface and closed observations. The public API comprises
-`Expr`, `Monomial`, `Poly`, their exported constructors, nine operations, and
-ten checked theorems; the Horner operations add no new public helper. Definition
-locates the implementations and law statements; Using it gives client idioms;
-Laws & proofs traces the two proof families; Design notes separates their
+`Expr`, `Monomial`, `Poly`, their exported constructors, eleven operations,
+and twelve checked theorems; Horner and substitution introduce no public
+helper beyond those named operations and laws. Definition locates the
+implementations and law statements; Using it gives client idioms; Laws &
+proofs traces the three proof families; Design notes separates their
 representations and limits.
 
 The source derives evaluation from the checked natural arithmetic, logic
 transport, Boolean conjunction, natural order and list-append definitions.
 Private functions and lemmas implement distribution, Horner collection,
-canonicity, positivity, and proof rearrangements. The root-loaded acceptance
-target compares exact trusted-`GlobalId` sets before and after loading the
+canonicity, positivity, substitution congruence, and proof rearrangements.
+The root-loaded acceptance target compares exact trusted-`GlobalId` sets
+before and after loading the
 package on its providers. The extension adds no Axiom, postulate, primitive,
 or foreign operation; inherited trust from the prelude and dependencies
 remains distinct from local trust.
