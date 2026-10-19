@@ -63,20 +63,21 @@ the rows below in the congruence-first test file.
     K0004.
   - Paired: R1 and R2 exceed 2s on `7ac7a5cd1`, and deleting the gate
     returns R1 over 2s.
-- **AC-1s (R1-swap, ratio; Architect `evt_bq2fze6dbp15`, bound restated
-  in `evt_7wakdhmgfc1`, growth clause deleted in `evt_54yq272b3s084`).**
-  R1 with the parameters swapped, so the failing pair comes last. The
-  kernel's own conversion of that pair is exponential (13.8s at K=20), so
-  this row is a ratio, not a bound. At K=14 and K=16, time full
-  elaboration and a kernel-only `convert_type` of the same two towers
-  declared as consts, one run per depth. Full is at most 20× kernel at
-  both depths, which is twice the parent's measured 10×, and the failure
-  message prints both ratios. Main fails (40.3× and 45.7×); the
-  gate-deleted mutant must fail too. The repair measures 14.4× to 16.2×.
+- **AC-1s (R1-swap, ratio; Architect `evt_bq2fze6dbp15`, restated in
+  `evt_7wakdhmgfc1`, corrected in `evt_54yq272b3s084` and
+  `evt_49ddbwmvsfw2w`).** R1 with the parameters swapped, so the failing
+  pair comes last. The kernel's own conversion of that pair is
+  exponential (13.8s at K=20), so this row is a ratio, not a bound. At
+  K=14 and K=16, time full elaboration and a kernel-only `convert_type` of
+  the same two towers declared as consts, one run per depth. Only K=16 is
+  gated: full is at most 30× kernel. K=14 runs and prints its ratio with no
+  assertion, since its sub-second kernel time is noise-dominated on CI
+  (14.4× to 23.3×). The failure message prints both ratios. Main fails at
+  45.7× or more; the repair measures 15.2× to 16.4× at K=16.
 - **AC-2.** AC-1, AC-1b and AC-1c of CONGRUENCE-FIRST stay green, as do
   the nested-domain and up-to-whnf suites. `fallback_suc` keeps its
   landed K=4 acceptance with no obligations, and gains a non-regression
-  sentinel, labelled as not gate evidence: at K=12, full is at most 8× the
+  sentinel, labelled as not gate evidence: at K=12, full is at most 12× the
   kernel-only conversion of the same pair (main is 5.79×).
 
 ## Stop conditions
