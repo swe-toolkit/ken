@@ -133,6 +133,16 @@ on the current base before measuring, and reports any that moved.
   unchanged. Derived and ArgParse timing stay within 10%, re-measured
   against the candidate's own base (the census's +0.05% is scratch
   evidence only).
+- **AC-2a (ambient census exception "SUBSET-SIGMA K-a Char projection",
+  Steward `evt_61fmagt1tw8g9` on Architect `evt_ra1z83nr0nm`).** The
+  strict-resolution census may change only by roots that gain
+  `charToInt`, and each such root must have `Core.Classes.LawfulClasses`
+  in its loader closure and no prior `charToInt`. Every changed row
+  carries the exception's name. Measured on `137d23a54`: 47 rows gain it,
+  none lose it. The 78-row attribution TSV is evidence, not a gate; the
+  census vector is the enforced check. `register_checked_char_carrier`
+  refuses a polymorphic or non-`Type` `Char` before unfolding it, with a
+  regression whose guard deletion reddens.
 - **AC-E (evidence).** Every landed package's owned declarations emit
   raw kernel core identical to base modulo global-id renaming, except the
   introduction, refinement-binder and K-a Char classes, each difference

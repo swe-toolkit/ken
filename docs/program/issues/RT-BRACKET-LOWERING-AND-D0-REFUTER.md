@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-LOWERING-AND-D0-REFUTER
 title: "CHILD 3 of RT-BRACKET-CONTROL-REGION-IR (after 1, 2a and 2b), AND THE ONLY ONE THAT ROUTES A CANDIDATE. The lowering consumer, the D0 EQUIVALENCE REFUTER, and closeout. Lowering receives ONLY a validated BracketSettlementControlView and consumes settlement, outcome merge and resume in order; an affine compiler ledger closes over exact region and edge identities. D0 IS NOT A CENSUS: it compares interpreter and linked-native normalized observation tuples over five mandatory rows and requires three compile-preserving mutations, and it CAN REFUTE THE REPRESENTATION where population equality provably cannot. ASSEMBLE CHILDREN 1, 2a AND 2b HERE AND ROUTE ONLY THE COMBINED TREE AS ONE ATOMIC CANDIDATE -- children 1, 2a and 2b are held, reviewed inputs and never independently landed products. Closeout un-ignores px8ta_oriented_subcontinuation::public_two_three_level_brackets_finish_and_release_lifo on BOTH its blockers and removes an order-excluding helper ONLY after both engines agree."
-status: draft
+status: active
 owner: runtime
 size: L
 gate: none
@@ -145,6 +145,26 @@ every owner in `PendingVisSettlements.bracket_exits`, whatever its ordinary
 class (Protocol, RetOnly, `Excluded{Relay}`, `Excluded{Underived}`), and
 replaces 2b's emission refusal for them. Its D0 counts that no S is
 emitted by any ordinary arm (Architect `evt_5yqxd0jyc9bjj`).
+File-backed-in-FS's bracket emission is masked at 2b by the earlier
+`FSOp` unavailable-lane refusal (Architect `evt_274rqjw2c74k2`). Child
+3's D0 exercises that owner's claim once the lane exists, or names a
+substitute source that reaches the claim.
+Relay admission lost through a marked S is S's ownership, so lowering
+claims or re-settles it (Architect `evt_392v8fmvem7z0`): relay 352 on
+nested-two's owner0, forwarding Q1 S743, and on file-backed-in-FS's owner0,
+forwarding Q1 S645. Child 3's D0 counts both.
+
+**Assembly and emission (Architect `evt_4fj9r29qyx40k`,
+`evt_6vx1v2n5y3czj`).** Child 1 is route C only: one `--no-ff` merge of
+2b's `09d607a10` onto the pre-registration checkpoint carries route C,
+2a and 2b at their reviewed SHAs. Route D `4b4c8565c` is never merged,
+cherry-picked or rebased. The marked S's Phase A demand is retained and
+resolved in Phase B into a disjoint `bracket_rows` table outside the
+plane, keyed by `BracketSettlementId`; no Phase B classifier sees it.
+Owner-returned S lowers as an owner-loop successor from its bracket row.
+Inline-keyed S lowers on the existing inline route, claimed by key. A
+Continuation-keyed S outside any owner, or the relay-fused source, is
+not ruled until D0-E measures it.
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 

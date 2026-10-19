@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-SETTLEMENT-PLANE
 title: "CHILD 2b of RT-BRACKET-CONTROL-REGION-IR. The settlement plane and its CLOSURE. Consume ONLY the bound region markers from child 2a (RT-BRACKET-REGION-TRANSPORT); partition marked settlement instances out of the RAW exact response occurrence/context inventory BEFORE the ordinary demand classifier and pass only the ordinary partition into the existing filtered/Phase-B machinery; key every region instance by its exact call/return context beside its source ports; build the parent forest; close the body-exit set at exactly returned value, returned body error and controlled trap; and rebuild the whole plane INDEPENDENTLY at plan close and require exact equality. NO OLD CLASSIFIER PREDICATE MAY KEEP A BRACKET ROW ALIVE LONG ENOUGH TO EXCLUDE IT -- that was the `bracket_release_only_suffix` carve-out and it is gone. A first-match `find_map` keyed on `effect_origin` projects one ID for a shared static origin and collapses repeated lowering contexts; parent edges and the ledger must NEVER be built on a first-match ID. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
-status: ready
+status: active
 owner: runtime
 size: L
 gate: none
@@ -152,6 +152,9 @@ AcquireErr -----------------------------------------------> Resume
   its bracket exits in `PendingVisSettlements.bracket_exits`, never as an
   owner settlement class. No other ordinary structure changes except by
   removal of S's own ownership.
+  Relay admission (`settled_relay_owners`) is a non-ownership role: it
+  may change only through an input traced to a marked S origin, and any
+  other change is an advancing stop (Architect `evt_274rqjw2c74k2`).
 - **Instance identity.** Each region carries its exact call/return context key
   beside its source ports, and EVERY disposition and control-view query uses
   that key.
