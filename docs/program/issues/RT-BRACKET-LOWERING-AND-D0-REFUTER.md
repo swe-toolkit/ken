@@ -155,8 +155,9 @@ nested-two's owner0, forwarding Q1 S743, and on file-backed-in-FS's owner0,
 forwarding Q1 S645. Child 3's D0 counts both.
 
 **Assembly and emission (Architect `evt_4fj9r29qyx40k`,
-`evt_6vx1v2n5y3czj`, `evt_1r37j7z3dgpbm`).** Child 1 is route C only: one `--no-ff` merge of
-2b's `09d607a10` onto the pre-registration checkpoint carries route C,
+`evt_6vx1v2n5y3czj`, `evt_1r37j7z3dgpbm`).** Child 1 is route C only:
+one `--no-ff` merge of 2b's `09d607a10` onto the pre-registration
+checkpoint carries route C,
 2a and 2b at their reviewed SHAs. Route D `4b4c8565c` is never merged,
 cherry-picked or rebased. The marked S's Phase A demand is retained and
 resolved in Phase B into a disjoint `bracket_rows` table outside the
