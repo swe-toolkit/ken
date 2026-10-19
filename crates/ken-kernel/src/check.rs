@@ -2360,30 +2360,32 @@ mod tests {
     }
 
     // Promise class: durable invariant. MEASURED: an earlier checked String
-    // with a scalar rejected by Char prevents view installation; the same
-    // registration succeeds for an accepted scalar. CLAIMED: the pre-install
-    // scan covers the existing payload population, not only future literals.
-    // THE GAP: deleting the scan would leave the bad earlier literal visible
-    // through an unchecked Char pair despite a well-typed sample scalar.
+    // with a later scalar rejected by Char prevents view installation; the
+    // same registration succeeds for an accepted scalar. CLAIMED: the
+    // pre-install scan covers every scalar in every existing payload.
+    // THE GAP: deleting the scan or checking only the first scalar would
+    // expose an unchecked Char pair despite a well-typed sample scalar.
     #[test]
     fn prior_checked_string_payload_is_vetted_before_char_view_installation() {
         let (mut rejected, [string_id, char_id, view, list, nil, cons, literal]) =
-            pre_view_string_fixture("z");
-        assert_eq!(rejected.checked_literal(literal).unwrap().as_str(), "z");
+            pre_view_string_fixture("A");
+        assert_eq!(rejected.checked_literal(literal).unwrap().as_str(), "A");
+        let later = declare_checked_string_literal(&mut rejected, "Az").unwrap();
+        assert_eq!(rejected.checked_literal(later).unwrap().as_str(), "Az");
         assert!(
             checked_char_literal(&rejected, 65).is_ok(),
             "sample Char passes"
         );
         assert!(
             checked_char_literal(&rejected, 122).is_err(),
-            "earlier z fails Char"
+            "the later scalar in an earlier String fails Char"
         );
         assert!(!rejected.has_literal_char_view());
         let before = rejected.next_global_id();
         assert!(
             register_literal_char_view(&mut rejected, string_id, char_id, view, list, nil, cons,)
                 .is_err(),
-            "earlier rejected scalar must prevent the view"
+            "a later rejected scalar in a pre-view String must prevent the view"
         );
         assert!(
             !rejected.has_literal_char_view(),
