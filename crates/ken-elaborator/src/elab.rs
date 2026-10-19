@@ -14400,6 +14400,32 @@ fn demanded_refinement_splits(
     demanded
 }
 
+/// A recursive unindexed constructor branch has no checked equation until
+/// LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW. An open obligation closes over only
+/// evidenced Γ (22 §3), so this frame supplies neither premise nor demand.
+#[inline(never)]
+fn recursive_unindexed_split(
+    cx: &ElabCtx<'_>, frame: &PathFrame, span: &Span,
+) -> Result<bool, ElabError> {
+    if frame.kind != SplitKind::Constructor || frame.witness_position.is_some() {
+        return Ok(false);
+    }
+    let Term::Eq(carrier, _, _) = &frame.condition else { return Ok(false) };
+    let (head, _) = peel_app(carrier);
+    let Term::IndFormer { id, .. } = head else { return Ok(false) };
+    let Some(inductive) = cx.env.inductive(id) else { return Ok(false) };
+    if !inductive.indices.is_empty() { return Ok(false); }
+    for ctor in &inductive.constructors {
+        if !recursive_shapes(cx.env, ctor, id, inductive.params.len())
+            .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?
+            .is_empty()
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 fn convoyable_frame(cx: &ElabCtx<'_>, frame: &PathFrame, span: &Span) -> Result<bool, ElabError> {
     if frame.kind != SplitKind::Constructor {
         return Ok(matches!(frame.kind, SplitKind::Let | SplitKind::If | SplitKind::Literal));
@@ -14591,7 +14617,12 @@ fn emit_subset_evidence(
     cx: &mut ElabCtx<'_>, goal: Term, span: &Span, kind: ObligationKind,
     direct_evidence: Option<Term>,
 ) -> Result<Term, ElabError> {
-    let frames = admissible_path_frames(cx);
+    let mut frames = Vec::new();
+    for frame in admissible_path_frames(cx) {
+        if !recursive_unindexed_split(cx, &frame, span)? {
+            frames.push(frame);
+        }
+    }
     // A convoy equation already has a real binder in Γ. Closing it once
     // more in the hole's extra condition telescope duplicates the premise
     // and leaves a redundant, unchecked logical assumption next to its
