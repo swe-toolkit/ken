@@ -59,19 +59,24 @@ the rows below in the congruence-first test file.
 - **AC-1.** At K=20, each under 2s:
   - R1: `fn H (a : Bool) (b : Type 1) : Type 1 = b -> Int` nested with
     `True` against `False`, accepted with no obligation;
-  - R1-swap: the same with the parameters swapped, so the failing pair
-    comes last;
   - R2: `Type` against `(Type -> Type)` leaves, refused with the parent's
     K0004.
   - Paired: R1 and R2 exceed 2s on `7ac7a5cd1`, and deleting the gate
     returns R1 over 2s.
+- **AC-1s (R1-swap, ratio; Architect `evt_bq2fze6dbp15`).** R1 with the
+  parameters swapped, so the failing pair comes last. The kernel's own
+  conversion of that pair is exponential (13.8s at K=20), so this row is
+  a ratio, not a bound. At K=14 and K=16, time full elaboration and a
+  kernel-only `convert_type` of the same two towers declared as consts.
+  Full is at most 4× kernel at both depths, and the K=16 ratio is at most
+  1.25× the K=14 ratio. Main runs 40× to 46× and the parent about 10×; the
+  gate-deleted mutant must fail too. The D0 measures the repaired ratio
+  first (predicted 2× to 3×). A non-growing ratio between 4× and 10× is
+  reported to the Architect as a measurement, not a stop.
 - **AC-2.** AC-1, AC-1b and AC-1c of CONGRUENCE-FIRST stay green, as do
   the nested-domain and up-to-whnf suites. `fallback_suc` gains a K=16
   timing assertion under 2s.
 
 ## Stop conditions
 
-- R1-swap is also over 2s on the parent of `7ac7a5cd1`: that cost is the
-  kernel's own recheck. Stop to the operator; do not repair it in the
-  elaborator.
 - Any kernel, conversion or `trusted_base()` change.
