@@ -104,6 +104,29 @@ Its six-part D0 runs on all 13 regions before any §2 code. Each stop it
 names is a stop. AC-3 needs a constructed control if no region has two
 keys.
 
+**E5 and the depth-sensitive terminals (Architect `evt_6pjd3avewr8mm`,
+operative; replaces E5 and amends T1 and T3 of `evt_4yq7wzsteew9v`).**
+Every `ComputationalMatch` in a Body must be a forwarding bind: exactly
+two cases with roles `ret` and `vis`; the Vis case has
+`argument_binders == 2` and `recursive_positions == [1]`; and its body,
+under `CheckedComputationalIHSlots` and `CheckedSubcontinuationFrame` only,
+is exactly `Construct(vis, [Var(1), IH OrdinaryApplication of a zero-arg
+Var call])`. The ruling's `forwarding_vis_arm` is the predicate. Any other
+match refuses as "fold is not a forwarding bind". Successors: the
+scrutinee at depth + 1, the Ret case at the same depth. Body is every node
+visited, scrutinee nodes included.
+- `Construct(ret, ..)` at depth > 0 is R, legal; at depth 0 it is T3, "body
+  bypasses settlement".
+- A Vis with Q's own Finalizer mark at depth 0 is T1; at depth > 0 it
+  refuses as "settlement inside a bind scrutinee".
+- A Vis with another region C's Finalizer mark is X: cross it as in E6.
+  Every crossed C has C.A and C.Resume in Body(Q), and every C with C.A in
+  Body(Q) is crossed; otherwise "crossing regions".
+- Measured 13/13 at c18 with T1 equal to the marker S set. Still owed in
+  the same non-advancing D0 before §2 code: E4 restricted to `Reachable`
+  emissions, the T1 outcome shape, the instance count per region, and
+  minimality (Body(10417) ⊂ Body(1529) for nested-three 24890).
+
 A private `BracketSettlementPlan` on `StaticTransitionPlan`, one
 `BracketSettlementRegion` per INSTANCE:
 
