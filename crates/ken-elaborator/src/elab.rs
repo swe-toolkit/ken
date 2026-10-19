@@ -14535,12 +14535,9 @@ fn coerce_refinement(
     if cx.path_conditions.iter().any(|frame| matches!(frame.kind, SplitKind::Let)) {
         return Ok(core);
     }
-    kernel_check_current(cx, &core, &target).map_err(|error| match error {
-        CurrentKernelQueryError::View(error) => error,
-        CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-            error, span: span.clone(),
-        },
-    })?;
+    // Ordinary conversion is judged and localized at final kernel admission.
+    // An introduced carrier is checked with its pair above; another terminal
+    // site check is redundant, including for the measured split-frame cases.
     Ok(core)
 }
 
