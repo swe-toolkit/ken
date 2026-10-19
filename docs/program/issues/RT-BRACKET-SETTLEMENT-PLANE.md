@@ -32,16 +32,38 @@ against child 1 at `c462fe831`.
   `evt_3jksek4xvf2wk`):** the runtime acquire is a second bound mark,
   delivered by 2a's AC-5 on `wp/RT-BRACKET-REGION-TRANSPORT-acquire`; build
   on that tip once it is reviewed. Every other port is positional from the
-  two anchors, each step validated by shape and checked constructor
-  identity with a named refusal and no fallback: AcquireK is the acquire
-  Vis's child 1, its body a two-case `Match` on `Var(0)` (Ok to Body, Err
-  to Resume); Settlement is the finalizer mark's Vis; OutcomeMerge is its
-  child 1; Resume is that body's `ITree::Ret`. Body and exits are
-  source-return graph sets per instance, and the parent is the region
-  whose Body is the least superset. Print these ports on the population
-  before building §2; if an AcquireK body is not that `Match`, stop with
-  the row. This child never discovers a port,
-  never selects by `HostOpV1`, and never re-derives authority.
+  two anchors (Architect `evt_719gp6pcxtycd`, replacing AcquireK,
+  dispatch and Resume in `evt_3jksek4xvf2wk` and `evt_45cep98adh4qp`).
+  Each step has one successor, so there is no predicate choice and no
+  search:
+  - **K.** Static route: the body of the `Let` whose value is the marked
+    `Effect`. Generic route: `A.args[1]`, which must be a
+    `LexicalClosure` with one parameter; K is its body.
+  - **Spine walk.** From K, step into the body of each
+    `CheckedSubcontinuationFrame` or `CheckedJoinSite`, and into the
+    scrutinee of each `ComputationalMatch`, collecting those folds. D is
+    the first other node. Measured depth: 1 fold top-level, 2 nested
+    inner.
+  - **Conditions.** Stop with the row unless all seven hold:
+    1. D is a `Match` on `Var(0)` with exactly two cases, the acquire
+       result family's Err and Ok by checked constructor identity.
+    2. The folds are non-empty; F is the innermost.
+    3. Resume is F's case whose constructor is the checked HostIO `Ret`.
+    4. AcquireErr is D's Err body, a one-argument `Ret` `Construct`.
+    5. The Body entry is D's Ok body.
+    6. Settlement S is the Vis two levels above the Finalizer mark
+       (mark at `S.arg0.arg0`), and the mark's path from K has the spine
+       path plus D's Ok case as a prefix.
+    7. OutcomeMerge is `S.arg1`, a `LexicalClosure` with one parameter.
+  - **D0 before any build.** Run the walk on all 13 regions of the 2a
+    census (9 cases). Per region report the route, the fold count,
+    conditions 1 to 7, and for each nested pair whether the child's
+    Resume lies in the parent's Body subtree. A failed condition is a
+    stop with the row; do not widen the walk.
+  - Body and exits are source-return graph sets per instance, and the
+    parent is the region whose Body is the least superset.
+  - This child never discovers a port, never selects by `HostOpV1`, and
+    never re-derives authority.
 - **Route C discharges:** port authenticity, the static acquire to Ok
   binder to finalizer pairing per region, and lexical nesting inside one
   declaration by path prefix.
