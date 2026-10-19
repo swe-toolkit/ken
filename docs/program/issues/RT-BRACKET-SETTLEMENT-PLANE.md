@@ -207,6 +207,27 @@ a new name.
 `responses.rs` for the reconciliation. **No new carrier, return protocol, KRET
 lane, host operation, dispatcher reorder, trace sort or fallback.**
 
+**Admitted outside that cluster: the role-authority bridge (Architect
+`evt_6560kbj1d6e88`), and nothing else.** Project the three
+already-validated spine roles onto the existing `NativeProcessSymbols` as
+`itree_ret`, `itree_vis` and `coproduct_in_l`:
+- `native_process_entrypoint.rs`: the three fields, and their prelude
+  spellings in `legacy_prelude()`, read from the seed fixtures.
+- `native_process_authority.rs` `native_process_symbols_from_record`: fill
+  them from `record.spine`, after confirming `record.roles()` already
+  validates all three. If it does not, stop.
+- `lowering/effects.rs` `runtime_producible_constructors`: bind them, do
+  not add them to `producible`, and keep the destructure exhaustive.
+- `ken-elaborator/src/compiler_driver.rs` (the struct literal): fill them
+  from `host_spine`.
+
+No new carrier, role or validation change. The plane reads the three by
+exact equality; no suffix matching. Controls: the producible set is equal
+before and after on a package-backed and a synthetic fixture; swapping
+`itree_ret` and `itree_vis` in a test-built authority makes the plane
+refuse on single-resource; and the struct-literal and destructure sweep is
+re-run across `crates/` at the base.
+
 **A CROSS-CRATE exhaustiveness sweep is owed ONLY IF THE TYPE IS VISIBLE
 OUTSIDE `ken-runtime`. CHECK VISIBILITY FIRST -- do not inherit the answer.**
 Measured at `dda3ff6d7`: `ResponseDisposition` and `StaticTransitionPlan` are
