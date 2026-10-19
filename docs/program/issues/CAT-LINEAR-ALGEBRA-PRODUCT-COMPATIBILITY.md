@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY
 title: "Algorithm.LinearAlgebra.NatMatrix exports spec 65 section 3's laws: matrix_vector of a product applies its factors in turn, transpose reverses a product, and dot_scale is promoted from private. Proved as checked terms at zero trust, from the Architect's D0 development"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
