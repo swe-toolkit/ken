@@ -84,9 +84,9 @@ primitive, partial result or trusted arithmetic rule.
 
 ### 1.3 Six checked-law obligations
 
-The prospective module must export checked proof bodies for exactly
-these six laws. The box-membership statements are generic in `b`,
-`c` and `p`; the distance statements are generic in `p` and `q`.
+The landed `Algorithm.Geometry.NatBox` exports checked proof bodies
+for these six §1 laws. The box-membership statements are generic in
+`b`, `c` and `p`; the distance statements are generic in `p` and `q`.
 `IsTrue` turns the Boolean result into a proposition. `And` here is
 the **ambient Ω-valued conjunction** of the checked D0, with
 `and_intro` and the two projections; it is not the distinct
