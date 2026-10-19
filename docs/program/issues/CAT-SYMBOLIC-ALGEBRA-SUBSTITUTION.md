@@ -32,7 +32,8 @@ spec 66 §3's public types, each law a checked proof.
   `eval_substitute`, `poly_eq_sound` at `compose_env env s`, and `sym`.
   The D0 package delta is `local/arch-subst-d0-package.diff.txt`; it
   checked with no Axiom and `trusted_base()` 114 before and after.
-- **Seed.** `conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md`.
+- **Seed.** The substitution seed,
+  `conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md`.
   Closed equations close with `Proved`, not `Refl`. The refused block's
   kernel error is a generic mismatch.
 - **Package.** `catalog/packages/Algorithm/SymbolicAlgebra/NatPolynomial.ken.md`,
