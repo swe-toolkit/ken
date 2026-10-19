@@ -1,10 +1,13 @@
 # Exact geometry
 
-> **Status: DRAFT v0 (SPEC-GEOMETRY-EXACT-CONTRACT).** Section 1
-> specifies two-dimensional natural points, closed axis-aligned boxes,
-> five operations and six generically checked D0 laws. The development
-> is a scratch check, not a landed catalog module or a measurement of
-> the trusted-base delta.
+> **Status: DRAFT v0 (SPEC-GEOMETRY-EXACT-CONTRACT §1;
+> SPEC-GEOMETRY-MANHATTAN-METRIC §2;
+> SPEC-GEOMETRY-BOX-CONTAINMENT §3).** Sections 1–2 and their catalog
+> operations, checked laws and seeds are present on main. Section 3
+> specifies a corner-wise containment test and seven checked law
+> obligations from Architect D0; its catalog code and seed are not
+> delivered. Scratch results do not establish §3 shipped harness
+> execution, CI, or a landed trust measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -81,9 +84,9 @@ primitive, partial result or trusted arithmetic rule.
 
 ### 1.3 Six checked-law obligations
 
-The prospective module must export checked proof bodies for exactly
-these six laws. The box-membership statements are generic in `b`,
-`c` and `p`; the distance statements are generic in `p` and `q`.
+The landed `Algorithm.Geometry.NatBox` exports checked proof bodies
+for these six §1 laws. The box-membership statements are generic in
+`b`, `c` and `p`; the distance statements are generic in `p` and `q`.
 `IsTrue` turns the Boolean result into a proposition. `And` here is
 the **ambient Ω-valued conjunction** of the checked D0, with
 `and_intro` and the two projections; it is not the distinct
@@ -126,18 +129,14 @@ closed seed replaces these proofs.
 
 ### 1.4 Visibility dependency, trust and deferrals
 
-The existing `Data.Numeric.Nat.Order` defines `greatest for min` and
-`least for max` but keeps **both private** on the D0 base. The proof
-of `intersect_complete` needs their public statements to combine the
-two lower and two upper inequalities. With the private declarations,
-the scratch D0 fails `UnboundName` at `max::least`; adding only `pub`
-to both declarations makes the checked development succeed. The
-catalog implementation must publish those existing checked bounds
-as a separate prerequisite follow-on rather than clone their proofs.
-That follow-on also owns the existing Rust test that pins their
-privacy. **Neither the bound publication nor the Rust test update
-has landed as part of this spec WP.** This chapter does not edit
-`catalog/` or `crates/` to meet the dependency.
+The original §1 D0 base kept the `Data.Numeric.Nat.Order` bounds
+`greatest for min` and `least for max` private. The proof of
+`intersect_complete` needs their public statements to combine the
+two lower and two upper inequalities. On that scratch base, the
+private declarations caused `UnboundName` at `max::least`; publishing
+the existing checked bounds and updating their privacy test removed
+that obstacle. Both changes have since landed with the §1 catalog
+module. This chapter does not edit `catalog/` or `crates/`.
 
 The Architect's 324-line development at base `813346f95` checked all
 six generic law bodies with the two visibility changes and no
@@ -147,21 +146,24 @@ assumptions (including Int and String), although no geometry proof
 body names them. Neither an absence of geometry-local axioms nor a
 successful scratch check is a measured `trusted_base()` delta.
 Constructor exports were independently added and checked against a
-client. Catalog publication, Rust acceptance, execution of a shipped
-conformance seed and CI require separate evidence.
+client. The §1 catalog and seed have since landed; that historical
+scratch check alone does not establish shipped seed-harness execution,
+CI, or a measured landed trust delta.
 
 Signed coordinates and signed-dependent orientation, cross products
 and rotation are deferred. Euclidean and floating-point distances,
-the Manhattan triangle inequality, box area, dimensions other than
-two, a canonical empty-box representation and point-set equality of
-boxes are also deferred. None follows from the six laws above.
+box area, dimensions other than two, a canonical empty-box
+representation and point-set equality of boxes are also deferred.
+Section 1's six laws alone do not establish the Manhattan triangle
+inequality; §2 specifies and exports it separately.
 
 ## 2. Manhattan metric laws on natural points
 
 > **Section 2 status: DRAFT v0 (SPEC-GEOMETRY-MANHATTAN-METRIC).**
-> Architect D0 checked the two new generic laws below on the landed
-> §1 base. This is a contract for a future catalog extension, not a
-> claim that its §2 source or conformance seed has shipped.
+> Architect D0 checked the two generic laws below on the then-landed
+> §1 base. The §2 catalog extension and seed have since landed; the
+> historical scratch check alone does not establish shipped seed-
+> harness execution, CI, or a measured landed trust delta.
 
 ### 2.1 Triangle inequality and zero-distance identity
 
@@ -226,15 +228,140 @@ scratch client checked, including a strict-slack detour, a tight
 path and both law instances. Separate negative clients rejected a
 false reverse-detour bound and false zero distance or equality for
 distinct points; four mutated proof steps also failed. These are
-**Architect-reported scratch results**, not an author-run Ken check,
-shipped §2 catalog proof, executed §2 conformance seed, CI result,
-or trust measurement on a landed §2 module.
+**Architect-reported scratch results**, not an author-run Ken check.
+The §2 source and seed are now present on main; D0 by itself is not
+shipped seed-harness execution, CI, or a measured landed trust delta.
 
 The §1 Nat Order `greatest for min` and `least for max` exports and
-§1 `NatBox` package are present on this landed base; the older §1
-follow-on wording records its prior D0 situation, not the current
-state. Section 2 adds no new prerequisite publication or change to
-§1's public helper boundary. Signed coordinates and orientation,
-Euclidean or floating-point distance, box area, dimensions beyond
-two, canonical empty boxes and point-set equality of boxes remain
-outside this metric extension.
+§1 `NatBox` package are present on main. Section 2 adds no new
+prerequisite publication or change to §1's public helper boundary.
+Signed coordinates and orientation, Euclidean or floating-point
+distance, box area, dimensions beyond two, canonical empty boxes and
+point-set equality of boxes remain outside this metric extension.
+
+## 3. Corner-wise containment of boxes
+
+> **Section 3 status: DRAFT v0 (SPEC-GEOMETRY-BOX-CONTAINMENT).**
+> The following public operation and seven generic laws were checked
+> in Architect D0 on the landed §1–2 base. They are a contract for
+> later catalog and conformance delivery, not an assertion that §3
+> exports, its seed, or CI have shipped.
+
+### 3.1 Definition and inverted-box boundary
+
+`inside b c` means that the **corners** of `b` fit inside the corners
+of `c`. For `b = MkBox (MkPoint blx bly) (MkPoint bhx bhy)` and
+`c = MkBox (MkPoint clx cly) (MkPoint chx chy)`, the public Boolean
+operation has this exact definition, using the existing checked
+natural order and conjunction:
+
+```ken
+pub fn inside (b : Box) (c : Box) : Bool =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          bool_and
+                            (axis_within blx bhx clx chx)
+                            (axis_within bly bhy cly chy)
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+fn axis_within (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) : Bool =
+  bool_and (leq_nat l2 l1) (leq_nat h1 h2)
+```
+
+The matches destructure the corners, as in `contains` and
+`intersect`. The per-axis `axis_within` is a private helper, **not**
+an exported name or an additional public law. Both comparisons are
+made even when `b` is inverted on one or both axes. There is no branch
+for an empty inner box, validity
+premise, canonical empty representation, or point-set quotient.
+
+For instance, `(3,3)–(2,2)` is inside `(0,0)–(6,6)` by its corners;
+`(6,6)–(5,5)` is **not** inside `(1,2)–(3,4)`, even though neither
+inverted inner box contains a point. Thus the test is sufficient for
+point-set inclusion but, without a witness in `b`, not necessary for
+it. Unlike `Eq Box`, `inside` is a directional Boolean comparison of
+bounds, not structural equality of two corner pairs.
+
+### 3.2 Seven checked-law obligations
+
+The module must export exactly these seven new public theorem types.
+`IsTrue` turns each Boolean into an Ω proposition. Soundness applies
+to **every** `b`, `c` and `p`: when the inner box is empty its second
+premise is uninhabited, rather than adding a special case to the
+operation.
+
+```ken
+pub theorem inside_sound (b : Box) (c : Box) (p : Point) :
+  IsTrue (inside b c) → IsTrue (contains b p) → IsTrue (contains c p)
+
+pub theorem inside_refl (b : Box) : IsTrue (inside b b)
+
+pub theorem intersect_inside_left (b : Box) (c : Box) :
+  IsTrue (inside (intersect b c) b)
+
+pub theorem intersect_inside_right (b : Box) (c : Box) :
+  IsTrue (inside (intersect b c) c)
+
+pub theorem inside_hull_left (b : Box) (c : Box) :
+  IsTrue (inside b (hull b c))
+
+pub theorem inside_hull_right (b : Box) (c : Box) :
+  IsTrue (inside c (hull b c))
+
+pub theorem inside_complete (b : Box) (c : Box) (q : Point) :
+  IsTrue (contains b q)
+    → ((p : Point) → IsTrue (contains b p) → IsTrue (contains c p))
+    → IsTrue (inside b c)
+```
+
+The intersection and hull laws hold **unconditionally**, including
+for inverted input boxes and empty intersections: `max` of lower
+bounds and `min` of upper bounds put an intersection inside each
+operand; the reverse extrema put each operand inside the hull. These
+are corner facts, not structural equations, and they require no
+choice of a canonical empty box. `inside_refl` includes inverted
+boxes because each bound compares with itself.
+
+The final theorem is the **witnessed converse** of `inside_sound`.
+A point `q` in `b` establishes a non-inverted bound on both axes;
+therefore both corners of `b` are themselves points in `b`. The
+pointwise inclusion premise puts both corners in `c`, supplying the
+four comparisons of `inside b c`. Point-set inclusion **alone** is
+insufficient: for inverted `b=(6,6)–(5,5)` and `c=(1,2)–(3,4)`,
+`b` has no points, so every pointwise inclusion implication is
+vacuously true while `inside b c` is `False`. No unwitnessed converse,
+point-set equality, or equivalence of box representations follows.
+
+### 3.3 Evidence and remaining scope
+
+On base `ae42bb7fb56a7f18451578d3bd5cda4075fe7bc4`, Architect
+D0 checked the package with the public `inside` and seven transparent
+public proof bodies in a detached scratch worktree: rc 0, no `Axiom`,
+53 owned declarations with zero `Opaque`, and identical
+`trusted_base()` identity sets of 114 entries before and after
+loading it. A scratch client checked nested, overlapping, self and
+inverted pairs and an instance of `inside_complete`; a separate
+client's claim of containment in a strictly smaller box was refused
+with `TypeMismatch`. The ambient-passthrough census on that scratch
+package passed 1/1 with no residuals. These are **D0 scratch
+measurements**, not §3 catalog publication, an authored or executed
+§3 seed, CI, or a measured landed trust delta.
+
+The approved contract adds no signed coordinates, dimensions beyond
+two, new primitive or surface feature. It does not collapse distinct
+empty boxes or change §1's `contains`, `intersect` or `hull`.

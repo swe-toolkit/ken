@@ -325,22 +325,23 @@ seed are not delivered by this contract. Composition of substitutions,
 a sorted-list normal form, and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–2 (SPEC-GEOMETRY-EXACT-CONTRACT;
-SPEC-GEOMETRY-MANHATTAN-METRIC). The §1
-`Algorithm.Geometry.NatBox` module, closed seed and required public
-Nat Order bounds have landed. Two-coordinate `Nat` points and closed
+**`67-geometry.md`** §§1–3 (SPEC-GEOMETRY-EXACT-CONTRACT;
+SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT).
+The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
+public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
 point membership, intersection, hull and Manhattan distance with
-six §1 checked laws. §2 specifies exactly two additional generically
-proved D0 laws: the detour triangle bound and zero-distance equality
-of points. The latter combines with §1's `manhattan_self`, with no
-separate converse theorem. Axis helpers remain private. Architect
-measured scratch `ken check` and an existing Rust test against the
-scratch §2 module: `trusted_base()` identities 114 → 114 on that
-copy, not a landed §2 catalog extension, shipped §2 seed or CI.
-Signed-coordinate geometry, Euclidean and floating-point distance,
-box area, other dimensions and point-set equality of boxes remain
-outside this contract.
+six §1 checked laws. §2's two additional generic metric laws,
+their catalog code and seed are present on main. The zero-distance
+law combines with §1's `manhattan_self` without a further public
+converse. §3 specifies a corner-wise Boolean `inside` test and seven
+checked D0 laws: soundness, reflexivity, intersection and hull bounds,
+and a converse requiring a point witness. The §3 code and seed are
+not delivered; its 114 → 114 trust result and zero-residual census
+are scratch measurements, not shipped seed-harness execution or CI.
+The per-axis helper remains private. Signed-coordinate geometry,
+Euclidean and floating-point distance, box area, other dimensions,
+canonical empty boxes and point-set equality remain outside scope.
 
 The **exact rational-interval contract** is pinned in
 **`68-numerical.md`** §§1–2
