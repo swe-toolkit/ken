@@ -28,7 +28,19 @@ against child 1 at `c462fe831`.
   `evt_7rvyzxzk7s17e`, Architect `evt_3drtxbpcrzv1c`), on this child's own
   branch. Never move, reset or delete that ref. Ports arrive from 2a's
   bound Runtime-IR region markers, `RuntimeExpr::CheckedBracketFinalizer`,
-  keyed by (owner, checked preorder node id). This child never discovers a port,
+  keyed by (owner, checked preorder node id). **Amendment (Architect
+  `evt_3jksek4xvf2wk`):** the runtime acquire is a second bound mark,
+  delivered by 2a's AC-5 on `wp/RT-BRACKET-REGION-TRANSPORT-acquire`; build
+  on that tip once it is reviewed. Every other port is positional from the
+  two anchors, each step validated by shape and checked constructor
+  identity with a named refusal and no fallback: AcquireK is the acquire
+  Vis's child 1, its body a two-case `Match` on `Var(0)` (Ok to Body, Err
+  to Resume); Settlement is the finalizer mark's Vis; OutcomeMerge is its
+  child 1; Resume is that body's `ITree::Ret`. Body and exits are
+  source-return graph sets per instance, and the parent is the region
+  whose Body is the least superset. Print these ports on the population
+  before building §2; if an AcquireK body is not that `Match`, stop with
+  the row. This child never discovers a port,
   never selects by `HostOpV1`, and never re-derives authority.
 - **Route C discharges:** port authenticity, the static acquire to Ok
   binder to finalizer pairing per region, and lexical nesting inside one
