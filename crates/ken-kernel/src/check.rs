@@ -2248,6 +2248,161 @@ mod tests {
         assert_eq!(env.checked_char_type(), None);
     }
 
+    // The installed view reduces a checked String to List Char. The fixture
+    // first admits a String with no view, so registration must check the
+    // existing payload rather than relying on later literal admission.
+    fn pre_view_string_fixture(payload: &str) -> (GlobalEnv, [GlobalId; 7]) {
+        let mut env = GlobalEnv::new();
+        let int = declare_primitive(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        register_checked_int_lit_carrier(&mut env, int).unwrap();
+        let bool_id = declare_inductive(&mut env, |_id| InductiveSpec {
+            level_params: vec![],
+            params: vec![],
+            indices: vec![],
+            level: Level::Zero,
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .unwrap();
+        let bool_ty = Term::indformer(bool_id, vec![]);
+        let leq = declare_primitive(
+            &mut env,
+            vec![],
+            Term::pi(
+                Term::const_(int, vec![]),
+                Term::pi(Term::const_(int, vec![]), bool_ty.clone()),
+            ),
+            PrimReduction::Op { symbol: "leq_int" },
+        )
+        .unwrap();
+        let predicate = Term::Elim {
+            fam: bool_id,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(Term::Ascript(
+                Box::new(Term::lam(bool_ty.clone(), Term::omega(Level::Zero))),
+                Box::new(Term::pi(bool_ty, Term::ty(Level::Zero.suc()))),
+            )),
+            methods: vec![
+                Term::const_(env.top_id(), vec![]),
+                Term::const_(env.bottom_id(), vec![]),
+            ],
+            indices: vec![],
+            scrut: Box::new(Term::app(
+                Term::app(Term::const_(leq, vec![]), Term::var(0)),
+                Term::IntLit(65u32.into()),
+            )),
+        };
+        let char_id = declare_def(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            Term::sigma(Term::const_(int, vec![]), predicate),
+        )
+        .unwrap();
+        register_checked_char_carrier(&mut env, char_id).unwrap();
+        let string_id = declare_primitive(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        register_checked_string_carrier(&mut env, string_id).unwrap();
+        let literal = declare_checked_string_literal(&mut env, payload).unwrap();
+        let list = declare_inductive(&mut env, |list| InductiveSpec {
+            level_params: vec![],
+            params: vec![Term::ty(Level::Zero)],
+            indices: vec![],
+            level: Level::Zero,
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![
+                        Term::var(0),
+                        Term::app(Term::indformer(list, vec![]), Term::var(1)),
+                    ],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .unwrap();
+        let nil = env.inductive(list).unwrap().constructors[0].id;
+        let cons = env.inductive(list).unwrap().constructors[1].id;
+        let list_char = Term::app(Term::indformer(list, vec![]), Term::const_(char_id, vec![]));
+        let view = declare_primitive(
+            &mut env,
+            vec![],
+            Term::pi(Term::const_(string_id, vec![]), list_char),
+            PrimReduction::Op {
+                symbol: "string_to_list_char",
+            },
+        )
+        .unwrap();
+        (env, [string_id, char_id, view, list, nil, cons, literal])
+    }
+
+    // Promise class: durable invariant. MEASURED: an earlier checked String
+    // with a scalar rejected by Char prevents view installation; the same
+    // registration succeeds for an accepted scalar. CLAIMED: the pre-install
+    // scan covers the existing payload population, not only future literals.
+    // THE GAP: deleting the scan would leave the bad earlier literal visible
+    // through an unchecked Char pair despite a well-typed sample scalar.
+    #[test]
+    fn prior_checked_string_payload_is_vetted_before_char_view_installation() {
+        let (mut rejected, [string_id, char_id, view, list, nil, cons, literal]) =
+            pre_view_string_fixture("z");
+        assert_eq!(rejected.checked_literal(literal).unwrap().as_str(), "z");
+        assert!(
+            checked_char_literal(&rejected, 65).is_ok(),
+            "sample Char passes"
+        );
+        assert!(
+            checked_char_literal(&rejected, 122).is_err(),
+            "earlier z fails Char"
+        );
+        assert!(!rejected.has_literal_char_view());
+        let before = rejected.next_global_id();
+        assert!(
+            register_literal_char_view(&mut rejected, string_id, char_id, view, list, nil, cons,)
+                .is_err(),
+            "earlier rejected scalar must prevent the view"
+        );
+        assert!(
+            !rejected.has_literal_char_view(),
+            "refusal installs no partial view"
+        );
+        assert_eq!(rejected.next_global_id(), before);
+
+        let (mut admitted, [string_id, char_id, view, list, nil, cons, literal]) =
+            pre_view_string_fixture("A");
+        assert!(checked_char_literal(&admitted, 65).is_ok());
+        register_literal_char_view(&mut admitted, string_id, char_id, view, list, nil, cons)
+            .expect("the same view accepts the earlier proven scalar");
+        assert!(admitted.has_literal_char_view());
+        let list_char = Term::app(Term::indformer(list, vec![]), Term::const_(char_id, vec![]));
+        let from_string = Term::app(Term::const_(view, vec![]), Term::const_(literal, vec![]));
+        check(&admitted, &Context::new(), &from_string, &list_char)
+            .expect("the admitted view has the checked List Char type");
+    }
+
     #[test]
     fn level_closure_reaches_every_explicit_level_slot_and_nested_child() {
         let u = LevelVar(0);
