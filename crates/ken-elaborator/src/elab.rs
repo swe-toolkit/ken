@@ -12304,123 +12304,59 @@ fn unify_type_position_argument_sort(cx: &mut ElabCtx<'_>, function: &Term, argu
 /// Reduction must reach nested domains as well as the heads of both types.
 fn unify_sorts_up_to_whnf(cx: &mut ElabCtx<'_>, expected: &Term, actual: &Term) {
     let mut ctx = cx.ctx.clone();
-    unify_sorts_walk(cx.env, &mut cx.metas, &mut ctx, expected, actual);
+    let mut failed = FailedSpines::new();
+    unify_sorts_walk(
+        cx.env,
+        &mut cx.metas,
+        &mut ctx,
+        &mut failed,
+        expected,
+        actual,
+    );
 }
+
+/// A failed same-constant spine attempt leaves every meta as it found it, so
+/// its outcome is a function of the zonked pair in its context. Reduction
+/// reaches the same pair again; replaying the attempt there is exponential.
+type FailedSpines = HashSet<(Vec<Term>, Term, Term)>;
 
 /// This is only a level-linking walk for the two type-position callers; the
 /// term-position unifier and any term metas remain outside it.
 #[inline(never)]
 fn unify_sorts_walk(
-    env: &GlobalEnv, metas: &mut MetaCtx, ctx: &mut Context, expected: &Term, actual: &Term,
+    env: &GlobalEnv,
+    metas: &mut MetaCtx,
+    ctx: &mut Context,
+    failed: &mut FailedSpines,
+    expected: &Term,
+    actual: &Term,
 ) {
     let expected = metas.zonk_term_with(expected, false);
-    if sort_walk_is_inert(metas, &expected, &metas.zonk_term_with(actual, false)) {
+    let zonked_actual = metas.zonk_term_with(actual, false);
+    if sort_walk_is_inert(metas, &expected, &zonked_actual) {
         return;
     }
-    if sort_walk_same_constant_spine(env, metas, ctx, &expected, actual) {
-        return;
+    let key = (ctx.types.clone(), expected.clone(), zonked_actual);
+    if !failed.contains(&key) {
+        if sort_walk_same_constant_spine(env, metas, ctx, failed, &expected, actual) {
+            return;
+        }
+        failed.insert(key);
     }
     let expected = whnf(env, ctx, &expected);
     let actual = whnf(env, ctx, actual);
     match (&expected, &actual) {
         (Term::Pi(a, b), Term::Pi(c, d)) | (Term::Lam(a, b), Term::Lam(c, d)) => {
-            unify_sorts_walk(env, metas, ctx, a, c);
+            unify_sorts_walk(env, metas, ctx, failed, a, c);
             ctx.push(metas.zonk_term_with(a, false));
-            unify_sorts_walk(env, metas, ctx, b, d);
+            unify_sorts_walk(env, metas, ctx, failed, b, d);
             ctx.pop();
         }
         (Term::App(f, a), Term::App(g, b)) => {
-            unify_sorts_walk(env, metas, ctx, f, g);
-            unify_sorts_walk(env, metas, ctx, a, b);
+            unify_sorts_walk(env, metas, ctx, failed, f, g);
+            unify_sorts_walk(env, metas, ctx, failed, a, b);
         }
         _ => unify_types(metas, &expected, &actual),
-    }
-}
-
-/// Erase every level in a term to the same constant for the spine gate's
-/// necessary-condition test. Keep this match exhaustive: a new term former
-/// must not bypass a level-bearing position when it is introduced.
-fn erase_levels(t: &Term) -> Term {
-    fn box_erase(t: &Term) -> Box<Term> {
-        Box::new(erase_levels(t))
-    }
-    fn list_erase(terms: &[Term]) -> Vec<Term> {
-        terms.iter().map(erase_levels).collect()
-    }
-    fn levels_zero(levels: &[Level]) -> Vec<Level> {
-        levels.iter().map(|_| Level::Zero).collect()
-    }
-    match t {
-        Term::Type(_) => Term::Type(Level::Zero),
-        Term::Omega(_) => Term::Omega(Level::Zero),
-        Term::Var(i) => Term::Var(*i),
-        Term::Const { id, level_args } => Term::Const {
-            id: *id,
-            level_args: levels_zero(level_args),
-        },
-        Term::IntLit(value) => Term::IntLit(value.clone()),
-        Term::IndFormer { id, level_args } => Term::IndFormer {
-            id: *id,
-            level_args: levels_zero(level_args),
-        },
-        Term::Constructor { id, level_args } => Term::Constructor {
-            id: *id,
-            level_args: levels_zero(level_args),
-        },
-        Term::Elim {
-            fam,
-            level_args,
-            params,
-            motive,
-            methods,
-            indices,
-            scrut,
-        } => Term::Elim {
-            fam: *fam,
-            level_args: levels_zero(level_args),
-            params: list_erase(params),
-            motive: box_erase(motive),
-            methods: list_erase(methods),
-            indices: list_erase(indices),
-            scrut: box_erase(scrut),
-        },
-        Term::Pi(a, b) => Term::Pi(box_erase(a), box_erase(b)),
-        Term::Lam(a, b) => Term::Lam(box_erase(a), box_erase(b)),
-        Term::App(f, a) => Term::App(box_erase(f), box_erase(a)),
-        Term::Sigma(a, b) => Term::Sigma(box_erase(a), box_erase(b)),
-        Term::Pair(a, b) => Term::Pair(box_erase(a), box_erase(b)),
-        Term::Proj1(p) => Term::Proj1(box_erase(p)),
-        Term::Proj2(p) => Term::Proj2(box_erase(p)),
-        Term::Let { ty, val, body } => Term::Let {
-            ty: box_erase(ty),
-            val: box_erase(val),
-            body: box_erase(body),
-        },
-        Term::Ascript(value, ty) => Term::Ascript(box_erase(value), box_erase(ty)),
-        Term::Eq(ty, a, b) => Term::Eq(box_erase(ty), box_erase(a), box_erase(b)),
-        Term::Refl(value) => Term::Refl(box_erase(value)),
-        Term::Cast(a, b, eq, value) => {
-            Term::Cast(box_erase(a), box_erase(b), box_erase(eq), box_erase(value))
-        }
-        Term::J(motive, method, eq) => Term::J(box_erase(motive), box_erase(method), box_erase(eq)),
-        Term::Quot(ty, relation, equiv) => {
-            Term::Quot(box_erase(ty), box_erase(relation), box_erase(equiv))
-        }
-        Term::QuotClass(value) => Term::QuotClass(box_erase(value)),
-        Term::QuotElim {
-            motive,
-            method,
-            respect,
-            scrut,
-        } => Term::QuotElim {
-            motive: box_erase(motive),
-            method: box_erase(method),
-            respect: box_erase(respect),
-            scrut: box_erase(scrut),
-        },
-        Term::Trunc(ty) => Term::Trunc(box_erase(ty)),
-        Term::TruncProj(value) => Term::TruncProj(box_erase(value)),
-        Term::Absurd(motive, proof) => Term::Absurd(box_erase(motive), box_erase(proof)),
     }
 }
 
@@ -12430,7 +12366,12 @@ fn erase_levels(t: &Term) -> Term {
 /// and let the caller reduce. A constant that ignores an argument still has
 /// that argument's levels linked, as kernel congruence would equate it.
 fn sort_walk_same_constant_spine(
-    env: &GlobalEnv, metas: &mut MetaCtx, ctx: &mut Context, expected: &Term, actual: &Term,
+    env: &GlobalEnv,
+    metas: &mut MetaCtx,
+    ctx: &mut Context,
+    failed: &mut FailedSpines,
+    expected: &Term,
+    actual: &Term,
 ) -> bool {
     let (Term::Const { id: expected_id, level_args: expected_levels }, expected_args) =
         peel_app(expected)
@@ -12447,19 +12388,12 @@ fn sort_walk_same_constant_spine(
     {
         return false;
     }
-    // A failed level-erased pair cannot be rescued by a level link. Test in
-    // source order so a failed argument does not walk its expensive siblings.
-    for (expected_arg, actual_arg) in expected_args.iter().zip(&actual_args) {
-        if !convert_type(env, ctx, &erase_levels(expected_arg), &erase_levels(actual_arg)) {
-            return false;
-        }
-    }
     let saved = metas.metas.clone();
     for (expected_level, actual_level) in expected_levels.iter().zip(&actual_levels) {
         unify_levels(metas, expected_level, actual_level);
     }
     for (expected_arg, actual_arg) in expected_args.iter().zip(&actual_args) {
-        unify_sorts_walk(env, metas, ctx, expected_arg, actual_arg);
+        unify_sorts_walk(env, metas, ctx, failed, expected_arg, actual_arg);
     }
     let levels_agree = expected_levels.iter().zip(&actual_levels).all(|(e, a)| {
         metas.zonk_level_with(e, false) == metas.zonk_level_with(a, false)

@@ -28,6 +28,34 @@ fn environment(depth: usize) -> ElabEnv {
     env
 }
 
+fn big_environment(depth: usize) -> ElabEnv {
+    let mut env = environment(depth);
+    for declaration in [
+        "fn T3 (n : Nat) (a : Type 2) : Type 2 = match blow n { Zero |-> a; Suc m |-> a }",
+        "fn D3 (n : Nat) (a : Type 2) : Type = match blow n { Zero |-> Int; Suc m |-> Int }",
+        "const Big : Type 2 = Type 1",
+    ] {
+        env.elaborate_decl(declaration)
+            .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
+    }
+    env
+}
+
+fn big_fast_row(name: &str, source: &str) {
+    let mut env = big_environment(DEPTH);
+    let started = Instant::now();
+    let result = env
+        .elaborate_decl_v1(source)
+        .unwrap_or_else(|error| panic!("{name}: {error:?}"));
+    let elapsed = started.elapsed();
+    eprintln!("sort-spine-necessity row={name} depth={DEPTH} elapsed={elapsed:?}");
+    assert!(
+        result.obligations.is_empty(),
+        "{name}: no obligations expected"
+    );
+    assert!(elapsed < LIMIT, "{name}: {elapsed:?} >= {LIMIT:?}");
+}
+
 fn fast_row(name: &str, source: &str) {
     let mut env = environment(DEPTH);
     let started = Instant::now();
@@ -86,6 +114,73 @@ fn eq_endpoints_with_meta_bearing_alias_avoid_delta() {
     fast_row(
         "eq_meta",
         "fn k (x y : T2 NN Type) (p : Eq (T2 NN Type) x y) (n : Int) : Int = n",
+    );
+}
+
+/// MEASURED: a discarded `Big` argument and a bare `Type` link at K=2
+/// accepts without obligations. CLAIMED: delta's literal `Type 1` is not
+/// erased into `Type 0` by a supposedly necessary sort gate. THE GAP: a
+/// passing verdict alone does not show which gate fired; restore the old
+/// erased gate and require this unchanged row to refuse.
+#[test]
+fn big_discard_links_level_hidden_behind_delta() {
+    let mut env = big_environment(2);
+    let source = "fn k (F : D3 NN Big -> Type) (x : D3 NN Type) (o : F x) (n : Int) : Int = n";
+    let result = env
+        .elaborate_decl_v1(source)
+        .unwrap_or_else(|error| panic!("big_discard: {error:?}"));
+    assert!(
+        result.obligations.is_empty(),
+        "big_discard adds no obligations"
+    );
+}
+
+/// MEASURED: both directions of the level-bearing alias, and an Eq carrier,
+/// accept without obligations below 2s at K=16. CLAIMED: same-head linking
+/// does not repeat an exponential fallback. THE GAP: these timings pin only
+/// the named shapes; R1/R2 and the gate/memo controls cover sibling paths.
+#[test]
+fn big_arg_avoids_repeated_delta() {
+    big_fast_row(
+        "big_arg",
+        "fn k (F : T3 NN Big -> Type) (x : T3 NN Type) (o : F x) (n : Int) : Int = n",
+    );
+}
+
+#[test]
+fn big_arg_rev_avoids_repeated_delta() {
+    big_fast_row(
+        "big_arg_rev",
+        "fn k (F : T3 NN Type -> Type) (x : T3 NN Big) (o : F x) (n : Int) : Int = n",
+    );
+}
+
+#[test]
+fn big_eq_avoids_repeated_delta() {
+    big_fast_row(
+        "big_eq",
+        "fn k (x y : T3 NN Big) (p : Eq (T3 NN Type) x y) (n : Int) : Int = n",
+    );
+}
+
+/// MEASURED: a genuinely mismatched leaf still refuses K0004. CLAIMED:
+/// linking the level alias never admits an unrelated function type. THE GAP:
+/// this is a semantic negative, not a timing bound on whnf fallback.
+#[test]
+fn big_wrong_still_refuses_nonconvertible_leaf() {
+    let mut env = big_environment(2);
+    let source =
+        "fn k (F : T3 NN Big -> Type) (x : T3 NN (Type -> Type)) (o : F x) (n : Int) : Int = n";
+    let result = env.elaborate_decl_v1(source);
+    assert!(
+        matches!(
+            result,
+            Err(ElabError::KernelRejected {
+                error: KernelError::TypeMismatch { .. },
+                ..
+            })
+        ),
+        "big_wrong must refuse K0004: {result:?}"
     );
 }
 
