@@ -146,6 +146,13 @@ AcquireErr -----------------------------------------------> Resume
   inventory, partition marked settlement instances out of it BEFORE
   `static_response_context_demands_filtered`, bind the control plane from the
   marked partition, and pass ONLY the ordinary partition onward.
+  The partition has two outputs, not one (Architect `evt_1yb966jffc2zr`). A
+  marked occurrence's raw demand is built by the same demand-construction
+  code as an ordinary one and is retained as `marked_demands`: it installs
+  S's K continuation context (`response_context_union` over both outputs)
+  and binds the plane, with each `Continuation` instance matching exactly
+  one marked demand. It is excluded only from ordinary demands, Deferred
+  rows, the Phase-B split, candidate rows and ownership.
 - **Instance identity.** Each region carries its exact call/return context key
   beside its source ports, and EVERY disposition and control-view query uses
   that key.
@@ -268,8 +275,12 @@ answer does not carry. Never `--workspace`.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 1 (Architect `evt_55at3sk6mqve`).
+§1a: 2 (Architect `evt_55at3sk6mqve`, `evt_1yb966jffc2zr`). The next
+advancing stop on this question is the third and triggers a research hold.
 
 1. An ordinary returned-Vis walk chained a successor through a
    partitioned S. Keyed on `vis_origin` membership in the ordinary
    candidate rows.
+2. S's K continuation context, and with it the residual disposition,
+   carrier variant and IH-force base, existed only through S's ordinary
+   demand. Keyed on S's membership in `demands`.
