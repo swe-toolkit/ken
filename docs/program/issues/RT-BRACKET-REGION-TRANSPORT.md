@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-REGION-TRANSPORT
 title: "CHILD 2a of RT-BRACKET-CONTROL-REGION-IR, by route C. Child 1's bracket regions are computed on the normalized plane and then dropped (compiler_driver binds them to _), and after erasure the confined finalizer lowers to the same HostOpV1::ResourceRelease as a public release, so nothing downstream can tell them apart. Carry each region across erasure as one compiler-private Runtime-IR bracket marker, bound exactly to its region, so the settlement plane reads ports from markers and never from HostOpV1. THIS CHILD DOES NOT LAND ALONE: it is a held, reviewed input assembled by child 3."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none

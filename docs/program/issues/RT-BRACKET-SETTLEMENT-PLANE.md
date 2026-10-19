@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-SETTLEMENT-PLANE
 title: "CHILD 2b of RT-BRACKET-CONTROL-REGION-IR. The settlement plane and its CLOSURE. Consume ONLY the bound region markers from child 2a (RT-BRACKET-REGION-TRANSPORT); partition marked settlement instances out of the RAW exact response occurrence/context inventory BEFORE the ordinary demand classifier and pass only the ordinary partition into the existing filtered/Phase-B machinery; key every region instance by its exact call/return context beside its source ports; build the parent forest; close the body-exit set at exactly returned value, returned body error and controlled trap; and rebuild the whole plane INDEPENDENTLY at plan close and require exact equality. NO OLD CLASSIFIER PREDICATE MAY KEEP A BRACKET ROW ALIVE LONG ENOUGH TO EXCLUDE IT -- that was the `bracket_release_only_suffix` carve-out and it is gone. A first-match `find_map` keyed on `effect_origin` projects one ID for a shared static origin and collapses repeated lowering contexts; parent edges and the ledger must NEVER be built on a first-match ID. THIS CHILD DOES NOT LAND ALONE -- it is a held, reviewed input assembled by child 3."
-status: draft
+status: ready
 owner: runtime
 size: L
 gate: none
@@ -12,7 +12,7 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. Retained work to be REBASED ONTO THE ACCEPTED PRODUCER rather than rebuilt: the raw-response-occurrence partition ahead of the ordinary demand classifier, and the explicit response-context key that replaced the earlier first-match-only design. Both are preserved at evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee, which is EVIDENCE, NEVER A CANDIDATE."
 ---
 
-> # NOT STARTABLE YET. It depends on child 2a's held tip.
+> # STARTABLE. Child 2a is accepted as a held input at `370168a48`.
 > #
 > # **This child does NOT land on its own.** It produces a reviewed checkpoint
 > # that child 3 assembles. No QA handoff as a candidate, no publication, no
@@ -23,8 +23,12 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 Re-sized on route C by the Architect's sizing D0 `evt_51cm672pdy1r1`,
 against child 1 at `c462fe831`.
 
-- **Build on child 2a's held tip over `c462fe831`.** Ports arrive from
-  2a's bound Runtime-IR region markers. This child never discovers a port,
+- **Build on child 2a's held tip `370168a48`**
+  (`wp/RT-BRACKET-REGION-TRANSPORT`, over `c462fe831`; runtime QA
+  `evt_7rvyzxzk7s17e`, Architect `evt_3drtxbpcrzv1c`), on this child's own
+  branch. Never move, reset or delete that ref. Ports arrive from 2a's
+  bound Runtime-IR region markers, `RuntimeExpr::CheckedBracketFinalizer`,
+  keyed by (owner, checked preorder node id). This child never discovers a port,
   never selects by `HostOpV1`, and never re-derives authority.
 - **Route C discharges:** port authenticity, the static acquire to Ok
   binder to finalizer pairing per region, and lexical nesting inside one
