@@ -240,6 +240,17 @@ byte-identical. Child 3 replaces these arms with real lowering. Owed:
 `-p ken-runtime --lib` checks clean, and each lowering file's diff is
 exactly the one arm.
 
+**Also admitted: a planning-only `BracketExit` settlement class
+(Architect `evt_55at3sk6mqve`), inside the static_transition cluster.**
+A returned Vis with no ordinary successor row names the plane's T1 edge
+when exactly one instance settles at it and the returning owner is that
+instance's acquire or lies in its Body. `ResponseOwnerSettlement` gains
+`BracketExit`, which is not an `Excluded` reason, so emission refuses it
+by its existing PlannerInvariant arm. This is not a new return protocol:
+no transfer, ABI word, KRET lane or emission is added, and child 3 lowers
+the edge. The Underived guard is unchanged for every other member. The
+ruling's edits 1-6 and controls (a)-(d) are operative.
+
 **A CROSS-CRATE exhaustiveness sweep is owed ONLY IF THE TYPE IS VISIBLE
 OUTSIDE `ken-runtime`. CHECK VISIBILITY FIRST -- do not inherit the answer.**
 Measured at `dda3ff6d7`: `ResponseDisposition` and `StaticTransitionPlan` are
@@ -254,3 +265,11 @@ WHAT STILL APPLIES HERE: the WITHIN-crate sweep by GREP before building (20
 the moment the variant lands. If `BracketSettlementId` or any new type reaches
 a public surface, the cross-crate sweep is owed again ON THAT TYPE and today's
 answer does not carry. Never `--workspace`.
+
+## Hard-stop inventory (§1b)
+
+§1a: 1 (Architect `evt_55at3sk6mqve`).
+
+1. An ordinary returned-Vis walk chained a successor through a
+   partitioned S. Keyed on `vis_origin` membership in the ordinary
+   candidate rows.
