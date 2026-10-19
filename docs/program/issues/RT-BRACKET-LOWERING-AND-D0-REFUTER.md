@@ -140,7 +140,11 @@ return protocol, so it is out of scope here and goes to a later node.
 Lowering must claim every marked S by its plane key (Architect
 `evt_1yb966jffc2zr`). A marked S with no response owner, such as
 multi-leaf's, otherwise reaches the origin-only `None` Construct arm
-(lowering/core.rs ~:16680) and is lowered ordinarily.
+(lowering/core.rs ~:16680) and is lowered ordinarily. Lowering also claims S for
+every owner in `PendingVisSettlements.bracket_exits`, whatever its ordinary
+class (Protocol, RetOnly, `Excluded{Relay}`, `Excluded{Underived}`), and
+replaces 2b's emission refusal for them. Its D0 counts that no S is
+emitted by any ordinary arm (Architect `evt_5yqxd0jyc9bjj`).
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 

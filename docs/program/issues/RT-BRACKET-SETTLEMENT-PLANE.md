@@ -142,17 +142,16 @@ AcquireOk -> Body -> BodyExit -> Settlement -> OutcomeMerge -> Resume
 AcquireErr -----------------------------------------------> Resume
 ```
 
-- **Partition FIRST.** Derive the raw exact response occurrence/context
-  inventory, partition marked settlement instances out of it BEFORE
-  `static_response_context_demands_filtered`, bind the control plane from the
-  marked partition, and pass ONLY the ordinary partition onward.
-  The partition has two outputs, not one (Architect `evt_1yb966jffc2zr`). A
-  marked occurrence's raw demand is built by the same demand-construction
-  code as an ordinary one and is retained as `marked_demands`: it installs
-  S's K continuation context (`response_context_union` over both outputs)
-  and binds the plane, with each `Continuation` instance matching exactly
-  one marked demand. It is excluded only from ordinary demands, Deferred
-  rows, the Phase-B split, candidate rows and ownership.
+- **Partition the OWNERSHIP role only, at member granularity (Architect
+  recut `evt_5yqxd0jyc9bjj`).** A marked S leaves ordinary ownership
+  (demands, Deferred, Phase B, candidates). Its raw demand is still built by
+  the ordinary demand-construction code, kept as `marked_demands`, and
+  creates S's K context (`response_context_union` over both outputs); each
+  `Continuation` instance matches exactly one marked demand. A returned-Vis
+  owner settles over its non-bracket members exactly as at c18, and records
+  its bracket exits in `PendingVisSettlements.bracket_exits`, never as an
+  owner settlement class. No other ordinary structure changes except by
+  removal of S's own ownership.
 - **Instance identity.** Each region carries its exact call/return context key
   beside its source ports, and EVERY disposition and control-view query uses
   that key.
@@ -247,16 +246,15 @@ byte-identical. Child 3 replaces these arms with real lowering. Owed:
 `-p ken-runtime --lib` checks clean, and each lowering file's diff is
 exactly the one arm.
 
-**Also admitted: a planning-only `BracketExit` settlement class
-(Architect `evt_55at3sk6mqve`), inside the static_transition cluster.**
-A returned Vis with no ordinary successor row names the plane's T1 edge
-when exactly one instance settles at it and the returning owner is that
-instance's acquire or lies in its Body. `ResponseOwnerSettlement` gains
-`BracketExit`, which is not an `Excluded` reason, so emission refuses it
-by its existing PlannerInvariant arm. This is not a new return protocol:
-no transfer, ABI word, KRET lane or emission is added, and child 3 lowers
-the edge. The Underived guard is unchanged for every other member. The
-ruling's edits 1-6 and controls (a)-(d) are operative.
+**Also admitted: the fail-closed emission refusal for bracket exits
+(Architect `evt_5yqxd0jyc9bjj`, item 4), and nothing else in lowering.**
+Copy `pending_vis_settlements.bracket_exits` into `Lowering` as
+`response_bracket_exits` (lowering/core.rs field copy, the mod.rs field,
+and the six test constructors), and refuse with the ruling's
+PlannerInvariant text in units.rs before the existing match, whose arms
+stay byte-identical. Child 3 replaces this refusal. The `BracketExit`
+settlement class of `evt_55at3sk6mqve` and its relay+bracket guard are
+withdrawn.
 
 **A CROSS-CRATE exhaustiveness sweep is owed ONLY IF THE TYPE IS VISIBLE
 OUTSIDE `ken-runtime`. CHECK VISIBILITY FIRST -- do not inherit the answer.**
@@ -276,15 +274,14 @@ answer does not carry. Never `--workspace`.
 ## Hard-stop inventory (§1b)
 
 §1a: 3 (Architect `evt_55at3sk6mqve`, `evt_1yb966jffc2zr`,
-`evt_3ccgjnw5cpjey`). **RESEARCH HOLD:** the ruling on entry 3 waits for
-a Research prior-art advisory; nothing builds on WIP `4b67d3ef6` until
-then.
+`evt_3ccgjnw5cpjey`). The research advisory (`evt_g6bwnpt95vvs`)
+discharged the third stop and the hold is released (`evt_5yqxd0jyc9bjj`);
+the next re-trigger is the sixth.
 
-Shared predicate (Architect `evt_3ccgjnw5cpjey`): the bracket partition is
-applied to coarse planner bundles, not to the ownership role alone. The
-candidate closure, not yet ruled: bracket ownership is a per-member
-classification consumed at every coarse unit, and every non-ownership
-role stays on its ordinary path.
+Shared predicate: the bracket partition was applied to coarse planner
+bundles, not to the ownership role alone. The ruled closure is the §2
+partition above: bracket ownership is classified per member, and every
+non-ownership role stays on its ordinary path.
 
 1. An ordinary returned-Vis walk chained a successor through a
    partitioned S. Keyed on `vis_origin` membership in the ordinary
