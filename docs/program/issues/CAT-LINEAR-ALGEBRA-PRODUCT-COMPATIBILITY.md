@@ -53,8 +53,9 @@ the seed's new §3 cases.
 - **AC-3 (mutation, QA).** Each mutant fails, and is restored:
   - `transpose_product` stated in the unreversed order is
     kernel-rejected;
-  - `vector_scale` ignoring its factor fails the seed's `dot_scale`
-    oracle;
+  - `vector_scale` ignoring its factor fails the public `dot_scale` proof
+    and the seed's `vector_scale_three_oracle` (the seed has no `dot_scale`
+    row; foundation QA `evt_68yhdem6h8268`);
   - `transpose` reversing its row order fails the `transpose_product`
     non-square oracle.
 
