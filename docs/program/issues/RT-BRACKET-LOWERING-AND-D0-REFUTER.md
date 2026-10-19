@@ -137,6 +137,11 @@ A `Trap` in a bracket Body stays refused by 2b's "body trap has no
 settlement edge" (Architect `evt_4hqrrtzpypd83`). Trap settlement needs a
 return protocol, so it is out of scope here and goes to a later node.
 
+Lowering must claim every marked S by its plane key (Architect
+`evt_1yb966jffc2zr`). A marked S with no response owner, such as
+multi-leaf's, otherwise reaches the origin-only `None` Construct arm
+(lowering/core.rs ~:16680) and is lowered ordinarily.
+
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 
 Split at the lowering/observation seam: the lowering consumer plus the affine
