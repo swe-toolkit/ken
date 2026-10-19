@@ -74,23 +74,29 @@ fn nested_bool_demand_reads_the_selected_evidence_not_the_hole_telescope() {
 }
 
 #[test]
-fn open_subset_proof_under_recursive_nat_split_refuses_without_minting_a_hole() {
+fn open_subset_proof_under_indexed_split_refuses_without_minting_a_hole() {
     let mut env = ElabEnv::new().expect("checked prelude");
+    env.elaborate_decl("data Ix : Nat -> Type where { Z : Ix Zero; S : Ix (Suc Zero) }")
+        .expect("checked indexed family");
     let mut cx = ElabCtx::new(
         &mut env.env,
         &env.globals,
         &mut env.num_values,
         &env.numeric_env,
         &env.refinement_facts,
-        "recursive split refusal",
+        "indexed split refusal",
     )
     .with_preconditions(&env.preconditions, PremiseHoles::Reported);
-    let nat = Term::indformer(*cx.globals.get("Nat").expect("prelude Nat"), vec![]);
     let zero = Term::constructor(*cx.globals.get("Zero").expect("prelude Zero"), vec![]);
-    cx.ctx.push(nat.clone());
+    let ix_zero = Term::app(
+        Term::indformer(*cx.globals.get("Ix").expect("checked Ix"), vec![]),
+        zero,
+    );
+    let z = Term::constructor(*cx.globals.get("Z").expect("checked Z"), vec![]);
+    cx.ctx.push(ix_zero.clone());
     let split_id = cx.mint_split();
     cx.path_conditions.push(PathFrame {
-        condition: Term::Eq(Box::new(nat), Box::new(Term::var(0)), Box::new(zero)),
+        condition: Term::Eq(Box::new(ix_zero), Box::new(Term::var(0)), Box::new(z)),
         install_depth: cx.ctx.len(),
         split_id,
         kind: SplitKind::Constructor,
@@ -105,7 +111,7 @@ fn open_subset_proof_under_recursive_nat_split_refuses_without_minting_a_hole() 
         ObligationKind::RefinementIntroduction,
         None,
     )
-    .expect_err("recursive split has no convoy evidence");
+    .expect_err("indexed split without heterogeneous equation has no convoy evidence");
     assert!(
         matches!(error, ElabError::NonConvoyableRefinementSplit { .. }),
         "{error:?}"

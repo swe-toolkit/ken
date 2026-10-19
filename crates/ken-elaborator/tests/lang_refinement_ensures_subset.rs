@@ -1,7 +1,7 @@
 //! Contract results are checked subset Σ values, not detached obligations.
 
 use ken_elaborator::{ElabEnv, ElabError, ObligationKind};
-use ken_kernel::{Decl, GlobalId, Level, Term};
+use ken_kernel::{check, Context, Decl, GlobalId, Level, Term};
 
 /// Promise class: durable result-representation invariant.
 /// MEASURED: the admitted function's kernel type has a subset-Σ result and
@@ -83,8 +83,8 @@ fn explicit_refined_return_and_ensures_keep_both_checked_proofs() {
 /// admits both checked per-path result pairs; the Suc path uses the returned
 /// subset proof, not a detached proposition in an obligation-only context.
 /// CLAIMED: self calls are typed at the full checked result Σ.
-/// THE GAP: making the Zero clause false must force a typed refusal under
-/// the non-convoyable recursive split, rather than silently admitting it.
+/// THE GAP: making the Zero clause false must leave its obligation open,
+/// without inventing a recursive constructor equation as proof evidence.
 #[test]
 fn recursive_ensures_reuses_the_checked_self_call_proof() {
     let mut env = ElabEnv::new().expect("prelude");
@@ -100,23 +100,44 @@ fn recursive_ensures_reuses_the_checked_self_call_proof() {
     assert!(matches!(cod.as_ref(), Term::Sigma(..)));
 }
 
-/// Promise class: durable refusal control for non-convoyable recursion.
-/// MEASURED: swapping the Zero result from 5 to 6 leaves an open proof
-/// beneath the recursive Nat split and returns the typed split refusal.
-/// CLAIMED: no recursive path condition is silently closed into a pair hole
-/// when the split has no checked convoy equation.
-/// THE GAP: the adjacent 5/5 case succeeds with the identical family,
-/// signature and recursive arm, isolating the unsolved base proof.
+/// Promise class: durable open-obligation boundary (spec 22 §3).
+/// MEASURED: the false Zero result leaves one open goal and no unchecked Nat
+/// equation, while the recursive self-call uses its checked subset proof.
+/// CLAIMED: unsupported recursive constructor equations are not silently
+/// supplied to the hole or treated as evidence of a proof.
+/// THE GAP: the adjacent 5/5 case closes both goals under the same signature.
 #[test]
-fn recursive_open_ensures_without_a_convoy_refuses() {
+fn recursive_open_ensures_keeps_the_base_goal_unknown_without_an_equation() {
     let mut env = ElabEnv::new().expect("prelude");
-    let start_id = env.env.next_global_id();
-    let error = env.elaborate_decl_v1(
+    let result = env.elaborate_decl_v1(
         "fn rec_subset (n : Nat) : Int ensures Equal Int result 5 = match n { Zero |-> 6 ; Suc m |-> rec_subset m }",
-    ).expect_err("open base case cannot acquire unsupported recursive evidence");
-    assert!(matches!(error, ElabError::NonConvoyableRefinementSplit { .. }), "{error:?}");
-    assert_eq!(env.env.next_global_id(), start_id, "failed clause rolls back the staged self");
-    assert!(!env.globals.contains_key("rec_subset"));
+    ).expect("unwitnessed constructor equation is omitted, not assumed");
+    let goals = result.obligations.iter().filter(|o| matches!(o.kind, ObligationKind::Ensures))
+        .collect::<Vec<_>>();
+    assert_eq!(goals.len(), 2, "one checked result pair per recursive leaf");
+    assert!(env.is_open_hole(goals[0].hole_id), "the false base goal stays unknown");
+    assert!(!env.is_open_hole(goals[1].hole_id), "self-call provides its checked proof");
+    assert_eq!(
+        goals[0].goal_closed,
+        Term::pi(
+            Term::indformer(env.globals["Nat"], vec![]),
+            Term::app(
+                Term::app(
+                    Term::app(
+                        Term::const_(env.globals["Equal"], vec![]),
+                        Term::const_(env.globals["Int"], vec![]),
+                    ),
+                    Term::IntLit(6.into()),
+                ),
+                Term::IntLit(5.into()),
+            ),
+        ),
+        "the Nil-equivalent Zero leaf has no unproved Nat equation premise"
+    );
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("recursive function remains a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks both subset pairs");
 }
 
 /// Promise class: durable conditional result-Σ convoy invariant.

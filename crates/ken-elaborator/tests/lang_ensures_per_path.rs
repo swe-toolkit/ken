@@ -2,7 +2,7 @@
 //! The predicate is opaque so no reduction can conceal whole-body emission.
 
 use ken_elaborator::{ElabEnv, ElabError, ObligationKind};
-use ken_kernel::{Decl, Level, Term};
+use ken_kernel::{check, Context, Decl, GlobalId, Level, Term};
 
 fn predicate_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
@@ -14,6 +14,15 @@ fn predicate_env() -> ElabEnv {
 
 fn contains_elim(term: &Term) -> bool {
     matches!(term, Term::Elim { .. }) || term.children().iter().any(|child| contains_elim(child))
+}
+
+fn has_nat_equation(term: &Term, nat: GlobalId) -> bool {
+    if let Term::Eq(carrier, _, _) = term {
+        if matches!(carrier.as_ref(), Term::IndFormer { id, .. } if *id == nat) {
+            return true;
+        }
+    }
+    term.children().iter().any(|child| has_nat_equation(child, nat))
 }
 
 /// Durable invariant. MEASURED: each independently opaque clause emits a
@@ -133,23 +142,30 @@ fn argument_branch_does_not_inherit_the_result_predicate() {
     );
 }
 
-/// Durable non-convoyable boundary. An opaque base goal under the recursive
-/// Nat split has no checked branch equation to apply to a subset pair's open
-/// hole. The positive closed-base self-call is pinned in
+/// Durable unknown boundary (22 §3). An opaque base goal under the
+/// recursive Nat split remains open without an unproved branch equation.
+/// The closed-base counterpart is pinned in
 /// lang_refinement_ensures_subset::recursive_ensures_reuses_the_checked_self_call_proof.
 #[test]
-fn recursive_open_postcondition_refuses_without_an_unchecked_path_binder() {
+fn recursive_open_postcondition_omits_the_unsupported_nat_equation() {
     let mut env = predicate_env();
-    for (source, name) in [
-        ("fn es_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc m |-> es_rec m }", "es_rec"),
-        ("fn lit_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc m |-> lit_rec m }", "lit_rec"),
+    for (source, name, kind, count) in [
+        ("fn es_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc m |-> es_rec m }", "es_rec", ObligationKind::Ensures, 2),
+        ("fn lit_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc m |-> lit_rec m }", "lit_rec", ObligationKind::RefinementIntroduction, 1),
     ] {
-        let before = env.env.next_global_id();
-        let error = env.elaborate_decl_v1(source).expect_err("unsupported open recursive path");
-        assert!(matches!(error, ElabError::NonConvoyableRefinementSplit { .. }),
-            "{source}: {error:?}");
-        assert_eq!(env.env.next_global_id(), before, "transactional refusal: {source}");
-        assert!(!env.globals.contains_key(name));
+        let result = env.elaborate_decl_v1(source).expect("no invented Nat equation");
+        assert_eq!(result.obligations.len(), count,
+            "direct subset self-call reuses its proof; ensures records each leaf: {source}");
+        assert!(result.obligations.iter().all(|goal|
+            std::mem::discriminant(&goal.kind) == std::mem::discriminant(&kind)
+            && !has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
+        assert!(env.is_open_hole(result.obligations[0].hole_id),
+            "opaque base goal remains unknown: {source}");
+        assert_eq!(env.globals[name], result.def_id, "admitted recursive result");
+        let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+            panic!("recursive result is checked and transparent: {source}")
+        };
+        check(&env.env, &Context::new(), body, ty).expect("kernel checks per-leaf subset pairs");
     }
 }
 
@@ -190,23 +206,30 @@ fn recursive_checked_result_uses_nonfinal_parameter_and_requirement() {
         "the postcondition is carried by the kernel result, not a detached hypothesis");
 }
 
-/// Durable nested-recursion boundary. A two-level recursive Nat matrix with
-/// any opaque open result proof must refuse before admitting either function.
-/// The nonrecursive two-level checked-equation counterpart is pinned in
-/// lang_refinement_ensures_subset::nested_constructor_result_pairs_replay_checked_split_equations.
+/// Durable nested-recursion boundary. Both recursive Nat splits lack a
+/// checked branch equation, so each open result leaf is admitted as unknown
+/// over evidenced Γ only. Nonrecursive checked-equation methods remain pinned
+/// in lang_refinement_ensures_subset::nested_constructor_result_pairs_replay_checked_split_equations.
 #[test]
-fn nested_recursive_matrix_open_leaf_refuses_without_a_checked_convoy() {
+fn nested_recursive_matrix_keeps_open_leaves_without_an_unsupported_equation() {
     let mut env = predicate_env();
-    for (source, name) in [
-        ("fn nested_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> nested_rec m }", "nested_rec"),
-        ("fn lit_nested_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> lit_nested_rec m }", "lit_nested_rec"),
+    for (source, name, kind, count) in [
+        ("fn nested_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> nested_rec m }", "nested_rec", ObligationKind::Ensures, 3),
+        ("fn lit_nested_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> lit_nested_rec m }", "lit_nested_rec", ObligationKind::RefinementIntroduction, 2),
     ] {
-        let before = env.env.next_global_id();
-        let error = env.elaborate_decl_v1(source).expect_err("recursive open leaf");
-        assert!(matches!(error, ElabError::NonConvoyableRefinementSplit { .. }),
-            "{source}: {error:?}");
-        assert_eq!(env.env.next_global_id(), before, "transactional refusal: {source}");
-        assert!(!env.globals.contains_key(name));
+        let result = env.elaborate_decl_v1(source).expect("recursive equations remain unsupported premises");
+        assert_eq!(result.obligations.len(), count,
+            "direct subset self-call reuses its proof; ensures records each leaf: {source}");
+        assert!(result.obligations.iter().all(|goal|
+            std::mem::discriminant(&goal.kind) == std::mem::discriminant(&kind)
+            && !has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
+        assert!(env.is_open_hole(result.obligations[0].hole_id),
+            "the opaque Zero leaf remains unknown: {source}");
+        assert_eq!(env.globals[name], result.def_id, "admitted recursive result");
+        let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+            panic!("nested recursive result is checked and transparent: {source}")
+        };
+        check(&env.env, &Context::new(), body, ty).expect("kernel checks nested result pairs");
     }
 }
 

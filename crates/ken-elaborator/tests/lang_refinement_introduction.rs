@@ -459,24 +459,31 @@ fn mutually_recursive_source_introductions_keep_alias_identity() {
     arbitrary_predicate(&mut env);
     env.elaborate_decl("def Pos = { x : Int | P x }")
         .expect("alias");
-    let before_id = env.env.next_global_id();
-    let before_globals = env.globals.clone();
-    let failure = env
+    let results = env
         .elaborate_file_v1(
             "fn left (n : Nat) : Pos = match n { Zero |-> 5 ; Suc m |-> right m }\n\
          fn right (n : Nat) : Pos = match n { Zero |-> 6 ; Suc m |-> left m }",
         )
-        .expect_err("open base evidence under recursive splits cannot convoy");
-    assert!(
-        matches!(failure, ElabError::NonConvoyableRefinementSplit { .. }),
-        "recursive open-hole demand must refuse by type: {failure:?}"
-    );
-    assert_eq!(
-        env.env.next_global_id(),
-        before_id,
-        "refused group admitted globals"
-    );
-    assert_eq!(env.globals, before_globals, "refused group retained names");
+        .expect("unsupported recursive equations are omitted, not assumed");
+    assert_eq!(results.len(), 2, "both mutually recursive names are admitted");
+    let nat = Term::indformer(env.globals["Nat"], vec![]);
+    let p = Term::const_(env.globals["P"], vec![]);
+    for (result, (name, value)) in results.iter().zip([("left", 5), ("right", 6)]) {
+        assert_eq!(env.globals[name], result.def_id, "correct mutual name");
+        let [goal] = result.obligations.as_slice() else {
+            panic!("one open introduction for the fresh base value: {name}")
+        };
+        assert!(matches!(goal.kind, ObligationKind::RefinementIntroduction));
+        assert!(env.is_open_hole(goal.hole_id), "each opaque base goal remains unknown");
+        assert_eq!(
+            goal.goal_closed,
+            Term::pi(nat.clone(), Term::app(p.clone(), Term::IntLit(value.into()))),
+            "no unchecked recursive constructor equation is closed into {name}'s goal"
+        );
+        let Some(ken_kernel::Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id)
+        else { panic!("mutual function {name} must remain checked and transparent") };
+        check(&env.env, &Context::new(), body, ty).expect("kernel checks alias-typed pair");
+    }
 }
 
 #[test]

@@ -1,9 +1,9 @@
 //! A match result retains the checked subset type at every leaf. Open proof
-//! demand under a recursive or unsupported indexed split refuses by type;
-//! a closed certificate does not demand a split witness.
+//! demand under an unsupported indexed split refuses by type; recursive
+//! unindexed paths omit unwitnessed equations and keep open goals unknown.
 
 use ken_elaborator::{ElabEnv, ElabError, ElabResult, ObligationKind};
-use ken_kernel::{normalize, Context, Term};
+use ken_kernel::{check, normalize, Context, Decl, GlobalId, Term};
 
 const FIVE: &str = "def Five = { n : Int | Equal Int n 5 }\n";
 const INDEX: &str =
@@ -25,7 +25,7 @@ fn refuses_open_split(source: &str, rejected_name: &str) {
     let before_trust = env.env.trusted_base();
     let error = env
         .elaborate_file_v1(source)
-        .expect_err("an open subset hole cannot demand a recursive or indexed split");
+        .expect_err("an open subset hole cannot demand an unsupported indexed split");
     assert!(
         matches!(error, ElabError::NonConvoyableRefinementSplit { .. }),
         "split refusal must be typed: {error:?}; source={source}"
@@ -74,15 +74,32 @@ fn nonrecursive_result_matrix_keeps_each_open_leaf_checked() {
     );
 }
 
+fn has_equation_for_family(term: &Term, family: GlobalId) -> bool {
+    if let Term::Eq(carrier, _, _) = term {
+        let mut head = carrier.as_ref();
+        while let Term::App(function, _) = head {
+            head = function;
+        }
+        if matches!(head, Term::IndFormer { id, .. } if *id == family) {
+            return true;
+        }
+    }
+    term.children().iter().any(|child| has_equation_for_family(child, family))
+}
+
+/// Promise class: durable unknown boundary under recursive unindexed splits
+/// (22 §3). Opaque open goals stay open, with no fabricated constructor Eq.
 #[test]
-fn recursive_and_indexed_open_result_splits_refuse_transactionally() {
-    for (source, name) in [
+fn recursive_unindexed_result_goals_omit_unsupported_equations() {
+    for (source, name, family, count) in [
         (
             format!(
                 "{FIVE}fn list_case (xs : List Bool) (x : Int) : Five = \
              match xs {{ Nil ↦ x; Cons b tail ↦ x }}"
             ),
             "list_case",
+            "List",
+            2,
         ),
         (
             format!(
@@ -90,20 +107,8 @@ fn recursive_and_indexed_open_result_splits_refuse_transactionally() {
              match n {{ Zero ↦ x; Suc m ↦ rec m x }}"
             ),
             "rec",
-        ),
-        (
-            format!(
-                "{FIVE}{INDEX}fn indexed_nested (n : Nat) (i : Ix n) (x : Int) : Five = \
-             match i {{ Z (Cons y ys) ↦ x; Z Nil ↦ x; S ys ↦ x }}"
-            ),
-            "indexed_nested",
-        ),
-        (
-            format!(
-                "{FIVE}{INDEX}fn homogeneous (i : Ix Zero) (x : Int) : Five = \
-             match i {{ Z xs ↦ x }}"
-            ),
-            "homogeneous",
+            "Nat",
+            1,
         ),
         (
             format!(
@@ -111,10 +116,58 @@ fn recursive_and_indexed_open_result_splits_refuse_transactionally() {
              match r {{ DLeaf ↦ x; DNode kids ↦ x }}"
             ),
             "nested",
+            "DRose",
+            2,
         ),
     ] {
-        refuses_open_split(&source, name);
+        let (env, result) = checked(&source, count);
+        assert_eq!(env.globals[name], result.def_id, "recursive result admitted");
+        assert!(result.obligations.iter().all(|goal|
+            matches!(goal.kind, ObligationKind::RefinementIntroduction)
+            && env.is_open_hole(goal.hole_id)
+            && !has_equation_for_family(&goal.goal_closed, env.globals[family])),
+            "open goals have no invented recursive equation: {source}");
+        let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+            panic!("recursive result is a checked transparent definition: {source}")
+        };
+        check(&env.env, &Context::new(), body, ty).expect("kernel checks recursive subset results");
     }
+}
+
+/// Promise class: durable indexed refusal. The homogeneous fixed-index
+/// branch has no heterogeneous index equation that could support its open
+/// result hole, so demand retains the typed refusal.
+#[test]
+fn unsupported_homogeneous_indexed_open_result_split_refuses_transactionally() {
+    refuses_open_split(
+        &format!(
+            "{FIVE}{INDEX}fn homogeneous (i : Ix Zero) (x : Int) : Five = \
+             match i {{ Z xs ↦ x }}"
+        ),
+        "homogeneous",
+    );
+}
+
+/// Promise class: durable checked-index path. A heterogeneous `Ix n` split
+/// has its existing checked index evidence; the new filter must not remove
+/// its three independently emitted introduction obligations.
+#[test]
+fn indexed_nested_split_preserves_checked_index_path() {
+    let (env, result) = checked(
+        &format!(
+            "{FIVE}{INDEX}fn indexed_nested (n : Nat) (i : Ix n) (x : Int) : Five = \
+             match i {{ Z (Cons y ys) ↦ x; Z Nil ↦ x; S ys ↦ x }}"
+        ),
+        3,
+    );
+    assert!(result.obligations.iter().all(|goal|
+        matches!(goal.kind, ObligationKind::RefinementIntroduction)
+            && env.is_open_hole(goal.hole_id)),
+        "the indexed split retains each open result leaf");
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("indexed result remains a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks indexed result pairs");
 }
 
 #[test]
