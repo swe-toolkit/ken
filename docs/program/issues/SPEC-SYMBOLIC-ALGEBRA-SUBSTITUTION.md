@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION
 title: "Spec 66 evaluates and decides equality of Nat polynomial expressions but defers substitution: nothing substitutes expressions for variables, or proves that evaluating a substitution is evaluating under the composed environment. Rule substitution and its laws from a checked D0 at zero trust, and state them as a section 3 with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
