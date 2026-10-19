@@ -1,7 +1,7 @@
 ---
 id: CAT-SYMBOLIC-ALGEBRA-SUBSTITUTION
 title: "Algorithm.SymbolicAlgebra.NatPolynomial exports spec 66 section 3: compose_env, substitute, eval_substitute and the True-direction poly_eq_substitute. Proved as checked terms at zero trust, from the Architect's D0 development, with the substitution seed run by the package test"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
