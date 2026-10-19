@@ -46,10 +46,33 @@ fn applied_type<'a>(ty: &'a SourceType, name: &str) -> Option<Vec<&'a SourceType
     }
 }
 
+// A closed false Equal normalizes to Bottom, so conversion alone cannot
+// distinguish this product law from an unrelated false equality. Compare
+// parsed proposition trees, ignoring spans and whitespace; derive both
+// expected trees from the positive control's own product operands.
+fn type_shape(ty: &SourceType) -> String {
+    match ty {
+        SourceType::TCon(name, _) => format!("constructor:{name}"),
+        SourceType::TVar(name, _) => format!("variable:{name}"),
+        SourceType::TApp(function, argument, _) => {
+            format!("({} {})", type_shape(function), type_shape(argument))
+        }
+        other => panic!("unsupported shape in the closed product seed: {other:?}"),
+    }
+}
+
+fn proposition_shape(proposition: &str) -> String {
+    let source = format!("theorem expected_product_relation : {proposition} = Refl");
+    let decls = parse_decls(&source).expect("derived product relation parses");
+    let [SourceDecl::TheoremDecl { theorem, .. }] = decls.as_slice() else {
+        panic!("derived product relation is one theorem");
+    };
+    type_shape(theorem)
+}
+
 // Build the reversed and unreversed statements from the positive control's
-// transpose-of-product operands. A checked theorem under a hypothetical
-// proposition then verifies that each seed declaration states THAT relation;
-// an unrelated false equality cannot substitute for the intended refusal.
+// transpose-of-product operands. The shape comparison pins the proposition;
+// the checker separately proves the reversed case and refuses the false one.
 fn paired_order_probes(shared: &str, refused: &str) -> (String, String) {
     let positive_decls = parse_decls(shared).expect("shared order-control Ken parses");
     let Some(SourceDecl::TheoremDecl {
@@ -92,6 +115,11 @@ fn paired_order_probes(shared: &str, refused: &str) -> (String, String) {
         )
     };
     let positive_type = &shared[positive_goal.span().start..positive_goal.span().end];
+    assert_eq!(
+        type_shape(positive_goal),
+        proposition_shape(&relation(b, a)),
+        "positive seed theorem must state reversed factor order"
+    );
     let reversed_probe = format!(
         "theorem seed_reversed_contract (fact : {}) : {positive_type} = fact",
         relation(b, a)
@@ -107,6 +135,11 @@ fn paired_order_probes(shared: &str, refused: &str) -> (String, String) {
     };
     assert_eq!(negative_proof, "Refl", "negative claim must use Refl");
     let negative_type = &refused[negative_goal.span().start..negative_goal.span().end];
+    assert_eq!(
+        type_shape(negative_goal),
+        proposition_shape(&relation(a, b)),
+        "refused seed theorem must state unreversed factor order on the same pair"
+    );
     let unreversed_probe = format!(
         "theorem seed_unreversed_contract (fact : {}) : {negative_type} = fact",
         relation(a, b)
@@ -439,10 +472,10 @@ fn shipped_seed_positive_clients_check_section_three() {
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: on the same two square inputs, the reversed product relation
 /// checks and the unreversed relation refuses as a `Refl` TypeMismatch. Ken
-/// also checks that the seed's positive theorem states the reversed relation
-/// and its negative states the unreversed relation derived from the positive
-/// control's own product operands. An unrelated false equality fails the
-/// hypothetical-statement check before it can count as this refusal.
+/// structurally verifies that the seed's positive theorem states the reversed
+/// relation and its negative the unreversed relation, both derived from the
+/// positive control's own product operands. Unrelated false equalities cannot
+/// pass by merely normalizing to Bottom.
 /// CLAIMED: transpose reverses product factor order.
 /// THE GAP: one finite pair does not prove the generic theorem; the exported
 /// transparent body and independent arbitrary-index client are checked above.
