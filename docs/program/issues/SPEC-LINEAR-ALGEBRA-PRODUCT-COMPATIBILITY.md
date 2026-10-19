@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY
 title: "Spec 65 exports matrix_vector, matrix_product and transpose but states no law that relates them: nothing proves that applying a product to a vector is applying its factors in turn, or that transpose reverses a product. Rule both from a checked D0 at zero trust over natural scalars, and state them as a section 3 with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
