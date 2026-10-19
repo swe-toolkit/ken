@@ -166,22 +166,24 @@ cherry-picked or rebased. The marked S's Phase A demand is retained and
 resolved in Phase B into a disjoint `bracket_rows` table outside the
 plane, keyed by `BracketSettlementId`; no Phase B classifier sees it.
 D0-E measured all 13 regions Continuation-keyed (Architect
-`evt_1r37j7z3dgpbm`). Each S settles in place at S when its region or a
-plane ancestor has an owner-returned exit (11 regions); otherwise it is
-Deferred on the existing residual route, claimed in the ledger
-(multi-leaf, anonymous mapping). Both Construct lowering arms, ordinary
-and computational producer, settle an in-place S through one helper over
-the existing `drive_response_at_source` (Architect `evt_7rss2x6c15xsf`).
-A Deferred S on the producer arm claims its three edges and takes the
-existing producer route unchanged (R6b, `evt_32mpqmy5v0y6s`). The
-in-place effect seat gets its synthesized-aggregate owners from the
-`bracket_rows` as well as the ordinary response population, failing
-closed if those rows are not yet resolved (R6c). A per-lowering
-instrument over px8ta depths 2 and 3, the nine sources and the five
-`rt_native_bracket_body_once` tests precedes D0. It records the selected
-case path of each lowering, and goes with a sweep of every planning and
-lowering reader of the ordinary response population. D0 runs only when
-px8ta reaches its observations at both depths and every ledger closes.
+`evt_1r37j7z3dgpbm`). **Settlement site (recut, Architect
+`evt_7r2aae0wx4hm6`).** An S whose region or a plane ancestor has an
+owner-returned exit (11 regions) settles in place **at a site the plan
+names**, not wherever its Construct happens to be lowered. The
+computational-producer trampoline emits S under owners that neither
+contain S nor own its K (measured: S649 under Specialization(1), its K
+Specialization(0)), and one owner emits several static copies. The
+mechanism is ruled after the Research advisory. The other regions
+(multi-leaf, anonymous mapping) are Deferred on the existing residual
+route, claimed in the ledger. **Retained:** route C `c462fe831`, 2a
+`c18c8db68`, 2b `09d607a10`, `bracket_rows` keyed by
+`BracketSettlementId` (R2), the counting ledger (R6a), the claimed
+Deferred producer route (R6b, `evt_32mpqmy5v0y6s`), the effect claim,
+the shared owner-set function and its drive-site check as the fail-closed
+guard (R7, `evt_2cf6favxh6kjw`), and the per-lowering instrument over
+px8ta depths 2 and 3, the nine sources and the five
+`rt_native_bracket_body_once` tests. D0 runs only when px8ta reaches its
+observations at both depths and every ledger closes.
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 
@@ -196,12 +198,19 @@ delay is the Steward's error, not the ring's.
 
 ## Hard-stop inventory (§1b)
 
-§1a (emission seam): 2 (Architect `evt_32mpqmy5v0y6s`); the 3rd holds
-and calls Research. §1a (assembly): 0.
+§1a (emission seam): 3, HELD for the Research advisory (Architect
+`evt_7r2aae0wx4hm6`). §1a (assembly): 0.
 
 1. Marked S reached on the computational producer Construct arm
    (core.rs:3912/6965), which the in-place gate did not cover. Keyed on
    the Construct lowering arm (fan-in).
-2. In-place S's host-effect seat had no synthesized-aggregate owner
-   under the settling owner. Keyed on effect-seat emission owners
-   derived only from the ordinary response population.
+2. In-place S's host-effect seat had no synthesized-aggregate owner.
+   Keyed on effect-seat owners derived from the ordinary response
+   population, then from source containment.
+3. On the producer arm, S is lowered under a specialization that neither
+   contains S nor is its K specialization. Keyed on the settling owner,
+   reconstructed from containment plus the row's base owner.
+
+**Shared predicate (§1b).** In-place settlement was keyed on where the S
+Construct happens to be lowered, and the plan has no relation naming that
+place; each entry asked that fact of a relation that does not carry it.
