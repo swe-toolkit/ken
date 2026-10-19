@@ -3,8 +3,9 @@
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/66-symbolic-algebra.md` §1.
 
-These are **authored closed behavioral oracles** for the prospective
-`Algorithm.SymbolicAlgebra.NatPolynomial` module. Architect's full
+These are **authored closed behavioral oracles** for the
+`Algorithm.SymbolicAlgebra.NatPolynomial` module. Its §1 package and
+this seed are present on main. Architect's full
 D0 source (SHA256
 `6eba5226846c340539834c849a093b730bcf553e702aa5bc6a58de094782f940`)
 checked, rc=0. A scratch copy with **only** the five explicit
@@ -27,8 +28,8 @@ of the noncanonical pair's evaluation equality for **every**
 environment checked rc=0 (SHA256
 `10c1c3152fe71e5709a04a31b58b1a52bf3e5d5dede1e89f8e3bdfbed70cb099`).
 All source-shaped checks used the freshly built local `ken check`
-from base `bc092bdd5`; they do not publish the module, execute a
-shipped seed, measure trusted-base delta, or establish CI results.
+from base `bc092bdd5`. These scratch checks do not establish shipped
+seed-harness execution, a `trusted_base()` measurement, or CI results.
 Every case has promise class **durable invariant**. `Eq` over
 inductive structures is not a semantic-equality decision: list
 order and repeated variables are observable here.

@@ -3,12 +3,13 @@
 Format: `../../README.md`.
 Spec: `spec/50-stdlib/66-symbolic-algebra.md` §2.
 
-This seed supplies closed operation oracles for the prospective §2 extension
-of `Algorithm.SymbolicAlgebra.NatPolynomial`. It does not replace or extend
+This seed supplies closed operation oracles for §2 of
+`Algorithm.SymbolicAlgebra.NatPolynomial`; its §2 catalog extension and
+this seed are present on main. It does not replace or extend
 `seed-nat-polynomial.md`, whose cases remain about §1's ordered distributed
 monomials. The assertions below are derived from the §2 contract and the
-checked `Nat` arithmetic interface. They do not claim that §2 catalog code or
-this seed has shipped or run.
+checked `Nat` arithmetic interface. They do not establish shipped seed-harness
+execution or CI.
 
 Every case has promise class **durable invariant**.
 
