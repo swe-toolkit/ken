@@ -12388,18 +12388,6 @@ fn sort_walk_same_constant_spine(
     {
         return false;
     }
-    // A pair with no open level meta is untouched by any link, so the final
-    // check below would refuse it exactly as this conversion does. Test in
-    // source order so a failed argument does not walk its expensive siblings.
-    for (expected_arg, actual_arg) in expected_args.iter().zip(&actual_args) {
-        let expected_arg = metas.zonk_term_with(expected_arg, false);
-        let actual_arg = metas.zonk_term_with(actual_arg, false);
-        if sort_walk_is_inert(metas, &expected_arg, &actual_arg)
-            && !convert_type(env, ctx, &expected_arg, &actual_arg)
-        {
-            return false;
-        }
-    }
     let saved = metas.metas.clone();
     for (expected_level, actual_level) in expected_levels.iter().zip(&actual_levels) {
         unify_levels(metas, expected_level, actual_level);
