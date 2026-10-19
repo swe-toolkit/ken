@@ -54,7 +54,8 @@ on the current base before measuring, and reports any that moved.
     most once per split. (B), always-bind, is out: M4 = 1 and 33 kernel
     rejections. (A) passed M1, M2 and the retry bound.
   - **Demand criterion (amendments 1 and 2, Architect
-    `evt_5zp1649t8qn9n`).** The ruling's text:
+    `evt_5zp1649t8qn9n`; amendment 3, `evt_6g7tvrp8r02s4`).** The
+    ruling's text:
     1. An introduction with a selected certificate demands exactly the
        enclosing splits whose condition binders are free in the peeled
        certificate evidence (`lower_binders` of the actual term). A
@@ -64,10 +65,12 @@ on the current base before measuring, and reports any that moved.
        every admissible condition it is closed over. Convoyable splits
        (`let`, `if`, literal, non-recursive non-indexed constructor
        branch) are discharged as the frame's evidence rules state.
-    3. An open hole whose demand reaches a non-convoyable split
-       (recursive, or indexed without heterogeneous equations) is a
-       typed refusal, never `Internal`. Recursive families stay with
-       `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`.
+    3. An open hole whose demand reaches an indexed split without
+       heterogeneous equations is a typed refusal, never `Internal`. A
+       recursive unindexed constructor split has no equation evidence
+       until `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`; per spec 22 §3 it
+       contributes no condition, is never demanded, and the hole closes
+       over the evidenced Γ only (Architect `evt_6g7tvrp8r02s4`).
 
 ## Deliverable
 
@@ -103,9 +106,15 @@ on the current base before measuring, and reports any that moved.
     certificate demands neither, and an open hole demands both. Paired
     failing configuration: demand read off the hole telescope makes the
     closed-certificate case demand both.
-  - **AC-0b-2.** One open hole under a recursive split gives the typed
-    refusal, not `Internal`. Paired failing configuration: removing the
-    gate admits it or panics.
+  - **AC-0b-2 (amendment 3).** One open hole under an indexed split
+    without heterogeneous equations gives the typed refusal, not
+    `Internal`. Paired failing configuration: removing the gate admits it
+    or panics. Under a recursive unindexed split (`sort`'s Nil leaf), the
+    hole's `goal_closed` holds no `Eq` on `List` and the `xs` match keeps
+    the plain Σ motive; closing over the equation, or demanding the
+    split, each refuses. The consumer sweep over every source root
+    reports each such hole's outcome against main, and any change from
+    proved to not proved is a stop.
   - **AC-0b-3.** At the candidate, the six closures stay admitted with 16
     pairs kernel-checked, and the certificate-discard mutation refuses
     the five `Doc` closures while Console stays admitted.
