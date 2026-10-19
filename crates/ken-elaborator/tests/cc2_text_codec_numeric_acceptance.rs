@@ -11,7 +11,7 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{eval, eval_checked, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const STRING_BIJECTION_KEN_MD: &str =
@@ -100,7 +100,9 @@ fn make_store(env: &ElabEnv) -> EvalStore {
 fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
     let id = env.globals[name];
     match env.env.lookup(id) {
-        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
+        Some(Decl::Transparent { body, ty, .. }) => {
+            eval_checked(body, ty, &env.env, store).expect("checked body erases")
+        }
         other => panic!("`{name}` must be transparent, got {other:?}"),
     }
 }

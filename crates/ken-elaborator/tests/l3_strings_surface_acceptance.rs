@@ -25,7 +25,7 @@ mod catalog_or;
 use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, NumericLitVal};
-use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{apply, eval_checked, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DERIVED: &str = "Data.Collections.Derived";
@@ -153,7 +153,9 @@ fn lit_to_eval(v: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
 
 fn eval_def(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
     match env.env.lookup(id) {
-        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
+        Some(Decl::Transparent { body, ty, .. }) => {
+            eval_checked(body, ty, &env.env, store).expect("checked body erases")
+        }
         _ => EvalVal::Unknown,
     }
 }
