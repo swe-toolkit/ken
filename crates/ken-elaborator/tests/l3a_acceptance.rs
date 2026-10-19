@@ -424,12 +424,23 @@ fn sort_emits_issorted_and_perm() {
         "sort must upgrade to transparent after SCT"
     );
 
-    // The conjoined refinement obligation is EMITTED (`34 §5`, `22 §2.1`).
+    // The refinement-introduction obligation (22 §2.1) is emitted per result leaf.
+    assert_eq!(
+        res.obligations
+            .iter()
+            .filter(|o| matches!(o.kind, ObligationKind::RefinementIntroduction))
+            .count(),
+        2,
+        "sort must emit one refinement introduction for each result leaf"
+    );
+    // The Cons leaf keeps `Perm` syntactically; the Nil leaf normalizes its
+    // `Perm` application while preserving the open proposition.
     let obl = res
         .obligations
         .iter()
-        .find(|o| matches!(o.kind, ObligationKind::Ensures))
-        .expect("sort emits an Ensures (refinement) obligation");
+        .filter(|o| matches!(o.kind, ObligationKind::RefinementIntroduction))
+        .nth(1)
+        .expect("sort emits a refinement-introduction obligation (22 §2.1) for its Cons leaf");
 
     // AC6 (soundness): the obligation carries BOTH conjuncts — `is_sorted` AND
     // the load-bearing `Perm` (sortedness-alone is `const Nil`-vacuous; a
@@ -457,15 +468,16 @@ fn sort_emits_issorted_and_perm() {
 // helpers (Term walking, literal bridge, slot extraction)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Does `term` mention the global constant `id` (as a `Term::Const`)? Walks the
-/// sub-term tree (Pi/Lam/App/Let/Ascript/Elim/Const/Constructor/IndFormer/...).
+/// Does `term` mention the global constant `id` (as a `Term::Const`)? Walks
+/// the Pi/Sigma/Elim and projected-ascription paths in the emitted goals.
 fn term_mentions_const(term: &Term, id: GlobalId) -> bool {
     match term {
         Term::Const { id: i, .. } => *i == id,
         Term::Var(_) | Term::Type(_) | Term::Omega(_) => false,
-        Term::Pi(a, b) | Term::Lam(a, b) | Term::App(a, b) => {
+        Term::Pi(a, b) | Term::Lam(a, b) | Term::App(a, b) | Term::Sigma(a, b) => {
             term_mentions_const(a, id) || term_mentions_const(b, id)
         }
+        Term::Proj1(term) | Term::Proj2(term) => term_mentions_const(term, id),
         Term::Let { ty, val, body, .. } => {
             term_mentions_const(ty, id)
                 || term_mentions_const(val, id)
@@ -485,8 +497,7 @@ fn term_mentions_const(term: &Term, id: GlobalId) -> bool {
                 || params.iter().any(|p| term_mentions_const(p, id))
         }
         Term::IndFormer { .. } | Term::Constructor { .. } => false,
-        // Pair/Cast/Eq/Refl/Proj/QuotElim/QuotClass — recurse into their Term
-        // sub-fields conservatively (the obligation tree only uses the above).
+        // These positive assertions inspect the reachable goal forms above.
         _ => false,
     }
 }
