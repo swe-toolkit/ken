@@ -1,7 +1,7 @@
 ---
 id: LANG-TYPE-POSITION-SORT-SPINE-GATE
 title: "The same-constant spine attempt in unify_sorts_walk walks every argument pair before testing any, then restores metas on failure and lets the caller re-walk the reduced form, so a spine that fails at every level costs 2^K: a discarded True-against-False argument nested 20 deep takes 43s against the parent's 0.58s. Gate the attempt on level-erased conversion of each pair, in order, before any walk or snapshot"
-status: ready
+status: merged
 owner: verify
 size: S
 tier: T1
