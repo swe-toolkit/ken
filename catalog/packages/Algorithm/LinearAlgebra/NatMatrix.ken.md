@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and the seven algebraic laws below have checked proofs.
+all arithmetic is exact, and the ten algebraic laws below have checked proofs.
 
 ## Contents
 
@@ -155,6 +155,50 @@ pub theorem dot_distrib
                       (dot_distrib k tail_xs tail_ys tail_zs))
                     (add_shuffle left_factor right_factor left_tail_dot right_tail_dot))
           }
+      }
+  }
+
+pub theorem dot_scale
+      (n : Nat) (x : Nat) (u : Vec Nat n) (c : Vec Nat n)
+    : Equal Nat (dot n (vector_scale n x u) c) (mul x (dot n u c)) =
+  match u {
+    VNil ↦ Proved;
+    VCons k y tail_u ↦
+      match c {
+        VCons _ z tail_c ↦
+          let
+            tail_dot = dot k tail_u tail_c;
+            scaled_tail_dot = dot k (vector_scale k x tail_u) tail_c
+          in
+            trans
+              Nat
+              (add (mul (mul x y) z) scaled_tail_dot)
+              (add (mul x (mul y z)) scaled_tail_dot)
+              (mul x (add (mul y z) tail_dot))
+              (cong
+                Nat
+                Nat
+                (mul (mul x y) z)
+                (mul x (mul y z))
+                (λv. add v scaled_tail_dot)
+                (sym Nat (mul x (mul y z)) (mul (mul x y) z) ((proof assoc for mul) x y z)))
+              (trans
+                Nat
+                (add (mul x (mul y z)) scaled_tail_dot)
+                (add (mul x (mul y z)) (mul x tail_dot))
+                (mul x (add (mul y z) tail_dot))
+                (cong
+                  Nat
+                  Nat
+                  scaled_tail_dot
+                  (mul x tail_dot)
+                  (add (mul x (mul y z)))
+                  (dot_scale k x tail_u tail_c))
+                (sym
+                  Nat
+                  (mul x (add (mul y z) tail_dot))
+                  (add (mul x (mul y z)) (mul x tail_dot))
+                  (mul_add_distrib_r x (mul y z) tail_dot)))
       }
   }
 
@@ -341,6 +385,81 @@ pub theorem matrix_product_assoc
             new_tail
             (VCons (Vec Nat q) k new_head)
             (matrix_product_assoc k n p q rest b c))
+  }
+
+pub theorem matrix_vector_product
+      (m : Nat)
+      (n : Nat)
+      (p : Nat)
+      (a : Vec (Vec Nat n) m)
+      (b : Vec (Vec Nat p) n)
+      (x : Vec Nat p)
+    : Equal
+        (Vec Nat m)
+        (matrix_vector m p (matrix_product m n p a b) x)
+        (matrix_vector m n a (matrix_vector n p b x)) =
+  match a {
+    VNil ↦ Proved;
+    VCons k row rest ↦
+      let
+        old_head = dot p (row_product n p b row) x;
+        new_head = dot n row (matrix_vector n p b x);
+        old_tail = matrix_vector k p (matrix_product k n p rest b) x;
+        new_tail = matrix_vector k n rest (matrix_vector n p b x)
+      in
+        trans
+          (Vec Nat (Suc k))
+          (VCons Nat k old_head old_tail)
+          (VCons Nat k new_head old_tail)
+          (VCons Nat k new_head new_tail)
+          (cong
+            Nat
+            (Vec Nat (Suc k))
+            old_head
+            new_head
+            (λv. VCons Nat k v old_tail)
+            (dot_row_product n p row b x))
+          (cong
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            old_tail
+            new_tail
+            (VCons Nat k new_head)
+            (matrix_vector_product k n p rest b x))
+  }
+
+pub theorem transpose_product
+      (m : Nat) (n : Nat) (p : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n)
+    : Equal
+        (Vec (Vec Nat m) p)
+        (transpose m p (matrix_product m n p a b))
+        (matrix_product p n m (transpose n p b) (transpose m n a)) =
+  match a {
+    VNil ↦
+      zero_width_repeat
+        p
+        (matrix_product p n Zero (transpose n p b) (transpose Zero n (VNil (Vec Nat n))));
+    VCons k arow rest ↦
+      let
+        bt = transpose n p b;
+        at_rest = transpose k n rest;
+        head = row_product n p b arow;
+        ih_lhs = transpose k p (matrix_product k n p rest b);
+        ih_rhs = matrix_product p n k bt at_rest
+      in
+        trans
+          (Vec (Vec Nat (Suc k)) p)
+          (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) p (prepend k) head ih_lhs)
+          (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) p (prepend k) head ih_rhs)
+          (matrix_product p n (Suc k) bt (transpose (Suc k) n (VCons (Vec Nat n) k arow rest)))
+          (cong
+            (Vec (Vec Nat k) p)
+            (Vec (Vec Nat (Suc k)) p)
+            ih_lhs
+            ih_rhs
+            (λt. zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) p (prepend k) head t)
+            (transpose_product k n p rest b))
+          (zip_prepend_map k n p arow at_rest bt)
   }
 
 fn prepend (n : Nat) (x : Nat) (column : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n x column
@@ -1075,50 +1194,6 @@ theorem columns_cons
       }
   }
 
-theorem dot_scale
-      (n : Nat) (x : Nat) (u : Vec Nat n) (c : Vec Nat n)
-    : Equal Nat (dot n (vector_scale n x u) c) (mul x (dot n u c)) =
-  match u {
-    VNil ↦ Proved;
-    VCons k y tail_u ↦
-      match c {
-        VCons _ z tail_c ↦
-          let
-            tail_dot = dot k tail_u tail_c;
-            scaled_tail_dot = dot k (vector_scale k x tail_u) tail_c
-          in
-            trans
-              Nat
-              (add (mul (mul x y) z) scaled_tail_dot)
-              (add (mul x (mul y z)) scaled_tail_dot)
-              (mul x (add (mul y z) tail_dot))
-              (cong
-                Nat
-                Nat
-                (mul (mul x y) z)
-                (mul x (mul y z))
-                (λv. add v scaled_tail_dot)
-                (sym Nat (mul x (mul y z)) (mul (mul x y) z) ((proof assoc for mul) x y z)))
-              (trans
-                Nat
-                (add (mul x (mul y z)) scaled_tail_dot)
-                (add (mul x (mul y z)) (mul x tail_dot))
-                (mul x (add (mul y z) tail_dot))
-                (cong
-                  Nat
-                  Nat
-                  scaled_tail_dot
-                  (mul x tail_dot)
-                  (add (mul x (mul y z)))
-                  (dot_scale k x tail_u tail_c))
-                (sym
-                  Nat
-                  (mul x (add (mul y z) tail_dot))
-                  (add (mul x (mul y z)) (mul x tail_dot))
-                  (mul_add_distrib_r x (mul y z) tail_dot)))
-      }
-  }
-
 theorem columns_scale
       (n : Nat) (q : Nat) (x : Nat) (u : Vec Nat n) (columns : Vec (Vec Nat n) q)
     : Equal
@@ -1336,6 +1411,216 @@ theorem row_product_assoc
                         (transpose k q rest_bc))))))
       }
   }
+
+theorem dot_row_product_empty
+      (p : Nat) (x : Vec Nat p)
+    : Equal Nat (dot p (row_product Zero p (VNil (Vec Nat p)) (VNil Nat)) x) Zero =
+  let
+    inner = row_product Zero p (VNil (Vec Nat p)) (VNil Nat);
+    zeros = repeat Nat p Zero
+  in
+    trans
+      Nat
+      (dot p inner x)
+      (dot p zeros x)
+      Zero
+      (cong
+        (Vec Nat p)
+        Nat
+        inner
+        zeros
+        (λw. dot p w x)
+        (columns_empty_row p (transpose Zero p (VNil (Vec Nat p)))))
+      (dot_zero_left p x)
+
+theorem dot_row_product
+      (n : Nat) (p : Nat) (row : Vec Nat n) (b : Vec (Vec Nat p) n) (x : Vec Nat p)
+    : Equal Nat (dot p (row_product n p b row) x) (dot n row (matrix_vector n p b x)) =
+  match row {
+    VNil ↦
+      J
+        (λbs _.
+          Equal
+            Nat
+            (dot p (row_product Zero p bs (VNil Nat)) x)
+            (dot Zero (VNil Nat) (matrix_vector Zero p bs x)))
+        (dot_row_product_empty p x)
+        (vec_zero_vnil (Vec Nat p) b);
+    VCons k y tail_row ↦
+      match b {
+        VCons _ brow tail_b ↦
+          let
+            cols = transpose k p tail_b;
+            scaled = vector_scale p y brow;
+            rest = row_product k p tail_b tail_row;
+            inner =
+              row_product (Suc k) p (VCons (Vec Nat p) k brow tail_b) (VCons Nat k y tail_row);
+            split = vector_add p scaled rest;
+            tail_mv = matrix_vector k p tail_b x;
+            step0 = dot p inner x;
+            step1 = dot p split x;
+            step2 = add (dot p scaled x) (dot p rest x);
+            step3 = add (mul y (dot p brow x)) (dot p rest x);
+            goal = add (mul y (dot p brow x)) (dot k tail_row tail_mv)
+          in
+            trans
+              Nat
+              step0
+              step1
+              goal
+              (cong
+                (Vec Nat p)
+                Nat
+                inner
+                split
+                (λw. dot p w x)
+                (columns_cons k p y tail_row brow cols))
+              (trans
+                Nat
+                step1
+                step2
+                goal
+                (dot_distrib p scaled rest x)
+                (trans
+                  Nat
+                  step2
+                  step3
+                  goal
+                  (cong
+                    Nat
+                    Nat
+                    (dot p scaled x)
+                    (mul y (dot p brow x))
+                    (λv. add v (dot p rest x))
+                    (dot_scale p y brow x))
+                  (cong
+                    Nat
+                    Nat
+                    (dot p rest x)
+                    (dot k tail_row tail_mv)
+                    (add (mul y (dot p brow x)))
+                    (dot_row_product k p tail_row tail_b x))))
+      }
+  }
+
+theorem zero_width_repeat
+      (p : Nat) (v : Vec (Vec Nat Zero) p)
+    : Equal (Vec (Vec Nat Zero) p) (repeat (Vec Nat Zero) p (VNil Nat)) v =
+  match v {
+    VNil ↦ Proved;
+    VCons j col rest ↦
+      let zeros =
+        repeat (Vec Nat Zero) j (VNil Nat)
+      in
+        trans
+          (Vec (Vec Nat Zero) (Suc j))
+          (VCons (Vec Nat Zero) j (VNil Nat) zeros)
+          (VCons (Vec Nat Zero) j col zeros)
+          (VCons (Vec Nat Zero) j col rest)
+          (cong
+            (Vec Nat Zero)
+            (Vec (Vec Nat Zero) (Suc j))
+            (VNil Nat)
+            col
+            (λh. VCons (Vec Nat Zero) j h zeros)
+            (vec_zero_vnil Nat col))
+          (cong
+            (Vec (Vec Nat Zero) j)
+            (Vec (Vec Nat Zero) (Suc j))
+            zeros
+            rest
+            (VCons (Vec Nat Zero) j col)
+            (zero_width_repeat j rest))
+  }
+
+theorem zip_prepend_map
+      (k : Nat)
+      (n : Nat)
+      (p : Nat)
+      (arow : Vec Nat n)
+      (at_rest : Vec (Vec Nat k) n)
+      (bt : Vec (Vec Nat n) p)
+    : Equal
+        (Vec (Vec Nat (Suc k)) p)
+        (zip_with
+          Nat
+          (Vec Nat k)
+          (Vec Nat (Suc k))
+          p
+          (prepend k)
+          (row_product_columns n p arow bt)
+          (map (Vec Nat n) (Vec Nat k) p (row_product n k at_rest) bt))
+        (map
+          (Vec Nat n)
+          (Vec Nat (Suc k))
+          p
+          (row_product
+            n
+            (Suc k)
+            (zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) arow at_rest))
+          bt) =
+  match bt {
+    VNil ↦ Proved;
+    VCons j col rest ↦
+      let
+        zipped = zip_with Nat (Vec Nat k) (Vec Nat (Suc k)) n (prepend k) arow at_rest;
+        tail_cols = row_product n k at_rest col;
+        old_head = VCons Nat k (dot n arow col) tail_cols;
+        mid_head = VCons Nat k (dot n col arow) tail_cols;
+        new_head = row_product n (Suc k) zipped col;
+        old_tail =
+          zip_with
+            Nat
+            (Vec Nat k)
+            (Vec Nat (Suc k))
+            j
+            (prepend k)
+            (row_product_columns n j arow rest)
+            (map (Vec Nat n) (Vec Nat k) j (row_product n k at_rest) rest);
+        new_tail = map (Vec Nat n) (Vec Nat (Suc k)) j (row_product n (Suc k) zipped) rest
+      in
+        trans
+          (Vec (Vec Nat (Suc k)) (Suc j))
+          (VCons (Vec Nat (Suc k)) j old_head old_tail)
+          (VCons (Vec Nat (Suc k)) j new_head old_tail)
+          (VCons (Vec Nat (Suc k)) j new_head new_tail)
+          (cong
+            (Vec Nat (Suc k))
+            (Vec (Vec Nat (Suc k)) (Suc j))
+            old_head
+            new_head
+            (λv. VCons (Vec Nat (Suc k)) j v old_tail)
+            (trans
+              (Vec Nat (Suc k))
+              old_head
+              mid_head
+              new_head
+              (cong
+                Nat
+                (Vec Nat (Suc k))
+                (dot n arow col)
+                (dot n col arow)
+                (λv. VCons Nat k v tail_cols)
+                (dot_comm n arow col))
+              (sym
+                (Vec Nat (Suc k))
+                new_head
+                mid_head
+                (cong
+                  (Vec (Vec Nat n) (Suc k))
+                  (Vec Nat (Suc k))
+                  (transpose n (Suc k) zipped)
+                  (VCons (Vec Nat n) k arow (transpose n k at_rest))
+                  (λw. row_product_columns n (Suc k) col w)
+                  (transpose_zip_cons k n arow at_rest)))))
+          (cong
+            (Vec (Vec Nat (Suc k)) j)
+            (Vec (Vec Nat (Suc k)) (Suc j))
+            old_tail
+            new_tail
+            (VCons (Vec Nat (Suc k)) j new_head)
+            (zip_prepend_map k n j arow at_rest rest))
+  }
 ```
 
 ## 3. Using it
@@ -1378,16 +1663,24 @@ transpose, applies `dot_comm` pointwise to each right-identity row, and lifts
 the row proof across the matrix. `matrix_identity_left` instead selects the
 head row with the first unit row and removes the zero-prefixed coordinate
 from each trailing row. `matrix_product_assoc` distributes column products
-over vector sums and scaling; `dot_scale` uses the checked natural-number
-right-distribution law. These are generic, indexed proof terms; the closed
-example only illustrates their operations.
+over vector sums and scaling. The public `dot_scale` proof uses the checked
+natural-number right-distribution law. `matrix_vector_product` distributes a
+row's dot product across the right matrix's column products, then lifts the
+result across the left matrix by induction on its rows. `transpose_product`
+induces on left rows, lifts its tail hypothesis over prepended columns and
+commutes each head dot product to reverse the factor order. Its zero-row case
+uses the checked empty-width transport. These are generic, indexed proof terms;
+the closed example only illustrates their operations.
 
 ## 5. Design notes
 
 A matrix is `Vec (Vec Nat n) m`, not a list plus an unchecked width. `transpose`
 keeps columns and rows in source order. `identity` places `Suc Zero` on the
 diagonal and `Zero` elsewhere. Left identity and product associativity have
-distinct generic proofs from right identity. The named `dot_with` helper passes
+distinct generic proofs from right identity. Matrix-vector compatibility and
+transposed-product reversal connect the same operations without adding a new
+matrix carrier; the row, empty-width and prepend proof stages stay private.
+The named `dot_with` helper passes
 the row's dot product to
 `map` without a lambda-headed application in a proof goal. A rational-valued
 or approximate matrix would require a different statement of equality and is
@@ -1402,12 +1695,13 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–2
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–3
 and [seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md)
-own fourteen public names and twelve behavioral cases. The module reuses the
+own seventeen public names and sixteen behavioral cases. The module reuses the
 published `Data.Vector.Vector` carrier and natural arithmetic. `repeat`,
-column prepending, row products and proof bridges remain private. All seven
+column prepending, row products and proof bridges remain private. All ten
 public theorems have checked bodies. This package adds no Axiom, postulate,
 primitive, `Float` or trusted-base entry; dependencies retain their own trust
 posture. The root-loaded acceptance target checks generic imports, closed
-values, refusal of a wrong inner dimension and the exact trusted-identity set.
+values, the non-square product and transpose relations, refusal of wrong inner
+dimensions and unreversed factor order, and the exact trusted-identity set.

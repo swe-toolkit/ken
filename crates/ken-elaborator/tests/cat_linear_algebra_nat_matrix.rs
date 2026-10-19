@@ -1,4 +1,4 @@
-//! Dimension-safe natural matrices: spec/50-stdlib/65-linear-algebra.md §§1–2.
+//! Dimension-safe natural matrices: spec/50-stdlib/65-linear-algebra.md §§1–3.
 //! Every closed assertion and the dimension refusal derive from
 //! conformance/stdlib/linear-algebra/seed-nat-matrix.md. Promise class:
 //! durable invariant (including the seed's explicitly fixed numeric oracles).
@@ -6,11 +6,26 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{ElabEnv, ElabError};
+use ken_elaborator::parser::parse_decls;
+use ken_elaborator::{extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole};
 use ken_kernel::{Decl, KernelError};
 
 const MATRIX: &str = "Algorithm.LinearAlgebra.NatMatrix";
 const VECTOR: &str = "Data.Vector.Vector";
+const SHIPPED_SEED: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../conformance/stdlib/linear-algebra/seed-nat-matrix.md"
+));
+
+fn shipped_seed_sources() -> Vec<&'static str> {
+    extract_ken_md(SHIPPED_SEED)
+        .expect("shipped linear-algebra seed Ken fences parse")
+        .fences
+        .into_iter()
+        .filter(|fence| fence.role == KenMdFenceRole::Source)
+        .map(|fence| &SHIPPED_SEED[fence.body_range])
+        .collect()
+}
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -26,10 +41,11 @@ fn matrix_env() -> ElabEnv {
 }
 
 /// SOURCE: spec/50-stdlib/65-linear-algebra.md §§1.3, 2. The generic
-/// `matrix_identity_left` and `matrix_product_assoc` clients exercise §2.
+/// `matrix_identity_left` and `matrix_product_assoc` clients exercise §2;
+/// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: exact owned, transparent law identities, selective imports of
-/// all fourteen names and generic clients for seven specified propositions.
+/// all seventeen names and generic clients for ten specified propositions.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
@@ -69,6 +85,9 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "matrix_identity_right",
         "matrix_identity_left",
         "matrix_product_assoc",
+        "dot_scale",
+        "matrix_vector_product",
+        "transpose_product",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -85,7 +104,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         .collect::<BTreeSet<_>>();
     assert!(
         expected.is_subset(&owned_names),
-        "all fourteen public names are owned"
+        "all seventeen public names are owned"
     );
     for name in &expected {
         let id = env.globals[&format!("{MATRIX}.{name}")];
@@ -110,11 +129,12 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
     env.elaborate_file(
         r#"
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
-import Data.Numeric.Nat.Arithmetic (add)
+import Data.Numeric.Nat.Arithmetic (add, mul)
 import Algorithm.LinearAlgebra.NatMatrix
   (vector_add, vector_scale, dot, matrix_vector, transpose, matrix_product,
    identity, dot_comm, dot_distrib, transpose_invol, vector_identity,
-   matrix_identity_right, matrix_identity_left, matrix_product_assoc)
+   matrix_identity_right, matrix_identity_left, matrix_product_assoc,
+   dot_scale, matrix_vector_product, transpose_product)
 fn client_add (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) : Vec Nat n =
   vector_add n xs ys
 fn client_scale (n : Nat) (f : Nat) (xs : Vec Nat n) : Vec Nat n =
@@ -153,12 +173,28 @@ theorem client_product_assoc (m : Nat) (n : Nat) (p : Nat) (q : Nat)
     (matrix_product m p q (matrix_product m n p a b) c)
     (matrix_product m n q a (matrix_product n p q b c)) =
   matrix_product_assoc m n p q a b c
+theorem client_dot_scale (n : Nat) (x : Nat)
+  (u : Vec Nat n) (c : Vec Nat n) :
+  Equal Nat (dot n (vector_scale n x u) c) (mul x (dot n u c)) =
+  dot_scale n x u c
+theorem client_matrix_vector_product (m : Nat) (n : Nat) (p : Nat)
+  (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n) (x : Vec Nat p) :
+  Equal (Vec Nat m)
+    (matrix_vector m p (matrix_product m n p a b) x)
+    (matrix_vector m n a (matrix_vector n p b x)) =
+  matrix_vector_product m n p a b x
+theorem client_transpose_product (m : Nat) (n : Nat) (p : Nat)
+  (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n) :
+  Equal (Vec (Vec Nat m) p)
+    (transpose m p (matrix_product m n p a b))
+    (matrix_product p n m (transpose n p b) (transpose m n a)) =
+  transpose_product m n p a b
 "#,
     )
-    .expect("generic clients independently state seven law types");
+    .expect("generic clients independently state ten law types");
 }
 
-// Thirteen positive, closed oracles from the twelve-case conformance seed. The
+// Sixteen positive, closed oracles from the sixteen-case conformance seed. The
 // expected vectors are constructed independently of the operations tested.
 const SEED: &str = r#"
 import Data.Vector.Vector (Vec, VNil, VCons)
@@ -234,19 +270,30 @@ theorem transpose_intermediate_oracle : Equal (Vec (Vec Nat two) three)
   (transpose two three a23) expected32 = Refl
 theorem transpose_round_trip_oracle : Equal (Vec (Vec Nat three) two)
   (transpose three two (transpose two three a23)) a23 = Refl
+theorem matrix_vector_product_oracle : Equal (Vec Nat two)
+  (matrix_vector two two (matrix_product two three two a23 b32) (v2 Zero one))
+  (matrix_vector two three a23 (matrix_vector three two b32 (v2 Zero one))) = Refl
+theorem transpose_product_oracle : Equal (Vec (Vec Nat two) two)
+  (transpose two two (matrix_product two three two a23 b32))
+  (matrix_product two three two (transpose three two b32) (transpose two three a23)) = Refl
+theorem matrix_vector_product_identity_control : Equal (Vec Nat two)
+  (matrix_vector two three
+    (matrix_product two three three a23 (identity three)) (v3 Zero one Zero))
+  (matrix_vector two three a23
+    (matrix_vector three three (identity three) (v3 Zero one Zero))) = Refl
 "#;
 
-/// MEASURED: the thirteen closed propositions kernel-check against independent
-/// numeral/constructor expectations, except that the association row compares
-/// two product groupings. CLAIMED: the twelve specified seed cases produce the
-/// stated results. THE GAP: closed equality cannot prove a generic law, and
-/// the association row alone could pass if both products erred the same way;
+/// MEASURED: the sixteen closed propositions kernel-check against independent
+/// numeral/constructor expectations, except that product association and §3's
+/// product relations compare two routes. CLAIMED: the sixteen specified seed
+/// cases produce the stated results. THE GAP: closed equality cannot prove
+/// a generic law, and the association row could pass if both products erred;
 /// the separately fixed product intermediate and generic proofs cover that gap.
 #[test]
-fn twelve_seed_cases_check_thirteen_closed_oracles() {
+fn sixteen_seed_cases_check_sixteen_closed_oracles() {
     let mut env = matrix_env();
     env.elaborate_file(SEED)
-        .expect("all thirteen seed oracles must kernel-check from public imports");
+        .expect("all sixteen seed oracles must kernel-check from public imports");
     for name in [
         "dot_oracle",
         "identity_two_oracle",
@@ -261,9 +308,77 @@ fn twelve_seed_cases_check_thirteen_closed_oracles() {
         "product_assoc_oracle",
         "transpose_intermediate_oracle",
         "transpose_round_trip_oracle",
+        "matrix_vector_product_oracle",
+        "transpose_product_oracle",
+        "matrix_vector_product_identity_control",
     ] {
         let id = env.globals[name];
         assert!(matches!(env.env.lookup(id), Some(Decl::Transparent { .. })));
+    }
+}
+
+/// SOURCE: conformance/stdlib/linear-algebra/seed-nat-matrix.md §§1–3.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the shipped positive seed fence roots-loads through the actual
+/// catalog and all sixteen closed assertions elaborate, including three §3
+/// rows; the §3 theorem declarations have transparent checked bodies.
+/// CLAIMED: the authored seed's closed output and product-relation clients
+/// agree with the published package on their typed inputs.
+/// THE GAP: the seed is finite; arbitrary indexed laws and trust identities
+/// are checked independently by the generic client above.
+#[test]
+fn shipped_seed_positive_clients_check_section_three() {
+    let sources = shipped_seed_sources();
+    let positive = sources
+        .first()
+        .expect("shipped seed has a positive program");
+    let mut env = matrix_env();
+    env.elaborate_file(positive)
+        .expect("shipped seed's sixteen positive clients check");
+    for name in [
+        "matrix_vector_product_oracle",
+        "transpose_product_oracle",
+        "matrix_vector_product_identity_control",
+    ] {
+        let id = env.globals[name];
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{name} is a checked shipped seed client"
+        );
+    }
+}
+
+/// SOURCE: conformance/stdlib/linear-algebra/seed-nat-matrix.md §3.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: on the same two square inputs, the reversed product relation
+/// checks and the unreversed relation refuses as a `Refl` TypeMismatch.
+/// CLAIMED: transpose reverses product factor order.
+/// THE GAP: one finite pair does not prove the generic theorem; the exported
+/// transparent body and independent arbitrary-index client are checked above.
+#[test]
+fn unreversed_transpose_product_refuses_after_reversed_control_checks() {
+    let sources = shipped_seed_sources();
+    let positive = sources.first().expect("shipped seed positive program");
+    let contrast = sources.last().expect("shipped seed order contrast");
+    let declarations = parse_decls(contrast).expect("order contrast Ken parses");
+    let Some(SourceDecl::TheoremDecl { span, .. }) = declarations.last() else {
+        panic!("order contrast must end in a theorem");
+    };
+    let (shared, refused) = contrast.split_at(span.start);
+    assert_eq!(
+        parse_decls(refused).expect("refused theorem parses").len(),
+        1,
+        "negative input must contain only its own false theorem"
+    );
+    let mut env = matrix_env();
+    env.elaborate_file(positive)
+        .expect("shipped seed's positive program checks first");
+    env.elaborate_file(shared)
+        .expect("shipped seed's reversed-order control checks on the same pair");
+    match env.elaborate_file(refused) {
+        Err(ElabError::TypeMismatch { reason, span })
+            if reason == "Refl expects an `Eq`-shaped goal" && span.end <= refused.len() => {}
+        other => panic!("shipped unreversed-order claim must refuse at Refl: {other:?}"),
     }
 }
 
@@ -274,12 +389,10 @@ fn twelve_seed_cases_check_thirteen_closed_oracles() {
 #[test]
 fn wrong_inner_dimension_rejects_at_the_index_boundary() {
     let mut env = matrix_env();
-    env.elaborate_file(SEED)
+    let sources = shipped_seed_sources();
+    env.elaborate_file(sources.first().expect("seed positives"))
         .expect("matching inner dimensions must check first");
-    match env.elaborate_file(
-        "const bad_product : Vec (Vec Nat two) two =
-           matrix_product two three two a23 expected22",
-    ) {
+    match env.elaborate_file(sources.get(1).expect("seed wrong-inner client")) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
             ..
