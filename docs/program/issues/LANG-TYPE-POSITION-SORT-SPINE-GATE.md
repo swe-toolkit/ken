@@ -37,8 +37,12 @@ congruence-first's links.
     one constant level. Return `false` at the first failing pair, with
     metas untouched.
   - Only if every pair passes, run the existing body unchanged.
-  - Sound because the gate is a necessary condition: admitted globals are
-    level-closed, so level erasure commutes with β, δ and ι.
+  - Claimed necessary because level erasure commutes with β, δ and ι.
+    **That claim is false for δ** (Architect `evt_4grwysh404yp`): unfolding
+    a level-closed alias restores its literal levels, so
+    `const Big : Type 2 = Type 1` against `Type ?m` is refuted although
+    `?m := 1` converts. The repair is
+    LANG-TYPE-POSITION-SORT-SPINE-GATE-NECESSITY.
 - **The enabler.** `fn erase_levels(t: &Term) -> Term` over every
   level-bearing position, as one exhaustive `match` with no `_ =>` arm
   (COORDINATION §7b). `ken_kernel::subst_levels` maps declared parameters
