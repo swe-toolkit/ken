@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-LOWERING-AND-D0-REFUTER
 title: "CHILD 3 of RT-BRACKET-CONTROL-REGION-IR (after 1, 2a and 2b), AND THE ONLY ONE THAT ROUTES A CANDIDATE. The lowering consumer, the D0 EQUIVALENCE REFUTER, and closeout. Lowering receives ONLY a validated BracketSettlementControlView and consumes settlement, outcome merge and resume in order; an affine compiler ledger closes over exact region and edge identities. D0 IS NOT A CENSUS: it compares interpreter and linked-native normalized observation tuples over five mandatory rows and requires three compile-preserving mutations, and it CAN REFUTE THE REPRESENTATION where population equality provably cannot. ASSEMBLE CHILDREN 1, 2a AND 2b HERE AND ROUTE ONLY THE COMBINED TREE AS ONE ATOMIC CANDIDATE -- children 1, 2a and 2b are held, reviewed inputs and never independently landed products. Closeout un-ignores px8ta_oriented_subcontinuation::public_two_three_level_brackets_finish_and_release_lifo on BOTH its blockers and removes an order-excluding helper ONLY after both engines agree."
-status: draft
+status: active
 owner: runtime
 size: L
 gate: none
