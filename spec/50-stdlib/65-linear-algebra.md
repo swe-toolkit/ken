@@ -1,11 +1,12 @@
 # Dimension-safe exact linear algebra
 
 > **Status: DRAFT v1 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
-> SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS).** Section 1 specifies the seven
-> `Nat`-valued operations and five laws landed in the catalog. Section 2
-> adds two generically checked product laws for a follow-on catalog
-> delivery. An authored conformance seed is not itself evidence that it
-> has run as a delivered suite.
+> SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
+> SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY §3).** Section 1 specifies
+> seven `Nat`-valued operations and five laws; §2 adds two product laws.
+> Both sections' laws are landed in the catalog. Section 3 specifies
+> two further product-compatibility laws and a public scaling lemma;
+> its D0 proofs are feasibility evidence, not catalog or seed delivery.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -146,14 +147,16 @@ cases is a **proved Vec law**, not a fresh axiom.
 
 The ordinary `Vec` eliminator, natural recursion, `Equal`, and the
 existing Nat laws account for §1's specified work. Its seven
-operations and five generic laws are now landed in
-`Algorithm.LinearAlgebra.NatMatrix`; neither the first catalog node
-nor the §1 signatures promise the two additional theorems in §2.
-The checked catalog module introduces no `Axiom`. Section 2's
-additional generic proofs are checked in a scratch development but
-are not yet exported by that module. No statement in this chapter
+operations and five generic laws, together with §2's left identity
+and product associativity, are now landed in
+`Algorithm.LinearAlgebra.NatMatrix`. The checked catalog module
+introduces no `Axiom`. Section 3's further two generic laws and
+public scaling lemma are checked or ruled in the Architect's D0
+scratch development, not yet exported by that module. The D0 measured
+`trusted_base()` as 109 before and after the edited package; that is
+not a measured landed §3 trust delta. No statement in this chapter
 adds a kernel form, syntax, primitive, or `Float` support. A scratch
-check or authored seed is not execution of the delivered seed.
+check or authored seed is not execution of a shipped seed harness.
 
 Signed scalars, a relation-parametric semiring abstraction and a
 Rational-valued matrix tier, determinants, inverses, solving and
@@ -164,11 +167,10 @@ an unchecked assumption, or a numerical example alone.
 ## 2. Left identity and associativity of matrix products
 
 The following two **generic laws have checked proof bodies** in the
-product-laws D0 development. A follow-on catalog node must publish
-them as theorems over every well-typed operand; the landed module
-still exports only the §1 laws. Neither law is gated on
-`LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`. Both use the existing
-`Nat`, `Vec`, and matrix operations, without a new carrier or scalar
+landed catalog module. Its §1 and §2 public laws are all exported;
+§3 specifies further compatibility laws separately. Neither §2 law
+is gated on `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`; both use the
+existing `Nat`, `Vec`, and matrix operations, without a new carrier or scalar
 tier.
 
 ```ken
@@ -199,19 +201,84 @@ existing checked Nat distributivity and associativity laws. Neither
 a finite equality of products nor the type formation of these
 propositions is the generic proof.
 
-The D0 check on landed base `e940e481c` closed each theorem and both
-together by structural recursion, using existing Nat proofs and
+The historical §2 D0 check on base `e940e481c` closed each theorem
+and both together by structural recursion, using existing Nat proofs and
 `Refl`, `Proved`, `J`, `cong`, `trans`, and `sym`. The added proof text
 has **no `Axiom`**; the trusted-base delta was **not measured**, so
 that observation is not a quantified zero-delta assertion. The
 checked D0 uses a private named helper `dot_with n row` where the
-landed package writes the argument to `map` as
+earlier §1 package wrote the argument to `map` as
 `λcolumn. dot n row column`. With the λ spelling, the proof checks
 failed during elaboration at `left_head` and `columns_cons` with an
 ill-typed ambient-method error; the named spelling checked both
 laws without changing any public type or operation. The λ failure
 belongs to `LANG-ELABORATED-BETA-REDEX-AT-KERNEL-INFERENCE`; fixing
 that elaborator defect is **not a prerequisite** for these theorems.
-The catalog follow-on may use the named private helper while
-retaining the exact public interface above. D0 proves feasibility,
-not catalog publication, shipped-seed execution, or CI.
+The landed catalog uses the named private helper while retaining
+the exact public interface above. The historical D0 established
+feasibility only; the two §2 catalog proofs have since landed.
+Neither that D0 nor their presence proves shipped-seed execution or CI.
+
+## 3. Products acting on vectors and reversing under transpose
+
+Two further generic laws relate the §1 operations over the same `Nat`
+scalars and indexed `Vec` carrier. These are required public theorem
+types for `Algorithm.LinearAlgebra.NatMatrix`, not consequences of
+checking a finite fixture. The first states that applying an
+`m × p` product to a length-`p` vector is the same as applying its
+`n × p` right factor and then its `m × n` left factor:
+
+```ken
+pub theorem matrix_vector_product
+  (m : Nat) (n : Nat) (p : Nat)
+  (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n) (x : Vec Nat p) :
+  Equal (Vec Nat m)
+    (matrix_vector m p (matrix_product m n p a b) x)
+    (matrix_vector m n a (matrix_vector n p b x))
+```
+
+The second states that transpose reverses the factors of a matrix
+product. Transposing the `m × p` product yields a `p × m` matrix;
+the reversed product multiplies `transpose n p b : p × n` by
+`transpose m n a : n × m`. The reversed order is required, not a
+notational convenience:
+
+```ken
+pub theorem transpose_product
+  (m : Nat) (n : Nat) (p : Nat)
+  (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n) :
+  Equal (Vec (Vec Nat m) p)
+    (transpose m p (matrix_product m n p a b))
+    (matrix_product p n m (transpose n p b) (transpose m n a))
+```
+
+The supporting scaled-dot law is also required to be public. It is
+the existing checked private `dot_scale`, promoted without a second
+spelling or proof body in the follow-on catalog work. It complements
+§1.3's already-public `dot_distrib`, which handles the summed
+first argument:
+
+```ken
+pub theorem dot_scale
+  (n : Nat) (x : Nat) (u : Vec Nat n) (c : Vec Nat n) :
+  Equal Nat (dot n (vector_scale n x u) c) (mul x (dot n u c))
+```
+
+The four proof-stage helpers `dot_row_product`,
+`dot_row_product_empty`, `zero_width_repeat`, and
+`zip_prepend_map` stay private: their types refer to private row,
+repeat, or prepend stages rather than only the public operations.
+Neither compatibility law needs subtraction, signed scalars, a
+semiring abstraction, a premise beyond its displayed operands,
+or a new primitive, kernel rule, or surface feature. Both apply
+at zero dimensions as well as to non-square matrices. An
+unreversed product law is not specified: on the D0's closed `2 × 2`
+example it equates different matrices. The Architect's development
+on base `21c53baae` checked both generic law bodies, their generic
+clients and a non-square closed example, with no `Axiom` and an
+unchanged `trusted_base()` set of 109 entries. The D0 is scratch
+feasibility evidence, not a catalog export of these §3 laws or of
+`dot_scale`, a §3 conformance seed, shipped seed-harness execution,
+CI, or a measured landed §3 trust delta. Later catalog work places
+the two public compatibility laws after `matrix_product_assoc` and
+keeps the four stage helpers private.
