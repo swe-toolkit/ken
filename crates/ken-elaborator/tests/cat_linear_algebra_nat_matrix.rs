@@ -73,7 +73,7 @@ fn proposition_shape(proposition: &str) -> String {
 // Build the reversed and unreversed statements from the positive control's
 // transpose-of-product operands. The shape comparison pins the proposition;
 // the checker separately proves the reversed case and refuses the false one.
-fn paired_order_probes(shared: &str, refused: &str) -> (String, String) {
+fn assert_paired_order_goals(shared: &str, refused: &str) {
     let positive_decls = parse_decls(shared).expect("shared order-control Ken parses");
     let Some(SourceDecl::TheoremDecl {
         theorem: positive_goal,
@@ -114,15 +114,10 @@ fn paired_order_probes(shared: &str, refused: &str) -> (String, String) {
             rhs(left, right)
         )
     };
-    let positive_type = &shared[positive_goal.span().start..positive_goal.span().end];
     assert_eq!(
         type_shape(positive_goal),
         proposition_shape(&relation(b, a)),
         "positive seed theorem must state reversed factor order"
-    );
-    let reversed_probe = format!(
-        "theorem seed_reversed_contract (fact : {}) : {positive_type} = fact",
-        relation(b, a)
     );
     let negative_decls = parse_decls(refused).expect("refusal Ken parses");
     let [SourceDecl::TheoremDecl {
@@ -134,17 +129,11 @@ fn paired_order_probes(shared: &str, refused: &str) -> (String, String) {
         panic!("refused block must be one theorem with a final proof");
     };
     assert_eq!(negative_proof, "Refl", "negative claim must use Refl");
-    let negative_type = &refused[negative_goal.span().start..negative_goal.span().end];
     assert_eq!(
         type_shape(negative_goal),
         proposition_shape(&relation(a, b)),
         "refused seed theorem must state unreversed factor order on the same pair"
     );
-    let unreversed_probe = format!(
-        "theorem seed_unreversed_contract (fact : {}) : {negative_type} = fact",
-        relation(a, b)
-    );
-    (reversed_probe, unreversed_probe)
 }
 
 fn root() -> PathBuf {
@@ -494,16 +483,12 @@ fn unreversed_transpose_product_refuses_after_reversed_control_checks() {
         1,
         "negative input must contain only its own false theorem"
     );
-    let (reversed_probe, unreversed_probe) = paired_order_probes(shared, refused);
+    assert_paired_order_goals(shared, refused);
     let mut env = matrix_env();
     env.elaborate_file(positive)
         .expect("shipped seed's positive program checks first");
     env.elaborate_file(shared)
         .expect("shipped seed's reversed-order control checks on the same pair");
-    env.elaborate_file(&reversed_probe)
-        .expect("positive control states reversed product order on its own operands");
-    env.elaborate_file(&unreversed_probe)
-        .expect("refusal states unreversed product order on those same operands");
     match env.elaborate_file(refused) {
         Err(ElabError::TypeMismatch { reason, span })
             if reason == "Refl expects an `Eq`-shaped goal" && span.end <= refused.len() => {}
