@@ -25,10 +25,13 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
   lowers the existing release through EXISTING host-effect machinery, consumes
   outcome merge, then consumes resume. Inline versus an existing private control
   unit is secondary.
-- **Affine ledger** over exact region and edge identities: every marked region
-  emitted once, every mandatory edge consumed once, no unplanned edge consumed,
-  every settlement reached through its owner. **This proves REPRESENTATION
-  CLOSURE, not semantic equivalence.**
+- **Counting ledger** over exact region and edge identities (Architect
+  `evt_32mpqmy5v0y6s`, R6a). A marked S may be lowered once per control
+  path, so each region counts settlement, outcome merge and resume, in
+  that order. Every lowering takes its mode's route, no unplanned edge is
+  consumed, and each region closes with settlement at least 1 and all
+  three counts equal. There is no exemption for zero lowerings. **This
+  proves REPRESENTATION CLOSURE, not semantic equivalence.**
 - **`D0`, the equivalence refuter.** Pre-registered BEFORE it is run -- the
   pre-registration already exists at `c22f4861d` and is preserved.
 - **Closeout.** Un-ignore the px8ta row; remove an order-excluding helper ONLY
@@ -168,10 +171,17 @@ plane ancestor has an owner-returned exit (11 regions); otherwise it is
 Deferred on the existing residual route, claimed in the ledger
 (multi-leaf, anonymous mapping). Both Construct lowering arms, ordinary
 and computational producer, settle an in-place S through one helper over
-the existing `drive_response_at_source`; a Deferred S on the producer arm
-refuses (Architect `evt_7rss2x6c15xsf`). A per-lowering instrument over
-px8ta depths 2 and 3, the nine sources and the five
-`rt_native_bracket_body_once` tests precedes D0.
+the existing `drive_response_at_source` (Architect `evt_7rss2x6c15xsf`).
+A Deferred S on the producer arm claims its three edges and takes the
+existing producer route unchanged (R6b, `evt_32mpqmy5v0y6s`). The
+in-place effect seat gets its synthesized-aggregate owners from the
+`bracket_rows` as well as the ordinary response population, failing
+closed if those rows are not yet resolved (R6c). A per-lowering
+instrument over px8ta depths 2 and 3, the nine sources and the five
+`rt_native_bracket_body_once` tests precedes D0. It records the selected
+case path of each lowering, and goes with a sweep of every planning and
+lowering reader of the ordinary response population. D0 runs only when
+px8ta reaches its observations at both depths and every ledger closes.
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 
@@ -186,8 +196,12 @@ delay is the Steward's error, not the ring's.
 
 ## Hard-stop inventory (§1b)
 
-§1a (emission seam): 1 (Architect `evt_7rss2x6c15xsf`). §1a (assembly): 0.
+§1a (emission seam): 2 (Architect `evt_32mpqmy5v0y6s`); the 3rd holds
+and calls Research. §1a (assembly): 0.
 
 1. Marked S reached on the computational producer Construct arm
    (core.rs:3912/6965), which the in-place gate did not cover. Keyed on
    the Construct lowering arm (fan-in).
+2. In-place S's host-effect seat had no synthesized-aggregate owner
+   under the settling owner. Keyed on effect-seat emission owners
+   derived only from the ordinary response population.
