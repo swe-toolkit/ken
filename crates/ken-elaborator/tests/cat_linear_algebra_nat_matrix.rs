@@ -7,7 +7,10 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
-use ken_elaborator::{extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole};
+use ken_elaborator::{
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, KenMdFenceRole,
+    Type as SourceType,
+};
 use ken_kernel::{Decl, KernelError};
 
 const MATRIX: &str = "Algorithm.LinearAlgebra.NatMatrix";
@@ -25,6 +28,90 @@ fn shipped_seed_sources() -> Vec<&'static str> {
         .filter(|fence| fence.role == KenMdFenceRole::Source)
         .map(|fence| &SHIPPED_SEED[fence.body_range])
         .collect()
+}
+
+// Match a type-position application by its checked operator, not by its
+// whitespace, source line or the names of this seed's concrete matrices.
+fn applied_type<'a>(ty: &'a SourceType, name: &str) -> Option<Vec<&'a SourceType>> {
+    let mut args = Vec::new();
+    let mut head = ty;
+    while let SourceType::TApp(function, argument, _) = head {
+        args.push(argument.as_ref());
+        head = function;
+    }
+    args.reverse();
+    match head {
+        SourceType::TVar(found, _) | SourceType::TCon(found, _) if found == name => Some(args),
+        _ => None,
+    }
+}
+
+// Build the reversed and unreversed statements from the positive control's
+// transpose-of-product operands. A checked theorem under a hypothetical
+// proposition then verifies that each seed declaration states THAT relation;
+// an unrelated false equality cannot substitute for the intended refusal.
+fn paired_order_probes(shared: &str, refused: &str) -> (String, String) {
+    let positive_decls = parse_decls(shared).expect("shared order-control Ken parses");
+    let Some(SourceDecl::TheoremDecl {
+        theorem: positive_goal,
+        body: Expr::ECon(proof, _),
+        ..
+    }) = positive_decls.last()
+    else {
+        panic!("square same-input control must end in a theorem proof");
+    };
+    assert_eq!(proof, "Refl", "positive control must carry its proof");
+    let equality = applied_type(positive_goal, "Equal").expect("control states Equal");
+    let [carrier, lhs, _] = equality.as_slice() else {
+        panic!("control has one carrier and two endpoints");
+    };
+    let transpose = applied_type(lhs, "transpose").expect("control transposes a product");
+    let [m, p, product] = transpose.as_slice() else {
+        panic!("control's transpose has its two dimensions and operand");
+    };
+    let factors = applied_type(product, "matrix_product").expect("transpose wraps a product");
+    let [_, n, _, a, b] = factors.as_slice() else {
+        panic!("control's product has its three dimensions and two factors");
+    };
+    let snippet = |ty: &SourceType| &shared[ty.span().start..ty.span().end];
+    let rhs =
+        |left: &SourceType, right: &SourceType| {
+            format!(
+            "matrix_product ({}) ({}) ({}) (transpose ({}) ({}) ({})) (transpose ({}) ({}) ({}))",
+            snippet(p), snippet(n), snippet(m),
+            snippet(n), snippet(p), snippet(left),
+            snippet(m), snippet(n), snippet(right)
+        )
+        };
+    let relation = |left: &SourceType, right: &SourceType| {
+        format!(
+            "Equal ({}) ({}) ({})",
+            snippet(carrier),
+            snippet(lhs),
+            rhs(left, right)
+        )
+    };
+    let positive_type = &shared[positive_goal.span().start..positive_goal.span().end];
+    let reversed_probe = format!(
+        "theorem seed_reversed_contract (fact : {}) : {positive_type} = fact",
+        relation(b, a)
+    );
+    let negative_decls = parse_decls(refused).expect("refusal Ken parses");
+    let [SourceDecl::TheoremDecl {
+        theorem: negative_goal,
+        body: Expr::ECon(negative_proof, _),
+        ..
+    }] = negative_decls.as_slice()
+    else {
+        panic!("refused block must be one theorem with a final proof");
+    };
+    assert_eq!(negative_proof, "Refl", "negative claim must use Refl");
+    let negative_type = &refused[negative_goal.span().start..negative_goal.span().end];
+    let unreversed_probe = format!(
+        "theorem seed_unreversed_contract (fact : {}) : {negative_type} = fact",
+        relation(a, b)
+    );
+    (reversed_probe, unreversed_probe)
 }
 
 fn root() -> PathBuf {
@@ -351,7 +438,11 @@ fn shipped_seed_positive_clients_check_section_three() {
 /// SOURCE: conformance/stdlib/linear-algebra/seed-nat-matrix.md §3.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: on the same two square inputs, the reversed product relation
-/// checks and the unreversed relation refuses as a `Refl` TypeMismatch.
+/// checks and the unreversed relation refuses as a `Refl` TypeMismatch. Ken
+/// also checks that the seed's positive theorem states the reversed relation
+/// and its negative states the unreversed relation derived from the positive
+/// control's own product operands. An unrelated false equality fails the
+/// hypothetical-statement check before it can count as this refusal.
 /// CLAIMED: transpose reverses product factor order.
 /// THE GAP: one finite pair does not prove the generic theorem; the exported
 /// transparent body and independent arbitrary-index client are checked above.
@@ -370,11 +461,16 @@ fn unreversed_transpose_product_refuses_after_reversed_control_checks() {
         1,
         "negative input must contain only its own false theorem"
     );
+    let (reversed_probe, unreversed_probe) = paired_order_probes(shared, refused);
     let mut env = matrix_env();
     env.elaborate_file(positive)
         .expect("shipped seed's positive program checks first");
     env.elaborate_file(shared)
         .expect("shipped seed's reversed-order control checks on the same pair");
+    env.elaborate_file(&reversed_probe)
+        .expect("positive control states reversed product order on its own operands");
+    env.elaborate_file(&unreversed_probe)
+        .expect("refusal states unreversed product order on those same operands");
     match env.elaborate_file(refused) {
         Err(ElabError::TypeMismatch { reason, span })
             if reason == "Refl expects an `Eq`-shaped goal" && span.end <= refused.len() => {}
