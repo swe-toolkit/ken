@@ -868,7 +868,7 @@ enum RefinementSlot {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SplitKind { Let, If, Literal, Constructor, NonConvoyable }
+enum SplitKind { Let, If, Literal, Constructor }
 
 #[derive(Clone, Debug)]
 struct PathFrame {
@@ -14660,8 +14660,7 @@ fn emit_subset_evidence(
                     Err(ElabError::RefinementSplitDemand {
                         split_id: frame.split_id, span: span.clone(),
                     }),
-            SplitKind::Let | SplitKind::NonConvoyable | SplitKind::If
-            | SplitKind::Literal | SplitKind::Constructor =>
+            SplitKind::Let | SplitKind::If | SplitKind::Literal | SplitKind::Constructor =>
                 Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() }),
         };
     }
@@ -17992,33 +17991,6 @@ fn build_pair_chain(field_vals: &[Term], record_nil_val_id: GlobalId) -> Term {
         acc = Term::pair(v.clone(), acc);
     }
     acc
-}
-
-/// Reject a predicate erased inside an alias body before that alias is admitted.
-/// The outermost refinement is recorded by the alias arm instead.
-pub(crate) fn alias_nested_refinement(ty: &RType) -> Option<(&Span, &'static str)> {
-    const FUNCTION: &str = "a refinement under a function-valued return type is not supported yet";
-    const OTHER: &str = "a refinement nested inside a named type alias is not supported yet";
-    fn walk(ty: &RType, in_function: bool) -> Option<(&Span, &'static str)> {
-        match ty {
-            RType::RRefine(_, _, _, span) => Some((span, if in_function { FUNCTION } else { OTHER })),
-            RType::RPi(_, domain, codomain, _)
-            | RType::REffectArr(domain, _, codomain, _) =>
-                walk(domain, true).or_else(|| walk(codomain, true)),
-            RType::RArr(domain, codomain, _) =>
-                walk(domain, true).or_else(|| walk(codomain, true)),
-            RType::RSigma(_, first, second, _) | RType::RApp(first, second, _) =>
-                walk(first, in_function).or_else(|| walk(second, in_function)),
-            RType::RTrunc(inner, _) => walk(inner, in_function),
-            RType::RUniv(_, _) | RType::RCon(_, _) | RType::RCheckedGlobal { .. }
-            | RType::RVarTy(_, _, _) | RType::RPatternAliasTy(_, _, _)
-            | RType::RProj(_, _, _) => None,
-        }
-    }
-    match ty {
-        RType::RRefine(_, carrier, _, _) => walk(carrier, false),
-        other => walk(other, false),
-    }
 }
 
 /// Constructor field types pass through the ordinary type elaborator when
