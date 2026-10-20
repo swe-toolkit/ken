@@ -68,9 +68,17 @@ on the current base before measuring, and reports any that moved.
     3. An open hole whose demand reaches an indexed split without
        heterogeneous equations is a typed refusal, never `Internal`. A
        recursive unindexed constructor split has no equation evidence
-       until `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`; per spec 22 §3 it
-       contributes no condition, is never demanded, and the hole closes
-       over the evidenced Γ only (Architect `evt_6g7tvrp8r02s4`).
+       until `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`. In this candidate it
+       contributes no condition and is never demanded, and the hole
+       closes over the evidenced Γ only.
+  - **Route (C) record (Steward `evt_489y4gdxhx0sc`,
+    `evt_5zg993ve8hrjd`).** Spec 22 §3 and 34 §3.3 stay normative and
+    require a checked equation in every unindexed arm, recursive ones
+    included. The Architect retracted the basis of amendment 3's
+    recursive clause (`evt_6jd4e9y5cvrca`). This WP lands as a disclosed
+    partial: the gap is recorded in SPEC-PROGRESS and pinned by the
+    recursive-split test, and `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW`
+    closes it and flips that pin.
 
 ## Deliverable
 
@@ -112,7 +120,8 @@ on the current base before measuring, and reports any that moved.
     or panics. Under a recursive unindexed split (`sort`'s Nil leaf), the
     hole's `goal_closed` holds no `Eq` on `List` and the `xs` match keeps
     the plain Σ motive; closing over the equation, or demanding the
-    split, each refuses. The consumer sweep over every source root
+    split, each refuses. This row is the route (C) known-gap pin, not
+    conformance. The consumer sweep over every source root
     reports each such hole's outcome against main, and any change from
     proved to not proved is a stop.
   - **AC-0b-3.** At the candidate, the six closures stay admitted with 16

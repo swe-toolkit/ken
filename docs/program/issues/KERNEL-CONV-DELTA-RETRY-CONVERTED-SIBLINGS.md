@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-DELTA-RETRY-CONVERTED-SIBLINGS
 title: "Within one δ retry the kernel re-decides spine argument pairs it already decided. Converted siblings are converted again because SpineFailure memoizes only the failed pair (swapped H, 13.8s at K=20), and a failed pair presented one binder deeper misses the memo on its depth equality (codomain-position Hc, 3.3s at K=18). Decide each original pair at most once, weakening-correctly"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1

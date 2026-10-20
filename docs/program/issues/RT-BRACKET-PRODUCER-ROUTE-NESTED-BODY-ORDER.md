@@ -52,37 +52,44 @@ base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-The producer-route repair that makes depth 3 run as the objective
-states, on its own branch, whose base the Architect rules with the fix
-design.
+The localization D0 is done (`evt_5hhmx816x4ac8`, D0-2
+`evt_3z9erek910n8w`). F1, the route selection with owner(899) = Spec(3),
+is retained from checkpoint `edc32de81` (tree `5bd10e81`).
 
-Its first step is a localization D0, in scratch, run in separate
-processes. It is non-advancing.
-- **(a)** At depth 3 under forced Deferred on `8d3731a3d`, emit runtime
-  markers at each producer-trampoline step and each body-continuation
-  entry. Name the step where the middle bracket's body (region 1, S747,
-  the second held acquire) is skipped, and the write that should have
-  filled the origin 509 scrutinee.
-- **(b)** The same markers at depth 2 on main. This tests whether
-  main's depth-2 release of 1 before 2 is the same mechanism
-  (`RT-SUBCONTINUATION-LIFO-RELEASE-ORDER`, merged).
-
-The Architect rules the fix design on that measurement. If (a) places
-the defect in child 3's planning (`bracket_rows`, seat-owner source
-(f)), the work returns to child 3 and this node closes.
+**Recut at the 3rd stop (Architect `evt_687xbfdep022z`, on Research
+`evt_57nv4616cf07w`).** Replace the inline re-lowering of a bounded P2
+Deferred response's K body at the handler-owned drive with a planned
+unit transfer: `DrivenKResume::TransferToUnit`, that is
+`call_declared_unit(k_body, [response] ++ captures)` followed by the
+composed eliminators. F2 and F3 are withdrawn, and the rebuild starts
+from `edc32de81`. The InPlace bracket S at `bracket_emission.rs:68`
+stays inline (`DrivenKResume::InlineInPlace`, its tail byte-identical).
+A D0 of the edge, the emission and LIFO comes before any build.
 
 ## Acceptance
 
-- **AC-1.** px8ta depth 3, natively, in its own process, gives the
-  interpreter's sequence: opens 1, 2, 3, releases 3, 2, 1, exit 0.
-  Paired: reverting the fix gives back the measured trap 40 at origin
-  509 with tag 0.
-- **AC-2.** Depth 2 keeps its current native observation, and the five
-  `rt_native_bracket_body_once` tests pass, under both settlement modes.
-- **AC-3.** The fix names the producer-route write that fills each body
-  result before its settlement, with no second derivation of the body
-  order. A mutation that drops that write reddens AC-1 on the origin
-  509 match.
+- **AC-T1 (D0, non-advancing).**
+  - (a) Spec3's `function_local.unit_calls` has key 883, with
+    `frame_owner` Unit(Pred4) and the slot run Parameter plus 7
+    captures, matching M2. Name the observed caller.
+  - (b) Under forced Deferred, Pred4 is a defined function in the
+    object. List the planned emission owners of S874 and S747.
+  - (c) At the 899 drive site, list the open settlements in stack
+    order. Each one reached from subtree(883) either opens and closes
+    inside K, or is open before the drive and still open there in stack
+    order. Anything else is a LIFO violation.
+- **AC-T2.** As-shipped depth 3, native: opens 1, 2, 3, strict LIFO
+  releases, exit 0. Each release's handle equals that of the open it
+  pairs with, and all three are distinct.
+- **AC-T3.** The same under forced Deferred, which re-runs the stop-3
+  counterexample.
+- **AC-T4 (mutation).** Under forced Deferred, forcing the P2 caller to
+  `InlineInPlace` reproduces the stop-1 refusal exactly, and is then
+  byte-restored.
+- **AC-T5 (carried from F1).** Depth 2 and `rt_native_bracket_body_once`
+  are unchanged. The owner(899) = Spec3 planner pin reddens on an A-only
+  or B-only revert. The owner readers are reconciled. The closeout shows
+  no unsettled candidates in either mode.
 
 ## Stop conditions
 
@@ -92,3 +99,32 @@ the defect in child 3's planning (`bracket_rows`, seat-owner source
   marker trace. Do not infer the step from static emission counts.
 - Do not reopen `RT-PLANNER-KRET-GRAFTED-SPINE`, and do not add a census,
   carve-out, narrowed matrix or fallback.
+
+## Hard-stop inventory (§1b)
+
+§1a: 3 (Architect `evt_5ambtq64tads9`). Child 3 stays at 4. The 3rd stop
+is ruled as closure (T), transfer, which is the recut in the Deliverable
+(`evt_687xbfdep022z`). The F2/F3 WIP `9ecf2948d` is superseded. A new
+structural wall after a green D0 is the 4th stop, and the next Research
+trigger is the 6th.
+
+1. With every bracket forced Deferred, object emission refuses the
+   lexical-owner call ("claimed continuation target not declared into
+   this function", token owner Predeclared(4), construct S874, defining
+   Spec(3); `evt_xp7wn0apy41f`).
+2. The CurrentLexical availability claim for Pred4's lexical frame is
+   refused inside the generated emission context Spec(3)
+   (`evt_2ydj1fayk50sc`).
+3. S747's descent-owned continuation call (emission owner
+   Specialization(1)) claimed inside Spec(3) by the handler-owned inline
+   drive of Vis899's K body — keyed on continuation-call identity's
+   emission owner (class not covered by F2's lexical-only copy rule)
+
+**§1b: YES.** The handler-owned drive (F1,
+`drive_handler_owned_deferred_response` -> `drive_response_at_source`)
+lowers Vis899's K body a second time, inline in the handler owner
+Spec(3)'s function. Every per-emission plane was derived under the
+invariant that a construct is lowered in exactly one function, its
+planned emission owner. Entries 1 and 3 hit it on the call-declaration
+plane, for the lexical and descent owner classes. Entry 2 hits it on the
+availability plane, for the lexical class.
