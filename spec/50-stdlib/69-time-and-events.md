@@ -5,9 +5,11 @@
 > SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
-> Architect-D0-checked ordered-input distribution law; its catalog
-> export and conformance seed are not yet delivered by this spec-only
-> cut. D0 scratch checks are not shipped §3 seed execution, CI, or a
+> Architect-D0-checked ordered-input distribution law. Its catalog
+> export is not delivered; the conformance seed is authored and present
+> at:
+> `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
+> D0 scratch checks are not shipped §3 seed execution, CI, or a
 > measured landed trust delta.
 
 ## 1. Finite event traces over natural times
@@ -277,9 +279,11 @@ specified in §3; the other §1.4 deferred topics remain deferred.
 
 > **Section 3 status: DRAFT v0
 > (SPEC-TIME-WINDOW-MERGE-DISTRIBUTION).** Architect D0 checked the
-> generic law below on the landed §1–2 base. This spec-only cut does
-> not deliver its catalog export or its conformance seed; no shipped
-> §3 seed-harness execution, CI or landed trust measurement is claimed.
+> generic law below on the landed §1–2 base. The §3 catalog export
+> is not delivered; its conformance seed is authored and present at:
+> `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
+> No shipped §3 seed-harness execution, CI, or landed trust
+> measurement is claimed.
 
 ### 3.1 Structural distribution with two ordering premises
 

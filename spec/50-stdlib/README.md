@@ -380,11 +380,12 @@ two generic filter prerequisites and two existing seeds are present
 on main. Section 3 specifies the D0-checked `trace_window_merge`
 structural list equality **when both inputs are time-ordered**; one
 ordered input does not suffice. The count corollary under those same
-premises adds no public law. §3 catalog/seed delivery, shipped §3
-seed execution, CI and a landed trust measurement are not established
-by this spec-only cut. Clock effects, durations, causality, infinite
-streams, a premise-free distribution law and k-way merge remain
-deferred.
+premises adds no public law. The §3 catalog export remains undelivered;
+the conformance seed is authored and present at
+`conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
+No shipped §3 seed-harness execution, CI, or landed trust measurement
+is claimed. Clock effects, durations, causality, infinite streams, a
+premise-free distribution law and k-way merge remain deferred.
 
 The **finite least-cost selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT).
