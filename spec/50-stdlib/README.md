@@ -361,10 +361,11 @@ use corresponding endpoints, while hull/intersection use exact min/max
 bounds. Section 3 specifies public endpoint-wise `interval_inside`,
 soundness, reflexivity, addition/multiplication isotonicity, four
 hull/intersection inclusions, and a converse only with a member
-witness. Its nine generic laws are D0-checked, but §3 catalog exports
-and a §3 seed are not delivered. The scratch `trusted_base()` identity
-sets were 114 → 114; this is not shipped §3 seed-harness execution,
-CI or a measured landed trust delta. Inverted empty intervals need not
+witness. Its nine generic laws are D0-checked. §3 catalog exports are not
+delivered. The seed is authored and present at
+`conformance/stdlib/numerical/seed-interval-inclusion.md`. The scratch
+`trusted_base()` identity sets were 114 → 114; this is not shipped-seed
+execution, CI, or a measured landed trust delta. Inverted empty intervals need not
 pass the endpoint test despite vacuous member-set inclusion. Signed
 arithmetic, division, `Float`, rounding, width, structural
 hull/intersection algebra and sub-distributivity remain deferred.
