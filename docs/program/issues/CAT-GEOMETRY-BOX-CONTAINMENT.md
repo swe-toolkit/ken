@@ -1,7 +1,7 @@
 ---
 id: CAT-GEOMETRY-BOX-CONTAINMENT
 title: "Algorithm.Geometry.NatBox exports spec 67 section 3: the corner-wise box test inside and its seven laws (soundness, reflexivity, intersect inside each input, each input inside the hull, and the witnessed converse). Proved as checked terms at zero trust, from the Architect's D0 development, with the containment seed run by the package test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

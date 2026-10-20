@@ -22,8 +22,9 @@ depth presents it (weakening-correct). Re-encounters under a changed path
 (recursive-head origin pushed, ι-discharged or hardened) are decided
 afresh. That is the verdict-preserving residual, stated in the code
 comment and not claimed linear (Architect AC-0 ruling
-`evt_1y9c55a0198na`). Kernel conversion of the swapped row and of R2c is
-linear in K.
+`evt_1y9c55a0198na`). Kernel conversion of the swapped row and of R2c
+does structural work linear in K (pinned) and wall time polynomial
+(measured quadratic from memo lookup; Architect `evt_6jzvk97rrp5kq`).
 
 ## Settled inputs (Architect `evt_bq2fze6dbp15`, on `eac1c51a6` and `f04abbfee`)
 
@@ -78,6 +79,17 @@ base, stop and report the mismatch.
 
 The repair in `crates/ken-kernel/src/conv.rs`, ruled by the Architect at
 AC-0, with pins over the swapped row and R2c.
+
+The candidate also carries one downstream guard migration, by semantic
+atomicity (Steward `evt_x6whm3wzxjsh`). The guard is
+`discarded_bool_last_pair_cost_is_bounded_by_kernel_conversion` in
+`crates/ken-elaborator/tests/lang_type_position_sort_congruence_first.rs`.
+Its full/kernel timing ratio of 30 or less reds when only the kernel
+denominator improves (K16 base 15.57, candidate 38.98, evt_3e6td1h64jexr).
+Its replacement (Architect `evt_6jzvk97rrp5kq`): the K16 swap under 2s,
+`amp(32)/amp(16)` of 2 or less, `converted` and no obligations on both
+rows, and a kernel-half-revert discriminator that reds on the base. No
+other test in the file changes.
 
 ## Acceptance
 
