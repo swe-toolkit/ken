@@ -134,8 +134,15 @@ fn explicit_type_one_family_accepts_type_payload() {
         .expect("the existing explicit Type-1 escape must remain valid");
 }
 
+/// Promise class: durable invariant (spec 34 §2; spec 39 §5.6).
+/// MEASURED: a malformed family signature is rejected by the kernel before
+/// the independent constructor-universe error, without invented attribution.
+/// CLAIMED: an earlier real kernel refusal is never replaced by a fabricated
+/// constructor location. THE GAP: this route never reaches the unattributed
+/// universe-error fallback; `data::tests::unlocated_universe_error_preserves_kernel_refusal`
+/// pins that fallback directly.
 #[test]
-fn failed_localization_preserves_the_unattributed_kernel_error() {
+fn malformed_family_signature_refuses_before_constructor_universes() {
     let error = env()
         .elaborate_decl(
             "data D (x : Int Int) : Type where { \
@@ -146,14 +153,11 @@ fn failed_localization_preserves_the_unattributed_kernel_error() {
         matches!(
             &error,
             ElabError::KernelRejected {
-                error: KernelError::ConstructorUniverseViolation {
-                    argument,
-                    family,
-                },
+                error: KernelError::IllFormedDecl(message),
                 ..
-            } if *argument == Level::zero().suc() && *family == Level::zero()
+            } if message == "inductive signature failed to type-check"
         ),
-        "expected the honest unattributed kernel error, got {error:?}"
+        "expected the honest malformed-family kernel refusal, got {error:?}"
     );
     let diagnostic = error.to_string();
     for invented in ["<unknown>", "#1", "C.safe"] {

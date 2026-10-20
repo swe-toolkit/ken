@@ -842,3 +842,47 @@ fn rtype_to_kernel_checked(
         )?))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Promise class: durable invariant (spec 34 §2; spec 39 §5.6).
+    /// MEASURED: an unlocated universe error retains its kernel error and
+    /// declaration span. CLAIMED: a failed source lookup invents no constructor
+    /// attribution. THE GAP: this pins the fallback arm directly; the malformed
+    /// surface family now refuses earlier, and the separate legacy diagnostic
+    /// test exercises the attributed path through actual elaboration.
+    #[test]
+    fn unlocated_universe_error_preserves_kernel_refusal() {
+        let decl_span = Span::new(17, 63);
+        let argument_level = Level::zero().suc();
+        let family_level = Level::zero();
+        let error = surface_universe_error(
+            "D",
+            None,
+            argument_level.clone(),
+            family_level.clone(),
+            &decl_span,
+        );
+        assert!(
+            matches!(
+                &error,
+                ElabError::KernelRejected {
+                    error: KernelError::ConstructorUniverseViolation { argument, family },
+                    span,
+                } if *argument == argument_level
+                    && *family == family_level
+                    && *span == decl_span
+            ),
+            "an unlocated universe error must preserve the kernel refusal: {error:?}"
+        );
+        let diagnostic = error.to_string();
+        for invented in ["<unknown>", "#1", "C.safe"] {
+            assert!(
+                !diagnostic.contains(invented),
+                "diagnostic fabricated source attribution '{invented}': {diagnostic}"
+            );
+        }
+    }
+}
