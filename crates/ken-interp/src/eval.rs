@@ -1681,9 +1681,9 @@ mod ds5b_cast_regular_tests {
     }
 
     // Promise class: durable invariant. MEASURED: the value-layer C5 comparator
-    // accepts identical Σ coordinates and refuses independent changes to each
-    // domain, codomain, environment-length, and environment-entry coordinate.
-    // CLAIMED: no differing structural Σ type passes this sufficient-only arm.
+    // accepts identical Σ coordinates and refuses independent changes to the
+    // domain, codomain, environment length, and each of two captured entries.
+    // CLAIMED: this sufficient-only arm cannot ignore a later captured entry.
     // THE GAP: this unit test does not infer or kernel-check these synthetic
     // type values; the CLI C5 test supplies the checked source-level route.
     #[test]
@@ -1696,24 +1696,32 @@ mod ds5b_cast_regular_tests {
             cod: Rc::new(cod),
             env: Rc::new(env),
         };
-        let source = sigma(17, Term::Var(0), vec![EvalVal::Int(1)]);
+        let captured = || vec![EvalVal::Int(1), EvalVal::Int(3)];
+        let source = sigma(17, Term::Var(0), captured());
         let payload = EvalVal::Int(47);
         assert_eq!(
             cast_reduce(
                 source.clone(),
-                sigma(17, Term::Var(0), vec![EvalVal::Int(1)]),
+                sigma(17, Term::Var(0), captured()),
                 EvalVal::Neutral,
                 payload.clone()
             ),
             payload
         );
         for (coordinate, target) in [
-            ("domain", sigma(18, Term::Var(0), vec![EvalVal::Int(1)])),
-            ("codomain", sigma(17, Term::Var(1), vec![EvalVal::Int(1)])),
-            ("environment length", sigma(17, Term::Var(0), vec![])),
+            ("domain", sigma(18, Term::Var(0), captured())),
+            ("codomain", sigma(17, Term::Var(1), captured())),
             (
-                "environment entry",
-                sigma(17, Term::Var(0), vec![EvalVal::Int(2)]),
+                "environment length",
+                sigma(17, Term::Var(0), vec![EvalVal::Int(1)]),
+            ),
+            (
+                "first environment entry",
+                sigma(17, Term::Var(0), vec![EvalVal::Int(2), EvalVal::Int(3)]),
+            ),
+            (
+                "later environment entry",
+                sigma(17, Term::Var(0), vec![EvalVal::Int(1), EvalVal::Int(2)]),
             ),
         ] {
             assert_eq!(
