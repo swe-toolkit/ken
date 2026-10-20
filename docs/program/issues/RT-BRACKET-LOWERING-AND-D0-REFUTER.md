@@ -6,7 +6,7 @@ owner: runtime
 size: L
 gate: none
 tier: T1
-depends_on: [RT-BRACKET-SETTLEMENT-PLANE]
+depends_on: [RT-BRACKET-SETTLEMENT-PLANE, RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER]
 blocks: []
 github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. THIS IS THE LARGEST OF THE THREE CHILDREN AND THE STEWARD MIS-SIZED THE PARENT TWICE BEFORE; the split point if it proves too big is named in section 6 rather than discovered, and the Steward recuts at the FIRST audit here rather than the second. Pre-registration commit c22f4861d already satisfies the sequencing half of AC-14 and must be preserved; evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee is EVIDENCE, NEVER A CANDIDATE."
@@ -214,8 +214,13 @@ delay is the Steward's error, not the ring's.
 
 ## Hard-stop inventory (§1b)
 
-§1a (emission seam): 3 (Architect `evt_7r2aae0wx4hm6`); resumed under
-R8 `evt_4y4mx4cda73sc`, where a build wall is the 4th; the next Research
+§1a (emission seam): 4 (Architect `evt_q5j50vngtzhv`). **HELD at the §4
+stop** (Architect `evt_4yf9jdc9veepy`): px8ta depth 3 differs between
+the engines in both settlement modes, so the defect is in the existing
+producer route. It is framed as the held input
+`RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER`, assembled here. WIP
+`8d3731a3d` is evidence only, and R8 is retained. A wall while building
+that fix is the 5th here if the fix lands in child 3. The next Research
 trigger is the 6th.
 §1a (assembly): 0.
 
@@ -228,6 +233,10 @@ trigger is the 6th.
 3. On the producer arm, S is lowered under a specialization that neither
    contains S nor is its K specialization. Keyed on the settling owner,
    reconstructed from containment plus the row's base owner.
+4. Depth-3 native: the outer settlement is reached on the producer route
+   before the middle body runs, with the body result unwritten (tag 0).
+   Keyed on producer-route sequencing of nested bracket bodies,
+   independent of settlement mode.
 
 **Shared predicate (§1b).** In-place settlement was keyed on where the S
 Construct happens to be lowered, and the plan has no relation naming that
