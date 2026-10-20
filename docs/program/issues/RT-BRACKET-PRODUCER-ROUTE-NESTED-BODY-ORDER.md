@@ -67,8 +67,11 @@ is LIFO only because the release runs inside K's native frames.
    `continuation_specialization_calls`. The record is the Rust
    declaration in Architect `evt_2nwrvm9038k7t`: `row`,
    `emission_owner`, `route` (the existing `HandlerDriveContextRoute`),
-   `parameters`, `eliminators` and `settlements`, each settlement with
-   its `region`, `acquisition_depth` and `composing_frame`.
+   `parameters`, `eliminators` and `settlements`. Each settlement entry
+   is `region`, `acquisition_depth`, `settlement_continuation` (the
+   region row's `k_identity()`) and `settlement_specialization` (its
+   `k_specialization()`), as amended in Architect `evt_7w488rtt4yj9j`.
+   There is no `composing_frame`.
 2. **Build site.** `publish_handler_resumption_plan` and its validator
    run once in `construction.rs`, after phase B and the response-owner
    agreement block, before any lowering view. Do not reorder the phases
@@ -82,10 +85,14 @@ is LIFO only because the release runs inside K's native frames.
    `eliminators`, and `BracketSettlementControlView::from_plan` reads
    `settlements`. `per_emitter_availability.rs`, `aggregates.rs` and
    `validate_continuation_specialization_plan` do not read the record.
-   **Settlement contract:** the validator requires `settlements`
-   strictly decreasing in `acquisition_depth`, a consistent parent
-   chain, every `composing_frame` in `eliminators`, and their positions
-   in `settlements` order. There is no compile-time ledger order check.
+   **Settlement contract:** for each entry, the region's `row()` is
+   present, with `row.vis_origin() == region.settlement()` and its
+   `k_identity` and `k_specialization` equal to the entry's two keys. A
+   region without a Continuation row inside a resumption is a planner
+   refusal. Entries are strictly decreasing in `acquisition_depth`, the
+   parent chain is consistent, and `eliminators[0] ==
+   route.continuation_origin`. Distinct specializations are not
+   required. There is no compile-time ledger order check.
 4. **Retain**, as consumers of the record rather than self-deriving:
    F1; P0 with its per-capture source compare; V; P with
    `raw_owner == Pred4` and C0 certification; L1′; and L2′ with its
@@ -108,19 +115,18 @@ is LIFO only because the release runs inside K's native frames.
     consumer.
   - Measured and ruled (Architect `evt_2nwrvm9038k7t`): the census is
     sufficient, with no further census.
-- **AC-0b (D0, non-advancing; owed before product code).** Under
-  forced-Deferred at depth 2 and 3: the drive's eliminator run at each
-  `TransferToContext`, per region `settlement`, `outcome_merge`,
-  `resume` and `body_exit`, and which eliminator frame composes each of
-  releases 1, 2, 3. Outcomes: (α) a distinct frame per region, at one of
-  its checked origins, fixes `composing_frame` and the build proceeds;
-  (β) distinct frames at no region origin go to the Architect for the
-  key; (γ) a shared frame is a query on the representation.
+- **AC-0b (D0, non-advancing).** Measured and ruled β (Architect
+  `evt_7w488rtt4yj9j`): no eliminator frame composes a Deferred release,
+  so the key is the region's checked settlement-row continuation.
 - **T''-1..16** stand (Architect `evt_3tma32z29wz46`, `evt_3ztrhbzpvyb0`,
   `evt_1t43pvv4apd6`).
-- **R-1.** Forced-Deferred depth 3 exits 0 with terminal None, opens 1,
-  2, 3 and releases 3, 2, 1. This is T''-3.
-- **R-2.** The same at depth 2.
+Release-to-region attribution is read from the trace's resource
+identity: handle k is acquired by region k−1.
+
+- **R-1.** Forced-Deferred depth 3 exits 0 with terminal None, opens
+  handles 1, 2, 3 and releases 3, 2, 1. This is T''-3.
+- **R-2.** Forced-Deferred depth 2 exits 0 with terminal None and
+  releases handles 2, 1.
 - **R-3.** As-shipped is unchanged: depth 3 exits 0 with releases 3, 2,
   1, and depth 2 and `rt_native_bracket_body_once` are unchanged.
 - **R-3′.** The eight named unforced-Deferred sources keep their exact
@@ -129,19 +135,23 @@ is LIFO only because the release runs inside K's native frames.
   two_bracket_distinguishable, ignored_two_buffer_witness,
   px8x_single_schema_observation and rt_parity_native
   buffer_allocate_malformed_capacity.
-- **R-4 (mutation).** Reversing `settlements` order on the record
-  gives releases 1, 2, 3 and exit 1, or a planner refusal, never exit 0.
+- **R-4 (mutation).** Reversing the `settlements` entries gives a
+  planner refusal, or releases 1, 2, 3 with exit 1; never exit 0.
 - **R-5 (mutation).** Deleting the record for the depth-3 row refuses at
   the planner, not at lowering.
-- **R-6.** The settlement-order check refuses a hand-built plan whose
-  order is not the reversal.
+- **R-6 (mutation).** Setting one entry's `settlement_continuation` to a
+  sibling region's identity gives a validator refusal. R-4 and R-6 are
+  the discriminating pair: a validator that ignores the key passes
+  neither.
 
-**Precommit.** D0 returns are non-advancing. A planner refusal of the
-record on depth 3 is a query, as is a lowering-time disagreement
-between a resumption argument and the aggregate or per-emitter planes.
-Any other new wall is the node's 6th advancing stop: hold and call
-Research, scoped to the new fork. D0 (2) does not reclassify T''-3,
-whatever it shows.
+**Precommit.** D0 returns are non-advancing. A validator refusal on
+depth 3 because an entry's row disagrees with the view is a query, as
+is a lowering-time disagreement between a resumption argument and the
+aggregate or per-emitter planes. R-1 still releasing 1, 2, 3 with every
+validator clause satisfied means the resumption does not enter the
+deepest entry's continuation first: that is the node's 6th advancing
+stop, so hold and call Research, scoped to that fork. Any other new
+wall is also the 6th. D0 (2) does not reclassify T''-3.
 
 ## Stop conditions
 
