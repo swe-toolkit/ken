@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-CONTAINMENT
 title: "Spec 67 relates boxes only through the membership of single points: nothing states that one box lies inside another, so a client cannot conclude from corners alone that every point of an intersection lies in each input, or that each input lies in its hull. Rule a corner-wise containment test and its laws from a checked D0 at zero trust, and state them as a section 3 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
