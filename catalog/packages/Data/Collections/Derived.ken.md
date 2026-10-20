@@ -2305,7 +2305,7 @@ theorem filter_starts_after_cons
           (sym Bool (keep y) False dropped)
   }
 
-theorem filter_starts_after
+pub theorem filter_starts_after
       (a : Type)
       (le : a → a → Bool)
       (le_trans : (x : a)

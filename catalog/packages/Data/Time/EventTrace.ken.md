@@ -50,6 +50,7 @@ import Data.Collections.Derived
     list_sorted_tail,
     list_sorted_head,
     filter_sorted,
+    filter_starts_after,
     count_left_first,
     count_right_first)
 
@@ -574,6 +575,554 @@ theorem trace_merge_into_count
         (trace_merge_into_count p eqf q x xt rest rest_count yt)
         (event_before p x y)
         Refl
+  }
+
+pub theorem trace_window_merge
+      (p : Type) (lo : Nat) (hi : Nat) (xs : List (Event p))
+    : (ys : List (Event p))
+      → time_ordered p xs
+      → time_ordered p ys
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge p xs ys))
+        (trace_merge p (trace_window p lo hi xs) (trace_window p lo hi ys)) =
+  match xs {
+    Nil ↦ λys. λsx. λsy. Refl;
+    Cons x xt ↦
+      λys.
+        λsx.
+          λsy.
+            trace_window_merge_into
+              p
+              lo
+              hi
+              x
+              xt
+              (λzs.
+                λsz.
+                  trace_window_merge
+                    p
+                    lo
+                    hi
+                    xt
+                    zs
+                    (list_sorted_tail (Event p) (event_before p) x xt sx)
+                    sz)
+              ys
+              sx
+              sy
+  }
+
+theorem trace_window_merge_into
+      (p : Type)
+      (lo : Nat)
+      (hi : Nat)
+      (x : Event p)
+      (xt : List (Event p))
+      (ih : (zs : List (Event p))
+        → time_ordered
+        p
+        zs
+        → Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge p xt zs))
+        (trace_merge p (trace_window p lo hi xt) (trace_window p lo hi zs)))
+      (ys : List (Event p))
+    : time_ordered p (Cons (Event p) x xt)
+      → time_ordered p ys
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge_into p x xt (trace_merge p xt) ys))
+        (trace_merge p (trace_window p lo hi (Cons (Event p) x xt)) (trace_window p lo hi ys)) =
+  match ys {
+    Nil ↦
+      λsx.
+        λsy.
+          sym
+            (List (Event p))
+            (trace_merge p (trace_window p lo hi (Cons (Event p) x xt)) (Nil (Event p)))
+            (trace_window p lo hi (Cons (Event p) x xt))
+            (trace_merge_nil_right p (trace_window p lo hi (Cons (Event p) x xt)));
+    Cons y yt ↦
+      λsx.
+        λsy.
+          trace_window_merge_into_cons
+            p
+            lo
+            hi
+            x
+            xt
+            ih
+            y
+            yt
+            sx
+            sy
+            (trace_window_merge_into
+              p
+              lo
+              hi
+              x
+              xt
+              ih
+              yt
+              sx
+              (list_sorted_tail (Event p) (event_before p) y yt sy))
+            (event_before p x y)
+            Refl
+  }
+
+theorem trace_window_merge_into_cons
+      (p : Type)
+      (lo : Nat)
+      (hi : Nat)
+      (x : Event p)
+      (xt : List (Event p))
+      (ih : (zs : List (Event p))
+        → time_ordered
+        p
+        zs
+        → Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge p xt zs))
+        (trace_merge p (trace_window p lo hi xt) (trace_window p lo hi zs)))
+      (y : Event p)
+      (yt : List (Event p))
+      (sx : time_ordered p (Cons (Event p) x xt))
+      (sy : time_ordered p (Cons (Event p) y yt))
+      (inner : Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge_into p x xt (trace_merge p xt) yt))
+        (trace_merge p (trace_window p lo hi (Cons (Event p) x xt)) (trace_window p lo hi yt)))
+      (decision : Bool)
+    : Equal Bool (event_before p x y) decision
+      → Equal
+        (List (Event p))
+        (trace_window
+          p
+          lo
+          hi
+          (trace_merge_into p x xt (trace_merge p xt) (Cons (Event p) y yt)))
+        (trace_merge
+          p
+          (trace_window p lo hi (Cons (Event p) x xt))
+          (trace_window p lo hi (Cons (Event p) y yt))) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (trace_window
+                p
+                lo
+                hi
+                (match choice {
+                  True ↦ Cons (Event p) x (trace_merge p xt (Cons (Event p) y yt));
+                  False ↦ Cons (Event p) y (trace_merge_into p x xt (trace_merge p xt) yt)
+                }))
+              (trace_merge
+                p
+                (trace_window p lo hi (Cons (Event p) x xt))
+                (trace_window p lo hi (Cons (Event p) y yt))))
+          (trace_window_merge_left_head
+            p
+            lo
+            hi
+            x
+            xt
+            (trace_merge p xt (Cons (Event p) y yt))
+            (trace_window p lo hi (Cons (Event p) y yt))
+            (ih (Cons (Event p) y yt) sy)
+            (filter_starts_after
+              (Event p)
+              (event_before p)
+              (event_before_trans p)
+              (event_in_window p lo hi)
+              x
+              (Cons (Event p) y yt)
+              (list_sorted_cons
+                (Event p)
+                (event_before p)
+                x
+                (Cons (Event p) y yt)
+                sy
+                comparison))
+            (event_in_window p lo hi x)
+            Refl)
+          (sym Bool (event_before p x y) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (trace_window
+                p
+                lo
+                hi
+                (match choice {
+                  True ↦ Cons (Event p) x (trace_merge p xt (Cons (Event p) y yt));
+                  False ↦ Cons (Event p) y (trace_merge_into p x xt (trace_merge p xt) yt)
+                }))
+              (trace_merge
+                p
+                (trace_window p lo hi (Cons (Event p) x xt))
+                (trace_window p lo hi (Cons (Event p) y yt))))
+          (trace_window_merge_right_head
+            p
+            lo
+            hi
+            y
+            (trace_merge_into p x xt (trace_merge p xt) yt)
+            yt
+            (trace_window p lo hi (Cons (Event p) x xt))
+            inner
+            (trace_window_head_after p lo hi x xt y sx comparison)
+            (event_in_window p lo hi y)
+            Refl)
+          (sym Bool (event_before p x y) False comparison)
+  }
+
+theorem trace_window_merge_left_head
+      (p : Type)
+      (lo : Nat)
+      (hi : Nat)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p))
+      (zs : List (Event p))
+      (ih : Equal
+        (List (Event p))
+        (trace_window p lo hi rest)
+        (trace_merge p (trace_window p lo hi xt) zs))
+      (after : starts_after (Event p) (event_before p) x zs)
+      (decision : Bool)
+    : Equal Bool (event_in_window p lo hi x) decision
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (Cons (Event p) x rest))
+        (trace_merge p (trace_window p lo hi (Cons (Event p) x xt)) zs) =
+  match decision {
+    True ↦
+      λkept.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (match choice {
+                True ↦ Cons (Event p) x (trace_window p lo hi rest);
+                False ↦ trace_window p lo hi rest
+              })
+              (trace_merge
+                p
+                (match choice {
+                  True ↦ Cons (Event p) x (trace_window p lo hi xt);
+                  False ↦ trace_window p lo hi xt
+                })
+                zs))
+          (trans
+            (List (Event p))
+            (Cons (Event p) x (trace_window p lo hi rest))
+            (Cons (Event p) x (trace_merge p (trace_window p lo hi xt) zs))
+            (trace_merge p (Cons (Event p) x (trace_window p lo hi xt)) zs)
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_window p lo hi rest)
+              (trace_merge p (trace_window p lo hi xt) zs)
+              (λtail. Cons (Event p) x tail)
+              ih)
+            (sym
+              (List (Event p))
+              (trace_merge p (Cons (Event p) x (trace_window p lo hi xt)) zs)
+              (Cons (Event p) x (trace_merge p (trace_window p lo hi xt) zs))
+              (trace_merge_cons_left p x (trace_window p lo hi xt) zs after)))
+          (sym Bool (event_in_window p lo hi x) True kept);
+    False ↦
+      λdropped.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (match choice {
+                True ↦ Cons (Event p) x (trace_window p lo hi rest);
+                False ↦ trace_window p lo hi rest
+              })
+              (trace_merge
+                p
+                (match choice {
+                  True ↦ Cons (Event p) x (trace_window p lo hi xt);
+                  False ↦ trace_window p lo hi xt
+                })
+                zs))
+          ih
+          (sym Bool (event_in_window p lo hi x) False dropped)
+  }
+
+theorem trace_window_merge_right_head
+      (p : Type)
+      (lo : Nat)
+      (hi : Nat)
+      (y : Event p)
+      (rest : List (Event p))
+      (yt : List (Event p))
+      (ws : List (Event p))
+      (ih : Equal
+        (List (Event p))
+        (trace_window p lo hi rest)
+        (trace_merge p ws (trace_window p lo hi yt)))
+      (after : trace_head_after p y ws)
+      (decision : Bool)
+    : Equal Bool (event_in_window p lo hi y) decision
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (Cons (Event p) y rest))
+        (trace_merge p ws (trace_window p lo hi (Cons (Event p) y yt))) =
+  match decision {
+    True ↦
+      λkept.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (match choice {
+                True ↦ Cons (Event p) y (trace_window p lo hi rest);
+                False ↦ trace_window p lo hi rest
+              })
+              (trace_merge
+                p
+                ws
+                (match choice {
+                  True ↦ Cons (Event p) y (trace_window p lo hi yt);
+                  False ↦ trace_window p lo hi yt
+                })))
+          (trans
+            (List (Event p))
+            (Cons (Event p) y (trace_window p lo hi rest))
+            (Cons (Event p) y (trace_merge p ws (trace_window p lo hi yt)))
+            (trace_merge p ws (Cons (Event p) y (trace_window p lo hi yt)))
+            (cong
+              (List (Event p))
+              (List (Event p))
+              (trace_window p lo hi rest)
+              (trace_merge p ws (trace_window p lo hi yt))
+              (λtail. Cons (Event p) y tail)
+              ih)
+            (sym
+              (List (Event p))
+              (trace_merge p ws (Cons (Event p) y (trace_window p lo hi yt)))
+              (Cons (Event p) y (trace_merge p ws (trace_window p lo hi yt)))
+              (trace_merge_cons_right p ws y (trace_window p lo hi yt) after)))
+          (sym Bool (event_in_window p lo hi y) True kept);
+    False ↦
+      λdropped.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (match choice {
+                True ↦ Cons (Event p) y (trace_window p lo hi rest);
+                False ↦ trace_window p lo hi rest
+              })
+              (trace_merge
+                p
+                ws
+                (match choice {
+                  True ↦ Cons (Event p) y (trace_window p lo hi yt);
+                  False ↦ trace_window p lo hi yt
+                })))
+          ih
+          (sym Bool (event_in_window p lo hi y) False dropped)
+  }
+
+fn trace_head_after (p : Type) (y : Event p) (zs : List (Event p)) : Prop =
+  match zs {
+    Nil ↦ Top;
+    Cons z zt ↦ Equal Bool (event_before p z y) False
+  }
+
+theorem trace_merge_nil_right
+      (p : Type) (xs : List (Event p))
+    : Equal (List (Event p)) (trace_merge p xs (Nil (Event p))) xs =
+  match xs {
+    Nil ↦ Proved;
+    Cons x xt ↦ Refl
+  }
+
+theorem trace_merge_cons_left
+      (p : Type) (x : Event p) (a : List (Event p)) (zs : List (Event p))
+    : starts_after (Event p) (event_before p) x zs
+      → Equal
+        (List (Event p))
+        (trace_merge p (Cons (Event p) x a) zs)
+        (Cons (Event p) x (trace_merge p a zs)) =
+  match zs {
+    Nil ↦
+      λafter.
+        cong
+          (List (Event p))
+          (List (Event p))
+          a
+          (trace_merge p a (Nil (Event p)))
+          (λtail. Cons (Event p) x tail)
+          (sym
+            (List (Event p))
+            (trace_merge p a (Nil (Event p)))
+            a
+            (trace_merge_nil_right p a));
+    Cons z zt ↦
+      λafter.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (match choice {
+                True ↦ Cons (Event p) x (trace_merge p a (Cons (Event p) z zt));
+                False ↦ Cons (Event p) z (trace_merge_into p x a (trace_merge p a) zt)
+              })
+              (Cons (Event p) x (trace_merge p a (Cons (Event p) z zt))))
+          (sym
+            (List (Event p))
+            (Cons (Event p) x (trace_merge p a (Cons (Event p) z zt)))
+            (Cons (Event p) x (trace_merge p a (Cons (Event p) z zt)))
+            Refl)
+          (sym Bool (event_before p x z) True after)
+  }
+
+theorem trace_merge_cons_right
+      (p : Type) (zs : List (Event p)) (y : Event p) (b : List (Event p))
+    : trace_head_after p y zs
+      → Equal
+        (List (Event p))
+        (trace_merge p zs (Cons (Event p) y b))
+        (Cons (Event p) y (trace_merge p zs b)) =
+  match zs {
+    Nil ↦ λafter. Refl;
+    Cons z zt ↦
+      λafter.
+        J
+          (λchoice _.
+            Equal
+              (List (Event p))
+              (match choice {
+                True ↦ Cons (Event p) z (trace_merge p zt (Cons (Event p) y b));
+                False ↦ Cons (Event p) y (trace_merge_into p z zt (trace_merge p zt) b)
+              })
+              (Cons (Event p) y (trace_merge_into p z zt (trace_merge p zt) b)))
+          (sym
+            (List (Event p))
+            (Cons (Event p) y (trace_merge_into p z zt (trace_merge p zt) b))
+            (Cons (Event p) y (trace_merge_into p z zt (trace_merge p zt) b))
+            Refl)
+          (sym Bool (event_before p z y) False after)
+  }
+
+theorem trace_window_head_after
+      (p : Type) (lo : Nat) (hi : Nat) (x : Event p) (xt : List (Event p)) (y : Event p)
+    : time_ordered p (Cons (Event p) x xt)
+      → Equal Bool (event_before p x y) False
+      → trace_head_after p y (trace_window p lo hi (Cons (Event p) x xt)) =
+  λsx.
+    λbeyond.
+      trace_window_head_after_decide
+        p
+        lo
+        hi
+        x
+        xt
+        y
+        beyond
+        (trace_head_after_from_start
+          p
+          x
+          y
+          (trace_window p lo hi xt)
+          (filter_starts_after
+            (Event p)
+            (event_before p)
+            (event_before_trans p)
+            (event_in_window p lo hi)
+            x
+            xt
+            sx)
+          beyond)
+        (event_in_window p lo hi x)
+        Refl
+
+theorem trace_window_head_after_decide
+      (p : Type)
+      (lo : Nat)
+      (hi : Nat)
+      (x : Event p)
+      (xt : List (Event p))
+      (y : Event p)
+      (beyond : Equal Bool (event_before p x y) False)
+      (later : trace_head_after p y (trace_window p lo hi xt))
+      (decision : Bool)
+    : Equal Bool (event_in_window p lo hi x) decision
+      → trace_head_after p y (trace_window p lo hi (Cons (Event p) x xt)) =
+  match decision {
+    True ↦
+      λkept.
+        J
+          (λchoice _.
+            trace_head_after
+              p
+              y
+              (match choice {
+                True ↦ Cons (Event p) x (trace_window p lo hi xt);
+                False ↦ trace_window p lo hi xt
+              }))
+          beyond
+          (sym Bool (event_in_window p lo hi x) True kept);
+    False ↦
+      λdropped.
+        J
+          (λchoice _.
+            trace_head_after
+              p
+              y
+              (match choice {
+                True ↦ Cons (Event p) x (trace_window p lo hi xt);
+                False ↦ trace_window p lo hi xt
+              }))
+          later
+          (sym Bool (event_in_window p lo hi x) False dropped)
+  }
+
+theorem trace_head_after_from_start
+      (p : Type) (x : Event p) (y : Event p) (zs : List (Event p))
+    : starts_after (Event p) (event_before p) x zs
+      → Equal Bool (event_before p x y) False
+      → trace_head_after p y zs =
+  match zs {
+    Nil ↦ λafter. λbeyond. Proved;
+    Cons z zt ↦
+      λafter. λbeyond. trace_head_after_decide p x y z after beyond (event_before p z y) Refl
+  }
+
+theorem trace_head_after_decide
+      (p : Type)
+      (x : Event p)
+      (y : Event p)
+      (z : Event p)
+      (xz : Equal Bool (event_before p x z) True)
+      (beyond : Equal Bool (event_before p x y) False)
+      (decision : Bool)
+    : Equal Bool (event_before p z y) decision → Equal Bool (event_before p z y) False =
+  match decision {
+    True ↦
+      λzy.
+        absurd
+          (trans
+            Bool
+            True
+            (event_before p x y)
+            False
+            (sym Bool (event_before p x y) True (event_before_trans p x z y xz zy))
+            beyond);
+    False ↦ λzy. zy
   }
 ```
 
