@@ -351,11 +351,12 @@ no ruled rational declaration consumes it.
 This contract specifies **non-negative exact rational values** only.
 Signed values, subtraction, reciprocals and division, reduced or
 canonical spellings, gcd normalization and Gcd exports, `Float`,
-approximate statistics, natural-construction homomorphism laws, and
-monotonicity of rational addition or multiplication remain separate
-work. A normalized subtype can be built over this carrier later;
-this chapter does not pretend every equivalent spelling is identical
-now.
+approximate statistics, and natural-construction homomorphism laws
+remain separate work. Rational addition and multiplication
+monotonicity are specified in §68 §1.4 and exported by
+`Data.Numeric.Rational`. A normalized subtype can be built over this
+carrier later; this chapter does not pretend every equivalent spelling
+is identical now.
 
 `spec/50-stdlib/63-statistics.md` §§1–2 interpret event mass and
 score sum over a positive total as numerator/denominator pairs,

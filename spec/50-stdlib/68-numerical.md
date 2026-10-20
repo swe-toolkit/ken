@@ -1,12 +1,13 @@
 # Exact numerical intervals
 
-> **Status: DRAFT v0 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT).**
-> Section 1 specifies exact closed intervals over non-negative
-> `Rational`, three total operations, and six generic interval laws
-> checked in Architect D0. The D0 used two additional checked Rational
-> monotonicity proofs in scratch; neither their catalog export nor the
-> interval module has landed as part of this contract. No shipped-seed
-> execution, CI result, or trusted-base delta is claimed.
+> **Status: DRAFT v0 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT §1;
+> SPEC-NUMERICAL-INTERVAL-HULL §2;
+> SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3).** The §1–2 operations,
+> ten checked interval laws, required Rational exports and seeds are
+> present on main. Section 3 specifies endpoint-wise inclusion and
+> nine checked law obligations from Architect D0; its catalog exports
+> and seed are not delivered. Scratch evidence is not §3 shipped-seed
+> execution, CI, or a measured landed trust delta.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -81,9 +82,9 @@ always produces an empty one. The six laws below assert enclosure
 
 ### 1.3 Six checked interval laws
 
-The prospective module must export checked proof bodies for
-**exactly these six interval laws**, generic in every displayed
-interval or rational argument. `IsTrue` turns Boolean membership
+The landed `Algorithm.Numeric.RationalInterval` exports checked
+proof bodies for these six §1 interval laws, generic in every
+displayed interval or rational argument. `IsTrue` turns Boolean membership
 into a proposition. The enclosure laws require **both** membership
 premises and compare result values using the checked rational
 operations. `rational_equiv` in `interval_point_sound` preserves
@@ -130,8 +131,9 @@ uses reflexivity of rational order; point soundness uses
 antisymmetry **up to `rational_equiv`**. Both point-operation laws
 check by structural equality of their constructed intervals. Closed
 seed instances exercise each law but do not establish its generic
-quantifiers. No law here equates extensionally equal intervals or
-states inclusion isotonicity for arbitrary interval pairs.
+quantifiers. No §1 law equates extensionally equal intervals or
+states inclusion isotonicity for arbitrary interval pairs; §3
+specifies the latter separately.
 
 ### 1.4 Rational dependency, trust, and deferrals
 
@@ -156,38 +158,38 @@ pub theorem rational_mul_mono
   Equal Bool (rational_leq (rational_mul x z) (rational_mul y w)) True
 ```
 
-A scratch copy of the existing Rational package with these two
-checked public proofs and their private Nat-derived helpers makes
-the six-law D0 check rc=0. With the landed Rational package, the
-same D0 instead rejects `UnboundName rational_add_mono`. The
-Rational exports, proof helpers, interval catalog publication, and
-any coupled Rust acceptance or catalog-census updates belong to a
-**separate catalog follow-on**; this spec WP edits none of them.
-Neither a missing export nor a scratch proof is a shipped package.
+A scratch copy of the Rational package with these two checked
+public proofs and their private Nat-derived helpers made the six-law
+D0 check rc=0. On the original D0 base, before the exports landed,
+the same development rejected `UnboundName rational_add_mono`.
+The Rational exports and §1 interval catalog module have since
+landed. Neither that historical failure nor the scratch proof alone
+established a shipped package or its trust delta.
 
-The D0 interval source and Rational monotonicity appendix declare
-no `Axiom`, postulate, or primitive, and need no new kernel or
-surface feature. Their successful checks have **not** measured
+The historical D0 interval source and Rational appendix declared
+no `Axiom`, postulate, or primitive, and needed no new kernel or
+surface feature. Their scratch checks did **not** measure
 `trusted_base()` before and after loading, including inherited
-assumptions from imports; zero trusted-base delta is a catalog
-validation obligation, not a result of this spec WP. Likewise,
-the source-shaped conformance seed is not execution of a shipped
-suite, Rust acceptance, catalog delivery, or CI.
+assumptions from imports; they are not a landed trust measurement.
+The §1 module and seed are now present on main, but that D0 did not
+execute a shipped seed or establish CI.
 
 Signed values and subtraction are deferred: signed multiplication
 would require comparing four endpoint products. Division and
 reciprocal intervals, particularly those spanning zero, are
 deferred. Floating point, rounding modes and outward rounding,
-width and diameter, interval intersection and hull, normalized
-endpoint spellings, inclusion isotonicity, and sub-distributivity
-are also outside §1. None is established by the six laws above.
+width and diameter, normalized endpoint spellings, and
+sub-distributivity remain outside §§1–3. Section 2 separately
+specifies hull and intersection; §3 specifies inclusion isotonicity.
+Neither follows from the six §1 laws alone.
 
 ## 2. Hull and intersection by containment
 
 > **Section 2 status: DRAFT v0 (SPEC-NUMERICAL-INTERVAL-HULL).**
 > Architect D0 checked the two operations and four generic laws below
-> on the landed §1 base. Its Rational additions and interval proofs
-> were in scratch copies, not published §2 catalog packages.
+> on the then-landed §1 base. The §2 Rational additions, interval
+> proofs and seed have since landed; the historical D0 alone does not
+> establish shipped seed-harness execution, CI or a landed trust delta.
 
 ### 2.1 Endpoint formulas and empty results
 
@@ -233,8 +235,8 @@ No minimality or empty-operand preservation law is claimed.
 
 ### 2.2 Four checked containment laws
 
-The prospective extension must provide checked generic proof bodies
-for exactly these four **public interval laws**. `IsTrue` turns
+The landed §2 extension provides checked generic proof bodies for
+these four **public interval laws**. `IsTrue` turns
 Boolean membership into a proposition. `And` here is the ambient
 Ω-valued conjunction with `and_intro` and its two projections,
 not the distinct `Type`-valued `Core.Logic.And` carrier. No premise
@@ -282,11 +284,11 @@ claims beyond the four displayed membership laws are not added.
 
 ### 2.3 Rational catalog prerequisites and evidence
 
-`Data.Numeric.Rational` must separately export the following
-operations and **six order proofs**. They are Rational catalog
-obligations, not additional interval laws and not delivered in
-this spec WP. Their comparison-based selection behavior is stated
-in §2.1; the proofs have the Architect-checked public types:
+`Data.Numeric.Rational` separately exports the following
+operations and **six order proofs** on main. They were Rational
+catalog obligations, not additional interval laws. Their
+comparison-based selection behavior is stated in §2.1; the proofs
+have the Architect-checked public types:
 
 ```ken
 pub fn rational_min (x : Rational) (y : Rational) : Rational
@@ -330,13 +332,148 @@ for the two differing hull spellings. The scratch source had no
 new `Axiom`, kernel/surface change, primitive or signed carrier.
 A mutated `leq_left for rational_min` also failed to check. These
 are **Architect-reported scratch results**, not an author-run Ken
-check, shipped §2 catalog module or seed, Cargo test, CI result
-or `trusted_base()` before/after measurement.
+check, executed shipped §2 seed, CI result or landed trust measurement.
 
-The §1 Rational monotonicity exports, interval package and §1 seed
-are present on this landed base; §1.4's follow-on wording records
-its earlier D0 state. The §2 Rational min/max exports and interval
-extension remain catalog follow-ons. Signed interval arithmetic,
-division, floating-point rounding, width, normalized endpoint
-spellings, arbitrary-pair inclusion isotonicity and
-sub-distributivity remain deferred.
+The §1–2 Rational exports, interval catalog module and two seeds are
+present on main. Signed interval arithmetic, division, floating-point
+rounding, width, normalized endpoint spellings and sub-distributivity
+remain deferred. Arbitrary-pair inclusion isotonicity is specified
+separately in §3; §2's four laws alone do not supply it.
+
+## 3. Interval inclusion and endpoint isotonicity
+
+> **Section 3 status: DRAFT v0 (SPEC-NUMERICAL-INCLUSION-ISOTONICITY).**
+> Architect D0 checked the following public operation and nine generic
+> laws on the landed §1–2 base. Section 3 is a contract for later
+> catalog and conformance delivery, not a claim that its exports,
+> seed, shipped harness, CI or landed trust measurement exist.
+
+### 3.1 Inclusion by endpoint comparisons
+
+`interval_inside i k` means the endpoints of `i` lie inside the
+endpoints of `k`, in the order appropriate to a containing interval.
+Its complete public Boolean definition uses the existing checked
+`rational_leq` and conjunction on the **values** of the endpoints,
+not structural `Equal Rational` or a normalized spelling:
+
+```ken
+pub fn interval_inside (i : Interval) (k : Interval) : Bool =
+  match i {
+    MkInterval a b ↦
+      match k {
+        MkInterval c d ↦ bool_and (rational_leq c a) (rational_leq b d)
+      }
+  }
+```
+
+Thus `i=[a,b]` lies inside `k=[c,d]` exactly when `c ≤ a` and
+`b ≤ d`. The operation **does not inspect membership or validity**
+and does not special-case an inverted `i`. For example, `[2,1]`
+lies inside `[0,4]` by its endpoints, but the empty `[1/2,0]` is
+not inside `[1,3]`: its lower comparison `1 ≤ 1/2` is false.
+Both have no members. The test is sufficient for inclusion of
+member sets, but it is not necessary without a point in `i`.
+The point interval `[1/2,1/2]` lies inside `[2/4,2/4]` by rational
+value order, even though the endpoint spellings differ structurally.
+
+### 3.2 Nine checked-law obligations
+
+The module must export checked proof bodies for exactly these nine
+new public theorem types. `IsTrue` turns each Boolean result into an
+Ω proposition. Soundness carries every member of an included inner
+interval into the outer interval; reflexivity includes inverted
+intervals without identifying different representations of emptiness:
+
+```ken
+pub theorem interval_inside_sound
+  (i : Interval) (k : Interval) (x : Rational) :
+  IsTrue (interval_inside i k) →
+  IsTrue (interval_contains i x) →
+  IsTrue (interval_contains k x)
+
+pub theorem interval_inside_refl (i : Interval) :
+  IsTrue (interval_inside i i)
+
+pub theorem interval_add_inside
+  (i : Interval) (i2 : Interval) (j : Interval) (j2 : Interval) :
+  IsTrue (interval_inside i i2) →
+  IsTrue (interval_inside j j2) →
+  IsTrue (interval_inside (interval_add i j) (interval_add i2 j2))
+
+pub theorem interval_mul_inside
+  (i : Interval) (i2 : Interval) (j : Interval) (j2 : Interval) :
+  IsTrue (interval_inside i i2) →
+  IsTrue (interval_inside j j2) →
+  IsTrue (interval_inside (interval_mul i j) (interval_mul i2 j2))
+
+pub theorem interval_inside_hull_left (i : Interval) (j : Interval) :
+  IsTrue (interval_inside i (interval_hull i j))
+
+pub theorem interval_inside_hull_right (i : Interval) (j : Interval) :
+  IsTrue (interval_inside j (interval_hull i j))
+
+pub theorem interval_intersect_inside_left (i : Interval) (j : Interval) :
+  IsTrue (interval_inside (interval_intersect i j) i)
+
+pub theorem interval_intersect_inside_right (i : Interval) (j : Interval) :
+  IsTrue (interval_inside (interval_intersect i j) j)
+
+pub theorem interval_inside_complete
+  (i : Interval) (k : Interval) (q : Rational) :
+  IsTrue (interval_contains i q) →
+  ((x : Rational) → IsTrue (interval_contains i x) →
+    IsTrue (interval_contains k x)) →
+  IsTrue (interval_inside i k)
+```
+
+The addition and multiplication laws are **isotonic in both interval
+arguments**: when each input lies inside its corresponding larger
+input, endpoint-wise arithmetic preserves both comparisons. They
+use the `rational_add_mono` and `rational_mul_mono` laws specified
+in §68 §1.4 and exported by `Data.Numeric.Rational` for exact
+**non-negative** values. `rational_mul_mono` needs no separate sign
+premise on this carrier. Neither law assumes ordered endpoints or
+changes §1's total, corresponding-endpoint formulas. No signed arithmetic,
+subtraction, four-cross-product multiplication, or rounding follows.
+
+The hull and intersection inclusions are **unconditional corner
+facts**, even for inverted inputs or a disjoint intersection. The
+§2 min/max endpoint formulas give each input bounds inside the hull
+and the intersection's bounds inside each input. These are Boolean
+inclusion statements, not structural `Equal Interval`, a member-set
+quotient, a least hull for an empty operand, or a canonical empty
+interval. Equivalent rational values may still have different
+stored spellings.
+
+The final theorem is a **witnessed converse** of soundness. A member
+`q` of `i=[a,b]` supplies `a ≤ q ≤ b`; hence both `a` and `b` are
+members of `i`. Pointwise member inclusion places both endpoints in
+`k=[c,d]`, giving `c ≤ a` and `b ≤ d`. Without `q`, pointwise
+inclusion is vacuous for inverted `[1/2,0]`, even though
+`interval_inside [1/2,0] [1,3]` is `False`. No unwitnessed converse,
+equivalence of member sets, or structural equality of intervals is
+promised. A transitivity law is not among these nine public laws.
+
+### 3.3 Evidence and boundary
+
+On the landed base `2f3977991d7f678020f69bb93835472985a20db4`,
+Architect D0 checked the complete §3 development in a scratch copy
+of `Algorithm.Numeric.RationalInterval`: package elaboration rc 0,
+no `Axiom` or `Opaque`, ten new owned Transparent declarations,
+and matching `trusted_base()` identity sets of 114 entries before
+and after loading it. A public-only scratch client checked nested
+and self inclusion, soundness, both isotonicity instances, hull and
+intersection cases, an inverted intersection, equivalent rational
+endpoint spellings, and the witnessed converse. The wrong claim
+that `[1,3]` lies inside `[2,2]` was kernel-refused. Two inverted
+closed examples distinguish the corner test from vacuous member
+inclusion. Existing §1 and §2 targeted Rust suites each passed 3/3
+on the scratch package; the ambient-name census row remained
+`[And, and_fst, and_intro, and_snd]` with no new ambient name.
+
+These are **Architect-reported scratch results**, not §3 catalog
+publication, an authored or executed §3 conformance seed, CI, or a
+measured trust delta on the landed module. This contract adds no
+primitive, kernel/surface feature, signed carrier, subtraction,
+`rational_equiv`-as-`Equal`, canonical empty interval, or member-set
+equality.

@@ -349,26 +349,25 @@ Euclidean and floating-point distance, box area, other dimensions,
 canonical empty boxes and point-set equality remain outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–2
+**`68-numerical.md`** §§1–3
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
-SPEC-NUMERICAL-INTERVAL-HULL). The §1
-`Algorithm.Numeric.RationalInterval` module and closed seed, and
-its required Rational monotonicity exports, are landed. Its
-non-negative `Rational` endpoints admit inclusive membership and
-inverted-bounds empty intervals; point, endpoint-wise addition and
-multiplication have six checked §1 laws. §2 specifies `Interval`-
-valued hull and intersection by exact min/max endpoint formulas
-with exactly four Architect-D0-checked **containment** laws: hull
-contains members from each input, and intersection contains exactly
-the common members. The requisite new Rational min/max operations
-and six public order proofs remain a catalog follow-on. D0 generic
-proofs and closed oracles ran only against scratch modules; no §2
-catalog delivery, shipped §2 seed, CI or `trusted_base()` result is
-claimed. Structural commutativity, idempotence and associativity of
-hull/intersection are not asserted; equivalent rational spellings
-refute structural hull commutativity. Signed arithmetic, division,
-`Float`, rounding, width, arbitrary-pair inclusion isotonicity and
-sub-distributivity remain deferred.
+SPEC-NUMERICAL-INTERVAL-HULL;
+SPEC-NUMERICAL-INCLUSION-ISOTONICITY). The §1–2
+`Algorithm.Numeric.RationalInterval` operations, ten checked laws,
+seeds and required Rational monotonicity/min-max exports are present
+on main. Non-negative `Rational` endpoints admit inclusive membership
+and inverted-bounds empty intervals; point, addition and multiplication
+use corresponding endpoints, while hull/intersection use exact min/max
+bounds. Section 3 specifies public endpoint-wise `interval_inside`,
+soundness, reflexivity, addition/multiplication isotonicity, four
+hull/intersection inclusions, and a converse only with a member
+witness. Its nine generic laws are D0-checked, but §3 catalog exports
+and a §3 seed are not delivered. The scratch `trusted_base()` identity
+sets were 114 → 114; this is not shipped §3 seed-harness execution,
+CI or a measured landed trust delta. Inverted empty intervals need not
+pass the endpoint test despite vacuous member-set inclusion. Signed
+arithmetic, division, `Float`, rounding, width, structural
+hull/intersection algebra and sub-distributivity remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §1 (SPEC-TIME-EVENT-TRACE-CONTRACT) and
