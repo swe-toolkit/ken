@@ -1,7 +1,7 @@
 ---
 id: KERNEL-CONV-DELTA-RETRY-CONVERTED-SIBLINGS
 title: "Within one δ retry the kernel re-decides spine argument pairs it already decided. Converted siblings are converted again because SpineFailure memoizes only the failed pair (swapped H, 13.8s at K=20), and a failed pair presented one binder deeper misses the memo on its depth equality (codomain-position Hc, 3.3s at K=18). Decide each original pair at most once, weakening-correctly"
-status: draft
+status: active
 owner: kernel
 size: S
 tier: T1
@@ -9,7 +9,7 @@ gate: architect
 depends_on: []
 blocks: []
 github: null
-origin: "Architect attribution evt_bq2fze6dbp15 of the LANG-TYPE-POSITION-SORT-SPINE-GATE R1-swap stop (verify-implementer evt_4evecavcpxby6): pre-existing kernel behaviour, not a CONGRUENCE-FIRST regression. A kernel change: draft until the operator approves. Amended per Architect evt_1crshmhjk9ay3 to fold in Adversary M8 finding evt_yvvjeg89jay1 (the depth half). Steward-filed per COORDINATION section 2."
+origin: "Architect attribution evt_bq2fze6dbp15 of the LANG-TYPE-POSITION-SORT-SPINE-GATE R1-swap stop (verify-implementer evt_4evecavcpxby6): pre-existing kernel behaviour, not a CONGRUENCE-FIRST regression. A kernel change, approved by the operator 2026-10-20: \"approve KERNEL-CONV-DELTA-RETRY-CONVERTED-SIBLINGS\"; kicked evt_575g2hsdngz78. Amended per Architect evt_1crshmhjk9ay3 to fold in Adversary M8 finding evt_yvvjeg89jay1 (the depth half). Steward-filed per COORDINATION section 2."
 ---
 
 # The δ retry decides each spine argument pair once
