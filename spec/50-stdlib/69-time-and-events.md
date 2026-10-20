@@ -1,14 +1,16 @@
 # Finite event traces over natural times
 
 > **Status: DRAFT v0 (SPEC-TIME-EVENT-TRACE-CONTRACT §1;
-> SPEC-TIME-WINDOW-MEMBERSHIP §2).** Section 1 binds finite events,
-> half-open windows and left-biased merging, with three generically
-> checked Architect D0 laws. Section 2 adds two generically checked D0
-> window-membership laws and two checked generic list-filter prerequisites.
-> This WP authors the §2 conformance seed; its execution against the
-> shipped catalog awaits implementation of §2's EventTrace laws. D0
-> scratch execution is not shipped seed execution, CI, or a measured
-> landed trusted-base delta.
+> SPEC-TIME-WINDOW-MEMBERSHIP §2;
+> SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3).** The §1–2 EventTrace
+> operations, five checked laws, two generic filter prerequisites and
+> both existing seeds are present on main. Section 3 specifies the
+> Architect-D0-checked ordered-input distribution law. Its catalog
+> export is not delivered; the conformance seed is authored and present
+> at:
+> `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
+> D0 scratch checks are not shipped §3 seed execution, CI, or a
+> measured landed trust delta.
 
 ## 1. Finite event traces over natural times
 
@@ -97,8 +99,8 @@ choice, not a new resolution or kernel rule.
 
 ### 1.3 Three checked generic laws
 
-The prospective package must export **checked proof bodies** for
-exactly these three laws, not assumptions. They quantify over every
+The landed package exports **checked proof bodies** for exactly these
+three §1 laws, not assumptions. They quantify over every
 payload type, timestamp bound, displayed trace and, in the count
 law, **every Boolean classifier** `eqf` and query `q`. The two
 order laws require their shown ordering premises. The count law
@@ -139,11 +141,12 @@ is required by the general law. The D0 checked these three laws
 generically. Closed examples in a conformance seed will exercise
 the interfaces, not establish their quantifiers.
 
-No window/merge distribution law, no generic window-membership
-soundness or completeness law, and no structural list equality of
-merged traces is included among the checked claims. In particular,
-the count law alone does not choose an order for equal timestamps;
-left-biased output is fixed by the operation's definition in §1.2.
+These three §1 claims do not include window membership or structural
+window/merge distribution; §2 separately states the two membership
+laws, and §3 states distribution under ordered-input premises. No
+unconditional structural list equality for unordered merged traces
+follows. The count law alone does not choose an order for equal
+timestamps; left-biased output is fixed by §1.2's definition.
 
 ### 1.4 Derivation, trust and deferred scope
 
@@ -151,16 +154,14 @@ left-biased output is fixed by the operation's definition in §1.2.
 arbitrary existing type; traces reuse prelude `List`. The ordered
 predicate uses prelude `is_sorted` and checked `leq_nat`; windowing
 uses `lt_nat`, `bool_and` and the existing `filter`; counting uses
-the existing `count` and checked `add`. The D0 checked its 771-line
-module on base `48cda520b`, rc=0, and declared no `Axiom`,
-primitive or foreign item. These facts establish a source-shaped
-proof development, **not** a published catalog package or a
-measured zero `trusted_base()` delta across imports. No new
-primitive, kernel rule or surface feature is required. The future
-catalog factoring may move private generic list proofs into
-`Data.Collections.Derived` and reuse its existing private sorted-
-head helpers; that is a separate delivery step, not an extra law
-of this section.
+the existing `count` and checked `add`. The historical §1 D0 checked
+its 771-line module on base `48cda520b`, rc 0, and declared no
+`Axiom`, primitive or foreign item. The §1–2 catalog module and both
+conformance seeds have since landed; the D0 check itself was scratch
+evidence, **not** a shipped seed run or a landed trust measurement.
+The catalog reuses generic filter, sorted-list and count helpers from
+`Data.Collections.Derived`. No new primitive, kernel rule or surface
+feature is required by §1.
 
 A timestamp here is **given data**, not a reading of a clock.
 `ClockWallNow` is a host effect outside this pure interface.
@@ -259,9 +260,10 @@ facts for the filter-completeness proof. It does **not** import
 `Core.Logic.And (And)`; both law statements use the ambient Ω `And`.
 The two generic filter proofs and these two instantiated window proofs
 checked on the Architect's D0 scratch tree on base `a0e9a1d30`, rc 0,
-without a new `Axiom`. That is evidence of a checked proof development,
-not delivery of these laws in the EventTrace catalog package or a
-measured `trusted_base()` delta on a published artifact.
+without a new `Axiom`. All four proofs are now exported on main from
+`Data.Collections.Derived` and `Data.Time.EventTrace` respectively;
+that earlier scratch check is not a shipped-seed execution or a
+landed `trusted_base()` measurement.
 
 These laws characterize **membership**, not an equality of lists or
 multiplicity. Filtering retains input order as specified in §1.2, and
@@ -270,5 +272,95 @@ second ordering law. The §1.3 exclusion of window-membership laws from
 its three checked claims describes §1, not these additional §2 claims.
 For `lo ≥ hi`, both completeness bound facts cannot hold for an event,
 and soundness over the empty window has an empty premise; neither case
-requires an extra public law. Window/merge distribution and the other
-§1.4 deferred topics remain deferred.
+requires an extra public law. Window/merge distribution is separately
+specified in §3; the other §1.4 deferred topics remain deferred.
+
+## 3. Windowing an ordered merge
+
+> **Section 3 status: DRAFT v0
+> (SPEC-TIME-WINDOW-MERGE-DISTRIBUTION).** Architect D0 checked the
+> generic law below on the landed §1–2 base. The §3 catalog export
+> is not delivered; its conformance seed is authored and present at:
+> `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
+> No shipped §3 seed-harness execution, CI, or landed trust
+> measurement is claimed.
+
+### 3.1 Structural distribution with two ordering premises
+
+The package must export a **checked proof body** for this public law,
+with precisely the displayed `Equal (List (Event p))` conclusion:
+
+```ken
+pub theorem trace_window_merge
+      (p : Type) (lo : Nat) (hi : Nat) (xs : List (Event p))
+    : (ys : List (Event p))
+      → time_ordered p xs
+      → time_ordered p ys
+      → Equal
+        (List (Event p))
+        (trace_window p lo hi (trace_merge p xs ys))
+        (trace_merge p (trace_window p lo hi xs) (trace_window p lo hi ys))
+```
+
+Both input traces must be non-decreasing by time. The law holds for
+**every** payload type `p` without a payload `DecEq` or `Ord`, including
+traces with equal-time events. It equates the two resulting lists of
+**stored events in order**, not merely their membership or counts.
+Windowing preserves the relative order of kept events, and merging
+continues to favor the left event on a cross-input timestamp tie.
+Neither operation validates ordering or sorts an unordered input;
+the two proofs are law premises, not fields of a new trace carrier.
+The half-open bounds may be equal or inverted, in which case both
+sides are empty.
+
+The two-premise condition is necessary in general. With window
+`[0,4)`, an unordered `xs=[5,1]` and ordered `ys=[3]` produce
+`trace_window (trace_merge xs ys)=[3,1]`, while merging the two
+windowed inputs yields `[1,3]`. Swapping the roles to ordered
+`xs=[3]` and unordered `ys=[5,1]` gives the same difference. Thus
+neither a premise-free structural equality nor a law requiring only
+one ordered input is asserted. In these two closed counterexamples,
+both outputs contain the same events; that fact does not imply list
+equality or establish a generic premise-free membership/count law.
+
+A closed ordered illustration uses `xs=[0a,3a,6a]` and
+`ys=[3b,5b,8b]` with distinct `Bool` payloads `a` and `b`, window
+`[1,7)`. Both arrangements yield `[3a,3b,5b,6a]`: the window
+drops the early left event and late right event but keeps the left
+`3a` before the tied right `3b`. A conformance seed will check the
+law application and this exact result separately; these closed
+checks do not establish the generic quantified law.
+
+### 3.2 Consequences and excluded claims
+
+Applying `count` to both sides of `trace_window_merge` and then
+using §1.3's `trace_merge_count` gives a **count corollary under the
+same two ordering premises**: the count of a windowed merge equals
+the sum of the counts of the windowed inputs, for any classifier and
+query. It needs no additional public theorem. A premise-free
+window/merge count or membership distribution law was **not**
+established by D0 and is not claimed here. Section 2's membership
+laws characterize one window at a time; they do not by themselves
+state membership of a merge. This section adds no payload equality
+decision, sorted carrier type, new primitive, kernel or surface rule.
+
+### 3.3 Evidence and catalog boundary
+
+On landed base `81ab720ff5170b4d0f45ea320101760e56fd98ca`,
+Architect D0 checked the generic EventTrace proof and a necessary
+`Data.Collections.Derived` provider export in scratch with rc 0 and
+no new `Axiom`, reporting zero added trust. Its positive client
+checked the ordered law, cross-input tie and count corollary.
+Separate closed negative clients rejected both one-sided-order
+counterexamples; claims of an unordered ordering premise and of
+the false equality were also rejected. These are **scratch D0**
+results, not publication of the §3 catalog export, execution of a
+shipped §3 seed, CI, or a landed trust measurement.
+
+Catalog delivery must make the existing generic
+`filter_starts_after` proof public in `Data.Collections.Derived`.
+`Data.Time.EventTrace` reaches it by adding the name to its existing
+`import Data.Collections.Derived` selection, not by adding a new
+import declaration. No duplicate local proof or new ambient name is
+specified. The new merge/window proof helpers remain private. The
+only new §3 public law is `trace_window_merge`.

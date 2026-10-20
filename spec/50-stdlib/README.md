@@ -371,21 +371,21 @@ arithmetic, division, `Float`, rounding, width, structural
 hull/intersection algebra and sub-distributivity remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §1 (SPEC-TIME-EVENT-TRACE-CONTRACT) and
-§2 (SPEC-TIME-WINDOW-MEMBERSHIP). `Data.Time.EventTrace` uses ordinary
-`Event p` values in plain `List (Event p)` traces, non-decreasing `Nat`
-timestamps, half-open time windows and left-biased merging at tied
-times. §1's three generic laws cover window ordering, ordered-input
-merge ordering and arbitrary-classifier merge count; its catalog module
-and seed are present on the base. §2 adds two D0-checked generic
-window-membership laws using Ω-valued `list_elem`, supported by two
-checked generic filter theorems in `Data.Collections.Derived` on this
-candidate. This WP authors the §2 seed, whose execution against the
-shipped catalog awaits §2 EventTrace-law implementation. D0 scratch
-execution does not establish shipped seed execution, CI or a landed
-trust delta. Clock effects, wall-
-clock time, vector clocks, infinite streams and window/merge relational
-laws remain deferred.
+**`69-time-and-events.md`** §§1–3 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION).
+`Data.Time.EventTrace` uses ordinary `Event p` values in plain
+`List (Event p)` traces, non-decreasing `Nat` times, half-open
+windows and left-biased merging at ties. Its five §1–2 checked laws,
+two generic filter prerequisites and two existing seeds are present
+on main. Section 3 specifies the D0-checked `trace_window_merge`
+structural list equality **when both inputs are time-ordered**; one
+ordered input does not suffice. The count corollary under those same
+premises adds no public law. The §3 catalog export remains undelivered;
+the conformance seed is authored and present at
+`conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
+No shipped §3 seed-harness execution, CI, or landed trust measurement
+is claimed. Clock effects, durations, causality, infinite streams, a
+premise-free distribution law and k-way merge remain deferred.
 
 The **finite least-cost selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT).
