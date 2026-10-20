@@ -336,9 +336,13 @@ their catalog code and seed are present on main. The zero-distance
 law combines with §1's `manhattan_self` without a further public
 converse. §3 specifies a corner-wise Boolean `inside` test and seven
 checked D0 laws: soundness, reflexivity, intersection and hull bounds,
-and a converse requiring a point witness. The §3 code and seed are
-not delivered; its 114 → 114 trust result and zero-residual census
-are scratch measurements, not shipped seed-harness execution or CI.
+and a converse requiring a point witness. The §3 conformance seed is
+authored and present at
+`conformance/stdlib/geometry/seed-box-containment.md`; §3 catalog
+exports are not delivered. Exact-seed shipped-harness execution and
+CI are unmeasured. The 114 → 114 trust result and zero-residual census
+are D0 scratch measurements; they do not establish a landed trust
+measurement.
 The per-axis helper remains private. Signed-coordinate geometry,
 Euclidean and floating-point distance, box area, other dimensions,
 canonical empty boxes and point-set equality remain outside scope.
