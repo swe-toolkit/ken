@@ -325,6 +325,7 @@ fn derived_loader_publishes_exactly_its_authorized_export_surface() {
             "eq_from_ord".to_owned(),
             "filter".to_owned(),
             "filter_sorted".to_owned(),
+            "filter_starts_after".to_owned(),
             "length".to_owned(),
             "list_append".to_owned(),
             "list_concat".to_owned(),
