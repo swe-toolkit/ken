@@ -3,7 +3,7 @@ id: RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER
 title: "HELD INPUT to RT-BRACKET-LOWERING-AND-D0-REFUTER (child 3). At px8ta depth 3, natively and under either settlement mode, the existing computational-producer route never drives the middle bracket's body: after the second acquire it reaches the outer region's settlement S524, whose ResourceBodyResult scrutinee at origin 509 is unwritten (tag 0), and it traps with planned identity 40. The interpreter opens 1, 2, 3 and releases 3, 2, 1. Make the producer route drive nested bracket bodies in order and write each body result before its settlement runs. THIS NODE DOES NOT LAND ALONE: its reviewed tip is assembled by child 3."
 status: active
 owner: runtime
-size: M
+size: L
 gate: none
 tier: T1
 depends_on: []
@@ -52,44 +52,75 @@ base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-The localization D0 is done (`evt_5hhmx816x4ac8`, D0-2
-`evt_3z9erek910n8w`). F1, the route selection with owner(899) = Spec(3),
-is retained from checkpoint `edc32de81` (tree `5bd10e81`).
+**Recut at the 5th stop (Architect `evt_7knq6fn8km9ra`, on Research
+`evt_2gt3nfsvmzzke`): the handler-owned drive becomes a planned
+resumption call.** It is no longer a lowering-time route. Measured at
+`1a4ed40ea`: the settlement plane orders nothing across regions. Mode
+comes only from whether a region has a returned-exit owner, and InPlace
+is LIFO only because the release runs inside K's native frames.
 
-**Recut at the 3rd stop (Architect `evt_687xbfdep022z`, on Research
-`evt_57nv4616cf07w`).** Replace the inline re-lowering of a bounded P2
-Deferred response's K body at the handler-owned drive with a planned
-unit transfer: `DrivenKResume::TransferToUnit`, that is
-`call_declared_unit(k_body, [response] ++ captures)` followed by the
-composed eliminators. F2 and F3 are withdrawn, and the rebuild starts
-from `edc32de81`. The InPlace bracket S at `bracket_emission.rs:68`
-stays inline (`DrivenKResume::InlineInPlace`, its tail byte-identical).
-A D0 of the edge, the emission and LIFO comes before any build.
+1. **Replace** `DrivenKResume::TransferToContext`, reached from
+   `drive_handler_owned_deferred_response`. The planner emits one
+   planned resumption call per handler-owned Deferred
+   `DeferredResponseRow`, in `PlannedContinuationSpecializationCall` or
+   in a sibling table that every consumer of it reads. The record
+   carries:
+   - `emission_owner`: the row's `admitted_deferred_handler_owner`;
+   - `producer_result_origin`: K's worker body;
+   - `producer_owner`: raw Pred4;
+   - `context`: C0;
+   - `inputs`: `[response] ++ claims`, the L1′ ABI;
+   - the checked eliminator run starting at `route.continuation_origin`,
+     as in L2′;
+   - `enclosed_regions`: the bracket regions acquired in K's body, with
+     their `parent` links.
+2. **Every plane reads the record, and none re-derives it at lowering.**
+   The readers are `intern_generated_contexts` (C0),
+   `entry_frame_claim_in` and `verify_entry_frame` (claims),
+   `call_declared_context` (inputs), the L2′ composition (eliminators)
+   and `BracketSettlementControlView` (settlement order).
+3. **Settlement contract.** Within one planned resumption, deferred
+   settlement order is the reverse of acquisition order. It is derived
+   from `enclosed_regions` nesting, not from emission order, and the
+   planner checks it: any other order is a `planner_error`.
+4. **Retain**, as consumers of the record rather than self-deriving:
+   F1; P0 with its per-capture source compare; V; P with
+   `raw_owner == Pred4` and C0 certification; L1′; and L2′ with its
+   frame-0 identity check. The non-candidate WIP `1a4ed40ea` is the base
+   to build from.
 
 ## Acceptance
 
-- **AC-T1 (D0, non-advancing).**
-  - (a) Spec3's `function_local.unit_calls` has key 883, with
-    `frame_owner` Unit(Pred4) and the slot run Parameter plus 7
-    captures, matching M2. Name the observed caller.
-  - (b) Under forced Deferred, Pred4 is a defined function in the
-    object. List the planned emission owners of S874 and S747.
-  - (c) At the 899 drive site, list the open settlements in stack
-    order. Each one reached from subtree(883) either opens and closes
-    inside K, or is open before the drive and still open there in stack
-    order. Anything else is a LIFO violation.
-- **AC-T2.** As-shipped depth 3, native: opens 1, 2, 3, strict LIFO
-  releases, exit 0. Each release's handle equals that of the open it
-  pairs with, and all three are distinct.
-- **AC-T3.** The same under forced Deferred, which re-runs the stop-3
-  counterexample.
-- **AC-T4 (mutation).** Under forced Deferred, forcing the P2 caller to
-  `InlineInPlace` reproduces the stop-1 refusal exactly, and is then
-  byte-restored.
-- **AC-T5 (carried from F1).** Depth 2 and `rt_native_bracket_body_once`
-  are unchanged. The owner(899) = Spec3 planner pin reddens on an A-only
-  or B-only revert. The owner readers are reconciled. The closeout shows
-  no unsettled candidates in either mode.
+- **AC-0 (D0, non-advancing; measures, edits no product).**
+  - (1) Under forced-Deferred, at depth 2 and depth 3: each region's
+    acquisition index and settlement index within the drive's
+    resumption, and the function and iteration key whose order emits
+    releases 1, 2, 3.
+  - (2) A census of the unforced regions that take Deferred, by
+    `BracketResponseContextKey` (Continuation or Inline) and by nesting
+    depth, across px8ta and the drivers in `crates/*/tests`,
+    `examples/`, `catalog/` and `conformance/`.
+  - (3) The planned-resumption record written as a Rust declaration in
+    the delivered vocabulary, naming its table, its id type and every
+    consumer.
+- **T''-1..16** stand (Architect `evt_3tma32z29wz46`, `evt_3ztrhbzpvyb0`,
+  `evt_1t43pvv4apd6`).
+- **R-1.** Forced-Deferred depth 3 exits 0 with terminal None, opens 1,
+  2, 3 and releases 3, 2, 1. This is T''-3.
+- **R-2.** The same at depth 2.
+- **R-3.** As-shipped is unchanged: depth 3 exits 0 with releases 3, 2,
+  1, and depth 2 and `rt_native_bracket_body_once` are unchanged.
+- **R-4 (mutation).** Reversing `enclosed_regions` order on the record
+  gives releases 1, 2, 3 and exit 1, or a planner refusal, never exit 0.
+- **R-5 (mutation).** Deleting the record for the depth-3 row refuses at
+  the planner, not at lowering.
+- **R-6.** The settlement-order check refuses a hand-built plan whose
+  order is not the reversal.
+
+**Precommit.** D0 returns are non-advancing. A planner refusal of the
+record on depth 3 is a query. Any other new wall is the node's 6th
+advancing stop: hold and call Research, scoped to the new fork. D0 (2)
+does not reclassify T''-3, whatever it shows.
 
 ## Stop conditions
 
@@ -102,15 +133,16 @@ A D0 of the edge, the emission and LIFO comes before any build.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 5, and the child 3 aggregate is 6 (Architect `evt_d6kxxtgevwbw`):
-the Research trigger, ruling held for the advisory. WIPs `16cc5ee62` and
+§1a: 5, and the child 3 aggregate is 6 (Architect `evt_d6kxxtgevwbw`).
+The Research advisory discharged the trigger, and the ruling is the
+structural recut in the Deliverable (`evt_7knq6fn8km9ra`). The next
+trigger is the node's 6th stop or child 3's 9th. WIPs `16cc5ee62` and
 `1a4ed40ea` are not candidates; at `1a4ed40ea` the as-shipped depth-3
 test exits 0 with releases 3,2,1. The 3rd stop is ruled as
 closure (T), transfer, which is the recut in the Deliverable
 (`evt_687xbfdep022z`), realized as T'' (the drive calls K883's one
 planned emission C0 through a planner-recorded route; `evt_3tma32z29wz46`,
-L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded. The
-node's next Research trigger is its 6th advancing stop.
+L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
 
 1. With every bracket forced Deferred, object emission refuses the
    lexical-owner call ("claimed continuation target not declared into
@@ -149,6 +181,6 @@ sharpens it (`evt_d6kxxtgevwbw`): the handler-owned drive is a resumption
 of K that the planner's planes do not see as a planned route, and each
 entry hand-recorded one more aspect (the owner gates, the call target and
 capture claims, the eliminator composition, the deferred settlement
-order). The Architect's lean, not yet a ruling, is a structural closure:
-the drive becomes a first-class planned emission that every plane
-consumes.
+order). The Architect ruled the structural closure
+(`evt_7knq6fn8km9ra`): the drive becomes a planned resumption call that
+every plane consumes.
