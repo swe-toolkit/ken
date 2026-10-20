@@ -8,12 +8,14 @@ use std::path::PathBuf;
 
 use ken_elaborator::parser::parse_decls;
 use ken_elaborator::{
-    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, KenMdFenceRole, Type as SourceType,
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, ExportForm, ImportKind, KenMdFenceRole,
+    Type as SourceType,
 };
 use ken_kernel::{Decl, KernelError};
 
 const DERIVED: &str = "Data.Collections.Derived";
 const TRACE: &str = "Data.Time.EventTrace";
+const TRACE_SOURCE: &str = include_str!("../../../catalog/packages/Data/Time/EventTrace.ken.md");
 const SEED: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md"
@@ -167,6 +169,163 @@ fn seed_sources() -> Vec<&'static str> {
         .filter(|fence| fence.role == KenMdFenceRole::Source)
         .map(|fence| &SEED[fence.body_range])
         .collect()
+}
+
+// Select only computational declarations from the actual published literate
+// module. Source slices come from the parser's spans, never a reimplemented
+// copy of trace_merge; the exact name/kind inventory fails closed if an
+// operation moves or ceases to be a definition. Proofs are omitted only in
+// this auxiliary client so a malformed *operation* can reach the value oracle
+// even if a checked package proof correctly rejects it first.
+fn production_computations() -> String {
+    let extracted = extract_ken_md(TRACE_SOURCE).expect("EventTrace source fences extract");
+    let declarations = parse_decls(&extracted.source).expect("EventTrace source parses");
+    let operations = BTreeSet::from([
+        "event_time",
+        "event_payload",
+        "event_before",
+        "time_ordered",
+        "event_in_window",
+        "trace_window",
+        "trace_merge",
+        "trace_merge_into",
+    ]);
+    let mut seen = BTreeSet::new();
+    let mut event = false;
+    let mut constructor = false;
+    let mut imports = 0usize;
+    let mut projection = String::new();
+    for declaration in &declarations {
+        let selected = match declaration.unwrap_pub() {
+            SourceDecl::ImportDecl {
+                module,
+                kind: ImportKind::Selective(items),
+                ..
+            } if module == "Core.Classes.LawfulClasses" => {
+                // The compiler base already binds IsTrue; importing its
+                // unaliased name again in this flat auxiliary client is
+                // ambiguous. All other production dependencies stay imported.
+                let keep = items
+                    .iter()
+                    .filter(|item| item.name != "IsTrue" || item.rename.is_some())
+                    .map(|item| match &item.rename {
+                        Some(alias) => format!("{} as {alias}", item.name),
+                        None => item.name.to_owned(),
+                    })
+                    .collect::<Vec<_>>();
+                assert!(!keep.is_empty(), "production comparison imports remain");
+                projection.push_str(&format!("import {module} ({})\n", keep.join(", ")));
+                imports += 1;
+                continue;
+            }
+            SourceDecl::ImportDecl { .. } => {
+                imports += 1;
+                true
+            }
+            SourceDecl::ExplicitDataDecl { name, .. } if name == "Event" => {
+                assert!(!event, "one Event carrier declaration");
+                event = true;
+                true
+            }
+            SourceDecl::ExportDecl {
+                form: ExportForm::InScope { items },
+                ..
+            } if items.len() == 1 && items[0].name == "MkEvent" => {
+                assert!(!constructor, "one MkEvent constructor export");
+                constructor = true;
+                true
+            }
+            SourceDecl::ViewDecl { name, .. } if operations.contains(name.as_str()) => {
+                assert!(seen.insert(name.as_str()), "one production {name}");
+                true
+            }
+            _ => false,
+        };
+        if selected {
+            let span = declaration.span();
+            projection.push_str(&extracted.source[span.start..span.end]);
+            projection.push('\n');
+        }
+    }
+    assert!(
+        imports > 0 && event && constructor,
+        "production carrier and imports: imports={imports} event={event} constructor={constructor}"
+    );
+    assert_eq!(
+        seen, operations,
+        "all selected production computations present"
+    );
+    projection
+}
+
+// The fixture and both exact-output theorems are spliced verbatim from the
+// authored positive seed fence, in separate checker calls so the first
+// failing theorem is an observable rather than a general refusal.
+fn seed_tie_outputs() -> (String, Vec<(&'static str, String)>) {
+    let sources = seed_sources();
+    let ordered = sources[0];
+    let declarations = parse_decls(ordered).expect("ordered seed source parses");
+    let mut fixtures = String::new();
+    let mut outputs = Vec::new();
+    for declaration in &declarations {
+        let span = declaration.span();
+        let text = &ordered[span.start..span.end];
+        match declaration {
+            SourceDecl::ViewDecl { params, .. } if params.is_empty() => {
+                fixtures.push_str(text);
+                fixtures.push('\n');
+            }
+            SourceDecl::TheoremDecl { name, .. }
+                if name == "window_of_merge_exact_value"
+                    || name == "merge_of_windows_exact_value" =>
+            {
+                outputs.push((
+                    if name == "window_of_merge_exact_value" {
+                        "window_of_merge_exact_value"
+                    } else {
+                        "merge_of_windows_exact_value"
+                    },
+                    text.to_owned(),
+                ));
+            }
+            _ => {}
+        }
+    }
+    assert!(!fixtures.is_empty(), "shipped tie fixture must be present");
+    assert_eq!(outputs.len(), 2, "both exact shipped output theorems");
+    assert_eq!(outputs[0].0, "window_of_merge_exact_value");
+    assert_eq!(outputs[1].0, "merge_of_windows_exact_value");
+    (fixtures, outputs)
+}
+
+/// SOURCE: spec/50-stdlib/69-time-and-events.md §1.2, §3.1 and the shipped
+/// distribution seed's two exact tie-output theorems.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the AST-selected *production* carrier, constructor, eight
+/// computation declarations and imports elaborate without the unrelated
+/// private proof obligations; the verbatim shipped fixtures and two exact
+/// value theorems then each check independently. The full roots-loaded module
+/// and checked generic proof are tested separately above.
+/// CLAIMED: a tie-specific wrong-head computation reaches the exact shipped
+/// seed-output assertion even if the full package rejects its proof earlier.
+/// THE GAP: this projection deliberately checks operation behavior rather
+/// than law soundness; it would be a proxy if any operation were hand-copied
+/// or an unselected alias replaced the production computation.
+#[test]
+fn shipped_exact_tie_outputs_reach_production_computations_without_proof_masking() {
+    let mut env = ElabEnv::new().expect("compiler base");
+    env.elaborate_module_from_roots(&[root()], DERIVED)
+        .expect("operation-only projection imports its real list provider");
+    env.elaborate_file(&production_computations())
+        .expect("all selected real EventTrace computations check");
+    let (fixtures, outputs) = seed_tie_outputs();
+    env.elaborate_file(&fixtures)
+        .expect("shipped closed tie inputs and expected output check");
+    for (name, source) in outputs {
+        env.elaborate_file(&source).unwrap_or_else(|error| {
+            panic!("shipped {name} must check against real operations: {error:?}")
+        });
+    }
 }
 
 fn accepted_seed_prefix(sources: &[&str]) -> String {
