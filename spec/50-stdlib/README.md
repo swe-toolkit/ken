@@ -338,9 +338,10 @@ converse. §3 specifies a corner-wise Boolean `inside` test and seven
 checked D0 laws: soundness, reflexivity, intersection and hull bounds,
 and a converse requiring a point witness. The §3 conformance seed is
 authored and present at
-`conformance/stdlib/geometry/seed-box-containment.md`; §3 catalog
-exports are not delivered. Exact-seed shipped-harness execution and
-CI are unmeasured. The 114 → 114 trust result and zero-residual census
+`conformance/stdlib/geometry/seed-box-containment.md`. The §3
+`inside` and seven law exports are present in `NatBox` on main since
+`e3e0cda6c`. Exact-seed shipped-harness execution and CI are
+unmeasured. The 114 → 114 trust result and zero-residual census
 are D0 scratch measurements; they do not establish a landed trust
 measurement.
 The per-axis helper remains private. Signed-coordinate geometry,
