@@ -174,12 +174,22 @@ fn refined_divisor_keeps_the_open_operation_hole_without_an_unchecked_hypothesis
         let Term::Pi(d, goal) = rest.as_ref() else {
             panic!("{spelling}: d binder missing")
         };
-        assert_eq!((n.as_ref(), d.as_ref()), (&int, &int));
+        assert_eq!(n.as_ref(), &int);
+        let Term::Sigma(carrier, _) = d.as_ref() else {
+            panic!("{spelling}: the divisor must retain its checked subset type")
+        };
+        assert_eq!(carrier.as_ref(), &int);
         let nonzero = env.numeric_env.classify_div(&int).unwrap().nonzero_id;
         assert_eq!(
             goal.as_ref(),
-            &Term::app(Term::const_(nonzero, vec![]), Term::var(0)),
-            "{spelling}: an unestablished refinement must not appear as a Pi hypothesis"
+            &Term::app(
+                Term::const_(nonzero, vec![]),
+                Term::proj1(Term::Ascript(
+                    Box::new(Term::var(0)),
+                    Box::new(d.as_ref().clone()),
+                )),
+            ),
+            "{spelling}: no extra unchecked hypothesis may discharge the operation"
         );
     }
 }
@@ -214,13 +224,17 @@ fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
         let Term::Pi(d, rest) = rest.as_ref() else {
             panic!("d carrier binder")
         };
-        assert_eq!((n.as_ref(), d.as_ref()), (&int, &int));
+        assert_eq!(n.as_ref(), &int);
+        let Term::Sigma(carrier, _) = d.as_ref() else {
+            panic!("the divisor must retain its checked subset type")
+        };
+        assert_eq!(carrier.as_ref(), &int);
         let Term::Pi(real_req, goal) = rest.as_ref() else {
             panic!("the actual requires premise must be present")
         };
         let mut ctx = Context::new();
         ctx.push(int.clone());
-        ctx.push(int.clone());
+        ctx.push(d.as_ref().clone());
         assert!(convert_type(
             &env.env,
             &ctx,
@@ -234,7 +248,13 @@ fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
         let nonzero = env.numeric_env.classify_div(&int).unwrap().nonzero_id;
         assert_eq!(
             goal.as_ref(),
-            &Term::app(Term::const_(nonzero, vec![]), Term::var(1)),
+            &Term::app(
+                Term::const_(nonzero, vec![]),
+                Term::proj1(Term::Ascript(
+                    Box::new(Term::var(1)),
+                    Box::new(d.as_ref().clone()),
+                )),
+            ),
             "{spelling}: only the proved requires may extend the goal telescope"
         );
     }
@@ -513,10 +533,22 @@ fn ensures_expression_operation_precedes_its_generated_ensures_hole() {
             .transparent_body(result.def_id)
             .expect("f is checked")
             .1;
+        let Term::Pair(value, proof) = peel_function_body(&body) else {
+            panic!("{spelling}: ordinary ensures must return a checked subset pair")
+        };
         assert_eq!(
-            peel_function_body(&body),
+            value.as_ref(),
             &Term::var(1),
-            "{spelling}: the operation is in the ensures proposition, not the body"
+            "{spelling}: the operation is in the ensures proposition, not the value"
+        );
+        let applied_ensures_hole = Term::app(
+            Term::app(Term::const_(ensures.hole_id, vec![]), Term::var(1)),
+            Term::var(0),
+        );
+        assert_eq!(
+            proof.as_ref(),
+            &applied_ensures_hole,
+            "{spelling}: the checked subset proof must be the reported ensures hole"
         );
         let int = Term::const_(env.globals["Int"], vec![]);
         let Term::Pi(n, rest) = &operation.goal_closed else {

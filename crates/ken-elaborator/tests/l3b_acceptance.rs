@@ -137,8 +137,8 @@ fn user_ord_instance_drives_verified_sort() {
 ///
 /// A `sort`-shaped const with `where Ord K` (user instance) and the refinement
 /// `{ ys : List K | And (is_sorted K ys) (Perm K ys xs) }` emits the conjoined
-/// Ensures obligation carrying BOTH `is_sorted` AND the load-bearing `Perm`
-/// conjunct on the user-`Ord` path.
+/// refinement-introduction obligation carrying BOTH `is_sorted` AND the
+/// load-bearing `Perm` conjunct on the user-`Ord` path.
 ///
 /// Discriminating: a build that drops `Perm` on the user-`Ord` path (while
 /// preserving it for built-in `Ord`, L3a AC6) passes L3a-AC6 but fails here.
@@ -159,7 +159,7 @@ fn user_ord_sort_emits_both_conjuncts() {
     // Declare a sort-shaped const with the full conjoined refinement and
     // `where Ord K`.  Body `Nil K` (the empty list) type-checks against
     // `List K` (the refinement carrier) and causes the elaborator to emit
-    // the Ensures obligation
+    // the refinement-introduction obligation (22 §2.1), per result leaf:
     // `And (is_sorted K (\_ _. True) (Nil K)) (Perm K (Nil K) xs)`.
     // The body does NOT need to be a correct sort — only the obligation
     // emission is under test. `is_sorted` (ES2-remainder, real def) now takes
@@ -175,12 +175,21 @@ fn user_ord_sort_emits_both_conjuncts() {
             "AC3: sort-shaped const with user Ord K + refinement must elaborate",
         );
 
-    // The conjoined Ensures obligation must be emitted.
+    // The conjoined refinement-introduction obligation (22 §2.1) is emitted
+    // once for the single result leaf.
+    assert_eq!(
+        res.obligations
+            .iter()
+            .filter(|o| matches!(o.kind, ObligationKind::RefinementIntroduction))
+            .count(),
+        1,
+        "AC3: sortK must emit one refinement introduction for its single leaf"
+    );
     let obl = res
         .obligations
         .iter()
-        .find(|o| matches!(o.kind, ObligationKind::Ensures))
-        .expect("AC3: Ensures (refinement) obligation must be emitted");
+        .find(|o| matches!(o.kind, ObligationKind::RefinementIntroduction))
+        .expect("AC3: refinement-introduction obligation (22 §2.1), per result leaf");
 
     let and_id = env.globals["And"];
     let issorted_id = env.globals["is_sorted"];

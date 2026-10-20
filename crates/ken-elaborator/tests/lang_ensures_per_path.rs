@@ -1,8 +1,8 @@
 //! Durable behavioral invariants for spec/20-verification/22 §2.2.
 //! The predicate is opaque so no reduction can conceal whole-body emission.
 
-use ken_elaborator::{ElabEnv, ObligationKind};
-use ken_kernel::{GlobalId, Level, Term};
+use ken_elaborator::{ElabEnv, ElabError, ObligationKind};
+use ken_kernel::{check, Context, Decl, GlobalId, Level, Term};
 
 fn predicate_env() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
@@ -14,6 +14,15 @@ fn predicate_env() -> ElabEnv {
 
 fn contains_elim(term: &Term) -> bool {
     matches!(term, Term::Elim { .. }) || term.children().iter().any(|child| contains_elim(child))
+}
+
+fn has_nat_equation(term: &Term, nat: GlobalId) -> bool {
+    if let Term::Eq(carrier, _, _) = term {
+        if matches!(carrier.as_ref(), Term::IndFormer { id, .. } if *id == nat) {
+            return true;
+        }
+    }
+    term.children().iter().any(|child| has_nat_equation(child, nat))
 }
 
 /// Durable invariant. MEASURED: each independently opaque clause emits a
@@ -50,7 +59,13 @@ fn result_postconditions_follow_match_and_if_leaves() {
         for (obligation, (branch, value)) in
             result.obligations.iter().zip([("True", 5), ("False", 6)])
         {
-            assert!(matches!(obligation.kind, ObligationKind::Ensures), "{mode}");
+            let expected = if mode.starts_with("ensures") {
+                ObligationKind::Ensures
+            } else {
+                ObligationKind::RefinementIntroduction
+            };
+            assert_eq!(std::mem::discriminant(&obligation.kind),
+                std::mem::discriminant(&expected), "{mode}");
             let path = Term::Eq(
                 Box::new(bool_ty.clone()),
                 Box::new(Term::var(0)),
@@ -88,7 +103,13 @@ fn straight_line_postcondition_preserves_the_original_goal() {
         let [obligation] = result.obligations.as_slice() else {
             panic!("one goal: {source}")
         };
-        assert!(matches!(obligation.kind, ObligationKind::Ensures));
+        let expected = if source.starts_with("fn es_line") {
+            ObligationKind::Ensures
+        } else {
+            ObligationKind::RefinementIntroduction
+        };
+        assert_eq!(std::mem::discriminant(&obligation.kind),
+            std::mem::discriminant(&expected));
         assert_eq!(
             obligation.goal_closed,
             Term::pi(int.clone(), Term::app(p.clone(), Term::var(0))),
@@ -121,148 +142,94 @@ fn argument_branch_does_not_inherit_the_result_predicate() {
     );
 }
 
-/// Durable invariant. A recursive call's postcondition is assumed only in
-/// that leaf's obligation: Zero remains open and Suc is discharged by its IH.
+/// Durable unknown boundary (22 §3). An opaque base goal under the
+/// recursive Nat split remains open without an unproved branch equation.
+/// The closed-base counterpart is pinned in
+/// lang_refinement_ensures_subset::recursive_ensures_reuses_the_checked_self_call_proof.
 #[test]
-fn recursive_postcondition_uses_direct_self_call_hypothesis() {
+fn recursive_open_postcondition_omits_the_unsupported_nat_equation() {
     let mut env = predicate_env();
-    for source in [
-        "fn es_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc m |-> es_rec m }",
-        "fn lit_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc m |-> lit_rec m }",
+    for (source, name, kind, count) in [
+        ("fn es_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc m |-> es_rec m }", "es_rec", ObligationKind::Ensures, 2),
+        ("fn lit_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc m |-> lit_rec m }", "lit_rec", ObligationKind::RefinementIntroduction, 1),
     ] {
-        let result = env
-            .elaborate_decl_v1(source)
-            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
-        assert_eq!(result.obligations.len(), 2, "one per constructor");
-        let [zero, suc] = result.obligations.as_slice() else {
-            unreachable!()
+        let result = env.elaborate_decl_v1(source).expect("no invented Nat equation");
+        assert_eq!(result.obligations.len(), count,
+            "direct subset self-call reuses its proof; ensures records each leaf: {source}");
+        assert!(result.obligations.iter().all(|goal|
+            std::mem::discriminant(&goal.kind) == std::mem::discriminant(&kind)
+            && !has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
+        assert!(env.is_open_hole(result.obligations[0].hole_id),
+            "opaque base goal remains unknown: {source}");
+        assert_eq!(env.globals[name], result.def_id, "admitted recursive result");
+        let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+            panic!("recursive result is checked and transparent: {source}")
         };
-        assert!(matches!(zero.kind, ObligationKind::Ensures));
-        assert!(matches!(suc.kind, ObligationKind::Ensures));
-        assert!(
-            env.is_open_hole(zero.hole_id),
-            "P 5 cannot discharge from P alone"
-        );
-        assert!(
-            !env.is_open_hole(suc.hole_id),
-            "Suc self-call postcondition has IH"
-        );
-        assert!(!contains_elim(&zero.goal_closed));
-        assert!(!contains_elim(&suc.goal_closed));
-        assert!(
-            format!("{:?}", suc.goal_closed).contains("Eq"),
-            "Suc path equation"
-        );
+        check(&env.env, &Context::new(), body, ty).expect("kernel checks per-leaf subset pairs");
     }
 }
 
-/// Durable invariant. A recursive contract depending on an early parameter
-/// must instantiate its IH with the direct call's full parameter and requires
-/// telescope. MEASURED: the recursive path closes while the base case stays
-/// open, with a non-final `tag` binder before `n` and `Q tag` in both goals.
-/// CLAIMED: the IH substitutes actual call arguments, not the raw predicate.
-/// THE GAP: mutating the IH collector to retain `psi` uninstantiated must
-/// redden the recursive-path assertion while the original suite stays green.
+/// Durable parameter-substitution invariant. Both recursive result pairs are
+/// checked: the base uses the matching explicit premise and the step uses the
+/// self-call's returned Proj2 at the non-final `tag`. A different tag cannot
+/// borrow this proof via the opaque P2 family.
 #[test]
-fn recursive_postcondition_substitutes_nonfinal_parameter_and_requirement() {
+fn recursive_checked_result_uses_nonfinal_parameter_and_requirement() {
     let mut env = predicate_env();
     let int = Term::const_(env.globals["Int"], vec![]);
     let omega = Term::omega(Level::Zero);
     env.declare_postulate_raw(
-        "P2",
-        Term::pi(int.clone(), Term::pi(int.clone(), omega.clone())),
-    )
-    .expect("P2 : Int -> Int -> Omega");
+        "P2", Term::pi(int.clone(), Term::pi(int.clone(), omega.clone())),
+    ).expect("P2 : Int -> Int -> Omega");
     env.declare_postulate_raw("Q", Term::pi(int.clone(), omega))
         .expect("Q : Int -> Omega");
     let result = env.elaborate_decl_v1(
-        "fn rec_dep (tag : Int) (n : Nat) : Int requires Q tag ensures P2 tag result = match n { Zero |-> 5 ; Suc m |-> rec_dep tag m }",
-    ).expect("parameter-dependent recursive contract");
-    let [zero, suc] = result.obligations.as_slice() else {
-        panic!("exactly one contract goal per leaf; no extra requires hole")
-    };
-    let q_tag = Term::app(Term::const_(env.globals["Q"], vec![]), Term::var(1));
-    for obligation in [zero, suc] {
-        assert!(matches!(obligation.kind, ObligationKind::Ensures));
-        let Term::Pi(tag_ty, rest) = &obligation.goal_closed else {
-            panic!("missing first parameter binder")
+        "fn rec_dep (tag : Int) (n : Nat) : Int requires Q tag requires P2 tag 5 ensures P2 tag result = match n { Zero |-> 5 ; Suc m |-> rec_dep tag m }",
+    ).expect("parameter-dependent checked recursive result");
+    let ensures = result.obligations.iter().filter(|o|
+        matches!(o.kind, ObligationKind::Ensures)).collect::<Vec<_>>();
+    assert_eq!(ensures.len(), 2, "one contract result site per method");
+    assert!(result.obligations.iter().all(|o| !env.is_open_hole(o.hole_id)),
+        "the recursive call and both written requirements carry checked proofs");
+    let Decl::Transparent { ty: Term::Pi(_, tail), .. } =
+        env.env.lookup(result.def_id).expect("admitted recursive function") else {
+            panic!("checked parameterized function")
         };
-        assert_eq!(tag_ty.as_ref(), &int);
-        let Term::Pi(_, rest) = rest.as_ref() else {
-            panic!("missing second parameter binder")
-        };
-        let Term::Pi(requirement, _) = rest.as_ref() else {
-            panic!("missing requires binder")
-        };
-        assert_eq!(requirement.as_ref(), &q_tag);
-        assert!(!contains_elim(&obligation.goal_closed));
-    }
-    assert!(
-        env.is_open_hole(zero.hole_id),
-        "opaque base P2 tag 5 remains open"
-    );
-    assert!(
-        !env.is_open_hole(suc.hole_id),
-        "P2 tag (rec_dep tag m) must use the instantiated IH"
-    );
+    let Term::Pi(_, tail) = tail.as_ref() else { panic!("n binder") };
+    let Term::Pi(q_req, tail) = tail.as_ref() else { panic!("Q requirement") };
+    assert_eq!(q_req.as_ref(),
+        &Term::app(Term::const_(env.globals["Q"], vec![]), Term::var(1)));
+    let Term::Pi(p2_req, tail) = tail.as_ref() else { panic!("P2 requirement") };
+    assert!(matches!(p2_req.as_ref(), Term::App(_, value)
+        if matches!(value.as_ref(), Term::IntLit(n) if *n == 5.into())));
+    assert!(matches!(tail.as_ref(), Term::Sigma(..)),
+        "the postcondition is carried by the kernel result, not a detached hypothesis");
 }
 
-/// Durable invariant. A non-flat constructor pattern splits again inside
-/// the Suc bucket. MEASURED: each emitted goal has one equation per split,
-/// and the recursive leaf has its contract IH. CLAIMED: obligations are
-/// localized under every constructor path. THE GAP: an unthreaded matrix
-/// would still produce three goals; the Eq-domain census closes that gap.
+/// Durable nested-recursion boundary. Both recursive Nat splits lack a
+/// checked branch equation, so each open result leaf is admitted as unknown
+/// over evidenced Γ only. Nonrecursive checked-equation methods remain pinned
+/// in lang_refinement_ensures_subset::nested_constructor_result_pairs_replay_checked_split_equations.
 #[test]
-fn nested_matrix_postconditions_carry_every_constructor_equation() {
-    fn equation_constructors(goal: &Term) -> Vec<GlobalId> {
-        let mut constructors = Vec::new();
-        let mut current = goal;
-        while let Term::Pi(domain, rest) = current {
-            if let Term::Eq(_, _, right) = domain.as_ref() {
-                let mut head = right.as_ref();
-                while let Term::App(function, _) = head {
-                    head = function;
-                }
-                let Term::Constructor { id, .. } = head else {
-                    panic!("path equation lost its constructor: {domain:?}")
-                };
-                constructors.push(*id);
-            }
-            current = rest;
-        }
-        constructors
-    }
+fn nested_recursive_matrix_keeps_open_leaves_without_an_unsupported_equation() {
     let mut env = predicate_env();
-    for source in [
-        "fn nested_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> nested_rec m }",
-        "fn lit_nested_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> lit_nested_rec m }",
+    for (source, name, kind, count) in [
+        ("fn nested_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> nested_rec m }", "nested_rec", ObligationKind::Ensures, 3),
+        ("fn lit_nested_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> lit_nested_rec m }", "lit_nested_rec", ObligationKind::RefinementIntroduction, 2),
     ] {
-        let result = env.elaborate_decl_v1(source)
-            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
-        assert_eq!(
-            result.obligations.len(),
-            3,
-            "one obligation per matrix path: {source}"
-        );
-        for (obligation, (constructors, open)) in result.obligations.iter().zip([
-            (vec![env.globals["Zero"]], true),
-            (vec![env.globals["Suc"], env.globals["Zero"]], true),
-            (vec![env.globals["Suc"], env.globals["Suc"]], false),
-        ]) {
-            assert!(matches!(obligation.kind, ObligationKind::Ensures));
-            assert_eq!(
-                equation_constructors(&obligation.goal_closed),
-                constructors,
-                "every split contributes its own equation: {:?}",
-                obligation.goal_closed
-            );
-            assert_eq!(
-                env.is_open_hole(obligation.hole_id),
-                open,
-                "only the recursive path has a postcondition IH: {source}"
-            );
-            assert!(!contains_elim(&obligation.goal_closed));
-        }
+        let result = env.elaborate_decl_v1(source).expect("recursive equations remain unsupported premises");
+        assert_eq!(result.obligations.len(), count,
+            "direct subset self-call reuses its proof; ensures records each leaf: {source}");
+        assert!(result.obligations.iter().all(|goal|
+            std::mem::discriminant(&goal.kind) == std::mem::discriminant(&kind)
+            && !has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
+        assert!(env.is_open_hole(result.obligations[0].hole_id),
+            "the opaque Zero leaf remains unknown: {source}");
+        assert_eq!(env.globals[name], result.def_id, "admitted recursive result");
+        let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+            panic!("nested recursive result is checked and transparent: {source}")
+        };
+        check(&env.env, &Context::new(), body, ty).expect("kernel checks nested result pairs");
     }
 }
 

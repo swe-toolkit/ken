@@ -42,8 +42,8 @@ fn lit_to_eval(v: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
 
 fn eval_def(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
     match env.env.lookup(id) {
-        Some(Decl::Transparent { body, .. }) => {
-            ken_interp::eval::eval(&[], body, &env.env, store)
+        Some(Decl::Transparent { body, ty, .. }) => {
+            ken_interp::eval::eval_checked(body, ty, &env.env, store).expect("checked body erases")
         }
         _ => EvalVal::Unknown,
     }

@@ -243,7 +243,13 @@ fn whnf_progress_mode(
                                                         Term::constructor(cons, vec![]),
                                                         char_ty.clone(),
                                                     ),
-                                                    Term::IntLit((scalar as u32).into()),
+                                                    Term::Ascript(
+                                                        Box::new(Term::Pair(
+                                                            Box::new(Term::IntLit((scalar as u32).into())),
+                                                            Box::new(Term::const_(env.tt_id(), vec![])),
+                                                        )),
+                                                        Box::new(char_ty.clone()),
+                                                    ),
                                                 ),
                                                 result,
                                             );
@@ -5283,15 +5289,20 @@ mod tests {
     #[test]
     fn k3_closed_iota_to_neutral_argument_does_not_report_iota_progress() {
         use crate::check::{
-            declare_checked_string_literal, declare_primitive, register_checked_char_carrier,
-            register_checked_int_lit_carrier, register_checked_string_carrier,
+            checked_char_literal, declare_checked_string_literal, declare_primitive,
+            register_checked_char_carrier, register_checked_int_lit_carrier,
+            register_checked_string_carrier,
             register_literal_char_view,
         };
         use crate::env::PrimReduction;
         let mut env = GlobalEnv::new();
         let int = declare_primitive(&mut env, vec![], type0(), PrimReduction::OpaqueType).unwrap();
         register_checked_int_lit_carrier(&mut env, int).unwrap();
-        let char_id = declare_def(&mut env, vec![], type0(), cref0(int)).unwrap();
+        let true_prop = cref0(env.top_id());
+        let char_id = declare_def(
+            &mut env, vec![], type0(),
+            Term::sigma(cref0(int), true_prop),
+        ).unwrap();
         register_checked_char_carrier(&mut env, char_id).unwrap();
         let string_id =
             declare_primitive(&mut env, vec![], type0(), PrimReduction::OpaqueType).unwrap();
@@ -5395,12 +5406,12 @@ mod tests {
         let expected = Term::app(
             Term::app(
                 Term::app(Term::constructor(cons, vec![]), char_ty.clone()),
-                Term::IntLit(65u32.into()),
+                checked_char_literal(&env, 65).unwrap(),
             ),
             Term::app(
                 Term::app(
                     Term::app(Term::constructor(cons, vec![]), char_ty.clone()),
-                    Term::IntLit(122u32.into()),
+                    checked_char_literal(&env, 122).unwrap(),
                 ),
                 Term::app(Term::constructor(nil, vec![]), char_ty.clone()),
             ),

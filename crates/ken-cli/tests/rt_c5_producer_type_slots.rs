@@ -36,14 +36,10 @@ fn checked_producer_lists_and_source_lists_cast_reflexively() {
         ),
     ];
     for (name, family, ctor, left, right) in cases {
-        let (_, left_body) = elab
-            .env
-            .transparent_body(elab.globals[left])
-            .expect("left body");
-        let (_, right_body) = elab
-            .env
-            .transparent_body(elab.globals[right])
-            .expect("right body");
+        // Refer to checked indices: 42 §3.2 erases subset proofs before
+        // value-only evaluation, including when Const unfolds the body.
+        let left_body = Term::const_(elab.globals[left], vec![]);
+        let right_body = Term::const_(elab.globals[right], vec![]);
         let left_ty = Term::app(
             Term::indformer(elab.globals[family], vec![]),
             left_body.clone(),

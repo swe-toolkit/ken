@@ -12,12 +12,12 @@
 //!
 //! Every case drives the REAL derived producer (`decimalAdd`/`decimalMul`/
 //! `decimalEq`/`eqChar`/`leqChar`/`intToChar`, elaborated Ken definitions in
-//! `ken-elaborator/src/decimal_char.rs`) via `elaborate_decl_v1` + `eval` —
+//! `ken-elaborator/src/decimal_char.rs`) via `elaborate_decl_v1` + typed `eval_checked` —
 //! never a hand-fed expected value
 //! ([[conformance-hand-feeds-the-deliverable]]).
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::{convert, convert_type, infer, whnf, Context, Decl, Term};
 
 /// Elaborate and evaluate a single top-level `view` declaration, seeding the
@@ -42,7 +42,8 @@ fn eval_view(src: &str) -> EvalVal {
         store.num_values.insert(*id, val);
     }
     match env.env.lookup(r.def_id) {
-        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, &mut store),
+        Some(Decl::Transparent { body, ty, .. }) => eval_checked(body, ty, &env.env, &mut store)
+            .expect("admitted declaration erases through the typed evaluator"),
         other => panic!(
             "expected a checked Transparent def, got {:?}",
             other.map(|_| ())
@@ -185,8 +186,8 @@ fn char_literal_rejects_surrogate_escape() {
 /// surface/numbers/char-is-isscalar-refinement (soundness)
 #[test]
 fn char_is_isscalar_refinement() {
-    // `Char` erases to `Int` (refinement-erasure) — a value of type `Char`
-    // reduces to a plain `Int`, never a `List`/`u32`-tagged carrier.
+    // `Char` is a checked subset pair; its Ω proof erases at the typed
+    // interpreter boundary, leaving the Int codepoint as a runtime value.
     let result = eval_view("const t : Char = 65");
     assert_eq!(result, EvalVal::Int(65));
 }
@@ -250,7 +251,7 @@ fn int_to_char_unicode_scalar_boundaries() {
 /// two distinct neutral proofs of it are definitionally equal in the kernel.
 /// CLAIMED: `isScalar` is proof-irrelevant, so no scalar proof can distinguish
 /// two `Char`s with one codepoint. THE GAP: only codepoint 97 is instantiated;
-/// `Char` itself erases to `Int`, so the value half is pinned by the eqChar test.
+/// `Char` itself is a checked pair, so the value half is pinned by the eqChar test.
 #[test]
 fn is_scalar_proofs_are_irrelevant() {
     let mut env = ElabEnv::new().expect("prelude init");

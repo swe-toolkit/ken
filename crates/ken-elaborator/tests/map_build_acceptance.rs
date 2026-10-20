@@ -18,7 +18,7 @@ mod catalog_or;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{convert, convert_type, Context, Decl, GlobalId, KernelError, Term};
 
 const MAP_KEN_MD: &str = include_str!("../../../catalog/packages/Data/Collections/Map.ken.md");
@@ -559,7 +559,9 @@ fn lit_to_eval(v: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
 
 fn eval_def(env: &ElabEnv, store: &mut EvalStore, id: GlobalId) -> EvalVal {
     match env.env.lookup(id) {
-        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
+        Some(Decl::Transparent { body, ty, .. }) => {
+            eval_checked(body, ty, &env.env, store).expect("checked body erases")
+        }
         _ => EvalVal::Unknown,
     }
 }

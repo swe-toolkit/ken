@@ -27,21 +27,15 @@ use crate::resolve::{RCtorDecl, RExplicitCtorDecl, RTelescopeEntry, RType};
 ///
 /// Registers D (the type former) and every constructor Cₖ in `globals`.
 /// Returns the `GlobalId` of the type former.
-/// Inductive lowering is independent of `elab_type`. Only a constructor
-/// field's own outer refinement is recorded after admission; all others
-/// would disappear into its carrier without an introduction obligation.
-fn guard_data_refinement(ty: &RType, allow_outer: bool) -> Result<(), ElabError> {
-    let nested = crate::elab::alias_nested_refinement(ty).map(|(span, _)| span);
-    let outer = if allow_outer { None } else {
-        match ty { RType::RRefine(_, _, _, span) => Some(span), _ => None }
-    };
-    if let Some(span) = outer.or(nested) {
-        return Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: "a refinement nested inside a type is not supported yet: only a binder's, field's or result's own annotation may be refined".into(),
-        });
-    }
-    Ok(())
+/// An explicitly supplied type is checked by the shared surface elaborator
+/// under a provisional family and then checked again by the kernel on final
+/// inductive admission. The independent structural converter is retained only
+/// for declarations with no refinement-bearing positions.
+pub(crate) struct CheckedInductiveTypes {
+    pub params: Vec<Term>,
+    pub indices: Vec<Term>,
+    pub fields: Vec<Vec<Term>>,
+    pub results: Vec<Option<Term>>,
 }
 
 pub(crate) fn elab_data_decl(
@@ -53,10 +47,31 @@ pub(crate) fn elab_data_decl(
     ctors: &[RCtorDecl],
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    let m = type_params.len();
-    for ctor in ctors {
-        for arg in &ctor.args { guard_data_refinement(arg, true)?; }
+    elab_data_decl_with_field_types(
+        env, globals, ctor_decl_spans, d_name, type_params, ctors, None, span,
+    )
+}
+
+/// Checked field terms are already scoped to `[Δp, args<j]`. The ordinary
+/// structural route has no such terms and retains its original weakening.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn elab_data_decl_with_field_types(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    ctor_decl_spans: &mut HashMap<String, Span>,
+    d_name: &str,
+    type_params: &[String],
+    ctors: &[RCtorDecl],
+    field_types: Option<&[Vec<Term>]>,
+    span: &Span,
+) -> Result<GlobalId, ElabError> {
+    if field_types.is_some_and(|types| {
+        types.len() != ctors.len()
+            || types.iter().zip(ctors).any(|(types, ctor)| types.len() != ctor.args.len())
+    }) {
+        return Err(ElabError::Internal("constructor field type count disagrees with declaration".into()));
     }
+    let m = type_params.len();
 
     // Snapshot globals + inductive-id set BEFORE the `declare_inductive` closure borrows `env`.
     let global_info: HashMap<String, GlobalId> = globals.clone();
@@ -86,6 +101,7 @@ pub(crate) fn elab_data_decl(
             &global_info,
             &ind_id_set,
             &ctor_id_set,
+            field_types,
         )
     })
     .map_err(|error| {
@@ -160,15 +176,20 @@ fn build_legacy_inductive_spec(
     globals: &HashMap<String, GlobalId>,
     ind_ids: &HashSet<GlobalId>,
     ctor_ids: &HashSet<GlobalId>,
+    field_types: Option<&[Vec<Term>]>,
 ) -> Result<InductiveSpec, ElabError> {
     let constructors = ctors
         .iter()
-        .map(|ctor| {
+        .enumerate()
+        .map(|(i, ctor)| {
             let args = ctor
                 .args
                 .iter()
                 .enumerate()
                 .map(|(j, rty)| {
+                    if let Some(types) = field_types {
+                        return Ok(types[i][j].clone());
+                    }
                     // The resolved legacy type is based in [Δ_p]. Argument j
                     // is checked in [Δ_p, arg₀…argⱼ₋₁], so weaken it by j.
                     rtype_to_kernel_checked(rty, d_name, d_id, globals, ind_ids, ctor_ids)
@@ -205,12 +226,34 @@ pub(crate) fn elab_explicit_data_decl(
     ctors: &[RExplicitCtorDecl],
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
+    elab_explicit_data_decl_with_types(
+        env, globals, ctor_decl_spans, d_name, params, indices, level, ctors, None, span,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn elab_explicit_data_decl_with_types(
+    env: &mut GlobalEnv,
+    globals: &mut HashMap<String, GlobalId>,
+    ctor_decl_spans: &mut HashMap<String, Span>,
+    d_name: &str,
+    params: &[RTelescopeEntry],
+    indices: &[RTelescopeEntry],
+    level: Option<u32>,
+    ctors: &[RExplicitCtorDecl],
+    checked: Option<&CheckedInductiveTypes>,
+    span: &Span,
+) -> Result<GlobalId, ElabError> {
     let m = params.len();
-    for param in params { guard_data_refinement(&param.ty, false)?; }
-    for index in indices { guard_data_refinement(&index.ty, false)?; }
-    for ctor in ctors {
-        for arg in &ctor.args { guard_data_refinement(&arg.ty, true)?; }
-        if let Some(result) = &ctor.result { guard_data_refinement(result, false)?; }
+    if checked.is_some_and(|types| {
+        types.params.len() != params.len()
+            || types.indices.len() != indices.len()
+            || types.fields.len() != ctors.len()
+            || types.results.len() != ctors.len()
+            || types.fields.iter().zip(ctors).any(|(fields, ctor)| fields.len() != ctor.args.len())
+            || types.results.iter().zip(ctors).any(|(result, ctor)| result.is_some() != ctor.result.is_some())
+    }) {
+        return Err(ElabError::Internal("checked inductive telescope disagrees with declaration".into()));
     }
 
     let global_info: HashMap<String, GlobalId> = globals.clone();
@@ -251,6 +294,8 @@ pub(crate) fn elab_explicit_data_decl(
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let param_terms = checked.map_or(param_terms, |types| types.params.clone());
+    let index_terms = checked.map_or(index_terms, |types| types.indices.clone());
     let level = level.map(level_from_nat).unwrap_or(Level::Zero);
     let ctors_owned = ctors.to_vec();
     let d_name_owned = d_name.to_string();
@@ -267,6 +312,7 @@ pub(crate) fn elab_explicit_data_decl(
             &global_info,
             &ind_id_set,
             &ctor_id_set,
+            checked,
         )
     })
     .map_err(|error| {
@@ -318,22 +364,27 @@ fn build_explicit_inductive_spec(
     globals: &HashMap<String, GlobalId>,
     ind_ids: &HashSet<GlobalId>,
     ctor_ids: &HashSet<GlobalId>,
+    checked: Option<&CheckedInductiveTypes>,
 ) -> Result<InductiveSpec, ElabError> {
     let constructors = ctors
         .iter()
-        .map(|c| {
-            let args = c
-                .args
-                .iter()
-                .map(|arg| {
+        .enumerate()
+        .map(|(i, c)| {
+            let args = if let Some(checked) = checked {
+                checked.fields[i].clone()
+            } else {
+                c.args.iter().map(|arg| {
                     rtype_to_kernel_checked(&arg.ty, d_name, d_id, globals, ind_ids, ctor_ids)
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+                }).collect::<Result<Vec<_>, _>>()?
+            };
 
             let target_indices = match &c.result {
                 Some(result) => {
-                    let result_term =
-                        rtype_to_kernel_checked(result, d_name, d_id, globals, ind_ids, ctor_ids)?;
+                    let result_term = if let Some(checked) = checked {
+                        checked.results[i].as_ref().expect("checked result count validated").clone()
+                    } else {
+                        rtype_to_kernel_checked(result, d_name, d_id, globals, ind_ids, ctor_ids)?
+                    };
                     validate_ctor_result_target(
                         &result_term,
                         d_id,
@@ -660,6 +711,42 @@ fn inferred_sort_level(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<Le
     }
 }
 
+/// The structural data converter rejects named projections because it has no
+/// class field list. Check the same boundary before the provisional checked-
+/// type route: an earlier `Sack c` application must not replace the located
+/// `d.Query` refusal with `infer_proj`'s context-free fallback.
+pub(crate) fn reject_data_projection(ty: &RType) -> Result<(), ElabError> {
+    match ty {
+        RType::RProj(_, field, span) => Err(data_projection_error(field, span)),
+        RType::RPi(_, left, right, _)
+        | RType::RSigma(_, left, right, _)
+        | RType::RArr(left, right, _)
+        | RType::REffectArr(left, _, right, _)
+        | RType::RApp(left, right, _) => {
+            reject_data_projection(left)?;
+            reject_data_projection(right)
+        }
+        RType::RRefine(_, carrier, _, _) | RType::RTrunc(carrier, _) => {
+            reject_data_projection(carrier)
+        }
+        RType::RUniv(_, _)
+        | RType::RCon(_, _)
+        | RType::RCheckedGlobal { .. }
+        | RType::RVarTy(_, _, _)
+        | RType::RPatternAliasTy(_, _, _) => Ok(()),
+    }
+}
+
+fn data_projection_error(field: &str, span: &Span) -> ElabError {
+    ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: format!(
+            "`.{field}` projection is not available in a data declaration's \
+             type; the class field list is not in scope here"
+        ),
+    }
+}
+
 fn rtype_to_kernel_checked(
     rty: &RType,
     d_name: &str,
@@ -749,15 +836,53 @@ fn rtype_to_kernel_checked(
         // own span rather than fabricating an index or panicking: the shape is
         // reachable from ordinary syntax (`data D (d : C a) (x : d.Field) …`),
         // so it owes a located diagnostic.
-        RType::RProj(_, field, span) => Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: format!(
-                "`.{field}` projection is not available in a data declaration's \
-                 type; the class field list is not in scope here"
-            ),
-        }),
+        RType::RProj(_, field, span) => Err(data_projection_error(field, span)),
         RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(rtype_to_kernel_checked(
             inner, d_name, d_id, globals, ind_id_set, ctor_id_set,
         )?))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Promise class: durable invariant (spec 34 §2; spec 39 §5.6).
+    /// MEASURED: an unlocated universe error retains its kernel error and
+    /// declaration span. CLAIMED: a failed source lookup invents no constructor
+    /// attribution. THE GAP: this pins the fallback arm directly; the malformed
+    /// surface family now refuses earlier, and the separate legacy diagnostic
+    /// test exercises the attributed path through actual elaboration.
+    #[test]
+    fn unlocated_universe_error_preserves_kernel_refusal() {
+        let decl_span = Span::new(17, 63);
+        let argument_level = Level::zero().suc();
+        let family_level = Level::zero();
+        let error = surface_universe_error(
+            "D",
+            None,
+            argument_level.clone(),
+            family_level.clone(),
+            &decl_span,
+        );
+        assert!(
+            matches!(
+                &error,
+                ElabError::KernelRejected {
+                    error: KernelError::ConstructorUniverseViolation { argument, family },
+                    span,
+                } if *argument == argument_level
+                    && *family == family_level
+                    && *span == decl_span
+            ),
+            "an unlocated universe error must preserve the kernel refusal: {error:?}"
+        );
+        let diagnostic = error.to_string();
+        for invented in ["<unknown>", "#1", "C.safe"] {
+            assert!(
+                !diagnostic.contains(invented),
+                "diagnostic fabricated source attribution '{invented}': {diagnostic}"
+            );
+        }
     }
 }

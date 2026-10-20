@@ -1481,6 +1481,23 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
             },
         ) => eq_type_eq(af, bf) && eq_type_eq(asnd, bsnd),
         (
+            EvalVal::SigmaTy {
+                dom: ad,
+                cod: ac,
+                env: ae,
+            },
+            EvalVal::SigmaTy {
+                dom: bd,
+                cod: bc,
+                env: be,
+            },
+        ) => {
+            eq_type_eq(ad, bd)
+                && ac == bc
+                && ae.len() == be.len()
+                && ae.iter().zip(be.iter()).all(|(x, y)| eq_type_eq(x, y))
+        }
+        (
             EvalVal::Ctor {
                 id: a, args: aa, ..
             },
@@ -1661,6 +1678,58 @@ mod ds5b_cast_regular_tests {
             cast_reduce(ty.clone(), ty, EvalVal::Unknown, EvalVal::Int(47)),
             EvalVal::Unknown
         );
+    }
+
+    // Promise class: durable invariant. MEASURED: the value-layer C5 comparator
+    // accepts identical Σ coordinates and refuses independent changes to the
+    // domain, codomain, environment length, and each of two captured entries.
+    // CLAIMED: this sufficient-only arm cannot ignore a later captured entry.
+    // THE GAP: this unit test does not infer or kernel-check these synthetic
+    // type values; the CLI C5 test supplies the checked source-level route.
+    #[test]
+    fn sigma_type_cast_requires_matching_domain_codomain_and_environment() {
+        let sigma = |dom_id, cod, env| EvalVal::SigmaTy {
+            dom: Rc::new(EvalVal::OpaquePrimType {
+                id: GlobalId(dom_id),
+                args: Rc::new(vec![]),
+            }),
+            cod: Rc::new(cod),
+            env: Rc::new(env),
+        };
+        let captured = || vec![EvalVal::Int(1), EvalVal::Int(3)];
+        let source = sigma(17, Term::Var(0), captured());
+        let payload = EvalVal::Int(47);
+        assert_eq!(
+            cast_reduce(
+                source.clone(),
+                sigma(17, Term::Var(0), captured()),
+                EvalVal::Neutral,
+                payload.clone()
+            ),
+            payload
+        );
+        for (coordinate, target) in [
+            ("domain", sigma(18, Term::Var(0), captured())),
+            ("codomain", sigma(17, Term::Var(1), captured())),
+            (
+                "environment length",
+                sigma(17, Term::Var(0), vec![EvalVal::Int(1)]),
+            ),
+            (
+                "first environment entry",
+                sigma(17, Term::Var(0), vec![EvalVal::Int(2), EvalVal::Int(3)]),
+            ),
+            (
+                "later environment entry",
+                sigma(17, Term::Var(0), vec![EvalVal::Int(1), EvalVal::Int(2)]),
+            ),
+        ] {
+            assert_eq!(
+                cast_reduce(source.clone(), target, EvalVal::Neutral, payload.clone()),
+                EvalVal::Unknown,
+                "{coordinate} mismatch must not cast"
+            );
+        }
     }
 }
 

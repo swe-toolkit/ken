@@ -1,8 +1,8 @@
 //! Durable invariants for spec/20-verification/22 §3 and §5: a let binds its
-//! equation for obligations in its body, without adding evidence to core.
+//! equation with checked evidence in core, not only in obligation contexts.
 
-use ken_elaborator::{ElabEnv, ElabResult, Obligation, ObligationKind};
-use ken_kernel::{check::check, Context, Decl, Level, Term};
+use ken_elaborator::{ElabEnv, ElabError, ElabResult, Obligation, ObligationKind};
+use ken_kernel::{check::check, Context, Decl, KernelError, Level, Term};
 
 fn fixture() -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
@@ -15,6 +15,48 @@ fn fixture() -> ElabEnv {
     env.elaborate_decl("def QPos = { x : Int | Q x }")
         .expect("checked named refinement");
     env
+}
+
+/// A non-subset comparison beneath a let may be deferred to kernel ζ, but
+/// this must not admit an actually mistyped body or allocate its declaration.
+#[test]
+fn let_conversion_deferral_rejects_wrong_body_at_final_kernel_check() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("fn good_let (n : Int) : Int = let r = n in r")
+        .expect("let substitution preserves a correctly typed result");
+    let before = env.env.next_global_id();
+    let failure = env
+        .elaborate_decl("fn bad_let (n : Int) : Bool = let r = n in r")
+        .expect_err("an Int let body cannot inhabit Bool");
+    assert!(matches!(failure, ElabError::KernelRejected {
+        error: KernelError::TypeMismatch { .. }, ..
+    }), "deferred wrong body must be rejected by the final kernel: {failure:?}");
+    assert_eq!(env.env.next_global_id(), before, "wrong body was admitted");
+    assert!(!env.globals.contains_key("bad_let"));
+}
+
+/// A logical conjunction is an Ω-classified Sigma, not a value subset.
+/// Its proof can cross a let only through the kernel's checked substitution;
+/// it must not be rebuilt by refinement introduction or carrier forgetting.
+#[test]
+fn logical_conjunction_under_let_is_not_a_subset_coercion() {
+    let mut env = fixture();
+    env.elaborate_decl(
+        "theorem and_let (n : Int) (h : Q n) : And (Q n) (Q n) = \
+         let r = n in and_intro (Q r) (Q r) h h",
+    )
+    .expect("a logical conjunction checks after the let RHS substitutes");
+    let before = env.env.next_global_id();
+    let failure = env.elaborate_decl(
+        "theorem and_bad (n : Int) (m : Int) (h : Q n) : And (Q n) (Q m) = \
+         let r = n in and_intro (Q r) (Q r) h h",
+    )
+    .expect_err("a false second conjunct has no checked proof");
+    assert!(matches!(failure, ElabError::KernelRejected {
+        error: KernelError::TypeMismatch { .. }, ..
+    }), "invalid conjunction: {failure:?}");
+    assert_eq!(env.env.next_global_id(), before);
+    assert!(!env.globals.contains_key("and_bad"));
 }
 
 fn int_ty(env: &ElabEnv) -> Term {
@@ -151,25 +193,22 @@ fn checked_body(env: &ElabEnv, result: &ElabResult) -> Term {
     body.clone()
 }
 
-/// Promise: durable invariant. Measured: the *actual hole type* has the
-/// binder and Eq in the right order, and a J certificate kernel-checks in an
-/// empty context. Claimed: a leaf under a let can use its RHS equation.
-/// Gap: the emitted body must remain the ordinary Let, not acquire a proof.
+fn pair_proof_contains_hole(term: &Term, id: ken_kernel::GlobalId) -> bool {
+    fn contains(term: &Term, id: ken_kernel::GlobalId) -> bool {
+        matches!(term, Term::Const { id: found, .. } if *found == id)
+            || term.children().iter().any(|child| contains(child, id))
+    }
+    matches!(term, Term::Pair(_, proof) if contains(proof, id))
+        || term.children().iter().any(|child| pair_proof_contains_hole(child, id))
+}
+
+/// Promise: durable invariant. The hole type retains the checked let Eq, a
+/// J certificate checks at it, and each admitted body introduces its result
+/// pair under a Let with Refl(rhs) applied to the Eq proof binder.
 #[test]
 fn ensures_literal_and_named_returns_transport_the_let_equation() {
     let mut env = fixture();
     let int = int_ty(&env);
-    let expected_body = Term::lam(
-        int.clone(),
-        Term::lam(
-            q(&env, 0),
-            Term::Let {
-                ty: Box::new(int.clone()),
-                val: Box::new(Term::var(1)),
-                body: Box::new(Term::var(0)),
-            },
-        ),
-    );
     for (source, kind) in [
         (
             "fn es_let (n : Int) : Int requires Q n ensures Q result = let r = n in r",
@@ -177,7 +216,7 @@ fn ensures_literal_and_named_returns_transport_the_let_equation() {
         ),
         (
             "fn lit_let (n : Int) : { x : Int | Q x } requires Q n = let r = n in r",
-            ObligationKind::Ensures,
+            ObligationKind::RefinementIntroduction,
         ),
         (
             "fn named_let (n : Int) : QPos requires Q n = let r = n in r",
@@ -188,7 +227,19 @@ fn ensures_literal_and_named_returns_transport_the_let_equation() {
         let obligation = one(&result, kind);
         kernel_certificate(&env, &obligation.goal_closed, &unary_certificate(&env));
         assert_eq!(obligation.goal_closed, unary_let_goal(&env), "{source}");
-        assert_eq!(checked_body(&env, &result), expected_body, "{source}");
+        let checked = checked_body(&env, &result);
+        let Term::Lam(_, body) = &checked else { panic!("n binder: {source}") };
+        let Term::Lam(_, body) = body.as_ref() else { panic!("Q premise: {source}") };
+        let Term::Let { ty, val, body } = body.as_ref() else {
+            panic!("source let survives checked result: {source}")
+        };
+        assert_eq!(ty.as_ref(), &int);
+        assert_eq!(val.as_ref(), &Term::var(1));
+        assert!(matches!(body.as_ref(), Term::App(_, proof)
+            if proof.as_ref() == &Term::Refl(Box::new(Term::var(2)))),
+            "the let equation has a checked Refl(rhs) argument: {source}");
+        assert!(pair_proof_contains_hole(body, obligation.hole_id),
+            "the actual obligation is applied in the result pair: {source}");
     }
 }
 
@@ -250,10 +301,10 @@ fn match_true_arm_places_let_equation_inside_the_branch_equation() {
             Term::pi(
                 q(&env, 0),
                 Term::pi(
-                    int.clone(),
+                    branch_eq(2, "True"),
                     Term::pi(
-                        branch_eq(3, "True"),
-                        Term::pi(let_eq(&int, 1, 3), q(&env, 2)),
+                        int.clone(),
+                        Term::pi(let_eq(&int, 0, 3), q(&env, 1)),
                     ),
                 ),
             ),
@@ -274,10 +325,10 @@ fn match_true_arm_places_let_equation_inside_the_branch_equation() {
             Term::lam(
                 q(&env, 0),
                 Term::lam(
-                    int.clone(),
+                    branch_eq(2, "True"),
                     Term::lam(
-                        branch_eq(3, "True"),
-                        Term::lam(let_eq(&int, 1, 3), transport_body(&int, &q_head, 6, 2, 3)),
+                        int.clone(),
+                        Term::lam(let_eq(&int, 0, 3), transport_body(&int, &q_head, 6, 1, 3)),
                     ),
                 ),
             ),
@@ -374,14 +425,15 @@ fn inferred_let_body_introduction_receives_the_equation() {
         env.is_open_hole(obligation.hole_id),
         "opaque Q has no premise"
     );
-    assert_eq!(
-        checked_body(&env, &result),
-        Term::Let {
-            ty: Box::new(int.clone()),
-            val: Box::new(Term::IntLit(5.into())),
-            body: Box::new(Term::var(0)),
-        }
-    );
+    let checked = checked_body(&env, &result);
+    let Term::Let { ty, val, body } = &checked else { panic!("checked inferred let") };
+    assert_eq!(ty.as_ref(), &int);
+    assert_eq!(val.as_ref(), &Term::IntLit(5.into()));
+    assert!(matches!(body.as_ref(), Term::App(_, proof)
+        if proof.as_ref() == &Term::Refl(Box::new(Term::IntLit(5.into())))),
+        "inferred let uses the checked Refl(rhs) argument");
+    assert!(pair_proof_contains_hole(body, obligation.hole_id),
+        "the introduced subset carries this exact typed obligation");
     // A literal predicate mentioning the same RHS is discharged by the Eq
     // hypothesis itself; this is an independent infer-arm certificate.
     let literal = env
@@ -416,7 +468,7 @@ fn let_free_ensures_literal_named_and_binary_controls_are_unchanged() {
         ),
         (
             "fn lit_plain (n : Int) : {x : Int | Q x} requires Q n = n",
-            ObligationKind::Ensures,
+            ObligationKind::RefinementIntroduction,
         ),
         (
             "fn named_plain (n : Int) : QPos requires Q n = n",

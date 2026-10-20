@@ -245,6 +245,13 @@ pub enum ElabError {
     /// An elaborator obligation is not proved where it is generated, and
     /// this context has no channel through which to report the hole.
     ObligationWithoutChannel { span: Span },
+    /// A branch-local subset proof requires this split to be retried with its
+    /// checked equation binder. Consumed by the owning split, not reported as
+    /// a user-facing refusal.
+    RefinementSplitDemand { split_id: u64, span: Span },
+    /// An open subset proof requires an equation from a split for which Ken
+    /// cannot construct term evidence (notably recursive/indexed families).
+    NonConvoyableRefinementSplit { span: Span },
     /// The elaborator surfaced a kernel type-mismatch (`39 §5.6`).
     TypeMismatch { span: Span, reason: String },
     /// A λ was checked against a non-Π type — V0 structural rejection (`39 §5.6`).
@@ -739,6 +746,13 @@ impl fmt::Display for ElabError {
             ElabError::ObligationWithoutChannel { span } => write!(
                 f,
                 "an obligation at {}-{} is not proved, but this context cannot report it",
+                span.start, span.end,
+            ),
+            ElabError::RefinementSplitDemand { span, .. } => write!(
+                f, "refinement split needs evidence at {}-{}", span.start, span.end,
+            ),
+            ElabError::NonConvoyableRefinementSplit { span } => write!(
+                f, "refinement proof needs evidence unavailable in this recursive or indexed split at {}-{}",
                 span.start, span.end,
             ),
             ElabError::TypeMismatch { span, reason } => {

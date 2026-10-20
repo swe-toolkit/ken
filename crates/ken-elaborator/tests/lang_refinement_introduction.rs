@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use ken_elaborator::{v2_extract, ElabEnv, ElabError, ObligationKind, ProvKind};
-use ken_kernel::{GlobalId, Level, Term};
+use ken_kernel::{check, convert_type, Context, GlobalId, KernelError, Level, Term};
 
 fn arbitrary_predicate(env: &mut ElabEnv) {
     let int = Term::const_(env.globals["Int"], vec![]);
@@ -211,9 +211,14 @@ fn named_return_over_a_match_is_realized_per_leaf() {
                 Term::app(is_scalar.clone(), Term::IntLit(value.into())),
             ),
         );
-        assert_eq!(
-            obligation.goal_closed, expected,
-            "{branch}: scalar goal must use its own leaf"
+        assert!(
+            convert_type(
+                &env.env,
+                &Context::new(),
+                &obligation.goal_closed,
+                &expected
+            ),
+            "{branch}: checked scalar predicate must concern its own leaf"
         );
         assert!(
             !env.is_open_hole(obligation.hole_id),
@@ -243,9 +248,14 @@ fn named_return_over_a_match_is_realized_per_leaf() {
                 Term::pi(equation, Term::app(is_scalar.clone(), value)),
             ),
         );
-        assert_eq!(
-            obligation.goal_closed, expected,
-            "{branch}: widen must use its own leaf"
+        assert!(
+            convert_type(
+                &env.env,
+                &Context::new(),
+                &obligation.goal_closed,
+                &expected
+            ),
+            "{branch}: checked widening predicate must concern its own leaf"
         );
         assert_eq!(
             env.is_open_hole(obligation.hole_id),
@@ -415,12 +425,32 @@ fn distinct_refinement_aliases_do_not_share_an_int_carrier_key() {
         negative.obligations[0].goal_closed, expected_neg,
         "Neg must emit Not (P 5), not the predicate of another Int alias"
     );
-    let expected_pos = Term::app(p, Term::const_(env.globals["negative"], vec![]));
+    let negative_core = Term::const_(env.globals["negative"], vec![]);
+    let negative_ty = Term::const_(env.globals["Neg"], vec![]);
+    let expected_pos = Term::app(
+        p,
+        Term::proj1(Term::Ascript(
+            Box::new(negative_core.clone()),
+            Box::new(negative_ty),
+        )),
+    );
     assert_eq!(
         conversion.obligations[0].goal_closed, expected_pos,
-        "Pos must emit P negative when converting from Neg"
+        "Pos requires P of Neg's checked carrier projection"
     );
     assert!(env.is_open_hole(conversion.obligations[0].hole_id));
+    assert!(
+        matches!(
+            check(
+                &env.env,
+                &Context::new(),
+                &negative_core,
+                &Term::const_(env.globals["Pos"], vec![])
+            ),
+            Err(KernelError::TypeMismatch { .. })
+        ),
+        "a Neg value cannot be reused as Pos without a checked pair"
+    );
 }
 
 #[test]
@@ -434,15 +464,25 @@ fn mutually_recursive_source_introductions_keep_alias_identity() {
             "fn left (n : Nat) : Pos = match n { Zero |-> 5 ; Suc m |-> right m }\n\
          fn right (n : Nat) : Pos = match n { Zero |-> 6 ; Suc m |-> left m }",
         )
-        .expect("mutual source group");
-    assert_eq!(results.len(), 2);
-    for result in &results {
+        .expect("unsupported recursive equations are omitted, not assumed");
+    assert_eq!(results.len(), 2, "both mutually recursive names are admitted");
+    let nat = Term::indformer(env.globals["Nat"], vec![]);
+    let p = Term::const_(env.globals["P"], vec![]);
+    for (result, (name, value)) in results.iter().zip([("left", 5), ("right", 6)]) {
+        assert_eq!(env.globals[name], result.def_id, "correct mutual name");
+        let [goal] = result.obligations.as_slice() else {
+            panic!("one open introduction for the fresh base value: {name}")
+        };
+        assert!(matches!(goal.kind, ObligationKind::RefinementIntroduction));
+        assert!(env.is_open_hole(goal.hole_id), "each opaque base goal remains unknown");
         assert_eq!(
-            result.obligations.len(),
-            1,
-            "each base case introduces Pos once"
+            goal.goal_closed,
+            Term::pi(nat.clone(), Term::app(p.clone(), Term::IntLit(value.into()))),
+            "no unchecked recursive constructor equation is closed into {name}'s goal"
         );
-        assert!(env.is_open_hole(result.obligations[0].hole_id));
+        let Some(ken_kernel::Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id)
+        else { panic!("mutual function {name} must remain checked and transparent") };
+        check(&env.env, &Context::new(), body, ty).expect("kernel checks alias-typed pair");
     }
 }
 

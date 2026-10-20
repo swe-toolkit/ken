@@ -917,7 +917,7 @@ impl ElabEnv {
             class_env,
             resolution_provenance: _,
             module_state,
-            refinement_facts,
+            refinement_facts: _,
         } = self;
         removed_names.extend(
             globals
@@ -953,7 +953,6 @@ impl ElabEnv {
             .retain(|id, _| !removed_ids.contains(id));
         class_env.scrub_global_ids(&removed_ids);
         module_state.scrub_global_ids(&removed_ids);
-        refinement_facts.scrub_global_ids(&removed_ids);
         Ok(())
     }
 

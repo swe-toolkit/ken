@@ -143,12 +143,10 @@ body/refinement can project its fields (`d.leq`) exactly as the spec's own
 illustration shows — ordinary implicit-dictionary insertion, the same
 `sort`/`is_sorted` view as the explicit-comparator form, no second mechanism.
 
-Once a concrete instance is registered, its fields project directly off the
-synthesized `C_instance_T` dictionary — `§4`'s `Ord Char` instance is a
-worked example: every one of its own fields is a `.`-projection off
-`Ord_instance_Int` (`(Ord_instance_Int).leq`, `(Ord_instance_Int).refl`,
-…), the same projection form a resolved `where Ord a` dictionary uses
-internally.
+Once a concrete instance is registered, its fields project off the
+synthesized `C_instance_T` dictionary. The `Ord Char` instance in §4
+applies `Ord_instance_Int`'s fields to the checked `Char` carrier
+projection, then lifts carrier equality to subset equality.
 
 ## 4. Laws & proofs
 
@@ -156,8 +154,8 @@ The public law shape lives in the three class declarations above; this section
 shows how each carrier inhabits it. Read the families in order when auditing the
 trust boundary: `Int` reuses one named certificate and visibly audited ordering
 laws, `Bool` proves finite cases in the kernel, `Nat` proves its order by
-structural recursion, and `Char` introduces no new assumption because it
-projects the already-existing `Int` dictionaries.
+structural recursion, and `Char` introduces no new assumption because its
+checked projection transports the already-existing `Int` dictionaries.
 
 ### 4.1 Canonical `Int` instances
 
@@ -197,9 +195,9 @@ against `eq_int` literally (`crates/ken-elaborator/src/numbers.rs`, before
 any catalog wrapper exists to reference). Spelling every law field's
 hypothesis as `eq_int x y` verbatim makes it match the certificate's own
 type on the nose, sidestepping any operand-congruence question entirely —
-the same "same literal expression" discipline `Ord Char` (`§5` below) uses
-for exactly this reason. (This is a SUFFICIENT choice, not a demonstrated
-NECESSARY one: whether a `fn`-wrapped alias like `int_eq` would actually
+the same literal-operand discipline the `Char` lift (§5) uses after
+projecting its checked subset carrier. (This is a SUFFICIENT choice, not a
+demonstrated NECESSARY one: whether a `fn`-wrapped alias like `int_eq` would actually
 fail here — the `§5`/K6 `conv_struct` gap — was not independently
 reproduced through this specific class-instance-record projection path;
 raw `eq_int` avoids the question rather than resolving it.)
@@ -619,48 +617,52 @@ instance Ord Nat {
 
 ### 4.4 `Ord Char` — transport from `Ord Int`
 
-Re-homed from the Decimal/Char DEMOTE
-(`docs/program/wp/lawful-classes-lane.md`), this instance uses refinement
-erasure rather than a carrier-specific proof. Under
-refinement erasure `Char = { c : Int | isScalar c }` (`decimal_char.rs`),
-`Char.toInt` (`charToInt`) is the IDENTITY projection and
-`leqChar a b = leq_int a b` (same file) — so `Char`'s order IS `Int`'s
-order, verbatim, not a fresh structure. The law fields do NOT re-postulate
-(that would mint a NEW `Decl::Opaque`, growing `trusted_base()`); they
-TRANSPORT — reference `Ord Int`'s own existing, already-visible fields via
-`.`-projection (`(Ord_instance_Int).refl` etc, `33 §5.2` eta-projection,
-parenthesized so the parser takes it as a projection and not a `M.foo`
-qualified-name token — `Ord_instance_Int` alone is a `ConId` and
-`parse_dotted` would otherwise swallow the whole `Ord_instance_Int.refl` as
-one qualified reference). So this instance's own `trusted_base_delta` mints
-nothing new: zero-NEW-delta by transport, NOT zero-delta (the referenced
-named axioms remain in `Ord Int`) — see `§5` for why `leq`
-is also transported rather than using the separately-defined `leqChar` view.
+`Char` is the checked subset `Σ(c:Int).isScalar c`, not `Int` by erasure.
+`charToInt` forgets the proof via `Proj1`. The comparator applies
+`Ord_instance_Int.leq` to projected carriers; each law applies the
+corresponding `Ord Int` field to those same carriers. Antisymmetry
+lifts the resulting `Equal Int` through observational equality of the
+subset: its carrier equality and reflexivity of the target's Ω proof
+form a checked `Equal Char`. No law is postulated here. The four named
+`Ord Int` axioms remain inherited trust, not new trust minted by this
+instance. See §5 for the equality-lift boundary.
 
 ```ken
+theorem lawful_char_to_int_injective
+      (x : Char) (y : Char) (p : Equal Int (charToInt x) (charToInt y))
+    : Equal Char x y =
+  (p, Refl)
+
+fn lawful_char_leq (x : Char) (y : Char) : Bool =
+  (Ord_instance_Int).leq (charToInt x) (charToInt y)
+
 instance Ord Char {
-  leq = (Ord_instance_Int).leq;
-  refl = (Ord_instance_Int).refl;
-  antisym = (Ord_instance_Int).antisym;
-  trans = (Ord_instance_Int).trans;
-  total = (Ord_instance_Int).total
+  leq = lawful_char_leq;
+  refl = λx.(Ord_instance_Int).refl (charToInt x);
+  antisym = λx.λy.λp.λq.lawful_char_to_int_injective x y
+    ((Ord_instance_Int).antisym (charToInt x) (charToInt y) p q);
+  trans = λx.λy.λz.λp.λq.(Ord_instance_Int).trans (charToInt x) (charToInt y) (charToInt z) p q;
+  total = λx.λy.(Ord_instance_Int).total (charToInt x) (charToInt y)
 }
 ```
 
 ### 4.5 `DecEq Char` — the same transport
 
-ADR 0013's Layer 1 states its intended consequence: "someone writes the
-trivial `instance DecEq Char`." The shape is identical to `Ord Char`
-above — every field is a direct `.`-projection off `DecEq_instance_Int`,
-zero-Char-specific kernel work, zero-NEW-delta (the projected fields
-themselves resolve to the shared `int_eq_sound`/`int_eq_complete`
-certificate, not a fresh postulate).
+The equality operation compares projected `Int` carriers. `sound` lifts
+`DecEq Int`'s carrier equality through the same checked subset-equality
+lemma; `complete` projects the carrier equality from `Equal Char`. These
+fields reuse the shared `int_eq_sound`/`int_eq_complete` certificate; they
+add no postulate.
 
 ```ken
+fn lawful_char_eq (x : Char) (y : Char) : Bool =
+  (DecEq_instance_Int).eq (charToInt x) (charToInt y)
+
 instance DecEq Char {
-  eq = (DecEq_instance_Int).eq;
-  sound = (DecEq_instance_Int).sound;
-  complete = (DecEq_instance_Int).complete
+  eq = lawful_char_eq;
+  sound = λx.λy.λp.lawful_char_to_int_injective x y
+    ((DecEq_instance_Int).sound (charToInt x) (charToInt y) p);
+  complete = λx.λy.λp.(DecEq_instance_Int).complete (charToInt x) (charToInt y) p.1
 }
 ```
 
@@ -2731,40 +2733,20 @@ exercised — no branch reuses a hypothesis across a swap; each computes its
 own concrete answer. Zero `conv.rs` diff, zero new capability,
 K6-independent.
 
-### 5.2 Why `Ord Char` transports `leq` via `.`-projection
+### 5.2 Why subset `Char` needs a checked equality lift
 
-`leq` is transported as `(Ord_instance_Int).leq`
-— not `leqChar`, though both reduce to the identical `leq_int a b`
-(confirmed: `leqChar`/`int_leq` are both `Decl::Transparent` wrappers over
-the same `leq_int` primitive, so both fully whnf to the same normal form).
-This is a REAL correction, not cosmetic: using `leqChar` here made every
-later field's kernel re-check FAIL, even though each field's OWN
-transported proof is individually real and each ingredient (Char~Int by
-refinement erasure; `leqChar`~`int_leq` by shared unfolding) converts in
-isolation. Root cause (isolated by a patch-and-revert scratch repro,
-`ken-kernel/src/conv.rs` untouched): `refl`'s expected codomain
-`IsTrue (leqChar x x)` and the transported term's own inferred codomain
-`IsTrue ((Ord_instance_Int).leq x x)` both whnf to a STUCK
-`Term::Eq(Bool, <leq-app-on-a-free-var>, True)` — `leq_int` only fires on
-literals, so a free-variable `x` leaves it neutral — and `conv_struct` has
-NO congruence arm comparing two `Term::Eq(...)` nodes component-wise, so it
-falls to its structural-equality-only path and rejects two operands that
-are SYNTACTICALLY different (`leqChar x x` vs `(Ord_instance_Int).leq x x`)
-even though both fully reduce to the identical `leq_int x x`. This is the
-SAME missing-arm shape as the `Eq Bool` `sym`/`trans` K6 gap above — but
-here a SOUND, POSITIONAL congruence arm (comparing type/lhs/rhs pairwise,
-each recursively convertible) WOULD have closed it, unlike K6's swap case
-(which needed the unsound cross-wise arm). Flagged to the Architect as K6's
-first real customer — forward kernel work, not blocking. The fix used here
-needs NO kernel change: transport `leq` itself via the SAME `.`-projection
-as every other field, so every later field's expected type and the
-transported proof's own inferred type share the LITERALLY IDENTICAL
-projection term (`(Ord_instance_Int).leq`, not two different names that
-happen to co-reduce) — the two sides become syntactically equal after whnf
-(`a == b` fires directly, `conv.rs`'s first structural-equality check),
-never reaching the missing `Eq`-congruence arm at all. Still zero-NEW-delta
-transport, still reduces via `leq_int` (through one more projection layer)
-— not a new proof technique, a more literal transport.
+`Char` is not definitionally `Int`: a `Char` value is a checked pair
+of an `Int` scalar and an Ω proof. Neither an `Ord Int` law field nor
+an `Equal Int` proof directly inhabits its `Char` counterpart. The
+`lawful_char_to_int_injective` theorem constructs the subset equality
+from the carrier equality and `Refl` at the target-side proof field.
+This follows observational equality for subset Σ (`16 §2.2`), where
+that Ω field needs no transported evidence. `Ord Char` and `DecEq Char`
+use this theorem for their sound equality conclusions; the other laws
+reuse the `Int` proof fields at `charToInt` projections. The comparator
+uses the same projected operands as its law fields, avoiding an
+independent neutral `Eq Bool` conversion question. This adds no axiom
+and preserves the underlying certificate and named order axioms.
 
 ## 6. Findings
 
@@ -2779,8 +2761,8 @@ transport, still reduces via `leq_int` (through one more projection layer)
 - **Kernel-completeness gap, PARKED (K6):** `conv_struct`
   (`ken-kernel/src/conv.rs`) has no congruence arm comparing two
   `Term::Eq(...)` nodes component-wise. A SOUND, POSITIONAL arm would help
-  `Ord Char`-shaped transport proofs (`§5`) but was not needed once `leq`
-  transports via `.`-projection instead of a separately-defined view; the
+  comparisons of distinct neutral comparator spellings, but the checked
+  `Char` lift (§5) reuses the same projected operands instead; the
   UNSOUND cross-wise arm that would have helped `Eq Bool`'s original
   proof attempt is a hard no (`§5`). Currently CUSTOMERLESS — no live
   proof obligation in this codebase needs the sound positional arm — so
@@ -2855,8 +2837,9 @@ Ken-native; no external reference implementation informed its source.
    over operation-wrapped equations that require K7's operand-whnf to
    collapse. `Ord Nat` uses structural recursion for its relation, laws, and
    proof-relevant totality program, then a provider-owned `bool_or` bridge to
-   assemble the class field. `Ord Char`/`DecEq Char` transport every field via
-   `.`-projection off `Ord_instance_Int`/`DecEq_instance_Int`. The
+   assemble the class field. `Ord Char`/`DecEq Char` apply the `Int`
+   dictionary fields to projected carriers and lift subset equality with
+   a checked proof pair. The
    `UInt8`, `Bytes`, and `String` instances transport through their existing
    injective views and structural dictionaries.
 5. **`trusted_base()` delta.** `Ord Int`: four named catalog axioms
@@ -2879,8 +2862,8 @@ Ken-native; no external reference implementation informed its source.
    anywhere in `Ord Bool`/`Eq Bool`/`DecEq Bool`. `Ord Nat`: **zero** — its
    structural relation, attached laws, totality program, bridge, and dictionary
    contain no postulate. `Ord Char`/`DecEq Char`: **zero-NEW-delta** — mint no
-   new postulate, transport `Ord Int`'s
-   named axioms / `DecEq Int`'s certificate reference via projection.
+   new postulate; their checked carrier projection and equality lift
+   reuse `Ord Int`'s named axioms and `DecEq Int`'s certificate.
 6. **Proof families.** `Bool` instances: full case-split on every
    quantified variable (`x`, `y`, and for `trans`, `z`), 4–8 branches per
    law field depending on arity, each closing with `Proved` (collapsed-`Top`
@@ -2890,8 +2873,9 @@ Ken-native; no external reference implementation informed its source.
    converting through `DecEq Int`'s `sound`/`complete` at each end — no
    case-split (`Int` has none to do). `Ord Nat`: structural recursion over
    `Nat`, with the `Or`-to-`bool_or` bridge assembled from the provider's two
-   introduction proofs. `Ord Char`/`DecEq Char`: no case-split, pure
-   `.`-projection. `UInt8`, `Bytes`, and `String` use injectivity
+   introduction proofs. `Ord Char`/`DecEq Char`: no case-split; carrier
+   projection, existing `Int` laws, and subset equality introduction.
+   `UInt8`, `Bytes`, and `String` use injectivity
    of their existing structural views; the String order laws project from the
    canonical structural `Ord (List Char)` dictionary.
 7. **Consumers.** `Data/Numeric/Nat/Order.ken.md` imports and re-exports the

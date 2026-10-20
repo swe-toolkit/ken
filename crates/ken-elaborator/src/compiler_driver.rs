@@ -8560,9 +8560,16 @@ mod package_route_example_declarations {
     }
 
     /// Promise class: normative compatibility vector for the fixed package
-    /// identity and source-only declarations; the relation also stays green
-    /// when unrelated `.ken` implementation details change without changing
-    /// the canonical artifact.
+    /// identity and source-only declarations. The denotation vector pins the
+    /// whole checked denotation closure, ambient prelude included. Under spec
+    /// 46 §3.1 an authorized checked-core change in that prelude moves it.
+    /// The K-a rebaseline changes `Char` from `Int` to `Σ Int isScalar`, plus
+    /// five dependent Char declarations: `charToInt`, `eqChar`, `intToChar`,
+    /// `leqChar`, and `print_line`. A per-key diff across all 21 semantic lanes
+    /// found only those six symbols changed. Replacing all six entries with
+    /// main `0919ab3d6`'s reproduces `0xea0b_029f_f624_c5d6` exactly
+    /// (evt_5p66cdb2xkky5, evt_1mz0vpbw28sev). The source-vs-literate
+    /// relation remains unchanged.
     ///
     /// MEASURED: the `.ken.md` example changes the declaration set and semantic
     /// hash on the old route. CLAIMED: package and denotation routes admit only
@@ -8636,7 +8643,7 @@ mod package_route_example_declarations {
         );
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0xea0b_029f_f624_c5d6
+            0xbc49_4e5f_2e9e_4885
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

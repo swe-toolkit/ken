@@ -1925,25 +1925,35 @@ pub fn register_checked_string_carrier(env: &mut GlobalEnv, id: GlobalId) -> Ker
     Ok(())
 }
 
-/// Char's current core carrier is a checked transparent alias convertible to
-/// Int. The source refinement predicate is erased at this boundary; each
-/// literal payload is independently validated as a Unicode scalar below.
+/// The checked Char carrier is a subset Σ over Int, not Int itself. Its
+/// second component is an Ω proposition, whose closed witness is checked for
+/// every scalar at literal admission; the registration never trusts a bare
+/// integer as a value of Char.
 pub fn register_checked_char_carrier(env: &mut GlobalEnv, id: GlobalId) -> KernelResult<()> {
+    // Every literal and String view uses Char with no level arguments. An
+    // unfolded polymorphic body is not a valid closed Char reference.
+    if env.checked_char_type().is_some()
+        || !matches!(
+            env.lookup(id),
+            Some(Decl::Transparent { level_params, ty, .. }) if level_params.is_empty()
+                && matches!(whnf(env, &Context::new(), ty), Term::Type(_))
+        )
+    {
+        return Err(KernelError::Msg("invalid or duplicate Char literal carrier".into()));
+    }
     let int_type = env
         .int_lit_type()
         .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
-    if env.checked_char_type().is_some()
-        || !matches!(env.lookup(id), Some(Decl::Transparent { .. }))
-        || !convert_type(
-            env,
-            &Context::new(),
-            &Term::const_(id, vec![]),
-            &Term::const_(int_type, vec![]),
-        )
+    let char_ty = Term::const_(id, vec![]);
+    let Term::Sigma(carrier, predicate) = whnf(env, &Context::new(), &char_ty) else {
+        return Err(KernelError::Msg("Char literal carrier must be a subset Sigma".into()));
+    };
+    let mut ctx = Context::new();
+    ctx.push((*carrier).clone());
+    if !convert_type(env, &Context::new(), &carrier, &Term::const_(int_type, vec![]))
+        || !matches!(classify(env, &ctx, &predicate), Ok(Sort::Omega(_)))
     {
-        return Err(KernelError::Msg(
-            "invalid or duplicate Char literal carrier".into(),
-        ));
+        return Err(KernelError::Msg("invalid or duplicate Char literal carrier".into()));
     }
     env.install_checked_char_carrier(id);
     Ok(())
@@ -1980,23 +1990,19 @@ pub fn register_literal_char_view(
             "literal String carrier must be an opaque primitive type".into(),
         ));
     }
-    let int_type = env
-        .int_lit_type()
-        .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
     let char_ty = Term::const_(char_type, vec![]);
-    // Char's checked core alias converts to Int; scalar validity is separately
-    // enforced at every checked literal admission (Rust `char::from_u32`).
+    let Term::Sigma(carrier, predicate) = whnf(env, &Context::new(), &char_ty) else {
+        return Err(KernelError::Msg("literal Char carrier must be a subset Sigma".into()));
+    };
+    let int_type = env.int_lit_type()
+        .ok_or_else(|| KernelError::Msg("Int literal carrier is not registered".into()))?;
+    let mut ctx = Context::new();
+    ctx.push((*carrier).clone());
     if !matches!(env.lookup(char_type), Some(Decl::Transparent { .. }))
-        || !convert_type(
-            env,
-            &Context::new(),
-            &char_ty,
-            &Term::const_(int_type, vec![]),
-        )
+        || !convert_type(env, &Context::new(), &carrier, &Term::const_(int_type, vec![]))
+        || !matches!(classify(env, &ctx, &predicate), Ok(Sort::Omega(_)))
     {
-        return Err(KernelError::Msg(
-            "literal Char carrier must be a checked Int-compatible alias".into(),
-        ));
+        return Err(KernelError::Msg("literal Char carrier must be a checked subset Sigma".into()));
     }
     let list_ty = Term::app(Term::indformer(list_type, vec![]), char_ty.clone());
     let expected_op = Term::pi(Term::const_(string_type, vec![]), list_ty.clone());
@@ -2019,9 +2025,19 @@ pub fn register_literal_char_view(
     let nil_term = Term::app(Term::constructor(nil, vec![]), char_ty.clone());
     let sample = apply_args(
         Term::constructor(cons, vec![]),
-        &[char_ty, Term::IntLit(65u32.into()), nil_term],
+        &[char_ty, checked_char_literal(env, 65)?, nil_term],
     );
     check(env, &Context::new(), &sample, &list_ty)?;
+    // Registration may follow earlier checked String literals. Check their
+    // prospective view elements now; later literals are checked at admission.
+    // No view is installed if any element fails its exact subset predicate.
+    for number in 0..env.next_global_id().0 {
+        if let Some(literal) = env.checked_literal(GlobalId(number)) {
+            for scalar in literal.as_str().chars() {
+                checked_char_literal(env, scalar as u32)?;
+            }
+        }
+    }
     env.install_literal_char_view(char_type, operation, nil, cons);
     Ok(())
 }
@@ -2034,29 +2050,38 @@ pub fn declare_checked_string_literal(env: &mut GlobalEnv, raw: &str) -> KernelR
         .ok_or_else(|| KernelError::Msg("literal String carrier is not registered".into()))?;
     let ty = Term::const_(ty_id, vec![]);
     let normalized: String = raw.nfc().collect();
+    // Every element the literal view may expose must be checked at Char
+    // before this String literal enters the environment. WHNF is not a
+    // certificate verifier; checking here prevents the view from forging a
+    // proof of a false Char predicate.
+    if env.has_literal_char_view() {
+        for scalar in normalized.chars() {
+            checked_char_literal(env, scalar as u32)?;
+        }
+    }
     let id = declare_primitive(env, vec![], ty, PrimReduction::Literal)?;
     env.install_checked_literal(id, CheckedStringLiteral(normalized));
     Ok(id)
 }
 
-/// A surface Char literal is an IntLit in the current core, but only a valid
-/// Unicode scalar at the checked, Int-compatible Char carrier may be emitted.
-/// The value lives in the Term itself, so derived `charToInt := λc.c` and
-/// direct use share one normal form without an extra reduction rule.
+/// A valid Unicode scalar inhabits Char only as a checked subset pair. The
+/// closed `tt` witness is checked at the exact scalar's predicate, rather than
+/// granting an unchecked proof to any integer payload.
 pub fn checked_char_literal(env: &GlobalEnv, scalar: u32) -> KernelResult<Term> {
     let c = char::from_u32(scalar)
         .ok_or_else(|| KernelError::Msg(format!("invalid Unicode scalar U+{scalar:X}")))?;
     let char_type = env
         .checked_char_type()
         .ok_or_else(|| KernelError::Msg("literal Char carrier is not registered".into()))?;
-    let term = Term::IntLit((c as u32).into());
-    check(
-        env,
-        &Context::new(),
-        &term,
-        &Term::const_(char_type, vec![]),
-    )?;
-    Ok(term)
+    let term = Term::Pair(
+        Box::new(Term::IntLit((c as u32).into())),
+        Box::new(Term::const_(env.tt_id(), vec![])),
+    );
+    let char_ty = Term::const_(char_type, vec![]);
+    check(env, &Context::new(), &term, &char_ty)?;
+    // A checked pair is an introduction form: an outer application (notably
+    // Cons Char in the String view) must be able to infer its argument type.
+    Ok(Term::Ascript(Box::new(term), Box::new(char_ty)))
 }
 
 /// `declare_deceq_certificate` — register a decidable-equality certificate
@@ -2194,6 +2219,190 @@ mod tests {
         .unwrap();
         assert_eq!(env.checked_string_type(), None);
         assert_string_carrier_refused_unchanged(&mut env, polymorphic);
+    }
+
+    #[test]
+    fn polymorphic_char_refusal_keeps_the_registered_carrier_empty() {
+        let mut env = GlobalEnv::new();
+        let int_ty = declare_primitive(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        register_checked_int_lit_carrier(&mut env, int_ty).unwrap();
+        let sigma = Term::sigma(
+            Term::const_(int_ty, vec![]),
+            Term::const_(env.top_id(), vec![]),
+        );
+        let polymorphic =
+            declare_def(&mut env, vec![LevelVar(0)], Term::ty(Level::Zero), sigma).unwrap();
+        assert_eq!(env.checked_char_type(), None);
+        assert_eq!(
+            register_checked_char_carrier(&mut env, polymorphic),
+            Err(KernelError::Msg(
+                "invalid or duplicate Char literal carrier".into()
+            )),
+        );
+        assert_eq!(env.checked_char_type(), None);
+    }
+
+    // The installed view reduces a checked String to List Char. The fixture
+    // first admits a String with no view, so registration must check the
+    // existing payload rather than relying on later literal admission.
+    fn pre_view_string_fixture(payload: &str) -> (GlobalEnv, [GlobalId; 7]) {
+        let mut env = GlobalEnv::new();
+        let int = declare_primitive(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        register_checked_int_lit_carrier(&mut env, int).unwrap();
+        let bool_id = declare_inductive(&mut env, |_id| InductiveSpec {
+            level_params: vec![],
+            params: vec![],
+            indices: vec![],
+            level: Level::Zero,
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .unwrap();
+        let bool_ty = Term::indformer(bool_id, vec![]);
+        let leq = declare_primitive(
+            &mut env,
+            vec![],
+            Term::pi(
+                Term::const_(int, vec![]),
+                Term::pi(Term::const_(int, vec![]), bool_ty.clone()),
+            ),
+            PrimReduction::Op { symbol: "leq_int" },
+        )
+        .unwrap();
+        let predicate = Term::Elim {
+            fam: bool_id,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(Term::Ascript(
+                Box::new(Term::lam(bool_ty.clone(), Term::omega(Level::Zero))),
+                Box::new(Term::pi(bool_ty, Term::ty(Level::Zero.suc()))),
+            )),
+            methods: vec![
+                Term::const_(env.top_id(), vec![]),
+                Term::const_(env.bottom_id(), vec![]),
+            ],
+            indices: vec![],
+            scrut: Box::new(Term::app(
+                Term::app(Term::const_(leq, vec![]), Term::var(0)),
+                Term::IntLit(65u32.into()),
+            )),
+        };
+        let char_id = declare_def(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            Term::sigma(Term::const_(int, vec![]), predicate),
+        )
+        .unwrap();
+        register_checked_char_carrier(&mut env, char_id).unwrap();
+        let string_id = declare_primitive(
+            &mut env,
+            vec![],
+            Term::ty(Level::Zero),
+            PrimReduction::OpaqueType,
+        )
+        .unwrap();
+        register_checked_string_carrier(&mut env, string_id).unwrap();
+        let literal = declare_checked_string_literal(&mut env, payload).unwrap();
+        let list = declare_inductive(&mut env, |list| InductiveSpec {
+            level_params: vec![],
+            params: vec![Term::ty(Level::Zero)],
+            indices: vec![],
+            level: Level::Zero,
+            constructors: vec![
+                CtorSpec {
+                    args: vec![],
+                    target_indices: vec![],
+                },
+                CtorSpec {
+                    args: vec![
+                        Term::var(0),
+                        Term::app(Term::indformer(list, vec![]), Term::var(1)),
+                    ],
+                    target_indices: vec![],
+                },
+            ],
+        })
+        .unwrap();
+        let nil = env.inductive(list).unwrap().constructors[0].id;
+        let cons = env.inductive(list).unwrap().constructors[1].id;
+        let list_char = Term::app(Term::indformer(list, vec![]), Term::const_(char_id, vec![]));
+        let view = declare_primitive(
+            &mut env,
+            vec![],
+            Term::pi(Term::const_(string_id, vec![]), list_char),
+            PrimReduction::Op {
+                symbol: "string_to_list_char",
+            },
+        )
+        .unwrap();
+        (env, [string_id, char_id, view, list, nil, cons, literal])
+    }
+
+    // Promise class: durable invariant. MEASURED: an earlier checked String
+    // with a later scalar rejected by Char prevents view installation; the
+    // same registration succeeds for an accepted scalar. CLAIMED: the
+    // pre-install scan covers every scalar in every existing payload.
+    // THE GAP: deleting the scan or checking only the first scalar would
+    // expose an unchecked Char pair despite a well-typed sample scalar.
+    #[test]
+    fn prior_checked_string_payload_is_vetted_before_char_view_installation() {
+        let (mut rejected, [string_id, char_id, view, list, nil, cons, literal]) =
+            pre_view_string_fixture("A");
+        assert_eq!(rejected.checked_literal(literal).unwrap().as_str(), "A");
+        let later = declare_checked_string_literal(&mut rejected, "Az").unwrap();
+        assert_eq!(rejected.checked_literal(later).unwrap().as_str(), "Az");
+        assert!(
+            checked_char_literal(&rejected, 65).is_ok(),
+            "sample Char passes"
+        );
+        assert!(
+            checked_char_literal(&rejected, 122).is_err(),
+            "the later scalar in an earlier String fails Char"
+        );
+        assert!(!rejected.has_literal_char_view());
+        let before = rejected.next_global_id();
+        assert!(
+            register_literal_char_view(&mut rejected, string_id, char_id, view, list, nil, cons,)
+                .is_err(),
+            "a later rejected scalar in a pre-view String must prevent the view"
+        );
+        assert!(
+            !rejected.has_literal_char_view(),
+            "refusal installs no partial view"
+        );
+        assert_eq!(rejected.next_global_id(), before);
+
+        let (mut admitted, [string_id, char_id, view, list, nil, cons, literal]) =
+            pre_view_string_fixture("A");
+        assert!(checked_char_literal(&admitted, 65).is_ok());
+        register_literal_char_view(&mut admitted, string_id, char_id, view, list, nil, cons)
+            .expect("the same view accepts the earlier proven scalar");
+        assert!(admitted.has_literal_char_view());
+        let list_char = Term::app(Term::indformer(list, vec![]), Term::const_(char_id, vec![]));
+        let from_string = Term::app(Term::const_(view, vec![]), Term::const_(literal, vec![]));
+        check(&admitted, &Context::new(), &from_string, &list_char)
+            .expect("the admitted view has the checked List Char type");
     }
 
     #[test]

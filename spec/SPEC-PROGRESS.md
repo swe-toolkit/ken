@@ -11,6 +11,12 @@ measured view of all 78 Markdown files under `spec/` at this update. It is not
 a build tracker, a next-action queue, or a substitute for the work-package
 nodes under `docs/program/issues/`.
 
+Implementation gap, route C (`LANG-REFINEMENT-SUBSET-SIGMA`): the checked
+scrutinee equation required in recursive unindexed constructor branches is
+not delivered. `LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW` must deliver it. This
+is an as-built conformance gap, not a weakening of `20-verification/22 §3`
+or `30-surface/34 §3.3`; those contracts remain normative.
+
 ## Status convention
 
 This index adopts **shape B: provenance/stage plus binding force**. The former

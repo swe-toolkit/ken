@@ -6,7 +6,7 @@
 
 use ken_elaborator::lexer::Lexer;
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{eval, EvalStore, EvalVal};
+use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::Decl;
 
 /// Elaborate one top-level `const` declaration and evaluate its body against
@@ -33,7 +33,9 @@ fn eval_const_in(env: &mut ElabEnv, src: &str) -> EvalVal {
         store.num_values.insert(*id, val);
     }
     match env.env.lookup(r.def_id) {
-        Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, &mut store),
+        Some(Decl::Transparent { body, ty, .. }) => {
+            eval_checked(body, ty, &env.env, &mut store).expect("checked body erases")
+        }
         other => panic!("expected a checked Transparent const, got {:?}", other.map(|_| ())),
     }
 }

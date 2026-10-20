@@ -18,7 +18,7 @@ use ken_elaborator::{
     prover::Verdict,
     v2_extract,
 };
-use ken_kernel::{Level, Term};
+use ken_kernel::{Decl, Level, Term};
 
 fn mk_env() -> ElabEnv {
     ElabEnv::new().expect("base env")
@@ -259,28 +259,25 @@ fn prove_and_law_emit_one_obligation_per_goal() {
 // B.1 — Refined parameter is a Γ-hypothesis, not a definition-site obligation
 // ======================================================================
 
-/// verify/obligations/refined-param-desugars-to-requires  (soundness)
-///
-/// A refined parameter `(n : { k : Nat | IsNonNeg k })` emits **no**
-/// definition-site obligation — it lowers to the carrier and contributes
-/// a hypothesis to Γ for the caller's burden (`22 §2.5.1`, §3).
+/// Promise class: durable refined-parameter evidence invariant.
+/// MEASURED: the checked function's domain is a subset Σ and the body
+/// forgets its proof with Proj1, without a definition-site obligation.
+/// CLAIMED: a refined binder is a real checked Σ, not a hidden `requires`.
+/// THE GAP: the source returns the binder at a bare carrier type, forcing
+/// the actual forgetful projection to appear in its admitted body.
 #[test]
-fn refined_param_is_hypothesis_not_obligation() {
+fn refined_parameter_is_checked_subset_and_forgets_by_projection() {
     let mut env = mk_env();
     decl_nat_pred(&mut env, "IsNonNeg");
-
-    // The refined parameter: lowers to carrier at the def site, no obligation.
-    let elab_res = env
-        .elaborate_decl_v1("fn f (n : { k : Nat | IsNonNeg k }) : Nat = n")
-        .expect("refined param const should elaborate");
-
-    let ex = v2_extract(&elab_res);
-    assert!(
-        ex.obligations.is_empty(),
-        "refined parameter is Γ-hypothesis at the def site, not an obligation"
-    );
-    // Γ-hypothesis contribution ((_ : IsNonNeg n) ∈ Γ) is
-    // [placeholder — reifies in V3] pending path-sensitive Γ accumulation.
+    let result = env.elaborate_decl_v1("fn f (n : { k : Nat | IsNonNeg k }) : Nat = n")
+        .expect("refined parameter");
+    assert!(v2_extract(&result).obligations.is_empty());
+    let Decl::Transparent { ty: Term::Pi(domain, _), body: Term::Lam(_, body), .. } =
+        env.env.lookup(result.def_id).expect("checked f") else { panic!("function declaration") };
+    assert!(matches!(domain.as_ref(), Term::Sigma(..)), "kernel domain keeps the refinement");
+    assert!(matches!(body.as_ref(), Term::Proj1(value)
+        if matches!(value.as_ref(), Term::Ascript(term, _) if term.as_ref() == &Term::var(0))),
+        "body's bare Nat value is a forgetful projection of the refined binder");
 }
 
 // ======================================================================
@@ -666,36 +663,35 @@ fn provenance_and_stable_ids() {
 }
 
 // ======================================================================
-// F.2 — Decoupled from Σ-sort
+// F.2 — V2 consumes the checked subset result and its proof-hole provenance
 // ======================================================================
 
-/// verify/obligations/decoupled-from-sigma-sort  (soundness)
-///
-/// V2 reads V1's bare-carrier + separate-obligation form — the obligation
-/// goal is never a `Σ`-projection (`22 §1.1`, `21 §2`).
+/// Promise class: durable V1→V2 checked-result consistency invariant.
+/// MEASURED: the V2 triple names the same checked pair's proof hole and the
+/// admitted function returns a subset Σ whose Ω predicate owns that hole.
+/// CLAIMED: extraction reads a real postcondition proof field, not a
+/// detached bare-carrier obligation. THE GAP: link the triple's hole ID to
+/// the admitted returned proof, not merely the triple's goal shape.
 #[test]
-fn decoupled_from_sigma_sort() {
+fn v2_extracts_the_checked_result_subset_proof_hole() {
     let mut env = mk_env();
     decl_nat_pred(&mut env, "PostCond");
-
-    let elab_res = env
-        .elaborate_decl_v1("fn f_sigma (n : Nat) : Nat ensures PostCond result = n")
-        .expect("elaborates");
-
-    let ex = v2_extract(&elab_res);
-    assert_eq!(ex.obligations.len(), 1);
-
-    let triple = &ex.obligations[0];
-    // phi is App(PostCond, Var(0)) — never Proj1/Proj2 of a Sigma
-    assert!(
-        !matches!(triple.phi, Term::Proj1(_) | Term::Proj2(_)),
-        "obligation phi is not a Sigma projection"
-    );
-    assert!(
-        !matches!(triple.goal_closed, Term::Sigma(_, _)),
-        "goal_closed is not a Sigma type"
-    );
-    // The triple is a standalone Γ ⊢ φ — decoupled from the sort_sigma erratum
+    let result = env.elaborate_decl_v1(
+        "fn f_sigma (n : Nat) : Nat ensures PostCond result = n",
+    ).expect("checked result");
+    let ex = v2_extract(&result);
+    let [triple] = ex.obligations.as_slice() else { panic!("one postcondition triple") };
+    let Decl::Transparent { ty: Term::Pi(_, cod), body: Term::Lam(_, body), .. } =
+        env.env.lookup(result.def_id).expect("checked f_sigma") else { panic!("function") };
+    let Term::Sigma(_, predicate) = cod.as_ref() else { panic!("subset Σ result") };
+    assert!(matches!(predicate.as_ref(), Term::App(head, _) if head.as_ref()
+        == &Term::const_(env.globals["PostCond"], vec![])));
+    let Term::Pair(value, proof) = body.as_ref() else { panic!("checked result pair") };
+    assert_eq!(value.as_ref(), &Term::var(0));
+    assert!(matches!(proof.as_ref(), Term::App(head, _) if head.as_ref()
+        == &Term::const_(triple.hole_id, vec![])));
+    assert_eq!(triple.hole_id, result.obligations[0].hole_id);
+    assert!(env.is_open_hole(triple.hole_id));
 }
 
 // ======================================================================

@@ -72,40 +72,44 @@ fn alias_chains_carry_the_root_predicate_and_reuse_is_identity_based() {
 }
 
 #[test]
-fn aliases_refuse_erased_nested_predicates_where_literal_function_refuses() {
+fn aliases_retain_checked_nested_refinements_in_function_results() {
     let mut env = ElabEnv::new().expect("prelude");
     opaque_predicate(&mut env);
-    let expected = "a refinement under a function-valued return type is not supported yet";
+    env.elaborate_decl_v1("def FiveFn = Int -> {x : Int | P x}")
+        .expect("a function result retains its checked subset");
+    env.elaborate_decl_v1("def G = Int → ({ x : Int | Equal Int x 5 })")
+        .expect("a nested equality subset is a type, not an erased alias");
     let literal = env.elaborate_decl_v1(
-        "const literal : Int -> {x : Int | P x} = \\m. m",
-    ).expect_err("literal nested refinement must refuse");
-    assert!(matches!(literal, ElabError::TypeMismatch { ref reason, .. } if reason == expected), "{literal:?}");
-    let named = env.elaborate_decl_v1("def FiveFn = Int -> {x : Int | P x}")
-        .expect_err("the alias itself must refuse before predicate erasure");
-    assert!(matches!(named, ElabError::TypeMismatch { ref reason, .. } if reason == expected), "{named:?}");
-    let parameter_src = "def G = Int → ({ x : Int | Equal Int x 5 })";
-    let parameter = env.elaborate_decl_v1(parameter_src)
-        .expect_err("a function-nested refinement must refuse at alias declaration");
-    assert!(matches!(parameter, ElabError::TypeMismatch { ref reason, ref span }
-        if reason == expected && span.start == 16 && span.end == 45),
-        "{parameter:?}");
+        "const literal : FiveFn = \\m. m",
+    ).expect("each invocation introduces checked result evidence");
+    assert_eq!(open_refinements(&env, &literal), 1);
+    let id = env.globals["literal"];
+    let Some(Decl::Transparent { ty, .. }) = env.env.lookup(id) else {
+        panic!("checked function must be transparent")
+    };
+    let reduced = ken_kernel::whnf(&env.env, &ken_kernel::Context::new(), ty);
+    let Term::Pi(_, result) = reduced else { panic!("function has a Pi type: {ty:?}") };
+    assert!(matches!(ken_kernel::whnf(&env.env, &ken_kernel::Context::new(), &result),
+        Term::Sigma(_, _)), "result retains a checked subset Sigma");
 }
 
 #[test]
-fn type_application_cannot_hide_a_refinement_in_an_alias() {
+fn type_application_preserves_a_refinement_inside_an_alias() {
     let mut env = ElabEnv::new().expect("prelude");
-    let alias_src = "def L = List ({ x : Int | Equal Int x 5 })";
-    let err = env.elaborate_decl_v1(alias_src)
-        .expect_err("a nested refinement has no predicate-owning alias root");
-    assert!(matches!(err, ElabError::TypeMismatch { ref reason, ref span }
-        if reason == "a refinement nested inside a named type alias is not supported yet"
-           && span.start == 13 && span.end == 42), "{err:?}");
-    // Literal-side diagnostic only: if this accepts without an obligation,
-    // that existing limitation belongs to the Architect, not this repair.
-    let literal = env.elaborate_decl_v1(
-        "const xs : List ({ x : Int | Equal Int x 5 }) = Cons Int 5 (Nil Int)",
-    );
-    eprintln!("literal nested List refinement outcome: {literal:?}");
+    env.elaborate_decl_v1("def Five = { x : Int | Equal Int x 5 }")
+        .expect("checked subset");
+    env.elaborate_decl_v1("def L = List Five")
+        .expect("List retains the named subset argument");
+    let before = env.env.next_global_id();
+    let error = env.elaborate_decl_v1("const forged : L = Cons Int 5 (Nil Int)")
+        .expect_err("List Int must not convert under the List former to List Five");
+    assert!(matches!(error, ElabError::KernelRejected { .. }),
+        "List former mismatch must reach the kernel: {error:?}");
+    assert_eq!(env.env.next_global_id(), before, "forged container admitted a global");
+    let checked = env.elaborate_decl_v1("const xs : L = Cons Five 5 (Nil Five)")
+        .expect("the constructor field introduces a checked Five pair");
+    assert_eq!(checked.obligations.len(), 1);
+    assert!(!env.is_open_hole(checked.obligations[0].hole_id));
 }
 
 #[test]
@@ -137,7 +141,8 @@ fn checked_theorem_body_reports_named_and_literal_refinements() {
     for declaration in [
         "const five : Int = 5",
         "def Five = { x : Int | Equal Int x 5 }",
-        "theorem proof_five (p : Five) : Equal Int p p = Refl",
+        "fn five_carrier (p : Five) : Int = p",
+        "theorem proof_five (p : Five) : Equal Int (five_carrier p) (five_carrier p) = Refl",
         "theorem proof_int (p : Int) : Equal Int p p = Refl",
     ] {
         env.elaborate_decl(declaration)
@@ -167,8 +172,9 @@ fn literal_refined_theorem_parameter_matches_named_call_site_obligation() {
     for declaration in [
         "const six : Int = 6",
         "def Five = { x : Int | Equal Int x 5 }",
-        "theorem proof_five (p : Five) : Equal Int p p = Refl",
-        "theorem proof_lit (p : { x : Int | Equal Int x 5 }) : Equal Int p p = Refl",
+        "fn five_carrier (p : Five) : Int = p",
+        "theorem proof_five (p : Five) : Equal Int (five_carrier p) (five_carrier p) = Refl",
+        "theorem proof_lit (p : { x : Int | Equal Int x 5 }) : Equal Int (five_carrier p) (five_carrier p) = Refl",
     ] {
         env.elaborate_decl(declaration)
             .unwrap_or_else(|error| panic!("{declaration}: {error:?}"));
