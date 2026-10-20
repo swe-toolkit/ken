@@ -6,7 +6,7 @@ owner: runtime
 size: L
 gate: none
 tier: T1
-depends_on: [RT-BRACKET-SETTLEMENT-PLANE]
+depends_on: [RT-BRACKET-SETTLEMENT-PLANE, RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER]
 blocks: []
 github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. THIS IS THE LARGEST OF THE THREE CHILDREN AND THE STEWARD MIS-SIZED THE PARENT TWICE BEFORE; the split point if it proves too big is named in section 6 rather than discovered, and the Steward recuts at the FIRST audit here rather than the second. Pre-registration commit c22f4861d already satisfies the sequencing half of AC-14 and must be preserved; evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee is EVIDENCE, NEVER A CANDIDATE."
@@ -25,10 +25,13 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
   lowers the existing release through EXISTING host-effect machinery, consumes
   outcome merge, then consumes resume. Inline versus an existing private control
   unit is secondary.
-- **Affine ledger** over exact region and edge identities: every marked region
-  emitted once, every mandatory edge consumed once, no unplanned edge consumed,
-  every settlement reached through its owner. **This proves REPRESENTATION
-  CLOSURE, not semantic equivalence.**
+- **Counting ledger** over exact region and edge identities (Architect
+  `evt_32mpqmy5v0y6s`, R6a). A marked S may be lowered once per control
+  path, so each region counts settlement, outcome merge and resume, in
+  that order. Every lowering takes its mode's route, no unplanned edge is
+  consumed, and each region closes with settlement at least 1 and all
+  three counts equal. There is no exemption for zero lowerings. **This
+  proves REPRESENTATION CLOSURE, not semantic equivalence.**
 - **`D0`, the equivalence refuter.** Pre-registered BEFORE it is run -- the
   pre-registration already exists at `c22f4861d` and is preserved.
 - **Closeout.** Un-ignore the px8ta row; remove an order-excluding helper ONLY
@@ -155,16 +158,48 @@ nested-two's owner0, forwarding Q1 S743, and on file-backed-in-FS's owner0,
 forwarding Q1 S645. Child 3's D0 counts both.
 
 **Assembly and emission (Architect `evt_4fj9r29qyx40k`,
-`evt_6vx1v2n5y3czj`).** Child 1 is route C only: one `--no-ff` merge of
-2b's `09d607a10` onto the pre-registration checkpoint carries route C,
+`evt_6vx1v2n5y3czj`, `evt_1r37j7z3dgpbm`).** Child 1 is route C only:
+one `--no-ff` merge of 2b's `09d607a10` onto the pre-registration
+checkpoint carries route C,
 2a and 2b at their reviewed SHAs. Route D `4b4c8565c` is never merged,
 cherry-picked or rebased. The marked S's Phase A demand is retained and
 resolved in Phase B into a disjoint `bracket_rows` table outside the
 plane, keyed by `BracketSettlementId`; no Phase B classifier sees it.
-Owner-returned S lowers as an owner-loop successor from its bracket row.
-Inline-keyed S lowers on the existing inline route, claimed by key. A
-Continuation-keyed S outside any owner, or the relay-fused source, is
-not ruled until D0-E measures it.
+D0-E measured all 13 regions Continuation-keyed (Architect
+`evt_1r37j7z3dgpbm`).
+
+**Settlement authority (recut, Architect `evt_7r2aae0wx4hm6`, R8
+`evt_4y4mx4cda73sc`; Research `evt_13kknengs4121`).** An S whose region
+or a plane ancestor has an owner-returned exit (11 regions) settles in
+place at every lowered copy. **A marked S's host effect lowers under its
+row's planned base-owner authority at every copy; K resumes lexically.**
+The producer trampoline emits S under foreign owners (S649 under
+Specialization(1), K Specialization(0)), and which owner lowers a copy
+keys nothing about the effect.
+- `drive_response_at_source` binds `row.base_owner()` authority around
+  the host effect only, releasing it before any error propagates;
+  `settle_bracket_at_source` supplies it and the handler-owned driver
+  passes none.
+- Source (f) of the seat owners is `row.base_owner()`, with R6c's
+  fail-closed check for empty `bracket_rows`. R7's drive-site owner
+  check is removed.
+- The transfer to a planned response-owner site is withdrawn: its K
+  frame cannot be built at a foreign producer copy (D0
+  `evt_3xbvjtkeg15c5`).
+- Before the build, a sweep classifies every owner reader reached inside
+  `lower_process_host_effect` and the two aggregate gate consumers. Any
+  answer that depends on the physical function is a stop.
+
+The other regions (multi-leaf, anonymous mapping) are Deferred on the
+existing residual route, claimed in the ledger. **Retained:** route C
+`c462fe831`, 2a `c18c8db68`, 2b `09d607a10`, `bracket_rows` keyed by
+`BracketSettlementId` (R2), the counting ledger over static lowerings
+(R6a), the claimed Deferred producer route (R6b, `evt_32mpqmy5v0y6s`),
+and the per-lowering instrument over px8ta depths 2 and 3, the nine
+sources and the five `rt_native_bracket_body_once` tests. Release
+exactly once at runtime is the px8ta and body-once observation. The
+refuter D0 runs only when px8ta reaches its observations at both depths
+and every ledger closes.
 
 ## 6. If this child is itself too big, THE SPLIT POINT IS NAMED IN ADVANCE
 
@@ -176,3 +211,33 @@ so that seam leaves neither half an inert precursor.
 **The Steward recuts at the FIRST audit here, not the second.** The parent node
 was carried through two audits before the cut was ruled the defect, and that
 delay is the Steward's error, not the ring's.
+
+## Hard-stop inventory (§1b)
+
+§1a (emission seam): 4 (Architect `evt_q5j50vngtzhv`). **HELD at the §4
+stop** (Architect `evt_4yf9jdc9veepy`): px8ta depth 3 differs between
+the engines in both settlement modes, so the defect is in the existing
+producer route. It is framed as the held input
+`RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER`, assembled here. WIP
+`8d3731a3d` is evidence only, and R8 is retained. A wall while building
+that fix is the 5th here if the fix lands in child 3. The next Research
+trigger is the 6th.
+§1a (assembly): 0.
+
+1. Marked S reached on the computational producer Construct arm
+   (core.rs:3912/6965), which the in-place gate did not cover. Keyed on
+   the Construct lowering arm (fan-in).
+2. In-place S's host-effect seat had no synthesized-aggregate owner.
+   Keyed on effect-seat owners derived from the ordinary response
+   population, then from source containment.
+3. On the producer arm, S is lowered under a specialization that neither
+   contains S nor is its K specialization. Keyed on the settling owner,
+   reconstructed from containment plus the row's base owner.
+4. Depth-3 native: the outer settlement is reached on the producer route
+   before the middle body runs, with the body result unwritten (tag 0).
+   Keyed on producer-route sequencing of nested bracket bodies,
+   independent of settlement mode.
+
+**Shared predicate (§1b).** In-place settlement was keyed on where the S
+Construct happens to be lowered, and the plan has no relation naming that
+place; each entry asked that fact of a relation that does not carry it.
