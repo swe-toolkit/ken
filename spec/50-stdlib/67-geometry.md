@@ -5,9 +5,12 @@
 > SPEC-GEOMETRY-BOX-CONTAINMENT §3).** Sections 1–2 and their catalog
 > operations, checked laws and seeds are present on main. Section 3
 > specifies a corner-wise containment test and seven checked law
-> obligations from Architect D0; its catalog code and seed are not
-> delivered. Scratch results do not establish §3 shipped harness
-> execution, CI, or a landed trust measurement.
+> obligations from Architect D0. The §3 conformance seed is authored
+> and present at
+> `conformance/stdlib/geometry/seed-box-containment.md`; §3 catalog
+> exports are not delivered. Exact-seed shipped-harness execution and
+> CI are unmeasured. D0 scratch results do not establish a landed trust
+> measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -243,9 +246,12 @@ point-set equality of boxes remain outside this metric extension.
 
 > **Section 3 status: DRAFT v0 (SPEC-GEOMETRY-BOX-CONTAINMENT).**
 > The following public operation and seven generic laws were checked
-> in Architect D0 on the landed §1–2 base. They are a contract for
-> later catalog and conformance delivery, not an assertion that §3
-> exports, its seed, or CI have shipped.
+> in Architect D0 on the landed §1–2 base. The §3 conformance seed
+> is authored and present at
+> `conformance/stdlib/geometry/seed-box-containment.md`; §3 catalog
+> exports are not delivered. Exact-seed shipped-harness execution and
+> CI are unmeasured. D0 scratch results do not establish a landed trust
+> measurement.
 
 ### 3.1 Definition and inverted-box boundary
 
