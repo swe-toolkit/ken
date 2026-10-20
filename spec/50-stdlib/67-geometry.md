@@ -7,10 +7,11 @@
 > specifies a corner-wise containment test and seven checked law
 > obligations from Architect D0. The §3 conformance seed is authored
 > and present at
-> `conformance/stdlib/geometry/seed-box-containment.md`; §3 catalog
-> exports are not delivered. Exact-seed shipped-harness execution and
-> CI are unmeasured. D0 scratch results do not establish a landed trust
-> measurement.
+> `conformance/stdlib/geometry/seed-box-containment.md`. The §3
+> `inside` and seven law exports are present in
+> `Algorithm.Geometry.NatBox` on main since `e3e0cda6c`. Exact-seed
+> shipped-harness execution and CI are unmeasured. D0 scratch results
+> do not establish a landed trust measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -248,10 +249,11 @@ point-set equality of boxes remain outside this metric extension.
 > The following public operation and seven generic laws were checked
 > in Architect D0 on the landed §1–2 base. The §3 conformance seed
 > is authored and present at
-> `conformance/stdlib/geometry/seed-box-containment.md`; §3 catalog
-> exports are not delivered. Exact-seed shipped-harness execution and
-> CI are unmeasured. D0 scratch results do not establish a landed trust
-> measurement.
+> `conformance/stdlib/geometry/seed-box-containment.md`. The §3
+> `inside` and seven law exports are present in
+> `Algorithm.Geometry.NatBox` on main since `e3e0cda6c`. Exact-seed
+> shipped-harness execution and CI are unmeasured. D0 scratch results
+> do not establish a landed trust measurement.
 
 ### 3.1 Definition and inverted-box boundary
 
