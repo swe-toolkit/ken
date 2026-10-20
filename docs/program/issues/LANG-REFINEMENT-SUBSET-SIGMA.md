@@ -88,6 +88,16 @@ on the current base before measuring, and reports any that moved.
 - **Kernel hunk K-a**, authorized: the three Char sites move to
   `Σ Int isScalar` with a closed witness. Each literal-view element's
   typing is established by `check` at checked-String-literal admission.
+- **Interpreter hunk, folded in** (Steward `evt_502fjf2x12crm` on
+  Architect `evt_1kwpqy4wgbenh`, after CI red on `ee5dfde13`). Add a
+  sufficient-only `SigmaTy` arm to `ken-interp` `eq_type_eq`, and have
+  `rt_c5_producer_type_slots.rs` evaluate its indices through `Const`
+  references, not raw `transparent_body`. Runtime Char values stay the
+  bare `Int` carrier (spec 42 §3.2, §3.5), and no Char consumer changes.
+  Runtime QA reviews this hunk. Its controls: A+B passes; reverting
+  either alone gives `Unknown`; the AC-2a census is byte-identical; and
+  a sweep of raw `transparent_body` evaluation of numeric `Char` sites.
+  The `PiTy` gap is a carry.
 - Retire `walk_nested_introduction`, the same-root reuse exemption,
   RefinementFacts as a guard input, and the root abstraction in
   `simplify_branch_goal_keeping_refinements`.

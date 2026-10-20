@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-WINDOW-MERGE-DISTRIBUTION
 title: "Spec 69 defers how windowing interacts with merging: nothing states that the window of a merged trace is the merge of the windowed inputs, so a client that windows two ordered traces cannot exchange the two steps. Rule the distribution law, its ordering premise, and its form (structural list equality) from a checked D0 at zero trust, and state it as a section 3 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
