@@ -79,6 +79,15 @@ base, stop and report the mismatch.
 The repair in `crates/ken-kernel/src/conv.rs`, ruled by the Architect at
 AC-0, with pins over the swapped row and R2c.
 
+The candidate also carries one downstream guard migration, by semantic
+atomicity (Steward `evt_x6whm3wzxjsh`). The guard is
+`discarded_bool_last_pair_cost_is_bounded_by_kernel_conversion` in
+`crates/ken-elaborator/tests/lang_type_position_sort_congruence_first.rs`.
+Its full/kernel timing ratio of 30 or less reds when only the kernel
+denominator improves (K16 base 15.57, candidate 38.98, evt_3e6td1h64jexr).
+The Architect rules its replacement criterion. The `converted` and
+no-obligations assertions stay, and no other line of the file changes.
+
 ## Acceptance
 
 - **AC-0 (design stop to the Architect; no build).** Reproduce both rows
