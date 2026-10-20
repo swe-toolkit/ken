@@ -164,13 +164,16 @@ wall is also the 6th. D0 (2) does not reclassify T''-3.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 5, and the child 3 aggregate is 6 (Architect `evt_d6kxxtgevwbw`).
-The Research advisory discharged the trigger, and the ruling is the
-structural recut in the Deliverable (`evt_7knq6fn8km9ra`). The next
-trigger is the node's 6th stop or child 3's 9th. WIPs `16cc5ee62` and
-`1a4ed40ea` are not candidates; at `1a4ed40ea` the as-shipped depth-3
-test exits 0 with releases 3,2,1. The 3rd stop is ruled as
-closure (T), transfer, which is the recut in the Deliverable
+§1a: 6, at R-1 (runtime-leader `evt_1h4jhr9pnqr8j`, implementer
+`evt_70paqtnpebmqz`). This is the precommitted 6th stop, and the
+Research trigger fires. The child 3 aggregate is 7 (Architect
+`evt_a2h1rv4tkmd6`). Research advised on entry 6 (`evt_7svg4vbndmhqx`),
+and the Architect rules after it. At
+the 5th stop the aggregate was 6 (`evt_d6kxxtgevwbw`), and that advisory
+gave the structural recut in the Deliverable (`evt_7knq6fn8km9ra`).
+WIPs `16cc5ee62` and `1a4ed40ea` are not candidates; at `1a4ed40ea`
+the as-shipped depth-3 test exits 0 with releases 3,2,1. The 3rd stop
+is ruled as closure (T), transfer, which is the recut in the Deliverable
 (`evt_687xbfdep022z`), realized as T'' (the drive calls K883's one
 planned emission C0 through a planner-recorded route; `evt_3tma32z29wz46`,
 L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
@@ -199,6 +202,16 @@ L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
    plane's ordering of releases for regions acquired inside a
    handler-resumed continuation, which the T'' route (recorded for the
    call target and capture claims only) does not carry.
+6. With the corrected β record published and every validator clause
+   passing, forced-Deferred depth 3 still releases handles 1, 2, 3 and
+   exits 1 at trap 40. The reader executes the record's route,
+   parameters and eliminators, but "does not enter region2's settlement
+   continuation first: it still calls the route C0 once"
+   (`evt_70paqtnpebmqz`). Keyed on how the planned resumption enters the
+   deepest checked settlement continuation (region2, K Spec0) before its
+   parent chain, versus the current single C0 call. Evidence:
+   `local/rt-bracket-producer-authenticity-d0/child3-assembly/recut-r1-node6/stop.txt`;
+   the WIP stays `1a4ed40ea`.
 
 **§1b: YES.** The handler-owned drive (F1,
 `drive_handler_owned_deferred_response` -> `drive_response_at_source`)
