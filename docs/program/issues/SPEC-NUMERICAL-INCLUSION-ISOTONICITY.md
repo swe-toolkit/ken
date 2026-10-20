@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INCLUSION-ISOTONICITY
 title: "Spec 68 relates intervals only through the membership of single rationals and defers inclusion isotonicity: nothing states that one interval lies inside another, or that interval addition and multiplication preserve that inclusion. Rule an endpoint-wise inclusion test, its soundness, and isotonicity of the two operations from a checked D0 at zero trust, and state them as a section 3 with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
