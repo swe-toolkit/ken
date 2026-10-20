@@ -334,50 +334,74 @@ fn discarded_bool_first_pair_avoids_exponential_walk() {
     assert!(elapsed < LIMIT, "R1: {elapsed:?} >= {LIMIT:?}");
 }
 
-/// MEASURED: full/kernel ratios of the same towers at K=14 and K=16;
-/// the K=16 ratio is at most 30×. CLAIMED: amplification is bounded at K=16.
-/// THE GAP: K=14 is diagnostic only because its subsecond kernel denominator
-/// varied on CI; an absolute K=20 bound confounds exponential kernel cost.
+/// MEASURED: on the repaired candidate, three-run medians gave amp(16) ≈
+/// 1.89, amp(32) ≈ 2.40, and amp(32)/amp(16) ≈ 1.27. CLAIMED: placing
+/// the failing Bool pair last adds at most a constant factor over the same
+/// tower with that pair first as K doubles. THE GAP: this is a timing ratio
+/// of two rows, not a work count; intrinsic elaborator growth (measured near
+/// K^2.7) is not bounded here. Kernel linear structural work is pinned in
+/// conv.rs; the old full/kernel timing denominator is no longer a stable gate.
 #[test]
 fn discarded_bool_last_pair_cost_is_bounded_by_kernel_conversion() {
-    let mut ratios = Vec::new();
-    for depth in [14, 16] {
-        let mut env = spine_gate_env(true);
-        let left = h_tower(depth, true, "True", "Type");
-        let right = h_tower(depth, true, "False", "Type");
-        let ll = env
-            .elaborate_decl_v1(&format!("const LL : Type 1 = {left}"))
-            .expect("left checked tower");
-        let rr = env
-            .elaborate_decl_v1(&format!("const RR : Type 1 = {right}"))
-            .expect("right checked tower");
-        let started_kernel = Instant::now();
-        let converted = convert_type(
-            &env.env,
-            &Context::new(),
-            &Term::const_(ll.def_id, vec![]),
-            &Term::const_(rr.def_id, vec![]),
-        );
-        let kernel_elapsed = started_kernel.elapsed();
-        assert!(converted, "LL and RR must convert at K={depth}");
+    let mut median_amplification = Vec::new();
+    for depth in [16, 32] {
+        let mut samples = Vec::new();
+        for _ in 0..3 {
+            let mut env = spine_gate_env(true);
+            let left = h_tower(depth, true, "True", "Type");
+            let right = h_tower(depth, true, "False", "Type");
+            let ll = env
+                .elaborate_decl_v1(&format!("const LL : Type 1 = {left}"))
+                .expect("left checked tower");
+            let rr = env
+                .elaborate_decl_v1(&format!("const RR : Type 1 = {right}"))
+                .expect("right checked tower");
+            assert!(
+                convert_type(
+                    &env.env,
+                    &Context::new(),
+                    &Term::const_(ll.def_id, vec![]),
+                    &Term::const_(rr.def_id, vec![]),
+                ),
+                "LL and RR must convert at K={depth}"
+            );
 
-        let source = h_row_at(depth, true, "True", "False", "Type", "Type");
-        let started_full = Instant::now();
-        let result = env
-            .elaborate_decl_v1(&source)
-            .unwrap_or_else(|error| panic!("R1-swap K={depth}: {error:?}"));
-        let full_elapsed = started_full.elapsed();
-        assert!(result.obligations.is_empty(), "R1-swap adds no obligations");
-        let ratio = full_elapsed.as_secs_f64() / kernel_elapsed.as_secs_f64();
-        eprintln!("sort-spine-gate row=R1-swap depth={depth} full={full_elapsed:?} kernel={kernel_elapsed:?} ratio={ratio:.3}");
-        ratios.push(ratio);
+            let source = h_row_at(depth, true, "True", "False", "Type", "Type");
+            let started_swap = Instant::now();
+            let swap = env
+                .elaborate_decl_v1(&source)
+                .unwrap_or_else(|error| panic!("R1-swap K={depth}: {error:?}"));
+            let full_swap = started_swap.elapsed();
+            assert!(swap.obligations.is_empty(), "R1-swap adds no obligations");
+            // Check the base discriminator before doing the deeper measurement.
+            if depth == 16 {
+                assert!(
+                    full_swap.as_secs_f64() < 2.0,
+                    "R1-swap K=16: {full_swap:?} >= 2s"
+                );
+            }
+
+            let mut r1_env = spine_gate_env(false);
+            let r1_source = h_row_at(depth, false, "True", "False", "Type", "Type");
+            let started_r1 = Instant::now();
+            let r1 = r1_env
+                .elaborate_decl_v1(&r1_source)
+                .unwrap_or_else(|error| panic!("R1 K={depth}: {error:?}"));
+            let full_r1 = started_r1.elapsed();
+            assert!(r1.obligations.is_empty(), "R1 adds no obligations");
+            let amp = full_swap.as_secs_f64() / full_r1.as_secs_f64();
+            eprintln!(
+                "sort-spine-gate depth={depth} swap={full_swap:?} r1={full_r1:?} amp={amp:.3}"
+            );
+            samples.push(amp);
+        }
+        samples.sort_by(f64::total_cmp);
+        median_amplification.push(samples[1]);
     }
-    let ratio = ratios[1];
+    let growth = median_amplification[1] / median_amplification[0];
     assert!(
-        ratio <= 30.0,
-        "R1-swap K=16: ratio {ratio:.3} > 30; K14={:.3}, K16={:.3}",
-        ratios[0],
-        ratios[1]
+        growth <= 2.0,
+        "R1-swap amplification grows {growth:.3}× from K16 to K32; medians {median_amplification:?}"
     );
 }
 

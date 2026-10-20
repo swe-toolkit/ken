@@ -655,36 +655,85 @@ struct DeltaPathEntry {
     depth: usize,
 }
 
-/// A failed spine argument visible only to the δ retry of its owner and that
-/// retry's descendants. Borrow the compared pair and exact ledger snapshot;
-/// sibling comparisons and later public conversions have no access to it.
-struct SpineFailure<'a> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RetryFact {
+    Converted,
+    Failed,
+}
+
+/// A decided original spine pair, visible only to its owner's δ retry and
+/// that retry's descendants. Every context carrying this memo is the original
+/// context or extends it by push, never by popping or replacing a binder.
+/// A hit has the memo-free verdict: its ledger path is identical, and weakening
+/// by k new binders preserves conversion of a pair not mentioning them. Every
+/// entry of the identical recorded path has depth ≤ the recording depth; its
+/// `fresh = ctx.len() - entry.depth` grows by k while free indices
+/// shift by k, preserving `mentions_var_below` and `checked_sub`; SCT positions,
+/// arity, transparency, and δ origins depend only on the environment, and new
+/// entries inside the subcomputation shift uniformly. By induction, memoized
+/// conversion agrees with memo-free conversion. Changed paths (recursive-head
+/// pushes, ι discharges, hardening) are decided afresh, not claimed linear.
+/// A lookup walks the retry's chain and compares terms, so wall time on deep
+/// alias towers is quadratic (measured K16 1.8ms, K32 7.6ms on 0b3c6b571)
+/// while the structural work the AC-1 pins bound is linear.
+struct RetryMemo<'a> {
     depth: usize,
+    fact: RetryFact,
+    closed: bool,
     left: &'a Term,
     right: &'a Term,
     path: &'a [DeltaPathEntry],
-    next: Option<&'a SpineFailure<'a>>,
+    next: Option<RetryMemoNext<'a>>,
 }
 
-fn seen_spine_failure(
-    memo: Option<&SpineFailure<'_>>,
+// Earlier retries are borrowed; this retry owns its newly recorded chain.
+enum RetryMemoNext<'a> {
+    Earlier(&'a RetryMemo<'a>),
+    ThisRetry(Box<RetryMemo<'a>>),
+}
+
+impl<'a> RetryMemoNext<'a> {
+    fn as_memo(&self) -> &RetryMemo<'a> {
+        match self {
+            Self::Earlier(memo) => memo,
+            Self::ThisRetry(memo) => memo,
+        }
+    }
+}
+
+fn retry_memo_verdict(
+    memo: Option<&RetryMemo<'_>>,
     ctx: &Context,
     path: &[DeltaPathEntry],
     a: &Term,
     b: &Term,
-) -> bool {
+) -> Option<bool> {
     let mut current = memo;
-    while let Some(failure) = current {
-        if failure.depth == ctx.len()
-            && failure.path == path
-            && ((failure.left == a && failure.right == b)
-                || (failure.left == b && failure.right == a))
-        {
-            return true;
+    while let Some(entry) = current {
+        if entry.path == path {
+            if let Some(k) = ctx.len().checked_sub(entry.depth) {
+                let hit = match (entry.fact, k) {
+                    // Preserve the existing same-depth failed-pair symmetry.
+                    (RetryFact::Failed, 0) => {
+                        (entry.left == a && entry.right == b)
+                            || (entry.left == b && entry.right == a)
+                    }
+                    (_, 0) => entry.left == a && entry.right == b,
+                    _ if entry.closed => entry.left == a && entry.right == b,
+                    _ => *a == weaken(entry.left, k as i64) && *b == weaken(entry.right, k as i64),
+                };
+                if hit {
+                    return Some(entry.fact == RetryFact::Converted);
+                }
+            }
         }
-        current = failure.next;
+        current = entry.next.as_ref().map(RetryMemoNext::as_memo);
     }
-    false
+    None
+}
+
+fn retry_pair_is_closed(left: &Term, right: &Term) -> bool {
+    !mentions_var_below(left, usize::MAX) && !mentions_var_below(right, usize::MAX)
 }
 
 /// Whether an argument mentions one of the `fresh` innermost context binders.
@@ -1007,7 +1056,7 @@ fn convert_path(
     a: &Term,
     b: &Term,
     path: &[DeltaPathEntry],
-    memo: Option<&SpineFailure<'_>>,
+    memo: Option<&RetryMemo<'_>>,
 ) -> bool {
     if a == b {
         return true; // α: syntactic identity under de Bruijn (`13 §6.2` step 1)
@@ -1121,7 +1170,7 @@ fn conv_struct_path_memo(
     a: &Term,
     b: &Term,
     path: &[DeltaPathEntry],
-    memo: Option<&SpineFailure<'_>>,
+    memo: Option<&RetryMemo<'_>>,
 ) -> bool {
     probe_struct_entry(path, a, b);
     // Syntactic-identity fast path (pre-δ, `13 §6.2` step 1): identical
@@ -1129,8 +1178,8 @@ fn conv_struct_path_memo(
     if a == b {
         return true;
     }
-    if seen_spine_failure(memo, ctx, path, a, b) {
-        return false;
+    if let Some(verdict) = retry_memo_verdict(memo, ctx, path, a, b) {
+        return verdict;
     }
 
     let (a_deferred, ad) = whnf_defer_head_delta(env, ctx, a);
@@ -1149,7 +1198,7 @@ fn conv_struct_deferred(
     b_deferred: Term,
     bd: WhnfProgress,
     path: &[DeltaPathEntry],
-    memo: Option<&SpineFailure<'_>>,
+    memo: Option<&RetryMemo<'_>>,
 ) -> bool {
     #[cfg(test)]
     {
@@ -1159,8 +1208,8 @@ fn conv_struct_deferred(
     if a_deferred == b_deferred {
         return true;
     }
-    if seen_spine_failure(memo, ctx, path, &a_deferred, &b_deferred) {
-        return false;
+    if let Some(verdict) = retry_memo_verdict(memo, ctx, path, &a_deferred, &b_deferred) {
+        return verdict;
     }
 
     // Head identity is observed AFTER β/let/ascription reduction. A head
@@ -1170,6 +1219,7 @@ fn conv_struct_deferred(
     let (ha, args_a) = peel_app(&a_deferred);
     let (hb, args_b) = peel_app(&b_deferred);
     let mut failed_spine = None;
+    let mut converted_spine = Vec::new();
     if let (
         Term::Const {
             id: ia,
@@ -1192,6 +1242,7 @@ fn conv_struct_deferred(
                     mismatch = Some((x, y));
                     break;
                 }
+                converted_spine.push((x, y));
             }
             if mismatch.is_none() {
                 return true;
@@ -1208,20 +1259,36 @@ fn conv_struct_deferred(
         _ => false,
     };
     let retry = transparent_head(&ha) || transparent_head(&hb);
-    // The failed pair belongs only to this node's δ retry. No memo is
-    // visible to the original spine's other arguments or sibling callers.
-    let retry_failure = if retry {
-        failed_spine.map(|(left, right)| SpineFailure {
-            depth: ctx.len(),
-            left,
-            right,
-            path,
-            next: memo,
+    // Only decided pairs precede the mismatch. They belong to this node's δ
+    // retry, not to the original spine's other arguments or sibling callers.
+    let retry_entries = if retry {
+        failed_spine.map(|(left, right)| {
+            let mut next = memo.map(RetryMemoNext::Earlier);
+            for (x, y) in converted_spine {
+                next = Some(RetryMemoNext::ThisRetry(Box::new(RetryMemo {
+                    depth: ctx.len(),
+                    fact: RetryFact::Converted,
+                    closed: retry_pair_is_closed(x, y),
+                    left: x,
+                    right: y,
+                    path,
+                    next,
+                })));
+            }
+            RetryMemo {
+                depth: ctx.len(),
+                fact: RetryFact::Failed,
+                closed: retry_pair_is_closed(left, right),
+                left,
+                right,
+                path,
+                next,
+            }
         })
     } else {
         None
     };
-    let retry_memo = retry_failure.as_ref().or(memo);
+    let retry_memo = retry_entries.as_ref().or(memo);
     let origin = if retry {
         delta_origin_pair(env, &a_deferred, &b_deferred)
     } else {
@@ -1609,6 +1676,183 @@ mod tests {
         .expect("checked non-recursive pred")
     }
 
+    // Kernel-checked aliases and applications: H swaps the two arguments,
+    // Hc puts the second argument below a Pi binder. Int is a live primitive
+    // type; no synthetic transparent declarations participate in the towers.
+    fn checked_retry_alias(
+        env: &mut GlobalEnv,
+        bool_ty: &Term,
+        int_ty: &Term,
+        swapped: bool,
+        codomain: bool,
+    ) -> GlobalId {
+        let type_one = Term::Type(Level::zero().suc());
+        let (first, second) = if swapped {
+            (type_one.clone(), bool_ty.clone())
+        } else {
+            (bool_ty.clone(), type_one.clone())
+        };
+        let body = if codomain {
+            Term::pi(int_ty.clone(), Term::var(1))
+        } else {
+            Term::pi(Term::var(if swapped { 1 } else { 0 }), int_ty.clone())
+        };
+        declare_def(
+            env,
+            vec![],
+            Term::pi(first.clone(), Term::pi(second.clone(), type_one)),
+            Term::lam(first, Term::lam(second, body)),
+        )
+        .expect("checked retry alias")
+    }
+
+    fn retry_alias_tower(
+        alias: GlobalId,
+        flag: &Term,
+        leaf: Term,
+        k: usize,
+        swapped: bool,
+    ) -> Term {
+        (0..k).fold(leaf, |term, _| {
+            let args = if swapped {
+                (term, flag.clone())
+            } else {
+                (flag.clone(), term)
+            };
+            Term::app(Term::app(Term::const_(alias, vec![]), args.0), args.1)
+        })
+    }
+
+    // Both independent AC-1 pins share the checked fixture, not the measured
+    // result: reverting either memo half must redden only its own test.
+    fn checked_retry_towers_for(variant: &str) {
+        let mut env = GlobalEnv::new();
+        let (bool_id, false_id, true_id) = declare_bool(&mut env);
+        let bool_ty = bool_ty(bool_id);
+        let true_ = Term::constructor(true_id, vec![]);
+        let false_ = Term::constructor(false_id, vec![]);
+        let int_id = crate::check::declare_primitive(
+            &mut env,
+            vec![],
+            Term::Type(Level::zero()),
+            PrimReduction::OpaqueType,
+        )
+        .expect("checked Int carrier");
+        let int_ty = Term::const_(int_id, vec![]);
+        let swapped = checked_retry_alias(&mut env, &bool_ty, &int_ty, true, false);
+        let codomain = checked_retry_alias(&mut env, &bool_ty, &int_ty, false, true);
+        let r2 = checked_retry_alias(&mut env, &bool_ty, &int_ty, false, false);
+        let ctx = Context::new();
+        let leaf = Term::Type(Level::zero());
+        let different_leaf = Term::pi(leaf.clone(), leaf.clone());
+        let type_one = Term::Type(Level::zero().suc());
+        for (row, alias, swapped_args, flags, leaves, expected) in [
+            (
+                "swapped",
+                swapped,
+                true,
+                (&true_, &false_),
+                (&leaf, &leaf),
+                true,
+            ),
+            (
+                "R2c",
+                codomain,
+                false,
+                (&true_, &true_),
+                (&leaf, &different_leaf),
+                false,
+            ),
+            (
+                "R1",
+                r2,
+                false,
+                (&true_, &false_),
+                (&leaf, &different_leaf),
+                false,
+            ),
+            (
+                "R2",
+                r2,
+                false,
+                (&true_, &true_),
+                (&leaf, &different_leaf),
+                false,
+            ),
+            (
+                "R1c",
+                codomain,
+                false,
+                (&true_, &false_),
+                (&leaf, &leaf),
+                true,
+            ),
+        ] {
+            if row != variant && !(variant == "controls" && row != "swapped" && row != "R2c") {
+                continue;
+            }
+            let depths: &[usize] = match row {
+                "swapped" | "R2c" => &[12, 16, 20],
+                _ => &[12, 20],
+            };
+            for &k in depths {
+                let left = retry_alias_tower(alias, flags.0, leaves.0.clone(), k, swapped_args);
+                let right = retry_alias_tower(alias, flags.1, leaves.1.clone(), k, swapped_args);
+                assert_ne!(left, right, "{row} k={k}: must not take α shortcut");
+                assert_typed(&env, &ctx, &left);
+                assert_typed(&env, &ctx, &right);
+                // Suppress only test-only deferred-fixed-point assertions before
+                // resetting the production-cost counter, not the verdict.
+                let assertions = delta_probe::DeferredFixedPointAssertionsGuard::suppress();
+                delta_probe::reset();
+                let verdict = convert_type(&env, &ctx, &left, &right);
+                let entries = delta_probe::struct_entries();
+                drop(assertions);
+                assert_eq!(verdict, expected, "{row} k={k}: base conversion verdict");
+                eprintln!("retry row={row} k={k} entries={entries} verdict={verdict}");
+                assert!(
+                    entries >= (if variant == "controls" { 2 } else { 3 }) * k as u64
+                        && entries <= 8 * k as u64,
+                    "{row} k={k}: {entries} structural entries (bound {}..={})",
+                    (if variant == "controls" { 2 } else { 3 }) * k,
+                    8 * k
+                );
+            }
+        }
+        // Type 0 and Type 0 -> Type 0 both inhabit Type 1: the R2c
+        // mismatch is a genuine same-sort type comparison, not an ill-typed
+        // witness whose failure could satisfy the negative control vacuously.
+        assert_typed(&env, &ctx, &leaf);
+        assert_typed(&env, &ctx, &different_leaf);
+        assert!(crate::check::check(&env, &ctx, &leaf, &type_one).is_ok());
+        assert!(crate::check::check(&env, &ctx, &different_leaf, &type_one).is_ok());
+    }
+
+    /// Durable retry bound (`17 §3.3`, §3.5): the swapped positive sibling
+    /// is reused within the same δ retry. MEASURED: `convert_type` true and
+    /// structural entries at K=12/16/20 through a checked H alias and typed
+    /// towers. CLAIMED: linear structural work with the true base verdict.
+    /// GAP: entries exclude whnf and allocation; changed paths are afresh.
+    #[test]
+    fn checked_swapped_retry_towers_are_linear() {
+        checked_retry_towers_for("swapped");
+    }
+
+    /// Durable retry bound (`17 §3.3`, §3.5): the failed R2c child is reused
+    /// beneath the Pi binder by weakening. MEASURED: `convert_type` false and
+    /// structural entries at K=12/16/20 through a checked Hc alias and typed
+    /// towers. CLAIMED: linear structural work with the false base verdict.
+    /// GAP: entries exclude whnf and allocation; changed paths are afresh.
+    #[test]
+    fn checked_codomain_retry_towers_are_linear() {
+        checked_retry_towers_for("R2c");
+    }
+
+    #[test]
+    fn checked_retry_alias_r1_r2_r1c_controls_keep_verdicts_and_bounds() {
+        checked_retry_towers_for("controls");
+    }
+
     /// Durable invariant (`17 §3.5`, §5): a negative same-head spine comparison
     /// is not recomputed at every level of its own non-recursive δ retry.
     /// MEASURED: `conv_struct_path` entries, including failed comparisons, for
@@ -1877,11 +2121,11 @@ mod tests {
         }
     }
 
-    /// Memo-key control (durable invariant): a failed pair is reusable only
-    /// with the identical depth and full δ ledger. This directly exercises
-    /// the key; the six-shape pin above establishes real conversion reach.
+    /// Memo-key control (durable invariant): a failed pair requires the same
+    /// full δ ledger and either the original or the lifted pair. The six-shape
+    /// pin above establishes real conversion reach.
     #[test]
-    fn failed_spine_memo_requires_identical_context_depth_and_delta_path() {
+    fn failed_spine_memo_requires_original_or_lifted_pair_and_delta_path() {
         let env = GlobalEnv::new();
         let ty = Term::Type(Level::zero());
         let mut ctx = Context::new();
@@ -1894,41 +2138,58 @@ mod tests {
             hard: false,
             depth: ctx.len(),
         }];
-        let failure = SpineFailure {
+        let failure = RetryMemo {
             depth: ctx.len(),
+            fact: RetryFact::Failed,
+            closed: retry_pair_is_closed(&left, &right),
             left: &left,
             right: &right,
             path: &path,
             next: None,
         };
         let memo = Some(&failure);
-        assert!(seen_spine_failure(memo, &ctx, &path, &left, &right));
-        assert!(seen_spine_failure(memo, &ctx, &path, &right, &left));
-        assert!(!seen_spine_failure(memo, &ctx, &[], &left, &right));
+        assert_eq!(
+            retry_memo_verdict(memo, &ctx, &path, &left, &right),
+            Some(false)
+        );
+        assert_eq!(
+            retry_memo_verdict(memo, &ctx, &path, &right, &left),
+            Some(false)
+        );
+        assert_eq!(retry_memo_verdict(memo, &ctx, &[], &left, &right), None);
         let hard_path = [DeltaPathEntry {
             hard: true,
             ..path[0]
         }];
-        assert!(!seen_spine_failure(memo, &ctx, &hard_path, &left, &right));
+        assert_eq!(
+            retry_memo_verdict(memo, &ctx, &hard_path, &left, &right),
+            None
+        );
         let changed_origin = [DeltaPathEntry {
             pair: (GlobalId(11), GlobalId(13)),
             ..path[0]
         }];
-        assert!(!seen_spine_failure(
-            memo,
-            &ctx,
-            &changed_origin,
-            &left,
-            &right
-        ));
+        assert_eq!(
+            retry_memo_verdict(memo, &ctx, &changed_origin, &left, &right),
+            None
+        );
         let mut deeper = ctx.clone();
         deeper.push(ty.clone());
-        assert!(!seen_spine_failure(memo, &deeper, &path, &left, &right));
-        assert!(!seen_spine_failure(memo, &ctx, &path, &left, &left));
+        assert_eq!(
+            retry_memo_verdict(memo, &deeper, &path, &left, &right),
+            None
+        );
+        assert_eq!(
+            retry_memo_verdict(memo, &deeper, &path, &Term::var(2), &Term::var(1)),
+            Some(false)
+        );
+        assert_eq!(retry_memo_verdict(memo, &ctx, &path, &left, &left), None);
 
         // The α path wins even over an artificial equal-pair memo node.
-        let artificial = SpineFailure {
+        let artificial = RetryMemo {
             depth: ctx.len(),
+            fact: RetryFact::Failed,
+            closed: retry_pair_is_closed(&left, &left),
             left: &left,
             right: &left,
             path: &path,
@@ -1943,10 +2204,196 @@ mod tests {
             Some(&artificial)
         ));
         let rebuilt = Term::Ascript(Box::new(left.clone()), Box::new(ty));
-        assert!(!seen_spine_failure(memo, &ctx, &path, &rebuilt, &right));
+        assert_eq!(
+            retry_memo_verdict(memo, &ctx, &path, &rebuilt, &right),
+            None
+        );
         assert!(!conv_struct_path_memo(
             &env, &ctx, &rebuilt, &right, &path, memo
         ));
+    }
+
+    /// Durable retry-key invariant (`17 §3.5`): facts are ordered and scoped
+    /// by the exact path; failed open pairs lift under new context binders.
+    /// MEASURED: lookup returns Some only at the original ordered pair/path
+    /// or its actual weakening. CLAIMED: no cross-path or fresh-Var reuse.
+    /// GAP: callers must preserve the context prefix (see RetryMemo's invariant).
+    #[test]
+    fn retry_memo_verdict_respects_orientation_path_and_weakening() {
+        let ty = Term::Type(Level::zero());
+        let omega = Term::Omega(Level::zero());
+        let path = [];
+        let changed_path = [DeltaPathEntry {
+            pair: (GlobalId(123), GlobalId(456)),
+            hard: false,
+            depth: 0,
+        }];
+        let empty = Context::new();
+        let converted = RetryMemo {
+            depth: 0,
+            fact: RetryFact::Converted,
+            closed: retry_pair_is_closed(&ty, &omega),
+            left: &ty,
+            right: &omega,
+            path: &path,
+            next: None,
+        };
+        assert_eq!(
+            retry_memo_verdict(Some(&converted), &empty, &path, &ty, &omega),
+            Some(true)
+        );
+        assert_eq!(
+            retry_memo_verdict(Some(&converted), &empty, &path, &omega, &ty),
+            None
+        );
+        assert_eq!(
+            retry_memo_verdict(Some(&converted), &empty, &changed_path, &ty, &omega),
+            None
+        );
+
+        let failed_closed = RetryMemo {
+            depth: 0,
+            fact: RetryFact::Failed,
+            closed: retry_pair_is_closed(&ty, &omega),
+            left: &ty,
+            right: &omega,
+            path: &path,
+            next: None,
+        };
+        let mut deeper = Context::new();
+        deeper.push(ty.clone());
+        assert_eq!(
+            retry_memo_verdict(Some(&failed_closed), &deeper, &path, &ty, &omega),
+            Some(false)
+        );
+        assert_eq!(
+            retry_memo_verdict(Some(&failed_closed), &empty, &path, &omega, &ty),
+            Some(false)
+        );
+
+        let left = Term::var(0);
+        let right = Term::var(1);
+        deeper.push(ty.clone());
+        let failed_open = RetryMemo {
+            depth: deeper.len(),
+            fact: RetryFact::Failed,
+            closed: retry_pair_is_closed(&left, &right),
+            left: &left,
+            right: &right,
+            path: &path,
+            next: None,
+        };
+        assert!(!failed_open.closed);
+        assert_eq!(
+            retry_memo_verdict(Some(&failed_open), &deeper, &path, &right, &left),
+            Some(false)
+        );
+        deeper.push(ty);
+        assert_eq!(
+            retry_memo_verdict(
+                Some(&failed_open),
+                &deeper,
+                &path,
+                &Term::var(1),
+                &Term::var(2)
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            retry_memo_verdict(Some(&failed_open), &deeper, &path, &left, &right),
+            None
+        );
+    }
+
+    /// Durable open-term control (`17 §3.5`): a failed pair reached one binder
+    /// deeper is reused only at its weakening. MEASURED: a reducer is skipped
+    /// for the lifted failure and entered for fresh Var(0), with both false
+    /// verdicts agreeing with public, memo-free conversion, plus a checked
+    /// Hc tower that installs the failed open pair automatically. CLAIMED:
+    /// lifted reuse and newly decided fresh binders. GAP: the synthetic memo
+    /// pins both paths at the lookup; the checked tower pins installation.
+    #[test]
+    fn open_retry_pair_lifts_but_fresh_var_is_decided_afresh() {
+        let mut env = GlobalEnv::new();
+        let ty = Term::Type(Level::zero().suc());
+        let mut ctx = Context::new();
+        ctx.push(ty.clone());
+        ctx.push(ty.clone());
+        let (bool_id, _, true_id) = declare_bool(&mut env);
+        let bool_ty = bool_ty(bool_id);
+        let int_id = crate::check::declare_primitive(
+            &mut env,
+            vec![],
+            Term::Type(Level::zero()),
+            PrimReduction::OpaqueType,
+        )
+        .expect("checked Int carrier");
+        let int_ty = Term::const_(int_id, vec![]);
+        let hc = checked_retry_alias(&mut env, &bool_ty, &int_ty, false, true);
+        let flag = Term::constructor(true_id, vec![]);
+        let open_left = retry_alias_tower(hc, &flag, Term::var(0), 12, false);
+        let open_right = retry_alias_tower(hc, &flag, Term::var(1), 12, false);
+        assert_typed(&env, &ctx, &open_left);
+        assert_typed(&env, &ctx, &open_right);
+        let assertions = delta_probe::DeferredFixedPointAssertionsGuard::suppress();
+        delta_probe::reset();
+        assert!(!convert_type(&env, &ctx, &open_left, &open_right));
+        let entries = delta_probe::struct_entries();
+        drop(assertions);
+        assert!(
+            entries >= 36 && entries <= 96,
+            "open Hc K=12: {entries} entries"
+        );
+        let left = Term::var(0);
+        let right = Term::var(1);
+        assert_typed(&env, &ctx, &left);
+        assert_typed(&env, &ctx, &right);
+        assert!(!convert_type(&env, &ctx, &left, &right));
+        let path = [];
+        let failed = RetryMemo {
+            depth: ctx.len(),
+            fact: RetryFact::Failed,
+            closed: retry_pair_is_closed(&left, &right),
+            left: &left,
+            right: &right,
+            path: &path,
+            next: None,
+        };
+        ctx.push(ty);
+        let lifted_left = Term::var(1);
+        let lifted_right = Term::var(2);
+        for term in [&left, &right, &lifted_left, &lifted_right] {
+            assert_typed(&env, &ctx, term);
+        }
+        assert!(!convert_type(&env, &ctx, &lifted_left, &lifted_right));
+        assert!(!convert_type(&env, &ctx, &left, &right));
+        delta_probe::reset();
+        assert!(!conv_struct_path_memo(
+            &env,
+            &ctx,
+            &lifted_left,
+            &lifted_right,
+            &path,
+            Some(&failed)
+        ));
+        assert_eq!(
+            delta_probe::reducer_entries(),
+            0,
+            "lifted failure must hit before reduction"
+        );
+        delta_probe::reset();
+        assert!(!conv_struct_path_memo(
+            &env,
+            &ctx,
+            &left,
+            &right,
+            &path,
+            Some(&failed)
+        ));
+        assert!(
+            delta_probe::reducer_entries() > 0,
+            "fresh Var(0) must be newly decided"
+        );
     }
 
     /// Durable memo lookup invariant (`17 §3.5`, §5): a failed checked pred
@@ -1983,8 +2430,10 @@ mod tests {
             ("before deferred WHNF", &ascribed_left, true),
             ("after deferred WHNF", &left, false),
         ] {
-            let failure = SpineFailure {
+            let failure = RetryMemo {
                 depth: ctx.len(),
+                fact: RetryFact::Failed,
+                closed: retry_pair_is_closed(remembered_left, &right),
                 left: remembered_left,
                 right: &right,
                 path: &path,
@@ -1992,13 +2441,13 @@ mod tests {
             };
             let memo = Some(&failure);
             assert_eq!(
-                seen_spine_failure(memo, &ctx, &path, &ascribed_left, &right),
-                matches_before,
+                retry_memo_verdict(memo, &ctx, &path, &ascribed_left, &right),
+                matches_before.then_some(false),
                 "{plane}: fixture must select its intended lookup plane"
             );
             assert_eq!(
-                seen_spine_failure(memo, &ctx, &path, &left, &right),
-                !matches_before,
+                retry_memo_verdict(memo, &ctx, &path, &left, &right),
+                (!matches_before).then_some(false),
                 "{plane}: the other lookup must not mask a deleted guard"
             );
             delta_probe::reset();
