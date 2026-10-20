@@ -303,9 +303,10 @@ feasibility evidence; §3 catalog and seed delivery are not claimed.
 No rational or `Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
-**`66-symbolic-algebra.md`** §§1–3 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
+**`66-symbolic-algebra.md`** §§1–4 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
 SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY;
-SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION). The §1
+SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION;
+SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION). The §1
 `Algorithm.SymbolicAlgebra.NatPolynomial` catalog package and seed
 are landed: `Expr` has natural constants, `Nat`-indexed variables,
 addition and multiplication under a total environment. Ordered
@@ -320,9 +321,14 @@ refusal of a `False` answer under universally equal evaluation. The
 alone does not establish shipped seed-harness execution or CI. Section
 3 specifies public `compose_env`, one-pass `substitute`, evaluation
 under the composed environment, and forward-only `poly_eq`
-preservation. Its proofs are D0-checked but its catalog export and
-seed are not delivered by this contract. Composition of substitutions,
-a sorted-list normal form, and signed/field arithmetic remain deferred.
+preservation. Its catalog exports and seed are present on main; the
+D0 alone does not establish shipped seed-harness execution or CI.
+Section 4 specifies public `compose_subst` with the order `t` then
+`s`, structural `Equal Expr` composition, and constructor-identity
+substitution. Both laws checked in Architect scratch D0 with trust
+identity sets 114→114; §4 catalog and seed delivery, shipped seed
+execution, CI and landed trust measurement are not claimed. A
+sorted-list normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–3 (SPEC-GEOMETRY-EXACT-CONTRACT;

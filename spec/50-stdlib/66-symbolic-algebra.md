@@ -2,11 +2,12 @@
 
 > **Status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT §1;
 > SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY §2;
-> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION §3).** The §1 ordered monomial
-> laws and §2 canonical Horner laws, catalog package, and seeds are
-> present on main. Section 3 specifies substitution and two checked
-> law obligations from Architect D0; its code and seed are not yet
-> delivered. Scratch evidence is not shipped harness execution or CI.
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION §3;
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION §4).** The §1–3
+> catalog operations, checked laws, and seeds are present on main.
+> Section 4 specifies substitution composition and identity from
+> Architect D0; its catalog exports and seed are not yet delivered.
+> Scratch evidence is not shipped seed-harness execution or CI.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -141,9 +142,9 @@ field-dependent operation are deferred. Section 1's distributed list
 is not a canonical form or an equality decision: §2 supplies a
 separate Horner representation and decision, now landed, while
 sorted-list canonicalization remains deferred. Dimension-indexed
-environments, composition of substitutions, and derivatives remain
-outside §§1–3. Substitution is specified separately in §3; it is
-not silently supplied by the `Nat` distributive normalizer in §1.
+environments and derivatives remain outside §§1–4. Substitution
+and its composition are specified separately in §§3–4; neither is
+silently supplied by the `Nat` distributive normalizer in §1.
 
 ## 2. Canonical polynomial form and semantic equality
 
@@ -279,9 +280,9 @@ primitive, or funext assumption is required. §1's ordered-list
 carrier supplies a separate canonical representation and equality
 decision. Sorted-list canonicalization, subtraction and signed
 coefficients, division, factoring, field-dependent operations,
-dimension-indexed environments, composition of substitutions,
-and derivatives remain outside §§1–3. Section 3 specifies
-substitution without changing §2's canonical carrier or decision.
+dimension-indexed environments and derivatives remain outside
+§§1–4. Sections 3–4 specify substitution and its composition
+without changing §2's canonical carrier or decision.
 
 ## 3. Substitution and evaluation under a composed environment
 
@@ -358,9 +359,84 @@ they are not a proof of either universally quantified theorem.
 The Architect's D0 on base `de3dc65b8` checked both generic law
 bodies, generic clients, and the closed discrimination above, with
 no `Axiom` and identical `trusted_base()` sets of 114 entries before
-and after loading the edited package. That is scratch feasibility,
-not §3 catalog publication, a delivered §3 conformance seed,
-shipped seed-harness execution, CI, or a measured landed trust delta.
-No subtraction, signed coefficient, division, new primitive, kernel
-rule, surface feature, or expansion of the catalog's ambient-name
-census is required. Composition of substitutions remains deferred.
+and after loading the edited package. The §3 catalog extension and
+seed have since landed; that earlier scratch measurement does not
+establish shipped seed-harness execution, CI, or a measured landed
+trust delta. No subtraction, signed coefficient, division, new
+primitive, kernel rule, surface feature, or expansion of the
+catalog's ambient-name census is required. Section 4 specifies
+composition of substitutions without changing §3's one-pass rule.
+
+## 4. Composition and identity of expression substitutions
+
+Substitutions remain total maps `Nat → Expr` with the single-pass
+meaning fixed in §3. To apply `t` first and then `s`, compose their
+images by substituting `s` into each `t v`. The builder is public:
+
+```ken
+pub fn compose_subst (s : Nat → Expr) (t : Nat → Expr) (v : Nat) : Expr =
+  substitute s (t v)
+```
+
+`compose_subst` is `Expr`-valued, unlike §3's `Nat`-valued
+`compose_env`. Naming it lets the following law state its function
+argument without an inline lambda. Applying `s` to each inserted
+`t v` is intentional: `substitute t e` itself is still one pass,
+and the **second** substitution then visits the result. The module
+must export checked proof bodies, not postulates or open goals, for
+exactly two new public laws:
+
+```ken
+pub theorem substitute_compose
+  (s : Nat → Expr) (t : Nat → Expr) (e : Expr) :
+  Equal Expr (substitute s (substitute t e))
+    (substitute (compose_subst s t) e)
+
+pub theorem substitute_var (e : Expr) :
+  Equal Expr (substitute EVar e) e
+```
+
+The first equality is **structural `Equal Expr`** for all `s`, `t`,
+and `e`, not merely equal evaluation under a chosen environment.
+The second uses the exported variable constructor `EVar` as the
+identity map and needs no named identity builder. A client-local
+named `identity_sub` can pass closed identity controls, but for an
+open `e` it does not generically convert to `EVar`; the public
+`substitute_var` law applies to the constructor, not every
+extensionally equivalent function. Pointwise, `compose_subst s EVar v`
+reduces to `s v`, and `compose_subst EVar t v` equals `t v` by
+`substitute_var (t v)`. These are consequences, not two more exports
+or an equality between functions requiring function extensionality.
+
+The composition proof is by induction on `e`. Constants and
+variables reduce directly; sums and products use the respective
+induction hypotheses through private `expr_add_cong` and
+`expr_mul_cong`. There is no `DecEq Expr`, normalization, new
+primitive, kernel form, surface form, or new ambient import. Applying
+`eval_substitute` and congruence to the composition law also gives
+pointwise evaluation under `compose_env env (compose_subst s t)`;
+applying `eval_substitute` twice gives evaluation under
+`compose_env (compose_env env s) t`. Neither evaluation consequence
+is an additional public law.
+
+A closed order discriminator can substitute a variable into an
+expression and then replace that inserted variable: with
+`e = EAdd (EVar Zero) (EConst one)`, `t Zero = EVar one`, and
+`s one = EConst two`, choose `t (Suc v) = EVar (Suc v)` and
+`s Zero = EVar Zero` while `s (Suc v) = EConst two`. Both
+`substitute s (substitute t e)` and
+`substitute (compose_subst s t) e` are
+`EAdd (EConst two) (EConst one)`. Reversing the composition yields
+`EAdd (EVar one) (EConst one)`, which is structurally different.
+This illustrates why the law fixes an order; the closed fixture is
+not a proof of the generic theorem.
+
+On landed base `fcd05e7eb`, Architect D0 checked the generic law
+bodies, closed clients and reversed-order refusal in scratch: rc 0,
+no `Axiom`, and identical `trusted_base()` identity sets of 114
+entries before and after loading its edited package. These are
+scratch measurements, not a delivered §4 catalog extension, shipped
+§4 conformance seed or seed-harness execution, CI, publication, or
+a measured landed trust delta. Sorted-list canonicalization,
+dimension-indexed environments, derivatives, subtraction and
+signed/field operations remain deferred.
