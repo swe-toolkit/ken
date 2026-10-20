@@ -102,11 +102,14 @@ A D0 of the edge, the emission and LIFO comes before any build.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 3 (Architect `evt_5ambtq64tads9`). Child 3 stays at 4. The 3rd stop
-is ruled as closure (T), transfer, which is the recut in the Deliverable
-(`evt_687xbfdep022z`). The F2/F3 WIP `9ecf2948d` is superseded. A new
-structural wall after a green D0 is the 4th stop, and the next Research
-trigger is the 6th.
+§1a: 4, and the child 3 aggregate is 5 (Architect `evt_3g47xkcm1hmq6`;
+no hold). WIP `16cc5ee62` is not a candidate. The 3rd stop is ruled as
+closure (T), transfer, which is the recut in the Deliverable
+(`evt_687xbfdep022z`), realized as T'' (the drive calls K883's one
+planned emission C0 through a planner-recorded route; `evt_3tma32z29wz46`,
+L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded. The
+next Research trigger is the 6th advancing stop, for the node and for
+child 3, and the next §1b check is at entry 6.
 
 1. With every bracket forced Deferred, object emission refuses the
    lexical-owner call ("claimed continuation target not declared into
@@ -119,6 +122,13 @@ trigger is the 6th.
    Specialization(1)) claimed inside Spec(3) by the handler-owned inline
    drive of Vis899's K body — keyed on continuation-call identity's
    emission owner (class not covered by F2's lexical-only copy rule)
+4. Handler-owned drive transfers into C0, the K883 context, and then
+   applies only eliminators after frame 0. Its value then reaches a
+   `ResourceBodyResult` match no case accepts (trap identity 40), after
+   a correct LIFO 3,2,1. Keyed on which eliminator frames the context's
+   result has already passed through, versus which the drive applies.
+   That split was hand-derived from `route.continuation_origin`, not
+   read from a planner relation.
 
 **§1b: YES.** The handler-owned drive (F1,
 `drive_handler_owned_deferred_response` -> `drive_response_at_source`)
