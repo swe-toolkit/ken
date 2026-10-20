@@ -4,10 +4,12 @@
 > SPEC-NUMERICAL-INTERVAL-HULL §2;
 > SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
-> present on main. Section 3 specifies endpoint-wise inclusion and
-> nine checked law obligations from Architect D0; its catalog exports
-> and seed are not delivered. Scratch evidence is not §3 shipped-seed
-> execution, CI, or a measured landed trust delta.
+> present on main. Section 3 specifies endpoint-wise inclusion and nine
+> checked law obligations from Architect D0; its catalog exports are not
+> delivered. The §3 conformance seed is authored and present at
+> `conformance/stdlib/numerical/seed-interval-inclusion.md`. Architect
+> scratch evidence is not seed execution, CI, or a measured landed trust
+> delta.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -344,9 +346,10 @@ separately in §3; §2's four laws alone do not supply it.
 
 > **Section 3 status: DRAFT v0 (SPEC-NUMERICAL-INCLUSION-ISOTONICITY).**
 > Architect D0 checked the following public operation and nine generic
-> laws on the landed §1–2 base. Section 3 is a contract for later
-> catalog and conformance delivery, not a claim that its exports,
-> seed, shipped harness, CI or landed trust measurement exist.
+> laws on the landed §1–2 base. Section 3's catalog exports are not
+> delivered. Its conformance seed is authored and present at
+> `conformance/stdlib/numerical/seed-interval-inclusion.md`. No shipped-
+> harness execution, CI, or landed trust measurement is claimed.
 
 ### 3.1 Inclusion by endpoint comparisons
 
@@ -472,8 +475,8 @@ on the scratch package; the ambient-name census row remained
 `[And, and_fst, and_intro, and_snd]` with no new ambient name.
 
 These are **Architect-reported scratch results**, not §3 catalog
-publication, an authored or executed §3 conformance seed, CI, or a
-measured trust delta on the landed module. This contract adds no
-primitive, kernel/surface feature, signed carrier, subtraction,
+publication or execution of the authored seed, CI, or a measured trust
+delta on the landed module. This contract adds no primitive,
+kernel/surface feature, signed carrier, subtraction,
 `rational_equiv`-as-`Equal`, canonical empty interval, or member-set
 equality.
