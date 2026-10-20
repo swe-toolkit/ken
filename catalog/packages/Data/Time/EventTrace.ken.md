@@ -1,7 +1,8 @@
 # Finite event traces
 
 Finite events with natural-number times support half-open windows and a
-left-biased two-list merge with checked ordering, count and membership laws.
+left-biased two-list merge with checked ordering, count, membership and
+window/merge distribution laws.
 
 ## Contents
 
@@ -24,7 +25,7 @@ Neither operation reads a clock or sorts unordered input.
 
 ## 2. Definition
 
-The public carrier, operations and five generic laws lead the checked source.
+The public carrier, operations and six generic laws lead the checked source.
 The private recursive merge helper and proof lemmas follow them. Windowing
 includes the lower bound but excludes the upper; a merge tie favors the left
 input without examining payloads. Membership uses Ω-valued `list_elem`, so
@@ -1172,6 +1173,14 @@ the right-head count proof branches on the classifier and lifts its premise
 through `Suc`. The classifier is arbitrary: it may ignore its query and need
 not decide payload equality.
 
+Window/merge distribution inducts over the left trace and carries a
+right-trace induction in the private head-insertion case. Generic filtered
+order preserves the comparison between a kept head and its tail, including
+across discarded events. When the heads compare in the opposite direction,
+that order evidence lets the right head lead both windowed arrangements.
+The two input-order premises preserve the head comparisons; no ordering
+premise is needed merely to compute either operation.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -1193,7 +1202,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and five checked law contracts.
+  — the carrier, half-open boundary, left-bias and six checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -1202,7 +1211,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the five laws form the package surface.
+   `trace_merge`, and the six laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -1211,12 +1220,14 @@ merging, not window multiplicity.
    preservation uses derived `count` and checked addition laws. Generic list
    lemmas are owned by the collections provider, not copied into this package.
    Window membership instantiates its two generic filter proofs and projects
-   both half-open timestamp bounds.
-4. **Trusted-base delta.** Zero: all five exported laws have checked proof
+   both half-open timestamp bounds. Window/merge distribution also uses
+   the public filtered-head-order proof from the collections provider.
+4. **Trusted-base delta.** Zero: all six exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
-   [trace seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md)
-   and [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md)
+   [trace seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md),
+   [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md)
+   and [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md)
    supply independent closed values and refused claims; these clients
    complement, not replace, the generic proofs.
