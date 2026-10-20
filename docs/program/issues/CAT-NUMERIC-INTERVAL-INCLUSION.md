@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-INTERVAL-INCLUSION
 title: "Algorithm.Numeric.RationalInterval exports spec 68 section 3: the endpoint-wise inclusion test interval_inside and its nine laws (soundness, reflexivity, add and mul isotonicity, each input inside the hull, the intersection inside each input, and the witnessed converse). Proved as checked terms at zero trust, from the Architect's D0 development, with the inclusion seed run by a package test"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2

@@ -102,11 +102,15 @@ A D0 of the edge, the emission and LIFO comes before any build.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 3 (Architect `evt_5ambtq64tads9`). Child 3 stays at 4. The 3rd stop
-is ruled as closure (T), transfer, which is the recut in the Deliverable
-(`evt_687xbfdep022z`). The F2/F3 WIP `9ecf2948d` is superseded. A new
-structural wall after a green D0 is the 4th stop, and the next Research
-trigger is the 6th.
+§1a: 5, and the child 3 aggregate is 6 (Architect `evt_d6kxxtgevwbw`):
+the Research trigger, ruling held for the advisory. WIPs `16cc5ee62` and
+`1a4ed40ea` are not candidates; at `1a4ed40ea` the as-shipped depth-3
+test exits 0 with releases 3,2,1. The 3rd stop is ruled as
+closure (T), transfer, which is the recut in the Deliverable
+(`evt_687xbfdep022z`), realized as T'' (the drive calls K883's one
+planned emission C0 through a planner-recorded route; `evt_3tma32z29wz46`,
+L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded. The
+node's next Research trigger is its 6th advancing stop.
 
 1. With every bracket forced Deferred, object emission refuses the
    lexical-owner call ("claimed continuation target not declared into
@@ -119,6 +123,19 @@ trigger is the 6th.
    Specialization(1)) claimed inside Spec(3) by the handler-owned inline
    drive of Vis899's K body — keyed on continuation-call identity's
    emission owner (class not covered by F2's lexical-only copy rule)
+4. Handler-owned drive transfers into C0, the K883 context, and then
+   applies only eliminators after frame 0. Its value then reaches a
+   `ResourceBodyResult` match no case accepts (trap identity 40), after
+   a correct LIFO 3,2,1. Keyed on which eliminator frames the context's
+   result has already passed through, versus which the drive applies.
+   That split was hand-derived from `route.continuation_origin`, not
+   read from a planner relation.
+5. Under forced-Deferred settlement, the drive's transfer into C0
+   releases the three nested regions in acquisition order 1,2,3 instead
+   of LIFO, then reaches trap 40. Keyed on the deferred-settlement
+   plane's ordering of releases for regions acquired inside a
+   handler-resumed continuation, which the T'' route (recorded for the
+   call target and capture claims only) does not carry.
 
 **§1b: YES.** The handler-owned drive (F1,
 `drive_handler_owned_deferred_response` -> `drive_response_at_source`)
@@ -127,4 +144,11 @@ Spec(3)'s function. Every per-emission plane was derived under the
 invariant that a construct is lowered in exactly one function, its
 planned emission owner. Entries 1 and 3 hit it on the call-declaration
 plane, for the lexical and descent owner classes. Entry 2 hits it on the
-availability plane, for the lexical class.
+availability plane, for the lexical class. At entry 5 the Architect
+sharpens it (`evt_d6kxxtgevwbw`): the handler-owned drive is a resumption
+of K that the planner's planes do not see as a planned route, and each
+entry hand-recorded one more aspect (the owner gates, the call target and
+capture claims, the eliminator composition, the deferred settlement
+order). The Architect's lean, not yet a ruling, is a structural closure:
+the drive becomes a first-class planned emission that every plane
+consumes.
