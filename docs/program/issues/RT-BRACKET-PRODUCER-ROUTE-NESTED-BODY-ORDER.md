@@ -60,29 +60,32 @@ comes only from whether a region has a returned-exit owner, and InPlace
 is LIFO only because the release runs inside K's native frames.
 
 1. **Replace** `DrivenKResume::TransferToContext`, reached from
-   `drive_handler_owned_deferred_response`. The planner emits one
-   planned resumption call per handler-owned Deferred
-   `DeferredResponseRow`, in `PlannedContinuationSpecializationCall` or
-   in a sibling table that every consumer of it reads. The record
-   carries:
-   - `emission_owner`: the row's `admitted_deferred_handler_owner`;
-   - `producer_result_origin`: K's worker body;
-   - `producer_owner`: raw Pred4;
-   - `context`: C0;
-   - `inputs`: `[response] ++ claims`, the L1′ ABI;
-   - the checked eliminator run starting at `route.continuation_origin`,
-     as in L2′;
-   - `enclosed_regions`: the bracket regions acquired in K's body, with
-     their `parent` links.
-2. **Every plane reads the record, and none re-derives it at lowering.**
-   The readers are `intern_generated_contexts` (C0),
-   `entry_frame_claim_in` and `verify_entry_frame` (claims),
-   `call_declared_context` (inputs), the L2′ composition (eliminators)
-   and `BracketSettlementControlView` (settlement order).
-3. **Settlement contract.** Within one planned resumption, deferred
-   settlement order is the reverse of acquisition order. It is derived
-   from `enclosed_regions` nesting, not from emission order, and the
-   planner checks it: any other order is a `planner_error`.
+   `drive_handler_owned_deferred_response`, with one
+   `PlannedHandlerResumptionCall` per handler-owned Deferred
+   `DeferredResponseRow`. It lives in its own id domain
+   (`PlannedHandlerResumptionId`), never in
+   `continuation_specialization_calls`. The record is the Rust
+   declaration in Architect `evt_2nwrvm9038k7t`: `row`,
+   `emission_owner`, `route` (the existing `HandlerDriveContextRoute`),
+   `parameters`, `eliminators` and `settlements`, each settlement with
+   its `region`, `acquisition_depth` and `composing_frame`.
+2. **Build site.** `publish_handler_resumption_plan` and its validator
+   run once in `construction.rs`, after phase B and the response-owner
+   agreement block, before any lowering view. Do not reorder the phases
+   and do not publish a draft. `emission_owner` is computed there and
+   checked against `static_response_owner_specializations`; the
+   context is the one `intern_generated_contexts` interned, with
+   `raw_owner` equal to Pred4.
+3. **Readers.** `verify_entry_frame` reads `route`,
+   `call_declared_context` reads `parameters` (L1′),
+   `drive_response_at_source` and the L2′ composition read
+   `eliminators`, and `BracketSettlementControlView::from_plan` reads
+   `settlements`. `per_emitter_availability.rs`, `aggregates.rs` and
+   `validate_continuation_specialization_plan` do not read the record.
+   **Settlement contract:** the validator requires `settlements`
+   strictly decreasing in `acquisition_depth`, a consistent parent
+   chain, every `composing_frame` in `eliminators`, and their positions
+   in `settlements` order. There is no compile-time ledger order check.
 4. **Retain**, as consumers of the record rather than self-deriving:
    F1; P0 with its per-capture source compare; V; P with
    `raw_owner == Pred4` and C0 certification; L1′; and L2′ with its
@@ -103,6 +106,16 @@ is LIFO only because the release runs inside K's native frames.
   - (3) The planned-resumption record written as a Rust declaration in
     the delivered vocabulary, naming its table, its id type and every
     consumer.
+  - Measured and ruled (Architect `evt_2nwrvm9038k7t`): the census is
+    sufficient, with no further census.
+- **AC-0b (D0, non-advancing; owed before product code).** Under
+  forced-Deferred at depth 2 and 3: the drive's eliminator run at each
+  `TransferToContext`, per region `settlement`, `outcome_merge`,
+  `resume` and `body_exit`, and which eliminator frame composes each of
+  releases 1, 2, 3. Outcomes: (α) a distinct frame per region, at one of
+  its checked origins, fixes `composing_frame` and the build proceeds;
+  (β) distinct frames at no region origin go to the Architect for the
+  key; (γ) a shared frame is a query on the representation.
 - **T''-1..16** stand (Architect `evt_3tma32z29wz46`, `evt_3ztrhbzpvyb0`,
   `evt_1t43pvv4apd6`).
 - **R-1.** Forced-Deferred depth 3 exits 0 with terminal None, opens 1,
@@ -110,7 +123,13 @@ is LIFO only because the release runs inside K's native frames.
 - **R-2.** The same at depth 2.
 - **R-3.** As-shipped is unchanged: depth 3 exits 0 with releases 3, 2,
   1, and depth 2 and `rt_native_bracket_body_once` are unchanged.
-- **R-4 (mutation).** Reversing `enclosed_regions` order on the record
+- **R-3′.** The eight named unforced-Deferred sources keep their exact
+  observed behaviour: multileaf, transport_mapping,
+  one_buffer_residual_layout, per_emitter_one_bracket,
+  two_bracket_distinguishable, ignored_two_buffer_witness,
+  px8x_single_schema_observation and rt_parity_native
+  buffer_allocate_malformed_capacity.
+- **R-4 (mutation).** Reversing `settlements` order on the record
   gives releases 1, 2, 3 and exit 1, or a planner refusal, never exit 0.
 - **R-5 (mutation).** Deleting the record for the depth-3 row refuses at
   the planner, not at lowering.
@@ -118,9 +137,11 @@ is LIFO only because the release runs inside K's native frames.
   order is not the reversal.
 
 **Precommit.** D0 returns are non-advancing. A planner refusal of the
-record on depth 3 is a query. Any other new wall is the node's 6th
-advancing stop: hold and call Research, scoped to the new fork. D0 (2)
-does not reclassify T''-3, whatever it shows.
+record on depth 3 is a query, as is a lowering-time disagreement
+between a resumption argument and the aggregate or per-emitter planes.
+Any other new wall is the node's 6th advancing stop: hold and call
+Research, scoped to the new fork. D0 (2) does not reclassify T''-3,
+whatever it shows.
 
 ## Stop conditions
 
