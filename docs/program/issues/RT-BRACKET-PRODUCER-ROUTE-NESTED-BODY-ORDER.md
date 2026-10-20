@@ -92,3 +92,32 @@ the defect in child 3's planning (`bracket_rows`, seat-owner source
   marker trace. Do not infer the step from static emission counts.
 - Do not reopen `RT-PLANNER-KRET-GRAFTED-SPINE`, and do not add a census,
   carve-out, narrowed matrix or fallback.
+
+## Hard-stop inventory (§1b)
+
+§1a: 3 (Architect `evt_5ambtq64tads9`). The ruling is held for a Research
+prior-art advisory. Child 3 stays at 4. WIP `9ecf2948d` (tree `9ff9ee70`)
+is held clean. The recut follows the advisory. It keeps F1 and replaces
+the F2/F3 per-class mechanism with one structural closure, transfer (T)
+or emission-context keying (E).
+
+1. With every bracket forced Deferred, object emission refuses the
+   lexical-owner call ("claimed continuation target not declared into
+   this function", token owner Predeclared(4), construct S874, defining
+   Spec(3); `evt_xp7wn0apy41f`).
+2. The CurrentLexical availability claim for Pred4's lexical frame is
+   refused inside the generated emission context Spec(3)
+   (`evt_2ydj1fayk50sc`).
+3. S747's descent-owned continuation call (emission owner
+   Specialization(1)) claimed inside Spec(3) by the handler-owned inline
+   drive of Vis899's K body — keyed on continuation-call identity's
+   emission owner (class not covered by F2's lexical-only copy rule)
+
+**§1b: YES.** The handler-owned drive (F1,
+`drive_handler_owned_deferred_response` -> `drive_response_at_source`)
+lowers Vis899's K body a second time, inline in the handler owner
+Spec(3)'s function. Every per-emission plane was derived under the
+invariant that a construct is lowered in exactly one function, its
+planned emission owner. Entries 1 and 3 hit it on the call-declaration
+plane, for the lexical and descent owner classes. Entry 2 hits it on the
+availability plane, for the lexical class.
