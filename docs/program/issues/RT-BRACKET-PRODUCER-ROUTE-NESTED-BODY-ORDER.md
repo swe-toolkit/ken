@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER
 title: "HELD INPUT to RT-BRACKET-LOWERING-AND-D0-REFUTER (child 3). At px8ta depth 3, natively and under either settlement mode, the existing computational-producer route never drives the middle bracket's body: after the second acquire it reaches the outer region's settlement S524, whose ResourceBodyResult scrutinee at origin 509 is unwritten (tag 0), and it traps with planned identity 40. The interpreter opens 1, 2, 3 and releases 3, 2, 1. Make the producer route drive nested bracket bodies in order and write each body result before its settlement runs. THIS NODE DOES NOT LAND ALONE: its reviewed tip is assembled by child 3."
-status: ready
+status: active
 owner: runtime
 size: M
 gate: none
