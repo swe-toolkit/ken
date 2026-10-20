@@ -103,12 +103,12 @@ theorem constructor_identity_public_law :
   extensionally equal function.
 - why: the spec binds identity to `EVar`, not function extensionality.
 
-## Refuse the reversed-order claim
+## Reversed-order base client
 
-This is a separate checker input. It repeats the same fixture with fresh
-names and checks both outputs and both correctly ordered law instances
-before the one false claim. The refused claim uses the reversed composition
-on the right but the forward nested substitution on the left.
+This second Ken fence is an expected-accept client. Check it alone; once
+the §4 catalog exports exist, all six controls should be accepted. Test
+the refusal only by appending a separate one-theorem fence to a fresh copy
+of this accepted base.
 
 ```ken
 import Algorithm.SymbolicAlgebra.NatPolynomial
@@ -159,7 +159,17 @@ theorem refusal_fixture_reverse_law :
   Equal Expr (substitute bad_inner0 (substitute bad_outer0 bad_e0))
     (substitute (compose_subst bad_inner0 bad_outer0) bad_e0) =
   substitute_compose bad_inner0 bad_outer0 bad_e0
+```
 
+## Append the reversed-order refusal
+
+For the refusal case, start from a fresh copy of the accepted `bad_*`
+base above and append only this fence. Expect the base alone to accept
+and the appended input to reject with `TypeMismatch` at
+`refuse_reversed_composition_claim`. These expected observations have not
+been executed.
+
+```ken
 theorem refuse_reversed_composition_claim :
   Equal Expr (substitute bad_outer0 (substitute bad_inner0 bad_e0))
     (substitute (compose_subst bad_inner0 bad_outer0) bad_e0) =
@@ -170,26 +180,24 @@ theorem refuse_reversed_composition_claim :
 
 - spec: `spec/50-stdlib/66-symbolic-algebra.md` §4.
 - promise class: durable invariant.
-- given: the same `bad_inner0`, `bad_outer0`, and `bad_e0` operands as
-  the accepted order case, repeated in a separate checker input.
-- expect: the forward and reversed output controls and both correctly
-  ordered law instances are accepted; the final claim that forward nesting
-  equals reversed composition is refused with `TypeMismatch`.
-- measured: both nested and composed outputs, both public law instances,
-  and rejection of the one false claim.
+- given: check the `bad_*` base fence alone; then append only the refusal
+  fence to a fresh copy of that accepted base.
+- expect: the base client accepts; the appended input rejects with
+  `TypeMismatch` at `refuse_reversed_composition_claim`.
+- measured: not executed; the authored recipe separates base acceptance
+  from the appended refusal.
 - claimed: the law cannot be applied with the composition arguments
   reversed.
 - the gap: this single closed fixture does not characterize every pair
   of substitutions.
-- why: the accepted reverse-order law has the same right-hand side as
-  the refused claim but a different left-hand side, isolating composition
-  order.
+- why: a separately accepted base shows all six controls pass before the
+  one false theorem is appended, making the refusal attributable to order.
 
 ## Coverage boundary
 
-The accepted client checks both forward structural outputs, the public
+The first client asserts both forward structural outputs, the public
 composition-law instance, the reversed output, and constructor identity
-with `EVar`. The separate refusal client repeats the fixture and reaches
-one reversed-order type mismatch after its positive controls. These cases
-do not prove the generic laws or establish shipped seed execution, CI,
-publication, or landing. AC-0's scratch checks remain separate evidence.
+with `EVar`. The `bad_*` base is expected to accept when checked alone;
+append only the refusal fence to a fresh copy to test the reversed claim.
+No seed execution, CI, publication, or landing is claimed. AC-0's scratch
+checks remain separate evidence.
