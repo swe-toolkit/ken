@@ -357,8 +357,10 @@ the false equality were also rejected. These are **scratch D0**
 results, not publication of the §3 catalog export, execution of a
 shipped §3 seed, CI, or a landed trust measurement.
 
-Catalog delivery must expose the existing generic
-`filter_starts_after` proof from `Data.Collections.Derived` and import
-it explicitly in `Data.Time.EventTrace`; no duplicate local proof or
-new ambient name is specified. The new merge/window proof helpers
-remain private. The only new §3 public law is `trace_window_merge`.
+Catalog delivery must make the existing generic
+`filter_starts_after` proof public in `Data.Collections.Derived`.
+`Data.Time.EventTrace` reaches it by adding the name to its existing
+`import Data.Collections.Derived` selection, not by adding a new
+import declaration. No duplicate local proof or new ambient name is
+specified. The new merge/window proof helpers remain private. The
+only new §3 public law is `trace_window_merge`.
