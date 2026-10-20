@@ -711,6 +711,42 @@ fn inferred_sort_level(env: &GlobalEnv, ctx: &Context, term: &Term) -> Option<Le
     }
 }
 
+/// The structural data converter rejects named projections because it has no
+/// class field list. Check the same boundary before the provisional checked-
+/// type route: an earlier `Sack c` application must not replace the located
+/// `d.Query` refusal with `infer_proj`'s context-free fallback.
+pub(crate) fn reject_data_projection(ty: &RType) -> Result<(), ElabError> {
+    match ty {
+        RType::RProj(_, field, span) => Err(data_projection_error(field, span)),
+        RType::RPi(_, left, right, _)
+        | RType::RSigma(_, left, right, _)
+        | RType::RArr(left, right, _)
+        | RType::REffectArr(left, _, right, _)
+        | RType::RApp(left, right, _) => {
+            reject_data_projection(left)?;
+            reject_data_projection(right)
+        }
+        RType::RRefine(_, carrier, _, _) | RType::RTrunc(carrier, _) => {
+            reject_data_projection(carrier)
+        }
+        RType::RUniv(_, _)
+        | RType::RCon(_, _)
+        | RType::RCheckedGlobal { .. }
+        | RType::RVarTy(_, _, _)
+        | RType::RPatternAliasTy(_, _, _) => Ok(()),
+    }
+}
+
+fn data_projection_error(field: &str, span: &Span) -> ElabError {
+    ElabError::TypeMismatch {
+        span: span.clone(),
+        reason: format!(
+            "`.{field}` projection is not available in a data declaration's \
+             type; the class field list is not in scope here"
+        ),
+    }
+}
+
 fn rtype_to_kernel_checked(
     rty: &RType,
     d_name: &str,
@@ -800,13 +836,7 @@ fn rtype_to_kernel_checked(
         // own span rather than fabricating an index or panicking: the shape is
         // reachable from ordinary syntax (`data D (d : C a) (x : d.Field) …`),
         // so it owes a located diagnostic.
-        RType::RProj(_, field, span) => Err(ElabError::TypeMismatch {
-            span: span.clone(),
-            reason: format!(
-                "`.{field}` projection is not available in a data declaration's \
-                 type; the class field list is not in scope here"
-            ),
-        }),
+        RType::RProj(_, field, span) => Err(data_projection_error(field, span)),
         RType::RTrunc(inner, _) => Ok(Term::Trunc(Box::new(rtype_to_kernel_checked(
             inner, d_name, d_id, globals, ind_id_set, ctor_id_set,
         )?))),

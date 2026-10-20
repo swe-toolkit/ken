@@ -19404,6 +19404,7 @@ fn elaborate_legacy_constructor_field_types(
         ctor.args.iter().enumerate().map(|(j, ty)| {
             // Legacy source arguments are resolved in [Δp], without earlier
             // fields. Insert the j binders only after elaboration, once.
+            data::reject_data_projection(ty)?;
             let term = elab_type_in_slot(&mut cx, ty, RefinementSlot::Outermost)?;
             Ok(weaken(&cx.metas.zonk_term(&term), j as i64))
         }).collect::<Result<Vec<_>, _>>()
@@ -19427,12 +19428,14 @@ fn elaborate_explicit_family_telescope(
     let mut parameter_types = Vec::with_capacity(params.len());
     let mut index_types = Vec::with_capacity(indices.len());
     for entry in params {
+        data::reject_data_projection(&entry.ty)?;
         let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
         let ty = cx.metas.zonk_term(&ty);
         cx.ctx.push(ty.clone());
         parameter_types.push(ty);
     }
     for entry in indices {
+        data::reject_data_projection(&entry.ty)?;
         let ty = elab_type_in_slot(&mut cx, &entry.ty, RefinementSlot::Outermost)?;
         let ty = cx.metas.zonk_term(&ty);
         cx.ctx.push(ty.clone());
@@ -19464,12 +19467,19 @@ fn elaborate_explicit_inductive_types(
         }
         let mut args = Vec::with_capacity(ctor.args.len());
         for arg in &ctor.args {
+            data::reject_data_projection(&arg.ty)?;
             let ty = elab_type_in_slot(&mut cx, &arg.ty, RefinementSlot::Outermost)?;
             let ty = cx.metas.zonk_term(&ty);
             cx.ctx.push(ty.clone());
             args.push(ty);
         }
-        results.push(ctor.result.as_ref().map(|ty| elab_type(&mut cx, ty)).transpose()?);
+        let result = if let Some(ty) = ctor.result.as_ref() {
+            data::reject_data_projection(ty)?;
+            Some(elab_type(&mut cx, ty)?)
+        } else {
+            None
+        };
+        results.push(result);
         fields.push(args);
     }
     Ok(data::CheckedInductiveTypes {

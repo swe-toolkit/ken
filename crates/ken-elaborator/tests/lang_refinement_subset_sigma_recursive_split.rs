@@ -30,10 +30,12 @@ fn list_match_motive(term: &Term, list: GlobalId) -> Option<&Term> {
         .find_map(|child| list_match_motive(child, list))
 }
 
-/// Transition sentinel: until LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW installs
-/// real recursive equations, the Nil leaf's open hole has no List equation,
-/// and the checked `xs` motive is the plain subset Σ. A new checked recursive
-/// equation may change both observations but must never invent a proof.
+/// Known-gap pin (transition sentinel): until
+/// LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW installs checked recursive equations,
+/// the Nil leaf's open hole has no List equation, and the checked `xs` motive
+/// is the plain subset Σ. BELOW must flip this absent-equation assertion and
+/// replace it with checked evidence, then revisit the motive observation;
+/// no proof may be invented. Spec 22 §3 and 34 §3.3 remain normative.
 /// MEASURED: production `sort`'s emitted Nil obligation and checked Elim.
 /// CLAIMED: only term-evidenced facts are used by the leaf hole and motive.
 /// THE GAP: a condition accidentally installed at a different site remains
