@@ -673,6 +673,9 @@ enum RetryFact {
 /// entries inside the subcomputation shift uniformly. By induction, memoized
 /// conversion agrees with memo-free conversion. Changed paths (recursive-head
 /// pushes, ι discharges, hardening) are decided afresh, not claimed linear.
+/// A lookup walks the retry's chain and compares terms, so wall time on deep
+/// alias towers is quadratic (measured K16 1.8ms, K32 7.6ms on 0b3c6b571)
+/// while the structural work the AC-1 pins bound is linear.
 struct RetryMemo<'a> {
     depth: usize,
     fact: RetryFact,
