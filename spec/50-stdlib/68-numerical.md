@@ -5,11 +5,12 @@
 > SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
-> checked law obligations from Architect D0; its catalog exports are not
-> delivered. The §3 conformance seed is authored and present at
-> `conformance/stdlib/numerical/seed-interval-inclusion.md`. Architect
-> scratch evidence is not seed execution, CI, or a measured landed trust
-> delta.
+> checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
+> kernel-checked bodies. Its conformance seed is present at
+> `conformance/stdlib/numerical/seed-interval-inclusion.md` and the targeted
+> package test runs its positive and two refused clients. Exact trusted-base
+> identities are unchanged in the candidate's targeted test; this is not a
+> claim of CI or a landed trust measurement.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -346,10 +347,11 @@ separately in §3; §2's four laws alone do not supply it.
 
 > **Section 3 status: DRAFT v0 (SPEC-NUMERICAL-INCLUSION-ISOTONICITY).**
 > Architect D0 checked the following public operation and nine generic
-> laws on the landed §1–2 base. Section 3's catalog exports are not
-> delivered. Its conformance seed is authored and present at
-> `conformance/stdlib/numerical/seed-interval-inclusion.md`. No shipped-
-> harness execution, CI, or landed trust measurement is claimed.
+> laws on the landed §1–2 base. The §3 catalog exports are present and
+> their checked bodies, public types and positive/refused seed clients pass
+> targeted package tests. The seed is present at
+> `conformance/stdlib/numerical/seed-interval-inclusion.md`. These local
+> results do not claim CI, publication or a landed trust measurement.
 
 ### 3.1 Inclusion by endpoint comparisons
 
@@ -474,9 +476,11 @@ inclusion. Existing §1 and §2 targeted Rust suites each passed 3/3
 on the scratch package; the ambient-name census row remained
 `[And, and_fst, and_intro, and_snd]` with no new ambient name.
 
-These are **Architect-reported scratch results**, not §3 catalog
-publication or execution of the authored seed, CI, or a measured trust
-delta on the landed module. This contract adds no primitive,
+The Architect's D0 results alone did not establish catalog delivery,
+seed execution or a landed trust measurement. The §3 package and its targeted
+acceptance now check the public exports, the authored seed and exact
+trusted-base identity equality on the candidate; no CI or landed trust
+delta is claimed. This contract adds no primitive,
 kernel/surface feature, signed carrier, subtraction,
 `rational_equiv`-as-`Equal`, canonical empty interval, or member-set
 equality.
