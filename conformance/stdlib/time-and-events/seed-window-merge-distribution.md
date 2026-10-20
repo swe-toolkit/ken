@@ -135,14 +135,32 @@ theorem merge_of_windows_exact_value :
 - why: different payloads at time 3 distinguish which input's event
   appears first.
 
-## Refused one-sided-order cases
+## Unordered-trace controls
 
 The frame's unordered-left case uses `[5a,1a]`, `[3b]` and `[0,4)`.
-Its positive output controls show `[3b,1a]` on the window-of-merge side
-and `[1a,3b]` on the merge-of-windows side. The swapped case keeps the
-left input ordered and makes only the right input unordered; its output
-controls show the same difference. These are false list-equality
-claims, not refusals of unordered inputs as arguments to `trace_merge`.
+Its outputs are `[3b,1a]` on the window-of-merge side and `[1a,3b]`
+on the merge-of-windows side. The swapped case keeps the left input
+ordered and makes only the right input unordered; its outputs are
+`[3a,1b]` and `[1b,3a]`. These are false list-equality claims, not
+refusals of unordered inputs to `trace_merge`.
+
+### stdlib/time-and-events/unordered-window-merge-controls
+
+- spec: `spec/50-stdlib/69-time-and-events.md` §3.1.
+- promise class: durable invariant.
+- given: the frame's unordered-left pair and its swapped counterpart,
+  each with window `[0,4)`.
+- expect: this fixture fence is accepted; the four exact output
+  controls produce the two differing list pairs above. The opposite
+  input in each pair is time-ordered.
+- measured: the two singleton ordering proofs and all four `*_is_exact`
+  controls in this non-refusing fence.
+- claimed: `trace_window` and `trace_merge` accept these unordered
+  inputs, and the output order witnesses each counterexample.
+- the gap: these finite fixtures do not establish a generic law or
+  every unordered counterexample.
+- why: each pair shares its events but differs in order, while the
+  other input remains ordered.
 
 ```ken
 const u5a : Event Bool = MkEvent Bool t5 True
@@ -185,13 +203,6 @@ theorem left_merge_of_windows_is_exact :
       (trace_window Bool t0 t4 ordered_right))
     left_merge_of_windows = Refl
 
-theorem refuse_left_unordered_distribution :
-  Equal (List (Event Bool))
-    (trace_window Bool t0 t4 (trace_merge Bool unordered_left ordered_right))
-    (trace_merge Bool
-      (trace_window Bool t0 t4 unordered_left)
-      (trace_window Bool t0 t4 ordered_right)) = Proved
-
 theorem right_window_of_merge_is_exact :
   Equal (List (Event Bool))
     (trace_window Bool t0 t4 (trace_merge Bool ordered_left unordered_right))
@@ -203,7 +214,60 @@ theorem right_merge_of_windows_is_exact :
       (trace_window Bool t0 t4 ordered_left)
       (trace_window Bool t0 t4 unordered_right))
     right_merge_of_windows = Refl
+```
 
+## Refused one-sided-order claims
+
+The ordered-positive fence above and the unordered-fixture fence form
+one common client when concatenated in that order. Once the §3 catalog
+export exists, that client is expected to accept. For each refusal,
+start from a fresh copy of this base client and append only that
+refusal's fence. The appended client is expected to reject. Never
+combine the two refusals: the first rejection would mask whether the
+other target is independently refused. This seed has not been run.
+
+### stdlib/time-and-events/reject-left-unordered-window-merge
+
+- spec: `spec/50-stdlib/69-time-and-events.md` §3.1.
+- promise class: durable invariant.
+- given: unordered `xs=[5a,1a]`, ordered `ys=[3b]`, and `[0,4)`.
+- expect: the common client accepts; appending only the left-unordered
+  false equality claim is refused.
+- measured: the accepted fixture fence contains both left exact-output
+  controls; this refusal fence contains only the false `Equal` claim.
+- claimed: the law cannot be weakened to require only the right input
+  to be ordered.
+- the gap: one finite payload fixture does not establish every such
+  counterexample or the generic law.
+- why: the outputs share events but disagree in order.
+
+```ken
+-- Refused: the left input is not time-ordered.
+theorem refuse_left_unordered_distribution :
+  Equal (List (Event Bool))
+    (trace_window Bool t0 t4 (trace_merge Bool unordered_left ordered_right))
+    (trace_merge Bool
+      (trace_window Bool t0 t4 unordered_left)
+      (trace_window Bool t0 t4 ordered_right)) = Proved
+```
+
+### stdlib/time-and-events/reject-right-unordered-window-merge
+
+- spec: `spec/50-stdlib/69-time-and-events.md` §3.1.
+- promise class: durable invariant.
+- given: ordered `xs=[3a]`, unordered `ys=[5b,1b]`, and `[0,4)`.
+- expect: the common client accepts; appending only the right-unordered
+  false equality claim is refused.
+- measured: the accepted fixture fence contains both right exact-output
+  controls; this refusal fence contains only the false `Equal` claim.
+- claimed: the law cannot be weakened to require only the left input
+  to be ordered.
+- the gap: one finite payload fixture does not establish every such
+  counterexample or the generic law.
+- why: the outputs share events but disagree in order.
+
+```ken
+-- Refused: the right input is not time-ordered.
 theorem refuse_right_unordered_distribution :
   Equal (List (Event Bool))
     (trace_window Bool t0 t4 (trace_merge Bool ordered_left unordered_right))
@@ -211,31 +275,3 @@ theorem refuse_right_unordered_distribution :
       (trace_window Bool t0 t4 ordered_left)
       (trace_window Bool t0 t4 unordered_right)) = Proved
 ```
-
-### stdlib/time-and-events/reject-left-unordered-window-merge
-
-- spec: `spec/50-stdlib/69-time-and-events.md` §3.1.
-- promise class: durable invariant.
-- given: unordered `xs=[5a,1a]`, ordered `ys=[3b]`, and `[0,4)`.
-- expect: the exact controls produce `[3b,1a]` and `[1a,3b]`;
-  `refuse_left_unordered_distribution` is refused.
-- measured: both operations' outputs and the false `Equal` claim.
-- claimed: the law cannot be weakened to require only the right input
-  to be ordered.
-- the gap: one finite payload fixture does not establish every such
-  counterexample or the generic law.
-- why: the outputs share events but disagree in order.
-
-### stdlib/time-and-events/reject-right-unordered-window-merge
-
-- spec: `spec/50-stdlib/69-time-and-events.md` §3.1.
-- promise class: durable invariant.
-- given: ordered `xs=[3a]`, unordered `ys=[5b,1b]`, and `[0,4)`.
-- expect: the exact controls produce `[3a,1b]` and `[1b,3a]`;
-  `refuse_right_unordered_distribution` is refused.
-- measured: both operations' outputs and the false `Equal` claim.
-- claimed: the law cannot be weakened to require only the left input
-  to be ordered.
-- the gap: one finite payload fixture does not establish every such
-  counterexample or the generic law.
-- why: the outputs share events but disagree in order.
