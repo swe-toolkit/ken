@@ -429,10 +429,11 @@ pub theorem interval_inside_complete
 The addition and multiplication laws are **isotonic in both interval
 arguments**: when each input lies inside its corresponding larger
 input, endpoint-wise arithmetic preserves both comparisons. They
-use §64's proved monotonicity of exact **non-negative** `Rational`;
-`rational_mul_mono` requires no additional sign premise on this
-carrier. Neither law assumes ordered endpoints or changes §1's
-total, corresponding-endpoint formulas. No signed arithmetic,
+use the `rational_add_mono` and `rational_mul_mono` laws specified
+in §68 §1.4 and exported by `Data.Numeric.Rational` for exact
+**non-negative** values. `rational_mul_mono` needs no separate sign
+premise on this carrier. Neither law assumes ordered endpoints or
+changes §1's total, corresponding-endpoint formulas. No signed arithmetic,
 subtraction, four-cross-product multiplication, or rounding follows.
 
 The hull and intersection inclusions are **unconditional corner
