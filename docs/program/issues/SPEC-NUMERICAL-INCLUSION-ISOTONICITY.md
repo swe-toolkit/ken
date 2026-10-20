@@ -46,7 +46,10 @@ base, stop and report the mismatch.
 A new spec 68 section stating the inclusion test and each ruled law by
 its public type, the deferral lists corrected to drop inclusion
 isotonicity, and a closed conformance seed under
-`conformance/stdlib/numerical/`.
+`conformance/stdlib/numerical/`. The AC-1 candidate also drops the stale
+"monotonicity of rational addition or multiplication" item from spec 64
+§5's separate-work list, pointing to §68 §1.4 (Steward
+`evt_14fbjer0yjckk`).
 
 ## Acceptance
 
