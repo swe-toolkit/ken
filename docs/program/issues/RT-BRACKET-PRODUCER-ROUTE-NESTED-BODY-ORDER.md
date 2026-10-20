@@ -1,9 +1,9 @@
 ---
 id: RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER
-title: "HELD INPUT to RT-BRACKET-LOWERING-AND-D0-REFUTER (child 3). At px8ta depth 3, natively and under either settlement mode, the existing computational-producer route never drives the middle bracket's body: after the second acquire it reaches the outer region's settlement S524, whose ResourceBodyResult scrutinee at origin 509 is unwritten (tag 0), and it traps with planned identity 40. The interpreter opens 1, 2, 3 and releases 3, 2, 1. Make the producer route drive nested bracket bodies in order and write each body result before its settlement runs. THIS NODE DOES NOT LAND ALONE: its reviewed tip is assembled by child 3."
+title: "HELD INPUT to RT-BRACKET-LOWERING-AND-D0-REFUTER (child 3). At px8ta depth 3, natively and under either settlement mode, the existing computational-producer route never drives the middle bracket's body: after the second acquire it reaches the outer region's settlement S524, whose ResourceBodyResult scrutinee at origin 509 is unwritten (tag 0), and it traps with planned identity 40. The interpreter opens 1, 2, 3 and releases 3, 2, 1. Keep the as-shipped InPlace route releasing 3, 2, 1, and refuse nested Deferred settlement at planning instead of ordering it (Architect evt_3d42r13m743t). THIS NODE DOES NOT LAND ALONE: its reviewed tip is assembled by child 3."
 status: active
 owner: runtime
-size: L
+size: M
 gate: none
 tier: T1
 depends_on: []
@@ -52,123 +52,80 @@ base, stop and report the mismatch; do not build around it.
 
 ## Deliverable
 
-**Recut at the 5th stop (Architect `evt_7knq6fn8km9ra`, on Research
-`evt_2gt3nfsvmzzke`): the handler-owned drive becomes a planned
-resumption call.** It is no longer a lowering-time route. Measured at
-`1a4ed40ea`: the settlement plane orders nothing across regions. Mode
-comes only from whether a region has a returned-exit owner, and InPlace
-is LIFO only because the release runs inside K's native frames.
+**Closure at the β′ ruling (Architect `evt_3d42r13m743t`, on the M
+return `evt_35kdvqg0h8p04`): nested Deferred settlement is refused at
+planning, not ordered.** Measured at `1a4ed40ea`: a Deferred settlement
+lowers as an ordinary Construct and does not own its release, so nested
+Deferred regions release FIFO at depth 2 and 3. No unforced corpus row
+has a Deferred region with a parent; as shipped, depth 3 is InPlace and
+releases 3, 2, 1.
 
-1. **Replace** `DrivenKResume::TransferToContext`, reached from
-   `drive_handler_owned_deferred_response`, with one
-   `PlannedHandlerResumptionCall` per handler-owned Deferred
-   `DeferredResponseRow`. It lives in its own id domain
-   (`PlannedHandlerResumptionId`), never in
-   `continuation_specialization_calls`. The record is the Rust
-   declaration in Architect `evt_2nwrvm9038k7t`: `row`,
-   `emission_owner`, `route` (the existing `HandlerDriveContextRoute`),
-   `parameters`, `eliminators` and `settlements`. Each settlement entry
-   is `region`, `acquisition_depth`, `settlement_continuation` (the
-   region row's `k_identity()`) and `settlement_specialization` (its
-   `k_specialization()`), as amended in Architect `evt_7w488rtt4yj9j`.
-   There is no `composing_frame`.
-2. **Build site.** `publish_handler_resumption_plan` and its validator
-   run once in `construction.rs`, after phase B and the response-owner
-   agreement block, before any lowering view. Do not reorder the phases
-   and do not publish a draft. `emission_owner` is computed there and
-   checked against `static_response_owner_specializations`; the
-   context is the one `intern_generated_contexts` interned, with
-   `raw_owner` equal to Pred4.
-3. **Readers.** `verify_entry_frame` reads `route`,
-   `call_declared_context` reads `parameters` (L1′),
-   `drive_response_at_source` and the L2′ composition read
-   `eliminators`, and `BracketSettlementControlView::from_plan` reads
-   `settlements`. `per_emitter_availability.rs`, `aggregates.rs` and
-   `validate_continuation_specialization_plan` do not read the record.
-   **Settlement contract:** for each entry, the region's `row()` is
-   present, with `row.vis_origin() == region.settlement()` and its
-   `k_identity` and `k_specialization` equal to the entry's two keys. A
-   region without a Continuation row inside a resumption is a planner
-   refusal. Entries are strictly decreasing in `acquisition_depth`, the
-   parent chain is consistent, and `eliminators[0] ==
-   route.continuation_origin`. Distinct specializations are not
-   required. There is no compile-time ledger order check.
-4. **Retain**, as consumers of the record rather than self-deriving:
-   F1; P0 with its per-capture source compare; V; P with
-   `raw_owner == Pred4` and C0 certification; L1′; and L2′ with its
-   frame-0 identity check. The non-candidate WIP `1a4ed40ea` is the base
-   to build from.
+1. **The refusal.** In `BracketSettlementControlView::from_plan`
+   (`brackets.rs` ~171), after `mode` is computed and after the
+   test-support override, so that forced runs observe it:
+
+   ```rust
+   if mode == BracketSettlementMode::Deferred && region.parent.is_some() {
+       return Err(planner_error(
+           "a nested bracket region has no in-place settlement owner; \
+            deferred settlement order is not planned for nested regions",
+       ));
+   }
+   ```
+
+   Depth-0 Deferred is untouched.
+2. **Retain** F1, P0 and V, the T'' route with L1′ and L2′, and the
+   published `PlannedHandlerResumptionCall`'s `route`, `parameters` and
+   `eliminators`, which the as-shipped path reads.
+3. **Drop** the `PlannedResumptionSettlement` list and its validator
+   clauses. With nested Deferred refused they have no consumer.
+
+The non-candidate WIP `1a4ed40ea` is the base to build from.
 
 ## Acceptance
 
-- **AC-0 (D0, non-advancing; measures, edits no product).**
-  - (1) Under forced-Deferred, at depth 2 and depth 3: each region's
-    acquisition index and settlement index within the drive's
-    resumption, and the function and iteration key whose order emits
-    releases 1, 2, 3.
-  - (2) A census of the unforced regions that take Deferred, by
-    `BracketResponseContextKey` (Continuation or Inline) and by nesting
-    depth, across px8ta and the drivers in `crates/*/tests`,
-    `examples/`, `catalog/` and `conformance/`.
-  - (3) The planned-resumption record written as a Rust declaration in
-    the delivered vocabulary, naming its table, its id type and every
-    consumer.
-  - Measured and ruled (Architect `evt_2nwrvm9038k7t`): the census is
-    sufficient, with no further census.
-- **AC-0b (D0, non-advancing).** Measured and ruled β (Architect
-  `evt_7w488rtt4yj9j`): no eliminator frame composes a Deferred release,
-  so the key is the region's checked settlement-row continuation.
+- **AC-0, AC-0b and M (D0s, non-advancing)** are measured and ruled
+  (`evt_2nwrvm9038k7t`, `evt_7w488rtt4yj9j`, `evt_3d42r13m743t`).
 - **T''-1..16** stand (Architect `evt_3tma32z29wz46`, `evt_3ztrhbzpvyb0`,
   `evt_1t43pvv4apd6`).
-Release-to-region attribution is read from the trace's resource
-identity: handle k is acquired by region k−1.
-
-- **R-1.** Forced-Deferred depth 3 exits 0 with terminal None, opens
-  handles 1, 2, 3 and releases 3, 2, 1. This is T''-3.
-- **R-2.** Forced-Deferred depth 2 exits 0 with terminal None and
-  releases handles 2, 1.
-- **R-3.** As-shipped is unchanged: depth 3 exits 0 with releases 3, 2,
-  1, and depth 2 and `rt_native_bracket_body_once` are unchanged.
-- **R-3′.** The eight named unforced-Deferred sources keep their exact
+- **R-1′.** Forced-Deferred depth 3 gives the planner refusal, naming the
+  nested region. Today it exits 1 at trap 40.
+- **R-2′.** Forced-Deferred depth 2 gives the same refusal. Today it
+  exits 0 releasing 1, 2.
+- **R-3′.** The eight unforced depth-0 Deferred sources keep their exact
   observed behaviour: multileaf, transport_mapping,
   one_buffer_residual_layout, per_emitter_one_bracket,
   two_bracket_distinguishable, ignored_two_buffer_witness,
   px8x_single_schema_observation and rt_parity_native
   buffer_allocate_malformed_capacity.
-- **R-4 (mutation).** Reversing the `settlements` entries gives a
-  planner refusal, or releases 1, 2, 3 with exit 1; never exit 0.
-- **R-5 (mutation).** Deleting the record for the depth-3 row refuses at
-  the planner, not at lowering.
-- **R-6 (mutation).** Setting one entry's `settlement_continuation` to a
-  sibling region's identity gives a validator refusal. R-4 and R-6 are
-  the discriminating pair: a validator that ignores the key passes
-  neither.
+- **R-7.** As shipped, depth 3 exits 0 with terminal None and releases 3,
+  2, 1.
+- **R-8.** The unforced census re-run is byte-identical (InPlace 30,
+  Deferred 12, Inline 0), with no new refusal.
+- **R-9 (mutation).** Deleting the check makes R-1′ fail again, back to
+  the trap-40 or FIFO observation.
 
-**Precommit.** D0 returns are non-advancing. A validator refusal on
-depth 3 because an entry's row disagrees with the view is a query, as
-is a lowering-time disagreement between a resumption argument and the
-aggregate or per-emitter planes. R-1 still releasing 1, 2, 3 with every
-validator clause satisfied means the resumption does not enter the
-deepest entry's continuation first: that is the node's 6th advancing
-stop, so hold and call Research, scoped to that fork. Any other new
-wall is also the 6th. D0 (2) does not reclassify T''-3.
+**Precommit.** If R-8 shows an unforced row refused, there is a nested
+Deferred region in the corpus: a query, which the Architect rules. Any
+other new wall is the node's 7th stop, advancing, with no hold. The next
+Research trigger is the node's 9th stop or child 3's 9th.
 
 ## Stop conditions
 
 - The fix needs a new carrier, return protocol, KRET lane or host
   operation: stop to the Architect and the Steward.
-- (a) cannot name the skipped step from runtime markers: stop with the
-  marker trace. Do not infer the step from static emission counts.
-- Do not reopen `RT-PLANNER-KRET-GRAFTED-SPINE`, and do not add a census,
-  carve-out, narrowed matrix or fallback.
+- Do not order nested Deferred settlement, and do not add a fallback that
+  lowers it. The refusal is the ruled closure.
+- Do not reopen `RT-PLANNER-KRET-GRAFTED-SPINE`.
 
 ## Hard-stop inventory (§1b)
 
 §1a: 6, at R-1 (runtime-leader `evt_1h4jhr9pnqr8j`, implementer
 `evt_70paqtnpebmqz`). This is the precommitted 6th stop, and the
 Research trigger fires. The child 3 aggregate is 7 (Architect
-`evt_a2h1rv4tkmd6`). Research advised on entry 6 (`evt_7svg4vbndmhqx`),
-and the Architect rules after it. At
+`evt_a2h1rv4tkmd6`). Research advised on entry 6 (`evt_7svg4vbndmhqx`,
+`evt_5qx5b0c76anpn`), and the closure is the β′ ruling in the
+Deliverable (`evt_3d42r13m743t`); counts stay at 6 and 7. At
 the 5th stop the aggregate was 6 (`evt_d6kxxtgevwbw`), and that advisory
 gave the structural recut in the Deliverable (`evt_7knq6fn8km9ra`).
 WIPs `16cc5ee62` and `1a4ed40ea` are not candidates; at `1a4ed40ea`
