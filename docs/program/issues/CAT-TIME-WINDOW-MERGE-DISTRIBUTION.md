@@ -54,6 +54,9 @@ base, stop and report the mismatch.
 §3 status lines updated to say the export is delivered, and a new
 `crates/ken-elaborator/tests/cat_time_window_merge_distribution.rs`
 that root-loads `trace_window_merge` and runs the seed.
+`crates/ken-elaborator/tests/cat_derived_pub_export.rs` adds only
+`Data.Collections.Derived.filter_starts_after` to its exact
+allowed-inventory set (Steward `evt_21vmbgab0dq90`).
 
 ## Acceptance
 
