@@ -1,4 +1,4 @@
-//! Exact natural-coordinate geometry, spec/50-stdlib/67-geometry.md §1.
+//! Exact natural-coordinate geometry, spec/50-stdlib/67-geometry.md §§1–3.
 //! Positive and negative clients come from
 //! conformance/stdlib/geometry/seed-nat-box.md.
 //! Promise class: durable invariant. The fixed endpoints, corners and
@@ -7,10 +7,71 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ken_elaborator::{ElabEnv, ElabError};
+use ken_elaborator::parser::parse_decls;
+use ken_elaborator::{
+    extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr, ImportKind, KenMdFenceRole,
+    Type as SourceType,
+};
 use ken_kernel::{Decl, KernelError};
 
 const GEOMETRY: &str = "Algorithm.Geometry.NatBox";
+const CONTAINMENT_SEED: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../conformance/stdlib/geometry/seed-box-containment.md"
+));
+
+// The compiler base already binds canonical IsTrue. Remove only a parsed
+// duplicate import; keep all other imported names and ignore source spacing.
+fn without_redundant_is_true_import(source: &str) -> String {
+    let mut edits = Vec::new();
+    for declaration in parse_decls(source).expect("seed Ken parses") {
+        if let SourceDecl::ImportDecl {
+            module,
+            kind: ImportKind::Selective(items),
+            span,
+        } = declaration
+        {
+            if module != "Core.Classes.LawfulClasses" {
+                continue;
+            }
+            let mut keep = Vec::new();
+            let mut removed = false;
+            for item in items {
+                if item.name == "IsTrue" && item.rename.is_none() {
+                    removed = true;
+                } else {
+                    keep.push(match item.rename {
+                        Some(alias) => format!("{} as {alias}", item.name),
+                        None => item.name,
+                    });
+                }
+            }
+            if removed {
+                let replacement = if keep.is_empty() {
+                    String::new()
+                } else {
+                    format!("import {module} ({})", keep.join(", "))
+                };
+                edits.push((span.start..span.end, replacement));
+            }
+        }
+    }
+    let mut client = source.to_owned();
+    for (range, replacement) in edits.into_iter().rev() {
+        client.replace_range(range, &replacement);
+    }
+    client
+}
+
+fn containment_sources() -> Vec<String> {
+    extract_ken_md(CONTAINMENT_SEED)
+        .expect("shipped box-containment seed Ken fences parse")
+        .fences
+        .into_iter()
+        .filter(|fence| fence.role == KenMdFenceRole::Source)
+        .map(|fence| without_redundant_is_true_import(&CONTAINMENT_SEED[fence.body_range]))
+        .collect()
+}
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -333,5 +394,280 @@ fn five_false_seed_propositions_are_refused_after_positive_control() {
             }
             other => panic!("{label}: expected semantic proof rejection, got {other:?}"),
         }
+    }
+}
+
+/// SOURCE: spec/50-stdlib/67-geometry.md §3.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: after explicit providers, loading NatBox leaves the exact
+/// trusted GlobalId set unchanged. The operation and seven laws are owned,
+/// transparent, and used by generic clients; `axis_within` stays private.
+/// CLAIMED: the §3 corner and witnessed-inclusion theory adds checked
+/// public contracts without enlarging the trusted base or helper surface.
+/// THE GAP: finite seed values and a false claim are measured separately.
+#[test]
+fn section_three_generic_containment_laws_add_no_trust() {
+    let mut env = ElabEnv::new().expect("compiler base");
+    for provider in [
+        "Core.Classes.LawfulClasses",
+        "Core.Logic.Transport",
+        "Data.Numeric.Nat.Arithmetic",
+        "Data.Numeric.Nat.Order",
+    ] {
+        env.elaborate_module_from_roots(&[root()], provider)
+            .unwrap_or_else(|error| panic!("{provider} roots-loads: {error:?}"));
+    }
+    let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    let owned = env
+        .elaborate_module_from_roots(&[root()], GEOMETRY)
+        .expect("NatBox §3 checked bodies kernel-check");
+    let after = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
+    eprintln!(
+        "§3 trusted_base() count: before={}, after={}",
+        before.len(),
+        after.len()
+    );
+    assert_eq!(after, before, "§3 adds no trusted GlobalId");
+    for public in [
+        "inside",
+        "inside_sound",
+        "inside_refl",
+        "intersect_inside_left",
+        "intersect_inside_right",
+        "inside_hull_left",
+        "inside_hull_right",
+        "inside_complete",
+    ] {
+        let id = env.globals[&format!("{GEOMETRY}.{public}")];
+        assert!(owned.contains(&id), "{public} must belong to NatBox");
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{public} must have a checked body"
+        );
+    }
+    env.elaborate_file(CONTAINMENT_GENERIC_CLIENT)
+        .expect("seven generic §3 law clients consume their exact public propositions");
+    match env.elaborate_file(&format!("import {GEOMETRY} (axis_within)")) {
+        Err(ElabError::UnboundName { name, .. }) => {
+            assert_eq!(name, format!("{GEOMETRY}.axis_within"));
+        }
+        other => panic!("per-axis helper must remain private: {other:?}"),
+    }
+}
+
+const CONTAINMENT_GENERIC_CLIENT: &str = r#"
+import Algorithm.Geometry.NatBox
+  (Point, Box, contains, intersect, hull, inside, inside_sound,
+   inside_refl, intersect_inside_left, intersect_inside_right,
+   inside_hull_left, inside_hull_right, inside_complete)
+
+theorem client_inside_sound (b : Box) (c : Box) (p : Point)
+    (i : IsTrue (inside b c)) (h : IsTrue (contains b p)) :
+  IsTrue (contains c p) = inside_sound b c p i h
+
+theorem client_inside_refl (b : Box) :
+  IsTrue (inside b b) = inside_refl b
+
+theorem client_intersect_inside_left (b : Box) (c : Box) :
+  IsTrue (inside (intersect b c) b) = intersect_inside_left b c
+
+theorem client_intersect_inside_right (b : Box) (c : Box) :
+  IsTrue (inside (intersect b c) c) = intersect_inside_right b c
+
+theorem client_inside_hull_left (b : Box) (c : Box) :
+  IsTrue (inside b (hull b c)) = inside_hull_left b c
+
+theorem client_inside_hull_right (b : Box) (c : Box) :
+  IsTrue (inside c (hull b c)) = inside_hull_right b c
+
+theorem client_inside_complete (b : Box) (c : Box) (q : Point)
+    (w : IsTrue (contains b q))
+    (all : (p : Point) → IsTrue (contains b p) → IsTrue (contains c p)) :
+  IsTrue (inside b c) = inside_complete b c q w all
+"#;
+
+/// SOURCE: conformance/stdlib/geometry/seed-box-containment.md positives.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: the actual positive seed fences elaborate from the published
+/// package, including nested, overlap, hull, inverted and empty cases and
+/// applications of all seven generic checked laws.
+/// CLAIMED: the public interface computes the finite corner observations
+/// and clients may use the proofs on the specified example boxes.
+/// THE GAP: finite oracles do not replace generic proofs checked above.
+#[test]
+fn shipped_box_containment_seed_positive_cases_check() {
+    let mut sources = containment_sources();
+    sources
+        .pop()
+        .expect("separate inward-containment refusal fence");
+    assert!(!sources.is_empty(), "seed needs positive source fences");
+    let mut env = geometry_env();
+    for positive in sources {
+        env.elaborate_file(&positive)
+            .expect("every shipped positive containment declaration checks");
+    }
+}
+
+// A closed false `IsTrue` claim need not distinguish this specific boundary
+// from an unrelated false claim. Compare proposition trees ignoring spans and
+// formatting, deriving the negative from a checked False observation whose
+// factor order is reversed in the fixture's checked positive controls.
+fn type_shape(ty: &SourceType) -> String {
+    match ty {
+        SourceType::TCon(name, _) => format!("constructor:{name}"),
+        SourceType::TVar(name, _) => format!("variable:{name}"),
+        SourceType::TApp(function, argument, _) => {
+            format!("({} {})", type_shape(function), type_shape(argument))
+        }
+        other => panic!("unsupported closed containment proposition: {other:?}"),
+    }
+}
+
+fn application<'a>(ty: &'a SourceType, name: &str) -> Option<Vec<&'a SourceType>> {
+    let mut args = Vec::new();
+    let mut head = ty;
+    while let SourceType::TApp(function, argument, _) = head {
+        args.push(argument.as_ref());
+        head = function;
+    }
+    args.reverse();
+    match head {
+        SourceType::TVar(found, _) | SourceType::TCon(found, _) if found == name => Some(args),
+        _ => None,
+    }
+}
+
+fn inside_pair(ty: &SourceType) -> Option<(&SourceType, &SourceType)> {
+    let args = application(ty, "inside")?;
+    let [first, second] = args.as_slice() else {
+        return None;
+    };
+    Some((first, second))
+}
+
+fn inside_claim(ty: &SourceType) -> Option<(&SourceType, &SourceType)> {
+    let args = application(ty, "IsTrue")?;
+    let [inside] = args.as_slice() else {
+        return None;
+    };
+    inside_pair(inside)
+}
+
+fn assert_strictly_smaller_refusal_goal(positive: &str, shared: &str, refused: &str) {
+    let positive_decls = parse_decls(positive).expect("positive containment fixture parses");
+    let false_inside = positive_decls
+        .iter()
+        .filter_map(|decl| {
+            let SourceDecl::TheoremDecl { theorem, .. } = decl else {
+                return None;
+            };
+            let equality = application(theorem, "Equal")?;
+            let [carrier, observed, value] = equality.as_slice() else {
+                return None;
+            };
+            if !application(carrier, "Bool").is_some_and(|args| args.is_empty())
+                || !application(value, "False").is_some_and(|args| args.is_empty())
+            {
+                return None;
+            }
+            let (inner, small) = inside_pair(observed)?;
+            Some((*observed, inner, small))
+        })
+        .collect::<Vec<_>>();
+    let controls = parse_decls(shared).expect("same-box negative controls parse");
+    let positive_pairs = controls
+        .iter()
+        .filter_map(|decl| {
+            let SourceDecl::TheoremDecl { theorem, .. } = decl else {
+                return None;
+            };
+            inside_claim(theorem)
+        })
+        .collect::<Vec<_>>();
+    let holds = |a: &SourceType, b: &SourceType| {
+        positive_pairs.iter().any(|(left, right)| {
+            type_shape(left) == type_shape(a) && type_shape(right) == type_shape(b)
+        })
+    };
+    let matching = false_inside
+        .iter()
+        .filter(|(_, inner, small)| {
+            holds(inner, inner)
+                && holds(small, inner)
+                && positive_pairs.iter().any(|(left, outer)| {
+                    type_shape(left) == type_shape(inner)
+                        && type_shape(outer) != type_shape(inner)
+                        && type_shape(outer) != type_shape(small)
+                        && holds(small, outer)
+                })
+        })
+        .collect::<Vec<_>>();
+    let [(observed, _, _)] = matching.as_slice() else {
+        panic!("one false inward relation must share boxes with four checked controls");
+    };
+    let negative_decls = parse_decls(refused).expect("refused theorem parses");
+    let [SourceDecl::TheoremDecl {
+        theorem: negative_goal,
+        body: Expr::ECon(proof, _),
+        ..
+    }] = negative_decls.as_slice()
+    else {
+        panic!("separate refused block must be one final theorem with a proof");
+    };
+    assert_eq!(proof, "Proved", "negative claim must attempt its proof");
+    let term = &positive[observed.span().start..observed.span().end];
+    let expected = format!("theorem expected_refusal : IsTrue ({term}) = Proved");
+    let expected_decls = parse_decls(&expected).expect("derived inward claim parses");
+    let [SourceDecl::TheoremDecl {
+        theorem: expected_goal,
+        ..
+    }] = expected_decls.as_slice()
+    else {
+        panic!("derived inward claim is one theorem");
+    };
+    assert_eq!(
+        type_shape(negative_goal),
+        type_shape(expected_goal),
+        "refusal must assert the false inside relation on the controlled boxes"
+    );
+}
+
+/// SOURCE: conformance/stdlib/geometry/seed-box-containment.md refusal.
+/// PROMISE CLASS: durable invariant.
+/// MEASURED: all shipped positives and four same-pair controls check first;
+/// the final theorem states the known false `inside` proposition derived
+/// from checked value and reverse-order controls. Its own `Proved` receives
+/// `KernelRejected(TypeMismatch)`, not an earlier parse or fixture error.
+/// CLAIMED: the inner box does not fit within the smaller point-box, though
+/// the smaller one fits within the inner and both lie in the outer.
+/// THE GAP: this fixed pair does not prove every false corner comparison.
+#[test]
+fn shipped_strictly_smaller_box_refuses_on_its_controlled_pair() {
+    let mut sources = containment_sources();
+    let negative = sources
+        .pop()
+        .expect("separate inward-containment refusal fence");
+    let first_positive = sources
+        .first()
+        .expect("shipped containment positive fixture");
+    let declarations = parse_decls(&negative).expect("negative fence parses");
+    let Some(SourceDecl::TheoremDecl { span, .. }) = declarations.last() else {
+        panic!("negative fence ends in false inside theorem");
+    };
+    let (shared, refused) = negative.split_at(span.start);
+    let mut env = geometry_env();
+    for positive in &sources {
+        env.elaborate_file(positive)
+            .expect("all shipped positives check first");
+    }
+    env.elaborate_file(shared)
+        .expect("four same-pair controls check first");
+    assert_strictly_smaller_refusal_goal(first_positive, shared, refused);
+    match env.elaborate_file(refused) {
+        Err(ElabError::KernelRejected {
+            error: KernelError::TypeMismatch { .. },
+            span,
+        }) if span.start < span.end && span.end <= refused.len() => {}
+        other => panic!("false inward containment must fail at its own theorem: {other:?}"),
     }
 }

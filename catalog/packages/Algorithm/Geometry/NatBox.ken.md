@@ -1,8 +1,8 @@
 # Closed boxes over natural coordinates
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
-geometry operations. The six box-and-distance laws and two metric laws
-carry kernel-checked generic proofs.
+geometry operations. Six box-and-distance laws, two metric laws, and
+seven corner-wise containment laws carry kernel-checked generic proofs.
 
 ## Contents
 
@@ -25,15 +25,17 @@ point set is empty.
 ## 2. Definition
 
 The two constructors are exported separately from their carrier types so a
-client can build a point and a box. The five operations and six public
-box-and-distance laws lead the first part of the definition; two
-additional public metric laws follow. Their private per-axis proofs and
-distance helpers stay within this module.
+client can build a point and a box. Five original operations and six
+box-and-distance laws lead the definition; two metric laws follow. The
+corner-wise `inside` operation and its seven laws come next. Their
+per-axis proof helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
-coordinate differences. Every proof body below is the checked general
-construction, not a finite seed in place of a proof.
+coordinate differences. `inside b c` compares both corners of `b` with
+those of `c`, even if `b` is inverted and has no points. Every proof body
+below is the checked general construction, not a finite seed in place of
+a proof.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, leq_nat, bool_and)
@@ -809,6 +811,398 @@ theorem point_equal
         (cong Nat Point y1 y2 (point_with_x x2) hy)
 ```
 
+```ken
+pub fn inside (b : Box) (c : Box) : Bool =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          bool_and (axis_within blx bhx clx chx) (axis_within bly bhy cly chy)
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem inside_sound
+      (b : Box) (c : Box) (p : Point)
+    : IsTrue (inside b c) → IsTrue (contains b p) → IsTrue (contains c p) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          match p {
+                            MkPoint px py ↦
+                              λw.
+                                λh.
+                                  (proof intro for bool_and)
+                                    (axis_contains clx chx px)
+                                    (axis_contains cly chy py)
+                                    (axis_within_sound
+                                      blx
+                                      bhx
+                                      clx
+                                      chx
+                                      px
+                                      ((proof left for bool_and)
+                                        (axis_within blx bhx clx chx)
+                                        (axis_within bly bhy cly chy)
+                                        w)
+                                      ((proof left for bool_and)
+                                        (axis_contains blx bhx px)
+                                        (axis_contains bly bhy py)
+                                        h))
+                                    (axis_within_sound
+                                      bly
+                                      bhy
+                                      cly
+                                      chy
+                                      py
+                                      ((proof right for bool_and)
+                                        (axis_within blx bhx clx chx)
+                                        (axis_within bly bhy cly chy)
+                                        w)
+                                      ((proof right for bool_and)
+                                        (axis_contains blx bhx px)
+                                        (axis_contains bly bhy py)
+                                        h))
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem inside_refl (b : Box) : IsTrue (inside b b) =
+  match b {
+    MkBox lo hi ↦
+      match lo {
+        MkPoint lx ly ↦
+          match hi {
+            MkPoint hx hy ↦
+              (proof intro for bool_and)
+                (axis_within lx hx lx hx)
+                (axis_within ly hy ly hy)
+                (axis_within_refl lx hx)
+                (axis_within_refl ly hy)
+          }
+      }
+  }
+
+pub theorem intersect_inside_left (b : Box) (c : Box) : IsTrue (inside (intersect b c) b) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          (proof intro for bool_and)
+                            (axis_within (max blx clx) (min bhx chx) blx bhx)
+                            (axis_within (max bly cly) (min bhy chy) bly bhy)
+                            ((proof intro for bool_and)
+                              (leq_nat blx (max blx clx))
+                              (leq_nat (min bhx chx) bhx)
+                              ((proof left_leq for max) blx clx)
+                              ((proof leq_left for min) bhx chx))
+                            ((proof intro for bool_and)
+                              (leq_nat bly (max bly cly))
+                              (leq_nat (min bhy chy) bhy)
+                              ((proof left_leq for max) bly cly)
+                              ((proof leq_left for min) bhy chy))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem intersect_inside_right (b : Box) (c : Box) : IsTrue (inside (intersect b c) c) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          (proof intro for bool_and)
+                            (axis_within (max blx clx) (min bhx chx) clx chx)
+                            (axis_within (max bly cly) (min bhy chy) cly chy)
+                            ((proof intro for bool_and)
+                              (leq_nat clx (max blx clx))
+                              (leq_nat (min bhx chx) chx)
+                              ((proof right_leq for max) blx clx)
+                              ((proof leq_right for min) bhx chx))
+                            ((proof intro for bool_and)
+                              (leq_nat cly (max bly cly))
+                              (leq_nat (min bhy chy) chy)
+                              ((proof right_leq for max) bly cly)
+                              ((proof leq_right for min) bhy chy))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem inside_hull_left (b : Box) (c : Box) : IsTrue (inside b (hull b c)) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          (proof intro for bool_and)
+                            (axis_within blx bhx (min blx clx) (max bhx chx))
+                            (axis_within bly bhy (min bly cly) (max bhy chy))
+                            ((proof intro for bool_and)
+                              (leq_nat (min blx clx) blx)
+                              (leq_nat bhx (max bhx chx))
+                              ((proof leq_left for min) blx clx)
+                              ((proof left_leq for max) bhx chx))
+                            ((proof intro for bool_and)
+                              (leq_nat (min bly cly) bly)
+                              (leq_nat bhy (max bhy chy))
+                              ((proof leq_left for min) bly cly)
+                              ((proof left_leq for max) bhy chy))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem inside_hull_right (b : Box) (c : Box) : IsTrue (inside c (hull b c)) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          (proof intro for bool_and)
+                            (axis_within clx chx (min blx clx) (max bhx chx))
+                            (axis_within cly chy (min bly cly) (max bhy chy))
+                            ((proof intro for bool_and)
+                              (leq_nat (min blx clx) clx)
+                              (leq_nat chx (max bhx chx))
+                              ((proof leq_right for min) blx clx)
+                              ((proof right_leq for max) bhx chx))
+                            ((proof intro for bool_and)
+                              (leq_nat (min bly cly) cly)
+                              (leq_nat chy (max bhy chy))
+                              ((proof leq_right for min) bly cly)
+                              ((proof right_leq for max) bhy chy))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem inside_complete
+      (b : Box) (c : Box) (q : Point)
+    : IsTrue (contains b q)
+      → ((p : Point) → IsTrue (contains b p) → IsTrue (contains c p))
+      → IsTrue (inside b c) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          match q {
+                            MkPoint qx qy ↦
+                              λhq.
+                                λall.
+                                  let
+                                    qxin : IsTrue (axis_contains blx bhx qx) =
+                                      (proof left for bool_and)
+                                        (axis_contains blx bhx qx)
+                                        (axis_contains bly bhy qy)
+                                        hq;
+                                    qyin : IsTrue (axis_contains bly bhy qy) =
+                                      (proof right for bool_and)
+                                        (axis_contains blx bhx qx)
+                                        (axis_contains bly bhy qy)
+                                        hq;
+                                    low : IsTrue
+                                      (contains
+                                        (MkBox (MkPoint clx cly) (MkPoint chx chy))
+                                        (MkPoint blx bly)) =
+                                      all
+                                        (MkPoint blx bly)
+                                        ((proof intro for bool_and)
+                                          (axis_contains blx bhx blx)
+                                          (axis_contains bly bhy bly)
+                                          (axis_corner_low blx bhx qx qxin)
+                                          (axis_corner_low bly bhy qy qyin));
+                                    high : IsTrue
+                                      (contains
+                                        (MkBox (MkPoint clx cly) (MkPoint chx chy))
+                                        (MkPoint bhx bhy)) =
+                                      all
+                                        (MkPoint bhx bhy)
+                                        ((proof intro for bool_and)
+                                          (axis_contains blx bhx bhx)
+                                          (axis_contains bly bhy bhy)
+                                          (axis_corner_high blx bhx qx qxin)
+                                          (axis_corner_high bly bhy qy qyin))
+                                  in
+                                    (proof intro for bool_and)
+                                      (axis_within blx bhx clx chx)
+                                      (axis_within bly bhy cly chy)
+                                      ((proof intro for bool_and)
+                                        (leq_nat clx blx)
+                                        (leq_nat bhx chx)
+                                        ((proof left for bool_and)
+                                          (leq_nat clx blx)
+                                          (leq_nat blx chx)
+                                          ((proof left for bool_and)
+                                            (axis_contains clx chx blx)
+                                            (axis_contains cly chy bly)
+                                            low))
+                                        ((proof right for bool_and)
+                                          (leq_nat clx bhx)
+                                          (leq_nat bhx chx)
+                                          ((proof left for bool_and)
+                                            (axis_contains clx chx bhx)
+                                            (axis_contains cly chy bhy)
+                                            high)))
+                                      ((proof intro for bool_and)
+                                        (leq_nat cly bly)
+                                        (leq_nat bhy chy)
+                                        ((proof left for bool_and)
+                                          (leq_nat cly bly)
+                                          (leq_nat bly chy)
+                                          ((proof right for bool_and)
+                                            (axis_contains clx chx blx)
+                                            (axis_contains cly chy bly)
+                                            low))
+                                        ((proof right for bool_and)
+                                          (leq_nat cly bhy)
+                                          (leq_nat bhy chy)
+                                          ((proof right for bool_and)
+                                            (axis_contains clx chx bhx)
+                                            (axis_contains cly chy bhy)
+                                            high)))
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+fn axis_within (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) : Bool =
+  bool_and (leq_nat l2 l1) (leq_nat h1 h2)
+
+theorem axis_within_sound
+      (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) (x : Nat)
+    : IsTrue (axis_within l1 h1 l2 h2)
+      → IsTrue (axis_contains l1 h1 x)
+      → IsTrue (axis_contains l2 h2 x) =
+  λw.
+    λa.
+      (proof intro for bool_and)
+        (leq_nat l2 x)
+        (leq_nat x h2)
+        ((proof trans for leq_nat)
+          l2
+          l1
+          x
+          ((proof left for bool_and) (leq_nat l2 l1) (leq_nat h1 h2) w)
+          ((proof left for bool_and) (leq_nat l1 x) (leq_nat x h1) a))
+        ((proof trans for leq_nat)
+          x
+          h1
+          h2
+          ((proof right for bool_and) (leq_nat l1 x) (leq_nat x h1) a)
+          ((proof right for bool_and) (leq_nat l2 l1) (leq_nat h1 h2) w))
+
+theorem axis_within_refl (l : Nat) (h : Nat) : IsTrue (axis_within l h l h) =
+  (proof intro for bool_and)
+    (leq_nat l l)
+    (leq_nat h h)
+    ((proof refl for leq_nat) l)
+    ((proof refl for leq_nat) h)
+
+theorem axis_corner_low
+      (l : Nat) (h : Nat) (x : Nat)
+    : IsTrue (axis_contains l h x) → IsTrue (axis_contains l h l) =
+  λa.
+    (proof intro for bool_and)
+      (leq_nat l l)
+      (leq_nat l h)
+      ((proof refl for leq_nat) l)
+      ((proof trans for leq_nat)
+        l
+        x
+        h
+        ((proof left for bool_and) (leq_nat l x) (leq_nat x h) a)
+        ((proof right for bool_and) (leq_nat l x) (leq_nat x h) a))
+
+theorem axis_corner_high
+      (l : Nat) (h : Nat) (x : Nat)
+    : IsTrue (axis_contains l h x) → IsTrue (axis_contains l h h) =
+  λa.
+    (proof intro for bool_and)
+      (leq_nat l h)
+      (leq_nat h h)
+      ((proof trans for leq_nat)
+        l
+        x
+        h
+        ((proof left for bool_and) (leq_nat l x) (leq_nat x h) a)
+        ((proof right for bool_and) (leq_nat l x) (leq_nat x h) a))
+      ((proof refl for leq_nat) h)
+```
+
 ## 3. Using it
 
 Constructing a box does not require a validity premise. Both endpoints
@@ -848,6 +1242,14 @@ The checked
 includes both strict and tight detours and separately rejects the false
 reverse bound and a zero distance between distinct points.
 
+`inside` compares the corners of two boxes, not just their sets of points.
+It recognizes a nested box and an inverted one whose corners still fit
+inside the outer box. The
+[containment seed](../../../../conformance/stdlib/geometry/seed-box-containment.md)
+checks both, intersections inside each input, and both inputs inside their
+hull. It also refuses an inner box's claim to fit inside a strictly
+smaller box.
+
 ## 4. Laws & proofs
 
 `intersect_sound` projects both coordinate witnesses from an intersection,
@@ -866,9 +1268,17 @@ addition to match the distance definition. `manhattan_zero_equal` splits
 a zero sum into zero per-axis distances, derives equality of both
 coordinates by induction, and lifts them into point equality with `cong`.
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
-arguments of the box laws explicit. All eight public statements are
+arguments of the box laws explicit. All fifteen public statements are
 generic in their boxes or points, and none identifies boxes by their
 sets of members.
+
+`inside_sound` transports point membership along the four corner comparisons
+of `inside`; `inside_refl` uses checked order reflexivity, including for
+inverted boxes. The two intersection laws use the respective `max` and `min`
+bounds, while the hull laws use the opposite extrema. `inside_complete`
+requires a point in the inner box before deriving its two corner witnesses;
+pointwise inclusion alone would be vacuous for an inverted inner box. The
+private `axis_within` and per-axis lemmas keep these distinctions explicit.
 
 ## 5. Design notes
 
@@ -879,7 +1289,10 @@ than quotienting by membership. Hull computes a coordinatewise enclosure,
 including the corners of an empty input; it does not claim a least point-set
 union in the presence of differently represented empty boxes. Manhattan
 distance is exact and unsigned; its triangle inequality and zero-distance
-identity are proved. Area and signed orientation remain outside this
+identity are proved. Corner-wise `inside` is directional and sufficient for
+point-set inclusion, but an empty inner box can be outside a second box by
+its corners despite having no points. Its converse law therefore requires
+a member of the inner box. Area and signed orientation remain outside this
 interface.
 
 ## 6. References
@@ -893,18 +1306,20 @@ interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–2](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the operations and eight public proof types.
+1. **Contract.** [Exact geometry, §§1–3](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the six operations and fifteen public proof types.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
-   `manhattan_symm`, `manhattan_self`, `manhattan_triangle`, and
-   `manhattan_zero_equal`. Per-axis lemmas and proof transport helpers
-   remain private.
+   `manhattan_symm`, `manhattan_self`, `manhattan_triangle`,
+   `manhattan_zero_equal`, `inside`, `inside_sound`, `inside_refl`,
+   `intersect_inside_left`, `intersect_inside_right`, `inside_hull_left`,
+   `inside_hull_right`, and `inside_complete`. `axis_within`, per-axis
+   lemmas and proof transport helpers remain private.
 3. **Source map.** Definition contains the constructors and operations,
    followed by the checked laws and private scaffolding. Using it points to
-   closed examples and generic metric use; Laws & proofs maps each
-   theorem to its proof strategy.
+   closed examples and generic metric and containment use; Laws & proofs
+   maps each theorem to its proof strategy.
 4. **Derivation.** `Nat`, `Bool` and the ambient conjunction come from the
    compiler floor and checked classes. Arithmetic reuses the canonical
    `Data.Numeric.Nat.Arithmetic` addition and checked
@@ -920,4 +1335,7 @@ interface.
    [metric seed](../../../../conformance/stdlib/geometry/seed-manhattan-metric.md)
    gives strict and tight detours, a generic identity-law client, closed
    instances of both laws, and false distance/inequality assertions.
-   Both supplement rather than replace the checked law bodies.
+   The [seed](../../../../conformance/stdlib/geometry/seed-box-containment.md)
+   checks nested, intersecting, hull, self and inverted boxes, with the
+   false inward claim separately refused. All three supplement rather
+   than replace the checked law bodies.
