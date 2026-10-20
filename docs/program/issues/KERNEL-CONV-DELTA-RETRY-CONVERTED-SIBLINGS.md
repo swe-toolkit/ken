@@ -17,8 +17,13 @@ origin: "Architect attribution evt_bq2fze6dbp15 of the LANG-TYPE-POSITION-SORT-S
 ## Objective
 
 Within one δ retry, each original spine argument pair is decided at most
-once, whatever binder depth the unfolded body presents it at. Kernel
-conversion of the swapped row and of R2c is linear in K.
+once among re-encounters under an unchanged ledger path, whatever binder
+depth presents it (weakening-correct). Re-encounters under a changed path
+(recursive-head origin pushed, ι-discharged or hardened) are decided
+afresh. That is the verdict-preserving residual, stated in the code
+comment and not claimed linear (Architect AC-0 ruling
+`evt_1y9c55a0198na`). Kernel conversion of the swapped row and of R2c is
+linear in K.
 
 ## Settled inputs (Architect `evt_bq2fze6dbp15`, on `eac1c51a6` and `f04abbfee`)
 
@@ -88,8 +93,11 @@ AC-0, with pins over the swapped row and R2c.
     they do.
   - Dropping the depth check is excluded.
 - **AC-1.** Committed `convert` pins over the swapped row and R2c, each at
-  three depths including K=20, each bound a measure linear in K and
-  return false.
+  three depths including K=20, each bound a measure linear in K, and
+  each asserting its measured base verdict: swapped true, R2c false
+  (Architect `evt_1y9c55a0198na`). Unit pins on the memo lookup cover a
+  same-path hit, a swapped-orientation miss, a different-path miss, and a
+  lifted open pair that hits only as its weakening.
 - **AC-2 (controls, one per half).**
   - Reverting only the positive half reddens the swapped pin and leaves
     R2c green; reverting only the depth half reddens R2c and leaves the
