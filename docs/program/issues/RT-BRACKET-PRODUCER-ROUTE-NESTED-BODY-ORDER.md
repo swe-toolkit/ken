@@ -120,12 +120,15 @@ Research trigger is the node's 9th stop or child 3's 9th.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 6, at R-1 (runtime-leader `evt_1h4jhr9pnqr8j`, implementer
-`evt_70paqtnpebmqz`). This is the precommitted 6th stop, and the
-Research trigger fires. The child 3 aggregate is 7 (Architect
-`evt_a2h1rv4tkmd6`). Research advised on entry 6 (`evt_7svg4vbndmhqx`,
-`evt_5qx5b0c76anpn`), and the closure is the β′ ruling in the
-Deliverable (`evt_3d42r13m743t`); counts stay at 6 and 7. At
+§1a: 7, child 3 aggregate 8 (Architect `evt_23st886k4a3z7`). The
+7th stop is the unforced binary after the β′ closure (runtime-leader
+`evt_3k3pjar47z8zj`). It advances with no hold. Only the non-advancing
+baseline attribution B (B0 `0919ab3d6`, B1 `1a4ed40ea`, B2 the stop
+configuration) is authorized. The next Research trigger is the node's
+9th stop or child 3's 9th. The 6th was at R-1 (runtime-leader
+`evt_1h4jhr9pnqr8j`, implementer `evt_70paqtnpebmqz`); Research advised
+on it (`evt_7svg4vbndmhqx`, `evt_5qx5b0c76anpn`), and the closure is the
+β′ ruling in the Deliverable (`evt_3d42r13m743t`). At
 the 5th stop the aggregate was 6 (`evt_d6kxxtgevwbw`), and that advisory
 gave the structural recut in the Deliverable (`evt_7knq6fn8km9ra`).
 WIPs `16cc5ee62` and `1a4ed40ea` are not candidates; at `1a4ed40ea`
@@ -169,6 +172,15 @@ L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
    parent chain, versus the current single C0 call. Evidence:
    `local/rt-bracket-producer-authenticity-d0/child3-assembly/recut-r1-node6/stop.txt`;
    the WIP stays `1a4ed40ea`.
+7. After the β′ closure (nested-Deferred refusal, R-1′, R-2′, R-7, R-8
+   and R-9 met), the unforced `px8ta_oriented_subcontinuation` binary has
+   3 failures. `px8ds_real_same_depth_path_runs_exact_edges` and
+   `px8ds_retired_flat_order_does_not_gain_m4_representation` fail
+   ObjectEmission with `PlannerInvariant: body tail leaves the region
+   unit` (bracket `body_walk`, `brackets.rs` ~407/~419).
+   `public_one_level_bracket_finishes_and_releases` sees 0 versus 2
+   source captures. Keyed on: unattributed, baseline owed
+   (`evt_3k3pjar47z8zj`).
 
 **§1b: YES.** The handler-owned drive (F1,
 `drive_handler_owned_deferred_response` -> `drive_response_at_source`)
