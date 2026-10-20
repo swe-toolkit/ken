@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION
 title: "Spec 66 section 3 defers composition of substitutions: nothing states that substituting twice is one substitution by the composed map, so a client cannot fuse two rewrites. Rule a named composition builder, the structural composition law, and whether an identity law holds, from a checked D0 at zero trust, and state them as a section 4 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
