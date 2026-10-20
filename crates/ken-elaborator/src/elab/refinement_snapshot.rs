@@ -44,6 +44,12 @@ pub(super) struct Snapshot {
 }
 
 impl Snapshot {
+    /// Allocate the retry state outside the ordinary recursive match frame.
+    #[inline(never)]
+    pub(super) fn capture_boxed(cx: &ElabCtx<'_>) -> Box<Self> {
+        Box::new(Self::capture(cx))
+    }
+
     pub(super) fn capture(cx: &ElabCtx<'_>) -> Self {
         Self {
             env_mark: env_mark(cx.env),

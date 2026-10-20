@@ -8831,6 +8831,54 @@ fn install_plain_declared_index_aliases(
     Ok(())
 }
 
+/// Build the checked constructor equation only for a demanded convoy. It
+/// must not enlarge the ordinary recursive dependent-branch stack frame.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn check_constructor_convoy_branch(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    scrut_ty: &Term,
+    scrut_core: &Term,
+    concrete: &Term,
+    n: usize,
+    expected: &Term,
+    path_base: usize,
+) -> Result<Term, ElabError> {
+    let branch_equation = Term::Eq(
+        Box::new(weaken(scrut_ty, n as i64)),
+        Box::new(weaken(scrut_core, n as i64)),
+        Box::new(concrete.clone()),
+    );
+    let position = cx.ctx.len();
+    cx.push_match_binder(branch_equation.clone(), MatchBinderOrigin::GeneratedEquation);
+    cx.hidden_positions.push(position);
+    let split_id = *cx.active_splits.last().expect("convoy has an owning split");
+    cx.path_conditions.push(PathFrame {
+        condition: weaken(&branch_equation, 1),
+        install_depth: cx.ctx.len(),
+        split_id,
+        kind: SplitKind::Constructor,
+        witness_position: Some(position),
+    });
+    let checked_goal = weaken(expected, 1);
+    let attempt = check_match_arm_result(cx, arm, &checked_goal, &arm.span).and_then(|checked| {
+        kernel_check_current(cx, &checked, &checked_goal)
+            .map(|()| checked)
+            .map_err(|error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error,
+                    span: arm.span.clone(),
+                },
+            })
+    });
+    cx.path_conditions.truncate(path_base);
+    debug_assert_eq!(cx.hidden_positions.pop(), Some(position));
+    cx.ctx.pop();
+    attempt.map(|body| Term::lam(branch_equation, body))
+}
+
 /// Check an ordinary dependent-match arm outside the wide method-construction
 /// dispatcher. Keeping this stateful fallback in a cold frame is load-bearing:
 /// the elaborator's unoptimized recursive checker runs near the spawned-thread
@@ -8866,165 +8914,24 @@ fn check_dependent_branch_body(
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
     debug_assert_eq!(cx.match_frames.last().map(|frame| frame.start_level), Some(outer_scope_depth));
     let path_base = cx.path_conditions.len();
-    let branch_equation = Term::Eq(
-        Box::new(weaken(scrut_ty, n as i64)),
-        Box::new(weaken(scrut_core, n as i64)),
-        Box::new(concrete.clone()),
-    );
     if !branch_convoy {
         push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n, 0);
     }
 
-    let outcome = (|| {
-        if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
-            install_plain_declared_index_aliases(
-                cx,
-                ind,
-                params,
-                level_args,
-                target_indices,
-                scrut_indices,
-                scrut_core,
-                concrete,
-                n,
-            )?;
-        } else {
-            install_branch_field_refinements(
-                cx,
-                ind,
-                params,
-                target_indices,
-                scrut_indices,
-                n,
-                outer_scope_depth,
-                equation_convoy,
-                expected_here,
-                concrete,
-                premise_domains,
-                sentinel_region,
-            )?;
-        }
-        install_hidden_result_refinements(
-            cx,
-            hidden_result_premise_slot,
-            scrut_ty,
-            concrete,
-            scrut_core,
-            n,
-            outer_scope_depth,
-        )?;
-        for (bottom_pos, sentinel, ctor_ty) in convoy_refinements {
-            cx.var_refinements.insert(
-                *bottom_pos,
-                (sentinel.clone(), ctor_ty.clone(), cx.ctx.len()),
-            );
-        }
-
-        let preserve_nested_goal =
-            !ind.indices.is_empty() && matches!(arm.body, RExpr::RMatch { .. });
-        let expected_unrefined = if preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _))
-        {
-                expected_here.clone()
-            } else {
-                simplify_branch_goal(cx.env, &cx.ctx, expected_here)
-            };
-        cx.match_frames.last_mut().ok_or_else(|| {
-            ElabError::Internal("dependent arm has no owning match frame".into())
-        })?.refined_target = Some(expected_unrefined.clone());
-        if let Some(premise_slot) = hidden_result_premise_slot {
-            if premise_slot >= premise_domains.len() {
-                return Err(ElabError::Internal(format!(
-                    "hidden result-refinement sentinel slot {premise_slot} exceeds region \
-                     {sentinel_region} premise telescope of length {}",
-                    premise_domains.len()
-                )));
-            }
-            cx.result_refinements.push(ResultRefinement {
-                index_ty: weaken(scrut_ty, n as i64),
-                concrete_index: concrete.clone(),
-                refined_index: weaken(scrut_core, n as i64),
-                premise_slot,
-                sentinel_region,
-                install_depth: cx.ctx.len(),
-            });
-        }
-        if !premise_domains.is_empty() {
-            if cx
-                .active_index_premise_frames
-                .iter()
-                .any(|frame| frame.sentinel_region == sentinel_region)
-            {
-                return Err(ElabError::Internal(format!(
-                    "duplicate active index-premise sentinel region {sentinel_region}"
-                )));
-            }
-            cx.active_index_premise_frames
-                .push(ActiveIndexPremiseFrame {
-                    sentinel_region,
-                    premise_domains: premise_domains.to_vec(),
-                    install_depth: cx.ctx.len(),
-                });
-        }
-        let obligation_base = cx.obligations.len();
-        let checked_goal = if branch_convoy {
-            let position = cx.ctx.len();
-            cx.push_match_binder(branch_equation.clone(), MatchBinderOrigin::GeneratedEquation);
-            cx.hidden_positions.push(position);
-            let split_id = *cx.active_splits.last().expect("convoy has an owning split");
-            cx.path_conditions.push(PathFrame {
-                condition: weaken(&branch_equation, 1),
-                install_depth: cx.ctx.len(),
-                split_id,
-                kind: SplitKind::Constructor,
-                witness_position: Some(position),
-            });
-            weaken(&expected_unrefined, 1)
-        } else { expected_unrefined.clone() };
-        // The simplified goal retains every refinement root while exposing
-        // ordinary heads needed by dependent matches and their index convoy.
-        let attempt = check_match_arm_result(cx, arm, &checked_goal, &arm.span).and_then(|checked| {
-            kernel_check_current(cx, &checked, &checked_goal)
-                .map(|()| checked)
-                .map_err(|error| match error {
-                    CurrentKernelQueryError::View(error) => error,
-                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                        error,
-                        span: arm.span.clone(),
-                    },
-                })
-        });
-        if branch_convoy {
-            cx.path_conditions.truncate(path_base);
-            let position = cx.ctx.len() - 1;
-            debug_assert_eq!(cx.hidden_positions.pop(), Some(position));
-            cx.ctx.pop();
-        }
-        let checked = match attempt {
-            Ok(checked) => checked,
-            Err(error) if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
-                || branch_convoy
-                || matches!(&error, ElabError::RefinementSplitDemand { .. }
-                    | ElabError::NonConvoyableRefinementSplit { .. }) => {
-                cx.obligations.truncate(obligation_base);
-                return Err(error);
-            }
-            Err(_) => {
-                cx.obligations.truncate(obligation_base);
-                check_match_dependent_refined_fallback(
-                    cx,
-                    arm,
-                    ind,
-                    params,
-                    target_indices,
-                    scrut_indices,
-                    n,
-                    expected_here,
-                    equation_convoy || preserve_nested_goal,
-                )?
-            }
-        };
-        wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
-    })();
+    let outcome = prepare_dependent_branch_body(
+        cx, arm, ind, params, level_args, target_indices, scrut_indices,
+        n, expected_here, premise_domains, hidden_result_premise_slot,
+        scrut_ty, concrete, scrut_core, sentinel_region,
+        convoy_refinements, equation_convoy, recursive_field_index_path,
+        outer_scope_depth,
+    ).and_then(|(goal, preserve_nested_goal)| {
+        complete_dependent_branch_body(
+            cx, arm, match_span, ind, params, target_indices, scrut_indices,
+            n, expected_here, premise_domains, scrut_ty, concrete, scrut_core,
+            sentinel_region, equation_convoy, recursive_field_index_path,
+            branch_convoy, path_base, &goal, preserve_nested_goal,
+        )
+    });
 
     cx.active_index_premise_frames
         .truncate(active_index_premise_frame_base);
@@ -9033,9 +8940,198 @@ fn check_dependent_branch_body(
     cx.active_index_refinements
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
-    outcome.map(|body| if branch_convoy {
-        Term::lam(branch_equation, body)
-    } else { body })
+    outcome
+}
+
+/// Install a dependent branch's checked refinements before descending into
+/// its result term. Its construction locals must not live across recursion.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn prepare_dependent_branch_body(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    ind: &InductiveDecl,
+    params: &[Term],
+    level_args: &[Level],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    n: usize,
+    expected_here: &Term,
+    premise_domains: &[Term],
+    hidden_result_premise_slot: Option<usize>,
+    scrut_ty: &Term,
+    concrete: &Term,
+    scrut_core: &Term,
+    sentinel_region: usize,
+    convoy_refinements: &[(usize, Term, Term)],
+    equation_convoy: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
+    outer_scope_depth: usize,
+) -> Result<(Term, bool), ElabError> {
+    if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
+        install_plain_declared_index_aliases(
+            cx,
+            ind,
+            params,
+            level_args,
+            target_indices,
+            scrut_indices,
+            scrut_core,
+            concrete,
+            n,
+        )?;
+    } else {
+        install_branch_field_refinements(
+            cx,
+            ind,
+            params,
+            target_indices,
+            scrut_indices,
+            n,
+            outer_scope_depth,
+            equation_convoy,
+            expected_here,
+            concrete,
+            premise_domains,
+            sentinel_region,
+        )?;
+    }
+    install_hidden_result_refinements(
+        cx,
+        hidden_result_premise_slot,
+        scrut_ty,
+        concrete,
+        scrut_core,
+        n,
+        outer_scope_depth,
+    )?;
+    for (bottom_pos, sentinel, ctor_ty) in convoy_refinements {
+        cx.var_refinements.insert(
+            *bottom_pos,
+            (sentinel.clone(), ctor_ty.clone(), cx.ctx.len()),
+        );
+    }
+
+    let preserve_nested_goal =
+        !ind.indices.is_empty() && matches!(arm.body, RExpr::RMatch { .. });
+    let expected_unrefined = if preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _))
+    {
+        expected_here.clone()
+    } else {
+        simplify_branch_goal(cx.env, &cx.ctx, expected_here)
+    };
+    cx.match_frames
+        .last_mut()
+        .ok_or_else(|| ElabError::Internal("dependent arm has no owning match frame".into()))?
+        .refined_target = Some(expected_unrefined.clone());
+    if let Some(premise_slot) = hidden_result_premise_slot {
+        if premise_slot >= premise_domains.len() {
+            return Err(ElabError::Internal(format!(
+                "hidden result-refinement sentinel slot {premise_slot} exceeds region \
+                 {sentinel_region} premise telescope of length {}",
+                premise_domains.len()
+            )));
+        }
+        cx.result_refinements.push(ResultRefinement {
+            index_ty: weaken(scrut_ty, n as i64),
+            concrete_index: concrete.clone(),
+            refined_index: weaken(scrut_core, n as i64),
+            premise_slot,
+            sentinel_region,
+            install_depth: cx.ctx.len(),
+        });
+    }
+    if !premise_domains.is_empty() {
+        if cx
+            .active_index_premise_frames
+            .iter()
+            .any(|frame| frame.sentinel_region == sentinel_region)
+        {
+            return Err(ElabError::Internal(format!(
+                "duplicate active index-premise sentinel region {sentinel_region}"
+            )));
+        }
+        cx.active_index_premise_frames
+            .push(ActiveIndexPremiseFrame {
+                sentinel_region,
+                premise_domains: premise_domains.to_vec(),
+                install_depth: cx.ctx.len(),
+            });
+    }
+    Ok((expected_unrefined, preserve_nested_goal))
+}
+
+/// Check a prepared branch and restore its obligation prefix on fallback.
+/// Preprocessing is complete before this recursive descent begins.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn complete_dependent_branch_body(
+    cx: &mut ElabCtx,
+    arm: &RMatchArm,
+    match_span: &Span,
+    ind: &InductiveDecl,
+    params: &[Term],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    n: usize,
+    expected_here: &Term,
+    premise_domains: &[Term],
+    scrut_ty: &Term,
+    concrete: &Term,
+    scrut_core: &Term,
+    sentinel_region: usize,
+    equation_convoy: bool,
+    recursive_field_index_path: RecursiveFieldIndexPath,
+    branch_convoy: bool,
+    path_base: usize,
+    expected_unrefined: &Term,
+    preserve_nested_goal: bool,
+) -> Result<Term, ElabError> {
+    let obligation_base = cx.obligations.len();
+    // The simplified goal retains every refinement root while exposing
+    // ordinary heads needed by dependent matches and their index convoy.
+    let attempt = if branch_convoy {
+        check_constructor_convoy_branch(
+            cx, arm, scrut_ty, scrut_core, concrete, n, expected_unrefined, path_base,
+        )
+    } else {
+        check_match_arm_result(cx, arm, expected_unrefined, &arm.span).and_then(|checked| {
+            kernel_check_current(cx, &checked, expected_unrefined)
+                .map(|()| checked)
+                .map_err(|error| match error {
+                    CurrentKernelQueryError::View(error) => error,
+                    CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                        error,
+                        span: arm.span.clone(),
+                    },
+                })
+        })
+    };
+    let checked = match attempt {
+        Ok(checked) => checked,
+        Err(error) if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
+            || branch_convoy
+            || matches!(&error, ElabError::RefinementSplitDemand { .. }
+                | ElabError::NonConvoyableRefinementSplit { .. }) => {
+            cx.obligations.truncate(obligation_base);
+            return Err(error);
+        }
+        Err(_) => {
+            cx.obligations.truncate(obligation_base);
+            check_match_dependent_refined_fallback(
+                cx,
+                arm,
+                ind,
+                params,
+                target_indices,
+                scrut_indices,
+                n,
+                expected_here,
+                equation_convoy || preserve_nested_goal,
+            )?
+        }
+    };
+    wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
 }
 
 /// Field refinements for one dependent branch. An equation-convoy branch then
@@ -9524,6 +9620,34 @@ fn subset_matrix_motive_after_tail(
     Ok(Term::Ascript(Box::new(Term::lam(*domain, body)), motive_ty))
 }
 
+/// Validate only a demanded convoy. Ordinary dependent matches retain a
+/// small motive-planning frame even when the split's equation is unavailable.
+#[inline(never)]
+fn checked_constructor_convoy_permitted(
+    cx: &ElabCtx,
+    ind: &InductiveDecl,
+    equation: Option<&str>,
+    arms: &[RMatchArm],
+    span: &Span,
+) -> Result<bool, ElabError> {
+    let requested = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
+    if !requested {
+        return Ok(false);
+    }
+    let permitted = equation.is_none()
+        && ind.indices.is_empty()
+        && ind.constructors.iter().all(|ctor| {
+            recursive_shapes(cx.env, ctor, ind.id, ind.params.len())
+                .is_ok_and(|shapes| shapes.is_empty())
+        })
+        && cx.path_conditions.iter().all(|frame| frame.install_depth <= cx.ctx.len())
+        && arms.iter().all(|arm| row_leaves_fields_unsplit(&arm.pat));
+    if !permitted {
+        return Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() });
+    }
+    Ok(true)
+}
+
 /// Check `match scrut { C₁ p… => e₁ ; … }` against a KNOWN `expected` goal
 /// that may reference the scrutinee (a per-branch-varying `Ω`- or `Type`-
 /// motive) — the K4/AC4 dependent-elimination path. Only FLAT constructor
@@ -9541,9 +9665,32 @@ fn check_match_dependent(
 ) -> Result<Term, ElabError> {
     let split_id = cx.mint_split();
     cx.active_splits.push(split_id);
-    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let snapshot = refinement_snapshot::Snapshot::capture_boxed(cx);
     let first = check_match_dependent_once(cx, scrut, equation, arms, expected, span, predicates);
-    let result = match first {
+    let result = finish_dependent_match_retry(
+        cx, first, snapshot, split_id, scrut, equation, arms, expected, span, predicates,
+    );
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+/// The retry's error matching and snapshot rollback are only entered after
+/// the first recursive branch descent, so their locals need no held frame.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn finish_dependent_match_retry(
+    cx: &mut ElabCtx,
+    first: Result<Term, ElabError>,
+    snapshot: Box<refinement_snapshot::Snapshot>,
+    split_id: u64,
+    scrut: &RExpr,
+    equation: Option<&str>,
+    arms: &[RMatchArm],
+    expected: &Term,
+    span: &Span,
+    predicates: &[ResultPredicate],
+) -> Result<Term, ElabError> {
+    match first {
         Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
             if requested == split_id => {
             snapshot.rollback(cx)?;
@@ -9551,9 +9698,7 @@ fn check_match_dependent(
             check_match_dependent_once(cx, scrut, equation, arms, expected, span, predicates)
         }
         other => other,
-    };
-    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
-    result
+    }
 }
 
 #[inline(never)]
@@ -9708,19 +9853,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             span,
             &mut motive_plan,
         )?;
-    let branch_convoy = cx.active_splits.last()
-        .is_some_and(|id| cx.convoy_splits.contains(id));
-    if branch_convoy {
-        let permitted = equation.is_none() && ind.indices.is_empty()
-            && ind.constructors.iter().all(|ctor| {
-                recursive_shapes(cx.env, ctor, ind.id, ind.params.len())
-                    .is_ok_and(|shapes| shapes.is_empty())
-            }) && cx.path_conditions.iter().all(|frame| frame.install_depth <= cx.ctx.len())
-            && arms.iter().all(|arm| row_leaves_fields_unsplit(&arm.pat));
-        if !permitted {
-            return Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() });
-        }
-    }
+    let branch_convoy = checked_constructor_convoy_permitted(cx, &ind, equation, arms, span)?;
     let motive = if branch_convoy {
         Box::new(subset_constructor_motive(*base_motive, &scrut_ty, &scrut_core))
     } else { base_motive };
