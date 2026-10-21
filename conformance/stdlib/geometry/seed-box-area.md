@@ -7,9 +7,10 @@ Spec: `spec/50-stdlib/67-geometry.md` §4, approved in Decision
 
 This source/content seed follows the approved §4 contract. Its candidate
 base is `4577ba7e3a843ad6a4326e744928e31509bd7204`; §4 and the area
-exports are not present at that base. The source fences have not been
-executed there. No shipped-seed execution, CI, publication, landing, or
-trust-measurement claim is made.
+exports were not present at that base. The package-owned roots-loader
+test now executes the positive and refused fences against the §4 exports
+and compares the exact trusted-base identities. This is not an official
+conformance-runner run, CI, publication or landing claim.
 
 The closed expected values follow the contract's inclusive natural spans:
 a point box has area 1, the box from `(0,0)` to `(2,2)` has area 9, and
@@ -168,6 +169,7 @@ theorem reject_inner_area_strictly_larger :
   IsTrue (leq_nat (Suc (area outer_box)) (area inner_box)) = Proved
 ```
 
-This seed specifies source-shaped observations only. Its two source
-fences remain unexecuted until §4 exports are available at a suitable
-base and the exact seed is run.
+This seed specifies source-shaped observations. Its two source fences
+are executed by the package-owned roots-loader test. Official
+conformance-runner execution and CI remain unmeasured; publication
+and landing are not asserted.
