@@ -1,7 +1,8 @@
 # `Argmin` — earliest least-cost candidate
 
 `argmin` selects an existing candidate with minimum natural-number cost,
-retaining the earliest candidate when costs tie.
+retaining the earliest candidate when costs tie. `argmin_option` makes the
+same selection from a possibly empty list, returning `None` for `Nil`.
 
 ## Contents
 
@@ -19,12 +20,16 @@ A nonempty finite input always has a least-cost candidate without requiring
 an equality operation on its values. Strictly comparing each tail candidate
 against the current head retains the head whenever two costs are equal.
 The input's existing `NonEmpty` carrier supplies the head and ordered tail.
+For a possibly empty `List`, the Option selector returns no value on `Nil`
+and delegates every `Cons` case to that same nonempty selection.
 
 ## Definition
 
-The operation and its seven public laws lead. Private selection helpers and
-inductive proofs follow; two generic Nat-order facts come from their canonical
-owner, `Data.Numeric.Nat.Order`.
+The nonempty operation and its seven public laws lead. Private selection
+helpers and inductive proofs follow. The Option selector, two equations and
+two `List` corollaries extend the same definition; their four case and
+transport helpers are private. Two generic Nat-order facts come from their
+canonical owner, `Data.Numeric.Nat.Order`.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, leq_nat)
@@ -250,6 +255,66 @@ theorem choose_le_yes
     True ↦ λh. (proof refl for leq_nat) (cost yes);
     False ↦ λh. (proof false_reverse_leq for lt_nat) (cost yes) (cost no) h
   }
+
+pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
+  match xs {
+    Nil ↦ None a;
+    Cons x rest ↦ Some a (argmin a cost (nonempty_cons a x rest))
+  }
+
+pub theorem argmin_option_nil
+      (a : Type) (cost : a → Nat)
+    : Equal (Option a) (argmin_option a cost (Nil a)) (None a) =
+  Proved
+
+pub theorem argmin_option_cons
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : Equal
+        (Option a)
+        (argmin_option a cost (Cons a x rest))
+        (Some a (argmin a cost (nonempty_cons a x rest))) =
+  Refl
+
+fn option_member (a : Type) (xs : List a) (outcome : Option a) : Prop =
+  match outcome {
+    None ↦ Top;
+    Some y ↦ list_elem a y xs
+  }
+
+theorem argmin_option_member_base
+      (a : Type) (cost : a → Nat) (xs : List a)
+    : option_member a xs (argmin_option a cost xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦ argmin_member a cost (nonempty_cons a x rest)
+  }
+
+pub theorem argmin_option_member
+      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
+    : Equal (Option a) (argmin_option a cost xs) (Some a y) → list_elem a y xs =
+  λfound. J (λr _. option_member a xs r) (argmin_option_member_base a cost xs) found
+
+fn option_least (a : Type) (cost : a → Nat) (xs : List a) (outcome : Option a) : Prop =
+  match outcome {
+    None ↦ Top;
+    Some y ↦ (z : a) → list_elem a z xs → IsTrue (leq_nat (cost y) (cost z))
+  }
+
+theorem argmin_option_least_base
+      (a : Type) (cost : a → Nat) (xs : List a)
+    : option_least a cost xs (argmin_option a cost xs) =
+  match xs {
+    Nil ↦ Proved;
+    Cons x rest ↦ argmin_least a cost (nonempty_cons a x rest)
+  }
+
+pub theorem argmin_option_least
+      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
+    : Equal (Option a) (argmin_option a cost xs) (Some a y)
+      → (z : a)
+      → list_elem a z xs
+      → IsTrue (leq_nat (cost y) (cost z)) =
+  λfound. J (λr _. option_least a cost xs r) (argmin_option_least_base a cost xs) found
 ```
 
 ## Using it
@@ -259,7 +324,9 @@ existing `NonEmpty` value. Construct inputs with `nonempty_singleton` or
 `nonempty_cons`; use `nonempty_to_list` to reason about the full ordered
 input. No `DecEq` or ordering on the candidate type is required. A singleton
 returns its sole value; a later candidate replaces the head only if its cost
-is strictly lower.
+is strictly lower. For a possibly empty `List`, call `argmin_option`; `None`
+means there was no candidate. When the result is `Some y`, the two direct
+corollaries establish `list_elem` membership and least cost on that list.
 
 ## Laws & proofs
 
@@ -278,6 +345,13 @@ expression is refined by a match. The generic strict/non-strict order bridges
 are public proofs attached to `lt_nat` in `Data.Numeric.Nat.Order`, not
 additional optimization laws or duplicated local recursion.
 
+`argmin_option_nil` and `argmin_option_cons` reduce the selector on both list
+constructors. The private `option_member` and `option_least` predicates assign
+`Top` to a missing result and the corresponding list proposition to `Some`.
+Their private base proofs use the existing `argmin_member` and `argmin_least`
+in the `Cons` case. `J` transports these proofs along the observed result
+equality to give the public membership and least-cost corollaries.
+
 ## Design notes
 
 `argmin_from` folds the ordered tail against the head. `cheaper` tests only
@@ -285,22 +359,25 @@ the candidates' `Nat` costs, and `choose` retains its `no` value on a false
 comparison. Using strict order rather than a non-strict replacement is what
 makes earliest-tie behavior observable. Membership is propositionally
 truncated: it certifies that the chosen value was present but is not a list
-index or a Boolean equality on arbitrary candidate values. The selector
-promises no complexity bound or result for an empty list.
+index or a Boolean equality on arbitrary candidate values. The nonempty selector
+promises no complexity bound. The Option selector handles an empty list by
+returning `None`, without introducing another selection algorithm.
 
 ## References
 
 - **Arg min — Wikipedia** — https://en.wikipedia.org/wiki/Arg_max —
   orientation on the minimum-argument operation and ties among minimizers.
 - **Ken optimization contract** — `spec/50-stdlib/72-optimization.md` §1 —
-  the seven public laws and their proof boundary.
+  the seven nonempty laws, the Option selector and their proof boundaries.
 - **Ken natural order** — `Data.Numeric.Nat.Order` — the canonical strict
   comparison and its checked non-strict bridges.
 
 ## Trust & derivation
 
-**Public API:** `argmin` and the seven `argmin_*` theorems. Selection helpers,
-branch proofs, and the list-membership induction are private. The carrier,
+**Public API:** `argmin`, its seven §1.2 theorems, `argmin_option`,
+`argmin_option_nil`, `argmin_option_cons`, `argmin_option_member`, and
+`argmin_option_least`. Selection helpers, branch proofs, the list-membership
+induction, and all four Option proof helpers are private. The carrier,
 its list view, the membership predicate, and Nat order retain their existing
 provider identities.
 
@@ -321,5 +398,10 @@ closure; this does not erase inherited assumptions.
 
 **Validation:** `conformance/stdlib/optimization/seed-argmin.md` names
 independent singleton, strict-minimum and earliest-tie observations, law
-instances and false-result refusals. The scoped acceptance target checks those
-client programs, generic law types and the exact trusted-base identity set.
+instances and false-result refusals. Its scoped acceptance target checks the
+client programs and the generic seven law types.
+`conformance/stdlib/optimization/seed-argmin-option.md` adds empty,
+singleton and non-degenerate tie cases, instances of the four Option laws,
+and an isolated false `Some`-on-`Nil` refusal. The Option target root-loads
+the public declarations, executes those cases and compares exact
+trusted-base identities with the same provider closure.
