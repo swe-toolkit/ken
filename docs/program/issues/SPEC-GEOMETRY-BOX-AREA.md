@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-AREA
 title: "Spec 67 defers box area: a client of NatBox can compare boxes by containment but cannot measure one, so nothing states that a box inside another has no greater area, or that an intersection is no larger than either input. Rule a natural-valued area and its laws from a checked D0 at zero trust, and state them as a section 4 with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
