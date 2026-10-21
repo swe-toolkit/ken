@@ -1,9 +1,9 @@
 ---
 id: LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW
-title: "A constructor-branch equation on a recursive family has no evidence term, because Ken's one recursor shares its motive with the induction hypothesis. Carry it on a case-only Elim convoy and compile structural recursion through generated below and brecOn"
-status: ready
+title: "A constructor-branch equation on a recursive family has no evidence term, because Ken's one recursor shares its motive with the induction hypothesis. Carry it on a case-only Elim convoy when the match does not consume the hypothesis"
+status: active
 owner: language
-size: L
+size: M
 tier: T1
 gate: architect
 depends_on: [LANG-REFINEMENT-SUBSET-SIGMA]
@@ -52,14 +52,26 @@ base, stop and report the mismatch.
 
 ## Deliverable
 
-- For each recursive family, elaborator-generated, kernel-checked
-  `below_D` and `brecOn_D` through `Elim` into `Type`.
-- Structural recursion compiled by projecting from `below` instead of
-  from the method's hypothesis, including in `compiler_driver`'s
-  computational-hypothesis lowering.
-- A recursive-family match with a demanding introduction beneath it
-  becomes a case-only `Elim` convoy carrying the equation and the `below`
-  dictionary. Without demand the match elaborates as on base.
+Amended by Architect ruling `evt_ffzy79zqax1b` at `664d86ee8`, which
+finds that AC-1's `sort` recurses by a direct `Const sort` self-call
+(SCT-admitted), and the method hypothesis is never read.
+
+- One predicate, "this match consumes a method hypothesis", replaces
+  the blanket recursive-family refusal in `convoyable_frame`, and is
+  applied identically in `checked_constructor_convoy_permitted` and
+  `emit_subset_evidence`. A match consumes one when an arm body holds
+  `RExpr::RRecursiveResult` or its scrutinee has a `lift_bindings`
+  entry. The family must still be unindexed.
+- A recursive-family match with demand and no hypothesis consumption
+  becomes the case-only `Elim` convoy. A consuming match, or one
+  without demand, elaborates as on base.
+- After `wrap_dependent_method_ihs` builds a convoy method, no
+  hypothesis binder of it occurs free in its body; otherwise
+  `ElabError::Internal`.
+
+Out of scope: `below_D`, `brecOn_D` and their `compiler_driver`
+lowering. They are filed as their own WP when a consuming match under
+demand exists, carrying the D0 `evt_4jsk1apebx4jr` and its constraints.
 
 ## Acceptance
 
@@ -70,20 +82,34 @@ base, stop and report the mismatch.
   carries a checked `Eq (List a) xs (Nil a)`, and the absent-equation
   assertion is replaced by one that requires it, with no proof
   invented. The `Cons` leaf's recursive call still computes the same
-  result as on base.
+  result as on base, its checked method still holds `Const sort`, and
+  its hypothesis binder is unused.
 - **AC-2.** Every landed package's emitted core is byte-identical to
-  base, and catalog and corpus obligation outcomes are identical.
+  base, and every obligation's count, kind and discharge status is
+  identical. A goal proposition may change only by gaining the branch
+  equation premise of an eligible match (Direct, non-consuming,
+  demanded), and only in that match's own arms. Any other change in
+  `Γ ⊢ φ` is the stop (Architect `evt_7f6b1pchpvyya`).
 - **AC-3.** Native and reference runtime parity unchanged across the
   recursion corpus.
-- **AC-4 (mutation).** Projecting the wrong `below` entry reddens AC-1 or
-  AC-3.
+- **AC-4 (mutation).** A new sentinel, a `recursive result for` match
+  under a refined result, is green on the candidate and elaborates as
+  on base. Dropping the consumption exclusion reddens it; restoring
+  the blanket refusal reddens AC-1.
 
 ## Stop conditions
 
-- `below_D` cannot be defined through `Elim`, or needs a kernel former or
-  trust change.
 - Any AC-2 outcome change or AC-3 parity change.
+- A third hypothesis-producing source path, a consuming match under
+  demand in the corpus (including nested-lift matches under a refined
+  result), or a demanding member in the AC-3 corpus: query the
+  Architect. A demanding convoy that hits native E0074 or E0079 is
+  `RT-NATIVE-ERASED-OMEGA-CALL-ARGUMENT`; disclose it.
 
 Checks: 4 fired: `method_type` (`inductive.rs:2138`) and
 `recursive_shapes` (`:1384`) exist at `245db5cfb`; the AC-1 subject is
 the landed sentinel test, since `pce_rec` is not on `main`.
+Amendment: 4 fired: `convoyable_frame`, `checked_constructor_convoy_permitted`
+and `emit_subset_evidence` are the three sites the Architect measured at
+`664d86ee8`. 8 fired: AC-4 uses mutants that the new sentinel and AC-1
+can tell apart, since no consuming match under demand exists.
