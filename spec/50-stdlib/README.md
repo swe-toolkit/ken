@@ -331,8 +331,9 @@ execution, CI and landed trust measurement are not claimed. A
 sorted-list normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
-**`67-geometry.md`** §§1–3 (SPEC-GEOMETRY-EXACT-CONTRACT;
-SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT).
+**`67-geometry.md`** §§1–4 (SPEC-GEOMETRY-EXACT-CONTRACT;
+SPEC-GEOMETRY-MANHATTAN-METRIC; SPEC-GEOMETRY-BOX-CONTAINMENT;
+SPEC-GEOMETRY-BOX-AREA).
 The §1 `Algorithm.Geometry.NatBox` module, closed seed and required
 public Nat Order bounds have landed. Two-coordinate `Nat` points and closed
 axis-aligned boxes (including inverted-corner empty boxes) have
@@ -350,9 +351,19 @@ authored and present at
 unmeasured. The 114 → 114 trust result and zero-residual census
 are D0 scratch measurements; they do not establish a landed trust
 measurement.
-The per-axis helper remains private. Signed-coordinate geometry,
-Euclidean and floating-point distance, box area, other dimensions,
-canonical empty boxes and point-set equality remain outside scope.
+Section 4 specifies public `area` as the product of two inclusive
+natural-coordinate spans, with zero area when either axis is inverted.
+Three generic laws state containment monotonicity without an outer-
+validity premise and zero area for each inverted axis. Intersection
+area bounds follow from monotonicity and the public §3.2 corner
+laws; no extra intersection theorem is exported. Architect checked
+the §4 D0 in scratch (rc 0, no local `Axiom`, trust identities
+114 → 114), but §4 catalog exports and seed have not been delivered;
+that scratch result is not shipped-seed execution, CI or a landed
+trust measurement. The per-axis and proof helpers remain private.
+Signed-coordinate geometry, Euclidean and floating-point distance,
+other dimensions, canonical empty boxes and point-set equality remain
+outside scope.
 
 The **exact rational-interval contract** is pinned in
 **`68-numerical.md`** §§1–3
