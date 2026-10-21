@@ -248,18 +248,22 @@ location relation or generic byte-concatenation theorem is claimed.
 Specifying §§5–6 does not claim their catalog builds have landed.
 
 The **Layer-3 graphs and dependency contract** is pinned in
-**`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT) and §2
-(SPEC-GRAPHS-CYCLE-REFUTES-ORDER). A graph has Boolean directed adjacency
+**`62-graphs.md`** §1 (SPEC-GRAPHS-DEPENDENCY-CONTRACT), §2
+(SPEC-GRAPHS-CYCLE-REFUTES-ORDER), and §3
+(SPEC-GRAPHS-WALK-COMPOSITION-ORDER). A graph has Boolean directed adjacency
 over any carrier; explicit `Finite q` permits decidable predicate
 reachability through §61 §2's existing Dfa fixed point, with a checked
 `Walk` rather than a stuttering raw word. `DecEq q` enters for a complete,
 duplicate-free topological list or a genuine cycle; the §1 catalog
 package is present on the base. §2 adds three checked generic laws:
 `before` is irreflexive and transitive for any list, and a cycle refutes
-every topological order by its forward-edge field alone. This WP
-includes the §2 seed, whose blocks CV exercised only as scratch clients;
-shipped seed-harness execution, CI and a landed trust-delta measurement
-are not established. No second fixed point is added.
+every topological order by its forward-edge field alone. Section 3
+specifies `walk_append` by recursion on the second walk and the checked
+`ordered_walk_forward` law for a walk with a first edge; the private
+`walk_before` remains unexported. The §2 seed's blocks were exercised
+only as scratch clients. Section 3's catalog exports and seed, shipped
+seed-harness execution, CI and a landed trust-delta measurement are not
+established by this spec-only candidate. No second fixed point is added.
 
 The **exact finite-support statistics contract** is pinned in
 **`63-statistics.md`** §§1–4 (SPEC-STATISTICS-EXACT-DISTRIBUTION-CONTRACT;
