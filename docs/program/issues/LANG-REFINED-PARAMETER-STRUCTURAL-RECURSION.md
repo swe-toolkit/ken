@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-PARAMETER-STRUCTURAL-RECURSION
 title: "Since subset-Σ landed, structural recursion whose decreasing parameter has a refinement type is refused by the termination gate (K0014), although the same declarations were accepted before. Restore the decreasing edge without weakening the gate"
-status: ready
+status: active
 owner: language
 size: M
 tier: T1

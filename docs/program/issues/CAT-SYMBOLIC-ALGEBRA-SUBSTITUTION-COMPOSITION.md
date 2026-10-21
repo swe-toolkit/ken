@@ -1,7 +1,7 @@
 ---
 id: CAT-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION
 title: "Algorithm.SymbolicAlgebra.NatPolynomial exports spec 66 section 4: the builder compose_subst and the structural laws substitute_compose and substitute_var, proved at zero trust from the Architect's D0 development, with the composition seed run by a package test"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2

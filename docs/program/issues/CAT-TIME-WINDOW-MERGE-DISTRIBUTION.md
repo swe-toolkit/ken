@@ -1,7 +1,7 @@
 ---
 id: CAT-TIME-WINDOW-MERGE-DISTRIBUTION
 title: "Data.Time.EventTrace exports spec 69 section 3: trace_window_merge, the structural law that windowing an ordered merge equals merging the windowed inputs, proved at zero trust from the Architect's D0 development, with Data.Collections.Derived's filter_starts_after made public and the distribution seed run by a package test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
