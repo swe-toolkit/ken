@@ -85,7 +85,11 @@ demand exists, carrying the D0 `evt_4jsk1apebx4jr` and its constraints.
   result as on base, its checked method still holds `Const sort`, and
   its hypothesis binder is unused.
 - **AC-2.** Every landed package's emitted core is byte-identical to
-  base, and catalog and corpus obligation outcomes are identical.
+  base, and every obligation's count, kind and discharge status is
+  identical. A goal proposition may change only by gaining the branch
+  equation premise of an eligible match (Direct, non-consuming,
+  demanded), and only in that match's own arms. Any other change in
+  `Γ ⊢ φ` is the stop (Architect `evt_7f6b1pchpvyya`).
 - **AC-3.** Native and reference runtime parity unchanged across the
   recursion corpus.
 - **AC-4 (mutation).** A new sentinel, a `recursive result for` match
