@@ -1,7 +1,7 @@
 ---
 id: LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW
 title: "A constructor-branch equation on a recursive family has no evidence term, because Ken's one recursor shares its motive with the induction hypothesis. Carry it on a case-only Elim convoy when the match does not consume the hypothesis"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1

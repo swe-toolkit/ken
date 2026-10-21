@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY
 title: "Spec 65 adds vectors but not matrices: a client of NatMatrix can multiply matrices but cannot sum them, so nothing states that a matrix product distributes over a matrix sum. Rule a componentwise matrix sum and its distributivity laws from a checked D0 at zero trust, and state them as a section 4 with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1

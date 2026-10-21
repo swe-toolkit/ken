@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER
 title: "HELD INPUT to RT-BRACKET-LOWERING-AND-D0-REFUTER (child 3). At px8ta depth 3, natively and under either settlement mode, the existing computational-producer route never drives the middle bracket's body: after the second acquire it reaches the outer region's settlement S524, whose ResourceBodyResult scrutinee at origin 509 is unwritten (tag 0), and it traps with planned identity 40. The interpreter opens 1, 2, 3 and releases 3, 2, 1. Keep the as-shipped InPlace route releasing 3, 2, 1, and refuse nested Deferred settlement at planning instead of ordering it (Architect evt_3d42r13m743t). THIS NODE DOES NOT LAND ALONE: its reviewed tip is assembled by child 3."
-status: active
+status: draft
 owner: runtime
 size: M
 gate: none
@@ -17,6 +17,11 @@ origin: "Architect scope ruling evt_4yf9jdc9veepy on child 3's 4th advancing sto
 > partial landing.
 
 # Nested bracket bodies run in order on the producer route
+
+Paused by the Steward recut of 2026-10-21 (`evt_1gxk3pcr6rgw2`): this
+is link 5 of the bracket chain and is rebuilt on `main` after
+`RT-BRACKET-LOWERING-AND-D0-REFUTER` lands. Its held refs are never
+moved, rebased or landed.
 
 ## Objective
 
