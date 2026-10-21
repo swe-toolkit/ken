@@ -4,13 +4,11 @@ Availability: **current**
 
 Authority: **derived reference**
 
-This path-preserving index is generated from the first heading of every checked
-catalog package document. At this revision, the command returns all 39 package
-subjects:
-
-```sh
-git grep -n '^# ' -- 'catalog/packages/**/*.ken.md'
-```
+This path-preserving index records the first heading of the 40 package sources
+represented by registered catalog cards. A raw `^# ` search finds one first
+heading in each of 76 checked package documents; the other 36 sources have no
+registered card in this index. Thus the raw heading population is larger than
+the card-derived subject population.
 
 ```text
 catalog/packages/Application/CommandLine/ArgParse.ken.md:1:# ArgParse
@@ -45,15 +43,15 @@ catalog/packages/Data/Collections/Derived.ken.md:1:# `Collections` — derived c
 catalog/packages/Data/Collections/Map.ken.md:1:# `Map`/`Set` — a proved, pure ordered binary search tree
 catalog/packages/Data/Collections/NonEmpty.ken.md:1:# `NonEmpty` — lists with a structural head
 catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md:1:# `Nat` arithmetic — canonical operations and free algebraic laws
-catalog/packages/Data/Numeric/Nat/Order.ken.md:1:# `Ord Nat` — a lawful total order on `Nat`, and its operations
+catalog/packages/Data/Numeric/Nat/Order.ken.md:1:# `Ord Nat` — the reader-facing order facade and `Nat` operations
 catalog/packages/Data/Sums/Combinators.ken.md:1:# `Sums` — the `Option`/`Result`/`Either` combinator floor
 catalog/packages/Data/Sums/Validation.ken.md:1:# `Validation` — accumulating independent errors
+catalog/packages/Data/Time/EventTrace.ken.md:1:# Finite event traces
 catalog/packages/Data/Text/Codec.ken.md:1:# `Data.Text.Codec` — safe UTF-8 and ASCII views
 catalog/packages/Data/Text/StringBijection.ken.md:1:# String/List-Char retraction and injectivity certificate
 catalog/packages/Data/Text/StringKeys.ken.md:1:# `Data.Text.StringKeys` — lawful String equality and order
 catalog/packages/Tooling/Testing/Property.ken.md:1:# `Tooling.Testing.Property` — deterministic finite property checks
 ```
 
-The path and heading together are the generated subject identity. The index
-does not infer declarations, laws, effects, assurance, platform, maturity, or
-dependency facts.
+The path and heading together identify each subject. The index does not infer
+declarations, laws, effects, assurance, platform, maturity, or dependency facts.

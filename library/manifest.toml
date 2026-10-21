@@ -1406,6 +1406,24 @@ validation = [
 owner = "doc"
 
 [[document]]
+path = "library/reference/catalog/Data/Time/EventTrace.md"
+kind = "reference"
+audience = ["human-reader", "agent-reader"]
+authority = "derived-reference"
+availability = "current"
+sources = [
+  "catalog/packages/Data/Time/EventTrace.ken.md",
+  "docs/program/wave-5-format-capability.md#d0-and-d1--capability-and-disposition",
+  "docs/program/06-catalog-campaign.md",
+]
+validation = [
+  "manifest-coverage", "manifest-completeness", "document-kind", "links",
+  "source-anchors", "availability-label", "authority-class",
+  "transport-delimiter", "source-currency",
+]
+owner = "doc"
+
+[[document]]
 path = "library/reference/catalog/Data/Numeric/Nat/Arithmetic.md"
 kind = "reference"
 audience = ["human-reader", "agent-reader"]

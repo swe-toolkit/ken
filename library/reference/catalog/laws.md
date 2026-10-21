@@ -7,7 +7,7 @@ Authority: **derived reference**
 ## Population and disposition
 
 This index projects the Law row from every landed catalog card. Its population
-is 39 of 39 cards: 27 rows are `authored` and 12 are `none-declared`. A
+is 40 of 40 cards: 29 rows are `authored` and 11 are `none-declared`. A
 `none-declared` entry means exactly that the cited card records no law in its
 canonical checked fences; it is not an inference from an omitted index entry.
 
@@ -41,13 +41,14 @@ canonical checked fences; it is not an inference from an omitted index entry.
 | [Core/Logic/EmptyDec](Core/Logic/EmptyDec.md) | `authored` | `yes_is_true` and `no_is_false` check `decide`'s two computation facts; the local `DecEq` record carries its soundness and completeness contract. |
 | [Core/Logic/Transport](Core/Logic/Transport.md) | `authored` | `cong`, `sym`, and `trans` are theorem declarations whose checked bodies prove the properties they name; the checked `sym_trans_compose` example exercises their composition. No additional internal law is declared. |
 | [Data/Binary/BytesKeys](Data/Binary/BytesKeys.md) | `authored` | Checked injectivity, soundness, and completeness theorems discharge both dictionaries. |
-| [Data/Collections/Derived](Data/Collections/Derived.md) | `authored` | The canonical fences contain checked structural, length, sorting, projection, and round-trip-derived proofs, including list decomposition and verified `List Bool` permutation/sortedness. |
+| [Data/Collections/Derived](Data/Collections/Derived.md) | `authored` | The canonical fences contain checked structural, length, sorting, projection, and round-trip-derived proofs, including list decomposition, verified `List Bool` permutation/sortedness, and the sorted-list `filter_starts_after` theorem. |
 | [Data/Collections/Map](Data/Collections/Map.md) | `authored` | Checked proofs cover order preservation, lookup after insertion and locality, ordered traversal, associative-list agreement, keyed-operation characterizations, and set algebra. |
 | [Data/Collections/NonEmpty](Data/Collections/NonEmpty.md) | `authored` | A checked three-value structural proof lifts list-append associativity to `nonempty_append` and inhabits the semigroup law. |
 | [Data/Numeric/Nat/Arithmetic](Data/Numeric/Nat/Arithmetic.md) | `authored` | Checked attached proofs establish zero, successor, identity, commutativity, associativity, and left/right distributivity laws for addition and multiplication. |
 | [Data/Numeric/Nat/Order](Data/Numeric/Nat/Order.md) | `authored` | Checked structural proofs establish reflexivity, antisymmetry, transitivity, and totality; the dictionary fields are inhabited by those proofs. |
 | [Data/Sums/Combinators](Data/Sums/Combinators.md) | `authored` | Every combinator is paired with checked constructor equations, and `swap` has a checked involution proof; each reduces by direct case analysis. |
 | [Data/Sums/Validation](Data/Sums/Validation.md) | `authored` | Checked proofs establish functor identity/fusion and applicative identity, homomorphism, interchange, composition, and map coherence. |
+| [Data/Time/EventTrace](Data/Time/EventTrace.md) | `authored` | `trace_window_ordered` requires an ordered input; `trace_merge_ordered` and `trace_window_merge` require both inputs ordered. Window-membership and merge-count laws have no ordering premise. |
 | [Data/Text/Codec](Data/Text/Codec.md) | `authored` | Checked proofs expose the decode definition, preserve absent and present `ascii_view` cases, and carry the existing one-way `BytesRoundTripLaw` without strengthening it. |
 | [Data/Text/StringBijection](Data/Text/StringBijection.md) | `authored` | The checked injectivity theorem follows from the named retraction using symmetry, congruence, and transitivity. |
 | [Data/Text/StringKeys](Data/Text/StringKeys.md) | `authored` | Checked soundness, completeness, reflexivity, antisymmetry, transitivity, and totality proofs inhabit the dictionary fields. |
