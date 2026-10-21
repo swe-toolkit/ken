@@ -4,6 +4,7 @@ use ken_elaborator::{
     ElabEnv, ElabError, ObligationKind,
 };
 use ken_kernel::{Decl, KernelError};
+use std::collections::BTreeSet;
 
 const Q1: &str = "def AnyNat = { x : Nat | Top }\n\
     fn f (n : AnyNat) : Nat = match n { Zero |-> Zero ; Suc m |-> f m }";
@@ -61,6 +62,82 @@ fn refined_parameter_package_contains_recursive_private_worker() {
         .recursion_metadata
         .values()
         .any(|meta| meta.group_members.contains(wrapper)));
+}
+
+/// Promise class: durable invariant (spec 17 §4, spec 39 §5.4).
+/// MEASURED: a checked later subset-Σ domain whose equality predicate uses
+/// the earlier refined parameter remains well-typed after both are split in
+/// the worker telescope, and structural descent is admitted. CLAIMED: later
+/// refined descriptors are rebased with earlier binders, not reused in the
+/// original context. THE GAP: these cover immediate and one-intervening-
+/// binder dependencies, not all higher-arity dependent telescopes.
+#[test]
+fn dependent_second_refinement_uses_split_first_parameter_context() {
+    let mut env = ElabEnv::new().expect("prelude");
+    env.elaborate_decl("def AnyNat = { x : Nat | Top }")
+        .expect("refinement alias");
+    env.elaborate_decl(
+        "fn nonrecursive (n : AnyNat) (m : { y : Nat | Equal Nat y n }) : Nat = Zero",
+    )
+    .expect("dependent refinement is supported independently of recursion");
+    let trust_before = env.env.trusted_base();
+    let result = env
+        .elaborate_decl_v1(
+            "fn dependent (n : AnyNat) (m : { y : Nat | Equal Nat y n }) : Nat = \
+             match n { Zero |-> Zero ; Suc p |-> Suc (dependent p p) }",
+        )
+        .expect("structural recursion through a dependent later refinement");
+    assert_eq!(result.auxiliary_ids.len(), 1);
+    assert!(env.env.is_recursive_transparent(result.auxiliary_ids[0]));
+    assert!(!env.env.is_recursive_transparent(result.def_id));
+    assert!(!env
+        .globals
+        .values()
+        .any(|id| *id == result.auxiliary_ids[0]));
+    assert!(result.obligations.iter().any(|obligation| {
+        matches!(obligation.kind, ObligationKind::RefinementIntroduction)
+            && !env.is_open_hole(obligation.hole_id)
+    }));
+    // Proof search may leave the dependent equality's second introduction
+    // open; that source obligation, never the checked worker, is its owner.
+    let open = result
+        .obligations
+        .iter()
+        .filter(|obligation| env.is_open_hole(obligation.hole_id))
+        .map(|obligation| obligation.hole_id)
+        .collect::<BTreeSet<_>>();
+    let new_trust = env
+        .env
+        .trusted_base()
+        .into_iter()
+        .filter(|id| !trust_before.contains(id))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(new_trust, open, "worker admission must add no trust");
+
+    // The later refined domain now sits beyond an ordinary `acc` binder;
+    // its cached predicate must rebase n at depth two, not depth one.
+    let trust_before = env.env.trusted_base();
+    let separated = env
+        .elaborate_decl_v1(
+            "fn separated (n : AnyNat) (acc : Nat) (m : { y : Nat | Equal Nat y n }) : Nat = \
+             match n { Zero |-> acc ; Suc p |-> separated p (Suc acc) p }",
+        )
+        .expect("dependency across an intervening binder must check");
+    assert_eq!(separated.auxiliary_ids.len(), 1);
+    assert!(env.env.is_recursive_transparent(separated.auxiliary_ids[0]));
+    let open = separated
+        .obligations
+        .iter()
+        .filter(|obligation| env.is_open_hole(obligation.hole_id))
+        .map(|obligation| obligation.hole_id)
+        .collect::<BTreeSet<_>>();
+    let new_trust = env
+        .env
+        .trusted_base()
+        .into_iter()
+        .filter(|id| !trust_before.contains(id))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(new_trust, open, "worker admission must add no trust");
 }
 
 fn one_solved_introduction(env: &mut ElabEnv, source: &str) {

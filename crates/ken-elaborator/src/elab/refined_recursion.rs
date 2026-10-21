@@ -6,6 +6,7 @@
 //! worker attempt falls back to admission of the original bodies.
 
 use super::*;
+use ken_kernel::subst::subst_var;
 
 struct RefinedMember {
     id: GlobalId,
@@ -21,11 +22,37 @@ struct RefinedWorkerPlan {
     members: Vec<RefinedMember>,
 }
 
-/// Substitute the old binder with the pair in two NEW binders. Old outer
-/// variables shift up twice before substitution removes the old binder; the
-/// result is in the context `..., x, h` (indices 1 and 0 respectively).
+/// Replace a refined binder under `depth` later binders with its split pair.
+/// Old outer variables shift up twice before substitution removes the old
+/// binder; in the resulting context its carrier and proof have indices
+/// `depth + 1` and `depth` respectively.
+fn split_refined_under(term: &Term, depth: usize) -> Term {
+    let pair = Term::pair(Term::var(depth + 1), Term::var(depth));
+    subst_var(&shift(term, 2, depth + 1), depth, &pair)
+}
+
 fn split_refined_binder(body: &Term) -> Term {
-    subst0(&shift(body, 2, 1), &Term::pair(Term::var(1), Term::var(0)))
+    split_refined_under(body, 0)
+}
+
+/// Cached later subset domains were classified under the original telescope.
+/// Rebase both components for each later domain: its carrier is under one
+/// binder per intervening parameter, and its predicate has one more binder
+/// for the subset carrier. Without this, a dependent second refinement still
+/// refers to the removed original binder even after its Pi/Lam body is split.
+fn split_later_positions(positions: &[Option<(Term, Term)>]) -> Vec<Option<(Term, Term)>> {
+    positions
+        .iter()
+        .enumerate()
+        .map(|(depth, position)| {
+            position.as_ref().map(|(carrier, predicate)| {
+                (
+                    split_refined_under(carrier, depth),
+                    split_refined_under(predicate, depth + 1),
+                )
+            })
+        })
+        .collect()
 }
 
 fn subset_domain(env: &GlobalEnv, ctx: &Context, domain: &Term) -> Option<(Term, Term)> {
@@ -56,7 +83,8 @@ fn worker_type(ty: &Term, positions: &[Option<(Term, Term)>]) -> Option<Term> {
             // classified subset. Later domains and the result retain their
             // original meaning by replacing the old pair binder.
             let rest = split_refined_binder(codomain);
-            let rest = worker_type(&rest, remaining)?;
+            let later = split_later_positions(remaining);
+            let rest = worker_type(&rest, &later)?;
             Some(Term::pi(carrier.clone(), Term::pi(predicate.clone(), rest)))
         }
         None => Some(Term::pi(
@@ -78,7 +106,8 @@ fn split_body(body: &Term, positions: &[Option<(Term, Term)>]) -> Option<Term> {
     };
     match position {
         Some((carrier, predicate)) => {
-            let inner = split_body(&split_refined_binder(inner), remaining)?;
+            let later = split_later_positions(remaining);
+            let inner = split_body(&split_refined_binder(inner), &later)?;
             Some(Term::lam(
                 carrier.clone(),
                 Term::lam(predicate.clone(), inner),
