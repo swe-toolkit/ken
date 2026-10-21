@@ -8715,7 +8715,7 @@ mod package_route_example_declarations {
         );
         assert_eq!(
             package_source.package.core_semantic_hash,
-            0x2d5a_715c_51d1_e896
+            0x4401_b7e1_d50b_abfc
         );
         assert_eq!(
             package_literate.package.core_semantic_hash, package_source.package.core_semantic_hash,
@@ -8751,7 +8751,7 @@ mod package_route_example_declarations {
         );
         assert_eq!(
             denotation_source.package.core_semantic_hash,
-            0xbc49_4e5f_2e9e_4885
+            0x5275_b6db_8ccc_8d8a
         );
         assert_eq!(
             denotation_literate.package.core_semantic_hash,

@@ -363,16 +363,16 @@ fn span_plan_diagnostics_preserve_specialized_and_deferred_rows() {
             .find(|(owner, _)| *owner == owner_four_origin)
             .map(|(_, members)| members.as_slice())
             .expect("span owner 4 retains a pending-Vis protocol after source drive");
-        assert_eq!(returned, &[528], "span owner 4 returns only its non-relay Vis");
+        assert_eq!(returned, &[536], "span owner 4 returns only its non-relay Vis");
         let owner_six = plan.static_response_owners.iter().find(|owner| owner.owner == 6)
             .expect("owner 6 stays specialized");
         let owner_six_row = plan.all_static_response_rows.get(owner_six.response as usize)
             .expect("owner 6 must name an installed response row");
-        assert_eq!(owner_six_row.vis_origin, 744, "fixture-local owner 6 Vis");
+        assert_eq!(owner_six_row.vis_origin, 752, "fixture-local owner 6 Vis");
         assert_eq!(owner_six_row.base_owner, owner_six.base_owner,
             "owner 6 must match its specialized response row");
         assert!(matches!(plan.static_response_deferred.as_slice(), [row]
-            if row.vis_origin == 1079 && row.sub_case == "ContinuationBodyTail"
+            if row.vis_origin == 1087 && row.sub_case == "ContinuationBodyTail"
                 && row.handler_owner.is_none()),
             "Vis1079 stays Deferred with no handler owner: {:?}", plan.static_response_deferred);
     });

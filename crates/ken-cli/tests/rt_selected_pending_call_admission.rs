@@ -61,11 +61,11 @@ fn selected_pending_call_admits_validated_owner_without_a_package() {
     let (candidates, owner, visited, traversed_families, gates, gate_binder_pairs) = admitted[0];
     assert_eq!(*owner, 3);
     assert_eq!(candidates.iter().map(|candidate| (candidate.arm, candidate.body))
-        .collect::<Vec<_>>(), vec![(0, 343), (1, 322)]);
+        .collect::<Vec<_>>(), vec![(0, 351), (1, 330)]);
     assert!(candidates.iter().all(|candidate| matches!(candidate.callee,
         ken_runtime::SelectedPendingCalleeObservation::StaticResponseOwner(_))),
         "every admitted leaf's direct callee must be validated by its owner");
-    for expected in [(311, "F1"), (96, "F1"), (55, "F1"), (49, "F3"), (47, "F4")] {
+    for expected in [(316, "F1"), (96, "F1"), (55, "F1"), (49, "F3"), (47, "F4")] {
         assert!(visited.contains(&expected), "missing route visit {expected:?}: {visited:?}");
     }
     let derived = visited.iter()

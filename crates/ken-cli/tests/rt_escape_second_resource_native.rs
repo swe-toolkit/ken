@@ -995,7 +995,7 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
         let selected = &owner.selected_caller;
         for component in [
             "emission_owner: Specialization(ContinuationSpecializationId(5))",
-            "producer_construct_origin: StaticOriginId(528)",
+            "producer_construct_origin: StaticOriginId(536)",
             "producer_alternative: 1",
             "target: ContinuationSpecializationId(6)",
             "recursive_position: 1",

@@ -748,7 +748,7 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     // is the last one emitted; its planned record tail places it on the
     // pending-Vis verifier.
     let refused = frames.last().expect("the refused owner was emitted");
-    assert_eq!(refused.owner_origin, 578, "the refused owner is the protocol owner");
+    assert_eq!(refused.owner_origin, 586, "the refused owner is the protocol owner");
     assert!(refused.widths.is_some(), "the refused owner took the pending-Vis arm: {frames:?}");
 }
 

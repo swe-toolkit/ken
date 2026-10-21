@@ -71,7 +71,7 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
 
             // The unforced row is the owner-installation control. Each forced
             // row changes only the protocol classification of that same source.
-            for forced_owner in [None, Some(890_u32), Some(768_u32)] {
+            for forced_owner in [None, Some(898_u32), Some(776_u32)] {
                 let build = || {
                     ken_cli::build_native_program(
                         source,
@@ -100,8 +100,8 @@ fn forced_underived_owner_either_refuses_or_preserves_performed_operations() {
                             .map(|row| (row.vis_origin, row.operation.as_str()))
                             .collect::<Vec<_>>();
                         assert!(
-                            rows.contains(&(768, "FsReadAt"))
-                                && rows.contains(&(890, "BufferAllocate")),
+                            rows.contains(&(776, "FsReadAt"))
+                                && rows.contains(&(898, "BufferAllocate")),
                             "the unforced fixture must install both forced operands: {rows:?}"
                         );
                         assert_eq!(
