@@ -4,10 +4,11 @@ Availability: **current**
 
 Authority: **derived reference**
 
-This path-preserving index records the first heading of each of the 40 checked
-catalog package documents. Each path and heading form one package subject.
-A raw heading search also returns section headings within each document, so it
-is not a command for producing this index.
+This path-preserving index records the first heading of the 40 package sources
+represented by registered catalog cards. A raw `^# ` search finds one first
+heading in each of 76 checked package documents; the other 36 sources have no
+registered card in this index. Thus the raw heading population is larger than
+the card-derived subject population.
 
 ```text
 catalog/packages/Application/CommandLine/ArgParse.ken.md:1:# ArgParse
