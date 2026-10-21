@@ -220,3 +220,30 @@ fn requires_argument_is_checked_binder_or_hole_applied_to_checked_binder() {
         "reported hole is applied to Γ including the checked Eq binder"
     );
 }
+
+/// MEASURED: the related but non-convertible Requires goal keeps exactly one
+/// open hole under Γ, Eq Bool b True. CLAIMED: R2 convoy demand cannot be
+/// removed without weakening that reported hole's logical context. THE GAP:
+/// this row is independently mutation-red even if the direct-equality row
+/// aborts first when R2 is removed.
+#[test]
+fn related_requires_hole_independently_needs_the_checked_if_equation() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let results = env
+        .elaborate_file_v1(
+            "fn indirect (b : Bool) : Bool requires Not (Equal Bool b False) = b\n\
+         fn outside (b : Bool) : Bool = indirect b\n\
+         fn inside (b : Bool) : Bool = if b then indirect b else b",
+        )
+        .expect("related Requires call admits with an open checked-convoy hole");
+    let plain = single(&env, result(&results, "outside"), ObligationKind::Requires);
+    let (_, body) = peel_pis(&plain.goal_closed);
+    let inside = single(&env, result(&results, "inside"), ObligationKind::Requires);
+    assert_eq!(
+        inside.goal_closed,
+        Term::pi(
+            Term::indformer(env.globals["Bool"], vec![]),
+            Term::pi(eq_bool(&env, 0, "True"), weaken(body, 1)),
+        )
+    );
+}
