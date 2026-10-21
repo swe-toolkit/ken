@@ -18,6 +18,26 @@ pub(super) fn match_consumes_method_ih(
         })
 }
 
+/// Only direct recursive fields use the exact-motive method builder. Pi,
+/// Sigma, and Former fields use distinct IH builders, so a match containing
+/// any of them must retain its base path even if the source never reads an IH.
+pub(super) fn direct_recursive_fields_only(
+    env: &GlobalEnv,
+    ind: &InductiveDecl,
+) -> Result<bool, ken_kernel::KernelError> {
+    for ctor in &ind.constructors {
+        for argument in recursive_shapes(env, ctor, ind.id, ind.params.len())? {
+            if !matches!(
+                argument.shape,
+                ken_kernel::inductive::RecursiveShape::Direct { .. }
+            ) {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
+}
+
 fn type_contains_recursive_result(ty: &RType) -> bool {
     match ty {
         RType::RPi(_, domain, codomain, _)

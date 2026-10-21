@@ -115,15 +115,6 @@ fn recursive_unindexed_case_only_result_goals_carry_checked_equations() {
             "Nat",
             1,
         ),
-        (
-            format!(
-                "{FIVE}{ROSE}fn nested (r : DRose) (x : Int) : Five = \
-             match r {{ DLeaf ↦ x; DNode kids ↦ x }}"
-            ),
-            "nested",
-            "DRose",
-            2,
-        ),
     ] {
         let (env, result) = checked(&source, count);
         assert_eq!(
@@ -143,6 +134,86 @@ fn recursive_unindexed_case_only_result_goals_carry_checked_equations() {
         };
         check(&env.env, &Context::new(), body, ty).expect("kernel checks recursive subset results");
     }
+}
+
+/// Promise class: transition sentinel for a future structured-IH convoy.
+/// MEASURED: a demanding, non-consuming `Former`-field match retains the
+/// existing checked body and open goals without a `DRose` constructor Eq.
+/// CLAIMED: non-direct fields take the base method builder, even though
+/// direct recursive fields can now carry an equation. THE GAP: this does not
+/// by itself control Pi/Sigma shapes; mutation of the shared shape guard
+/// must reject this exact fixture during declaration admission.
+#[test]
+fn structured_recursive_family_under_demand_keeps_base_path() {
+    let source = format!(
+        "{FIVE}{ROSE}fn nested (r : DRose) (x : Int) : Five = \
+         match r {{ DLeaf ↦ x; DNode kids ↦ x }}"
+    );
+    let (env, result) = checked(&source, 2);
+    assert_eq!(env.globals["nested"], result.def_id);
+    assert!(
+        result.obligations.iter().all(|goal| matches!(
+            goal.kind,
+            ObligationKind::RefinementIntroduction
+        ) && env.is_open_hole(goal.hole_id)
+            && !has_equation_for_family(&goal.goal_closed, env.globals["DRose"])),
+        "a structured recursive field retains the base open goals"
+    );
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("structured result is a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks the structured result");
+}
+
+/// Promise class: transition sentinel for future consuming-IH convoys
+/// (22 §3, 34 §3.3). MEASURED: a nested former's generated List lift and
+/// `recursive result for rest` are consumed beneath a refined result. The
+/// Nil obligation is discharged, the Cons obligation remains open, and
+/// neither gains a constructor equation for the lifted List or NRose.
+/// CLAIMED: an IH consumer never enters the case-only convoy. THE GAP: this has
+/// both selector and lift-binding provenance; the classifier's two arms
+/// need separate controls if they are later refactored independently.
+#[test]
+fn recursive_result_selector_under_refined_result_keeps_consuming_base_path() {
+    let source = r#"
+        data NRose : Type where {
+            NLeaf : NRose ; NNode : List (Pair String NRose) -> NRose
+        }
+        fn rsize (r : NRose) : { n : Nat | Equal Nat n (Suc Zero) } =
+            match r {
+                NLeaf |-> Suc Zero ;
+                NNode members |-> match members {
+                    Nil |-> Zero ;
+                    Cons member rest |-> recursive result for rest
+                }
+            }
+    "#;
+    let (env, result) = checked(source, 2);
+    assert_eq!(env.globals["rsize"], result.def_id);
+    assert_eq!(
+        result
+            .obligations
+            .iter()
+            .map(|goal| env.is_open_hole(goal.hole_id))
+            .collect::<Vec<_>>(),
+        [false, true],
+        "the trivial Nil proof and open Cons proof retain their base dispositions"
+    );
+    for goal in &result.obligations {
+        assert!(matches!(goal.kind, ObligationKind::RefinementIntroduction));
+        assert!(
+            !has_equation_for_family(&goal.goal_closed, env.globals["List"]),
+            "lifted List must not receive a convoy Eq: {goal:?}"
+        );
+        assert!(
+            !has_equation_for_family(&goal.goal_closed, env.globals["NRose"]),
+            "enclosing NRose must not receive a convoy Eq: {goal:?}"
+        );
+    }
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("nested P2 result is a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks the consuming result");
 }
 
 /// Promise class: durable indexed refusal. The homogeneous fixed-index

@@ -922,9 +922,9 @@ struct ElabCtx<'e> {
     next_split_id: u64,
     active_splits: Vec<u64>,
     convoy_splits: HashSet<u64>,
-    /// Classify each active match once from resolved source and checked lift
-    /// provenance; all three recursive-convoy gates consult the same answer.
-    ih_consuming_splits: HashSet<u64>,
+    /// Source IH consumption and kernel recursive-field shape classify each
+    /// split once; every recursive-convoy gate consults the same refusal.
+    recursive_convoy_refused_splits: HashSet<u64>,
     /// One-shot result-position channel. Never visible to a subterm check.
     result_predicates: Vec<ResultPredicate>,
     /// The typeclass registry, when available — needed only for `.field`
@@ -1180,7 +1180,7 @@ impl<'e> ElabCtx<'e> {
             next_split_id: 0,
             active_splits: Vec::new(),
             convoy_splits: HashSet::new(),
-            ih_consuming_splits: HashSet::new(),
+            recursive_convoy_refused_splits: HashSet::new(),
             result_predicates: Vec::new(),
             class_env: None,
             standard_operators: None,
@@ -9649,13 +9649,13 @@ fn checked_constructor_convoy_permitted(
     if !requested {
         return Ok(false);
     }
-    let consumes_ih = cx.active_splits.last().is_some_and(|id| cx.ih_consuming_splits.contains(id));
+    let refused = cx.active_splits.last().is_some_and(|id| cx.recursive_convoy_refused_splits.contains(id));
     let permitted = equation.is_none()
         && ind.indices.is_empty()
         && (ind.constructors.iter().all(|ctor| {
             recursive_shapes(cx.env, ctor, ind.id, ind.params.len())
                 .is_ok_and(|shapes| shapes.is_empty())
-        }) || !consumes_ih)
+        }) || !refused)
         && cx.path_conditions.iter().all(|frame| frame.install_depth <= cx.ctx.len())
         && arms.iter().all(|arm| row_leaves_fields_unsplit(&arm.pat));
     if !permitted {
@@ -9687,7 +9687,7 @@ fn check_match_dependent(
         cx, first, snapshot, split_id, scrut, equation, arms, expected, span, predicates,
     );
     debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
-    cx.ih_consuming_splits.remove(&split_id);
+    cx.recursive_convoy_refused_splits.remove(&split_id);
     result
 }
 
@@ -9803,9 +9803,14 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         Some(original_expected.clone()),
         scrutinee_level,
     );
-    if recursive_branch_convoy::match_consumes_method_ih(cx, arms, scrutinee_level) {
+    // One answer for all three convoy gates. A shape classifier error cannot
+    // make the case-only path eligible; leave the original path to diagnose it.
+    let refused = recursive_branch_convoy::match_consumes_method_ih(cx, arms, scrutinee_level)
+        || !ind.indices.is_empty()
+        || !recursive_branch_convoy::direct_recursive_fields_only(cx.env, &ind).unwrap_or(false);
+    if refused {
         let split_id = *cx.active_splits.last().expect("dependent match has an active split");
-        cx.ih_consuming_splits.insert(split_id);
+        cx.recursive_convoy_refused_splits.insert(split_id);
     }
     let recursive_field_index_path = recursive_field_index_path(
         cx,
@@ -14555,9 +14560,9 @@ fn demanded_refinement_splits(
     demanded
 }
 
-/// A recursive unindexed constructor branch has no checked equation until
-/// LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW. An open obligation closes over only
-/// evidenced Γ (22 §3), so this frame supplies neither premise nor demand.
+/// A consuming or non-direct recursive unindexed branch has no checked
+/// constructor equation. Open obligations close over only evidenced Γ, so
+/// that frame supplies neither premise nor convoy demand (22 §3).
 #[inline(never)]
 fn recursive_unindexed_split(
     cx: &ElabCtx<'_>, frame: &PathFrame, span: &Span,
@@ -14575,7 +14580,7 @@ fn recursive_unindexed_split(
             .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?
             .is_empty()
         {
-            return Ok(cx.ih_consuming_splits.contains(&frame.split_id));
+            return Ok(cx.recursive_convoy_refused_splits.contains(&frame.split_id));
         }
     }
     Ok(false)
@@ -14595,7 +14600,7 @@ fn convoyable_frame(cx: &ElabCtx<'_>, frame: &PathFrame, span: &Span) -> Result<
             .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?
             .is_empty()
         {
-            return Ok(!cx.ih_consuming_splits.contains(&frame.split_id));
+            return Ok(!cx.recursive_convoy_refused_splits.contains(&frame.split_id));
         }
     }
     Ok(true)

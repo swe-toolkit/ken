@@ -23,7 +23,7 @@ pub(super) struct Snapshot {
     next_split_id: u64,
     active_splits: Vec<u64>,
     convoy_splits: HashSet<u64>,
-    ih_consuming_splits: HashSet<u64>,
+    recursive_convoy_refused_splits: HashSet<u64>,
     result_predicates: Vec<ResultPredicate>,
     provenance: Option<Vec<crate::classes::InstanceResolution>>,
     local_dicts: HashMap<String, (Term, Term, usize)>,
@@ -68,7 +68,7 @@ impl Snapshot {
             next_split_id: cx.next_split_id,
             active_splits: cx.active_splits.clone(),
             convoy_splits: cx.convoy_splits.clone(),
-            ih_consuming_splits: cx.ih_consuming_splits.clone(),
+            recursive_convoy_refused_splits: cx.recursive_convoy_refused_splits.clone(),
             result_predicates: cx.result_predicates.clone(),
             provenance: cx.provenance.as_ref().map(|log| (**log).clone()),
             local_dicts: cx.local_dicts.clone(),
@@ -113,7 +113,7 @@ impl Snapshot {
         cx.next_split_id = self.next_split_id;
         cx.active_splits = self.active_splits;
         cx.convoy_splits = self.convoy_splits;
-        cx.ih_consuming_splits = self.ih_consuming_splits;
+        cx.recursive_convoy_refused_splits = self.recursive_convoy_refused_splits;
         cx.result_predicates = self.result_predicates;
         cx.local_dicts = self.local_dicts;
         cx.var_refinements = self.var_refinements;
