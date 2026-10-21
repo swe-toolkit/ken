@@ -42,7 +42,7 @@ catalog/packages/Data/Collections/Derived.ken.md:1:# `Collections` — derived c
 catalog/packages/Data/Collections/Map.ken.md:1:# `Map`/`Set` — a proved, pure ordered binary search tree
 catalog/packages/Data/Collections/NonEmpty.ken.md:1:# `NonEmpty` — lists with a structural head
 catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md:1:# `Nat` arithmetic — canonical operations and free algebraic laws
-catalog/packages/Data/Numeric/Nat/Order.ken.md:1:# `Ord Nat` — a lawful total order on `Nat`, and its operations
+catalog/packages/Data/Numeric/Nat/Order.ken.md:1:# `Ord Nat` — the reader-facing order facade and `Nat` operations
 catalog/packages/Data/Sums/Combinators.ken.md:1:# `Sums` — the `Option`/`Result`/`Either` combinator floor
 catalog/packages/Data/Sums/Validation.ken.md:1:# `Validation` — accumulating independent errors
 catalog/packages/Data/Time/EventTrace.ken.md:1:# Finite event traces

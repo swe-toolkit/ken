@@ -1,4 +1,4 @@
-# `Ord Nat` — a lawful total order on `Nat`, and its operations
+# `Ord Nat` — the reader-facing order facade and `Nat` operations
 
 Availability: **partial**
 
@@ -8,7 +8,7 @@ Canonical source: [checked package](../../../../../catalog/packages/Data/Numeric
 
 | Fact class | Disposition | Result and grounding |
 |---|---|---|
-| Subject | `generated` | `catalog/packages/Data/Numeric/Nat/Order.ken.md` — “`Ord Nat` — a lawful total order on `Nat`, and its operations,” from the [subject index](../../subjects.md). |
+| Subject | `generated` | `catalog/packages/Data/Numeric/Nat/Order.ken.md` — “`Ord Nat` — the reader-facing order facade and `Nat` operations,” from the [subject index](../../subjects.md). |
 | Declaration/type | `authored` | Declares structural `Nat` ordering, an `Ord Nat` dictionary, three-way `OrdResult`, and `min`, `max`, `sub`, and `compare`. |
 | Law | `authored` | Checked structural proofs establish reflexivity, antisymmetry, transitivity, and totality; the dictionary fields are inhabited by those proofs. |
 | Effect/capability | `none-declared` | The canonical checked fences declare no effect row, `proc`, `visits`, or capability value for this package. |
