@@ -9,13 +9,15 @@ tie fixture is `[3, 2, 0, 1]` with costs `[5, 1, 9, 1]`: the selected
 distinguish a head-returning selector, a last-tie selector, and a
 selector that returns `None` on nonempty input.
 
-This candidate is based on `origin/main` at
-`8546cb58cd50450f2b0a98ceadbde5e62fb5e07b`, where the §1.4 exports
-are absent. The Ken fence is authored against the approved §1.4 contract,
-not executable against that base. This is source content only; it makes
-no shipped-seed execution, catalog delivery, CI, publication, or landing
-claim. Architect's `ken check` and false-claim result are scratch D0
-evidence (`evt_py40bd5dz90y`), not execution of this seed.
+This seed was authored on `origin/main` at
+`8546cb58cd50450f2b0a98ceadbde5e62fb5e07b`, before the §1.4 exports
+were available. The Ken fences state the approved §1.4 contract. The
+package-owned test at
+`crates/ken-elaborator/tests/cat_optimization_argmin_option.rs` now
+executes the positive fence and the isolated refused claim against the
+catalog extension. This is not official conformance-runner execution, CI,
+publication, or landing. Architect's earlier `ken check` and false-claim
+result are distinct scratch D0 evidence (`evt_py40bd5dz90y`).
 
 Each case has promise class **durable invariant**. Expected values are
 independent closed constants; they are not computed by the selector.
@@ -194,8 +196,9 @@ theorem seed_neg
 ```
 
 Architect reports this false-claim shape refused with E0038 in D0
-scratch (`evt_py40bd5dz90y`). Because the §1.4 exports are absent from
-this seed's base, that report is not shipped-seed execution.
+scratch (`evt_py40bd5dz90y`). That earlier report is separate from the
+package test's execution of this seed: the accepted `None` control checks
+before the isolated false `Some` claim is kernel-refused with `TypeMismatch`.
 
 ## Coverage boundary
 
@@ -206,5 +209,6 @@ selector. It also instantiates each of the four public §1.4 laws. The
 refused `Some`-on-`Nil` claim is paired with an accepted observation of
 `None` on the identical input. No `DecEq` on the candidate type, order on
 that type, new search strategy, or complexity guarantee is asserted. The
-seed does not claim the §1.4 catalog exports are delivered, the source
-fences were executed, CI passed, or the candidate was published or landed.
+five §1.4 exports are present in the package source. The package test
+executes the positive source fence and isolated refusal;
+there is no official conformance-runner, CI, publication, or landing claim.

@@ -6,9 +6,10 @@
 > non-empty selector and its seven laws; its catalog module and seed
 > are present on main. Section 1.4 specifies the Option selector and
 > four additional public laws from Architect-checked scratch D0; its
-> catalog extension and seed are not yet delivered. Section 2's catalog
-> module and seed are also present on main. Scratch checks are not
-> shipped-seed execution, CI or a landed `trusted_base()` measurement.
+> catalog extension exports the selector and four checked laws, and the
+> package test executes the seed. Section 2's catalog module and seed are
+> also present on main. Scratch checks alone establish neither shipped-seed
+> execution, CI nor a landed `trusted_base()` measurement.
 
 ## 1. Least-cost candidate
 
@@ -246,10 +247,14 @@ Architect AC-0 checked this general development on base `1d82fd8ec`
 at exact scratch tip `04f60997a494b12ca04ff91d3208f73a68e33fd5`:
 `ken check` rc 0, with no `Axiom`, `Opaque` or `postulate` in the new
 source. A scratch false claim of `Some` on `Nil` was refused with E0038.
-These are scratch observations, not the §1.4 catalog extension or
-shipped-seed execution; no landed trust-identity census or CI result
-is established here. The catalog extension must keep the helpers
-private and add no ambient name outside the existing module imports.
+These are scratch observations, separate from the §1.4 catalog extension.
+The package test root-loads that extension, checks its five exports and
+private helper boundary, and executes the positive and isolated refused
+seed fences. It measures unchanged trusted-base identities on the
+checked package; this source and test status claims neither official
+conformance-runner execution nor CI, publication or landing. The extension
+keeps the helpers private and adds no ambient name outside the existing
+module imports.
 
 ## 2. Least witness below a finite bound
 
