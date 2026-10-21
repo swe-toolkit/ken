@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINEMENT-SUBSET-SIGMA
 title: "Refinements are carrier types, so List Int is accepted as List Five, a lambda checked at a named refinement over a Pi carrier emits no obligation, and a refined binder converts with its carrier. Elaborate refinements to the core subset Σ, introduce by pair plus obligation, forget by Proj1, and retire the carrier guard machinery"
-status: active
+status: merged
 owner: language
 size: L
 tier: T1

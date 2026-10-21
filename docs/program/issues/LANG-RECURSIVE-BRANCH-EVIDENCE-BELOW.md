@@ -1,7 +1,7 @@
 ---
 id: LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW
 title: "A constructor-branch equation on a recursive family has no evidence term, because Ken's one recursor shares its motive with the induction hypothesis. Carry it on a case-only Elim convoy and compile structural recursion through generated below and brecOn"
-status: draft
+status: ready
 owner: language
 size: L
 tier: T1
@@ -36,6 +36,13 @@ beneath it demands it (`LANG-REFINEMENT-SUBSET-SIGMA`, Architect
   and recursion goes through `below_D` and `brecOn_D`, derived from the
   same recursor with the plain motive `T`, so `below (C r)` reduces to the
   result for `r` paired with `below r`. No kernel former, no trust change.
+- **The gap pin (on `main` at `245db5cfb`).** SIGMA landed the
+  transition sentinel
+  `recursive_sort_nil_goal_omits_unwitnessed_list_eq_and_uses_plain_sigma_motive`
+  in `crates/ken-elaborator/tests/lang_refinement_subset_sigma_recursive_split.rs`:
+  a recursive `sort` with a refined result leaves its `Nil` leaf open
+  with no `Eq (List a) xs (Nil a)`, and the `xs` motive is the plain
+  subset Σ. This WP flips it.
 - Lean 4 compiles a recursive call by projecting from `below`; the
   advisory cites that lookup. It is prior art to understand, not code to
   copy.
@@ -59,9 +66,11 @@ base, stop and report the mismatch.
 - **AC-0 (D0).** Probe that `below_D` for `Nat` and `List` checks through
   `Elim` into `Type` and reduces on a constructor (large elimination, spec
   14 section 3), then the Architect rules the cut.
-- **AC-1.** An introduction in `pce_rec`'s `Zero` arm checks with the
-  equation supplied, and an IH-using recursive method computes the same
-  result.
+- **AC-1.** The gap pin flips. The recursive `sort`'s `Nil` leaf goal
+  carries a checked `Eq (List a) xs (Nil a)`, and the absent-equation
+  assertion is replaced by one that requires it, with no proof
+  invented. The `Cons` leaf's recursive call still computes the same
+  result as on base.
 - **AC-2.** Every landed package's emitted core is byte-identical to
   base, and catalog and corpus obligation outcomes are identical.
 - **AC-3.** Native and reference runtime parity unchanged across the
@@ -74,3 +83,7 @@ base, stop and report the mismatch.
 - `below_D` cannot be defined through `Elim`, or needs a kernel former or
   trust change.
 - Any AC-2 outcome change or AC-3 parity change.
+
+Checks: 4 fired: `method_type` (`inductive.rs:2138`) and
+`recursive_shapes` (`:1384`) exist at `245db5cfb`; the AC-1 subject is
+the landed sentinel test, since `pce_rec` is not on `main`.
