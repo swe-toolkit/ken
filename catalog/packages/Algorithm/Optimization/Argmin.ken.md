@@ -25,11 +25,11 @@ and delegates every `Cons` case to that same nonempty selection.
 
 ## Definition
 
-The nonempty operation and its seven public laws lead. Private selection
-helpers and inductive proofs follow. The Option selector, two equations and
-two `List` corollaries extend the same definition; their four case and
-transport helpers are private. Two generic Nat-order facts come from their
-canonical owner, `Data.Numeric.Nat.Order`.
+The nonempty operation and its seven public laws lead, followed by the
+Option selector, its two equations and two `List` corollaries. Private
+selection helpers, inductive proofs and the four Option proof helpers
+follow. Two generic Nat-order facts come from their canonical owner,
+`Data.Numeric.Nat.Order`.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, leq_nat)
@@ -124,6 +124,38 @@ pub theorem argmin_takes_tail
         (argmin a cost (nonempty_cons a x (Cons a y ys)))
         (argmin a cost (nonempty_cons a y ys)) =
   choose_yes a (lt_nat (cost (argmin_from a cost y ys)) (cost x)) (argmin_from a cost y ys) x
+
+pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
+  match xs {
+    Nil ↦ None a;
+    Cons x rest ↦ Some a (argmin a cost (nonempty_cons a x rest))
+  }
+
+pub theorem argmin_option_nil
+      (a : Type) (cost : a → Nat)
+    : Equal (Option a) (argmin_option a cost (Nil a)) (None a) =
+  Proved
+
+pub theorem argmin_option_cons
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : Equal
+        (Option a)
+        (argmin_option a cost (Cons a x rest))
+        (Some a (argmin a cost (nonempty_cons a x rest))) =
+  Refl
+
+pub theorem argmin_option_member
+      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
+    : Equal (Option a) (argmin_option a cost xs) (Some a y) → list_elem a y xs =
+  λfound. J (λr _. option_member a xs r) (argmin_option_member_base a cost xs) found
+
+pub theorem argmin_option_least
+      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
+    : Equal (Option a) (argmin_option a cost xs) (Some a y)
+      → (z : a)
+      → list_elem a z xs
+      → IsTrue (leq_nat (cost y) (cost z)) =
+  λfound. J (λr _. option_least a cost xs r) (argmin_option_least_base a cost xs) found
 
 fn argmin_from (a : Type) (cost : a → Nat) (x : a) (rest : List a) : a =
   match rest {
@@ -256,25 +288,6 @@ theorem choose_le_yes
     False ↦ λh. (proof false_reverse_leq for lt_nat) (cost yes) (cost no) h
   }
 
-pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
-  match xs {
-    Nil ↦ None a;
-    Cons x rest ↦ Some a (argmin a cost (nonempty_cons a x rest))
-  }
-
-pub theorem argmin_option_nil
-      (a : Type) (cost : a → Nat)
-    : Equal (Option a) (argmin_option a cost (Nil a)) (None a) =
-  Proved
-
-pub theorem argmin_option_cons
-      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
-    : Equal
-        (Option a)
-        (argmin_option a cost (Cons a x rest))
-        (Some a (argmin a cost (nonempty_cons a x rest))) =
-  Refl
-
 fn option_member (a : Type) (xs : List a) (outcome : Option a) : Prop =
   match outcome {
     None ↦ Top;
@@ -289,11 +302,6 @@ theorem argmin_option_member_base
     Cons x rest ↦ argmin_member a cost (nonempty_cons a x rest)
   }
 
-pub theorem argmin_option_member
-      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
-    : Equal (Option a) (argmin_option a cost xs) (Some a y) → list_elem a y xs =
-  λfound. J (λr _. option_member a xs r) (argmin_option_member_base a cost xs) found
-
 fn option_least (a : Type) (cost : a → Nat) (xs : List a) (outcome : Option a) : Prop =
   match outcome {
     None ↦ Top;
@@ -307,14 +315,6 @@ theorem argmin_option_least_base
     Nil ↦ Proved;
     Cons x rest ↦ argmin_least a cost (nonempty_cons a x rest)
   }
-
-pub theorem argmin_option_least
-      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
-    : Equal (Option a) (argmin_option a cost xs) (Some a y)
-      → (z : a)
-      → list_elem a z xs
-      → IsTrue (leq_nat (cost y) (cost z)) =
-  λfound. J (λr _. option_least a cost xs r) (argmin_option_least_base a cost xs) found
 ```
 
 ## Using it
