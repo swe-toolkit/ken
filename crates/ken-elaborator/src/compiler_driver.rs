@@ -695,10 +695,12 @@ pub fn compile_checked_target_denotation(
         .iter()
         .map(|result| result.def_id)
         .collect::<Vec<_>>();
+    let mut admitted = declarations.iter().flat_map(|result| {
+        result.auxiliary_ids.iter().copied().chain(std::iter::once(result.def_id))
+    }).collect::<Vec<_>>();
     let mut results = declarations;
     results.extend(examples);
     let obligations = owned_v2_obligations(&results);
-    let mut admitted = declaration_ids.clone();
     let source_declarations = declaration_ids.iter().copied().collect::<BTreeSet<_>>();
     let target_id = env.globals.get(target_name).copied().ok_or_else(|| {
         CheckedTargetDenotationError::MissingSourceTarget {
@@ -1324,7 +1326,10 @@ fn compile_ken_package_sources_with_env(
     for source in &sources {
         let (declarations, examples, source_example_ids) =
             elaborate_package_source(&mut env, source, &mut headed_source)?;
-        admitted.extend(declarations.iter().map(|result| result.def_id));
+        for result in &declarations {
+            admitted.extend(result.auxiliary_ids.iter().copied());
+            admitted.push(result.def_id);
+        }
         example_ids.extend(source_example_ids);
         results.extend(declarations);
         results.extend(examples);
@@ -2389,7 +2394,10 @@ pub fn prepare_native_program_sources(
         let (declarations, examples, source_example_ids) =
             elaborate_package_source(&mut env, source, &mut headed_source)
                 .map_err(NativeProgramBuildError::Driver)?;
-        admitted_ids.extend(declarations.iter().map(|result| result.def_id));
+        for result in &declarations {
+            admitted_ids.extend(result.auxiliary_ids.iter().copied());
+            admitted_ids.push(result.def_id);
+        }
         example_ids.extend(source_example_ids);
         results.extend(declarations);
         results.extend(examples);

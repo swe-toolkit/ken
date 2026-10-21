@@ -25,6 +25,8 @@ use ken_kernel::{
 
 #[path = "elab/refinement_snapshot.rs"]
 mod refinement_snapshot;
+#[path = "elab/refined_recursion.rs"]
+mod refined_recursion;
 #[cfg(test)]
 #[path = "elab/refinement_tests.rs"]
 mod refinement_tests;
@@ -100,6 +102,9 @@ pub struct ElabResult {
     pub name: String,
     /// The definition's `GlobalId` (or, for `prove`, the hole's postulate id).
     pub def_id: GlobalId,
+    /// Private admitted Transparent declarations owned by this result, in
+    /// admission order. Never named in `globals`; empty on the ordinary path.
+    pub auxiliary_ids: Vec<GlobalId>,
     /// Open obligation holes emitted during elaboration.
     pub obligations: Vec<Obligation>,
     /// For `foreign` declarations: the full binding record (AC1/AC5 tests).
@@ -17962,6 +17967,7 @@ fn elaborate_associated_rdecl(
                 foreign_binding: None,
                 temporal_obligations: vec![],
                 effect_row_type: None,
+                auxiliary_ids: Vec::new(),
             })
         }
         RDeclKind::ExplicitDataDecl {
@@ -17985,6 +17991,7 @@ fn elaborate_associated_rdecl(
                 foreign_binding: None,
                 temporal_obligations: vec![],
                 effect_row_type: None,
+                auxiliary_ids: Vec::new(),
             })
         }
         RDeclKind::TypeAlias { ty } => {
@@ -18009,6 +18016,7 @@ fn elaborate_associated_rdecl(
                 foreign_binding: None,
                 temporal_obligations: vec![],
                 effect_row_type: None,
+                auxiliary_ids: Vec::new(),
             })
         }
         RDeclKind::Foreign {
@@ -18264,6 +18272,7 @@ fn elab_record_decl_checked(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -18476,6 +18485,7 @@ fn elab_class_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -19070,6 +19080,7 @@ fn elab_instance_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -19159,6 +19170,7 @@ fn elab_derive(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -19232,6 +19244,7 @@ fn elaborate_foreign_decl(
         foreign_binding: Some(binding),
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -19712,6 +19725,7 @@ pub(crate) fn elaborate_space_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     }];
     absorb_obligations(&mut results[0].obligations, cell_obligations);
 
@@ -20010,6 +20024,7 @@ pub(crate) fn elaborate_space_decl(
             foreign_binding: None,
             temporal_obligations: vec![],
             effect_row_type: Some(declared_row),
+            auxiliary_ids: Vec::new(),
         });
     }
     Ok(results)
@@ -20113,6 +20128,7 @@ fn elaborate_v0(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -20261,15 +20277,16 @@ fn elaborate_recursive_view(
     };
 
     // 4. Check and install the entire singleton group in the kernel.
-    let admit_result = ken_kernel::admit_pending(env, pending, vec![body_core]);
+    let admit_result = refined_recursion::admit_pending_refined(env, pending, vec![body_core]);
 
     match admit_result {
-        Ok(_) => {
+        Ok((_, auxiliary_ids)) => {
             let mut obligations = type_obligations;
             absorb_obligations(&mut obligations, body_obligations);
             Ok(ElabResult {
                 name: rdecl.name.clone(),
                 def_id: id,
+                auxiliary_ids: auxiliary_ids.into_iter().flatten().collect(),
                 obligations,
                 foreign_binding: None,
                 temporal_obligations: vec![],
@@ -20474,16 +20491,18 @@ pub(crate) fn elaborate_mutual_group(
     // opaque during checking and SCT, and escape paths are checked before
     // any member is upgraded. A per-member call would wrongly reject an
     // honest mutual cycle through already-transparent siblings.
-    let admit_result = ken_kernel::admit_pending(env, pending, bodies);
+    let admit_result = refined_recursion::admit_pending_refined(env, pending, bodies);
 
     match admit_result {
-        Ok(_) => Ok(members
+        Ok((_, auxiliary_ids)) => Ok(members
             .iter()
             .zip(ids)
             .zip(all_obligations)
-            .map(|((rdecl, id), obligations)| ElabResult {
+            .zip(auxiliary_ids)
+            .map(|(((rdecl, id), obligations), auxiliary)| ElabResult {
                 name: rdecl.name.clone(),
                 def_id: id,
+                auxiliary_ids: auxiliary.into_iter().collect(),
                 obligations,
                 foreign_binding: None,
                 temporal_obligations: vec![],
@@ -20967,14 +20986,18 @@ fn elaborate_view_with_spec(
         };
 
         // Phase 4's full contract type and body were built before staging.
+        let mut admitted_auxiliary_ids = Vec::new();
         let id = if let Some(pre_id) = pre_admit_id {
             // The opaque was staged at the complete contract type, so recursive
             // calls and final admission see the same premise telescope.
             let staged = pending
                 .take()
                 .expect("recursive view staged its placeholder");
-            match ken_kernel::admit_pending(env, staged, vec![full_body]) {
-                Ok(_) => pre_id,
+            match refined_recursion::admit_pending_refined(env, staged, vec![full_body]) {
+                Ok((_, auxiliary_ids)) => {
+                    admitted_auxiliary_ids = auxiliary_ids.into_iter().flatten().collect();
+                    pre_id
+                },
                 Err((error, removed)) => {
                     forget_rolled_back_decls(removed, globals, num_values);
                     preconditions.remove(&pre_id);
@@ -21001,6 +21024,7 @@ fn elaborate_view_with_spec(
         Ok(ElabResult {
             name: rdecl.name.clone(),
             def_id: id,
+            auxiliary_ids: admitted_auxiliary_ids,
             obligations: decl_obligations,
             foreign_binding: None,
             temporal_obligations: vec![],
@@ -21065,6 +21089,7 @@ fn elaborate_prove(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -21117,6 +21142,7 @@ fn elaborate_prop_decl(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     };
 
     for intro in intros {
@@ -21216,6 +21242,7 @@ fn elaborate_checked_theorem(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -21473,6 +21500,7 @@ fn elaborate_temporal(
         foreign_binding: None,
         temporal_obligations: vec![obl],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 
@@ -21560,6 +21588,7 @@ fn elaborate_law(
         foreign_binding: None,
         temporal_obligations: vec![],
         effect_row_type: None,
+        auxiliary_ids: Vec::new(),
     })
 }
 

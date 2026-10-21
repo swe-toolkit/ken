@@ -728,11 +728,16 @@ impl ElabEnv {
         let declarations = modules::expand_and_elaborate(self, &decls)?;
         let before_examples = declaration_ids(&self.env);
         let examples = self.execute_ken_md_checked_fences_v1(src, &extracted)?;
-        let example_ids = declaration_ids(&self.env)
+        let mut example_ids = declaration_ids(&self.env)
             .difference(&before_examples)
             .copied()
-            .collect();
-        Ok((declarations, examples, example_ids))
+            .collect::<HashSet<_>>();
+        // Keep the explicit private-owner link even when a future fence
+        // executor changes how the before/after environment delta is taken.
+        for result in &examples {
+            example_ids.extend(result.auxiliary_ids.iter().copied());
+        }
+        Ok((declarations, examples, example_ids.into_iter().collect()))
     }
 
     /// Execute one literate entry's checked-but-not-tangled fence roles.
