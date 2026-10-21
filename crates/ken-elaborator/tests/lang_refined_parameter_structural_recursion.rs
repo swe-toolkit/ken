@@ -12,7 +12,8 @@ const Q1: &str = "def AnyNat = { x : Nat | Top }\n\
 /// MEASURED: the package producer emits a checked private recursive worker
 /// and names it in recursion metadata. CLAIMED: public wrapper and private
 /// carrier worker remain a closed checked source package. THE GAP: native
-/// execution, example omission, and other recursive forms have separate pins.
+/// execution is not delivered; example omission and other forms are pinned
+/// separately.
 #[test]
 fn refined_parameter_package_contains_recursive_private_worker() {
     let mut env = ElabEnv::new().expect("prelude");
@@ -98,7 +99,8 @@ fn one_solved_introduction(env: &mut ElabEnv, source: &str) {
 /// checked with one solved RefinementIntroduction each, and the proc follows
 /// the same admission route. CLAIMED: carrier-typed workers restore structural
 /// descent without erasing the caller's original refinement obligation.
-/// THE GAP: package/native/example emission has separate boundary tests.
+/// THE GAP: package and example emission are pinned separately; native
+/// execution is not delivered pending erased-Ω call lowering.
 #[test]
 fn refined_parameter_recursion_keeps_base_obligations_for_all_shapes() {
     let mut env = ElabEnv::new().expect("prelude");
