@@ -5,7 +5,7 @@ Availability: **current**
 Authority: **derived reference**
 
 This path-preserving index is generated from the first heading of every checked
-catalog package document. At this revision, the command returns all 39 package
+catalog package document. At this revision, the command returns all 40 package
 subjects:
 
 ```sh
@@ -48,6 +48,7 @@ catalog/packages/Data/Numeric/Nat/Arithmetic.ken.md:1:# `Nat` arithmetic — can
 catalog/packages/Data/Numeric/Nat/Order.ken.md:1:# `Ord Nat` — a lawful total order on `Nat`, and its operations
 catalog/packages/Data/Sums/Combinators.ken.md:1:# `Sums` — the `Option`/`Result`/`Either` combinator floor
 catalog/packages/Data/Sums/Validation.ken.md:1:# `Validation` — accumulating independent errors
+catalog/packages/Data/Time/EventTrace.ken.md:1:# Finite event traces
 catalog/packages/Data/Text/Codec.ken.md:1:# `Data.Text.Codec` — safe UTF-8 and ASCII views
 catalog/packages/Data/Text/StringBijection.ken.md:1:# String/List-Char retraction and injectivity certificate
 catalog/packages/Data/Text/StringKeys.ken.md:1:# `Data.Text.StringKeys` — lawful String equality and order
