@@ -50,7 +50,10 @@ base, stop and report the mismatch.
 The five exports and the four private helpers in `Argmin.ken.md`, the
 spec 72 §1.4 status lines updated to say the exports are delivered, and
 a new `crates/ken-elaborator/tests/cat_optimization_argmin_option.rs`
-that root-loads each new public name and runs the seed.
+that root-loads each new public name and runs the seed. The seed's
+status wording changes in the same candidate to say the package test
+executes it, with no conformance-runner, CI or landing claim, and no
+fence or fixture change (Steward `evt_17wqzjhzc75vk`).
 
 ## Acceptance
 
@@ -60,7 +63,7 @@ that root-loads each new public name and runs the seed.
   the earliest least-cost element that is neither the head nor the last
   tie. Its refused block is pinned to the seed's `Some`-on-`Nil`
   proposition, and the accepted `Nil` control passes. The §1.1 to §1.3
-  suite still passes. The Spec leader reviews the spec/ status lines.
+  suite still passes. The Spec leader reviews the spec/ status lines and CV the seed's.
 - **AC-2.** `trusted_base()` is equal before and after, with no Axiom or
   primitive. The census row for `Algorithm.Optimization.Argmin` is
   unchanged, measured on the candidate.
