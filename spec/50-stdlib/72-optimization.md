@@ -1,16 +1,20 @@
 # Finite least-cost candidate selection
 
-> **Status: DRAFT v0 (SPEC-OPTIMIZATION-SEARCH-CONTRACT).** Section 1
-> normatively specifies a least-cost selector over an existing non-empty
-> list with seven laws proved in Architect D0. The catalog module and
-> conformance seed are prospective; neither shipped checks, CI, nor a
-> measured `trusted_base()` delta is claimed.
+> **Status: DRAFT v0 (SPEC-OPTIMIZATION-SEARCH-CONTRACT §1;
+> SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH §2).** Section 1 specifies the
+> non-empty selector and its seven laws; its catalog module and seed
+> are present on main. Section 1.4 specifies the Option selector and
+> four additional public laws from Architect-checked scratch D0; its
+> catalog extension and seed are not yet delivered. Section 2's catalog
+> module and seed are also present on main. Scratch checks are not
+> shipped-seed execution, CI or a landed `trusted_base()` measurement.
 
 ## 1. Least-cost candidate
 
 ### 1.1 Carrier, operation and tie rule
 
-The catalog Section is `Algorithm.Optimization`. Its prospective module
+The catalog Section is `Algorithm.Optimization`. Its landed module
 `Algorithm.Optimization.Argmin`, at
 `catalog/packages/Algorithm/Optimization/Argmin.ken.md`, exports:
 
@@ -137,10 +141,11 @@ rejected, and three implementation mutations failed: selecting a
 later tie, reversing the cost order, or always retaining the head.
 The tie mutation reddened the earliest-tie seed; the order-reversing
 and always-head mutations reddened the strict-minimum seed. This is
-**Architect-reported scratch evidence**, not a delivered catalog
-module, a committed or executed conformance seed, CI, or a measured
-`trusted_base()` delta. A future catalog module must carry the actual
-checked proof bodies and preserve the zero-new-assumption construction.
+**Architect-reported scratch evidence**. The §1 catalog module and its
+seed are now present on main; that fact does not turn D0's scratch
+runs into shipped-seed execution, CI, or a measured landed
+`trusted_base()` delta. The landed module carries checked proof bodies
+without introducing a new package assumption.
 
 D0's membership proof uses the canonical `NonEmpty` list-view shape
 equality, rather than destructuring its inaccessible constructor in a
@@ -152,32 +157,110 @@ proof cannot assume that a match on a computed term refines an
 indirectly convertible expression. These are proof-strategy constraints,
 not extra public interfaces.
 
-A catalog follow-on should place two generic Nat-order bridges at their
-natural home, `Data.Numeric.Nat.Order`: `lt_nat m n = True` implies
-`leq_nat m n`, and `leq_nat m n` implies `lt_nat n m = False`. D0
-proved both as private helpers because that package does not yet
-export them. Publishing them as attached `lt_nat` proofs and importing
-them into `Argmin` avoids maintaining duplicate private order facts;
-this is a **separately authorized catalog obligation**, not part of
-the §1 author-slice paths and not an eighth or ninth optimization law.
+The landed `Data.Numeric.Nat.Order` supplies two generic attached
+`lt_nat` bridges: `lt_nat m n = True` implies `leq_nat m n`, and
+`leq_nat m n` implies `lt_nat n m = False`. Earlier D0 proved both as
+private helpers before that package exported them; the landed
+`Argmin` imports their public proofs instead of maintaining duplicate
+local order facts. They remain Nat-order laws, not eighth or ninth
+optimization laws.
 
 Real-valued and continuous optimization, infinite or implicit search
 spaces, heuristics and approximation guarantees, maximization
 (`argmax`), costs into an arbitrary `Ord`, multi-objective and
-lexicographic costs, top-k and stable multi-result selection, and an
-`Option`-returning selector for a possibly empty `List` are deferred.
-The right-fold description is not a machine-checked complexity result;
-all asymptotic and resource claims remain deferred.
+lexicographic costs, and top-k and stable multi-result selection remain
+deferred. The Option-returning selector for a possibly empty `List` is
+specified in §1.4, not deferred. The right-fold description is not a
+machine-checked complexity result; all asymptotic and resource claims
+remain deferred.
+
+### 1.4 Option selector over a possibly empty list
+
+The same `Algorithm.Optimization.Argmin` module extends §1 with a public
+selector on the existing `List a`. It branches on the list's shape:
+`Nil` returns `None a`; `Cons x rest` constructs the existing
+`NonEmpty a` with `nonempty_cons` and returns `Some a` of `argmin` on
+that input. No second selection algorithm, equality decision on `a`,
+or order on `a` is needed. Its public definition and two checked
+selection equations are:
+
+```ken
+pub fn argmin_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
+  match xs {
+    Nil ↦ None a;
+    Cons x rest ↦ Some a (argmin a cost (nonempty_cons a x rest))
+  }
+
+pub theorem argmin_option_nil
+  (a : Type) (cost : a → Nat) :
+  Equal (Option a) (argmin_option a cost (Nil a)) (None a)
+
+pub theorem argmin_option_cons
+  (a : Type) (cost : a → Nat) (x : a) (rest : List a) :
+  Equal (Option a)
+    (argmin_option a cost (Cons a x rest))
+    (Some a (argmin a cost (nonempty_cons a x rest)))
+```
+
+The `Cons` equality names the existing `argmin` result exactly, so it
+inherits the earlier §1.2 earliest-tie behavior without restating its
+head, singleton, or branch laws for `List`. `Nil` cannot yield a
+`Some` result, and the `Cons` branch cannot yield `None`; this is a
+constructor distinction, not a premise about the candidate type.
+
+For a client holding only a list and an observed `Some y`, the module
+also exports direct-to-`List` corollaries with checked bodies. The
+first recovers truncated membership in the original input:
+
+```ken
+pub theorem argmin_option_member
+  (a : Type) (cost : a → Nat) (xs : List a) (y : a) :
+  Equal (Option a) (argmin_option a cost xs) (Some a y)
+    → list_elem a y xs
+```
+
+Its private `option_member` predicate selects `Top` for `None` and
+`list_elem` for `Some`. A private `argmin_option_member_base` splits
+`xs` and uses the existing `argmin_member` in the `Cons` case; `J`
+transports that proof along the observed result equality. The second
+corollary bounds the selected cost against every input member:
+
+```ken
+pub theorem argmin_option_least
+  (a : Type) (cost : a → Nat) (xs : List a) (y : a) :
+  Equal (Option a) (argmin_option a cost xs) (Some a y)
+    → (z : a) → list_elem a z xs
+    → IsTrue (leq_nat (cost y) (cost z))
+```
+
+Its private `option_least` predicate likewise selects `Top` for
+`None`; `argmin_option_least_base` uses the existing `argmin_least` in
+the `Cons` case and `J` transports the result. These four helpers are
+private proof steps, not additional public laws or trusted premises.
+Membership is Ω-valued, not a Boolean equality test on `a`, and the
+least-cost law quantifies only over members of the input list. The
+other five §1.2 laws remain attached to `argmin`; the `Cons` equation
+makes their behavior available without duplicating their interfaces.
+
+Architect AC-0 checked this general development on base `1d82fd8ec`
+at exact scratch tip `04f60997a494b12ca04ff91d3208f73a68e33fd5`:
+`ken check` rc 0, with no `Axiom`, `Opaque` or `postulate` in the new
+source. A scratch false claim of `Some` on `Nil` was refused with E0038.
+These are scratch observations, not the §1.4 catalog extension or
+shipped-seed execution; no landed trust-identity census or CI result
+is established here. The catalog extension must keep the helpers
+private and add no ambient name outside the existing module imports.
 
 ## 2. Least witness below a finite bound
 
 > **Section 2 status: DRAFT v0 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).**
 > Three general laws were checked in Architect D0; the catalog module
-> and this section's conformance seed are not delivered here.
+> and this section's conformance seed are now present on main. Scratch
+> checks alone establish neither their shipped execution nor CI.
 
 ### 2.1 Carrier and result
 
-The catalog Section remains `Algorithm.Optimization`. Its prospective
+The catalog Section remains `Algorithm.Optimization`. Its landed
 module `Algorithm.Optimization.BoundedSearch`, at
 `catalog/packages/Algorithm/Optimization/BoundedSearch.ken.md`, exports:
 
@@ -252,8 +335,9 @@ claims were refused at their own declarations. Mutating the
 implementation to prefer a later witness, never report a witness, or
 include the bound made the proof development fail, and restoring each
 mutation restored rc 0. These are **Architect-reported scratch
-results**, not a shipped catalog module or §2 conformance seed, CI,
-or a measured `trusted_base()` delta.
+results**. The §2 catalog module and seed are now present on main;
+these earlier D0 results do not establish shipped-seed execution, CI,
+or a landed trust-identity measurement.
 
 The D0 proof route inducts over the finite bound with a private
 outcome invariant: a missing result means no hit below the bound; a
@@ -269,10 +353,9 @@ elaborator does not provide. These explain the D0 evidence; no
 private helper is a fourth public law or a mandated implementation
 strategy.
 
-The `Option`-returning selector over a possibly empty `List` deferred
-by §1 remains deferred. It would wrap `argmin` after distinguishing
-`Nil` from `Cons`, not search a numeric range; if authorized later,
-it belongs as a §1 extension, not as another §2 operation. General
-implicit or infinite search, heuristics and approximations, arbitrary
-candidate orders, and machine-checked performance guarantees remain
-outside this bounded contract.
+Section 1.4 now specifies the `Option`-returning selector over a
+possibly empty `List`: it wraps `argmin` after distinguishing `Nil`
+from `Cons`, not a search over a numeric range. It adds no §2 law.
+General implicit or infinite search, heuristics and approximations,
+arbitrary candidate orders, and machine-checked performance guarantees
+remain outside this bounded contract.

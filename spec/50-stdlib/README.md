@@ -396,16 +396,19 @@ Clock effects, durations, causality, infinite streams, a premise-free
 distribution law and k-way merge remain deferred.
 
 The **finite least-cost selection contract** is pinned in
-**`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT).
+**`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
+SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4). The landed
 `Algorithm.Optimization.Argmin` selects the earliest minimum under a
-`Nat` cost from the existing `NonEmpty a`, with no `DecEq a`. Seven
-Architect-D0-checked laws establish membership, minimum cost, the
-absence of a cheaper member, head-on-tie, and the three exact
-selection equations. The prospective catalog module, conformance
-seed, CI and measured trusted-base delta are not established by §1.
+`Nat` cost from `NonEmpty a`, with no `DecEq a`; its seven checked laws
+and seed are present on main. Section 1.4 specifies `argmin_option`
+on a possibly empty `List a`, with `Nil`/`Cons` equations and direct
+membership and least-cost corollaries for a `Some` result. Architect
+D0 checked those four new generic laws in scratch; their catalog
+exports and seed are not yet delivered. Scratch checks do not
+establish shipped-seed execution, CI or a landed trust measurement.
 Continuous or implicit search, heuristics, approximation, argmax,
-arbitrary-order or multi-objective costs, top-k, empty-list selection
-and complexity claims remain deferred.
+arbitrary-order or multi-objective costs, top-k and complexity claims
+remain deferred.
 
 The **finite bounded-search contract** is pinned in
 **`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).
@@ -414,10 +417,10 @@ predicate over `Nat` and a finite bound, returning `Some` with the
 least satisfying index below it or `None` when none exists. Three
 Architect-D0-checked generic laws give soundness, leastness and
 completeness. No search direction, predicate-call count, recursion
-shape or complexity guarantee is normative. The D0 checks are
-scratch evidence, not a delivered catalog module or §2 conformance
-seed, CI, or a measured trusted-base delta. An `Option` selector over
-a possibly empty list remains a deferred §1 extension, not part of §2.
+shape or complexity guarantee is normative. The §2 catalog module
+and seed are present on main; its D0 scratch checks alone establish
+neither shipped-seed execution, CI nor a landed trust measurement.
+The `List`-input Option selector is specified in §1.4, not §2.
 
 ## 4. I/O, effects, serialization
 
