@@ -1,7 +1,7 @@
 ---
 id: CAT-GEOMETRY-BOX-AREA
 title: "Algorithm.Geometry.NatBox exports spec 67 section 4: the natural-valued area of a box and its three laws (area_inside, area_inverted_x, area_inverted_y), proved at zero trust from the Architect's D0 development, with the section 4 seed run by a package test"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2

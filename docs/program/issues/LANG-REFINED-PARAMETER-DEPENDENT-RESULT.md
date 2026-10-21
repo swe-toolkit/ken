@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-PARAMETER-DEPENDENT-RESULT
 title: "Structural recursion on a refined parameter is still refused with K0014 when the result refinement mentions that parameter, though base b22a41649 accepted it: the refined-worker plan rejects the projection of the coerced recursive argument substituted into the result type. Accept it as on base"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1

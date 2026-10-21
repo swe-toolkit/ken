@@ -82,6 +82,23 @@ no Mapping or operation carve-out. px8ta stays `#[ignore]`d. The `(H)`
 probe caution in `RT-DEPTH3-CONTINUATION-CLAIM-UNDECLARED` stands. §1a for
 the px8ta chain is 0.
 
+## 0a. Landing order (Steward recut 2026-10-21, `evt_1gxk3pcr6rgw2`)
+
+The chain lands bottom-up, one link at a time, each green on `main` by
+itself:
+
+1. This WP, as a fresh candidate on `main` with its own suites green,
+   after the Architect's A1 measurement.
+2. `RT-BRACKET-REGION-TRANSPORT` (A2 and A3).
+3. `RT-BRACKET-SETTLEMENT-PLANE`.
+4. `RT-BRACKET-LOWERING-AND-D0-REFUTER` (B and C).
+5. `RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER`, paused and rebuilt
+   on `main` after link 4.
+
+The held refs are inputs only: never moved, rebased or landed. A link
+that cannot land alone is held, and the Architect rules the landing
+unit.
+
 ## 1. What is settled. Do not re-derive.
 
 - The representation is not in question. The Architect's second audit says
