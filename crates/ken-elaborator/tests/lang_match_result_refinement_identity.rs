@@ -1,6 +1,6 @@
 //! A match result retains the checked subset type at every leaf. Open proof
 //! demand under an unsupported indexed split refuses by type; recursive
-//! unindexed paths omit unwitnessed equations and keep open goals unknown.
+//! unindexed case-only paths carry checked equations and keep open goals unknown.
 
 use ken_elaborator::{ElabEnv, ElabError, ElabResult, ObligationKind};
 use ken_kernel::{check, normalize, Context, Decl, GlobalId, Term};
@@ -84,13 +84,18 @@ fn has_equation_for_family(term: &Term, family: GlobalId) -> bool {
             return true;
         }
     }
-    term.children().iter().any(|child| has_equation_for_family(child, family))
+    term.children()
+        .iter()
+        .any(|child| has_equation_for_family(child, family))
 }
 
-/// Promise class: durable unknown boundary under recursive unindexed splits
-/// (22 §3). Opaque open goals stay open, with no fabricated constructor Eq.
+/// Promise class: durable invariant for case-only recursive splits (22 §3).
+/// MEASURED: open goals remain open while the emitted checked case-only
+/// eliminator carries their constructor equation. CLAIMED: the equation has
+/// a term binder, not a fabricated proof. THE GAP: consuming-IH paths are
+/// kept on the original elaboration route and pinned separately.
 #[test]
-fn recursive_unindexed_result_goals_omit_unsupported_equations() {
+fn recursive_unindexed_case_only_result_goals_carry_checked_equations() {
     for (source, name, family, count) in [
         (
             format!(
@@ -121,12 +126,18 @@ fn recursive_unindexed_result_goals_omit_unsupported_equations() {
         ),
     ] {
         let (env, result) = checked(&source, count);
-        assert_eq!(env.globals[name], result.def_id, "recursive result admitted");
-        assert!(result.obligations.iter().all(|goal|
-            matches!(goal.kind, ObligationKind::RefinementIntroduction)
-            && env.is_open_hole(goal.hole_id)
-            && !has_equation_for_family(&goal.goal_closed, env.globals[family])),
-            "open goals have no invented recursive equation: {source}");
+        assert_eq!(
+            env.globals[name], result.def_id,
+            "recursive result admitted"
+        );
+        assert!(
+            result.obligations.iter().all(|goal| matches!(
+                goal.kind,
+                ObligationKind::RefinementIntroduction
+            ) && env.is_open_hole(goal.hole_id)
+                && has_equation_for_family(&goal.goal_closed, env.globals[family])),
+            "open goals carry the checked recursive equation: {source}"
+        );
         let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
             panic!("recursive result is a checked transparent definition: {source}")
         };
@@ -160,10 +171,13 @@ fn indexed_nested_split_preserves_checked_index_path() {
         ),
         3,
     );
-    assert!(result.obligations.iter().all(|goal|
-        matches!(goal.kind, ObligationKind::RefinementIntroduction)
-            && env.is_open_hole(goal.hole_id)),
-        "the indexed split retains each open result leaf");
+    assert!(
+        result.obligations.iter().all(|goal| matches!(
+            goal.kind,
+            ObligationKind::RefinementIntroduction
+        ) && env.is_open_hole(goal.hole_id)),
+        "the indexed split retains each open result leaf"
+    );
     let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
         panic!("indexed result remains a checked transparent definition")
     };

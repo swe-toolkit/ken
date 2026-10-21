@@ -27,6 +27,8 @@ use ken_kernel::{
 mod refinement_snapshot;
 #[path = "elab/refined_recursion.rs"]
 mod refined_recursion;
+#[path = "elab/recursive_branch_convoy.rs"]
+mod recursive_branch_convoy;
 #[cfg(test)]
 #[path = "elab/refinement_tests.rs"]
 mod refinement_tests;
@@ -920,6 +922,9 @@ struct ElabCtx<'e> {
     next_split_id: u64,
     active_splits: Vec<u64>,
     convoy_splits: HashSet<u64>,
+    /// Classify each active match once from resolved source and checked lift
+    /// provenance; all three recursive-convoy gates consult the same answer.
+    ih_consuming_splits: HashSet<u64>,
     /// One-shot result-position channel. Never visible to a subterm check.
     result_predicates: Vec<ResultPredicate>,
     /// The typeclass registry, when available — needed only for `.field`
@@ -1175,6 +1180,7 @@ impl<'e> ElabCtx<'e> {
             next_split_id: 0,
             active_splits: Vec::new(),
             convoy_splits: HashSet::new(),
+            ih_consuming_splits: HashSet::new(),
             result_predicates: Vec::new(),
             class_env: None,
             standard_operators: None,
@@ -8650,6 +8656,7 @@ fn finish_dependent_constructor_method(
     field_count: usize,
     expected: &Term,
     equation_convoy: bool,
+    branch_convoy: bool,
     recursive_field_index_path: RecursiveFieldIndexPath,
     scrut_core: &Term,
     ind: &InductiveDecl,
@@ -8674,7 +8681,7 @@ fn finish_dependent_constructor_method(
         shapes,
         field_count,
         expected,
-        (equation_convoy || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
+        (equation_convoy || branch_convoy || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
             .then_some(motive),
         scrut_core,
         ind,
@@ -8688,6 +8695,9 @@ fn finish_dependent_constructor_method(
         embedded_method_repairs,
         method,
     )?;
+    if branch_convoy {
+        recursive_branch_convoy::check_case_only_method(&wrapped, field_count, shapes.len())?;
+    }
     finalize_large_convoy_refl_method(
         cx.env,
         &cx.ctx,
@@ -9639,12 +9649,13 @@ fn checked_constructor_convoy_permitted(
     if !requested {
         return Ok(false);
     }
+    let consumes_ih = cx.active_splits.last().is_some_and(|id| cx.ih_consuming_splits.contains(id));
     let permitted = equation.is_none()
         && ind.indices.is_empty()
-        && ind.constructors.iter().all(|ctor| {
+        && (ind.constructors.iter().all(|ctor| {
             recursive_shapes(cx.env, ctor, ind.id, ind.params.len())
                 .is_ok_and(|shapes| shapes.is_empty())
-        })
+        }) || !consumes_ih)
         && cx.path_conditions.iter().all(|frame| frame.install_depth <= cx.ctx.len())
         && arms.iter().all(|arm| row_leaves_fields_unsplit(&arm.pat));
     if !permitted {
@@ -9676,6 +9687,7 @@ fn check_match_dependent(
         cx, first, snapshot, split_id, scrut, equation, arms, expected, span, predicates,
     );
     debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    cx.ih_consuming_splits.remove(&split_id);
     result
 }
 
@@ -9791,6 +9803,10 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
         Some(original_expected.clone()),
         scrutinee_level,
     );
+    if recursive_branch_convoy::match_consumes_method_ih(cx, arms, scrutinee_level) {
+        let split_id = *cx.active_splits.last().expect("dependent match has an active split");
+        cx.ih_consuming_splits.insert(split_id);
+    }
     let recursive_field_index_path = recursive_field_index_path(
         cx,
         &ind,
@@ -10079,6 +10095,7 @@ fn check_match_dependent_mode<const MAY_REFINE_GROUP_RESULT: bool>(
             n,
             expected,
             equation_convoy,
+            branch_convoy,
             recursive_field_index_path,
             &scrut_core,
             &ind,
@@ -14558,7 +14575,7 @@ fn recursive_unindexed_split(
             .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?
             .is_empty()
         {
-            return Ok(true);
+            return Ok(cx.ih_consuming_splits.contains(&frame.split_id));
         }
     }
     Ok(false)
@@ -14578,7 +14595,7 @@ fn convoyable_frame(cx: &ElabCtx<'_>, frame: &PathFrame, span: &Span) -> Result<
             .map_err(|error| ElabError::KernelRejected { error, span: span.clone() })?
             .is_empty()
         {
-            return Ok(false);
+            return Ok(!cx.ih_consuming_splits.contains(&frame.split_id));
         }
     }
     Ok(true)
