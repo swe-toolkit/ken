@@ -4,7 +4,9 @@ Ordered monomials expose the result of distributing natural-coefficient
 polynomials. A separate recursive Horner form collects like terms and decides
 semantic equality. Substitution replaces variables in a single pass and
 preserves evaluation and a positive equality decision under every total
-environment. These operations have kernel-checked generic laws.
+environment. Substitutions also compose in a fixed order and have the variable
+constructor as their identity map. These operations have kernel-checked generic
+laws.
 
 ## Contents
 
@@ -44,7 +46,10 @@ Substitution is a simultaneous single pass: an inserted expression is not
 substituted again. `compose_env` evaluates each variable's replacement under
 the original environment, and two laws relate that operation to evaluation
 and the forward direction of polynomial equality. These laws do not claim
-that substitution preserves a `False` answer.
+that substitution preserves a `False` answer. `compose_subst` applies its
+second argument first and then its first argument to each inserted expression.
+Two checked laws establish structural composition and constructor identity;
+private expression congruence proofs support their inductive branches.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -804,6 +809,86 @@ pub theorem poly_eq_substitute
               (eval env (substitute s e2))
               (eval composed e2)
               (eval_substitute env s e2))))
+
+pub fn compose_subst (s : Nat → Expr) (t : Nat → Expr) (v : Nat) : Expr = substitute s (t v)
+
+pub theorem substitute_compose
+      (s : Nat → Expr) (t : Nat → Expr) (e : Expr)
+    : Equal Expr (substitute s (substitute t e)) (substitute (compose_subst s t) e) =
+  match e {
+    EConst c ↦ Refl;
+    EVar v ↦ Refl;
+    EAdd a b ↦
+      expr_add_cong
+        (substitute s (substitute t a))
+        (substitute (compose_subst s t) a)
+        (substitute s (substitute t b))
+        (substitute (compose_subst s t) b)
+        (substitute_compose s t a)
+        (substitute_compose s t b);
+    EMul a b ↦
+      expr_mul_cong
+        (substitute s (substitute t a))
+        (substitute (compose_subst s t) a)
+        (substitute s (substitute t b))
+        (substitute (compose_subst s t) b)
+        (substitute_compose s t a)
+        (substitute_compose s t b)
+  }
+
+pub theorem substitute_var (e : Expr) : Equal Expr (substitute EVar e) e =
+  match e {
+    EConst c ↦ Refl;
+    EVar v ↦ Refl;
+    EAdd a b ↦
+      expr_add_cong
+        (substitute EVar a)
+        a
+        (substitute EVar b)
+        b
+        (substitute_var a)
+        (substitute_var b);
+    EMul a b ↦
+      expr_mul_cong
+        (substitute EVar a)
+        a
+        (substitute EVar b)
+        b
+        (substitute_var a)
+        (substitute_var b)
+  }
+
+theorem expr_add_cong
+      (a1 : Expr)
+      (a2 : Expr)
+      (b1 : Expr)
+      (b2 : Expr)
+      (p : Equal Expr a1 a2)
+      (q : Equal Expr b1 b2)
+    : Equal Expr (EAdd a1 b1) (EAdd a2 b2) =
+  trans
+    Expr
+    (EAdd a1 b1)
+    (EAdd a2 b1)
+    (EAdd a2 b2)
+    (cong Expr Expr a1 a2 (λx. EAdd x b1) p)
+    (cong Expr Expr b1 b2 (λx. EAdd a2 x) q)
+
+theorem expr_mul_cong
+      (a1 : Expr)
+      (a2 : Expr)
+      (b1 : Expr)
+      (b2 : Expr)
+      (p : Equal Expr a1 a2)
+      (q : Equal Expr b1 b2)
+    : Equal Expr (EMul a1 b1) (EMul a2 b2) =
+  trans
+    Expr
+    (EMul a1 b1)
+    (EMul a2 b1)
+    (EMul a2 b2)
+    (cong Expr Expr a1 a2 (λx. EMul x b1) p)
+    (cong Expr Expr b1 b2 (λx. EMul a2 x) q)
 
 fn shift_env (env : Nat → Nat) (v : Nat) : Nat = env (Suc v)
 
@@ -2141,7 +2226,10 @@ hypotheses with private addition and multiplication congruence. In
 `poly_eq_substitute`, `poly_eq_sound` supplies equality under the composed
 environment; `eval_substitute` transports each side to the substituted
 expression, and `poly_eq_complete` yields the `True` decision. No proof of a
-reverse implication is used or claimed.
+reverse implication is used or claimed. `substitute_compose` inducts over the
+original expression and lifts the induction hypotheses through `EAdd` and
+`EMul` with private congruence proofs. `substitute_var` uses the same structural
+steps with `EVar` as the identity map; neither theorem equates functions.
 
 ## 5. Design notes
 
@@ -2157,7 +2245,9 @@ operation; §2's separate `canonicalize : Expr → Poly` merges like terms.
 Substitution preserves the original expression constructors and inserts each
 variable's image once;
 evaluating the original expression under `compose_env` gives the same result
-as evaluating its substitution under the given environment.
+as evaluating its substitution under the given environment. To apply two
+substitutions, `compose_subst s t` visits each `t` image with `s`; it does not
+change the single-pass behavior of either substitution.
 
 A `PHorner p q` reads `p` with variable indices shifted upward and adds `q`
 multiplied by variable zero. Collapsing `PHorner (PConst c) (PConst Zero)`
@@ -2180,22 +2270,24 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–3 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–4 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
-and [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md)
+[substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
+and [composition seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-composition.md)
 specify the public surface and closed observations. The public API comprises
-`Expr`, `Monomial`, `Poly`, their exported constructors, eleven operations,
-and twelve checked theorems; Horner and substitution introduce no public
+`Expr`, `Monomial`, `Poly`, their exported constructors, twelve operations,
+and fourteen checked theorems; Horner and substitution expose no additional
 helper beyond those named operations and laws. Definition locates the
 implementations and law statements; Using it gives client idioms; Laws &
-proofs traces the three proof families; Design notes separates their
+proofs traces the proof families; Design notes separates their
 representations and limits.
 
 The source derives evaluation from the checked natural arithmetic, logic
 transport, Boolean conjunction, natural order and list-append definitions.
 Private functions and lemmas implement distribution, Horner collection,
-canonicity, positivity, substitution congruence, and proof rearrangements.
+canonicity, positivity, substitution and expression congruence, and proof
+rearrangements.
 The root-loaded acceptance target compares exact trusted-`GlobalId` sets
 before and after loading the
 package on its providers. The extension adds no Axiom, postulate, primitive,

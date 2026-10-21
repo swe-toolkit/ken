@@ -5,9 +5,9 @@
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION §3;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION §4).** The §1–3
 > catalog operations, checked laws, and seeds are present on main.
-> Section 4 specifies substitution composition and identity from
-> Architect D0; its catalog exports and seed are not yet delivered.
-> Scratch evidence is not shipped seed-harness execution or CI.
+> Section 4's catalog operations and checked laws are delivered alongside
+> its authored seed. The D0 alone does not establish shipped seed-harness
+> execution or CI.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -434,9 +434,9 @@ not a proof of the generic theorem.
 On landed base `fcd05e7eb`, Architect D0 checked the generic law
 bodies, closed clients and reversed-order refusal in scratch: rc 0,
 no `Axiom`, and identical `trusted_base()` identity sets of 114
-entries before and after loading its edited package. These are
-scratch measurements, not a delivered §4 catalog extension, shipped
-§4 conformance seed or seed-harness execution, CI, publication, or
-a measured landed trust delta. Sorted-list canonicalization,
+entries before and after loading its edited package. The §4 catalog
+extension and authored seed are now present; the D0 measurements alone
+do not establish shipped seed-harness execution, CI, publication, or a
+measured landed trust delta. Sorted-list canonicalization,
 dimension-indexed environments, derivatives, subtraction and
 signed/field operations remain deferred.
