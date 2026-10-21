@@ -16,7 +16,7 @@
 //! never a hand-fed expected value
 //! ([[conformance-hand-feeds-the-deliverable]]).
 
-use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
+use ken_elaborator::{ElabEnv, ElabError, NumericLitVal, ObligationKind};
 use ken_interp::eval::{eval_checked, EvalStore, EvalVal};
 use ken_kernel::{convert, convert_type, infer, whnf, Context, Decl, Term};
 
@@ -180,6 +180,105 @@ fn char_literal_rejects_surrogate_escape() {
     assert_eq!(
         error.to_string(),
         "invalid escape at 18-26: unicode escape is not a valid scalar value"
+    );
+}
+
+/// surface/numbers/char-expected-integer-literal-scalar-boundary (soundness)
+///
+/// Promise class: durable invariant. MEASURED: each expected-Char integer
+/// literal emits its own checked isScalar goal; D800 remains an open hole,
+/// while D7FF is discharged. CLAIMED: introducing Char from an integer never
+/// silently accepts a surrogate as a proved scalar. THE GAP: these two
+/// boundary values do not exhaust every Int-to-Char introduction route.
+#[test]
+fn expected_char_integer_literals_report_scalar_boundary() {
+    let mut env = ElabEnv::new().expect("prelude init");
+    let is_scalar = Term::const_(env.globals["isScalar"], vec![]);
+    for (source, codepoint, must_stay_open) in [
+        ("const char_D800 : Char = 55296", 55296, true),
+        ("const char_D7FF : Char = 55295", 55295, false),
+    ] {
+        let result = env
+            .elaborate_decl_v1(source)
+            .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+        let [obligation] = result.obligations.as_slice() else {
+            panic!(
+                "{source}: expected one scalar-introduction goal, got {:?}",
+                result.obligations
+            );
+        };
+        assert!(matches!(
+            obligation.kind,
+            ObligationKind::RefinementIntroduction
+        ));
+        assert_eq!(
+            obligation.goal_closed,
+            Term::app(is_scalar.clone(), Term::IntLit(codepoint.into())),
+            "{source}: the obligation must constrain this codepoint"
+        );
+        assert_eq!(
+            env.is_open_hole(obligation.hole_id),
+            must_stay_open,
+            "{source}: surrogate remains open; adjacent scalar discharges"
+        );
+    }
+}
+
+/// surface/numbers/char-excludes-surrogates (Int-expression route, soundness)
+///
+/// Promise class: durable invariant. MEASURED: a free Int converted to Char
+/// creates an open isScalar n goal under its binder, whereas a guarded
+/// intToChar result is reused and its closed fallback is discharged.
+/// CLAIMED: a function result of Char cannot silently treat every Int as
+/// scalar. THE GAP: the guarded control tests this Option/Char path, not
+/// arbitrary user-defined guards or every way to construct a Char.
+#[test]
+fn int_expression_at_char_result_reports_scalar_obligation() {
+    let mut env = ElabEnv::new().expect("prelude init");
+    let raw = env
+        .elaborate_decl_v1("fn toC (n : Int) : Char = n")
+        .expect("free Int introduction is checked with a visible obligation");
+    let [obligation] = raw.obligations.as_slice() else {
+        panic!(
+            "toC: expected one scalar-introduction goal, got {:?}",
+            raw.obligations
+        );
+    };
+    assert!(matches!(
+        obligation.kind,
+        ObligationKind::RefinementIntroduction
+    ));
+    assert_eq!(
+        obligation.goal_closed,
+        Term::pi(
+            Term::const_(env.globals["Int"], vec![]),
+            Term::app(Term::const_(env.globals["isScalar"], vec![]), Term::var(0))
+        ),
+        "toC must require isScalar of its free n under the function binder"
+    );
+    assert!(
+        env.is_open_hole(obligation.hole_id),
+        "isScalar n is not proved"
+    );
+
+    let guarded = env
+        .elaborate_decl_v1(
+            "fn toC_guarded (n : Int) : Char = match (intToChar n) { Some c |-> c ; None |-> 65 }",
+        )
+        .expect("the prelude's guarded conversion can return a checked Char");
+    let [fallback] = guarded.obligations.as_slice() else {
+        panic!(
+            "guarded Char fallback must introduce one goal: {:?}",
+            guarded.obligations
+        );
+    };
+    assert!(matches!(
+        fallback.kind,
+        ObligationKind::RefinementIntroduction
+    ));
+    assert!(
+        !env.is_open_hole(fallback.hole_id),
+        "the 65 fallback closes; the Some arm reuses intToChar's checked Char"
     );
 }
 
