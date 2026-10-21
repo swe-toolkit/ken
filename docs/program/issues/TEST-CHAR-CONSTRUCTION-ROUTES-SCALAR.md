@@ -1,7 +1,7 @@
 ---
 id: TEST-CHAR-CONSTRUCTION-ROUTES-SCALAR
 title: "Pin that every surface route that builds a Char refuses a surrogate: a Char literal, an integer literal at an expected Char, and an Int-typed expression at Char. Two rows no test pins today; a route that admits D800 stops to the Architect as a Language design fork"
-status: active
+status: merged
 owner: verify
 size: S
 tier: T1

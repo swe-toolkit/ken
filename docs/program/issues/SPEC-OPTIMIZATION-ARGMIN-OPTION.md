@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMIN-OPTION
 title: "Spec 72 section 1 defers an Option-returning least-cost selector over a possibly empty List: a client holding a List must rebuild the NonEmpty split itself before it can call argmin. Rule the selector's name, its Nil and Cons equations, and any membership or optimality corollaries from a checked D0 at zero trust, and state them as a section 1 extension with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
