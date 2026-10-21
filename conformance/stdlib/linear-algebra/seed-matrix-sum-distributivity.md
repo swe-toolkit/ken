@@ -11,11 +11,11 @@ or landing claim is made.
 
 The closed cases use `Nat` matrices with dimensions in their `Vec`
 types. They check a direct 2×2 row-wise sum, then both distribution
-orientations on non-square products. The false right-distribution
-claim uses the same square left factor and right summands as its
-accepting control; only the dropped product differs.
+orientations on non-square products. The false sum-on-the-right
+claim (`a(b+c)=ab+c`) uses the same square left factor and right
+summands as its accepting control; only the dropped product differs.
 
-## Fixtures and direct matrix-add values
+## stdlib/linear-algebra/matrix-add-2x2-direct-oracle
 
 - spec: `spec/50-stdlib/65-linear-algebra.md` §4.1.
 - promise class: durable invariant.
@@ -95,7 +95,7 @@ theorem matrix_add_two_by_three_value :
     b_plus_c_23 = Refl
 ```
 
-## Left factor over a right-hand sum
+## stdlib/linear-algebra/matrix-product-distrib-left-1x2-2x3
 
 - spec: `spec/50-stdlib/65-linear-algebra.md` §4.2.
 - promise class: durable invariant.
@@ -125,7 +125,7 @@ theorem matrix_product_distrib_left_closed :
       (matrix_product one two three factor_12 c23)) = Refl
 ```
 
-## Right factor after a left-hand sum
+## stdlib/linear-algebra/matrix-product-distrib-right-2x3-3x1
 
 - spec: `spec/50-stdlib/65-linear-algebra.md` §4.2.
 - promise class: durable invariant.
@@ -155,7 +155,7 @@ theorem matrix_product_distrib_right_closed :
       (matrix_product two three one c23 factor_31)) = Refl
 ```
 
-## Same-input control and isolated refusal
+## stdlib/linear-algebra/matrix-product-distrib-left-refusal-same-input
 
 The accepting control uses the square left factor below with the same
 `b23` and `c23` as the refusal. The refusal input is made by taking a
