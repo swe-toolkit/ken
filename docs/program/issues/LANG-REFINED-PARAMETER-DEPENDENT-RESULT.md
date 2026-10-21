@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-PARAMETER-DEPENDENT-RESULT
 title: "Structural recursion on a refined parameter is still refused with K0014 when the result refinement mentions that parameter, though base b22a41649 accepted it: the refined-worker plan rejects the projection of the coerced recursive argument substituted into the result type. Accept it as on base"
-status: active
+status: closed
 owner: language
 size: S
 tier: T1
@@ -13,6 +13,15 @@ origin: "Adversary M8 finding evt_2v7tpgnkbzra9 on LANG-REFINED-PARAMETER-STRUCT
 ---
 
 # Recursion with a result that mentions the refined parameter
+
+Closed 2026-10-21 as a documented limitation (Steward rescope
+`evt_5q797p3jqwgsf` on the Architect's stop `evt_e23n6wvtsd2s`).
+Refined structural recursion whose open obligations mention the
+recursive call's result stays refused with K0014. It fails closed. WIP
+`47c25c5c3` is never landed. The only repair that keeps obligation
+identity is a kernel admission feature: an SCT group checked with
+non-recursive transparent companion definitions. That is trust-root
+growth and is the operator's call; it is not framed.
 
 ## Objective
 
@@ -74,3 +83,12 @@ Checks: 4 fired: `unwrap_pair`, the ~:185/~:193 projection arms, the
 ~:312 pre-check and the ~:412 fallback exist at `664d86ee8`. 7 fired:
 AC-1 carries all four refused siblings, and AC-2 keeps a source pair
 projection on the conservative path.
+
+## Symptom inventory
+
+1. Worker admission TypeMismatch: open-obligation constants are
+   env-typed against the public group member (`g651 : … g648 (m, g2)
+   …`), which the worker split cannot rewrite, so the worker pair's
+   predicate (at the worker call) disagrees with its proof's type (at
+   the public call). Keyed on a non-member constant whose declared type
+   mentions a group member (Architect `evt_e23n6wvtsd2s`).

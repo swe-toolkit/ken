@@ -1,7 +1,7 @@
 ---
 id: LANG-CLOSE-GOAL-PATH-CONDITIONS
 title: "close_goal closes call-site requires obligations and the partial-primitive NoOvf and nonzero obligations over the context alone, never reading path_conditions, so they are posed without the if, match and let equations that hold on their path. Spec 22 §3 says each obligation is discharged under exactly the facts on its path. Close every obligation over its path facts"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
