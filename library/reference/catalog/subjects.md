@@ -4,13 +4,10 @@ Availability: **current**
 
 Authority: **derived reference**
 
-This path-preserving index is generated from the first heading of every checked
-catalog package document. At this revision, the command returns all 40 package
-subjects:
-
-```sh
-git grep -n '^# ' -- 'catalog/packages/**/*.ken.md'
-```
+This path-preserving index records the first heading of each of the 40 checked
+catalog package documents. Each path and heading form one package subject.
+A raw heading search also returns section headings within each document, so it
+is not a command for producing this index.
 
 ```text
 catalog/packages/Application/CommandLine/ArgParse.ken.md:1:# ArgParse
@@ -55,6 +52,5 @@ catalog/packages/Data/Text/StringKeys.ken.md:1:# `Data.Text.StringKeys` — lawf
 catalog/packages/Tooling/Testing/Property.ken.md:1:# `Tooling.Testing.Property` — deterministic finite property checks
 ```
 
-The path and heading together are the generated subject identity. The index
-does not infer declarations, laws, effects, assurance, platform, maturity, or
-dependency facts.
+The path and heading together identify each subject. The index does not infer
+declarations, laws, effects, assurance, platform, maturity, or dependency facts.

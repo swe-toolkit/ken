@@ -7,7 +7,7 @@ Authority: **derived reference**
 ## Population and disposition
 
 This index projects the Law row from every landed catalog card. Its population
-is 40 of 40 cards: 28 rows are `authored` and 12 are `none-declared`. A
+is 40 of 40 cards: 29 rows are `authored` and 11 are `none-declared`. A
 `none-declared` entry means exactly that the cited card records no law in its
 canonical checked fences; it is not an inference from an omitted index entry.
 
