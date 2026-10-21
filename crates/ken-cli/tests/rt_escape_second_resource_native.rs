@@ -832,7 +832,7 @@ fn buffer_freeze_outcome(
 /// Promise class: transition sentinel for this r2 fixture's owner/Vis origins.
 /// MEASURED: both relay-bearing owners have one static successor and one
 /// source-driven relay; each retains only its independent successor (owner 2:
-/// 746, owner 3: 528). CLAIMED: neither emitted owner waits for the forwarded
+/// 754, owner 3: 536). CLAIMED: neither emitted owner waits for the forwarded
 /// relay's unrepresentable K. THE GAP: this planned member relation alone
 /// does not prove source drive executes; the native parity row separately
 /// observes the effect sequence and terminal result.
@@ -874,8 +874,8 @@ fn r2_relay_owners_return_only_source_independent_successors() {
                 .map(|(_, members)| members.as_slice())
                 .expect("a driven relay owner retains an installed pending-Vis protocol");
             let ruled_successor = match protocol.owner_origin {
-                1264 => 746, // owner 2, Vis 1264
-                1283 => 528, // owner 3, Vis 1283
+                1272 => 754, // owner 2, Vis 1272
+                1291 => 536, // owner 3, Vis 1291
                 other => panic!("unexpected r2 relay owner at Vis {other}"),
             };
             assert_eq!(expected, ruled_successor,
@@ -885,7 +885,7 @@ fn r2_relay_owners_return_only_source_independent_successors() {
             returned.push(expected);
         }
         returned.sort_unstable();
-        assert_eq!(returned, [528, 746], "r2's two surviving successor Vis origins");
+        assert_eq!(returned, [536, 754], "r2's two surviving successor Vis origins");
         let mut owners = protocols.iter().map(|protocol| protocol.owner_origin)
             .collect::<Vec<_>>();
         owners.sort_unstable();
