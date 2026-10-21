@@ -2,11 +2,14 @@
 
 > **Status: DRAFT v1 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 > SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
-> SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY §3).** Section 1 specifies
-> seven `Nat`-valued operations and five laws; §2 adds two product laws.
-> Both sections' laws are landed in the catalog. Section 3 specifies
-> two further product-compatibility laws and a public scaling lemma;
-> its D0 proofs are feasibility evidence, not catalog or seed delivery.
+> SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY §3;
+> SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY §4).** Sections 1–3
+> and their ten public checked laws are landed in the catalog. The
+> existing seed includes three closed §3 cases, and the catalog has a
+> source acceptance target for them. Section 4 specifies row-wise
+> matrix addition and four new public distributivity laws. The §4 D0
+> proofs are scratch feasibility evidence only; §4 catalog exports,
+> seed execution, CI and a landed trust measurement are not claimed.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -148,15 +151,15 @@ cases is a **proved Vec law**, not a fresh axiom.
 The ordinary `Vec` eliminator, natural recursion, `Equal`, and the
 existing Nat laws account for §1's specified work. Its seven
 operations and five generic laws, together with §2's left identity
-and product associativity, are now landed in
-`Algorithm.LinearAlgebra.NatMatrix`. The checked catalog module
-introduces no `Axiom`. Section 3's further two generic laws and
-public scaling lemma are checked or ruled in the Architect's D0
-scratch development, not yet exported by that module. The D0 measured
-`trusted_base()` as 109 before and after the edited package; that is
-not a measured landed §3 trust delta. No statement in this chapter
-adds a kernel form, syntax, primitive, or `Float` support. A scratch
-check or authored seed is not execution of a shipped seed harness.
+and product associativity and §3's two compatibility laws and
+`dot_scale`, are landed in `Algorithm.LinearAlgebra.NatMatrix`.
+The checked catalog module introduces no `Axiom`. The historical §3
+D0 measured `trusted_base()` as 109 before and after its scratch
+package; that measurement does not establish a landed §3 trust delta.
+The new §4 D0 is separately measured in §4.3. No statement in this
+chapter adds a kernel form, syntax, primitive, or `Float` support.
+An authored seed or scratch check alone is not execution of a shipped
+seed harness.
 
 Signed scalars, a relation-parametric semiring abstraction and a
 Rational-valued matrix tier, determinants, inverses, solving and
@@ -167,8 +170,8 @@ an unchecked assumption, or a numerical example alone.
 ## 2. Left identity and associativity of matrix products
 
 The following two **generic laws have checked proof bodies** in the
-landed catalog module. Its §1 and §2 public laws are all exported;
-§3 specifies further compatibility laws separately. Neither §2 law
+landed catalog module. Its §1–3 public laws are all exported;
+§3 states the separate compatibility contract. Neither §2 law
 is gated on `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`; both use the
 existing `Nat`, `Vec`, and matrix operations, without a new carrier or scalar
 tier.
@@ -276,9 +279,130 @@ unreversed product law is not specified: on the D0's closed `2 × 2`
 example it equates different matrices. The Architect's development
 on base `21c53baae` checked both generic law bodies, their generic
 clients and a non-square closed example, with no `Axiom` and an
-unchanged `trusted_base()` set of 109 entries. The D0 is scratch
-feasibility evidence, not a catalog export of these §3 laws or of
-`dot_scale`, a §3 conformance seed, shipped seed-harness execution,
-CI, or a measured landed §3 trust delta. Later catalog work places
-the two public compatibility laws after `matrix_product_assoc` and
-keeps the four stage helpers private.
+unchanged `trusted_base()` set of 109 entries. That D0 is historical
+scratch evidence; the two laws and `dot_scale` have since landed as
+catalog exports. The existing §1–3 seed and its source acceptance
+target include closed §3 clients, but this statement is not a fresh
+run of that target, CI result, or landed trust measurement. The
+catalog places the two compatibility laws after
+`matrix_product_assoc` and keeps the four stage helpers private.
+
+## 4. Row-wise matrix sums and distributivity
+
+> **Section 4 status: DRAFT v1
+> (SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY).** The Architect
+> checked the generic definitions and proofs in a scratch package on
+> the landed §1–3 base. The §4 catalog exports and conformance seed
+> have not been delivered. Scratch checks do not establish shipped
+> seed execution, CI, publication, landing or landed trust.
+
+### 4.1 Exact sum on the existing indexed carrier
+
+`Algorithm.LinearAlgebra.NatMatrix` adds one public operation. Two
+matrices of the same `m × n` dimensions sum row by row by applying
+§1.2's `vector_add n` to the corresponding rows. The existing indexed
+`zip_with` cannot truncate either operand; no new matrix carrier,
+scalar class or implicit broadcasting is introduced. The definition
+is exact, including `m = Zero` and `n = Zero`:
+
+```ken
+pub fn matrix_add
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
+    : Vec (Vec Nat n) m =
+  zip_with (Vec Nat n) (Vec Nat n) (Vec Nat n) m (vector_add n) a b
+```
+
+### 4.2 Four public checked-law obligations
+
+The first two laws hold over arbitrary `m`, `n`, `p` and typed
+operands. The `left` suffix means that the fixed left factor
+multiplies a **sum on the right**: `a(b+c) = ab+ac`.
+The `right` suffix means a **sum on the left** of a fixed right
+factor: `(a+b)c = ac+bc`. These names refer to the product side
+held fixed, not to an assumed commutative matrix product. In each
+case the two terms have exactly `m × p` shape; `matrix_add n p`
+requires both right summands to be `n × p`, whereas
+`matrix_add m n` requires both left summands to be `m × n`.
+
+```ken
+pub theorem matrix_product_distrib_left
+      (m : Nat) (n : Nat) (p : Nat)
+      (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat p) n) (c : Vec (Vec Nat p) n)
+    : Equal (Vec (Vec Nat p) m)
+        (matrix_product m n p a (matrix_add n p b c))
+        (matrix_add m p (matrix_product m n p a b) (matrix_product m n p a c))
+
+pub theorem matrix_product_distrib_right
+      (m : Nat) (n : Nat) (p : Nat)
+      (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m) (c : Vec (Vec Nat p) n)
+    : Equal (Vec (Vec Nat p) m)
+        (matrix_product m n p (matrix_add m n a b) c)
+        (matrix_add m p (matrix_product m n p a c) (matrix_product m n p b c))
+```
+
+Two further public laws give compatibility with §1.2's
+`matrix_vector` and `transpose`. In the first, the same length-`n`
+vector acts on both `m × n` summands and the results add at length
+`m`. In the second, the two `m × n` inputs transpose separately to
+`n × m` before addition. Neither law is already supplied by §1–3;
+`transpose_add` is also a proof ingredient for the left product law.
+
+```ken
+pub theorem matrix_vector_distrib
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m) (x : Vec Nat n)
+    : Equal (Vec Nat m)
+        (matrix_vector m n (matrix_add m n a b) x)
+        (vector_add m (matrix_vector m n a x) (matrix_vector m n b x))
+
+pub theorem transpose_add
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat m) n)
+        (transpose m n (matrix_add m n a b))
+        (matrix_add n m (transpose m n a) (transpose m n b))
+```
+
+Every law is a generic equality of indexed values, not a comparison
+of unchecked shapes or of only closed numerals. Zero dimensions and
+non-square matrices are included. The section does not specify
+`matrix_vector` distributivity over a sum in its **vector** argument:
+that is a different orientation, neither requested nor measured.
+
+### 4.3 Private proof boundary and evidence
+
+The ruled proof stages `dot_distrib_right`, `columns_add_right`,
+`row_product_add`, and `zip_prepend_add` remain **private**. Right-
+argument dot distributivity is obtained from the existing public
+`dot_comm` and `dot_distrib`; it is not a fifth exported law. The
+private `columns_add_right` carries that dot step over columns;
+`row_product_add` uses `transpose_add` and the column step. The
+previously private `columns_add` and `zero_width_repeat` are reused.
+The right product law reduces row-by-row through `columns_add`,
+`matrix_vector_distrib` through `dot_distrib`, and `transpose_add`
+through the empty-width case and `zip_prepend_add`. None promotes a
+private helper or changes any §1–3 operation or law.
+
+The Architect's D0 on base `b5b423cad974d803da3286b82156bfcc92d515bb`
+added only the scratch `NatMatrix` declarations: `ken check` returned
+rc 0 with no new `Axiom`, postulate or opaque declaration. Its scratch
+trust test passed 1/1; the exact `trusted_base()` set remained
+**109 → 109**, with 61 owned package declarations and five new public
+names transparent and owned. A client import of private
+`dot_distrib_right` was refused with E0012. The ambient-passthrough
+census test **was not run to a verdict**: the Architect stopped it to
+release the shared build lock. The later catalog QA owns that test;
+there is no census-success claim here. Closed scratch values used
+`Refl` and covered a `2 × 2` sum and non-square distributivity. The
+separate, square-typed false claim `a(b+c) = ab+c` refused with E0038
+while its correct-RHS control checked; that negative does not itself
+prove any generic law. These are scratch D0 observations, **not** a
+§4 catalog or seed delivery, shipped seed execution, CI, publication,
+landing or a landed trust measurement.
+
+The §4 seed must distinguish the side on which the sum occurs, with
+closed non-square products for both orientations. Its false law
+`a(b+c) = ab+c` needs a square left factor so the incorrect `+c`
+term type-checks; it must be a separately appended refusal after a
+positive control. Seed authoring and exact execution are later,
+separately reviewed work. Signed, Rational-valued, semiring-general
+and approximate matrices, and subtraction, are not implied by these
+natural-number laws.

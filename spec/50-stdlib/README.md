@@ -289,18 +289,24 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–3
+**`65-linear-algebra.md`** §§1–4
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
-SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY).
+SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
+SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
-with row-major `Vec (Vec Nat n) m` matrices. Its seven natural-valued
-operations and all seven §1–2 checked laws are landed; neither §2 law
-awaits `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`. Section 3 specifies
-checked matrix-vector/product compatibility and reverse-order
-transpose/product, with public `dot_scale` support. Their D0 is scratch
-feasibility evidence; §3 catalog and seed delivery are not claimed.
-No rational or `Float` tier is claimed.
+with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
+operations and all ten §1–3 checked laws are landed; neither §2 law
+awaits `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`. The existing seed
+includes closed §3 compatibility cases, with a catalog acceptance
+source target. Section 4 specifies row-wise public `matrix_add`,
+left and right matrix-product distribution, matrix-vector distribution
+in the matrix argument, and transposition of a sum. Its four generic
+laws were checked in Architect scratch D0 (rc 0, no new `Axiom`,
+trust identities 109 → 109), not delivered as §4 catalog exports or
+seed. The D0 census did not run to a verdict. No §4 shipped-seed
+execution, CI, publication, landing or landed trust measurement is
+claimed. No rational or `Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–4 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
