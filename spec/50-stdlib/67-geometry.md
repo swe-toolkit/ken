@@ -2,16 +2,15 @@
 
 > **Status: DRAFT v0 (SPEC-GEOMETRY-EXACT-CONTRACT §1;
 > SPEC-GEOMETRY-MANHATTAN-METRIC §2;
-> SPEC-GEOMETRY-BOX-CONTAINMENT §3).** Sections 1–2 and their catalog
-> operations, checked laws and seeds are present on main. Section 3
-> specifies a corner-wise containment test and seven checked law
-> obligations from Architect D0. The §3 conformance seed is authored
-> and present at
-> `conformance/stdlib/geometry/seed-box-containment.md`. The §3
-> `inside` and seven law exports are present in
-> `Algorithm.Geometry.NatBox` on main since `e3e0cda6c`. Exact-seed
-> shipped-harness execution and CI are unmeasured. D0 scratch results
-> do not establish a landed trust measurement.
+> SPEC-GEOMETRY-BOX-CONTAINMENT §3;
+> SPEC-GEOMETRY-BOX-AREA §4).** Sections 1–3, their catalog operations
+> and checked laws, and their seeds are present on main. Section 4
+> specifies natural-valued area, containment monotonicity, and both
+> generic inverted-axis zero laws. Architect checked the §4 generic
+> proofs in scratch, but §4 catalog exports and conformance seed have
+> not been delivered. Neither that scratch check nor the earlier
+> seeds establish §4 shipped-seed execution, CI or a landed trust
+> measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -156,10 +155,11 @@ CI, or a measured landed trust delta.
 
 Signed coordinates and signed-dependent orientation, cross products
 and rotation are deferred. Euclidean and floating-point distances,
-box area, dimensions other than two, a canonical empty-box
-representation and point-set equality of boxes are also deferred.
-Section 1's six laws alone do not establish the Manhattan triangle
-inequality; §2 specifies and exports it separately.
+dimensions other than two, a canonical empty-box representation and
+point-set equality of boxes are also deferred. Box area is specified
+in §4; the §1 distance operation is not an area calculation. Section
+1's six laws alone do not establish the Manhattan triangle inequality;
+§2 specifies and exports it separately.
 
 ## 2. Manhattan metric laws on natural points
 
@@ -240,8 +240,9 @@ The §1 Nat Order `greatest for min` and `least for max` exports and
 §1 `NatBox` package are present on main. Section 2 adds no new
 prerequisite publication or change to §1's public helper boundary.
 Signed coordinates and orientation, Euclidean or floating-point
-distance, box area, dimensions beyond two, canonical empty boxes and
-point-set equality of boxes remain outside this metric extension.
+distance, dimensions beyond two, canonical empty boxes and point-set
+equality of boxes remain outside this metric extension. Section 4
+specifies box area separately from the §2 metric laws.
 
 ## 3. Corner-wise containment of boxes
 
@@ -373,3 +374,116 @@ measurements**, not §3 catalog publication, an authored or executed
 The approved contract adds no signed coordinates, dimensions beyond
 two, new primitive or surface feature. It does not collapse distinct
 empty boxes or change §1's `contains`, `intersect` or `hull`.
+
+## 4. Natural area of a closed box
+
+> **Section 4 status: DRAFT v0 (SPEC-GEOMETRY-BOX-AREA).** Architect
+> checked the generic area laws on the landed §1–3 base in scratch.
+> The §4 catalog extension and seed have not been delivered. Scratch
+> checking does not establish §4 shipped-seed execution, CI,
+> publication, landing or a landed trust measurement.
+
+### 4.1 Inclusive spans and inverted axes
+
+`Algorithm.Geometry.NatBox` adds one public natural-valued operation.
+For `MkBox (MkPoint lx ly) (MkPoint hx hy)`, `area` is the product of
+two inclusive axis spans. The private `axis_span` is part of the
+operation's definition, not a new export:
+
+```ken
+pub fn area (b : Box) : Nat =
+  match b {
+    MkBox lo hi ↦
+      match lo {
+        MkPoint lx ly ↦
+          match hi {
+            MkPoint hx hy ↦ mul (axis_span lx hx) (axis_span ly hy)
+          }
+      }
+  }
+
+fn axis_span (lo : Nat) (hi : Nat) : Nat = sub (Suc hi) lo
+```
+
+`sub` saturates at zero. Thus an axis with coincident endpoints has
+span one; `Suc hi ≤ lo` makes that axis's span zero. The area is zero
+if **either** axis is inverted, including when the other axis is
+nonempty. A point box has area one, not zero: these are counts of
+inclusive natural-coordinate positions, not a continuous Euclidean
+measure. The area of a valid box with x span three and y span three
+is nine. Different inverted boxes remain structurally distinct even
+when both have area zero; no canonical empty-box or point-set quotient
+is introduced.
+
+### 4.2 Three public checked-law obligations
+
+The module exports exactly these three new public theorem types. The
+first reuses §3's corner-wise `inside` and the existing Boolean natural
+order. The latter two state the inverted-axis rule for **all** natural
+coordinates, not just the closed examples intended for the seed.
+`Equal Nat` in these laws is value equality, not structural `Eq Box`.
+
+```ken
+pub theorem area_inside (b : Box) (c : Box) :
+  IsTrue (inside b c) → IsTrue (leq_nat (area b) (area c))
+
+pub theorem area_inverted_x
+    (lx : Nat) (ly : Nat) (hx : Nat) (hy : Nat) :
+  IsTrue (leq_nat (Suc hx) lx) →
+  Equal Nat (area (MkBox (MkPoint lx ly) (MkPoint hx hy))) Zero
+
+pub theorem area_inverted_y
+    (lx : Nat) (ly : Nat) (hx : Nat) (hy : Nat) :
+  IsTrue (leq_nat (Suc hy) ly) →
+  Equal Nat (area (MkBox (MkPoint lx ly) (MkPoint hx hy))) Zero
+```
+
+`area_inside` has **only** its `inside b c` premise. It needs no
+validity premise on the outer box `c`: if its x bounds are inverted,
+`inside b c` requires `clx ≤ blx` and `bhx ≤ chx < clx`, forcing
+`b` to be inverted on x as well. Both areas are then zero. The y-axis
+case is symmetric. No special case for empty point sets is added to
+`inside`; its corner comparisons already imply the required span
+inequalities. The proof uses private monotonicity and antitonicity of
+saturating `sub`, and multiplication monotonicity also when a factor
+is zero.
+
+Area of an intersection is no greater than either input, even for
+inverted boxes. These are **corollaries**, not further public theorem
+names: `IsTrue (leq_nat (area (intersect b c)) (area b))` follows by
+`area_inside (intersect b c) b (intersect_inside_left b c)`; the
+right-hand bound is
+`area_inside (intersect b c) c (intersect_inside_right b c)`.
+Section 3.2 already exports both corner-inclusion premises. No structural
+intersection equality or area-based equivalence of boxes follows.
+
+### 4.3 Proof boundary and remaining scope
+
+The per-axis span, generic `sub` and `mul` monotonicity helpers,
+per-axis inversion and point-span helpers, and the two intersection
+corollaries are **private**. Existing `Data.Numeric.Nat.Order` proves
+saturation of `sub`, but does not export these generic monotonicity
+helpers. Its public `leq_nat_mul_right_mono` requires a successor
+factor, so the private proof also handles zero. No Nat library theorem
+is promoted as part of this geometry contract. The exported operation
+and three theorems require no new primitive, axiom or surface feature.
+
+On landed base `0fd75f5515dded57eea1aeb47021573cfbc4a5e0`, the
+checked scratch D0 `2645b9830d31e75e2d0974185ae3901402958ead`
+returned `ken check` rc 0 with no local `Axiom` or postulate. Its
+roots-loaded scratch trust test ran 1/1 and compared the exact
+`trusted_base()` identity sets before and after the new module:
+**114 → 114**. Architect independently repeated those checks on the
+exact D0. The D0's inversion theorems were checked as private
+proofs; Architect's ruling promotes their **unchanged theorem types**
+to the §4 public interface. This is visibility, not an inference from
+two closed examples. A separate scratch claim that a closed inner
+box has strictly larger area than its enclosing box was refused with
+rc 1/K0004. These measurements do **not** establish §4 catalog
+exports, shipped-seed execution, CI, publication, landing or a landed
+trust measurement.
+
+Signed coordinates and orientations, continuous or approximate area,
+higher-dimensional volume, canonical empty boxes and point-set
+equality remain outside this extension. Neither area nor containment
+supplies a runtime-cost guarantee.
