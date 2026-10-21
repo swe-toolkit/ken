@@ -7,7 +7,7 @@ Authority: **derived reference**
 ## Population and disposition
 
 This index projects the Declaration/type row from every landed catalog card.
-Its population is 40 of 40 cards: all 40 rows are `authored`, and none is
+Its population is 40 of 40 cards: 39 rows are `authored` and one is
 `none-declared`. Each entry links the card that supplies the complete result;
 the index does not re-read or extend the checked package.
 
@@ -36,7 +36,7 @@ the index does not re-read or extend the checked package.
 | [Capability/System/Resource](Capability/System/Resource.md) | `authored` | Declares constructors for successful and failed resource bodies and a total Boolean classifier over every `ResourceBracketResult` constructor. |
 | [Capability/Time/WallClock](Capability/Time/WallClock.md) | `authored` | Declares projection and replacement for the nanosecond `Int` carried by the structural `Instant` value. |
 | [Core/Classes/EffectfulClasses](Core/Classes/EffectfulClasses.md) | `authored` | Declares the `Applicative`, `Monad`, and `Traversable` classes; concrete `Option` and `List` instances; an `Identity` support instance; and the checked helper functions used by their dictionaries. |
-| [Core/Classes/LawfulClasses](Core/Classes/LawfulClasses.md) | `authored` | Declares `IsTrue`, `Eq`, `DecEq`, `Ord`, comparison helpers, the public Boolean helpers `and_cases`, `and_true`, `or_cases`, `or_left`, and `or_right`, and registered dictionaries for `Int`, `Bool`, `Char`, `Pair`, and `List` as supported by the checked source. |
+| [Core/Classes/LawfulClasses](Core/Classes/LawfulClasses.md) | `authored` | Declares `IsTrue`, `Eq`, `DecEq`, `Ord`, comparison helpers, and registered dictionaries for `Int`, `Bool`, `Char`, `Pair`, and `List`. Its public Boolean helpers include `bool_not` and the `and_*`/`or_*` theorems `and_cases`, `and_true`, `or_cases`, `or_left`, and `or_right`. |
 | [Core/Classes/LawfulFunctors](Core/Classes/LawfulFunctors.md) | `authored` | Declares the four named classes, their operations and coherence fields, and checked `List`, `Bool`, and `Option` instances with their supporting functions. |
 | [Core/Logic/EmptyDec](Core/Logic/EmptyDec.md) | `authored` | The public API is `Empty`, `absurd_empty`, `Dec`, `Yes`, `No`, `decide`, `yes`, `no`, and `dec_eq_decides`. The standard `Empty`/`Dec` display is illustrative; the package-authored wrappers and bridge are checked. |
 | [Core/Logic/Transport](Core/Logic/Transport.md) | `authored` | Exports `subst`, `cong`, `cast`, `sym`, and `trans`: five non-recursive wrappers over the surface equality eliminator `J` and native equality `Eq`. |
@@ -48,7 +48,7 @@ the index does not re-read or extend the checked package.
 | [Data/Numeric/Nat/Order](Data/Numeric/Nat/Order.md) | `authored` | Declares structural `Nat` ordering, an `Ord Nat` dictionary, three-way `OrdResult`, and `min`, `max`, `sub`, and `compare`. |
 | [Data/Sums/Combinators](Data/Sums/Combinators.md) | `authored` | Declares the neutral `Either` carrier and structural elimination, mapping, fallback, chaining, and swapping combinators across `Option`, `Result`, and `Either`. |
 | [Data/Sums/Validation](Data/Sums/Validation.md) | `authored` | Declares the `Validation` carrier, mapping, pure, error-accumulating application, and lawful `Functor` and `Applicative` dictionaries parameterized by a `Semigroup`. |
-| [Data/Time/EventTrace](Data/Time/EventTrace.md) | `authored` | Declares finite timestamped events, window filtering, and a left-biased two-list merge, with checked ordering, count, membership, and window/merge distribution laws. |
+| [Data/Time/EventTrace](Data/Time/EventTrace.md) | `authored` | Declares finite timestamped events, window filtering, and a left-biased two-list merge. The checked ordering and window/merge distribution laws require ordered inputs; membership and count laws do not. |
 | [Data/Text/Codec](Data/Text/Codec.md) | `authored` | Declares safe UTF-8 decoding, byte-level ASCII classification, and an optional indexed ASCII view that preserves absent-byte results. |
 | [Data/Text/StringBijection](Data/Text/StringBijection.md) | `authored` | Declares the single `string_to_list_char_retraction` certificate and derives `string_to_list_char_injective` for consumers of lawful string keys. |
 | [Data/Text/StringKeys](Data/Text/StringKeys.md) | `authored` | Declares transported equality and ordering operations plus lawful `DecEq String` and `Ord String` dictionaries over the checked `List Char` views. |

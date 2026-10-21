@@ -48,7 +48,7 @@ canonical checked fences; it is not an inference from an omitted index entry.
 | [Data/Numeric/Nat/Order](Data/Numeric/Nat/Order.md) | `authored` | Checked structural proofs establish reflexivity, antisymmetry, transitivity, and totality; the dictionary fields are inhabited by those proofs. |
 | [Data/Sums/Combinators](Data/Sums/Combinators.md) | `authored` | Every combinator is paired with checked constructor equations, and `swap` has a checked involution proof; each reduces by direct case analysis. |
 | [Data/Sums/Validation](Data/Sums/Validation.md) | `authored` | Checked proofs establish functor identity/fusion and applicative identity, homomorphism, interchange, composition, and map coherence. |
-| [Data/Time/EventTrace](Data/Time/EventTrace.md) | `authored` | Checked laws establish window ordering and membership, merge ordering and count, and distribution of windowing over merge. |
+| [Data/Time/EventTrace](Data/Time/EventTrace.md) | `authored` | `trace_window_ordered` requires an ordered input; `trace_merge_ordered` and `trace_window_merge` require both inputs ordered. Window-membership and merge-count laws have no ordering premise. |
 | [Data/Text/Codec](Data/Text/Codec.md) | `authored` | Checked proofs expose the decode definition, preserve absent and present `ascii_view` cases, and carry the existing one-way `BytesRoundTripLaw` without strengthening it. |
 | [Data/Text/StringBijection](Data/Text/StringBijection.md) | `authored` | The checked injectivity theorem follows from the named retraction using symmetry, congruence, and transitivity. |
 | [Data/Text/StringKeys](Data/Text/StringKeys.md) | `authored` | Checked soundness, completeness, reflexivity, antisymmetry, transitivity, and totality proofs inhabit the dictionary fields. |
