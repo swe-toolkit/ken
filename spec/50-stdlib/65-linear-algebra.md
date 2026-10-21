@@ -398,11 +398,17 @@ prove any generic law. These are scratch D0 observations, **not** a
 §4 catalog or seed delivery, shipped seed execution, CI, publication,
 landing or a landed trust measurement.
 
-The §4 seed must distinguish the side on which the sum occurs, with
-closed non-square products for both orientations. Its false law
-`a(b+c) = ab+c` needs a square left factor so the incorrect `+c`
-term type-checks; it must be a separately appended refusal after a
-positive control. Seed authoring and exact execution are later,
-separately reviewed work. Signed, Rational-valued, semiring-general
-and approximate matrices, and subtraction, are not implied by these
-natural-number laws.
+The §4 seed must include a **direct closed `matrix_add` oracle**:
+`[[1,0],[2,1]] + [[0,3],[1,1]] = [[1,3],[3,2]]` as a `2 × 2`
+indexed value, comparing `matrix_add` to an independently constructed
+expected `Vec`. It must also distinguish the side on which the sum
+occurs, with closed non-square products for both distributivity
+orientations. The false law `a(b+c) = ab+c` needs a square left
+factor so the incorrect `+c` term type-checks. The accepting
+positive control must use **the same `a`, `b`, and `c` operands** as
+the isolated refusal and assert the correct `a(b+c) = ab+ac` result.
+Append only the false-RHS claim to a fresh accepting client: an
+unrelated rejection cannot satisfy that negative. Seed authoring and
+exact execution are later, separately reviewed work. Signed,
+Rational-valued, semiring-general and approximate matrices, and
+subtraction, are not implied by these natural-number laws.
