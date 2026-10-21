@@ -6,11 +6,11 @@
 > SPEC-GEOMETRY-BOX-AREA §4).** Sections 1–3, their catalog operations
 > and checked laws, and their seeds are present on main. Section 4
 > specifies natural-valued area, containment monotonicity, and both
-> generic inverted-axis zero laws. Architect checked the §4 generic
-> proofs in scratch, but §4 catalog exports and conformance seed have
-> not been delivered. Neither that scratch check nor the earlier
-> seeds establish §4 shipped-seed execution, CI or a landed trust
-> measurement.
+> generic inverted-axis zero laws. The §4 catalog exports are delivered
+> with checked proofs; a package-owned roots-loader test executes the
+> §4 seed's positive and refused fences and measures unchanged trusted
+> identities (114 → 114). This does not establish an official
+> conformance-runner run, CI, publication or landing.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -379,9 +379,10 @@ empty boxes or change §1's `contains`, `intersect` or `hull`.
 
 > **Section 4 status: DRAFT v0 (SPEC-GEOMETRY-BOX-AREA).** Architect
 > checked the generic area laws on the landed §1–3 base in scratch.
-> The §4 catalog extension and seed have not been delivered. Scratch
-> checking does not establish §4 shipped-seed execution, CI,
-> publication, landing or a landed trust measurement.
+> The four §4 exports and seed are present; the package-owned test runs
+> the exact positive and refused seed fences and measures unchanged
+> trusted `GlobalId` identities (114 → 114). No official
+> conformance-runner execution, CI, publication or landing is claimed.
 
 ### 4.1 Inclusive spans and inverted axes
 

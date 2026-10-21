@@ -1,8 +1,9 @@
 # Closed boxes over natural coordinates
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
-geometry operations. Six box-and-distance laws, two metric laws, and
-seven corner-wise containment laws carry kernel-checked generic proofs.
+geometry operations. Six box-and-distance laws, two metric laws, seven
+corner-wise containment laws, and three area laws carry kernel-checked
+generic proofs.
 
 ## Contents
 
@@ -27,22 +28,25 @@ point set is empty.
 The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
 box-and-distance laws lead the definition; two metric laws follow. The
-corner-wise `inside` operation and its seven laws come next. Their
-per-axis proof helpers and distance helpers stay private.
+corner-wise `inside` operation and its seven laws come next, followed by
+`area` and its three laws. Per-axis proof helpers and distance helpers stay
+private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
 coordinate differences. `inside b c` compares both corners of `b` with
-those of `c`, even if `b` is inverted and has no points. Every proof body
-below is the checked general construction, not a finite seed in place of
-a proof.
+those of `c`, even if `b` is inverted and has no points. `area` multiplies
+the two inclusive spans, with saturating subtraction giving zero on either
+inverted axis. Every proof body below is the checked general construction,
+not a finite seed in place of a proof.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, leq_nat, bool_and)
 
-import Data.Numeric.Nat.Arithmetic (add)
+import Data.Numeric.Nat.Arithmetic (add, mul)
 
-import Data.Numeric.Nat.Order (min, max, sub, leq_nat_add_left_bound, leq_nat_weaken_right)
+import Data.Numeric.Nat.Order
+  (min, max, sub, leq_nat_add_left_bound, leq_nat_weaken_right, leq_nat_mul_right_mono)
 
 import Core.Logic.Transport (cong, sym, trans)
 
@@ -1139,6 +1143,95 @@ pub theorem inside_complete
       }
   }
 
+pub fn area (b : Box) : Nat =
+  match b {
+    MkBox lo hi ↦
+      match lo {
+        MkPoint lx ly ↦
+          match hi {
+            MkPoint hx hy ↦ mul (axis_span lx hx) (axis_span ly hy)
+          }
+      }
+  }
+
+pub theorem area_inside
+      (b : Box) (c : Box)
+    : IsTrue (inside b c) → IsTrue (leq_nat (area b) (area c)) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match blo {
+            MkPoint blx bly ↦
+              match bhi {
+                MkPoint bhx bhy ↦
+                  match clo {
+                    MkPoint clx cly ↦
+                      match chi {
+                        MkPoint chx chy ↦
+                          λh.
+                            mul_both_mono
+                              (axis_span blx bhx)
+                              (axis_span clx chx)
+                              (axis_span bly bhy)
+                              (axis_span cly chy)
+                              (axis_span_within
+                                blx
+                                bhx
+                                clx
+                                chx
+                                ((proof left for bool_and)
+                                  (bool_and (leq_nat clx blx) (leq_nat bhx chx))
+                                  (bool_and (leq_nat cly bly) (leq_nat bhy chy))
+                                  h))
+                              (axis_span_within
+                                bly
+                                bhy
+                                cly
+                                chy
+                                ((proof right for bool_and)
+                                  (bool_and (leq_nat clx blx) (leq_nat bhx chx))
+                                  (bool_and (leq_nat cly bly) (leq_nat bhy chy))
+                                  h))
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem area_inverted_x
+      (lx : Nat) (ly : Nat) (hx : Nat) (hy : Nat)
+    : IsTrue (leq_nat (Suc hx) lx)
+      → Equal Nat (area (MkBox (MkPoint lx ly) (MkPoint hx hy))) Zero =
+  λh.
+    trans
+      Nat
+      (mul (axis_span lx hx) (axis_span ly hy))
+      (mul Zero (axis_span ly hy))
+      Zero
+      (cong
+        Nat
+        Nat
+        (axis_span lx hx)
+        Zero
+        (λw. mul w (axis_span ly hy))
+        (axis_span_inverted lx hx h))
+      ((proof zero_l for mul) (axis_span ly hy))
+
+pub theorem area_inverted_y
+      (lx : Nat) (ly : Nat) (hx : Nat) (hy : Nat)
+    : IsTrue (leq_nat (Suc hy) ly)
+      → Equal Nat (area (MkBox (MkPoint lx ly) (MkPoint hx hy))) Zero =
+  λh.
+    cong
+      Nat
+      Nat
+      (axis_span ly hy)
+      Zero
+      (λw. mul (axis_span lx hx) w)
+      (axis_span_inverted ly hy h)
+
 fn axis_within (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) : Bool =
   bool_and (leq_nat l2 l1) (leq_nat h1 h2)
 
@@ -1201,6 +1294,148 @@ theorem axis_corner_high
         ((proof left for bool_and) (leq_nat l x) (leq_nat x h) a)
         ((proof right for bool_and) (leq_nat l x) (leq_nat x h) a))
       ((proof refl for leq_nat) h)
+
+theorem area_intersect_left
+      (b : Box) (c : Box)
+    : IsTrue (leq_nat (area (intersect b c)) (area b)) =
+  area_inside (intersect b c) b (intersect_inside_left b c)
+
+theorem area_intersect_right
+      (b : Box) (c : Box)
+    : IsTrue (leq_nat (area (intersect b c)) (area c)) =
+  area_inside (intersect b c) c (intersect_inside_right b c)
+
+theorem axis_span_within
+      (li : Nat) (hi : Nat) (lo : Nat) (ho : Nat)
+    : IsTrue (bool_and (leq_nat lo li) (leq_nat hi ho))
+      → IsTrue (leq_nat (axis_span li hi) (axis_span lo ho)) =
+  λh.
+    axis_span_mono
+      li
+      hi
+      lo
+      ho
+      ((proof left for bool_and) (leq_nat lo li) (leq_nat hi ho) h)
+      ((proof right for bool_and) (leq_nat lo li) (leq_nat hi ho) h)
+
+theorem mul_both_mono
+      (ix : Nat) (ox : Nat) (iy : Nat) (oy : Nat)
+    : IsTrue (leq_nat ix ox)
+      → IsTrue (leq_nat iy oy)
+      → IsTrue (leq_nat (mul ix iy) (mul ox oy)) =
+  λhx.
+    λhy.
+      (proof trans for leq_nat)
+        (mul ix iy)
+        (mul ox iy)
+        (mul ox oy)
+        (mul_right_mono_any ix ox iy hx)
+        (mul_left_mono_any iy oy ox hy)
+
+theorem mul_left_mono_any
+      (a : Nat) (b : Nat) (k : Nat)
+    : IsTrue (leq_nat a b) → IsTrue (leq_nat (mul k a) (mul k b)) =
+  λh.
+    J
+      (λx _. IsTrue (leq_nat x (mul k b)))
+      (J
+        (λy _. IsTrue (leq_nat (mul a k) y))
+        (mul_right_mono_any a b k h)
+        (sym Nat (mul k b) (mul b k) ((proof comm for mul) k b)))
+      (sym Nat (mul k a) (mul a k) ((proof comm for mul) k a))
+
+theorem mul_right_mono_any
+      (a : Nat) (b : Nat) (k : Nat)
+    : IsTrue (leq_nat a b) → IsTrue (leq_nat (mul a k) (mul b k)) =
+  match k {
+    Zero ↦ λh. Proved;
+    Suc k2 ↦ λh. leq_nat_mul_right_mono a b k2 h
+  }
+
+theorem axis_span_mono
+      (li : Nat) (hi : Nat) (lo : Nat) (ho : Nat)
+    : IsTrue (leq_nat lo li)
+      → IsTrue (leq_nat hi ho)
+      → IsTrue (leq_nat (axis_span li hi) (axis_span lo ho)) =
+  λhl.
+    λhh.
+      (proof trans for leq_nat)
+        (axis_span li hi)
+        (sub (Suc ho) li)
+        (axis_span lo ho)
+        (sub_left_mono (Suc hi) (Suc ho) li hh)
+        (sub_right_antitone (Suc ho) lo li hl)
+
+theorem sub_right_antitone
+      (a : Nat)
+    : (k : Nat) → (l : Nat) → IsTrue (leq_nat k l) → IsTrue (leq_nat (sub a l) (sub a k)) =
+  λk.
+    match k {
+      Zero ↦ λl. λh. sub_below a l;
+      Suc k2 ↦
+        λl.
+          match l {
+            Zero ↦ λh. absurd h;
+            Suc l2 ↦
+              match a {
+                Zero ↦ λh. Proved;
+                Suc a2 ↦ λh. sub_right_antitone a2 k2 l2 h
+              }
+          }
+    }
+
+theorem sub_below (a : Nat) : (k : Nat) → IsTrue (leq_nat (sub a k) a) =
+  match a {
+    Zero ↦
+      λk.
+        match k {
+          Zero ↦ Proved;
+          Suc k2 ↦ Proved
+        };
+    Suc a2 ↦
+      λk.
+        match k {
+          Zero ↦ (proof refl for leq_nat) (Suc a2);
+          Suc k2 ↦ leq_nat_weaken_right (sub a2 k2) a2 (sub_below a2 k2)
+        }
+  }
+
+theorem sub_left_mono
+      (a : Nat)
+    : (b : Nat) → (k : Nat) → IsTrue (leq_nat a b) → IsTrue (leq_nat (sub a k) (sub b k)) =
+  match a {
+    Zero ↦
+      λb.
+        λk.
+          match k {
+            Zero ↦ λh. Proved;
+            Suc k2 ↦ λh. Proved
+          };
+    Suc a2 ↦
+      λb.
+        match b {
+          Zero ↦ λk. λh. absurd h;
+          Suc b2 ↦
+            λk.
+              match k {
+                Zero ↦ λh. h;
+                Suc k2 ↦ λh. sub_left_mono a2 b2 k2 h
+              }
+        }
+  }
+
+theorem axis_span_inverted
+      (lo : Nat) (hi : Nat)
+    : IsTrue (leq_nat (Suc hi) lo) → Equal Nat (axis_span lo hi) Zero =
+  λh. (proof saturates for sub) (Suc hi) lo h
+
+theorem axis_span_point (n : Nat) : Equal Nat (axis_span n n) (Suc Zero) =
+  match n {
+    Zero ↦ Proved;
+    Suc rest ↦ axis_span_point rest
+  }
+
+fn axis_span (lo : Nat) (hi : Nat) : Nat = sub (Suc hi) lo
 ```
 
 ## 3. Using it
@@ -1250,6 +1485,14 @@ checks both, intersections inside each input, and both inputs inside their
 hull. It also refuses an inner box's claim to fit inside a strictly
 smaller box.
 
+`area` counts inclusive natural positions: a point box has area one, while
+a box spanning three positions on each axis has area nine. Either inverted
+axis makes the area zero, regardless of the other axis. The
+[area seed](../../../../conformance/stdlib/geometry/seed-box-area.md)
+checks both axis cases and a nested pair with areas four and nine. The
+three public laws establish the corresponding general properties, not just
+these closed values.
+
 ## 4. Laws & proofs
 
 `intersect_sound` projects both coordinate witnesses from an intersection,
@@ -1268,7 +1511,7 @@ addition to match the distance definition. `manhattan_zero_equal` splits
 a zero sum into zero per-axis distances, derives equality of both
 coordinates by induction, and lifts them into point equality with `cong`.
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
-arguments of the box laws explicit. All fifteen public statements are
+arguments of the box laws explicit. All fifteen pre-area public laws are
 generic in their boxes or points, and none identifies boxes by their
 sets of members.
 
@@ -1279,6 +1522,15 @@ bounds, while the hull laws use the opposite extrema. `inside_complete`
 requires a point in the inner box before deriving its two corner witnesses;
 pointwise inclusion alone would be vacuous for an inverted inner box. The
 private `axis_within` and per-axis lemmas keep these distinctions explicit.
+
+`area_inside` bounds each inner inclusive span by its outer span using
+monotonicity and antitonicity of saturating subtraction, then combines the
+bounds with multiplication monotonicity, including zero factors. An
+inverted outer box needs no added premise: `inside` forces the inner box
+to be inverted on that axis too. `area_inverted_x` and `area_inverted_y`
+use the checked saturation law separately for either axis. The private
+intersection-area bounds apply `area_inside` to the existing
+`intersect_inside_left` and `intersect_inside_right` laws.
 
 ## 5. Design notes
 
@@ -1292,8 +1544,9 @@ distance is exact and unsigned; its triangle inequality and zero-distance
 identity are proved. Corner-wise `inside` is directional and sufficient for
 point-set inclusion, but an empty inner box can be outside a second box by
 its corners despite having no points. Its converse law therefore requires
-a member of the inner box. Area and signed orientation remain outside this
-interface.
+a member of the inner box. Different inverted boxes can have the same zero
+area without being structurally equal. Signed orientation remains outside
+this interface.
 
 ## 6. References
 
@@ -1302,29 +1555,31 @@ interface.
 - [Taxicab geometry](https://en.wikipedia.org/wiki/Taxicab_geometry)
   — Wikipedia — orientation for the sum of coordinate distances.
 - [Natural order](../../Data/Numeric/Nat/Order.ken.md) — the checked `min`,
-  `max`, `sub` and order-law provider used by the eight laws.
+  `max`, `sub` and order-law provider used by these checked laws.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–3](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the six operations and fifteen public proof types.
+1. **Contract.** [Exact geometry, §§1–4](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and eighteen public proof types.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
    `manhattan_symm`, `manhattan_self`, `manhattan_triangle`,
    `manhattan_zero_equal`, `inside`, `inside_sound`, `inside_refl`,
    `intersect_inside_left`, `intersect_inside_right`, `inside_hull_left`,
-   `inside_hull_right`, and `inside_complete`. `axis_within`, per-axis
-   lemmas and proof transport helpers remain private.
+   `inside_hull_right`, `inside_complete`, `area`, `area_inside`,
+   `area_inverted_x`, and `area_inverted_y`. `axis_within`, `axis_span`,
+   generic subtraction and multiplication bounds, per-axis lemmas and
+   proof transport helpers remain private.
 3. **Source map.** Definition contains the constructors and operations,
    followed by the checked laws and private scaffolding. Using it points to
-   closed examples and generic metric and containment use; Laws & proofs
-   maps each theorem to its proof strategy.
+   closed examples and generic metric, containment and area use; Laws &
+   proofs maps each theorem to its proof strategy.
 4. **Derivation.** `Nat`, `Bool` and the ambient conjunction come from the
    compiler floor and checked classes. Arithmetic reuses the canonical
-   `Data.Numeric.Nat.Arithmetic` addition and checked
-   `Data.Numeric.Nat.Order` bounds and saturating subtraction. The
-   metric proofs also use existing checked equality transport. The
+   `Data.Numeric.Nat.Arithmetic` addition and multiplication, and checked
+   `Data.Numeric.Nat.Order` bounds and saturating subtraction. The metric
+   and area proofs also use existing checked equality transport. The
    source declares no `Axiom` or new primitive.
 5. **Trust.** Loading this package adds zero trusted `GlobalId`s beyond the
    already-loaded provider closure; that closure may itself carry inherited
@@ -1337,5 +1592,8 @@ interface.
    instances of both laws, and false distance/inequality assertions.
    The [seed](../../../../conformance/stdlib/geometry/seed-box-containment.md)
    checks nested, intersecting, hull, self and inverted boxes, with the
-   false inward claim separately refused. All three supplement rather
+   false inward claim separately refused. The
+   [area seed](../../../../conformance/stdlib/geometry/seed-box-area.md)
+   checks inclusive and inverted values and a nested pair, with a strictly
+   larger inner-area claim separately refused. All four supplement rather
    than replace the checked law bodies.
