@@ -562,9 +562,9 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     use std::collections::{BTreeMap, BTreeSet};
 
     let fixtures: &[(&str, &str, u32, &[(u32, &[u32])])] = &[
-        ("right-denial-protocol", RIGHT_NOT_HELD, 578, &[(0, &[555]), (1, &[])]),
-        ("double-release-protocol", DOUBLE_RELEASE, 609,
-            &[(1, &[598]), (0, &[517]), (2, &[])]),
+        ("right-denial-protocol", RIGHT_NOT_HELD, 586, &[(0, &[563]), (1, &[])]),
+        ("double-release-protocol", DOUBLE_RELEASE, 617,
+            &[(1, &[606]), (0, &[525]), (2, &[])]),
     ];
     for &(label, source, owner, expected) in fixtures {
         let dir = output_dir(label);
