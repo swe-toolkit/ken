@@ -5,12 +5,12 @@
 > SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
-> Architect-D0-checked ordered-input distribution law. Its catalog
-> export is not delivered; the conformance seed is authored and present
-> at:
+> Architect-D0-checked ordered-input distribution law. The checked §3
+> catalog export is now present in `Data.Time.EventTrace`; package
+> acceptance runs the authored seed at:
 > `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
-> D0 scratch checks are not shipped §3 seed execution, CI, or a
-> measured landed trust delta.
+> D0 scratch checks alone were not shipped seed execution. CI and a
+> measured landed trust delta are not established by this status.
 
 ## 1. Finite event traces over natural times
 
@@ -279,11 +279,10 @@ specified in §3; the other §1.4 deferred topics remain deferred.
 
 > **Section 3 status: DRAFT v0
 > (SPEC-TIME-WINDOW-MERGE-DISTRIBUTION).** Architect D0 checked the
-> generic law below on the landed §1–2 base. The §3 catalog export
-> is not delivered; its conformance seed is authored and present at:
+> generic law below on the landed §1–2 base. The checked §3 law is
+> now a catalog export; package acceptance runs the authored seed at:
 > `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
-> No shipped §3 seed-harness execution, CI, or landed trust
-> measurement is claimed.
+> CI and a landed trust measurement are not established by this status.
 
 ### 3.1 Structural distribution with two ordering premises
 
@@ -355,11 +354,13 @@ Separate closed negative clients rejected both one-sided-order
 counterexamples; claims of an unordered ordering premise and of
 the false equality were also rejected. These are **scratch D0**
 results, not publication of the §3 catalog export, execution of a
-shipped §3 seed, CI, or a landed trust measurement.
+shipped §3 seed, CI, or a landed trust measurement. The delivered
+catalog candidate checks this law and runs the authored seed in targeted
+package acceptance; CI and landing remain separate measurements.
 
-Catalog delivery must make the existing generic
-`filter_starts_after` proof public in `Data.Collections.Derived`.
-`Data.Time.EventTrace` reaches it by adding the name to its existing
+The catalog export makes the existing generic `filter_starts_after`
+proof public in `Data.Collections.Derived`. `Data.Time.EventTrace`
+reaches it by adding the name to its existing
 `import Data.Collections.Derived` selection, not by adding a new
 import declaration. No duplicate local proof or new ambient name is
 specified. The new merge/window proof helpers remain private. The

@@ -2196,8 +2196,11 @@ theorem sort_bool_perm
 
 Filtered order and occurrence counting are generic properties of lists, not of
 event timestamps. `filter_sorted` preserves sorting across dropped elements
-when the comparator is transitive. The public sorted-cons, tail and head
-bridges reuse the existing private sorted-head proof family. `count_cons`,
+when the comparator is transitive. The public `filter_starts_after` proof
+retains the head-order fact through filtering a sorted tail; EventTrace
+uses it when distributing a window across a merge. The public sorted-cons,
+tail and head bridges reuse the existing private sorted-head proof family.
+`count_cons`,
 `count_left_first` and `count_right_first` account for a predicate-recognized
 occurrence without requiring a comparator or sorted input; the intermediate
 case-split and arithmetic helpers remain private.
@@ -2305,7 +2308,7 @@ theorem filter_starts_after_cons
           (sym Bool (keep y) False dropped)
   }
 
-theorem filter_starts_after
+pub theorem filter_starts_after
       (a : Type)
       (le : a → a → Bool)
       (le_trans : (x : a)
