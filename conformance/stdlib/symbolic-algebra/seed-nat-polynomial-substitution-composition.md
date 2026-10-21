@@ -166,8 +166,9 @@ theorem refusal_fixture_reverse_law :
 For the refusal case, start from a fresh copy of the accepted `bad_*`
 base above and append only this fence. Expect the base alone to accept
 and the appended input to reject with `TypeMismatch` at
-`refuse_reversed_composition_claim`. These expected observations have not
-been executed.
+`refuse_reversed_composition_claim`. The package test executes the accepted
+base and then the isolated refusal; no official conformance-runner execution
+is claimed.
 
 ```ken
 theorem refuse_reversed_composition_claim :
@@ -184,8 +185,9 @@ theorem refuse_reversed_composition_claim :
   fence to a fresh copy of that accepted base.
 - expect: the base client accepts; the appended input rejects with
   `TypeMismatch` at `refuse_reversed_composition_claim`.
-- measured: not executed; the authored recipe separates base acceptance
-  from the appended refusal.
+- measured: the package test accepts the base and kernel-refuses the
+  isolated theorem with `TypeMismatch`; the authored recipe separates base
+  acceptance from the appended refusal.
 - claimed: the law cannot be applied with the composition arguments
   reversed.
 - the gap: this single closed fixture does not characterize every pair
@@ -199,5 +201,7 @@ The first client asserts both forward structural outputs, the public
 composition-law instance, the reversed output, and constructor identity
 with `EVar`. The `bad_*` base is expected to accept when checked alone;
 append only the refusal fence to a fresh copy to test the reversed claim.
-No seed execution, CI, publication, or landing is claimed. AC-0's scratch
-checks remain separate evidence.
+The positive fences and isolated refusal are executed by
+`crates/ken-elaborator/tests/cat_symbolic_algebra_substitution_composition.rs`.
+No official conformance-runner execution, CI, publication, or landing is
+claimed. AC-0's scratch checks remain separate evidence.
