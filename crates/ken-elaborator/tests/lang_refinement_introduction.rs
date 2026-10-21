@@ -453,6 +453,12 @@ fn distinct_refinement_aliases_do_not_share_an_int_carrier_key() {
     );
 }
 
+/// Promise class: durable mutual-recursion subset introduction (22 §3).
+/// MEASURED: both checked mutual members keep their public identities and
+/// one open opaque result goal beneath a checked Zero constructor equation.
+/// CLAIMED: neither method-IH consumption nor a missing alias proof has
+/// been laundered by the case-only convoy. THE GAP: the source self-calls
+/// are SCT-admitted globals; native execution is checked separately.
 #[test]
 fn mutually_recursive_source_introductions_keep_alias_identity() {
     let mut env = ElabEnv::new().expect("prelude");
@@ -464,7 +470,7 @@ fn mutually_recursive_source_introductions_keep_alias_identity() {
             "fn left (n : Nat) : Pos = match n { Zero |-> 5 ; Suc m |-> right m }\n\
          fn right (n : Nat) : Pos = match n { Zero |-> 6 ; Suc m |-> left m }",
         )
-        .expect("unsupported recursive equations are omitted, not assumed");
+        .expect("the mutual group's checked direct constructor equations are carried");
     assert_eq!(results.len(), 2, "both mutually recursive names are admitted");
     let nat = Term::indformer(env.globals["Nat"], vec![]);
     let p = Term::const_(env.globals["P"], vec![]);
@@ -477,8 +483,18 @@ fn mutually_recursive_source_introductions_keep_alias_identity() {
         assert!(env.is_open_hole(goal.hole_id), "each opaque base goal remains unknown");
         assert_eq!(
             goal.goal_closed,
-            Term::pi(nat.clone(), Term::app(p.clone(), Term::IntLit(value.into()))),
-            "no unchecked recursive constructor equation is closed into {name}'s goal"
+            Term::pi(
+                nat.clone(),
+                Term::pi(
+                    Term::Eq(
+                        Box::new(nat.clone()),
+                        Box::new(Term::var(0)),
+                        Box::new(Term::constructor(env.globals["Zero"], vec![])),
+                    ),
+                    Term::app(p.clone(), Term::IntLit(value.into())),
+                ),
+            ),
+            "the checked Zero equation accompanies {name}'s still-open goal"
         );
         let Some(ken_kernel::Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id)
         else { panic!("mutual function {name} must remain checked and transparent") };

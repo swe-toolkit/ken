@@ -83,8 +83,8 @@ fn explicit_refined_return_and_ensures_keep_both_checked_proofs() {
 /// admits both checked per-path result pairs; the Suc path uses the returned
 /// subset proof, not a detached proposition in an obligation-only context.
 /// CLAIMED: self calls are typed at the full checked result Σ.
-/// THE GAP: making the Zero clause false must leave its obligation open,
-/// without inventing a recursive constructor equation as proof evidence.
+/// THE GAP: a checked branch equation must not be treated as a proof of
+/// an unrelated result predicate when the Zero clause is false.
 #[test]
 fn recursive_ensures_reuses_the_checked_self_call_proof() {
     let mut env = ElabEnv::new().expect("prelude");
@@ -101,17 +101,16 @@ fn recursive_ensures_reuses_the_checked_self_call_proof() {
 }
 
 /// Promise class: durable open-obligation boundary (spec 22 §3).
-/// MEASURED: the false Zero result leaves one open goal and no unchecked Nat
-/// equation, while the recursive self-call uses its checked subset proof.
-/// CLAIMED: unsupported recursive constructor equations are not silently
-/// supplied to the hole or treated as evidence of a proof.
-/// THE GAP: the adjacent 5/5 case closes both goals under the same signature.
+/// MEASURED: the false Zero result leaves one open goal beneath its checked
+/// Nat equation, while the recursive self-call uses its checked subset proof.
+/// CLAIMED: adding a constructor equation does not prove an unrelated false
+/// result postcondition. THE GAP: the adjacent 5/5 case closes both goals.
 #[test]
-fn recursive_open_ensures_keeps_the_base_goal_unknown_without_an_equation() {
+fn recursive_open_ensures_keeps_the_base_goal_unknown_with_checked_equation() {
     let mut env = ElabEnv::new().expect("prelude");
     let result = env.elaborate_decl_v1(
         "fn rec_subset (n : Nat) : Int ensures Equal Int result 5 = match n { Zero |-> 6 ; Suc m |-> rec_subset m }",
-    ).expect("unwitnessed constructor equation is omitted, not assumed");
+    ).expect("the constructor equation has checked method evidence");
     let goals = result.obligations.iter().filter(|o| matches!(o.kind, ObligationKind::Ensures))
         .collect::<Vec<_>>();
     assert_eq!(goals.len(), 2, "one checked result pair per recursive leaf");
@@ -121,18 +120,25 @@ fn recursive_open_ensures_keeps_the_base_goal_unknown_without_an_equation() {
         goals[0].goal_closed,
         Term::pi(
             Term::indformer(env.globals["Nat"], vec![]),
-            Term::app(
+            Term::pi(
+                Term::Eq(
+                    Box::new(Term::indformer(env.globals["Nat"], vec![])),
+                    Box::new(Term::var(0)),
+                    Box::new(Term::constructor(env.globals["Zero"], vec![])),
+                ),
                 Term::app(
                     Term::app(
-                        Term::const_(env.globals["Equal"], vec![]),
-                        Term::const_(env.globals["Int"], vec![]),
+                        Term::app(
+                            Term::const_(env.globals["Equal"], vec![]),
+                            Term::const_(env.globals["Int"], vec![]),
+                        ),
+                        Term::IntLit(6.into()),
                     ),
-                    Term::IntLit(6.into()),
+                    Term::IntLit(5.into()),
                 ),
-                Term::IntLit(5.into()),
             ),
         ),
-        "the Nil-equivalent Zero leaf has no unproved Nat equation premise"
+        "Zero's checked Nat equation cannot prove an unrelated false postcondition"
     );
     let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
         panic!("recursive function remains a checked transparent definition")

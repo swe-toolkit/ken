@@ -1,8 +1,8 @@
-//! Recursive unindexed constructor equations lack checked evidence until
-//! LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW (spec 22 §3, 39 §2(8)).
+//! Demand-only recursive constructor equations, without reading a method IH
+//! (LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW; spec 22 §3, 34 §3.3).
 
 use ken_elaborator::{ElabEnv, ObligationKind};
-use ken_kernel::{check, Context, Decl, GlobalId, Term};
+use ken_kernel::{check, subst::shift, Context, Decl, GlobalId, Term};
 
 fn contains_equation_on_family(term: &Term, family: GlobalId) -> bool {
     if let Term::Eq(carrier, _, _) = term {
@@ -19,29 +19,31 @@ fn contains_equation_on_family(term: &Term, family: GlobalId) -> bool {
         .any(|child| contains_equation_on_family(child, family))
 }
 
-fn list_match_motive(term: &Term, list: GlobalId) -> Option<&Term> {
-    if let Term::Elim { fam, motive, .. } = term {
-        if *fam == list {
-            return Some(motive);
-        }
+fn list_match_elim(term: &Term, list: GlobalId) -> Option<&Term> {
+    if matches!(term, Term::Elim { fam, .. } if *fam == list) {
+        return Some(term);
     }
     term.children()
         .iter()
-        .find_map(|child| list_match_motive(child, list))
+        .find_map(|child| list_match_elim(child, list))
 }
 
-/// Known-gap pin (transition sentinel): until
-/// LANG-RECURSIVE-BRANCH-EVIDENCE-BELOW installs checked recursive equations,
-/// the Nil leaf's open hole has no List equation, and the checked `xs` motive
-/// is the plain subset Σ. BELOW must flip this absent-equation assertion and
-/// replace it with checked evidence, then revisit the motive observation;
-/// no proof may be invented. Spec 22 §3 and 34 §3.3 remain normative.
-/// MEASURED: production `sort`'s emitted Nil obligation and checked Elim.
-/// CLAIMED: only term-evidenced facts are used by the leaf hole and motive.
-/// THE GAP: a condition accidentally installed at a different site remains
-/// outside this row; the mutation controls test both these production sites.
+fn contains_const(term: &Term, id: GlobalId) -> bool {
+    matches!(term, Term::Const { id: found, .. } if *found == id)
+        || term
+            .children()
+            .iter()
+            .any(|child| contains_const(child, id))
+}
+
+/// Promise class: durable invariant (spec 22 §3 and 34 §3.3).
+/// MEASURED: the checked recursive `sort` Nil obligation includes its List
+/// constructor equation, the motive carries it, and the Cons method still
+/// calls the SCT-admitted global without using its method IH. CLAIMED: a
+/// demanded case-only convoy changes branch evidence, not recursion. THE GAP:
+/// this does not establish behavior for a consuming method IH; AC-4 excludes it.
 #[test]
-fn recursive_sort_nil_goal_omits_unwitnessed_list_eq_and_uses_plain_sigma_motive() {
+fn recursive_sort_nil_goal_carries_checked_list_eq_without_consuming_ih() {
     let mut env = ElabEnv::new().expect("checked prelude");
     env.elaborate_decl(
         "fn insert (a : Type) (leq : a → a → Bool) (x : a) (xs : List a) : List a = \
@@ -69,24 +71,48 @@ fn recursive_sort_nil_goal_omits_unwitnessed_list_eq_and_uses_plain_sigma_motive
     );
     let list = env.globals["List"];
     assert!(
-        !contains_equation_on_family(&nil.goal_closed, list),
-        "Nil cannot assume the missing Eq (List a) xs (Nil a): {:?}",
+        contains_equation_on_family(&nil.goal_closed, list),
+        "Nil needs its checked Eq (List a) xs (Nil a): {:?}",
         nil.goal_closed
     );
     let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
         panic!("sort remains a checked transparent definition")
     };
     check(&env.env, &Context::new(), body, ty).expect("kernel checks the emitted sort");
-    let motive = list_match_motive(body, list).expect("the xs match uses the List eliminator");
-    let motive_body = match motive {
+    let Term::Elim {
+        motive, methods, ..
+    } = list_match_elim(body, list).expect("xs uses the List eliminator")
+    else {
+        unreachable!()
+    };
+    let motive_body = match motive.as_ref() {
         Term::Ascript(function, _) => function.as_ref(),
         other => other,
     };
-    let Term::Lam(_, result) = motive_body else {
+    let Term::Lam(_, motive_result) = motive_body else {
         panic!("the xs motive abstracts over its scrutinee: {motive:?}")
     };
     assert!(
-        matches!(result.as_ref(), Term::Sigma(..)),
-        "a recursive unindexed split uses the plain checked Σ motive, not an Eq convoy: {motive:?}"
+        matches!(motive_result.as_ref(), Term::Pi(domain, _) if contains_equation_on_family(domain, list)),
+        "the checked motive must carry the List constructor equation: {motive:?}"
+    );
+    let cons = &methods[1];
+    assert!(
+        contains_const(cons, result.def_id),
+        "Cons retains the direct sort call"
+    );
+    let Term::Lam(_, cons) = cons else {
+        panic!("Cons binds head")
+    };
+    let Term::Lam(_, cons) = cons.as_ref() else {
+        panic!("Cons binds tail")
+    };
+    let Term::Lam(_, cons) = cons.as_ref() else {
+        panic!("Cons binds the unused method IH")
+    };
+    assert_eq!(
+        shift(&shift(cons, -1, 0), 1, 0),
+        **cons,
+        "Cons must not consume its method IH"
     );
 }

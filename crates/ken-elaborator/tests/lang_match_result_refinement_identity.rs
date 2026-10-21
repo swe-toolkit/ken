@@ -1,6 +1,6 @@
 //! A match result retains the checked subset type at every leaf. Open proof
 //! demand under an unsupported indexed split refuses by type; recursive
-//! unindexed paths omit unwitnessed equations and keep open goals unknown.
+//! unindexed case-only paths carry checked equations and keep open goals unknown.
 
 use ken_elaborator::{ElabEnv, ElabError, ElabResult, ObligationKind};
 use ken_kernel::{check, normalize, Context, Decl, GlobalId, Term};
@@ -84,13 +84,18 @@ fn has_equation_for_family(term: &Term, family: GlobalId) -> bool {
             return true;
         }
     }
-    term.children().iter().any(|child| has_equation_for_family(child, family))
+    term.children()
+        .iter()
+        .any(|child| has_equation_for_family(child, family))
 }
 
-/// Promise class: durable unknown boundary under recursive unindexed splits
-/// (22 §3). Opaque open goals stay open, with no fabricated constructor Eq.
+/// Promise class: durable invariant for case-only recursive splits (22 §3).
+/// MEASURED: open goals remain open while the emitted checked case-only
+/// eliminator carries their constructor equation. CLAIMED: the equation has
+/// a term binder, not a fabricated proof. THE GAP: consuming-IH paths are
+/// kept on the original elaboration route and pinned separately.
 #[test]
-fn recursive_unindexed_result_goals_omit_unsupported_equations() {
+fn recursive_unindexed_case_only_result_goals_carry_checked_equations() {
     for (source, name, family, count) in [
         (
             format!(
@@ -110,28 +115,205 @@ fn recursive_unindexed_result_goals_omit_unsupported_equations() {
             "Nat",
             1,
         ),
-        (
-            format!(
-                "{FIVE}{ROSE}fn nested (r : DRose) (x : Int) : Five = \
-             match r {{ DLeaf ↦ x; DNode kids ↦ x }}"
-            ),
-            "nested",
-            "DRose",
-            2,
-        ),
     ] {
         let (env, result) = checked(&source, count);
-        assert_eq!(env.globals[name], result.def_id, "recursive result admitted");
-        assert!(result.obligations.iter().all(|goal|
-            matches!(goal.kind, ObligationKind::RefinementIntroduction)
-            && env.is_open_hole(goal.hole_id)
-            && !has_equation_for_family(&goal.goal_closed, env.globals[family])),
-            "open goals have no invented recursive equation: {source}");
+        assert_eq!(
+            env.globals[name], result.def_id,
+            "recursive result admitted"
+        );
+        assert!(
+            result.obligations.iter().all(|goal| matches!(
+                goal.kind,
+                ObligationKind::RefinementIntroduction
+            ) && env.is_open_hole(goal.hole_id)
+                && has_equation_for_family(&goal.goal_closed, env.globals[family])),
+            "open goals carry the checked recursive equation: {source}"
+        );
         let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
             panic!("recursive result is a checked transparent definition: {source}")
         };
         check(&env.env, &Context::new(), body, ty).expect("kernel checks recursive subset results");
     }
+}
+
+/// Promise class: transition sentinel for a future structured-IH convoy.
+/// MEASURED: a demanding, non-consuming `Former`-field match retains the
+/// existing checked body and open goals without a `DRose` constructor Eq.
+/// CLAIMED: non-direct fields take the base method builder, even though
+/// direct recursive fields can now carry an equation. THE GAP: this does not
+/// by itself control Pi/Sigma shapes; mutation of the shared shape guard
+/// must reject this exact fixture during declaration admission.
+#[test]
+fn structured_recursive_family_under_demand_keeps_base_path() {
+    let source = format!(
+        "{FIVE}{ROSE}fn nested (r : DRose) (x : Int) : Five = \
+         match r {{ DLeaf ↦ x; DNode kids ↦ x }}"
+    );
+    let (env, result) = checked(&source, 2);
+    assert_eq!(env.globals["nested"], result.def_id);
+    assert!(
+        result.obligations.iter().all(|goal| matches!(
+            goal.kind,
+            ObligationKind::RefinementIntroduction
+        ) && env.is_open_hole(goal.hole_id)
+            && !has_equation_for_family(&goal.goal_closed, env.globals["DRose"])),
+        "a structured recursive field retains the base open goals"
+    );
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("structured result is a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks the structured result");
+}
+
+/// Promise class: transition sentinel for future consuming-IH convoys
+/// (22 §3, 34 §3.3). MEASURED: a nested former's generated List lift and
+/// `recursive result for rest` are consumed beneath a refined result. The
+/// Nil obligation is discharged, the Cons obligation remains open, and
+/// neither gains a constructor equation for the lifted List or NRose.
+/// CLAIMED: an IH consumer never enters the case-only convoy. THE GAP: this has
+/// both selector and lift-binding provenance; the classifier's two arms
+/// need separate controls if they are later refactored independently.
+#[test]
+fn recursive_result_selector_under_refined_result_keeps_consuming_base_path() {
+    let source = r#"
+        data NRose : Type where {
+            NLeaf : NRose ; NNode : List (Pair String NRose) -> NRose
+        }
+        fn rsize (r : NRose) : { n : Nat | Equal Nat n (Suc Zero) } =
+            match r {
+                NLeaf |-> Suc Zero ;
+                NNode members |-> match members {
+                    Nil |-> Zero ;
+                    Cons member rest |-> recursive result for rest
+                }
+            }
+    "#;
+    let (env, result) = checked(source, 2);
+    assert_eq!(env.globals["rsize"], result.def_id);
+    assert_eq!(
+        result
+            .obligations
+            .iter()
+            .map(|goal| env.is_open_hole(goal.hole_id))
+            .collect::<Vec<_>>(),
+        [false, true],
+        "the trivial Nil proof and open Cons proof retain their base dispositions"
+    );
+    for goal in &result.obligations {
+        assert!(matches!(goal.kind, ObligationKind::RefinementIntroduction));
+        assert!(
+            !has_equation_for_family(&goal.goal_closed, env.globals["List"]),
+            "lifted List must not receive a convoy Eq: {goal:?}"
+        );
+        assert!(
+            !has_equation_for_family(&goal.goal_closed, env.globals["NRose"]),
+            "enclosing NRose must not receive a convoy Eq: {goal:?}"
+        );
+    }
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("nested P2 result is a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks the consuming result");
+}
+
+/// Promise class: transition sentinel for the lift-binding P2 route (22 §3).
+/// MEASURED: the inner List match's scrutinee has a generated lift, but no
+/// arm contains a recursive-result selector. Its checked result goals keep
+/// their base status without a List or NRose constructor equation.
+/// CLAIMED: a lift alone excludes the case-only convoy. THE GAP: the
+/// independent lift-arm deletion must redden this same fixture.
+#[test]
+fn lifted_scrutinee_without_selector_keeps_consuming_base_path() {
+    let source = r#"
+        data NRose : Type where {
+            NLeaf : NRose ; NNode : List (Pair String NRose) -> NRose
+        }
+        fn rsize (r : NRose) : { n : Nat | Equal Nat n (Suc Zero) } =
+            match r {
+                NLeaf |-> Suc Zero ;
+                NNode members |-> match members {
+                    Nil |-> Zero ;
+                    Cons member rest |-> Zero
+                }
+            }
+    "#;
+    let (env, result) = checked(source, 3);
+    assert_eq!(env.globals["rsize"], result.def_id);
+    assert_eq!(
+        result
+            .obligations
+            .iter()
+            .map(|goal| env.is_open_hole(goal.hole_id))
+            .collect::<Vec<_>>(),
+        [false, true, true],
+        "the closed NLeaf and open List leaves retain their base statuses"
+    );
+    for goal in &result.obligations {
+        assert!(matches!(goal.kind, ObligationKind::RefinementIntroduction));
+        assert!(
+            !has_equation_for_family(&goal.goal_closed, env.globals["List"]),
+            "the lifted List must not receive a case-only convoy: {goal:?}"
+        );
+        assert!(
+            !has_equation_for_family(&goal.goal_closed, env.globals["NRose"]),
+            "the structured host stays on its base route: {goal:?}"
+        );
+    }
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("lifted result is a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks lifted result");
+}
+
+/// Promise class: transition sentinel for the source-selector P2 route
+/// (22 §3). MEASURED: the eligible outer Nat split has open refined-result
+/// goals, a plain scrutinee without a lift, and a recursive-result selector
+/// only inside one nested-family arm. Its goals have no Nat constructor Eq.
+/// CLAIMED: an IH selector anywhere in an arm tree excludes that match from
+/// case-only convoy. THE GAP: the independent selector-arm deletion must
+/// redden this fixture without modifying the lift-binding arm.
+#[test]
+fn nested_selector_without_lift_on_outer_scrutinee_keeps_base_path() {
+    let source = r#"
+        data Bag (a : Type) : Type where {
+            Empty : Bag a ; One : a -> Bag a ; Join : Bag a -> Bag a -> Bag a
+        }
+        data LiftRose = LiftLeaf | LiftNode (Bag LiftRose)
+        fn f (n : Nat) (r : LiftRose) : { x : Int | Equal Int x 5 } =
+            match n {
+                Zero |-> 6 ;
+                Suc m |-> match r {
+                    LiftLeaf |-> 6 ;
+                    LiftNode b |-> match b {
+                        Empty |-> 5 ;
+                        One x |-> 5 ;
+                        Join xs ys |-> recursive result for xs
+                    }
+                }
+            }
+    "#;
+    let (env, result) = checked(source, 4);
+    assert_eq!(env.globals["f"], result.def_id);
+    assert_eq!(
+        result
+            .obligations
+            .iter()
+            .map(|goal| env.is_open_hole(goal.hole_id))
+            .collect::<Vec<_>>(),
+        [true, true, false, false],
+        "outer open goals and nested checked goals retain their base statuses"
+    );
+    for goal in &result.obligations {
+        assert!(matches!(goal.kind, ObligationKind::RefinementIntroduction));
+        assert!(
+            !has_equation_for_family(&goal.goal_closed, env.globals["Nat"]),
+            "the outer Nat match must not receive a case-only convoy: {goal:?}"
+        );
+    }
+    let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
+        panic!("selector result is a checked transparent definition")
+    };
+    check(&env.env, &Context::new(), body, ty).expect("kernel checks nested selector result");
 }
 
 /// Promise class: durable indexed refusal. The homogeneous fixed-index
@@ -160,10 +342,13 @@ fn indexed_nested_split_preserves_checked_index_path() {
         ),
         3,
     );
-    assert!(result.obligations.iter().all(|goal|
-        matches!(goal.kind, ObligationKind::RefinementIntroduction)
-            && env.is_open_hole(goal.hole_id)),
-        "the indexed split retains each open result leaf");
+    assert!(
+        result.obligations.iter().all(|goal| matches!(
+            goal.kind,
+            ObligationKind::RefinementIntroduction
+        ) && env.is_open_hole(goal.hole_id)),
+        "the indexed split retains each open result leaf"
+    );
     let Some(Decl::Transparent { ty, body, .. }) = env.env.lookup(result.def_id) else {
         panic!("indexed result remains a checked transparent definition")
     };

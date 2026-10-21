@@ -142,23 +142,24 @@ fn argument_branch_does_not_inherit_the_result_predicate() {
     );
 }
 
-/// Durable unknown boundary (22 §3). An opaque base goal under the
-/// recursive Nat split remains open without an unproved branch equation.
-/// The closed-base counterpart is pinned in
-/// lang_refinement_ensures_subset::recursive_ensures_reuses_the_checked_self_call_proof.
+/// Promise class: durable direct-recursion boundary (22 §3).
+/// MEASURED: open recursive Nat goals carry a checked constructor equation
+/// while self-calls discharge only their own result proofs. CLAIMED: the
+/// added equation does not prove an unrelated opaque predicate. THE GAP:
+/// this measures direct Nat fields, not IH-consuming or structured shapes.
 #[test]
-fn recursive_open_postcondition_omits_the_unsupported_nat_equation() {
+fn recursive_open_postcondition_carries_checked_nat_equation() {
     let mut env = predicate_env();
     for (source, name, kind, count) in [
         ("fn es_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc m |-> es_rec m }", "es_rec", ObligationKind::Ensures, 2),
         ("fn lit_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc m |-> lit_rec m }", "lit_rec", ObligationKind::RefinementIntroduction, 1),
     ] {
-        let result = env.elaborate_decl_v1(source).expect("no invented Nat equation");
+        let result = env.elaborate_decl_v1(source).expect("kernel-checked direct Nat equation");
         assert_eq!(result.obligations.len(), count,
             "direct subset self-call reuses its proof; ensures records each leaf: {source}");
         assert!(result.obligations.iter().all(|goal|
             std::mem::discriminant(&goal.kind) == std::mem::discriminant(&kind)
-            && !has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
+            && has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
         assert!(env.is_open_hole(result.obligations[0].hole_id),
             "opaque base goal remains unknown: {source}");
         assert_eq!(env.globals[name], result.def_id, "admitted recursive result");
@@ -206,23 +207,24 @@ fn recursive_checked_result_uses_nonfinal_parameter_and_requirement() {
         "the postcondition is carried by the kernel result, not a detached hypothesis");
 }
 
-/// Durable nested-recursion boundary. Both recursive Nat splits lack a
-/// checked branch equation, so each open result leaf is admitted as unknown
-/// over evidenced Γ only. Nonrecursive checked-equation methods remain pinned
-/// in lang_refinement_ensures_subset::nested_constructor_result_pairs_replay_checked_split_equations.
+/// Promise class: durable nested direct-recursion boundary (22 §3).
+/// MEASURED: both nested Nat splits carry checked constructor equations
+/// and keep their opaque refined-result leaves open. CLAIMED: a nested
+/// case-only convoy does not silently prove a predicate. THE GAP: neither
+/// the IH-consuming path nor non-direct recursive shapes are exercised.
 #[test]
-fn nested_recursive_matrix_keeps_open_leaves_without_an_unsupported_equation() {
+fn nested_recursive_matrix_keeps_open_leaves_with_checked_equations() {
     let mut env = predicate_env();
     for (source, name, kind, count) in [
         ("fn nested_rec (n : Nat) : Int ensures P result = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> nested_rec m }", "nested_rec", ObligationKind::Ensures, 3),
         ("fn lit_nested_rec (n : Nat) : { x : Int | P x } = match n { Zero |-> 5 ; Suc Zero |-> 6 ; Suc (Suc m) |-> lit_nested_rec m }", "lit_nested_rec", ObligationKind::RefinementIntroduction, 2),
     ] {
-        let result = env.elaborate_decl_v1(source).expect("recursive equations remain unsupported premises");
+        let result = env.elaborate_decl_v1(source).expect("kernel-checked nested Nat equations");
         assert_eq!(result.obligations.len(), count,
             "direct subset self-call reuses its proof; ensures records each leaf: {source}");
         assert!(result.obligations.iter().all(|goal|
             std::mem::discriminant(&goal.kind) == std::mem::discriminant(&kind)
-            && !has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
+            && has_nat_equation(&goal.goal_closed, env.globals["Nat"])));
         assert!(env.is_open_hole(result.obligations[0].hole_id),
             "the opaque Zero leaf remains unknown: {source}");
         assert_eq!(env.globals[name], result.def_id, "admitted recursive result");
