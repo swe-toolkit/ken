@@ -9035,6 +9035,8 @@ fn check_constructor_convoy_branch(
     debug_assert_eq!(cx.hidden_positions.pop(), Some(position));
     cx.ctx.pop();
     attempt.map(|body| Term::lam(branch_equation, body))
+}
+
 /// Only constructor-field variable leaves are eliminated. Outer-index-only
 /// leaves and non-variable leaves retain their proof-carrying alias path.
 fn method_has_variable_side_leaves(
