@@ -6698,6 +6698,17 @@ fn declare_obligation_hole(
 }
 
 fn precondition_proof(cx: &mut ElabCtx<'_>, goal: Term, span: &Span) -> Result<Term, ElabError> {
+    let frames = obligation_path_frames(cx, span)?;
+    if let Some(frame) = frames.iter().rev().find(|frame| frame.witness_position.is_none()) {
+        if convoyable_frame(cx, frame, span)? {
+            return Err(ElabError::RefinementSplitDemand {
+                split_id: frame.split_id,
+                span: span.clone(),
+            });
+        }
+    }
+    // A non-convoyable frame cannot supply an argument for an applied hole.
+    // Omitting it keeps this obligation stronger, never falsely discharged.
     let closed = close_goal(&cx.ctx, &[], goal);
     let (hole_id, level_args) =
         declare_obligation_hole(cx, closed, span, ObligationKind::Requires)?;
@@ -14184,7 +14195,9 @@ fn elab_binop(
                         Term::app(Term::const_(novf_id, vec![]), lhs_core.clone()),
                         rhs_core.clone(),
                     );
-                    let closed = close_goal(&cx.ctx, &[], phi);
+                    let frames = obligation_path_frames(cx, span)?;
+                    let conditions = unwitnessed_conditions(&frames);
+                    let (closed, _) = close_refinement_goal_with(cx, &conditions, phi, &[], None);
                     declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
                 }
             }
@@ -14244,7 +14257,9 @@ fn elab_binop(
             let goal = Term::app(Term::const_(entry.nonzero_id, vec![]), rhs_core);
             let known = premise_proof_in_scope(cx, &goal).is_some();
             if !known {
-                let closed = close_goal(&cx.ctx, &[], goal);
+                let frames = obligation_path_frames(cx, span)?;
+                let conditions = unwitnessed_conditions(&frames);
+                let (closed, _) = close_refinement_goal_with(cx, &conditions, goal, &[], None);
                 declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
             }
             Ok((applied, result_ty))
@@ -14532,6 +14547,26 @@ fn admissible_path_frames(cx: &ElabCtx<'_>) -> Vec<PathFrame> {
     }).collect()
 }
 
+/// Path frames an obligation posed here must respect (spec 22 §3), rebased
+/// to the current depth. Convoy frames already have a binder in Γ.
+fn obligation_path_frames(cx: &ElabCtx<'_>, span: &Span) -> Result<Vec<PathFrame>, ElabError> {
+    let mut frames = Vec::new();
+    for frame in admissible_path_frames(cx) {
+        if !recursive_unindexed_split(cx, &frame, span)? {
+            frames.push(frame);
+        }
+    }
+    Ok(frames)
+}
+
+fn unwitnessed_conditions(frames: &[PathFrame]) -> Vec<Term> {
+    frames
+        .iter()
+        .filter(|frame| frame.witness_position.is_none())
+        .map(|frame| frame.condition.clone())
+        .collect()
+}
+
 /// Peel the actual evidence, not the telescope of the obligation that would
 /// have been minted if evidence were absent. `lower_binders` inspects every
 /// term former through the kernel's complete shift; a closed proof therefore
@@ -14777,19 +14812,12 @@ fn emit_subset_evidence(
     cx: &mut ElabCtx<'_>, goal: Term, span: &Span, kind: ObligationKind,
     direct_evidence: Option<Term>,
 ) -> Result<Term, ElabError> {
-    let mut frames = Vec::new();
-    for frame in admissible_path_frames(cx) {
-        if !recursive_unindexed_split(cx, &frame, span)? {
-            frames.push(frame);
-        }
-    }
+    let frames = obligation_path_frames(cx, span)?;
     // A convoy equation already has a real binder in Γ. Closing it once
     // more in the hole's extra condition telescope duplicates the premise
     // and leaves a redundant, unchecked logical assumption next to its
     // checked witness. Only unbound path frames need an extra Π domain.
-    let conditions: Vec<_> = frames.iter()
-        .filter(|frame| frame.witness_position.is_none())
-        .map(|frame| frame.condition.clone()).collect();
+    let conditions = unwitnessed_conditions(&frames);
     let goal = cx.metas.zonk_term(&goal);
     let mut goal_whnf = None;
     let certificate = std::iter::once(Term::const_(cx.env.tt_id(), vec![]))
@@ -19994,6 +20022,10 @@ pub(crate) fn elaborate_space_decl(
                 debug_assert_eq!(cx.ctx.len() - 1, result_position);
                 cx.ctx.pop();
 
+                debug_assert!(
+                    cx.path_conditions.is_empty(),
+                    "space postcondition closes outside every split"
+                );
                 let closed = zonk_obligation_levels(&cx, &close_goal(&cx.ctx, &[], goal));
                 let level_params = obligation_level_params(&cx, &closed)?;
                 let hole_id =
