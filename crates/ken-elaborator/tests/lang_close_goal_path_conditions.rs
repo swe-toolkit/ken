@@ -51,6 +51,16 @@ fn eq_bool(env: &ElabEnv, b: usize, ctor: &str) -> Term {
     )
 }
 
+fn written_equal(env: &ElabEnv, carrier: Term, left: Term, right: Term) -> Term {
+    Term::app(
+        Term::app(
+            Term::app(Term::const_(env.globals["Equal"], vec![]), carrier),
+            left,
+        ),
+        right,
+    )
+}
+
 fn peel_pis(mut goal: &Term) -> (Vec<&Term>, &Term) {
     let mut domains = vec![];
     while let Term::Pi(domain, codomain) = goal {
@@ -319,6 +329,96 @@ fn related_requires_hole_independently_needs_the_checked_if_equation() {
         Term::pi(
             Term::indformer(env.globals["Bool"], vec![]),
             Term::pi(eq_bool(&env, 0, "True"), weaken(body, 1)),
+        )
+    );
+    assert_reported_trust_delta(&env, &before, &results);
+}
+
+/// MEASURED: the recursive Nat `Suc k` arm's Requires hole has the exact
+/// constructor equation in its checked Γ, after its existing Requires proof
+/// and field binders. CLAIMED: the R2 retry carries match equations into
+/// call-site obligations without bypassing SCT. THE GAP: an obligation-count
+/// check alone stays green if the entire Eq domain disappears.
+#[test]
+fn recursive_match_requires_hole_pins_constructor_equation() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base().into_iter().collect();
+    let declaration = env
+        .elaborate_decl_v1(
+            "fn r (n : Nat) : Nat requires Equal Nat n n = \
+         match n { Zero ↦ Zero; Suc k ↦ r k }",
+        )
+        .expect("structural recursive call keeps one Requires hole");
+    let hole = single(&env, &declaration, ObligationKind::Requires);
+    let nat = Term::indformer(env.globals["Nat"], vec![]);
+    let expected = Term::pi(
+        nat.clone(),
+        Term::pi(
+            written_equal(&env, nat.clone(), Term::var(0), Term::var(0)),
+            Term::pi(
+                nat.clone(),
+                Term::pi(
+                    Term::Eq(
+                        Box::new(nat.clone()),
+                        Box::new(Term::var(2)),
+                        Box::new(Term::app(
+                            Term::constructor(env.globals["Suc"], vec![]),
+                            Term::var(0),
+                        )),
+                    ),
+                    written_equal(&env, nat, Term::var(1), Term::var(1)),
+                ),
+            ),
+        ),
+    );
+    assert_eq!(hole.goal_closed, expected);
+    assert!(
+        env.env.transparent_body(declaration.def_id).is_some(),
+        "SCT checked the recursive body"
+    );
+    assert_reported_trust_delta(&env, &before, std::slice::from_ref(&declaration));
+}
+
+/// MEASURED: an informative `let x = a` closes a Requires call with both x
+/// and `Eq Int x a` as binders, not only the outer a. CLAIMED: a missing R2
+/// retry cannot preserve the stated call-site obligation. THE GAP: the
+/// outside-let control is checked against the original one-binder type.
+#[test]
+fn let_body_requires_hole_pins_local_equation() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base().into_iter().collect();
+    let results = env
+        .elaborate_file_v1(
+            "fn need (x : Int) : Int requires Equal Int x 5 = x\n\
+         fn outside (a : Int) : Int = need a\n\
+         fn inside (a : Int) : Int = let x : Int = a in need x",
+        )
+        .expect("informative let body checks an applied Requires hole");
+    let plain = single(&env, result(&results, "outside"), ObligationKind::Requires);
+    let inside = single(&env, result(&results, "inside"), ObligationKind::Requires);
+    let int = Term::const_(env.globals["Int"], vec![]);
+    assert_eq!(
+        plain.goal_closed,
+        Term::pi(
+            int.clone(),
+            written_equal(&env, int.clone(), Term::var(0), Term::IntLit(5.into()))
+        )
+    );
+    assert_eq!(
+        inside.goal_closed,
+        Term::pi(
+            int.clone(),
+            Term::pi(
+                int.clone(),
+                Term::pi(
+                    Term::Eq(
+                        Box::new(int.clone()),
+                        Box::new(Term::var(0)),
+                        Box::new(Term::var(1))
+                    ),
+                    written_equal(&env, int, Term::var(1), Term::IntLit(5.into())),
+                ),
+            ),
         )
     );
     assert_reported_trust_delta(&env, &before, &results);
