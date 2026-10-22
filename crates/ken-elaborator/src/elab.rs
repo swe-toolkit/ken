@@ -981,6 +981,10 @@ struct ElabCtx<'e> {
     /// body` later relocates to the convoy binder — so the resolved term is a
     /// bare `Var` in that case, not a `Cast`.
     var_refinements: HashMap<usize, (Term, Term, usize)>,
+    /// 34 §3.3 arm-local source-name coordinates: a variable scrutinee and its
+    /// bare-variable indices denote the constructor coordinate inside one arm.
+    /// Name resolution only; convoy and closure planning never read it.
+    arm_coordinates: HashMap<usize, (Term, Term, usize)>,
     /// During a generalized branch-goal check, a premise sentinel resolves to
     /// the temporary Pi binder rather than its original method premise. The
     /// bottom-relative position is stable across deeper local binders.
@@ -1190,6 +1194,7 @@ impl<'e> ElabCtx<'e> {
             provenance: None,
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
+            arm_coordinates: HashMap::new(),
             active_index_refinements: Vec::new(),
             match_frames: Vec::new(),
             next_aux_sentinel_region: AUX_SENTINEL_REGION_BASE,
@@ -1594,6 +1599,9 @@ fn elab_type_named_variable(
             name, span.start, span.end
         ))
     })?;
+    if let Some((raw_term, _, install_depth)) = cx.arm_coordinates.get(&position) {
+        return Ok(weaken(raw_term, (cx.ctx.len() - install_depth) as i64));
+    }
     if let Some((raw_term, _, install_depth)) = cx.var_refinements.get(&position) {
         let growth = cx.ctx.len().checked_sub(*install_depth).ok_or_else(|| {
             ElabError::Internal("index-refined type variable escaped its branch context".into())
@@ -2490,6 +2498,12 @@ fn check_variable_with_index_views_named(
         .ok_or_else(|| ElabError::Internal(format!("Var({surface_index}) out of range")))?;
     let local_ty = weaken(stored_ty, (actual_index as i64) + 1);
     let local_term = Term::var(actual_index);
+    if let Some((raw_term, raw_ty, install_depth)) = cx.arm_coordinates.get(&position) {
+        let growth = (cx.ctx.len() - install_depth) as i64;
+        let ty = weaken(raw_ty, growth);
+        unify_types(&mut cx.metas, expected, &ty);
+        return Ok(weaken(raw_term, growth));
+    }
 
     let Some((raw_refined_term, raw_refined_ty, install_depth)) = cx.var_refinements.get(&position)
     else {
@@ -2778,7 +2792,9 @@ fn check(cx: &mut ElabCtx, expr: &RExpr, expected: &Term, _span: &Span) -> Resul
         // original constructor-local type retained in the kernel context. The
         // expected type selects the view at checking boundaries (notably local
         // helper arguments); inference remains outer-refined by default.
-        RExpr::RVar(index, name, span) if !cx.var_refinements.is_empty() => {
+        RExpr::RVar(index, name, span)
+            if !cx.var_refinements.is_empty() || !cx.arm_coordinates.is_empty() =>
+        {
             check_refined_index_variable(cx, *index, name, span, expected)
         }
         RExpr::RPair(components, span) => check_pair_or_record(cx, components, expected, span),
@@ -5541,8 +5557,7 @@ fn compute_context_convoy(
         // A scrutinee introduced as a local variable has its recorded level;
         // a refined alias has no level, and its active value is its identity.
         if frame.scrutinee_level == Some(bottom_pos)
-            || (frame.scrutinee_level.is_none()
-                && refinement.as_ref().is_some_and(|(value, _)| value == scrut_core))
+            || refinement.as_ref().is_some_and(|(value, _)| value == scrut_core)
         {
             continue;
         }
@@ -5574,6 +5589,11 @@ fn compute_context_convoy(
             }
             if !dependencies.contains(&occurrence) {
                 dependencies.push(occurrence.clone());
+            }
+            // One arm-visible value travels once. An original whose active
+            // alias is an inner rebound binder already carries that binder.
+            if convoy.iter().any(|entry: &ConvoyEntry| entry.occurrence == occurrence) {
+                continue;
             }
             convoy.push(ConvoyEntry { var, occurrence, ambient_ty, embedded_elims: Vec::new() });
         }
@@ -7532,6 +7552,7 @@ fn check_generalized_branch_goal(
     let original_depth = cx.ctx.len();
     let original_hidden = cx.hidden_positions.len();
     let saved_refinements = cx.var_refinements.clone();
+    let saved_arm_coordinates = cx.arm_coordinates.clone();
     let (saved_premises, saved_origins, saved_telescope) = {
         let frame = cx.match_frames.last().ok_or_else(|| {
             ElabError::Internal("generalized branch has no owning match frame".into())
@@ -7655,6 +7676,8 @@ fn check_generalized_branch_goal(
         } else {
             simplify_branch_goal(cx.env, &cx.ctx, &inner_goal)
         };
+        let field_start = cx.match_frames.last().map_or(original_depth, |frame| frame.start_level);
+        rebase_arm_coordinates_through_fields(cx, field_start, original_depth);
         let mut body = check_match_arm_result(cx, arm, &expected, &arm.span)?;
         kernel_check_current(cx, &body, &expected).map_err(|error| match error {
             CurrentKernelQueryError::View(error) => error,
@@ -7693,6 +7716,7 @@ fn check_generalized_branch_goal(
     cx.ctx.types.truncate(original_depth);
     cx.hidden_positions.truncate(original_hidden);
     cx.var_refinements = saved_refinements;
+    cx.arm_coordinates = saved_arm_coordinates;
     let frame = cx.match_frames.last_mut().ok_or_else(|| {
         ElabError::Internal("generalized branch lost its owning match frame".into())
     })?;
@@ -8989,6 +9013,120 @@ fn install_plain_declared_index_aliases(
     Ok(())
 }
 
+/// A generalized arm rebinds its eliminated and dependent fields after the
+/// arm coordinates were installed. Read those coordinates through the same
+/// rebinding, so a renamed scrutinee names the fields the body can see.
+#[inline(never)]
+fn rebase_arm_coordinates_through_fields(cx: &mut ElabCtx<'_>, from: usize, to: usize) {
+    let len = cx.ctx.len();
+    let substitutions: Vec<(Term, Term)> = (from..to)
+        .filter_map(|field| {
+            cx.var_refinements.get(&field).and_then(|(value, _, at)| {
+                (*at <= len).then(|| (Term::var(len - 1 - field), weaken(value, (len - at) as i64)))
+            })
+        })
+        .collect();
+    if substitutions.is_empty() {
+        return;
+    }
+    let rebased: Vec<(usize, (Term, Term, usize))> = cx
+        .arm_coordinates
+        .iter()
+        .filter(|(_, (_, _, at))| *at <= len)
+        .map(|(position, (term, ty, at))| {
+            let growth = (len - at) as i64;
+            (*position, (
+                subst_term_generalize_many(&weaken(term, growth), &substitutions),
+                subst_term_generalize_many(&weaken(ty, growth), &substitutions),
+                len,
+            ))
+        })
+        .collect();
+    cx.arm_coordinates.extend(rebased);
+}
+
+/// 34 §3.3: inside one arm of a match on a variable scrutinee, the source
+/// names of the scrutinee and of each bare-variable index denote the
+/// constructor coordinate. A name is the scrutinee's (or index's) when its
+/// active occurrence is that variable, so an alias resolving to it is renamed
+/// with it. Name resolution only: no equation, no conversion, no convoy key.
+#[allow(clippy::too_many_arguments)]
+#[inline(never)]
+fn install_arm_coordinates(
+    cx: &mut ElabCtx<'_>,
+    ind: &InductiveDecl,
+    params: &[Term],
+    level_args: &[Level],
+    target_indices: &[Term],
+    scrut_indices: &[Term],
+    concrete: &Term,
+    field_count: usize,
+) -> Result<(), ElabError> {
+    if ind.indices.is_empty() {
+        return Ok(());
+    }
+    let Some(scrut_position) = cx.match_frames.last().and_then(|frame| frame.scrutinee_level) else {
+        return Ok(());
+    };
+    let depth = cx.ctx.len();
+    let ambient = depth.saturating_sub(field_count);
+    if scrut_position >= ambient {
+        return Err(ElabError::Internal("indexed scrutinee escaped its constructor context".into()));
+    }
+    let active = |cx: &ElabCtx<'_>, position: usize| -> Term {
+        match cx.var_refinements.get(&position) {
+            Some((value, _, at)) if *at <= depth => weaken(value, (depth - at) as i64),
+            _ => Term::var(depth - 1 - position),
+        }
+    };
+    let zonked_ctx = Context {
+        types: cx.ctx.types.iter().map(|term| cx.metas.zonk_term(term)).collect(),
+    };
+    let mut renamed: Vec<(Term, Term, Term)> = Vec::new();
+    for (ordinal, (actual, target)) in scrut_indices.iter().zip(target_indices).enumerate() {
+        let Term::Var(actual_index) = actual else {
+            continue;
+        };
+        let variable = Term::var(actual_index + field_count);
+        let target = cx.metas.zonk_term(target);
+        if target == variable {
+            continue;
+        }
+        let index_ty = cx.metas.zonk_term(&weaken(
+            &subst_levels(
+                &subst_outer(&ind.indices[ordinal], ind.params.len(), params, ordinal),
+                &ind.level_params,
+                level_args,
+            ),
+            field_count as i64,
+        ));
+        renamed.push((variable, target, index_ty));
+    }
+    let concrete = cx.metas.zonk_term(concrete);
+    let concrete_ty = kernel_infer_in_zonked_current(cx, &zonked_ctx, &concrete).map_err(
+        |error| match error {
+            CurrentKernelQueryError::View(error) => error,
+            CurrentKernelQueryError::Kernel(error) => ElabError::Internal(format!(
+                "indexed scrutinee constructor is ill-typed: {error:?}"
+            )),
+        },
+    )?;
+    renamed.push((Term::var(depth - 1 - scrut_position), concrete, concrete_ty));
+    let mut installs = Vec::new();
+    for position in 0..ambient {
+        let raw = Term::var(depth - 1 - position);
+        let occurrence = active(cx, position);
+        if let Some((_, value, ty)) = renamed
+            .iter()
+            .find(|(variable, _, _)| *variable == raw || *variable == occurrence)
+        {
+            installs.push((position, (value.clone(), ty.clone(), depth)));
+        }
+    }
+    cx.arm_coordinates.extend(installs);
+    Ok(())
+}
+
 /// Build the checked constructor equation only for a demanded convoy. It
 /// must not enlarge the ordinary recursive dependent-branch stack frame.
 #[allow(clippy::too_many_arguments)]
@@ -9102,6 +9240,7 @@ fn check_dependent_branch_body(
 ) -> Result<Term, ElabError> {
     let outer_scope_depth = cx.ctx.len() - n;
     let var_refinement_snapshot = cx.var_refinements.clone();
+    let arm_coordinate_snapshot = cx.arm_coordinates.clone();
     let active_index_refinement_base = cx.active_index_refinements.len();
     let result_refinement_base = cx.result_refinements.len();
     let active_index_premise_frame_base = cx.active_index_premise_frames.len();
@@ -9140,6 +9279,7 @@ fn check_dependent_branch_body(
     cx.active_index_refinements
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
+    cx.arm_coordinates = arm_coordinate_snapshot;
     outcome
 }
 
@@ -9169,6 +9309,9 @@ fn prepare_dependent_branch_body(
     outer_scope_depth: usize,
     variable_side: bool,
 ) -> Result<(Term, bool), ElabError> {
+    install_arm_coordinates(
+        cx, ind, params, level_args, target_indices, scrut_indices, concrete, n,
+    )?;
     if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared {
         install_plain_declared_index_aliases(
             cx,
@@ -13048,6 +13191,10 @@ fn infer_named_local_variable(
     let (pos, actual_index) = cx
         .surface_var(*i)
         .ok_or_else(|| ElabError::Internal(format!("Var({}) out of range", i)))?;
+    if let Some((raw_term, raw_ty, install_depth)) = cx.arm_coordinates.get(&pos) {
+        let growth = (cx.ctx.len() - install_depth) as i64;
+        return Ok((weaken(raw_term, growth), weaken(raw_ty, growth)));
+    }
     if let Some((raw_term, raw_ty, install_depth)) = cx.var_refinements.get(&pos) {
         let growth = (cx.ctx.len() - install_depth) as i64;
         let core = weaken(raw_term, growth);

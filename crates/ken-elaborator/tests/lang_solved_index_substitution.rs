@@ -106,6 +106,42 @@ accepts_dual!(
     "match rest { DualNil ↦ Refl; DualCons q y r2 ↦ Refl }"
 );
 
+/// MEASURED: the same checked indexed arm accepts both a constructor-index
+/// spelling and an alias spelling in the nested body. CLAIMED: §34 §3.3's
+/// name coordinate composes with R1's reverted goal, not just with the
+/// source scrutinee alone. THE GAP: these are the two DualFin successor arms;
+/// sibling Vec tests separately pin a let annotation and independent index.
+accepts_dual!(
+    c_mixed,
+    PRED_HEAD,
+    "hp x",
+    "match j { DualFZ p ↦ hp (dual_lookup a (Suc p) rest j); DualFS p j2 ↦ hp (dual_lookup a (Suc p) rest j) }"
+);
+accepts_dual!(
+    c_alias_k,
+    PRED_HEAD,
+    "hp x",
+    "match j { DualFZ p ↦ hp (dual_lookup a k rest j); DualFS p j2 ↦ hp (dual_lookup a k rest j) }"
+);
+
+/// MEASURED: replacing the nested scrutinee by `DualFZ m` in its `DualFZ p`
+/// arm is kernel-refused with unchanged trust. CLAIMED: coordinate substitution
+/// does not invent a conversion from `DualFin (Suc m)` to `DualFin m`. THE GAP:
+/// this refuses one wrong constructor index; the other typed false twins in
+/// the acceptance target cover independent fields and missing branches.
+#[test]
+fn a_nonmatching_constructor_coordinate_stays_refused() {
+    on_elaboration_stack(|| {
+        refuses_typed(
+            DUAL_FIXTURES,
+            &dual_row(
+                "f_nonctor", PRED_HEAD, "hp x",
+                "match j { DualFZ p ↦ hp (dual_lookup a m rest (DualFZ m)); DualFS p j2 ↦ hp (dual_lookup a m rest j) }",
+            ),
+        );
+    });
+}
+
 const SIBLING_FIXTURES: &[&str] = &[
     "data DualEnv (a : Type) : Nat -> Type where { DualNil : DualEnv a Zero; DualCons : (n : Nat) -> a -> DualEnv a n -> DualEnv a (Suc n) }",
     "fn dual_len (a : Type) (n : Nat) (xs : DualEnv a n) : Nat = match xs { DualNil ↦ Zero; DualCons k x rest ↦ Suc (dual_len a k rest) }",
