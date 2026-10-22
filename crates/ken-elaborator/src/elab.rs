@@ -2220,6 +2220,7 @@ fn check_if_branch(
     checked.map(|body| if convoy { Term::lam(equation, body) } else { body })
 }
 
+#[inline(never)]
 fn infer_if(
     cx: &mut ElabCtx<'_>,
     condition: &RExpr,
@@ -2227,25 +2228,93 @@ fn infer_if(
     else_branch: &RExpr,
     span: &Span,
 ) -> Result<(Term, Term), ElabError> {
+    // Every If path frame must have a retry route: answer its own demand
+    // with the branch-equation convoy, as check_if and infer_let do.
+    let split_id = cx.mint_split();
+    cx.active_splits.push(split_id);
+    let snapshot = refinement_snapshot::Snapshot::capture(cx);
+    let first = infer_if_once(cx, condition, then_branch, else_branch, span);
+    let result = match first {
+        Err(ElabError::RefinementSplitDemand { split_id: requested, .. })
+            if requested == split_id => {
+            snapshot.rollback(cx)?;
+            cx.convoy_splits.insert(split_id);
+            infer_if_once(cx, condition, then_branch, else_branch, span)
+        }
+        other => other,
+    };
+    debug_assert_eq!(cx.active_splits.pop(), Some(split_id));
+    result
+}
+
+#[inline(never)]
+fn infer_if_once(
+    cx: &mut ElabCtx<'_>,
+    condition: &RExpr,
+    then_branch: &RExpr,
+    else_branch: &RExpr,
+    span: &Span,
+) -> Result<(Term, Term), ElabError> {
     let condition_core = elaborate_if_condition(cx, condition)?;
-    let base = cx.path_conditions.len();
+    let convoy = cx.active_splits.last().is_some_and(|id| cx.convoy_splits.contains(id));
     let bool_ty = Term::indformer(cx.numeric_env.bool_id, vec![]);
-    cx.push_path(Term::Eq(
+    let equation = |constructor: GlobalId| Term::Eq(
         Box::new(bool_ty.clone()), Box::new(condition_core.clone()),
-        Box::new(Term::constructor(cx.numeric_env.bool_true_id, vec![])),
-    ), cx.ctx.len(), SplitKind::If);
+        Box::new(Term::constructor(constructor, vec![])),
+    );
+    let then_equation = equation(cx.numeric_env.bool_true_id);
+    let else_equation = equation(cx.numeric_env.bool_false_id);
+    let base = cx.path_conditions.len();
+    cx.push_path(then_equation.clone(), cx.ctx.len(), SplitKind::If);
+    if convoy {
+        install_if_branch_witness(cx, &then_equation);
+    }
     let then_result = infer(cx, then_branch);
     cx.path_conditions.truncate(base);
-    let (then_core, result_ty) = then_result?;
-    cx.push_path(Term::Eq(
-        Box::new(bool_ty), Box::new(condition_core.clone()),
-        Box::new(Term::constructor(cx.numeric_env.bool_false_id, vec![])),
-    ), cx.ctx.len(), SplitKind::If);
-    let else_result = check(cx, else_branch, &result_ty, else_branch.span());
+    if convoy {
+        debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+        cx.ctx.pop();
+    }
+    let (then_core, then_ty) = then_result?;
+    let result_ty = if convoy {
+        lower_binders(&then_ty, 1, 0).map_err(|_| ElabError::TypeMismatch {
+            span: span.clone(),
+            reason: "inferred if result type depends on its branch equation".into(),
+        })?
+    } else {
+        then_ty
+    };
+    cx.push_path(else_equation.clone(), cx.ctx.len(), SplitKind::If);
+    if convoy {
+        install_if_branch_witness(cx, &else_equation);
+    }
+    let else_expected = if convoy { weaken(&result_ty, 1) } else { result_ty.clone() };
+    let else_result = check(cx, else_branch, &else_expected, else_branch.span());
     cx.path_conditions.truncate(base);
+    if convoy {
+        debug_assert_eq!(cx.hidden_positions.pop(), Some(cx.ctx.len() - 1));
+        cx.ctx.pop();
+    }
     let else_core = else_result?;
-    let core = make_if_elim(cx, condition_core, then_core, else_core, &result_ty, span)?;
+    let (then_core, else_core) = if convoy {
+        (Term::lam(then_equation, then_core), Term::lam(else_equation, else_core))
+    } else {
+        (then_core, else_core)
+    };
+    let core = make_if_elim_with_convoy(
+        cx, condition_core, then_core, else_core, &result_ty, span, convoy,
+    )?;
     Ok((core, result_ty))
+}
+
+/// The convoy witness for the If path frame just pushed: a hidden checked
+/// binder of the branch equation, recorded on that frame.
+fn install_if_branch_witness(cx: &mut ElabCtx<'_>, equation: &Term) {
+    let position = cx.ctx.len();
+    cx.push_match_binder(equation.clone(), MatchBinderOrigin::GeneratedEquation);
+    cx.hidden_positions.push(position);
+    cx.path_conditions.last_mut().expect("if branch path installed").witness_position =
+        Some(position);
 }
 
 fn check_pair(
