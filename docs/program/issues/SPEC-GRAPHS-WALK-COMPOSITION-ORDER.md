@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-WALK-COMPOSITION-ORDER
 title: "Spec 62 has walks and dependency orders but no public way to join two walks, and the fact that an order puts the start of every walk before its end is private (walk_before). Rule walk concatenation and the order-respects-walk law from a checked D0 at zero trust, and state them as a section 3 with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
