@@ -1,7 +1,7 @@
 ---
 id: KERNEL-SCT-GROUP-TRANSPARENT-COMPANIONS
 title: "Refined structural recursion whose open obligations mention the recursive call's result is refused with K0014, because the obligation constants are typed against the public group member and the worker split cannot rewrite them. Admit the member group while its non-recursive public wrappers are transparent companions, so those programs are accepted with their open obligations"
-status: active
+status: merged
 owner: kernel
 size: M
 tier: T1

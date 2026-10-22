@@ -1,7 +1,7 @@
 ---
 id: CAT-NUMERIC-INTERVAL-DISTRIBUTIVITY
 title: "Algorithm.Numeric.RationalInterval exports spec 68 section 4: the four interval distributivity inclusions (left and right, both directions), proved at zero trust from the Architect's D0 development, with the section 4 seed run by a package test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

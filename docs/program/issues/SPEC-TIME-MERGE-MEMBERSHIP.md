@@ -1,7 +1,7 @@
 ---
 id: SPEC-TIME-MERGE-MEMBERSHIP
 title: "Spec 69 states membership one window at a time and says a premise-free membership law for trace_merge was not established, so a client cannot conclude that merging keeps exactly the events of its inputs. Rule premise-free merge membership (sound and complete) from a checked D0 at zero trust, and state it as a section 4 with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: S
 tier: T1
