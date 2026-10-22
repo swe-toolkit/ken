@@ -33,10 +33,14 @@ the checked Rational monotonicity laws. Hull and intersection select stored
 endpoint values using Rational's min/max operations; their four further laws
 establish containment without assuming either input has ordered endpoints.
 The endpoint-inclusion operation and its nine checked laws follow the §1–2
-proofs; neither the operation nor its laws assumes sorted endpoints.
+proofs; neither the operation nor its laws assumes sorted endpoints. Four
+further checked laws establish distributivity and factoring by endpoint-value
+inclusion on both sides of multiplication.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, bool_and)
+
+import Core.Logic.Transport (sym, trans)
 
 import Data.Numeric.Rational
   (Rational,
@@ -567,6 +571,181 @@ pub theorem interval_inside_complete
                   ((proof right for bool_and) (rational_leq c b) (rational_leq b d) high_in_k)
       }
   }
+
+pub theorem interval_distrib_l_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_mul i (interval_add j k))
+          (interval_add (interval_mul i j) (interval_mul i k))) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_add (rational_mul a c) (rational_mul a e))
+                  (rational_mul a (rational_add c e)))
+                (rational_leq
+                  (rational_mul b (rational_add d f))
+                  (rational_add (rational_mul b d) (rational_mul b f)))
+                (equiv_leq
+                  (rational_add (rational_mul a c) (rational_mul a e))
+                  (rational_mul a (rational_add c e))
+                  ((proof sym for rational_equiv)
+                    (rational_mul a (rational_add c e))
+                    (rational_add (rational_mul a c) (rational_mul a e))
+                    ((proof distrib_l for rational_mul) a c e)))
+                (equiv_leq
+                  (rational_mul b (rational_add d f))
+                  (rational_add (rational_mul b d) (rational_mul b f))
+                  ((proof distrib_l for rational_mul) b d f))
+          }
+      }
+  }
+
+pub theorem interval_factor_l_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_add (interval_mul i j) (interval_mul i k))
+          (interval_mul i (interval_add j k))) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_mul a (rational_add c e))
+                  (rational_add (rational_mul a c) (rational_mul a e)))
+                (rational_leq
+                  (rational_add (rational_mul b d) (rational_mul b f))
+                  (rational_mul b (rational_add d f)))
+                (equiv_leq
+                  (rational_mul a (rational_add c e))
+                  (rational_add (rational_mul a c) (rational_mul a e))
+                  ((proof distrib_l for rational_mul) a c e))
+                (equiv_leq
+                  (rational_add (rational_mul b d) (rational_mul b f))
+                  (rational_mul b (rational_add d f))
+                  ((proof sym for rational_equiv)
+                    (rational_mul b (rational_add d f))
+                    (rational_add (rational_mul b d) (rational_mul b f))
+                    ((proof distrib_l for rational_mul) b d f)))
+          }
+      }
+  }
+
+pub theorem interval_distrib_r_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_mul (interval_add j k) i)
+          (interval_add (interval_mul j i) (interval_mul k i))) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_add (rational_mul c a) (rational_mul e a))
+                  (rational_mul (rational_add c e) a))
+                (rational_leq
+                  (rational_mul (rational_add d f) b)
+                  (rational_add (rational_mul d b) (rational_mul f b)))
+                (equiv_leq
+                  (rational_add (rational_mul c a) (rational_mul e a))
+                  (rational_mul (rational_add c e) a)
+                  ((proof sym for rational_equiv)
+                    (rational_mul (rational_add c e) a)
+                    (rational_add (rational_mul c a) (rational_mul e a))
+                    (rational_distrib_r a c e)))
+                (equiv_leq
+                  (rational_mul (rational_add d f) b)
+                  (rational_add (rational_mul d b) (rational_mul f b))
+                  (rational_distrib_r b d f))
+          }
+      }
+  }
+
+pub theorem interval_factor_r_inside
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue
+        (interval_inside
+          (interval_add (interval_mul j i) (interval_mul k i))
+          (interval_mul (interval_add j k) i)) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              (proof intro for bool_and)
+                (rational_leq
+                  (rational_mul (rational_add c e) a)
+                  (rational_add (rational_mul c a) (rational_mul e a)))
+                (rational_leq
+                  (rational_add (rational_mul d b) (rational_mul f b))
+                  (rational_mul (rational_add d f) b))
+                (equiv_leq
+                  (rational_mul (rational_add c e) a)
+                  (rational_add (rational_mul c a) (rational_mul e a))
+                  (rational_distrib_r a c e))
+                (equiv_leq
+                  (rational_add (rational_mul d b) (rational_mul f b))
+                  (rational_mul (rational_add d f) b)
+                  ((proof sym for rational_equiv)
+                    (rational_mul (rational_add d f) b)
+                    (rational_add (rational_mul d b) (rational_mul f b))
+                    (rational_distrib_r b d f)))
+          }
+      }
+  }
+
+theorem equiv_leq
+      (x : Rational) (y : Rational)
+    : rational_equiv x y → IsTrue (rational_leq x y) =
+  λh.
+    trans
+      Bool
+      (rational_leq x y)
+      (rational_leq x x)
+      True
+      (sym
+        Bool
+        (rational_leq x x)
+        (rational_leq x y)
+        ((proof respect for rational_leq) x x x y ((proof refl for rational_equiv) x) h))
+      ((proof refl for rational_leq) x)
+
+theorem rational_distrib_r
+      (x : Rational) (y : Rational) (z : Rational)
+    : rational_equiv
+        (rational_mul (rational_add y z) x)
+        (rational_add (rational_mul y x) (rational_mul z x)) =
+  (proof trans for rational_equiv)
+    (rational_mul (rational_add y z) x)
+    (rational_add (rational_mul x y) (rational_mul x z))
+    (rational_add (rational_mul y x) (rational_mul z x))
+    ((proof trans for rational_equiv)
+      (rational_mul (rational_add y z) x)
+      (rational_mul x (rational_add y z))
+      (rational_add (rational_mul x y) (rational_mul x z))
+      ((proof comm for rational_mul) (rational_add y z) x)
+      ((proof distrib_l for rational_mul) x y z))
+    ((proof respect for rational_add)
+      (rational_mul x y)
+      (rational_mul y x)
+      (rational_mul x z)
+      (rational_mul z x)
+      ((proof comm for rational_mul) x y)
+      ((proof comm for rational_mul) x z))
 ```
 
 The inclusion test compares rational values, not constructor spellings:
@@ -626,6 +805,14 @@ In the witnessed converse, a member `q` establishes `a ≤ q ≤ b`; this makes
 both inner endpoints members, and applying pointwise inclusion to them yields
 the outer bounds.
 
+For distributivity, each law splits the three intervals and proves both
+endpoint comparisons separately. The left pair uses Rational's checked
+left-distributivity value law in opposite directions. The right pair uses
+the private `rational_distrib_r` derivation from Rational's multiplication
+commutativity and left distributivity; `equiv_leq` turns each Rational value
+equivalence into the corresponding checked order comparison. Neither stage
+exports a new Rational law or assumes an interval commutativity law.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
@@ -644,8 +831,11 @@ hull may retain a bound from an empty operand. Neither operation normalizes
 equivalent rational spellings, so structural commutativity, idempotence and
 associativity are not claimed. Inclusion does not equate empty intervals or
 normalize rational spellings; its converse requires an actual inner member.
-Subtraction, signed arithmetic, division near zero, floating rounding and
-width remain outside this non-negative exact interval API.
+Both distributive directions hold for inverted inputs without asserting
+structural `Equal Interval`: different endpoint spellings may denote equal
+Rational values. Subtraction, signed arithmetic, division near zero,
+floating rounding and width remain outside this non-negative exact interval
+API.
 
 ## 6. References
 
@@ -663,25 +853,31 @@ width remain outside this non-negative exact interval API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and nineteen checked interval laws
-   form the public contract.
+   `interval_intersect`, `interval_inside` and twenty-three checked interval
+   laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
    and [Laws & proofs](#4-laws--proofs) explains the proof families,
-   including endpoint inclusion and its witnessed converse.
+   including endpoint inclusion, its witnessed converse and the four
+   distributivity/factoring inclusions.
 3. **Derivation.** Carrier endpoints and exact arithmetic come from the
    rational package. Enclosure uses its public checked two-input addition
    and multiplication monotonicity; point soundness uses rational order
    reflexivity and antisymmetry. Hull and intersection reuse the six public
    Rational min/max bounds, with no local copy of scalar order proofs.
    Inclusion soundness reuses transitivity; its isotonicity reuses Rational
-   monotonicity, and its four bound laws reuse those min/max proofs.
-4. **Trusted-base delta.** Zero: all nineteen laws have checked proof bodies,
+   monotonicity, and its four bound laws reuse those min/max proofs. The
+   four distributive inclusions reuse Rational's checked `distrib_l` and
+   `comm` laws through two private proof stages.
+4. **Trusted-base delta.** Zero: all twenty-three laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
    [arithmetic seed](../../../../conformance/stdlib/numerical/seed-rational-interval.md)
    [hull/intersection seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersection.md)
-   and [inclusion seed](../../../../conformance/stdlib/numerical/seed-interval-inclusion.md)
+   [inclusion seed](../../../../conformance/stdlib/numerical/seed-interval-inclusion.md)
+   and [distributivity seed](../../../../conformance/stdlib/numerical/seed-interval-distributivity.md)
    supply separately constructed positive values and false controls;
-   those finite cases do not replace the generic checked proof bodies.
+   those finite cases do not replace the generic checked proof bodies. The
+   distributivity seed's accepting client and dropped-product refusal run in
+   a package test, not in an official conformance-runner or CI claim.
