@@ -1648,6 +1648,133 @@ pub fn admit_pending(
     }
 }
 
+/// A refused companion admission. The member transaction is rolled back;
+/// the companion transaction is returned intact for a fallback admission.
+pub struct CompanionRefusal {
+    pub error: KernelError,
+    pub removed: Vec<Decl>,
+    pub companions: PendingAdmission,
+}
+
+/// Admit `members` as one SCT group while `companions` are transparent.
+///
+/// A companion is a staged placeholder of an earlier transaction with a
+/// checked, non-recursive body: it reaches no companion, directly or through
+/// a transparent body. Companion bodies are checked with every placeholder
+/// opaque; member bodies are then checked with the companions transparent,
+/// so a member may be typed against a declaration whose type mentions a
+/// companion. SCT runs on the members only. A member that reaches a companion
+/// is refused by the escape check, so no recursion is routed through one.
+/// Both groups are installed together or not at all.
+pub fn admit_pending_with_companions(
+    env: &mut GlobalEnv,
+    members: PendingAdmission,
+    member_bodies: Vec<Term>,
+    companions: PendingAdmission,
+    companion_bodies: Vec<Term>,
+) -> Result<Vec<GlobalId>, CompanionRefusal> {
+    let owned = env.instance_id() == members.mark.env_instance
+        && env.instance_id() == companions.mark.env_instance;
+    let checked = if !owned {
+        Err(KernelError::Msg(
+            "admission handle belongs to another environment".into(),
+        ))
+    } else if !pending_tail_intact(env, &members) || !pending_tail_intact(env, &companions) {
+        Err(KernelError::IllFormedDecl(
+            "pending admission staged tail is no longer intact".into(),
+        ))
+    } else if companions.mark.mark_len >= members.mark.mark_len {
+        Err(KernelError::IllFormedDecl(
+            "companions must be staged before the member group".into(),
+        ))
+    } else if member_bodies.len() != members.ids.len()
+        || companion_bodies.len() != companions.ids.len()
+    {
+        Err(KernelError::IllFormedDecl(
+            "pending admission body count does not match placeholder count".into(),
+        ))
+    } else {
+        let group = members
+            .ids
+            .iter()
+            .copied()
+            .zip(member_bodies)
+            .collect::<Vec<_>>();
+        let companion_group = companions
+            .ids
+            .iter()
+            .copied()
+            .zip(companion_bodies)
+            .collect::<Vec<_>>();
+        check_with_companions(env, &group, &companion_group)
+    };
+    match checked {
+        Ok(view) => {
+            env.commit_checked_view(view);
+            let mut ids = companions.ids;
+            ids.extend(members.ids);
+            Ok(ids)
+        }
+        Err(error) if !owned => Err(CompanionRefusal {
+            error,
+            removed: Vec::new(),
+            companions,
+        }),
+        Err(error) => match rollback_pending(env, members) {
+            Ok(removed) => Err(CompanionRefusal {
+                error,
+                removed,
+                companions,
+            }),
+            Err(rollback_error) => Err(CompanionRefusal {
+                error: rollback_error,
+                removed: Vec::new(),
+                companions,
+            }),
+        },
+    }
+}
+
+fn check_with_companions(
+    env: &GlobalEnv,
+    group: &[(GlobalId, Term)],
+    companion_group: &[(GlobalId, Term)],
+) -> KernelResult<GlobalEnv> {
+    let companion_ids: HashSet<GlobalId> = companion_group.iter().map(|(id, _)| *id).collect();
+    if group.iter().any(|(id, _)| companion_ids.contains(id)) {
+        return Err(KernelError::IllFormedDecl(
+            "a companion cannot be a member of its group".into(),
+        ));
+    }
+    for (_, body) in companion_group {
+        let mut pending = Vec::new();
+        let mut terms = vec![body];
+        while let Some(term) = terms.pop() {
+            if let Term::Const { id, .. } = term {
+                pending.push(*id);
+            }
+            terms.extend(term.children());
+        }
+        let mut seen = HashSet::new();
+        while let Some(id) = pending.pop() {
+            if companion_ids.contains(&id) {
+                return Err(KernelError::NotTerminating(
+                    "companion definition is recursive".into(),
+                ));
+            }
+            if seen.insert(id) {
+                if let Some(refs) = env.transparent_body_refs(id) {
+                    pending.extend(refs.iter().copied());
+                }
+            }
+        }
+    }
+    let mut view = env.clone();
+    admit_bodies(&mut view, companion_group)?;
+    admit_bodies(&mut view, group)?;
+    Ok(view)
+}
+
 /// Check and install a complete group of pre-admitted opaque bodies.
 ///
 /// Type-check each body while all group members are still opaque, then run

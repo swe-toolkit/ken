@@ -117,12 +117,15 @@ fn split_body(body: &Term, positions: &[Option<(Term, Term)>]) -> Option<Term> {
     }
 }
 
-fn unwrap_pair(term: &Term) -> Option<(&Term, &Term)> {
-    let mut term = term;
+fn strip_ascript(mut term: &Term) -> &Term {
     while let Term::Ascript(inner, _) = term {
         term = inner;
     }
-    match term {
+    term
+}
+
+fn unwrap_pair(term: &Term) -> Option<(&Term, &Term)> {
+    match strip_ascript(term) {
         Term::Pair(a, b) => Some((a, b)),
         _ => None,
     }
@@ -130,6 +133,34 @@ fn unwrap_pair(term: &Term) -> Option<(&Term, &Term)> {
 
 fn projection_pair(term: &Term) -> Option<(&Term, &Term)> {
     unwrap_pair(term)
+}
+
+/// What a literal-pair projection may do during the rewrite.
+enum ProjectionRedexes {
+    /// Pre-check: admit only a refined argument of the enclosing member call
+    /// when it appears inside that call's result ascription type. These two
+    /// restrictions are defensive; the current source negatives do not
+    /// independently discriminate position from argument identity.
+    Induced(Vec<Term>),
+    /// Worker construction: reduce every literal-pair projection after the
+    /// original type and body have passed the pre-check.
+    All,
+}
+
+impl ProjectionRedexes {
+    fn under_binder(&self) -> Self {
+        match self {
+            Self::Induced(args) => Self::Induced(args.iter().map(|arg| shift(arg, 1, 0)).collect()),
+            Self::All => Self::All,
+        }
+    }
+
+    fn admits(&self, operand: &Term) -> bool {
+        match self {
+            Self::Induced(args) => args.iter().any(|arg| arg == strip_ascript(operand)),
+            Self::All => true,
+        }
+    }
 }
 
 /// One total, binder-preserving core walk. Group Const occurrences are valid
@@ -140,9 +171,10 @@ fn projection_pair(term: &Term) -> Option<(&Term, &Term)> {
 fn rewrite_core(
     term: &Term,
     members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
-    allow_new_projection_redexes: bool,
+    mode: &ProjectionRedexes,
 ) -> Option<Term> {
-    let walk = |term: &Term| rewrite_core(term, members, allow_new_projection_redexes);
+    let walk = |term: &Term| rewrite_core(term, members, mode);
+    let under_binder = |term: &Term| rewrite_core(term, members, &mode.under_binder());
     Some(match term {
         Term::App(..) => {
             let (head, args) = peel_app(term);
@@ -174,14 +206,14 @@ fn rewrite_core(
             call
         }
         Term::Const { id, .. } if members.contains_key(id) => return None,
-        Term::Pi(a, b) => Term::pi(walk(a)?, walk(b)?),
-        Term::Lam(a, b) => Term::lam(walk(a)?, walk(b)?),
-        Term::Sigma(a, b) => Term::sigma(walk(a)?, walk(b)?),
+        Term::Pi(a, b) => Term::pi(walk(a)?, under_binder(b)?),
+        Term::Lam(a, b) => Term::lam(walk(a)?, under_binder(b)?),
+        Term::Sigma(a, b) => Term::sigma(walk(a)?, under_binder(b)?),
         Term::Pair(a, b) => Term::pair(walk(a)?, walk(b)?),
         Term::Proj1(inner) => {
             let inner = walk(inner)?;
             match projection_pair(&inner) {
-                Some((carrier, _)) if allow_new_projection_redexes => carrier.clone(),
+                Some((carrier, _)) if mode.admits(&inner) => carrier.clone(),
                 Some(_) => return None,
                 None => Term::proj1(inner),
             }
@@ -189,7 +221,7 @@ fn rewrite_core(
         Term::Proj2(inner) => {
             let inner = walk(inner)?;
             match projection_pair(&inner) {
-                Some((_, proof)) if allow_new_projection_redexes => proof.clone(),
+                Some((_, proof)) if mode.admits(&inner) => proof.clone(),
                 Some(_) => return None,
                 None => Term::proj2(inner),
             }
@@ -197,9 +229,42 @@ fn rewrite_core(
         Term::Let { ty, val, body } => Term::Let {
             ty: Box::new(walk(ty)?),
             val: Box::new(walk(val)?),
-            body: Box::new(walk(body)?),
+            body: Box::new(under_binder(body)?),
         },
-        Term::Ascript(body, ty) => Term::Ascript(Box::new(walk(body)?), Box::new(walk(ty)?)),
+        Term::Ascript(body, ty) => match mode {
+            ProjectionRedexes::All => Term::Ascript(Box::new(walk(body)?), Box::new(walk(ty)?)),
+            ProjectionRedexes::Induced(_) => {
+                // An outer call's argument cannot authorize a projection in
+                // this term. Only this ascription's own saturated member call
+                // may authorize a projection in its result type.
+                let rewritten_body =
+                    rewrite_core(body, members, &ProjectionRedexes::Induced(vec![]))?;
+                let (head, args) = peel_app(body);
+                let induced = match head {
+                    Term::Const { id, .. } => members
+                        .get(&id)
+                        .filter(|(positions, _)| args.len() >= positions.len())
+                        .map(|(positions, _)| {
+                            positions
+                                .iter()
+                                .zip(&args)
+                                .filter(|(position, _)| position.is_some())
+                                .map(|(_, arg)| strip_ascript(arg).clone())
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    _ => vec![],
+                };
+                Term::Ascript(
+                    Box::new(rewritten_body),
+                    Box::new(rewrite_core(
+                        ty,
+                        members,
+                        &ProjectionRedexes::Induced(induced),
+                    )?),
+                )
+            }
+        },
         Term::Eq(a, b, c) => Term::Eq(Box::new(walk(a)?), Box::new(walk(b)?), Box::new(walk(c)?)),
         Term::Refl(a) => Term::Refl(Box::new(walk(a)?)),
         Term::Cast(a, b, c, d) => Term::Cast(
@@ -309,11 +374,19 @@ impl RefinedWorkerPlan {
             .map(|member| (member.id, (member.positions.as_slice(), GlobalId(u32::MAX))))
             .collect();
         for member in &members {
-            // A pre-existing projection of a literal pair is not a redex
-            // created by splitting a refined binder. Conservatively keep the
-            // original admission path rather than reducing that older term.
-            rewrite_core(&member.original_type, &by_id, false)?;
-            rewrite_core(&member.original_body, &by_id, false)?;
+            // Permit only a refined call argument projected inside that
+            // call's result ascription. Source literal-pair projections and
+            // every other shape retain the original admission path.
+            rewrite_core(
+                &member.original_type,
+                &by_id,
+                &ProjectionRedexes::Induced(vec![]),
+            )?;
+            rewrite_core(
+                &member.original_body,
+                &by_id,
+                &ProjectionRedexes::Induced(vec![]),
+            )?;
         }
         Some(Self { members })
     }
@@ -342,7 +415,7 @@ impl RefinedWorkerPlan {
             .iter()
             .map(|member| {
                 let split = split_body(&member.original_body, &member.positions)?;
-                rewrite_core(&split, &by_id, true)
+                rewrite_core(&split, &by_id, &ProjectionRedexes::All)
             })
             .collect()
     }
@@ -429,10 +502,10 @@ pub(super) fn admit_pending_refined(
         return ken_kernel::admit_pending(env, pending, bodies)
             .map(|ids| (ids, vec![None; original.len()]));
     };
-    match ken_kernel::admit_pending(env, workers, worker_bodies) {
-        Ok(_) => ken_kernel::admit_pending(env, pending, wrappers)
-            .map(|ids| (ids, worker_ids.into_iter().map(Some).collect())),
-        Err(_) => ken_kernel::admit_pending(env, pending, bodies)
+    match ken_kernel::admit_pending_with_companions(env, workers, worker_bodies, pending, wrappers)
+    {
+        Ok(_) => Ok((ids, worker_ids.into_iter().map(Some).collect())),
+        Err(refusal) => ken_kernel::admit_pending(env, refusal.companions, bodies)
             .map(|ids| (ids, vec![None; original.len()])),
     }
 }
