@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-MATRIX-SUM
 title: "Algorithm.LinearAlgebra.NatMatrix exports spec 65 section 4: the row-wise matrix sum and its four laws (left and right product distributivity, matrix_vector distributivity, transpose_add), proved at zero trust from the Architect's D0 development, with the section 4 seed run by a package test"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
