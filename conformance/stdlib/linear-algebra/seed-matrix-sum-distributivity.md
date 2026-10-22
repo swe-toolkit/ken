@@ -5,9 +5,10 @@ Spec: `spec/50-stdlib/65-linear-algebra.md` §4, on main at
 `3809ccdd46fab11556ac3387c7a896ed442f8b82`.
 
 The §4 contract is landed at this seed's base, but its catalog exports
-are absent. This file is a source/content seed only: neither source
-fence has been executed. No shipped-seed execution, CI, publication,
-or landing claim is made.
+were absent there. A package-owned roots-loader test now executes all five
+Ken source fences, checking the four positive blocks and isolating the
+refused theorem after the same-operand control. This is not an official
+conformance-runner execution, CI, publication or landing claim.
 
 The closed cases use `Nat` matrices with dimensions in their `Vec`
 types. They check a direct 2×2 row-wise sum, then both distribution

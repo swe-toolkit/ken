@@ -197,6 +197,11 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "dot_scale",
         "matrix_vector_product",
         "transpose_product",
+        "matrix_add",
+        "matrix_product_distrib_left",
+        "matrix_product_distrib_right",
+        "matrix_vector_distrib",
+        "transpose_add",
     ]
     .into_iter()
     .map(str::to_owned)

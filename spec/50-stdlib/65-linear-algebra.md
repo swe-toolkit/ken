@@ -8,8 +8,10 @@
 > existing seed includes three closed §3 cases, and the catalog has a
 > source acceptance target for them. Section 4 specifies row-wise
 > matrix addition and four new public distributivity laws. The §4 D0
-> proofs are scratch feasibility evidence only; §4 catalog exports,
-> seed execution, CI and a landed trust measurement are not claimed.
+> proofs now accompany five §4 catalog exports; a package-owned test
+> checks the sum seed and measures unchanged trusted identities (109 → 109).
+> This is not official conformance-runner execution, CI, publication or
+> landing.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -292,9 +294,12 @@ catalog places the two compatibility laws after
 > **Section 4 status: DRAFT v1
 > (SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY).** The Architect
 > checked the generic definitions and proofs in a scratch package on
-> the landed §1–3 base. The §4 catalog exports and conformance seed
-> have not been delivered. Scratch checks do not establish shipped
-> seed execution, CI, publication, landing or landed trust.
+> the landed §1–3 base. The five §4 exports now have checked catalog
+> bodies; a package-owned roots-loader test checks all five seed source
+> fences, including the isolated refusal, and measures unchanged
+> trusted identities (109 → 109); the unchanged NatMatrix census row
+> passes in the targeted strict-resolution suite (5/5). No official
+> conformance-runner run, CI, publication or landing is claimed.
 
 ### 4.1 Exact sum on the existing indexed carrier
 
@@ -389,8 +394,9 @@ trust test passed 1/1; the exact `trusted_base()` set remained
 names transparent and owned. A client import of private
 `dot_distrib_right` was refused with E0012. The ambient-passthrough
 census test **was not run to a verdict**: the Architect stopped it to
-release the shared build lock. The later catalog QA owns that test;
-there is no census-success claim here. Closed scratch values used
+release the shared build lock. That scratch result claims no census
+success; the package candidate separately passes the strict-resolution
+suite (5/5) with the NatMatrix row unchanged. Closed scratch values used
 `Refl` and covered a `2 × 2` sum and non-square distributivity. The
 separate, square-typed false claim `a(b+c) = ab+c` refused with E0038
 while its correct-RHS control checked; that negative does not itself
@@ -408,7 +414,8 @@ factor so the incorrect `+c` term type-checks. The accepting
 positive control must use **the same `a`, `b`, and `c` operands** as
 the isolated refusal and assert the correct `a(b+c) = ab+ac` result.
 Append only the false-RHS claim to a fresh accepting client: an
-unrelated rejection cannot satisfy that negative. Seed authoring and
-exact execution are later, separately reviewed work. Signed,
+unrelated rejection cannot satisfy that negative. The package-owned
+test now runs the exact seed fences, but official conformance-runner
+execution, CI and landing remain unmeasured. Signed,
 Rational-valued, semiring-general and approximate matrices, and
 subtraction, are not implied by these natural-number laws.
