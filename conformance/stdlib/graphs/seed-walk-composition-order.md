@@ -191,6 +191,12 @@ theorem ordered_walk_forward_on_chain :
 - why: the refusal is isolated to the reversed result, not a changed
   graph, order, edge, or walk fixture.
 
+To exercise this refusal when the §3 exports are available, concatenate the
+shared-fixture fence and both positive fences as an accepted client. Then
+append only this reversed theorem to a fresh copy of that accepted source; the
+expected refusal is the kernel type mismatch, not missing imports or fixture
+names.
+
 ```ken
 theorem refuse_reversed_order_on_same_chain_walk :
   Equal Bool
