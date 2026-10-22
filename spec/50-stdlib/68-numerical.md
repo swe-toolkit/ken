@@ -342,9 +342,10 @@ check, executed shipped §2 seed, CI result or landed trust measurement.
 
 The §1–2 Rational exports, interval catalog module and two seeds are
 present on main. Signed interval arithmetic, division, floating-point
-rounding, width, normalized endpoint spellings and sub-distributivity
-remain deferred. Arbitrary-pair inclusion isotonicity is specified
-separately in §3; §2's four laws alone do not supply it.
+rounding, width and normalized endpoint spellings remain deferred.
+Sub-distributivity is specified separately in §4. Arbitrary-pair
+inclusion isotonicity is specified in §3; §2's four laws alone do not
+supply it.
 
 ## 3. Interval inclusion and endpoint isotonicity
 
