@@ -1,8 +1,9 @@
 //! Checked companion admission: type conversion, trust, recursion and rollback.
 
 use ken_kernel::{
-    admit_pending, admit_pending_with_companions, declare_def, declare_postulate, rollback_pending,
-    stage_placeholders, GlobalEnv, GlobalId, KernelError, Level, Term,
+    admit_pending, admit_pending_with_companions, check, declare_def, declare_inductive,
+    declare_postulate, rollback_pending, stage_placeholders, CtorSpec, GlobalEnv, GlobalId,
+    InductiveSpec, KernelError, Level, Term,
 };
 
 fn c(id: GlobalId) -> Term {
@@ -155,6 +156,97 @@ fn recursive_companion_refused_without_member_conversion() {
         matches!(error, KernelError::NotTerminating(ref reason) if reason == "companion definition is recursive"),
         "{error:?}"
     );
+}
+
+/// Promise class: durable invariant (spec 17 §4; spec 18 §5).
+/// MEASURED: a well-typed Nat-recursive companion passes ordinary SCT because
+/// every call descends on the constructor field, yet companion admission
+/// refuses it while an unrelated member remains opaque. CLAIMED: companions
+/// must be non-recursive, not merely SCT-certified. THE GAP: the separate
+/// indirect probe checks recursion through an external transparent definition.
+#[test]
+fn structurally_decreasing_companion_is_still_refused() {
+    let mut env = GlobalEnv::new();
+    let nat = declare_inductive(&mut env, |nat| InductiveSpec {
+        level_params: vec![],
+        params: vec![],
+        indices: vec![],
+        level: Level::zero(),
+        constructors: vec![
+            CtorSpec {
+                args: vec![],
+                target_indices: vec![],
+            },
+            CtorSpec {
+                args: vec![Term::indformer(nat, vec![])],
+                target_indices: vec![],
+            },
+        ],
+    })
+    .expect("Nat");
+    let zero = env.inductive(nat).unwrap().constructors[0].id;
+    let nat_ty = Term::indformer(nat, vec![]);
+    let fn_ty = Term::pi(nat_ty.clone(), nat_ty.clone());
+    let companions = stage(&mut env, "companion", vec![fn_ty.clone()]);
+    let companion = companions.ids()[0];
+    let members = stage(&mut env, "member", vec![fn_ty]);
+    let member = members.ids()[0];
+
+    // Under the successor method: Var(1) is the constructor field and
+    // Var(0) is the unused induction hypothesis. SCT records strict descent.
+    let body = Term::lam(
+        nat_ty.clone(),
+        Term::Elim {
+            fam: nat,
+            level_args: vec![],
+            params: vec![],
+            motive: Box::new(Term::Ascript(
+                Box::new(Term::lam(nat_ty.clone(), nat_ty.clone())),
+                Box::new(Term::pi(nat_ty.clone(), Term::Type(Level::zero()))),
+            )),
+            methods: vec![
+                Term::constructor(zero, vec![]),
+                Term::lam(
+                    nat_ty.clone(),
+                    Term::lam(nat_ty.clone(), Term::app(c(companion), Term::var(1))),
+                ),
+            ],
+            indices: vec![],
+            scrut: Box::new(Term::var(0)),
+        },
+    );
+    check(
+        &env,
+        &ken_kernel::env::Context::new(),
+        &body,
+        &Term::pi(nat_ty.clone(), nat_ty.clone()),
+    )
+    .expect("companion body type-checks while staged opaque");
+    ken_kernel::sct::sct_check(&env, &[(companion, body.clone())])
+        .expect("ordinary SCT accepts this structurally decreasing recursion");
+
+    let refusal = admit_pending_with_companions(
+        &mut env,
+        members,
+        vec![Term::lam(nat_ty.clone(), Term::var(0))],
+        companions,
+        vec![body],
+    )
+    .expect_err("a recursive companion must be refused even when SCT accepts it");
+    assert!(
+        matches!(refusal.error, KernelError::NotTerminating(ref reason) if reason == "companion definition is recursive"),
+        "{:?}",
+        refusal.error
+    );
+    assert!(
+        env.lookup(member).is_none(),
+        "failed member group rolled back"
+    );
+    assert!(matches!(
+        env.lookup(companion),
+        Some(ken_kernel::Decl::Opaque { .. })
+    ));
+    rollback_pending(&mut env, refusal.companions).expect("companion remains rollbackable");
 }
 
 #[test]
