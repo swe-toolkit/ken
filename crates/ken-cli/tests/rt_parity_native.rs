@@ -2709,13 +2709,13 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
         assert_eq!(read_availability.len(), 1);
         let census = &read_availability[0];
         // Promise class: transition sentinel. The checked read fixture's
-        // complete keys were re-recorded on 1d8267b5 after literal leq_int
-        // reduction. Specialization identity is unchanged up to origin numbering
-        // (Architect evt_531qbtbnf8y1d); the vector includes availability
-        // drafts. Re-record only when specialization identity intentionally
-        // changes or another lawful upstream normalization shifts origins.
+        // complete keys were re-recorded after the confined bracket-release
+        // constructor shifted checked prelude origins. Specialization identity
+        // remains unchanged up to origin numbering, and the vector includes
+        // availability drafts. Re-record only when specialization identity
+        // intentionally changes or another lawful normalization shifts origins.
         assert_eq!(census.interned_keys.join("\n"),
-            include_str!("rt_per_emitter_read_keys.1d8267b5.txt"));
+            include_str!("rt_per_emitter_read_keys.private_bracket_release.txt"));
         assert_eq!(census.materializations.len(), 7);
         assert_eq!(census.unclassified.len(), 6);
         let points_by_specialization = census.materializations.iter()
@@ -2752,10 +2752,10 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             ].into());
         let destination = census.materializations.iter().find(|point| {
             point.specialization == 1
-                && point.emission_origin == 735
+                && point.emission_origin == 743
                 && point.kind == "CheckedIhTransportDestination"
                 && point.owner == "Specialization(ContinuationSpecializationId(2))"
-        }).expect("Vis735 has one checked-IH transport destination for spec 1");
+        }).expect("Vis743 has one checked-IH transport destination for spec 1");
         assert_eq!(destination.owner_id,
             ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2));
         assert_eq!(destination.captures.len(), 14);
@@ -2765,7 +2765,7 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             assert_eq!(capture.run, if index < 8 { "Worker" } else { "Context" });
             assert_eq!(capture.ordinal, if index < 8 { index as u32 } else { (index - 8) as u32 });
             assert!(capture.result.starts_with("FinalizedTransport("),
-                "Vis735 receives its own finalized W/C transport claim: {capture:?}");
+                "Vis743 receives its own finalized W/C transport claim: {capture:?}");
             assert_eq!(capture.unfinalizable_owner, None,
                 "a finalized transport claim cannot borrow an unfinalizable owner");
         }
@@ -4222,7 +4222,7 @@ fn assert_generated_entry_capsule_mutation_child() {
 // The planner's exact-edge refusal when neither materialization authority
 // selects the performing response owner. This text is not a runtime trap oracle.
 const MATERIALIZATION_SUPPRESSED_RELAY_REFUSAL: &str =
-    "relay: forwarded host op BufferAllocate from source StaticOriginId(1288) has no performing route";
+    "relay: forwarded host op BufferAllocate from source StaticOriginId(1296) has no performing route";
 const EXECUTE_THEN_RESUME_REKEY_CHILD: &str = "KEN_RT_EXECUTE_THEN_RESUME_REKEY_CHILD";
 
 // Build only: suppressing ETR can leave a mixed response-owner plane that

@@ -137,6 +137,28 @@ fn hidden_and_nonexistent_leaves_have_the_same_failure_class() {
     }
 }
 
+/// Promise class: durable privacy invariant. Both ordinary source entry points
+/// reject a direct and a family-qualified forgery of the confined finalizer.
+/// MEASURED: the exact constructor spelling is unavailable for both forms.
+/// CLAIMED: source cannot mint a bracket-finalizer release by these routes.
+/// THE GAP: new source name-resolution routes require their own coverage;
+/// the independent checked prelude bracket remains constructible.
+#[test]
+fn bracket_finalizer_constructor_not_source_resolvable() {
+    for entry in [Entry::Decl, Entry::File] {
+        let source = "fn forged (r : Resource ResourceKind.FsHandle) : FSOp AFull = \
+                      PrivateBracketRelease AFull ResourceKind.FsHandle r";
+        assert_missing(entry, source, "PrivateBracketRelease");
+        let qualified = "fn forged (r : Resource ResourceKind.FsHandle) : FSOp AFull = \
+                         FSOp.PrivateBracketRelease AFull ResourceKind.FsHandle r";
+        let err = elaborate(entry, qualified).expect_err("qualified private name refuses");
+        assert!(
+            matches!(&err, ElabError::UnboundName { name, .. } if name == "FSOp.PrivateBracketRelease"),
+            "unexpected qualified refusal: {err:?}"
+        );
+    }
+}
+
 /// Promise class: non-regression. The public qualified resource kind is still
 /// an atomic type argument and the public Bool constructor still resolves.
 #[test]
@@ -176,10 +198,11 @@ fn hidden_roster_sweeps_all_kernel_constructor_identities() {
         .inductive(env.globals["MappingHandle"])
         .expect("checked MappingHandle");
     assert_eq!(mapping.constructors.len(), 1);
-    let private: [GlobalId; 16] = [
+    let private: [GlobalId; 17] = [
         p.private_fs_open_id,
         p.private_fs_handle_metadata_id,
         p.private_resource_release_id,
+        p.private_bracket_release_id,
         p.private_buffer_allocate_id,
         p.private_fs_read_at_id,
         p.private_fs_write_at_id,

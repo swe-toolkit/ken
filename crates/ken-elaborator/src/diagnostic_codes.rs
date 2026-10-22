@@ -113,6 +113,8 @@ ken_diagnostic::define_error_codes! {
     Self::CheckedCoreBodyView { .. } => ("E0075", "compiler.checked_core_body_view"),
     Self::EntrypointClosurePackageMismatch { .. } => ("E0076", "compiler.entrypoint_closure_package_mismatch"),
     Self::DuplicateBoundaryHeader { .. } => ("E0077", "compiler.duplicate_boundary_header"),
+    Self::InvalidBracketRegion { .. } => ("E0084", "compiler.invalid_bracket_region"),
+    Self::InvalidBracketReleaseHostOperation { .. } => ("E0085", "compiler.invalid_bracket_release_host_operation"),
     ;
     Self::Elaboration(error) => error.code(),
 }

@@ -1,0 +1,39 @@
+program capabilities FS AFull
+
+fn body_done (_second : Result ResourceError Unit)
+  : HostIO AFull (ResourceBodyResult Unit Unit) =
+  Ret (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (ResourceBodyResult Unit Unit)
+    (ResourceBodyOk Unit Unit MkUnit)
+
+proc release_twice (resource : Resource ResourceKind.FsHandle)
+  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
+  bind (Coproduct (FSOp AFull) AmbientOp)
+    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+    (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+    (release AFull resource)
+    (\first. bind (Coproduct (FSOp AFull) AmbientOp)
+      (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+      (Result ResourceError Unit) (ResourceBodyResult Unit Unit)
+      (release AFull resource)
+      (\second. body_done second))
+
+fn done (outcome : Result FileError (ResourceBracketResult Unit Unit))
+  : HostIO AFull ExitCode =
+  match outcome {
+    Ok _ |-> host_exit AFull Success;
+    Err _ |-> host_exit AFull (Failure 75)
+  }
+
+proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
+  : HostIO AFull ExitCode visits [FS] =
+  match caps {
+    MkProgramCaps cap |->
+      bind (Coproduct (FSOp AFull) AmbientOp)
+        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
+        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
+        (withResource AFull Unit Unit cap (bytes_encode "held.bin")
+          ResourceMetadata release_twice)
+        (\outcome. done outcome)
+  }

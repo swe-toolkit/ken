@@ -5459,6 +5459,7 @@ pub struct FSIds {
     pub private_mapping_write_view_id: GlobalId,
     pub private_mapping_acquire_file_id: GlobalId,
     pub private_resource_release_id: GlobalId,
+    pub private_bracket_release_id: GlobalId,
     pub resource_read_id: GlobalId,
     pub resource_metadata_mode_id: GlobalId,
     pub resource_write_create_id: GlobalId,
@@ -5543,6 +5544,7 @@ impl FSIds {
             private_mapping_write_view_id: prelude.private_mapping_write_view_id,
             private_mapping_acquire_file_id: prelude.private_mapping_acquire_file_id,
             private_resource_release_id: prelude.private_resource_release_id,
+            private_bracket_release_id: prelude.private_bracket_release_id,
             resource_read_id: roles.resource_open_read,
             resource_metadata_mode_id: roles.resource_open_metadata,
             resource_write_create_id: roles.resource_open_write_create,
@@ -6710,7 +6712,7 @@ fn fs_dispatch<H: HostHandler>(
             ken_host::CanonicalRequestV1::BufferFreeze { start, length },
             fs.op_metadata_id,
         )
-    } else if op_id == fs.private_resource_release_id {
+    } else if op_id == fs.private_resource_release_id || op_id == fs.private_bracket_release_id {
         (
             ken_host::HostOpV1::ResourceRelease,
             ken_host::CanonicalRequestV1::ResourceRelease,
@@ -8123,6 +8125,7 @@ mod px5b_effect_observation_tests {
             private_mapping_write_view_id: id(),
             private_mapping_acquire_file_id: id(),
             private_resource_release_id: id(),
+            private_bracket_release_id: id(),
             resource_read_id: id(),
             resource_metadata_mode_id: id(),
             resource_write_create_id: id(),
