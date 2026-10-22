@@ -2,7 +2,8 @@
 
 > **Status: DRAFT v0 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT §1;
 > SPEC-NUMERICAL-INTERVAL-HULL §2;
-> SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3).** The §1–2 operations,
+> SPEC-NUMERICAL-INCLUSION-ISOTONICITY §3;
+> SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY §4).** The §1–2 operations,
 > ten checked interval laws, required Rational exports and seeds are
 > present on main. Section 3 specifies endpoint-wise inclusion and nine
 > checked laws, now exported by `Algorithm.Numeric.RationalInterval` with
@@ -10,7 +11,9 @@
 > `conformance/stdlib/numerical/seed-interval-inclusion.md` and the targeted
 > package test runs its positive and two refused clients. Exact trusted-base
 > identities are unchanged in the candidate's targeted test; this is not a
-> claim of CI or a landed trust measurement.
+> claim of CI or a landed trust measurement. Section 4 specifies four
+> checked distributivity/factoring inclusions; its catalog exports and
+> conformance seed are not delivered by this spec-only candidate.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -484,3 +487,82 @@ delta is claimed. This contract adds no primitive,
 kernel/surface feature, signed carrier, subtraction,
 `rational_equiv`-as-`Equal`, canonical empty interval, or member-set
 equality.
+
+## 4. Distributivity as endpoint-value inclusion
+
+The §1.2 total endpoint operations and §3.1 `interval_inside` now
+support distributivity in both operand positions. Let `i`, `j`, and
+`k` be any intervals, including intervals with inverted bounds.
+Write `L` for `interval_mul i (interval_add j k)` and `R` for
+`interval_add (interval_mul i j) (interval_mul i k)`. The public
+checked left-hand laws state **both** endpoint inclusions:
+
+```ken
+pub theorem interval_distrib_l_inside
+  (i : Interval) (j : Interval) (k : Interval) :
+  IsTrue (interval_inside
+    (interval_mul i (interval_add j k))
+    (interval_add (interval_mul i j) (interval_mul i k)))
+
+pub theorem interval_factor_l_inside
+  (i : Interval) (j : Interval) (k : Interval) :
+  IsTrue (interval_inside
+    (interval_add (interval_mul i j) (interval_mul i k))
+    (interval_mul i (interval_add j k)))
+```
+
+For the right-hand orientation, let `Lr` be
+`interval_mul (interval_add j k) i` and `Rr` be
+`interval_add (interval_mul j i) (interval_mul k i)`.
+The module exports a **separate pair** of checked laws:
+
+```ken
+pub theorem interval_distrib_r_inside
+  (i : Interval) (j : Interval) (k : Interval) :
+  IsTrue (interval_inside
+    (interval_mul (interval_add j k) i)
+    (interval_add (interval_mul j i) (interval_mul k i)))
+
+pub theorem interval_factor_r_inside
+  (i : Interval) (j : Interval) (k : Interval) :
+  IsTrue (interval_inside
+    (interval_add (interval_mul j i) (interval_mul k i))
+    (interval_mul (interval_add j k) i))
+```
+
+Each inclusion is the §3 endpoint comparison, not a statement that
+arithmetic with an empty interval preserves emptiness. For each
+orientation, the two directions force mutual `rational_leq` between
+corresponding lower endpoints and between corresponding upper
+endpoints. By §64 §2.2 antisymmetry, each pair of endpoint **values**
+is `rational_equiv`. Thus these laws give equality of endpoint values
+without asserting `Equal Interval`: §64 operations can retain
+distinct spellings for equivalent rational values. No normalization, quotient
+carrier, structural distributivity theorem, or interval commutativity
+law is added. In particular, the **right** laws are not obtained by
+swapping interval factors through an unstated interval commutativity
+law; §64's `comm for rational_mul` supports a private right-hand
+Rational derivation from `distrib_l for rational_mul`.
+
+The checked development uses two private proof stages: `equiv_leq`
+carries `rational_equiv x y` into `IsTrue (rational_leq x y)` through
+§64's respect and reflexivity, while `rational_distrib_r` derives
+the right-hand Rational value equality using multiplication
+commutativity, left distributivity, equivalence transitivity and
+addition respect. Neither is a public helper or a restatement of
+§64's public distributivity law. The four interval laws require no
+validity or membership premise and add no primitive, Rational
+public declaration, signed endpoint, subtraction or division.
+
+On base `826a4fed0`, the Architect's AC-0 scratch development
+checked all four generic theorem bodies with rc 0, no `Axiom`, and
+no open obligation. The generic `Refl` claim for structural
+`Equal Interval` was refused; a closed point-`1/2` structural
+equality claim was also refused. This is evidence for the chosen
+endpoint-value boundary, not delivery of §4 catalog exports, seed
+execution, CI, publication, landing, or a landed `trusted_base()`
+measurement. The separate AC-2 seed uses distinct-endpoint
+intervals and a same-input accepting control against a dropped-product
+refusal; this spec-only AC-1 neither authors nor executes that seed.
+The former §1–3 sub-distributivity deferral is settled **here**, not
+by revising any §1–3 operation or law.
