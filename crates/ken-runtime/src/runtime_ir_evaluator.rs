@@ -883,7 +883,8 @@ fn reject_runtime_expr_blockers(
     expr: &RuntimeExpr,
 ) -> Result<(), RuntimeIrEvaluationError> {
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -1006,7 +1007,8 @@ fn reject_runtime_expr_blockers(
 
 fn runtime_expr_contains_effect(expr: &RuntimeExpr) -> bool {
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -1226,7 +1228,8 @@ impl<'a> RuntimeIrEvaluatorState<'a> {
         env: &[EvaluatedValue],
     ) -> Result<RuntimeIrOutcome, RuntimeIrEvaluationError> {
         match expr {
-            RuntimeExpr::CheckedJoinSite { body, .. }
+            RuntimeExpr::CheckedBracketFinalizer { body, .. }
+            | RuntimeExpr::CheckedJoinSite { body, .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
             | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
             | RuntimeExpr::CheckedComputationalIHSlots { body, .. }

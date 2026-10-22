@@ -416,6 +416,33 @@ fn skipped_nodes(node: &Term, next: &mut u32) -> Result<(), KernelError> {
     Ok(())
 }
 
+/// Locate one node in the SAME checked preorder used by the Ω erasure plan.
+/// Skipped siblings are counted with the plan's own traversal, including
+/// descendants that the executable decoder later erases.
+pub(crate) fn checked_body_preorder_id_at_path(
+    body: &Term,
+    path: &[usize],
+) -> Result<Option<u32>, KernelError> {
+    fn descend(node: &Term, path: &[usize], next: &mut u32) -> Result<Option<u32>, KernelError> {
+        let here = *next;
+        *next = next
+            .checked_add(1)
+            .ok_or_else(|| KernelError::Msg("erasure plan node index overflow".into()))?;
+        let Some((&selected, tail)) = path.split_first() else {
+            return Ok(Some(here));
+        };
+        let children = node.children();
+        let Some(child) = children.get(selected) else {
+            return Ok(None);
+        };
+        for preceding in children.iter().take(selected) {
+            skipped_nodes(preceding, next)?;
+        }
+        descend(child, tail, next)
+    }
+    descend(body, path, &mut 0)
+}
+
 fn visit(
     env: &GlobalEnv,
     ctx: &mut Context,

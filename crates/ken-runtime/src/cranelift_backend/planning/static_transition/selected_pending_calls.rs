@@ -9,7 +9,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    occurrences::{occurrence_authority, occurrence_subtree_contains}, planner_capacity_error, planner_error, unsupported,
+    occurrences::{occurrence_authority, occurrence_subtree_contains}, peel_checked_bracket_operation,
+    planner_capacity_error, planner_error, unsupported,
     CheckedCaseBinderLayout, CheckedCaseBinderRole, ContinuationEmissionOwner,
     CraneliftBackendError, PredeclaredFunctionId,
     ResolvedContinuationCallee, ResponseDisposition, RuntimeExpr, StaticOriginId,
@@ -771,7 +772,11 @@ fn selected_leaf_response_witness(
                     RuntimeExpr::LexicalClosure { captures, params, .. }] = args.as_slice() else {
                     return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
                 };
-                let [RuntimeExpr::Construct { args: selected_fields, .. }] = operation_fields.as_slice() else {
+                let [selected_operation] = operation_fields.as_slice() else {
+                    return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
+                };
+                let RuntimeExpr::Construct { args: selected_fields, .. } =
+                    peel_checked_bracket_operation(selected_operation) else {
                     return Ok(Err(PendingRefusal::UnsupportedRouteEdge));
                 };
                 if params.len() != 1 {
@@ -832,7 +837,8 @@ fn pending_free_indices(
             .ok_or_else(|| planner_capacity_error("pending binder depth exceeds u32"))
     };
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -913,7 +919,8 @@ fn route_kind(expr: &RuntimeExpr) -> Result<PendingRouteKind, PendingRefusal> {
             Ok(Kind::Binding)
         }
         RuntimeExpr::CheckedComputationalIHInvocation { .. } => Ok(Kind::CarriedResidual),
-        RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. }
         | RuntimeExpr::Value(_)
@@ -1110,7 +1117,8 @@ fn walk_to_gate(
             }
             Ok(exits)
         }
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. } => walk_to_gate(
@@ -1659,6 +1667,7 @@ mod tests {
                 constructor: response_ctor.clone(), binders: 1,
                 body: RuntimeExpr::Let {
                     value: Box::new(RuntimeExpr::Effect {
+                        bracket_acquire: None,
                         family: "effect:FS".to_owned(),
                         operation: ken_host::HostOpV1::BufferAllocate,
                         capability: None,

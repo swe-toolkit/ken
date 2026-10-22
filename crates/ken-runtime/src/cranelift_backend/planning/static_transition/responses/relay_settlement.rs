@@ -171,7 +171,8 @@ fn source_results_in_scope(
                 if constructor.as_str().ends_with("::ITree::Vis") && args.len() == 2 => {
                 let path_tail = inherited_tail && tail_to(plan, parents, origin, scope)?;
                 let operation = plan.child_static_origin(origin, 0).map_err(|e| e.to_string())?;
-                match plan.source_occurrence(operation).map_err(|e| e.to_string())? {
+                let operation = plan.source_occurrence(operation).map_err(|e| e.to_string())?;
+                match peel_checked_bracket_operation(operation) {
                     RuntimeExpr::Construct { .. } => sources.push(Source {
                         vis: origin, tail_edges: path_tail, redex_body,
                     }),
@@ -199,7 +200,8 @@ fn source_results_in_scope(
                     std::mem::discriminant(expr)));
             }
             // The result inventory also includes the wrappers it visited.
-            RuntimeExpr::CheckedJoinSite { .. }
+            RuntimeExpr::CheckedBracketFinalizer { .. }
+            | RuntimeExpr::CheckedJoinSite { .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedRecursiveInvocation { .. }
             | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -216,7 +218,10 @@ fn source_shape(plan: &StaticTransitionPlan<'_>, vis: StaticOriginId) -> Result<
     let RuntimeExpr::Construct { constructor, args } = expr else { return Ok(false) };
     if !constructor.as_str().ends_with("::ITree::Vis") || args.len() != 2 { return Ok(false); }
     let RuntimeExpr::Construct { args: outer, .. } = &args[0] else { return Ok(false) };
-    if !matches!(outer.as_slice(), [RuntimeExpr::Construct { .. }]) { return Ok(false); }
+    let [operation] = outer.as_slice() else { return Ok(false); };
+    if !matches!(peel_checked_bracket_operation(operation), RuntimeExpr::Construct { .. }) {
+        return Ok(false);
+    }
     Ok(matches!(&args[1], RuntimeExpr::LexicalClosure { params, .. } if params.len() == 1))
 }
 

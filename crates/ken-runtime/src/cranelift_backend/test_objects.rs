@@ -159,6 +159,7 @@ fn px8tr_nested_post_effect_fixture() -> (
     };
     let terminal_body = RuntimeExpr::Let {
         value: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleFlush,
             capability: None,

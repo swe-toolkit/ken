@@ -222,7 +222,8 @@ fn walk_runtime(expr: &ken_runtime::RuntimeExpr, c: &mut RuntimeCensus) {
             c.ih_invocations += 1;
             walk_runtime(body, c);
         }
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::Closure { body, .. }

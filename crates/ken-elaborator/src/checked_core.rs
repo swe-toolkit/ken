@@ -295,6 +295,9 @@ pub struct CheckedCoreDeclarationBodyView {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CheckedCoreConstructorView {
+    /// Decoder-only identity of this constructor reference in the checked
+    /// body's canonical preorder. Not encoded or included in its hash.
+    pub checked_node_id: Option<u32>,
     pub symbol: StableSymbol,
     pub family_symbol: StableSymbol,
     pub level_args: Vec<CheckedCoreLevelView>,
@@ -3313,9 +3316,9 @@ fn decode_supported_body_term_after_tag(
                 decode_stable_symbol(cursor).map_err(|reason| malformed_body(owner, reason))?;
             let level_args =
                 decode_levels(cursor).map_err(|reason| malformed_body(owner, reason))?;
-            Ok(CheckedCoreBodyTerm::ConstructorReference(
-                checked_constructor_view(semantic, owner, &symbol, level_args)?,
-            ))
+            let mut constructor = checked_constructor_view(semantic, owner, &symbol, level_args)?;
+            constructor.checked_node_id = node_id;
+            Ok(CheckedCoreBodyTerm::ConstructorReference(constructor))
         }
         "elim" => {
             decode_supported_match_view(cursor, semantic, selection, owner, type_context, plan)
@@ -4648,6 +4651,7 @@ fn checked_constructor_view_from_metadata(
         return Err(ctor.symbol.clone());
     }
     Ok(CheckedCoreConstructorView {
+        checked_node_id: None,
         symbol: ctor.symbol.clone(),
         family_symbol: family_symbol.clone(),
         level_args,
@@ -7214,6 +7218,7 @@ mod tests {
         assert_eq!(
             match_view.scrutinee.as_ref(),
             &CheckedCoreBodyTerm::ConstructorReference(CheckedCoreConstructorView {
+                checked_node_id: None,
                 symbol: true_ctor.clone(),
                 family_symbol: match_view.family_symbol.clone(),
                 level_args: Vec::new(),

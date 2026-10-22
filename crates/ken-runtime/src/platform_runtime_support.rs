@@ -648,7 +648,8 @@ fn collect_runtime_support_for_expr(
     visiting: &mut BTreeSet<RuntimeSymbol>,
 ) -> Result<(), PlatformRuntimeSupportError> {
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }

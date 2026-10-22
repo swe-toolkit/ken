@@ -4729,6 +4729,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
             message: "D7 governed-sites default".to_string(),
         };
         let allocate = || RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -4737,6 +4738,7 @@ pub(in crate::cranelift_backend::lowering) mod tests {
         // `origin` and `target` are the two bound buffer resources, named at
         // whatever de Bruijn depth the caller sits at.
         let write = |origin: u32, target: u32| RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::FsWriteAt,
             capability: None,

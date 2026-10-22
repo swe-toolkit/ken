@@ -2615,6 +2615,7 @@ pub fn prepare_native_program_sources(
                 symbol,
                 &normalized_body,
                 &env.prelude_env,
+                &symbols,
                 env.prelude_env.resource_id,
                 ok_method,
             )
@@ -2704,6 +2705,7 @@ pub fn prepare_native_program_sources(
             recursive_invocation_templates,
             computational_ih_slot_templates,
             computational_ih_call_templates,
+            bracket_regions.clone(),
         )
         .map_err(NativeProgramBuildError::Erasure)?;
     let join_plan_bytes = join_plan.canonical_bytes();
@@ -2881,6 +2883,11 @@ impl NativeProgramPreparationV1 {
     /// No host operation or Runtime expression participates in their selection.
     pub fn bracket_regions(&self) -> &[NormalizedBracketRegion] {
         &self.bracket_regions
+    }
+
+    #[cfg(test)]
+    pub(crate) fn bracket_host_spine_for_test(&self) -> &crate::erasure::CheckedHostSpineV1 {
+        &self.host_spine
     }
 
     #[cfg(test)]
@@ -4189,6 +4196,7 @@ fn checked_host_spine_v1(
         unit: resolve_id(roles.unit)?,
         bool_false: resolve_id(roles.bool_false)?,
         bool_true: resolve_id(roles.bool_true)?,
+        bracket_finalizer_constructor: Some(resolve_id(prelude.private_bracket_release_id)?),
         operations,
     })
 }
@@ -6717,6 +6725,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let family = StableSymbol::declaration("px8ta-runtime-census", &[], "Tree");
         let constructor = StableSymbol::constructor(&family, "Step");
         let constructor_view = CheckedCoreConstructorView {
+            checked_node_id: None,
             symbol: constructor,
             family_symbol: family.clone(),
             level_args: Vec::new(),
@@ -6863,6 +6872,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
 
         let constructor_view = |symbol, argument_count, recursive_positions| {
             crate::checked_core::CheckedCoreConstructorView {
+                checked_node_id: None,
                 symbol,
                 family_symbol: family.clone(),
                 level_args: Vec::new(),
@@ -6975,6 +6985,7 @@ fn main (input : ProcessInput) (_caps : ProgramCaps APartial)
         let family = StableSymbol::declaration("px8ta-runtime-call-census", &[], "Box");
         let constructor = StableSymbol::constructor(&family, "MkBox");
         let constructor_view = crate::checked_core::CheckedCoreConstructorView {
+            checked_node_id: None,
             symbol: constructor,
             family_symbol: family,
             level_args: Vec::new(),
