@@ -137,23 +137,30 @@ theorem right_result_member_is_sound :
 
 ## Refuse a member from neither input
 
-The same accepted client is the base for this refusal. `neither` has time
-`3`, while every input event has time `1` or `2`. The false proof attempts
-the head-equality branch of the merged list's `list_elem`; it asks `Refl`
-to identify `neither` with `left_tie`. The closed merge control and the
-same-input positive law instances guard against an unrelated failure.
+Runner assembly: first build and accept a client containing the entire
+positive Ken fence above. Copy that accepted client fresh and append only
+the refusal fence below. Do not run the negative fence alone. The combined
+client must reach the false `Equal (Event Bool) neither left_tie`/`Refl`
+witness after the positive prefix; rejection for a missing import or
+fixture, or at an earlier positive assertion, is not the expected result.
+
+`neither` has time `3`, while every input event has time `1` or `2`. The
+false proof attempts the head-equality branch of the merged list's
+`list_elem`; it asks `Refl` to identify `neither` with `left_tie`. The
+closed merge control and same-input positive law instances guard against
+an unrelated failure.
 
 ### stdlib/time-and-events/reject-event-from-neither-input
 
 - spec: `spec/50-stdlib/69-time-and-events.md` §4.
 - promise class: durable invariant.
-- given: the same unordered pair and an event with time `3` that occurs
-  in neither input.
-- expect: the membership claim is refused at its false head-equality
-  witness.
-- measured: the positive client asserts the closed merge value and both
-  same-input membership instances. The refusal is not executed in this
-  seed.
+- given: a fresh copy of the accepted client containing the entire
+  positive fence, plus only this refusal fence; `neither` has time `3` and
+  occurs in neither input.
+- expect: the combined client is refused at the false head-equality
+  witness, not at a missing fixture or an earlier assertion.
+- measured: not executed in this seed. The positive prefix asserts the
+  closed merge value and both same-input membership instances.
 - claimed: an event absent from both inputs is not a member of their
   merge.
 - gap: this refusal checks one attempted head witness, not every possible
