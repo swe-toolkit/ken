@@ -1,7 +1,7 @@
 ---
 id: LANG-INFER-IF-SPLIT-DEMAND-ROUTE
 title: "A call-site requires call or subset introduction inside an if elaborated in infer mode fails with the internal retry signal RefinementSplitDemand (E0082), because convoyable_frame treats every If frame as convoyable while infer_if has no route to answer the demand. LANG-CLOSE-GOAL-PATH-CONDITIONS extended the pre-existing subset gap to the requires route. Answer or decline the demand so these programs elaborate again"
-status: ready
+status: active
 owner: language
 size: S
 tier: T1
@@ -64,8 +64,10 @@ the five rows.
   argument, `/` in an inferred `if`) keep their `a2a4169d3` outcome, and no
   hole closed on `a2a4169d3` is open on the candidate across catalog,
   library and examples.
-- **AC-3 (mutation, QA).** Restoring the unconditional If arm in
-  `convoyable_frame`, or removing the new `infer_if` arm, reddens a1 to a4.
+- **AC-3 (mutation, QA).** Removing `infer_if`'s catch-and-retry
+  reddens a1 to a4 and s1 back to E0082 (route ruled `evt_7nagvjyhbvwkk`:
+  `infer_if` gets its own split and convoy arm, `convoyable_frame`
+  unchanged).
 
 ## Stop conditions
 

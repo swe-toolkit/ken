@@ -140,10 +140,30 @@ no change without them.
 
 ## Hard-stop inventory (§1b)
 
-§1a: the variable-side leaf elimination chain is at 4 (Architect
+**Paused at the §1a 6 Research hold (`evt_68jp7ct8055x3`).** Resume
+checkpoint `fc15cad6f`. AC-1 is recut after the Research advisory and the
+Architect's route ruling on it (Steward scope `evt_5asyh12k755v`):
+- AC-1 is recut around one closure, not entry by entry:
+  - one occurrence telescope, ordered by dependency and deduplicated;
+  - equations solved per premise slot;
+  - a per-method plan that admits mixed leaves.
+  The AC-1b name layer, the convoy dedupe, ConvoyRebound admission and
+  the kernel node are retained.
+- AC-0 becomes program-wide: every ken-elaborator integration binary plus
+  the catalog loaders, with zero failures that are green on main.
+- The gate to the proved population is measured beside the full closure.
+
+§1a: the variable-side leaf elimination chain is at 6 (Architect
 `evt_6gq7rm62sy7qf`, `evt_20k6hnw9evhy5`, `evt_4f8gr0yddtjzk`,
-`evt_7ex6qpqscy58q`). The third was held for Research
-(`evt_6q5n8x61jsyvw`). The next Research trigger is count 6.
+`evt_7ex6qpqscy58q`, `evt_7ge5kbggd1n1m`, `evt_68jp7ct8055x3`).
+
+**§1b answer (`evt_68jp7ct8055x3`): entries 2, 4, 5 and 6 share one
+predicate.** R1's selector and restoration are indexed by syntactic units
+(leaf, source position, origin tag). Those units do not coincide with
+what the J must transport: the premise slot, the occurrence, and its
+dependency order. Entries 1 and 3 are separate. Entry 1 is closed by the
+retained scrutinee-only path, and entry 3 by
+KERNEL-OMEGA-STRUCTURAL-POSITIONS.
 
 **Shared predicate (Architect `evt_4f8gr0yddtjzk`).** The raw index
 premise `e : Eq Nat (Suc k) (Suc m)` is a free proof variable inside
@@ -172,3 +192,22 @@ carry it as a binder. The closure must address `e`'s representation.
    binder position (origin), as entry 2 was keyed on origin tag. Ruled
    (`evt_7ex6qpqscy58q`): admit `frame.convoy_originals` as Original
    dependents rebound ConvoyRebound; re-derive only Eq premises.
+5. A nested match's context convoy carried one arm-visible value twice:
+   the original binder whose alias is the R1-rebound binder, and the
+   rebound binder itself. It also carried an original whose alias is the
+   scrutinee. The arm name went to one slot and the goal to the other.
+   Keyed on binder position, not on the occurrence the arm sees. Ruled
+   (`evt_7ge5kbggd1n1m`): §3.3 coordinates live in a separate name layer,
+   `arm_coordinates`, read only by the three name resolvers; the convoy
+   keys on the occurrence and skips the scrutinee's alias.
+6. R1's unit of work is the syntactic leaf and source position, not what
+   the J transports:
+   - (A) a premise slot that projects to several leaves must be reflexive
+     after its first leaf;
+   - (B) the reverted telescope is ordered by source position but binds
+     alias values, so a binder whose type mentions an inner-bound alias
+     keeps an old-coordinate occurrence;
+   - (C) a variable leaf beside a constructor leaf in one method (frame
+     stop);
+   - (D) nested-elimination output is rejected by the kernel, untraced.
+   Keyed on leaf and position, not on premise slot and occurrence.
