@@ -21,7 +21,8 @@ recursive call's result stays refused with K0014. It fails closed. WIP
 `47c25c5c3` is never landed. The only repair that keeps obligation
 identity is a kernel admission feature: an SCT group checked with
 non-recursive transparent companion definitions. That is trust-root
-growth and is the operator's call; it is not framed.
+growth and is the operator's call. The operator approved it on
+2026-10-22 ("approve change"); it is KERNEL-SCT-GROUP-TRANSPARENT-COMPANIONS.
 
 ## Objective
 

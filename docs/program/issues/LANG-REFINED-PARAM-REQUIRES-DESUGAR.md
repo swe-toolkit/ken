@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-PARAM-REQUIRES-DESUGAR
 title: "A refined parameter lowers to its bare carrier, so its predicate is neither available in the body nor carried in the function's type. Desugar a refined parameter, and a refined domain in a written function type, to the carrier plus a requires premise, as spec 21 now defines"
-status: ready
+status: closed
 owner: language
 size: M
 tier: T1
@@ -13,6 +13,13 @@ origin: "Operator 2026-10-03: 'approve 3(a) as a desugar to requires' (evt_2903k
 ---
 
 # Refined parameters desugar to requires
+
+Closed 2026-10-22 as superseded (Architect `evt_50sa3e3dyfcsc`). Spec 21
+§6.3 on `main` keeps a refined parameter as a subset-Σ binder, so this
+frame's desugar and its AC-1 twin-type equality contradict the spec.
+LANG-REFINEMENT-SUBSET-SIGMA delivered the caller obligation and the
+higher-order refusal. The undelivered body-side discharge is
+LANG-PARTIAL-PRIMITIVE-REFINED-EVIDENCE.
 
 ## Objective
 
