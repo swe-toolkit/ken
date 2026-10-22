@@ -1,17 +1,15 @@
 # Rational interval distributivity
 
 Format: `../../README.md`.
-Spec: `spec/50-stdlib/68-numerical.md` §4, as stated by the
-AC-1 candidate `0ad93e3136b779b12d18c5dcff42c31abc873845`.
+Spec: `spec/50-stdlib/68-numerical.md` §4.
 
 These are source-shaped closed behavioral oracles for the four §4
-interval-inclusion laws. The AC-1 spec candidate is routed but not yet
-landed, and the corresponding four catalog theorem exports are absent
-from authoring base `77352e68e1bad7c17c1e7e4751e25c54cc8cc692`. This file therefore
-records intended behavior only: no Ken fence or conformance runner was
-executed. Do not route or land this seed before AC-1 lands. Even after
-that, seed execution requires a verified base with the four exports.
-No CI, publication, landing, or trust measurement is claimed.
+interval-inclusion laws. The four catalog theorem exports are checked,
+and a package-owned test exercises the unchanged positive Ken fence and
+its paired dropped-product refusal. This is package-test execution, not
+official conformance-runner execution, CI, publication or landing. The
+test compares exact trusted-base identities before and after loading the
+interval package; no landed trust measurement is claimed.
 
 Each case has promise class **durable invariant**. The assertions concern
 non-negative rational endpoint values and the public inclusion relation,
@@ -95,23 +93,23 @@ theorem right_factor_law_instance :
 
 ## Refuse the claim that drops one product
 
-- spec: `spec/50-stdlib/68-numerical.md` §4, as stated by the AC-1
-  candidate `0ad93e3136b779b12d18c5dcff42c31abc873845`.
+- spec: `spec/50-stdlib/68-numerical.md` §4.
 - promise class: durable invariant.
 - given: the same `ii`, `jj`, and `kk` as the positive client; the
   proposed containing interval is only `ii*jj`, dropping `ii*kk`.
 - expect: claiming `ii*(jj+kk)` is inside `ii*jj` rejects. The full
   result has upper endpoint `10`, while the retained product's upper
   endpoint is `6`.
-- measured: not run in this seed. The positive client checks both left
-  inclusion directions and directly checks that the dropped-product
-  inclusion is `False`.
+- measured: the package test checks the positive client's four law instances
+  and direct Boolean controls, including the dropped-product inclusion as
+  `False`, before submitting the isolated refused theorem.
 - claimed: a product term cannot be omitted from the distributive sum.
 - gap: this one closed refusal does not establish the generic laws.
 - why: it uses the same distinct-endpoint inputs as the accepting
   controls, and the only changed claim is the RHS with one product
-  omitted. The Architect's AC-2 scratch probe reported K0004 for this
-  false claim; that scratch result is not execution of this seed.
+  omitted. The package test pins the refused theorem to the positive
+  client's same-input `False` observation and checks its own kernel
+  type mismatch; an unrelated false theorem does not satisfy that pin.
 
 ```ken
 -- Reject: the RHS omits ii*kk and ends at 6, below the LHS upper endpoint 10.

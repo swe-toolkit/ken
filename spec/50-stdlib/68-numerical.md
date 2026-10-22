@@ -11,9 +11,11 @@
 > `conformance/stdlib/numerical/seed-interval-inclusion.md` and the targeted
 > package test runs its positive and two refused clients. Exact trusted-base
 > identities are unchanged in the candidate's targeted test; this is not a
-> claim of CI or a landed trust measurement. Section 4 specifies four
-> checked distributivity/factoring inclusions; its catalog exports and
-> conformance seed are not delivered by this spec-only candidate.
+> claim of CI or a landed trust measurement. Section 4's four checked
+> distributivity/factoring inclusions are now catalog exports, and a targeted
+> package test exercises the authored seed's positive and refused clients.
+> Package tests do not establish official conformance-runner execution, CI,
+> publication, landing or a landed trust measurement.
 
 ## 1. Exact intervals over non-negative rationals
 
@@ -564,6 +566,12 @@ endpoint-value boundary, not delivery of §4 catalog exports, seed
 execution, CI, publication, landing, or a landed `trusted_base()`
 measurement. The separate AC-2 seed uses distinct-endpoint
 intervals and a same-input accepting control against a dropped-product
-refusal; this spec-only AC-1 neither authors nor executes that seed.
-The former §1–3 sub-distributivity deferral is settled **here**, not
-by revising any §1–3 operation or law.
+refusal. The checked §4 exports are now in the catalog. A package-owned test
+runs the unchanged seed Ken fences, confirms that the refused claim is the
+paired dropped-product proposition, and measures exact trusted-base identity
+sets before and after package loading. The unchanged RationalInterval census
+row passes the targeted strict-resolution suite with no D0 residuals. These
+are package-test measurements, not official conformance-runner execution,
+CI, publication, landing or a landed trust measurement. The former §1–3
+sub-distributivity deferral is settled **here**, not by revising any §1–3
+operation or law.
