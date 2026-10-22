@@ -770,6 +770,7 @@ fn b2f_process_pair_fixture() -> RuntimeExpr {
                     binders: 3,
                     body: RuntimeExpr::Let {
                         value: Box::new(RuntimeExpr::Effect {
+                            bracket_acquire: None,
                             family: "FS".to_string(),
                             operation: ken_host::HostOpV1::FsReadFile,
                             capability: Some(crate::RuntimeCapabilityUse {
@@ -816,6 +817,7 @@ fn b2f_carried_site_operand_fixture() -> RuntimeExpr {
                                 captures: vec![RuntimeExpr::Var(4)],
                                 params: vec!["path".to_string()],
                                 body: Box::new(RuntimeExpr::Effect {
+                                    bracket_acquire: None,
                                     family: "FS".to_string(),
                                     operation: ken_host::HostOpV1::FsReadFile,
                                     capability: Some(crate::RuntimeCapabilityUse {
@@ -968,6 +970,7 @@ extern "C" fn directory_reply_probe(
 fn directory_reply_fixture() -> RuntimeExpr {
     RuntimeExpr::Let {
         value: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::FsReadDirectory,
             capability: Some(crate::RuntimeCapabilityUse {
@@ -1570,6 +1573,7 @@ const ABI_S6_D5A_KIND_MISMATCH: u64 = 1;
 
 fn abi_s6_mapping_allocate() -> RuntimeExpr {
     RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::MappingAllocate,
         capability: None,
@@ -1759,6 +1763,7 @@ fn abi_s6_mapping_view_sequence(symbols: &crate::NativeProcessSymbols) -> Runtim
     };
     let read = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::MappingReadView,
             capability: None,
@@ -1785,6 +1790,7 @@ fn abi_s6_mapping_view_sequence(symbols: &crate::NativeProcessSymbols) -> Runtim
     };
     let write = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::MappingWriteView,
             capability: None,
@@ -1811,6 +1817,7 @@ fn abi_s6_mapping_view_sequence(symbols: &crate::NativeProcessSymbols) -> Runtim
     };
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::MappingAllocate,
             capability: None,
@@ -1972,12 +1979,14 @@ fn px8_dynamic_read_residual_fixture(symbols: &crate::NativeProcessSymbols) -> R
         message: "dynamic read residual fixture default".to_string(),
     };
     let allocate = || RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::BufferAllocate,
         capability: None,
         args: vec![RuntimeExpr::Value(RuntimeValue::Int((8).into()))],
     };
     let read = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsReadAt,
         capability: None,
@@ -2374,6 +2383,7 @@ fn unsupported_effect_is_distinct_from_backend_failure() {
         name: "unsupported-effect".to_string(),
         checked_core_shape: "diagnostic label only".to_string(),
         ir: RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleRead,
             capability: None,
@@ -2428,6 +2438,7 @@ fn px8_resource_error_projection_fixture(
     };
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -2489,6 +2500,7 @@ fn px9_resource_origin_revoked_projection_fixture(
     };
     let metadata = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::FsHandleMetadata,
             capability: None,
@@ -2522,6 +2534,7 @@ fn px9_resource_origin_revoked_projection_fixture(
     };
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -2542,6 +2555,7 @@ fn px8i_metadata_big_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeEx
         message: "PX8-I metadata result default".to_string(),
     };
     let metadata = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsHandleMetadata,
         capability: None,
@@ -2578,6 +2592,7 @@ fn px8i_metadata_big_fixture(symbols: &crate::NativeProcessSymbols) -> RuntimeEx
     };
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -2608,6 +2623,7 @@ fn px8i_invalid_allocate(
 ) -> RuntimeExpr {
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -2662,12 +2678,14 @@ fn px8n_read_arm_fixture_with_start(
         message: "PX8-N checked read result default".to_string(),
     };
     let allocate = || RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::BufferAllocate,
         capability: None,
         args: vec![RuntimeExpr::Value(RuntimeValue::Int((8).into()))],
     };
     let read = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsReadAt,
         capability: None,
@@ -3072,12 +3090,14 @@ fn px8n_write_arm_fixture_with_start(
         message: "PX8-N checked result default".to_string(),
     };
     let allocate = || RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::BufferAllocate,
         capability: None,
         args: vec![RuntimeExpr::Value(RuntimeValue::Int((8).into()))],
     };
     let write = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsWriteAt,
         capability: None,
@@ -3319,6 +3339,7 @@ fn d7_fs_write_at_carrier_fixture(symbols: &crate::NativeProcessSymbols) -> Runt
         message: "D7 reaching fixture default".to_string(),
     };
     let allocate = || RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::BufferAllocate,
         capability: None,
@@ -3327,6 +3348,7 @@ fn d7_fs_write_at_carrier_fixture(symbols: &crate::NativeProcessSymbols) -> Runt
     // Same operand shape as the established `FsWriteAt` fixture: a span-origin
     // resource distinct from the target buffer.
     let write = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsWriteAt,
         capability: None,
@@ -3739,6 +3761,7 @@ fn buffer_freeze_pair_fixture(
     let int = |n: i64| px8n_failure(symbols, RuntimeExpr::Value(RuntimeValue::Int(n.into())));
     let freeze = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferFreeze,
             capability: None,
@@ -3774,6 +3797,7 @@ fn buffer_freeze_pair_fixture(
     };
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -4448,6 +4472,7 @@ fn fs_open_carried_mode_fixture(mode: RuntimeExpr) -> RuntimeExpr {
                 }),
                 body: Box::new(RuntimeExpr::Let {
                     value: Box::new(RuntimeExpr::Effect {
+                        bracket_acquire: None,
                         family: "FS".to_string(),
                         operation: ken_host::HostOpV1::FsOpen,
                         capability: Some(crate::RuntimeCapabilityUse {
@@ -4484,6 +4509,7 @@ fn capacity_outcome_fixture(
 ) -> RuntimeExpr {
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -5550,6 +5576,7 @@ fn console_outcome_fixture_for_stream(
 ) -> RuntimeExpr {
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleWrite,
             capability: None,
@@ -5718,6 +5745,7 @@ fn an_incomplete_duplicate_discarded_or_misobserved_visit_rejects() {
     let strict_phase_fixture = || {
         let expr = RuntimeExpr::Let {
             value: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Console".to_string(),
                 operation: ken_host::HostOpV1::ConsoleRead,
                 capability: None,
@@ -5883,6 +5911,7 @@ fn a_discarded_visit_refuses_before_its_body_is_defined() {
 #[test]
 fn console_read_rejects_a_response_referent_misclassified_as_a_scalar() {
     let expr = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "Console".to_string(),
         operation: ken_host::HostOpV1::ConsoleRead,
         capability: None,
@@ -5966,6 +5995,7 @@ fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
     // leaves its arm dead in the baseline while the arm is still lowered.
     let dynamic_request = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,
@@ -5998,6 +6028,7 @@ fn dead_arm_pair_program(request_is_constructed: bool) -> RuntimeExpr {
                     constructor: REQUEST.to_string(),
                     binders: 0,
                     body: RuntimeExpr::Effect {
+                        bracket_acquire: None,
                         family: "Clock".to_string(),
                         operation: ken_host::HostOpV1::ClockMonotonicNow,
                         capability: None,

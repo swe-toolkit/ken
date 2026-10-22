@@ -13,6 +13,7 @@ use super::surface::{backend, unsupported, BackendFailure, CraneliftBackendError
 use crate::{RuntimeDeclaration, RuntimeDeclarationKind, RuntimeExpr, RuntimeProgram};
 
 mod static_transition;
+pub(in crate::cranelift_backend) use static_transition::peel_checked_bracket_operation;
 
 #[cfg(feature = "px8-ds-test-support")]
 pub use static_transition::{
@@ -507,7 +508,8 @@ pub(super) fn collect_checked_subcontinuation_frames(
             }
             collect_checked_subcontinuation_frames(body, frames)
         }
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
         | RuntimeExpr::CheckedComputationalIHInvocation { body, .. }
@@ -696,7 +698,8 @@ pub(super) fn collect_checked_oriented_markers(
             }
             collect_checked_oriented_child(body, markers, root, runtime_path, 0)
         }
-        RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedJoinSite { body, .. } => {
             collect_checked_oriented_child(body, markers, root, runtime_path, 0)
         }

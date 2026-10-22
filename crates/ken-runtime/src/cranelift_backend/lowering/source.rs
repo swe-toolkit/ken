@@ -2341,6 +2341,11 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
         // Record this occurrence before dispatch, including delegated forms.
         self.enter_source_occurrence_plan(static_origin)?;
         Ok(match expr {
+            RuntimeExpr::CheckedBracketFinalizer { body, .. } => SourceMachineState::Eval {
+                expr: self.owned_child_occurrence(static_origin, 0, *body)?,
+                env,
+                control,
+            },
             RuntimeExpr::CheckedSubcontinuationFrame { frame_id, body } => {
                 self.enter_checked_subcontinuation_frame(builder, frame_id)?;
                 SourceMachineState::Eval {

@@ -179,6 +179,7 @@ fn selected_host_leaf_free_var_resolves_through_actual_match_and_let_environment
         file_operation_duplicate: unused.clone(),
         resource_mapping_limit: unused.clone(),
         resource_kind_mapping: unused,
+        bracket_finalizer_constructor: None,
         operations,
     };
     let word = |text: &str| RuntimeExpr::Value(RuntimeValue::String(text.into()));

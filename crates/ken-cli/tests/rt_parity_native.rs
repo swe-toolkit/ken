@@ -1195,7 +1195,7 @@ fn checked_ih_continuation_inheritance_derives_read_and_write_independently() {
                     "ImmediateInvocationEnvironment"
                 );
                 assert_eq!(row.ret_case_body_origin + 5, inherited_frame);
-                assert_eq!(row.closure_origin + 10, inherited_frame);
+                assert_eq!(row.closure_origin + 11, inherited_frame);
                 assert_eq!(row.capture_occurrence + 1, row.closure_origin);
                 assert_eq!(row.closure_body_origin + 8, row.closure_origin);
                 assert_eq!(row.body_capture_reads.len(), 1);
@@ -2752,10 +2752,10 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             ].into());
         let destination = census.materializations.iter().find(|point| {
             point.specialization == 1
-                && point.emission_origin == 743
+                && point.emission_origin == 745
                 && point.kind == "CheckedIhTransportDestination"
                 && point.owner == "Specialization(ContinuationSpecializationId(2))"
-        }).expect("Vis743 has one checked-IH transport destination for spec 1");
+        }).expect("Vis745 has one checked-IH transport destination for spec 1");
         assert_eq!(destination.owner_id,
             ken_runtime::PerEmitterOwnerDiagnostic::Specialization(2));
         assert_eq!(destination.captures.len(), 14);
@@ -2765,7 +2765,7 @@ fn checked_ih_direct_application_pairs_one_declared_call_result() {
             assert_eq!(capture.run, if index < 8 { "Worker" } else { "Context" });
             assert_eq!(capture.ordinal, if index < 8 { index as u32 } else { (index - 8) as u32 });
             assert!(capture.result.starts_with("FinalizedTransport("),
-                "Vis743 receives its own finalized W/C transport claim: {capture:?}");
+                "Vis745 receives its own finalized W/C transport claim: {capture:?}");
             assert_eq!(capture.unfinalizable_owner, None,
                 "a finalized transport claim cannot borrow an unfinalizable owner");
         }
@@ -4222,7 +4222,7 @@ fn assert_generated_entry_capsule_mutation_child() {
 // The planner's exact-edge refusal when neither materialization authority
 // selects the performing response owner. This text is not a runtime trap oracle.
 const MATERIALIZATION_SUPPRESSED_RELAY_REFUSAL: &str =
-    "relay: forwarded host op BufferAllocate from source StaticOriginId(1296) has no performing route";
+    "relay: forwarded host op BufferAllocate from source StaticOriginId(1300) has no performing route";
 const EXECUTE_THEN_RESUME_REKEY_CHILD: &str = "KEN_RT_EXECUTE_THEN_RESUME_REKEY_CHILD";
 
 // Build only: suppressing ETR can leave a mixed response-owner plane that

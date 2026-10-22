@@ -2538,7 +2538,8 @@ fn producer_binder_depth(
     let expr = plan.planned_occurrence_expr(origin)?;
     let child = |position| plan.semantic.child_origin(origin, position);
     match expr {
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -2737,7 +2738,8 @@ fn continuation_result_positions(
                 Ok(())
             };
         match expr {
-            RuntimeExpr::CheckedJoinSite { .. }
+            RuntimeExpr::CheckedBracketFinalizer { .. }
+            | RuntimeExpr::CheckedJoinSite { .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedRecursiveInvocation { .. }
             | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -2840,7 +2842,8 @@ pub(super) fn continuation_result_origins(
         let expr = plan.planned_occurrence_expr(origin)?;
         let child = |position| plan.semantic.child_origin(origin, position);
         match expr {
-            RuntimeExpr::CheckedJoinSite { .. }
+            RuntimeExpr::CheckedBracketFinalizer { .. }
+            | RuntimeExpr::CheckedJoinSite { .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedRecursiveInvocation { .. }
             | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -3390,7 +3393,8 @@ fn walk_continuation_value_environment_impl(
         walk_continuation_value_environment_impl(plan, child(position)?, target, environment)
     };
     let result = match expr {
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -3824,7 +3828,8 @@ pub(super) fn required_surrounding_environment_prefix(
     let mut maximum = 0usize;
     let mut include = |required: usize| maximum = maximum.max(required);
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -5633,7 +5638,8 @@ pub(super) fn derive_checked_ih_bindings(
                 out.insert(origin, resolution);
             }
         }
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -7121,7 +7127,8 @@ fn validate_source_return_context(
         let role_matches = match (step.role, expr) {
             (
                 SourceReturnContextRole::CheckedBody,
-                RuntimeExpr::CheckedJoinSite { .. }
+                RuntimeExpr::CheckedBracketFinalizer { .. }
+                | RuntimeExpr::CheckedJoinSite { .. }
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }
                 | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -8539,6 +8546,7 @@ pub(in crate::cranelift_backend)     fn contspec_activation_owned_worker_capture
         let capture = |tag: usize| {
             if tag % 2 == 0 {
                 RuntimeExpr::Effect {
+                    bracket_acquire: None,
                     family: "Console".to_string(),
                     operation: ken_host::HostOpV1::ConsoleRead,
                     capability: None,
@@ -8613,6 +8621,7 @@ pub(in crate::cranelift_backend::planning::static_transition)     fn contspec_mu
     fn contsrc_d2_both_binding_kinds_fixture() -> RuntimeExpr {
         RuntimeExpr::Let {
             value: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Console".to_string(),
                 operation: ken_host::HostOpV1::ConsoleRead,
                 capability: None,

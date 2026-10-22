@@ -73,6 +73,15 @@ use super::{
 #[cfg_attr(not(test), allow(unused_imports))]
 use crate::boundary_value::{BoundaryClass, BoundaryReferentOwner, BoundaryTag};
 use crate::{RuntimeExpr, RuntimeTrap};
+
+// A checked bracket mark annotates the executing constructor; source
+// classifiers must see the same selected operation with or without the mark.
+pub(in crate::cranelift_backend) fn peel_checked_bracket_operation(expr: &RuntimeExpr) -> &RuntimeExpr {
+    match expr {
+        RuntimeExpr::CheckedBracketFinalizer { body, .. } => body,
+        other => other,
+    }
+}
 use abi::AbiPlane;
 #[cfg_attr(not(test), allow(unused_imports))]
 use abi::install_continuation_specialization_abi;
@@ -1544,6 +1553,7 @@ pub(in crate::cranelift_backend) fn governed_nested_resource_bracket_answering(
     let release_scope = closure_scope.bind(BinderRole::RecursiveResult);
     let release = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferFreeze,
             capability: None,
@@ -1598,6 +1608,7 @@ pub(in crate::cranelift_backend) fn governed_nested_resource_bracket_answering(
     };
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,

@@ -830,7 +830,8 @@ impl<'src> Planner<'src> {
                 self.edge(node.entry, successor, exit_kind)?;
                 Ok(node)
             }
-            RuntimeExpr::CheckedJoinSite { body, .. }
+            RuntimeExpr::CheckedBracketFinalizer { body, .. }
+            | RuntimeExpr::CheckedJoinSite { body, .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
             | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
             | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -1692,6 +1693,7 @@ fn validate_causal_context_abi_prefix(
 
 fn runtime_expr_tag(expr: &RuntimeExpr) -> u32 {
     match expr {
+        RuntimeExpr::CheckedBracketFinalizer { .. } => 22,
         RuntimeExpr::CheckedJoinSite { .. } => 0,
         RuntimeExpr::CheckedSubcontinuationFrame { .. } => 1,
         RuntimeExpr::CheckedRecursiveInvocation { .. } => 2,

@@ -18,6 +18,7 @@ use crate::checked_core::{
     LowerabilityStatus, PartialityMetadata, PrimitiveMetadata, RecordSigmaMetadata,
     RecursionMetadata, StableSymbol,
 };
+use crate::compiler_driver::NormalizedBracketRegion;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ErasureError {
@@ -465,7 +466,8 @@ fn runtime_declaration_refs_in_kind(kind: &RuntimeDeclarationKind) -> Vec<String
 
 fn collect_runtime_declaration_refs(expr: &RuntimeExpr, output: &mut BTreeSet<String>) {
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -618,6 +620,8 @@ pub(crate) struct CheckedHostSpineV1 {
     pub resource_mapping_limit: StableSymbol,
     /// ABI-S6 D5a appends the now-native Mapping kind role.
     pub resource_kind_mapping: StableSymbol,
+    /// The checked constructor identity, independent of its host-op mapping.
+    pub bracket_finalizer_constructor: Option<StableSymbol>,
     pub operations: BTreeMap<StableSymbol, ken_host::HostOpV1>,
 }
 
@@ -729,9 +733,26 @@ struct NativeJoinPlanCollector {
 }
 
 #[derive(Clone)]
+struct PendingBracketMark {
+    region: NormalizedBracketRegion,
+    role: ken_runtime::CheckedBracketMarkRole,
+    constructor: StableSymbol,
+    finalizer_path: Vec<usize>,
+}
+
+#[derive(Clone)]
+struct BoundBracketMark {
+    marker: ken_runtime::CheckedBracketRegionMarker,
+    constructor: StableSymbol,
+}
+
+#[derive(Clone)]
 struct NativeLoweringPlanCollector {
     joins: Option<NativeJoinPlanCollector>,
     oriented: OrientedSubcontinuationPlanCollector,
+    bracket_constructor: Option<StableSymbol>,
+    pending_brackets: BTreeMap<(StableSymbol, u32), PendingBracketMark>,
+    consumed_brackets: BTreeMap<(StableSymbol, u32), BoundBracketMark>,
     recursive_invocations: BTreeMap<(StableSymbol, u64), CheckedRecursiveInvocationSeed>,
     consumed_recursive_invocations: BTreeSet<u64>,
     next_recursive_ordinal: BTreeMap<StableSymbol, u64>,
@@ -924,6 +945,9 @@ impl NativeLoweringPlanCollector {
         Self {
             joins: answer_symbols.map(NativeJoinPlanCollector::new),
             oriented: OrientedSubcontinuationPlanCollector::default(),
+            bracket_constructor: None,
+            pending_brackets: BTreeMap::new(),
+            consumed_brackets: BTreeMap::new(),
             recursive_invocations,
             consumed_recursive_invocations: BTreeSet::new(),
             next_recursive_ordinal: BTreeMap::new(),
@@ -937,6 +961,158 @@ impl NativeLoweringPlanCollector {
             pending_computational_ih_slots: Vec::new(),
             pending_computational_ih_calls: Vec::new(),
         }
+    }
+
+    fn with_bracket_regions(
+        mut self,
+        constructor: StableSymbol,
+        regions: Vec<NormalizedBracketRegion>,
+    ) -> Result<Self, ErasureError> {
+        self.bracket_constructor = Some(constructor.clone());
+        let mut region_keys = BTreeSet::new();
+        for region in regions {
+            if region.finalizer_paths.is_empty()
+                || region.finalizer_constructor_node_ids.len() != region.finalizer_paths.len()
+            {
+                return Err(expression_lowering_error(
+                    &region.owner,
+                    "checked_bracket_region_finalizer_count",
+                    "bracket region has no static finalizer Constructor",
+                ));
+            }
+            if !region_keys.insert((region.owner.clone(), region.ok_resource_binder_path.clone())) {
+                return Err(expression_lowering_error(
+                    &region.owner,
+                    "checked_bracket_region_duplicate_source",
+                    "two bracket regions name the same Ok binder",
+                ));
+            }
+            let acquire = PendingBracketMark {
+                region: region.clone(),
+                role: ken_runtime::CheckedBracketMarkRole::Acquire,
+                constructor: region.acquire_constructor.clone(),
+                finalizer_path: region.finalizer_paths[0].clone(),
+            };
+            let key = (region.owner.clone(), region.acquire_constructor_node_id);
+            if self.pending_brackets.insert(key, acquire).is_some() {
+                return Err(expression_lowering_error(
+                    &region.owner,
+                    "checked_bracket_acquire_duplicate",
+                    "two bracket regions name the same checked acquire Constructor node",
+                ));
+            }
+            for (node_id, path) in region
+                .finalizer_constructor_node_ids
+                .iter()
+                .copied()
+                .zip(&region.finalizer_paths)
+            {
+                let key = (region.owner.clone(), node_id);
+                let finalizer = PendingBracketMark {
+                    region: region.clone(),
+                    role: ken_runtime::CheckedBracketMarkRole::Finalizer,
+                    constructor: constructor.clone(),
+                    finalizer_path: path.clone(),
+                };
+                if self.pending_brackets.insert(key, finalizer).is_some() {
+                    return Err(expression_lowering_error(
+                        &region.owner,
+                        "checked_bracket_region_duplicate_source",
+                        "two bracket marks name the same checked Constructor node",
+                    ));
+                }
+            }
+        }
+        Ok(self)
+    }
+
+    fn consume_bracket_constructor(
+        &mut self,
+        owner: &StableSymbol,
+        constructor: &checked_core::CheckedCoreConstructorView,
+    ) -> Result<Option<ken_runtime::CheckedBracketRegionMarker>, ErasureError> {
+        let Some(node_id) = constructor.checked_node_id else {
+            if self.bracket_constructor.as_ref() == Some(&constructor.symbol) {
+                return Err(expression_lowering_error(
+                    owner,
+                    "checked_bracket_marker_missing_node_id",
+                    "private bracket Constructor has no checked preorder node id",
+                ));
+            }
+            return Ok(None);
+        };
+        let key = (owner.clone(), node_id);
+        if let Some(bound) = self.consumed_brackets.get(&key) {
+            let lane = match bound.marker.role {
+                ken_runtime::CheckedBracketMarkRole::Acquire => "checked_bracket_acquire_duplicate",
+                ken_runtime::CheckedBracketMarkRole::Finalizer => "checked_bracket_marker_duplicate",
+            };
+            return Err(expression_lowering_error(
+                owner,
+                lane,
+                format!("checked bracket Constructor node {node_id} was lowered twice"),
+            ));
+        }
+        if let Some(pending) = self.pending_brackets.get(&key) {
+            if constructor.symbol != pending.constructor {
+                let lane = match pending.role {
+                    ken_runtime::CheckedBracketMarkRole::Acquire => {
+                        "checked_bracket_acquire_wrong_constructor"
+                    }
+                    ken_runtime::CheckedBracketMarkRole::Finalizer => {
+                        "checked_bracket_marker_wrong_constructor"
+                    }
+                };
+                return Err(expression_lowering_error(
+                    owner,
+                    lane,
+                    format!("checked bracket node {node_id} has a different checked constructor"),
+                ));
+            }
+            let pending = self.pending_brackets.remove(&key).expect("key was checked");
+            let marker = ken_runtime::CheckedBracketRegionMarker {
+                owner: owner.to_string(),
+                role: pending.role,
+                constructor_node_id: node_id,
+                acquire_vis_path: pending.region.acquire_vis_path,
+                acquire_response_binder_path: pending.region.acquire_response_binder_path,
+                ok_resource_binder_path: pending.region.ok_resource_binder_path,
+                finalizer_path: pending.finalizer_path,
+            };
+            self.consumed_brackets.insert(
+                key,
+                BoundBracketMark { marker: marker.clone(), constructor: pending.constructor },
+            );
+            return Ok(Some(marker));
+        }
+        if self.bracket_constructor.as_ref() == Some(&constructor.symbol) {
+            return Err(expression_lowering_error(
+                owner,
+                "checked_bracket_marker_without_region",
+                format!("private bracket Constructor node {node_id} has no checked region"),
+            ));
+        }
+        Ok(None)
+    }
+
+    fn validate_bracket_regions_bound(&self, root: &StableSymbol) -> Result<(), ErasureError> {
+        if let Some(((owner, node_id), _)) = self.pending_brackets.iter().find(|(_, pending)| {
+            pending.role == ken_runtime::CheckedBracketMarkRole::Acquire
+        }) {
+            return Err(expression_lowering_error(
+                root,
+                "checked_bracket_acquire_without_marker",
+                format!("region {owner} at acquire Constructor node {node_id} has no Runtime mark"),
+            ));
+        }
+        if let Some(((owner, node_id), _)) = self.pending_brackets.iter().next() {
+            return Err(expression_lowering_error(
+                root,
+                "checked_bracket_region_without_marker",
+                format!("region {owner} at finalizer Constructor node {node_id} has no Runtime marker"),
+            ));
+        }
+        Ok(())
     }
 
     fn finish(
@@ -1789,6 +1965,7 @@ pub(crate) fn erase_checked_host_package_for_target_with_join_plan<'a>(
     recursive_invocations: Vec<CheckedRecursiveInvocationSeed>,
     computational_ih_slots: Vec<CheckedComputationalIHSlotSeed>,
     computational_ih_calls: Vec<CheckedComputationalIHCallSeed>,
+    bracket_regions: Vec<NormalizedBracketRegion>,
 ) -> Result<
     (
         RuntimeProgram,
@@ -1798,12 +1975,20 @@ pub(crate) fn erase_checked_host_package_for_target_with_join_plan<'a>(
     ErasureError,
 > {
     let targets: Vec<StableSymbol> = target_closure.into_iter().cloned().collect();
+    let bracket_constructor = spine.bracket_finalizer_constructor.clone().ok_or_else(|| {
+        expression_lowering_error(
+            root,
+            "checked_bracket_constructor_missing",
+            "checked bracket constructor identity is absent",
+        )
+    })?;
     let mut collector = NativeLoweringPlanCollector::new(
         Some(answer_symbols),
         recursive_invocations,
         computational_ih_slots,
         computational_ih_calls,
-    );
+    )
+    .with_bracket_regions(bracket_constructor.clone(), bracket_regions)?;
     let mut program = erase_checked_package_with_host_root(
         package,
         targets,
@@ -1812,6 +1997,8 @@ pub(crate) fn erase_checked_host_package_for_target_with_join_plan<'a>(
         Some(&mut collector),
     )?;
     collector.validate_total_computational_ih_seed_consumption()?;
+    collector.validate_bracket_regions_bound(root)?;
+    let expected_brackets = collector.consumed_brackets.clone();
     let (join_plan, mut oriented_plan) = collector.finish();
     let retained_recursive_calls = oriented_plan
         .recursive_calls
@@ -1827,6 +2014,13 @@ pub(crate) fn erase_checked_host_package_for_target_with_join_plan<'a>(
         remove_unplanned_recursive_invocation_markers(&mut example.ir, &retained_recursive_calls);
     }
     bind_oriented_runtime_marker_locations(root, &program, &mut oriented_plan)?;
+    bind_bracket_runtime_marker_locations(
+        root,
+        &program,
+        &expected_brackets,
+        &bracket_constructor,
+        &spine.operations,
+    )?;
     Ok((program, join_plan, oriented_plan))
 }
 
@@ -1854,7 +2048,8 @@ fn remove_unplanned_recursive_invocation_markers(
     }
 
     match expression {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -1932,8 +2127,23 @@ fn remove_unplanned_recursive_invocation_markers(
     }
 }
 
+enum BracketRuntimeSubject {
+    Construct(String),
+    StaticEffect { family: String, operation: ken_host::HostOpV1 },
+    Other,
+}
+
 #[derive(Default)]
 struct OrientedRuntimeMarkerLocations {
+    brackets: BTreeMap<
+        (String, u32),
+        Vec<(
+            ken_runtime::CheckedBracketRegionMarker,
+            CheckedRuntimeMarkerLocationV1,
+            BracketRuntimeSubject,
+        )>,
+    >,
+    constructors: Vec<String>,
     recursive_calls: BTreeMap<(u64, Vec<u64>), Vec<CheckedRuntimeMarkerLocationV1>>,
     computational_ih_slots: BTreeMap<(u64, Vec<u64>), Vec<CheckedRuntimeMarkerLocationV1>>,
     computational_ih_calls: BTreeMap<(u64, Vec<u64>), Vec<CheckedRuntimeMarkerLocationV1>>,
@@ -2026,6 +2236,151 @@ fn bind_oriented_runtime_marker_locations(
     })
 }
 
+fn bind_bracket_runtime_marker_locations(
+    root: &StableSymbol,
+    program: &RuntimeProgram,
+    expected: &BTreeMap<(StableSymbol, u32), BoundBracketMark>,
+    private_constructor: &StableSymbol,
+    checked_operations: &BTreeMap<StableSymbol, ken_host::HostOpV1>,
+) -> Result<(), ErasureError> {
+    let mut locations = OrientedRuntimeMarkerLocations::default();
+    let private_constructor = private_constructor.to_string();
+    for declaration in &program.declarations {
+        let RuntimeDeclarationKind::Transparent { body } = &declaration.kind else {
+            continue;
+        };
+        collect_oriented_runtime_marker_locations(
+            body,
+            &declaration.symbol,
+            &mut Vec::new(),
+            &mut locations,
+        )?;
+    }
+    let mut region_counts: BTreeMap<(StableSymbol, Vec<usize>), (usize, usize)> = BTreeMap::new();
+    for ((owner, node_id), bound) in expected
+        .iter()
+        .filter(|(_, bound)| bound.marker.role == ken_runtime::CheckedBracketMarkRole::Acquire)
+        .chain(expected.iter().filter(|(_, bound)| {
+            bound.marker.role == ken_runtime::CheckedBracketMarkRole::Finalizer
+        }))
+    {
+        let region_key = (owner.clone(), bound.marker.ok_resource_binder_path.clone());
+        let counts = region_counts.entry(region_key).or_default();
+        let (missing, duplicate, wrong, mismatch) = match bound.marker.role {
+            ken_runtime::CheckedBracketMarkRole::Acquire => {
+                counts.0 += 1;
+                (
+                    "checked_bracket_acquire_without_marker",
+                    "checked_bracket_acquire_duplicate",
+                    "checked_bracket_acquire_wrong_constructor",
+                    "checked_bracket_acquire_mismatch",
+                )
+            }
+            ken_runtime::CheckedBracketMarkRole::Finalizer => {
+                counts.1 += 1;
+                (
+                    "checked_bracket_region_without_marker",
+                    "checked_bracket_marker_duplicate",
+                    "checked_bracket_marker_wrong_constructor",
+                    "checked_bracket_marker_mismatch",
+                )
+            }
+        };
+        let key = (owner.to_string(), *node_id);
+        let found = locations.brackets.remove(&key).ok_or_else(|| {
+            expression_lowering_error(
+                root,
+                missing,
+                format!("bound region {owner} at node {node_id} has no Runtime marker"),
+            )
+        })?;
+        if found.len() != 1 {
+            return Err(expression_lowering_error(
+                root,
+                duplicate,
+                format!("bound region {owner} at node {node_id} has {} Runtime markers", found.len()),
+            ));
+        }
+        let subject_matches = match (&found[0].2, bound.marker.role) {
+            (BracketRuntimeSubject::Construct(actual), _) => {
+                actual == &bound.constructor.to_string()
+            }
+            (BracketRuntimeSubject::StaticEffect { family, operation },
+             ken_runtime::CheckedBracketMarkRole::Acquire) => {
+                let mut family_components = bound.constructor.components.clone();
+                let _ = family_components.pop();
+                let expected_family = StableSymbol::new(
+                    checked_core::SymbolNamespace::Declaration,
+                    family_components,
+                );
+                *family == expected_family.to_string()
+                    && checked_operations.get(&bound.constructor) == Some(operation)
+            }
+            (BracketRuntimeSubject::Other, _)
+            | (BracketRuntimeSubject::StaticEffect { .. },
+               ken_runtime::CheckedBracketMarkRole::Finalizer) => false,
+        };
+        if !subject_matches {
+            return Err(expression_lowering_error(
+                root,
+                wrong,
+                format!(
+                    "Runtime marker for {owner} at node {node_id} does not identify its checked operation"
+                ),
+            ));
+        }
+        if found[0].0 != bound.marker {
+            return Err(expression_lowering_error(
+                root,
+                mismatch,
+                format!("Runtime marker for {owner} at node {node_id} differs from its checked region"),
+            ));
+        }
+    }
+    for ((owner, binder), (acquires, finalizers)) in region_counts {
+        if acquires != 1 || finalizers == 0 {
+            return Err(expression_lowering_error(
+                root,
+                "checked_bracket_region_mark_count",
+                format!(
+                    "region {owner} at Ok binder {binder:?} has {acquires} acquire and {finalizers} finalizer marks"
+                ),
+            ));
+        }
+    }
+    if let Some((_, extra)) = locations.brackets.iter().find(|(_, extras)| {
+        extras[0].0.role == ken_runtime::CheckedBracketMarkRole::Acquire
+    }).or_else(|| locations.brackets.iter().next()) {
+        let lane = match extra[0].0.role {
+            ken_runtime::CheckedBracketMarkRole::Acquire => "checked_bracket_acquire_without_region",
+            ken_runtime::CheckedBracketMarkRole::Finalizer => "checked_bracket_marker_without_region",
+        };
+        return Err(expression_lowering_error(
+            root,
+            lane,
+            "Runtime IR contains a bracket mark with no checked region",
+        ));
+    }
+    let private_count = locations
+        .constructors
+        .iter()
+        .filter(|constructor| *constructor == &private_constructor)
+        .count();
+    let finalizer_count = expected.values().filter(|bound| {
+        bound.marker.role == ken_runtime::CheckedBracketMarkRole::Finalizer
+    }).count();
+    if private_count != finalizer_count {
+        return Err(expression_lowering_error(
+            root,
+            "checked_bracket_marker_without_region",
+            format!(
+                "{private_count} private Constructs exist for {finalizer_count} bound finalizer marks",
+            ),
+        ));
+    }
+    Ok(())
+}
+
 fn collect_oriented_runtime_marker_locations(
     expression: &RuntimeExpr,
     declaration: &str,
@@ -2037,6 +2392,20 @@ fn collect_oriented_runtime_marker_locations(
         runtime_path: runtime_path.clone(),
     };
     match expression {
+        RuntimeExpr::CheckedBracketFinalizer { region, body } => {
+            let subject = match body.as_ref() {
+                RuntimeExpr::Construct { constructor, .. } => {
+                    BracketRuntimeSubject::Construct(constructor.clone())
+                }
+                _ => BracketRuntimeSubject::Other,
+            };
+            locations
+                .brackets
+                .entry((region.owner.clone(), region.constructor_node_id))
+                .or_default()
+                .push(((**region).clone(), location(), subject));
+            collect_oriented_runtime_marker_child(body, declaration, runtime_path, locations, 0)
+        }
         RuntimeExpr::CheckedRecursiveInvocation {
             call_template_id,
             checked_occurrence_path,
@@ -2137,6 +2506,9 @@ fn collect_oriented_runtime_marker_locations(
             )
         }
         RuntimeExpr::PrimitiveCall { args, .. } | RuntimeExpr::Construct { args, .. } => {
+            if let RuntimeExpr::Construct { constructor, .. } = expression {
+                locations.constructors.push(constructor.clone());
+            }
             for (index, argument) in args.iter().enumerate() {
                 collect_oriented_runtime_marker_child(
                     argument,
@@ -2216,8 +2588,16 @@ fn collect_oriented_runtime_marker_locations(
             Ok(())
         }
         RuntimeExpr::Effect {
-            capability, args, ..
+            family, operation, capability, args, bracket_acquire,
         } => {
+            if let Some(region) = bracket_acquire {
+                locations.brackets
+                    .entry((region.owner.clone(), region.constructor_node_id))
+                    .or_default()
+                    .push(((**region).clone(), location(), BracketRuntimeSubject::StaticEffect {
+                        family: family.clone(), operation: *operation,
+                    }));
+            }
             if let Some(capability) = capability {
                 collect_oriented_runtime_marker_child(
                     &capability.value,
@@ -2753,9 +3133,17 @@ fn lower_body_term_with_plans(
                 parent_oriented_frame,
             )?);
         }
-        return Ok(RuntimeExpr::Construct {
+        let constructed = RuntimeExpr::Construct {
             constructor: constructor.symbol.to_string(),
             args,
+        };
+        let marker = native_plans.consume_bracket_constructor(&owner, constructor)?;
+        return Ok(match marker {
+            Some(region) => RuntimeExpr::CheckedBracketFinalizer {
+                region: Box::new(region),
+                body: Box::new(constructed),
+            },
+            None => constructed,
         });
     }
 
@@ -3706,6 +4094,32 @@ fn lower_checked_host_computation(
                     );
                 }
             };
+            // The static HostIO route executes an Effect, not the checked
+            // operation Construct. Bind its checked node once on that Effect;
+            // the generic Construct route uses the same pending map.
+            #[cfg(test)]
+            let skip_static_acquire = OMIT_STATIC_ACQUIRE_MARK.with(std::cell::Cell::get);
+            #[cfg(not(test))]
+            let skip_static_acquire = false;
+            let bracket_acquire = if skip_static_acquire {
+                None
+            } else {
+                native_plans
+                    .as_deref_mut()
+                    .map(|plans| plans.consume_bracket_constructor(&owner, decoded.constructor))
+                    .transpose()?
+                    .flatten()
+                    .map(Box::new)
+            };
+            if let Some(mark) = &bracket_acquire {
+                if mark.role != ken_runtime::CheckedBracketMarkRole::Acquire {
+                    return Err(expression_lowering_error(
+                        root,
+                        "checked_bracket_marker_wrong_route",
+                        "a finalizer checked node reached the static acquire Effect",
+                    ));
+                }
+            }
             let runtime_args = &decoded.args[decoded.constructor.family_parameter_count..];
             let (capability, semantic_args) =
                 if static_host_operation_requires_capability(decoded.operation) {
@@ -3770,6 +4184,7 @@ fn lower_checked_host_computation(
                     operation: decoded.operation,
                     capability,
                     args,
+                    bracket_acquire,
                 }),
                 body: Box::new(continuation_body),
             });
@@ -4118,6 +4533,7 @@ fn lower_runtime_selected_host_operation(
                         operation: host_operation,
                         capability,
                         args,
+                        bracket_acquire: None,
                     }),
                     body: Box::new(shift_runtime_vars(
                         continuation_body.clone(),
@@ -5286,6 +5702,12 @@ fn runtime_int_from_big_int(value: &BigInt) -> RuntimeIntV1 {
 
 fn shift_runtime_vars(expr: RuntimeExpr, by: u32, cutoff: u32) -> RuntimeExpr {
     match expr {
+        RuntimeExpr::CheckedBracketFinalizer { region, body } => {
+            RuntimeExpr::CheckedBracketFinalizer {
+                region,
+                body: Box::new(shift_runtime_vars(*body, by, cutoff)),
+            }
+        }
         RuntimeExpr::CheckedJoinSite { site_id, body } => RuntimeExpr::CheckedJoinSite {
             site_id,
             body: Box::new(shift_runtime_vars(*body, by, cutoff)),
@@ -5447,6 +5869,7 @@ fn shift_runtime_vars(expr: RuntimeExpr, by: u32, cutoff: u32) -> RuntimeExpr {
             operation,
             capability,
             args,
+            bracket_acquire,
         } => RuntimeExpr::Effect {
             family,
             operation,
@@ -5458,6 +5881,7 @@ fn shift_runtime_vars(expr: RuntimeExpr, by: u32, cutoff: u32) -> RuntimeExpr {
                 .into_iter()
                 .map(|arg| shift_runtime_vars(arg, by, cutoff))
                 .collect(),
+            bracket_acquire,
         },
     }
 }
@@ -7492,6 +7916,16 @@ fn effects_for_targets(package: &CheckedCorePackage, targets: &[StableSymbol]) -
 }
 
 #[cfg(test)]
+thread_local! {
+    // AC-5 control: remove only the production static-Effect acquire binding.
+    static OMIT_STATIC_ACQUIRE_MARK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+#[path = "erasure/bracket_marker_tests.rs"]
+mod bracket_marker_tests;
+
+#[cfg(test)]
 #[path = "erasure/selected_host_binder_depth_tests.rs"]
 mod selected_host_binder_depth_tests;
 
@@ -8032,9 +8466,11 @@ mod px7l_tests {
             "ken_d7_1b_marker_gate",
         ) {
             Ok(_) => None,
-            Err(CraneliftBackendError::Unsupported(UnsupportedLowering { construct, reason, .. })) => {
-                Some((construct, reason))
-            }
+            Err(CraneliftBackendError::Unsupported(UnsupportedLowering {
+                construct,
+                reason,
+                ..
+            })) => Some((construct, reason)),
             Err(other) => Some(("BackendFailure", format!("{other:?}"))),
         }
     }
@@ -8395,6 +8831,7 @@ mod px7l_tests {
         argument_count: usize,
     ) -> checked_core::CheckedCoreConstructorView {
         checked_core::CheckedCoreConstructorView {
+            checked_node_id: None,
             symbol: StableSymbol::constructor(family, name),
             family_symbol: family.clone(),
             level_args: Vec::new(),
@@ -8562,6 +8999,7 @@ mod px7l_tests {
             unit: StableSymbol::constructor(&family("Unit"), "MkUnit"),
             bool_false: StableSymbol::constructor(&family("Bool"), "False"),
             bool_true: StableSymbol::constructor(&family("Bool"), "True"),
+            bracket_finalizer_constructor: None,
             operations: BTreeMap::from([(read, ken_host::HostOpV1::FsReadFile)]),
         }
     }
@@ -8959,6 +9397,7 @@ mod d1b_role_b_decoder_alignment {
             io_errors: (0..13)
                 .map(|i| sentinel(&format!("io_error_{i}")))
                 .collect(),
+            bracket_finalizer_constructor: None,
             operations: [(sentinel("operation_zero"), ken_host::HostOpV1::ConsoleRead)]
                 .into_iter()
                 .collect(),

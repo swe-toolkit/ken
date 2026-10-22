@@ -10253,7 +10253,8 @@ fn boundary_result_value_contains_closure(
         let expr = plan.planned_occurrence_expr(origin)?;
         let child = |position| plan.semantic.child_origin(origin, position);
         match expr {
-            RuntimeExpr::CheckedJoinSite { .. }
+            RuntimeExpr::CheckedBracketFinalizer { .. }
+            | RuntimeExpr::CheckedJoinSite { .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedRecursiveInvocation { .. }
             | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -11689,6 +11690,7 @@ mod tests {
         args: Vec<RuntimeExpr>,
     ) -> (StaticTransitionPlan<'static>, StaticOriginId, ContinuationEmissionOwner) {
         let expr = Box::leak(Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation,
             capability: None,
@@ -12971,6 +12973,7 @@ mod tests {
     #[test]
     fn non_inline_host_effect_records_equal_their_actual_emission_owner_set() {
         let expression = super::super::tests::contspec_parameter_match(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::FsReadFile,
             capability: None,
