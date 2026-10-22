@@ -1,13 +1,16 @@
 # Finite directed graphs and dependency order
 
 > **Status: DRAFT v0 (SPEC-GRAPHS-DEPENDENCY-CONTRACT §1;
-> SPEC-GRAPHS-CYCLE-REFUTES-ORDER §2).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-CYCLE-REFUTES-ORDER §2;
+> SPEC-GRAPHS-WALK-COMPOSITION-ORDER §3).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
-> base. Section 2 adds three checked generic laws and this WP authors
-> a §2 conformance seed. Scratch execution of seed blocks is not shipped
-> harness execution or CI. No kernel, trust, or surface-syntax change
-> or revision to §61 §2 is required.
+> base. Section 2 adds three checked generic laws and has an authored
+> §2 conformance seed. Section 3 specifies walk composition and an order
+> law for a walk with a first edge; its catalog exports and seed are not
+> delivered by this spec-only candidate. Scratch execution of earlier seed
+> blocks is not shipped harness execution or CI. No kernel, trust, or
+> surface-syntax change or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -361,3 +364,75 @@ by a shipped harness or CI. Those checks do not establish a measured
 landed `trusted_base()` delta. Reachability, finite enumeration, and §1's
 choice behavior remain unchanged; the deferred graph operations in
 §1.4 remain outside this section.
+
+## 3. Walk composition and order along a walk
+
+The same `Algorithm.Graphs.Dependency` package gains a public operation
+for joining genuine walks. It introduces neither a new graph carrier nor
+an adjacency decision. Its arguments name the start `s`, shared endpoint
+`t`, and final endpoint `u` in path order, followed by the two walks in
+that same order:
+
+```ken
+pub fn walk_append
+  (q : Type) (g : Graph q) (s : q) (t : q) (u : q)
+  (first : Walk q g s t) (second : Walk q g t u) :
+  Walk q g s u
+```
+
+`walk_append` recurses on the **second** walk, which was built by
+appending edges at its destination. If `second` is `WalkHere`, the
+result is `first`. If it is `WalkStep prev end e prefix`, the result
+is `WalkStep q g s prev end e` applied to
+`walk_append q g s t prev first prefix`. In particular, the last
+checked edge of the second walk remains the last checked edge of the
+result; no list of proposed vertices is passed off as edge evidence.
+Right `WalkHere` identity holds by computation, even for an open
+`first : Walk q g s t`:
+`walk_append q g s t t first (WalkHere q g t)` reduces to `first`.
+Left `WalkHere` identity does **not** hold by computation on an open
+second walk. Neither a left-unit law nor an associativity law is part
+of this section's public contract, and no public right-unit theorem
+is added for an equality already supplied by reduction.
+
+A topological order places the start of every walk with a **first
+edge** before its end. The nonempty shape is explicit rather than a
+new predicate: `first` checks `s → next`, and `rest` walks from
+`next` to `t`. The public checked law has exactly this type:
+
+```ken
+pub theorem ordered_walk_forward
+  (q : Type) (d : DecEq q) (g : Graph q)
+  (order : TopoOrder q d g)
+  (s : q) (next : q) (t : q)
+  (first : Equal Bool (edge q g s next) True)
+  (rest : Walk q g next t) :
+  Equal Bool
+    (before q d s t (ordered_vertices q d g order)) True
+```
+
+The order's `all_edges_forward` field puts `s` before `next`;
+transitivity of `before` carries this direction along `rest`. If
+`rest` is `WalkHere`, this is the one-edge case, not a claim that a
+zero-edge walk puts a vertex before itself. The proof reuses §2's
+private `walk_before` as a transport lemma over the projected order
+and its forward-edge field. It does **not** export `walk_before`,
+change §2's `cycle_refutes_order`, require a separate list-coverage or
+uniqueness premise, or add a new equality or graph primitive. Every
+public theorem here must have a checked body without `Axiom`, a
+postulate, or a new `trusted_base()` entry.
+
+The Architect's AC-0 development on base `10b1ec623` checked the
+`walk_append` definition and `ordered_walk_forward` proof with rc 0
+and no `Axiom`. Its closed three-vertex chain clients accepted the
+composed two-edge walk and forward order, while a reversed-order
+claim on the same walk was refused; a false first-edge claim and a
+client import of private `walk_before` were also refused. These are
+scratch checks on the D0 package, not execution of a delivered §3
+catalog export or seed. AC-2 separately authors a three-vertex
+chain seed with two nontrivial walks, the forward-order control, and
+the isolated same-input reversed-order refusal. This spec-only AC-1
+does not claim that seed's execution, CI, publication, landing, or a
+landed trust measurement. Section 1's reachability and finite
+certificates, §2's three laws, and the deferred scope in §1.4 are
+unchanged.
