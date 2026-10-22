@@ -9,7 +9,7 @@ use ken_elaborator::lexer::{Lexer, Token};
 use ken_elaborator::parser::{parse_decls, parse_expr};
 use ken_elaborator::{BinOp, ElabEnv, ElabError, Expr, ObligationKind};
 use ken_kernel::env::Context;
-use ken_kernel::{convert_type, whnf, Term};
+use ken_kernel::{check, convert_type, whnf, Decl, GlobalId, Term};
 
 fn peel_function_body(body: &Term) -> &Term {
     let Term::Lam(_, inner) = body else {
@@ -144,8 +144,63 @@ fn assert_operation_obligations(spelling: &str, case: &str, source: &str, expect
     }
 }
 
+// Promise class: durable checked-certificate invariant (21 §6.3, 22 §2.5).
+// MEASURED: one reported closed PartialPrim obligation, zero new trusted-base
+// entries, exact transparent certificate body, and independent kernel recheck.
+// CLAIMED: the refined divisor's Proj2 discharges the operation-site burden.
+// THE GAP: the bound divisor must be the proof source (not n or an unrelated
+// requires), and neither a skipped hole nor a still-open hole may count as proof.
+fn assert_refined_divisor_certificate(
+    env: &ElabEnv,
+    hole_id: GlobalId,
+    goal_closed: &Term,
+    with_requires: bool,
+    spelling: &str,
+) {
+    assert!(
+        !env.is_open_hole(hole_id),
+        "{spelling}: evidence closes the recorded hole"
+    );
+    let Term::Pi(n_ty, rest) = goal_closed else {
+        panic!("n binder")
+    };
+    let Term::Pi(d_ty, rest) = rest.as_ref() else {
+        panic!("d binder")
+    };
+    let certificate = if with_requires {
+        let Term::Pi(req_ty, _) = rest.as_ref() else {
+            panic!("requires binder")
+        };
+        Term::lam(
+            n_ty.as_ref().clone(),
+            Term::lam(
+                d_ty.as_ref().clone(),
+                Term::lam(req_ty.as_ref().clone(), Term::proj2(Term::var(1))),
+            ),
+        )
+    } else {
+        Term::lam(
+            n_ty.as_ref().clone(),
+            Term::lam(d_ty.as_ref().clone(), Term::proj2(Term::var(0))),
+        )
+    };
+    let Some(Decl::Transparent { body, ty, .. }) = env.env.lookup(hole_id) else {
+        panic!("{spelling}: the obligation is a transparent checked declaration")
+    };
+    assert_eq!(
+        ty, goal_closed,
+        "{spelling}: no weakening of the closed goal"
+    );
+    assert_eq!(
+        body, &certificate,
+        "{spelling}: checked Proj2 divisor certificate"
+    );
+    check(&env.env, &Context::new(), body, ty)
+        .expect("kernel independently rechecks the obligation declaration");
+}
+
 #[test]
-fn refined_divisor_keeps_the_open_operation_hole_without_an_unchecked_hypothesis() {
+fn refined_divisor_discharges_recorded_operation_hole_with_checked_projection() {
     for spelling in ["/", "%"] {
         let mut env = ElabEnv::new().unwrap();
         let before = env.env.trusted_base();
@@ -156,17 +211,26 @@ fn refined_divisor_keeps_the_open_operation_hole_without_an_unchecked_hypothesis
             .elaborate_decl_v1(&source)
             .expect("refined-domain function");
         let [obligation] = result.obligations.as_slice() else {
-            panic!("{spelling}: carrier-only refinement must not discharge division")
+            panic!("{spelling}: exactly one recorded operation-site obligation")
         };
         assert!(matches!(obligation.kind, ObligationKind::PartialPrim));
-        assert!(env.is_open_hole(obligation.hole_id));
+        assert_refined_divisor_certificate(
+            &env,
+            obligation.hole_id,
+            &obligation.goal_closed,
+            false,
+            spelling,
+        );
         let added = env
             .env
             .trusted_base()
             .into_iter()
             .filter(|id| !before.contains(id))
             .collect::<Vec<_>>();
-        assert_eq!(added, [obligation.hole_id]);
+        assert!(
+            added.is_empty(),
+            "{spelling}: discharge adds no trusted postulate"
+        );
         let int = Term::const_(env.globals["Int"], vec![]);
         let Term::Pi(n, rest) = &obligation.goal_closed else {
             panic!("{spelling}: n binder missing")
@@ -189,7 +253,7 @@ fn refined_divisor_keeps_the_open_operation_hole_without_an_unchecked_hypothesis
                     Box::new(d.as_ref().clone()),
                 )),
             ),
-            "{spelling}: no extra unchecked hypothesis may discharge the operation"
+            "{spelling}: the goal stays about the divisor's checked carrier"
         );
     }
 }
@@ -209,13 +273,21 @@ fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
             panic!("{spelling}: an unrelated proof premise must not discharge the divisor")
         };
         assert!(matches!(obligation.kind, ObligationKind::PartialPrim));
+        assert_refined_divisor_certificate(
+            &env,
+            obligation.hole_id,
+            &obligation.goal_closed,
+            true,
+            spelling,
+        );
         assert_eq!(
             env.env
                 .trusted_base()
                 .into_iter()
                 .filter(|id| !before.contains(id))
                 .collect::<Vec<_>>(),
-            [obligation.hole_id]
+            [],
+            "{spelling}: unrelated requires does not increase trust"
         );
         let int = Term::const_(env.globals["Int"], vec![]);
         let Term::Pi(n, rest) = &obligation.goal_closed else {
@@ -261,7 +333,7 @@ fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
 }
 
 #[test]
-fn refined_divisor_caller_owes_introduction_and_callee_keeps_its_hole() {
+fn refined_divisor_caller_owes_introduction_after_callee_discharge() {
     for spelling in ["/", "%"] {
         let mut env = ElabEnv::new().unwrap();
         let before = env.env.trusted_base();
@@ -274,16 +346,9 @@ fn refined_divisor_caller_owes_introduction_and_callee_keeps_its_hole() {
             panic!("{spelling}: f must retain its operation-site side condition")
         };
         assert!(matches!(hole.kind, ObligationKind::PartialPrim));
-        assert!(env.is_open_hole(hole.hole_id));
+        assert_refined_divisor_certificate(&env, hole.hole_id, &hole.goal_closed, false, spelling);
         let after_f = env.env.trusted_base();
-        assert_eq!(
-            after_f
-                .iter()
-                .filter(|id| !before.contains(id))
-                .copied()
-                .collect::<Vec<_>>(),
-            [hole.hole_id]
-        );
+        assert_eq!(after_f, before, "{spelling}: the callee does not add trust");
         let g = env
             .elaborate_decl_v1("fn g (u : Int) : Int = f 1 0")
             .expect("a zero argument emits a caller refinement obligation");
@@ -295,10 +360,7 @@ fn refined_divisor_caller_owes_introduction_and_callee_keeps_its_hole() {
             ObligationKind::RefinementIntroduction
         ));
         assert!(env.is_open_hole(introduction.hole_id));
-        assert!(
-            env.is_open_hole(hole.hole_id),
-            "the callee's divisor hole remains open"
-        );
+        assert_refined_divisor_certificate(&env, hole.hole_id, &hole.goal_closed, false, spelling);
         let Term::Pi(u, caller_goal) = &introduction.goal_closed else {
             panic!("{spelling}: caller goal must close over u")
         };
@@ -326,6 +388,92 @@ fn refined_divisor_caller_owes_introduction_and_callee_keeps_its_hole() {
             [introduction.hole_id],
             "only the caller's argument introduction adds a trusted-base hole"
         );
+    }
+}
+
+// Promise class: durable negative control for checked-evidence selection.
+// MEASURED: the operation still reports one open PartialPrim hole and exactly
+// that hole enters trusted_base for every wrong/irrelevant proposition.
+// CLAIMED: only a certificate of the divisor's nonzero predicate discharges.
+// THE GAP: each row has a live Proj2 or another plausible proof in Γ, so a
+// shape-only projection search would incorrectly close the obligation.
+#[test]
+fn unrelated_refinements_cannot_discharge_divisor_side_condition() {
+    for spelling in ["/", "%"] {
+        for (case, source) in [
+            (
+                "trivial subset",
+                format!("fn f (n : Int) (d : {{z : Int | Top}}) : Int = n {spelling} d"),
+            ),
+            (
+                "different exclusion",
+                format!(
+                    "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 1)}}) : Int = n {spelling} d"
+                ),
+            ),
+            (
+                "refined numerator only",
+                format!(
+                    "fn f (n : {{z : Int | Not (Equal Int z 0)}}) (d : Int) : Int = n {spelling} d"
+                ),
+            ),
+        ] {
+            assert_operation_obligations(spelling, case, &source, 1);
+        }
+    }
+}
+
+// Promise class: durable invariant, not a status-string proxy. The branch and
+// let rows retain one recorded closed obligation, and their checked obligation
+// declarations pass an independent kernel recheck with zero trust growth.
+#[test]
+fn refined_divisor_certificate_survives_checked_branch_and_let() {
+    for spelling in ["/", "%"] {
+        for (case, source) in [
+            (
+                "branch",
+                format!(
+                    "fn f (b : Bool) (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = \
+                     if b then n {spelling} d else 0"
+                ),
+            ),
+            (
+                "let alias",
+                format!(
+                    "fn f (n : Int) (d : {{z : Int | Not (Equal Int z 0)}}) : Int = \
+                     let e = d in n {spelling} e"
+                ),
+            ),
+            (
+                "refined second operand named n",
+                format!(
+                    "fn f (n : {{z : Int | Not (Equal Int z 0)}}) (d : Int) : Int = d {spelling} n"
+                ),
+            ),
+        ] {
+            let mut env = ElabEnv::new().expect("numeric prelude");
+            let before = env.env.trusted_base();
+            let result = env
+                .elaborate_decl_v1(&source)
+                .unwrap_or_else(|error| panic!("{spelling} {case}: {error:?}"));
+            let [obligation] = result.obligations.as_slice() else {
+                panic!("{spelling} {case}: one recorded operation-site burden")
+            };
+            assert!(matches!(obligation.kind, ObligationKind::PartialPrim));
+            assert!(!env.is_open_hole(obligation.hole_id));
+            assert_eq!(
+                env.env.trusted_base(),
+                before,
+                "{spelling} {case}: no added trust"
+            );
+            let Some(Decl::Transparent { body, ty, .. }) = env.env.lookup(obligation.hole_id)
+            else {
+                panic!("{spelling} {case}: closed obligation declaration")
+            };
+            assert_eq!(ty, &obligation.goal_closed);
+            check(&env.env, &Context::new(), body, ty)
+                .unwrap_or_else(|error| panic!("{spelling} {case}: {error:?}"));
+        }
     }
 }
 
