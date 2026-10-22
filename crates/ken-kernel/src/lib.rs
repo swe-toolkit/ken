@@ -68,11 +68,11 @@ mod obs_eq_termination_congruence;
 
 // --- re-exports (the provisional internal entry points; stable API is K-api) ---
 pub use check::{
-    admit_pending, check, declare_deceq_certificate, declare_def, declare_inductive,
-    declare_inductive_try, declare_postulate, declare_primitive, declare_recursive_group, env_mark,
-    infer, raw_well_formed, recorded_eq_endpoints, rollback_pending, rollback_to_mark,
-    stage_placeholders, CtorSpec,
-    EnvMark, InductiveSpec, PendingAdmission,
+    admit_pending, admit_pending_with_companions, check, declare_deceq_certificate, declare_def,
+    declare_inductive, declare_inductive_try, declare_postulate, declare_primitive,
+    declare_recursive_group, env_mark, infer, raw_well_formed, recorded_eq_endpoints,
+    rollback_pending, rollback_to_mark, stage_placeholders, CompanionRefusal, CtorSpec, EnvMark,
+    InductiveSpec, PendingAdmission,
 };
 pub use conv::{convert, convert_type, level_eq, normalize, whnf};
 pub use env::{

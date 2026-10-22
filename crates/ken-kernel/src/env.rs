@@ -1001,6 +1001,14 @@ impl GlobalEnv {
         }
     }
 
+    /// Replace this environment with a checked clone of it, keeping this
+    /// environment's transaction ownership. Internal to the kernel: only a
+    /// companion admission that succeeded on `view` commits it.
+    pub(crate) fn commit_checked_view(&mut self, mut view: GlobalEnv) {
+        std::mem::swap(&mut view.instance, &mut self.instance);
+        *self = view;
+    }
+
     /// Install a checked body after [`crate::check::admit_bodies`] has checked
     /// the whole group and its escape paths. Internal to the kernel; external
     /// callers must use the checked admission entry point.
