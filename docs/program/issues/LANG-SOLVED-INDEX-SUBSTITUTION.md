@@ -181,7 +181,8 @@ Architect's route ruling on it (Steward scope `evt_5asyh12k755v`):
 §1a: the variable-side leaf elimination chain is at 7 (Architect
 `evt_6gq7rm62sy7qf`, `evt_20k6hnw9evhy5`, `evt_4f8gr0yddtjzk`,
 `evt_7ex6qpqscy58q`, `evt_7ge5kbggd1n1m`, `evt_68jp7ct8055x3`,
-`evt_72kqj0sjczgpf`). The next trigger is 9.
+`evt_72kqj0sjczgpf`, `evt_3hry844t543x0`). It is at 8. The next advancing
+stop, 9, holds the WP for Research and the §1b question.
 
 **§1b answer (`evt_68jp7ct8055x3`): entries 2, 4, 5 and 6 share one
 predicate.** R1's selector and restoration are indexed by syntactic units
@@ -244,3 +245,11 @@ carry it as a binder. The closure must address `e`'s representation.
    the planner abandons its plan and abstracts the folded goal into an
    ill-typed motive. Keyed on the compiled method shape of a δι-exposed
    callee (`evt_72kqj0sjczgpf`, which supersedes `evt_6b47hx56q9mtq`).
+8. The retained-first regime state (the retained Result, its error and
+   the final regime match) was resident in the recursive
+   `check_dependent_branch_body` frame. Keyed on frame residency at
+   opt-level 0: +2 KiB per held level overflowed row M's stated 3,072
+   KiB. Ruled (`evt_3hry844t543x0`): an outlined
+   `check_dependent_branch_regimes` helper with a `method_regime` field,
+   with identical semantics. The AC-3 mutants are re-spelled on the
+   helper.

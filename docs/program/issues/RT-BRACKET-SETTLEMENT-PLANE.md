@@ -12,11 +12,19 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. Retained work to be REBASED ONTO THE ACCEPTED PRODUCER rather than rebuilt: the raw-response-occurrence partition ahead of the ordinary demand classifier, and the explicit response-context key that replaced the earlier first-match-only design. Both are preserved at evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee, which is EVIDENCE, NEVER A CANDIDATE."
 ---
 
-> # STARTABLE. Child 2a is accepted as a held input at `370168a48`.
-> #
-> # **This child does NOT land on its own.** It produces a reviewed checkpoint
-> # that child 3 assembles. No QA handoff as a candidate, no publication, no
-> # partial landing.
+> **Recut 2026-10-22 (`evt_1gxk3pcr6rgw2`; operator 2026-10-22, "keep
+> separate").** This is link 3 of the bottom-up chain and lands alone, as
+> a fresh candidate on `main` after link 2 (`b6adca031`). The accepted
+> held input `09d607a10` (Architect `evt_7q0vfz6dfj9h3`), built on 2a's
+> held tip `c18c8db68`, is a reference only: never moved, rebased or
+> landed. Where a settled input below names `370168a48` or `c18c8db68` as
+> the base, re-measure it on `main`.
+>
+> **Base and unit (Architect D0 first).** The candidate is the net delta
+> `c18c8db68..09d607a10` (7 commits, 17 files, +1301/-156) applied fresh
+> on `b6adca031`. The Architect rules the unit and any expectation
+> corrections the port needs before the build, as for link 2
+> (`evt_1m5yxewmk3xhw`).
 
 ## 1. What is settled. Do not re-derive.
 

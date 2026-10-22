@@ -1,7 +1,7 @@
 ---
 id: LANG-INFER-IF-SPLIT-DEMAND-ROUTE
 title: "A call-site requires call or subset introduction inside an if elaborated in infer mode fails with the internal retry signal RefinementSplitDemand (E0082), because convoyable_frame treats every If frame as convoyable while infer_if has no route to answer the demand. LANG-CLOSE-GOAL-PATH-CONDITIONS extended the pre-existing subset gap to the requires route. Answer or decline the demand so these programs elaborate again"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
