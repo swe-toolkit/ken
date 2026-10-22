@@ -330,7 +330,8 @@ impl StaticTransitionPlan<'_> {
                 | RuntimeExpr::LexicalClosure { .. }
                 | RuntimeExpr::Record { .. } => return Ok(None),
                 RuntimeExpr::Trap(_) => {}
-                RuntimeExpr::CheckedJoinSite { .. }
+                RuntimeExpr::CheckedBracketFinalizer { .. }
+                | RuntimeExpr::CheckedJoinSite { .. }
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }
                 | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -363,7 +364,8 @@ impl StaticTransitionPlan<'_> {
             }
             let child = |position| self.child_static_origin(origin, position);
             match self.source_occurrence(origin)? {
-                RuntimeExpr::CheckedJoinSite { .. }
+                RuntimeExpr::CheckedBracketFinalizer { .. }
+                | RuntimeExpr::CheckedJoinSite { .. }
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }
                 | RuntimeExpr::CheckedComputationalIHSlots { .. }

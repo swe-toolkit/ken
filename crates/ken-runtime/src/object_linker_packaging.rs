@@ -4354,6 +4354,7 @@ mod tests {
         };
         let stale_use = RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "FS".to_string(),
                 operation: ken_host::HostOpV1::FsHandleMetadata,
                 capability: None,
@@ -4378,6 +4379,7 @@ mod tests {
         };
         let release = RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Resource".to_string(),
                 operation: ken_host::HostOpV1::ResourceRelease,
                 capability: None,
@@ -4402,6 +4404,7 @@ mod tests {
         };
         let metadata = RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "FS".to_string(),
                 operation: ken_host::HostOpV1::FsHandleMetadata,
                 capability: None,
@@ -4426,6 +4429,7 @@ mod tests {
         };
         let entry = RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "FS".to_string(),
                 operation: ken_host::HostOpV1::FsOpen,
                 capability: Some(crate::RuntimeCapabilityUse {

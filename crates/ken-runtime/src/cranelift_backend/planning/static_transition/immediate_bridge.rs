@@ -1067,6 +1067,7 @@ mod tests {
                 binders: 0,
                 body: RuntimeExpr::Let {
                     value: Box::new(RuntimeExpr::Effect {
+                        bracket_acquire: None,
                         family: "eff:fixture::Console".to_string(),
                         operation: ken_host::HostOpV1::ConsoleRead,
                         capability: None,

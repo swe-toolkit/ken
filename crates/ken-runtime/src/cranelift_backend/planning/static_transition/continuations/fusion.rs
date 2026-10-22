@@ -1769,7 +1769,8 @@ pub(in crate::cranelift_backend::planning::static_transition) fn fusion_through_
 ) -> Result<StaticOriginId, CraneliftBackendError> {
     loop {
         match plan.planned_occurrence_expr(origin)? {
-            RuntimeExpr::CheckedSubcontinuationFrame { .. }
+            RuntimeExpr::CheckedBracketFinalizer { .. }
+            | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedComputationalIHSlots { .. }
             | RuntimeExpr::CheckedComputationalIHInvocation { .. }
             | RuntimeExpr::CheckedRecursiveInvocation { .. }
@@ -2784,7 +2785,8 @@ mod tests {
     ) -> Result<StaticOriginId, CraneliftBackendError> {
         loop {
             match plan.planned_occurrence_expr(origin)? {
-                RuntimeExpr::CheckedSubcontinuationFrame { .. }
+                RuntimeExpr::CheckedBracketFinalizer { .. }
+                | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedComputationalIHSlots { .. }
                 | RuntimeExpr::CheckedComputationalIHInvocation { .. }
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }

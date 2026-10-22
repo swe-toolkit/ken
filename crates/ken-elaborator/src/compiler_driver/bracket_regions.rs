@@ -21,7 +21,13 @@ pub struct NormalizedBracketRegion {
     pub acquire_vis_path: Vec<usize>,
     pub acquire_response_binder_path: Vec<usize>,
     pub ok_resource_binder_path: Vec<usize>,
+    /// The checked selected-operation constructor under the acquire Vis's InL.
+    pub acquire_constructor: StableSymbol,
+    pub acquire_constructor_node_id: u32,
     pub finalizer_paths: Vec<Vec<usize>>,
+    /// Preorder ids of the constructor heads, not the enclosing App spines.
+    /// Numbered by the same traversal as the checked Ω-erasure plan.
+    pub finalizer_constructor_node_ids: Vec<u32>,
 }
 
 struct Binder<'a> {
@@ -33,17 +39,20 @@ struct Acquire<'a> {
     vis_path: Vec<usize>,
     response_binder_path: Vec<usize>,
     response_ty: &'a Term,
+    constructor_id: GlobalId,
 }
 
 struct OkArm {
     resource_binder_path: Vec<usize>,
     acquire_vis_path: Vec<usize>,
     acquire_response_binder_path: Vec<usize>,
+    acquire_constructor_id: GlobalId,
 }
 
 struct Collector<'a> {
     owner: &'a StableSymbol,
     prelude: &'a PreludeEnv,
+    symbols: &'a BTreeMap<GlobalId, StableSymbol>,
     resource_id: GlobalId,
     ok_method: usize,
     regions: BTreeMap<Vec<usize>, NormalizedBracketRegion>,
@@ -130,6 +139,7 @@ impl<'a> Collector<'a> {
             vis_path: path.to_vec(),
             response_binder_path,
             response_ty,
+            constructor_id: op,
         }))
     }
 
@@ -183,6 +193,7 @@ impl<'a> Collector<'a> {
             resource_binder_path,
             acquire_vis_path: acquire.vis_path.clone(),
             acquire_response_binder_path: acquire.response_binder_path.clone(),
+            acquire_constructor_id: acquire.constructor_id,
         }))
     }
 
@@ -192,12 +203,22 @@ impl<'a> Collector<'a> {
         path: &[usize],
         binders: &[Binder<'_>],
         ok_arms: &[OkArm],
+        extends_parent_application: bool,
     ) -> Result<(), CompilerDriverError> {
+        // Visit only the maximal application spine. Walking every App's
+        // function child would misread the same complete finalizer as an
+        // under-applied prefix with 2, 1, then 0 operands.
+        if extends_parent_application {
+            return Ok(());
+        }
         let Some((head, args)) = constructor_head(term) else {
             return Ok(());
         };
-        if head != self.prelude.private_bracket_release_id || args.len() != 3 {
+        if head != self.prelude.private_bracket_release_id {
             return Ok(());
+        }
+        if args.len() != 3 {
+            return Err(self.invalid(path, "private bracket finalizer has wrong arity"));
         }
         let Term::Var(index) = args[2] else {
             return Err(self.invalid(path, "finalizer operand is not an Ok resource variable"));
@@ -219,6 +240,9 @@ impl<'a> Collector<'a> {
         // A lexical binder path identifies exactly one Ok arm in this term.
         // It is not a count, constructor identity, enclosing declaration or
         // HostOpV1 key; the key would also group copied finalizer leaves.
+        let acquire_constructor = self.symbols.get(&ok.acquire_constructor_id).ok_or_else(|| {
+            self.invalid(path, "acquire constructor lacks a checked stable symbol")
+        })?;
         let region = self
             .regions
             .entry(ok.resource_binder_path.clone())
@@ -227,8 +251,16 @@ impl<'a> Collector<'a> {
                 acquire_vis_path: ok.acquire_vis_path.clone(),
                 acquire_response_binder_path: ok.acquire_response_binder_path.clone(),
                 ok_resource_binder_path: ok.resource_binder_path.clone(),
+                acquire_constructor: acquire_constructor.clone(),
+                acquire_constructor_node_id: 0, // Set by the shared checked preorder traversal.
                 finalizer_paths: Vec::new(),
+                finalizer_constructor_node_ids: Vec::new(),
             });
+        if region.acquire_constructor != *acquire_constructor
+            || region.acquire_vis_path != ok.acquire_vis_path
+        {
+            return Err(self.invalid(path, "one Ok binder names two acquire constructors"));
+        }
         region.finalizer_paths.push(path.to_vec());
         Ok(())
     }
@@ -240,13 +272,14 @@ impl<'a> Collector<'a> {
         binders: &mut Vec<Binder<'t>>,
         acquires: &mut Vec<Acquire<'t>>,
         ok_arms: &mut Vec<OkArm>,
+        extends_parent_application: bool,
     ) -> Result<(), CompilerDriverError> {
         let acquire = self.acquire(term, path)?;
         let pushed_acquire = acquire.is_some();
         if let Some(acquire) = acquire {
             acquires.push(acquire);
         }
-        self.finalizer(term, path, binders, ok_arms)?;
+        self.finalizer(term, path, binders, ok_arms, extends_parent_application)?;
         for (index, child) in term.children().into_iter().enumerate() {
             let binder_ty = match term {
                 Term::Pi(ty, _) | Term::Lam(ty, _) | Term::Sigma(ty, _) if index == 1 => {
@@ -267,7 +300,14 @@ impl<'a> Collector<'a> {
                 });
             }
             path.push(index);
-            self.visit(child, path, binders, acquires, ok_arms)?;
+            self.visit(
+                child,
+                path,
+                binders,
+                acquires,
+                ok_arms,
+                index == 0 && matches!(term, Term::App(_, _)),
+            )?;
             path.pop();
             if binder_ty.is_some() {
                 binders.pop();
@@ -283,16 +323,35 @@ impl<'a> Collector<'a> {
     }
 }
 
+// Locate the already-authenticated selected operation in Term::children order.
+// The target is a borrowed node of this same normalized body, not a matching
+// constructor elsewhere in the declaration.
+fn path_to_descendant(term: &Term, target: &Term, path: &mut Vec<usize>) -> bool {
+    if std::ptr::eq(term, target) {
+        return true;
+    }
+    for (index, child) in term.children().into_iter().enumerate() {
+        path.push(index);
+        if path_to_descendant(child, target, path) {
+            return true;
+        }
+        path.pop();
+    }
+    false
+}
+
 pub(super) fn collect_normalized_bracket_regions(
     owner: &StableSymbol,
     term: &Term,
     prelude: &PreludeEnv,
+    symbols: &BTreeMap<GlobalId, StableSymbol>,
     resource_id: GlobalId,
     ok_method: usize,
 ) -> Result<Vec<NormalizedBracketRegion>, CompilerDriverError> {
     let mut collector = Collector {
         owner,
         prelude,
+        symbols,
         resource_id,
         ok_method,
         regions: BTreeMap::new(),
@@ -303,7 +362,80 @@ pub(super) fn collect_normalized_bracket_regions(
         &mut Vec::new(),
         &mut Vec::new(),
         &mut Vec::new(),
+        false,
     )?;
+    for region in collector.regions.values_mut() {
+        let mut acquire_vis = term;
+        for &step in &region.acquire_vis_path {
+            acquire_vis = acquire_vis.children().get(step).copied().ok_or_else(|| {
+                CompilerDriverError::InvalidBracketRegion {
+                    symbol: owner.clone(),
+                    path: region.acquire_vis_path.clone(),
+                    reason: "acquire Vis path no longer names a checked term",
+                }
+            })?;
+        }
+        let (_, vis_args) = term_application_spine_exact(acquire_vis);
+        let (_, injection) = term_application_spine_exact(vis_args[3]);
+        let (head, _) = term_application_spine_exact(injection[2]);
+        let mut acquire_path = region.acquire_vis_path.clone();
+        if !path_to_descendant(acquire_vis, head, &mut acquire_path)
+            || !matches!(
+                head,
+                Term::Constructor { id, .. } if symbols.get(id) == Some(&region.acquire_constructor)
+            )
+        {
+            return Err(CompilerDriverError::InvalidBracketRegion {
+                symbol: owner.clone(),
+                path: acquire_path,
+                reason: "acquire selected operation does not name its checked constructor",
+            });
+        }
+        region.acquire_constructor_node_id =
+            crate::omega_erasure::checked_body_preorder_id_at_path(term, &acquire_path)
+                .ok()
+                .flatten()
+                .ok_or_else(|| CompilerDriverError::InvalidBracketRegion {
+                    symbol: owner.clone(),
+                    path: acquire_path,
+                    reason: "acquire constructor has no checked preorder id",
+                })?;
+        for finalizer_path in &region.finalizer_paths {
+            let mut constructor_path = finalizer_path.clone();
+            let mut node = term;
+            for &step in finalizer_path {
+                node = node.children().get(step).copied().ok_or_else(|| {
+                    CompilerDriverError::InvalidBracketRegion {
+                        symbol: owner.clone(),
+                        path: finalizer_path.clone(),
+                        reason: "finalizer path no longer names a checked term",
+                    }
+                })?;
+            }
+            while let Term::App(function, _) = node {
+                constructor_path.push(0);
+                node = function;
+            }
+            if !matches!(node, Term::Constructor { id, .. } if *id == prelude.private_bracket_release_id)
+            {
+                return Err(CompilerDriverError::InvalidBracketRegion {
+                    symbol: owner.clone(),
+                    path: finalizer_path.clone(),
+                    reason: "finalizer spine does not end at the private constructor",
+                });
+            }
+            let node_id =
+                crate::omega_erasure::checked_body_preorder_id_at_path(term, &constructor_path)
+                    .ok()
+                    .flatten()
+                    .ok_or_else(|| CompilerDriverError::InvalidBracketRegion {
+                        symbol: owner.clone(),
+                        path: constructor_path,
+                        reason: "finalizer constructor has no checked preorder id",
+                    })?;
+            region.finalizer_constructor_node_ids.push(node_id);
+        }
+    }
     Ok(collector.regions.into_values().collect())
 }
 
@@ -383,15 +515,68 @@ mod tests {
             crate::checked_core::SymbolNamespace::Declaration,
             vec!["synthetic-collector".to_string()],
         );
-        let grouped =
-            collect_normalized_bracket_regions(&owner, &tree, &prelude, prelude.resource_id, 1)
-                .expect("both leaves have one Ok binder");
+        let symbols = BTreeMap::from([(
+            prelude.private_fs_open_id,
+            StableSymbol::constructor(
+                &StableSymbol::declaration("synthetic-collector", &[], "FSOp"),
+                "PrivateFsOpen",
+            ),
+        )]);
+        let grouped = collect_normalized_bracket_regions(
+            &owner,
+            &tree,
+            &prelude,
+            &symbols,
+            prelude.resource_id,
+            1,
+        )
+        .expect("both leaves have one Ok binder");
         assert_eq!(grouped.len(), 1);
         assert_eq!(grouped[0].finalizer_paths.len(), 2);
         prelude.private_bracket_release_id = GlobalId(111);
-        let absent =
-            collect_normalized_bracket_regions(&owner, &tree, &prelude, prelude.resource_id, 1)
-                .expect("omitting the constructor yields no region");
+        let absent = collect_normalized_bracket_regions(
+            &owner,
+            &tree,
+            &prelude,
+            &symbols,
+            prelude.resource_id,
+            1,
+        )
+        .expect("omitting the constructor yields no region");
         assert!(absent.is_empty());
+    }
+
+    /// Promise class: durable arity guard on the maximal private application
+    /// spine. Previously a two-argument private finalizer was silently skipped
+    /// as zero regions; now it refuses on the checked normalized plane.
+    #[test]
+    fn underapplied_private_finalizer_refuses_instead_of_becoming_no_region() {
+        let mut prelude = empty_prelude_env();
+        prelude.private_bracket_release_id = GlobalId(106);
+        let owner = StableSymbol::declaration("synthetic-bracket-arity", &[], "main");
+        let two_args = app(
+            Term::constructor(prelude.private_bracket_release_id, vec![]),
+            [
+                Term::ty(ken_kernel::Level::Zero),
+                Term::ty(ken_kernel::Level::Zero),
+            ],
+        );
+        let error = collect_normalized_bracket_regions(
+            &owner,
+            &two_args,
+            &prelude,
+            &BTreeMap::new(),
+            prelude.resource_id,
+            1,
+        )
+        .expect_err("private finalizer with two operands is not a valid region");
+        assert_eq!(error.code(), ken_diagnostic::Code::new("E0084"));
+        assert!(matches!(
+            error,
+            CompilerDriverError::InvalidBracketRegion {
+                reason: "private bracket finalizer has wrong arity",
+                ..
+            }
+        ));
     }
 }

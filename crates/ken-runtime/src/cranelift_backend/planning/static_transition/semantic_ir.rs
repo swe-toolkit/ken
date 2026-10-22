@@ -456,11 +456,13 @@ pub(super) enum RuntimeExprShape {
     Call,
     Effect,
     Trap,
+    CheckedBracketFinalizer,
 }
 
 impl RuntimeExprShape {
     fn of(expr: &RuntimeExpr) -> Self {
         match expr {
+            RuntimeExpr::CheckedBracketFinalizer { .. } => Self::CheckedBracketFinalizer,
             RuntimeExpr::CheckedJoinSite { .. } => Self::CheckedJoinSite,
             RuntimeExpr::CheckedSubcontinuationFrame { .. } => Self::CheckedSubcontinuationFrame,
             RuntimeExpr::CheckedRecursiveInvocation { .. } => Self::CheckedRecursiveInvocation,
@@ -567,7 +569,8 @@ impl SemanticSourceSeed {
             capture_slots: match expr {
                 RuntimeExpr::Closure { captures, .. } => checked_len(captures.len())?,
                 RuntimeExpr::LexicalClosure { captures, .. } => checked_len(captures.len())?,
-                RuntimeExpr::CheckedJoinSite { .. }
+                RuntimeExpr::CheckedBracketFinalizer { .. }
+                | RuntimeExpr::CheckedJoinSite { .. }
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }
                 | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -1618,7 +1621,8 @@ fn opcode_for_source(source: SemanticSourceKind) -> SemanticOpcode {
             | RuntimeExprShape::Var
             | RuntimeExprShape::DeclarationRef
             | RuntimeExprShape::ImportedDeclarationRef => SemanticOpcode::EvaluateExpression,
-            RuntimeExprShape::CheckedJoinSite
+            RuntimeExprShape::CheckedBracketFinalizer
+            | RuntimeExprShape::CheckedJoinSite
             | RuntimeExprShape::CheckedSubcontinuationFrame
             | RuntimeExprShape::CheckedComputationalIHSlots
             | RuntimeExprShape::Let
@@ -3033,6 +3037,7 @@ fn emit_expression_atoms(
     arena: &mut SemanticMaterialArena,
 ) -> Result<(), CraneliftBackendError> {
     match expr {
+        RuntimeExpr::CheckedBracketFinalizer { .. } => {}
         RuntimeExpr::CheckedJoinSite { site_id, .. } => {
             arena.push_numeric(SemanticAtomKind::CheckedSiteId, *site_id)?;
         }
@@ -3361,6 +3366,7 @@ fn checked_u32(value: usize) -> Result<u32, CraneliftBackendError> {
 fn source_material_elements(expr: &RuntimeExpr) -> Result<u32, CraneliftBackendError> {
     let mut total = 0usize;
     match expr {
+        RuntimeExpr::CheckedBracketFinalizer { .. } => add_material(&mut total, 1)?,
         RuntimeExpr::CheckedJoinSite { .. } | RuntimeExpr::CheckedSubcontinuationFrame { .. } => {
             add_material(&mut total, 2)?
         }

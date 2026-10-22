@@ -391,7 +391,8 @@ pub(super) fn derive_case_producer_fact(
     let expr = plan.planned_occurrence_expr(origin)?;
     let child = |position| plan.semantic.child_origin(origin, position);
     let result = match expr {
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -1101,7 +1102,8 @@ impl<'src> StaticTransitionPlan<'src> {
             let expr = occurrence.expr;
             let child = |position| self.semantic.child_origin(origin, position);
             match expr {
-                RuntimeExpr::CheckedJoinSite { .. }
+                RuntimeExpr::CheckedBracketFinalizer { .. }
+                | RuntimeExpr::CheckedJoinSite { .. }
                 | RuntimeExpr::CheckedSubcontinuationFrame { .. }
                 | RuntimeExpr::CheckedRecursiveInvocation { .. }
                 | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -6726,6 +6728,7 @@ mod tests {
     fn substrate_case_emission_open_ingress_prunes_nothing() {
         let expr = RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "FS".to_string(),
                 operation: ken_host::HostOpV1::BufferAllocate,
                 capability: None,

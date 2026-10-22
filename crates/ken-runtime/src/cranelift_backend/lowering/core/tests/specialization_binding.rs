@@ -2867,6 +2867,7 @@ fn d4a_trap(message: &str) -> RuntimeTrap {
 /// exists so a reader can tell them apart in source; nothing asserts on it.
 fn d4a_console_write(payload: &[u8]) -> RuntimeExpr {
     RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "Console".to_string(),
         operation: ken_host::HostOpV1::ConsoleWrite,
         capability: None,

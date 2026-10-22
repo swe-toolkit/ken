@@ -646,8 +646,35 @@ impl CheckedComputationalIHBinderMorphism {
     }
 }
 
+/// The closed identities of the two compiler-owned anchors in a bracket region.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CheckedBracketMarkRole {
+    Acquire,
+    Finalizer,
+}
+
+/// Provenance retained on the exact checked operation or finalizer Construct.
+/// This compiler-only transport is not a runtime value, host operation or ABI.
+#[doc(hidden)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CheckedBracketRegionMarker {
+    pub owner: RuntimeSymbol,
+    pub role: CheckedBracketMarkRole,
+    pub constructor_node_id: u32,
+    pub acquire_vis_path: Vec<usize>,
+    pub acquire_response_binder_path: Vec<usize>,
+    pub ok_resource_binder_path: Vec<usize>,
+    pub finalizer_path: Vec<usize>,
+}
+
 #[derive(Clone, Debug)]
 pub enum RuntimeExpr {
+    #[doc(hidden)]
+    CheckedBracketFinalizer {
+        region: Box<CheckedBracketRegionMarker>,
+        body: Box<RuntimeExpr>,
+    },
     #[doc(hidden)]
     CheckedJoinSite {
         site_id: u64,
@@ -756,6 +783,9 @@ pub enum RuntimeExpr {
         operation: ken_host::HostOpV1,
         capability: Option<RuntimeCapabilityUse>,
         args: Vec<RuntimeExpr>,
+        /// Compiler-only checked bracket provenance on the executing static
+        /// acquisition. Neither evaluation, host dispatch nor the ABI reads it.
+        bracket_acquire: Option<Box<CheckedBracketRegionMarker>>,
     },
     Trap(RuntimeTrap),
 }
@@ -1620,8 +1650,14 @@ mod tests {
             source_binder_index: 0,
             runtime_binder_index: 4,
         };
-        assert_eq!(morphism.shifted_runtime(1, 0).unwrap().runtime_index(0), Some(5));
-        assert_eq!(morphism.shifted_runtime(1, 5).unwrap().runtime_index(0), Some(4));
+        assert_eq!(
+            morphism.shifted_runtime(1, 0).unwrap().runtime_index(0),
+            Some(5)
+        );
+        assert_eq!(
+            morphism.shifted_runtime(1, 5).unwrap().runtime_index(0),
+            Some(4)
+        );
     }
 
     #[test]

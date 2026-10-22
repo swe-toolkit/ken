@@ -1752,6 +1752,7 @@ fn d8_mixed_host_result_join_fixture(swapped: bool) -> RuntimeExpr {
     };
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "FS".to_string(),
             operation: ken_host::HostOpV1::BufferAllocate,
             capability: None,

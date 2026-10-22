@@ -727,6 +727,7 @@ mod tests {
         };
         let mut stderr = Vec::new();
         let effect_entrypoint = RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleRead,
             capability: None,
