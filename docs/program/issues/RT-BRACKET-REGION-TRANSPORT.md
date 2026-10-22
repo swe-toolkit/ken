@@ -12,9 +12,18 @@ github: null
 origin: "Operator 2026-10-18 (\"concur with rec on px8ta decision\": route C child 1, children 2 and 3 sized after it). Architect sizing D0 evt_51cm672pdy1r1 on child 1 at c462fe831 (Architect approval as a held input evt_2hz1a3x9tzp8k, Decision dec_1ngs256pczqdk) found the region-transport seam that neither child-2 nor child-3 frame named, and cut it as its own child. Steward-filed per COORDINATION section 2."
 ---
 
-> **AUTHORIZED AND STARTABLE.** This child does NOT land on its own. Its
-> reviewed tip is a held input that child 3 assembles. No publication and
-> no partial landing.
+> **Recut 2026-10-21 (`evt_1gxk3pcr6rgw2`; operator 2026-10-22, "keep
+> separate").** This is link 2 of the bottom-up chain and lands alone, as
+> a fresh candidate on `main` after link 1 (`77352e68e`). The accepted
+> held input `370168a48`, built on `c462fe831`, is a reference only: never
+> moved, rebased or landed. Where a settled input below names
+> `c462fe831` as the base, re-measure it on `main`.
+>
+> **Base and unit (Architect `evt_1m5yxewmk3xhw`).** Link 2 is AC-0 to
+> AC-5 as one landing unit: the net delta `c462fe831..c18c8db68` applied
+> fresh on `77352e68e` (ported tree `813dfe6ba`), with two expectation
+> corrections: the arity test code E0084, and the px7f owner ordinals +1.
+> Evidence: `/workspaces/ken/local/arch-rt2-d0/`.
 
 # Bracket regions survive erasure as bound markers
 
@@ -31,11 +40,11 @@ from Runtime IR.
   on this child's own branch. Never move, reset or delete that ref, or
   `wp/RT-BRACKET-PRODUCER-AUTHENTICITY`.
 - **The drop.** `complete_native_program_preparation` destructures the
-  regions as `bracket_regions: _` (compiler_driver.rs ~:3062). The only
-  reader is the test accessor `bracket_regions()`.
+  regions as `bracket_regions: _` (compiler_driver.rs ~:3070 on
+  `77352e68e`). The only reader is the test accessor `bracket_regions()`.
 - **The erasure collision.** `RuntimeExpr::Effect` carries `HostOpV1`
-  only (ken-runtime-support ir.rs ~:764), and both checked release IDs
-  lower to `HostOpV1::ResourceRelease`. The static arm of
+  only (ken-runtime-support ir.rs ~:754 on `77352e68e`), and both checked
+  release IDs lower to `HostOpV1::ResourceRelease`. The static arm of
   `lower_checked_host_computation` sees none of the finalizers (measured
   `evt_59wt0vsvvcp1p`). Each finalizer reaches erasure as a private
   constructor `RuntimeExpr::Construct` from `lower_body_term_with_plans`,
@@ -91,7 +100,8 @@ collector arity hardening below.
 - **AC-2.** A region with no marker, a marker with no region, and a
   region bound twice each reach an exact named refusal.
 - **AC-3 (arity hardening).** A hand-built collector row with
-  `PrivateBracketRelease` under-applied (2 args) refuses with E0082.
+  `PrivateBracketRelease` under-applied (2 args) refuses with E0084 (E0082 is now
+  `elab.refinement_split_demand` on `main`).
   Paired: at `c462fe831` the same row returns `Ok` with 0 regions.
 - **AC-4.** The cross-crate `RuntimeExpr` match sweep is complete by grep,
   and runtime behaviour on the population is unchanged.

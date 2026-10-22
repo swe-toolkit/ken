@@ -1,7 +1,7 @@
 ---
 id: CAT-GRAPHS-WALK-COMPOSITION-ORDER
 title: "Algorithm.Graphs.Dependency exports spec 62 section 3: walk_append and ordered_walk_forward, proved at zero trust from the Architect's D0 development, with the section 3 seed run by a package test"
-status: ready
+status: merged
 owner: foundation
 size: S
 tier: T2
