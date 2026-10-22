@@ -23,6 +23,8 @@ identity is a kernel admission feature: an SCT group checked with
 non-recursive transparent companion definitions. That is trust-root
 growth and is the operator's call. The operator approved it on
 2026-10-22 ("approve change"); it is KERNEL-SCT-GROUP-TRANSPARENT-COMPANIONS.
+That repair merged at `a0311a8a7`, and the four rows are now accepted
+with their open obligations.
 
 ## Objective
 

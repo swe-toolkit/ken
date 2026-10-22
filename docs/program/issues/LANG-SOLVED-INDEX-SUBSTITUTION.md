@@ -71,8 +71,9 @@ dependency-closure selector and one J per leaf (Architect
   scrutinee index, which belongs to the motive and convoy path. So do
   `install_hidden_result_variable_refinements` and
   `install_plain_declared_index_aliases`.
-- A method that mixes variable and non-variable leaf plans is a stop to
-  report.
+- Mixed methods and multi-leaf premise slots take the retained alias
+  path in this stage; stage 2 (LANG-SOLVED-INDEX-EQUATION-UNIFIER) removes
+  the gate (Architect `evt_6htgrnanmjnm4`).
 
 **Composition (amendments 3 and 4, Architect `evt_20k6hnw9evhy5`,
 `evt_44mfvbvp38fjy`).**
@@ -106,12 +107,27 @@ no change without them.
 
 ## Acceptance
 
-- **AC-0 (measure, before building).** Census the leaf installs across
-  the LET-ANNOTATION AC-2 suites, split into field-variable side,
-  scrutinee-variable side and neither. If "neither" is nonzero and has
-  no retained path, stop and report.
-- **AC-1.** sec, secrest, q2 and q3 are Ok, with `trusted_base()`
-  unchanged. Amendment 3 and 4 rows: p1, p2_new, p5, p6_let_new, p7_new,
+- **Recut (Architect `evt_6htgrnanmjnm4`, staged route).** AC-1 is the
+  stage-1 closure on checkpoint `fc15cad6f`:
+  - hunk 1, the gate: eliminate only all-variable methods whose premise
+    slots each project to one leaf;
+  - hunk 2: bind the reverted telescope in the dependency order of its
+    occurrences, one binder per occurrence;
+  - the class D closure (Architect `evt_72kqj0sjczgpf`): retained first,
+    elimination as fallback. A variable-side method first runs the
+    retained alias path once (`retained_regime_attempt` on `ElabCtx`,
+    consumed at entry). On success that output is kept. A split demand
+    propagates. Any other refusal rolls back and eliminates, and if both
+    refuse, the retained diagnostic is reported. Measured on the 18
+    residual rows plus 14 binaries: all green, and sec, secrest, q2, q3,
+    secpp, c_alias_k and c_mixed still eliminate.
+  A non-Var alias value is a stop, not a silent pass.
+- **AC-0 (program-wide).** Every ken-elaborator integration binary plus
+  the catalog loaders has zero failures that are green on `a2a4169d3`.
+  It also counts the gate's fallbacks by equation, which is stage 2's
+  population.
+- **AC-1.** sec, secrest, q2 and q3 are Ok through elimination, not the
+  fallback, with `trusted_base()` unchanged. Amendment 3 and 4 rows: p1, p2_new, p5, p6_let_new, p7_new,
   p9, p11_new and p10_new (or p10 dropped with the reason), red on main
   and green here; control q1; the 15 convoy and dependent-match targets.
 - **AC-1b (gated on SPEC-INDEXED-ARM-SCRUTINEE-COORDINATE).** secpp is
@@ -128,7 +144,10 @@ no change without them.
   `evt_5pesq48fpdrrs`). q4 (written at `n`) is measured, not required.
 - **AC-3 (mutation, QA).** Restoring the alias installer for
   variable-side leaves returns sec to its motive rejection and q3 to K2
-  at `h`.
+  at `h`. Dropping the retained-first block reddens the D rows
+  (`r1_two_lists_at_suc_index` and the NatMatrix seeds). Returning the
+  retained error in place of the elimination fallback reddens sec,
+  secrest, q2 and q3.
 
 ## Stop conditions
 
@@ -137,11 +156,17 @@ no change without them.
 - A leaf class outside AC-0's census with no retained path.
 - A local repair for one producer in place of the elimination: that is
   the next entry on the same predicate, not this node.
+- A definition that needs elimination and is later ι-exposed in a
+  C2-planned goal. That is stage 2's question, not a fourth gate.
+- A targeted binary slower than its budget. Re-elaboration is
+  exponential in the depth of nested variable-side methods in the worst
+  case.
 
 ## Hard-stop inventory (§1b)
 
-**Paused at the §1a 6 Research hold (`evt_68jp7ct8055x3`).** Resume
-checkpoint `fc15cad6f`. AC-1 is recut after the Research advisory and the
+**Resumes from checkpoint `fc15cad6f` on the recut under Acceptance**
+(route `evt_6htgrnanmjnm4`, D closure `evt_72kqj0sjczgpf`). The §1a 6
+Research hold (`evt_68jp7ct8055x3`) is answered. AC-1 is recut after the Research advisory and the
 Architect's route ruling on it (Steward scope `evt_5asyh12k755v`):
 - AC-1 is recut around one closure, not entry by entry:
   - one occurrence telescope, ordered by dependency and deduplicated;
@@ -153,9 +178,10 @@ Architect's route ruling on it (Steward scope `evt_5asyh12k755v`):
   the catalog loaders, with zero failures that are green on main.
 - The gate to the proved population is measured beside the full closure.
 
-§1a: the variable-side leaf elimination chain is at 6 (Architect
+§1a: the variable-side leaf elimination chain is at 7 (Architect
 `evt_6gq7rm62sy7qf`, `evt_20k6hnw9evhy5`, `evt_4f8gr0yddtjzk`,
-`evt_7ex6qpqscy58q`, `evt_7ge5kbggd1n1m`, `evt_68jp7ct8055x3`).
+`evt_7ex6qpqscy58q`, `evt_7ge5kbggd1n1m`, `evt_68jp7ct8055x3`,
+`evt_72kqj0sjczgpf`). The next trigger is 9.
 
 **§1b answer (`evt_68jp7ct8055x3`): entries 2, 4, 5 and 6 share one
 predicate.** R1's selector and restoration are indexed by syntactic units
@@ -209,5 +235,12 @@ carry it as a binder. The closure must address `e`'s representation.
      keeps an old-coordinate occurrence;
    - (C) a variable leaf beside a constructor leaf in one method (frame
      stop);
-   - (D) nested-elimination output is rejected by the kernel, untraced.
+   - (D) traced as entry 7.
    Keyed on leaf and position, not on premise slot and occurrence.
+7. R1's eliminated method output (a J transporting convoyed binders with
+   a leaf proof typed at the concrete index) is outside the closed
+   method-shape set of the C2 embedded-eliminator planner. When a
+   definition compiled with elimination is ι-unfolded into a later goal,
+   the planner abandons its plan and abstracts the folded goal into an
+   ill-typed motive. Keyed on the compiled method shape of a δι-exposed
+   callee (`evt_72kqj0sjczgpf`, which supersedes `evt_6b47hx56q9mtq`).
