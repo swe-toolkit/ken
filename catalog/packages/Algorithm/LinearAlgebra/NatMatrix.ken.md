@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and the ten algebraic laws below have checked proofs.
+all arithmetic is exact, and fourteen algebraic laws have checked proofs.
 
 ## Contents
 
@@ -24,8 +24,10 @@ zero-row and zero-column matrices use the same operations as nonempty ones.
 
 The canonical operations follow their contract: componentwise addition,
 scaling and dot product, followed by matrix-vector multiplication, transpose,
-matrix product and diagonal identity. The named private stages build columns
-and row products; no second matrix carrier or numeric primitive is needed.
+matrix product and diagonal identity. Row-wise matrix addition and its four
+public laws follow those operations and laws. The named private stages build
+columns and row products; no second matrix carrier or numeric primitive is
+needed.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
@@ -2005,6 +2007,15 @@ commutes each head dot product to reverse the factor order. Its zero-row case
 uses the checked empty-width transport. These are generic, indexed proof terms;
 the closed example only illustrates their operations.
 
+`matrix_product_distrib_left` lifts a row's sum through transpose and column
+products, then recurses over rows. `matrix_product_distrib_right` uses the
+existing column-add proof on each pair of summed left rows.
+`matrix_vector_distrib` uses the checked dot distributivity law for each row.
+`transpose_add` lifts its tail induction through column prepending, with the
+empty-width transport handling zero rows. Right-argument dot distribution,
+column addition, row-product addition and the prepend bridge stay private.
+These four proofs cover arbitrary indexed matrices, including zero dimensions.
+
 ## 5. Design notes
 
 A matrix is `Vec (Vec Nat n) m`, not a list plus an unchecked width. `transpose`
@@ -2013,9 +2024,10 @@ diagonal and `Zero` elsewhere. Left identity and product associativity have
 distinct generic proofs from right identity. Matrix-vector compatibility and
 transposed-product reversal connect the same operations without adding a new
 matrix carrier; the row, empty-width and prepend proof stages stay private.
-The named `dot_with` helper passes
-the row's dot product to
-`map` without a lambda-headed application in a proof goal. A rational-valued
+`matrix_add` adds rows with `vector_add`; it neither truncates nor broadcasts,
+and the four sum laws hold for arbitrary well-typed dimensions. The named
+`dot_with` helper passes the row's dot product to `map` without a
+lambda-headed application in a proof goal. A rational-valued
 or approximate matrix would require a different statement of equality and is
 not implied by natural-number arithmetic.
 
@@ -2028,13 +2040,14 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–3
-and [seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md)
-own seventeen public names and sixteen behavioral cases. The module reuses the
-published `Data.Vector.Vector` carrier and natural arithmetic. `repeat`,
-column prepending, row products and proof bridges remain private. All ten
-public theorems have checked bodies. This package adds no Axiom, postulate,
-primitive, `Float` or trusted-base entry; dependencies retain their own trust
-posture. The root-loaded acceptance target checks generic imports, closed
-values, the non-square product and transpose relations, refusal of wrong inner
-dimensions and unreversed factor order, and the exact trusted-identity set.
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–4 owns
+twenty-two public names across eight operations and fourteen laws. The
+[original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md)
+and [sum seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md)
+provide finite behavioral clients. The module reuses the published
+`Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column prepending, row products and proof bridges remain
+private. All fourteen public theorems have checked bodies. This package adds
+no Axiom, postulate, primitive, `Float` or trusted-base entry; dependencies
+retain their own trust posture. Root-loaded acceptance tests check generic
+imports, closed values and indexed relations, the two deliberately refused
+claims, and the exact trusted-identity set.
