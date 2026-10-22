@@ -874,8 +874,8 @@ fn r2_relay_owners_return_only_source_independent_successors() {
                 .map(|(_, members)| members.as_slice())
                 .expect("a driven relay owner retains an installed pending-Vis protocol");
             let ruled_successor = match protocol.owner_origin {
-                1272 => 754, // owner 2, Vis 1272
-                1291 => 536, // owner 3, Vis 1291
+                1276 => 756, // owner 2, Vis 1276
+                1296 => 537, // owner 3, Vis 1296
                 other => panic!("unexpected r2 relay owner at Vis {other}"),
             };
             assert_eq!(expected, ruled_successor,
@@ -885,7 +885,7 @@ fn r2_relay_owners_return_only_source_independent_successors() {
             returned.push(expected);
         }
         returned.sort_unstable();
-        assert_eq!(returned, [536, 754], "r2's two surviving successor Vis origins");
+        assert_eq!(returned, [537, 756], "r2's two surviving successor Vis origins");
         let mut owners = protocols.iter().map(|protocol| protocol.owner_origin)
             .collect::<Vec<_>>();
         owners.sort_unstable();
@@ -995,7 +995,7 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
         let selected = &owner.selected_caller;
         for component in [
             "emission_owner: Specialization(ContinuationSpecializationId(5))",
-            "producer_construct_origin: StaticOriginId(536)",
+            "producer_construct_origin: StaticOriginId(537)",
             "producer_alternative: 1",
             "target: ContinuationSpecializationId(6)",
             "recursive_position: 1",
