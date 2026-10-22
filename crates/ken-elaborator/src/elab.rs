@@ -10925,7 +10925,15 @@ fn solved_index_dependency_binders(
             continue;
         }
         match source {
-            ExpandedBindingSource::Original(original) if *original < method_start => {
+            // An outer binding carried by this method's context convoy has its
+            // arm occurrence (the alias value) inside the method; it is
+            // rebound as a convoy dependent, never left at its old coordinate.
+            ExpandedBindingSource::Original(original)
+                if *original < method_start
+                    && !cx.match_frames.last().is_some_and(|frame| {
+                        frame.convoy_originals.contains(original)
+                    }) =>
+            {
                 return Err(ElabError::Internal(
                     "solved-index dependency closure crosses outside the method".into(),
                 ));
@@ -11086,6 +11094,9 @@ fn refine_branch_goal(
                     (expanded_len - position) as i64,
                 );
                 if !scrut_occurs(&premise_ty, old) { continue; }
+                // A convoy binder is generalized through its selected
+                // original; only an index equation is re-derived here.
+                if binders.iter().any(|(_, value, _)| *value == raw) { continue; }
                 let Term::Eq(carrier, first, second) = &premise_ty else {
                     return Err(ElabError::Internal("solved premise is not an Eq".into()));
                 };
