@@ -4,11 +4,12 @@ Format: `../../README.md`.
 Spec: `spec/50-stdlib/62-graphs.md` §3.
 Frame: `docs/program/issues/SPEC-GRAPHS-WALK-COMPOSITION-ORDER.md`.
 
-These are authored behavioral oracles, not executed results. At base
-`cb48b8ddb5e22cf21a1167d270bc98d6d8c08782`, §3 is landed in the Spec,
-but its catalog exports are absent. None of the Ken fences below was run.
-This source/content seed does not claim catalog delivery, seed execution,
-CI, publication, landing, or a trust measurement.
+The unchanged Ken fences below are exercised by the package-owned
+`cat_graphs_walk_composition` test: its positive checks precede an isolated
+reversed-order refusal. This is package-test execution, not official
+conformance-runner execution, CI, publication, or landing. The test also
+compares exact trusted-base identities before and after the package loads;
+that measurement is not a claim of a landed trust result.
 
 Shared fixtures use `Vertex3` and its checked `DecEq` instance. The graph
 has only the edges `V0 → V1` and `V1 → V2`; `chain_order` is an explicit
@@ -191,11 +192,10 @@ theorem ordered_walk_forward_on_chain :
 - why: the refusal is isolated to the reversed result, not a changed
   graph, order, edge, or walk fixture.
 
-To exercise this refusal when the §3 exports are available, concatenate the
-shared-fixture fence and both positive fences as an accepted client. Then
-append only this reversed theorem to a fresh copy of that accepted source; the
-expected refusal is the kernel type mismatch, not missing imports or fixture
-names.
+The package test concatenates the shared-fixture fence and both positive
+fences as an accepted client, then appends only this reversed theorem to a
+fresh copy of that accepted source. The refusal is a type mismatch for the
+reversed proposition, not a missing import or fixture name.
 
 ```ken
 theorem refuse_reversed_order_on_same_chain_walk :

@@ -6,10 +6,10 @@
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
-> §2 conformance seed. Section 3 specifies walk composition and an order
-> law for a walk with a first edge; its catalog exports and seed are not
-> delivered by this spec-only candidate. Scratch execution of earlier seed
-> blocks is not shipped harness execution or CI. No kernel, trust, or
+> §2 conformance seed. Section 3's walk-composition operation and
+> first-edge order law now have checked catalog exports; the four §3 seed
+> fences are exercised in a package-owned test. Package-test execution is
+> not official conformance-runner execution or CI. No kernel, trust, or
 > surface-syntax change or revision to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
@@ -427,12 +427,14 @@ The Architect's AC-0 development on base `10b1ec623` checked the
 and no `Axiom`. Its closed three-vertex chain clients accepted the
 composed two-edge walk and forward order, while a reversed-order
 claim on the same walk was refused; a false first-edge claim and a
-client import of private `walk_before` were also refused. These are
-scratch checks on the D0 package, not execution of a delivered §3
-catalog export or seed. AC-2 separately authors a three-vertex
-chain seed with two nontrivial walks, the forward-order control, and
-the isolated same-input reversed-order refusal. This spec-only AC-1
-does not claim that seed's execution, CI, publication, landing, or a
-landed trust measurement. Section 1's reachability and finite
-certificates, §2's three laws, and the deferred scope in §1.4 are
-unchanged.
+client import of private `walk_before` were also refused. Those were
+scratch checks. The catalog now exports both §3 names with checked
+bodies; a package-owned test root-loads them, checks both positive
+seed cases and the same-input forward-order control, and refuses the
+isolated reversed-order proposition. It measures exact trusted-base
+identities before and after loading the package. The unchanged census
+row passes the targeted strict-resolution suite with zero D0 residuals.
+These are package-test measurements, not official conformance-runner
+execution, CI, publication, landing, or a landed trust measurement.
+Section 1's reachability and finite certificates, §2's three laws,
+and the deferred scope in §1.4 are unchanged.

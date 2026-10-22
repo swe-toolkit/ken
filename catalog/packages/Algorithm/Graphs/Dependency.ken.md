@@ -26,10 +26,10 @@ cycle. These guarantees do not require a canonical order or a shortest path.
 ## 2. Definition
 
 The public declarations follow the contract's order: graph and path evidence,
-predicate reachability, order predicates and certificates, then their generic
-laws. Constructor exports make proof-carrying witnesses available to clients.
-The private DFA encoding, search, ranking, deduplication, sorting and proofs
-are given below.
+walk composition, predicate reachability, order predicates and certificates,
+then their generic laws. Constructor exports make proof-carrying witnesses
+available to clients. The private DFA encoding, search, ranking,
+deduplication, sorting and proofs are given below.
 
 ```ken
 import Data.Finite.Finite (Finite, MkFinite, elements, covers)
@@ -87,6 +87,21 @@ pub data ReachWitness (q : Type) (g : Graph q) (s : q) (target : q → Bool) : T
 }
 
 export MkReach
+
+pub fn walk_append
+      (q : Type)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (u : q)
+      (first : Walk q g s t)
+      (second : Walk q g t u)
+    : Walk q g s u =
+  match second {
+    WalkHere ↦ first;
+    WalkStep prev end e prefix ↦
+      WalkStep q g s prev end e (walk_append q g s t prev first prefix)
+  }
 
 pub fn graph_reachable
       (q : Type) (fq : Finite q) (g : Graph q) (s : q) (target : q → Bool)
@@ -254,6 +269,29 @@ pub theorem cycle_refutes_order
           }
       }
 
+pub theorem ordered_walk_forward
+      (q : Type)
+      (d : DecEq q)
+      (g : Graph q)
+      (order : TopoOrder q d g)
+      (s : q)
+      (next : q)
+      (t : q)
+      (first : Equal Bool (edge q g s next) True)
+      (rest : Walk q g next t)
+    : Equal Bool (before q d s t (ordered_vertices q d g order)) True =
+  walk_before
+    q
+    d
+    g
+    (ordered_vertices q d g order)
+    (ordered_forward q d g order)
+    s
+    next
+    t
+    rest
+    (ordered_forward q d g order s next first)
+
 pub data OrderOrCycle (q : Type) (d : DecEq q) (g : Graph q) : Type where {
   HasOrder : TopoOrder q d g → OrderOrCycle q d g;
   HasCycle : Cycle q g → OrderOrCycle q d g
@@ -379,7 +417,11 @@ of `before` use only repeated calls to the same `d.eq` and need no
 uniqueness or coverage premise. The first edge of a `Cycle` and its
 return `Walk` would force an order to place its start before itself;
 only the `all_edges_forward` field is needed to derive the contradiction.
-The Boolean step proofs reuse the private `before_step` scan helper.
+`walk_append` recurses on the second walk, preserving the first walk and
+appending the second walk's final checked edge. An order's forward-edge
+field places a walk's first edge ahead; the existing `walk_before` lemma
+transports that ordering through the rest of the walk. The Boolean step
+proofs reuse the private `before_step` scan helper.
 
 ```ken
 fn graph_step_from (q : Type) (s : q) (x : q) (b : Bool) : q =
@@ -2114,7 +2156,9 @@ compare and deduplicate vertices. The result is a tagged `Type` sum because
 an order or cycle carries computationally relevant evidence, unlike an
 `Omega`-sorted disjunction. Neither unrelated-vertex tie order nor a shortest
 walk or simple cycle is prescribed. The finite pair scan considers potential
-cycle edges; it does not duplicate reachability's fixed point.
+cycle edges; it does not duplicate reachability's fixed point. Walk
+composition does not require finite evidence, and only a walk with a
+checked first edge gives a strict ordering claim.
 
 ## 6. References
 
@@ -2127,12 +2171,16 @@ cycle edges; it does not duplicate reachability's fixed point.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–2](../../../../spec/50-stdlib/62-graphs.md).
-The existing [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
-covers its original operations and laws; the §2 seed is a separate
-conformance deliverable. The public API is the graph, path and certificate
-types, their constructors, the predicate-reachability decision and witness,
-the dependency-order operation, five list/order predicates, and ten
+The behavioral contract is [graphs §§1–3](../../../../spec/50-stdlib/62-graphs.md).
+The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
+covers the original graph and order behavior; the §2 seed covers the
+cycle/order exclusion; the
+[§3 seed](../../../../conformance/stdlib/graphs/seed-walk-composition-order.md)
+checks two-edge walk composition, forward ordering, and the paired
+reversed-order refusal in a package-owned test. The public API is the
+graph, path and certificate types, their constructors, the walk-append
+operation, the predicate-reachability decision and witness, the
+dependency-order operation, five list/order predicates, and eleven
 kernel-checked laws. Every other helper is private to this package.
 
 | Reader task | Section |
@@ -2148,5 +2196,8 @@ helpers are checked terms. The package adds no `Axiom`, primitive, foreign
 binding, postulate or `trusted_base()` entry; this does not erase inherited
 assumptions of imported providers. The existing graph seed and targeted
 acceptance suite exercise the §1 behavior cases, generic law clients,
-exact public ownership and the package-local trust delta; neither
+exact public ownership and the package-local trust delta. The separate
+§3 package test root-loads the two added exports, exercises the §3 seed,
+and checks that their private proof dependency stays unimportable; this
+is not official conformance-runner execution or CI. Neither suite
 establishes execution of the §2 seed.
