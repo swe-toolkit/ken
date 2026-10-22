@@ -985,6 +985,9 @@ struct ElabCtx<'e> {
     /// bare-variable indices denote the constructor coordinate inside one arm.
     /// Name resolution only; convoy and closure planning never read it.
     arm_coordinates: HashMap<usize, (Term, Term, usize)>,
+    /// Set only for the single retained attempt of a variable-side method;
+    /// that method consumes it at entry, so nested methods choose their own.
+    retained_regime_attempt: bool,
     /// During a generalized branch-goal check, a premise sentinel resolves to
     /// the temporary Pi binder rather than its original method premise. The
     /// bottom-relative position is stable across deeper local binders.
@@ -1195,6 +1198,7 @@ impl<'e> ElabCtx<'e> {
             local_dicts: HashMap::new(),
             var_refinements: HashMap::new(),
             arm_coordinates: HashMap::new(),
+            retained_regime_attempt: false,
             active_index_refinements: Vec::new(),
             match_frames: Vec::new(),
             next_aux_sentinel_region: AUX_SENTINEL_REGION_BASE,
@@ -9202,10 +9206,24 @@ fn method_has_variable_side_leaves(
             other = true;
         }
     }
+    // Eliminate only the population the per-leaf J is proved on: every leaf
+    // a field variable, and every premise slot projecting to a single leaf.
+    // Mixed methods and multi-leaf slots keep today's alias path until the
+    // per-equation unifier admits them.
     if variable && other {
-        return Err(ElabError::Internal(
-            "solved-index method mixes variable and non-variable leaf plans".into(),
-        ));
+        return Ok(false);
+    }
+    if variable {
+        for pair in &pairs {
+            let Some(slot_leaves) = project_method_index_premises(
+                cx, &zonked_ctx, std::slice::from_ref(pair), sentinel_region,
+            )? else {
+                return Ok(false);
+            };
+            if slot_leaves.len() > 1 {
+                return Ok(false);
+            }
+        }
     }
     Ok(variable)
 }
@@ -9252,6 +9270,33 @@ fn check_dependent_branch_body(
             cx, ind, params, target_indices, scrut_indices, n, sentinel_region,
         )?
     };
+    // Retained first. Elimination is the fallback for a method the retained
+    // alias path cannot check, so every method the retained path accepts keeps
+    // the output shape that the C2 embedded-eliminator planner consumes when
+    // its definition is unfolded into a later goal.
+    let retained_attempt = std::mem::take(&mut cx.retained_regime_attempt);
+    let variable_side = variable_side && !retained_attempt;
+    let mut retained_error = None;
+    if variable_side {
+        let snapshot = refinement_snapshot::Snapshot::capture_boxed(cx);
+        cx.retained_regime_attempt = true;
+        let retained = check_dependent_branch_body(
+            cx, arm, match_span, ind, params, level_args, target_indices, scrut_indices,
+            n, expected_here, premise_domains, hidden_result_premise_slot, scrut_ty,
+            concrete, scrut_core, sentinel_region, convoy_refinements, equation_convoy,
+            recursive_field_index_path, branch_convoy,
+        );
+        cx.retained_regime_attempt = false;
+        match retained {
+            Ok(term) => return Ok(term),
+            // A split demand is control flow owned by an enclosing frame.
+            Err(error @ ElabError::RefinementSplitDemand { .. }) => return Err(error),
+            Err(error) => {
+                snapshot.rollback(cx)?;
+                retained_error = Some(error);
+            }
+        }
+    }
     let path_base = cx.path_conditions.len();
     if !branch_convoy {
         push_branch_path_condition(cx, scrut_ty, scrut_core, concrete, n, 0);
@@ -9280,7 +9325,12 @@ fn check_dependent_branch_body(
         .truncate(active_index_refinement_base);
     cx.var_refinements = var_refinement_snapshot;
     cx.arm_coordinates = arm_coordinate_snapshot;
-    outcome
+    // Both regimes refused: report the retained diagnostic, the program's
+    // refusal on the pre-elimination path.
+    match (outcome, retained_error) {
+        (Err(_), Some(retained)) => Err(retained),
+        (outcome, _) => outcome,
+    }
 }
 
 /// Install a dependent branch's checked refinements before descending into
@@ -11106,6 +11156,16 @@ fn solved_index_dependency_binders(
             GeneralizedGoalBinder { source: binder_source, source_value: source_original },
         ));
         dependencies.push(Term::var(index));
+    }
+    // Bind the reverted telescope in the dependency order of the occurrences
+    // it abstracts (outer value first), one binder per occurrence: a selected
+    // binder's alias value can be outer to an earlier-selected binder.
+    if selected.iter().all(|(_, value, _)| matches!(value, Term::Var(_))) {
+        selected.sort_by_key(|(_, value, _)| match value {
+            Term::Var(index) => std::cmp::Reverse(*index),
+            _ => unreachable!("checked above"),
+        });
+        selected.dedup_by(|later, earlier| later.1 == earlier.1);
     }
     Ok(selected)
 }
