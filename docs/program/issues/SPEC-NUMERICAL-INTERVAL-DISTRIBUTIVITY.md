@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY
 title: "Spec 68 defers sub-distributivity: interval_mul and interval_add have enclosure laws but nothing relates i*(j+k) to i*j+i*k. Over non-negative rationals the endpoint products may make it an equality. Rule the law from a checked D0 at zero trust, and state it as a section 4 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
