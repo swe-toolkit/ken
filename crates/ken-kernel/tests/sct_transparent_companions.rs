@@ -132,6 +132,31 @@ fn recursive_companion_refused_and_companions_returned() {
     rollback_pending(&mut env, refusal.companions).expect("companion handle intact");
 }
 
+/// Promise class: durable invariant (spec 17 §4).
+/// MEASURED: a self-referencing companion is refused even when the unrelated
+/// member never calls it. CLAIMED: every transparent companion must terminate,
+/// independently of how members use it. THE GAP: the indirect path is separate.
+#[test]
+fn recursive_companion_refused_without_member_conversion() {
+    let mut env = GlobalEnv::new();
+    let companions = stage(&mut env, "companion", vec![endo()]);
+    let companion = companions.ids()[0];
+    let members = stage(&mut env, "member", vec![endo()]);
+    let error = admit_pending_with_companions(
+        &mut env,
+        members,
+        vec![Term::lam(ty0(), Term::var(0))],
+        companions,
+        vec![Term::lam(ty0(), Term::app(c(companion), Term::var(0)))],
+    )
+    .unwrap_err()
+    .error;
+    assert!(
+        matches!(error, KernelError::NotTerminating(ref reason) if reason == "companion definition is recursive"),
+        "{error:?}"
+    );
+}
+
 #[test]
 fn companion_reaching_itself_through_external_definition_refused() {
     // indirect form
