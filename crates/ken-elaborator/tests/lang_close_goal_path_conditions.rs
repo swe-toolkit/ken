@@ -2,7 +2,8 @@
 //! Promise class: durable invariant (spec/20-verification/22 §3).
 
 use ken_elaborator::{ElabEnv, ElabResult, Obligation, ObligationKind};
-use ken_kernel::{check::check as kernel_check, subst::weaken, Context, Decl, Term};
+use ken_kernel::{check::check as kernel_check, subst::weaken, Context, Decl, GlobalId, Term};
+use std::collections::BTreeSet;
 
 fn result<'a>(results: &'a [ElabResult], name: &str) -> &'a ElabResult {
     results
@@ -23,6 +24,23 @@ fn single<'a>(env: &ElabEnv, result: &'a ElabResult, kind: ObligationKind) -> &'
         matches!(env.env.lookup(obligation.hole_id), Some(Decl::Opaque { ty, .. }) if *ty == obligation.goal_closed)
     );
     obligation
+}
+
+fn assert_reported_trust_delta(env: &ElabEnv, before: &BTreeSet<GlobalId>, results: &[ElabResult]) {
+    let delta = env
+        .env
+        .trusted_base()
+        .into_iter()
+        .filter(|id| !before.contains(id))
+        .collect::<BTreeSet<_>>();
+    let reported = results
+        .iter()
+        .flat_map(|result| result.obligations.iter().map(|o| o.hole_id))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        delta, reported,
+        "no path retry may leak an unreported trusted hole"
+    );
 }
 
 fn eq_bool(env: &ElabEnv, b: usize, ctor: &str) -> Term {
@@ -49,6 +67,7 @@ fn peel_pis(mut goal: &Term) -> (Vec<&Term>, &Term) {
 #[test]
 fn fixed_width_addition_closes_let_equation_and_if_branch() {
     let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base().into_iter().collect();
     let source = "fn plain (c : Bool) (a : UInt8) (b : UInt8) : UInt8 = a + b\n\
                   fn local (a : UInt8) (b : UInt8) : UInt8 = let x : UInt8 = a in x + b\n\
                   fn branch (c : Bool) (a : UInt8) (b : UInt8) : UInt8 = if c then a + b else a";
@@ -93,6 +112,7 @@ fn fixed_width_addition_closes_let_equation_and_if_branch() {
     assert_eq!(branch_pis.len(), 4);
     assert_eq!(branch_pis[3], &eq_bool(&env, 2, "True"));
     assert_eq!(branch_body, &weaken(plain_body, 1));
+    assert_reported_trust_delta(&env, &before, &results);
 }
 
 /// MEASURED: True and False arms gain their distinct Eq Bool path domains.
@@ -101,6 +121,7 @@ fn fixed_width_addition_closes_let_equation_and_if_branch() {
 #[test]
 fn division_closes_each_if_arm_without_changing_path_free_goal() {
     let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base().into_iter().collect();
     let results = env
         .elaborate_file_v1(
             "fn plain (c : Bool) (n : Int) (d : Int) : Int = n / d\n\
@@ -125,6 +146,7 @@ fn division_closes_each_if_arm_without_changing_path_free_goal() {
         assert_eq!(pis[3], &eq_bool(&env, 2, constructor));
         assert_eq!(body, &weaken(plain_body, 1));
     }
+    assert_reported_trust_delta(&env, &before, &results);
 }
 
 /// An impossible True arm of `if False` carries Eq Bool False True. That
@@ -160,6 +182,7 @@ fn check_equation_dependent_certificate(env: &ElabEnv, obligation: &Obligation) 
 #[test]
 fn partial_primitive_holes_accept_certificates_needing_their_path_equation() {
     let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base().into_iter().collect();
     let results = env
         .elaborate_file_v1(
             "fn impossible_add (a : UInt8) (b : UInt8) : UInt8 = if False then a + b else a\n\
@@ -170,6 +193,7 @@ fn partial_primitive_holes_accept_certificates_needing_their_path_equation() {
         let obligation = single(&env, result(&results, name), ObligationKind::PartialPrim);
         check_equation_dependent_certificate(&env, obligation);
     }
+    assert_reported_trust_delta(&env, &before, &results);
 }
 
 fn requires_call_argument<'a>(body: &'a Term, callee: ken_kernel::GlobalId) -> Option<&'a Term> {
@@ -189,9 +213,13 @@ fn requires_call_argument<'a>(body: &'a Term, callee: ken_kernel::GlobalId) -> O
 /// requirement mints a hole whose Γ includes that binder. CLAIMED: applied
 /// holes never gain an unapplied proposition-only domain. THE GAP: a missing
 /// convoy must redden the direct row's hole count and the related row's type.
+/// Known boundary: a non-convoyable unbound frame keeps the stronger old
+/// obligation rather than refusing; the indexed-match Requires acceptance
+/// in `lang_match_result_refinement_identity` pins that non-refusal separately.
 #[test]
 fn requires_argument_is_checked_binder_or_hole_applied_to_checked_binder() {
     let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base().into_iter().collect();
     let results = env
         .elaborate_file_v1(
             "fn direct (b : Bool) : Bool requires Equal Bool b True = b\n\
@@ -264,6 +292,7 @@ fn requires_argument_is_checked_binder_or_hole_applied_to_checked_binder() {
                 && *b.as_ref() == Term::var(1)) && *eq.as_ref() == Term::var(0)),
         "reported hole is applied to Γ including the checked Eq binder"
     );
+    assert_reported_trust_delta(&env, &before, &results);
 }
 
 /// MEASURED: the related but non-convertible Requires goal keeps exactly one
@@ -274,6 +303,7 @@ fn requires_argument_is_checked_binder_or_hole_applied_to_checked_binder() {
 #[test]
 fn related_requires_hole_independently_needs_the_checked_if_equation() {
     let mut env = ElabEnv::new().expect("prelude");
+    let before = env.env.trusted_base().into_iter().collect();
     let results = env
         .elaborate_file_v1(
             "fn indirect (b : Bool) : Bool requires Not (Equal Bool b False) = b\n\
@@ -291,4 +321,5 @@ fn related_requires_hole_independently_needs_the_checked_if_equation() {
             Term::pi(eq_bool(&env, 0, "True"), weaken(body, 1)),
         )
     );
+    assert_reported_trust_delta(&env, &before, &results);
 }
