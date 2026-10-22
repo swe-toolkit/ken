@@ -116,11 +116,16 @@ no change without them.
   and green here; control q1; the 15 convoy and dependent-match targets.
 - **AC-1b (gated on SPEC-INDEXED-ARM-SCRUTINEE-COORDINATE).** secpp is
   Ok, and secrestpp stays Ok. The old-coordinate bodies (p2_mixed,
-  u11_mixed, u7_pred_old, u6_let_old, u10_old) follow the landed spec
-  rule.
+  u11_mixed, u7_pred_old, u6_let_old, u10_old, and `v_outer` in
+  LET-ANNOTATION `vec_siblings`, flipped to Ok in the same commit as the
+  mechanism) follow the landed spec rule. All of these hold together,
+  with `v_indep` still refused and `trusted_base()` unchanged; a
+  `v_outer` flip alone is not evidence (Architect `evt_5pesq48fpdrrs`).
 - **AC-2.** secrestpp, r1, r1pp, r2, r2len, p8, b1 and b2 stay Ok; their
   false twins stay refused with a typed error; the LET-ANNOTATION AC-2
-  suites stay green. q4 (written at `n`) is measured, not required.
+  suites stay green, except `v_outer`, which moves to AC-1b; its
+  false-twin role is carried by `v_indep` (Architect
+  `evt_5pesq48fpdrrs`). q4 (written at `n`) is measured, not required.
 - **AC-3 (mutation, QA).** Restoring the alias installer for
   variable-side leaves returns sec to its motive rejection and q3 to K2
   at `h`.
@@ -135,10 +140,10 @@ no change without them.
 
 ## Hard-stop inventory (§1b)
 
-§1a: the variable-side leaf elimination chain is at 3 (Architect
-`evt_6gq7rm62sy7qf`, `evt_20k6hnw9evhy5`, `evt_4f8gr0yddtjzk`). The
-third is held for Research (`evt_6q5n8x61jsyvw`); no fourth entry is
-ruled on this predicate.
+§1a: the variable-side leaf elimination chain is at 4 (Architect
+`evt_6gq7rm62sy7qf`, `evt_20k6hnw9evhy5`, `evt_4f8gr0yddtjzk`,
+`evt_7ex6qpqscy58q`). The third was held for Research
+(`evt_6q5n8x61jsyvw`). The next Research trigger is count 6.
 
 **Shared predicate (Architect `evt_4f8gr0yddtjzk`).** The raw index
 premise `e : Eq Nat (Suc k) (Suc m)` is a free proof variable inside
@@ -160,3 +165,10 @@ carry it as a binder. The closure must address `e`'s representation.
    `cast (DualEnv a (Suc k)) (DualEnv a (Suc m)) e _` carries the raw
    premise `e`, and neutral Cast congruence (conv.rs ~:1410) compares
    proofs syntactically. Keyed on proof-term identity.
+4. The R1 dependency closure refused an outer let whose arm occurrence is
+   this method's context-convoy binder (`v_fresh`: `k : Vec Nat (Suc m)`
+   aliased to `Vec Nat (Suc m')`), because it judged crossing by the
+   binder's declared position, not by where its alias lives. Keyed on
+   binder position (origin), as entry 2 was keyed on origin tag. Ruled
+   (`evt_7ex6qpqscy58q`): admit `frame.convoy_originals` as Original
+   dependents rebound ConvoyRebound; re-derive only Eq premises.

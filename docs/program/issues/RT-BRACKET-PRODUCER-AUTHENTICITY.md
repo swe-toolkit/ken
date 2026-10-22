@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-PRODUCER-AUTHENTICITY
 title: "CHILD 1 of 3 of RT-BRACKET-CONTROL-REGION-IR, by route C (operator 2026-10-18). The checked bracket producer and its AUTHENTICITY boundary: the canonical producer releases through a confined finalizer constructor, PrivateBracketRelease, that source cannot name, and each bracket region is extracted from the normalized plane before erasure as that constructor plus the Ok binder of its own acquire. Two shapes are REJECTED ON MEASUREMENT and must not be retried: ordinary prelude proc declarations as markers (forgeable), and locating ports by scanning for an acquisition HostOpV1 plus every ResourceRelease (a lawful public early release makes the finalizer ambiguous). HostOpV1 may VALIDATE already-extracted ports; it may never DISCOVER them. Since the 2026-10-21 recut (evt_1gxk3pcr6rgw2) this is link 1 of the bottom-up chain and lands alone."
-status: active
+status: merged
 owner: runtime
 size: M
 gate: none
