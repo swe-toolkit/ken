@@ -5526,6 +5526,23 @@ impl<'a> Lowering<'a> {
         .map(ProducerTrampolineStep::ordinary)
     }
 
+    /// The checked bracket marker is transparent to selected-operation shape,
+    /// but its planned origin is not: constructor identity belongs to its
+    /// positional child, not to the marker occurrence.
+    fn selected_operation_source<'src>(
+        &self,
+        source: &'src RuntimeExpr,
+        origin: StaticOriginId,
+    ) -> Result<(&'src RuntimeExpr, StaticOriginId), CraneliftBackendError> {
+        let operation = crate::cranelift_backend::planning::peel_checked_bracket_operation(source);
+        let operation_origin = if matches!(source, RuntimeExpr::CheckedBracketFinalizer { .. }) {
+            self.static_transition_plan.child_static_origin(origin, 0)?
+        } else {
+            origin
+        };
+        Ok((operation, operation_origin))
+    }
+
     /// Execute a carried P1 `Vis` only in its planner-selected nearest handler.
     ///
     /// The ordinary writeAll unit still computes the recursive ITree value. The
@@ -5596,6 +5613,8 @@ impl<'a> Lowering<'a> {
         let selected_origin = self
             .static_transition_plan
             .child_static_origin(operation_origin, 0)?;
+        let (selected_source, selected_origin) =
+            self.selected_operation_source(selected_source, selected_origin)?;
         let RuntimeExpr::Construct {
             args: selected_fields,
             ..
@@ -5719,6 +5738,7 @@ impl<'a> Lowering<'a> {
             operation: effect_operation,
             capability,
             args: effect_args,
+            ..
         } = effect.expr
         else {
             return Err(unsupported(LoweringCause::PlannerInvariant,
@@ -5908,6 +5928,8 @@ impl<'a> Lowering<'a> {
         let selected_origin = self
             .static_transition_plan
             .child_static_origin(operation_origin, 0)?;
+        let (selected_source, selected_origin) =
+            self.selected_operation_source(selected_source, selected_origin)?;
         let RuntimeExpr::Construct {
             args: selected_sources,
             ..
@@ -6071,6 +6093,7 @@ impl<'a> Lowering<'a> {
             operation,
             capability,
             args,
+            ..
         } = effect.expr
         else {
             return Err(unsupported(LoweringCause::PlannerInvariant,
@@ -14845,6 +14868,7 @@ impl<'a> Lowering<'a> {
             | RuntimeExpr::Call { .. }
             | RuntimeExpr::Effect { .. }
             | RuntimeExpr::Trap(_)
+            | RuntimeExpr::CheckedBracketFinalizer { .. }
             | RuntimeExpr::CheckedJoinSite { .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedRecursiveInvocation { .. }
@@ -16409,6 +16433,10 @@ impl<'a> Lowering<'a> {
             RuntimeExpr::Value(value) => self
                 .lower_value(builder, value)
                 .map(LoweringOperand::Specialized),
+            RuntimeExpr::CheckedBracketFinalizer { body, .. } => {
+                let body = self.child_occurrence(static_origin, 0, body)?;
+                self.lower_expr(builder, body, env)
+            }
             RuntimeExpr::CheckedJoinSite { site_id, body } => {
                 if self.active_join_site.replace(*site_id).is_some() {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
@@ -17592,6 +17620,7 @@ impl<'a> Lowering<'a> {
                 operation,
                 capability,
                 args,
+                ..
             } if self.process_object => self.lower_process_host_effect(
                 builder,
                 family,

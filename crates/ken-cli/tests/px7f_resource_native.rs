@@ -562,9 +562,9 @@ fn owner_vis_return_protocol_px7f_planned_fixpoints() {
     use std::collections::{BTreeMap, BTreeSet};
 
     let fixtures: &[(&str, &str, u32, &[(u32, &[u32])])] = &[
-        ("right-denial-protocol", RIGHT_NOT_HELD, 586, &[(0, &[563]), (1, &[])]),
-        ("double-release-protocol", DOUBLE_RELEASE, 617,
-            &[(1, &[606]), (0, &[525]), (2, &[])]),
+        ("right-denial-protocol", RIGHT_NOT_HELD, 587, &[(0, &[564]), (1, &[])]),
+        ("double-release-protocol", DOUBLE_RELEASE, 618,
+            &[(1, &[607]), (0, &[526]), (2, &[])]),
     ];
     for &(label, source, owner, expected) in fixtures {
         let dir = output_dir(label);
@@ -748,7 +748,7 @@ fn owner_vis_pending_verifier_rejects_unchecked_k_result() {
     // is the last one emitted; its planned record tail places it on the
     // pending-Vis verifier.
     let refused = frames.last().expect("the refused owner was emitted");
-    assert_eq!(refused.owner_origin, 586, "the refused owner is the protocol owner");
+    assert_eq!(refused.owner_origin, 587, "the refused owner is the protocol owner");
     assert!(refused.widths.is_some(), "the refused owner took the pending-Vis arm: {frames:?}");
 }
 

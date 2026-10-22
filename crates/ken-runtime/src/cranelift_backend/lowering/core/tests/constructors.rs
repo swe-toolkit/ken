@@ -1000,6 +1000,7 @@ fn constructor_field_composes_through_computational_consumer() {
     let leaf = "ctor:fixture::FieldTree::Leaf".to_string();
     let field = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleIsTerminal,
             capability: None,
@@ -1561,6 +1562,7 @@ fn heterogeneous_final_kind_fixture(exit_code_filler: bool) -> RuntimeExpr {
     };
     let producer = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleIsTerminal,
             capability: None,
@@ -1792,6 +1794,7 @@ fn nested_computational_fixture(
             body: Box::new(RuntimeExpr::ComputationalMatch {
                 scrutinee: Box::new(RuntimeExpr::Match {
                     scrutinee: Box::new(RuntimeExpr::Effect {
+                        bracket_acquire: None,
                         family: "Console".to_string(),
                         operation: ken_host::HostOpV1::ConsoleIsTerminal,
                         capability: None,
@@ -1860,6 +1863,7 @@ pub(in crate::cranelift_backend::lowering) fn heterogeneous_eliminator_fixture(
     };
     let producer = RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleIsTerminal,
             capability: None,
@@ -2015,6 +2019,7 @@ fn dynamic_io_error_match(producer: bool, ordinary_bool: bool) -> RuntimeExpr {
     let tree = "ctor:fixture::DynamicConstructorTree::Code";
     let producer_tree = |code: RuntimeExpr| RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleIsTerminal,
             capability: None,
@@ -2164,6 +2169,7 @@ fn dynamic_io_error_match(producer: bool, ordinary_bool: bool) -> RuntimeExpr {
 }
 fn fs_read_effect() -> RuntimeExpr {
     RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsReadFile,
         capability: Some(crate::RuntimeCapabilityUse {
@@ -3742,6 +3748,7 @@ fn c2_ac4_runtime_host_result_selects_a_separately_generated_nested_payload() {
     // Placed as the OUTER binding so the match's `Var(0)` still names the
     // producer's result and the consumer is untouched.
     let write_effect = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsWriteAt,
         capability: None,
@@ -8839,6 +8846,7 @@ fn a_dynamic_alternative_with_no_planned_record_refuses() {
 
     let symbols = crate::NativeProcessSymbols::legacy_prelude();
     let write = RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "FS".to_string(),
         operation: ken_host::HostOpV1::FsWriteAt,
         capability: None,

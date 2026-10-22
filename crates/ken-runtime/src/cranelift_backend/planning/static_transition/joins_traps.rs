@@ -329,7 +329,8 @@ fn summarize_result_phase(
     };
     let mut summary = match expr {
         RuntimeExpr::Trap(_) => ResultPhaseSummary::TRAP,
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. } => {
             summarize_child(0, environment, joins)?

@@ -1835,7 +1835,8 @@ pub(super) fn result_carrier(
                      descriptor in the intra-module representation contract",
                 ));
             }
-            RuntimeExprShape::CheckedJoinSite
+            RuntimeExprShape::CheckedBracketFinalizer
+            | RuntimeExprShape::CheckedJoinSite
             | RuntimeExprShape::CheckedSubcontinuationFrame
             | RuntimeExprShape::CheckedRecursiveInvocation
             | RuntimeExprShape::CheckedComputationalIHSlots

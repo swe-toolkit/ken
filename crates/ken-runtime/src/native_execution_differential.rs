@@ -2351,7 +2351,8 @@ fn lowerability_status_tag(status: &RuntimeLowerabilityStatus) -> String {
 
 fn runtime_expr_host_ops(expr: &RuntimeExpr, operations: &mut BTreeSet<ken_host::HostOpV1>) {
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -3184,6 +3185,7 @@ mod tests {
     fn replace_target_body_with_effect(program: &mut RuntimeProgram) {
         program.declarations[0].kind = RuntimeDeclarationKind::Transparent {
             body: RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Clock".to_string(),
                 operation: ken_host::HostOpV1::ClockMonotonicNow,
                 capability: None,
@@ -4028,6 +4030,7 @@ mod tests {
         let mut program = starter_program(43);
         program.declarations[0].kind = RuntimeDeclarationKind::Transparent {
             body: RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Console".to_string(),
                 operation: ken_host::HostOpV1::ConsoleWrite,
                 capability: None,

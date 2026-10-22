@@ -115,7 +115,8 @@ pub(super) fn derive_occurrence_lifetime(
     let expr = plan.planned_occurrence_expr(origin)?;
     let child = |position| plan.semantic.child_origin(origin, position);
     let lifetime = match expr {
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. }

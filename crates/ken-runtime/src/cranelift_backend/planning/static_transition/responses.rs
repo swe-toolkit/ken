@@ -27,7 +27,7 @@ use super::continuations::{
 use super::occurrences::StaticOriginId;
 use super::semantic_ir::ConstructorIdentity;
 use super::{
-    occurrence_subtree_contains, planner_capacity_error, planner_error,
+    occurrence_subtree_contains, peel_checked_bracket_operation, planner_capacity_error, planner_error,
     CheckedIhEnvironmentTransport, CraneliftBackendError, StaticTransitionPlan,
 };
 use crate::cranelift_backend::grafted_spine_control_graph::GraftedSpineFunctionScope;
@@ -1301,7 +1301,8 @@ fn checked_host_response_call(
     let expr = plan.planned_occurrence_expr(origin)?;
     let child = |position| plan.semantic.child_origin(origin, position);
     match expr {
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. } => {
@@ -2173,7 +2174,8 @@ fn free_environment_indices(
         free_environment_indices(expr, depth, free)
     };
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -2497,7 +2499,8 @@ fn count_deferred_response_parameter_uses(
         })
     };
     match expr {
-        RuntimeExpr::CheckedJoinSite { body, .. }
+        RuntimeExpr::CheckedBracketFinalizer { body, .. }
+        | RuntimeExpr::CheckedJoinSite { body, .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { body, .. }
         | RuntimeExpr::CheckedRecursiveInvocation { body, .. }
         | RuntimeExpr::CheckedComputationalIHSlots { body, .. }
@@ -2615,7 +2618,8 @@ fn classify_deferred_response_tail(
         classify_deferred_response_tail(plan, origin, shape)
     };
     match plan.planned_occurrence_expr(origin)? {
-        RuntimeExpr::CheckedJoinSite { .. }
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
         | RuntimeExpr::CheckedSubcontinuationFrame { .. }
         | RuntimeExpr::CheckedRecursiveInvocation { .. }
         | RuntimeExpr::CheckedComputationalIHSlots { .. }
@@ -4060,7 +4064,8 @@ impl StaticTransitionPlan<'_> {
         }
         let children = self.semantic.child_origins(origin)?.to_vec();
         let result = match self.planned_occurrence_expr(origin)? {
-            RuntimeExpr::CheckedJoinSite { .. }
+            RuntimeExpr::CheckedBracketFinalizer { .. }
+            | RuntimeExpr::CheckedJoinSite { .. }
             | RuntimeExpr::CheckedSubcontinuationFrame { .. }
             | RuntimeExpr::CheckedComputationalIHSlots { .. } => {
                 self.static_response_frontier_sequence(&children, active)
@@ -5164,6 +5169,7 @@ mod tests {
             binders: 1,
             body: RuntimeExpr::Let {
                 value: Box::new(RuntimeExpr::Effect {
+                    bracket_acquire: None,
                     family: "effect:FS".to_string(),
                     operation: HostOpV1::BufferAllocate,
                     capability: None,
@@ -5455,6 +5461,7 @@ mod tests {
                 binders: 1,
                 body: RuntimeExpr::Let {
                     value: Box::new(RuntimeExpr::Effect {
+                        bracket_acquire: None,
                         family: "effect:FS".to_string(),
                         operation: HostOpV1::BufferAllocate,
                         capability: None,

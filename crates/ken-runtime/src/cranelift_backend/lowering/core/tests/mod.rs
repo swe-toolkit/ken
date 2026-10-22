@@ -185,6 +185,7 @@ pub(in crate::cranelift_backend::lowering) fn planned_root_occurrence<'src>(
 // tests/mod.rs ancestor shared by its actual users.
 fn console_write_effect() -> RuntimeExpr {
     RuntimeExpr::Effect {
+        bracket_acquire: None,
         family: "Console".to_string(),
         operation: ken_host::HostOpV1::ConsoleWrite,
         capability: None,
@@ -305,6 +306,7 @@ fn host_result_computational_fixture(
     RuntimeExpr::ComputationalMatch {
         scrutinee: Box::new(RuntimeExpr::Match {
             scrutinee: Box::new(RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Console".to_string(),
                 operation: ken_host::HostOpV1::ConsoleWrite,
                 capability: None,
@@ -350,6 +352,7 @@ fn host_result_computational_fixture(
 fn constructor_field_aggregate() -> RuntimeExpr {
     RuntimeExpr::Match {
         scrutinee: Box::new(RuntimeExpr::Effect {
+            bracket_acquire: None,
             family: "Console".to_string(),
             operation: ken_host::HostOpV1::ConsoleIsTerminal,
             capability: None,
@@ -1009,6 +1012,7 @@ fn every_variant_occurrence() -> Vec<(&'static str, RuntimeExpr)> {
         (
             "Effect (capability present)",
             RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Fs".to_string(),
                 operation: ken_host::HostOpV1::FsReadFile,
                 capability: Some(crate::RuntimeCapabilityUse {
@@ -1021,6 +1025,7 @@ fn every_variant_occurrence() -> Vec<(&'static str, RuntimeExpr)> {
         (
             "Effect (capability absent)",
             RuntimeExpr::Effect {
+                bracket_acquire: None,
                 family: "Console".to_string(),
                 operation: ken_host::HostOpV1::ConsoleWrite,
                 capability: None,
@@ -2096,6 +2101,7 @@ fn self_consistent_join_site(
 #[cfg(test)]
 pub(super) fn expression_children(expr: &RuntimeExpr) -> Vec<&RuntimeExpr> {
     match expr {
+        RuntimeExpr::CheckedBracketFinalizer { body, .. } => vec![body],
         RuntimeExpr::CheckedJoinSite { site_id: _, body } => vec![body],
         RuntimeExpr::CheckedSubcontinuationFrame { frame_id: _, body } => vec![body],
         RuntimeExpr::CheckedRecursiveInvocation {
@@ -2164,6 +2170,7 @@ pub(super) fn expression_children(expr: &RuntimeExpr) -> Vec<&RuntimeExpr> {
             operation: _,
             capability,
             args,
+            ..
         } => capability
             .iter()
             .map(|capability| capability.value.as_ref())
