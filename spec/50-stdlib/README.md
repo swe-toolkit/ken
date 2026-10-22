@@ -376,10 +376,11 @@ other dimensions, canonical empty boxes and point-set equality remain
 outside scope.
 
 The **exact rational-interval contract** is pinned in
-**`68-numerical.md`** §§1–3
+**`68-numerical.md`** §§1–4
 (SPEC-NUMERICAL-RATIONAL-INTERVAL-CONTRACT;
 SPEC-NUMERICAL-INTERVAL-HULL;
-SPEC-NUMERICAL-INCLUSION-ISOTONICITY). The §1–2
+SPEC-NUMERICAL-INCLUSION-ISOTONICITY;
+SPEC-NUMERICAL-INTERVAL-DISTRIBUTIVITY). The §1–2
 `Algorithm.Numeric.RationalInterval` operations, ten checked laws,
 seeds and required Rational monotonicity/min-max exports are present
 on main. Non-negative `Rational` endpoints admit inclusive membership
@@ -395,9 +396,15 @@ package acceptance, including its two refused clients. Exact trusted-base
 identity sets remain equal at 114 → 114 on the candidate; the earlier D0
 scratch result by itself did not establish execution, CI or a landed trust
 delta. Inverted empty intervals need not
-pass the endpoint test despite vacuous member-set inclusion. Signed
-arithmetic, division, `Float`, rounding, width, structural
-hull/intersection algebra and sub-distributivity remain deferred.
+pass the endpoint test despite vacuous member-set inclusion. Section 4
+specifies four checked inclusions: each side of the
+left- and right-oriented distributivity pair lies inside the other
+by endpoint value, without structural `Equal Interval` or interval
+commutativity. Its catalog exports and conformance seed are not
+delivered by this spec-only candidate; the Architect's scratch D0
+is not shipped-seed execution, CI or a landed trust measurement.
+Signed arithmetic, division, `Float`, rounding, width and structural
+hull/intersection algebra remain deferred.
 
 The **finite event-trace contract** is pinned in
 **`69-time-and-events.md`** §§1–3 (SPEC-TIME-EVENT-TRACE-CONTRACT;
