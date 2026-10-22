@@ -2,7 +2,7 @@
 //! Promise class: durable invariant (spec/20-verification/22 §3).
 
 use ken_elaborator::{ElabEnv, ElabResult, Obligation, ObligationKind};
-use ken_kernel::{subst::weaken, Decl, Term};
+use ken_kernel::{check::check as kernel_check, subst::weaken, Context, Decl, Term};
 
 fn result<'a>(results: &'a [ElabResult], name: &str) -> &'a ElabResult {
     results
@@ -124,6 +124,51 @@ fn division_closes_each_if_arm_without_changing_path_free_goal() {
         assert_eq!(pis.len(), 4, "{name}: Γ and exactly one path binder");
         assert_eq!(pis[3], &eq_bool(&env, 2, constructor));
         assert_eq!(body, &weaken(plain_body, 1));
+    }
+}
+
+/// An impossible True arm of `if False` carries Eq Bool False True. That
+/// equation reduces to Bottom, so this is a checked proof of the partial
+/// operation's otherwise-opaque proposition, not a test-only postulate. A
+/// certificate missing the equation would have no final `Var(0)` witness.
+fn check_equation_dependent_certificate(env: &ElabEnv, obligation: &Obligation) {
+    let (domains, proposition) = peel_pis(&obligation.goal_closed);
+    let equation = Term::Eq(
+        Box::new(Term::indformer(env.globals["Bool"], vec![])),
+        Box::new(Term::constructor(env.globals["False"], vec![])),
+        Box::new(Term::constructor(env.globals["True"], vec![])),
+    );
+    assert_eq!(domains.last().copied(), Some(&equation));
+    let mut certificate = Term::Absurd(Box::new(proposition.clone()), Box::new(Term::var(0)));
+    for domain in domains.iter().rev() {
+        certificate = Term::lam((*domain).clone(), certificate);
+    }
+    kernel_check(
+        &env.env,
+        &Context::new(),
+        &certificate,
+        &obligation.goal_closed,
+    )
+    .expect("kernel checks a certificate needing the closed path equation");
+}
+
+/// MEASURED: each partial caller accepts a checked certificate using only an
+/// impossible arm's Eq Bool False True. CLAIMED: the added domain is a usable
+/// kernel hypothesis, not merely printed structure. THE GAP: the proposition
+/// remains an open obligation on real reachable paths; this is an impossible
+/// branch witness only, not an overflow or nonzero solver.
+#[test]
+fn partial_primitive_holes_accept_certificates_needing_their_path_equation() {
+    let mut env = ElabEnv::new().expect("prelude");
+    let results = env
+        .elaborate_file_v1(
+            "fn impossible_add (a : UInt8) (b : UInt8) : UInt8 = if False then a + b else a\n\
+         fn impossible_div (n : Int) (d : Int) : Int = if False then n / d else n",
+        )
+        .expect("impossible arms still report their partial primitive obligations");
+    for name in ["impossible_add", "impossible_div"] {
+        let obligation = single(&env, result(&results, name), ObligationKind::PartialPrim);
+        check_equation_dependent_certificate(&env, obligation);
     }
 }
 
