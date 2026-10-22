@@ -14259,8 +14259,19 @@ fn elab_binop(
             if !known {
                 let frames = obligation_path_frames(cx, span)?;
                 let conditions = unwitnessed_conditions(&frames);
-                let (closed, _) = close_refinement_goal_with(cx, &conditions, goal, &[], None);
-                declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
+                let goal = cx.metas.zonk_term(&goal);
+                // `21 §6.3`: checked evidence, such as `Proj2 d` of a refined
+                // divisor, fills the hole through kernel admission.
+                match checked_evidence_certificate(cx, &goal, None) {
+                    Some(proof) => admit_certificate_hole(
+                        cx, &conditions, goal, &proof, span, ObligationKind::PartialPrim,
+                    )?,
+                    None => {
+                        let (closed, _) =
+                            close_refinement_goal_with(cx, &conditions, goal, &[], None);
+                        declare_obligation_hole(cx, closed, span, ObligationKind::PartialPrim)?;
+                    }
+                }
             }
             Ok((applied, result_ty))
         }
@@ -14805,22 +14816,15 @@ fn evidence_heads_refuse(env: &GlobalEnv, candidate: &Term, goal: &Term) -> bool
     }
 }
 
-/// Select the proof actually stored in the pair. Only a checked, usable term
-/// is evidence: a proposition closed over a path equation is not a witness.
-#[inline(never)]
-fn emit_subset_evidence(
-    cx: &mut ElabCtx<'_>, goal: Term, span: &Span, kind: ObligationKind,
-    direct_evidence: Option<Term>,
-) -> Result<Term, ElabError> {
-    let frames = obligation_path_frames(cx, span)?;
-    // A convoy equation already has a real binder in Γ. Closing it once
-    // more in the hole's extra condition telescope duplicates the premise
-    // and leaves a redundant, unchecked logical assumption next to its
-    // checked witness. Only unbound path frames need an extra Π domain.
-    let conditions = unwitnessed_conditions(&frames);
-    let goal = cx.metas.zonk_term(&goal);
+/// The checked-evidence search of `21 §6.3`: `tt`, each Γ binder, `Proj2`
+/// of each subset-typed binder whose predicate is a proposition, then the
+/// caller's direct evidence. A candidate is evidence only if the kernel
+/// checks it against `goal` (already zonked); first found wins.
+fn checked_evidence_certificate(
+    cx: &ElabCtx<'_>, goal: &Term, direct_evidence: Option<Term>,
+) -> Option<Term> {
     let mut goal_whnf = None;
-    let certificate = std::iter::once(Term::const_(cx.env.tt_id(), vec![]))
+    std::iter::once(Term::const_(cx.env.tt_id(), vec![]))
         .chain((0..cx.ctx.len()).map(Term::var))
         .chain((0..cx.ctx.len()).filter_map(|index| {
             let ty = cx.ctx.lookup(index)?;
@@ -14842,7 +14846,7 @@ fn emit_subset_evidence(
                     let inferred = cx.metas.zonk_term(&weaken(ty, (*index + 1) as i64));
                     if let (Some(actual), Some(expected)) = (
                         recorded_eq_endpoints(cx.env, &inferred),
-                        recorded_eq_endpoints(cx.env, &goal),
+                        recorded_eq_endpoints(cx.env, goal),
                     ) {
                         if actual == expected {
                             return true;
@@ -14852,13 +14856,48 @@ fn emit_subset_evidence(
             }
             if let Ok(inferred) = kernel_infer_raw(cx.env, &cx.ctx, proof) {
                 let actual = whnf(cx.env, &cx.ctx, &inferred);
-                let expected = goal_whnf.get_or_insert_with(|| whnf(cx.env, &cx.ctx, &goal));
+                let expected = goal_whnf.get_or_insert_with(|| whnf(cx.env, &cx.ctx, goal));
                 if evidence_heads_refuse(cx.env, &actual, expected) {
                     return false;
                 }
             }
-            kernel_check_raw(cx.env, &cx.ctx, proof, &goal).is_ok()
-        });
+            kernel_check_raw(cx.env, &cx.ctx, proof, goal).is_ok()
+        })
+}
+
+/// Fill an obligation hole with selected evidence. The hole is declared at
+/// the closed goal and `admit_bodies` checks this exact body against it
+/// under empty Γ, so the discharge is a kernel-checked declaration.
+fn admit_certificate_hole(
+    cx: &mut ElabCtx<'_>, conditions: &[Term], goal: Term, proof: &Term, span: &Span,
+    kind: ObligationKind,
+) -> Result<(), ElabError> {
+    let (closed, _) = close_refinement_goal_with(cx, conditions, goal.clone(), &[], None);
+    let closed = zonk_obligation_levels(cx, &closed);
+    let (hole, _) = declare_obligation_hole(cx, closed, span, kind)?;
+    let lifted = weaken(proof, conditions.len() as i64);
+    let (_, body) = close_refinement_goal_with(cx, conditions, goal, &[], Some(lifted));
+    let body = zonk_obligation_levels(cx, &body.expect("selected certificate has a body"));
+    ken_kernel::check::admit_bodies(cx.env, &[(hole, body)]).map_err(|error| {
+        ElabError::KernelRejected { error, span: span.clone() }
+    })
+}
+
+/// Select the proof actually stored in the pair. Only a checked, usable term
+/// is evidence: a proposition closed over a path equation is not a witness.
+#[inline(never)]
+fn emit_subset_evidence(
+    cx: &mut ElabCtx<'_>, goal: Term, span: &Span, kind: ObligationKind,
+    direct_evidence: Option<Term>,
+) -> Result<Term, ElabError> {
+    let frames = obligation_path_frames(cx, span)?;
+    // A convoy equation already has a real binder in Γ. Closing it once
+    // more in the hole's extra condition telescope duplicates the premise
+    // and leaves a redundant, unchecked logical assumption next to its
+    // checked witness. Only unbound path frames need an extra Π domain.
+    let conditions = unwitnessed_conditions(&frames);
+    let goal = cx.metas.zonk_term(&goal);
+    let certificate = checked_evidence_certificate(cx, &goal, direct_evidence);
     let (closed, _) = close_refinement_goal_with(cx, &conditions, goal.clone(), &[], None);
     let closed = zonk_obligation_levels(cx, &closed);
     // A certificate's own evidence determines split demand. In particular,
@@ -14883,18 +14922,11 @@ fn emit_subset_evidence(
                 Err(ElabError::NonConvoyableRefinementSplit { span: span.clone() }),
         };
     }
-    let (hole, levels) = declare_obligation_hole(cx, closed.clone(), span, kind)?;
     if let Some(proof) = certificate {
-        let lifted = weaken(&proof, conditions.len() as i64);
-        let (_, body) = close_refinement_goal_with(cx, &conditions, goal, &[], Some(lifted));
-        let body = zonk_obligation_levels(cx, &body.expect("selected certificate has a body"));
-        // The hole was declared at `closed`; admission checks this exact
-        // body against the same type under empty Γ before publishing it.
-        ken_kernel::check::admit_bodies(cx.env, &[(hole, body)]).map_err(|error| {
-            ElabError::KernelRejected { error, span: span.clone() }
-        })?;
+        admit_certificate_hole(cx, &conditions, goal, &proof, span, kind)?;
         return Ok(proof);
     }
+    let (hole, levels) = declare_obligation_hole(cx, closed.clone(), span, kind)?;
     let mut applied = Term::const_(hole, levels);
     for index in (0..cx.ctx.len()).rev() {
         applied = Term::app(applied, Term::var(index));
