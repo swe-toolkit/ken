@@ -407,8 +407,9 @@ Signed arithmetic, division, `Float`, rounding, width and structural
 hull/intersection algebra remain deferred.
 
 The **finite event-trace contract** is pinned in
-**`69-time-and-events.md`** §§1–3 (SPEC-TIME-EVENT-TRACE-CONTRACT;
-SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION).
+**`69-time-and-events.md`** §§1–4 (SPEC-TIME-EVENT-TRACE-CONTRACT;
+SPEC-TIME-WINDOW-MEMBERSHIP; SPEC-TIME-WINDOW-MERGE-DISTRIBUTION;
+SPEC-TIME-MERGE-MEMBERSHIP).
 `Data.Time.EventTrace` uses ordinary `Event p` values in plain
 `List (Event p)` traces, non-decreasing `Nat` times, half-open
 windows and left-biased merging at ties. Its five §1–2 checked laws,
@@ -420,8 +421,15 @@ premises adds no public law. The checked §3 catalog export is present in
 `Data.Time.EventTrace`; package acceptance runs the authored seed at
 `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
 CI and a landed trust measurement are not established by this status.
-Clock effects, durations, causality, infinite streams, a premise-free
-distribution law and k-way merge remain deferred.
+Section 4 specifies three checked, premise-free `list_elem` laws:
+merge-member soundness and separate left/right member preservation.
+Their catalog exports and conformance seed are not delivered by this
+spec-only candidate. Architect AC-0 checked the generic proof bodies
+in scratch without `Axiom`; it did not execute the shipped seed or
+measure landed trust. A private one-way window-of-merge membership
+consequence adds no public law. Clock effects, durations, causality,
+infinite streams, premise-free structural window/merge distribution
+and k-way merge remain deferred.
 
 The **finite least-cost selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;

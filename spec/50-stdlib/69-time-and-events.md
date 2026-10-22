@@ -2,7 +2,8 @@
 
 > **Status: DRAFT v0 (SPEC-TIME-EVENT-TRACE-CONTRACT §1;
 > SPEC-TIME-WINDOW-MEMBERSHIP §2;
-> SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3).** The §1–2 EventTrace
+> SPEC-TIME-WINDOW-MERGE-DISTRIBUTION §3;
+> SPEC-TIME-MERGE-MEMBERSHIP §4).** The §1–2 EventTrace
 > operations, five checked laws, two generic filter prerequisites and
 > both existing seeds are present on main. Section 3 specifies the
 > Architect-D0-checked ordered-input distribution law. The checked §3
@@ -11,6 +12,10 @@
 > `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
 > D0 scratch checks alone were not shipped seed execution. CI and a
 > measured landed trust delta are not established by this status.
+> Section 4 specifies three premise-free merge membership laws; its
+> catalog exports and conformance seed are not delivered by this
+> spec-only candidate. Its Architect D0 is scratch proof evidence,
+> not shipped-seed execution, CI or a landed trust measurement.
 
 ## 1. Finite event traces over natural times
 
@@ -319,8 +324,10 @@ windowed inputs yields `[1,3]`. Swapping the roles to ordered
 `xs=[3]` and unordered `ys=[5,1]` gives the same difference. Thus
 neither a premise-free structural equality nor a law requiring only
 one ordered input is asserted. In these two closed counterexamples,
-both outputs contain the same events; that fact does not imply list
-equality or establish a generic premise-free membership/count law.
+both outputs contain the same events; that closed observation does
+not imply list equality or establish a generic premise-free
+window/merge membership or count-distribution law. Section 4
+separately proves direct merge membership without ordering.
 
 A closed ordered illustration uses `xs=[0a,3a,6a]` and
 `ys=[3b,5b,8b]` with distinct `Bool` payloads `a` and `b`, window
@@ -336,12 +343,16 @@ Applying `count` to both sides of `trace_window_merge` and then
 using §1.3's `trace_merge_count` gives a **count corollary under the
 same two ordering premises**: the count of a windowed merge equals
 the sum of the counts of the windowed inputs, for any classifier and
-query. It needs no additional public theorem. A premise-free
-window/merge count or membership distribution law was **not**
-established by D0 and is not claimed here. Section 2's membership
-laws characterize one window at a time; they do not by themselves
-state membership of a merge. This section adds no payload equality
-decision, sorted carrier type, new primitive, kernel or surface rule.
+query. It needs no additional public theorem. The §3 D0 did not
+establish a premise-free structural window/merge equality or a
+premise-free window/merge count-distribution law, and this section
+claims neither. Section 2's membership laws characterize one window
+at a time; they do not by themselves state membership of a merge.
+Section 4 separately specifies premise-free **merge membership** in
+both directions, with a private one-way window-of-merge membership
+consequence. Section 4 adds no further public window/merge law,
+payload equality decision, sorted carrier type, primitive, kernel
+or surface rule.
 
 ### 3.3 Evidence and catalog boundary
 
@@ -365,3 +376,80 @@ reaches it by adding the name to its existing
 import declaration. No duplicate local proof or new ambient name is
 specified. The new merge/window proof helpers remain private. The
 only new §3 public law is `trace_window_merge`.
+
+## 4. Premise-free membership of a merge
+
+An event occurs in `trace_merge p xs ys` exactly when it occurs in at
+least one input trace, regardless of timestamp order. This is
+**membership**, not structural equality of lists or a claim about
+multiplicities. It uses §2.1's Ω-valued `list_elem (Event p)` for any
+`p : Type`, including payloads without decidable equality. The
+truncated `Or` in the soundness result records the two possible
+sources without exposing a position or requiring a payload
+comparison. The package must export **three checked proof bodies**
+with exactly these public types:
+
+```ken
+pub theorem trace_merge_member_sound
+      (p : Type) (e : Event p) (xs : List (Event p))
+    : (ys : List (Event p))
+      → list_elem (Event p) e (trace_merge p xs ys)
+      → ‖ Or (list_elem (Event p) e xs) (list_elem (Event p) e ys) ‖
+
+pub theorem trace_merge_member_left
+      (p : Type) (e : Event p) (xs : List (Event p))
+    : (ys : List (Event p))
+      → list_elem (Event p) e xs
+      → list_elem (Event p) e (trace_merge p xs ys)
+
+pub theorem trace_merge_member_right
+      (p : Type) (e : Event p) (xs : List (Event p))
+    : (ys : List (Event p))
+      → list_elem (Event p) e ys
+      → list_elem (Event p) e (trace_merge p xs ys)
+```
+
+`trace_merge_member_sound` excludes events not in either input.
+`trace_merge_member_left` and `trace_merge_member_right` retain a
+member from each side, including equal-time events whose merge order
+is decided by §1.2's left tie rule. Together they supply a
+source-to-merge direction for a truncated choice of input: a client
+can eliminate that choice into the Ω-valued merge membership goal
+and apply the corresponding law. That derived combination has no
+fourth public name. No `time_ordered` premise is needed for any of
+the three laws; each input can be unordered. The laws do not imply
+the ordered-input structural distribution of §3.1 when its premises
+are absent.
+
+There is a **private**, one-way window-of-merge consequence. A
+member of `trace_window p lo hi (trace_merge p xs ys)` is a member
+of the merge by `trace_window_member_sound` (§2.3), then belongs to
+`xs` or `ys` by `trace_merge_member_sound`. This yields a truncated
+choice between `list_elem (Event p) e xs` and
+`list_elem (Event p) e ys` without any ordering premise. The
+checked D0 names this composition `trace_window_merge_member_sound`
+privately; §4 adds no public window/merge membership or count law.
+The §2.3 window law also supplies both half-open bound facts, but
+neither those facts nor this consequence assert a structural
+window/merge equality for unordered inputs.
+
+The checked proof follows the existing structurally recursive
+`trace_merge`/private `trace_merge_into` arrangement (§1.2).
+Three private `trace_merge_into_member_*` helpers carry the
+respective recursive soundness, left and right membership premises
+through the right input; their three private `_cons` branches
+transport the selected head comparison. The development reuses
+`list_elem_later` from `Data.Collections.Derived` and imports
+`Or`, `Inl` and `Inr` explicitly from `Core.Logic.Or`. It does
+**not** reuse `list_elem_append_left` or `_right`: merge is not
+append. `elim_trunc`, `trunc_intro` and `absurd` are existing
+surface forms, not new ambient names or primitives.
+
+On base `747b105cfaf6c50aa03cee8294a3fff4d08da650`, the Architect
+reported a scratch check of the three generic package laws and the
+private window consequence, rc 0 without a code `Axiom`. A mutation
+changing one helper's `Inl` to `Inr` was kernel-refused. These are
+AC-0 proof-development observations, not §4 catalog delivery or
+execution of a shipped seed. This spec-only AC-1 authors no seed,
+and neither the scratch check nor its mutation establishes CI,
+publication, landing or a landed `trusted_base()` measurement.
