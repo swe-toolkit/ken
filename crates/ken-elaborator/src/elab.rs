@@ -9277,6 +9277,32 @@ fn install_arm_coordinates(
             installs.push((position, (value.clone(), ty.clone(), depth)));
         }
     }
+    // An enclosing arm installed its coordinates before this arm renamed its
+    // scrutinee and index variables. Read them through this renaming, so an
+    // outer name agrees with the context this arm refines (34 §3.3).
+    let substitutions: Vec<(Term, Term)> = installs
+        .iter()
+        .map(|(position, (value, _, _))| (Term::var(depth - 1 - position), value.clone()))
+        .collect();
+    let rebased: Vec<(usize, (Term, Term, usize))> = cx
+        .arm_coordinates
+        .iter()
+        .filter(|(position, (_, _, at))| {
+            *at <= depth && !installs.iter().any(|(installed, _)| installed == *position)
+        })
+        .map(|(position, (term, ty, at))| {
+            let growth = (depth - at) as i64;
+            (
+                *position,
+                (
+                    subst_term_generalize_many(&weaken(term, growth), &substitutions),
+                    subst_term_generalize_many(&weaken(ty, growth), &substitutions),
+                    depth,
+                ),
+            )
+        })
+        .collect();
+    cx.arm_coordinates.extend(rebased);
     cx.arm_coordinates.extend(installs);
     Ok(())
 }
