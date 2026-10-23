@@ -34,6 +34,12 @@ exactly §4's public types, each a checked proof.
 Treat anchors as perishable. If a settled input is false on the landed
 base, stop and report the mismatch.
 
+- **Seed fix (Steward amendment 2026-10-23).** The landed positive fence
+  ends one `)` short in `right_result_member_is_sound` (stop
+  `evt_5f0ddkgkdqsn4`). The CV adds that one parenthesis as this
+  candidate's first commit, on the seed path only. Spec-author and Spec
+  Leader review it inside the candidate.
+
 ## Deliverable
 
 The §4 exports and their private helpers in `EventTrace.ken.md`; the

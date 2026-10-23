@@ -12,6 +12,12 @@ github: null
 origin: "Architect scope ruling evt_4yf9jdc9veepy on child 3's 4th advancing stop (evt_x3qm5wmxcwm5) and its diagnosis (evt_4mcwhasce96f1): forced all-Deferred fails byte-identically, so the defect is in the existing producer route that child 3 exposes, not in child 3's settlement emission. Child 3's section 4 stop has fired. Operator 2026-10-17: reactivate the remaining ignored tests. Steward-filed per COORDINATION section 2."
 ---
 
+> **Amended 2026-10-23 (Architect `evt_28qc7qjzewbhd`, Steward
+> `evt_1ptt5bsccyk0`).** This node is the last piece of the single
+> link 3 + child 3 candidate, built fresh on that branch's tip. Its held
+> checkpoints (`1a4ed40ea` and earlier) are references only. The
+> Architect rules its port once BoundaryCarrier (cause D) is closed.
+>
 > **HELD INPUT.** This node does not land on its own. Its reviewed tip
 > is assembled into child 3, like 2a and 2b. No publication and no
 > partial landing.
