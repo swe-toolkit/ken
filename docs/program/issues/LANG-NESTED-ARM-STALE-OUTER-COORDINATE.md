@@ -1,7 +1,7 @@
 ---
 id: LANG-NESTED-ARM-STALE-OUTER-COORDINATE
 title: "A nested match on an indexed field refuses well-typed programs with KernelRejected since 76064f39c: an enclosing arm's installed coordinates are not rebased through the nested arm's field refinements, so outer names resolve stale. Rebase them, and keep the inner names' resolution"
-status: active
+status: merged
 owner: language
 size: M
 tier: T1

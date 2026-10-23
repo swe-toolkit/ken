@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMAX
 title: "Spec 72 defers maximization, so a client cannot select the greatest-cost candidate from a NonEmpty list and rely on checked membership, optimality and an earliest-tie rule. Rule argmax with checked laws at zero trust from a D0, and state it as a section 3 with a conformance seed"
-status: ready
+status: active
 owner: spec
 size: M
 tier: T1
