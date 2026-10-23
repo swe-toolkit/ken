@@ -2879,9 +2879,11 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
         .collect::<BTreeSet<_>>();
     let pending_vis_record_protocol = static_transition_plan.pending_vis_settlements.protocol.clone();
     let response_owner_settlements = static_transition_plan.pending_vis_settlements.owners.clone();
+    let response_bracket_exits = static_transition_plan.pending_vis_settlements.bracket_exits.clone();
     let mut compiler = Lowering {
         pending_vis_record_protocol,
         response_owner_settlements,
+        response_bracket_exits,
         continuation_claims: None,
         lowered_construct_origins: BTreeSet::new(),
         fusion_compositions: None,
@@ -16703,6 +16705,17 @@ impl<'a> Lowering<'a> {
                         }
                         // Unlicensed: the root lowers ordinarily rather than
                         // supplying a placeholder without an owner retarget.
+                    }
+                    // Only the keyed bracket query mints BracketOwned. An
+                    // origin-only query yielding it has collapsed distinct
+                    // settlement instances at one S; ordinary lowering here
+                    // would bypass the settlement. Child 3 replaces this arm.
+                    Some(ResponseDisposition::BracketOwned(_)) => {
+                        return Err(backend_module(
+                            LoweringCause::PlannerInvariant,
+                            "a bracket-owned response reached the origin-only operation-root disposition"
+                                .to_string(),
+                        ));
                     }
                     // Deferred (R3): the residual falls through to the ordinary
                     // Construct arm below -- main's pre-WP lowering, the exact path

@@ -465,7 +465,7 @@ pub(in crate::cranelift_backend) use super::planning::{
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    ResponseOwnerSettlement, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
+    ResponseOwnerSettlement, BracketSettlementId, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 #[cfg(test)]
@@ -3277,6 +3277,7 @@ struct Lowering<'a> {
     refused_scalar_join: Option<&'a std::cell::Cell<Option<StaticOriginId>>>,
     pending_vis_record_protocol: Option<PendingVisRecordProtocol>,
     response_owner_settlements: BTreeMap<StaticResponseContinuationId, ResponseOwnerSettlement>,
+    response_bracket_exits: BTreeMap<StaticResponseContinuationId, BTreeSet<BracketSettlementId>>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,

@@ -314,6 +314,7 @@ impl<'src> Planner<'src> {
                 required_consumer_projections: BTreeMap::new(),
                 immediate_bridge_realizations: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
+                bracket_settlements: super::brackets::BracketSettlementPlan::default(),
                 static_response_continuations: Vec::new(),
                 static_response_plan_installed: false,
                 static_response_infeasible: None,
@@ -1419,7 +1420,7 @@ impl<'src> Planner<'src> {
         // must leave every prior descriptor, slot, input and affinity byte
         // unchanged, not merely leave the context count plausible.
         let causal_contexts = self.plan.continuation_contexts.clone();
-        self.plan.install_static_response_context_plan()?;
+        self.plan.install_static_response_context_plan(symbols)?;
         let mut causal_abi = self.plan.abi.clone();
         install_continuation_context_abi(&mut causal_abi, &causal_contexts)?;
         // `D5a`: the generated contexts' own ABI, in its own arenas. ⛔ Installed

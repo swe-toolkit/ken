@@ -56,6 +56,7 @@ fn run_checked_bounded_nat_fixture(
         static_transition_plan: inert_test_plan(),
         pending_vis_record_protocol: None,
         response_owner_settlements: BTreeMap::new(),
+        response_bracket_exits: BTreeMap::new(),
         result_table: BTreeMap::new(),
         next_token: 0,
         next_recursor_frame_provenance: 0,

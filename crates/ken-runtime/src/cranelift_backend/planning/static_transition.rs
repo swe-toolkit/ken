@@ -7,6 +7,8 @@
 
 mod abi;
 mod aggregates;
+mod brackets;
+pub(in crate::cranelift_backend) use brackets::BracketSettlementId;
 mod closure;
 mod construction;
 mod continuations;
@@ -652,6 +654,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// `(specialization, worker body)` interner before this population's ABI is
     /// installed.
     continuation_contexts: Vec<PlannedContinuationContext>,
+    /// Checked-marker regions and exact response-context instances. Constructed
+    /// from the raw marked partition before ordinary response demands exist.
+    bracket_settlements: brackets::BracketSettlementPlan,
     /// Every validated response edge resolved through the installed union
     /// context population. Empty exactly when `static_response_infeasible` is
     /// populated or the complete response population is empty.
@@ -1073,7 +1078,8 @@ pub(in crate::cranelift_backend) fn plan_static_transition_graph_with_symbols_an
         }
     }
     planner.connect_declaration_calls(&declaration_entries)?;
-    let plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
+    let mut plan = planner.finish(symbols, root_ingress, functionized_units, forced_carrier_joins)?;
+    brackets::validate_direct_rebuild(&mut plan, entry, declarations, symbols)?;
     #[cfg(feature = "px8-ds-test-support")]
     record_static_response_feasibility_diagnostic(&plan)?;
     #[cfg(feature = "px8-ds-test-support")]

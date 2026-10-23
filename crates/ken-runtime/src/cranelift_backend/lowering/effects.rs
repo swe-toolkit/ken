@@ -220,6 +220,9 @@ fn runtime_producible_constructors(
         file_operation_read,
         file_operation_write,
         file_operation_change_mode,
+        itree_ret,
+        itree_vis,
+        coproduct_in_l,
         io_errors,
         resource_host_io,
         resource_closed,
@@ -270,9 +273,12 @@ fn runtime_producible_constructors(
         resource_mapping_limit,
         resource_kind_mapping,
     } = symbols;
-    // Every field is a constructor the native runtime can put in front of a
-    // match: host-effect responses, process-entry inputs, and the primitive
-    // result vocabulary alike. None is classified as program-only.
+    // The checked ITree/Coproduct spine is constructed by the program; the
+    // host never synthesizes Ret, Vis or InL as a response. Keep these three
+    // fields bound exhaustively, but outside the host-producible inventory.
+    let _ = (itree_ret, itree_vis, coproduct_in_l);
+    // The remaining roles name constructors the runtime can put in front of
+    // a match: host-effect responses, process-entry inputs and primitives.
     let mut producible = [
         process_input,
         list_nil,
@@ -2893,6 +2899,17 @@ impl<'a> Lowering<'a> {
                 }
                 // Unlicensed: an edge no owner replaces enters this function
                 // natively, so the effect lowers ordinarily below.
+            }
+            // Only the keyed bracket query mints BracketOwned. An
+            // origin-only query yielding it has collapsed distinct
+            // settlement instances at one S; ordinary lowering here
+            // would bypass the settlement. Child 3 replaces this arm.
+            Some(ResponseDisposition::BracketOwned(_)) => {
+                return Err(backend_module(
+                    LoweringCause::PlannerInvariant,
+                    "a bracket-owned response reached the origin-only effect disposition"
+                        .to_string(),
+                ));
             }
             // Deferred (R3): the residual falls through to the ordinary host-effect
             // lowering below -- main's pre-WP path (4a088d8aa), no placeholder/owner.
