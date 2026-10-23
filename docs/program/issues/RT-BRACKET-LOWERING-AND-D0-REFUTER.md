@@ -12,11 +12,20 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. THIS IS THE LARGEST OF THE THREE CHILDREN AND THE STEWARD MIS-SIZED THE PARENT TWICE BEFORE; the split point if it proves too big is named in section 6 rather than discovered, and the Steward recuts at the FIRST audit here rather than the second. Pre-registration commit c22f4861d already satisfies the sequencing half of AC-14 and must be preserved; evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee is EVIDENCE, NEVER A CANDIDATE."
 ---
 
-> # NOT STARTABLE YET. It depends on child 2b being accepted.
-> #
-> # **`D0` can still stop the whole chain, and that is its job.**
-> # Do NOT answer a `D0` failure with a larger census. That move cost seven hard
-> # stops on the parked predecessor.
+> **Recut 2026-10-23 (Architect D0 `evt_3yked97dme4gw`).** This child
+> lands together with link 3 (RT-BRACKET-SETTLEMENT-PLANE) as one
+> candidate, fresh on `main`. It is the lawful replacement for link 3's
+> emission refusal (COORDINATION §8a). Links 1 (`77352e68e`) and 2
+> (`b6adca031`) are on `main`. Do not use the held assembly `0b4975281` as
+> a base. Its lowering checkpoints R5 to R8 (`0b4975281..8d3731a3d`) are
+> references only, and so are the held refs.
+> RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER is rebuilt last
+> (`evt_1gxk3pcr6rgw2`).
+>
+> **D0 first (Architect).** After the link 3 coverage census, rule the
+> lowering unit on link 3's port: what ports from R5 to R8, and the px8ta
+> depth-3 row's disposition until NESTED-BODY-ORDER lands. The bar is zero
+> main-green regressions across the ken-cli bracket population.
 
 ## 1. Deliverable
 
