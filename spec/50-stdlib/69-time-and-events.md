@@ -451,7 +451,7 @@ private window consequence, rc 0 without a code `Axiom`. A mutation
 changing one helper's `Inl` to `Inr` was kernel-refused. Those are
 AC-0 proof-development observations, not themselves §4 catalog delivery
 or execution of a shipped seed. The three §4 laws are now checked
-catalog exports. A package-owned test runs the unchanged seed's positive
+catalog exports. A package-owned test runs the corrected seed's positive
 client and its paired refusal on the same fixtures and measures the exact
 `trusted_base()` identity sets before and after loading EventTrace. That
 package test is not official conformance-runner execution, CI,
