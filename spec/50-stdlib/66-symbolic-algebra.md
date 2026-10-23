@@ -525,9 +525,9 @@ theorem deriv_taylor
 
 where `taylor_rem` is a private natural-valued structural remainder.
 The sum and product branches use checked arithmetic identities
-via §2's `poly_eq_sound` on closed expression pairs under a private
-seven-slot `cons_env` environment. The variable branch splits on
-the Boolean comparison that both `var_deriv` and `bump_env` use;
+via §2's `poly_eq_sound` on arithmetic expression pairs interpreted
+under a private seven-slot `cons_env` environment. The variable branch
+splits on the Boolean comparison that both `var_deriv` and `bump_env` use;
 it does not rely on a match of a delta-unfolded neutral expression.
 
 For any `e1` and `e2` satisfying the headline premise, apply that
