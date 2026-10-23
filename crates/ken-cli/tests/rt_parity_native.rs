@@ -2064,6 +2064,22 @@ fn full_demand_producer_k_control(
         .expect("READ response-grid executable bytes");
     let read_hash = read_result.artifact.executable_hash;
     assert_eq!(read.len(), 1);
+    if label == "merge-k" {
+        let bracket = &read[0].bracket_response_rows;
+        assert_eq!(bracket.len(), 2, "both moved K rows remain plane-bound");
+        let vis = bracket.iter().map(|row| row.vis_origin)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(vis.len(), 2, "the bracket K rows have distinct source Vis identities");
+        assert_eq!(vis, read[0].bracket_settlement_vis_origins.iter()
+            .copied().collect(), "the moved rows belong to authenticated S regions");
+        assert!(bracket.iter().all(|row| row.operation == "ResourceRelease"));
+        assert_eq!(bracket.iter().map(|row| row.producer_call_origin)
+            .collect::<std::collections::BTreeSet<_>>().len(), 1,
+            "the two bracket K rows share one producer");
+        assert_eq!(bracket.iter().map(|row| row.k_identity.as_str())
+            .collect::<std::collections::BTreeSet<_>>().len(), 2,
+            "the shared producer retains distinct K identities");
+    }
 
     let ((_root, (result, diagnostics)), applications) =
         ken_runtime::with_static_response_context_demand_mutation(mutation, || {

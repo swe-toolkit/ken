@@ -151,10 +151,10 @@ pub(in crate::cranelift_backend) use responses::{
 };
 #[cfg(feature = "px8-ds-test-support")]
 pub use responses::{
-    mixed_owner_execute_then_resume_overpromotion_is_exact,
+    bracket_ordinary_owner_mutation_is_exact,
     static_response_context_demand_mutation_is_exact,
     suppressed_execute_then_resume_response_is_exact,
-    with_mixed_owner_execute_then_resume_overpromotion,
+    with_bracket_ordinary_owner_mutation,
     with_static_response_context_demand_mutation, with_suppressed_execute_then_resume_response,
     with_suppressed_relay_promotion,
     with_mixed_relay_refusal_observations,
@@ -1219,6 +1219,12 @@ pub struct StaticResponseFeasibilityDiagnostic {
     pub static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
     pub all_static_response_rows: Vec<StaticResponseFeasibilityObservation>,
     pub all_static_response_infeasible: Option<StaticResponseInfeasibleObservation>,
+    /// Marked demand rows resolved under the bracket plane, outside ordinary
+    /// Specialized/Deferred ownership. Their source fields are observed by the
+    /// same projection as ordinary rows; the plane origins are separate so a
+    /// test can verify every moved row belongs to an authenticated settlement.
+    pub bracket_response_rows: Vec<StaticResponseFeasibilityObservation>,
+    pub bracket_settlement_vis_origins: Vec<u32>,
     pub static_response_owners: Vec<StaticResponseOwnerObservation>,
     /// Planner-only, pre-schema identities, exposed solely to test whether
     /// the early and late strata agree on exact members rather than counts.
@@ -1368,6 +1374,11 @@ fn record_static_response_feasibility_diagnostic(
     )?;
     let (all_static_response_rows, all_static_response_infeasible) =
         observe(plan.static_response_feasibility_ledger_all()?)?;
+    let (bracket_response_rows, bracket_infeasible) =
+        observe(Ok(plan.bracket_rows.values().cloned().collect()))?;
+    if bracket_infeasible.is_some() {
+        return Err(planner_error("installed bracket row is infeasible"));
+    }
     let static_response_owners = match plan.static_response_owner_specializations()? {
         Ok(owners) => owners
             .iter()
@@ -1475,6 +1486,10 @@ fn record_static_response_feasibility_diagnostic(
                 static_response_infeasible,
                 all_static_response_rows,
                 all_static_response_infeasible,
+                bracket_response_rows,
+                bracket_settlement_vis_origins: plan.bracket_settlements.regions.iter()
+                    .map(|region| region.settlement.0).collect::<BTreeSet<_>>()
+                    .into_iter().collect(),
                 static_response_owners,
                 pre_schema_transport_sources: plan.pre_schema_transport_sources.iter()
                     .map(|identity| format!("{identity:?}")).collect(),

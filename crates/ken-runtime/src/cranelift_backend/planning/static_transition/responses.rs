@@ -1108,40 +1108,34 @@ pub fn with_mixed_relay_refusal_observations<T>(operation: impl FnOnce() -> T)
     (result, observations)
 }
 
-// Route-B precision control for `RT-WRITEALL-SUCCESS-PLANE-CLOSE`. Production
-// promotes only exclusively-predeclared transport groups. This mutation removes
-// that ownership restriction and counts every mixed-owner response it actually
-// over-promotes; the real WRITE_ALL compile must then refuse the escaping
-// response placeholder.
+// AC-1 control: each marked S must stay outside ordinary response ownership.
+// At plan close, independently revalidate a scratch plan with one installed
+// bracket row illegally reinserted in ordinary ownership. Each S is tested
+// separately; a mutation that never reaches a row cannot count as a control.
 #[cfg(feature = "px8-ds-test-support")]
 thread_local! {
-    static OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE: std::cell::Cell<bool> =
+    static BRACKET_ORDINARY_OWNER_MUTATION: std::cell::Cell<bool> =
         const { std::cell::Cell::new(false) };
-    static OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS: std::cell::Cell<usize> =
+    static BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS: std::cell::Cell<usize> =
         const { std::cell::Cell::new(0) };
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn with_mixed_owner_execute_then_resume_overpromotion<T>(
-    operation: impl FnOnce() -> T,
-) -> (T, usize) {
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| {
-        assert!(
-            !slot.replace(true),
-            "mixed-owner execute-then-resume overpromotion mutations cannot nest"
-        );
+pub fn with_bracket_ordinary_owner_mutation<T>(operation: impl FnOnce() -> T) -> (T, usize) {
+    BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| {
+        assert!(!slot.replace(true), "bracket owner mutations cannot nest");
     });
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS.with(|count| count.set(0));
+    BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS.with(|count| count.set(0));
     let result = operation();
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| slot.set(false));
-    let applications =
-        OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS.with(std::cell::Cell::get);
+    BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| slot.set(false));
+    let applications = BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS
+        .with(std::cell::Cell::get);
     (result, applications)
 }
 
 #[cfg(feature = "px8-ds-test-support")]
-pub fn mixed_owner_execute_then_resume_overpromotion_is_exact() -> bool {
-    OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(|slot| !slot.get())
+pub fn bracket_ordinary_owner_mutation_is_exact() -> bool {
+    BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| !slot.get())
 }
 
 /// Compile-preserving HS15/HS17 refutations. Each moves one operand of the
@@ -3016,6 +3010,8 @@ impl StaticTransitionPlan<'_> {
         }
         let expected_demands = demands.clone();
         #[cfg(feature = "px8-ds-test-support")]
+        let expected_marked_demands = marked_demands.clone();
+        #[cfg(feature = "px8-ds-test-support")]
         if operation.is_none() && apply_mutation {
             if let Some(mutation) =
                 STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION.with(std::cell::Cell::get)
@@ -3084,11 +3080,14 @@ impl StaticTransitionPlan<'_> {
                             })?;
                     }
                     StaticResponseContextDemandMutation::MergeTwoKKeys => {
-                        let pair = demands
+                        // The shared producer's two release K keys are marked
+                        // S rows. AC-1 removed them from ordinary demands;
+                        // corrupt the plane-bound demands themselves instead.
+                        let pair = marked_demands
                             .iter()
                             .enumerate()
                             .find_map(|(left, first)| {
-                                demands.iter().enumerate().find_map(|(right, second)| {
+                                marked_demands.iter().enumerate().find_map(|(right, second)| {
                                     (left != right
                                         && first.producer_call_origin
                                             == second.producer_call_origin
@@ -3099,11 +3098,13 @@ impl StaticTransitionPlan<'_> {
                             })
                             .ok_or_else(|| {
                                 planner_error(
-                                    "the two-K merge mutation found no shared producer",
+                                    "the bracket two-K merge mutation found no shared producer",
                                 )
                             })?;
-                        demands[pair.1].k_specialization = demands[pair.0].k_specialization;
-                        demands[pair.1].k_body_origin = demands[pair.0].k_body_origin;
+                        marked_demands[pair.1].k_specialization =
+                            marked_demands[pair.0].k_specialization;
+                        marked_demands[pair.1].k_body_origin =
+                            marked_demands[pair.0].k_body_origin;
                     }
                     StaticResponseContextDemandMutation::SubstituteResponseWithOperation => {
                         demands[target].response_origin = demands[target].operation_root_origin;
@@ -3243,6 +3244,11 @@ impl StaticTransitionPlan<'_> {
                 }
                 STATIC_RESPONSE_CONTEXT_DEMAND_MUTATION_APPLICATIONS
                     .with(|count| count.set(count.get() + applications));
+                if mutation == StaticResponseContextDemandMutation::MergeTwoKKeys {
+                    validate_static_response_demand_closure(
+                        &expected_marked_demands, &marked_demands,
+                    )?;
+                }
             }
         }
         validate_static_response_demand_closure(&expected_demands, &demands)?;
@@ -3830,11 +3836,6 @@ impl StaticTransitionPlan<'_> {
             let suppress_execute = SUPPRESS_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
             #[cfg(not(feature = "px8-ds-test-support"))]
             let suppress_execute = false;
-            #[cfg(feature = "px8-ds-test-support")]
-            let overpromote_mixed =
-                OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_RESPONSE.with(std::cell::Cell::get);
-            #[cfg(not(feature = "px8-ds-test-support"))]
-            let overpromote_mixed = false;
             let transport_source = transport_sources.contains(&demand.k_identity);
             let exclusively_predeclared_stage = transport_producer_owners
                 .get(&demand.producer_call_origin)
@@ -3848,17 +3849,6 @@ impl StaticTransitionPlan<'_> {
                     demand.vis_origin,
                 )));
             }
-            #[cfg(feature = "px8-ds-test-support")]
-            if count_install_applications
-                && overpromote_mixed
-                && has_unitless_response
-                && requires_execute_then_resume
-                && transport_source
-                && !exclusively_predeclared_stage
-            {
-                OVERPROMOTE_MIXED_EXECUTE_THEN_RESUME_APPLICATIONS
-                    .with(|count| count.set(count.get() + 1));
-            }
             // Execute-then-resume is admitted only for the composed ordinary
             // has-K groups identified above. Unit-less P1 members are absent
             // from `demands` and remain on main lowering, so this loop cannot
@@ -3871,8 +3861,7 @@ impl StaticTransitionPlan<'_> {
                 && (suppress_execute
                     || !requires_execute_then_resume
                     || (has_unitless_response
-                        && !exclusively_predeclared_stage
-                        && !overpromote_mixed))
+                        && !exclusively_predeclared_stage))
             {
                 // Population-side mutation restores P2 for an otherwise eligible
                 // plane; open and single-stage planes remain lawful residuals.
@@ -3958,6 +3947,37 @@ impl StaticTransitionPlan<'_> {
             return Err(planner_error(
                 "the final plan carries no installed static response context plan",
             ));
+        }
+        #[cfg(feature = "px8-ds-test-support")]
+        if BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| slot.replace(false)) {
+            let result = (|| {
+                let mut first_refusal = None;
+                for row in self.bracket_rows.values() {
+                    let mut mutant = self.clone();
+                    mutant.static_response_continuations.push(row.clone());
+                    let Err(error) = mutant.validate_static_response_context_plan(causal_contexts)
+                    else {
+                        return Err(planner_error(
+                            "a bracket row reinserted as an ordinary owner passed plan close",
+                        ));
+                    };
+                    if !format!("{error:?}").contains(
+                        "the installed response context/continuation plane is not its exact closed derivation"
+                    ) {
+                        return Err(planner_error(
+                            "bracket ordinary-owner mutation reached a different refusal",
+                        ));
+                    }
+                    BRACKET_ORDINARY_OWNER_MUTATION_APPLICATIONS
+                        .with(|count| count.set(count.get() + 1));
+                    first_refusal.get_or_insert(error);
+                }
+                first_refusal.ok_or_else(|| planner_error(
+                    "bracket ordinary-owner mutation found no installed marked row",
+                ))
+            })();
+            BRACKET_ORDINARY_OWNER_MUTATION.with(|slot| slot.set(true));
+            return Err(result?);
         }
         let (demands, marked_demands, p1_deferred) =
             match self.static_response_context_demands_filtered(None, false)? {

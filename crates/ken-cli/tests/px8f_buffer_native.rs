@@ -1116,17 +1116,16 @@ fn grafted_spine_expected_source_changes_validation_not_actual_lowering_graph() 
 
 #[cfg(target_os = "linux")]
 /// Promise class: durable invariant. The checked `writeAll` response plane
-/// promotes exactly its two exclusively-predeclared producer groups while the
-/// unit-less P1 and mixed-owner group retain their existing lowering paths.
+/// promotes exactly its two exclusively-predeclared ordinary producer groups;
+/// unit-less P1 remains Deferred and all marked release S rows are bracket-owned.
 ///
-/// MEASURED: the exact FsReadAt and BufferAllocate rows acquire response owners
-/// and compile beside the one FsWriteAt P1 row and three mixed-owner
-/// ResourceRelease rows. Suppression restores those two rows to P2, while
-/// deliberately over-promoting all three ResourceRelease rows reaches the
-/// owner-escape refusal. CLAIMED: the Route-B ownership restriction is both
-/// sufficient and necessary for sound partial specialization. THE GAP: the
-/// successful `ReadSome` body still belongs to the held parent carry WP, so this
-/// predecessor does not claim the runtime right-path witness.
+/// MEASURED: ordinary FsReadAt/BufferAllocate owners compile beside one
+/// FsWriteAt P1 row and three distinct authenticated bracket settlements.
+/// Suppression restores the ordinary read to P2 without moving any S. Inserting
+/// each marked row, one at a time, into ordinary ownership is independently
+/// refused by plan close. CLAIMED: bracket authority never borrows ordinary
+/// ownership. THE GAP: plan-close exclusion does not establish the held parent
+/// carry WP's successful `ReadSome` runtime body.
 #[test]
 fn write_all_classifies_mixed_specialized_and_deferred_responses() {
     std::thread::Builder::new()
@@ -1180,10 +1179,20 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 deferred,
                 std::collections::BTreeMap::from([
                     (("FsWriteAt", "NoContinuationUnit"), 1),
-                    (("ResourceRelease", "UnconsumedTransportCaller"), 3),
                 ]),
-                "P1 stays main-lowered and the mixed-owner group stays P2"
+                "P1 stays main-lowered; marked S cannot enter ordinary Deferred"
             );
+            let bracket = &diagnostic.bracket_response_rows;
+            assert_eq!(bracket.len(), 3, "three mixed-owner release rows move to bracket S");
+            let bracket_vis = bracket.iter().map(|row| row.vis_origin)
+                .collect::<std::collections::BTreeSet<_>>();
+            assert_eq!(bracket_vis.len(), 3, "three distinct release Vis identities");
+            assert_eq!(bracket_vis, diagnostic.bracket_settlement_vis_origins.iter()
+                .copied().collect(), "each moved row belongs to an authenticated S");
+            assert!(bracket.iter().all(|row| row.operation == "ResourceRelease"));
+            assert!(bracket_vis.is_disjoint(&diagnostic.all_static_response_rows.iter()
+                .map(|row| row.vis_origin).collect()),
+                "bracket S rows must not be ordinary specialized owners");
 
             // Gate 0, on continuation structure rather than the RecursiveBackedge
             // marker. The maximum path use is one, every tail returns or makes one
@@ -1231,14 +1240,6 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 Some(1),
                 "P1 short progress must recurse through one static tail call"
             );
-            assert!(
-                diagnostic
-                    .static_response_deferred
-                    .iter()
-                    .filter(|row| row.operation != "FsWriteAt")
-                    .all(|row| row.tail_static_calls == Some(0)),
-                "resource-release continuations must return directly rather than recurse"
-            );
 
             let (suppressed_result, suppressed_diagnostics) =
                 ken_runtime::with_suppressed_execute_then_resume_response(|| {
@@ -1273,41 +1274,34 @@ fn write_all_classifies_mixed_specialized_and_deferred_responses() {
                 suppressed_p2,
                 std::collections::BTreeMap::from([
                     ("FsReadAt", 1),
-                    ("ResourceRelease", 3),
                 ]),
-                "the veto reopens ordinary groups as P2 but not the relay performer"
+                "the veto reopens only the ordinary read group as P2"
             );
+            assert_eq!(suppressed.bracket_response_rows.len(), 3,
+                "suppressing ordinary promotion cannot move bracket settlements");
+            assert_eq!(suppressed.bracket_settlement_vis_origins,
+                diagnostic.bracket_settlement_vis_origins);
             assert!(
                 ken_runtime::suppressed_execute_then_resume_response_is_exact(),
                 "the suppression hook did not restore"
             );
 
-            let ((overpromoted_result, overpromoted_diagnostics), applications) =
-                ken_runtime::with_mixed_owner_execute_then_resume_overpromotion(|| {
-                    compile("px8f_write_all_plane_overpromoted")
+            let ((mutated_result, mutated_diagnostics), applications) =
+                ken_runtime::with_bracket_ordinary_owner_mutation(|| {
+                    compile("px8f_write_all_plane_bracket_owner_mutated")
                 });
-            let error =
-                overpromoted_result.expect_err("over-promoting the mixed-owner group compiled");
-            assert!(
-                format!("{error:?}").contains(
-                    "a deferred host response is compiler control and can only enter its exact \
-                     response owner"
-                ),
-                "over-promotion reached the wrong refusal: {error:?}"
+            let error = mutated_result.expect_err(
+                "a bracket settlement reinserted as an ordinary owner compiled"
             );
-            assert_eq!(
-                overpromoted_diagnostics.len(),
-                1,
-                "the over-promoted plan must reach the lowering refusal"
-            );
-            assert_eq!(
-                applications, 3,
-                "only the real phase-B install counts its three mixed-owner over-promotions"
-            );
-            assert!(
-                ken_runtime::mixed_owner_execute_then_resume_overpromotion_is_exact(),
-                "the over-promotion hook did not restore"
-            );
+            assert!(format!("{error:?}").contains(
+                "the installed response context/continuation plane is not its exact closed derivation"
+            ), "the owner mutation reached the wrong refusal: {error:?}");
+            assert!(mutated_diagnostics.is_empty(),
+                "plan close must refuse before diagnostic publication");
+            assert_eq!(applications, 3,
+                "each of the three marked S rows must independently red ordinary ownership");
+            assert!(ken_runtime::bracket_ordinary_owner_mutation_is_exact(),
+                "the bracket owner mutation hook did not restore");
         })
         .expect("spawn large-stack classify-mixed probe")
         .join()
