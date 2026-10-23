@@ -344,11 +344,12 @@ specifies structural `deriv` and two generic checked laws: universal
 evaluation equality preserves derivative evaluation, and a `True`
 `poly_eq` result remains `True` after differentiation. The Architect's
 §5 D0 checked the Taylor-bump and remainder-extraction proof route
-with no new `Axiom` and trust identities 114→114. Its §5 catalog
-exports and conformance seed are not delivered by this spec-only
-candidate; D0 does not establish shipped-seed execution, CI or landed
-trust. A sorted-list normal form and signed/field arithmetic remain
-deferred.
+with no new `Axiom` and trust identities 114→114. The §5 seed is
+authored as a separate source candidate at
+`conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md`;
+§5 catalog exports remain undelivered. D0 and seed authorship do not
+establish shipped-seed execution, CI or landed trust. A sorted-list
+normal form and signed/field arithmetic remain deferred.
 
 The **exact natural-geometry contract** is pinned in
 **`67-geometry.md`** §§1–4 (SPEC-GEOMETRY-EXACT-CONTRACT;
