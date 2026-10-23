@@ -1,7 +1,7 @@
 ---
 id: LANG-PARTIAL-PRIMITIVE-REFINED-EVIDENCE
 title: "Integer division by a refined divisor {d : Int | Not (Equal Int d 0)} still leaves an open PartialPrim hole, though spec 35 section 3.1 says such an argument makes div and mod total and spec 21 section 6.3's evidence search lists Proj2 of a refined variable. Close the side condition from that evidence with a kernel-checked term"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1

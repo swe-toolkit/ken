@@ -1,7 +1,7 @@
 ---
 id: CAT-TIME-MERGE-MEMBERSHIP
 title: "Data.Time.EventTrace exports spec 69 section 4: premise-free trace_merge membership, sound and complete, proved at zero trust from the Architect's D0 development, with the section 4 seed run by a package test"
-status: draft
+status: active
 owner: foundation
 size: S
 tier: T2
