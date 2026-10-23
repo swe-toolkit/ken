@@ -3,11 +3,13 @@
 > **Status: DRAFT v0 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT §1;
 > SPEC-SYMBOLIC-ALGEBRA-CANONICAL-EQUALITY §2;
 > SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION §3;
-> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION §4).** The §1–3
-> catalog operations, checked laws, and seeds are present on main.
-> Section 4's catalog operations and checked laws are delivered alongside
-> its authored seed. The D0 alone does not establish shipped seed-harness
-> execution or CI.
+> SPEC-SYMBOLIC-ALGEBRA-SUBSTITUTION-COMPOSITION §4;
+> SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE §5).** The §1–3 catalog operations,
+> checked laws, and seeds are present on main. Section 4's catalog
+> operations and checked laws are delivered alongside its authored seed.
+> Section 5 is specified from a checked Architect D0; its catalog exports
+> and conformance seed are separate deliveries. D0 alone establishes
+> neither shipped seed-harness execution nor CI.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -142,9 +144,10 @@ field-dependent operation are deferred. Section 1's distributed list
 is not a canonical form or an equality decision: §2 supplies a
 separate Horner representation and decision, now landed, while
 sorted-list canonicalization remains deferred. Dimension-indexed
-environments and derivatives remain outside §§1–4. Substitution
-and its composition are specified separately in §§3–4; neither is
-silently supplied by the `Nat` distributive normalizer in §1.
+environments remain outside §§1–5. Formal differentiation is specified
+in §5; it does not make this ordered-list normalizer canonical.
+Substitution and its composition are specified separately in §§3–4;
+neither is silently supplied by the `Nat` distributive normalizer in §1.
 
 ## 2. Canonical polynomial form and semantic equality
 
@@ -280,9 +283,11 @@ primitive, or funext assumption is required. §1's ordered-list
 carrier supplies a separate canonical representation and equality
 decision. Sorted-list canonicalization, subtraction and signed
 coefficients, division, factoring, field-dependent operations,
-dimension-indexed environments and derivatives remain outside
-§§1–4. Sections 3–4 specify substitution and its composition
-without changing §2's canonical carrier or decision.
+dimension-indexed environments remain outside §§1–5. Section 5
+specifies formal differentiation, but `canonicalize_complete` alone
+does not prove that differentiation respects semantic equality.
+Sections 3–4 specify substitution and its composition without
+changing §2's canonical carrier or decision.
 
 ## 3. Substitution and evaluation under a composed environment
 
@@ -437,6 +442,122 @@ no `Axiom`, and identical `trusted_base()` identity sets of 114
 entries before and after loading its edited package. The §4 catalog
 extension and authored seed are now present; the D0 measurements alone
 do not establish shipped seed-harness execution, CI, publication, or a
-measured landed trust delta. Sorted-list canonicalization,
-dimension-indexed environments, derivatives, subtraction and
-signed/field operations remain deferred.
+measured landed trust delta. Section 5 specifies formal derivatives;
+it does not add a differentiation/substitution commutation law.
+Sorted-list canonicalization, dimension-indexed environments,
+subtraction and signed/field operations remain deferred.
+
+## 5. Formal derivatives preserve polynomial functions
+
+A formal partial derivative of an `Expr` with respect to a `Nat`
+variable is another `Expr`. It is a structural transformation,
+not a finite-difference operator or a new primitive. The existing
+private `nat_same v w` compares variable indices using the checked
+natural order. The private Boolean helper `var_deriv` returns
+`EConst (Suc Zero)` for a matching variable and `EConst Zero`
+otherwise. The operation has these defining equations:
+
+```ken
+fn var_deriv (b : Bool) : Expr =
+  match b {
+    True ↦ EConst (Suc Zero);
+    False ↦ EConst Zero
+  }
+
+pub fn deriv (v : Nat) (e : Expr) : Expr =
+  match e {
+    EConst c ↦ EConst Zero;
+    EVar w ↦ var_deriv (nat_same v w);
+    EAdd a b ↦ EAdd (deriv v a) (deriv v b);
+    EMul a b ↦ EAdd (EMul (deriv v a) b) (EMul a (deriv v b))
+  }
+```
+
+The product rule is the `EAdd` of two `EMul` terms in that order:
+first differentiate the left operand, then the right. It is not
+an `Expr` quotient law or a claim that arbitrary expressions with
+the same evaluation have identical derivative syntax. The four
+structural equations are definitional consequences of `deriv`,
+not separate exported theorem names.
+
+### 5.1 Checked semantic laws
+
+The package must export checked proof bodies, not postulates or
+open goals, for these two laws. The headline premise quantifies
+over every total `Nat → Nat` environment. The result is pointwise
+`Equal Nat` under every such environment, not structural equality
+of derivative expressions or function extensionality.
+
+```ken
+pub theorem deriv_respects_eval
+  (v : Nat) (e1 : Expr) (e2 : Expr)
+  (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+  (env : Nat → Nat) :
+  Equal Nat (eval env (deriv v e1)) (eval env (deriv v e2))
+
+pub theorem poly_eq_deriv
+  (v : Nat) (e1 : Expr) (e2 : Expr)
+  (h : IsTrue (poly_eq e1 e2)) :
+  IsTrue (poly_eq (deriv v e1) (deriv v e2))
+```
+
+`poly_eq_deriv` preserves a `True` answer in the forward direction
+only. Its proof applies §2's `poly_eq_sound`, the headline law, and
+`poly_eq_complete`. It does not preserve `False`: distinct constants
+both differentiate to `EConst Zero`.
+
+### 5.2 Derivation and extraction boundary
+
+The checked D0 derives the headline without assuming that §2's
+`canonicalize` commutes with differentiation. It therefore does
+**not** use `canonicalize_complete` to obtain a derivative theorem.
+A private `bump_env v t env` raises only variable `v` by `t`.
+Structural induction on `e` proves the private Taylor identity
+
+```ken
+theorem deriv_taylor
+  (v : Nat) (t : Nat) (env : Nat → Nat) (e : Expr) :
+  Equal Nat (eval (bump_env v t env) e)
+    (add (eval env e)
+      (mul t (add (eval env (deriv v e))
+        (mul t (taylor_rem v t env e)))))
+```
+
+where `taylor_rem` is a private natural-valued structural remainder.
+The sum and product branches use checked arithmetic identities
+via §2's `poly_eq_sound` on closed expression pairs under a private
+seven-slot `cons_env` environment. The variable branch splits on
+the Boolean comparison that both `var_deriv` and `bump_env` use;
+it does not rely on a match of a delta-unfolded neutral expression.
+
+For any `e1` and `e2` satisfying the headline premise, apply that
+premise at `env` and at the bumped environment. Cancel the equal
+base values with private `add_cancel_left`, then cancel the positive
+bump factor with private `mul_cancel_positive`. Choose
+`t = Suc (add d1 d2)`, where `d1` and `d2` are the two derivative
+values at `env`; both are strictly below `t`. Private
+`remainder_unique` then extracts `Equal Nat d1 d2`, despite the
+unknown higher-order remainders. The route reuses §2's private
+cancellation and remainder-uniqueness helpers and the checked
+natural-order bounds; none is a new public law, decision procedure,
+primitive or trusted assumption. No subtraction or signed coefficient is needed.
+
+### 5.3 Evidence and limits
+
+On landed base `80682b3f7`, Architect D0 checked the base package
+and the derivative extension separately with `ken check` rc 0.
+The D0 trust test passed with identical five-provider
+`trusted_base()` identity sets, 114 before and 114 after loading.
+There was no new `Axiom`, postulate, admit or import. Removing the
+right-hand product-rule term made the D0 checker reject the proof
+with K0004; restoring it checked again. The base-only trust harness
+reported the same 114 → 114 measurement but failed its subsequent
+new-export lookup, as those exports were not on the base; it was not
+a passing base-harness run.
+
+These are scratch development measurements, not catalog delivery,
+shipped conformance-seed execution, CI, publication, landing or a
+landed trust measurement. The §5 catalog extension and separate
+seed remain to be delivered. No `DecEq Expr`, function equality,
+derivative/substitution commutation, differentiation of signed or
+field coefficients, or analytic limit is claimed.
