@@ -1,10 +1,16 @@
 //! One checked in-place settlement sequence shared by both Construct arms.
-//! `drive_response_at_source` supplies the existing host-effect and lexical-K
-//! lowering; the ledger binds it to the authenticated S and exit ports.
+//! `perform_response_at_source` supplies the existing host effect; the ledger
+//! binds it to the authenticated S and exit ports. The settlement returns the
+//! lexical K for its caller to lower: the expression arm lowers it directly,
+//! and the producer arm hands it to the producer trampoline, so K is never
+//! lowered under the producer stack or nested inside the settlement's frames.
 
 use cranelift_frontend::FunctionBuilder;
 
-use super::{BracketSettlement, BracketSettlementMode, EliminatorFrame, Lowering, LoweringOperand};
+use super::super::planning::StaticOriginId;
+use super::{
+    BracketSettlement, BracketSettlementMode, Lowering, LoweringEnvironmentBinding, LoweringOperand,
+};
 use crate::cranelift_backend::surface::{backend_module, CraneliftBackendError, LoweringCause};
 use crate::RuntimeExpr;
 
@@ -14,8 +20,7 @@ impl Lowering<'_> {
         builder: &mut FunctionBuilder<'_>,
         region: &BracketSettlement,
         lowered_args: &[LoweringOperand],
-        producer_eliminators: Option<&[EliminatorFrame<'_>]>,
-    ) -> Result<LoweringOperand, CraneliftBackendError> {
+    ) -> Result<(StaticOriginId, Vec<LoweringEnvironmentBinding>), CraneliftBackendError> {
         let row = region.row().cloned().ok_or_else(|| {
             Self::bracket_error("an InPlace bracket settlement has no validated response row")
         })?;
@@ -65,7 +70,7 @@ impl Lowering<'_> {
                 "an InPlace S effect claim is already open",
             ));
         }
-        let settled = self.drive_response_at_source(
+        let settled = self.perform_response_at_source(
             builder,
             region.settlement(),
             lowered_args,
@@ -73,7 +78,6 @@ impl Lowering<'_> {
             row.effect_origin(),
             row.operation(),
             Some((row.base_owner(), row.effect_source_owner())),
-            producer_eliminators,
         );
         let unclaimed = self.bracket_effect_claim.take().is_some();
         let settled = settled?;

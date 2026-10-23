@@ -3198,6 +3198,14 @@ enum ProducerTrampolineWork<'a> {
         answer: RoutedAnswer,
         eliminators: Vec<EliminatorFrame<'a>>,
     },
+    // An in-place bracket S has performed its effect. Its lexical K is lowered
+    // at the trampoline's own depth, never under the producer stack, and its
+    // value continues through the remaining eliminators as an ordinary answer.
+    LexicalK {
+        body: StaticOriginId,
+        env: Vec<LoweringEnvironmentBinding>,
+        eliminators: Vec<EliminatorFrame<'a>>,
+    },
 }
 
 // One step either transfers the real routed answer to the next iteration or
@@ -3476,23 +3484,47 @@ impl<'a> Lowering<'a> {
         // can extract only a completed ordinary result.
         loop {
             step = match step {
-                ProducerTrampolineStep::Continue(work) => {
-                    let ProducerTrampolineWork::Value {
+                ProducerTrampolineStep::Continue(work) => match *work {
+                    ProducerTrampolineWork::Value {
                         answer,
                         eliminators,
-                    } = *work;
-                    self.lower_computational_match_value_composed_once(
+                    } => self.lower_computational_match_value_composed_once(
                         builder,
                         answer,
                         &eliminators,
-                    )?
-                }
+                    )?,
+                    ProducerTrampolineWork::LexicalK {
+                        body,
+                        env,
+                        eliminators,
+                    } => self.lower_bracket_lexical_k(builder, body, &env, eliminators)?,
+                },
                 ProducerTrampolineStep::Complete(returned) => {
                     let ComposedReturn::Ordinary(value) = *returned;
                     return Ok(value);
                 }
             };
         }
+    }
+
+    // Kept out of line: every nested trampoline level holds its loop frame on
+    // the stack, and only a settled bracket needs the room to lower K.
+    #[inline(never)]
+    fn lower_bracket_lexical_k<'b>(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        body: StaticOriginId,
+        env: &[LoweringEnvironmentBinding],
+        eliminators: Vec<EliminatorFrame<'b>>,
+    ) -> Result<ProducerTrampolineStep<'b>, CraneliftBackendError> {
+        let k_body = self.retained_body_occurrence(body)?;
+        let answer = RoutedAnswer::direct(self.lower_expr(builder, k_body, env)?);
+        Ok(ProducerTrampolineStep::Continue(Box::new(
+            ProducerTrampolineWork::Value {
+                answer,
+                eliminators,
+            },
+        )))
     }
 
     fn continue_composed_value<'b>(
@@ -4301,17 +4333,21 @@ impl<'a> Lowering<'a> {
         // return. No operand is cloned to keep these two states in agreement.
         loop {
             step = match step {
-                ProducerTrampolineStep::Continue(work) => {
-                    let ProducerTrampolineWork::Value {
+                ProducerTrampolineStep::Continue(work) => match *work {
+                    ProducerTrampolineWork::Value {
                         answer,
                         eliminators,
-                    } = *work;
-                    self.lower_computational_match_value_composed_once(
+                    } => self.lower_computational_match_value_composed_once(
                         builder,
                         answer,
                         &eliminators,
-                    )?
-                }
+                    )?,
+                    ProducerTrampolineWork::LexicalK {
+                        body,
+                        env,
+                        eliminators,
+                    } => self.lower_bracket_lexical_k(builder, body, &env, eliminators)?,
+                },
                 ProducerTrampolineStep::Complete(returned) => {
                     let ComposedReturn::Ordinary(value) = *returned;
                     return Ok(value);
@@ -5891,6 +5927,38 @@ impl<'a> Lowering<'a> {
         effect_authority: Option<(ContinuationEmissionOwner, PredeclaredFunctionId)>,
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
+        let (body, k_env) = self.perform_response_at_source(
+            builder,
+            vis_origin,
+            lowered_args,
+            operation_root_origin,
+            effect_origin,
+            planned_operation,
+            effect_authority,
+        )?;
+        let k_body = self.retained_body_occurrence(body)?;
+        match producer_eliminators {
+            Some(eliminators) => {
+                let eliminators = eliminators.to_vec();
+                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
+            }
+            None => self.lower_expr(builder, k_body, &k_env),
+        }
+    }
+
+    /// Perform the response's host effect at its Construct-Vis source and
+    /// return its exact lexical K body with the environment K is entered with.
+    /// The caller decides where K is lowered.
+    pub(super) fn perform_response_at_source(
+        &mut self,
+        builder: &mut FunctionBuilder<'_>,
+        vis_origin: StaticOriginId,
+        lowered_args: &[LoweringOperand],
+        operation_root_origin: StaticOriginId,
+        effect_origin: StaticOriginId,
+        planned_operation: ken_host::HostOpV1,
+        effect_authority: Option<(ContinuationEmissionOwner, PredeclaredFunctionId)>,
+    ) -> Result<(StaticOriginId, Vec<LoweringEnvironmentBinding>), CraneliftBackendError> {
         let [operation, k] = lowered_args else {
             return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
@@ -6162,14 +6230,7 @@ impl<'a> Lowering<'a> {
                 .cloned()
                 .map(LoweringEnvironmentBinding::Value),
         );
-        let k_body = self.retained_body_occurrence(*body)?;
-        match producer_eliminators {
-            Some(eliminators) => {
-                let eliminators = eliminators.to_vec();
-                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
-            }
-            None => self.lower_expr(builder, k_body, &k_env),
-        }
+        Ok((*body, k_env))
     }
 
     fn lower_computational_producer_call(
@@ -6992,9 +7053,15 @@ impl<'a> Lowering<'a> {
                             self.lower_expr(builder, arg, producer_env)
                         })
                         .collect::<Result<Vec<_>, _>>()?;
-                    return self.settle_bracket_at_source(
-                        builder, &region, &lowered_args, Some(eliminators),
-                    ).map(ProducerTrampolineStep::ordinary);
+                    let (body, env) =
+                        self.settle_bracket_at_source(builder, &region, &lowered_args)?;
+                    return Ok(ProducerTrampolineStep::Continue(Box::new(
+                        ProducerTrampolineWork::LexicalK {
+                            body,
+                            env,
+                            eliminators: eliminators.to_vec(),
+                        },
+                    )));
                 }
                 BracketSettlementMode::Deferred => {
                     self.bracket_ledger.consume_settlement(region.id(), region.mode(),
@@ -16729,9 +16796,10 @@ impl<'a> Lowering<'a> {
                                     self.lower_expr(builder, arg, env)
                                 })
                                 .collect::<Result<Vec<_>, _>>()?;
-                            return self.settle_bracket_at_source(
-                                builder, region, &lowered_args, None,
-                            );
+                            let (body, k_env) =
+                                self.settle_bracket_at_source(builder, region, &lowered_args)?;
+                            let k_body = self.retained_body_occurrence(body)?;
+                            return self.lower_expr(builder, k_body, &k_env);
                         }
                         BracketSettlementMode::Deferred => {
                             self.bracket_ledger.consume_settlement(region.id(), region.mode(),
