@@ -5,8 +5,8 @@ polynomials. A separate recursive Horner form collects like terms and decides
 semantic equality. Substitution replaces variables in a single pass and
 preserves evaluation and a positive equality decision under every total
 environment. Substitutions also compose in a fixed order and have the variable
-constructor as their identity map. These operations have kernel-checked generic
-laws.
+constructor as their identity map. Formal differentiation preserves equality
+of polynomial functions. These operations have kernel-checked generic laws.
 
 ## Contents
 
@@ -50,6 +50,10 @@ that substitution preserves a `False` answer. `compose_subst` applies its
 second argument first and then its first argument to each inserted expression.
 Two checked laws establish structural composition and constructor identity;
 private expression congruence proofs support their inductive branches.
+`deriv` differentiates each expression constructor structurally. Its two
+checked laws say that equal polynomial functions have equal derivatives at
+every environment and that `poly_eq` preserves a `True` answer after
+differentiation. Private Taylor and natural-arithmetic proofs support them.
 
 ```ken
 import Core.Logic.Transport (cong, sym, trans)
@@ -857,6 +861,67 @@ pub theorem substitute_var (e : Expr) : Equal Expr (substitute EVar e) e =
         (substitute_var a)
         (substitute_var b)
   }
+
+pub fn deriv (v : Nat) (e : Expr) : Expr =
+  match e {
+    EConst c ↦ EConst Zero;
+    EVar w ↦ var_deriv (nat_same v w);
+    EAdd a b ↦ EAdd (deriv v a) (deriv v b);
+    EMul a b ↦ EAdd (EMul (deriv v a) b) (EMul a (deriv v b))
+  }
+
+pub theorem deriv_respects_eval
+      (v : Nat)
+      (e1 : Expr)
+      (e2 : Expr)
+      (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+      (env : Nat → Nat)
+    : Equal Nat (eval env (deriv v e1)) (eval env (deriv v e2)) =
+  let
+    d1 : Nat = eval env (deriv v e1);
+    d2 : Nat = eval env (deriv v e2);
+    t : Nat = Suc (add d1 d2);
+    r1 : Nat = taylor_rem v t env e1;
+    r2 : Nat = taylor_rem v t env e2;
+    bumped : Nat → Nat = bump_env v t env
+  in
+    deriv_extract
+      (eval env e1)
+      (eval env e2)
+      t
+      d1
+      d2
+      r1
+      r2
+      Proved
+      (leq_nat_add_left_bound d1 d2)
+      (leq_nat_add_right_bound d1 d2)
+      (h env)
+      (trans
+        Nat
+        (add (eval env e1) (mul t (add d1 (mul t r1))))
+        (eval bumped e1)
+        (add (eval env e2) (mul t (add d2 (mul t r2))))
+        (sym
+          Nat
+          (eval bumped e1)
+          (add (eval env e1) (mul t (add d1 (mul t r1))))
+          (deriv_taylor v t env e1))
+        (trans
+          Nat
+          (eval bumped e1)
+          (eval bumped e2)
+          (add (eval env e2) (mul t (add d2 (mul t r2))))
+          (h bumped)
+          (deriv_taylor v t env e2)))
+
+pub theorem poly_eq_deriv
+      (v : Nat) (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq (deriv v e1) (deriv v e2)) =
+  poly_eq_complete
+    (deriv v e1)
+    (deriv v e2)
+    (λenv. deriv_respects_eval v e1 e2 (λg. poly_eq_sound e1 e2 h g) env)
 
 theorem expr_add_cong
       (a1 : Expr)
@@ -2151,6 +2216,239 @@ theorem poly_same_refl (p : Poly) : IsTrue (poly_same p p) =
         (poly_same_refl p0)
         (poly_same_refl q)
   }
+
+fn var_deriv (b : Bool) : Expr =
+  match b {
+    True ↦ EConst (Suc Zero);
+    False ↦ EConst Zero
+  }
+
+fn bump_at (b : Bool) (x : Nat) (t : Nat) : Nat =
+  match b {
+    True ↦ add x t;
+    False ↦ x
+  }
+
+fn bump_env (v : Nat) (t : Nat) (env : Nat → Nat) (w : Nat) : Nat =
+  bump_at (nat_same v w) (env w) t
+
+fn taylor_rem (v : Nat) (t : Nat) (env : Nat → Nat) (e : Expr) : Nat =
+  match e {
+    EConst c ↦ Zero;
+    EVar w ↦ Zero;
+    EAdd a b ↦ add (taylor_rem v t env a) (taylor_rem v t env b);
+    EMul a b ↦
+      add
+        (add
+          (mul (taylor_rem v t env a) (eval env b))
+          (mul (eval env a) (taylor_rem v t env b)))
+        (mul
+          (add (eval env (deriv v a)) (mul t (taylor_rem v t env a)))
+          (add (eval env (deriv v b)) (mul t (taylor_rem v t env b))))
+  }
+
+theorem deriv_taylor
+      (v : Nat) (t : Nat) (env : Nat → Nat) (e : Expr)
+    : Equal Nat
+        (eval (bump_env v t env) e)
+        (add (eval env e) (mul t (add (eval env (deriv v e)) (mul t (taylor_rem v t env e))))) =
+  match e {
+    EConst c ↦ Refl;
+    EVar w ↦ taylor_var (nat_same v w) env (env w) t;
+    EAdd a b ↦
+      trans
+        Nat
+        (add (eval (bump_env v t env) a) (eval (bump_env v t env) b))
+        (add
+          (add (eval env a) (mul t (add (eval env (deriv v a)) (mul t (taylor_rem v t env a)))))
+          (add
+            (eval env b)
+            (mul t (add (eval env (deriv v b)) (mul t (taylor_rem v t env b))))))
+        (add
+          (add (eval env a) (eval env b))
+          (mul
+            t
+            (add
+              (add (eval env (deriv v a)) (eval env (deriv v b)))
+              (mul t (add (taylor_rem v t env a) (taylor_rem v t env b))))))
+        (add_cong
+          (eval (bump_env v t env) a)
+          (add (eval env a) (mul t (add (eval env (deriv v a)) (mul t (taylor_rem v t env a)))))
+          (eval (bump_env v t env) b)
+          (add (eval env b) (mul t (add (eval env (deriv v b)) (mul t (taylor_rem v t env b)))))
+          (deriv_taylor v t env a)
+          (deriv_taylor v t env b))
+        (taylor_add_identity
+          (eval env a)
+          (eval env b)
+          t
+          (eval env (deriv v a))
+          (eval env (deriv v b))
+          (taylor_rem v t env a)
+          (taylor_rem v t env b));
+    EMul a b ↦
+      trans
+        Nat
+        (mul (eval (bump_env v t env) a) (eval (bump_env v t env) b))
+        (mul
+          (add (eval env a) (mul t (add (eval env (deriv v a)) (mul t (taylor_rem v t env a)))))
+          (add
+            (eval env b)
+            (mul t (add (eval env (deriv v b)) (mul t (taylor_rem v t env b))))))
+        (add
+          (mul (eval env a) (eval env b))
+          (mul
+            t
+            (add
+              (add
+                (mul (eval env (deriv v a)) (eval env b))
+                (mul (eval env a) (eval env (deriv v b))))
+              (mul t (taylor_rem v t env (EMul a b))))))
+        (mul_cong
+          (eval (bump_env v t env) a)
+          (add (eval env a) (mul t (add (eval env (deriv v a)) (mul t (taylor_rem v t env a)))))
+          (eval (bump_env v t env) b)
+          (add (eval env b) (mul t (add (eval env (deriv v b)) (mul t (taylor_rem v t env b)))))
+          (deriv_taylor v t env a)
+          (deriv_taylor v t env b))
+        (taylor_mul_identity
+          (eval env a)
+          (eval env b)
+          t
+          (eval env (deriv v a))
+          (eval env (deriv v b))
+          (taylor_rem v t env a)
+          (taylor_rem v t env b))
+  }
+
+theorem taylor_var
+      (b : Bool) (env : Nat → Nat) (x : Nat) (t : Nat)
+    : Equal Nat (bump_at b x t) (add x (mul t (add (eval env (var_deriv b)) (mul t Zero)))) =
+  match b {
+    True ↦
+      poly_eq_sound
+        (EAdd (EVar Zero) (EVar (Suc Zero)))
+        (EAdd (EVar Zero) (EMul (EVar (Suc Zero)) (EConst (Suc Zero))))
+        Proved
+        (ring_env x t Zero Zero Zero Zero Zero);
+    False ↦ Refl
+  }
+
+fn ring_env (a : Nat) (b : Nat) (c : Nat) (d : Nat) (e : Nat) (f : Nat) (g : Nat) : Nat → Nat =
+  cons_env
+    a
+    (cons_env b (cons_env c (cons_env d (cons_env e (cons_env f (cons_env g one_env))))))
+
+theorem taylor_add_identity
+      (a : Nat) (b : Nat) (t : Nat) (da : Nat) (db : Nat) (ra : Nat) (rb : Nat)
+    : Equal Nat
+        (add (add a (mul t (add da (mul t ra)))) (add b (mul t (add db (mul t rb)))))
+        (add (add a b) (mul t (add (add da db) (mul t (add ra rb))))) =
+  poly_eq_sound
+    (EAdd
+      (EAdd (EVar Zero) (EMul ring_t (EAdd ring_da (EMul ring_t ring_ra))))
+      (EAdd (EVar (Suc Zero)) (EMul ring_t (EAdd ring_db (EMul ring_t ring_rb)))))
+    (EAdd
+      (EAdd (EVar Zero) (EVar (Suc Zero)))
+      (EMul ring_t (EAdd (EAdd ring_da ring_db) (EMul ring_t (EAdd ring_ra ring_rb)))))
+    Proved
+    (ring_env a b t da db ra rb)
+
+theorem taylor_mul_identity
+      (a : Nat) (b : Nat) (t : Nat) (da : Nat) (db : Nat) (ra : Nat) (rb : Nat)
+    : Equal Nat
+        (mul (add a (mul t (add da (mul t ra)))) (add b (mul t (add db (mul t rb)))))
+        (add
+          (mul a b)
+          (mul
+            t
+            (add
+              (add (mul da b) (mul a db))
+              (mul
+                t
+                (add
+                  (add (mul ra b) (mul a rb))
+                  (mul (add da (mul t ra)) (add db (mul t rb)))))))) =
+  poly_eq_sound
+    (EMul
+      (EAdd (EVar Zero) (EMul ring_t (EAdd ring_da (EMul ring_t ring_ra))))
+      (EAdd (EVar (Suc Zero)) (EMul ring_t (EAdd ring_db (EMul ring_t ring_rb)))))
+    (EAdd
+      (EMul (EVar Zero) (EVar (Suc Zero)))
+      (EMul
+        ring_t
+        (EAdd
+          (EAdd (EMul ring_da (EVar (Suc Zero))) (EMul (EVar Zero) ring_db))
+          (EMul
+            ring_t
+            (EAdd
+              (EAdd (EMul ring_ra (EVar (Suc Zero))) (EMul (EVar Zero) ring_rb))
+              (EMul
+                (EAdd ring_da (EMul ring_t ring_ra))
+                (EAdd ring_db (EMul ring_t ring_rb))))))))
+    Proved
+    (ring_env a b t da db ra rb)
+
+const ring_t : Expr = EVar (Suc (Suc Zero))
+
+const ring_da : Expr = EVar (Suc (Suc (Suc Zero)))
+
+const ring_db : Expr = EVar (Suc (Suc (Suc (Suc Zero))))
+
+const ring_ra : Expr = EVar (Suc (Suc (Suc (Suc (Suc Zero)))))
+
+const ring_rb : Expr = EVar (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))
+
+theorem deriv_extract
+      (a1 : Nat)
+      (a2 : Nat)
+      (t : Nat)
+      (d1 : Nat)
+      (d2 : Nat)
+      (r1 : Nat)
+      (r2 : Nat)
+      (ht : IsTrue (leq_nat (Suc Zero) t))
+      (h1 : IsTrue (leq_nat (Suc d1) t))
+      (h2 : IsTrue (leq_nat (Suc d2) t))
+      (h0 : Equal Nat a1 a2)
+      (h : Equal Nat (add a1 (mul t (add d1 (mul t r1)))) (add a2 (mul t (add d2 (mul t r2)))))
+    : Equal Nat d1 d2 =
+  remainder_unique
+    t
+    d1
+    d2
+    r1
+    r2
+    h1
+    h2
+    (mul_cancel_positive
+      (add d1 (mul t r1))
+      (add d2 (mul t r2))
+      t
+      ht
+      (trans
+        Nat
+        (mul (add d1 (mul t r1)) t)
+        (mul t (add d1 (mul t r1)))
+        (mul (add d2 (mul t r2)) t)
+        ((proof comm for mul) (add d1 (mul t r1)) t)
+        (trans
+          Nat
+          (mul t (add d1 (mul t r1)))
+          (mul t (add d2 (mul t r2)))
+          (mul (add d2 (mul t r2)) t)
+          (add_cancel_left
+            a1
+            (mul t (add d1 (mul t r1)))
+            (mul t (add d2 (mul t r2)))
+            (trans
+              Nat
+              (add a1 (mul t (add d1 (mul t r1))))
+              (add a2 (mul t (add d2 (mul t r2))))
+              (add a1 (mul t (add d2 (mul t r2))))
+              h
+              (cong Nat Nat a2 a1 (λu. add u (mul t (add d2 (mul t r2)))) (sym Nat a1 a2 h0))))
+          ((proof comm for mul) t (add d2 (mul t r2))))))
 ```
 
 ## 3. Using it
@@ -2231,6 +2529,16 @@ original expression and lifts the induction hypotheses through `EAdd` and
 `EMul` with private congruence proofs. `substitute_var` uses the same structural
 steps with `EVar` as the identity map; neither theorem equates functions.
 
+`deriv_respects_eval` proves a Taylor expansion by structural induction on an
+expression, with a private natural-valued remainder. The arithmetic in its
+addition and multiplication branches follows from `poly_eq_sound` applied to
+polynomial identities. Equal evaluations at the original and bumped
+environments cancel the base value and positive bump factor. Taking the bump
+larger than both derivative values lets `remainder_unique` identify those
+values. `poly_eq_deriv` applies this semantic result to `poly_eq_sound`, then
+uses `poly_eq_complete` for the decision. Neither law equates derivative
+expression trees or uses `canonicalize_complete` as a derivative theorem.
+
 ## 5. Design notes
 
 A variable index is a `Nat`, and the evaluator's environment is a total
@@ -2247,7 +2555,9 @@ variable's image once;
 evaluating the original expression under `compose_env` gives the same result
 as evaluating its substitution under the given environment. To apply two
 substitutions, `compose_subst s t` visits each `t` image with `s`; it does not
-change the single-pass behavior of either substitution.
+change the single-pass behavior of either substitution. Differentiation of a
+product keeps both summands in left-then-right order; derivatives of different
+expressions with equal evaluations need not have identical expression trees.
 
 A `PHorner p q` reads `p` with variable indices shifted upward and adds `q`
 multiplied by variable zero. Collapsing `PHorner (PConst c) (PConst Zero)`
@@ -2270,24 +2580,25 @@ for coefficient equality, not a new trusted equality primitive.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–4 and
+The [contract](../../../../spec/50-stdlib/66-symbolic-algebra.md) §§1–5 and
 its [distributed seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial.md),
 [canonical-equality seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-canonical-equality.md),
 [substitution seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution.md),
-and [composition seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-composition.md)
+[composition seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-substitution-composition.md),
+and [derivative seed](../../../../conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md)
 specify the public surface and closed observations. The public API comprises
-`Expr`, `Monomial`, `Poly`, their exported constructors, twelve operations,
-and fourteen checked theorems; Horner and substitution expose no additional
-helper beyond those named operations and laws. Definition locates the
-implementations and law statements; Using it gives client idioms; Laws &
-proofs traces the proof families; Design notes separates their
+`Expr`, `Monomial`, `Poly`, their exported constructors, thirteen operations,
+and sixteen checked theorems; Horner, substitution and differentiation expose
+no additional helper beyond those named operations and laws. Definition
+locates the implementations and law statements; Using it gives client idioms;
+Laws & proofs traces the proof families; Design notes separates their
 representations and limits.
 
 The source derives evaluation from the checked natural arithmetic, logic
 transport, Boolean conjunction, natural order and list-append definitions.
 Private functions and lemmas implement distribution, Horner collection,
-canonicity, positivity, substitution and expression congruence, and proof
-rearrangements.
+canonicity, positivity, substitution, differentiation and expression
+congruence, and proof rearrangements.
 The root-loaded acceptance target compares exact trusted-`GlobalId` sets
 before and after loading the
 package on its providers. The extension adds no Axiom, postulate, primitive,

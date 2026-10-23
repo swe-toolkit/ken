@@ -33,7 +33,6 @@ have value four there, while `x` has value two.
 
 ```ken
 import Core.Logic.Transport (cong, trans)
-import Core.Classes.LawfulClasses (IsTrue)
 import Data.Numeric.Nat.Arithmetic (add, mul, mul_add_distrib_r)
 import Algorithm.SymbolicAlgebra.NatPolynomial
   (Expr, EConst, EVar, EAdd, EMul, eval, poly_eq,
