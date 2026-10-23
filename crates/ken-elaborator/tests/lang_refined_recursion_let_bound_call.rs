@@ -1,14 +1,14 @@
 //! Let-bound refined recursive calls retain their checked descent and trust boundary.
 
 use ken_elaborator::{ElabEnv, ElabError, ObligationKind};
-use ken_kernel::{Decl, KernelError};
+use ken_kernel::{normalize, Context, Decl, KernelError};
 use std::collections::BTreeSet;
 
 fn row(result: &str, step: &str) -> String {
     format!("fn g (n : AnyNat) : {result} = match n {{ Zero |-> Zero ; Suc m |-> {step} }}")
 }
 
-fn check_row(source: &str, goals: usize, explicit_axioms: usize) {
+fn check_row(source: &str, goals: usize, explicit_axioms: usize) -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_decl("def AnyNat = { x : Nat | Top }")
         .expect("refined carrier alias");
@@ -55,6 +55,47 @@ fn check_row(source: &str, goals: usize, explicit_axioms: usize) {
     assert!(other
         .iter()
         .all(|id| matches!(env.env.lookup(*id), Some(Decl::Opaque { .. }))));
+    env
+}
+
+// The checked public wrapper calls the emitted private recursive worker.
+// Normalize each closed call against an independently written, checked Nat
+// constructor. For the match rows, inputs one and two enter different inner
+// methods, so type-correct admission alone cannot supply the observation.
+fn check_row_with_outputs(source: &str, goals: usize) {
+    let mut env = check_row(source, goals, 0);
+    let trust = env.env.trusted_base();
+    for (index, (input, expected)) in [
+        ("Zero", "Zero"),
+        ("Suc Zero", "Suc Zero"),
+        ("Suc (Suc Zero)", "Suc (Suc Zero)"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let observed_id = env
+            .elaborate_decl(&format!(
+                "const observed_{index} : Nat = g ({input}, Proved)"
+            ))
+            .unwrap_or_else(|error| panic!("checked call g ({input}, Proved): {error:?}"));
+        let expected_id = env
+            .elaborate_decl(&format!("const expected_{index} : Nat = {expected}"))
+            .unwrap_or_else(|error| panic!("checked Nat constructor {expected}: {error:?}"));
+        let normal = |id| {
+            let body = env
+                .env
+                .transparent_body(id)
+                .expect("checked transparent const")
+                .1;
+            normalize(&env.env, &Context::new(), &body)
+        };
+        assert_eq!(
+            normal(observed_id),
+            normal(expected_id),
+            "emitted recursive result for g ({input}, Proved)"
+        );
+    }
+    assert_eq!(env.env.trusted_base(), trust, "closed calls add no trust");
 }
 
 fn expect_k0014(source: &str) {
@@ -108,68 +149,65 @@ fn lp_let_of_suc_inherits_call_argument() {
 
 /// Promise class: durable invariant (spec 17 §4; spec 39 §3; spec 64 §1).
 /// MEASURED: each nested-let value yields one kernel-checked recursive worker,
-/// three goals and no trust beyond open holes. CLAIMED: a let-bound value whose
-/// inner body returns the saturated call carries its refined argument into
-/// the outer let's type and scope. THE GAP: match/if and non-tail calls have
-/// independent rows below.
+/// three goals, no trust beyond open holes, and the expected Nat results at
+/// zero, one and two. CLAIMED: an inner let returning the saturated call
+/// preserves the outer result as well as structural descent. THE GAP: match,
+/// if and non-tail calls have independent rows below.
 #[test]
 fn rr2_nested_let_return_result() {
-    check_row(&row(RESULT, "let r = (let s = g m in s) in Suc r"), 3, 0);
+    check_row_with_outputs(&row(RESULT, "let r = (let s = g m in s) in Suc r"), 3);
 }
 
 #[test]
 fn rr2_nested_let_return_ensures() {
-    check_row(&row(ENSURES, "let r = (let s = g m in s) in Suc r"), 3, 0);
+    check_row_with_outputs(&row(ENSURES, "let r = (let s = g m in s) in Suc r"), 3);
 }
 
 /// Promise class: durable invariant (spec 17 §4; spec 39 §3; spec 64 §1).
-/// MEASURED: a match whose two arms return the call is checked with four
-/// goals and no new opaque assumption beyond open holes. CLAIMED: method
-/// binders, motive and both methods inherit only the call arguments common
-/// to all arms. THE GAP: unequal/absent calls are earlier E0083, not a
-/// refusal imposed by this adapter; nondecreasing calls have K0014 rows.
+/// MEASURED: checked match/if calls return the expected Nat constructors at
+/// zero, one and two, including both nested match methods, with four goals
+/// and no trust beyond open holes. CLAIMED: method binders, motive and methods
+/// inherit only the arguments common to all arms without changing results.
+/// THE GAP: unequal/absent calls refuse earlier with E0083, outside this
+/// adapter; nondecreasing calls have independent K0014 rows.
 #[test]
 fn rr2_match_both_methods_return_call() {
-    check_row(
+    check_row_with_outputs(
         &row(
             RESULT,
             "let r = (match m { Zero |-> g m ; Suc k |-> g m }) in Suc r",
         ),
         4,
-        0,
     );
 }
 
 #[test]
 fn rr2_match_ensures_both_methods_return_call() {
-    check_row(
+    check_row_with_outputs(
         &row(
             ENSURES,
             "let r = (match m { Zero |-> g m ; Suc k |-> g m }) in Suc r",
         ),
         4,
-        0,
     );
 }
 
 #[test]
 fn rr2_if_both_methods_return_call() {
-    check_row(
+    check_row_with_outputs(
         &row(RESULT, "let r = (if True then g m else g m) in Suc r"),
         4,
-        0,
     );
 }
 
 #[test]
 fn rr2_arm_local_let_returns_call() {
-    check_row(
+    check_row_with_outputs(
         &row(
             RESULT,
             "let r = (match m { Zero |-> let s = g m in s ; Suc k |-> g m }) in Suc r",
         ),
         4,
-        0,
     );
 }
 
