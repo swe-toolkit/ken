@@ -137,10 +137,10 @@ fn projection_pair(term: &Term) -> Option<(&Term, &Term)> {
 
 /// What a literal-pair projection may do during the rewrite.
 enum ProjectionRedexes {
-    /// Pre-check: admit only a refined argument of the enclosing member call
-    /// when it appears inside that call's result ascription type. These two
-    /// restrictions are defensive; the current source negatives do not
-    /// independently discriminate position from argument identity.
+    /// Pre-check: admit only a projection whose operand is a refined argument
+    /// of a saturated member call whose value is in flight: in that call's
+    /// result ascription or in the type and scope of a let that binds it.
+    /// Authority is inherited inward and never reset.
     Induced(Vec<Term>),
     /// Worker construction: reduce every literal-pair projection after the
     /// original type and body have passed the pre-check.
@@ -160,6 +160,46 @@ impl ProjectionRedexes {
             Self::Induced(args) => args.iter().any(|arg| arg == strip_ascript(operand)),
             Self::All => true,
         }
+    }
+
+    /// Add the refined arguments of a saturated member call to the inherited set.
+    fn with_call(
+        &self,
+        call: &Term,
+        members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
+    ) -> Self {
+        match self {
+            Self::Induced(args) => Self::Induced(
+                args.iter()
+                    .cloned()
+                    .chain(member_call_refined_args(call, members))
+                    .collect(),
+            ),
+            Self::All => Self::All,
+        }
+    }
+}
+
+/// The refined arguments of a saturated member call; otherwise none.
+fn member_call_refined_args(
+    term: &Term,
+    members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
+) -> Vec<Term> {
+    let (head, args) = peel_app(term);
+    match head {
+        Term::Const { id, .. } => members
+            .get(&id)
+            .filter(|(positions, _)| args.len() >= positions.len())
+            .map(|(positions, _)| {
+                positions
+                    .iter()
+                    .zip(&args)
+                    .filter(|(position, _)| position.is_some())
+                    .map(|(_, arg)| strip_ascript(arg).clone())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        _ => vec![],
     }
 }
 
@@ -226,44 +266,20 @@ fn rewrite_core(
                 None => Term::proj2(inner),
             }
         }
-        Term::Let { ty, val, body } => Term::Let {
-            ty: Box::new(walk(ty)?),
-            val: Box::new(walk(val)?),
-            body: Box::new(under_binder(body)?),
-        },
+        Term::Let { ty, val, body } => {
+            let bound = mode.with_call(val, members);
+            Term::Let {
+                ty: Box::new(rewrite_core(ty, members, &bound)?),
+                val: Box::new(walk(val)?),
+                body: Box::new(rewrite_core(body, members, &bound.under_binder())?),
+            }
+        }
         Term::Ascript(body, ty) => match mode {
             ProjectionRedexes::All => Term::Ascript(Box::new(walk(body)?), Box::new(walk(ty)?)),
-            ProjectionRedexes::Induced(_) => {
-                // An outer call's argument cannot authorize a projection in
-                // this term. Only this ascription's own saturated member call
-                // may authorize a projection in its result type.
-                let rewritten_body =
-                    rewrite_core(body, members, &ProjectionRedexes::Induced(vec![]))?;
-                let (head, args) = peel_app(body);
-                let induced = match head {
-                    Term::Const { id, .. } => members
-                        .get(&id)
-                        .filter(|(positions, _)| args.len() >= positions.len())
-                        .map(|(positions, _)| {
-                            positions
-                                .iter()
-                                .zip(&args)
-                                .filter(|(position, _)| position.is_some())
-                                .map(|(_, arg)| strip_ascript(arg).clone())
-                                .collect()
-                        })
-                        .unwrap_or_default(),
-                    _ => vec![],
-                };
-                Term::Ascript(
-                    Box::new(rewritten_body),
-                    Box::new(rewrite_core(
-                        ty,
-                        members,
-                        &ProjectionRedexes::Induced(induced),
-                    )?),
-                )
-            }
+            ProjectionRedexes::Induced(_) => Term::Ascript(
+                Box::new(walk(body)?),
+                Box::new(rewrite_core(ty, members, &mode.with_call(body, members))?),
+            ),
         },
         Term::Eq(a, b, c) => Term::Eq(Box::new(walk(a)?), Box::new(walk(b)?), Box::new(walk(c)?)),
         Term::Refl(a) => Term::Refl(Box::new(walk(a)?)),
@@ -374,9 +390,10 @@ impl RefinedWorkerPlan {
             .map(|member| (member.id, (member.positions.as_slice(), GlobalId(u32::MAX))))
             .collect();
         for member in &members {
-            // Permit only a refined call argument projected inside that
-            // call's result ascription. Source literal-pair projections and
-            // every other shape retain the original admission path.
+            // Permit only a refined call argument projected where that call's
+            // value is in flight: its result ascription, or a let that binds it.
+            // Source literal-pair projections and every other shape retain the
+            // original admission path.
             rewrite_core(
                 &member.original_type,
                 &by_id,
