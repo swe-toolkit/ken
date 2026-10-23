@@ -416,8 +416,53 @@ fn body_walk(plan: &StaticTransitionPlan<'_>, origin: StaticOriginId,
             Ok(())
         }
         RuntimeExpr::Trap(_) => Err(planner_error("body trap has no settlement edge")),
+        RuntimeExpr::Call { .. } => match applied_tail(plan, origin)? {
+            AppliedTail::Lexical(body) =>
+                body_walk(plan, body, roles, key, depth, visited, exits, crossed),
+            // A declared computation inside a bind scrutinee returns through
+            // that bind exactly as a `Ret` does, and the bind forwards its Vis.
+            AppliedTail::Declared if depth != 0 => Ok(()),
+            AppliedTail::Declared => Err(planner_error("body bypasses settlement")),
+        },
         _ => Err(planner_error("body tail leaves the region unit")),
     }
+}
+
+enum AppliedTail {
+    Lexical(StaticOriginId),
+    Declared,
+}
+
+/// Where a body-tail application transfers control. A `Call` chain whose
+/// innermost callee is a `LexicalClosure`, each closure layer taking exactly
+/// its application's argument count, continues in that closure's body. A
+/// chain whose innermost callee is a planned declaration call target is an
+/// opaque declared computation. A variable callee, a partial or
+/// over-application, or anything else stays refused. Arguments are not
+/// tails: a settlement hidden in one is left out of `exits` and refused by
+/// the exits equality at the region close.
+fn applied_tail(plan: &StaticTransitionPlan<'_>, origin: StaticOriginId)
+    -> Result<AppliedTail, CraneliftBackendError>
+{
+    let mut arities = Vec::new();
+    let mut at = origin;
+    while let RuntimeExpr::Call { args, .. } = expr(plan, at)? {
+        arities.push(args.len());
+        at = child(plan, at, 0)?;
+    }
+    if matches!(expr(plan, at)?, RuntimeExpr::DeclarationRef { .. })
+        && plan.declaration_call_target_class(at).is_some()
+    {
+        return Ok(AppliedTail::Declared);
+    }
+    for arity in arities.into_iter().rev() {
+        match expr(plan, at)? {
+            RuntimeExpr::LexicalClosure { params, .. } if params.len() == arity =>
+                at = child(plan, at, 0)?,
+            _ => return Err(planner_error("body tail leaves the region unit")),
+        }
+    }
+    Ok(AppliedTail::Lexical(at))
 }
 
 fn source_marks(plan: &StaticTransitionPlan<'_>)
@@ -556,9 +601,7 @@ pub(super) fn build_bracket_static_regions(plan: &StaticTransitionPlan<'_>,
         let mut exits = BTreeSet::new();
         let mut crossed = BTreeSet::new();
         body_walk(plan, body_entry, roles, &key, 0, &mut body, &mut exits, &mut crossed)?;
-        if exits != BTreeSet::from([settlement]) {
-            return Err(planner_error("bracket Body exits do not equal its authenticated settlement marks"));
-        }
+        require_body_exits(&exits, settlement)?;
         regions.push(BracketStaticRegion {
             key, acquire: a, acquire_failure_resume: acquire_error, body_entry, body,
             settlement, outcome_merge, resume, crossed_settlements: crossed, parent: None,
@@ -566,6 +609,15 @@ pub(super) fn build_bracket_static_regions(plan: &StaticTransitionPlan<'_>,
     }
     assign_parent_forest(&mut regions)?;
     Ok(regions)
+}
+
+fn require_body_exits(
+    exits: &BTreeSet<StaticOriginId>, settlement: StaticOriginId,
+) -> Result<(), CraneliftBackendError> {
+    if *exits != BTreeSet::from([settlement]) {
+        return Err(planner_error("bracket Body exits do not equal its authenticated settlement marks"));
+    }
+    Ok(())
 }
 
 /// Source containment must form a unique acyclic parent relation. Keeping
@@ -880,6 +932,24 @@ mod tests {
         assert_eq!(actual, reason);
     }
 
+    fn walk_test_body<'a>(
+        body: &'a RuntimeExpr,
+        declarations: &BTreeMap<&str, &'a RuntimeDeclaration>,
+        depth: usize,
+    ) -> Result<(BTreeSet<StaticOriginId>, BTreeSet<StaticOriginId>), CraneliftBackendError> {
+        let symbols = NativeProcessSymbols::legacy_prelude();
+        let plan = super::super::plan_static_transition_graph_with_symbols(
+            body, declarations, &symbols, super::super::AbiRootIngress::Value, false,
+        ).expect("the control has a planned source graph");
+        let mut visited = BTreeSet::new();
+        let mut exits = BTreeSet::new();
+        let mut crossed = BTreeSet::new();
+        body_walk(&plan, plan.root_occurrence.expect("the body has a source origin"),
+            &BracketRoles::from(&symbols), &template(11).key, depth,
+            &mut visited, &mut exits, &mut crossed)?;
+        Ok((visited, exits))
+    }
+
     fn marked(role: CheckedBracketMarkRole) -> CheckedBracketRegionMarker {
         CheckedBracketRegionMarker {
             owner: "measured-bracket-owner".into(), role, constructor_node_id: 1,
@@ -1010,6 +1080,177 @@ mod tests {
             "body trap has no settlement edge");
         assert_eq!(visited.len(), 1, "the refusal reached the exact Trap source");
         assert!(exits.is_empty());
+    }
+
+    /// Promise class: durable invariant. An unbound variable cannot become a
+    /// body-tail transfer merely because it occurs in a Call callee position.
+    #[test]
+    fn body_tail_variable_callee_refuses() {
+        let body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::Var(0)), args: Vec::new(),
+        };
+        let symbols = NativeProcessSymbols::legacy_prelude();
+        let plan = super::super::plan_static_transition_graph_with_symbols(
+            &body, &BTreeMap::new(), &symbols,
+            super::super::AbiRootIngress::Value, false,
+        ).expect("the variable Call has a source origin");
+        let mut visited = BTreeSet::new();
+        let mut exits = BTreeSet::new();
+        let mut crossed = BTreeSet::new();
+        assert_refusal(body_walk(&plan, plan.root_occurrence.unwrap(),
+            &BracketRoles::from(&symbols), &template(11).key, 0,
+            &mut visited, &mut exits, &mut crossed),
+            "body tail leaves the region unit");
+        assert_eq!(visited.len(), 1, "the Call reached the tail walk");
+    }
+
+    /// Promise class: durable invariant. A one-argument call cannot enter a
+    /// closure requiring two arguments, even if its body would reach a return.
+    #[test]
+    fn body_tail_partial_lexical_application_refuses() {
+        let body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(), params: vec!["a".into(), "b".into()],
+                body: Box::new(RuntimeExpr::Construct {
+                    constructor: NativeProcessSymbols::legacy_prelude().itree_ret,
+                    args: vec![RuntimeExpr::Var(0)],
+                }),
+            }),
+            args: vec![RuntimeExpr::Var(0)],
+        };
+        let symbols = NativeProcessSymbols::legacy_prelude();
+        let plan = super::super::plan_static_transition_graph_with_symbols(
+            &body, &BTreeMap::new(), &symbols,
+            super::super::AbiRootIngress::Value, false,
+        ).expect("the partial Call has a source origin");
+        let mut visited = BTreeSet::new();
+        let mut exits = BTreeSet::new();
+        let mut crossed = BTreeSet::new();
+        assert_refusal(body_walk(&plan, plan.root_occurrence.unwrap(),
+            &BracketRoles::from(&symbols), &template(11).key, 0,
+            &mut visited, &mut exits, &mut crossed),
+            "body tail leaves the region unit");
+        assert_eq!(visited.len(), 1);
+    }
+
+    /// Promise class: durable invariant. A planned declaration call may end
+    /// a forwarding bind scrutinee, but cannot bypass settlement at depth 0.
+    #[test]
+    fn declared_body_tail_needs_forwarding_bind_depth() {
+        let declaration = RuntimeDeclaration {
+            symbol: "decl:body-tail-control".into(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::Value(crate::RuntimeValue::Bool(true)),
+            },
+            metadata: crate::RuntimeSymbolMetadata::empty(),
+        };
+        let body = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: declaration.symbol.clone(),
+            }),
+            args: Vec::new(),
+        };
+        let declarations = BTreeMap::from([(declaration.symbol.as_str(), &declaration)]);
+        let symbols = NativeProcessSymbols::legacy_prelude();
+        let plan = super::super::plan_static_transition_graph_with_symbols(
+            &body, &declarations, &symbols,
+            super::super::AbiRootIngress::Value, false,
+        ).expect("the declared target is planned");
+        let origin = plan.root_occurrence.unwrap();
+        assert!(matches!(applied_tail(&plan, origin), Ok(AppliedTail::Declared)),
+            "the declared target must be planned, not inferred from its name");
+        let mut visited = BTreeSet::new();
+        let mut exits = BTreeSet::new();
+        let mut crossed = BTreeSet::new();
+        assert_refusal(body_walk(&plan, origin, &BracketRoles::from(&symbols),
+            &template(11).key, 0, &mut visited, &mut exits, &mut crossed),
+            "body bypasses settlement");
+        assert!(walk_test_body(&body, &declarations, 1).is_ok(),
+            "the same declared computation returns through the bind at depth 1");
+    }
+
+    fn staged_marked_tail(in_argument: bool)
+        -> (BTreeSet<StaticOriginId>, BTreeSet<StaticOriginId>, StaticOriginId)
+    {
+        let symbols = NativeProcessSymbols::legacy_prelude();
+        let settlement = || RuntimeExpr::Construct {
+            constructor: symbols.itree_vis.clone(),
+            args: vec![RuntimeExpr::Construct {
+                constructor: symbols.coproduct_in_l.clone(),
+                args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(false))],
+            }, RuntimeExpr::LexicalClosure {
+                captures: Vec::new(), params: vec!["settled".into()],
+                body: Box::new(RuntimeExpr::Construct {
+                    constructor: symbols.itree_ret.clone(),
+                    args: vec![RuntimeExpr::Var(0)],
+                }),
+            }],
+        };
+        let source = RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::LexicalClosure {
+                captures: Vec::new(), params: vec!["body".into()],
+                body: Box::new(if in_argument {
+                    RuntimeExpr::Construct {
+                        constructor: symbols.itree_ret.clone(),
+                        args: vec![RuntimeExpr::Var(0)],
+                    }
+                } else { settlement() }),
+            }),
+            args: vec![if in_argument { settlement() } else {
+                RuntimeExpr::Value(crate::RuntimeValue::Bool(true))
+            }],
+        };
+        let mut plan = super::super::plan_static_transition_graph_with_symbols(
+            &source, &BTreeMap::new(), &symbols,
+            super::super::AbiRootIngress::Value, false,
+        ).expect("the unmarked fixture has a source graph");
+        let root = plan.root_occurrence.expect("the application has an origin");
+        let s = if in_argument { child(&plan, root, 1) }
+            else { child(&plan, child(&plan, root, 0).unwrap(), 0) }
+            .expect("the Vis source is in the chosen position");
+        let marker = child(&plan, child(&plan, s, 0).unwrap(), 0).unwrap();
+        // Isolate body_walk after source planning. The pre-existing leaf is
+        // replaced by a checked Finalizer only here, without changing any
+        // graph edge. Full marker pairing is tested separately; this unit
+        // varies solely whether the authenticated S sits in the body tail or
+        // in an application argument.
+        let finalizer = Box::leak(Box::new(RuntimeExpr::CheckedBracketFinalizer {
+            region: Box::new(marked(CheckedBracketMarkRole::Finalizer)),
+            body: Box::new(RuntimeExpr::Construct {
+                constructor: symbols.itree_ret.clone(),
+                args: vec![RuntimeExpr::Value(crate::RuntimeValue::Bool(true))],
+            }),
+        }));
+        plan.source_occurrences[marker.0 as usize]
+            .as_mut().expect("the marker slot is planned").expr = finalizer;
+        let mut visited = BTreeSet::new();
+        let mut exits = BTreeSet::new();
+        let mut crossed = BTreeSet::new();
+        body_walk(&plan, root, &BracketRoles::from(&symbols), &template(11).key,
+            usize::from(in_argument), &mut visited, &mut exits, &mut crossed)
+            .expect("the saturated lexical call transfers to its body");
+        (visited, exits, s)
+    }
+
+    /// Promise class: durable invariant. A saturated lexical application
+    /// transfers to its body and counts the one checked settlement at its Vis.
+    #[test]
+    fn saturated_lexical_body_tail_records_exact_settlement() {
+        let (visited, exits, settlement) = staged_marked_tail(false);
+        assert!(visited.contains(&settlement));
+        assert_eq!(exits, BTreeSet::from([settlement]));
+        require_body_exits(&exits, settlement).expect("the exit is the selected S");
+    }
+
+    /// Promise class: durable invariant. An application argument is not a
+    /// body tail; hiding S there cannot satisfy the region's exit equality.
+    #[test]
+    fn settlement_hidden_in_application_argument_refuses_at_exit_equality() {
+        let (visited, exits, settlement) = staged_marked_tail(true);
+        assert!(!visited.contains(&settlement));
+        assert!(exits.is_empty());
+        assert_refusal(require_body_exits(&exits, settlement),
+            "bracket Body exits do not equal its authenticated settlement marks");
     }
 
     /// Durable invariant: each exact source-return context over one marked S
