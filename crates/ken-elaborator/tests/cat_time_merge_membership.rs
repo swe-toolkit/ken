@@ -11,7 +11,7 @@ use ken_elaborator::{
     extract_ken_md, Decl as SourceDecl, ElabEnv, ElabError, Expr as SourceExpr, KenMdFenceRole,
     Type as SourceType,
 };
-use ken_kernel::{Decl, KernelError};
+use ken_kernel::Decl;
 
 const TRACE: &str = "Data.Time.EventTrace";
 const SEED: &str = include_str!(concat!(
@@ -159,8 +159,7 @@ fn shipped_unordered_tie_client_checks() {
 // proposition or witness that the checker is actually asked to accept.
 fn type_shape(ty: &SourceType) -> String {
     match ty {
-        SourceType::TCon(name, _) => format!("con:{name}"),
-        SourceType::TVar(name, _) => format!("var:{name}"),
+        SourceType::TCon(name, _) | SourceType::TVar(name, _) => format!("name:{name}"),
         SourceType::TApp(function, argument, _) => {
             format!("({} {})", type_shape(function), type_shape(argument))
         }
@@ -263,10 +262,10 @@ fn assert_refusal_is_same_input_false_head(positive: &str, negative: &str) -> ke
     let [element, query, refused_merge]: [&SourceType; 3] = type_applied(refused, "list_elem")
         .try_into()
         .expect("refusal queries one element of the merge");
-    assert_eq!(type_shape(element), "(con:Event con:Bool)");
-    assert_eq!(type_shape(query), "var:neither");
+    assert_eq!(type_shape(element), "(name:Event name:Bool)");
+    assert_eq!(type_shape(query), "name:neither");
     assert_eq!(type_shape(refused_merge), type_shape(checked_merge));
-    assert_eq!(type_shape(checked_result), "var:merged");
+    assert_eq!(type_shape(checked_result), "name:merged");
 
     // The accepted closed merge's first head is the only branch this seed
     // attempts. Ensure its queried event differs from every input entry by
@@ -302,8 +301,8 @@ fn assert_refusal_is_same_input_false_head(positive: &str, negative: &str) -> ke
 /// accepted exact-result control and its false `Refl` identifies a fresh
 /// query with that result's first head. Independently checked time facts
 /// distinguish the query from all four input events. The refusal is appended
-/// to a fresh accepted client and fails at its own theorem with a typed kernel
-/// TypeMismatch, not an import, setup or earlier-positive error.
+/// to a fresh accepted client and fails at its own `Refl` with a typed
+/// elaborator TypeMismatch, not an import, setup or earlier-positive error.
 /// CLAIMED: an event absent from either input cannot be made a member of
 /// their merge by a fabricated head-equality proof.
 /// THE GAP: one false head witness is not a proof against all possible false
@@ -345,10 +344,19 @@ theorem neither_after_right_early :
     env.elaborate_file(positive)
         .expect("entire positive seed fence must check before refusal");
     match env.elaborate_file(negative) {
-        Err(ElabError::KernelRejected {
-            error: KernelError::TypeMismatch { .. },
-            span,
-        }) => assert_eq!(span, negative_span, "false witness fails in its theorem"),
-        other => panic!("false head witness must kernel-reject, got {other:?}"),
+        Err(ElabError::TypeMismatch { span, reason })
+            if reason == "Refl expects an `Eq`-shaped goal" =>
+        {
+            assert!(
+                span.start >= negative_span.start && span.end <= negative_span.end,
+                "false witness fails inside its own theorem"
+            );
+            assert_eq!(
+                negative.get(span.start..span.end),
+                Some("Refl"),
+                "the rejected child is precisely the false head equality"
+            );
+        }
+        other => panic!("false head witness must reject at Refl, got {other:?}"),
     }
 }

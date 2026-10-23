@@ -12,8 +12,8 @@ premise.
 
 The three §4 catalog exports are checked. A package-owned test runs the
 unchanged positive Ken fence and then appends the refused fence to a fresh
-copy of that accepted client. It verifies a typed kernel rejection at the
-false head-equality witness, not an import or fixture failure. This is
+copy of that accepted client. It verifies a typed elaborator rejection at
+`Refl` in the false head-equality witness, not an import or fixture failure. This is
 package-test execution, not official conformance-runner execution, CI,
 publication, landing or a landed trust measurement. The test checks the
 exact trusted-base identities before and after loading the package.
@@ -161,7 +161,7 @@ an unrelated failure.
 - measured: the package test first checks the entire positive fence, then
   submits this refusal alone in the accepted client's context. It pins the
   refused theorem to the same merge and queried event, and verifies
-  `KernelRejected(TypeMismatch)` at the false head-equality witness.
+  `TypeMismatch` at the false head-equality `Refl` witness.
 - claimed: an event absent from both inputs is not a member of their
   merge.
 - gap: this refusal checks one attempted head witness, not every possible

@@ -1140,10 +1140,7 @@ pub theorem trace_merge_member_sound
       λys.
         λmember.
           trunc_intro
-            (Inr
-              (list_elem (Event p) e (Nil (Event p)))
-              (list_elem (Event p) e ys)
-              member);
+            (Inr (list_elem (Event p) e (Nil (Event p))) (list_elem (Event p) e ys) member);
     Cons x xt ↦
       λys.
         trace_merge_into_member_sound
@@ -1201,12 +1198,22 @@ theorem trace_merge_into_member_sound_cons
       (xt : List (Event p))
       (rest : List (Event p) → List (Event p))
       (rest_sound : (zs : List (Event p))
-        → list_elem (Event p) e (rest zs)
-        → ‖ Or (list_elem (Event p) e xt) (list_elem (Event p) e zs) ‖)
+        → list_elem
+        (Event p)
+        e
+        (rest zs)
+        → ‖ Or
+        (list_elem (Event p) e xt)
+        (list_elem (Event p) e zs) ‖)
       (y : Event p)
       (yt : List (Event p))
-      (ih : list_elem (Event p) e (trace_merge_into p x xt rest yt)
-        → ‖ Or (list_elem (Event p) e (Cons (Event p) x xt)) (list_elem (Event p) e yt) ‖)
+      (ih : list_elem
+        (Event p)
+        e
+        (trace_merge_into p x xt rest yt)
+        → ‖ Or
+        (list_elem (Event p) e (Cons (Event p) x xt))
+        (list_elem (Event p) e yt) ‖)
       (decision : Bool)
     : Equal Bool (event_before p x y) decision
       → list_elem (Event p) e (trace_merge_into p x xt rest (Cons (Event p) y yt))
@@ -1219,15 +1226,15 @@ theorem trace_merge_into_member_sound_cons
         J
           (λchoice _.
             list_elem
-                (Event p)
-                e
-                (match choice {
-                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
-                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
-                })
-              → ‖ Or
-                (list_elem (Event p) e (Cons (Event p) x xt))
-                (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              })
+            → ‖ Or
+              (list_elem (Event p) e (Cons (Event p) x xt))
+              (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
           (λmember.
             elim_trunc
               (‖ Or
@@ -1271,15 +1278,15 @@ theorem trace_merge_into_member_sound_cons
         J
           (λchoice _.
             list_elem
-                (Event p)
-                e
-                (match choice {
-                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
-                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
-                })
-              → ‖ Or
-                (list_elem (Event p) e (Cons (Event p) x xt))
-                (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              })
+            → ‖ Or
+              (list_elem (Event p) e (Cons (Event p) x xt))
+              (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
           (λmember.
             elim_trunc
               (‖ Or
@@ -1327,8 +1334,13 @@ theorem trace_merge_into_member_sound
       (xt : List (Event p))
       (rest : List (Event p) → List (Event p))
       (rest_sound : (zs : List (Event p))
-        → list_elem (Event p) e (rest zs)
-        → ‖ Or (list_elem (Event p) e xt) (list_elem (Event p) e zs) ‖)
+        → list_elem
+        (Event p)
+        e
+        (rest zs)
+        → ‖ Or
+        (list_elem (Event p) e xt)
+        (list_elem (Event p) e zs) ‖)
       (ys : List (Event p))
     : list_elem (Event p) e (trace_merge_into p x xt rest ys)
       → ‖ Or (list_elem (Event p) e (Cons (Event p) x xt)) (list_elem (Event p) e ys) ‖ =
@@ -1362,12 +1374,24 @@ theorem trace_merge_into_member_left_cons
       (xt : List (Event p))
       (rest : List (Event p) → List (Event p))
       (rest_left : (zs : List (Event p))
-        → list_elem (Event p) e xt
-        → list_elem (Event p) e (rest zs))
+        → list_elem
+        (Event p)
+        e
+        xt
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
       (y : Event p)
       (yt : List (Event p))
-      (ih : list_elem (Event p) e (Cons (Event p) x xt)
-        → list_elem (Event p) e (trace_merge_into p x xt rest yt))
+      (ih : list_elem
+        (Event p)
+        e
+        (Cons (Event p) x xt)
+        → list_elem
+        (Event p)
+        e
+        (trace_merge_into p x xt rest yt))
       (decision : Bool)
     : Equal Bool (event_before p x y) decision
       → list_elem (Event p) e (Cons (Event p) x xt)
@@ -1378,13 +1402,13 @@ theorem trace_merge_into_member_left_cons
         J
           (λchoice _.
             list_elem (Event p) e (Cons (Event p) x xt)
-              → list_elem
-                (Event p)
-                e
-                (match choice {
-                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
-                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
-                }))
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
           (λmember.
             elim_trunc
               (list_elem (Event p) e (Cons (Event p) x (rest (Cons (Event p) y yt))))
@@ -1411,15 +1435,14 @@ theorem trace_merge_into_member_left_cons
         J
           (λchoice _.
             list_elem (Event p) e (Cons (Event p) x xt)
-              → list_elem
-                (Event p)
-                e
-                (match choice {
-                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
-                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
-                }))
-          (λmember.
-            list_elem_later (Event p) e y (trace_merge_into p x xt rest yt) (ih member))
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
+          (λmember. list_elem_later (Event p) e y (trace_merge_into p x xt rest yt) (ih member))
           (sym Bool (event_before p x y) False comparison)
   }
 
@@ -1430,8 +1453,14 @@ theorem trace_merge_into_member_left
       (xt : List (Event p))
       (rest : List (Event p) → List (Event p))
       (rest_left : (zs : List (Event p))
-        → list_elem (Event p) e xt
-        → list_elem (Event p) e (rest zs))
+        → list_elem
+        (Event p)
+        e
+        xt
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
       (ys : List (Event p))
     : list_elem (Event p) e (Cons (Event p) x xt)
       → list_elem (Event p) e (trace_merge_into p x xt rest ys) =
@@ -1459,12 +1488,17 @@ theorem trace_merge_into_member_right_cons
       (xt : List (Event p))
       (rest : List (Event p) → List (Event p))
       (rest_right : (zs : List (Event p))
-        → list_elem (Event p) e zs
-        → list_elem (Event p) e (rest zs))
+        → list_elem
+        (Event p)
+        e
+        zs
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
       (y : Event p)
       (yt : List (Event p))
-      (ih : list_elem (Event p) e yt
-        → list_elem (Event p) e (trace_merge_into p x xt rest yt))
+      (ih : list_elem (Event p) e yt → list_elem (Event p) e (trace_merge_into p x xt rest yt))
       (decision : Bool)
     : Equal Bool (event_before p x y) decision
       → list_elem (Event p) e (Cons (Event p) y yt)
@@ -1475,13 +1509,13 @@ theorem trace_merge_into_member_right_cons
         J
           (λchoice _.
             list_elem (Event p) e (Cons (Event p) y yt)
-              → list_elem
-                (Event p)
-                e
-                (match choice {
-                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
-                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
-                }))
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
           (λmember.
             list_elem_later
               (Event p)
@@ -1495,13 +1529,13 @@ theorem trace_merge_into_member_right_cons
         J
           (λchoice _.
             list_elem (Event p) e (Cons (Event p) y yt)
-              → list_elem
-                (Event p)
-                e
-                (match choice {
-                  True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
-                  False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
-                }))
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
           (λmember.
             elim_trunc
               (list_elem (Event p) e (Cons (Event p) y (trace_merge_into p x xt rest yt)))
@@ -1514,12 +1548,7 @@ theorem trace_merge_into_member_right_cons
                         (list_elem (Event p) e (trace_merge_into p x xt rest yt))
                         same);
                   Inr later ↦
-                    list_elem_later
-                      (Event p)
-                      e
-                      y
-                      (trace_merge_into p x xt rest yt)
-                      (ih later)
+                    list_elem_later (Event p) e y (trace_merge_into p x xt rest yt) (ih later)
                 })
               member)
           (sym Bool (event_before p x y) False comparison)
@@ -1532,11 +1561,16 @@ theorem trace_merge_into_member_right
       (xt : List (Event p))
       (rest : List (Event p) → List (Event p))
       (rest_right : (zs : List (Event p))
-        → list_elem (Event p) e zs
-        → list_elem (Event p) e (rest zs))
+        → list_elem
+        (Event p)
+        e
+        zs
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
       (ys : List (Event p))
-    : list_elem (Event p) e ys
-      → list_elem (Event p) e (trace_merge_into p x xt rest ys) =
+    : list_elem (Event p) e ys → list_elem (Event p) e (trace_merge_into p x xt rest ys) =
   match ys {
     Nil ↦ λmember. absurd member;
     Cons y yt ↦
@@ -1555,12 +1589,7 @@ theorem trace_merge_into_member_right
   }
 
 theorem trace_window_merge_member_sound
-      (p : Type)
-      (lo : Nat)
-      (hi : Nat)
-      (xs : List (Event p))
-      (ys : List (Event p))
-      (e : Event p)
+      (p : Type) (lo : Nat) (hi : Nat) (xs : List (Event p)) (ys : List (Event p)) (e : Event p)
     : list_elem (Event p) e (trace_window p lo hi (trace_merge p xs ys))
       → ‖ Or (list_elem (Event p) e xs) (list_elem (Event p) e ys) ‖ =
   λmember.
