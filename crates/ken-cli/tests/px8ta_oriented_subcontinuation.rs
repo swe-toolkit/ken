@@ -269,101 +269,33 @@ fn public_one_level_bracket_finishes_and_releases() {
 }
 
 #[cfg(target_os = "linux")]
-// Re-measured under RT-SUBCONTINUATION-LIFO-RELEASE-ORDER (failing-rows
-// ledger row 9) at main 5899268451d42e7c1337929a996921d6483b6541. The layers
-// below are STRUCK together rather than appended to, as the depth-1 row above
-// already does.
-//
-//   1. "Ignored pending RT-CLOSURE-BOUNDARY-LANE ... a closure cannot cross
-//      the boundary: it is runtime-local and live-domain only, and it has no
-//      durable lane" -- does not reproduce. The closure-lane signature
-//      appears at NEITHER depth.
-//   2. "It refuses at object emission, so the program never executes and no
-//      binding order is observable in it." -- half true, which is what made
-//      it misleading rather than merely stale. FALSE of depth 2, TRUE of
-//      depth 3. Which program it was written about is not recorded and is
-//      not established here: it is struck on the measurement, not on a
-//      reading of its author's intent.
-//   3. "depth 2 reaches the closure lane first" -- depth 2 reaches no refusal
-//      at all. It builds, links, executes and exits 0.
-//
-// WHAT THIS ROW DOES, MEASURED. The body runs `for depth in 2..=3`, so it is
-// two programs. Depth 2 panics, which is why the second has never been
-// observed by any measurement of this row, the ledger's included:
-//
-//   depth 2  EXECUTES. Exit 0, no terminal error, every bracket continuation
-//            retained. The strict-LIFO assertion below then fails:
-//              left  [ResourceTraceIdentityV1(1), ResourceTraceIdentityV1(2)]
-//              right [ResourceTraceIdentityV1(2), ResourceTraceIdentityV1(1)]
-//            LEFT is observed, RIGHT is expected -- read the assert_eq!, not
-//            the panic message. Releases come back in ACQUISITION order: the
-//            outer bracket's resource is released before the inner one's.
-//            Deterministic across 20 fresh processes, 20 identical results.
-//            That excludes instability at or above rate 0.15 at >= 96%; it is
-//            a bound, NOT a demonstration of stability, which repetition
-//            cannot return.
-//   depth 3  REFUSES at object emission, and not with the struck label's
-//            signature:
-//              unsupported runtime-IR lowering: ContinuationSpecialization:
-//              the claimed continuation target was not declared into this
-//              function
-//            Measured by running both depths under catch_unwind, and again
-//            with depth 3 first. The two programs use separate output
-//            directories and separate build_native_program calls, so the
-//            result is order-independent.
-//
-// SO THIS ROW IS TWO BLOCKERS UNDER ONE #[ignore] AND EITHER FIX ALONE LEAVES
-// IT RED. The ordering defect is a PRODUCT defect: it is escalated under
-// RT-SUBCONTINUATION-LIFO-RELEASE-ORDER D0 arm (i) rather than repaired here,
-// because the expectation is correct and editing it to match the observation
-// would encode the defect in the fixture. The depth-3 refusal is a separate
-// finding, reported with it and not owned by that node.
-//
-// RT-CLOSURE-BOUNDARY-LANE is cited for provenance only -- merged, no frame,
-// never names this row, and the ledger records its label as not agreeing with
-// what the row does.
-//
-// Both the panic and the refusal surface on the helper thread
-// 'px8ta-nested-brackets'; this test thread then fails only with the wrapper
-//   nested-bracket control thread: Any { .. }
-// which carries no signature of its own. The signatures above are the real
-// causes.
-//
-// Annotation only -- test body and expectations are unchanged.
+// Measured on the combined link-3/child-3 tree: depth 2 builds, executes,
+// exits zero with no terminal error, and releases both resources in strict
+// reverse acquisition order. It is no longer an ignored blocker.
 #[test]
-#[ignore = "RT-SUBCONTINUATION-LIFO-RELEASE-ORDER: depth 2 executes and releases in acquisition order rather than strict LIFO (product defect, escalated); depth 3 separately refuses at object emission on ContinuationSpecialization"]
-fn public_two_three_level_brackets_finish_and_release_lifo() {
-    // Lowering nested checked brackets is stack-hungry, and libtest hands a
-    // test a 2 MiB (2048 KiB) worker thread. Bisected minimum passing stack
-    // for this test, measured on both commits at 64 KiB resolution:
-    //
-    //   70bd2c74   > 1984 KiB, <= 2048 KiB   -- cleared the default by < 64 KiB
-    //   08633b3c   > 2112 KiB, <= 2176 KiB   -- does not fit; SIGABRT
-    //
-    // Production is unaffected: this test drives the lowering directly on the
-    // libtest worker, while a real build runs on the main thread (8 MiB by
-    // `ulimit -s`), so the product had ~3.7x the headroom this harness gave
-    // itself. The wrapper below gives the harness **at least** the product's
-    // headroom, exactly as
-    // `px8ds_real_same_depth_path_runs_exact_edges` in
-    // this file already does. ⚠ Not "matches the product": 256 MiB is 32x the
-    // product's 8 MiB, and saying "matches" would understate by how much this
-    // stops being able to observe a stack regression at all.
-    //
-    // ⛔ This is a harness fix and nothing more. It is NOT scaling evidence for
-    // per-static-origin target functions, and it does NOT discharge the n=3..7
-    // nesting-depth gate -- the fixture only defines depths 1/2/3 by hand, so
-    // n >= 4 is not even expressible here. The thresholds above are recorded so
-    // the next reader sees how little room there was instead of rediscovering
-    // it from a red shard.
+fn public_two_level_brackets_finish_and_release_lifo() {
+    assert_nested_depth_on_existing_test_thread(2);
+}
+
+#[cfg(target_os = "linux")]
+// Depth 3 builds and runs, but its native observation exits at a planned
+// PatternMatchFailure for `ResourceBodyResult` after entering the nested body.
+// RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER owns that remaining defect; do
+// not rewrite the expected LIFO result to make this row pass.
+#[test]
+#[ignore = "RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER: depth 3 runs but traps at ResourceBodyResult PatternMatchFailure"]
+fn public_three_level_brackets_finish_and_release_lifo() {
+    assert_nested_depth_on_existing_test_thread(3);
+}
+
+#[cfg(target_os = "linux")]
+fn assert_nested_depth_on_existing_test_thread(depth: usize) {
+    // Preserve the old nested fixture's 256 MiB harness provision unchanged.
+    // This is not evidence for default-stack lowering or depths beyond three.
     std::thread::Builder::new()
         .name("px8ta-nested-brackets".to_string())
         .stack_size(256 * 1024 * 1024)
-        .spawn(|| {
-            for depth in 2..=3 {
-                assert_depth_finishes_and_releases_lifo(depth);
-            }
-        })
+        .spawn(move || assert_depth_finishes_and_releases_lifo(depth))
         .expect("spawn large-stack nested-bracket control")
         .join()
         .expect("nested-bracket control thread");
