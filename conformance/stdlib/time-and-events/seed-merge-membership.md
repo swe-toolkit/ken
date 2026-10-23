@@ -1,8 +1,7 @@
 # Premise-free membership of a merge
 
 Format: `../../README.md`.
-Spec: `spec/50-stdlib/69-time-and-events.md` §4, as stated by AC-1
-candidate `d68d2a45846e171a1260393f800108ddb3eefac1`.
+Spec: `spec/50-stdlib/69-time-and-events.md` §4.
 Frame: `docs/program/issues/SPEC-TIME-MERGE-MEMBERSHIP.md`.
 
 This source-shaped client covers the three §4 membership laws on a closed
@@ -11,13 +10,13 @@ same time, so the fixture has a cross-input tie; each following event is
 earlier, so neither input is time-ordered. The client supplies no ordering
 premise.
 
-The current authoring base is `a0311a8a758dac707ee64368a00cea8339d81db7`.
-It lacks the three §4 catalog exports. Architect D0 `evt_1dwxvhjh9p81j`
-checked their proof development in scratch on base
-`747b105cfaf6c50aa03cee8294a3fff4d08da650`; that is not seed execution.
-No Ken fence or conformance runner was executed. Do not claim execution
-until a verified base contains the exports. This is a separate source
-candidate; no CI, publication, landing, or trust measurement is claimed.
+The three §4 catalog exports are checked. A package-owned test runs
+the positive Ken fence in this seed and then appends the refused fence to
+a fresh copy of that accepted client. It verifies a typed elaborator rejection at
+`Refl` in the false head-equality witness, not an import or fixture failure. This is
+package-test execution, not official conformance-runner execution, CI,
+publication, landing or a landed trust measurement. The test checks the
+exact trusted-base identities before and after loading the package.
 
 ## Closed unordered pair and positive controls
 
@@ -114,7 +113,7 @@ theorem right_result_member_is_sound :
         (list_elem_head
           (Event Bool)
           right_tie
-          (Cons (Event Bool) right_early (Nil (Event Bool)))))
+          (Cons (Event Bool) right_early (Nil (Event Bool))))))
 ```
 
 ### stdlib/time-and-events/merge-membership-unordered-tie
@@ -125,9 +124,9 @@ theorem right_result_member_is_sound :
   `ys=[right_tie,right_early]`, with a cross-input tie at time `2`.
 - expect: each same-input member is in the merge, and a merged member
   is in at least one input, without ordering premises.
-- measured: not executed in this seed. The authored assertions check both
+- measured: the package test executes this positive Ken fence, including both
   decreasing head-to-tail comparisons, the cross-input tie, the closed merge
-  value, both completeness instances, and one soundness instance.
+  value, both completeness instances and one soundness instance.
 - claimed: the three generic merge-membership laws apply to this closed
   unordered pair.
 - gap: these finite Bool-payload instances do not establish the generic
@@ -159,8 +158,10 @@ an unrelated failure.
   occurs in neither input.
 - expect: the combined client is refused at the false head-equality
   witness, not at a missing fixture or an earlier assertion.
-- measured: not executed in this seed. The positive prefix asserts the
-  closed merge value and both same-input membership instances.
+- measured: the package test first checks the entire positive fence, then
+  submits this refusal alone in the accepted client's context. It pins the
+  refused theorem to the same merge and queried event, and verifies
+  `TypeMismatch` at the false head-equality `Refl` witness.
 - claimed: an event absent from both inputs is not a member of their
   merge.
 - gap: this refusal checks one attempted head witness, not every possible

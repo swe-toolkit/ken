@@ -2,7 +2,8 @@
 
 Finite events with natural-number times support half-open windows and a
 left-biased two-list merge with checked ordering, count, membership and
-window/merge distribution laws.
+window/merge distribution laws. Merge membership holds even for unordered
+inputs.
 
 ## Contents
 
@@ -25,16 +26,20 @@ Neither operation reads a clock or sorts unordered input.
 
 ## 2. Definition
 
-The public carrier, operations and six generic laws lead the checked source.
-The private recursive merge helper and proof lemmas follow them. Windowing
-includes the lower bound but excludes the upper; a merge tie favors the left
-input without examining payloads. Membership uses Ω-valued `list_elem`, so
-neither a payload equality decision nor an ordering premise is needed.
+The public carrier, operations and the first five generic laws lead the
+checked source, followed by their private recursive merge helper and proof
+lemmas. The window/merge distribution law and the three merge membership
+laws each lead their own private lemmas later in the source.
+Windowing includes the lower bound but excludes the upper; a merge tie favors
+the left input without examining payloads. Membership uses Ω-valued `list_elem`,
+so neither a payload equality decision nor an ordering premise is needed.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, and_true, bool_and, bool_or, leq_nat)
 
 import Core.Logic.Transport (cong, sym, trans)
+
+import Core.Logic.Or (Or, Inl, Inr)
 
 import Data.Numeric.Nat.Arithmetic (add)
 
@@ -44,6 +49,7 @@ import Data.Collections.Derived
   (filter,
     count,
     list_elem,
+    list_elem_later,
     list_elem_filter_sound,
     list_elem_filter_complete,
     starts_after,
@@ -1125,6 +1131,481 @@ theorem trace_head_after_decide
             beyond);
     False ↦ λzy. zy
   }
+
+pub theorem trace_merge_member_sound
+      (p : Type) (e : Event p) (xs : List (Event p))
+    : (ys : List (Event p))
+      → list_elem (Event p) e (trace_merge p xs ys)
+      → ‖ Or (list_elem (Event p) e xs) (list_elem (Event p) e ys) ‖ =
+  match xs {
+    Nil ↦
+      λys.
+        λmember.
+          trunc_intro
+            (Inr (list_elem (Event p) e (Nil (Event p))) (list_elem (Event p) e ys) member);
+    Cons x xt ↦
+      λys.
+        trace_merge_into_member_sound
+          p
+          e
+          x
+          xt
+          (trace_merge p xt)
+          (λzs. trace_merge_member_sound p e xt zs)
+          ys
+  }
+
+pub theorem trace_merge_member_left
+      (p : Type) (e : Event p) (xs : List (Event p))
+    : (ys : List (Event p))
+      → list_elem (Event p) e xs
+      → list_elem (Event p) e (trace_merge p xs ys) =
+  match xs {
+    Nil ↦ λys. λmember. absurd member;
+    Cons x xt ↦
+      λys.
+        trace_merge_into_member_left
+          p
+          e
+          x
+          xt
+          (trace_merge p xt)
+          (λzs. trace_merge_member_left p e xt zs)
+          ys
+  }
+
+pub theorem trace_merge_member_right
+      (p : Type) (e : Event p) (xs : List (Event p))
+    : (ys : List (Event p))
+      → list_elem (Event p) e ys
+      → list_elem (Event p) e (trace_merge p xs ys) =
+  match xs {
+    Nil ↦ λys. λmember. member;
+    Cons x xt ↦
+      λys.
+        trace_merge_into_member_right
+          p
+          e
+          x
+          xt
+          (trace_merge p xt)
+          (λzs. trace_merge_member_right p e xt zs)
+          ys
+  }
+
+theorem trace_merge_into_member_sound_cons
+      (p : Type)
+      (e : Event p)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_sound : (zs : List (Event p))
+        → list_elem
+        (Event p)
+        e
+        (rest zs)
+        → ‖ Or
+        (list_elem (Event p) e xt)
+        (list_elem (Event p) e zs) ‖)
+      (y : Event p)
+      (yt : List (Event p))
+      (ih : list_elem
+        (Event p)
+        e
+        (trace_merge_into p x xt rest yt)
+        → ‖ Or
+        (list_elem (Event p) e (Cons (Event p) x xt))
+        (list_elem (Event p) e yt) ‖)
+      (decision : Bool)
+    : Equal Bool (event_before p x y) decision
+      → list_elem (Event p) e (trace_merge_into p x xt rest (Cons (Event p) y yt))
+      → ‖ Or
+        (list_elem (Event p) e (Cons (Event p) x xt))
+        (list_elem (Event p) e (Cons (Event p) y yt)) ‖ =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λchoice _.
+            list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              })
+            → ‖ Or
+              (list_elem (Event p) e (Cons (Event p) x xt))
+              (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+          (λmember.
+            elim_trunc
+              (‖ Or
+                (list_elem (Event p) e (Cons (Event p) x xt))
+                (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+              (λcase.
+                match case {
+                  Inl same ↦
+                    trunc_intro
+                      (Inl
+                        (list_elem (Event p) e (Cons (Event p) x xt))
+                        (list_elem (Event p) e (Cons (Event p) y yt))
+                        (trunc_intro
+                          (Inl (Equal (Event p) e x) (list_elem (Event p) e xt) same)));
+                  Inr later ↦
+                    elim_trunc
+                      (‖ Or
+                        (list_elem (Event p) e (Cons (Event p) x xt))
+                        (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+                      (λinner.
+                        match inner {
+                          Inl in_xt ↦
+                            trunc_intro
+                              (Inl
+                                (list_elem (Event p) e (Cons (Event p) x xt))
+                                (list_elem (Event p) e (Cons (Event p) y yt))
+                                (list_elem_later (Event p) e x xt in_xt));
+                          Inr in_ys ↦
+                            trunc_intro
+                              (Inr
+                                (list_elem (Event p) e (Cons (Event p) x xt))
+                                (list_elem (Event p) e (Cons (Event p) y yt))
+                                in_ys)
+                        })
+                      (rest_sound (Cons (Event p) y yt) later)
+                })
+              member)
+          (sym Bool (event_before p x y) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λchoice _.
+            list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              })
+            → ‖ Or
+              (list_elem (Event p) e (Cons (Event p) x xt))
+              (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+          (λmember.
+            elim_trunc
+              (‖ Or
+                (list_elem (Event p) e (Cons (Event p) x xt))
+                (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+              (λcase.
+                match case {
+                  Inl same ↦
+                    trunc_intro
+                      (Inr
+                        (list_elem (Event p) e (Cons (Event p) x xt))
+                        (list_elem (Event p) e (Cons (Event p) y yt))
+                        (trunc_intro
+                          (Inl (Equal (Event p) e y) (list_elem (Event p) e yt) same)));
+                  Inr later ↦
+                    elim_trunc
+                      (‖ Or
+                        (list_elem (Event p) e (Cons (Event p) x xt))
+                        (list_elem (Event p) e (Cons (Event p) y yt)) ‖)
+                      (λinner.
+                        match inner {
+                          Inl in_x ↦
+                            trunc_intro
+                              (Inl
+                                (list_elem (Event p) e (Cons (Event p) x xt))
+                                (list_elem (Event p) e (Cons (Event p) y yt))
+                                in_x);
+                          Inr in_yt ↦
+                            trunc_intro
+                              (Inr
+                                (list_elem (Event p) e (Cons (Event p) x xt))
+                                (list_elem (Event p) e (Cons (Event p) y yt))
+                                (list_elem_later (Event p) e y yt in_yt))
+                        })
+                      (ih later)
+                })
+              member)
+          (sym Bool (event_before p x y) False comparison)
+  }
+
+theorem trace_merge_into_member_sound
+      (p : Type)
+      (e : Event p)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_sound : (zs : List (Event p))
+        → list_elem
+        (Event p)
+        e
+        (rest zs)
+        → ‖ Or
+        (list_elem (Event p) e xt)
+        (list_elem (Event p) e zs) ‖)
+      (ys : List (Event p))
+    : list_elem (Event p) e (trace_merge_into p x xt rest ys)
+      → ‖ Or (list_elem (Event p) e (Cons (Event p) x xt)) (list_elem (Event p) e ys) ‖ =
+  match ys {
+    Nil ↦
+      λmember.
+        trunc_intro
+          (Inl
+            (list_elem (Event p) e (Cons (Event p) x xt))
+            (list_elem (Event p) e (Nil (Event p)))
+            member);
+    Cons y yt ↦
+      trace_merge_into_member_sound_cons
+        p
+        e
+        x
+        xt
+        rest
+        rest_sound
+        y
+        yt
+        (trace_merge_into_member_sound p e x xt rest rest_sound yt)
+        (event_before p x y)
+        Refl
+  }
+
+theorem trace_merge_into_member_left_cons
+      (p : Type)
+      (e : Event p)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_left : (zs : List (Event p))
+        → list_elem
+        (Event p)
+        e
+        xt
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
+      (y : Event p)
+      (yt : List (Event p))
+      (ih : list_elem
+        (Event p)
+        e
+        (Cons (Event p) x xt)
+        → list_elem
+        (Event p)
+        e
+        (trace_merge_into p x xt rest yt))
+      (decision : Bool)
+    : Equal Bool (event_before p x y) decision
+      → list_elem (Event p) e (Cons (Event p) x xt)
+      → list_elem (Event p) e (trace_merge_into p x xt rest (Cons (Event p) y yt)) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λchoice _.
+            list_elem (Event p) e (Cons (Event p) x xt)
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
+          (λmember.
+            elim_trunc
+              (list_elem (Event p) e (Cons (Event p) x (rest (Cons (Event p) y yt))))
+              (λcase.
+                match case {
+                  Inl same ↦
+                    trunc_intro
+                      (Inl
+                        (Equal (Event p) e x)
+                        (list_elem (Event p) e (rest (Cons (Event p) y yt)))
+                        same);
+                  Inr later ↦
+                    list_elem_later
+                      (Event p)
+                      e
+                      x
+                      (rest (Cons (Event p) y yt))
+                      (rest_left (Cons (Event p) y yt) later)
+                })
+              member)
+          (sym Bool (event_before p x y) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λchoice _.
+            list_elem (Event p) e (Cons (Event p) x xt)
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
+          (λmember. list_elem_later (Event p) e y (trace_merge_into p x xt rest yt) (ih member))
+          (sym Bool (event_before p x y) False comparison)
+  }
+
+theorem trace_merge_into_member_left
+      (p : Type)
+      (e : Event p)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_left : (zs : List (Event p))
+        → list_elem
+        (Event p)
+        e
+        xt
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
+      (ys : List (Event p))
+    : list_elem (Event p) e (Cons (Event p) x xt)
+      → list_elem (Event p) e (trace_merge_into p x xt rest ys) =
+  match ys {
+    Nil ↦ λmember. member;
+    Cons y yt ↦
+      trace_merge_into_member_left_cons
+        p
+        e
+        x
+        xt
+        rest
+        rest_left
+        y
+        yt
+        (trace_merge_into_member_left p e x xt rest rest_left yt)
+        (event_before p x y)
+        Refl
+  }
+
+theorem trace_merge_into_member_right_cons
+      (p : Type)
+      (e : Event p)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_right : (zs : List (Event p))
+        → list_elem
+        (Event p)
+        e
+        zs
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
+      (y : Event p)
+      (yt : List (Event p))
+      (ih : list_elem (Event p) e yt → list_elem (Event p) e (trace_merge_into p x xt rest yt))
+      (decision : Bool)
+    : Equal Bool (event_before p x y) decision
+      → list_elem (Event p) e (Cons (Event p) y yt)
+      → list_elem (Event p) e (trace_merge_into p x xt rest (Cons (Event p) y yt)) =
+  match decision {
+    True ↦
+      λcomparison.
+        J
+          (λchoice _.
+            list_elem (Event p) e (Cons (Event p) y yt)
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
+          (λmember.
+            list_elem_later
+              (Event p)
+              e
+              x
+              (rest (Cons (Event p) y yt))
+              (rest_right (Cons (Event p) y yt) member))
+          (sym Bool (event_before p x y) True comparison);
+    False ↦
+      λcomparison.
+        J
+          (λchoice _.
+            list_elem (Event p) e (Cons (Event p) y yt)
+            → list_elem
+              (Event p)
+              e
+              (match choice {
+                True ↦ Cons (Event p) x (rest (Cons (Event p) y yt));
+                False ↦ Cons (Event p) y (trace_merge_into p x xt rest yt)
+              }))
+          (λmember.
+            elim_trunc
+              (list_elem (Event p) e (Cons (Event p) y (trace_merge_into p x xt rest yt)))
+              (λcase.
+                match case {
+                  Inl same ↦
+                    trunc_intro
+                      (Inl
+                        (Equal (Event p) e y)
+                        (list_elem (Event p) e (trace_merge_into p x xt rest yt))
+                        same);
+                  Inr later ↦
+                    list_elem_later (Event p) e y (trace_merge_into p x xt rest yt) (ih later)
+                })
+              member)
+          (sym Bool (event_before p x y) False comparison)
+  }
+
+theorem trace_merge_into_member_right
+      (p : Type)
+      (e : Event p)
+      (x : Event p)
+      (xt : List (Event p))
+      (rest : List (Event p) → List (Event p))
+      (rest_right : (zs : List (Event p))
+        → list_elem
+        (Event p)
+        e
+        zs
+        → list_elem
+        (Event p)
+        e
+        (rest zs))
+      (ys : List (Event p))
+    : list_elem (Event p) e ys → list_elem (Event p) e (trace_merge_into p x xt rest ys) =
+  match ys {
+    Nil ↦ λmember. absurd member;
+    Cons y yt ↦
+      trace_merge_into_member_right_cons
+        p
+        e
+        x
+        xt
+        rest
+        rest_right
+        y
+        yt
+        (trace_merge_into_member_right p e x xt rest rest_right yt)
+        (event_before p x y)
+        Refl
+  }
+
+theorem trace_window_merge_member_sound
+      (p : Type) (lo : Nat) (hi : Nat) (xs : List (Event p)) (ys : List (Event p)) (e : Event p)
+    : list_elem (Event p) e (trace_window p lo hi (trace_merge p xs ys))
+      → ‖ Or (list_elem (Event p) e xs) (list_elem (Event p) e ys) ‖ =
+  λmember.
+    trace_merge_member_sound
+      p
+      e
+      xs
+      ys
+      (and_fst
+        (list_elem (Event p) e (trace_merge p xs ys))
+        (And
+          (Equal Bool (leq_nat lo (event_time p e)) True)
+          (Equal Bool (lt_nat (event_time p e) hi) True))
+        (trace_window_member_sound p lo hi (trace_merge p xs ys) e member))
 ```
 
 ## 3. Using it
@@ -1181,6 +1662,17 @@ that order evidence lets the right head lead both windowed arrangements.
 The two input-order premises preserve the head comparisons; no ordering
 premise is needed merely to compute either operation.
 
+Merge membership instead needs no ordering premise. Three checked laws prove
+that a member of the merge came from at least one input and that a member of
+either input remains in the merge. Their private recursive helpers follow the
+head-insertion branch for each input; a named comparison decision transports
+membership through both Boolean outcomes. The proofs reuse the collections
+provider's `list_elem_later` for a member behind a retained head, rather than
+append laws for a merge that is not append. A private consequence combines
+window-membership soundness with merge-membership soundness: a windowed-merge
+member came from at least one input. It does not equate windowed lists for
+unordered inputs or count duplicate occurrences.
+
 ## 5. Design notes
 
 `time_ordered` is a proposition over a plain list, not a field of `Event` or
@@ -1202,7 +1694,7 @@ merging, not window multiplicity.
   defines a result for unordered inputs by comparing current heads.
 - **Ken specification** —
   [Finite event traces](../../../../spec/50-stdlib/69-time-and-events.md)
-  — the carrier, half-open boundary, left-bias and six checked law contracts.
+  — the carrier, half-open boundary, left-bias and nine checked law contracts.
 - **Collections provider** —
   [Derived collections](../../Data/Collections/Derived.ken.md)
   — generic filtering, list membership, sorted bridges and counting.
@@ -1211,7 +1703,7 @@ merging, not window multiplicity.
 
 1. **Public API.** `Event`, `MkEvent`, its two projections, the time
    comparison, ordering predicate, window predicate, `trace_window`,
-   `trace_merge`, and the six laws form the package surface.
+   `trace_merge`, and the nine laws form the package surface.
 2. **Source map.** [Definition](#2-definition) contains every public
    declaration and private support; [Using it](#3-using-it) shows an
    observable tie; [Laws & proofs](#4-laws--proofs) traces the proof families.
@@ -1222,12 +1714,18 @@ merging, not window multiplicity.
    Window membership instantiates its two generic filter proofs and projects
    both half-open timestamp bounds. Window/merge distribution also uses
    the public filtered-head-order proof from the collections provider.
-4. **Trusted-base delta.** Zero: all six exported laws have checked proof
+   Merge membership reuses `list_elem_later` and ordinary truncated `Or`;
+   the one-way window-of-merge consequence composes the two checked soundness
+   laws and remains private.
+4. **Trusted-base delta.** Zero: all nine exported laws have checked proof
    bodies, and this package adds no `Axiom` or primitive. Imported logical,
    numeric and collection providers retain their inherited trust.
 5. **Validation.** The
    [trace seed](../../../../conformance/stdlib/time-and-events/seed-event-trace.md),
-   [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md)
-   and [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md)
+   [window-membership seed](../../../../conformance/stdlib/time-and-events/seed-window-membership.md),
+   [distribution seed](../../../../conformance/stdlib/time-and-events/seed-window-merge-distribution.md)
+   and [merge-membership seed](../../../../conformance/stdlib/time-and-events/seed-merge-membership.md)
    supply independent closed values and refused claims; these clients
-   complement, not replace, the generic proofs.
+   complement, not replace, the generic proofs. A package test runs the
+   merge-membership seed, including its pinned refusal; this is not an
+   official conformance-runner or CI claim.

@@ -12,10 +12,10 @@
 > `conformance/stdlib/time-and-events/seed-window-merge-distribution.md`.
 > D0 scratch checks alone were not shipped seed execution. CI and a
 > measured landed trust delta are not established by this status.
-> Section 4 specifies three premise-free merge membership laws; its
-> catalog exports and conformance seed are not delivered by this
-> spec-only candidate. Its Architect D0 is scratch proof evidence,
-> not shipped-seed execution, CI or a landed trust measurement.
+> Section 4's three premise-free merge membership laws are now checked
+> catalog exports. A targeted package test executes the authored seed's
+> positive and refused clients, but neither official conformance-runner
+> execution, CI nor a landed trust measurement is established here.
 
 ## 1. Finite event traces over natural times
 
@@ -448,8 +448,11 @@ surface forms, not new ambient names or primitives.
 On base `747b105cfaf6c50aa03cee8294a3fff4d08da650`, the Architect
 reported a scratch check of the three generic package laws and the
 private window consequence, rc 0 without a code `Axiom`. A mutation
-changing one helper's `Inl` to `Inr` was kernel-refused. These are
-AC-0 proof-development observations, not §4 catalog delivery or
-execution of a shipped seed. This spec-only AC-1 authors no seed,
-and neither the scratch check nor its mutation establishes CI,
-publication, landing or a landed `trusted_base()` measurement.
+changing one helper's `Inl` to `Inr` was kernel-refused. Those are
+AC-0 proof-development observations, not themselves §4 catalog delivery
+or execution of a shipped seed. The three §4 laws are now checked
+catalog exports. A package-owned test runs the corrected seed's positive
+client and its paired refusal on the same fixtures and measures the exact
+`trusted_base()` identity sets before and after loading EventTrace. That
+package test is not official conformance-runner execution, CI,
+publication, landing or a landed trust measurement.
