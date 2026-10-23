@@ -7,9 +7,10 @@
 > SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE §5).** The §1–3 catalog operations,
 > checked laws, and seeds are present on main. Section 4's catalog
 > operations and checked laws are delivered alongside its authored seed.
-> Section 5 is specified from a checked Architect D0; its catalog exports
-> and conformance seed are separate deliveries. D0 alone establishes
-> neither shipped seed-harness execution nor CI.
+> Section 5 is specified from a checked Architect D0, with an authored
+> conformance seed in a separate source candidate. Its catalog exports
+> remain undelivered. D0 and seed authorship establish neither shipped
+> seed-harness execution nor CI.
 
 ## 1. Polynomial expressions over natural coefficients
 
@@ -557,7 +558,10 @@ a passing base-harness run.
 
 These are scratch development measurements, not catalog delivery,
 shipped conformance-seed execution, CI, publication, landing or a
-landed trust measurement. The §5 catalog extension and separate
-seed remain to be delivered. No `DecEq Expr`, function equality,
-derivative/substitution commutation, differentiation of signed or
-field coefficients, or analytic limit is claimed.
+landed trust measurement. The §5 conformance seed is authored at
+`conformance/stdlib/symbolic-algebra/seed-nat-polynomial-derivative.md`
+in this separate source candidate; the §5 catalog extension remains
+undelivered, so the seed was not executed against shipped exports.
+No `DecEq Expr`, function equality, derivative/substitution
+commutation, differentiation of signed or field coefficients, or
+analytic limit is claimed.
