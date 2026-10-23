@@ -299,8 +299,9 @@ fn assert_refusal_is_same_input_false_head(positive: &str, negative: &str) -> ke
 /// MEASURED: the full positive fence checks in a fresh roots-loaded client;
 /// the isolated refusal's parsed proposition is about the same merge as the
 /// accepted exact-result control and its false `Refl` identifies a fresh
-/// query with that result's first head. Independently checked time facts
-/// distinguish the query from all four input events. The refusal is appended
+/// query with that result's first head. Checked exact input-list facts ensure
+/// the four named events exhaust both actual inputs; independently checked
+/// time facts distinguish the query from each of those four. The refusal is appended
 /// to a fresh accepted client and fails at its own `Refl` with a typed
 /// elaborator TypeMismatch, not an import, setup or earlier-positive error.
 /// CLAIMED: an event absent from either input cannot be made a member of
@@ -320,9 +321,21 @@ fn shipped_neither_input_refusal_is_pinned_to_checked_merge() {
         matches!(neither, SourceExpr::EApp(..)),
         "absent event is a constructed event"
     );
-    // These closed facts are derived from the actual positive-fixture names.
-    // Their successful elaboration establishes non-vacuity even if a fixture
-    // gets edited so the query shares a payload or timestamp with an input.
+    // These independently spelled fixture values must exhaust the actual
+    // lists. Adding a member anywhere in xs or ys must reject even if the
+    // seed's expected merge and refused tail are updated in step.
+    let input_population = r#"
+theorem exact_left_input :
+  Equal (List (Event Bool)) xs
+    (Cons (Event Bool) left_tie
+      (Cons (Event Bool) left_early (Nil (Event Bool)))) = Refl
+theorem exact_right_input :
+  Equal (List (Event Bool)) ys
+    (Cons (Event Bool) right_tie
+      (Cons (Event Bool) right_early (Nil (Event Bool)))) = Refl
+"#;
+    // These four checked timestamp facts then establish that the query
+    // cannot equal an element of either complete input list.
     let distinct_times = r#"
 theorem neither_after_left_tie :
   Equal Bool (event_before Bool neither left_tie) False = Proved
@@ -337,6 +350,9 @@ theorem neither_after_right_early :
     control
         .elaborate_file(positive)
         .expect("same-input positive source controls check before refusal");
+    control
+        .elaborate_file(input_population)
+        .expect("actual xs and ys contain exactly the four named fixture events");
     control
         .elaborate_file(distinct_times)
         .expect("queried event has a later timestamp than every input entry");
