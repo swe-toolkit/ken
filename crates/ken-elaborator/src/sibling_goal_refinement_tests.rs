@@ -170,6 +170,7 @@ fn whole_pi_restores_existing_alias_once_at_original_goal() {
         &[Term::var(3)],
         0,
         &goal,
+        false,
     )
     .expect("classify one whole-Pi refinement");
     assert_eq!(restorations.len(), 1, "one h1-keyed restoration");
@@ -460,6 +461,7 @@ fn generalized_premise_generated_proof_is_consumed_by_body() {
         .push(MatchFrame::new(cx.ctx.len(), 0, Some(old.clone()), None));
     let source_type = Term::pi(new.clone(), weaken(&new, 1));
     let restoration = || BranchGoalRestoration::Generalized {
+        solved: None,
         whole: Box::new(BranchGoalRestoration::OmegaJ {
             index_type: nat_ty.clone(),
             old_index: Term::var(1),

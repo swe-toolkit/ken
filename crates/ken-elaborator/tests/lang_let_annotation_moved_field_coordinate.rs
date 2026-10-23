@@ -175,6 +175,8 @@ fn vec_siblings_do_not_overrestrict_fresh_annotated_lets() {
             ("v_fresh", "let k = repl n in match w { VCons _ b ys |-> match k { VCons _ c ks |-> VCons Nat m a xs } }"),
             ("v_fresh_ann", "let k : Vec Nat n = repl n in match k { VCons _ c ks |-> VCons Nat m a xs }"),
             ("v_outer_unann", "let k = w in match k { VCons _ c ks |-> VCons Nat m a xs }"),
+            ("v_outer", "let k : Vec Nat n = w in match k { VCons _ c ks |-> VCons Nat m a xs }"),
+            ("v_outer_succ", "let k : Vec Nat (Suc m) = w in match k { VCons _ c ks |-> VCons Nat m a xs }"),
             ("v_direct", "match w { VCons _ c ks |-> VCons Nat m a xs }"),
             ("v_field", "let k : Vec Nat m = xs in VCons Nat m a k"),
             ("v_mixed", "let k : Vec Nat n = VCons Nat m a xs in match k { VCons _ c ks |-> k }"),
@@ -193,10 +195,9 @@ fn vec_siblings_do_not_overrestrict_fresh_annotated_lets() {
         let trust = env.env.trusted_base();
         env.elaborate_decl(vec).expect("Vec declaration");
         env.elaborate_decl(repl).expect("repl declaration");
-        let source = body(
-            "v_outer",
-            "let k : Vec Nat n = w in match k { VCons _ c ks |-> VCons Nat m a xs }",
-        );
+        // `p` is independent of the matched variable `v` and its bare index
+        // `n`: §3.3 cannot turn this omitted VNil branch into an impossible one.
+        let source = "fn v_indep (n : Nat) (p : Nat) (u : Vec Nat p) (v : Vec Nat n) (w : Vec Nat n) : Vec Nat n = match v { VNil |-> VNil Nat; VCons m a xs |-> let k : Vec Nat p = u in match k { VCons _ c ks |-> VCons Nat m a xs } }";
         let error = env
             .elaborate_decl(&source)
             .expect_err("missing VNil must refuse");
