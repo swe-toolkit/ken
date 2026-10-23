@@ -12,19 +12,25 @@ github: null
 origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict evt_3rvns2yxm898r. Retained work to be REBASED ONTO THE ACCEPTED PRODUCER rather than rebuilt: the raw-response-occurrence partition ahead of the ordinary demand classifier, and the explicit response-context key that replaced the earlier first-match-only design. Both are preserved at evidence checkpoint 81f222b7f012829cd9f8d0f3dc684410a9b2b9ee, which is EVIDENCE, NEVER A CANDIDATE."
 ---
 
-> **Recut 2026-10-22 (`evt_1gxk3pcr6rgw2`; operator 2026-10-22, "keep
-> separate").** This is link 3 of the bottom-up chain and lands alone, as
-> a fresh candidate on `main` after link 2 (`b6adca031`). The accepted
-> held input `09d607a10` (Architect `evt_7q0vfz6dfj9h3`), built on 2a's
-> held tip `c18c8db68`, is a reference only: never moved, rebased or
-> landed. Where a settled input below names `370168a48` or `c18c8db68` as
-> the base, re-measure it on `main`.
+> **Recut 2026-10-23 (Architect D0 `evt_3yked97dme4gw`).** Link 3 does
+> not land alone. Ported onto `b6adca031`, it turns 120 main-green ken-cli
+> rows red, 108 of them at its own fail-closed emission refusal, which
+> only child 3's lowering may replace. It is therefore one half of a
+> semantic-atomicity pair (COORDINATION §8a). The candidate is link 3 plus
+> RT-BRACKET-LOWERING-AND-D0-REFUTER as one tree, fresh on `main`, with
+> per-commit QA and Architect review inside it. The operator's "keep
+> separate" still governs everything that can land alone.
 >
-> **Base and unit (Architect D0 first).** The candidate is the net delta
-> `c18c8db68..09d607a10` (7 commits, 17 files, +1301/-156) applied fresh
-> on `b6adca031`. The Architect rules the unit and any expectation
-> corrections the port needs before the build, as for link 2
-> (`evt_1m5yxewmk3xhw`).
+> **Port.** The net delta `c18c8db68..09d607a10` (17 files, +1301/-156,
+> `local/arch-rt3-d0/delta.diff`, sha256 c008a768) applies cleanly to
+> `b6adca031` with `git apply --3way`. No expectation correction is ruled.
+> The 120 rows are behaviour changes and are not to be re-pinned. Held
+> `09d607a10` is a reference only: never moved, rebased or landed.
+>
+> **Owed before any child-3 build (Architect).** Seven main-green rows
+> reach the plane's catch-all in `body_walk` (brackets.rs:305) or its
+> `args.len() != 2` arm (:293). Census those node kinds and rule the
+> plane's coverage.
 
 ## 1. What is settled. Do not re-derive.
 
