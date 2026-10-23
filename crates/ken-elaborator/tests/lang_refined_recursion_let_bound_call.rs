@@ -106,6 +106,98 @@ fn lp_let_of_suc_inherits_call_argument() {
     check_row(&row(RESULT, "let r = g m in let q = Suc r in q"), 3, 0);
 }
 
+/// Promise class: durable invariant (spec 17 §4; spec 39 §3; spec 64 §1).
+/// MEASURED: each nested-let value yields one kernel-checked recursive worker,
+/// three goals and no trust beyond open holes. CLAIMED: a let-bound value whose
+/// inner body returns the saturated call carries its refined argument into
+/// the outer let's type and scope. THE GAP: match/if and non-tail calls have
+/// independent rows below.
+#[test]
+fn rr2_nested_let_return_result() {
+    check_row(&row(RESULT, "let r = (let s = g m in s) in Suc r"), 3, 0);
+}
+
+#[test]
+fn rr2_nested_let_return_ensures() {
+    check_row(&row(ENSURES, "let r = (let s = g m in s) in Suc r"), 3, 0);
+}
+
+/// Promise class: durable invariant (spec 17 §4; spec 39 §3; spec 64 §1).
+/// MEASURED: a match whose two arms return the call is checked with four
+/// goals and no new opaque assumption beyond open holes. CLAIMED: method
+/// binders, motive and both methods inherit only the call arguments common
+/// to all arms. THE GAP: unequal/absent calls are earlier E0083, not a
+/// refusal imposed by this adapter; nondecreasing calls have K0014 rows.
+#[test]
+fn rr2_match_both_methods_return_call() {
+    check_row(
+        &row(
+            RESULT,
+            "let r = (match m { Zero |-> g m ; Suc k |-> g m }) in Suc r",
+        ),
+        4,
+        0,
+    );
+}
+
+#[test]
+fn rr2_match_ensures_both_methods_return_call() {
+    check_row(
+        &row(
+            ENSURES,
+            "let r = (match m { Zero |-> g m ; Suc k |-> g m }) in Suc r",
+        ),
+        4,
+        0,
+    );
+}
+
+#[test]
+fn rr2_if_both_methods_return_call() {
+    check_row(
+        &row(RESULT, "let r = (if True then g m else g m) in Suc r"),
+        4,
+        0,
+    );
+}
+
+#[test]
+fn rr2_arm_local_let_returns_call() {
+    check_row(
+        &row(
+            RESULT,
+            "let r = (match m { Zero |-> let s = g m in s ; Suc k |-> g m }) in Suc r",
+        ),
+        4,
+        0,
+    );
+}
+
+/// Promise class: durable invariant (spec 17 §4; spec 64 §1).
+/// MEASURED: these three and the existing `ll_nested_let_inherits_call_argument`
+/// keep their checked worker, original goal counts and trust accounting.
+/// CLAIMED: only returned saturated calls add authority; a non-tail Suc
+/// wrapper is not itself a returned call. THE GAP: these fixed neighbours do
+/// not enumerate every possible eliminator family.
+#[test]
+fn rr2_control_suc_of_match() {
+    check_row(
+        &row(RESULT, "Suc (match m { Zero |-> g m ; Suc k |-> g m })"),
+        4,
+        0,
+    );
+}
+
+#[test]
+fn rr2_control_inner_suc_result() {
+    check_row(&row(RESULT, "let r = (let s = g m in Suc s) in r"), 3, 0);
+}
+
+#[test]
+fn rr2_control_suc_of_inner_let() {
+    check_row(&row(RESULT, "let r = Suc (let s = g m in s) in r"), 3, 0);
+}
+
 /// Promise class: durable invariant (spec 17 §4; spec 64 §1).
 /// MEASURED: source pair as the call argument admits, with exactly two goals;
 /// trust grows only by source Axiom and open holes. CLAIMED: a call argument's
@@ -164,6 +256,37 @@ fn let_bound_nested_g_of_suc_g_m_remains_k0014() {
 #[test]
 fn let_bound_unchanged_g_n_remains_k0014() {
     expect_k0014(&row(RESULT, "let r = g n in Suc r"));
+}
+
+/// Promise class: durable invariant (spec 17 §4; spec 64 §1).
+/// MEASURED: the same nested-let return path with a nondecreasing saturated
+/// argument still reaches exact SCT K0014. CLAIMED: returned-call authority
+/// cannot license nondecreasing recursion. THE GAP: distinct match-method
+/// and unrelated-pair refusals remain independent controls.
+#[test]
+fn rr2_nested_let_return_of_nested_call_remains_k0014() {
+    expect_k0014(&row(RESULT, "let r = (let s = g (g m) in s) in Suc r"));
+}
+
+/// Promise class: durable invariant (spec 17 §4; spec 64 §1).
+/// MEASURED: when both match methods return the same nondecreasing call,
+/// the kernel's SCT refusal remains exact K0014. CLAIMED: intersection
+/// cannot manufacture descent from a common but wrong argument. THE GAP:
+/// differing or absent calls refuse earlier with E0083 outside this adapter.
+#[test]
+fn rr2_both_methods_nested_call_remains_k0014() {
+    expect_k0014(&row(
+        RESULT,
+        "let r = (match m { Zero |-> g (g m) ; Suc k |-> g (g m) }) in Suc r",
+    ));
+}
+
+#[test]
+fn rr2_both_methods_unchanged_argument_remains_k0014() {
+    expect_k0014(&row(
+        RESULT,
+        "let r = (match m { Zero |-> g n ; Suc k |-> g n }) in Suc r",
+    ));
 }
 
 /// Promise class: durable invariant (spec 17 §4; spec 64 §1).

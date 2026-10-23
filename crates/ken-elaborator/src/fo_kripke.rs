@@ -1223,7 +1223,7 @@ fn quote_iform(env: &GlobalEnv, sig: &FoSliceSignature, term: &Term) -> Result<I
 /// six term-free leaves (`Type`, `Omega`, `Const`, `IndFormer`,
 /// `Constructor`, `IntLit`) return `false` because they are STRUCTURALLY
 /// incapable of carrying a `Var` -- an exact fact, not a default.
-fn mentions_var0(term: &Term) -> bool {
+pub(crate) fn mentions_var0(term: &Term) -> bool {
     fn go(term: &Term, depth: usize) -> bool {
         match term {
             Term::Var(i) => *i == depth,
