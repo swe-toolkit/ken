@@ -65,6 +65,28 @@ rows join `lang_refined_parameter_dependent_result.rs`.
 - **AC-3 (mutation, QA).** Restoring the enclosing mode at the `Let` arm
   reddens the three rows back to K0014.
 
+## Amendment (Steward, 2026-10-23, `evt_6m9k4hzdj295`)
+
+On the Architect's AC-0 ruling `evt_3vsjks22y4pnd`, the frame now names
+these rows. Where it conflicts with the sections above, this amendment
+wins.
+
+- **Rule.** A saturated member call's refined arguments are inherited
+  inward by the Let arm and by the Ascript arm's Induced branch. The
+  change is in `refined_recursion.rs` only.
+- **AC-1, added.**
+  - 3 obligations: `let r = g m in let s = r in Suc s` and `let r = g m
+    in let q = Suc r in q`.
+  - 2 obligations: `let r = g (m, Axiom) in Suc r`, the same class as
+    main's accepted ascribed form.
+- **AC-2, added.** These stay K0014:
+  - the let-bound forms of the kept refusals;
+  - `let r = g m in let q = ((m, Axiom) : AnyNat).1 in Suc r` and its
+    `(Suc m, Axiom)` twin.
+- **AC-3.** Two seams: the Let arm's mode, and the Ascript arm's reset.
+- **Ascription strip.** The outer strip on the call term is kept only if
+  a named row needs it.
+
 ## Stop conditions
 
 - Any kernel or `trusted_base()` change.
