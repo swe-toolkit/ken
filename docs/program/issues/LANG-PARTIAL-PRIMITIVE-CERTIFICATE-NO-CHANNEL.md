@@ -1,7 +1,7 @@
 ---
 id: LANG-PARTIAL-PRIMITIVE-CERTIFICATE-NO-CHANNEL
 title: "A refined-divisor division is refused with ObligationWithoutChannel in a context that has no obligation channel (the REPL's elaborate_expr route), although the evidence search finds and kernel-checks the certificate: admit_certificate_hole always mints a hole first, and declare_obligation_hole refuses under PremiseHoles::Refused before the certificate is used. Admit a found certificate there, as the sibling subset introduction already does"
-status: ready
+status: active
 owner: language
 size: S
 tier: T2
