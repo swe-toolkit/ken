@@ -114,7 +114,7 @@ theorem right_result_member_is_sound :
         (list_elem_head
           (Event Bool)
           right_tie
-          (Cons (Event Bool) right_early (Nil (Event Bool)))))
+          (Cons (Event Bool) right_early (Nil (Event Bool))))))
 ```
 
 ### stdlib/time-and-events/merge-membership-unordered-tie
