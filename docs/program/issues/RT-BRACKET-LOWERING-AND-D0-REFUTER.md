@@ -19,8 +19,11 @@ origin: "Steward recut 2026-09-22 on the Architect's second WIP audit verdict ev
 > (`b6adca031`) are on `main`. Do not use the held assembly `0b4975281` as
 > a base. Its lowering checkpoints R5 to R8 (`0b4975281..8d3731a3d`) are
 > references only, and so are the held refs.
-> RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER is rebuilt last
-> (`evt_1gxk3pcr6rgw2`).
+> **Amended 2026-10-23 (Architect D0 `evt_28qc7qjzewbhd`, Steward
+> `evt_1ptt5bsccyk0`).** The combined tree compiles px8ta depth 3 and
+> then traps, where `main` refuses it. Therefore
+> RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER joins this candidate,
+> after child 3's ruled pieces (A to E). It is no longer rebuilt last.
 >
 > **D0 first (Architect).** After the link 3 coverage census, rule the
 > lowering unit on link 3's port: what ports from R5 to R8, and the px8ta
