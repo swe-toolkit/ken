@@ -10,10 +10,11 @@ existing checked natural arithmetic. It was authored on AC-1 candidate
 catalog exports are absent, so neither case ran against that base or
 through an official conformance runner. Architect AC-0 checked generic
 proofs in separate scratch. A temporary overlay of that D0 checked a
-copy of the full positive client (rc 0) and a fresh positive copy with
-only the refusal appended (rc 1/K0004 at its false theorem). These are
-scratch-client checks, not shipped-seed execution. No CI, publication,
-landing or landed trust measurement is claimed.
+copy of the full positive client (rc 0) and, historically, the old
+open-environment refusal (rc 1/K0004). The closed refusal below instead
+has local package-test evidence; no official conformance-runner execution
+is claimed. Those scratch checks make no CI, publication, landing or
+landed-trust claim.
 
 ## Equal functions with different expression trees
 
@@ -134,46 +135,45 @@ theorem square_derivative_equals_double_at_two :
 Runner assembly: first build and accept a client containing the entire
 positive Ken fence above. Copy that accepted client fresh and append
 only the refusal fence below. Never check the refusal alone. The
-combined client must reach the false universal equality theorem
+combined client must reach the false closed equality theorem
 `refuse_square_derivative_as_one_x`; rejection for a missing import,
 fixture or an earlier positive assertion is not the expected result.
 
 The refused theorem claims that the derivative of `square = x·x` equals
-`x` at **every** total `env : Nat → Nat`. The accepted prefix supplies
-a closed counterexample to that universal proposition using its same
-`square`, `x` and `env_two`: `deriv Zero square` evaluates to four,
-`doubled = x+x` evaluates to four, and `x` evaluates to two. A broken
-product rule that discards either summand changes the derivative's
-value at `env_two` to two and would accept the false claim while
-rejecting the `x+x` control. One counterexample refutes this universal
-law; it does not characterize all derivatives.
+`x` at the specific `env_two`. The accepted prefix uses the same
+`square`, `x` and `env_two` to check that `deriv Zero square` evaluates
+to four, `doubled = x+x` evaluates to four, and `x` evaluates to two.
+A product rule that drops either summand instead evaluates the
+square's derivative to two. Unlike an open-environment `Proved`
+refusal, this closed claim would then be accepted: it distinguishes
+the correct rule from either one-summand rule on this input. It does
+not characterize all derivatives.
 
 ### `stdlib/symbolic-algebra/reject-square-derivative-as-one-x`
 
 - spec: `spec/50-stdlib/66-symbolic-algebra.md` §5.1.
 - promise class: durable invariant.
 - given: a fresh copy of the accepted positive client, followed by
-  only this refusal; `square` and `x` are unchanged, and `env_two` is
-  a counterexample to the claimed universal equality.
-- expect: the combined client rejects at the false universally
-  quantified `Equal Nat` theorem, not from missing declarations or
-  a prior failure. The accepted prefix witnesses four versus two
-  at `env_two`.
-- measured: a fresh positive-prefix copy with only this refusal
-  appended was kernel-refused at this theorem, rc 1/K0004, in an
-  isolated D0 scratch overlay. No shipped seed run is claimed.
-- claimed: the universal assertion that the derivative of `x·x` in
-  `x` agrees with `x` at every environment is false.
-- the gap: the concrete counterexample does not characterize every
+  only this refusal; `square`, `x` and `env_two` are unchanged.
+- expect: the combined client rejects at its false closed `Equal Nat`
+  theorem, not from missing declarations or a prior failure. The
+  accepted prefix witnesses four versus two at `env_two`.
+- measured: the package test checks the accepted prefix, then rejects
+  this closed claim with a kernel TypeMismatch; a client-local rule
+  dropping one product summand accepts the same closed claim. This is
+  local test evidence, not an official conformance-runner result.
+- claimed: the derivative of `x·x` in `x` is not `x` at `env_two`;
+  a one-summand product rule would make this equality hold.
+- the gap: this closed counterexample does not characterize every
   expression or every possible defective derivative rule.
-- why: the same expression, queried variable, and counterexample
-  environment accept the correct `x+x` control and refute the
-  missing-summand result.
+- why: the same expression, queried variable and environment accept
+  the correct `x+x` control, reject the correct-rule equality to `x`,
+  and accept that equality when a summand is dropped.
 
 ```ken
-theorem refuse_square_derivative_as_one_x (env : Nat → Nat) :
-  Equal Nat (eval env (deriv Zero square))
-    (eval env x) = Proved
+theorem refuse_square_derivative_as_one_x :
+  Equal Nat (eval env_two (deriv Zero square))
+    (eval env_two x) = Proved
 ```
 
 ## Coverage boundary
@@ -181,8 +181,8 @@ theorem refuse_square_derivative_as_one_x (env : Nat → Nat) :
 The positive client checks the structural transformation through
 closed evaluation oracles and applies both §5 public laws. The
 negative is assembled only after that same accepted client and
-asserts a false universal equality on the shared expressions; its
-closed `env_two` instance is refuted by the positive value oracles.
-The seed states source-shaped cases pending §5 catalog exports. Scratch
-client checks on the Architect D0 overlay are separate from shipped-
-seed execution, CI, publication, landing, and landed trust.
+asserts a false closed equality on the shared expressions at `env_two`.
+The positive value oracles establish four versus two; the local
+one-summand rule makes that same closed equality true and checkable.
+The seed is source-shaped; the local package test does not claim
+an official conformance-runner result, CI or publication.

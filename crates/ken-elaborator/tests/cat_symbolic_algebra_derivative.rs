@@ -190,16 +190,16 @@ fn equal_nat(ty: &SourceType) -> (String, String) {
     (shape(lhs), shape(rhs))
 }
 
-/// MEASURED: the accepted prefix fixes different values four and two on the
-/// very two operands in the false universal theorem. The refusal has exactly
-/// the intended Nat-to-Nat environment binder and its claim type separately
-/// checks when supplied as a hypothesis. A fresh prefix then checks before
-/// that same claim with `Proved` kernel-refuses; setup errors do not count.
-/// CLAIMED: the derivative of x·x is not universally the value of x.
-/// THE GAP: this single counterexample does not characterize other products;
-/// the generic proof and the separate value-five cases provide broader checks.
+/// MEASURED: the accepted prefix fixes four and two on the exact operands of
+/// the closed refusal. The closed claim checks with a hypothetical witness and
+/// with a client-local rule that drops the right product summand, but the same
+/// claim under the shipped rule kernel-refuses at its equality after a fresh
+/// accepted prefix; setup errors do not count.
+/// CLAIMED: d/dx(x·x) is not x at env_two, whereas a dropped summand makes it x.
+/// THE GAP: one closed counterexample does not characterize other products;
+/// the checked generic proof and separate value-five cases give broader checks.
 #[test]
-fn shipped_square_derivative_as_one_x_refuses_at_its_own_equality() {
+fn shipped_square_derivative_as_one_x_refuses_at_its_own_closed_equality() {
     let (positive, refusal) = seed_cases();
     let accepted = parse_decls(positive).expect("positive client parses");
     let (derivative_at_two, four) =
@@ -223,52 +223,65 @@ fn shipped_square_derivative_as_one_x_refuses_at_its_own_equality() {
         ..
     }] = refused.as_slice()
     else {
-        panic!("refusal is precisely one universally quantified theorem with a proof");
+        panic!("refusal is precisely one closed theorem with a proof");
     };
     assert_eq!(name, "refuse_square_derivative_as_one_x");
-    let [binder] = params.as_slice() else {
-        panic!("the refused claim has exactly one environment binder");
-    };
-    assert_eq!(
-        binder.names,
-        ["env"],
-        "the claim binds the queried environment"
-    );
-    let SourceType::TArr(domain, codomain, _) = &binder.ty else {
-        panic!("the refusal environment must be a total Nat-to-Nat function");
-    };
-    assert_eq!(shape(domain), "Nat", "domain of the refused environment");
-    assert_eq!(
-        shape(codomain),
-        "Nat",
-        "codomain of the refused environment"
-    );
+    assert!(params.is_empty(), "claim has no open environment binder");
     assert_eq!(proof, "Proved");
     let (refused_derivative, refused_x) = equal_nat(false_goal);
     assert_eq!(
-        refused_derivative.replace("env", "env_two"),
-        derivative_at_two,
-        "same square derivative as the accepted four oracle"
+        refused_derivative, derivative_at_two,
+        "same closed square derivative as the accepted four oracle"
     );
     assert_eq!(
-        refused_x.replace("env", "env_two"),
-        x_at_two,
-        "same x as the accepted two oracle"
+        refused_x, x_at_two,
+        "same closed x as the accepted two oracle"
     );
+
+    // A hypothetical witness checks the exact parsed closed proposition
+    // without an axiom; malformed claims cannot masquerade as body rejection.
+    let claim_span = false_goal.span();
+    let claimed_equality = &refusal[claim_span.start..claim_span.end];
+    let well_typed_claim = format!(
+        "theorem refusal_claim_typechecks (h : {claimed_equality}) : {claimed_equality} = h"
+    );
+    let mut checked_type = loaded_package();
+    checked_type
+        .elaborate_file(positive)
+        .expect("positive controls check before the claim-type control");
+    checked_type
+        .elaborate_file(&well_typed_claim)
+        .expect("the refused closed proposition is itself well-typed");
+
+    // On the very same square as the refusal, this client-local derivative
+    // drops only the right product summand. The non-product cases defer to
+    // the shipped rule; the closed environment and RHS come from the seed.
+    let one_summand_client = format!(
+        r#"
+fn deriv_drop_right_product (v : Nat) (e : Expr) : Expr =
+  match e {{
+    EConst c ↦ deriv v (EConst c);
+    EVar w ↦ deriv v (EVar w);
+    EAdd a b ↦ deriv v (EAdd a b);
+    EMul a b ↦ EMul (deriv v a) b
+  }}
+
+theorem one_summand_square_equals_x :
+  Equal Nat (eval env_two (deriv_drop_right_product Zero square))
+    {refused_x} = Proved
+"#
+    );
+    let mut one_summand = loaded_package();
+    one_summand
+        .elaborate_file(positive)
+        .expect("positive controls check before the one-summand client");
+    one_summand
+        .elaborate_file(&one_summand_client)
+        .expect("the same closed claim accepts with one product summand dropped");
 
     let mut env = loaded_package();
     env.elaborate_file(positive)
         .expect("all positive controls check before refusal");
-    // A hypothetical witness discharges the exact parsed claim without adding
-    // an axiom. This checks its type before the refusal asks `Proved` to inhabit
-    // that claim: a kernel error while forming the proposition cannot count.
-    let claim_span = false_goal.span();
-    let claimed_equality = &refusal[claim_span.start..claim_span.end];
-    let well_typed_claim = format!(
-        "theorem refusal_claim_typechecks (env : Nat → Nat) (h : {claimed_equality}) : {claimed_equality} = h"
-    );
-    env.elaborate_file(&well_typed_claim)
-        .expect("the refused proposition itself is well-typed under the same binder");
     match env.elaborate_file(refusal) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },
