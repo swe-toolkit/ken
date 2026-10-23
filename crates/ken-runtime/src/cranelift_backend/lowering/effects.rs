@@ -2875,6 +2875,19 @@ impl<'a> Lowering<'a> {
         // Recut §7 total match (AC-2) over the response classify verdict. No
         // catch-all: adding a ResponseDisposition variant reddens the build here.
         use crate::cranelift_backend::planning::{ResponseDisposition, StaticResponseSite};
+        let bracket_claim = if let Some((id, origin)) = self.bracket_effect_claim {
+            if origin == static_origin {
+                let matches = self.bracket_view.region(id).is_some_and(|region|
+                    region.mode() == BracketSettlementMode::InPlace
+                    && region.row().is_some_and(|row| row.effect_origin() == origin));
+                if !matches {
+                    return Err(backend_module(LoweringCause::PlannerInvariant,
+                        "an InPlace S effect claim disagrees with its validated view".to_string()));
+                }
+                self.bracket_effect_claim.take();
+                true
+            } else { false }
+        } else { false };
         match self
             .static_transition_plan
             .response_disposition_at_effect(static_origin)
@@ -2904,6 +2917,7 @@ impl<'a> Lowering<'a> {
             // origin-only query yielding it has collapsed distinct
             // settlement instances at one S; ordinary lowering here
             // would bypass the settlement. Child 3 replaces this arm.
+            Some(ResponseDisposition::BracketOwned(_)) if bracket_claim => {}
             Some(ResponseDisposition::BracketOwned(_)) => {
                 return Err(backend_module(
                     LoweringCause::PlannerInvariant,

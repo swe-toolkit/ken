@@ -2880,10 +2880,15 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
     let pending_vis_record_protocol = static_transition_plan.pending_vis_settlements.protocol.clone();
     let response_owner_settlements = static_transition_plan.pending_vis_settlements.owners.clone();
     let response_bracket_exits = static_transition_plan.pending_vis_settlements.bracket_exits.clone();
+    let bracket_view = BracketSettlementControlView::from_plan(&static_transition_plan)?;
+    let bracket_ledger = BracketSettlementLedger::open(&bracket_view);
     let mut compiler = Lowering {
         pending_vis_record_protocol,
         response_owner_settlements,
         response_bracket_exits,
+        bracket_view,
+        bracket_ledger,
+        bracket_effect_claim: None,
         continuation_claims: None,
         lowered_construct_origins: BTreeSet::new(),
         fusion_compositions: None,
@@ -3132,6 +3137,9 @@ fn compile_expr_into_module_with_root_projection<'a, M: Module>(
             // question: an obligation opened in one descent whose discharge can
             // only be checked once every descent is done.
             compiler.require_complete_static_worker_disposition()?;
+            // Every source definition and the root adapter has now run. This
+            // is representation closure, not the D0 equivalence observation.
+            compiler.bracket_ledger.close()?;
             super::units::close_continuation_claim_ledger(&mut compiler)?;
             // `D2f` — the fused-region ledger's four-way closeout: ownership,
             // definition, redirect and takeover are each exactly the installed
@@ -5865,14 +5873,14 @@ impl<'a> Lowering<'a> {
         }
         self.drive_response_at_source(
             builder, vis_origin, lowered_args, row.operation_root_origin(),
-            row.effect_origin(), row.operation(), producer_eliminators,
+            row.effect_origin(), row.operation(), None, producer_eliminators,
         )
     }
 
     /// Perform a handler-owned Deferred response at its Construct-Vis source
     /// and resume its exact lexical K through the active eliminators. This
     /// path is not a relay drive; admitted relays use static producer fusion.
-    fn drive_response_at_source(
+    pub(super) fn drive_response_at_source(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         vis_origin: StaticOriginId,
@@ -5880,6 +5888,7 @@ impl<'a> Lowering<'a> {
         operation_root_origin: StaticOriginId,
         effect_origin: StaticOriginId,
         planned_operation: ken_host::HostOpV1,
+        effect_authority: Option<(ContinuationEmissionOwner, PredeclaredFunctionId)>,
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let [operation, k] = lowered_args else {
@@ -6117,6 +6126,11 @@ impl<'a> Lowering<'a> {
             .function_local
             .driven_deferred_response_effect
             .replace(effect.static_origin);
+        // A marked bracket's effect owns records under its checked row's base
+        // owner, even when this S is emitted in another owner's body. This
+        // binding ends before K: its closure and arguments stay copy-lexical.
+        let authority = effect_authority
+            .map(|(owner, unit)| AmbientBodyAuthority::bind(self, owner, unit));
         let response = self.lower_process_host_effect(
             builder,
             family,
@@ -6126,6 +6140,9 @@ impl<'a> Lowering<'a> {
             effect.static_origin,
             &effect_env,
         );
+        if let Some(authority) = authority {
+            authority.release(self);
+        }
         self.function_local.driven_deferred_response_effect = prior_driven_effect;
         let response = response?;
         if !matches!(
@@ -6966,6 +6983,28 @@ impl<'a> Lowering<'a> {
         self.static_transition_plan.reject_reached_admitted_relay(
             static_origin, constructor, args, self.defining_emission_owner,
         )?;
+        if let Some(region) = self.bracket_view.settlement_at(static_origin)?.cloned() {
+            match region.mode() {
+                BracketSettlementMode::InPlace => {
+                    let lowered_args = args.iter().enumerate()
+                        .map(|(position, arg)| {
+                            let arg = self.child_occurrence(static_origin, position, arg)?;
+                            self.lower_expr(builder, arg, producer_env)
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    return self.settle_bracket_at_source(
+                        builder, &region, &lowered_args, Some(eliminators),
+                    ).map(ProducerTrampolineStep::ordinary);
+                }
+                BracketSettlementMode::Deferred => {
+                    self.bracket_ledger.consume_settlement(region.id(), region.mode(),
+                        region.body_exit(), static_origin)?;
+                    self.bracket_ledger.consume_outcome_merge(region.id(), region.outcome_merge())?;
+                    self.bracket_ledger.consume_resume(region.id(), region.resume())?;
+                    // The existing producer deforestation continues below this claim.
+                }
+            }
+        }
         let eliminator = eliminators[0];
         if let Some(row) = self
             .static_transition_plan
@@ -16675,6 +16714,31 @@ impl<'a> Lowering<'a> {
                 self.static_transition_plan.reject_reached_admitted_relay(
                     static_origin, constructor, args, self.defining_emission_owner,
                 )?;
+                let bracket = self.bracket_view.settlement_at(static_origin)?.cloned();
+                if let Some(region) = &bracket {
+                    if self.static_transition_plan
+                        .response_disposition_at_operation_root(static_origin).is_some() {
+                        return Err(backend_module(LoweringCause::PlannerInvariant,
+                            "a marked S acquired an ordinary operation-root disposition".to_string()));
+                    }
+                    match region.mode() {
+                        BracketSettlementMode::InPlace => {
+                            let lowered_args = args.iter().enumerate()
+                                .map(|(position, arg)| {
+                                    let arg = self.child_occurrence(static_origin, position, arg)?;
+                                    self.lower_expr(builder, arg, env)
+                                })
+                                .collect::<Result<Vec<_>, _>>()?;
+                            return self.settle_bracket_at_source(
+                                builder, region, &lowered_args, None,
+                            );
+                        }
+                        BracketSettlementMode::Deferred => {
+                            self.bracket_ledger.consume_settlement(region.id(), region.mode(),
+                                region.body_exit(), static_origin)?;
+                        }
+                    }
+                }
                 // Recut §7 total match (AC-2) over the response classify verdict.
                 // No catch-all: adding a ResponseDisposition variant reddens the
                 // build here.
@@ -16746,16 +16810,15 @@ impl<'a> Lowering<'a> {
                 // descent.
                 let recognized = Self::recognized_constructor_worker_fields(args, env);
                 if recognized.iter().any(Option::is_some) {
-                    return Ok(LoweringOperand::Specialized(
-                        self.static_worker_constructor_template(
-                            builder,
-                            static_origin,
-                            constructor,
-                            args,
-                            &recognized,
-                            env,
-                        )?,
-                    ));
+                    let constructed = self.static_worker_constructor_template(
+                        builder, static_origin, constructor, args, &recognized, env,
+                    )?;
+                    if let Some(region) = &bracket {
+                        self.bracket_ledger.consume_outcome_merge(
+                            region.id(), region.outcome_merge())?;
+                        self.bracket_ledger.consume_resume(region.id(), region.resume())?;
+                    }
+                    return Ok(LoweringOperand::Specialized(constructed));
                 }
                 let lowered_args = args
                     .iter()
@@ -16849,17 +16912,17 @@ impl<'a> Lowering<'a> {
                     LoweringOperand::Residual(_) => true,
                     LoweringOperand::Specialized(_) => false,
                 }) {
-                    return Ok(LoweringOperand::Carried(
-                        self.transfer_constructor_operands(
-                            builder,
-                            static_origin,
-                            constructor,
-                            &lowered_args,
-                            Some(env),
-                        )?,
-                    ));
+                    let constructed = self.transfer_constructor_operands(
+                        builder, static_origin, constructor, &lowered_args, Some(env),
+                    )?;
+                    if let Some(region) = &bracket {
+                        self.bracket_ledger.consume_outcome_merge(
+                            region.id(), region.outcome_merge())?;
+                        self.bracket_ledger.consume_resume(region.id(), region.resume())?;
+                    }
+                    return Ok(LoweringOperand::Carried(constructed));
                 }
-                Ok(LoweringOperand::Specialized(Lowered::Constructor {
+                let constructed = LoweringOperand::Specialized(Lowered::Constructor {
                     constructor: constructor.clone(),
                     synthesized_identity: Some(
                         self.static_transition_plan
@@ -16875,7 +16938,13 @@ impl<'a> Lowering<'a> {
                         &lowered_args,
                         "a constructor argument",
                     )?,
-                }))
+                });
+                if let Some(region) = &bracket {
+                    self.bracket_ledger.consume_outcome_merge(
+                        region.id(), region.outcome_merge())?;
+                    self.bracket_ledger.consume_resume(region.id(), region.resume())?;
+                }
+                Ok(constructed)
             }
             RuntimeExpr::Match { scrutinee, cases, default } => {
                 self.lower_runtime_match_expr(builder, static_origin, scrutinee, cases, default, env)

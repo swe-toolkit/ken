@@ -35,6 +35,8 @@ impl From<&NativeProcessSymbols> for BracketRoles {
 pub(in crate::cranelift_backend) struct BracketSettlementId(u32);
 
 impl BracketSettlementId {
+    pub(in crate::cranelift_backend) fn ordinal(self) -> u32 { self.0 }
+
     fn next(size: usize) -> Result<Self, CraneliftBackendError> {
         Ok(Self(u32::try_from(size).map_err(|_| {
             planner_capacity_error("bracket settlement identity exhausted")
@@ -97,6 +99,118 @@ pub(in crate::cranelift_backend) struct BracketSettlementRegion {
 pub(in crate::cranelift_backend) struct BracketSettlementPlan {
     pub(super) roles: Option<BracketRoles>,
     pub(super) regions: Vec<BracketSettlementRegion>,
+}
+
+/// The checked, closed settlement authority made available to emission. In
+/// particular, a source origin is never enough to pick between two context
+/// instances at the same S: `settlement_at` refuses that collapse.
+#[derive(Clone, Debug, Default)]
+pub(in crate::cranelift_backend) struct BracketSettlementControlView {
+    regions: BTreeMap<BracketSettlementId, BracketSettlement>,
+    by_settlement: BTreeMap<StaticOriginId, Vec<BracketSettlementId>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum BracketSettlementMode {
+    InPlace,
+    Deferred,
+}
+
+#[derive(Clone, Debug)]
+pub(in crate::cranelift_backend) struct BracketSettlement {
+    id: BracketSettlementId,
+    settlement: StaticOriginId,
+    body_exit: StaticOriginId,
+    outcome_merge: StaticOriginId,
+    resume: StaticOriginId,
+    mode: BracketSettlementMode,
+    row: Option<super::responses::StaticResponseContinuation>,
+    /// Nearest owner of the region's own or an ancestor's returned exit.
+    response_owner: Option<super::responses::StaticResponseContinuationId>,
+}
+
+impl BracketSettlement {
+    pub(in crate::cranelift_backend) fn id(&self) -> BracketSettlementId { self.id }
+    pub(in crate::cranelift_backend) fn settlement(&self) -> StaticOriginId { self.settlement }
+    pub(in crate::cranelift_backend) fn body_exit(&self) -> StaticOriginId { self.body_exit }
+    pub(in crate::cranelift_backend) fn outcome_merge(&self) -> StaticOriginId { self.outcome_merge }
+    pub(in crate::cranelift_backend) fn resume(&self) -> StaticOriginId { self.resume }
+    pub(in crate::cranelift_backend) fn mode(&self) -> BracketSettlementMode { self.mode }
+    pub(in crate::cranelift_backend) fn row(&self) -> Option<&super::responses::StaticResponseContinuation> {
+        self.row.as_ref()
+    }
+    pub(in crate::cranelift_backend) fn response_owner(&self)
+        -> Option<super::responses::StaticResponseContinuationId> { self.response_owner }
+}
+
+impl BracketSettlementControlView {
+    pub(in crate::cranelift_backend) fn from_plan(
+        plan: &StaticTransitionPlan<'_>,
+    ) -> Result<Self, CraneliftBackendError> {
+        let mut view = Self::default();
+        for region in &plan.bracket_settlements.regions {
+            let mut cursor = Some(region.id);
+            let mut owner = None;
+            while let Some(id) = cursor {
+                let current = plan.bracket_settlements.regions.iter()
+                    .find(|candidate| candidate.id == id)
+                    .ok_or_else(|| planner_error("a bracket ancestor has no region"))?;
+                let owners = plan.pending_vis_settlements.bracket_exits.iter()
+                    .filter(|(_, exits)| exits.contains(&id))
+                    .map(|(owner, _)| *owner).collect::<Vec<_>>();
+                match owners.as_slice() {
+                    [] => {}
+                    [unique] if owner.is_none() => owner = Some(*unique),
+                    [_] => {}
+                    _ => return Err(planner_error("a bracket region has two returned-exit owners")),
+                }
+                cursor = current.parent;
+            }
+            let mode = if owner.is_some() {
+                BracketSettlementMode::InPlace
+            } else {
+                BracketSettlementMode::Deferred
+            };
+            let row = plan.bracket_rows.get(&region.id).cloned();
+            match (&region.context, &row) {
+                (BracketResponseContextKey::Continuation(identity), Some(row))
+                    if row.vis_origin() == region.settlement && row.k_identity() == identity => {}
+                (BracketResponseContextKey::Inline { .. }, None)
+                    if mode == BracketSettlementMode::Deferred => {}
+                _ => return Err(planner_error("bracket row disagrees with its checked region")),
+            }
+            if view.regions.insert(region.id, BracketSettlement {
+                id: region.id, settlement: region.settlement,
+                body_exit: region.body_exit, outcome_merge: region.outcome_merge,
+                resume: region.resume, mode, row, response_owner: owner,
+            }).is_some() {
+                return Err(planner_error("two bracket regions share one identity"));
+            }
+            view.by_settlement.entry(region.settlement).or_default().push(region.id);
+        }
+        if view.regions.len() != plan.bracket_settlements.regions.len()
+            || plan.bracket_rows.keys().any(|id| !view.regions.contains_key(id)) {
+            return Err(planner_error("a marked row has no bracket region"));
+        }
+        Ok(view)
+    }
+
+    pub(in crate::cranelift_backend) fn regions(&self)
+        -> impl Iterator<Item = &BracketSettlement> { self.regions.values() }
+
+    pub(in crate::cranelift_backend) fn region(&self, id: BracketSettlementId)
+        -> Option<&BracketSettlement> { self.regions.get(&id) }
+
+    pub(in crate::cranelift_backend) fn settlement_at(
+        &self, origin: StaticOriginId,
+    ) -> Result<Option<&BracketSettlement>, CraneliftBackendError> {
+        let Some(ids) = self.by_settlement.get(&origin) else { return Ok(None) };
+        let [id] = ids.as_slice() else {
+            return Err(planner_error("one settlement origin names two bracket instances"));
+        };
+        self.regions.get(id).map(Some).ok_or_else(||
+            planner_error("a bracket settlement identity has no validated region"))
+    }
 }
 
 #[derive(Clone, Debug)]

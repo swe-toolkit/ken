@@ -315,6 +315,7 @@ impl<'src> Planner<'src> {
                 immediate_bridge_realizations: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
                 bracket_settlements: super::brackets::BracketSettlementPlan::default(),
+                bracket_rows: BTreeMap::new(),
                 static_response_continuations: Vec::new(),
                 static_response_plan_installed: false,
                 static_response_infeasible: None,

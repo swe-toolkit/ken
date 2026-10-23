@@ -728,6 +728,10 @@ impl StaticResponseContinuation {
     ) -> &[(u32, ContinuationSourceCoordinate, u32)] {
         &self.continuation_inputs
     }
+
+    pub(in crate::cranelift_backend) fn operation_root_origin(&self) -> StaticOriginId {
+        self.operation_root_origin
+    }
 }
 
 /// The classify verdict for one response `ITree::Vis` occurrence (recut
@@ -838,6 +842,9 @@ impl DeferredResponseRow {
 #[derive(Clone, Debug)]
 pub(in crate::cranelift_backend) struct StaticResponsePhaseA {
     demands: Vec<StaticResponseContextDemand>,
+    /// Phase A's validated S demands retain their K-context authority, but
+    /// never enter ordinary Phase-B ownership, Deferred, or candidate rows.
+    marked: Vec<StaticResponseContextDemand>,
     preexisting_count: usize,
     deferred: Vec<DeferredResponseRow>,
 }
@@ -3444,6 +3451,50 @@ impl StaticTransitionPlan<'_> {
         Ok(resolved)
     }
 
+    /// Resolve marked S against the already-interned K-context population.
+    /// Its identity is a region-local label, never an ordinary successor id or
+    /// a pending-Vis discriminant. Bind both directions: no two rows can claim
+    /// one region, and no Continuation-keyed region can remain unbound.
+    fn resolve_marked_bracket_rows(
+        &self,
+        mut marked: Vec<StaticResponseContextDemand>,
+        contexts: &[PlannedContinuationContext],
+        preexisting_count: usize,
+    ) -> Result<BTreeMap<super::brackets::BracketSettlementId, StaticResponseContinuation>,
+        CraneliftBackendError> {
+        use super::brackets::BracketResponseContextKey;
+        self.validate_marked_bracket_demands(&marked)?;
+        let mut ids = Vec::with_capacity(marked.len());
+        for demand in &mut marked {
+            let matches = self.bracket_settlements.regions.iter().filter(|region| {
+                region.settlement == demand.vis_origin && matches!(
+                    &region.context, BracketResponseContextKey::Continuation(identity)
+                        if identity == &demand.k_identity
+                )
+            }).collect::<Vec<_>>();
+            let [region] = matches.as_slice() else {
+                return Err(planner_error("marked demand and plane instance disagree"));
+            };
+            demand.id = StaticResponseContinuationId::from_position(
+                region.id.ordinal() as usize)?;
+            ids.push(region.id);
+        }
+        let rows = self.resolve_static_response_context_demands(
+            marked, contexts, preexisting_count)?;
+        let mut bound = BTreeMap::new();
+        for (id, row) in ids.into_iter().zip(rows) {
+            if bound.insert(id, row).is_some() {
+                return Err(planner_error("two marked rows claim one bracket region"));
+            }
+        }
+        if bound.len() != self.bracket_settlements.regions.iter()
+            .filter(|region| matches!(region.context,
+                BracketResponseContextKey::Continuation(_))).count() {
+            return Err(planner_error("a Continuation bracket region has no marked row"));
+        }
+        Ok(bound)
+    }
+
     /// PHASE A of the two-phase response context install (RECUT 2, HS5, Architect
     /// evt_7eh84c8n6w08e). Runs once at construction.rs:1213, after causal
     /// specialization planning closes and BEFORE the context ABI (:1221) and
@@ -3488,6 +3539,7 @@ impl StaticTransitionPlan<'_> {
         self.continuation_contexts = contexts;
         self.static_response_phase_a = Some(StaticResponsePhaseA {
             demands,
+            marked: marked_demands,
             preexisting_count,
             deferred,
         });
@@ -3538,7 +3590,10 @@ impl StaticTransitionPlan<'_> {
             &contexts,
             phase_a.preexisting_count,
         )?;
+        let bracket_rows = self.resolve_marked_bracket_rows(
+            phase_a.marked, &contexts, phase_a.preexisting_count)?;
         self.static_response_continuations = rows;
+        self.bracket_rows = bracket_rows;
         self.static_response_deferred = deferred;
         self.static_response_plan_installed = true;
         Ok(())
@@ -3914,6 +3969,7 @@ impl StaticTransitionPlan<'_> {
                     }
                     if self.static_response_infeasible.as_ref() != Some(&infeasible)
                         || !self.static_response_continuations.is_empty()
+                        || !self.bracket_rows.is_empty()
                         || !self.static_response_deferred.is_empty()
                         || landed_contexts != causal_contexts
                     {
@@ -3953,6 +4009,8 @@ impl StaticTransitionPlan<'_> {
             &expected_contexts,
             preexisting_count,
         )?;
+        let expected_bracket_rows = self.resolve_marked_bracket_rows(
+            marked_demands, &expected_contexts, preexisting_count)?;
         for context in &mut expected_contexts {
             context.finalized_availability.clear();
         }
@@ -3962,6 +4020,7 @@ impl StaticTransitionPlan<'_> {
         }
         if landed_contexts != expected_contexts
             || self.static_response_continuations != expected_rows
+            || self.bracket_rows != expected_bracket_rows
             || self.static_response_deferred != expected_deferred
         {
             return Err(planner_error(

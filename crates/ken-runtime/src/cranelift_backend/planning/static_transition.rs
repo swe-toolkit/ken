@@ -8,7 +8,10 @@
 mod abi;
 mod aggregates;
 mod brackets;
-pub(in crate::cranelift_backend) use brackets::BracketSettlementId;
+pub(in crate::cranelift_backend) use brackets::{
+    BracketSettlement, BracketSettlementControlView, BracketSettlementId,
+    BracketSettlementMode,
+};
 mod closure;
 mod construction;
 mod continuations;
@@ -657,6 +660,9 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// Checked-marker regions and exact response-context instances. Constructed
     /// from the raw marked partition before ordinary response demands exist.
     bracket_settlements: brackets::BracketSettlementPlan,
+    /// Marked S demands resolved against the existing K-context ABI. This is
+    /// disjoint from ordinary response ownership and pending-Vis successors.
+    bracket_rows: BTreeMap<BracketSettlementId, StaticResponseContinuation>,
     /// Every validated response edge resolved through the installed union
     /// context population. Empty exactly when `static_response_infeasible` is
     /// populated or the complete response population is empty.
@@ -817,11 +823,13 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 
 /// Every emission owner under which an inline synthesized aggregate is built.
 ///
-/// The five sources are (a) predeclared units containing the seat, (b)
+/// The six sources are (a) predeclared units containing the seat, (b)
 /// continuation specializations whose selected case body contains it, (c)
 /// Specialized response rows under their base owner, (d) Deferred responses
-/// handled by another owner, and (e) returned-Vis successors performed by the
-/// pending-Vis loop under each successor row's base owner. Those are the
+/// handled by another owner, (e) returned-Vis successors performed by the
+/// pending-Vis loop under each successor row's base owner, and (f) a marked
+/// bracket's host effect under its row's base-owner authority at every S copy.
+/// Those are the
 /// emission populations lowering enters, not a reconstruction from response
 /// disposition alone. Generated continuation contexts are a narrower,
 /// post-hoc population and cannot authorize the records by themselves.
@@ -830,9 +838,9 @@ fn runtime_value_lifetime(value: &crate::RuntimeValue) -> PlannedReferentLifetim
 /// `seat`: host-result constructors and unit-boundary environments. A checked-IH
 /// environment is force-emitted at a different seat and uses its explicit force
 /// relation instead.
-fn inline_synthesized_seat_emission_owners(
+fn emission_owners_containing(
     plan: &StaticTransitionPlan<'_>,
-    seat: StaticOriginId,
+    origin: StaticOriginId,
 ) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
     let mut owners = Vec::new();
     // Source ownership is only a traversal boundary. A retained checked-IH
@@ -842,7 +850,7 @@ fn inline_synthesized_seat_emission_owners(
     for unit in plan.emittable_units()? {
         if plan
             .emission_source_origins(unit.function(), unit.body_occurrence())?
-            .contains(&seat)
+            .contains(&origin)
         {
             owners.push(ContinuationEmissionOwner::Predeclared(unit.function()));
         }
@@ -866,11 +874,24 @@ fn inline_synthesized_seat_emission_owners(
             .checked_add(1)
             .ok_or_else(|| planner_capacity_error("continuation case position overflows"))?;
         let body = plan.semantic.child_origin(unit.continuation_origin(), body_position)?;
-        if occurrence_subtree_contains(plan, body, seat)? {
+        if occurrence_subtree_contains(plan, body, origin)? {
             owners.push(ContinuationEmissionOwner::Specialization(unit.id()));
         }
     }
+    Ok(owners)
+}
+
+fn inline_synthesized_seat_emission_owners(
+    plan: &StaticTransitionPlan<'_>,
+    seat: StaticOriginId,
+) -> Result<Vec<ContinuationEmissionOwner>, CraneliftBackendError> {
+    let mut owners = emission_owners_containing(plan, seat)?;
     if plan.static_response_plan_installed {
+        if !plan.bracket_settlements.regions.is_empty() && plan.bracket_rows.is_empty() {
+            return Err(planner_error(
+                "bracket rows are not resolved before synthesized seat ownership",
+            ));
+        }
         let responses = match plan.static_response_feasibility_ledger_all()? {
             Ok(responses) => responses,
             Err(_) => Vec::new(),
@@ -902,6 +923,13 @@ fn inline_synthesized_seat_emission_owners(
                 continue;
             };
             owners.push(owner);
+        }
+        // (f) A marked bracket's host effect is lowered under its row's
+        // planned authority at every copy of S, including foreign owners.
+        for row in plan.bracket_rows.values() {
+            if row.effect_origin() == seat && !owners.contains(&row.base_owner()) {
+                owners.push(row.base_owner());
+            }
         }
         // (e) A Vis returned by a K context is performed by its response
         // owner's pending-Vis loop under the successor row's base owner

@@ -21,6 +21,9 @@ use crate::cranelift_backend::surface::LoweringCause;
 use residual::{append_carried_block_param, CarriedBlockParam, CarriedResidualWord,
     RecursiveCarrierSlotKey, Representation};
 mod frame_validation;
+mod bracket_ledger;
+mod bracket_emission;
+use bracket_ledger::BracketSettlementLedger;
 use frame_validation::{FrameEventKind, FrameEvents, FrameTerminalKind};
 
 // `RT-FNSPLIT-B2F` `D1`/`D2` — the target code-unit population. A sibling of
@@ -465,7 +468,9 @@ pub(in crate::cranelift_backend) use super::planning::{
     StaticResponseFrameSource, StaticResponseOwnerId,
     StaticResponseOwnerSpecialization, StaticResponseSite, StaticTransitionPlan,
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
-    ResponseOwnerSettlement, BracketSettlementId, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
+    ResponseOwnerSettlement, BracketSettlement, BracketSettlementControlView,
+    BracketSettlementId,
+    BracketSettlementMode, verify_current_lexical_availability, verify_predeclared_entry_frame_membership,
     SynthesizedConstructorRole, SynthesizedFixedConstructorRole,
 };
 #[cfg(test)]
@@ -3278,6 +3283,10 @@ struct Lowering<'a> {
     pending_vis_record_protocol: Option<PendingVisRecordProtocol>,
     response_owner_settlements: BTreeMap<StaticResponseContinuationId, ResponseOwnerSettlement>,
     response_bracket_exits: BTreeMap<StaticResponseContinuationId, BTreeSet<BracketSettlementId>>,
+    bracket_view: BracketSettlementControlView,
+    bracket_ledger: BracketSettlementLedger,
+    /// Exactly one validated S effect may run under the in-place release call.
+    bracket_effect_claim: Option<(BracketSettlementId, StaticOriginId)>,
     grafted_spine_builder: Option<GraftedSpineControlGraphBuilder>,
     grafted_spine_graph: Option<GraftedSpineControlGraph>,
     result_table: BTreeMap<i64, RuntimeGroundValue>,

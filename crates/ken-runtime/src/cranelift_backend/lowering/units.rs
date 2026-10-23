@@ -3146,7 +3146,7 @@ fn static_response_shape_matches(
 /// Emit one validated response effect from an existing response row. Initial
 /// owners and pending-Vis successors use this same lowering, so a successor
 /// does not acquire a second operation/effect or frame-input authority.
-fn lower_static_response_effect(
+pub(super) fn lower_static_response_effect(
     compiler: &mut Lowering<'_>,
     builder: &mut FunctionBuilder<'_>,
     row: &StaticResponseContinuation,
@@ -4653,11 +4653,8 @@ pub(super) fn define_static_response_owner_bodies<M: Module>(
             } else {
                 returned
             };
-            if let Some(exits) = compiler.response_bracket_exits.get(&emission.row.id()) {
-                return Err(backend_module(LoweringCause::PlannerInvariant, format!(
-                    "response owner {:?} returns bracket settlement exits {exits:?}; only the bracket lowering consumer may emit them",
-                    emission.row.id(),
-                )));
+            if compiler.response_bracket_exits.contains_key(&emission.row.id()) {
+                compiler.bracket_ledger.close_owner(emission.row.id())?;
             }
             let pending_vis_owner = match compiler.response_owner_settlements.get(&emission.row.id()) {
                 Some(ResponseOwnerSettlement::Protocol) if !emission.successors.is_empty() => true,
