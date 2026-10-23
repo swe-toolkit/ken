@@ -1,7 +1,7 @@
 ---
 id: SPEC-SYMBOLIC-ALGEBRA-DERIVATIVE
 title: "Spec 66 defers derivatives, so a client cannot differentiate a Nat polynomial expression and rely on the result depending only on the polynomial function it denotes. Rule a formal derivative on Expr with checked laws at zero trust from a D0, including that semantically equal expressions have semantically equal derivatives, and state it as a section 5 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: M
 tier: T1

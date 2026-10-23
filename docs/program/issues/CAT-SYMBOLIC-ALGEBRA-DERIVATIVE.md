@@ -1,7 +1,7 @@
 ---
 id: CAT-SYMBOLIC-ALGEBRA-DERIVATIVE
 title: "Implement spec 66 §5's formal derivative and its checked laws in Algorithm.SymbolicAlgebra.NatPolynomial, with a package test that runs the §5 seed"
-status: ready
+status: active
 owner: foundation
 size: M
 tier: T2
