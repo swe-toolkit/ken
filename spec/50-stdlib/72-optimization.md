@@ -1,15 +1,19 @@
-# Finite least-cost candidate selection
+# Finite candidate selection and bounded search
 
 > **Status: DRAFT v0 (SPEC-OPTIMIZATION-SEARCH-CONTRACT §1;
 > SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
-> SPEC-OPTIMIZATION-BOUNDED-SEARCH §2).** Section 1 specifies the
-> non-empty selector and its seven laws; its catalog module and seed
+> SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
+> SPEC-OPTIMIZATION-ARGMAX §3).** Section 1 specifies the non-empty
+> least-cost selector and its seven laws; its catalog module and seed
 > are present on main. Section 1.4 specifies the Option selector and
 > four additional public laws from Architect-checked scratch D0; its
 > catalog extension exports the selector and four checked laws, and the
-> package test executes the seed. Section 2's catalog module and seed are
-> also present on main. Scratch checks alone establish neither shipped-seed
-> execution, CI nor a landed `trusted_base()` measurement.
+> package test executes the seed. Section 2's catalog module and seed
+> are also present on main. Section 3 specifies the greatest-cost
+> selector and seven laws from Architect-checked D0; this spec-only
+> candidate delivers neither §3 catalog exports nor a §3 seed.
+> Scratch checks alone establish neither shipped-seed execution, CI
+> nor a landed `trusted_base()` measurement.
 
 ## 1. Least-cost candidate
 
@@ -166,14 +170,15 @@ private helpers before that package exported them; the landed
 local order facts. They remain Nat-order laws, not eighth or ninth
 optimization laws.
 
-Real-valued and continuous optimization, infinite or implicit search
-spaces, heuristics and approximation guarantees, maximization
-(`argmax`), costs into an arbitrary `Ord`, multi-objective and
-lexicographic costs, and top-k and stable multi-result selection remain
-deferred. The Option-returning selector for a possibly empty `List` is
-specified in §1.4, not deferred. The right-fold description is not a
-machine-checked complexity result; all asymptotic and resource claims
-remain deferred.
+Greatest-cost selection (`argmax`) on `NonEmpty a` under a `Nat` cost
+is specified in §3, not deferred. Real-valued and continuous
+optimization, infinite or implicit search spaces, heuristics and
+approximation guarantees, costs into an arbitrary `Ord`,
+multi-objective and lexicographic costs, and top-k and stable
+multi-result selection remain deferred. The Option-returning selector
+for a possibly empty `List` is specified in §1.4, not deferred. The
+right-fold description is not a machine-checked complexity result;
+all asymptotic and resource claims remain deferred.
 
 ### 1.4 Option selector over a possibly empty list
 
@@ -364,3 +369,119 @@ from `Cons`, not a search over a numeric range. It adds no §2 law.
 General implicit or infinite search, heuristics and approximations,
 arbitrary candidate orders, and machine-checked performance guarantees
 remain outside this bounded contract.
+
+## 3. Greatest-cost candidate
+
+> **Section 3 status: DRAFT v0 (SPEC-OPTIMIZATION-ARGMAX).** Architect
+> checked the operation and seven general laws in an isolated D0 on
+> base `136f959ad`. This spec-only candidate delivers no §3 catalog
+> export, conformance seed, shipped-seed execution, CI, publication,
+> landing, or landed trust measurement.
+
+### 3.1 Carrier, operation and tie rule
+
+The existing `Algorithm.Optimization.Argmin` module extends its
+`NonEmpty a` selectors with:
+
+```ken
+pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a
+```
+
+For every candidate type `a` and total `cost : a → Nat`, `argmax`
+returns a member of `xs` with the **greatest natural cost**. Among
+candidates tied for that cost, it returns the **earliest occurrence**.
+No `DecEq a` or order on candidates is required. An empty-input
+case is excluded by `NonEmpty`; this operation neither returns an
+`Option` nor changes `argmin_option`'s §1.4 contract.
+
+At each non-empty head/tail decomposition, a candidate selected from
+the tail replaces the head only if the head's cost is **strictly less**
+than the tail candidate's cost under `lt_nat`. An equal-cost tail
+candidate does not replace the earlier head. This is the observable
+choice fixed by the branch laws below, not a requirement to expose a
+particular fold or helper. Like §1, membership uses the existing
+Ω-valued, propositionally truncated `list_elem` over
+`nonempty_to_list`, and optimality uses the established `Nat` order.
+No position witness, equality decision on `a`, new built-in, or
+complexity guarantee is introduced.
+
+### 3.2 Seven checked laws
+
+The same module must export proof bodies for **exactly** these seven
+new public theorem interfaces. The order predicates refer to the
+actual cost of the selected input member; all quantification over
+`y` in the greatest-cost law is conditioned on input membership:
+
+```ken
+pub theorem argmax_member (a : Type) (cost : a → Nat) (xs : NonEmpty a)
+    : list_elem a (argmax a cost xs) (nonempty_to_list a xs)
+
+pub theorem argmax_greatest (a : Type) (cost : a → Nat) (xs : NonEmpty a)
+    : (y : a) → list_elem a y (nonempty_to_list a xs)
+      → IsTrue (leq_nat (cost y) (cost (argmax a cost xs)))
+
+pub theorem argmax_no_costlier (a : Type) (cost : a → Nat) (xs : NonEmpty a) (y : a)
+    : list_elem a y (nonempty_to_list a xs)
+      → Equal Bool (lt_nat (cost (argmax a cost xs)) (cost y)) False
+
+pub theorem argmax_head_on_tie (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : ((y : a) → list_elem a y rest → IsTrue (leq_nat (cost y) (cost x)))
+      → Equal a (argmax a cost (nonempty_cons a x rest)) x
+
+pub theorem argmax_singleton (a : Type) (cost : a → Nat) (x : a)
+    : Equal a (argmax a cost (nonempty_singleton a x)) x
+
+pub theorem argmax_keeps_head (a : Type) (cost : a → Nat) (x : a) (y : a) (ys : List a)
+    : Equal Bool (lt_nat (cost x) (cost (argmax a cost (nonempty_cons a y ys)))) False
+      → Equal a (argmax a cost (nonempty_cons a x (Cons a y ys))) x
+
+pub theorem argmax_takes_tail (a : Type) (cost : a → Nat) (x : a) (y : a) (ys : List a)
+    : Equal Bool (lt_nat (cost x) (cost (argmax a cost (nonempty_cons a y ys)))) True
+      → Equal a (argmax a cost (nonempty_cons a x (Cons a y ys)))
+          (argmax a cost (nonempty_cons a y ys))
+```
+
+`argmax_member` excludes an invented greater-cost value;
+`argmax_greatest` bounds every member by the selected cost; and
+`argmax_no_costlier` excludes a strictly more expensive input member.
+Those three laws alone do not choose among tied maxima. When every
+member of `rest` costs at most the head, `argmax_head_on_tie` returns
+the head even if another member costs the same. The singleton and
+strict-comparison branch laws determine both outcomes for every
+non-singleton input. A tie makes the comparison `False` and keeps
+the earlier head. These seven are additional to, and do not change,
+§1.2's seven `argmin` laws or §1.4's four Option laws.
+
+For a finite discriminator, set costs `0 ↦ 9`, `1 ↦ 1`, `2 ↦ 1`,
+and every value at least `3 ↦ 5`. On `[1, 3, 2, 4]`, `3` and `4`
+tie for the greatest cost, so the result is `3`, **not** later `4`.
+Replacing on a non-strict comparison would instead return `4` and
+violate the earliest-tie rule while still meeting greatest-cost
+optimality. On `[3, 0, 1]`, the strictly greater-cost `0` wins.
+These are illustrative instances of the general laws, not shipped
+conformance results; the closed seed is separately owned.
+
+### 3.3 Proof boundary and deferred work
+
+Architect's isolated D0 on `136f959ad` reported package `ken check`
+and `ken fmt --check` rc 0, 114→114 identical `trusted_base()` GlobalId
+sets, and no `Axiom`, `Opaque`, or `Primitive` among 41 package-owned
+declarations. A generic client restating all eight `argmax` statements
+checked. The closed earliest-tie control selected `3` and its
+later-tie refusal `4` reached the kernel's `TypeMismatch`; a local
+non-strict selector reversed those two observations. These are
+Architect-reported D0 measurements, not §3 catalog delivery or
+shipped-seed execution.
+
+The checked D0 shares a private selection fold and membership proof
+between `argmin` and `argmax`, with a private greatest-cost proof and
+order helpers for the new direction. The public declarations of
+`argmin`, its seven laws, and `argmin_option` and its four laws stay
+unchanged. Fold sharing is a package design choice, not another public
+selector, law, dependency, or required execution strategy.
+
+Arbitrary candidate orders or equality decisions, Option-returning
+maximization on a possibly empty input, multiple sorted results,
+continuous optimization, approximation guarantees and performance
+bounds remain outside §3. In particular, §3 supplies no public
+`argmax_option` or top-k selection.
