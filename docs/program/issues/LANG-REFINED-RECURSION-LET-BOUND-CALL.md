@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-RECURSION-LET-BOUND-CALL
 title: "Dependent-result structural recursion on a refined parameter is still refused with K0014 when the recursive call is bound by an un-ascribed let, though base b22a41649 accepted it: the refined-worker plan admits the induced projection of the coerced recursive argument only inside the call's own result ascription, not after it has flowed into the let's inferred type. Admit it there too"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
