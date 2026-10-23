@@ -135,39 +135,46 @@ theorem square_derivative_equals_double_at_two :
 Runner assembly: first build and accept a client containing the entire
 positive Ken fence above. Copy that accepted client fresh and append
 only the refusal fence below. Never check the refusal alone. The
-combined client must reach the false value equality at
+combined client must reach the false universal equality theorem
 `refuse_square_derivative_as_one_x`; rejection for a missing import,
 fixture or an earlier positive assertion is not the expected result.
 
-At the same `square`, `x` and `env_two` used by the accepted control,
-`deriv Zero square` evaluates to four, `doubled` evaluates to four,
-and `x` evaluates to two. A broken product rule that discards one of
-the two summands changes the left side to two and would accept this
-false claim while rejecting the `x+x` control. The requested refusal
-is one closed counterexample to the universal wrong law; it does not
-assert that all non-double claims must be rejected.
+The refused theorem claims that the derivative of `square = x·x` equals
+`x` at **every** total `env : Nat → Nat`. The accepted prefix supplies
+a closed counterexample to that universal proposition using its same
+`square`, `x` and `env_two`: `deriv Zero square` evaluates to four,
+`doubled = x+x` evaluates to four, and `x` evaluates to two. A broken
+product rule that discards either summand changes the derivative's
+value at `env_two` to two and would accept the false claim while
+rejecting the `x+x` control. One counterexample refutes this universal
+law; it does not characterize all derivatives.
 
 ### `stdlib/symbolic-algebra/reject-square-derivative-as-one-x`
 
 - spec: `spec/50-stdlib/66-symbolic-algebra.md` §5.1.
 - promise class: durable invariant.
 - given: a fresh copy of the accepted positive client, followed by
-  only this refusal; `square`, `x`, and `env_two` are unchanged.
-- expect: the combined client rejects at the false `Equal Nat` proof
-  of four versus two, not from missing declarations or a prior failure.
+  only this refusal; `square` and `x` are unchanged, and `env_two` is
+  a counterexample to the claimed universal equality.
+- expect: the combined client rejects at the false universally
+  quantified `Equal Nat` theorem, not from missing declarations or
+  a prior failure. The accepted prefix witnesses four versus two
+  at `env_two`.
 - measured: a fresh positive-prefix copy with only this refusal
   appended was kernel-refused at this theorem, rc 1/K0004, in an
   isolated D0 scratch overlay. No shipped seed run is claimed.
-- claimed: the derivative of `x·x` in `x` is not merely `x`.
-- the gap: this closed counterexample does not characterize every
+- claimed: the universal assertion that the derivative of `x·x` in
+  `x` agrees with `x` at every environment is false.
+- the gap: the concrete counterexample does not characterize every
   expression or every possible defective derivative rule.
-- why: the same expression, queried variable, and environment accept
-  the correct `x+x` control and refuse the missing-summand result.
+- why: the same expression, queried variable, and counterexample
+  environment accept the correct `x+x` control and refute the
+  missing-summand result.
 
 ```ken
-theorem refuse_square_derivative_as_one_x :
-  Equal Nat (eval env_two (deriv Zero square))
-    (eval env_two x) = Proved
+theorem refuse_square_derivative_as_one_x (env : Nat → Nat) :
+  Equal Nat (eval env (deriv Zero square))
+    (eval env x) = Proved
 ```
 
 ## Coverage boundary
@@ -175,7 +182,8 @@ theorem refuse_square_derivative_as_one_x :
 The positive client checks the structural transformation through
 closed evaluation oracles and applies both §5 public laws. The
 negative is assembled only after that same accepted client and
-attempts the false one-summand value on shared operands. The seed
-states source-shaped cases pending §5 catalog exports. Scratch
+asserts a false universal equality on the shared expressions; its
+closed `env_two` instance is refuted by the positive value oracles.
+The seed states source-shaped cases pending §5 catalog exports. Scratch
 client checks on the Architect D0 overlay are separate from shipped-
 seed execution, CI, publication, landing, and landed trust.
