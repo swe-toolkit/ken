@@ -18,8 +18,8 @@ origin: "Architect ruling evt_50sa3e3dyfcsc: LANG-REFINED-PARAM-REQUIRES-DESUGAR
 
 `fn f (n : Int) (d : {z : Int | Not (Equal Int z 0)}) : Int = n / d`,
 and the same with `%`, elaborates with no open obligation. The divisor
-side condition is discharged by a term built from `Proj2 d` that the
-kernel checks.
+side condition is a recorded PartialPrim obligation, discharged by a
+term built from `Proj2 d` that the kernel checks.
 
 ## Settled inputs (Architect `evt_50sa3e3dyfcsc`, main `7eded7922`)
 
@@ -55,8 +55,11 @@ for both spellings.
   emits. The suppression at ~:14257 is elaborator-only conversion that
   never reaches the kernel, so the new evidence must be a term the kernel
   checks in the elaborated body, not a skipped hole.
-- **AC-1.** `/` and `%` with the refined divisor give 0 obligations and
-  `trusted_base()` is unchanged. The caller `g = f 1 0` still owes its one
+- **AC-1 (corrected by the D0, `evt_gjdwyw89122r`).** `/` and `%` with
+  the refined divisor each record one PartialPrim obligation that is
+  closed (`!is_open_hole`), with the transparent body `λ n. λ d. Proj2 d`
+  and `ken_kernel::check` success. `trusted_base()` membership is
+  unchanged. The caller `g = f 1 0` still owes its one open
   `RefinementIntroduction`.
 - **AC-2 (negative).** A plain `Int` divisor, and a refined divisor whose
   predicate is not `Not (Equal Int z 0)` (for example `Top`), keep their
