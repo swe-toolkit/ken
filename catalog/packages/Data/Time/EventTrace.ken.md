@@ -26,11 +26,13 @@ Neither operation reads a clock or sorts unordered input.
 
 ## 2. Definition
 
-The public carrier, operations and nine generic laws lead the checked source.
-The private recursive merge helper and proof lemmas follow them. Windowing
-includes the lower bound but excludes the upper; a merge tie favors the left
-input without examining payloads. Membership uses Ω-valued `list_elem`, so
-neither a payload equality decision nor an ordering premise is needed.
+The public carrier, operations and the first five generic laws lead the
+checked source, followed by their private recursive merge helper and proof
+lemmas. The window/merge distribution law and the three merge membership
+laws each lead their own private lemmas later in the source.
+Windowing includes the lower bound but excludes the upper; a merge tie favors
+the left input without examining payloads. Membership uses Ω-valued `list_elem`,
+so neither a payload equality decision nor an ordering premise is needed.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, and_true, bool_and, bool_or, leq_nat)

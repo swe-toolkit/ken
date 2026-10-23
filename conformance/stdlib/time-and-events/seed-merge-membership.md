@@ -10,9 +10,9 @@ same time, so the fixture has a cross-input tie; each following event is
 earlier, so neither input is time-ordered. The client supplies no ordering
 premise.
 
-The three §4 catalog exports are checked. A package-owned test runs the
-unchanged positive Ken fence and then appends the refused fence to a fresh
-copy of that accepted client. It verifies a typed elaborator rejection at
+The three §4 catalog exports are checked. A package-owned test runs
+the positive Ken fence in this seed and then appends the refused fence to
+a fresh copy of that accepted client. It verifies a typed elaborator rejection at
 `Refl` in the false head-equality witness, not an import or fixture failure. This is
 package-test execution, not official conformance-runner execution, CI,
 publication, landing or a landed trust measurement. The test checks the
