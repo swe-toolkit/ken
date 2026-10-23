@@ -3044,6 +3044,11 @@ enum ComposedReturnForwardRetAuthorityOutcome {
     /// The exact Tail plan formed, but the Ret body has no Ready strict sink.
     /// Keep its checked control on the base call-tail continuation path.
     FormedBasePath(CheckedIhForwardRetPlanProof),
+    /// The exact Tail plan formed, but a marked bracket settlement owns its
+    /// continuation identity (release-order ruling evt_4t14zmba83hjm). That
+    /// settlement is the one consumer: the seat keeps the base call-tail path
+    /// and emits no forward edge.
+    ConsumedBySettlement(CheckedIhForwardRetPlanProof, BracketSettlementId),
     #[cfg(feature = "px8-ds-test-support")]
     MissingRequired,
     #[cfg(feature = "px8-ds-test-support")]

@@ -4158,6 +4158,30 @@ impl StaticTransitionPlan<'_> {
             .map(|region| ResponseDisposition::BracketOwned(region.id))
     }
 
+    /// The bracket settlement whose marked response context is exactly this
+    /// continuation identity (`marked_bracket_response_contexts`). Keyed on the
+    /// full identity, never on S alone, a selected caller, or emission
+    /// position. Two owners refuse.
+    pub(in crate::cranelift_backend) fn bracket_settlement_owning_continuation(
+        &self,
+        identity: &ContinuationCallIdentity,
+    ) -> Result<Option<super::brackets::BracketSettlementId>, CraneliftBackendError> {
+        let mut owners = self.bracket_settlements.regions.iter().filter(|region| {
+            matches!(
+                &region.context,
+                super::brackets::BracketResponseContextKey::Continuation(owned)
+                    if owned == identity
+            )
+        });
+        let owner = owners.next().map(|region| region.id);
+        if owners.next().is_some() {
+            return Err(planner_error(
+                "dual ownership: two bracket regions own one continuation identity",
+            ));
+        }
+        Ok(owner)
+    }
+
     /// Derive the lexical K's single-shot and tail-exit facts from its source
     /// occurrence. Nothing here consults `RecursiveBackedge` or runtime tags.
     pub(super) fn deferred_response_continuation_shape(

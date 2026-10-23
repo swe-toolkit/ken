@@ -15175,6 +15175,16 @@ impl<'a> Lowering<'a> {
         else {
             return Ok(ComposedReturnForwardRetAuthorityOutcome::NonApplicable);
         };
+        // A continuation a marked bracket settlement owns is consumed by that
+        // settlement (evt_4t14zmba83hjm); keyed on the proof's exact identity.
+        if let Some(settlement) = self
+            .static_transition_plan
+            .bracket_settlement_owning_continuation(proof.source_call_identity())?
+        {
+            return Ok(ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(
+                proof, settlement,
+            ));
+        }
         #[cfg(feature = "px8-ds-test-support")]
         {
             let mutation = composed_return_forward_ret_authority_mutation();
