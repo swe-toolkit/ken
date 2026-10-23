@@ -62,21 +62,25 @@ fn refuses_wrong_index(source: &str) {
     assert_eq!(env.env.trusted_base(), trust, "refusal adds no trust");
 }
 
-fn pair(name: &str, result: &str, nil: &str, first: &str, second: &str) -> String {
+// p3/d3 carry a sibling w; p3b/d3b/p3d do not. Adding an unused w to the
+// latter changes the motive and lets their stale-coordinate baseline pass.
+fn pair(name: &str, result: &str, nil: &str, first: &str, second: &str, sibling: bool) -> String {
+    let w = if sibling { " (w : Vec Nat n)" } else { "" };
     format!(
-        "fn {name} (n : Nat) (v : Vec Nat n) (w : Vec Nat n) : {result} = \
+        "fn {name} (n : Nat) (v : Vec Nat n){w} : {result} = \
          match v {{ VNil ↦ {nil}; VCons m a xs ↦ match xs {{ \
          VNil ↦ {first}; VCons m2 b ys ↦ {second} }} }}"
     )
 }
 
-fn triple(name: &str, result: &str, nil: &str, first: &str, deep: &str) -> String {
+fn triple(name: &str, result: &str, nil: &str, first: &str, deep: &str, sibling: bool) -> String {
     pair(
         name,
         result,
         nil,
         first,
         &format!("match ys {{ VNil ↦ {deep}; VCons m3 c zs ↦ {deep} }}"),
+        sibling,
     )
 }
 
@@ -87,14 +91,14 @@ fn triple(name: &str, result: &str, nil: &str, first: &str, deep: &str) -> Strin
 #[test]
 fn p3_outer_index_in_inner_nat_result() {
     on_elaboration_stack(|| {
-        accepts(&pair("p3", "Nat", "Zero", "vlen n w", "vlen n w"));
+        accepts(&pair("p3", "Nat", "Zero", "vlen n w", "vlen n w", true));
     });
 }
 
 #[test]
 fn p3b_outer_vector_in_inner_dependent_result() {
     on_elaboration_stack(|| {
-        accepts(&pair("p3b", "Vec Nat n", "VNil Nat", "v", "v"));
+        accepts(&pair("p3b", "Vec Nat n", "VNil Nat", "v", "v", false));
     });
 }
 
@@ -104,14 +108,14 @@ fn p3b_outer_vector_in_inner_dependent_result() {
 #[test]
 fn d3_composes_three_levels_for_nat_result() {
     on_elaboration_stack(|| {
-        accepts(&triple("d3", "Nat", "Zero", "vlen n w", "vlen n w"));
+        accepts(&triple("d3", "Nat", "Zero", "vlen n w", "vlen n w", true));
     });
 }
 
 #[test]
 fn d3b_composes_three_levels_for_dependent_result() {
     on_elaboration_stack(|| {
-        accepts(&triple("d3b", "Vec Nat n", "VNil Nat", "v", "v"));
+        accepts(&triple("d3b", "Vec Nat n", "VNil Nat", "v", "v", false));
     });
 }
 
@@ -128,6 +132,7 @@ fn p3c_explicit_constructor_stays_accepted() {
             "VNil Nat",
             "VCons Nat m a xs",
             "VCons Nat m a xs",
+            false,
         ));
     });
 }
@@ -135,7 +140,7 @@ fn p3c_explicit_constructor_stays_accepted() {
 #[test]
 fn p3e_inner_self_scrutinee_stays_accepted() {
     on_elaboration_stack(|| {
-        accepts(&pair("p3e", "Nat", "Zero", "vlen n v", "vlen n v"));
+        accepts(&pair("p3e", "Nat", "Zero", "vlen n v", "vlen n v", false));
     });
 }
 
@@ -146,7 +151,14 @@ fn p3e_inner_self_scrutinee_stays_accepted() {
 #[test]
 fn p3d_constructed_vector_now_checks() {
     on_elaboration_stack(|| {
-        accepts(&pair("p3d", "Vec Nat n", "VNil Nat", "repl n", "repl n"));
+        accepts(&pair(
+            "p3d",
+            "Vec Nat n",
+            "VNil Nat",
+            "repl n",
+            "repl n",
+            false,
+        ));
     });
 }
 
@@ -157,6 +169,6 @@ fn p3d_constructed_vector_now_checks() {
 #[test]
 fn d3x_wrong_deep_index_remains_kernel_refused() {
     on_elaboration_stack(|| {
-        refuses_wrong_index(&triple("d3x", "Vec Nat n", "VNil Nat", "v", "xs"));
+        refuses_wrong_index(&triple("d3x", "Vec Nat n", "VNil Nat", "v", "xs", false));
     });
 }
