@@ -191,9 +191,10 @@ fn equal_nat(ty: &SourceType) -> (String, String) {
 }
 
 /// MEASURED: the accepted prefix fixes different values four and two on the
-/// very two operands in the false universal theorem. A fresh copy of that
-/// whole prefix checks, then the one appended false theorem reaches its own
-/// kernel TypeMismatch; setup errors and unrelated false claims do not count.
+/// very two operands in the false universal theorem. The refusal has exactly
+/// the intended Nat-to-Nat environment binder and its claim type separately
+/// checks when supplied as a hypothesis. A fresh prefix then checks before
+/// that same claim with `Proved` kernel-refuses; setup errors do not count.
 /// CLAIMED: the derivative of x·x is not universally the value of x.
 /// THE GAP: this single counterexample does not characterize other products;
 /// the generic proof and the separate value-five cases provide broader checks.
@@ -225,7 +226,23 @@ fn shipped_square_derivative_as_one_x_refuses_at_its_own_equality() {
         panic!("refusal is precisely one universally quantified theorem with a proof");
     };
     assert_eq!(name, "refuse_square_derivative_as_one_x");
-    assert_eq!(params.len(), 1, "claim quantifies over the environment");
+    let [binder] = params.as_slice() else {
+        panic!("the refused claim has exactly one environment binder");
+    };
+    assert_eq!(
+        binder.names,
+        ["env"],
+        "the claim binds the queried environment"
+    );
+    let SourceType::TArr(domain, codomain, _) = &binder.ty else {
+        panic!("the refusal environment must be a total Nat-to-Nat function");
+    };
+    assert_eq!(shape(domain), "Nat", "domain of the refused environment");
+    assert_eq!(
+        shape(codomain),
+        "Nat",
+        "codomain of the refused environment"
+    );
     assert_eq!(proof, "Proved");
     let (refused_derivative, refused_x) = equal_nat(false_goal);
     assert_eq!(
@@ -242,6 +259,16 @@ fn shipped_square_derivative_as_one_x_refuses_at_its_own_equality() {
     let mut env = loaded_package();
     env.elaborate_file(positive)
         .expect("all positive controls check before refusal");
+    // A hypothetical witness discharges the exact parsed claim without adding
+    // an axiom. This checks its type before the refusal asks `Proved` to inhabit
+    // that claim: a kernel error while forming the proposition cannot count.
+    let claim_span = false_goal.span();
+    let claimed_equality = &refusal[claim_span.start..claim_span.end];
+    let well_typed_claim = format!(
+        "theorem refusal_claim_typechecks (env : Nat → Nat) (h : {claimed_equality}) : {claimed_equality} = h"
+    );
+    env.elaborate_file(&well_typed_claim)
+        .expect("the refused proposition itself is well-typed under the same binder");
     match env.elaborate_file(refusal) {
         Err(ElabError::KernelRejected {
             error: KernelError::TypeMismatch { .. },

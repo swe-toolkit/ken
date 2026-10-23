@@ -862,6 +862,67 @@ pub theorem substitute_var (e : Expr) : Equal Expr (substitute EVar e) e =
         (substitute_var b)
   }
 
+pub fn deriv (v : Nat) (e : Expr) : Expr =
+  match e {
+    EConst c ↦ EConst Zero;
+    EVar w ↦ var_deriv (nat_same v w);
+    EAdd a b ↦ EAdd (deriv v a) (deriv v b);
+    EMul a b ↦ EAdd (EMul (deriv v a) b) (EMul a (deriv v b))
+  }
+
+pub theorem deriv_respects_eval
+      (v : Nat)
+      (e1 : Expr)
+      (e2 : Expr)
+      (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
+      (env : Nat → Nat)
+    : Equal Nat (eval env (deriv v e1)) (eval env (deriv v e2)) =
+  let
+    d1 : Nat = eval env (deriv v e1);
+    d2 : Nat = eval env (deriv v e2);
+    t : Nat = Suc (add d1 d2);
+    r1 : Nat = taylor_rem v t env e1;
+    r2 : Nat = taylor_rem v t env e2;
+    bumped : Nat → Nat = bump_env v t env
+  in
+    deriv_extract
+      (eval env e1)
+      (eval env e2)
+      t
+      d1
+      d2
+      r1
+      r2
+      Proved
+      (leq_nat_add_left_bound d1 d2)
+      (leq_nat_add_right_bound d1 d2)
+      (h env)
+      (trans
+        Nat
+        (add (eval env e1) (mul t (add d1 (mul t r1))))
+        (eval bumped e1)
+        (add (eval env e2) (mul t (add d2 (mul t r2))))
+        (sym
+          Nat
+          (eval bumped e1)
+          (add (eval env e1) (mul t (add d1 (mul t r1))))
+          (deriv_taylor v t env e1))
+        (trans
+          Nat
+          (eval bumped e1)
+          (eval bumped e2)
+          (add (eval env e2) (mul t (add d2 (mul t r2))))
+          (h bumped)
+          (deriv_taylor v t env e2)))
+
+pub theorem poly_eq_deriv
+      (v : Nat) (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
+    : IsTrue (poly_eq (deriv v e1) (deriv v e2)) =
+  poly_eq_complete
+    (deriv v e1)
+    (deriv v e2)
+    (λenv. deriv_respects_eval v e1 e2 (λg. poly_eq_sound e1 e2 h g) env)
+
 theorem expr_add_cong
       (a1 : Expr)
       (a2 : Expr)
@@ -2155,67 +2216,6 @@ theorem poly_same_refl (p : Poly) : IsTrue (poly_same p p) =
         (poly_same_refl p0)
         (poly_same_refl q)
   }
-
-pub fn deriv (v : Nat) (e : Expr) : Expr =
-  match e {
-    EConst c ↦ EConst Zero;
-    EVar w ↦ var_deriv (nat_same v w);
-    EAdd a b ↦ EAdd (deriv v a) (deriv v b);
-    EMul a b ↦ EAdd (EMul (deriv v a) b) (EMul a (deriv v b))
-  }
-
-pub theorem deriv_respects_eval
-      (v : Nat)
-      (e1 : Expr)
-      (e2 : Expr)
-      (h : (env : Nat → Nat) → Equal Nat (eval env e1) (eval env e2))
-      (env : Nat → Nat)
-    : Equal Nat (eval env (deriv v e1)) (eval env (deriv v e2)) =
-  let
-    d1 : Nat = eval env (deriv v e1);
-    d2 : Nat = eval env (deriv v e2);
-    t : Nat = Suc (add d1 d2);
-    r1 : Nat = taylor_rem v t env e1;
-    r2 : Nat = taylor_rem v t env e2;
-    bumped : Nat → Nat = bump_env v t env
-  in
-    deriv_extract
-      (eval env e1)
-      (eval env e2)
-      t
-      d1
-      d2
-      r1
-      r2
-      Proved
-      (leq_nat_add_left_bound d1 d2)
-      (leq_nat_add_right_bound d1 d2)
-      (h env)
-      (trans
-        Nat
-        (add (eval env e1) (mul t (add d1 (mul t r1))))
-        (eval bumped e1)
-        (add (eval env e2) (mul t (add d2 (mul t r2))))
-        (sym
-          Nat
-          (eval bumped e1)
-          (add (eval env e1) (mul t (add d1 (mul t r1))))
-          (deriv_taylor v t env e1))
-        (trans
-          Nat
-          (eval bumped e1)
-          (eval bumped e2)
-          (add (eval env e2) (mul t (add d2 (mul t r2))))
-          (h bumped)
-          (deriv_taylor v t env e2)))
-
-pub theorem poly_eq_deriv
-      (v : Nat) (e1 : Expr) (e2 : Expr) (h : IsTrue (poly_eq e1 e2))
-    : IsTrue (poly_eq (deriv v e1) (deriv v e2)) =
-  poly_eq_complete
-    (deriv v e1)
-    (deriv v e2)
-    (λenv. deriv_respects_eval v e1 e2 (λg. poly_eq_sound e1 e2 h g) env)
 
 fn var_deriv (b : Bool) : Expr =
   match b {
