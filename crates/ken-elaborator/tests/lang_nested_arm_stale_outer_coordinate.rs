@@ -73,13 +73,21 @@ fn pair(name: &str, result: &str, nil: &str, first: &str, second: &str, sibling:
     )
 }
 
-fn triple(name: &str, result: &str, nil: &str, first: &str, deep: &str, sibling: bool) -> String {
+fn triple(
+    name: &str,
+    result: &str,
+    nil: &str,
+    first: &str,
+    deep_nil: &str,
+    deep_cons: &str,
+    sibling: bool,
+) -> String {
     pair(
         name,
         result,
         nil,
         first,
-        &format!("match ys {{ VNil ↦ {deep}; VCons m3 c zs ↦ {deep} }}"),
+        &format!("match ys {{ VNil ↦ {deep_nil}; VCons m3 c zs ↦ {deep_cons} }}"),
         sibling,
     )
 }
@@ -108,14 +116,24 @@ fn p3b_outer_vector_in_inner_dependent_result() {
 #[test]
 fn d3_composes_three_levels_for_nat_result() {
     on_elaboration_stack(|| {
-        accepts(&triple("d3", "Nat", "Zero", "vlen n w", "vlen n w", true));
+        accepts(&triple(
+            "d3", "Nat", "Zero", "vlen n w", "vlen n w", "vlen n w", true,
+        ));
     });
 }
 
 #[test]
 fn d3b_composes_three_levels_for_dependent_result() {
     on_elaboration_stack(|| {
-        accepts(&triple("d3b", "Vec Nat n", "VNil Nat", "v", "v", false));
+        accepts(&triple(
+            "d3b",
+            "Vec Nat n",
+            "VNil Nat",
+            "v",
+            "v",
+            "v",
+            false,
+        ));
     });
 }
 
@@ -169,6 +187,14 @@ fn p3d_constructed_vector_now_checks() {
 #[test]
 fn d3x_wrong_deep_index_remains_kernel_refused() {
     on_elaboration_stack(|| {
-        refuses_wrong_index(&triple("d3x", "Vec Nat n", "VNil Nat", "v", "xs", false));
+        refuses_wrong_index(&triple(
+            "d3x",
+            "Vec Nat n",
+            "VNil Nat",
+            "v",
+            "xs",
+            "v",
+            false,
+        ));
     });
 }
