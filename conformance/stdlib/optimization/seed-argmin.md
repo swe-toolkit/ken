@@ -248,6 +248,7 @@ list position witness, or complexity claim. They do not cover real-valued
 or continuous optimization, search over infinite or implicit spaces,
 heuristics or approximation guarantees, `argmax`, arbitrary `Ord` costs,
 multi-objective or lexicographic costs, top-k or stable multi-result
-selection, or an `Option` selector over a possibly empty list; §1.3
-defers those behaviors. No catalog build, seed execution, CI, publication,
-or landing is claimed.
+selection, or an `Option` selector over a possibly empty list. Section 1.3
+defers the other listed behaviors; `argmax` is specified in §3 and the
+Option selector in §1.4, but neither is exercised by this seed. No catalog
+build, seed execution, CI, publication, or landing is claimed.
