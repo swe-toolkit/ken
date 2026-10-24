@@ -237,9 +237,82 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
     (observation, plan.frames.len())
 }
 
-/// Promise class: durable invariant. A nested Deferred region has no planned
-/// release order, so the planner refuses it before emitting a native artifact.
-/// The gate is test-support-only and requires an explicit forced-mode run.
+/// Promise class: durable invariant. MEASURED: the actual depth-three plan's
+/// repeated-producer Deferred FsOpen has the same statically bounded handler
+/// as its specialized FsOpen row. CLAIMED: the marked bracket release ends
+/// the Deferred suffix without swallowing the intervening acquisition.
+/// THE GAP: this planner observation does not prove the linked owner executes
+/// that acquisition; the separate-process native effect trace tests that.
+#[cfg(target_os = "linux")]
+#[test]
+fn nested_bracket_repeated_producer_has_bounded_deferred_owner() {
+    // Measured here on β′ with a test-only Builder stack-size override:
+    // 1920 KiB overflows, 1984 KiB passes (64-KiB grid). The stated
+    // 256 MiB provision leaves 260160 KiB of headroom over that bound;
+    // no ambient RUST_MIN_STACK is used to select the thread stack.
+    std::thread::Builder::new()
+        .name("px8ta-bounded-owner".to_string())
+        .stack_size(256 * 1024 * 1024)
+        .spawn(check_nested_bracket_repeated_producer_owner)
+        .expect("spawn stated-stack depth-three planner control")
+        .join()
+        .expect("depth-three planner control thread");
+}
+
+#[cfg(target_os = "linux")]
+fn check_nested_bracket_repeated_producer_owner() {
+    let dir = output_dir("depth-3-bounded-owner");
+    let (built, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        ken_cli::build_native_program(
+            &nested_bracket_source(3),
+            ken_cli::SourceFormat::Ken,
+            "px8ta-depth-3-bounded-owner",
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    built.expect("the checked depth-three program builds a native artifact");
+    let plans: Vec<_> = plans
+        .iter()
+        .filter(|plan| {
+            plan.all_static_response_rows.iter().any(|row| row.operation == "FsOpen")
+                && plan
+                    .static_response_deferred
+                    .iter()
+                    .any(|row| row.operation == "FsOpen")
+        })
+        .collect();
+    let [plan] = plans.as_slice() else {
+        panic!("one checked depth-three response plan has both FsOpen rows: {plans:?}");
+    };
+    let specialized: Vec<_> = plan
+        .all_static_response_rows
+        .iter()
+        .filter(|row| row.operation == "FsOpen")
+        .collect();
+    let deferred: Vec<_> = plan
+        .static_response_deferred
+        .iter()
+        .filter(|row| row.operation == "FsOpen")
+        .collect();
+    let ([specialized], [deferred]) = (specialized.as_slice(), deferred.as_slice()) else {
+        panic!("the nested checked program has one specialized and one Deferred FsOpen row");
+    };
+    assert_eq!(deferred.sub_case, "UnconsumedTransportCaller");
+    assert_eq!(deferred.producer_call_origin, specialized.producer_call_origin);
+    assert_ne!(deferred.vis_origin, specialized.vis_origin);
+    assert_eq!(
+        deferred.bounded_handler_owner.as_deref(),
+        Some(specialized.base_owner.as_str()),
+        "the Deferred nested acquisition must have its enclosing checked owner"
+    );
+}
+
+/// Promise class: durable invariant. R-2′ in
+/// docs/program/issues/RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER.md:
+/// a nested Deferred region has no planned release order, so the planner
+/// refuses depth two before native artifact emission. The gate is
+/// test-support-only and requires an explicit forced-mode run.
 #[cfg(target_os = "linux")]
 #[test]
 #[ignore = "run with RT_RECUT_FORCE_DEFERRED=1 and ken-runtime/px8-ds-test-support"]
@@ -247,8 +320,10 @@ fn forced_nested_deferred_depth_two_refuses_at_planning() {
     assert_nested_deferred_refuses_at_planning(2);
 }
 
-/// Promise class: durable invariant. This exercises two nested regions, not
-/// just one, and refuses before the former depth-three trap-40 execution.
+/// Promise class: durable invariant. R-1′ in
+/// docs/program/issues/RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER.md:
+/// depth three has two nested regions and refuses before the former trap-40
+/// execution, not merely before its outer resource is released.
 #[cfg(target_os = "linux")]
 #[test]
 #[ignore = "run with RT_RECUT_FORCE_DEFERRED=1 and ken-runtime/px8-ds-test-support"]
@@ -260,8 +335,10 @@ fn forced_nested_deferred_depth_three_refuses_at_planning() {
 fn assert_nested_deferred_refuses_at_planning(depth: usize) {
     assert!(std::env::var_os("RT_RECUT_FORCE_DEFERRED").is_some(),
         "forced nested Deferred refusal needs its explicit test-support gate");
-    // The existing checked depth-three fixture needs >2112 KiB; use its
-    // stated 256 MiB provision, not the harness's ambient thread stack.
+    // Measured here with a test-only Builder stack-size override, at both
+    // depths two and three: 1600 KiB overflows, 1664 KiB passes (64-KiB
+    // grid). Stated 256 MiB leaves 260480 KiB of headroom over the passing
+    // bound. Do not rely on the harness's ambient thread stack.
     std::thread::Builder::new()
         .name(format!("px8ta-deferred-refusal-{depth}"))
         .stack_size(256 * 1024 * 1024)
