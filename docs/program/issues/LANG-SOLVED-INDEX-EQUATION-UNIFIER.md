@@ -1,7 +1,7 @@
 ---
 id: LANG-SOLVED-INDEX-EQUATION-UNIFIER
 title: "Stage 2 of solved-index elimination: LANG-SOLVED-INDEX-SUBSTITUTION eliminates only all-variable methods whose premise slots each project to one leaf, and mixed methods and multi-leaf slots keep the alias path. Replace the per-leaf plan with a per-equation unifier (an equation telescope, injectivity decomposition, per-equation rule dispatch, dependency-ordered transport) and lift the gate"
-status: draft
+status: active
 owner: language
 size: L
 tier: T1
@@ -9,7 +9,7 @@ gate: architect
 depends_on: [LANG-SOLVED-INDEX-SUBSTITUTION]
 blocks: []
 github: null
-origin: "Architect staged route evt_6htgrnanmjnm4 on the §1a 6 hold of LANG-SOLVED-INDEX-SUBSTITUTION, after the Research advisory evt_34qvnmp4g573c (the standard unifier: Agda's eqTel and reorderTel, Lean's unifyEqs). Within the operator's 2026-10-17 restructuring authorization of that WP. Steward-filed per COORDINATION section 2."
+origin: "Architect staged route evt_6htgrnanmjnm4 on the §1a 6 hold of LANG-SOLVED-INDEX-SUBSTITUTION, after the Research advisory evt_34qvnmp4g573c (the standard unifier: Agda's eqTel and reorderTel, Lean's unifyEqs). Within the operator's 2026-10-17 restructuring authorization of that WP. Absorbs LANG-DEPENDENT-BRANCH-RETRY-NESTED-COST (Steward evt_1xjmh1w0g8nxa). Steward-filed per COORDINATION section 2."
 ---
 
 # Solved indices by a per-equation unifier
@@ -36,6 +36,16 @@ slots are then eliminated too, and the stage-1 gate is removed.
   by its argument equations; each solved equation becomes Refl
   separately; the context is reordered by free-variable dependency.
 
+- **The retry cost (Architect `evt_730agekm23atv`, at `2cb7c6ec4`).**
+  Stage 1 selects the regime by trial: retained first, then eliminated
+  after a rollback (`check_dependent_branch_regimes`, elab.rs ~:9431).
+  With the pre-existing refined-goal fallback, a refused nested peel runs
+  the arm body three times per level, R(d) = 3R(d-1) + 1, giving 13, 121
+  and 1093 retries and 4.7 s at d = 7. Accepted twins make 0 retries.
+  The fix is structural: select the regime and the goal refinement by a
+  decidable property before the body is elaborated. Evidence:
+  `/workspaces/ken/local/architect-shared/retry-cost-d0/`.
+
 ## Deliverable
 
 The Architect's D0 first rules the representation and the rule set in
@@ -53,9 +63,19 @@ removes the gate.
   ken-elaborator integration binary plus the catalog loaders.
 - **AC-3 (mutation, QA).** Restoring the gate leaves AC-1's rows on the
   fallback path, which a test pins by the eliminated binder's coordinate.
+- **AC-4.** The regime is chosen without trial. A test pins the deepD
+  refusal (the Adversary probe in `evt_1beqd0ntawbqc`) at d = 3, 5 and 7
+  by body-entry count: the count does not grow 3x per level, and the
+  diagnostic is unchanged. Time is measured locally and is not asserted
+  in CI.
 
 ## Stop conditions
 
 - Any kernel or `trusted_base()` change.
 - A rule outside deletion, solution, injectivity and conflict, unless
   the D0 rules it.
+
+Checks: 8 fired: AC-4 counts body entries rather than time, because a
+constant-factor speedup would pass a timing bound. 6 fired: the cost
+population is the three body entries per failing level that the D0
+counted.

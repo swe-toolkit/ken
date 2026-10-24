@@ -1,7 +1,7 @@
 ---
 id: LANG-DEPENDENT-BRANCH-RETRY-NESTED-COST
 title: "A failing nested indexed peel costs about 4x per nesting level since 76064f39c (2.3x before): the retained-then-eliminated retry in check_dependent_branch_regimes reruns the whole arm, including each nested method's own retry. Bound the retry so refusal cost stays linear in depth with an unchanged diagnostic"
-status: ready
+status: closed
 owner: language
 size: M
 tier: T1
@@ -67,3 +67,20 @@ Checks: 4 fired: the anchors were re-read on `218387582`, and the base
 moved since the measurement, so the D0 re-measures first. 8 fired: a
 constant-factor speedup would also pass AC-1, so AC-2 pins the count's
 growth.
+
+## Closeout
+
+Closed without merge, superseded by LANG-SOLVED-INDEX-EQUATION-UNIFIER
+(Steward scope call `evt_1xjmh1w0g8nxa`, on Architect `evt_730agekm23atv`).
+
+- The D0 at `2cb7c6ec4` reproduced the cost: 13, 121 and 1093 retries at
+  d = 3, 5 and 7. Each failing level runs the arm body on three distinct
+  states: the retained attempt, its refined-goal fallback and the
+  eliminated regime. There is no exact pruning, so AC-2 cannot be met by
+  trial selection.
+- The proposed skip refuses some programs the full search accepts, and it
+  fired 0 times across 48 binaries, so the corpus cannot certify it.
+- The cost affects refusals only. Accepted programs are unchanged.
+- The structural fix, selecting the regime before the body is elaborated,
+  is carried to stage 2 as its AC-4. Evidence:
+  `/workspaces/ken/local/architect-shared/retry-cost-d0/`.
