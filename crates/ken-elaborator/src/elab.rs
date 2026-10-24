@@ -9406,16 +9406,13 @@ fn check_dependent_branch_body(
         recursive_field_index_path,
         outer_scope_depth,
         variable_side,
+        branch_convoy,
     )
     .and_then(|(goal, preserve_nested_goal)| {
         complete_dependent_branch_body(
             cx,
             arm,
             match_span,
-            ind,
-            params,
-            target_indices,
-            scrut_indices,
             n,
             expected_here,
             premise_domains,
@@ -9424,12 +9421,10 @@ fn check_dependent_branch_body(
             scrut_core,
             sentinel_region,
             equation_convoy,
-            recursive_field_index_path,
             branch_convoy,
             path_base,
-            &goal,
+            goal,
             preserve_nested_goal,
-            variable_side,
         )
     });
 
@@ -9469,7 +9464,8 @@ fn prepare_dependent_branch_body(
     recursive_field_index_path: RecursiveFieldIndexPath,
     outer_scope_depth: usize,
     variable_side: bool,
-) -> Result<(Term, bool), ElabError> {
+    branch_convoy: bool,
+) -> Result<(PreparedArmGoal, bool), ElabError> {
     install_arm_coordinates(
         cx,
         ind,
@@ -9578,7 +9574,55 @@ fn prepare_dependent_branch_body(
                 install_depth: cx.ctx.len(),
             });
     }
-    Ok((expected_unrefined, preserve_nested_goal))
+    // One regime per arm, decided here before descent. Outside the
+    // plain-declared and constructor-convoy paths, the arm checks once
+    // against its refined goal: field-variable leaves are solved,
+    // parameter-side leaves are generalized. No unrefined attempt runs first,
+    // so neither a nested refusal nor an arm-level kernel rejection is retried.
+    if !variable_side
+        && (branch_convoy || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
+    {
+        return Ok((PreparedArmGoal::Unrefined(expected_unrefined), preserve_nested_goal));
+    }
+    let (goal, restorations) = refine_branch_goal(
+        cx,
+        ind,
+        params,
+        target_indices,
+        scrut_indices,
+        n,
+        expected_here,
+        variable_side,
+    )?;
+    if restorations.iter().any(|restoration| {
+        matches!(restoration, BranchGoalRestoration::Generalized { binders, .. } if !binders.is_empty())
+            || matches!(restoration, BranchGoalRestoration::Generalized { solved: Some(_), .. })
+    }) {
+        return Ok((PreparedArmGoal::Reverted(goal, restorations), preserve_nested_goal));
+    }
+    let goal = if equation_convoy
+        || preserve_nested_goal
+        || matches!(arm.body, RExpr::RLam(_, _, _))
+    {
+        goal
+    } else {
+        simplify_branch_goal(cx.env, &cx.ctx, &goal)
+    };
+    Ok((PreparedArmGoal::Refined(goal, restorations), preserve_nested_goal))
+}
+
+/// The goal a prepared dependent arm is checked against. It is decided before
+/// descent, so the recursive frames carry no regime state and share one
+/// in-place check for every arm that reverts no binder.
+enum PreparedArmGoal {
+    /// Plain-declared or constructor-convoy arm: the unrefined goal, admitted
+    /// by the kernel at the arm.
+    Unrefined(Term),
+    /// Refined goal that reverts no binder: checked in place, then restored.
+    Refined(Term, Vec<BranchGoalRestoration>),
+    /// Refined goal that reverts dependent binders: the outlined generalized
+    /// check.
+    Reverted(Term, Vec<BranchGoalRestoration>),
 }
 
 /// Check a prepared branch and restore its obligation prefix on fallback.
@@ -9589,10 +9633,6 @@ fn complete_dependent_branch_body(
     cx: &mut ElabCtx,
     arm: &RMatchArm,
     match_span: &Span,
-    ind: &InductiveDecl,
-    params: &[Term],
-    target_indices: &[Term],
-    scrut_indices: &[Term],
     n: usize,
     expected_here: &Term,
     premise_domains: &[Term],
@@ -9601,50 +9641,43 @@ fn complete_dependent_branch_body(
     scrut_core: &Term,
     sentinel_region: usize,
     equation_convoy: bool,
-    recursive_field_index_path: RecursiveFieldIndexPath,
     branch_convoy: bool,
     path_base: usize,
-    expected_unrefined: &Term,
+    prepared: PreparedArmGoal,
     preserve_nested_goal: bool,
-    variable_side: bool,
 ) -> Result<Term, ElabError> {
     let obligation_base = cx.obligations.len();
-    // One regime per arm, decided before descent. Outside the plain-declared
-    // and constructor-convoy paths, the arm checks once against its refined
-    // goal: field-variable leaves are solved, parameter-side leaves are
-    // generalized. No unrefined attempt runs first, so neither a nested
-    // refusal nor an arm-level kernel rejection is retried.
-    let attempt = if variable_side
-        || (!branch_convoy && recursive_field_index_path != RecursiveFieldIndexPath::PlainDeclared)
-    {
-        let (goal, restorations) = refine_branch_goal(
-            cx,
-            ind,
-            params,
-            target_indices,
-            scrut_indices,
-            n,
-            expected_here,
-            variable_side,
-        )?;
-        return check_generalized_branch_goal(
-            cx,
-            arm,
-            goal,
-            restorations,
-            expected_here,
-            equation_convoy || preserve_nested_goal,
-        )
-        .and_then(|checked| {
-            wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
-        });
-    } else if branch_convoy {
+    let (arm_goal, restorations) = match prepared {
+        PreparedArmGoal::Reverted(goal, restorations) => {
+            return check_generalized_branch_goal(
+                cx,
+                arm,
+                goal,
+                restorations,
+                expected_here,
+                equation_convoy || preserve_nested_goal,
+            )
+            .and_then(|checked| {
+                wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
+            });
+        }
+        PreparedArmGoal::Refined(goal, restorations) => (goal, Some(restorations)),
+        PreparedArmGoal::Unrefined(goal) => (goal, None),
+    };
+    let attempt = if branch_convoy && restorations.is_none() {
         check_constructor_convoy_branch(
-            cx, arm, scrut_ty, scrut_core, concrete, n, expected_unrefined, path_base,
+            cx, arm, scrut_ty, scrut_core, concrete, n, &arm_goal, path_base,
         )
     } else {
-        check_match_arm_result(cx, arm, expected_unrefined, &arm.span).and_then(|checked| {
-            kernel_check_current(cx, &checked, expected_unrefined)
+        check_match_arm_result(cx, arm, &arm_goal, &arm.span).and_then(|checked| match restorations {
+            // As on the generalized path, a refined goal gets no early kernel
+            // admission: declaration universe metas may still be solved by
+            // the enclosing method checker.
+            Some(restorations) => Ok(restorations
+                .into_iter()
+                .rev()
+                .fold(checked, |body, restoration| restoration.apply(body))),
+            None => kernel_check_current(cx, &checked, &arm_goal)
                 .map(|()| checked)
                 .map_err(|error| match error {
                     CurrentKernelQueryError::View(error) => error,
@@ -9652,7 +9685,7 @@ fn complete_dependent_branch_body(
                         error,
                         span: arm.span.clone(),
                     },
-                })
+                }),
         })
     };
     match attempt {
