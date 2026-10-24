@@ -7532,87 +7532,6 @@ fn check_structured_constructor_method(
     Ok(method)
 }
 
-/// LANG-NATIVE-PRODUCTION-STACK-FOOTPRINT D2: `check_match_dependent`'s
-/// capability-3 goal-refinement retry -- the arm taken only when the cheap
-/// unrefined attempt fails -- pulled into its own `#[inline(never)]` frame.
-/// Same reasoning as `LANG-RECORD-STACK-OVERFLOW`'s `check_pair_or_record`/
-/// `infer_record_requires_expected_type`: in an unoptimized build a
-/// function's frame is sized for every local declared anywhere in its body,
-/// paid on every call regardless of which branch runs. Unlike that node's
-/// extraction targets, this one matters here for a *narrower* reason worth
-/// recording: `check_match_dependent` is on the `check` <-> `check_match_
-/// dependent` mutual-recursion cycle that `decimal_char.rs`'s fixed
-/// 31-level `decimalPow10` cascade drives to full depth on every compile
-/// (`decimal_char.rs:62-75`), and every arm of that cascade is a bare
-/// literal or a two-way `eq_int` match that the cheap unrefined attempt
-/// always resolves -- so this fallback's own frame is declared (and paid
-/// for by its caller) on every level, but never otherwise entered on this
-/// path. Moving it out removes dead weight from
-/// the caller's always-paid frame without adding a frame that this
-/// particular recursion ever pays for. Unchanged control flow and
-/// semantics -- same `refine_branch_goal`/`simplify_branch_goal`/`check`/
-/// `Term::Cast` calls in the same order, only their host frame moved.
-///
-/// This coldness claim is about *which programs*, and it was measured on
-/// one: the `decimalPow10` cascade above. A recursion that DOES enter this
-/// fallback at every level pays the extracted frame's own call overhead at
-/// every level, on top of (not instead of) the reduced caller frame. The
-/// inversion mode for such a recursion is a SIGSEGV on the guard page, not
-/// a red test in this suite: nothing here would notice before it happened
-/// on that recursion's own deployment.
-///
-/// `LANG-REFINED-FALLBACK-COLDNESS-CLAIM` `D4`, measured, not assumed:
-/// `objdump`'s prologue for this function gives `0x1000 + 0x48 = 4168`
-/// bytes/call -- well under the `+6472` measured on the reverted mirror
-/// extraction above. A recursion that entered this fallback at every level
-/// would pay `30232 + 4168 = 34400` bytes/call, `+1048` against the
-/// pre-extraction `33352` baseline, not the `+3352`/level a `6472`-sized
-/// frame would cost. Over 31 levels that is `+32488` bytes (~31.7 KiB), well
-/// inside the ~96 KiB this change bought, not the ~104 KiB that would
-/// exceed it.
-///
-/// `LANG-STACK-ARC-EVIDENCE-USABILITY` `D2`: the `4168` figure above is
-/// reproducible from a named artifact, not a one-off read. Build
-/// `ken-cli`'s test binaries (`scripts/ken-cargo build -p ken-cli --tests`,
-/// default/dev profile), resolve this function's mangled symbol in the
-/// `px4b_native_production` binary
-/// (`target/debug/deps/px4b_native_production-<hash>`) with
-/// `nm <binary> | grep refined_fallback`, then read `0x1000 + 0x48` off
-/// `objdump -d --disassemble='<mangled-name>' <binary>`'s prologue -- the
-/// two `sub $imm,%rsp` immediates, excluding the `push` register-save
-/// bytes.
-#[inline(never)]
-fn check_match_dependent_refined_fallback(
-    cx: &mut ElabCtx,
-    arm: &RMatchArm,
-    ind: &InductiveDecl,
-    params_terms: &[Term],
-    target_indices: &[Term],
-    scrut_indices: &[Term],
-    n: usize,
-    expected_here: &Term,
-    preserve_goal: bool,
-) -> Result<Term, ElabError> {
-    let (goal_refined, goal_restorations) = refine_branch_goal(
-        cx,
-        ind,
-        params_terms,
-        target_indices,
-        scrut_indices,
-        n,
-        expected_here,
-        false,
-    )?;
-    check_generalized_branch_goal(
-        cx,
-        arm,
-        goal_refined,
-        goal_restorations,
-        expected_here,
-        preserve_goal,
-    )
-}
-
 #[inline(never)]
 fn check_generalized_branch_goal(
     cx: &mut ElabCtx<'_>,
@@ -9690,9 +9609,14 @@ fn complete_dependent_branch_body(
     variable_side: bool,
 ) -> Result<Term, ElabError> {
     let obligation_base = cx.obligations.len();
-    // The simplified goal retains every refinement root while exposing
-    // ordinary heads needed by dependent matches and their index convoy.
-    let attempt = if variable_side {
+    // One regime per arm, decided before descent. Outside the plain-declared
+    // and constructor-convoy paths, the arm checks once against its refined
+    // goal: field-variable leaves are solved, parameter-side leaves are
+    // generalized. No unrefined attempt runs first, so neither a nested
+    // refusal nor an arm-level kernel rejection is retried.
+    let attempt = if variable_side
+        || (!branch_convoy && recursive_field_index_path != RecursiveFieldIndexPath::PlainDeclared)
+    {
         let (goal, restorations) = refine_branch_goal(
             cx,
             ind,
@@ -9701,7 +9625,7 @@ fn complete_dependent_branch_body(
             scrut_indices,
             n,
             expected_here,
-            true,
+            variable_side,
         )?;
         return check_generalized_branch_goal(
             cx,
@@ -9731,31 +9655,15 @@ fn complete_dependent_branch_body(
                 })
         })
     };
-    let checked = match attempt {
-        Ok(checked) => checked,
-        Err(error) if recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared
-            || branch_convoy
-            || matches!(&error, ElabError::RefinementSplitDemand { .. }
-                | ElabError::NonConvoyableRefinementSplit { .. }) => {
-            cx.obligations.truncate(obligation_base);
-            return Err(error);
+    match attempt {
+        Ok(checked) => {
+            wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
         }
-        Err(_) => {
+        Err(error) => {
             cx.obligations.truncate(obligation_base);
-            check_match_dependent_refined_fallback(
-                cx,
-                arm,
-                ind,
-                params,
-                target_indices,
-                scrut_indices,
-                n,
-                expected_here,
-                equation_convoy || preserve_nested_goal,
-            )?
+            Err(error)
         }
-    };
-    wrap_premise_lams_finalized(checked, premise_domains, sentinel_region, match_span)
+    }
 }
 
 /// Field refinements for one dependent branch. An equation-convoy branch then

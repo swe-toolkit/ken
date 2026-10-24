@@ -2,7 +2,7 @@
 
 use super::SOLVED_INDEX_BODY_VISITS;
 use crate::{ElabEnv, ElabError};
-use ken_kernel::KernelError;
+use ken_kernel::{normalize, Context, KernelError};
 
 // The adjacent indexed-convoy fixture measured a 1,982,464-byte prelude
 // peak. A fixed 32 MiB stack adds over 30 MiB headroom for seven nested
@@ -19,6 +19,8 @@ fn on_elaboration_stack(f: impl FnOnce() + Send + 'static) {
 }
 
 const CHAIN: &str = "data Chain (a : Type) : Nat -> Type where { ChainNil : Chain a Zero; ChainCons : (n : Nat) -> a -> Chain a n -> Chain a (Suc n) }";
+const PARAM_NEST: &str = "data ParamNest (p : Nat) : Nat -> Type where { ParamStop : ParamNest p p; ParamStep : ParamNest p p -> ParamNest p p }";
+const VEC: &str = "data Vec (a : Type) : Nat -> Type where { VNil : Vec a Zero; VCons : (n : Nat) -> a -> Vec a n -> Vec a (Suc n) }";
 
 fn suc_count(depth: usize) -> String {
     (0..depth).fold("n".to_string(), |value, _| format!("(Suc {value})"))
@@ -39,6 +41,48 @@ fn chain_body(depth: usize, leaf: &str) -> String {
         "fn nested (a : Type) (n : Nat) (xs : Chain a {}) : Nat = {body}",
         suc_count(depth)
     )
+}
+
+fn param_body(depth: usize, leaf: &str) -> String {
+    let mut body = leaf.to_string();
+    for index in (1..=depth).rev() {
+        let scrutinee = if index == 1 {
+            "xs".to_string()
+        } else {
+            format!("rest{}", index - 1)
+        };
+        body = format!("match {scrutinee} {{ ParamStop ↦ Zero; ParamStep rest{index} ↦ {body} }}");
+    }
+    format!("fn nested_param (p : Nat) (xs : ParamNest p p) : Nat = {body}")
+}
+
+fn vec_body(depth: usize, leaf: &str) -> String {
+    let mut body = leaf.to_string();
+    for index in (1..=depth).rev() {
+        let scrutinee = if index == 1 {
+            "xs".to_string()
+        } else {
+            format!("t{}", index - 1)
+        };
+        body = format!(
+            "match {scrutinee} {{ VNil ↦ VNil a; VCons m{index} x{index} t{index} ↦ VCons a m{index} x{index} ({body}) }}"
+        );
+    }
+    format!("fn deep_vec (a : Type) (n : Nat) (xs : Vec a n) : Vec a n = {body}")
+}
+
+fn closed_nat(depth: usize) -> String {
+    (0..depth).fold("Zero".to_string(), |value, _| format!("(Suc {value})"))
+}
+
+fn closed_vec(depth: usize) -> String {
+    (0..depth).fold("VNil Nat".to_string(), |tail, index| {
+        format!(
+            "VCons Nat {} {} ({tail})",
+            closed_nat(index),
+            closed_nat(index + 1)
+        )
+    })
 }
 
 fn check_count(source: &str, fixture: &str) -> (Result<(), ElabError>, usize) {
@@ -74,6 +118,106 @@ fn solved_field_nesting_uses_one_body_entry_per_level() {
                 entries, depth,
                 "accepted depth {depth}: one visit per level"
             );
+        }
+    });
+}
+
+/// Promise class: durable invariant. MEASURED: for an all-parameter-side
+/// indexed family, both accepted and typed-refused nests visit exactly two
+/// constructor bodies per level and add no trust. CLAIMED: refined F checks
+/// each arm once without trying U first. THE GAP: this family isolates the
+/// parameter-side route; the independent Vec control exercises accepted
+/// nested goal substitution even when there are no restorations.
+#[test]
+fn parameter_side_nesting_checks_each_arm_once() {
+    on_elaboration_stack(|| {
+        for depth in [1, 3, 5, 7] {
+            let (result, accepted_entries) = check_count(&param_body(depth, "Zero"), PARAM_NEST);
+            result.unwrap_or_else(|error| panic!("accepted parameter nest {depth}: {error:?}"));
+            assert_eq!(
+                accepted_entries,
+                2 * depth,
+                "accepted parameter nest {depth}"
+            );
+            let (refusal, refused_entries) = check_count(&param_body(depth, "Refl"), PARAM_NEST);
+            assert!(
+                matches!(&refusal, Err(ElabError::TypeMismatch { .. })),
+                "false Nat leaf depth {depth}: {refusal:?}"
+            );
+            assert_eq!(refused_entries, 2 * depth, "refused parameter nest {depth}");
+        }
+    });
+}
+
+/// Promise class: durable invariant. MEASURED: nested Vec reconstruction
+/// admits a correct leaf and rejects a wrong leaf, with two constructor-body
+/// entries per level in both cases. CLAIMED: F can succeed without retry or
+/// selecting only nonempty restorations. THE GAP: an independent checked
+/// closed-call result is observed by the separate output test below.
+#[test]
+fn returned_vector_nesting_checks_each_arm_once() {
+    on_elaboration_stack(|| {
+        for depth in 2..=7 {
+            let (accepted, accepted_entries) =
+                check_count(&vec_body(depth, &format!("t{depth}")), VEC);
+            accepted.unwrap_or_else(|error| panic!("accepted Vec depth {depth}: {error:?}"));
+            assert_eq!(accepted_entries, 2 * depth, "accepted Vec depth {depth}");
+            let (refusal, refused_entries) =
+                check_count(&vec_body(depth, &format!("x{depth}")), VEC);
+            assert!(
+                matches!(
+                    &refusal,
+                    Err(ElabError::TypeMismatch { .. })
+                        | Err(ElabError::KernelRejected {
+                            error: KernelError::TypeMismatch { .. },
+                            ..
+                        })
+                ),
+                "wrong Vec leaf depth {depth}: {refusal:?}"
+            );
+            assert_eq!(refused_entries, 2 * depth, "refused Vec depth {depth}");
+        }
+    });
+}
+
+/// Promise class: durable invariant. MEASURED: independently constructed
+/// closed vectors emerge unchanged from admitted deep Vec reconstruction
+/// (including distinct head/tail elements). CLAIMED: selecting F directly
+/// preserves emitted values, not merely admission. THE GAP: the open generic
+/// method is tested separately; these checked calls observe closed instances.
+#[test]
+fn returned_vector_nesting_emits_the_independent_vector() {
+    on_elaboration_stack(|| {
+        for depth in [2, 5, 7] {
+            let mut env = ElabEnv::new().expect("prelude");
+            env.elaborate_decl(VEC).expect("indexed vector fixture");
+            let trust = env.env.trusted_base();
+            env.elaborate_decl(&vec_body(depth, &format!("t{depth}")))
+                .unwrap_or_else(|error| panic!("deep Vec {depth}: {error:?}"));
+            let length = closed_nat(depth);
+            let independent = closed_vec(depth);
+            let observed = env
+                .elaborate_decl(&format!(
+                    "const output : Vec Nat {length} = deep_vec Nat {length} ({independent})"
+                ))
+                .unwrap_or_else(|error| panic!("checked Vec call depth {depth}: {error:?}"));
+            let expected = env
+                .elaborate_decl(&format!("const oracle : Vec Nat {length} = {independent}"))
+                .unwrap_or_else(|error| panic!("checked Vec expectation depth {depth}: {error:?}"));
+            let normal = |id| {
+                let body = env
+                    .env
+                    .transparent_body(id)
+                    .expect("checked transparent const")
+                    .1;
+                normalize(&env.env, &Context::new(), &body)
+            };
+            assert_eq!(
+                normal(observed),
+                normal(expected),
+                "emitted Vec depth {depth}"
+            );
+            assert_eq!(env.env.trusted_base(), trust, "Vec output adds no trust");
         }
     });
 }
