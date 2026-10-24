@@ -5943,8 +5943,28 @@ impl<'a> Lowering<'a> {
             LoweringCause::PlannerInvariant, "StaticResponseDeferred",
             "a handler-owned drive transfer has no defining emission owner",
         ))?;
-        let record = self.static_transition_plan
-            .handler_resumption_at_vis(vis_origin, owner)?.clone();
+        let Some(record) = self.static_transition_plan
+            .handler_resumption_at_vis(vis_origin, owner)?.cloned()
+        else {
+            // Only a unit-less P1 is unplanned: K runs here under the live
+            // stack, as the established one-use tail-resumptive route.
+            if row.sub_case()
+                != crate::cranelift_backend::planning::DeferredResponseSubCase::NoContinuationUnit
+            {
+                return Err(unsupported(LoweringCause::PlannerInvariant,
+                    "StaticResponseDeferred",
+                    "a handler-owned Deferred response has no planned resumption",
+                ));
+            }
+            let k_body = self.retained_body_occurrence(body)?;
+            return match producer_eliminators {
+                Some(eliminators) => {
+                    let eliminators = eliminators.to_vec();
+                    self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
+                }
+                None => self.lower_expr(builder, k_body, &k_env),
+            };
+        };
         let route = &record.route;
         if record.row != (row.vis_origin(), row.operation_root_origin(), row.effect_origin())
             || body != route.worker_body_origin || vis_origin != route.vis_origin

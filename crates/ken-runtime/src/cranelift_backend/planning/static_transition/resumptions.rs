@@ -147,8 +147,14 @@ impl StaticTransitionPlan<'_> {
     pub(super) fn validate_handler_resumption_plan(&self)
         -> Result<(), CraneliftBackendError>
     {
-        let owners = self.static_response_owner_specializations()?
-            .map_err(|infeasible| planner_error(infeasible.reason()))?;
+        let owners = match self.static_response_owner_specializations()? {
+            Ok(owners) => owners,
+            // Phase A's installed typed refusal stays the plane's outcome; it
+            // lowers nothing, so it publishes no resumption to validate.
+            Err(infeasible) if self.static_response_infeasible.as_ref() == Some(&infeasible)
+                && self.handler_resumptions.is_empty() => return Ok(()),
+            Err(infeasible) => return Err(planner_error(infeasible.reason())),
+        };
         let mut expected_rows = Vec::new();
         for row in &self.static_response_deferred {
             let Some(owner) = self.admitted_deferred_handler_owner(row)? else { continue };
@@ -189,11 +195,10 @@ impl StaticTransitionPlan<'_> {
 
     pub(in crate::cranelift_backend) fn handler_resumption_at_vis(
         &self, vis_origin: StaticOriginId, owner: ContinuationEmissionOwner,
-    ) -> Result<&PlannedHandlerResumptionCall, CraneliftBackendError> {
+    ) -> Result<Option<&PlannedHandlerResumptionCall>, CraneliftBackendError> {
         let mut matching = self.handler_resumptions.iter()
             .filter(|record| record.row.0 == vis_origin && record.emission_owner == owner);
-        let row = matching.next().ok_or_else(||
-            planner_error("a handler-owned Deferred response has no planned resumption"))?;
+        let row = matching.next();
         if matching.next().is_some() {
             return Err(planner_error("two handler resumptions claim one Vis and owner"));
         }

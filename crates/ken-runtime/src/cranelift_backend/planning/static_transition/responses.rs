@@ -4689,6 +4689,10 @@ impl StaticTransitionPlan<'_> {
         if self.admitted_deferred_handler_owner(row)? != Some(handler) {
             return Ok(None);
         }
+        // A unit-less P1 has no context to transfer into; its handler lowers K.
+        if row.sub_case == DeferredResponseSubCase::NoContinuationUnit {
+            return Ok(None);
+        }
         let Some(body) = self.deferred_response_k_body(row)? else {
             return Ok(None);
         };
