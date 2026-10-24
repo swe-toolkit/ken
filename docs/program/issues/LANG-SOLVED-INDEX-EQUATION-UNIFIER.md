@@ -7,9 +7,9 @@ size: L
 tier: T1
 gate: architect
 depends_on: [LANG-SOLVED-INDEX-SUBSTITUTION]
-blocks: []
+blocks: [LANG-SOLVED-INDEX-ELIMINATE-ALWAYS]
 github: null
-origin: "Architect staged route evt_6htgrnanmjnm4 on the §1a 6 hold of LANG-SOLVED-INDEX-SUBSTITUTION, after the Research advisory evt_34qvnmp4g573c (the standard unifier: Agda's eqTel and reorderTel, Lean's unifyEqs). Within the operator's 2026-10-17 restructuring authorization of that WP. Absorbs LANG-DEPENDENT-BRANCH-RETRY-NESTED-COST (Steward evt_1xjmh1w0g8nxa). Steward-filed per COORDINATION section 2."
+origin: "Architect staged route evt_6htgrnanmjnm4 on the §1a 6 hold of LANG-SOLVED-INDEX-SUBSTITUTION, after the Research advisory evt_34qvnmp4g573c (the standard unifier: Agda's eqTel and reorderTel, Lean's unifyEqs). Within the operator's 2026-10-17 restructuring authorization of that WP. Cut (i) per Steward evt_2tsvy1y6tsfqj on Architect AC-0 evt_42gkba2758n1v; the no-trial regime and the retry cost moved to LANG-SOLVED-INDEX-ELIMINATE-ALWAYS. Steward-filed per COORDINATION section 2."
 ---
 
 # Solved indices by a per-equation unifier
@@ -36,38 +36,36 @@ slots are then eliminated too, and the stage-1 gate is removed.
   by its argument equations; each solved equation becomes Refl
   separately; the context is reordered by free-variable dependency.
 
-- **The retry cost (Architect `evt_730agekm23atv`, at `2cb7c6ec4`).**
-  Stage 1 selects the regime by trial: retained first, then eliminated
-  after a rollback (`check_dependent_branch_regimes`, elab.rs ~:9431).
-  With the pre-existing refined-goal fallback, a refused nested peel runs
-  the arm body three times per level, R(d) = 3R(d-1) + 1, giving 13, 121
-  and 1093 retries and 4.7 s at d = 7. Accepted twins make 0 retries.
-  The fix is structural: select the regime and the goal refinement by a
-  decidable property before the body is elaborated. Evidence:
-  `/workspaces/ken/local/architect-shared/retry-cost-d0/`.
+- **AC-0 ruling (Architect `evt_42gkba2758n1v`, at `d366662a6`).** The
+  ruled code is in that event:
+  - (a) remove both gates in `method_has_variable_side_leaves`, so mixed
+    methods and multi-leaf slots become variable-side;
+  - (b) in `refine_branch_goal`, reassemble a solved premise from its
+    observational reduct (`reassemble_solved_premise`, checking the raw
+    `Eq` before whnf) instead of refusing a non-reflexive one;
+  - (c) fix the stage-1 defect in `check_generalized_branch_goal`, whose
+    no-binder path also caught a solved restoration with an empty
+    dependency telescope and left the solved field at its old coordinate.
+  Measured in the probe: 6A (86 rows, all from `fok_invert_atomlike`)
+  and 6C (4 rows) close, with 0 reassembly failures across 37 binaries.
+- **Out of scope.** The regime trial stays. One regime with no trial,
+  and the retry cost, are LANG-SOLVED-INDEX-ELIMINATE-ALWAYS.
 
 ## Deliverable
 
-The Architect's D0 first rules the representation and the rule set in
-Ken's vocabulary (the observational reduct for injectivity, a single J
-per solution). Then one landing unit replaces the per-leaf plan and
-removes the gate.
+One landing unit with (a), (b) and (c), built from the AC-0 ruling, with
+the regime trial unchanged.
 
 ## Acceptance
 
-- **AC-0 (D0, Architect).** The equation telescope and rules are
-  measured on the stage-1 fallback population.
-- **AC-1.** The gate is gone, the 6A and 6C rows eliminate and pass, and
-  `trusted_base()` is unchanged.
+- **AC-0 (D0, Architect).** Done: `evt_42gkba2758n1v`.
+- **AC-1.** The gates are gone, the 6A and 6C rows eliminate and pass,
+  and `trusted_base()` is unchanged. The hand rows m1 to m4 (multi-leaf
+  and mixed, true and false) give the right verdicts, and m3 pins (c).
 - **AC-2.** Zero failures that are green on main, across every
   ken-elaborator integration binary plus the catalog loaders.
 - **AC-3 (mutation, QA).** Restoring the gate leaves AC-1's rows on the
   fallback path, which a test pins by the eliminated binder's coordinate.
-- **AC-4.** The regime is chosen without trial. A test pins the deepD
-  refusal (the Adversary probe in `evt_1beqd0ntawbqc`) at d = 3, 5 and 7
-  by body-entry count: the count does not grow 3x per level, and the
-  diagnostic is unchanged. Time is measured locally and is not asserted
-  in CI.
 
 ## Stop conditions
 
@@ -75,7 +73,6 @@ removes the gate.
 - A rule outside deletion, solution, injectivity and conflict, unless
   the D0 rules it.
 
-Checks: 8 fired: AC-4 counts body entries rather than time, because a
-constant-factor speedup would pass a timing bound. 6 fired: the cost
-population is the three body entries per failing level that the D0
-counted.
+Checks: 4 fired: the AC-0 code compiled and ran in the probe at
+`d366662a6`. 8 fired: AC-3 restores the gate, the configuration that
+keeps AC-1's rows on the fallback path.
