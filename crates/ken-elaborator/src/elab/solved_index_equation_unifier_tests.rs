@@ -2,7 +2,7 @@
 
 use super::SOLVED_INDEX_BODY_VISITS;
 use crate::{ElabEnv, ElabError};
-use ken_kernel::{normalize, Context, KernelError};
+use ken_kernel::{normalize, Context, KernelError, Term};
 
 // The adjacent indexed-convoy fixture measured a 1,982,464-byte prelude
 // peak. A fixed 32 MiB stack adds over 30 MiB headroom for seven nested
@@ -222,41 +222,80 @@ fn returned_vector_nesting_emits_the_independent_vector() {
     });
 }
 
-/// Promise class: durable invariant. MEASURED: multi-leaf and mixed-index
-/// goals each accept a checked use of their constructor; reversing the
-/// result-coordinate refuses with a kernel type mismatch and unchanged trust.
-/// CLAIMED: both newly admitted method classes remain discriminating. THE GAP:
-/// the independent production corpus covers other index families and convoys.
-#[test]
-fn multi_leaf_and_mixed_methods_distinguish_true_from_false_goals() {
-    on_elaboration_stack(|| {
-        let mut env = ElabEnv::new().expect("prelude");
-        for fixture in [
-            "data GridPoint : Type where { Pt : Nat -> Nat -> GridPoint }",
-            "data BiIndex : GridPoint -> Type where { At : (u : Nat) -> (v : Nat) -> BiIndex (Pt u v) }",
-            "data OneIndex : GridPoint -> Type where { On : (u : Nat) -> OneIndex (Pt u Zero) }",
-        ] {
-            env.elaborate_decl(fixture).expect("hand-row fixture");
+// Inspect the checked core term, not a rendering of source text. A retained
+// mixed or multi-leaf alias installs a Cast in each of the two hand methods.
+fn contains_cast(term: &Term) -> bool {
+    match term {
+        Term::Cast(..) => true,
+        Term::Elim {
+            params,
+            motive,
+            methods,
+            indices,
+            scrut,
+            ..
+        } => {
+            params.iter().any(contains_cast)
+                || contains_cast(motive)
+                || methods.iter().any(contains_cast)
+                || indices.iter().any(contains_cast)
+                || contains_cast(scrut)
         }
-        let trust = env.env.trusted_base();
-        let bi = "(x : Nat) (y : Nat) (P : Nat -> Nat -> Type) (h : (u : Nat) -> (v : Nat) -> BiIndex (Pt u v) -> P u v)";
-        let one =
-            "(x : Nat) (y : Nat) (P : Nat -> Type) (h : (u : Nat) -> OneIndex (Pt u Zero) -> P u)";
-        for (name, head, scrutinee, result_ty, arm) in [
-            (
-                "bi_true",
-                bi,
-                "BiIndex (Pt x y)",
-                "P x y",
-                "At u v ↦ h u v (At u v)",
-            ),
-            (
-                "bi_false",
-                bi,
-                "BiIndex (Pt x y)",
-                "P y x",
-                "At u v ↦ h u v (At u v)",
-            ),
+        Term::Let { ty, val, body } => {
+            contains_cast(ty) || contains_cast(val) || contains_cast(body)
+        }
+        Term::QuotElim {
+            motive,
+            method,
+            respect,
+            scrut,
+        } => {
+            contains_cast(motive)
+                || contains_cast(method)
+                || contains_cast(respect)
+                || contains_cast(scrut)
+        }
+        Term::Pi(a, b)
+        | Term::Lam(a, b)
+        | Term::App(a, b)
+        | Term::Sigma(a, b)
+        | Term::Pair(a, b)
+        | Term::Ascript(a, b)
+        | Term::Absurd(a, b) => contains_cast(a) || contains_cast(b),
+        Term::Eq(a, b, c) | Term::J(a, b, c) | Term::Quot(a, b, c) => {
+            contains_cast(a) || contains_cast(b) || contains_cast(c)
+        }
+        Term::Proj1(a)
+        | Term::Proj2(a)
+        | Term::Refl(a)
+        | Term::QuotClass(a)
+        | Term::Trunc(a)
+        | Term::TruncProj(a) => contains_cast(a),
+        Term::Type(_)
+        | Term::Omega(_)
+        | Term::Var(_)
+        | Term::Const { .. }
+        | Term::IntLit(_)
+        | Term::IndFormer { .. }
+        | Term::Constructor { .. } => false,
+    }
+}
+
+fn checked_hand_rows(mixed: bool) {
+    let mut env = ElabEnv::new().expect("prelude");
+    for fixture in [
+        "data GridPoint : Type where { Pt : Nat -> Nat -> GridPoint }",
+        "data BiIndex : GridPoint -> Type where { At : (u : Nat) -> (v : Nat) -> BiIndex (Pt u v) }",
+        "data OneIndex : GridPoint -> Type where { On : (u : Nat) -> OneIndex (Pt u Zero) }",
+    ] {
+        env.elaborate_decl(fixture).expect("hand-row fixture");
+    }
+    let trust = env.env.trusted_base();
+    let bi = "(x : Nat) (y : Nat) (P : Nat -> Nat -> Type) (h : (u : Nat) -> (v : Nat) -> BiIndex (Pt u v) -> P u v)";
+    let one =
+        "(x : Nat) (y : Nat) (P : Nat -> Type) (h : (u : Nat) -> OneIndex (Pt u Zero) -> P u)";
+    let rows = if mixed {
+        [
             (
                 "one_true",
                 one,
@@ -271,25 +310,71 @@ fn multi_leaf_and_mixed_methods_distinguish_true_from_false_goals() {
                 "P y",
                 "On u ↦ h u (On u)",
             ),
-        ] {
-            let source =
-                format!("fn {name} {head} (z : {scrutinee}) : {result_ty} = match z {{ {arm} }}");
-            let result = env.elaborate_decl(&source);
-            if name.ends_with("_true") {
-                result.unwrap_or_else(|error| panic!("{name}: {error:?}"));
-            } else {
-                assert!(
-                    matches!(
-                        &result,
-                        Err(ElabError::KernelRejected {
-                            error: KernelError::TypeMismatch { .. },
-                            ..
-                        })
-                    ),
-                    "{name}: expected kernel-refused wrong result: {result:?}"
-                );
-            }
-            assert_eq!(env.env.trusted_base(), trust, "{name}: no added trust");
+        ]
+    } else {
+        [
+            (
+                "bi_true",
+                bi,
+                "BiIndex (Pt x y)",
+                "P x y",
+                "At u v ↦ h u v (At u v)",
+            ),
+            (
+                "bi_false",
+                bi,
+                "BiIndex (Pt x y)",
+                "P y x",
+                "At u v ↦ h u v (At u v)",
+            ),
+        ]
+    };
+    for (name, head, scrutinee, result_ty, arm) in rows {
+        let source =
+            format!("fn {name} {head} (z : {scrutinee}) : {result_ty} = match z {{ {arm} }}");
+        let result = env.elaborate_decl(&source);
+        if name.ends_with("_true") {
+            let id = result.unwrap_or_else(|error| panic!("{name}: {error:?}"));
+            let (_, body) = env.env.transparent_body(id).expect("checked hand-row body");
+            assert!(
+                !contains_cast(&body),
+                "{name}: variable-side field must be eliminated"
+            );
+        } else {
+            assert!(
+                matches!(
+                    &result,
+                    Err(ElabError::KernelRejected {
+                        error: KernelError::TypeMismatch { .. },
+                        ..
+                    })
+                ),
+                "{name}: expected kernel-refused wrong result: {result:?}"
+            );
         }
-    });
+        assert_eq!(env.env.trusted_base(), trust, "{name}: no added trust");
+    }
+}
+
+/// Promise class: durable admission/refusal invariant for a decomposed
+/// multi-leaf equation. MEASURED: the accepted emitted core has no alias Cast
+/// and the reversed result refuses at the kernel with unchanged trust.
+/// CLAIMED: gate removal reaches this hand-row method, not only acceptance.
+/// THE GAP: this core-shape pin is a transition sentinel: revisit it if the
+/// Architect later approves SolvedJ-as-Cast; other index families remain in
+/// the independent consumer suite.
+#[test]
+fn multi_leaf_equation_eliminates_its_field() {
+    on_elaboration_stack(|| checked_hand_rows(false));
+}
+
+/// Promise class: durable admission/refusal invariant for a mixed-variable
+/// and constructor index. MEASURED: the accepted emitted core has no alias
+/// Cast and the reversed result refuses at the kernel with unchanged trust.
+/// CLAIMED: the method uses elimination, not the retained alias path. THE GAP:
+/// the Cast exclusion is a transition sentinel until a future approved
+/// SolvedJ-as-Cast route replaces this implementation.
+#[test]
+fn mixed_equation_eliminates_its_field() {
+    on_elaboration_stack(|| checked_hand_rows(true));
 }
