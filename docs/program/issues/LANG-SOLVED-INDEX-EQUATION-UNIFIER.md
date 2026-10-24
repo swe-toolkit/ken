@@ -6,7 +6,7 @@ owner: language
 size: L
 tier: T1
 gate: architect
-depends_on: [LANG-SOLVED-INDEX-SUBSTITUTION]
+depends_on: [LANG-SOLVED-INDEX-SUBSTITUTION, KERNEL-NORMALIZE-J-EVIDENCE-RECORDING]
 blocks: []
 github: null
 origin: "Architect staged route evt_6htgrnanmjnm4 on the §1a 6 hold of LANG-SOLVED-INDEX-SUBSTITUTION, after the Research advisory evt_34qvnmp4g573c (the standard unifier: Agda's eqTel and reorderTel, Lean's unifyEqs). Within the operator's 2026-10-17 restructuring authorization of that WP. One unit with the no-trial regime per Steward evt_2t9d4ea4vn9yq, after the Architect measured cut (i) inert with the trial kept (evt_2qef3qpjvtaf6). Absorbs LANG-SOLVED-INDEX-ELIMINATE-ALWAYS and the retry cost of LANG-DEPENDENT-BRANCH-RETRY-NESTED-COST. Steward-filed per COORDINATION section 2."
@@ -107,8 +107,21 @@ unmeasured on non-variable-side nests, so AC-4 measures it.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 1 (Architect stack-split ruling `evt_1yhvagtfq3vv6`).
+§1a: 2 (Architect stack-split ruling `evt_1yhvagtfq3vv6`; CI-red ruling
+`evt_2xtv10vsa2fkd`, advancing, next trigger at 3).
 
 1. trivial-restoration arm routed through the generalized check's 12
    KiB frame on the recursive path -- keyed on which function holds the
    recursive call, not on what the arm needs
+2. a kernel-checked Eq recording on J evidence was lost across executable
+   normalization, keyed on a syntactic ascription that normalize discards
+
+## Park on the kernel repair (Steward `evt_2gk2xy9ag9vmh`)
+
+Candidate `5344cf49c` failed CI on PR #4924 at ken-cli
+`rt_c5_primitive_type_native_gate`. The Architect traced it to the kernel
+(`evt_2xtv10vsa2fkd`): the certificate is correct, and normalization drops
+J's Eq recording. The repair is `KERNEL-NORMALIZE-J-EVIDENCE-RECORDING`.
+After it lands, `5344cf49c` rebases with its tree unchanged and takes fresh
+QA, which includes the ken-cli sentinel, then the Architect's identity
+review.
