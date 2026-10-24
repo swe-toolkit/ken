@@ -103,7 +103,7 @@ fn check_count(source: &str, fixture: &str) -> (Result<(), ElabError>, usize) {
 #[test]
 fn solved_field_nesting_uses_one_body_entry_per_level() {
     on_elaboration_stack(|| {
-        for depth in 1..=7 {
+        for depth in (1..=7).rev() {
             let (error, entries) = check_count(&chain_body(depth, "Refl"), CHAIN);
             assert!(
                 matches!(&error, Err(ElabError::TypeMismatch { .. })),
