@@ -5,82 +5,6 @@ fn output_dir(name: &str) -> tempfile::TempDir {
     tempfile::Builder::new().prefix(&prefix).tempdir().unwrap()
 }
 
-const NESTED_BRACKET_PROGRAM: &str = r#"program capabilities FS AFull
-fn leaf_body (_resource : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  Ret (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (ResourceBodyResult Unit Unit)
-    (ResourceBodyOk Unit Unit MkUnit)
-
-fn body_result
-  (outcome : Result FileError (ResourceBracketResult Unit Unit))
-  : HostIO AFull (ResourceBodyResult Unit Unit) =
-  match outcome {
-    Ok (ResourceBracketOk unit) |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
-        (ResourceBodyOk Unit Unit MkUnit);
-    Ok bracket |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
-        (ResourceBodyErr Unit Unit MkUnit);
-    Err error |->
-      Ret (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (ResourceBodyResult Unit Unit)
-        (ResourceBodyErr Unit Unit MkUnit)
-  }
-
-proc level_one_body
-  (cap : Cap AFull) (_resource : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-      ResourceMetadata leaf_body)
-    (\outcome. body_result outcome)
-
-proc level_two_body
-  (cap : Cap AFull) (_resource : Resource ResourceKind.FsHandle)
-  : HostIO AFull (ResourceBodyResult Unit Unit) visits [FS] =
-  bind (Coproduct (FSOp AFull) AmbientOp)
-    (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-    (Result FileError (ResourceBracketResult Unit Unit))
-    (ResourceBodyResult Unit Unit)
-    (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-      ResourceMetadata (\resource. level_one_body cap resource))
-    (\outcome. body_result outcome)
-
-fn after_root
-  (outcome : Result FileError (ResourceBracketResult Unit Unit))
-  : HostIO AFull ExitCode =
-  match outcome {
-    Ok (ResourceBracketOk unit) |-> host_exit AFull Success;
-    Ok (ResourceBracketBodyError error) |-> host_exit AFull (Failure 81);
-    Ok (ResourceBracketReleaseError error) |-> host_exit AFull (Failure 82);
-    Ok (ResourceBracketBodyAndReleaseError body_error release_error) |->
-      host_exit AFull (Failure 83);
-    Err error |-> host_exit AFull (Failure 84)
-  }
-
-proc main (_input : ProcessInput) (caps : ProgramCaps AFull)
-  : HostIO AFull ExitCode visits [FS] =
-  match caps {
-    MkProgramCaps cap |->
-      bind (Coproduct (FSOp AFull) AmbientOp)
-        (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-        (Result FileError (ResourceBracketResult Unit Unit)) ExitCode
-        (withResource AFull Unit Unit cap (bytes_encode "held-0.bin")
-          ResourceMetadata __ROOT_BODY__)
-        (\outcome. after_root outcome)
-  }
-"#;
-
 const PX8DS_SIBLING_RECURSION_PROGRAM: &str = r#"program capabilities FS APartial
 proc countdown (fuel : Nat)
   : HostIO APartial (Result Int Bool) visits [Console] =
@@ -156,42 +80,10 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
     (\outcome. finish_buffer outcome)
 "#;
 
+#[path = "support/rt_bracket_nested_source.rs"]
+mod bracket_source;
 #[cfg(target_os = "linux")]
-fn nested_bracket_source(depth: usize) -> String {
-    let body = match depth {
-        1 => "leaf_body",
-        2 => {
-            r#"(\resource.
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit Unit))
-            (ResourceBodyResult Unit Unit)
-            (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-              ResourceMetadata leaf_body)
-            (\outcome. body_result outcome))"#
-        }
-        3 => {
-            r#"(\resource.
-          bind (Coproduct (FSOp AFull) AmbientOp)
-            (resp_coproduct (FSOp AFull) AmbientOp (fs_resp AFull) ambient_resp)
-            (Result FileError (ResourceBracketResult Unit Unit))
-            (ResourceBodyResult Unit Unit)
-            (withResource AFull Unit Unit cap (bytes_encode "held-1.bin")
-              ResourceMetadata (\inner_resource.
-                bind (Coproduct (FSOp AFull) AmbientOp)
-                  (resp_coproduct (FSOp AFull) AmbientOp
-                    (fs_resp AFull) ambient_resp)
-                  (Result FileError (ResourceBracketResult Unit Unit))
-                  (ResourceBodyResult Unit Unit)
-                  (withResource AFull Unit Unit cap (bytes_encode "held-2.bin")
-                    ResourceMetadata leaf_body)
-                  (\inner_outcome. body_result inner_outcome)))
-            (\outcome. body_result outcome))"#
-        }
-        _ => panic!("PX8-TA public control supports depths one through three"),
-    };
-    NESTED_BRACKET_PROGRAM.replace("__ROOT_BODY__", body)
-}
+use bracket_source::nested_bracket_source;
 
 #[cfg(target_os = "linux")]
 fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
