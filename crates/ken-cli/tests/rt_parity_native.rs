@@ -4877,43 +4877,100 @@ fn composed_return_ret_sink_is_byte_inert() {
     });
 }
 
+fn assert_forward_ret_consumption_partition<T>(
+    planned_coordinates: impl IntoIterator<Item = T>,
+    planned_reaches: usize,
+    formed: impl IntoIterator<Item = T>,
+    settled: impl IntoIterator<Item = T>,
+    edge_authorities: impl IntoIterator<Item = T>,
+    label: &str,
+) where
+    T: Ord + Clone + std::fmt::Debug,
+{
+    let planned = planned_coordinates
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let formed = formed.into_iter().collect::<Vec<_>>();
+    let settled = settled.into_iter().collect::<Vec<_>>();
+    let edges = edge_authorities.into_iter().collect::<Vec<_>>();
+    let formed_set = formed
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let settled_set = settled
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let edge_set = edges
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+
+    assert!(!formed.is_empty(), "{label}: no formed forward-Ret edge");
+    assert_eq!(
+        formed.len(),
+        edges.len(),
+        "{label}: formed outcome multiplicity changed"
+    );
+    assert_eq!(
+        formed_set, edge_set,
+        "{label}: formed outcomes and edge authorities differ"
+    );
+    assert!(
+        formed_set.is_disjoint(&settled_set),
+        "{label}: one planned proof has both Formed and ConsumedBySettlement outcomes"
+    );
+    assert_eq!(
+        formed.len() + settled.len(),
+        planned_reaches,
+        "{label}: each reached plan proof must yield exactly one consumer outcome"
+    );
+    assert_eq!(
+        planned,
+        formed_set.union(&settled_set).cloned().collect(),
+        "{label}: every reached plan proof must be consumed as Formed or ConsumedBySettlement"
+    );
+}
+
 /// **Promise class: durable invariant.**
 ///
-/// **MEASURED:** D3 consumes the post-selection authority as a live forward SSA
-/// edge, so exact authority formation and complete suppression emit the SAME
-/// upstream plan (transport hash) and SAME core semantic hash but DIFFERENT
-/// executable bytes; every exact observation still names forward,
-/// producer-result-direct delivery to field zero of one compiler-local Ret block.
-/// **CLAIMED:** the authority is now load-bearing at codegen (forming vs
-/// suppressing it changes the emitted code), and the change is confined to
-/// codegen -- no spec, kernel, ABI, wire, or semantic-plan change accompanies it
-/// (AC-NO-BOUNDARY-REOPEN: the edge is compiler state, not a runtime lane).
-/// **THE GAP:** this differential isolates that the forward edge is emitted and
-/// that its effect is codegen-only; the population and role-witness controls
-/// establish the authority's coordinate identity, and the durable
-/// `fs_*_narrows` products below establish the executed behavior.
+/// **MEASURED:** the exact read fixture's planned forward-Ret proofs partition
+/// into emitted `Formed` edge authorities and `ConsumedBySettlement` outcomes;
+/// every formed edge observation names forward, producer-result-direct delivery
+/// to field zero of one compiler-local Ret block. Suppressing the emitted edge
+/// preserves the upstream plan and core semantic hash but changes executable
+/// bytes.
+/// **CLAIMED:** each planned proof is accounted for exactly once, and forming
+/// versus suppressing the one emitted edge changes codegen output without a
+/// spec, kernel, ABI, wire, or semantic-plan change.
+/// **THE GAP:** this build-only differential establishes emission and the
+/// proof-consumption partition, not runtime reachability of an emitted edge.
 #[test]
-fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
-    in_large_stack_thread("rt-parity-forward-ret-authority-live", || {
+fn composed_return_forward_ret_proof_consumption_partition_is_exact() {
+    in_large_stack_thread("rt-parity-forward-ret-proof-partition", || {
         use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
 
         let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-        let exact_root = output_dir("forward-ret-authority-live-exact");
-        let suppressed_root = output_dir("forward-ret-authority-live-suppressed");
-        let (exact, exact_rows, exact_applications) =
+        let exact_root = output_dir("forward-ret-proof-partition-exact");
+        let suppressed_root = output_dir("forward-ret-proof-partition-suppressed");
+        let (((exact, exact_plan_rows), exact_role_rows), exact_rows, exact_applications) =
             ken_runtime::with_composed_return_forward_ret_authority_mutation(
                 Mutation::Exact,
                 || {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_authority_live",
-                        exact_root.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
+                    ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                        ken_runtime::with_checked_ih_generated_entry_observations(|| {
+                            ken_cli::build_native_program(
+                                &source,
+                                ken_cli::SourceFormat::Ken,
+                                "rt_parity_forward_ret_proof_partition",
+                                exact_root.path(),
+                                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                            )
+                        })
+                    })
                 },
             );
-        let exact = exact.expect("exact D3 forward-Ret authority artifact");
+        let exact = exact.expect("exact D3 forward-Ret partition artifact");
         let (suppressed, suppressed_rows, suppressed_applications) =
             ken_runtime::with_composed_return_forward_ret_authority_mutation(
                 Mutation::SuppressForInertness,
@@ -4921,37 +4978,81 @@ fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
                     ken_cli::build_native_program(
                         &source,
                         ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_authority_live",
+                        "rt_parity_forward_ret_proof_partition",
                         suppressed_root.path(),
                         ken_runtime::boundary_resource_profile::starter_smoke_profile(),
                     )
                 },
             );
-        let suppressed = suppressed.expect("suppressed D3 forward-Ret authority artifact");
+        let suppressed = suppressed.expect("suppressed D3 forward-Ret partition artifact");
 
         assert!(
             !exact_rows.is_empty(),
-            "the real Tail authority population must reach"
+            "the real forward-Ret proof population must reach"
         );
         assert!(suppressed_rows.is_empty());
-        assert_eq!(exact_applications, exact_rows.len());
+        assert!(
+            exact_role_rows
+                .iter()
+                .all(|row| match row.outcome.as_str() {
+                    "Formed" | "ConsumedBySettlement" => row.formed_coordinate.is_some(),
+                    _ => row.formed_coordinate.is_none(),
+                }),
+            "the exact read fixture must classify every proof-bearing role row"
+        );
+        assert!(
+            exact_role_rows
+                .iter()
+                .any(|row| row.outcome == "ConsumedBySettlement"),
+            "the exact read fixture must reach the bracket-settlement consumer"
+        );
+        let exact_planned_rows = exact_plan_rows
+            .iter()
+            .filter(|row| {
+                row.installed && row.reached_count > 0 && !row.forward_ret_coordinates.is_empty()
+            })
+            .collect::<Vec<_>>();
+        let exact_planned_reaches = exact_planned_rows
+            .iter()
+            .map(|row| row.reached_count)
+            .sum::<usize>();
+        assert_forward_ret_consumption_partition(
+            exact_planned_rows
+                .iter()
+                .flat_map(|row| row.forward_ret_coordinates.iter().cloned()),
+            exact_planned_reaches,
+            exact_role_rows
+                .iter()
+                .filter(|row| row.outcome == "Formed")
+                .map(|row| {
+                    row.formed_coordinate
+                        .clone()
+                        .expect("a Formed outcome must carry its proof coordinate")
+                }),
+            exact_role_rows
+                .iter()
+                .filter(|row| row.outcome == "ConsumedBySettlement")
+                .map(|row| {
+                    row.formed_coordinate
+                        .clone()
+                        .expect("a settlement outcome must carry its proof coordinate")
+                }),
+            exact_rows.iter().map(|row| row.coordinate.clone()),
+            "exact read fixture",
+        );
         // (A) ruling evt_h0vgd11g5xfb: formation is unnarrowed, so the read
-        // program's successful-path effect Tail also forms. In the EXACT build the
-        // forward edge delivers the answer and short-circuits, bypassing EXACTLY
-        // ONE continuation -- that effect Tail -- which the SuppressForInertness
-        // collapse still lowers; so suppressed builds exactly one more plan-proof
-        // application than exact. That -1 is the SIGNATURE of a LIVE forward edge:
-        // a bare `<=` would also pass if the edge went dead (exact == 0), so pin
-        // both the exact relationship and the presence of the forward-edge
-        // application in exact.
+        // program's successful-path effect Tail also forms. The suppressed build
+        // lowers that continuation and records exactly one more plan-proof
+        // application. This is a compiler-build observation, not evidence that an
+        // emitted edge is dynamically reached.
         assert!(
             exact_applications >= 1,
-            "the forward-edge application must be present in exact (edge liveness)"
+            "the exact build must include the formed edge application"
         );
         assert_eq!(
             suppressed_applications,
             exact_applications + 1,
-            "the forward edge must bypass exactly one continuation (the successful-path effect Tail the SuppressForInertness collapse still lowers)"
+            "suppression must add exactly one plan-proof application for the successful-path effect Tail"
         );
         assert!(exact_rows.iter().all(|row| {
             row.coordinate
@@ -4988,17 +5089,17 @@ fn composed_return_forward_ret_authority_is_live_at_the_forward_edge() {
 
 /// **Promise class: durable invariant.**
 ///
-/// **MEASURED:** at the actual consumer call, every formed authority pairs the
-/// current C/admission and selected I with the same `(I,E,S)` coordinate that
-/// the independent planner and authority observers report; E's existing
-/// capsule row is installed and reached, and at least one real row has C != E.
-/// **CLAIMED:** current consumer call C and certificate entry E have distinct
-/// roles, while exact whole-transport selection I causally joins C to the real
-/// planned and reached `(E,S)` certificate without storing I in access.
+/// **MEASURED:** every planned forward-Ret proof has exactly one
+/// `Formed`-edge or `ConsumedBySettlement` outcome. Each formed authority pairs
+/// the current C/admission and selected I with the same `(I,E,S)` coordinate
+/// that the independent planner reports; E's capsule row is installed and
+/// reached, and at least one real row has C != E.
+/// **CLAIMED:** no planned proof is dropped or consumed twice, while each
+/// formed authority keeps the distinct roles of consumer call C, selected I,
+/// and certificate entry E.
 /// **THE GAP:** the role witness is observation-only and cannot license
 /// authority; existing production equality/member/source/projection/sink gates
-/// remain the enforcement, while the paired witness prevents their coordinates
-/// from being misdescribed as one call again.
+/// remain the enforcement.
 #[test]
 fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
     in_large_stack_thread("rt-parity-forward-ret-role-witness", || {
@@ -5007,7 +5108,7 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
         let compile = |label: &str, entry: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
             let root = output_dir(&format!("forward-ret-role-witness-{label}"));
-            let (((result, plan_rows), role_rows), authorities, applications) =
+            let (((result, plan_rows), role_rows), authorities, _applications) =
                 ken_runtime::with_composed_return_forward_ret_authority_mutation(
                     Mutation::Exact,
                     || {
@@ -5026,12 +5127,7 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
                 );
             result.expect("the exact C/I/E/S role witness fixture must compile");
             assert!(!authorities.is_empty(), "{label}: no authority formed");
-            assert_eq!(applications, authorities.len());
 
-            let planned = plan_rows
-                .iter()
-                .flat_map(|row| row.forward_ret_coordinates.iter().cloned())
-                .collect::<std::collections::BTreeSet<_>>();
             let formed = authorities
                 .iter()
                 .map(|row| row.coordinate.clone())
@@ -5059,18 +5155,52 @@ fn composed_return_forward_ret_role_witness_pairs_c_and_certificate() {
                     coordinate
                 })
                 .collect::<std::collections::BTreeSet<_>>();
-            assert_eq!(planned, formed, "{label}: planned/formed Tail set changed");
-            assert_eq!(
-                formed, paired,
-                "{label}: formed authority lacks one C/I/E/S row"
+            assert!(
+                role_rows.iter().all(|row| match row.outcome.as_str() {
+                    "Formed" | "ConsumedBySettlement" => row.formed_coordinate.is_some(),
+                    _ => row.formed_coordinate.is_none(),
+                }),
+                "{label}: every proof-bearing role row must be Formed or ConsumedBySettlement"
             );
-            assert_eq!(
+            let reached_plan_rows = plan_rows
+                .iter()
+                .filter(|row| {
+                    row.installed
+                        && row.reached_count > 0
+                        && !row.forward_ret_coordinates.is_empty()
+                })
+                .collect::<Vec<_>>();
+            let planned_reaches = reached_plan_rows
+                .iter()
+                .map(|row| row.reached_count)
+                .sum::<usize>();
+            assert_forward_ret_consumption_partition(
+                reached_plan_rows
+                    .iter()
+                    .flat_map(|row| row.forward_ret_coordinates.iter().cloned()),
+                planned_reaches,
                 role_rows
                     .iter()
                     .filter(|row| row.outcome == "Formed")
-                    .count(),
-                authorities.len(),
-                "{label}: paired rows and formed authorities differ in multiplicity"
+                    .map(|row| {
+                        row.formed_coordinate
+                            .clone()
+                            .expect("a Formed outcome must carry its proof coordinate")
+                    }),
+                role_rows
+                    .iter()
+                    .filter(|row| row.outcome == "ConsumedBySettlement")
+                    .map(|row| {
+                        row.formed_coordinate
+                            .clone()
+                            .expect("a settlement outcome must carry its proof coordinate")
+                    }),
+                authorities.iter().map(|row| row.coordinate.clone()),
+                label,
+            );
+            assert_eq!(
+                formed, paired,
+                "{label}: formed authority lacks one C/I/E/S row"
             );
             assert!(
                 role_rows.iter().any(|row| {
@@ -5169,8 +5299,8 @@ fn forward_edge_collapsibility_discriminates_value_and_effect_tails() {
         };
 
         // The pure read narrowing: every formed Tail route is a value-returning
-        // tail -> collapsible (the guard's positive arm; also bracketed by
-        // forward_ret_edge_substituted_word_reds staying GREEN).
+        // tail -> collapsible (the guard's positive arm). The retired edge-mutation
+        // rows did not establish runtime reachability.
         let read = determine("read", "rt_read_offset_stage");
         assert!(
             read.values().all(|(collapsible, body_purities)| {
@@ -6223,146 +6353,13 @@ fn suppressing_both_materialization_authorities_refuses_at_the_relay_edge() {
     });
 }
 
-// -- D3 forward-SSA-edge causal controls ---------------------------------
+// -- D3 forward-SSA-edge mutation controls retired -----------------------
 //
-// Each runs the read-offset durable product under ONE compile-time mutation of
-// the governed Tail closeout and asserts native no longer cleanly observes
-// InvalidOffset, while the interpreter -- untouched by a cranelift-only mutation
-// -- still does. The divergence is the causal evidence that the exact forward
-// SSA edge carrying the exact Trap-checked Result, and only it, produces the
-// durable product. The twice-closeout (DuplicateTailAuthorityAt) and
-// missing-authority (RemoveTailAuthorityAt) refusals are separately closed by
-// `composed_return_forward_ret_authority_population_is_exact` above.
-
-/// Run the read-offset differential under one forward-Ret authority mutation and
-/// assert native fails the fixture's own axis-1 green condition (exit 0 with no
-/// terminal error) while the interpreter still meets it.
-fn assert_forward_ret_authority_control_reds(
-    mutation: ken_runtime::ComposedReturnForwardRetAuthorityMutation,
-) {
-    let (
-        Differential {
-            interpreted,
-            native,
-        },
-        _rows,
-        _applications,
-    ) = ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
-        differential("fs-read-at-offset-single", "rt_read_offset_stage")
-    });
-    assert_eq!(
-        interpreted.exit_status, 0,
-        "{mutation:?}: the interpreter still observes InvalidOffset (cranelift-only mutation): {interpreted:?}"
-    );
-    assert_eq!(
-        interpreted.terminal_error, None,
-        "{mutation:?}: interpreter"
-    );
-    assert!(
-        native.exit_status != 0 || native.terminal_error.is_some(),
-        "{mutation:?}: native must NOT cleanly observe InvalidOffset -- only the exact forward edge delivers the product: {native:?}"
-    );
-}
-
-/// **Promise class: durable invariant.** AC-EXACT-ONCE (zero-closeout): suppress
-/// the authority and the governed Tail reverts to the source-machine answer
-/// collapse, so native reddens on the base ResourceBodyResult trap. The causal
-/// pair of `fs_read_at_malformed_offset_narrows_to_invalid_offset`.
-#[test]
-fn forward_ret_edge_suppressed_reverts_to_collapse() {
-    in_large_stack_thread("rt-parity-forward-ret-suppressed", || {
-        assert_forward_ret_authority_control_reds(
-            ken_runtime::ComposedReturnForwardRetAuthorityMutation::SuppressForInertness,
-        );
-    });
-}
-
-/// **Promise class: durable invariant.** AC-CAUSAL-PAIR (b): keep the edge and
-/// the sink but carry an independent non-result word, so the exact Trap-checked
-/// Result no longer reaches the exit -- separating result identity from producer
-/// existence and binding, which the suppress control (no edge at all) and the
-/// population control (which authority) hold fixed.
-///
-/// Under (A) (evt_h0vgd11g5xfb) the read program's successful-path effect Tail
-/// takes the base `call_tail -> Continue` path, so a corrupted edge word
-/// manifests as an `UnclassifiedRuntimeTrap` rather than a clean captured red.
-/// The mutant is still KILLED; this pins the exact green->trap FLIP (the
-/// unmutated edge runs clean, `SubstituteForwardEdgeWord` traps) and CATCHES the
-/// trap rather than relying on a panicking differential helper. The edge word is
-/// compiler-produced and never attacker-controlled, so the trap is unreachable
-/// in unmutated production and no runtime guard is warranted.
-#[test]
-fn forward_ret_edge_substituted_word_reds() {
-    in_large_stack_thread("rt-parity-forward-ret-substituted", || {
-        use ken_runtime::ComposedReturnForwardRetAuthorityMutation as Mutation;
-
-        // Build + run the read fixture's native artifact under `mutation`,
-        // returning the run Result so a corrupted-edge trap is CAUGHT here, not
-        // panicked through the differential helper.
-        fn run_native(
-            mutation: Mutation,
-        ) -> Result<ken_runtime::EffectObservation, ken_runtime::NativeEffectRunErrorV1> {
-            // The mutation wrapper returns (closure_result, authority_rows,
-            // applications); only the run Result is needed here.
-            let (run_result, _rows, _applications) =
-                ken_runtime::with_composed_return_forward_ret_authority_mutation(mutation, || {
-                    let root = output_dir(&format!("forward-ret-substituted-{mutation:?}"));
-                    std::fs::write(root.path().join("source"), b"ab").unwrap();
-                    let source =
-                        RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", "rt_read_offset_stage");
-                    let output = ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        "rt_parity_forward_ret_substituted",
-                        root.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
-                    .expect("the substituted-edge control reaches linked native lowering");
-                    ken_runtime::run_bound_process_effect_observation(
-                        &output.artifact,
-                        &ken_runtime::NativeEffectRunOptionsV1 {
-                            arguments: Vec::new(),
-                            environment: Vec::new(),
-                            cwd: root.path().to_owned(),
-                            plan_hash: output.plan_transport_hash,
-                        },
-                    )
-                });
-            run_result
-        }
-
-        // Unmutated: the compiler-produced edge delivers the Trap-checked Result,
-        // so native cleanly observes InvalidOffset (exit 0, no trap) -- GREEN.
-        let unmutated =
-            run_native(Mutation::Exact).expect("the unmutated forward edge runs cleanly");
-        assert_eq!(
-            unmutated.exit_status, 0,
-            "unmutated: native cleanly observes InvalidOffset via the forward edge: {unmutated:?}"
-        );
-        assert_eq!(
-            unmutated.terminal_error, None,
-            "unmutated: native must not trap"
-        );
-
-        // SubstituteForwardEdgeWord: the edge carries an independent non-result
-        // word, so the Trap-checked Result never reaches the exit and native
-        // TRAPS. The green->trap flip is the mutant-kill for "the edge word
-        // matters"; pin the exact trap, do not accept "any non-green".
-        match run_native(Mutation::SubstituteForwardEdgeWord) {
-            Err(ken_runtime::NativeEffectRunErrorV1::UnclassifiedRuntimeTrap {
-                terminal_value,
-            }) => {
-                assert_eq!(
-                    terminal_value, -1,
-                    "SubstituteForwardEdgeWord: native traps with terminal value -1"
-                );
-            }
-            other => panic!(
-                "SubstituteForwardEdgeWord must flip the clean edge to UnclassifiedRuntimeTrap {{ terminal_value: -1 }}; got {other:?}"
-            ),
-        }
-    });
-}
+// The former `forward_ret_edge_*` rows could mutate only a formed forward edge.
+// A's bracket settlement is live (the user96 trap) but returns before those
+// edge mutations; B's emitted edge has no observed live consumer on these
+// fixtures. These controls therefore have no live edge-consumer discriminator.
+// Do not retarget them to B or count a settlement hit as an edge mutation.
 
 // -- BufferFreeze --------------------------------------------------------
 
