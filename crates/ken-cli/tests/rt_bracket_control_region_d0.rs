@@ -369,6 +369,11 @@ fn d0_body_error_outcome_exact_tuple() {
             }
             let source = bracket_source::nested_bracket_source(2);
             let leaf_ok = "    (ResourceBodyOk Unit Unit MkUnit)\n\nfn body_result";
+            let leaf_count = source.matches(leaf_ok).count();
+            assert_eq!(
+                leaf_count, 1,
+                "D0 body-error input has exactly one replaceable leaf-success arm"
+            );
             let source = source.replacen(
                 leaf_ok,
                 "    (ResourceBodyErr Unit Unit MkUnit)\n\nfn body_result",
