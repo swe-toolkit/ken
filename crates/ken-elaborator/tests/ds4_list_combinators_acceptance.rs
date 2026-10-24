@@ -235,33 +235,34 @@ fn ac8_off_by_one_range_length_rejected() {
     );
 }
 
-// AC8 discriminator 3: `zip`'s length law is `min`, not `length xs` alone
-// (i.e. it genuinely truncates at the shorter list) — reusing the proof
-// against a wrong statement (no `min`, just `length xs`) must be rejected.
+// AC8 discriminator 3: the owner-local zip has length two on 3-vs-2
+// inputs. The wrong left-only length (three) must fail at the kernel,
+// not at private-name resolution. A non-truncating zip would make the
+// negative theorem true and turn this test red.
 #[test]
 fn ac8_zip_length_is_min_not_left_length() {
-    let mut env = base_env();
-    // This legacy flat-scope negative must reach the wrong law, not fail at
-    // a missing helper alias after length moves to the base provider.
-    let provider = env.globals["Data.Collections.List.length"];
-    env.globals.insert("length".to_owned(), provider);
-    let r = env.elaborate_decl(
-        "fn bad_zip_length_ignores_shorter (a : Type) (b : Type) (xs : List a) (ys : List b) : \
-           Equal Nat (length (Pair a b) (zip a b xs ys)) (length a xs) = zip_length a b xs ys",
+    let (mut env, checked) =
+        ds4_owner_examples(&[("derived_example_zip3v2_length_value", &["length", "zip"])]);
+    assert_eq!(
+        checked_nat(&env, checked["derived_example_zip3v2_length_value"]),
+        2
     );
-    match r {
-        Ok(_) => panic!(
-            "zip_length proves length = min(..), not the left length alone — must be rejected"
+    let rejected = env
+        .elaborate_decl(
+            "theorem bad_zip_length_is_left_length : Equal Nat \
+             derived_example_zip3v2_length_value (Suc (Suc (Suc Zero))) = Proved",
+        )
+        .expect_err("zip must truncate at the shorter list");
+    assert!(
+        matches!(
+            rejected,
+            ken_elaborator::ElabError::KernelRejected {
+                error: ken_kernel::KernelError::TypeMismatch { .. },
+                ..
+            }
         ),
-        Err(e) => {
-            let msg = format!("{:?}", e);
-            assert!(
-                msg.contains("TypeMismatch") || msg.contains("KernelRejected"),
-                "expected a TypeMismatch/KernelRejected (specific variant), got: {:?}",
-                e
-            );
-        }
-    }
+        "wrong zip length must reach kernel equality refusal, got {rejected:?}"
+    );
 }
 
 // Functional sanity: `zip` genuinely truncates at the shorter list (a

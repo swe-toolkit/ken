@@ -119,7 +119,8 @@ whole member, preserving the `Pair String Json` carrier without projecting a
 second recursive call from it.
 
 This checked example counts five JSON nodes: the object, its nested array, and
-three scalar leaves. Object keys do not contribute to the count.
+three scalar leaves. Object keys do not contribute to the count. The nine
+private size contracts are also checked here, inside their defining module.
 
 ```ken example
 const json_example_nested_structure_size : Nat =
@@ -136,6 +137,48 @@ const json_example_nested_structure_size : Nat =
           (Pair String Json)
           (mk_pair String Json "leaf" (JsonString "x"))
           (Nil (Pair String Json)))))
+
+theorem json_example_contract_json_nat_add_right_suc (m : Nat) (n : Nat)
+               : Equal Nat (json_nat_add m (Suc n)) (Suc (json_nat_add m n)) =
+               json_nat_add_right_suc m n
+
+theorem json_example_contract_json_size_null
+               : Equal Nat (json_size JsonNull) (Suc Zero) = json_size_null
+
+theorem json_example_contract_json_size_bool (flag : Bool)
+               : Equal Nat (json_size (JsonBool flag)) (Suc Zero) = json_size_bool flag
+
+theorem json_example_contract_json_size_number (number : Int)
+               : Equal Nat (json_size (JsonNumber number)) (Suc Zero) =
+               json_size_number number
+
+theorem json_example_contract_json_size_string (text : String)
+               : Equal Nat (json_size (JsonString text)) (Suc Zero) =
+               json_size_string text
+
+theorem json_example_contract_json_size_array_nil
+               : Equal Nat (json_size (JsonArray (Nil Json))) (Suc Zero) =
+               json_size_array_nil
+
+theorem json_example_contract_json_size_array_cons (child : Json) (rest : List Json)
+               : Equal Nat
+                   (json_size (JsonArray (Cons Json child rest)))
+                   (json_nat_add (json_size child) (json_size (JsonArray rest))) =
+               json_size_array_cons child rest
+
+theorem json_example_contract_json_size_object_nil
+               : Equal Nat (json_size (JsonObject (Nil (Pair String Json))))
+                   (Suc Zero) = json_size_object_nil
+
+theorem json_example_contract_json_size_object_cons
+                 (key : String) (value : Json) (rest : List (Pair String Json))
+               : Equal Nat
+                   (json_size
+                     (JsonObject
+                       (Cons (Pair String Json)
+                         (mk_pair String Json key value) rest)))
+                   (json_nat_add (json_size value) (json_size (JsonObject rest))) =
+               json_size_object_cons key value rest
 ```
 
 The character cursor treats the unconsumed suffix as its carrier. Its location

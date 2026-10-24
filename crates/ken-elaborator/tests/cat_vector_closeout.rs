@@ -8,7 +8,7 @@
 //! `cat_vec_acceptance` retains the family-index, computation, and
 //! impossible-call behavior obligations.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, ElabError};
@@ -31,20 +31,52 @@ fn load(module: &str) -> (ElabEnv, Vec<GlobalId>) {
     (env, owned)
 }
 
-fn with_private_names() -> ElabEnv {
-    let (mut env, _) = load(VECTOR);
+fn checked_vector_examples(names: &[&str]) -> (ElabEnv, Vec<GlobalId>) {
+    let (mut env, owned) = load(VECTOR);
     let prefix = format!("{VECTOR}.");
-    let aliases: Vec<_> = env
+    let before: BTreeMap<_, _> = env
         .globals
         .iter()
-        .filter_map(|(qualified, id)| {
-            qualified
-                .strip_prefix(&prefix)
-                .map(|local| (local.to_owned(), *id))
-        })
+        .filter(|(name, _)| name.starts_with(&prefix))
+        .map(|(name, id)| (name.clone(), *id))
         .collect();
-    env.globals.extend(aliases);
-    env
+    let trust_before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
+    for name in names {
+        assert!(
+            !env.globals.contains_key(*name),
+            "{name} must come from the fence"
+        );
+        assert!(!before.contains_key(&format!("{VECTOR}.{name}")));
+    }
+    env.execute_loaded_entry_checked_fences(VECTOR)
+        .expect("Vector's owner-local checked examples must elaborate");
+    let after: BTreeMap<_, _> = env
+        .globals
+        .iter()
+        .filter(|(name, _)| name.starts_with(&prefix))
+        .map(|(name, id)| (name.clone(), *id))
+        .collect();
+    assert_eq!(after, before, "fences cannot add Vector-owned names");
+    assert_eq!(
+        env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
+        trust_before,
+        "fences cannot add trust"
+    );
+    for name in names {
+        let id = *env
+            .globals
+            .get(*name)
+            .unwrap_or_else(|| panic!("missing {name}"));
+        assert!(
+            !owned.contains(&id),
+            "{name} is an example, not an owned law"
+        );
+        assert!(
+            matches!(env.env.lookup(id), Some(Decl::Transparent { .. })),
+            "{name} must be a checked transparent example"
+        );
+    }
+    (env, owned)
 }
 
 fn expected_owned_names() -> BTreeSet<String> {
@@ -383,28 +415,19 @@ fn vector_exports_only_checked_fin_family_and_constructors() {
 /// provider's raw type. CLAIMED: lookup after zipping with `f` at the same
 /// `Fin n` equals `f` of *both* input lookups, at arbitrary element types,
 /// lengths, functions and vectors. THE GAP: the client pins the proposition
-/// and transparent proof, not its particular proof structure. An intact
-/// statement with a broken operation is separately tested by kernel check.
+/// and transparent proof, not its particular proof structure. THE GAP: the
+/// contract is now spelled in the provider's example fence and elaborated
+/// separately from the law; raw type equality checks its binders and endpoints.
 #[test]
 fn lookup_zip_with_has_exact_checked_generic_proposition() {
-    let mut env = with_private_names();
+    let (env, _) = checked_vector_examples(&["vec_example_lookup_zip_with_contract"]);
     let id = env.globals[&format!("{VECTOR}.lookup_zip_with")];
     let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("lookup law must roots-load")
     else {
         panic!("lookup_zip_with must be a checked transparent theorem");
     };
     let actual = ty.clone();
-    env.elaborate_file(
-        "theorem checked_lookup_zip_with_contract
-           (a : Type) (b : Type) (c : Type) (n : Nat)
-           (f : a → b → c) (xs : Vec a n) (ys : Vec b n) (i : Fin n)
-         : Equal c
-             (lookup c n (zip_with a b c n f xs ys) i)
-             (f (lookup a n xs i) (lookup b n ys i)) =
-           lookup_zip_with a b c n f xs ys i",
-    )
-    .expect("the generic consumer must type-check against the lookup law");
-    let witness_id = env.globals["checked_lookup_zip_with_contract"];
+    let witness_id = env.globals["vec_example_lookup_zip_with_contract"];
     let Decl::Transparent { ty: expected, .. } = env
         .env
         .lookup(witness_id)
@@ -425,31 +448,18 @@ fn lookup_zip_with_has_exact_checked_generic_proposition() {
 /// CLAIMED: the proof relates mapped zip to zip with `k` for arbitrary element
 /// types, lengths, vectors and the pointwise head witness, not a reflexive
 /// filler or an equality with swapped maps. THE GAP: the test-owned signature
-/// is an independent spelling of the law; the kernel checks the application,
-/// while raw type equality catches any binder or endpoint change.
+/// is now spelled in the provider's example fence, separately elaborated
+/// from the law; raw type equality catches any binder or endpoint change.
 #[test]
 fn zip_with_map_has_exact_checked_pointwise_proposition() {
-    let mut env = with_private_names();
+    let (env, _) = checked_vector_examples(&["vec_example_zip_with_map_contract"]);
     let name = format!("{VECTOR}.zip_with_map");
     let id = env.globals[&name];
     let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("law must roots-load") else {
         panic!("{name} must be a checked transparent theorem, not an assumption");
     };
     let actual = ty.clone();
-    env.elaborate_file(
-        "theorem pointwise_vector_naturality_contract
-           (a : Type) (a2 : Type) (b : Type) (b2 : Type) (c : Type) (n : Nat)
-           (g : a → b) (h : a2 → b2) (f : b → b2 → c)
-           (k : a → a2 → c)
-           (hk : (u : a) → (v : a2) → Equal c (k u v) (f (g u) (h v)))
-           (xs : Vec a n) (ys : Vec a2 n)
-         : Equal (Vec c n)
-             (zip_with b b2 c n f (map a b n g xs) (map a2 b2 n h ys))
-             (zip_with a a2 c n k xs ys) =
-           zip_with_map a a2 b b2 c n g h f k hk xs ys",
-    )
-    .expect("the stated proposition must be inhabited by the Vector law");
-    let witness_id = env.globals["pointwise_vector_naturality_contract"];
+    let witness_id = env.globals["vec_example_zip_with_map_contract"];
     let Decl::Transparent { ty: expected, .. } = env
         .env
         .lookup(witness_id)
@@ -469,46 +479,48 @@ fn zip_with_map_has_exact_checked_pointwise_proposition() {
 /// `h True = False`; the unswapped law is inhabited, while the swapped
 /// concrete claim is kernel-rejected. CLAIMED: `g` and `h` are not
 /// interchangeable in the pointwise law. THE GAP: this one-vector witness
-/// discriminates the two orders, not every possible function pair.
+/// discriminates the two orders, not every possible function pair. The
+/// contract is now spelled in the provider's example fence and elaborated
+/// separately from the law; checked bodies cite the exact owned operations.
 #[test]
 fn swapped_maps_reject_on_distinct_boolean_functions() {
-    let mut env = with_private_names();
-    env.elaborate_file(
-        "fn pointwise_g (x : Bool) : Bool = x
-         fn pointwise_h (x : Bool) : Bool =
-           match x { True ↦ False; False ↦ True }
-         fn pointwise_f (x : Bool) (y : Bool) : Bool = y
-         fn pointwise_k (x : Bool) (y : Bool) : Bool =
-           pointwise_f (pointwise_g x) (pointwise_h y)
-         theorem pointwise_hk (u : Bool) (v : Bool)
-           : Equal Bool (pointwise_k u v)
-               (pointwise_f (pointwise_g u) (pointwise_h v)) = Refl
-         theorem mapped_g_true : Equal Bool (pointwise_g True) True = Proved
-         theorem mapped_h_true : Equal Bool (pointwise_h True) False = Proved
-         theorem unswapped_concrete :
-           Equal (Vec Bool (Suc Zero))
-             (zip_with Bool Bool Bool (Suc Zero) pointwise_f
-               (map Bool Bool (Suc Zero) pointwise_g (VCons Bool Zero True (VNil Bool)))
-               (map Bool Bool (Suc Zero) pointwise_h (VCons Bool Zero True (VNil Bool))))
-             (zip_with Bool Bool Bool (Suc Zero) pointwise_k
-               (VCons Bool Zero True (VNil Bool))
-               (VCons Bool Zero True (VNil Bool))) =
-           zip_with_map Bool Bool Bool Bool Bool (Suc Zero)
-             pointwise_g pointwise_h pointwise_f pointwise_k pointwise_hk
-             (VCons Bool Zero True (VNil Bool))
-             (VCons Bool Zero True (VNil Bool))",
-    )
-    .expect("the original order and distinguishing functions must check");
-    let bad = "theorem swapped_concrete :
-           Equal (Vec Bool (Suc Zero))
-             (zip_with Bool Bool Bool (Suc Zero) pointwise_f
-               (map Bool Bool (Suc Zero) pointwise_h (VCons Bool Zero True (VNil Bool)))
-               (map Bool Bool (Suc Zero) pointwise_g (VCons Bool Zero True (VNil Bool))))
-             (zip_with Bool Bool Bool (Suc Zero) pointwise_k
-               (VCons Bool Zero True (VNil Bool))
-               (VCons Bool Zero True (VNil Bool))) = Proved";
+    let (mut env, owned) = checked_vector_examples(&[
+        "vec_example_pointwise_g",
+        "vec_example_pointwise_h",
+        "vec_example_pointwise_f",
+        "vec_example_pointwise_k",
+        "vec_example_pointwise_hk",
+        "vec_example_unswapped_concrete",
+        "vec_example_swapped_head",
+        "vec_example_pointwise_head",
+        "vec_example_swapped_head_true",
+        "vec_example_pointwise_head_false",
+    ]);
+    let swapped = env.globals["vec_example_swapped_head"];
+    let positive = env.globals["vec_example_unswapped_concrete"];
+    for (example, required) in [
+        (swapped, &["zip_with", "map", "lookup"][..]),
+        (positive, &["zip_with_map"][..]),
+    ] {
+        let Some(Decl::Transparent { body, .. }) = env.env.lookup(example) else {
+            panic!("Vector example must have a checked body");
+        };
+        let mut references = BTreeSet::new();
+        collect_references(body, &mut references);
+        for name in required {
+            let id = env.globals[&format!("{VECTOR}.{name}")];
+            assert!(owned.contains(&id), "{name} must belong to Vector");
+            assert!(
+                references.contains(&id),
+                "example body must cite checked {name}"
+            );
+        }
+    }
     let error = env
-        .elaborate_file(bad)
+        .elaborate_file(
+            "theorem vector_swapped_concrete : Equal Bool \
+             vec_example_swapped_head vec_example_pointwise_head = Proved",
+        )
         .expect_err("swapped maps must not prove the same proposition");
     assert!(
         matches!(
