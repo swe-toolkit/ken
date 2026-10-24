@@ -5981,20 +5981,14 @@ impl<'a> Lowering<'a> {
                 "a planned resumption's first eliminator frame is not its route's continuation",
             ));
         }
-        let frame_origins = eliminators.iter().map(|frame| match frame {
-            EliminatorFrame::Computational(frame) => Some(frame.static_origin),
-            EliminatorFrame::Ordinary(frame) => Some(frame.static_origin),
-            EliminatorFrame::PendingLet(_) | EliminatorFrame::InvocationReturn
-            | EliminatorFrame::Active(_) => None,
-        }).collect::<Option<Vec<_>>>().ok_or_else(|| unsupported(
-            LoweringCause::PlannerInvariant, "StaticResponseDeferred",
-            "a planned resumption cannot name a source-less eliminator frame",
-        ))?;
-        if frame_origins != record.eliminators {
-            return Err(unsupported(LoweringCause::PlannerInvariant,
-                "StaticResponseDeferred",
-                "the live eliminator run disagrees with its planned resumption",
-            ));
+        // K's own handler-owned responses must lower under their owner: here,
+        // K runs under the live stack, which already threads its continuation.
+        if record.execution
+            == crate::cranelift_backend::planning::PlannedResumptionExecution::AtHandler
+        {
+            let k_body = self.retained_body_occurrence(body)?;
+            let eliminators = eliminators.to_vec();
+            return self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators);
         }
         let k_inputs = k_env.into_iter().map(|binding| match binding {
             LoweringEnvironmentBinding::Value(value) => Ok(value),

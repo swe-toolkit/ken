@@ -18,6 +18,19 @@ pub(in crate::cranelift_backend) enum PlannedResumptionParameter {
     KCapture { source_origin: StaticOriginId, member: ContinuationSourceCoordinate },
 }
 
+/// Where K's body executes. Chosen by which owner lowers the handler-owned
+/// responses K's body performs; the frame run is never recorded here, since
+/// the lowering already threads K's continuation across named calls.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum PlannedResumptionExecution {
+    /// The target context's specialization owns every handler-owned response
+    /// K's body performs, so K runs there and returns its raw result.
+    Transfer,
+    /// K's body performs a response its handler owns and the target context
+    /// does not, so K runs in the handler's lowering under its live stack.
+    AtHandler,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::cranelift_backend) struct PlannedHandlerResumptionCall {
     pub(in crate::cranelift_backend) id: PlannedHandlerResumptionId,
@@ -25,7 +38,7 @@ pub(in crate::cranelift_backend) struct PlannedHandlerResumptionCall {
     pub(in crate::cranelift_backend) emission_owner: ContinuationEmissionOwner,
     pub(in crate::cranelift_backend) route: HandlerDriveContextRoute,
     pub(in crate::cranelift_backend) parameters: Vec<PlannedResumptionParameter>,
-    pub(in crate::cranelift_backend) eliminators: Vec<StaticOriginId>,
+    pub(in crate::cranelift_backend) execution: PlannedResumptionExecution,
 }
 
 impl StaticTransitionPlan<'_> {
@@ -83,20 +96,51 @@ impl StaticTransitionPlan<'_> {
                 }
             }
         }
-        let mut eliminators = Vec::new();
-        let mut cursor = row.vis_origin();
-        while let Some((parent, position)) = parents.get(&cursor).copied() {
-            match self.planned_occurrence_expr(parent)? {
-                RuntimeExpr::ComputationalMatch { .. } | RuntimeExpr::Match { .. }
-                    if position == 0 => eliminators.push(parent),
-                RuntimeExpr::LexicalClosure { .. } => break,
-                _ => {}
+        let target = ContinuationEmissionOwner::Specialization(
+            self.continuation_contexts()?.into_iter()
+                .find(|candidate| candidate.id() == route.context)
+                .ok_or_else(|| planner_error("a planned resumption's context has no projected view"))?
+                .enclosing_specialization(),
+        );
+        let (mut covered_by_target, mut covered_by_handler) = (true, true);
+        for nested in &self.static_response_deferred {
+            if nested.vis_origin() == row.vis_origin() {
+                continue;
             }
-            cursor = parent;
+            // The target lowers a response iff its Vis is reached from K's
+            // body without crossing a closure, which another unit lowers.
+            let mut cursor = nested.vis_origin();
+            let mut lowered_in_body = cursor == route.worker_body_origin;
+            while !lowered_in_body {
+                let Some((parent, _)) = parents.get(&cursor).copied() else { break };
+                if parent == route.worker_body_origin {
+                    lowered_in_body = true;
+                } else if matches!(self.planned_occurrence_expr(parent)?,
+                    RuntimeExpr::LexicalClosure { .. })
+                {
+                    break;
+                }
+                cursor = parent;
+            }
+            if !lowered_in_body {
+                continue;
+            }
+            let Some(nested_owner) = self.admitted_deferred_handler_owner(nested)? else {
+                continue;
+            };
+            covered_by_target &= nested_owner == target;
+            covered_by_handler &= nested_owner == owner;
         }
+        let execution = if covered_by_target {
+            PlannedResumptionExecution::Transfer
+        } else if covered_by_handler {
+            PlannedResumptionExecution::AtHandler
+        } else {
+            return Err(planner_error("a planned resumption's K performs a handler-owned response that neither its target context nor its handler owns"));
+        };
         Ok(PlannedHandlerResumptionCall {
             id, row: (row.vis_origin(), row.operation_root_origin(), row.effect_origin()),
-            emission_owner: owner, route, parameters, eliminators,
+            emission_owner: owner, route, parameters, execution,
         })
     }
 
@@ -130,10 +174,8 @@ impl StaticTransitionPlan<'_> {
             if record.parameters != expected.parameters {
                 return Err(planner_error("resumption response or K-capture parameter is not certified by the checked context"));
             }
-            if record.eliminators != expected.eliminators
-                || record.eliminators.first() != Some(&record.route.continuation_origin)
-            {
-                return Err(planner_error("resumption eliminator run disagrees with its checked continuation route"));
+            if record.execution != expected.execution {
+                return Err(planner_error("resumption execution site disagrees with its checked response ownership"));
             }
         }
         Ok(())

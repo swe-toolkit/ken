@@ -38,7 +38,7 @@ mod occurrences;
 mod responses;
 mod resumptions;
 pub(in crate::cranelift_backend) use resumptions::{
-    PlannedHandlerResumptionCall, PlannedResumptionParameter,
+    PlannedHandlerResumptionCall, PlannedResumptionExecution, PlannedResumptionParameter,
 };
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
