@@ -29,7 +29,7 @@ const two : Nat = Suc one
 const three : Nat = Suc two
 const four : Nat = Suc three
 const five : Nat = Suc (Suc (Suc (Suc (Suc Zero))))
-const nine : Nat = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero)))))))
+const nine : Nat = Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc (Suc Zero))))))))
 
 fn seed_cost (n : Nat) : Nat =
   match n {

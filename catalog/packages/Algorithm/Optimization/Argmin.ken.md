@@ -1,8 +1,9 @@
-# `Argmin` — earliest least-cost candidate
+# `Argmin` — earliest minimum- and maximum-cost candidates
 
-`argmin` selects an existing candidate with minimum natural-number cost,
-retaining the earliest candidate when costs tie. `argmin_option` makes the
-same selection from a possibly empty list, returning `None` for `Nil`.
+`argmin` and `argmax` select existing candidates with the least and greatest
+natural-number costs, respectively, retaining the earliest candidate on a
+tie. `argmin_option` selects a minimum from a possibly empty list, returning
+`None` for `Nil`.
 
 ## Contents
 
@@ -16,20 +17,20 @@ same selection from a possibly empty list, returning `None` for `Nil`.
 
 ## Motivation
 
-A nonempty finite input always has a least-cost candidate without requiring
-an equality operation on its values. Strictly comparing each tail candidate
-against the current head retains the head whenever two costs are equal.
-The input's existing `NonEmpty` carrier supplies the head and ordered tail.
-For a possibly empty `List`, the Option selector returns no value on `Nil`
-and delegates every `Cons` case to that same nonempty selection.
+A nonempty finite input always has least- and greatest-cost candidates
+without requiring an equality operation on its values. Strictly comparing
+each tail candidate against the current head retains the head whenever two
+costs are equal. The existing `NonEmpty` carrier supplies the head and ordered
+tail. For a possibly empty `List`, the Option minimum selector returns no
+value on `Nil` and delegates each `Cons` case to nonempty selection.
 
 ## Definition
 
-The nonempty operation and its seven public laws lead, followed by the
-Option selector, its two equations and two `List` corollaries. Private
-selection helpers, inductive proofs and the four Option proof helpers
-follow. Two generic Nat-order facts come from their canonical owner,
-`Data.Numeric.Nat.Order`.
+The minimum selector and its seven laws lead, followed by the Option
+selector and its four laws. The maximum selector and its seven laws follow.
+Private shared selection helpers, inductive proofs and the four Option proof
+helpers close the definition. Two generic Nat-order facts come from their
+canonical owner, `Data.Numeric.Nat.Order`.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, leq_nat)
@@ -157,14 +158,101 @@ pub theorem argmin_option_least
       → IsTrue (leq_nat (cost y) (cost z)) =
   λfound. J (λr _. option_least a cost xs r) (argmin_option_least_base a cost xs) found
 
-fn argmin_from (a : Type) (cost : a → Nat) (x : a) (rest : List a) : a =
+pub fn argmax (a : Type) (cost : a → Nat) (xs : NonEmpty a) : a =
+  argmax_from a cost (nonempty_head a xs) (nonempty_tail a xs)
+
+pub theorem argmax_member
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a)
+    : list_elem a (argmax a cost xs) (nonempty_to_list a xs) =
+  J
+    (λl _.
+      list_elem a (argmax a cost xs) l → list_elem a (argmax a cost xs) (nonempty_to_list a xs))
+    (λmember. member)
+    (nonempty_to_list_shape a xs)
+    (select_from_member a cost costlier (nonempty_head a xs) (nonempty_tail a xs))
+
+pub theorem argmax_greatest
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a)
+    : (y : a)
+      → list_elem a y (nonempty_to_list a xs)
+      → IsTrue (leq_nat (cost y) (cost (argmax a cost xs))) =
+  λy.
+    λmember.
+      argmax_from_greatest
+        a
+        cost
+        (nonempty_head a xs)
+        (nonempty_tail a xs)
+        y
+        (J (λl _. list_elem a y l) member (nonempty_to_list_shape a xs))
+
+pub theorem argmax_no_costlier
+      (a : Type) (cost : a → Nat) (xs : NonEmpty a) (y : a)
+    : list_elem a y (nonempty_to_list a xs)
+      → Equal Bool (lt_nat (cost (argmax a cost xs)) (cost y)) False =
+  λmember.
+    (proof leq_not_lt for lt_nat)
+      (cost y)
+      (cost (argmax a cost xs))
+      (argmax_greatest a cost xs y member)
+
+pub theorem argmax_head_on_tie
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : ((y : a) → list_elem a y rest → IsTrue (leq_nat (cost y) (cost x)))
+      → Equal a (argmax a cost (nonempty_cons a x rest)) x =
   match rest {
-    Nil ↦ x;
-    Cons y ys ↦ cheaper a cost x (argmin_from a cost y ys)
+    Nil ↦ λbound. Refl;
+    Cons z zs ↦
+      λbound.
+        choose_no
+          a
+          (costlier (cost (argmax_from a cost z zs)) (cost x))
+          (argmax_from a cost z zs)
+          x
+          ((proof leq_not_lt for lt_nat)
+            (cost (argmax_from a cost z zs))
+            (cost x)
+            (bound (argmax_from a cost z zs) (select_from_member a cost costlier z zs)))
   }
 
-fn cheaper (a : Type) (cost : a → Nat) (incumbent : a) (challenger : a) : a =
-  choose a (lt_nat (cost challenger) (cost incumbent)) challenger incumbent
+pub theorem argmax_singleton
+      (a : Type) (cost : a → Nat) (x : a)
+    : Equal a (argmax a cost (nonempty_singleton a x)) x =
+  Refl
+
+pub theorem argmax_keeps_head
+      (a : Type) (cost : a → Nat) (x : a) (y : a) (ys : List a)
+    : Equal Bool (lt_nat (cost x) (cost (argmax a cost (nonempty_cons a y ys)))) False
+      → Equal a (argmax a cost (nonempty_cons a x (Cons a y ys))) x =
+  choose_no a (costlier (cost (argmax_from a cost y ys)) (cost x)) (argmax_from a cost y ys) x
+
+pub theorem argmax_takes_tail
+      (a : Type) (cost : a → Nat) (x : a) (y : a) (ys : List a)
+    : Equal Bool (lt_nat (cost x) (cost (argmax a cost (nonempty_cons a y ys)))) True
+      → Equal a
+        (argmax a cost (nonempty_cons a x (Cons a y ys)))
+        (argmax a cost (nonempty_cons a y ys)) =
+  choose_yes a (costlier (cost (argmax_from a cost y ys)) (cost x)) (argmax_from a cost y ys) x
+
+fn argmin_from (a : Type) (cost : a → Nat) (x : a) (rest : List a) : a =
+  select_from a cost lt_nat x rest
+
+fn argmax_from (a : Type) (cost : a → Nat) (x : a) (rest : List a) : a =
+  select_from a cost costlier x rest
+
+fn costlier (challenger : Nat) (incumbent : Nat) : Bool = lt_nat incumbent challenger
+
+fn select_from
+      (a : Type) (cost : a → Nat) (better : Nat → Nat → Bool) (x : a) (rest : List a)
+    : a =
+  match rest {
+    Nil ↦ x;
+    Cons y ys ↦
+      let tail_choice =
+        select_from a cost better y ys
+      in
+        choose a (better (cost tail_choice) (cost x)) tail_choice x
+  }
 
 fn choose (a : Type) (b : Bool) (yes : a) (no : a) : a =
   match b {
@@ -175,16 +263,21 @@ fn choose (a : Type) (b : Bool) (yes : a) (no : a) : a =
 theorem argmin_from_member
       (a : Type) (cost : a → Nat) (x : a) (rest : List a)
     : list_elem a (argmin_from a cost x rest) (Cons a x rest) =
+  select_from_member a cost lt_nat x rest
+
+theorem select_from_member
+      (a : Type) (cost : a → Nat) (better : Nat → Nat → Bool) (x : a) (rest : List a)
+    : list_elem a (select_from a cost better x rest) (Cons a x rest) =
   match rest {
     Nil ↦ list_elem_head a x (Nil a);
     Cons y ys ↦
       choose_elem
         a
-        (lt_nat (cost (argmin_from a cost y ys)) (cost x))
-        (argmin_from a cost y ys)
+        (better (cost (select_from a cost better y ys)) (cost x))
+        (select_from a cost better y ys)
         x
         (Cons a y ys)
-        (argmin_from_member a cost y ys)
+        (select_from_member a cost better y ys)
   }
 
 theorem argmin_from_least
@@ -288,6 +381,83 @@ theorem choose_le_yes
     False ↦ λh. (proof false_reverse_leq for lt_nat) (cost yes) (cost no) h
   }
 
+theorem argmax_from_greatest
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : (y : a)
+      → list_elem a y (Cons a x rest)
+      → IsTrue (leq_nat (cost y) (cost (argmax_from a cost x rest))) =
+  match rest {
+    Nil ↦
+      λy.
+        λmember.
+          elim_trunc
+            (IsTrue (leq_nat (cost y) (cost x)))
+            (λcase.
+              match case {
+                Inl same ↦
+                  J
+                    (λv _. IsTrue (leq_nat (cost y) (cost v)))
+                    ((proof refl for leq_nat) (cost y))
+                    same;
+                Inr later ↦ absurd later
+              })
+            member;
+    Cons z zs ↦
+      λy.
+        λmember.
+          elim_trunc
+            (IsTrue (leq_nat (cost y) (cost (argmax_from a cost x (Cons a z zs)))))
+            (λcase.
+              match case {
+                Inl same ↦
+                  J
+                    (λv _.
+                      IsTrue (leq_nat (cost v) (cost (argmax_from a cost x (Cons a z zs))))
+                      → IsTrue (leq_nat (cost y) (cost (argmax_from a cost x (Cons a z zs)))))
+                    (λh. h)
+                    same
+                    (choose_ge_no
+                      a
+                      cost
+                      (argmax_from a cost z zs)
+                      x
+                      (costlier (cost (argmax_from a cost z zs)) (cost x))
+                      Refl);
+                Inr later ↦
+                  (proof trans for leq_nat)
+                    (cost y)
+                    (cost (argmax_from a cost z zs))
+                    (cost (argmax_from a cost x (Cons a z zs)))
+                    (argmax_from_greatest a cost z zs y later)
+                    (choose_ge_yes
+                      a
+                      cost
+                      (argmax_from a cost z zs)
+                      x
+                      (costlier (cost (argmax_from a cost z zs)) (cost x))
+                      Refl)
+              })
+            member
+  }
+
+theorem choose_ge_no
+      (a : Type) (cost : a → Nat) (yes : a) (no : a) (b : Bool)
+    : Equal Bool (lt_nat (cost no) (cost yes)) b
+      → IsTrue (leq_nat (cost no) (cost (choose a b yes no))) =
+  match b {
+    True ↦ λh. (proof true_leq for lt_nat) (cost no) (cost yes) h;
+    False ↦ λh. (proof refl for leq_nat) (cost no)
+  }
+
+theorem choose_ge_yes
+      (a : Type) (cost : a → Nat) (yes : a) (no : a) (b : Bool)
+    : Equal Bool (lt_nat (cost no) (cost yes)) b
+      → IsTrue (leq_nat (cost yes) (cost (choose a b yes no))) =
+  match b {
+    True ↦ λh. (proof refl for leq_nat) (cost yes);
+    False ↦ λh. (proof false_reverse_leq for lt_nat) (cost no) (cost yes) h
+  }
+
 fn option_member (a : Type) (xs : List a) (outcome : Option a) : Prop =
   match outcome {
     None ↦ Top;
@@ -319,14 +489,15 @@ theorem argmin_option_least_base
 
 ## Using it
 
-Call `argmin` with the value type, a natural-number cost function, and an
-existing `NonEmpty` value. Construct inputs with `nonempty_singleton` or
-`nonempty_cons`; use `nonempty_to_list` to reason about the full ordered
-input. No `DecEq` or ordering on the candidate type is required. A singleton
-returns its sole value; a later candidate replaces the head only if its cost
-is strictly lower. For a possibly empty `List`, call `argmin_option`; `None`
-means there was no candidate. When the result is `Some y`, the two direct
-corollaries establish `list_elem` membership and least cost on that list.
+Call `argmin` or `argmax` with the value type, a natural-number cost
+function and an existing `NonEmpty` value. Construct inputs with
+`nonempty_singleton` or `nonempty_cons`; use `nonempty_to_list` to reason
+about the full ordered input. No `DecEq` or order on the candidate type is
+required. A singleton returns its sole value; a later candidate replaces the
+head only when its cost is strictly lower for `argmin`, or strictly higher for
+`argmax`. For a possibly empty `List`, call `argmin_option`; `None` means
+there was no candidate. On `Some y`, its corollaries establish membership
+and least cost on the original list.
 
 ## Laws & proofs
 
@@ -352,34 +523,44 @@ Their private base proofs use the existing `argmin_member` and `argmin_least`
 in the `Cons` case. `J` transports these proofs along the observed result
 equality to give the public membership and least-cost corollaries.
 
+`argmax_member` transports the shared private selection-membership proof to
+the public list view. `argmax_greatest` inducts over the ordered tail and
+eliminates truncated membership only into `IsTrue`, bounding every member's
+cost by the selected cost. `argmax_no_costlier` uses the checked Nat-order
+bridge. `argmax_head_on_tie` uses the greatest bound and the strict-order
+bridge to keep the head, even when a tail candidate ties it. The singleton
+and both strict-comparison branch laws fix the choice on every input.
+
 ## Design notes
 
-`argmin_from` folds the ordered tail against the head. `cheaper` tests only
-the candidates' `Nat` costs, and `choose` retains its `no` value on a false
-comparison. Using strict order rather than a non-strict replacement is what
-makes earliest-tie behavior observable. Membership is propositionally
-truncated: it certifies that the chosen value was present but is not a list
-index or a Boolean equality on arbitrary candidate values. The nonempty selector
-promises no complexity bound. The Option selector handles an empty list by
-returning `None`, without introducing another selection algorithm.
+`argmin_from` and `argmax_from` share a private `select_from` fold over the
+ordered tail. The former compares challenger with incumbent; the latter's
+`costlier` reverses those cost arguments. `choose` keeps the incumbent on a
+false comparison, including ties. The shared membership proof depends only
+on selection from the two candidates, not on cost direction. Membership is
+propositionally truncated: it certifies that the chosen value was present but
+is not an index or a Boolean equality on arbitrary candidate values. Neither
+nonempty selector promises a complexity bound. The Option selector handles an
+empty list by returning `None`, without another selection algorithm.
 
 ## References
 
-- **Arg min — Wikipedia** — https://en.wikipedia.org/wiki/Arg_max —
-  orientation on the minimum-argument operation and ties among minimizers.
-- **Ken optimization contract** — `spec/50-stdlib/72-optimization.md` §1 —
-  the seven nonempty laws, the Option selector and their proof boundaries.
+- **Arg max — Wikipedia** — https://en.wikipedia.org/wiki/Arg_max —
+  orientation on maximum-argument selection and ties among maximizers.
+- **Ken optimization contract** — `spec/50-stdlib/72-optimization.md` §§1, 3 —
+  the nonempty selectors, their laws and proof boundaries.
 - **Ken natural order** — `Data.Numeric.Nat.Order` — the canonical strict
   comparison and its checked non-strict bridges.
 
 ## Trust & derivation
 
-**Public API:** `argmin`, its seven §1.2 theorems, `argmin_option`,
-`argmin_option_nil`, `argmin_option_cons`, `argmin_option_member`, and
-`argmin_option_least`. Selection helpers, branch proofs, the list-membership
-induction, and all four Option proof helpers are private. The carrier,
-its list view, the membership predicate, and Nat order retain their existing
-provider identities.
+**Public API:** `argmin` and its seven §1.2 theorems; `argmin_option` and
+its four §1.4 laws; `argmax` and the seven §3.2 laws `argmax_member`,
+`argmax_greatest`, `argmax_no_costlier`, `argmax_head_on_tie`,
+`argmax_singleton`, `argmax_keeps_head` and `argmax_takes_tail`. Selection
+helpers, branch proofs, the shared membership induction and all four Option
+proof helpers are private. The carrier, list view, membership predicate and
+Nat order retain their provider identities.
 
 | Reader task | Section |
 |---|---|
@@ -392,8 +573,8 @@ provider identities.
 `Data.Collections.NonEmpty`; `list_elem` and its introduction lemmas by
 `Data.Collections.Derived`; `IsTrue` and `leq_nat` by
 `Core.Classes.LawfulClasses`; and `lt_nat` with its two attached bridges by
-`Data.Numeric.Nat.Order`. The selector adds no axiom, primitive, postulate, or
-opaque constant. `trusted_base()` must stay unchanged relative to its provider
+`Data.Numeric.Nat.Order`. The selectors add no axiom, primitive, postulate or
+opaque constant. `trusted_base()` must stay unchanged relative to the provider
 closure; this does not erase inherited assumptions.
 
 **Validation:** `conformance/stdlib/optimization/seed-argmin.md` names
@@ -405,3 +586,6 @@ singleton and non-degenerate tie cases, instances of the four Option laws,
 and an isolated false `Some`-on-`Nil` refusal. The Option target root-loads
 the public declarations, executes those cases and compares exact
 trusted-base identities with the same provider closure.
+`conformance/stdlib/optimization/seed-argmax.md` supplies an earliest-tied
+maximum and a false later-tie result; its package test checks the full
+positive client before refusing the false equality.
