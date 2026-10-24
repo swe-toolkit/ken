@@ -1,7 +1,7 @@
 ---
 id: CAT-SYMBOLIC-ALGEBRA-DERIVATIVE-CLOSED-REFUSAL
 title: "The derivative seed's refusal row claims d/dx(x·x) = x at every open environment with Proved, which the kernel refuses whether the claim is true or false, so the row cannot fail under a broken product rule. Replace it with a closed env_two refusal that a dropped product-rule summand would accept"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2

@@ -785,10 +785,6 @@ writer; both subject files were restored byte-identically each time.
 `053ca7bea8f0630e86ec10b51f7c7241fbbc5ac3cc93892b1a92158b65de99f8`)
 and its `/tmp/lang-direct-writer-coupled-<probe>.log` files retain the results.
 
-Decoder provider work landed at `00ffedcfd`; item 6 no longer waits for
-that landing, but still waits for item 5's probe. The CAT5/tier-D item-7
-file collision still waits for BYTES D3. No item 6 or 7 work begins here.
-
 The first-cause single-site reds include public Ken names
 `cat3_canonical_min`, Derived `count`/`map`/`filter`, Vector `Vec`, and private
 PX8p prelude names as `UnresolvedCon`, plus a CC6b missing host `MkPath` and
@@ -796,7 +792,7 @@ a CC6a missing host `process_arguments`. The Derived test-2 no-op first hits
 its preexisting flat host `filter` assertion; **that failure alone does not
 prove** the subsequent Ken `mem`/`IsTrue`/`bool_and` resolutions. Each synthetic
 kernel fixture red is local source/RExpr name resolution, not a catalog export
-failure. Item 2 remains unstarted. Before item 8 can delete the door, its
+failure. Before item 8 can delete the door, its
 owner must disposition every R row together with the per-test W/H controls,
 without deleting the C controls or confusing a local synthetic declaration
 with an importable catalog export. No acceptance criterion changes here.

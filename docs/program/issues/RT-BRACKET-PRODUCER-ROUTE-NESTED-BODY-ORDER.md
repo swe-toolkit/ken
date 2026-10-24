@@ -1,7 +1,7 @@
 ---
 id: RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER
 title: "HELD INPUT to RT-BRACKET-LOWERING-AND-D0-REFUTER (child 3). At px8ta depth 3, natively and under either settlement mode, the existing computational-producer route never drives the middle bracket's body: after the second acquire it reaches the outer region's settlement S524, whose ResourceBodyResult scrutinee at origin 509 is unwritten (tag 0), and it traps with planned identity 40. The interpreter opens 1, 2, 3 and releases 3, 2, 1. Keep the as-shipped InPlace route releasing 3, 2, 1, and refuse nested Deferred settlement at planning instead of ordering it (Architect evt_3d42r13m743t). THIS NODE DOES NOT LAND ALONE: its reviewed tip is assembled by child 3."
-status: draft
+status: active
 owner: runtime
 size: M
 gate: none
@@ -24,10 +24,17 @@ origin: "Architect scope ruling evt_4yf9jdc9veepy on child 3's 4th advancing sto
 
 # Nested bracket bodies run in order on the producer route
 
-Paused by the Steward recut of 2026-10-21 (`evt_1gxk3pcr6rgw2`): this
-is link 5 of the bracket chain and is rebuilt on `main` after
-`RT-BRACKET-LOWERING-AND-D0-REFUTER` lands. Its held refs are never
-moved, rebased or landed.
+**Recut 2026-10-24 (Architect `evt_2j4fxp3ekyr03`, on Research
+`evt_4a2ee3es6nvdw`).** The combined-tree D0 (child 3 §2) found a
+main-green regression from the T'' port: the two drive-seat tests in
+`abi_s6_mapping_surface_native.rs` exit 1 natively where the interpreter
+exits 0 (red from `e31be7b05`, green at `2012431be`). Item 2 of the
+Deliverable is replaced by R-a and R-b, and R-10 to R-12 join the
+Acceptance. Build on the combined branch
+`wp/RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER-combined` at
+`c68c77a3e` (tree `532654446`, fresh on `d26c7964e`, with the
+pre-registration `c22f4861d` cherry-picked). Held refs are never moved,
+rebased or landed.
 
 ## Objective
 
@@ -86,12 +93,28 @@ releases 3, 2, 1.
 
    Depth-0 Deferred is untouched.
 2. **Retain** F1, P0 and V, the T'' route with L1′ and L2′, and the
-   published `PlannedHandlerResumptionCall`'s `route`, `parameters` and
-   `eliminators`, which the as-shipped path reads.
+   published `PlannedHandlerResumptionCall`'s `route` and `parameters`.
 3. **Drop** the `PlannedResumptionSettlement` list and its validator
    clauses. With nested Deferred refused they have no consumer.
+4. **R-a. Do not record the eliminator run.** Remove
+   `PlannedHandlerResumptionCall.eliminators`, the lexical
+   source-parent walk that derives it, the validator's eliminator clause,
+   and the lowering's `frame_origins != record.eliminators` check. The
+   frame run is the live stack the lowering already threads through named
+   calls. Keep the head check against `route.continuation_origin`.
+5. **R-b. Record where K executes, keyed on response ownership.** Over
+   every handler-owned Deferred row whose Vis K's body reaches without
+   crossing a closure: **Transfer** when every such row is admitted to the
+   target context's enclosing specialization (vacuously, when there are
+   none); **AtHandler** when every such row is admitted to the handler, in
+   which case K is lowered inline under the live stack; otherwise refuse
+   at planning. Route, parameters, claims, P0, V, L1′ and L2′ are
+   unchanged for Transfer records.
 
-The non-candidate WIP `1a4ed40ea` is the base to build from.
+The Architect's verified patch for 4 and 5 is
+`local/architect-shared/rt-combined-d0/s9/fix-c68.patch` (sha256
+`2bbcc828…16463e2`, four files, +67/-31; hunks verbatim in
+`evt_2j4fxp3ekyr03`).
 
 ## Acceptance
 
@@ -115,11 +138,26 @@ The non-candidate WIP `1a4ed40ea` is the base to build from.
   Deferred 12, Inline 0), with no new refusal.
 - **R-9 (mutation).** Deleting the check makes R-1′ fail again, back to
   the trap-40 or FIFO observation.
+- **R-10.** Both drive-seat tests in `abi_s6_mapping_surface_native.rs`
+  pass, and the whole file passes 12/12.
+- **R-11 (mutation).** Forcing Transfer reddens R-10 with native exit 1,
+  (1,0) against (0,0). Restore it byte-identically.
+- **R-12.** The planner's coverage on the candidate is: abi_s6 record 580
+  AtHandler and 557 Transfer, px8ta record 899 Transfer, body-once 0
+  records.
+- **Reruns on the exact candidate** (ancestor approvals do not carry):
+  the `e1d947edd` partition rows and the `a408136b9` P2 rows in
+  `rt_parity_native`, β′'s forced controls 2/2, T''-15 and T''-16.
+- **Stated gap, not a criterion.** Forcing AtHandler on px8ta's record
+  899 stays green, so no measured consumer needs the Transfer arm. Its
+  necessity rests on T''-4, T''-15 and T''-16.
+
+The child-3 D0 (§2 of `RT-BRACKET-LOWERING-AND-D0-REFUTER`) and closeout
+then resume on this node's tip.
 
 **Precommit.** If R-8 shows an unforced row refused, there is a nested
-Deferred region in the corpus: a query, which the Architect rules. Any
-other new wall is the node's 7th stop, advancing, with no hold. The next
-Research trigger is the node's 9th stop or child 3's 9th.
+Deferred region in the corpus: a query, which the Architect rules. The
+next advancing stop is the node's 9th, a Research trigger.
 
 ## Stop conditions
 
@@ -131,9 +169,12 @@ Research trigger is the node's 9th stop or child 3's 9th.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 7, child 3 aggregate 8 (Architect `evt_23st886k4a3z7`). The
-7th stop is the unforced binary after the β′ closure (runtime-leader
-`evt_3k3pjar47z8zj`). It advances with no hold. Only the non-advancing
+§1a: 8, child 3 aggregate 9 (Architect `evt_62kr796gv7yjf`; the
+Research pull `evt_4a2ee3es6nvdw` discharged the 9th, and the ruling is
+`evt_2j4fxp3ekyr03`). The next advancing stop on this node is its 9th, a
+Research trigger. The 7th stop is the unforced binary after the β′
+closure (runtime-leader `evt_3k3pjar47z8zj`). It advances with no hold.
+Only the non-advancing
 baseline attribution B (B0 `0919ab3d6`, B1 `1a4ed40ea`, B2 the stop
 configuration) is authorized. The next Research trigger is the node's
 9th stop or child 3's 9th. The 6th was at R-1 (runtime-leader
@@ -192,6 +233,27 @@ L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
    `public_one_level_bracket_finishes_and_releases` sees 0 versus 2
    source captures. Keyed on: unattributed, baseline owed
    (`evt_3k3pjar47z8zj`).
+8. Combined D0, read-write-read: the handler drive's eliminator run
+   is derived by a lexical source-parent walk from the Vis to its
+   closure (empty here), while the route's continuation (CM 350) is the
+   specialization's continuation reached through a named-proc call; T''
+   executes wrong (native exit 1), beta-prime refuses. Keyed on:
+   lexical source ancestry of the Vis, versus the specialization
+   plane's continuation relation.
+8 (correction). The e31 wrong execution is owner escape, not frames:
+   T'' transfers K into a context whose enclosing specialization (Spec0)
+   does not own a handler-owned response K performs (Vis 557, Spec2),
+   so that response is never driven. The lexical eliminator walk
+   explains only c68's refusal. Keyed on: target context selected by
+   source position (unique selecting unit at the Vis), versus ownership
+   of K's nested responses.
+
+**Shared predicate, entries 4, 8 and 8 (correction)** (Architect
+`evt_2j4fxp3ekyr03`): the drive's composition, both its frames and its
+execution site, was selected by source position, not read from the plane
+that owns K's continuation. R-a and R-b close it: the frames are the
+threaded continuation and are never re-derived, and the execution site
+is keyed on response ownership.
 
 **§1b: YES.** The handler-owned drive (F1,
 `drive_handler_owned_deferred_response` -> `drive_response_at_source`)

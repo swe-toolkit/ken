@@ -104,3 +104,11 @@ Checks: 8 fired: cut (i) alone gives base's observations, so AC-1 is
 stated where elimination is the accepting path; a 2^d configuration
 passes "not 3x per level", so AC-3 pins entries <= d. 9 fired: F is
 unmeasured on non-variable-side nests, so AC-4 measures it.
+
+## Hard-stop inventory (§1b)
+
+§1a: 1 (Architect stack-split ruling `evt_1yhvagtfq3vv6`).
+
+1. trivial-restoration arm routed through the generalized check's 12
+   KiB frame on the recursive path -- keyed on which function holds the
+   recursive call, not on what the arm needs
