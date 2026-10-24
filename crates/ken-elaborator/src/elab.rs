@@ -9316,7 +9316,9 @@ fn method_has_variable_side_leaves(
     else {
         return Ok(false);
     };
-    Ok(leaves.iter().any(|leaf| matches!(leaf.target, Term::Var(v) if v < n)))
+    Ok(leaves
+        .iter()
+        .any(|leaf| matches!(leaf.target, Term::Var(v) if v < n)))
 }
 
 #[cfg(test)]
@@ -9582,7 +9584,10 @@ fn prepare_dependent_branch_body(
     if !variable_side
         && (branch_convoy || recursive_field_index_path == RecursiveFieldIndexPath::PlainDeclared)
     {
-        return Ok((PreparedArmGoal::Unrefined(expected_unrefined), preserve_nested_goal));
+        return Ok((
+            PreparedArmGoal::Unrefined(expected_unrefined),
+            preserve_nested_goal,
+        ));
     }
     let (goal, restorations) = refine_branch_goal(
         cx,
@@ -9600,15 +9605,16 @@ fn prepare_dependent_branch_body(
     }) {
         return Ok((PreparedArmGoal::Reverted(goal, restorations), preserve_nested_goal));
     }
-    let goal = if equation_convoy
-        || preserve_nested_goal
-        || matches!(arm.body, RExpr::RLam(_, _, _))
-    {
-        goal
-    } else {
-        simplify_branch_goal(cx.env, &cx.ctx, &goal)
-    };
-    Ok((PreparedArmGoal::Refined(goal, restorations), preserve_nested_goal))
+    let goal =
+        if equation_convoy || preserve_nested_goal || matches!(arm.body, RExpr::RLam(_, _, _)) {
+            goal
+        } else {
+            simplify_branch_goal(cx.env, &cx.ctx, &goal)
+        };
+    Ok((
+        PreparedArmGoal::Refined(goal, restorations),
+        preserve_nested_goal,
+    ))
 }
 
 /// The goal a prepared dependent arm is checked against. It is decided before
@@ -9669,7 +9675,8 @@ fn complete_dependent_branch_body(
             cx, arm, scrut_ty, scrut_core, concrete, n, &arm_goal, path_base,
         )
     } else {
-        check_match_arm_result(cx, arm, &arm_goal, &arm.span).and_then(|checked| match restorations {
+        check_match_arm_result(cx, arm, &arm_goal, &arm.span).and_then(|checked| match restorations
+        {
             // As on the generalized path, a refined goal gets no early kernel
             // admission: declaration universe metas may still be solved by
             // the enclosing method checker.
@@ -11366,7 +11373,12 @@ fn solved_index_dependency_binders(
 /// observational reduct: solved leaves become Refl, Top becomes tt, and an
 /// untouched leaf keeps its projection of the original premise.
 fn reassemble_solved_premise(
-    env: &GlobalEnv, ctx: &Context, sub_ty: &Term, orig_ty: &Term, old: &Term, proof: Term,
+    env: &GlobalEnv,
+    ctx: &Context,
+    sub_ty: &Term,
+    orig_ty: &Term,
+    old: &Term,
+    proof: Term,
 ) -> Option<Term> {
     // Check the raw Eq before whnf: Eq (List A) X X reduces to a Sigma.
     if let Term::Eq(carrier, left, right) = sub_ty {
@@ -11381,21 +11393,33 @@ fn reassemble_solved_premise(
         }
     }
     if matches!(&substituted, Term::Const { id, .. } if *id == env.top_id()) {
-        return Some(Term::Const { id: env.tt_id(), level_args: vec![] });
+        return Some(Term::Const {
+            id: env.tt_id(),
+            level_args: vec![],
+        });
     }
     let original = whnf(env, ctx, orig_ty);
     match (&substituted, &original) {
         (Term::Sigma(first_sub, second_sub), Term::Sigma(first_orig, second_orig)) => {
             let first = reassemble_solved_premise(
-                env, ctx, first_sub, first_orig, old, Term::proj1(proof.clone()),
+                env,
+                ctx,
+                first_sub,
+                first_orig,
+                old,
+                Term::proj1(proof.clone()),
             )?;
             let second = reassemble_solved_premise(
-                env, ctx, &subst0(second_sub, &first),
-                &subst0(second_orig, &Term::proj1(proof.clone())), old,
+                env,
+                ctx,
+                &subst0(second_sub, &first),
+                &subst0(second_orig, &Term::proj1(proof.clone())),
+                old,
                 Term::proj2(proof),
             )?;
             Some(Term::Ascript(
-                Box::new(Term::pair(first, second)), Box::new(substituted),
+                Box::new(Term::pair(first, second)),
+                Box::new(substituted),
             ))
         }
         (Term::Eq(..), Term::Eq(..)) if !scrut_occurs(orig_ty, old) => Some(proof),
@@ -11544,10 +11568,17 @@ fn refine_branch_goal(
                     Term::Refl(Box::new(lhs.clone()))
                 } else {
                     let substituted = Term::Eq(
-                        carrier.clone(), Box::new(lhs.clone()), Box::new(rhs.clone()),
+                        carrier.clone(),
+                        Box::new(lhs.clone()),
+                        Box::new(rhs.clone()),
                     );
                     reassemble_solved_premise(
-                        cx.env, &view.context, &substituted, &premise_ty, old, raw.clone(),
+                        cx.env,
+                        &view.context,
+                        &substituted,
+                        &premise_ty,
+                        old,
+                        raw.clone(),
                     )
                     .ok_or_else(|| {
                         ElabError::Internal("solved premise does not reassemble".into())
