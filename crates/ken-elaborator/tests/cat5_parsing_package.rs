@@ -1133,6 +1133,7 @@ fn cat5_d1_concrete_nonempty_source_constructs_and_projects() {
     let mut env = mk_env();
     env.elaborate_cat5_client(
         r#"
+        import Data.Collections.Derived (bytes_nat_length)
         data ConcreteByteSource = MkConcreteByteSource
 
         const sample_abc_bytes : Bytes = bytes_encode "abc"
@@ -1454,15 +1455,15 @@ fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
 fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
     let extracted = ken_elaborator::literate::extract_ken_md(PARSING_KEN_MD)
         .expect("Parsing checked fences must extract");
-    let (mut env, providers) = dependency_env_with_provider_owned();
+    let (mut env, _) = dependency_env_with_provider_owned();
     let parsing_owned = load_parsing_module(&mut env);
     let leq = catalog_or::provider_owned_id(
         &env,
-        &providers.nat_order,
-        "Data.Numeric.Nat.Order",
+        &parsing_owned,
+        "Capability.Parsing.Parsing",
         "LessEqNat",
     )
-    .expect("checked Nat.Order must own LessEqNat");
+    .expect("checked Parsing must own LessEqNat");
     let source_length = catalog_or::provider_owned_id(
         &env,
         &parsing_owned,

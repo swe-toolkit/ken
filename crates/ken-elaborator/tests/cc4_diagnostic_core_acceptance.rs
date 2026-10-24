@@ -84,12 +84,29 @@ fn full_env() -> ElabEnv {
     env
 }
 
-fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
+fn assert_transparent_globals(
+    env: &ElabEnv,
+    names: &[&str],
+    diagnostics: &[GlobalId],
+    cursor: &[GlobalId],
+    parsing: &[GlobalId],
+) {
     for name in names {
-        let id = *env
-            .globals
-            .get(*name)
-            .unwrap_or_else(|| panic!("expected checked global `{name}`"));
+        let provider = if name.starts_with("arg_location_") {
+            Some(("Capability.Parsing.Cursor", cursor))
+        } else if name.starts_with("span_") {
+            Some(("Capability.Parsing.Parsing", parsing))
+        } else if name.starts_with("numeric_") {
+            None // Numeric's checked declarations are local to this flat fixture.
+        } else {
+            Some(("Capability.Diagnostics.Core", diagnostics))
+        };
+        let id = if let Some((module, owned)) = provider {
+            catalog_or::provider_owned_id(env, owned, module, name)
+                .unwrap_or_else(|error| panic!("{module}.{name}: {error}"))
+        } else {
+            *env.globals.get(*name).unwrap_or_else(|| panic!("missing local `{name}`"))
+        };
         assert!(
             env.env.transparent_body(id).is_some(),
             "`{name}` must be a real transparent, kernel-checked term"
@@ -202,7 +219,17 @@ fn nat_count(env: &ElabEnv, value: &EvalVal) -> u64 {
 
 #[test]
 fn ordered_dependency_closure_elaborates_all_cc4_clients() {
-    let env = full_env();
+    let mut env = full_env();
+    let root = catalog_or::catalog_root();
+    let diagnostics = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), "Capability.Diagnostics.Core")
+        .expect("Diagnostics must be cached by its real roots load");
+    let cursor = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), "Capability.Parsing.Cursor")
+        .expect("Cursor must be cached by its real roots load");
+    let parsing = env
+        .elaborate_module_from_roots(std::slice::from_ref(&root), "Capability.Parsing.Parsing")
+        .expect("Parsing must be cached by its real roots load");
     assert_transparent_globals(
         &env,
         &[
@@ -235,6 +262,9 @@ fn ordered_dependency_closure_elaborates_all_cc4_clients() {
             "numeric_argument_origin_start_faithful",
             "numeric_argument_origin_end_faithful",
         ],
+        &diagnostics,
+        &cursor,
+        &parsing,
     );
 
     for name in [
@@ -244,10 +274,14 @@ fn ordered_dependency_closure_elaborates_all_cc4_clients() {
         "DiagnosticCode",
         "Diagnostic",
     ] {
-        assert!(
-            env.globals.contains_key(name),
-            "expected checked data `{name}`"
-        );
+        let id = catalog_or::provider_owned_id(
+            &env,
+            &diagnostics,
+            "Capability.Diagnostics.Core",
+            name,
+        )
+        .unwrap_or_else(|error| panic!("Diagnostics must own {name}: {error}"));
+        assert!(env.env.inductive(id).is_some(), "{name} must be checked data");
     }
     assert!(
         !env.globals.contains_key("NumericError"),
@@ -576,7 +610,8 @@ fn exact_non_degenerate_injections_preserve_every_location_field() {
           (SourceId, Origin, SourceOrigin, ArgumentOrigin, EnvironmentOrigin,
            ConfigKeyOrigin, MkByteRange, MkDiagnostic, MkDiagnosticCode,
            ValidByteRange, ValidOrigin, source_id_from_nat)
-        import Capability.Parsing.Cursor (ArgLocation, MkArgLocation)"#,
+        import Capability.Parsing.Cursor (ArgLocation, MkArgLocation)
+        import Capability.Parsing.Parsing (span_origin, MkSpan)"#,
     )
     .expect("CC4's public DC and Cursor prerequisites must import");
     env.elaborate_file(

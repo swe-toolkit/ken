@@ -86,15 +86,19 @@ fn derived_fixture_retains_lawfulclasses_for_cc3_dependency_closure() {
     let _ = dependency_env();
 }
 
-fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
+fn assert_transparent_globals(
+    env: &ElabEnv,
+    module: &str,
+    owned: &BTreeSet<GlobalId>,
+    names: &[&str],
+) {
+    let owned: Vec<_> = owned.iter().copied().collect();
     for name in names {
-        let id = *env
-            .globals
-            .get(*name)
-            .unwrap_or_else(|| panic!("expected checked global `{name}`"));
+        let id = catalog_or::provider_owned_id(env, &owned, module, name)
+            .unwrap_or_else(|error| panic!("{module}.{name}: {error}"));
         assert!(
             env.env.transparent_body(id).is_some(),
-            "`{name}` must be a real transparent, kernel-checked term"
+            "`{module}.{name}` must be a real transparent, kernel-checked term"
         );
     }
 }
@@ -370,9 +374,11 @@ fn cursor_length_occurrence_population_and_migration_shape_are_pinned() {
 #[test]
 fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
     let mut env = dependency_env();
-    load_cursor_module(&mut env);
+    let cursor_owned = load_cursor_module(&mut env);
     assert_transparent_globals(
         &env,
+        "Capability.Parsing.Cursor",
+        &cursor_owned,
         &[
             "cursor_remaining",
             "cursor_peek",
@@ -392,9 +398,11 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
         ],
     );
 
-    load_decoder_module(&mut env);
+    let decoder_owned = load_decoder_module(&mut env);
     assert_transparent_globals(
         &env,
+        "Capability.Parsing.Decoder",
+        &decoder_owned,
         &[
             "decoder_error_location",
             "decoder_pure",
@@ -416,9 +424,11 @@ fn ordered_dependency_closure_elaborates_cursor_then_decoder() {
         ],
     );
 
-    load_parsing_module(&mut env);
+    let parsing_owned = load_parsing_module(&mut env);
     assert_transparent_globals(
         &env,
+        "Capability.Parsing.Parsing",
+        &parsing_owned,
         &[
             "byte_cursor_remaining",
             "byte_cursor_peek",
@@ -605,6 +615,11 @@ fn repetition_progress_and_arg_locations_impl() {
     let long_bytes = "x".repeat(long_len);
     env.elaborate_file(&format!(
         r#"
+        import Capability.Parsing.Cursor
+          (ArgCursor, ArgLocation, arg_cursor_start, arg_cursor_ops)
+        import Capability.Parsing.Decoder
+          (Decoder, DecoderResult, decoder_satisfy, decoder_many,
+           decoder_pure, decoder_seq)
         const long_arg_bytes : Bytes = bytes_encode "{long_bytes}"
         const long_args : List Bytes = Cons Bytes long_arg_bytes (Nil Bytes)
         const long_start : ArgCursor = arg_cursor_start long_args

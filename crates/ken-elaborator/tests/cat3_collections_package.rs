@@ -132,7 +132,7 @@ fn mk_env_with_derived_owned() -> (ElabEnv, Vec<GlobalId>) {
     catalog_or::assert_transparent_result_uses_core_logic_or(
         &env,
         &or_owned,
-        "pair_compare_lt_cases",
+        "Core.Logic.Compare.pair_compare_lt_cases",
     );
     (env, owned)
 }

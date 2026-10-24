@@ -215,7 +215,7 @@ pub fn load_core_logic_compare_with_or_owned(env: &mut ElabEnv) -> (Vec<GlobalId
         }
     }
     env.elaborate_file(
-        "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt, \
+        "import Core.Logic.OrdResult (OrdResult, Lt, Eq as ord_result_eq, Gt, ord_eq, ord_lt, ord_gt, \
          ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2)\n\
          import Core.Logic.Compare (pair_compare, pair_compare_result_of, \
          pair_compare_lt_cases, list_eq, list_compare)",

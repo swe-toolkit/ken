@@ -300,7 +300,7 @@ fn list_combinator_floor_derived_over_real_elim() {
     );
 
     // `OrdResult` is a checked `data` inductive — NOT a postulate/primitive.
-    let ordresult_id = env.globals["OrdResult"];
+    let ordresult_id = env.globals["Core.Logic.OrdResult.OrdResult"];
     assert!(
         matches!(env.env.lookup(ordresult_id), Some(Decl::Inductive { .. })),
         "OrdResult must be a checked inductive, not a postulate/primitive"
