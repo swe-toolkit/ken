@@ -3,17 +3,17 @@
 > **Status: DRAFT v0 (SPEC-OPTIMIZATION-SEARCH-CONTRACT §1;
 > SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4;
 > SPEC-OPTIMIZATION-BOUNDED-SEARCH §2;
-> SPEC-OPTIMIZATION-ARGMAX §3).** Section 1 specifies the non-empty
-> least-cost selector and its seven laws; its catalog module and seed
-> are present on main. Section 1.4 specifies the Option selector and
-> four additional public laws from Architect-checked scratch D0; its
-> catalog extension exports the selector and four checked laws, and the
-> package test executes the seed. Section 2's catalog module and seed
-> are also present on main. Section 3 specifies the greatest-cost
-> selector and seven laws from Architect-checked D0; this spec-only
-> candidate delivers neither §3 catalog exports nor a §3 seed.
-> Scratch checks alone establish neither shipped-seed execution, CI
-> nor a landed `trusted_base()` measurement.
+> SPEC-OPTIMIZATION-ARGMAX §3;
+> SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** Section 1 specifies the
+> non-empty least-cost selector and seven laws; its catalog module and
+> seed are present on main. Section 1.4's Option selector, four laws
+> and seed are also present on main. Section 2's catalog module and
+> seed are present on main. Section 3's greatest-cost selector and
+> seven laws are landed; §3.4 specifies the Option-returning extension
+> and its four laws from Architect-checked D0. The §3.4 catalog exports
+> are not yet landed, and this candidate's seed is authored rather
+> than run against shipped exports. Scratch checks do not establish
+> shipped-seed execution, CI or a landed `trusted_base()` measurement.
 
 ## 1. Least-cost candidate
 
@@ -372,11 +372,13 @@ remain outside this bounded contract.
 
 ## 3. Greatest-cost candidate
 
-> **Section 3 status: DRAFT v0 (SPEC-OPTIMIZATION-ARGMAX).** Architect
-> checked the operation and seven general laws in an isolated D0 on
-> base `136f959ad`. This spec-only candidate delivers no §3 catalog
-> export, conformance seed, shipped-seed execution, CI, publication,
-> landing, or landed trust measurement.
+> **Section 3 status: DRAFT v0 (SPEC-OPTIMIZATION-ARGMAX;
+> SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** The §3.1–§3.2 operation
+> and seven laws, plus their seed, are present on main. Architect
+> checked §3.4 on an isolated D0 from `914cfbda0`; the §3.4 catalog
+> exports are not delivered by this spec-and-seed candidate. Its
+> authored seed and any scratch checks do not establish shipped-seed
+> execution, CI, publication, landing or landed trust.
 
 ### 3.1 Carrier, operation and tie rule
 
@@ -470,8 +472,8 @@ declarations. A generic client restating all eight `argmax` statements
 checked. The closed earliest-tie control selected `3` and its
 later-tie refusal `4` reached the kernel's `TypeMismatch`; a local
 non-strict selector reversed those two observations. These are
-Architect-reported D0 measurements, not §3 catalog delivery or
-shipped-seed execution.
+Architect-reported D0 measurements for §3.1–§3.2, not evidence that
+this candidate ran its new §3.4 seed.
 
 The checked D0 shares a private selection fold and membership proof
 between `argmin` and `argmax`, with a private greatest-cost proof and
@@ -480,8 +482,76 @@ order helpers for the new direction. The public declarations of
 unchanged. Fold sharing is a package design choice, not another public
 selector, law, dependency, or required execution strategy.
 
-Arbitrary candidate orders or equality decisions, Option-returning
-maximization on a possibly empty input, multiple sorted results,
-continuous optimization, approximation guarantees and performance
-bounds remain outside §3. In particular, §3 supplies no public
-`argmax_option` or top-k selection.
+Option-returning maximization on a possibly empty input is specified
+in §3.4, not deferred. Arbitrary candidate orders or equality
+decisions, multiple sorted results, continuous optimization,
+approximation guarantees and performance bounds remain outside §3.
+In particular, §3 supplies no top-k selection.
+
+### 3.4 Greatest-cost Option selector over a possibly empty list
+
+For a possibly empty `List a`, the same
+`Algorithm.Optimization.Argmin` module extends §3 with:
+
+```ken
+pub fn argmax_option (a : Type) (cost : a → Nat) (xs : List a) : Option a =
+  match xs {
+    Nil ↦ None a;
+    Cons x rest ↦ Some a (argmax a cost (nonempty_cons a x rest))
+  }
+```
+
+The selected member has the greatest `Nat` cost and retains §3.1's
+earliest-tie rule. This constructor split does not grant a public
+position witness or require a new selector primitive. The four public
+checked interfaces are exactly:
+
+```ken
+pub theorem argmax_option_nil
+      (a : Type) (cost : a → Nat)
+    : Equal (Option a) (argmax_option a cost (Nil a)) (None a)
+
+pub theorem argmax_option_cons
+      (a : Type) (cost : a → Nat) (x : a) (rest : List a)
+    : Equal
+        (Option a)
+        (argmax_option a cost (Cons a x rest))
+        (Some a (argmax a cost (nonempty_cons a x rest)))
+
+pub theorem argmax_option_member
+      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
+    : Equal (Option a) (argmax_option a cost xs) (Some a y) → list_elem a y xs
+
+pub theorem argmax_option_greatest
+      (a : Type) (cost : a → Nat) (xs : List a) (y : a)
+    : Equal (Option a) (argmax_option a cost xs) (Some a y)
+      → (z : a)
+      → list_elem a z xs
+      → IsTrue (leq_nat (cost z) (cost y))
+```
+
+The first law holds on `Nil`; the second exposes the `Cons` case
+through public `nonempty_cons` and `argmax`. The remaining two are
+direct-to-`List` corollaries conditioned on an observed `Some y`.
+They do not assert that a result exists on `Nil` or require `DecEq a`,
+an order on `a`, or function extensionality. The checked development
+proves the `Nil` law with `Proved` and the `Cons` law with `Refl`.
+Private `option_greatest`, `argmax_option_member_base`, and
+`argmax_option_greatest_base` use the existing private
+`option_member` predicate without changing it. The `Nil`/`Cons`
+proof split and `J` follow §1.4, but the `_base` proofs remain
+selector-specific: none of these helpers is a fifth public law.
+The §1.2, §1.4 and §3.2 public types and proof bodies stay unchanged.
+
+Architect's checked §3.4 D0 from `914cfbda0` reported `ken check` and
+`ken fmt --check` rc 0 on the extended package, no new `Axiom`, and
+114→114 identical `trusted_base()` identities over its eight
+providers. The four new generic laws were consumed by a scratch
+client; the `Nil`, singleton and tied-maximum controls and five
+false-claim probes were checked separately in scratch. Those are
+Architect-reported measurements, not execution of this candidate's
+seed against shipped §3.4 exports. No ambient name beyond the
+package's current census row or change to the existing selectors is
+required. Option minimization remains §1.4; `argmax_option` adds no
+`argmax` law, generic Option search, top-k selection, or runtime-cost
+promise.
