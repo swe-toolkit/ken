@@ -1585,36 +1585,118 @@ fn checked_ih_generated_entry_confluence_reaches_exact_capsules() {
     });
 }
 
+type StaticResponseMarkedKey = (u32, String);
+type StaticResponseMarkedKeys = std::collections::BTreeSet<StaticResponseMarkedKey>;
+
+/// Classify marked-S members omitted by the post-strip protocol projection.
+/// Owner relay exclusion can erase the same post observation as the strip, so
+/// only the non-relay, owner-surviving cases are direct strip evidence.
+fn classify_marked_returned_vis_strips(
+    diagnostic: &ken_runtime::StaticResponseFeasibilityDiagnostic,
+    marked_keys: &StaticResponseMarkedKeys,
+) -> (StaticResponseMarkedKeys, StaticResponseMarkedKeys) {
+    let mut post_members_by_owner = std::collections::BTreeMap::new();
+    for (owner, members) in &diagnostic.settled_returned_vis_protocols {
+        let previous = post_members_by_owner.insert(
+            *owner,
+            members
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>(),
+        );
+        assert!(previous.is_none(), "duplicate post-strip owner {owner}");
+    }
+
+    let mut observed = std::collections::BTreeSet::new();
+    let mut inferred = std::collections::BTreeSet::new();
+    for protocol in &diagnostic.returned_vis_protocols {
+        for (_, members) in &protocol.contexts {
+            for member in members {
+                let matches = marked_keys
+                    .iter()
+                    .filter(|key| key.0 == member.origin)
+                    .collect::<Vec<_>>();
+                if matches.is_empty() {
+                    continue;
+                }
+                if post_members_by_owner
+                    .get(&protocol.owner_origin)
+                    .is_some_and(|post_members| post_members.contains(&member.origin))
+                {
+                    continue;
+                }
+                assert_eq!(
+                    matches.len(),
+                    1,
+                    "each removed marked-S member must join exactly one key: \
+                     owner={}, member={}, matches={matches:?}",
+                    protocol.owner_origin,
+                    member.origin
+                );
+                let key = (*matches[0]).clone();
+                let is_observed = !member.relay
+                    && (!protocol.excluded_by_relay
+                        || post_members_by_owner.contains_key(&protocol.owner_origin));
+                if is_observed {
+                    assert!(
+                        !inferred.contains(&key),
+                        "marked key has both observed and inferred strip evidence: {key:?}"
+                    );
+                    observed.insert(key);
+                } else {
+                    assert!(
+                        !observed.contains(&key),
+                        "marked key has both observed and inferred strip evidence: {key:?}"
+                    );
+                    inferred.insert(key);
+                }
+            }
+        }
+    }
+    (observed, inferred)
+}
+
 /// **Promise class: transition sentinel.** A reviewed graph change may replace
 /// these dense coordinates, but must replace the complete response-producer
 /// ledger and retain one fully validated context demand per singleton K row.
 ///
-/// **MEASURED:** the read product has four response rows and the write product
-/// has seven. Their earlier `FsReadAt` rows require new contexts while the later
-/// `BufferAllocate` rows reuse causal context zero; every row has one exact
-/// owner ABI and selected caller.
-/// **CLAIMED:** absence from the old-caller context population is a demand, not
-/// SSA infeasibility. Every fixed row has one explicit capture/input schema and
-/// resolves by `(ContinuationSpecializationId, worker body)` after old context
-/// identities are preserved as the union prefix.
-/// **THE GAP:** this fixture observes planning and ABI identity. Finished owner
-/// body, exact context-call/Ret closure, and runtime InvalidOffset behavior are
-/// independently pinned below. Runtime closure remains unselected.
+/// **MEASURED:** the fixed products retain one exact owner ABI and selected
+/// caller per response row. The read product has no Deferred
+/// `UnconsumedTransportCaller` rows; its former P2 population is represented by
+/// distinct marked `(S, Continuation identity)` rows partitioned between the
+/// returned-Vis removal class and forward-Ret settlement. The read removal is
+/// INFERRED because its owner is relay-excluded and absent post-strip. The write
+/// product still has no Deferred rows.
+/// **CLAIMED:** the former P2 population belongs in the marked Continuation
+/// plane, not ordinary Deferred execution. Every fixed row has one explicit
+/// capture/input schema and resolves by `(ContinuationSpecializationId, worker
+/// body)` after old context identities are preserved as the union prefix.
+/// **THE GAP:** because the read removal is INFERRED, its absence is also
+/// consistent with relay exclusion, so this row does not directly observe the
+/// strip consumer. `returned_bracket_settlement -> None` fails closed at
+/// packaging before this row, not as a row-redden. Finished owner body, exact
+/// context-call/Ret closure, and runtime InvalidOffset behavior are independently
+/// pinned below. Removing marking fails closed in `validate_direct_rebuild`,
+/// and routing a marked row back to demands fails in
+/// `validate_marked_bracket_demands`; neither counterfactual reaches this row's
+/// assertions; marking removal is not row-mutated.
 #[test]
 fn static_response_context_demand_ledger_closes_fixed_products() {
     in_generated_entry_stack_thread("rt-parity-static-response-demand", || {
         let compile = |label: &str, entry: &str| {
             let source = RT_PARITY_SOURCE.replace("__RT_PARITY_ENTRY__", entry);
             let root = output_dir(&format!("static-response-demand-{label}"));
-            let (result, diagnostics) =
-                ken_runtime::with_static_response_feasibility_diagnostics(|| {
-                    ken_cli::build_native_program(
-                        &source,
-                        ken_cli::SourceFormat::Ken,
-                        &format!("rt_parity_static_response_demand_{label}"),
-                        root.path(),
-                        ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-                    )
+            let ((result, diagnostics), role_rows) =
+                ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                    ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                        ken_cli::build_native_program(
+                            &source,
+                            ken_cli::SourceFormat::Ken,
+                            &format!("rt_parity_static_response_demand_{label}"),
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    })
                 });
             result.expect("the fixed response-demand product must compile");
             assert_eq!(diagnostics.len(), 1, "one compile publishes one plan");
@@ -1698,38 +1780,95 @@ fn static_response_context_demand_ledger_closes_fixed_products() {
                 }
                 assert!(owner.frame_bytes > 0);
             }
-            diagnostic
+            (diagnostic, role_rows)
         };
 
-        let read = compile("read", "rt_read_offset_stage");
-        let write = compile("write", "rt_write_writable_stage");
-        // Structural totality for both products. The pure read plane retains its
-        // P2 transport sources so inc1's forward-Ret path remains live. The
-        // read-then-write plane has two producer groups whose transport sources
-        // are exclusively predeclared, so execute-then-resume specializes every
-        // has-K transport source. Each
-        // Specialized row owns one forward declaration, without baked ids/counts.
+        let (read, read_roles) = compile("read", "rt_read_offset_stage");
+        let (write, _) = compile("write", "rt_write_writable_stage");
+        // Structural totality for both products. The former read P2 population
+        // belongs to marked Continuation regions, while the eligible write plane
+        // specializes its transport sources. Each Specialized row owns one
+        // forward declaration, without baked ids or counts.
         for diagnostic in [&read, &write] {
             assert!(
                 !diagnostic.all_static_response_rows.is_empty(),
                 "each fixed product specializes at least one response"
             );
         }
+        let deferred_read_p2 = read
+            .static_response_deferred
+            .iter()
+            .filter(|row| row.sub_case == "UnconsumedTransportCaller")
+            .collect::<Vec<_>>();
         assert!(
-            !read.static_response_deferred.is_empty()
-                && read
-                    .static_response_deferred
-                    .iter()
-                    .all(|row| row.sub_case == "UnconsumedTransportCaller"),
-            "the single-stage read plane must retain only P2: {:?}",
-            read.static_response_deferred
+            deferred_read_p2.is_empty(),
+            "read UnconsumedTransportCaller rows must be in the marked plane: \
+             {deferred_read_p2:?}"
         );
+
         assert!(
             read.static_response_deferred
                 .iter()
                 .all(|row| row.handler_owner.is_none()),
             "a P1-free plane acquired handler-owned Deferred execution: {:?}",
             read.static_response_deferred
+        );
+
+        let marked_rows = &read.bracket_response_rows;
+        let marked_keys = marked_rows
+            .iter()
+            .map(|row| (row.vis_origin, row.k_identity.clone()))
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            marked_keys.len() == marked_rows.len() && marked_keys.len() >= 2,
+            "read marked rows need at least two distinct (S, identity) keys: \
+             {marked_rows:?}"
+        );
+
+        let (observed_strip_keys, inferred_strip_keys) =
+            classify_marked_returned_vis_strips(&read, &marked_keys);
+        assert!(
+            observed_strip_keys.is_disjoint(&inferred_strip_keys),
+            "a marked key cannot have both observed and inferred strip evidence"
+        );
+        let strip_keys = observed_strip_keys
+            .union(&inferred_strip_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut settled_keys = std::collections::BTreeSet::new();
+        for outcome in read_roles
+            .iter()
+            .filter(|row| row.outcome == "ConsumedBySettlement")
+        {
+            let matches = marked_keys
+                .iter()
+                .filter(|key| key.1.as_str() == outcome.selected_source_call_identity.as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(
+                matches.len(),
+                1,
+                "each ConsumedBySettlement identity must join exactly one marked key: \
+                 outcome={outcome:?}, matches={matches:?}"
+            );
+            settled_keys.insert((*matches[0]).clone());
+        }
+        assert!(
+            !strip_keys.is_empty() && !settled_keys.is_empty(),
+            "both returned-Vis stripping and forward-Ret settlement must consume \
+             marked regions: strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        assert!(
+            strip_keys.is_disjoint(&settled_keys),
+            "a marked region has both strip and forward-Ret consumers: \
+             strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        let consumed_keys = strip_keys
+            .union(&settled_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            consumed_keys, marked_keys,
+            "strip and ConsumedBySettlement must partition marked regions"
         );
         assert!(
             write.static_response_deferred.is_empty(),
@@ -1934,13 +2073,18 @@ static_response_context_demand_test!(
 // retains every capture/input coordinate in exact order. MEASURED: row
 // drop/duplicate/vary, K-key merge, three response-authority substitutions, and
 // independent drop/permute/vary of every fixed READ and WRITE capture/input each
-// reach the closed demand validator and red; the fixed ledgers also contain
-// shared producers whose distinct K callers remain distinct, and the eligible
-// write plane selects distinct owners for them. CLAIMED:
-// context interning cannot launder a malformed producer/K row or an incomplete
-// explicit input run. THE GAP: exact duplicate context demand reuse is separately
-// pinned by static_response_context_demand_duplicate_is_idempotent; these
-// controls move producer rows and each element of their typed population instead.
+// reach the closed demand validator and red; the read's former P2 fan-out is
+// measured through distinct Continuation identities in marked bracket rows,
+// not Deferred rows; the write's former fan-out is measured in that same marked
+// plane, while ordinary Specialized rows have no shared-producer group. The
+// write's removed marked-S members are INFERRED because their owners are
+// relay-excluded and absent post-strip; this is a strip-evidence GAP.
+// CLAIMED: the former P2 read and write populations belong to the marked
+// Continuation plane; context interning cannot launder a malformed producer/K row or an
+// incomplete explicit input run. THE GAP: exact duplicate context demand reuse
+// is separately pinned by static_response_context_demand_duplicate_is_idempotent;
+// these controls move producer rows and each element of their typed population
+// instead.
 
 // DRY compile step for the decomposed full-demand controls -- a macro (not a fn)
 // so the build/diagnostic return types stay inferred at each call site, as in the
@@ -1965,90 +2109,170 @@ macro_rules! full_demand_compile {
 #[test]
 fn static_response_full_demand_fan_out_population_is_distinct() {
     in_generated_entry_stack_thread("rt-parity-static-response-full-grid", || {
-        // The shared-producer fan-out remains affine across both dispositions.
-        // The pure read plane retains P2; the eligible write plane specializes
-        // the same shape to distinct owners. Producers are selected structurally,
-        // never by baked native ids.
+        // The former P2 fan-out now resides in marked bracket rows for both
+        // products; ordinary write rows no longer carry a shared-producer group.
+        // The write strip partition retains INFERRED members as a disclosed GAP,
+        // not as direct evidence that the bracket strip alone removed them.
+        // Producers are selected structurally, never by baked native ids.
         let (read_root, (read_result, read)) =
             full_demand_compile!("rt_read_offset_stage", "baseline");
         read_result.expect("the exact READ response population compiles");
-        let (write_root, (write_result, write)) =
-            full_demand_compile!("rt_write_writable_stage", "baseline");
+        let ((write_root, (write_result, write)), write_roles) =
+            ken_runtime::with_composed_return_forward_ret_role_witnesses(|| {
+                full_demand_compile!("rt_write_writable_stage", "baseline")
+            });
         write_result.expect("the exact WRITE response population compiles");
         assert_eq!(read.len(), 1);
         assert_eq!(write.len(), 1);
 
-        let mut read_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+        let read_regions = &read[0].bracket_response_rows;
+        let read_identities = read_regions
+            .iter()
+            .map(|row| row.k_identity.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            read_regions.len() >= 2,
+            "pure read has fewer than two marked bracket regions: {read_regions:?}"
+        );
+        assert_eq!(
+            read_identities.len(),
+            read_regions.len(),
+            "read marked regions must have pairwise-distinct Continuation identities: \
+             {read_regions:?}"
+        );
+
+        let write_deferred_p2 = write[0]
+            .static_response_deferred
+            .iter()
+            .filter(|row| row.sub_case == "UnconsumedTransportCaller")
+            .collect::<Vec<_>>();
+        assert!(
+            write_deferred_p2.is_empty(),
+            "write UnconsumedTransportCaller rows must be in the marked plane: \
+             {write_deferred_p2:?}"
+        );
+
+        let marked_rows = &write[0].bracket_response_rows;
+        let marked_keys = marked_rows
+            .iter()
+            .map(|row| (row.vis_origin, row.k_identity.clone()))
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(
+            marked_keys.len() == marked_rows.len() && marked_keys.len() >= 2,
+            "write marked rows need at least two distinct (S, identity) keys: \
+             {marked_rows:?}"
+        );
+        let marked_origins = marked_rows
+            .iter()
+            .map(|row| row.vis_origin)
+            .collect::<std::collections::BTreeSet<_>>();
+        let settlement_origins = write[0]
+            .bracket_settlement_vis_origins
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            marked_origins, settlement_origins,
+            "write marked-row origins must equal bracket settlement origins"
+        );
+
+        let mut ordinary_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
             std::collections::BTreeMap::new();
-        for row in &read[0].static_response_deferred {
-            read_by_producer
+        for row in &write[0].all_static_response_rows {
+            ordinary_by_producer
                 .entry(row.producer_call_origin)
                 .or_default()
                 .push(row);
         }
-        let read_fan_outs = read_by_producer
+        let ordinary_fan_outs = ordinary_by_producer
             .iter()
             .filter(|(_, rows)| rows.len() >= 2)
             .collect::<Vec<_>>();
         assert!(
-            !read_fan_outs.is_empty(),
-            "pure read has no shared-producer P2 fan-out: {:?}",
-            read[0].static_response_deferred
+            ordinary_fan_outs.is_empty(),
+            "ordinary write plane retains a shared-producer fan-out: \
+             {ordinary_fan_outs:?}"
         );
-        for (producer, fan_out) in read_fan_outs {
+
+        let mut marked_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
+            std::collections::BTreeMap::new();
+        for row in marked_rows {
+            marked_by_producer
+                .entry(row.producer_call_origin)
+                .or_default()
+                .push(row);
+        }
+        let marked_fan_outs = marked_by_producer
+            .iter()
+            .filter(|(_, rows)| rows.len() >= 2)
+            .collect::<Vec<_>>();
+        assert!(
+            !marked_fan_outs.is_empty(),
+            "eligible write has no shared-producer marked-row fan-out: {marked_rows:?}"
+        );
+        for (producer, fan_out) in marked_fan_outs {
+            let keys = fan_out
+                .iter()
+                .map(|row| (row.vis_origin, row.k_identity.as_str()))
+                .collect::<std::collections::BTreeSet<_>>();
             assert_eq!(
-                fan_out
-                    .iter()
-                    .map(|row| row.vis_origin)
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
+                keys.len(),
                 fan_out.len(),
-                "read producer {producer} merged distinct K into one P2 row"
-            );
-            assert!(
-                fan_out
-                    .iter()
-                    .all(|row| row.sub_case == "UnconsumedTransportCaller")
+                "write marked producer {producer} merged distinct (S, identity) keys"
             );
         }
 
-        let mut write_by_producer: std::collections::BTreeMap<u32, Vec<_>> =
-            std::collections::BTreeMap::new();
-        for row in &write[0].all_static_response_rows {
-            write_by_producer
-                .entry(row.producer_call_origin)
-                .or_default()
-                .push(row);
-        }
-        let write_fan_outs = write_by_producer
-            .iter()
-            .filter(|(_, rows)| rows.len() >= 2)
-            .collect::<Vec<_>>();
+        let (observed_strip_keys, inferred_strip_keys) =
+            classify_marked_returned_vis_strips(&write[0], &marked_keys);
         assert!(
-            !write_fan_outs.is_empty(),
-            "eligible write has no shared-producer Specialized fan-out: {:?}",
-            write[0].all_static_response_rows
+            observed_strip_keys.is_disjoint(&inferred_strip_keys),
+            "a marked key cannot have both observed and inferred strip evidence"
         );
-        for (producer, fan_out) in write_fan_outs {
+        assert!(
+            observed_strip_keys.is_empty(),
+            "write strip members are INFERRED because their owners are relay-excluded: \
+             observed={observed_strip_keys:?}, inferred={inferred_strip_keys:?}"
+        );
+        let strip_keys = observed_strip_keys
+            .union(&inferred_strip_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+
+        let mut settled_keys = std::collections::BTreeSet::new();
+        for outcome in write_roles
+            .iter()
+            .filter(|row| row.outcome == "ConsumedBySettlement")
+        {
+            let matches = marked_keys
+                .iter()
+                .filter(|key| key.1.as_str() == outcome.selected_source_call_identity.as_str())
+                .collect::<Vec<_>>();
             assert_eq!(
-                fan_out
-                    .iter()
-                    .map(|row| row.vis_origin)
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
-                fan_out.len(),
-                "write producer {producer} merged distinct K into one response row"
+                matches.len(),
+                1,
+                "each ConsumedBySettlement identity must join exactly one marked key: \
+                 outcome={outcome:?}, matches={matches:?}"
             );
-            assert_eq!(
-                fan_out
-                    .iter()
-                    .map(|row| row.k_identity.as_str())
-                    .collect::<std::collections::BTreeSet<_>>()
-                    .len(),
-                fan_out.len(),
-                "write producer {producer} merged distinct K identities"
-            );
+            settled_keys.insert((*matches[0]).clone());
         }
+        assert!(
+            !strip_keys.is_empty() && !settled_keys.is_empty(),
+            "both returned-Vis stripping and forward-Ret settlement must consume \
+             marked regions: strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        assert!(
+            strip_keys.is_disjoint(&settled_keys),
+            "a marked region has both strip and forward-Ret consumers: \
+             strip={strip_keys:?}, settled={settled_keys:?}"
+        );
+        let consumed_keys = strip_keys
+            .union(&settled_keys)
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            consumed_keys, marked_keys,
+            "strip and ConsumedBySettlement must partition write marked regions"
+        );
         drop((write_root, read_root));
     });
 }
