@@ -207,14 +207,40 @@ need_cmd git
 need_cmd date
 need_cmd jq
 
+# A GitHub App installation token lives about one hour, and the non-doc path
+# waits for CI before it first reads checks. With CI near an hour, the wait alone
+# outlived the token: PR #4915 got `HTTP 401: Bad credentials` at its first
+# `gh pr checks`, and every retry would too. So record when this process minted
+# its token and re-mint before any GitHub call that follows a wait. A token
+# handed in by the caller has an unknown age, so the first refresh replaces it.
+# A stored `gh auth login` session (no GH_TOKEN) is not ours to replace.
+gh_token_minted_s=0
+gh_token_max_age_s="${GH_TOKEN_MAX_AGE_S:-2700}"
+
+mint_gh_token() {
+  local token
+  token="$(.devcontainer/mint-gh-token.sh)" || die "could not mint a GitHub token"
+  export GH_TOKEN="$token"
+  gh_token_minted_s="$(date +%s)"
+}
+
+refresh_gh_token() {
+  [ -x .devcontainer/mint-gh-token.sh ] || return 0
+  [ -n "${GH_TOKEN:-}" ] || return 0
+  if [ $(( $(date +%s) - gh_token_minted_s )) -ge "$gh_token_max_age_s" ]; then
+    mint_gh_token
+  fi
+}
+
 if ! gh auth status >/dev/null 2>&1; then
   if [ -x .devcontainer/mint-gh-token.sh ]; then
-    export GH_TOKEN="$(.devcontainer/mint-gh-token.sh)"
+    mint_gh_token
     gh auth setup-git >/dev/null
   else
     die "gh is not authenticated and .devcontainer/mint-gh-token.sh is absent"
   fi
 fi
+refresh_gh_token
 
 tmpdir="$(mktemp -d)"
 cleanup() {
@@ -788,6 +814,7 @@ if [ "$doc_only" -eq 1 ]; then
   #    The freeze is only meaningful if it is read INSIDE the lock, immediately
   #    before evaluating and merging.
   refuse_if_frozen
+  refresh_gh_token
   fresh_result_gate
   merge_pr
   printf 'Doc-only PR #%s merge command succeeded.\n' "$pr_number"
@@ -819,6 +846,7 @@ printf 'Waiting %ss before polling PR #%s checks.\n' "$wait_seconds" "$pr_number
 sleep "$wait_seconds"
 
 while :; do
+  refresh_gh_token
   set +e
   checks_json="$(gh pr checks "$pr_number" --json name,bucket,state,link)"
   checks_status=$?
@@ -864,6 +892,7 @@ while :; do
     #    The freeze is only meaningful if it is read INSIDE the lock, immediately
     #    before evaluating and merging.
     refuse_if_frozen
+    refresh_gh_token
     fresh_result_gate
     merge_pr
     printf 'PR #%s checks passed and merge command succeeded.\n' "$pr_number"
