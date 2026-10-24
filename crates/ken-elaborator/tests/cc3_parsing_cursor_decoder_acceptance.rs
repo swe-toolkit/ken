@@ -3,7 +3,7 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::{foreign::trusted_base_delta, ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
@@ -36,7 +36,6 @@ fn dependency_env_with_provider_owned() -> (ElabEnv, Cc3ProviderOwned) {
     );
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     (
         env,
         Cc3ProviderOwned {
@@ -57,7 +56,6 @@ fn load_cursor_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Cursor must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Cursor");
     owned
 }
 
@@ -67,7 +65,6 @@ fn load_decoder_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Decoder must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Decoder");
     owned
 }
 
@@ -77,7 +74,6 @@ fn load_parsing_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Parsing must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
     owned
 }
 
@@ -235,8 +231,13 @@ fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
     }
 }
 
-fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
-    let expected = env.globals[name];
+fn ctor_args<'a>(
+    env: &ElabEnv,
+    constructors: &BTreeMap<&str, GlobalId>,
+    value: &'a EvalVal,
+    name: &str,
+) -> &'a [EvalVal] {
+    let expected = constructors.get(name).copied().unwrap_or_else(|| env.globals[name]);
     match value {
         EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
         other => panic!("expected `{name}`, got {other:?}"),
@@ -610,7 +611,7 @@ fn repetition_progress_and_arg_locations_are_discriminating() {
 }
 
 fn repetition_progress_and_arg_locations_impl() {
-    let mut env = full_env();
+    let (mut env, constructors) = full_env();
     let long_len = 96;
     let long_bytes = "x".repeat(long_len);
     env.elaborate_file(&format!(
@@ -710,9 +711,9 @@ fn repetition_progress_and_arg_locations_impl() {
     neutralize_fixture_proofs(&env, &mut store, &["record_nil_val"]);
 
     let long_result = eval_global(&env, &mut store, "long_many_result");
-    let long_args = ctor_args(&env, &long_result, "Decoded");
+    let long_args = ctor_args(&env, &constructors, &long_result, "Decoded");
     assert_eq!(list_count(&env, &long_args[3]), long_len as u64);
-    let long_end = ctor_args(&env, &long_args[4], "MkArgCursor");
+    let long_end = ctor_args(&env, &constructors, &long_args[4], "MkArgCursor");
     assert_eq!(
         (nat_count(&env, &long_end[1]), nat_count(&env, &long_end[2])),
         (1, 0),
@@ -720,9 +721,9 @@ fn repetition_progress_and_arg_locations_impl() {
     );
 
     let zero_progress = eval_global(&env, &mut store, "zero_progress_result");
-    let zero_failed = ctor_args(&env, &zero_progress, "DecoderFailed");
-    let zero_error = ctor_args(&env, &zero_failed[3], "DecoderZeroProgress");
-    let zero_at = ctor_args(&env, &zero_error[1], "MkArgLocation");
+    let zero_failed = ctor_args(&env, &constructors, &zero_progress, "DecoderFailed");
+    let zero_error = ctor_args(&env, &constructors, &zero_failed[3], "DecoderZeroProgress");
+    let zero_at = ctor_args(&env, &constructors, &zero_error[1], "MkArgLocation");
     assert_eq!(
         (nat_count(&env, &zero_at[0]), nat_count(&env, &zero_at[1])),
         (0, 0),
@@ -730,9 +731,9 @@ fn repetition_progress_and_arg_locations_impl() {
     );
 
     let location_result = eval_global(&env, &mut store, "location_probe_result");
-    let location_failed = ctor_args(&env, &location_result, "DecoderFailed");
-    let rejected = ctor_args(&env, &location_failed[3], "DecoderRejected");
-    let at = ctor_args(&env, &rejected[1], "MkArgLocation");
+    let location_failed = ctor_args(&env, &constructors, &location_result, "DecoderFailed");
+    let rejected = ctor_args(&env, &constructors, &location_failed[3], "DecoderRejected");
+    let at = ctor_args(&env, &constructors, &rejected[1], "MkArgLocation");
     assert_eq!(
         (
             nat_count(&env, &at[0]),
@@ -745,10 +746,49 @@ fn repetition_progress_and_arg_locations_impl() {
 }
 
 #[allow(dead_code)]
-fn full_env() -> ElabEnv {
+fn full_env() -> (ElabEnv, BTreeMap<&'static str, GlobalId>) {
     let mut env = dependency_env();
-    load_cursor_module(&mut env);
-    load_decoder_module(&mut env);
+    let cursor_owned = load_cursor_module(&mut env);
+    let decoder_owned = load_decoder_module(&mut env);
     load_parsing_module(&mut env);
-    env
+    let mut constructors = BTreeMap::new();
+    for (module, owned, family, names) in [
+        (
+            "Capability.Parsing.Cursor",
+            &cursor_owned,
+            "ArgCursor",
+            &["MkArgCursor"][..],
+        ),
+        (
+            "Capability.Parsing.Cursor",
+            &cursor_owned,
+            "ArgLocation",
+            &["MkArgLocation"][..],
+        ),
+        (
+            "Capability.Parsing.Decoder",
+            &decoder_owned,
+            "DecoderResult",
+            &["Decoded", "DecoderFailed"][..],
+        ),
+        (
+            "Capability.Parsing.Decoder",
+            &decoder_owned,
+            "DecoderError",
+            &["DecoderZeroProgress", "DecoderRejected"][..],
+        ),
+    ] {
+        let family_id = env.globals[&format!("{module}.{family}")];
+        assert!(owned.contains(&family_id), "{family} must belong to {module}");
+        let family_decl = env.env.inductive(family_id).expect("checked constructor parent");
+        for &name in names {
+            let id = env.globals[&format!("{module}.{name}")];
+            assert!(
+                family_decl.constructors.iter().any(|constructor| constructor.id == id),
+                "{module}.{name} must belong to its checked {family}"
+            );
+            assert!(constructors.insert(name, id).is_none());
+        }
+    }
+    (env, constructors)
 }

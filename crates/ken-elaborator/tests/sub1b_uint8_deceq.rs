@@ -19,7 +19,6 @@ fn dependency_env() -> (ElabEnv, Vec<GlobalId>) {
     let lawful_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("LawfulClasses provider must roots-load");
-    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
     (env, lawful_owned)
 }
 

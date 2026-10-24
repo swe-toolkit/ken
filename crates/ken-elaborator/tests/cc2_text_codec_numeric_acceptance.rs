@@ -45,7 +45,6 @@ fn load_derived_dependencies(env: &mut ElabEnv) -> Vec<GlobalId> {
     let diagnostic_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load after Derived");
-    catalog_or::expose_module(env, "Capability.Diagnostics.Core");
     diagnostic_owned
 }
 

@@ -228,19 +228,6 @@ pub fn load_core_logic_compare(env: &mut ElabEnv) -> Vec<GlobalId> {
     load_core_logic_compare_with_or_owned(env).0
 }
 
-pub fn expose_module(env: &mut ElabEnv, module: &str) {
-    let prefix = format!("{module}.");
-    let aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(&prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(aliases);
-}
-
 pub fn load_derived_fixture(env: &mut ElabEnv) -> Vec<GlobalId> {
     env.elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Derived's canonical Nat-order dependency must roots-load");
@@ -249,20 +236,14 @@ pub fn load_derived_fixture(env: &mut ElabEnv) -> Vec<GlobalId> {
         .elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
 
-    // These legacy fixture suites append declarations in a synthetic flat
-    // scope. Bind each real module declaration's exact GlobalId under its old
-    // fixture spelling; no duplicate catalog declaration is elaborated. The
-    // provider state preserves the pre-D6 class-owner context for later raw
-    // instance fixtures while Derived itself imports the exact same identities.
-    expose_module(env, "Core.Classes.LawfulClasses");
-    expose_module(env, "Data.Collections.Derived");
+    // The provider state preserves the class-owner context for later raw
+    // instance fixtures without exposing provider-private names to clients.
     env.module_state = provider_state;
     owned
 }
 
-/// Retain Derived's module record while withholding selected legacy flat aliases.
-/// Each consumer's real selective import must install its exact binding; other
-/// aliases remain available to the legacy dependency fixture.
+/// Retain Derived's checked provider identities without flat aliases.
+/// Every requested client import must install its exact public binding.
 pub fn load_derived_importing_fixture_many(
     env: &mut ElabEnv,
     imports: &[&str],
@@ -273,8 +254,6 @@ pub fn load_derived_importing_fixture_many(
     let derived_owned = env
         .elaborate_module_from_roots(&[catalog_root()], "Data.Collections.Derived")
         .expect("Data.Collections.Derived must load through its real provider closure");
-    expose_module(env, "Core.Classes.LawfulClasses");
-    expose_module(env, "Data.Collections.Derived");
     for imported in imports {
         env.globals.remove(*imported);
         assert!(

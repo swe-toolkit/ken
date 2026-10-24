@@ -290,7 +290,6 @@ fn dependency_env() -> ElabEnv {
         "Core.Classes.EffectfulClasses",
     )
     .expect("Core.Classes.EffectfulClasses must roots-load fifth");
-    catalog_or::expose_module(&mut env, "Core.Classes.EffectfulClasses");
     env
 }
 

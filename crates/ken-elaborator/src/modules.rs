@@ -2130,6 +2130,7 @@ fn load_unit(
 pub(crate) fn execute_loaded_entry_checked_fences_v1(
     elab: &mut ElabEnv,
     entry: &str,
+    rejections: Option<&mut Vec<(std::ops::Range<usize>, ElabError)>>,
 ) -> Result<Vec<crate::elab::ElabResult>, ElabError> {
     if !elab.module_state.loaded_units.contains_key(entry) {
         return Err(ElabError::Internal(format!(
@@ -2151,7 +2152,7 @@ pub(crate) fn execute_loaded_entry_checked_fences_v1(
             ))
         })?;
     let previous = std::mem::replace(&mut elab.module_state.root_scope, scope);
-    let result = elab.execute_ken_md_checked_fences_v1(&source, &extracted);
+    let result = elab.execute_ken_md_checked_fences_reporting(&source, &extracted, rejections);
     elab.module_state.root_scope = previous;
     result
 }

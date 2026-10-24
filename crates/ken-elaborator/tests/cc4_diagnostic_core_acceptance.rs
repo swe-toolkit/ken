@@ -35,7 +35,6 @@ fn dependency_env() -> ElabEnv {
     );
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env
 }
 
@@ -45,7 +44,6 @@ fn load_cursor_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Cursor must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Cursor");
     owned
 }
 
@@ -55,7 +53,6 @@ fn load_decoder_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Decoder must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Decoder");
     owned
 }
 
@@ -65,7 +62,6 @@ fn load_parsing_module(env: &mut ElabEnv) -> BTreeSet<GlobalId> {
         .expect("Capability.Parsing.Parsing must roots-load")
         .into_iter()
         .collect();
-    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
     owned
 }
 

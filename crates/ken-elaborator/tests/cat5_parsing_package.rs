@@ -39,13 +39,10 @@ fn dependency_env_with_provider_owned() -> (ElabEnv, Cat5ProviderOwned) {
     let diagnostics_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
         .expect("Capability.Parsing.Cursor must roots-load fifth");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Cursor");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
         .expect("Capability.Parsing.Decoder must roots-load sixth");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
     (env, Cat5ProviderOwned { diagnostics: diagnostics_owned, derived, lawful, nat_order })
 }
 
@@ -64,7 +61,6 @@ fn load_parsing_module(env: &mut ElabEnv) -> Vec<GlobalId> {
         "Capability.Parsing.Parsing",
     )
     .expect("Capability.Parsing.Parsing must roots-load");
-    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
     owned
 }
 
@@ -1472,10 +1468,15 @@ fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
     )
     .expect("checked Parsing must own source_length");
     let suc = env.prelude_env.suc_id;
-    let over_end = extracted.reject_ranges.iter().any(|range| {
-        let err = env
-            .elaborate_file(&PARSING_KEN_MD[range.clone()])
-            .expect_err("a reject fence must not elaborate");
+    let rejections = env
+        .execute_loaded_entry_checked_fences_reporting_rejections("Capability.Parsing.Parsing")
+        .expect("the owner-scoped Parsing fences must execute");
+    assert_eq!(
+        rejections.iter().map(|(range, _)| range.clone()).collect::<Vec<_>>(),
+        extracted.reject_ranges,
+        "every reject fence must be reported in document order"
+    );
+    let over_end = rejections.iter().any(|(_, err)| {
         let ElabError::KernelRejected {
             error: KernelError::TypeMismatch { expected, found },
             ..
@@ -1513,8 +1514,8 @@ fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
             length,
         );
         *found_right.as_ref() == *found_left.as_ref()
-            && *found == true_endpoint
-            && *expected == false_endpoint
+            && found.as_ref() == &true_endpoint
+            && expected.as_ref() == &false_endpoint
     });
     assert!(
         over_end,

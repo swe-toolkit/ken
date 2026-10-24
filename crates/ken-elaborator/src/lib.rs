@@ -655,7 +655,20 @@ impl ElabEnv {
         &mut self,
         entry: &str,
     ) -> Result<Vec<ElabResult>, ElabError> {
-        modules::execute_loaded_entry_checked_fences_v1(self, entry)
+        modules::execute_loaded_entry_checked_fences_v1(self, entry, None)
+    }
+
+    /// Execute a loaded entry's checked fences exactly as
+    /// [`Self::execute_loaded_entry_checked_fences`] does, and return the error
+    /// each `ken reject` block was rejected with, in document order, paired
+    /// with that block's byte range in the entry document.
+    pub fn execute_loaded_entry_checked_fences_reporting_rejections(
+        &mut self,
+        entry: &str,
+    ) -> Result<Vec<(std::ops::Range<usize>, ElabError)>, ElabError> {
+        let mut rejections = Vec::new();
+        modules::execute_loaded_entry_checked_fences_v1(self, entry, Some(&mut rejections))?;
+        Ok(rejections)
     }
 
     /// Number of successfully loaded cross-file units in this elaboration run.
@@ -766,10 +779,19 @@ impl ElabEnv {
         src: &str,
         extracted: &literate::KenMdExtraction,
     ) -> Result<Vec<ElabResult>, ElabError> {
+        self.execute_ken_md_checked_fences_reporting(src, extracted, None)
+    }
+
+    pub(crate) fn execute_ken_md_checked_fences_reporting(
+        &mut self,
+        src: &str,
+        extracted: &literate::KenMdExtraction,
+        rejections: Option<&mut Vec<(std::ops::Range<usize>, ElabError)>>,
+    ) -> Result<Vec<ElabResult>, ElabError> {
         let program_boundary = self.module_state.boundary_header().cloned();
         let program_main = self.globals.get("main").copied();
         let program_main_row = self.effect_rows.get("main").cloned();
-        let result = self.execute_ken_md_checked_fences_unisolated(src, extracted);
+        let result = self.execute_ken_md_checked_fences_unisolated(src, extracted, rejections);
         self.module_state.restore_boundary_header(program_boundary);
         restore_program_binding(&mut self.globals, "main", program_main);
         restore_program_binding(&mut self.effect_rows, "main", program_main_row);
@@ -780,9 +802,14 @@ impl ElabEnv {
         &mut self,
         src: &str,
         extracted: &literate::KenMdExtraction,
+        mut rejections: Option<&mut Vec<(std::ops::Range<usize>, ElabError)>>,
     ) -> Result<Vec<ElabResult>, ElabError> {
         for range in &extracted.reject_ranges {
-            if self.elaborate_file(&src[range.clone()]).is_ok() {
+            let outcome = self.elaborate_file(&src[range.clone()]);
+            if let (Err(error), Some(sink)) = (&outcome, rejections.as_deref_mut()) {
+                sink.push((range.clone(), error.clone()));
+            }
+            if outcome.is_ok() {
                 return Err(ElabError::ParseError {
                     msg: "a 'ken reject' block unexpectedly elaborated: the negative example \
                           is stale and no longer demonstrates a rejection"
