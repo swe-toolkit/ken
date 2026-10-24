@@ -1,7 +1,7 @@
 ---
 id: LANG-SOLVED-INDEX-ELIMINATE-ALWAYS
 title: "Dependent-branch regimes are chosen by trial: a variable-side method is checked retained first and eliminated after a rollback, so a refused nested peel runs the arm body three times per level (3279 entries and 4.7 s at d=7). Eliminate every variable-side method with no trial, after fixing the two eliminated-path defects the trial masks"
-status: ready
+status: closed
 owner: language
 size: L
 tier: T1
@@ -82,3 +82,10 @@ Checks: 8 fired: a 2^d configuration passes "not 3x per level", so
 AC-2 pins entries <= d. 9 fired: F is unmeasured on non-variable-side
 nests, so AC-3 measures it. 7 fired: the body-use selector was re-run
 against `sec` and fails it.
+
+## Closeout
+
+Closed before kickoff, folded into LANG-SOLVED-INDEX-EQUATION-UNIFIER
+(Steward `evt_2t9d4ea4vn9yq`). The Architect measured the other half,
+2(a) to 2(c), as inert without 2(d) (`evt_2qef3qpjvtaf6`), so the two
+are one semantic unit.
