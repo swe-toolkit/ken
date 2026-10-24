@@ -152,9 +152,8 @@ pub fn load_core_logic_compare_with_or_owned(env: &mut ElabEnv) -> (Vec<GlobalId
         .elaborate_module_from_roots(&[catalog_root()], "Core.Logic.Compare")
         .expect("the Core.Logic comparison provider closure must load");
 
-    // Older acceptance fixtures elaborate a catalog consumer as a flat source
-    // and then append declarations in the same synthetic scope. Preserve that
-    // harness shape while reusing the real providers' exact GlobalIds.
+    // Authenticate each old fixture name against its checked provider before
+    // importing it into the session. No synthetic flat global is installed.
     for (module, names) in [
         (
             "Core.Logic.OrdResult",
@@ -205,9 +204,23 @@ pub fn load_core_logic_compare_with_or_owned(env: &mut ElabEnv) -> (Vec<GlobalId
                 provider_owned_id(env, owned, module, name)
                     .unwrap_or_else(|error| panic!("comparison owner {name}: {error}"))
             };
-            env.globals.insert((*name).to_owned(), id);
+            assert!(
+                env.env.lookup(id).is_some() || env.env.constructor(id).is_some(),
+                "{module}.{name} must be checked"
+            );
+            assert!(
+                !env.globals.contains_key(*name),
+                "{name} must not have a flat alias"
+            );
         }
     }
+    env.elaborate_file(
+        "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt, \
+         ord_result_leq, ord_result_dispatch2, ord_result_elim, ord_result_elim2)\n\
+         import Core.Logic.Compare (pair_compare, pair_compare_result_of, \
+         pair_compare_lt_cases, list_eq, list_compare)",
+    )
+    .expect("checked OrdResult and Compare dependencies must import into the session");
     (transport_owned, or_owned)
 }
 
@@ -294,9 +307,8 @@ pub fn load_lawful_functors_importing_fixture(env: &mut ElabEnv) {
         .expect("Core.Classes.LawfulFunctors must load through its real provider closure");
 }
 
-/// Withhold LC's flat conjunction aliases before elaborating LawfulFunctors.
-/// This proves that the package's qualified import, rather than an earlier
-/// dependency's synthetic flat exposure, supplies every canonical binding.
+/// Authenticate LC's checked conjunction identities and require the client
+/// fixture to have no ambient flat aliases before its selective imports.
 const LC_BOOL_AND_IMPORTS: [&str; 4] = [
     "bool_and",
     "bool_and::assoc",
@@ -308,25 +320,23 @@ pub fn withhold_lc_bool_and_flat_aliases(env: &mut ElabEnv, lawful_owned: &[Glob
     for name in LC_BOOL_AND_IMPORTS {
         let canonical = provider_owned_id(env, lawful_owned, "Core.Classes.LawfulClasses", name)
             .unwrap_or_else(|error| panic!("LC owner {name}: {error}"));
-        assert_eq!(
-            env.globals.remove(name),
-            Some(canonical),
-            "the LF fixture must withhold LC's exact flat `{name}` alias"
+        env.globals.remove(name);
+        assert!(
+            !env.globals.contains_key(name),
+            "the LF fixture must not prebind flat `{name}` before import of {canonical:?}"
         );
     }
 }
 
-/// Restore the same canonical identities after LawfulFunctors has proved its
-/// own dependency edge. Later sources in these synthetic flat fixtures still
-/// receive the legacy aliases explicitly, rather than through LF ownership.
-pub fn restore_lc_bool_and_flat_aliases(env: &mut ElabEnv, lawful_owned: &[GlobalId]) {
+/// After LawfulFunctors' selective import, the synthetic flat fixture still
+/// must not gain an LC alias. The owner identities remain available by module.
+pub fn assert_lc_bool_and_absent_after_import(env: &ElabEnv, lawful_owned: &[GlobalId]) {
     for name in LC_BOOL_AND_IMPORTS {
         let canonical = provider_owned_id(env, lawful_owned, "Core.Classes.LawfulClasses", name)
             .unwrap_or_else(|error| panic!("LC owner {name}: {error}"));
-        assert_eq!(
-            env.globals.insert(name.to_owned(), canonical),
-            None,
-            "LF must not leave a flat `{name}` binding behind"
+        assert!(
+            !env.globals.contains_key(name),
+            "LF must not leave a flat `{name}` alias for {canonical:?}"
         );
     }
 }
@@ -347,18 +357,24 @@ pub fn assert_derived_fixture_retains_lawfulclasses(env: &mut ElabEnv, lawful_ow
 
     let provider = provider_owned_id(env, lawful_owned, "Core.Classes.LawfulClasses", "leq_nat")
         .expect("the shared Derived fixture must retain checked LC.leq_nat");
-    assert_eq!(
-        env.globals["leq_nat"], provider,
-        "the retained class owner must preserve the canonical provider identity"
+    assert!(
+        !env.globals.contains_key("leq_nat"),
+        "LC.leq_nat must be found by checked owner or import, not a flat fixture alias for {provider:?}"
     );
 }
 
 pub fn expose_core_logic_transport(env: &mut ElabEnv, transport_owned: &[GlobalId]) {
     for name in ["cong", "sym", "trans"] {
-        let id = provider_owned_id(env, transport_owned, "Core.Logic.Transport", name)
+        provider_owned_id(env, transport_owned, "Core.Logic.Transport", name)
             .unwrap_or_else(|error| panic!("Transport owner {name}: {error}"));
-        env.globals.insert(name.to_owned(), id);
+        env.globals.remove(name);
+        assert!(
+            !env.globals.contains_key(name),
+            "{name} must not have a flat alias"
+        );
     }
+    env.elaborate_file("import Core.Logic.Transport (cong, sym, trans)")
+        .expect("checked Transport dependencies must import into the session");
 }
 
 /// Snapshot the provider-only module state before loading a consumer's legacy

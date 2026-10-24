@@ -414,10 +414,9 @@ fn vector_exports_only_checked_fin_family_and_constructors() {
 /// checked law at that type. The client's raw checked type must equal the
 /// provider's raw type. CLAIMED: lookup after zipping with `f` at the same
 /// `Fin n` equals `f` of *both* input lookups, at arbitrary element types,
-/// lengths, functions and vectors. THE GAP: the client pins the proposition
-/// and transparent proof, not its particular proof structure. THE GAP: the
-/// contract is now spelled in the provider's example fence and elaborated
-/// separately from the law; raw type equality checks its binders and endpoints.
+/// lengths, functions and vectors. THE GAP: the contract is now spelled in
+/// the provider's example fence and elaborated separately from the law;
+/// raw type equality checks binders and endpoints, not proof structure.
 #[test]
 fn lookup_zip_with_has_exact_checked_generic_proposition() {
     let (env, _) = checked_vector_examples(&["vec_example_lookup_zip_with_contract"]);

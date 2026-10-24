@@ -308,12 +308,14 @@ fn functor_law_emits_obligation_cross_decl_resolves() {
     env.elaborate_module_from_roots(&[catalog_root], "Data.Collections.Derived")
         .expect("Derived map must roots-load");
     let derived_map = env.globals["Data.Collections.Derived.map"];
-    env.globals.insert("map".to_owned(), derived_map);
+    env.elaborate_file("import Data.Collections.Derived (map)")
+        .expect("the public Derived map must import into the session");
+    assert!(!env.globals.contains_key("map"));
     setup_combinators(&mut env);
 
     // `map_id : map id xs ≡ xs`, stated in a declaration SEPARATE from `map`.
-    // The cross-declaration lowercase reference `map` resolves via the landed
-    // `L-resolver-globals` fallback (`c3a3f1d`).
+    // The cross-declaration lowercase reference resolves through the checked
+    // session import, not an ambient flat global.
     let res = env
         .elaborate_decl_v1(
             "fn map_id (a : Type) (xs : List a) : Int \
@@ -379,7 +381,9 @@ fn structurally_equal_lists_share_slot() {
     let mut store = EvalStore::new();
     let mkdecimalpair_id = env.prelude_env.mkdecimalpair_id;
     for (id, lit) in &env.num_values {
-        store.num_values.insert(*id, lit_to_evalval(lit, mkdecimalpair_id));
+        store
+            .num_values
+            .insert(*id, lit_to_evalval(lit, mkdecimalpair_id));
     }
     // Two structurally-equal lists share one slot (content-addressed dedup).
     let v12a = eval(&[], &t12, &env.env, &mut store);

@@ -16,7 +16,12 @@ fn checked_ascii_client(env: &mut ElabEnv) -> Result<(), (String, ken_elaborator
         .map_err(|error| ("load Data.Collections.Derived.map".to_owned(), error))?;
     let derived_map = env.globals["Data.Collections.Derived.map"];
     assert!(env.env.transparent_body(derived_map).is_some());
-    env.globals.insert("map".to_owned(), derived_map);
+    env.elaborate_file("import Data.Collections.Derived (map)")
+        .map_err(|error| ("import Data.Collections.Derived (map)".to_owned(), error))?;
+    assert!(
+        !env.globals.contains_key("map"),
+        "map must come from the checked import"
+    );
 
     let tags = (0..=127)
         .map(|n| format!("Ascii{n}"))

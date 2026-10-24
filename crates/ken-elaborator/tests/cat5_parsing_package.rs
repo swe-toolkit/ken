@@ -35,16 +35,7 @@ fn dependency_env_with_provider_owned() -> (ElabEnv, Cat5ProviderOwned) {
         .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let lawful_prefix = "Core.Classes.LawfulClasses.";
-    let lawful_aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(lawful_prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(lawful_aliases);
+    assert!(!env.globals.contains_key("leq_nat"), "LC must not provide a flat test alias");
     let diagnostics_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
@@ -1463,10 +1454,22 @@ fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
 fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
     let extracted = ken_elaborator::literate::extract_ken_md(PARSING_KEN_MD)
         .expect("Parsing checked fences must extract");
-    let mut env = mk_env();
-    catalog_or::expose_module(&mut env, "Data.Numeric.Nat.Order");
-    let leq = env.globals["LessEqNat"];
-    let source_length = env.globals["source_length"];
+    let (mut env, providers) = dependency_env_with_provider_owned();
+    let parsing_owned = load_parsing_module(&mut env);
+    let leq = catalog_or::provider_owned_id(
+        &env,
+        &providers.nat_order,
+        "Data.Numeric.Nat.Order",
+        "LessEqNat",
+    )
+    .expect("checked Nat.Order must own LessEqNat");
+    let source_length = catalog_or::provider_owned_id(
+        &env,
+        &parsing_owned,
+        "Capability.Parsing.Parsing",
+        "source_length",
+    )
+    .expect("checked Parsing must own source_length");
     let suc = env.prelude_env.suc_id;
     let over_end = extracted.reject_ranges.iter().any(|range| {
         let err = env

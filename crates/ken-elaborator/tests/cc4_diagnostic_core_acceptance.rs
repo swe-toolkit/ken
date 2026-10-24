@@ -8,7 +8,7 @@ mod catalog_publication;
 use std::collections::BTreeSet;
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
-use ken_interp::eval::{EvalStore, EvalVal, ListCharIds, eval};
+use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
 use ken_kernel::{Decl, GlobalId, Term};
 
 const DIAGNOSTIC_KEN_MD: &str =
@@ -29,16 +29,10 @@ fn dependency_env() -> ElabEnv {
         .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let lawful_prefix = "Core.Classes.LawfulClasses.";
-    let lawful_aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(lawful_prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(lawful_aliases);
+    assert!(
+        !env.globals.contains_key("leq_nat"),
+        "LC must not provide a flat test alias"
+    );
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
     catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
