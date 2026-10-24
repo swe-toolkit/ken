@@ -922,7 +922,9 @@ fn inline_synthesized_seat_emission_owners(
             let Some(owner) = plan.deferred_response_handler_owner(row)? else {
                 continue;
             };
-            owners.push(owner);
+            if !owners.contains(&owner) {
+                owners.push(owner);
+            }
         }
         // (f) A marked bracket's host effect is lowered under its row's
         // planned authority at every copy of S, including foreign owners.
@@ -1197,6 +1199,9 @@ pub struct DeferredResponseObservation {
     /// zero). Eligible-plane has-K census comes from Specialized rows.
     pub capture_count: usize,
     pub continuation_input_count: usize,
+    /// The statically bounded P2 suffix owner, before the ordinary handler
+    /// fallback. Exposed for tests of the actual checked response plan.
+    pub bounded_handler_owner: Option<String>,
     /// The structurally nearest specialized handler, only when the lexical K
     /// is single-shot and tail-resumptive.
     pub handler_owner: Option<String>,
@@ -1415,6 +1420,9 @@ fn record_static_response_feasibility_diagnostic(
                 sub_case: format!("{:?}", row.sub_case()),
                 capture_count: row.capture_count(),
                 continuation_input_count: row.continuation_input_count(),
+                bounded_handler_owner: plan
+                    .bounded_deferred_response_handler_owner(row)?
+                    .map(|owner| format!("{owner:?}")),
                 handler_owner: plan
                     .deferred_response_handler_owner(row)?
                     .map(|owner| format!("{owner:?}")),

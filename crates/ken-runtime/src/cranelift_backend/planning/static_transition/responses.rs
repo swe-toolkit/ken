@@ -18,14 +18,14 @@ use super::continuations::{
     continuation_owner_entry_sources, derive_checked_ih_post_call_consumer_chain,
     generated_context_parameters,
     walk_continuation_value_environment, CheckedIhPostCallConsumerStep, ContinuationCallIdentity,
-    ContinuationContextId, ContinuationEmissionOwner, ContinuationInputProjection,
-    ContinuationUnitView,
+    ContinuationContextId, ContinuationEmissionOwner, ContinuationEnvironmentClaim,
+    ContinuationFrameIdentity, ContinuationInputProjection, ContinuationUnitView,
     ContinuationSourceCoordinate,
     ContinuationSpecializationId, ContinuationValueSourceAuthority,
     ContinuationWorkerCaptureSource, ContinuationWorkerProvenance, PlannedContinuationContext,
     RequiredConsumerProjection, SourceReturnContextRole, SourceReturnContextTemplate,
 };
-use super::occurrences::StaticOriginId;
+use super::occurrences::{occurrence_authority, StaticOriginId};
 use super::semantic_ir::ConstructorIdentity;
 use super::{
     occurrence_subtree_contains, peel_checked_bracket_operation, planner_capacity_error, planner_error,
@@ -830,6 +830,21 @@ impl DeferredResponseRow {
     pub(in crate::cranelift_backend) fn sub_case(&self) -> DeferredResponseSubCase {
         self.sub_case
     }
+}
+
+/// One planner-selected transfer of a handler-owned Deferred response into
+/// the exact generated context already planned to execute its lexical K.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct HandlerDriveContextRoute {
+    pub(in crate::cranelift_backend) vis_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) handler: ContinuationEmissionOwner,
+    pub(in crate::cranelift_backend) context: ContinuationContextId,
+    pub(in crate::cranelift_backend) continuation_origin: StaticOriginId,
+    pub(in crate::cranelift_backend) recursive_position: u32,
+    pub(in crate::cranelift_backend) worker_body_origin: StaticOriginId,
+    /// The context's Capture run, re-planned in its declared order for this
+    /// handler's actual defining frame rather than its original caller's.
+    pub(in crate::cranelift_backend) capture_claims: Vec<ContinuationEnvironmentClaim>,
 }
 
 /// Phase-A carry of the two-phase response context install (RECUT 2, HS5). Built
@@ -4240,6 +4255,16 @@ impl StaticTransitionPlan<'_> {
         Ok(Some(Vec::new()))
     }
 
+    /// A bracket ledger settles this marked S under its checked region row.
+    /// The S is an existing owner boundary, not a Deferred suffix member and
+    /// not an opaque Vis that invalidates the enclosing owner's suffix.
+    fn is_marked_bracket_settlement(&self, vis: StaticOriginId) -> bool {
+        self.bracket_settlements
+            .regions
+            .iter()
+            .any(|region| region.settlement == vis)
+    }
+
     fn static_response_frontier(
         &self,
         origin: StaticOriginId,
@@ -4325,7 +4350,8 @@ impl StaticTransitionPlan<'_> {
                     || self
                         .static_response_deferred
                         .iter()
-                        .any(|row| row.vis_origin() == origin);
+                        .any(|row| row.vis_origin() == origin)
+                    || self.is_marked_bracket_settlement(origin);
                 if known {
                     Ok(Some(vec![origin]))
                 } else {
@@ -4393,6 +4419,7 @@ impl StaticTransitionPlan<'_> {
                 .static_response_continuations
                 .iter()
                 .any(|candidate| candidate.vis_origin() == vis)
+                || self.is_marked_bracket_settlement(vis)
             {
                 continue;
             }
@@ -4575,6 +4602,135 @@ impl StaticTransitionPlan<'_> {
                 "one Deferred response has more than one nearest static handler owner",
             )),
         }
+    }
+
+    /// Claim one exact member of the frame being defined by a handler-owned
+    /// response. Ambiguous or absent membership never falls back to a root ABI
+    /// position: the consumer will independently re-check this same frame.
+    pub(in crate::cranelift_backend) fn entry_frame_claim_in(
+        &self,
+        handler: ContinuationEmissionOwner,
+        coordinate: ContinuationSourceCoordinate,
+    ) -> Result<ContinuationEnvironmentClaim, CraneliftBackendError> {
+        let mut found = None;
+        let mut offer = |member: ContinuationSourceCoordinate, slot: u32| {
+            if member == coordinate {
+                if found.replace(slot).is_some() {
+                    return Err(planner_error(
+                        "a handler drive frame declares two members for one continuation coordinate",
+                    ));
+                }
+            }
+            Ok(())
+        };
+        let frame = match handler {
+            ContinuationEmissionOwner::Predeclared(owner) => {
+                for (position, member) in continuation_owner_entry_sources(self, owner)?
+                    .into_iter()
+                    .enumerate()
+                {
+                    let position = u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("handler drive entry slot exhausted")
+                    })?;
+                    offer(member.coordinate, position)?;
+                }
+                ContinuationFrameIdentity::Predeclared(owner)
+            }
+            ContinuationEmissionOwner::Specialization(specialization) => {
+                let units = self.continuation_units()?;
+                let unit = units.get(specialization.0 as usize).ok_or_else(|| {
+                    planner_error("a handler drive names a specialization that was never interned")
+                })?;
+                let body = unit.worker_body_origin();
+                let context = self.continuation_context_for(specialization, body)?
+                    .ok_or_else(|| planner_error(
+                        "a handler drive's specialization has no defining generated context",
+                    ))?;
+                for (position, member) in self
+                    .continuation_context_parameter_members(context.id())?
+                    .into_iter()
+                    .enumerate()
+                {
+                    let position = u32::try_from(position).map_err(|_| {
+                        planner_capacity_error("handler drive context Parameter slot exhausted")
+                    })?;
+                    offer(member, position)?;
+                }
+                for (position, capture) in context.captures()?.iter().enumerate() {
+                    let slot = u32::try_from(position).ok()
+                        .and_then(|position| context.parameters().checked_add(position))
+                        .ok_or_else(|| planner_capacity_error(
+                            "handler drive context Capture slot exhausted",
+                        ))?;
+                    offer(capture.coordinate, slot)?;
+                }
+                ContinuationFrameIdentity::GeneratedContext {
+                    context: context.id(),
+                    specialization,
+                    worker_body_origin: body,
+                }
+            }
+            ContinuationEmissionOwner::Fusion(_) => return Err(planner_error(
+                "a handler drive cannot claim an ordinary frame for an installed fusion",
+            )),
+        };
+        let declared_slot = found.ok_or_else(|| planner_error(
+            "a handler drive frame declares no member for the continuation coordinate",
+        ))?;
+        Ok(ContinuationEnvironmentClaim::EntryFrame { frame, declared_slot })
+    }
+
+    /// The planned context transfer for one handler-owned Deferred response.
+    pub(in crate::cranelift_backend) fn handler_drive_context_route(
+        &self,
+        row: &DeferredResponseRow,
+        handler: ContinuationEmissionOwner,
+    ) -> Result<Option<HandlerDriveContextRoute>, CraneliftBackendError> {
+        if self.admitted_deferred_handler_owner(row)? != Some(handler) {
+            return Ok(None);
+        }
+        let Some(body) = self.deferred_response_k_body(row)? else {
+            return Ok(None);
+        };
+        let units = self.continuation_units()?;
+        let selecting = units.iter()
+            .filter(|unit| unit.worker_body_origin() == body
+                && unit.producer_construct_origin() == row.vis_origin())
+            .collect::<Vec<_>>();
+        let [unit] = selecting.as_slice() else {
+            return Err(planner_error(
+                "a handler-owned drive's K body has no unique selecting specialization at its Vis",
+            ));
+        };
+        let context = self
+            .carried_invocation_context(unit.continuation_origin(), unit.recursive_position(), body)?
+            .ok_or_else(|| planner_error(
+                "a handler-owned drive's selecting specialization binds no carried context",
+            ))?;
+        let view = self.continuation_contexts()?.into_iter()
+            .find(|candidate| candidate.id() == context)
+            .ok_or_else(|| planner_error(
+                "a handler-owned drive's context has no projected view",
+            ))?;
+        let k_owner = occurrence_authority(self, body)?.owner;
+        if view.raw_owner() != k_owner {
+            return Err(planner_error(
+                "a handler-owned drive's context raw owner is not the K body's checked owner",
+            ));
+        }
+        // The real K closure supplies the full Parameter run. Certify that
+        // this context declares exactly its checked raw owner's entry members.
+        self.continuation_context_parameter_members(context)?;
+        let mut capture_claims = Vec::new();
+        for capture in view.captures()? {
+            capture_claims.push(self.entry_frame_claim_in(handler, capture.coordinate)?);
+        }
+        Ok(Some(HandlerDriveContextRoute {
+            vis_origin: row.vis_origin(), handler, context,
+            continuation_origin: unit.continuation_origin(),
+            recursive_position: unit.recursive_position(),
+            worker_body_origin: body, capture_claims,
+        }))
     }
 
     /// The prefix ending at the nearest enclosing continuation frame.

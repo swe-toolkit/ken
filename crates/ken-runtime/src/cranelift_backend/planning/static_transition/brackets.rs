@@ -171,6 +171,14 @@ impl BracketSettlementControlView {
             } else {
                 BracketSettlementMode::Deferred
             };
+            // A nested Deferred region has no in-place owner to order its
+            // settlement against the parent. Refuse it before lowering.
+            if mode == BracketSettlementMode::Deferred && region.parent.is_some() {
+                return Err(planner_error(
+                    "a nested bracket region has no in-place settlement owner; \
+                     deferred settlement order is not planned for nested regions",
+                ));
+            }
             let row = plan.bracket_rows.get(&region.id).cloned();
             match (&region.context, &row) {
                 (BracketResponseContextKey::Continuation(identity), Some(row))

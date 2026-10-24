@@ -5873,11 +5873,11 @@ impl<'a> Lowering<'a> {
     /// semantics, including zero or multiple reads of that typed parameter.
     /// Operation fields may already be carried or may still be specialized;
     /// both routes validate the same source identities before the existing
-    /// synchronous host dispatch. The K body is then lowered in this function,
-    /// so its closure does not cross a boundary and the current HostResult cannot
-    /// be replaced by a prior body result. A producer-path call receives its
-    /// current eliminator stack so the statically unrolled step resumes exactly
-    /// the surrounding ITree handler before returning to the response owner.
+    /// synchronous host dispatch. The drive calls K's one planned context
+    /// through a recorded route and receives the current HostResult rather
+    /// than a prior body result. The context returns K's raw result; the drive
+    /// applies the handler's complete eliminator run, beginning with the
+    /// route's recorded continuation.
     fn drive_handler_owned_deferred_response(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
@@ -5909,14 +5909,16 @@ impl<'a> Lowering<'a> {
         }
         self.drive_response_at_source(
             builder, vis_origin, lowered_args, row.operation_root_origin(),
-            row.effect_origin(), row.operation(), None, producer_eliminators,
+            row.effect_origin(), row.operation(), None, producer_eliminators, row,
         )
     }
 
     /// Perform a handler-owned Deferred response at its Construct-Vis source
-    /// and resume its exact lexical K through the active eliminators. This
-    /// path is not a relay drive; admitted relays use static producer fusion.
-    pub(super) fn drive_response_at_source(
+    /// and transfer its exact lexical K through the planned context. The
+    /// context returns K's raw result; this drive applies the complete
+    /// eliminator run, including the first recorded continuation. In-place
+    /// settlement calls `perform_response_at_source` instead of this path.
+    fn drive_response_at_source(
         &mut self,
         builder: &mut FunctionBuilder<'_>,
         vis_origin: StaticOriginId,
@@ -5926,6 +5928,7 @@ impl<'a> Lowering<'a> {
         planned_operation: ken_host::HostOpV1,
         effect_authority: Option<(ContinuationEmissionOwner, PredeclaredFunctionId)>,
         producer_eliminators: Option<&[EliminatorFrame<'_>]>,
+        row: &crate::cranelift_backend::planning::DeferredResponseRow,
     ) -> Result<LoweringOperand, CraneliftBackendError> {
         let (body, k_env) = self.perform_response_at_source(
             builder,
@@ -5936,14 +5939,62 @@ impl<'a> Lowering<'a> {
             planned_operation,
             effect_authority,
         )?;
-        let k_body = self.retained_body_occurrence(body)?;
-        match producer_eliminators {
-            Some(eliminators) => {
-                let eliminators = eliminators.to_vec();
-                self.lower_computational_producer_expr(builder, k_body, &k_env, &eliminators)
-            }
-            None => self.lower_expr(builder, k_body, &k_env),
+        let owner = self.defining_emission_owner.ok_or_else(|| unsupported(
+            LoweringCause::PlannerInvariant, "StaticResponseDeferred",
+            "a handler-owned drive transfer has no defining emission owner",
+        ))?;
+        let route = self.static_transition_plan.handler_drive_context_route(row, owner)?
+            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a handler-owned Deferred drive has no planner-recorded context route",
+            ))?;
+        if body != route.worker_body_origin || vis_origin != route.vis_origin
+            || owner != route.handler
+        {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a handler-owned drive's K body or owner is not its recorded route",
+            ));
         }
+        let Some(eliminators) = producer_eliminators else {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a context-transfer drive has no producer eliminator frames",
+            ));
+        };
+        let Some(first) = eliminators.first() else {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a context-transfer drive has an empty eliminator run",
+            ));
+        };
+        // Identity, not consumption: the context returns K's raw result,
+        // so the first frame still applies to it.
+        let EliminatorFrame::Computational(first) = first else {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a handler-owned drive's first eliminator is not computational",
+            ));
+        };
+        if first.static_origin != route.continuation_origin {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "a context-transfer drive's first eliminator frame is not its route's continuation",
+            ));
+        }
+        let k_inputs = k_env.into_iter().map(|binding| match binding {
+            LoweringEnvironmentBinding::Value(value) => Ok(value),
+            LoweringEnvironmentBinding::StaticWorker(_) => Err(unsupported(
+                LoweringCause::PlannerInvariant, "StaticResponseDeferred",
+                "a checked response K environment contains a non-value binding",
+            )),
+        }).collect::<Result<Vec<_>, _>>()?;
+        let resumed = self.call_declared_context(
+            builder, route.context, body, &k_inputs, None, Some(&route.capture_claims),
+        )?;
+        self.lower_computational_match_value_composed(
+            builder, RoutedAnswer::direct(resumed), eliminators,
+        )
     }
 
     /// Perform the response's host effect at its Construct-Vis source and
@@ -10407,6 +10458,35 @@ impl<'a> Lowering<'a> {
                             context.id()
                         ),
                     ));
+                }
+                if declared_slot < context.parameters() {
+                    let members = self
+                        .static_transition_plan
+                        .continuation_context_parameter_members(context.id())?;
+                    let mut found = None;
+                    for (position, member) in members.iter().enumerate() {
+                        if *member != coordinate {
+                            continue;
+                        }
+                        if found.is_some() {
+                            return Err(unsupported(LoweringCause::PlannerInvariant,
+                                "ContinuationSpecialization",
+                                "a generated context's parameter run declares two members for one continuation coordinate, so the declared slot is ambiguous",
+                            ));
+                        }
+                        found = Some(position);
+                    }
+                    let position = found.ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
+                        "ContinuationSpecialization",
+                        format!("a generated context's parameter run declares no member for {coordinate:?}"),
+                    ))?;
+                    if u32::try_from(position).ok() != Some(declared_slot) {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "ContinuationSpecialization",
+                            format!("an entry-frame claim declares parameter slot {declared_slot} for {coordinate:?}, but the generated context declares that member at slot {position}"),
+                        ));
+                    }
+                    return Ok(());
                 }
                 let captures = context.captures()?;
                 let mut found = None;
