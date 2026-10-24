@@ -1,7 +1,7 @@
 ---
 id: SPEC-OPTIMIZATION-ARGMAX-OPTION
 title: "Spec 72 section 3 supplies argmax only on NonEmpty and states that it gives no public argmax_option: a client holding a possibly empty List must rebuild the NonEmpty split itself, as it had to for argmin before section 1.4. Rule the greatest-cost Option selector's name, its Nil and Cons equations, and its member and greatest corollaries from a checked D0 at zero trust, and state them as a section 3 extension with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
