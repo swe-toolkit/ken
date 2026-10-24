@@ -36,6 +36,10 @@ mod joins_traps;
 pub use joins_traps::with_forced_carrier_match_joins;
 mod occurrences;
 mod responses;
+mod resumptions;
+pub(in crate::cranelift_backend) use resumptions::{
+    PlannedHandlerResumptionCall, PlannedResumptionParameter,
+};
 mod returned_vis;
 pub(in crate::cranelift_backend) use returned_vis::{
     PendingVisFrameOwner, PendingVisFrameRegion, PendingVisRecordProtocol,
@@ -642,6 +646,8 @@ pub(in crate::cranelift_backend) struct StaticTransitionPlan<'src> {
     /// facts, but no lowering accessor exists until the activation slice.
     continuation_specializations: Vec<PlannedContinuationSpecialization>,
     continuation_specialization_calls: Vec<PlannedContinuationSpecializationCall>,
+    /// Handler-owned Deferred drives have a separate, post-response-B identity domain.
+    handler_resumptions: Vec<PlannedHandlerResumptionCall>,
     /// One independently validated consumer-level occurrence per continuation
     /// call whose discovery established the relation. Keyed by the whole opaque
     /// call identity, never by specialization identity or function provenance.

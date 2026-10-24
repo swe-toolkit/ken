@@ -1080,6 +1080,7 @@ impl<'a> Lowering<'a> {
                     inputs,
                     carried_base,
                     None,
+                    None,
                 )?,
                 None => self.call_declared_unit(
                     builder,
@@ -1111,7 +1112,31 @@ impl<'a> Lowering<'a> {
             inputs: &[LoweringOperand],
             carried_base: Option<CarriedResidualWord>,
             caller_claims: Option<&[ContinuationEnvironmentClaim]>,
+            resumption: Option<&crate::cranelift_backend::planning::PlannedHandlerResumptionCall>,
         ) -> Result<LoweringOperand, CraneliftBackendError> {
+            if let Some(record) = resumption {
+                let members = self.static_transition_plan
+                    .continuation_context_parameter_members(context)?;
+                let parameter_members_agree = record.parameters.iter().enumerate().all(
+                    |(position, parameter)| match parameter {
+                        crate::cranelift_backend::planning::PlannedResumptionParameter::Response {
+                            effect_origin,
+                        } => position == 0 && *effect_origin == record.row.2,
+                        crate::cranelift_backend::planning::PlannedResumptionParameter::KCapture {
+                            member, ..
+                        } => position > 0 && members.get(position) == Some(member),
+                    },
+                );
+                if record.route.context != context || record.route.worker_body_origin != body_origin
+                    || !parameter_members_agree || members.len() != record.parameters.len()
+                    || caller_claims != Some(record.route.capture_claims.as_slice())
+                    || inputs.len() != record.parameters.len()
+                    || self.defining_emission_owner != Some(record.emission_owner)
+                {
+                    return Err(unsupported(LoweringCause::PlannerInvariant,
+                        "StaticResponseDeferred", "a planned resumption's response or K-capture parameters disagree with the declared context call"));
+                }
+            }
             let target = self
                 .function_local
                 .context_calls

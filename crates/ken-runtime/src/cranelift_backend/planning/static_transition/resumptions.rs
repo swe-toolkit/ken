@@ -1,0 +1,160 @@
+//! Handler-owned Deferred drives use their own checked resumption domain.
+//! They are neither causal specialization calls nor a second context interner.
+
+use super::continuations::{
+    ContinuationEmissionOwner, ContinuationSourceCoordinate,
+};
+use super::responses::{DeferredResponseRow, HandlerDriveContextRoute};
+use super::{planner_capacity_error, planner_error, CraneliftBackendError,
+    StaticOriginId, StaticTransitionPlan};
+use crate::RuntimeExpr;
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(in crate::cranelift_backend) struct PlannedHandlerResumptionId(u32);
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) enum PlannedResumptionParameter {
+    Response { effect_origin: StaticOriginId },
+    KCapture { source_origin: StaticOriginId, member: ContinuationSourceCoordinate },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::cranelift_backend) struct PlannedHandlerResumptionCall {
+    pub(in crate::cranelift_backend) id: PlannedHandlerResumptionId,
+    pub(in crate::cranelift_backend) row: (StaticOriginId, StaticOriginId, StaticOriginId),
+    pub(in crate::cranelift_backend) emission_owner: ContinuationEmissionOwner,
+    pub(in crate::cranelift_backend) route: HandlerDriveContextRoute,
+    pub(in crate::cranelift_backend) parameters: Vec<PlannedResumptionParameter>,
+    pub(in crate::cranelift_backend) eliminators: Vec<StaticOriginId>,
+}
+
+impl StaticTransitionPlan<'_> {
+    /// Publish only after response phase B fixes owners, transports and rows.
+    pub(super) fn publish_handler_resumption_plan(&mut self)
+        -> Result<(), CraneliftBackendError>
+    {
+        if !self.handler_resumptions.is_empty() {
+            return Err(planner_error("handler resumptions were published twice"));
+        }
+        let mut published = Vec::new();
+        for row in &self.static_response_deferred {
+            let Some(owner) = self.admitted_deferred_handler_owner(row)? else {
+                continue;
+            };
+            let Some(route) = self.handler_drive_context_route(row, owner)? else {
+                continue;
+            };
+            let id = PlannedHandlerResumptionId(u32::try_from(published.len())
+                .map_err(|_| planner_capacity_error("handler resumption ids exhausted"))?);
+            published.push(self.derive_handler_resumption(row, owner, route, id)?);
+        }
+        self.handler_resumptions = published;
+        Ok(())
+    }
+
+    fn derive_handler_resumption(
+        &self, row: &DeferredResponseRow, owner: ContinuationEmissionOwner,
+        route: HandlerDriveContextRoute, id: PlannedHandlerResumptionId,
+    ) -> Result<PlannedHandlerResumptionCall, CraneliftBackendError> {
+        let k_origin = self.semantic.child_origin(row.vis_origin(), 1)?;
+        let RuntimeExpr::LexicalClosure { captures, .. } =
+            self.planned_occurrence_expr(k_origin)? else {
+                return Err(planner_error("a planned resumption does not have a lexical K"));
+            };
+        let members = self.continuation_context_parameter_members(route.context)?;
+        if members.len() != captures.len() + 1 {
+            return Err(planner_error("a planned resumption's K Parameter run disagrees with its checked context"));
+        }
+        let mut parameters = vec![PlannedResumptionParameter::Response {
+            effect_origin: row.effect_origin(),
+        }];
+        for (position, member) in members.into_iter().enumerate().skip(1) {
+            parameters.push(PlannedResumptionParameter::KCapture {
+                source_origin: self.semantic.child_origin(k_origin, position)?, member,
+            });
+        }
+        let mut parents = std::collections::BTreeMap::new();
+        for occurrence in self.source_occurrences.iter().flatten() {
+            for (position, child) in self.semantic.child_origins(occurrence.static_origin)?
+                .iter().copied().enumerate()
+            {
+                if parents.insert(child, (occurrence.static_origin, position)).is_some() {
+                    return Err(planner_error("resumption source occurrence has two parents"));
+                }
+            }
+        }
+        let mut eliminators = Vec::new();
+        let mut cursor = row.vis_origin();
+        while let Some((parent, position)) = parents.get(&cursor).copied() {
+            match self.planned_occurrence_expr(parent)? {
+                RuntimeExpr::ComputationalMatch { .. } | RuntimeExpr::Match { .. }
+                    if position == 0 => eliminators.push(parent),
+                RuntimeExpr::LexicalClosure { .. } => break,
+                _ => {}
+            }
+            cursor = parent;
+        }
+        Ok(PlannedHandlerResumptionCall {
+            id, row: (row.vis_origin(), row.operation_root_origin(), row.effect_origin()),
+            emission_owner: owner, route, parameters, eliminators,
+        })
+    }
+
+    pub(super) fn validate_handler_resumption_plan(&self)
+        -> Result<(), CraneliftBackendError>
+    {
+        let owners = self.static_response_owner_specializations()?
+            .map_err(|infeasible| planner_error(infeasible.reason()))?;
+        let mut expected_rows = Vec::new();
+        for row in &self.static_response_deferred {
+            let Some(owner) = self.admitted_deferred_handler_owner(row)? else { continue };
+            let Some(route) = self.handler_drive_context_route(row, owner)? else { continue };
+            expected_rows.push((row, owner, route));
+        }
+        if self.handler_resumptions.len() != expected_rows.len() {
+            return Err(planner_error("a handler-owned Deferred resumption row is missing"));
+        }
+        for (index, (record, (row, owner, route))) in
+            self.handler_resumptions.iter().zip(expected_rows).enumerate()
+        {
+            if record.id != PlannedHandlerResumptionId(u32::try_from(index)
+                    .map_err(|_| planner_capacity_error("handler resumption ids exhausted"))?)
+                || record.row != (row.vis_origin(), row.operation_root_origin(), row.effect_origin())
+                || record.emission_owner != owner || record.route != route
+                || !owners.iter().any(|candidate| candidate.base_owner() == owner)
+            {
+                return Err(planner_error("handler resumption row, owner or context route disagrees with the checked response"));
+            }
+            let expected = self.derive_handler_resumption(row, owner, route,
+                record.id)?;
+            if record.parameters != expected.parameters {
+                return Err(planner_error("resumption response or K-capture parameter is not certified by the checked context"));
+            }
+            if record.eliminators != expected.eliminators
+                || record.eliminators.first() != Some(&record.route.continuation_origin)
+            {
+                return Err(planner_error("resumption eliminator run disagrees with its checked continuation route"));
+            }
+        }
+        Ok(())
+    }
+
+    pub(in crate::cranelift_backend) fn handler_resumptions(
+        &self,
+    ) -> &[PlannedHandlerResumptionCall] {
+        &self.handler_resumptions
+    }
+
+    pub(in crate::cranelift_backend) fn handler_resumption_at_vis(
+        &self, vis_origin: StaticOriginId, owner: ContinuationEmissionOwner,
+    ) -> Result<&PlannedHandlerResumptionCall, CraneliftBackendError> {
+        let mut matching = self.handler_resumptions.iter()
+            .filter(|record| record.row.0 == vis_origin && record.emission_owner == owner);
+        let row = matching.next().ok_or_else(||
+            planner_error("a handler-owned Deferred response has no planned resumption"))?;
+        if matching.next().is_some() {
+            return Err(planner_error("two handler resumptions claim one Vis and owner"));
+        }
+        Ok(row)
+    }
+}

@@ -311,6 +311,7 @@ impl<'src> Planner<'src> {
                 occurrence_authorities: Vec::new(),
                 continuation_specializations: Vec::new(),
                 continuation_specialization_calls: Vec::new(),
+                handler_resumptions: Vec::new(),
                 required_consumer_projections: BTreeMap::new(),
                 immediate_bridge_realizations: BTreeMap::new(),
                 continuation_contexts: Vec::new(),
@@ -1527,6 +1528,11 @@ impl<'src> Planner<'src> {
                 }
             }
         }
+        // Response phase B and the selected-owner agreement are final. Publish
+        // each resolved handler resumption once, then validate it before any
+        // lowering view can observe it; do not introduce a draft or reorder B.
+        self.plan.publish_handler_resumption_plan()?;
+        self.plan.validate_handler_resumption_plan()?;
         // Phase B has installed the final response-owner population and its
         // selected calls. Close the returned-Vis settlement exactly once before
         // ownership source (e) reads its successor rows.

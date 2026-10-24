@@ -5943,12 +5943,11 @@ impl<'a> Lowering<'a> {
             LoweringCause::PlannerInvariant, "StaticResponseDeferred",
             "a handler-owned drive transfer has no defining emission owner",
         ))?;
-        let route = self.static_transition_plan.handler_drive_context_route(row, owner)?
-            .ok_or_else(|| unsupported(LoweringCause::PlannerInvariant,
-                "StaticResponseDeferred",
-                "a handler-owned Deferred drive has no planner-recorded context route",
-            ))?;
-        if body != route.worker_body_origin || vis_origin != route.vis_origin
+        let record = self.static_transition_plan
+            .handler_resumption_at_vis(vis_origin, owner)?.clone();
+        let route = &record.route;
+        if record.row != (row.vis_origin(), row.operation_root_origin(), row.effect_origin())
+            || body != route.worker_body_origin || vis_origin != route.vis_origin
             || owner != route.handler
         {
             return Err(unsupported(LoweringCause::PlannerInvariant,
@@ -5979,7 +5978,22 @@ impl<'a> Lowering<'a> {
         if first.static_origin != route.continuation_origin {
             return Err(unsupported(LoweringCause::PlannerInvariant,
                 "StaticResponseDeferred",
-                "a context-transfer drive's first eliminator frame is not its route's continuation",
+                "a planned resumption's first eliminator frame is not its route's continuation",
+            ));
+        }
+        let frame_origins = eliminators.iter().map(|frame| match frame {
+            EliminatorFrame::Computational(frame) => Some(frame.static_origin),
+            EliminatorFrame::Ordinary(frame) => Some(frame.static_origin),
+            EliminatorFrame::PendingLet(_) | EliminatorFrame::InvocationReturn
+            | EliminatorFrame::Active(_) => None,
+        }).collect::<Option<Vec<_>>>().ok_or_else(|| unsupported(
+            LoweringCause::PlannerInvariant, "StaticResponseDeferred",
+            "a planned resumption cannot name a source-less eliminator frame",
+        ))?;
+        if frame_origins != record.eliminators {
+            return Err(unsupported(LoweringCause::PlannerInvariant,
+                "StaticResponseDeferred",
+                "the live eliminator run disagrees with its planned resumption",
             ));
         }
         let k_inputs = k_env.into_iter().map(|binding| match binding {
@@ -5991,6 +6005,7 @@ impl<'a> Lowering<'a> {
         }).collect::<Result<Vec<_>, _>>()?;
         let resumed = self.call_declared_context(
             builder, route.context, body, &k_inputs, None, Some(&route.capture_claims),
+            Some(&record),
         )?;
         self.lower_computational_match_value_composed(
             builder, RoutedAnswer::direct(resumed), eliminators,
@@ -10447,6 +10462,19 @@ impl<'a> Lowering<'a> {
                         }
                     }
                 };
+                for resumption in self.static_transition_plan.handler_resumptions() {
+                    if resumption.emission_owner == defining_owner
+                        && resumption.route.worker_body_origin == worker_body_origin
+                        && (resumption.route.handler != defining_owner
+                            || resumption.route.context != claimed_context
+                            || resumption.route.context != context.id())
+                    {
+                        return Err(unsupported(LoweringCause::PlannerInvariant,
+                            "StaticResponseDeferred",
+                            "a resumption entry frame disagrees with its recorded owner or generated context route",
+                        ));
+                    }
+                }
                 if context.id() != claimed_context {
                     return Err(unsupported(LoweringCause::PlannerInvariant,
                         "ContinuationSpecialization",

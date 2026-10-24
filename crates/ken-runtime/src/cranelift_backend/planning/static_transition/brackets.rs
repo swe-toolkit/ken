@@ -171,6 +171,12 @@ impl BracketSettlementControlView {
             } else {
                 BracketSettlementMode::Deferred
             };
+            #[cfg(feature = "px8-ds-test-support")]
+            let mode = if std::env::var_os("RT_RECUT_FORCE_DEFERRED").is_some() {
+                BracketSettlementMode::Deferred
+            } else {
+                mode
+            };
             // A nested Deferred region has no in-place owner to order its
             // settlement against the parent. Refuse it before lowering.
             if mode == BracketSettlementMode::Deferred && region.parent.is_some() {

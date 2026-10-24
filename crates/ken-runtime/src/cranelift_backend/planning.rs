@@ -95,7 +95,8 @@ pub(in crate::cranelift_backend) use static_transition::{
     FusionRegionClaimLedger, PendingVisFrameOwner, PendingVisFrameRegion,
     PendingVisRecordProtocol, ResponseOwnerSettlement, BracketSettlement,
     BracketSettlementControlView,
-    BracketSettlementId, BracketSettlementMode,
+    BracketSettlementId, BracketSettlementMode, PlannedHandlerResumptionCall,
+    PlannedResumptionParameter,
 };
 /// `D2f` — the fused region's identity and its joined view, in PRODUCTION.
 ///

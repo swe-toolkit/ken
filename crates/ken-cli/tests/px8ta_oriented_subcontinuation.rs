@@ -157,7 +157,7 @@ proc main (_input : ProcessInput) (_caps : ProgramCaps APartial)
 "#;
 
 #[cfg(target_os = "linux")]
-fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
+fn nested_bracket_source(depth: usize) -> String {
     let body = match depth {
         1 => "leaf_body",
         2 => {
@@ -190,7 +190,12 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
         }
         _ => panic!("PX8-TA public control supports depths one through three"),
     };
-    let source = NESTED_BRACKET_PROGRAM.replace("__ROOT_BODY__", body);
+    NESTED_BRACKET_PROGRAM.replace("__ROOT_BODY__", body)
+}
+
+#[cfg(target_os = "linux")]
+fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
+    let source = nested_bracket_source(depth);
     let dir = output_dir(&format!("depth-{depth}"));
     for index in 0..depth {
         std::fs::write(
@@ -230,6 +235,58 @@ fn run_depth(depth: usize) -> (ken_runtime::EffectObservation, usize) {
     )
     .expect("linked nested bracket emits its canonical observation");
     (observation, plan.frames.len())
+}
+
+/// Promise class: durable invariant. A nested Deferred region has no planned
+/// release order, so the planner refuses it before emitting a native artifact.
+/// The gate is test-support-only and requires an explicit forced-mode run.
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "run with RT_RECUT_FORCE_DEFERRED=1 and ken-runtime/px8-ds-test-support"]
+fn forced_nested_deferred_depth_two_refuses_at_planning() {
+    assert_nested_deferred_refuses_at_planning(2);
+}
+
+/// Promise class: durable invariant. This exercises two nested regions, not
+/// just one, and refuses before the former depth-three trap-40 execution.
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore = "run with RT_RECUT_FORCE_DEFERRED=1 and ken-runtime/px8-ds-test-support"]
+fn forced_nested_deferred_depth_three_refuses_at_planning() {
+    assert_nested_deferred_refuses_at_planning(3);
+}
+
+#[cfg(target_os = "linux")]
+fn assert_nested_deferred_refuses_at_planning(depth: usize) {
+    assert!(std::env::var_os("RT_RECUT_FORCE_DEFERRED").is_some(),
+        "forced nested Deferred refusal needs its explicit test-support gate");
+    // The existing checked depth-three fixture needs >2112 KiB; use its
+    // stated 256 MiB provision, not the harness's ambient thread stack.
+    std::thread::Builder::new()
+        .name(format!("px8ta-deferred-refusal-{depth}"))
+        .stack_size(256 * 1024 * 1024)
+        .spawn(move || {
+            let dir = output_dir(&format!("forced-deferred-{depth}"));
+            let result = ken_cli::build_native_program(
+                &nested_bracket_source(depth),
+                ken_cli::SourceFormat::Ken,
+                &format!("px8ta-forced-deferred-{depth}"),
+                dir.path(),
+                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+            );
+            let error = match result {
+                Err(error) => error,
+                Ok(_) => panic!("depth {depth}: nested Deferred emitted native code"),
+            };
+            let diagnostic = format!("{error:?}");
+            assert!(diagnostic.contains(
+                "a nested bracket region has no in-place settlement owner; \
+                 deferred settlement order is not planned for nested regions"),
+                "depth {depth}: expected the exact nested-region planner refusal, got {diagnostic}");
+        })
+        .expect("spawn stated-stack forced Deferred control")
+        .join()
+        .expect("forced Deferred control thread");
 }
 
 #[cfg(target_os = "linux")]
@@ -278,12 +335,10 @@ fn public_two_level_brackets_finish_and_release_lifo() {
 }
 
 #[cfg(target_os = "linux")]
-// Depth 3 builds and runs, but its native observation exits at a planned
-// PatternMatchFailure for `ResourceBodyResult` after entering the nested body.
-// RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER owns that remaining defect; do
-// not rewrite the expected LIFO result to make this row pass.
+// Promise class: durable invariant. Depth 3 now builds, exits without a
+// terminal error, and releases all three resources in reverse acquisition
+// order through the same strict-LIFO observation as depths 1 and 2.
 #[test]
-#[ignore = "RT-BRACKET-PRODUCER-ROUTE-NESTED-BODY-ORDER: depth 3 runs but traps at ResourceBodyResult PatternMatchFailure"]
 fn public_three_level_brackets_finish_and_release_lifo() {
     assert_nested_depth_on_existing_test_thread(3);
 }
