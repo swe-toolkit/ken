@@ -258,6 +258,58 @@ fn refined_divisor_discharges_recorded_operation_hole_with_checked_projection() 
     }
 }
 
+/// Promise class: durable no-channel certificate boundary (22 §2.5 item 3).
+/// MEASURED: both checked refined-divisor expressions elaborate with no trust
+/// delta, while the same operations on plain or wrongly refined Int refuse
+/// with ObligationWithoutChannel. CLAIMED: a checked certificate discharges a
+/// PartialPrim site without minting an unreported postulate; the absence of
+/// evidence never does. THE GAP: a fn's reported and closed obligation is
+/// independently pinned by refined_divisor_discharges_recorded_operation_hole.
+#[test]
+fn standalone_refined_divisor_certificate_needs_no_obligation_channel() {
+    for spelling in ["/", "%"] {
+        let mut env = ElabEnv::new().expect("numeric prelude");
+        let before = env.env.trusted_base();
+        let source = format!(
+            "(\\n . \\d . n {spelling} d) : \
+             (n : Int) -> (d : {{z : Int | Not (Equal Int z 0)}}) -> Int"
+        );
+        let (body, ty) = env
+            .elaborate_expr(format!("checked_{spelling}"), &source)
+            .unwrap_or_else(|error| panic!("checked {spelling} divisor: {error:?}"));
+        check(&env.env, &Context::new(), &body, &ty)
+            .unwrap_or_else(|error| panic!("kernel-check {spelling} expression: {error:?}"));
+        assert_eq!(
+            env.env.trusted_base(),
+            before,
+            "{spelling}: no hidden postulate"
+        );
+
+        for (case, divisor) in [
+            ("plain Int", "Int"),
+            (
+                "reversed nonzero predicate",
+                "{z : Int | Not (Equal Int 0 z)}",
+            ),
+        ] {
+            let source =
+                format!("(\\n . \\d . n {spelling} d) : (n : Int) -> (d : {divisor}) -> Int");
+            let error = env
+                .elaborate_expr(format!("no_certificate_{case}_{spelling}"), &source)
+                .expect_err("no-channel unproved division must refuse");
+            assert!(
+                matches!(error, ElabError::ObligationWithoutChannel { .. }),
+                "{spelling} {case}: expected no-channel refusal, got {error:?}"
+            );
+            assert_eq!(
+                env.env.trusted_base(),
+                before,
+                "{spelling} {case}: no trust"
+            );
+        }
+    }
+}
+
 #[test]
 fn refined_divisor_with_requires_closes_only_over_the_real_proof_premise() {
     for spelling in ["/", "%"] {

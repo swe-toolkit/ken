@@ -15259,6 +15259,11 @@ fn elab_binop(
                 // `21 §6.3`: checked evidence, such as `Proj2 d` of a refined
                 // divisor, fills the hole through kernel admission.
                 match checked_evidence_certificate(cx, &goal, None) {
+                    // A context with no obligation channel records nothing for
+                    // a discharged obligation (`PremiseHoles::Refused`), as
+                    // `emit_subset_evidence` does. The certificate was
+                    // kernel-checked against `goal` in the current context.
+                    Some(_) if cx.premise_holes == PremiseHoles::Refused => {}
                     Some(proof) => admit_certificate_hole(
                         cx, &conditions, goal, &proof, span, ObligationKind::PartialPrim,
                     )?,
