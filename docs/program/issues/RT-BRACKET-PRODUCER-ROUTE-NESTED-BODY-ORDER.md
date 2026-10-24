@@ -169,10 +169,10 @@ next advancing stop is the node's 9th, a Research trigger.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 8, child 3 aggregate 9 (Architect `evt_62kr796gv7yjf`; the
-Research pull `evt_4a2ee3es6nvdw` discharged the 9th, and the ruling is
-`evt_2j4fxp3ekyr03`). The next advancing stop on this node is its 9th, a
-Research trigger. The 7th stop is the unforced binary after the β′
+§1a: 9, child 3 aggregate 10 (Architect `evt_61nznjb9jvcer`: the
+df26d3135 CI red advances; node stop 9 is the Research trigger, ruling
+held for the advisory). Before it: 8, aggregate 9 (`evt_62kr796gv7yjf`;
+Research `evt_4a2ee3es6nvdw`, ruling `evt_2j4fxp3ekyr03`). The 7th stop is the unforced binary after the β′
 closure (runtime-leader `evt_3k3pjar47z8zj`). It advances with no hold.
 Only the non-advancing
 baseline attribution B (B0 `0919ab3d6`, B1 `1a4ed40ea`, B2 the stop
@@ -247,6 +247,10 @@ L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
    explains only c68's refusal. Keyed on: target context selected by
    source position (unique selecting unit at the Vis), versus ownership
    of K's nested responses.
+9. T'' handler-drive route keyed on a unique continuation-unit lookup
+   at (K body, Vis); unit-less P1 rows lost their established in-place
+   drive. Keyed on: specialization-table lookup by source position.
+   Shares entry 8's predicate (Architect `evt_61nznjb9jvcer`).
 
 **Shared predicate, entries 4, 8 and 8 (correction)** (Architect
 `evt_2j4fxp3ekyr03`): the drive's composition, both its frames and its

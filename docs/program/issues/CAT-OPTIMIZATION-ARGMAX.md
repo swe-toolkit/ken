@@ -1,7 +1,7 @@
 ---
 id: CAT-OPTIMIZATION-ARGMAX
 title: "Implement spec 72 §3's argmax and its checked laws in the Algorithm.Optimization package, with a package test that runs the §3 seed"
-status: active
+status: merged
 owner: foundation
 size: M
 tier: T2
