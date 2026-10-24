@@ -445,22 +445,22 @@ and k-way merge remain deferred.
 The **finite candidate-selection contract** is pinned in
 **`72-optimization.md`** §1 (SPEC-OPTIMIZATION-SEARCH-CONTRACT;
 SPEC-OPTIMIZATION-ARGMIN-OPTION §1.4) and §3
-(SPEC-OPTIMIZATION-ARGMAX). The landed
-`Algorithm.Optimization.Argmin` selects the earliest minimum under a
-`Nat` cost from `NonEmpty a`, with no `DecEq a`; its seven checked laws
-and seed are present on main. Section 1.4 specifies `argmin_option`
-on a possibly empty `List a`, with `Nil`/`Cons` equations and direct
-membership and least-cost corollaries for a `Some` result. Its four
-laws were checked in Architect scratch D0; its catalog exports and
-seed are now present on main. Section 3 specifies `argmax` in the same
-module, selecting the earliest greatest-cost member of `NonEmpty a`
-under seven additional laws. Architect checked the §3 development
-with unchanged 114→114 trusted identities; §3 catalog exports and
-seed are not delivered by this spec-only candidate. Scratch checks
-alone establish neither shipped-seed execution, CI nor a landed trust
-measurement. Continuous or implicit search, heuristics, approximation,
-arbitrary-order or multi-objective costs, top-k and complexity claims
-remain deferred.
+(SPEC-OPTIMIZATION-ARGMAX; SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).
+The landed `Algorithm.Optimization.Argmin` selects the earliest minimum
+or greatest `Nat`-cost member of `NonEmpty a` with no `DecEq a`; the
+seven `argmin` and seven `argmax` laws and both seeds are present on
+main. Section 1.4's `argmin_option` and four laws are also landed.
+Section 3.4 specifies `argmax_option` on a possibly empty `List a`:
+`Nil` yields `None`, and `Cons` yields `Some` of `argmax` over
+`nonempty_cons`. Four laws give the two equations and direct-to-`List`
+membership and greatest-cost consequences for an observed `Some`.
+Architect's D0 checked these laws at 114→114 trusted identities. The
+§3.4 catalog exports are not yet delivered; the new seed is authored
+and checked only on an isolated D0 overlay, not shipped exports or the
+official conformance runner. No CI, publication, landing or landed
+trust measurement follows from the scratch checks. Continuous or
+implicit search, heuristics, approximation, arbitrary-order or
+multi-objective costs, top-k and complexity claims remain deferred.
 
 The **finite bounded-search contract** is pinned in
 **`72-optimization.md`** §2 (SPEC-OPTIMIZATION-BOUNDED-SEARCH).
