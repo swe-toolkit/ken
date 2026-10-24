@@ -11356,19 +11356,6 @@ fn solved_index_dependency_binders(
     Ok(selected)
 }
 
-/// Capability 3: does the branch's own CHECKING GOAL (not a context
-/// variable) depend on the scrutinee's un-refined outer index? A branch
-/// that constructs a FRESH value (e.g. `VNil Nat` against goal `Vec Nat n`,
-/// `zip`'s base case) needs the goal itself refined (each index's outer
-/// value substituted for the constructor's own target value) before
-/// `check` can succeed at all — capability 1/2 only re-type EXISTING
-/// context variables, never the goal `check` runs against, so a branch
-/// whose body never re-uses an existing field/sibling (like `tail`'s or
-/// `firstIsSecond`'s) never exercises this gap. Returns the (possibly
-/// more-refined) goal to check the body against, plus a producer-classified
-/// restoration plan needed to bring the CHECKED result back up to the original
-/// `expected_here`, to be applied in REVERSE order (innermost/most-refined
-/// first). Replay dispatches on the tag and never re-classifies a goal.
 /// Re-derive a solved method premise at the solution coordinate from its
 /// observational reduct: solved leaves become Refl, Top becomes tt, and an
 /// untouched leaf keeps its projection of the original premise.
@@ -11427,6 +11414,19 @@ fn reassemble_solved_premise(
     }
 }
 
+/// Capability 3: does the branch's own CHECKING GOAL (not a context
+/// variable) depend on the scrutinee's un-refined outer index? A branch
+/// that constructs a FRESH value (e.g. `VNil Nat` against goal `Vec Nat n`,
+/// `zip`'s base case) needs the goal itself refined (each index's outer
+/// value substituted for the constructor's own target value) before
+/// `check` can succeed at all — capability 1/2 only re-type EXISTING
+/// context variables, never the goal `check` runs against, so a branch
+/// whose body never re-uses an existing field/sibling (like `tail`'s or
+/// `firstIsSecond`'s) never exercises this gap. Returns the (possibly
+/// more-refined) goal to check the body against, plus a producer-classified
+/// restoration plan needed to bring the CHECKED result back up to the original
+/// `expected_here`, to be applied in REVERSE order (innermost/most-refined
+/// first). Replay dispatches on the tag and never re-classifies a goal.
 fn refine_branch_goal(
     cx: &ElabCtx,
     ind: &InductiveDecl,
