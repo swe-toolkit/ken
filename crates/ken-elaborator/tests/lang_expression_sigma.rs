@@ -120,9 +120,10 @@ fn check_nested_list_sigma(source: &str, truncated: bool) {
     let Term::Sigma(_, codomain) = *sigma else {
         panic!("expected kernel Sigma with dependent codomain")
     };
+    let true_id = env.globals["True"];
     assert!(
-        matches!(codomain.as_ref(), Term::App(_, argument) if matches!(argument.as_ref(), Term::Const { .. })),
-        "Sigma codomain must retain the checked equality's True endpoint"
+        matches!(codomain.as_ref(), Term::App(_, argument) if matches!(argument.as_ref(), Term::Constructor { id, .. } if *id == true_id)),
+        "Sigma codomain must retain the exact checked True constructor"
     );
     fn contains_nearest_var(term: &Term) -> bool {
         matches!(term, Term::Var(0)) || term.children().into_iter().any(contains_nearest_var)
