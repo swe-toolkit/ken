@@ -8,10 +8,19 @@ fn row(result: &str, step: &str) -> String {
     format!("fn g (n : AnyNat) : {result} = match n {{ Zero |-> Zero ; Suc m |-> {step} }}")
 }
 
+const VEC: &str = "data Vec (a : Type) : Nat -> Type where { VNil : Vec a Zero; VCons : (n : Nat) -> a -> Vec a n -> Vec a (Suc n) }";
+
 fn check_row(source: &str, goals: usize, explicit_axioms: usize) -> ElabEnv {
+    check_row_with_setup(source, goals, explicit_axioms, false)
+}
+
+fn check_row_with_setup(source: &str, goals: usize, explicit_axioms: usize, vec: bool) -> ElabEnv {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_decl("def AnyNat = { x : Nat | Top }")
         .expect("refined carrier alias");
+    if vec {
+        env.elaborate_decl(VEC).expect("checked indexed Vec family");
+    }
     let before = env.env.trusted_base().into_iter().collect::<BTreeSet<_>>();
     let result = env
         .elaborate_decl_v1(source)
@@ -63,7 +72,11 @@ fn check_row(source: &str, goals: usize, explicit_axioms: usize) -> ElabEnv {
 // constructor. For the match rows, inputs one and two enter different inner
 // methods, so type-correct admission alone cannot supply the observation.
 fn check_row_with_outputs(source: &str, goals: usize) {
-    let mut env = check_row(source, goals, 0);
+    check_row_with_outputs_and_setup(source, goals, false, ["", "", ""]);
+}
+
+fn check_row_with_outputs_and_setup(source: &str, goals: usize, vec: bool, suffixes: [&str; 3]) {
+    let mut env = check_row_with_setup(source, goals, 0, vec);
     let trust = env.env.trusted_base();
     for (index, (input, expected)) in [
         ("Zero", "Zero"),
@@ -73,11 +86,12 @@ fn check_row_with_outputs(source: &str, goals: usize) {
     .into_iter()
     .enumerate()
     {
+        let suffix = suffixes[index];
         let observed_id = env
             .elaborate_decl(&format!(
-                "const observed_{index} : Nat = g ({input}, Proved)"
+                "const observed_{index} : Nat = g ({input}, Proved){suffix}"
             ))
-            .unwrap_or_else(|error| panic!("checked call g ({input}, Proved): {error:?}"));
+            .unwrap_or_else(|error| panic!("checked call g ({input}, Proved){suffix}: {error:?}"));
         let expected_id = env
             .elaborate_decl(&format!("const expected_{index} : Nat = {expected}"))
             .unwrap_or_else(|error| panic!("checked Nat constructor {expected}: {error:?}"));
@@ -99,9 +113,16 @@ fn check_row_with_outputs(source: &str, goals: usize) {
 }
 
 fn expect_k0014(source: &str) {
+    expect_k0014_with_setup(source, false);
+}
+
+fn expect_k0014_with_setup(source: &str, vec: bool) {
     let mut env = ElabEnv::new().expect("prelude");
     env.elaborate_decl("def AnyNat = { x : Nat | Top }")
         .expect("refined carrier alias");
+    if vec {
+        env.elaborate_decl(VEC).expect("checked indexed Vec family");
+    }
     let error = env
         .elaborate_decl_v1(source)
         .expect_err("nondecreasing or unrelated pair must remain refused");
@@ -115,6 +136,171 @@ fn expect_k0014(source: &str) {
 
 const RESULT: &str = "{ y : Nat | Equal Nat y n }";
 const ENSURES: &str = "Nat ensures Equal Nat result n";
+
+fn indexed_row(parameters: &str, step: &str) -> String {
+    format!(
+        "fn g (n : AnyNat){parameters} : {RESULT} = match n {{ Zero |-> Zero ; Suc m |-> {step} }}"
+    )
+}
+
+const VEC_VALUE: &str = "let v : Vec Nat (Suc Zero) = VCons Nat Zero Zero (VNil Nat) in ";
+const INDEXED_PARAMS: &str = " (j : Nat) (v : Vec Nat j)";
+const INDEXED_PROOF_PARAMS: &str = " (j : Nat) (v : Vec Nat j) (e : Equal Nat j j)";
+
+/// Promise class: durable invariant (spec 17 §4, 39 §2, 64 §1).
+/// MEASURED: an indexed match returning a descending call through a let
+/// has a kernel-checked private worker, pinned goal count, closed Nat outputs,
+/// and no new trust outside its open obligations. CLAIMED: both methods of an
+/// applied eliminator grant their common returned-call argument authority.
+/// THE GAP: the first row skips a checked absurd branch; mixed, nested, and
+/// non-decreasing live branches are separately refused below.
+#[test]
+fn indexed_a2_impossible_method_does_not_erase_descent() {
+    check_row_with_outputs_and_setup(
+        &indexed_row(
+            "",
+            &format!("{VEC_VALUE}let r = (match v {{ VCons i a xs |-> g m }}) in Suc r"),
+        ),
+        3,
+        true,
+        ["", "", ""],
+    );
+}
+
+#[test]
+fn indexed_c0_both_methods_return_descending_call() {
+    check_row_with_outputs_and_setup(
+        &indexed_row(
+            INDEXED_PARAMS,
+            "let r = (match v { VNil |-> g m j v ; VCons i a xs |-> g m j v }) in Suc r",
+        ),
+        4,
+        true,
+        [
+            " Zero (VNil Nat)",
+            " Zero (VNil Nat)",
+            " (Suc Zero) (VCons Nat Zero Zero (VNil Nat))",
+        ],
+    );
+}
+
+#[test]
+fn indexed_c2_proof_parameter_keeps_descending_call() {
+    check_row_with_outputs_and_setup(
+        &indexed_row(
+            INDEXED_PROOF_PARAMS,
+            "let r = (match v { VNil |-> g m j v e ; VCons i a xs |-> g m j v e }) in Suc r",
+        ),
+        4,
+        true,
+        [
+            " Zero (VNil Nat) Proved",
+            " Zero (VNil Nat) Proved",
+            " (Suc Zero) (VCons Nat Zero Zero (VNil Nat)) Proved",
+        ],
+    );
+}
+
+/// Promise class: durable invariant (spec 17 §4, 39 §2, 64 §1).
+/// MEASURED: four adjacent previously accepted forms keep exact goal counts,
+/// checked workers, and trust deltas. CLAIMED: the applied-eliminator route
+/// does not change plain calls or an inline match. THE GAP: a new nested
+/// call inside that match is guarded by the typed K0014 refusals below.
+#[test]
+fn indexed_a1_inline_match_control() {
+    check_row_with_setup(
+        &indexed_row(
+            "",
+            &format!("{VEC_VALUE}Suc (match v {{ VCons i a xs |-> g m }})"),
+        ),
+        3,
+        0,
+        true,
+    );
+}
+
+#[test]
+fn indexed_c1_inline_match_with_proof_control() {
+    check_row_with_setup(
+        &indexed_row(
+            INDEXED_PROOF_PARAMS,
+            "Suc (match v { VNil |-> g m j v e ; VCons i a xs |-> g m j v e })",
+        ),
+        4,
+        0,
+        true,
+    );
+}
+
+#[test]
+fn indexed_c3_plain_let_call_control() {
+    check_row_with_setup(
+        &indexed_row(INDEXED_PROOF_PARAMS, "let r = g m j v e in Suc r"),
+        3,
+        0,
+        true,
+    );
+}
+
+#[test]
+fn indexed_a0_plain_call_after_vec_let_control() {
+    check_row_with_setup(
+        &indexed_row("", &format!("{VEC_VALUE}let r = g m in Suc r")),
+        3,
+        0,
+        true,
+    );
+}
+
+/// Promise class: durable invariant (spec 17 §4 and §4.1).
+/// MEASURED: the kernel returns exact NotTerminating/K0014 for each
+/// nondecreasing, nested, or branch-unequal call after an indexed match.
+/// CLAIMED: the returned-call intersection cannot manufacture structural
+/// descent or grant authority from an impossible method alone. THE GAP:
+/// these four independent counterexamples do not enumerate every family.
+#[test]
+fn indexed_mixed_nested_method_refused_k0014() {
+    expect_k0014_with_setup(
+        &indexed_row(
+            INDEXED_PARAMS,
+            "let r = (match v { VNil |-> g m j v ; VCons i a xs |-> g (g m j v) j v }) in Suc r",
+        ),
+        true,
+    );
+}
+
+#[test]
+fn indexed_absurd_and_nested_live_method_refused_k0014() {
+    expect_k0014_with_setup(
+        &indexed_row(
+            "",
+            &format!("{VEC_VALUE}let r = (match v {{ VCons i a xs |-> g (g m) }}) in Suc r"),
+        ),
+        true,
+    );
+}
+
+#[test]
+fn indexed_unchanged_argument_in_both_methods_refused_k0014() {
+    expect_k0014_with_setup(
+        &indexed_row(
+            INDEXED_PARAMS,
+            "let r = (match v { VNil |-> g n j v ; VCons i a xs |-> g n j v }) in Suc r",
+        ),
+        true,
+    );
+}
+
+#[test]
+fn indexed_mixed_call_and_noncall_refused_k0014() {
+    expect_k0014_with_setup(
+        &indexed_row(
+            INDEXED_PARAMS,
+            "let r = (match v { VNil |-> g m j v ; VCons i a xs |-> Zero }) in Suc r",
+        ),
+        true,
+    );
+}
 
 /// Promise class: durable invariant (spec 17 §4; spec 39 §3; spec 64 §1).
 /// MEASURED: each let-bound descent produces a kernel-checked private worker,
