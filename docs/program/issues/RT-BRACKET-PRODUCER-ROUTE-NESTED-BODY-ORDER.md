@@ -169,9 +169,11 @@ next advancing stop is the node's 9th, a Research trigger.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 10, child 3 aggregate 11 (Architect `evt_2rp8t2pz1rz4f`: the
-respin's attribution baseline failed on a mis-specified criterion;
-advancing, next Research trigger at 12). Before it: 9, aggregate 10
+§1a: 11, child 3 aggregate 12 (Architect `evt_5aw3s64w0zan7`: the
+capsule footprint declared from a filtered projection; advancing, next
+Research trigger at 12). Before it: 10, aggregate 11
+(`evt_2rp8t2pz1rz4f`: the respin's attribution baseline failed on a
+mis-specified criterion). Before that: 9, aggregate 10
 (`evt_61nznjb9jvcer`: the df26d3135 CI red; Research `evt_yxd12w9d32sx`,
 same-WP respin on `76fc5d236`). Before that: 8, aggregate 9 (`evt_62kr796gv7yjf`;
 Research `evt_4a2ee3es6nvdw`, ruling `evt_2j4fxp3ekyr03`). The 7th stop is the unforced binary after the β′
@@ -259,6 +261,13 @@ L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
    position in the log. Shares the entry 8 and 9 family (Architect
    `evt_2rp8t2pz1rz4f`); segment attribution with a counterfactual run
    replaces it (`evt_4mm2j7qj6tkb4`).
+11. The capsule footprint F was enumerated by hand from the filtered
+   site-A projection; the complete recorder log also carries
+   Route1(1286,true) x8, which vanishes under M-2'. Keyed on: a
+   vocabulary subset of the recorder log. Shares entry 10's predicate,
+   a population declared from a partial projection; F is now the
+   measured complete-log delta against M-2' (Architect
+   `evt_5aw3s64w0zan7`).
 
 **Shared predicate, entries 4, 8 and 8 (correction)** (Architect
 `evt_2j4fxp3ekyr03`): the drive's composition, both its frames and its
