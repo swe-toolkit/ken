@@ -315,7 +315,8 @@ fn cat3_d1_structural_collections_package_elaborates_zero_delta() {
             .copied()
             .filter(|id| {
                 env.class_env.class_by_id(*id).is_some_and(|class| {
-                    class.projection.owner_name == name && class.projection.type_id == *id
+                    class.projection.owner_name == format!("{DERIVED}.{name}")
+                        && class.projection.type_id == *id
                 })
             })
             .collect::<Vec<_>>();

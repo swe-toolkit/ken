@@ -30054,3 +30054,70 @@ mod surf1_visits_row_production_path {
         );
     }
 }
+
+#[cfg(test)]
+mod class_identity_resolution_tests {
+    use super::*;
+
+    /// Promise class: durable invariant (spec 33 §3.3).
+    /// MEASURED: the purity-only constraint lookup ignores an omitted checked
+    /// class ID even when the exact same class spelling has a checked global
+    /// and a registered instance. CLAIMED: a missing scope selection cannot
+    /// be replaced by an ambient class. THE GAP: normal scoped elaboration
+    /// supplies Some for selected classes; this targets the fail-closed helper.
+    #[test]
+    fn constraint_without_checked_class_id_cannot_borrow_registry_instance() {
+        let mut elab = crate::ElabEnv::new().expect("prelude");
+        elab.elaborate_file("class C a {} instance C Nat {}")
+            .expect("checked class and dictionary fixture");
+        let class_id = elab.globals["C"];
+        let instance_id = elab.globals["C_instance_Nat"];
+        let span = Span::zero();
+        let mut constraint = RInstanceConstraint {
+            class_name: "C".to_owned(),
+            class_id: None,
+            head_type: RType::RCon("Nat".to_owned(), span),
+            binder: "d".to_owned(),
+        };
+        let ctx = ProjectionPurityCtx {
+            env: &elab.env,
+            globals: &elab.globals,
+            class_env: &elab.class_env,
+            local_constraints: &[],
+            bound_dict_classes: &[],
+        };
+        assert_eq!(constraint_instance_id(&constraint, &ctx), None);
+        constraint.class_id = Some(class_id);
+        assert_eq!(constraint_instance_id(&constraint, &ctx), Some(instance_id));
+    }
+
+    /// Promise class: durable invariant (spec 36 §1.6).
+    /// MEASURED: an unresolved RCon dictionary domain retains an unknown
+    /// owner and its projection contributes a nonempty unknown-effect row.
+    /// CLAIMED: a missing class selection cannot silently become pure.
+    /// THE GAP: unknown is a conservative row, not a proof of actual effects.
+    #[test]
+    fn unresolved_dictionary_rcon_never_defaults_to_an_empty_effect_row() {
+        let elab = crate::ElabEnv::new().expect("prelude");
+        let span = Span::zero();
+        let ty = RType::RPi(
+            "d".to_owned(),
+            Box::new(RType::RCon("UnselectedClass".to_owned(), span.clone())),
+            Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+            span.clone(),
+        );
+        let dictionaries = collect_bound_dictionary_params(Some(&ty), &elab.globals, &elab.class_env);
+        assert_eq!(dictionaries, vec![("d".to_owned(), None)]);
+        let ctx = ProjectionPurityCtx {
+            env: &elab.env,
+            globals: &elab.globals,
+            class_env: &elab.class_env,
+            local_constraints: &[],
+            bound_dict_classes: &dictionaries,
+        };
+        let projected = projected_field_row_type(
+            &RExpr::RVar(0, "d".to_owned(), span), "step", Some(&ctx),
+        );
+        assert_eq!(projected, crate::effects::RowType::singleton("unknown checked class owner"));
+    }
+}

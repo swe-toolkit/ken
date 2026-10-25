@@ -208,7 +208,7 @@ fn lawful_instance_id(
     lawful_class_id(env, owned, class);
     let id = env
         .class_env
-        .instance_search(class, head)
+        .instance_search(&format!("Core.Classes.LawfulClasses.{class}"), head)
         .unwrap_or_else(|| panic!("{class} {head} must have a registered dictionary"));
     assert!(owned.contains(&id), "LawfulClasses must own {class} {head}");
     id

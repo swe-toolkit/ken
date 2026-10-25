@@ -189,7 +189,7 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
     assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
     let bool_instance = env
         .class_env
-        .instance_search("Ord", "Bool")
+        .instance_search("Core.Classes.LawfulClasses.Ord", "Bool")
         .expect("Ord Bool must remain registered");
     assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be owner-checked");
     env.elaborate_file(

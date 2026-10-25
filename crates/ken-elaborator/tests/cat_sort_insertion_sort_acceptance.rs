@@ -294,7 +294,7 @@ fn boolean_vectors_compute_and_both_generic_laws_instantiate() {
     assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
     let bool_instance = env
         .class_env
-        .instance_search("Ord", "Bool")
+        .instance_search("Core.Classes.LawfulClasses.Ord", "Bool")
         .expect("the canonical Ord Bool dictionary must be registered");
     assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be LawfulClasses-owned");
     let wrapper_id = env.globals["cat_sort_bool_via_ord"];

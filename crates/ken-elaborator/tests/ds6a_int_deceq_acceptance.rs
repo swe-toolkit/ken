@@ -47,7 +47,7 @@ fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
     let instance_id = |head: &str| {
         let id = env
             .class_env
-            .instance_search("DecEq", head)
+            .instance_search("Core.Classes.LawfulClasses.DecEq", head)
             .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
         assert!(lawful_owned.contains(&id), "DecEq {head} must belong to LawfulClasses");
         id

@@ -47,7 +47,7 @@ fn assert_transparent_globals(env: &ElabEnv, lawful_owned: &[GlobalId], names: &
         let id = if let Some(head) = name.strip_prefix("DecEq_instance_") {
             let instance = env
                 .class_env
-                .instance_search("DecEq", head)
+                .instance_search("Core.Classes.LawfulClasses.DecEq", head)
                 .unwrap_or_else(|| panic!("DecEq {head} must remain registered"));
             assert!(
                 lawful_owned.contains(&instance),

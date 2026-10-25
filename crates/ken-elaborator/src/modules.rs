@@ -4156,9 +4156,12 @@ fn synthesized_dictionary_name(
     let resolved_class = resolve_class_ref(scope, exports, class_name, span)?;
     let resolved_head = resolve_ref(scope, exports, head_name, span)?;
     Ok(SynthesizedDictionaryName {
+        // The unit-local alias follows its selected source spelling; the
+        // global key below follows the canonical checked class identity.
+        // Two aliased imports of same-spelled classes can therefore coexist.
         surface: format!(
             "{}_instance_{}",
-            canonical_leaf(&resolved_class),
+            canonical_leaf(class_name),
             canonical_leaf(&resolved_head)
         ),
         canonical: format!("{resolved_class}_instance_{resolved_head}"),

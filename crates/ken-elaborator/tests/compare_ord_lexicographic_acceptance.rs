@@ -70,7 +70,7 @@ fn owned_ord_instance(env: &ElabEnv, owned: &[GlobalId], head: &str) -> GlobalId
     assert!(owned.contains(&class), "the Ord class must be LC-owned");
     let instance = env
         .class_env
-        .instance_search("Ord", head)
+        .instance_search("Core.Classes.LawfulClasses.Ord", head)
         .unwrap_or_else(|| panic!("Ord {head} must be registered"));
     assert!(
         owned.contains(&instance),
@@ -390,7 +390,7 @@ fn pair_and_list_instances_compute_lexicographically() {
     ] {
         let instance = env
             .class_env
-            .instance_search("Ord", head)
+            .instance_search("Core.Classes.LawfulClasses.Ord", head)
             .unwrap_or_else(|| panic!("Ord {head} must remain registered"));
         assert!(
             lawful_owned.contains(&instance),
