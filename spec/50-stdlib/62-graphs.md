@@ -445,7 +445,6 @@ execution, CI, publication, landing, or a landed trust measurement.
 Section 1's reachability and finite certificates, §2's three laws,
 and the deferred scope in §1.4 are unchanged.
 
-
 ## 4. Left unit and associativity of walk composition
 
 The same `Algorithm.Graphs.Dependency` package proves that a zero-edge
@@ -490,8 +489,9 @@ Induction on `third` establishes this equality at every start and
 intermediate endpoint. A `WalkHere` third operand leaves a reflexive
 equality of stuck walk terms (`Refl` in the checked D0); in a
 `WalkStep` case, congruence through the final `WalkStep` transports
-the induction hypothesis without deleting or permuting an edge. No new public helper or private proof helper is
-required. Neither theorem changes the definition of `Walk`,
+the induction hypothesis without deleting or permuting an edge. No
+new public helper or private proof helper is required. Neither theorem
+changes the definition of `Walk`,
 `walk_append`, or the existing §1–3 laws. In particular, right
 `WalkHere` remains an **unexported reduction**, not a third public
 unit law. These statements use level-zero `Walk` data in `Type` and

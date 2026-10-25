@@ -162,9 +162,10 @@ changes to the genuinely different route via `D2`. Both sides have
 the same `Walk Vertex4 diamond D0 D3` type, but different checked
 intermediate vertices. The refusal must occur at this appended
 claim, not at an import, fixture, or accepted theorem. Use `Refl`:
-Architect's D0 found that `Proved` and `λsame. absurd same` both reject
-**true and false** closed WalkStep equalities on the measured base;
-those forms do not discriminate.
+Architect's D0 found that `Proved` is refused even for the true closed
+WalkStep equality, and that `λsame. absurd same` is refused for both
+the true and the false one, on the measured base; neither form
+discriminates.
 
 ### stdlib/graphs/walk-append-other-route-refused
 
