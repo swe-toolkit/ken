@@ -554,7 +554,7 @@ pub fn normalize(env: &GlobalEnv, ctx: &Context, t: &Term) -> Term {
         Term::J(m, d, e) => Term::J(
             Box::new(normalize(env, ctx, m)),
             Box::new(normalize(env, ctx, d)),
-            Box::new(normalize(env, ctx, e)),
+            Box::new(normalize_j_evidence(env, ctx, e)),
         ),
         Term::Quot(a, r, e) => Term::Quot(
             Box::new(normalize(env, ctx, a)),
@@ -594,6 +594,27 @@ pub fn normalize(env: &GlobalEnv, ctx: &Context, t: &Term) -> Term {
         | Term::Constructor { .. }
         | Term::IntLit(_) => h,
     }
+}
+
+/// J's recorded Eq evidence keeps its recording through normalization. The
+/// recorded formation is authoritative for `j_endpoints`; reducing its Eq
+/// head could expose a Pi or Sigma, and stripping it would leave a normal form
+/// the checker cannot re-infer. Only the components are normalized, so the
+/// recording stays convertible to the checked one and is re-checked on use.
+fn normalize_j_evidence(env: &GlobalEnv, ctx: &Context, e: &Term) -> Term {
+    if let Term::Ascript(inner, recorded) = e {
+        if let Term::Eq(a, x, y) = crate::check::eq_formation_head(env, recorded) {
+            return Term::Ascript(
+                Box::new(normalize(env, ctx, inner)),
+                Box::new(Term::Eq(
+                    Box::new(normalize(env, ctx, &a)),
+                    Box::new(normalize(env, ctx, &x)),
+                    Box::new(normalize(env, ctx, &y)),
+                )),
+            );
+        }
+    }
+    normalize(env, ctx, e)
 }
 
 /// Is `ty` a proposition — `Γ ⊢ ty : Ω_ℓ` for some `ℓ` (`16 §1.1`)? This is the
