@@ -138,17 +138,72 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control() {
 
 fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
     let root = tempfile::tempdir().expect("temporary native-build root");
-    let (_, rows) = ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
-        ken_runtime::with_branched_scrutinee_unit_body_match_branch_entry_suppressed(|| {
-            ken_cli::build_native_program(
-                BRANCHED_SCRUTINEE_SOURCE,
-                ken_cli::SourceFormat::Ken,
-                "rt_branched_scrutinee_unit_body_mutation",
-                root.path(),
-                ken_runtime::boundary_resource_profile::starter_smoke_profile(),
-            )
-        })
-    });
+    let (((result, rows), diagnostics), sequence) =
+        ken_runtime::with_settlement_footprint_sequence(|| {
+            ken_runtime::with_static_response_feasibility_diagnostics(|| {
+                ken_runtime::with_branched_scrutinee_unit_body_route1(|| {
+                    ken_runtime::with_branched_scrutinee_unit_body_match_branch_entry_suppressed(|| {
+                        ken_cli::build_native_program(
+                            BRANCHED_SCRUTINEE_SOURCE,
+                            ken_cli::SourceFormat::Ken,
+                            "rt_branched_scrutinee_unit_body_mutation",
+                            root.path(),
+                            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+                        )
+                    })
+                })
+            })
+        });
+    result.expect("the suppressed branch-entry build must complete before attribution");
+    assert_eq!(diagnostics.len(), 1, "one branched response plan authenticates the Tail");
+    use ken_runtime::SettlementFootprintEvent as Event;
+    use std::collections::BTreeMap;
+    let authenticated = &diagnostics[0].bracket_settlement_vis_origins;
+    if std::env::var_os("RT_FOOTPRINT_DETERMINISM").is_some() {
+        eprintln!("RT_SETTLEMENT_FOOTPRINT_SEQUENCE {sequence:?}");
+    }
+    let consumed = Event::Consumed { settlement: 1, construct: 717 };
+    let arrival = Event::ResidualArrival { origin: 523 };
+    let route = Event::Route1 { origin: 889, route1: true };
+    let mut segments = vec![BTreeMap::<Event, usize>::new()];
+    let mut non_consumed = BTreeMap::<Event, usize>::new();
+    for &event in &sequence {
+        if let Event::Consumed { construct, .. } = event {
+            assert_eq!(event, consumed, "only settlement 1 owns this Tail");
+            assert!(authenticated.contains(&construct),
+                "branched Tail Vis {construct} was not authenticated");
+            segments.push(BTreeMap::new());
+        } else {
+            *non_consumed.entry(event).or_default() += 1;
+        }
+        *segments.last_mut().expect("segment zero exists").entry(event).or_default() += 1;
+    }
+    // Transition sentinel. MEASURED: the complete unified lowering event log,
+    // including site-A arrival 523 between Consumed and Route1(889,true).
+    // CLAIMED: only the authenticated Tail produces two exact segment footprints
+    // and the ordinary d26 event population stays empty. THE GAP: this is
+    // compile-time work, not executed native semantics; the settlement forward
+    // edge retires both footprint events together.
+    // (a) Exact authenticated settlement count.
+    assert_eq!(segments.len(), 3, "two settlement-consumed branched Tails");
+    // (b) Segment zero and both complete segments as measured (not adjacency).
+    assert!(segments[0].is_empty(), "the d26 ordinary prefix is empty");
+    let expected = BTreeMap::from([(consumed, 1), (arrival, 1), (route, 1)]);
+    for (index, segment) in segments.iter().enumerate().skip(1) {
+        assert_eq!(*segment, expected,
+            "branched segment {index} changed from its measured full multiset");
+    }
+    // (c) F is the complete M-2' delta and its removal leaves no ordinary
+    // events; do not project away the residual arrival or any route event.
+    for footprint in [arrival, route] {
+        assert_eq!(non_consumed.remove(&footprint), Some(2),
+            "branched counterfactual footprint member changed: {footprint:?}");
+    }
+    assert!(non_consumed.is_empty(),
+        "branched non-footprint entries changed: {non_consumed:?}");
+    assert_eq!(sequence.iter().filter(|event| matches!(event, Event::Route1 { .. })).count(),
+        rows.iter().filter(|row| row.route1).count(),
+        "each selected route has one source-origin event");
     // The suppressed build's row count is not this control's subject. Before
     // RT-NATIVE-CONTINUATION-ENV-CARRIAGE I-2 the suppressed build aborted at
     // the first resolver entry, so one row was recorded. From I-2 the residual
@@ -157,10 +212,8 @@ fn suppressing_match_branch_entry_is_a_recorder_positive_control_body() {
     // run records. Select by the recorded property, as the sibling test does,
     // and do not freeze the total.
     assert!(!rows.is_empty(), "the resolver entry remains observable");
-    assert!(
-        rows.iter().all(|row| !row.route1),
-        "the old route-1 observation remains satisfied: {rows:?}"
-    );
+    assert_eq!(rows.iter().filter(|row| row.route1).count(), 2,
+        "exactly two selected routes follow the authenticated Tail: {rows:?}");
     assert!(
         rows.iter()
             .all(|row| !row.match_branch_entered && row.match_arms_walked == 0),

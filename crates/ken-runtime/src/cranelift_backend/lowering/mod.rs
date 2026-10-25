@@ -4128,8 +4128,77 @@ fn record_residual_counter_event(site: &'static str) {
     }
 }
 
+/// Test-support sequence of lowering acts, not a source-ancestry or runtime
+/// execution trace. Settlement-delimited segments include every entry from
+/// all recorder producers in one thread and build; no entry is filtered.
 #[cfg(any(test, feature = "px8-ds-test-support"))]
-fn record_site_a_residual_none_arrival() {
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum SettlementFootprintEvent {
+    Consumed { settlement: u32, construct: u32 },
+    ResidualArrival { origin: u32 },
+    Route1 { origin: u32, route1: bool },
+    RecursorApplied { layer: u32 },
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+thread_local! {
+    static SETTLEMENT_FOOTPRINT_SEQUENCE:
+        std::cell::RefCell<Option<Vec<SettlementFootprintEvent>>> =
+            const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+#[doc(hidden)]
+pub fn with_settlement_footprint_sequence<T>(body: impl FnOnce() -> T) ->
+    (T, Vec<SettlementFootprintEvent>)
+{
+    struct Restore(Option<Vec<SettlementFootprintEvent>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+                *cell.borrow_mut() = self.0.take();
+            });
+        }
+    }
+    let previous = SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+        cell.borrow_mut().replace(Vec::new())
+    });
+    let restore = Restore(previous);
+    let value = body();
+    let sequence = SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+        cell.borrow_mut().take().expect("settlement footprint sequence scope")
+    });
+    drop(restore);
+    (value, sequence)
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_settlement_footprint(event: SettlementFootprintEvent) {
+    SETTLEMENT_FOOTPRINT_SEQUENCE.with(|cell| {
+        if let Some(sequence) = cell.borrow_mut().as_mut() {
+            sequence.push(event);
+        }
+    });
+}
+
+#[cfg(feature = "px8-ds-test-support")]
+fn record_settlement_consumed_tail(
+    settlement: BracketSettlementId,
+    identity: &ContinuationCallIdentity,
+) {
+    let settlement = settlement.ordinal();
+    let construct = identity.producer_construct_origin().observation_ordinal();
+    record_settlement_footprint(SettlementFootprintEvent::Consumed { settlement, construct });
+    if std::env::var_os("KEN_RT_ITREE_D1_ROUTE_CONTROL_CHILD").is_some() {
+        eprintln!("RT_BRACKET_SETTLEMENT_CONSUMED_TAIL settlement={settlement} construct={construct}");
+    }
+}
+
+#[cfg(any(test, feature = "px8-ds-test-support"))]
+fn record_site_a_residual_none_arrival(origin: StaticOriginId) {
+    record_settlement_footprint(SettlementFootprintEvent::ResidualArrival {
+        origin: origin.observation_ordinal(),
+    });
     RESIDUAL_LOWERING_COUNTERS.with(|counter| {
         let mut measured = counter.get();
         measured.site_a_none_arrivals += 1;
@@ -11924,6 +11993,9 @@ impl SourceComputationalAnswerRoute {
                 eprintln!(
                     "RT_ITREE_D1_RECURSOR_APPLIED mode=drop-checked-frame-1 frame=1"
                 );
+                record_settlement_footprint(SettlementFootprintEvent::RecursorApplied {
+                    layer: layer.static_origin.observation_ordinal(),
+                });
                 Self::DirectScrutinee
             }
             Ok("drop-checked-frame-1") => route,

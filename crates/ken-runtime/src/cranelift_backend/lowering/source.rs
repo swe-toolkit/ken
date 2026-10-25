@@ -4904,12 +4904,14 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                     // retains the existing environment-capture producer path.
                     if current_checked_ih_projection.is_none() {
                         match forward_ret_outcome {
-                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {
+                            ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
                                 self.pending_computational_ih_call.take();
                                 let result = self
                                     .call_tail_checked_ih_transport_from_case_environment(
                                         builder, &transport, &env,
                                     )?;
+                                #[cfg(feature = "px8-ds-test-support")]
+                                record_settlement_consumed_tail(settlement, proof.source_call_identity());
                                 return Ok(SourceCallOutcome::Continue(
                                     SourceMachineState::Value {
                                         value: RoutedAnswer::checked(result),
@@ -5150,12 +5152,14 @@ match_origin={static_origin:?} input[{}] frame_route={answer_route:?} next_top={
                             // transfer, the active carried backedge, and the checked
                             // fallback. Same closeout as the non-governed seam above.
                             match forward_ret_outcome {
-                                ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(..) => {
+                                ComposedReturnForwardRetAuthorityOutcome::ConsumedBySettlement(proof, settlement) => {
                                     self.pending_computational_ih_call.take();
                                     let result = self
                                         .call_tail_checked_ih_transport_from_case_environment(
                                             builder, &transport, &env,
                                         )?;
+                                    #[cfg(feature = "px8-ds-test-support")]
+                                    record_settlement_consumed_tail(settlement, proof.source_call_identity());
                                     return Ok(SourceCallOutcome::Continue(
                                         SourceMachineState::Value {
                                             value: RoutedAnswer::checked(result),

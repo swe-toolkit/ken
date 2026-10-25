@@ -1167,7 +1167,14 @@ pub fn with_branched_scrutinee_unit_body_match_branch_entry_suppressed<R>(
 }
 
 #[cfg(any(test, feature = "px8-ds-test-support"))]
-fn record_branched_scrutinee_unit_body_route1(scrutinee: &RuntimeExpr) {
+fn record_branched_scrutinee_unit_body_route1(
+    origin: StaticOriginId,
+    scrutinee: &RuntimeExpr,
+) {
+    record_settlement_footprint(SettlementFootprintEvent::Route1 {
+        origin: origin.observation_ordinal(),
+        route1: true,
+    });
     BRANCHED_SCRUTINEE_UNIT_BODY_ROUTE1.with(|cell| {
         if let Some(rows) = cell.borrow_mut().as_mut() {
             let (plain_match, match_scrutinee_is_var, match_cases, construct_bodies) = match scrutinee {
@@ -1255,7 +1262,8 @@ mod branched_scrutinee_unit_body_observer_tests {
         let (_, rows) = with_branched_scrutinee_unit_body_route1(|| {
             record_branched_scrutinee_unit_body_entry();
             record_branched_scrutinee_unit_body_match_branch_entered();
-            record_branched_scrutinee_unit_body_route1(&RuntimeExpr::Var(0));
+            record_branched_scrutinee_unit_body_route1(
+                StaticOriginId::for_validation_observation(0), &RuntimeExpr::Var(0));
         });
         assert_eq!(rows.len(), 1);
         assert!(rows[0].match_branch_entered && rows[0].route1, "{rows:?}");
@@ -14334,7 +14342,7 @@ impl<'a> Lowering<'a> {
             if let LoweringOperand::Residual(residual) = argument {
                 debug_assert!(residual_fields[position].is_none());
                 #[cfg(any(test, feature = "px8-ds-test-support"))]
-                record_site_a_residual_none_arrival();
+                record_site_a_residual_none_arrival(origin);
                 decoded[position] = Some(self.decode_residual_child(builder, *residual)?);
             }
         }
@@ -15045,7 +15053,7 @@ impl<'a> Lowering<'a> {
                 return agreeing_recursive_body_unit(declared_units);
             }
             #[cfg(any(test, feature = "px8-ds-test-support"))]
-            record_branched_scrutinee_unit_body_route1(source.expr);
+            record_branched_scrutinee_unit_body_route1(source_origin, source.expr);
             return Ok(None);
         };
         let Some(argument) = recursive_position_construct_argument(args, position, false)? else {
