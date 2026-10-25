@@ -1,7 +1,7 @@
 ---
 id: SPEC-NUMERICAL-INTERVAL-INSIDE-ORDER
 title: "Spec 68 section 3 gives interval_inside reflexivity but no transitivity, and states no law that swapping the operands of interval_add, interval_mul, interval_hull or interval_intersect stays inside the original. Rule transitivity and operand-swap inclusion from a checked D0 at zero trust, and state them as a section 5 with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
