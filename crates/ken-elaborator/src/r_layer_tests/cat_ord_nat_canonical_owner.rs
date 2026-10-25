@@ -335,7 +335,7 @@ fn order_facade_carries_relation_and_dictionary_identities() {
         .resolution_provenance
         .iter()
         .rev()
-        .find(|resolution| resolution.class_name == "Ord" && resolution.head_type == "Nat")
+        .find(|resolution| resolution.class_name == "Core.Classes.LawfulClasses.Ord" && resolution.head_type == "Nat")
         .expect("Order-only consumer must record Ord Nat resolution provenance");
     assert_eq!(resolution.instance_id, dictionary);
     assert_eq!(resolution.defining_package, LAWFUL);
@@ -520,6 +520,7 @@ fn ownership_move_preserves_trust_posture_and_behavior() {
 
     env.elaborate_file(
         "import Data.Numeric.Nat.Order (leq_nat)\n\
+         import Core.Classes.LawfulClasses (Ord_instance_Nat)\n\
          theorem cat_ord_lt_behavior\n\
            : Equal Bool (leq_nat Zero (Suc Zero)) True = Proved\n\
          theorem cat_ord_gt_behavior\n\

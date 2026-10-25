@@ -86,20 +86,20 @@ fn anonymous_headers_parse_structurally_and_named_headers_reject_at_name() {
 fn write_two_provider_fixture(root: &FixtureRoot, admits: &str) {
     root.write(
         "P.ken",
-        "class RenderP a { tag : Bool }\n\
+        "pub class RenderP a { tag : Bool }\n\
          instance RenderP Int { tag = True }\n",
     );
     root.write(
         "Q.ken",
-        "class RenderQ a { tag : Bool }\n\
+        "pub class RenderQ a { tag : Bool }\n\
          instance RenderQ Bool { tag = False }\n",
     );
     root.write(
         "Entry.ken",
         &format!(
             "program admits {admits}\n\
-             import P\n\
-             import Q\n\
+             import P (RenderP)\n\
+             import Q (RenderQ)\n\
              fn useP (x : Int) : Int where RenderP Int = x\n\
              fn useQ (x : Bool) : Bool where RenderQ Bool = x\n"
         ),
@@ -115,10 +115,10 @@ fn admitted_ambient_resolution_records_distinct_provider_provenance() {
     let resolutions = &env.resolution_provenance;
     assert_eq!(resolutions.len(), 2);
     assert_eq!(resolutions[0].defining_package, "P");
-    assert_eq!(resolutions[0].class_name, "RenderP");
+    assert_eq!(resolutions[0].class_name, "P.RenderP");
     assert_eq!(resolutions[0].head_type, "Int");
     assert_eq!(resolutions[1].defining_package, "Q");
-    assert_eq!(resolutions[1].class_name, "RenderQ");
+    assert_eq!(resolutions[1].class_name, "Q.RenderQ");
     assert_eq!(resolutions[1].head_type, "Bool");
     assert_ne!(resolutions[0].instance_id, resolutions[1].instance_id);
 }
@@ -138,10 +138,10 @@ fn unadmitted_direct_dispatch_rejects_after_selection_and_one_line_admit_flips()
             ..
         }) => {
             assert_eq!(defining_package, "Q");
-            assert_eq!(class, "RenderQ");
+            assert_eq!(class, "Q.RenderQ");
             assert_eq!(head_type, "Bool");
             assert_eq!(
-                env.class_env.instances[&("RenderQ".to_string(), "Bool".to_string())].instance_id,
+                env.class_env.instances[&("Q.RenderQ".to_string(), "Bool".to_string())].instance_id,
                 instance_id,
                 "the diagnostic names the canonical instance selected by real search"
             );
@@ -160,8 +160,8 @@ fn multi_provider_direct_use_without_a_boundary_fails_closed() {
     write_two_provider_fixture(&root, "P, Q");
     root.write(
         "Entry.ken",
-        "import P\n\
-         import Q\n\
+        "import P (RenderP)\n\
+         import Q (RenderQ)\n\
          fn useP (x : Int) : Int where RenderP Int = x\n",
     );
 
@@ -174,7 +174,7 @@ fn multi_provider_direct_use_without_a_boundary_fails_closed() {
             ..
         }) => assert_eq!(
             (defining_package.as_str(), class.as_str(), head_type.as_str()),
-            ("P", "RenderP", "Int")
+            ("P", "P.RenderP", "Int")
         ),
         other => panic!("multi-provider direct use needs an explicit boundary, got {other:?}"),
     }
@@ -185,20 +185,20 @@ fn package_dependency_is_transitive_for_coherence_but_not_parent_direct_use() {
     let root = FixtureRoot::new("transitive");
     root.write(
         "Q.ken",
-        "class QMark a { tag : Bool }\n\
+        "pub class QMark a { tag : Bool }\n\
          instance QMark Int { tag = True }\n",
     );
     root.write(
         "P.ken",
         "package admits Q\n\
-         import Q\n\
+         import Q (QMark)\n\
          fn insideP (x : Int) : Int where QMark Int = x\n",
     );
     root.write(
         "Entry.ken",
         "program admits P\n\
          import P\n\
-         import Q\n\
+         import Q (QMark)\n\
          fn directQ (x : Int) : Int where QMark Int = x\n",
     );
 
@@ -216,7 +216,7 @@ fn package_dependency_is_transitive_for_coherence_but_not_parent_direct_use() {
                     class.as_str(),
                     head_type.as_str()
                 ),
-                ("Q", "QMark", "Int")
+                ("Q", "Q.QMark", "Int")
             );
             assert!(
                 env.globals.contains_key("P.insideP"),
@@ -225,7 +225,7 @@ fn package_dependency_is_transitive_for_coherence_but_not_parent_direct_use() {
             assert!(
                 env.class_env
                     .instances
-                    .contains_key(&("QMark".to_string(), "Int".to_string())),
+                    .contains_key(&("Q.QMark".to_string(), "Int".to_string())),
                 "Q remains present in the unfiltered source coherence registry"
             );
         }
@@ -257,12 +257,12 @@ fn sole_external_source_provider_self_admits_without_boundary() {
     let root = FixtureRoot::new("sole-external-provider");
     root.write(
         "P.ken",
-        "class Mark a { tag : Bool }\n\
+        "pub class Mark a { tag : Bool }\n\
          instance Mark Int { tag = True }\n",
     );
     root.write(
         "Entry.ken",
-        "import P\n\
+        "import P (Mark)\n\
          fn useP (x : Int) : Int where Mark Int = x\n",
     );
 
@@ -273,7 +273,7 @@ fn sole_external_source_provider_self_admits_without_boundary() {
         .last()
         .expect("real search records the external provider");
     assert_eq!(provenance.defining_package, "P");
-    assert_eq!(provenance.class_name, "Mark");
+    assert_eq!(provenance.class_name, "P.Mark");
     assert_eq!(provenance.head_type, "Int");
 }
 
@@ -302,12 +302,12 @@ fn admission_does_not_replace_overlap_or_orphan_gates() {
     }
 
     let orphan = FixtureRoot::new("orphan");
-    orphan.write("Class.ken", "class Render a { tag : Bool }\n");
-    orphan.write("Head.ken", "data RItem = MkRItem\n");
+    orphan.write("Class.ken", "pub class Render a { tag : Bool }\n");
+    orphan.write("Head.ken", "pub data RItem = MkRItem\n");
     orphan.write(
         "Bad.ken",
-        "import Class\n\
-         import Head\n\
+        "import Class (Render)\n\
+         import Head (RItem)\n\
          instance Render RItem { tag = True }\n",
     );
     orphan.write(
@@ -319,7 +319,7 @@ fn admission_does_not_replace_overlap_or_orphan_gates() {
     match orphan_env.elaborate_module_from_roots(&[orphan.path().to_path_buf()], "Entry") {
         Err(ElabError::OrphanInstance {
             class, head_type, ..
-        }) => assert_eq!((class.as_str(), head_type.as_str()), ("Render", "RItem")),
+        }) => assert_eq!((class.as_str(), head_type.as_str()), ("Class.Render", "Head.RItem")),
         other => panic!("admitted orphan must still reject at declaration, got {other:?}"),
     }
 }

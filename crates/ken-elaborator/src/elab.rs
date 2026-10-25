@@ -16942,13 +16942,32 @@ fn rtype_is_app_headed_by(ty: &RType, head: &RTypeHead) -> bool {
             .is_some_and(|candidate| rtype_heads_match(candidate, head))
 }
 
-fn type_is_applicative_dict_for_head(ty: &RType, head: &RTypeHead) -> bool {
+/// A dictionary head names the `Applicative` contract (`56 §5.2`) when it
+/// resolves to a checked class whose declared name is `Applicative`. The
+/// class key is owner-qualified, so the declared name is its last segment; a
+/// global that is not a registered class never earns the contract.
+fn names_applicative_class(
+    head: &RType,
+    globals: &HashMap<String, GlobalId>,
+    class_env: &ClassEnv,
+) -> bool {
+    let (name, id) = match head {
+        RType::RCheckedGlobal { name, id, .. } => (name, Some(*id)),
+        RType::RCon(name, _) => (name, globals.get(name).copied()),
+        _ => return false,
+    };
+    name.rsplit('.').next() == Some("Applicative")
+        && id.is_some_and(|id| class_env.class_by_id(id).is_some())
+}
+
+fn type_is_applicative_dict_for_head(
+    ty: &RType,
+    head: &RTypeHead,
+    is_applicative: &dyn Fn(&RType) -> bool,
+) -> bool {
     match ty {
         RType::RApp(f, arg, _) => {
-            matches!(&**f,
-                RType::RCon(name, _) | RType::RCheckedGlobal { name, .. }
-                    if name == "Applicative"
-            )
+            is_applicative(f)
                 && rtype_app_head(arg)
                     .as_ref()
                     .is_some_and(|candidate| rtype_heads_match(candidate, head))
@@ -16981,7 +17000,10 @@ fn collect_field_arrow_chain<'a>(ty: &'a RType, args: &mut Vec<&'a RType>) -> &'
     }
 }
 
-fn type_has_applicative_row_polymorphic_contract(ty: &RType) -> bool {
+fn type_has_applicative_row_polymorphic_contract(
+    ty: &RType,
+    is_applicative: &dyn Fn(&RType) -> bool,
+) -> bool {
     let mut args = Vec::new();
     let result = collect_field_arrow_chain(ty, &mut args);
     for arg in &args {
@@ -16991,7 +17013,7 @@ fn type_has_applicative_row_polymorphic_contract(ty: &RType) -> bool {
         if rtype_is_app_headed_by(result, &head)
             && args
                 .iter()
-                .any(|candidate| type_is_applicative_dict_for_head(candidate, &head))
+                .any(|candidate| type_is_applicative_dict_for_head(candidate, &head, is_applicative))
         {
             return true;
         }
@@ -16999,8 +17021,8 @@ fn type_has_applicative_row_polymorphic_contract(ty: &RType) -> bool {
     false
 }
 
-fn field_type_earns_proc(ty: &RType) -> bool {
-    type_contains_effect_row(ty) || type_has_applicative_row_polymorphic_contract(ty)
+fn field_type_earns_proc(ty: &RType, is_applicative: &dyn Fn(&RType) -> bool) -> bool {
+    type_contains_effect_row(ty) || type_has_applicative_row_polymorphic_contract(ty, is_applicative)
 }
 
 fn class_field_declared_row(keyword: DefKeyword, field_name: &str) -> crate::effects::RowType {
@@ -17017,9 +17039,10 @@ fn check_class_field_marker(
     field_name: &str,
     ty: &RType,
     span: &Span,
+    is_applicative: &dyn Fn(&RType) -> bool,
 ) -> Result<(), ElabError> {
     let explicit_value_params = explicit_value_param_count_from_field_type(ty);
-    let earns_proc = field_type_earns_proc(ty);
+    let earns_proc = field_type_earns_proc(ty, is_applicative);
     match keyword {
         DefKeyword::Const | DefKeyword::Fn if earns_proc => Err(ElabError::TypeMismatch {
             span: span.clone(),
@@ -19581,7 +19604,9 @@ fn elab_class_decl(
         let mut tys = Vec::new();
         for field in fields {
             if let Some(keyword) = field.purity {
-                check_class_field_marker(keyword, &field.name, &field.ty, span)?;
+                let is_applicative =
+                    |head: &RType| names_applicative_class(head, &*globals, &*class_env);
+                check_class_field_marker(keyword, &field.name, &field.ty, span, &is_applicative)?;
             }
             let t = elab_type(&mut cx, &field.ty)?;
             let t = cx.metas.zonk_term(&t);

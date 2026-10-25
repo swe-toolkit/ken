@@ -148,7 +148,7 @@ fn map_qualified_bindings(env: &ElabEnv) -> BTreeMap<String, GlobalId> {
 }
 
 fn map_instance_id(env: &ElabEnv, owned: &[GlobalId], carrier: &str) -> GlobalId {
-    let spelling = format!("Membership_instance_{MAP}.{carrier}");
+    let spelling = format!("Core.Classes.Membership.Membership_instance_{MAP}.{carrier}");
     let matches = owned
         .iter()
         .copied()

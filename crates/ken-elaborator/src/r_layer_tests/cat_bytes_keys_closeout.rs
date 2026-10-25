@@ -82,7 +82,7 @@ fn package_shape() -> PackageShape {
 
 fn instance_id(env: &ElabEnv, class: &str, head: &str) -> GlobalId {
     env.class_env
-        .instance_search(class, head)
+        .instance_search(&format!("{LAWFUL}.{class}"), head)
         .unwrap_or_else(|| panic!("{class} {head} must be registered"))
 }
 

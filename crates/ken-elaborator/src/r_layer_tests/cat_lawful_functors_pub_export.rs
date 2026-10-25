@@ -377,7 +377,7 @@ fn lawful_functors_list_instance_selects_derived_map_and_both_laws() {
     let list_instance = env
         .class_env
         .instances
-        .get(&("Functor".to_owned(), "List".to_owned()))
+        .get(&(format!("{LAWFUL_FUNCTORS}.Functor"), "List".to_owned()))
         .expect("Functor List instance must remain registered")
         .instance_id;
     let (_, body) = env
@@ -459,7 +459,7 @@ fn lawful_functors_bool_algebra_uses_only_lawfulclasses_canonical_family() {
         ("Semigroup", [true, true, false, false]),
         ("Monoid", [true, true, true, true]),
     ] {
-        let key = (class.to_owned(), "Bool".to_owned());
+        let key = (format!("{LAWFUL_FUNCTORS}.{class}"), "Bool".to_owned());
         let instance = env
             .class_env
             .instances
@@ -525,7 +525,7 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
         .class_env
         .instances
         .iter()
-        .filter(|((class, _), _)| class == "Semigroup")
+        .filter(|((class, _), _)| class == "Core.Classes.LawfulFunctors.Semigroup")
         .map(|((_, head), instance)| (head.clone(), instance.instance_id))
         .collect::<BTreeSet<_>>();
     assert_eq!(

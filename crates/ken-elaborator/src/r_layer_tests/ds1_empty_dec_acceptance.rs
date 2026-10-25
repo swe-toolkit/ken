@@ -302,7 +302,7 @@ fn real_empty_dec_imports_bind_canonical_class_and_transport_identities() {
     );
     let bool_instance = env
         .class_env
-        .instance_search("DecEq", "Bool")
+        .instance_search("Core.Classes.LawfulClasses.DecEq", "Bool")
         .expect("LawfulClasses must register DecEq Bool");
     let info = env
         .class_env
@@ -340,7 +340,7 @@ fn ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int() {
         .expect("EmptyDec checked examples and rejection fences must elaborate");
     let bool_instance = env
         .class_env
-        .instance_search("DecEq", "Bool")
+        .instance_search("Core.Classes.LawfulClasses.DecEq", "Bool")
         .expect("the class owner must register DecEq Bool");
     for example in ["true_is_true", "true_is_not_false"] {
         let example = env.globals[example];
@@ -402,7 +402,7 @@ fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
     assert!(lawful_owned.contains(&dec_eq_class), "LawfulClasses must own DecEq");
     let bool_instance = env
         .class_env
-        .instance_search("DecEq", "Bool")
+        .instance_search("Core.Classes.LawfulClasses.DecEq", "Bool")
         .expect("DecEq Bool must be a registered dictionary");
     assert!(
         lawful_owned.contains(&bool_instance) && env.env.transparent_body(bool_instance).is_some(),
