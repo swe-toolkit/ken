@@ -19,9 +19,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A push to main whose tree is byte-identical to a PR merge commit that
+  # already passed a full-mode pull_request run of this workflow is
+  # `pr-verified`: the heavy jobs skip, exactly as for doc-only. PR runs
+  # record their tested merge commit in the `ci-tested-tree` artifact; the
+  # push run re-derives that commit's tree from git and fails closed to
+  # `full` on any lookup failure or mismatch (scripts/ci-pr-verified.py).
+  # The read-only token scopes below exist for that lookup only.
   classify-paths:
     name: classify changed paths
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
     steps:
@@ -30,6 +41,8 @@ jobs:
           fetch-depth: 0
       - id: classify
         shell: bash
+        env:
+          CI_PR_VERIFIED_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           base='${{ github.event.pull_request.base.sha || github.event.before }}'
@@ -41,7 +54,29 @@ jobs:
           if classified=$(python3 scripts/ci-doc-only.py paths.json) && [ "$classified" = doc-only ]; then
             mode=doc-only
           fi
+          if [ "$mode" = full ] && [ "$GITHUB_EVENT_NAME" = push ]; then
+            if verified=$(python3 scripts/ci-pr-verified.py check) && [ "$verified" = pr-verified ]; then
+              mode=pr-verified
+            fi
+          fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
+      # Best effort: a PR run without this record only means its later push
+      # run stays full, so a recording failure must not fail the PR.
+      - name: Record tested merge tree
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          CI_MODE: ${{ steps.classify.outputs.mode }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/ci-pr-verified.py record "$CI_MODE" ci-tested-tree/record.json
+      - name: Upload tested merge tree
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-tested-tree
+          path: ci-tested-tree/record.json
+          if-no-files-found: error
       # TODO(F2/Team Spec): run the black-box conformance corpus once it exists.
       # TODO(F1/Team Foundation): scan for AGPL/license markers with the
       # denylist/manual-review boundary described in CLEAN-ROOM.md.
@@ -310,6 +345,10 @@ jobs:
           name: workspace-test-build-timings-${{ matrix.shard }}
           path: target/cargo-timings/
           if-no-files-found: error
+      # .config/nextest.toml gives the multi-minute catalog census tests top
+      # priority, so whichever shard draws them starts them first rather than
+      # partway through. It reorders the selection only; it never adds to or
+      # removes from it, so the shard union is unchanged.
       - name: Test
         run: >-
           scripts/run-ci-shard.sh
@@ -585,6 +624,12 @@ jobs:
           z3_adapter='${{ needs.z3-process-adapter.result }}'
           issue_tracker='${{ needs.issue-tracker.result }}'
           shard_union='${{ needs.verify-realized-shard-union.result }}'
+          mode='${{ needs.classify-paths.outputs.mode }}'
+          # doc-only and pr-verified skip the heavy jobs by design; only in
+          # those two modes is a skipped job accepted as passing.
+          skip_ok=0
+          case "$mode" in doc-only|pr-verified) skip_ok=1 ;; esac
+          echo "classified mode:        $mode"
           echo "path classification:    $classify"
           echo "test-shard matrix:      $shards"
           echo "native auxiliary tests: $write"
@@ -607,7 +652,7 @@ jobs:
                       "issue tracker and ignored-row sweep:$issue_tracker" \
                       "realized-shard-union:$shard_union"; do
             name="${pair%:*}"; result="${pair##*:}"
-            if [ "$result" != "success" ] && ! { [ '${{ needs.classify-paths.outputs.mode }}' = doc-only ] && [ "$result" = skipped ]; }; then
+            if [ "$result" != "success" ] && ! { [ "$skip_ok" = 1 ] && [ "$result" = skipped ]; }; then
               echo "::error::$name did not pass ($result)." >&2
               failed=1
             fi
