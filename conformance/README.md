@@ -287,6 +287,10 @@ claim with no conformance case is a claim no one can rely on
   bytes in both orientations, and a separate human AC-READER gate. Grouped
   inputs are red until the LET-4 surface lands; formatter bytes additionally
   require its formatter arm.
+- `surface/elaboration/seed-expression-sigma.md` — expression-position Σ
+  (`32 §2–3`, `33 §3.1–3.3`, `13 §4`): lowercase `and` exported as `And` and
+  explicitly imported by a consumer; conversion in both directions against
+  type-position Σ, plus the relevant-first `Type`-versus-Ω sort discriminator.
 - `surface/modules/seed-modules.md` — ES3 minimal modules/imports (`33 §3-4`,
   the bounded L4 slice): `module`/`import`/`pub`/abstract-export **elaborate
   away** to the kernel's single flat append-only `Σ` (`11 §4`) — **zero new

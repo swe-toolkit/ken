@@ -115,7 +115,7 @@ fn contains_recursive_result(expr: &RExpr) -> bool {
                     .iter()
                     .any(|(_, value, _)| contains_recursive_result(value))
         }
-        RExpr::RPi(_, domain, codomain, _) => {
+        RExpr::RPi(_, domain, codomain, _) | RExpr::RSigma(_, domain, codomain, _) => {
             type_contains_recursive_result(domain) || contains_recursive_result(codomain)
         }
         RExpr::RVar(_, _, _)
