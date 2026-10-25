@@ -2573,11 +2573,10 @@ fn rewrite_rexpr_inner(
         arm @ RExpr::RRecord { .. } => {
             rewrite_rexpr_inner_rrecord(scope, exports, arm, kernel_head)
         }
-        arm @ RExpr::RPosProj(..) => {
-            rewrite_rexpr_inner_rposproj(scope, exports, arm, kernel_head)
-        }
+        arm @ RExpr::RPosProj(..) => rewrite_rexpr_inner_rposproj(scope, exports, arm, kernel_head),
         arm @ RExpr::RProj(..) => rewrite_rexpr_inner_rproj(scope, exports, arm, kernel_head),
         arm @ RExpr::RPi(..) => rewrite_rexpr_inner_rpi(scope, exports, arm, kernel_head),
+        arm @ RExpr::RSigma(..) => rewrite_rexpr_inner_rsigma(scope, exports, arm, kernel_head),
         arm @ RExpr::RArrow(..) => rewrite_rexpr_inner_rarrow(scope, exports, arm, kernel_head),
         arm @ RExpr::RAttachedProofRef { .. } => {
             rewrite_rexpr_inner_rattachedproofref(scope, exports, arm, kernel_head)
@@ -2988,6 +2987,27 @@ fn rewrite_rexpr_inner_rpi(
     let _ = &kernel_head;
     Ok(rewrite_rexpr_arm(|| {
         Ok(RExpr::RPi(
+            x,
+            Box::new(rewrite_rtype(scope, exports, *a)?),
+            Box::new(rewrite_rexpr(scope, exports, *b)?),
+            s,
+        ))
+    })?)
+}
+
+#[inline(never)]
+fn rewrite_rexpr_inner_rsigma(
+    scope: &Scope,
+    exports: &HashMap<String, HashMap<String, String>>,
+    e: RExpr,
+    kernel_head: Option<&'static str>,
+) -> Result<RExpr, ElabError> {
+    let RExpr::RSigma(x, a, b, s) = e else {
+        unreachable!("rewrite_rexpr_inner_rsigma dispatch")
+    };
+    let _ = &kernel_head;
+    Ok(rewrite_rexpr_arm(|| {
+        Ok(RExpr::RSigma(
             x,
             Box::new(rewrite_rtype(scope, exports, *a)?),
             Box::new(rewrite_rexpr(scope, exports, *b)?),
