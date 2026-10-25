@@ -1,7 +1,7 @@
 ---
 id: SPEC-GEOMETRY-BOX-INSIDE-ORDER
 title: "Spec 67 section 3 puts an intersection inside each operand and each operand inside the hull, but states neither that inside is transitive nor that intersect and hull are the greatest and least such boxes. A client cannot chain two containments or conclude that a box inside both operands is inside their intersection. Rule those laws from a checked D0 at zero trust and state them as a section 5 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
