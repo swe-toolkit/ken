@@ -3,12 +3,14 @@
 Spec: `spec/50-stdlib/72-optimization.md` §3.4.
 Frame: `docs/program/issues/SPEC-OPTIMIZATION-ARGMAX-OPTION.md`.
 
-This authored seed states closed observations for `argmax_option` on `Nil`,
-a singleton and a tied-maximum input. The §3.4 exports are absent from the
-landed base at authoring, so the checks reported below use an isolated
-overlay of Architect's ruled D0 development, not shipped package exports.
-No official conformance-runner, CI, publication, landing or shipped-seed
-execution is claimed. Each case has promise class **durable invariant**.
+This seed states closed observations for `argmax_option` on `Nil`, a
+singleton and a tied-maximum input. The package test root-loads the §3.4
+exports and checks all accepted assertions and five isolated refusals. Its
+executable client omits only the redundant `IsTrue` import already bound by
+the compiler base; the seed's Ken fences and fixtures are unchanged. The
+earlier author check used an isolated D0 overlay, not package exports.
+Neither test claims official conformance-runner execution, CI, publication
+or landing. Each case has promise class **durable invariant**.
 
 ## Shared fixtures and accepted assertions
 
@@ -258,7 +260,8 @@ sources were loaded as temporary `catalog/packages/` clients so their
 imports resolved; their Ken fences came from this exact seed. The CLI
 binary was built in Architect's D0 scratch tree from `914cfbda0`,
 whose difference from the checked base affects docs and agent material,
-not `crates/` or `catalog/`. This is a local overlay check, not
-execution against landed §3.4 exports or by the official conformance
-runner. It supplies no runtime-cost, arbitrary candidate order, or
-tie-position witness claim.
+not `crates/` or `catalog/`. That historical check used a local overlay;
+the package test now checks these same assertions against roots-loaded §3.4
+exports, without claiming official conformance-runner execution. Neither
+check supplies a runtime-cost, arbitrary candidate order or tie-position
+witness claim.
