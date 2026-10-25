@@ -213,42 +213,14 @@ fn returned_call_refined_args(
             returned
         }
         Term::Elim { fam, methods, .. } => {
-            let Some(Decl::Inductive(decl)) = env.lookup(*fam) else {
-                return vec![];
+            eliminator_returned_args(env, *fam, methods, 0, members, scope)
+        }
+        Term::App(..) if matches!(peel_app(strip_ascript(value)).0, Term::Elim { .. }) => {
+            let (head, args) = peel_app(strip_ascript(value));
+            let Term::Elim { fam, methods, .. } = head else {
+                unreachable!("guarded by the match arm")
             };
-            if methods.is_empty() || decl.constructors.len() != methods.len() {
-                return vec![];
-            }
-            let mut common: Option<Vec<Term>> = None;
-            for (constructor, method) in decl.constructors.iter().zip(methods) {
-                let Ok(recursive) = ken_kernel::inductive::recursive_shapes(
-                    env,
-                    constructor,
-                    *fam,
-                    decl.params.len(),
-                ) else {
-                    return vec![];
-                };
-                let binders = constructor.args.len() + recursive.len();
-                let mut body = method;
-                for _ in 0..binders {
-                    let Term::Lam(_, inner) = strip_ascript(body) else {
-                        return vec![];
-                    };
-                    body = inner;
-                }
-                scope.extend(std::iter::repeat_with(Vec::new).take(binders));
-                let returned = returned_call_refined_args(env, body, members, scope);
-                scope.truncate(scope.len() - binders);
-                common = Some(match common {
-                    None => returned,
-                    Some(prior) => prior
-                        .into_iter()
-                        .filter(|arg| returned.contains(arg))
-                        .collect(),
-                });
-            }
-            common.unwrap_or_default()
+            eliminator_returned_args(env, fam, &methods, args.len(), members, scope)
         }
         call => member_call_refined_args(call, members)
             .into_iter()
@@ -263,6 +235,58 @@ fn returned_call_refined_args(
             })
             .collect(),
     }
+}
+
+/// The refined arguments every possible method of an eliminator returns,
+/// applied to `applied` arguments (an index-equation convoy's premises). Each
+/// method binds its constructor's arguments, then their inductive hypotheses,
+/// then one binder per applied argument. A method whose body is a checked
+/// `Absurd` has no path and is not intersected; if none has a path, none is
+/// returned.
+fn eliminator_returned_args(
+    env: &GlobalEnv,
+    fam: GlobalId,
+    methods: &[Term],
+    applied: usize,
+    members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
+    scope: &mut Vec<Vec<Term>>,
+) -> Vec<Term> {
+    let Some(Decl::Inductive(decl)) = env.lookup(fam) else {
+        return vec![];
+    };
+    if methods.is_empty() || decl.constructors.len() != methods.len() {
+        return vec![];
+    }
+    let mut common: Option<Vec<Term>> = None;
+    for (constructor, method) in decl.constructors.iter().zip(methods) {
+        let Ok(recursive) =
+            ken_kernel::inductive::recursive_shapes(env, constructor, fam, decl.params.len())
+        else {
+            return vec![];
+        };
+        let binders = constructor.args.len() + recursive.len() + applied;
+        let mut body = method;
+        for _ in 0..binders {
+            let Term::Lam(_, inner) = strip_ascript(body) else {
+                return vec![];
+            };
+            body = inner;
+        }
+        if matches!(strip_ascript(body), Term::Absurd(..)) {
+            continue;
+        }
+        scope.extend(std::iter::repeat_with(Vec::new).take(binders));
+        let returned = returned_call_refined_args(env, body, members, scope);
+        scope.truncate(scope.len() - binders);
+        common = Some(match common {
+            None => returned,
+            Some(prior) => prior
+                .into_iter()
+                .filter(|arg| returned.contains(arg))
+                .collect(),
+        });
+    }
+    common.unwrap_or_default()
 }
 
 /// The refined arguments of a saturated member call; otherwise none.
@@ -324,6 +348,17 @@ fn rewrite_core(
                     }
                     return Some(call);
                 }
+            }
+            // An eliminator applied to its convoy arguments returns what its
+            // methods return under those binders; its motive and methods
+            // inherit that call, not the bare eliminator's.
+            if matches!(head, Term::Elim { .. }) {
+                let returned = mode.with_call(env, term, members);
+                let mut call = rewrite_elim(env, &head, members, mode, &returned)?;
+                for arg in &args {
+                    call = Term::app(call, walk(arg)?);
+                }
+                return Some(call);
             }
             let mut call = walk(&head)?;
             for arg in &args {
@@ -399,28 +434,11 @@ fn rewrite_core(
             respect: Box::new(walk(respect)?),
             scrut: Box::new(walk(scrut)?),
         },
-        Term::Elim {
-            fam,
-            level_args,
-            params,
-            motive,
-            methods,
-            indices,
-            scrut,
-        } => {
+        Term::Elim { .. } => {
             // The motive and methods type and produce the value this
             // eliminator returns, so they inherit the call it returns.
             let returned = mode.with_call(env, term, members);
-            let typed = |term: &Term| rewrite_core(env, term, members, &returned);
-            Term::Elim {
-                fam: *fam,
-                level_args: level_args.clone(),
-                params: params.iter().map(walk).collect::<Option<Vec<_>>>()?,
-                motive: Box::new(typed(motive)?),
-                methods: methods.iter().map(typed).collect::<Option<Vec<_>>>()?,
-                indices: indices.iter().map(walk).collect::<Option<Vec<_>>>()?,
-                scrut: Box::new(walk(scrut)?),
-            }
+            rewrite_elim(env, term, members, mode, &returned)?
         }
         Term::Var(_)
         | Term::Const { .. }
@@ -429,6 +447,40 @@ fn rewrite_core(
         | Term::IndFormer { .. }
         | Term::Constructor { .. }
         | Term::IntLit(_) => term.clone(),
+    })
+}
+
+/// Rewrite an eliminator whose motive and methods inherit `returned`; its
+/// parameters, indices and scrutinee keep the enclosing `mode`.
+fn rewrite_elim(
+    env: &GlobalEnv,
+    term: &Term,
+    members: &HashMap<GlobalId, (&[Option<(Term, Term)>], GlobalId)>,
+    mode: &ProjectionRedexes,
+    returned: &ProjectionRedexes,
+) -> Option<Term> {
+    let Term::Elim {
+        fam,
+        level_args,
+        params,
+        motive,
+        methods,
+        indices,
+        scrut,
+    } = term
+    else {
+        return None;
+    };
+    let walk = |term: &Term| rewrite_core(env, term, members, mode);
+    let typed = |term: &Term| rewrite_core(env, term, members, returned);
+    Some(Term::Elim {
+        fam: *fam,
+        level_args: level_args.clone(),
+        params: params.iter().map(walk).collect::<Option<Vec<_>>>()?,
+        motive: Box::new(typed(motive)?),
+        methods: methods.iter().map(typed).collect::<Option<Vec<_>>>()?,
+        indices: indices.iter().map(walk).collect::<Option<Vec<_>>>()?,
+        scrut: Box::new(walk(scrut)?),
     })
 }
 
