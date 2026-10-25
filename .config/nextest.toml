@@ -1,0 +1,22 @@
+# Test scheduling hints for cargo-nextest (priority needs nextest >= 0.9.91).
+#
+# Priority changes only the order in which selected tests start, never which
+# tests run, so the duration-balanced shard selection and its exact-once
+# union check (scripts/check-ci-shard-union.py) are unaffected.
+#
+# These catalog tests each run for several minutes on a CI runner. In run
+# 40190674778 shard 1 started the census about 530s into a 1,904s Test step
+# and it finished last (1,375s), with the frontier test second to last. Start
+# them first so the long tail overlaps the shard's short tests instead of
+# trailing them. The population pin is the same family and ran 300-440s.
+[[profile.default.overrides]]
+filter = 'binary_id(=ken-elaborator::lang_mod_strict_resolution_d0) & test(=catalog_ambient_passthrough_migration_census)'
+priority = 100
+
+[[profile.default.overrides]]
+filter = 'binary_id(=ken-elaborator) & test(=r_layer_tests::lang_mod_catalog_evidence_frontier::catalog_evidence_frontier_is_closed_and_honest)'
+priority = 100
+
+[[profile.default.overrides]]
+filter = 'binary_id(=ken-elaborator) & test(=r_layer_tests::lang_mod_catalog_evidence_frontier::population_pin_rejects_omission_replacement_and_duplicate)'
+priority = 100
