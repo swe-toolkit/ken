@@ -1,7 +1,7 @@
 ---
 id: CAT-GEOMETRY-BOX-INSIDE-ORDER
 title: "Algorithm.Geometry.NatBox exports spec 67 section 5: inside_trans, intersect_greatest and hull_least over corner-wise inside, proved at zero trust from the Architect's D0, with the section 5 seed run by a package test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
