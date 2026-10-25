@@ -2573,9 +2573,7 @@ fn rewrite_rexpr_inner(
         arm @ RExpr::RRecord { .. } => {
             rewrite_rexpr_inner_rrecord(scope, exports, arm, kernel_head)
         }
-        arm @ RExpr::RPosProj(..) => {
-            rewrite_rexpr_inner_rposproj(scope, exports, arm, kernel_head)
-        }
+        arm @ RExpr::RPosProj(..) => rewrite_rexpr_inner_rposproj(scope, exports, arm, kernel_head),
         arm @ RExpr::RProj(..) => rewrite_rexpr_inner_rproj(scope, exports, arm, kernel_head),
         arm @ RExpr::RPi(..) => rewrite_rexpr_inner_rpi(scope, exports, arm, kernel_head),
         arm @ RExpr::RSigma(..) => rewrite_rexpr_inner_rsigma(scope, exports, arm, kernel_head),

@@ -14366,8 +14366,11 @@ fn infer(cx: &mut ElabCtx, expr: &RExpr) -> Result<(Term, Term), ElabError> {
 
         RExpr::RTrunc(inner, span) => infer_trunc(cx, inner, span),
 
-        RExpr::RAttachedProofRef { subject, proof_name, span } =>
-            infer_attached_proof_ref(cx, subject, proof_name, span),
+        RExpr::RAttachedProofRef {
+            subject,
+            proof_name,
+            span,
+        } => infer_attached_proof_ref(cx, subject, proof_name, span),
     }
 }
 
@@ -14493,15 +14496,16 @@ fn infer_sigma(
         types: cx.ctx.types.iter().map(|t| cx.metas.zonk_term(t)).collect(),
     };
     let zonked_sigma = cx.metas.zonk_term(&sigma);
-    let sort = kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_sigma).map_err(
-        |error| match error {
-            CurrentKernelQueryError::View(error) => error,
-            CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
-                error,
-                span: span.clone(),
+    let sort =
+        kernel_infer_in_zonked_current(cx, &zonked_ctx, &zonked_sigma).map_err(
+            |error| match error {
+                CurrentKernelQueryError::View(error) => error,
+                CurrentKernelQueryError::Kernel(error) => ElabError::KernelRejected {
+                    error,
+                    span: span.clone(),
+                },
             },
-        },
-    )?;
+        )?;
     Ok((sigma, sort))
 }
 
