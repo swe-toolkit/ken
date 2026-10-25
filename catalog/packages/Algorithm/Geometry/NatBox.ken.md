@@ -2,8 +2,8 @@
 
 Points and axis-aligned boxes over `Nat` have total, exact membership and
 geometry operations. Six box-and-distance laws, two metric laws, seven
-corner-wise containment laws, and three area laws carry kernel-checked
-generic proofs.
+corner-wise containment laws, three inclusion-order laws, and three area
+laws carry kernel-checked generic proofs.
 
 ## Contents
 
@@ -28,9 +28,9 @@ point set is empty.
 The two constructors are exported separately from their carrier types so a
 client can build a point and a box. Five original operations and six
 box-and-distance laws lead the definition; two metric laws follow. The
-corner-wise `inside` operation and its seven laws come next, followed by
-`area` and its three laws. Per-axis proof helpers and distance helpers stay
-private.
+corner-wise `inside` operation and its seven laws come next, then the three
+inclusion-order laws, followed by `area` and its three laws. Per-axis proof
+helpers and distance helpers stay private.
 
 Intersection takes coordinatewise maximum lower and minimum upper bounds;
 hull takes the opposite bounds. Distance adds two saturated absolute
@@ -1143,6 +1143,204 @@ pub theorem inside_complete
       }
   }
 
+pub theorem inside_trans
+      (a : Box) (b : Box) (c : Box)
+    : IsTrue (inside a b) → IsTrue (inside b c) → IsTrue (inside a c) =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match c {
+            MkBox clo chi ↦
+              match alo {
+                MkPoint alx aly ↦
+                  match ahi {
+                    MkPoint ahx ahy ↦
+                      match blo {
+                        MkPoint blx bly ↦
+                          match bhi {
+                            MkPoint bhx bhy ↦
+                              match clo {
+                                MkPoint clx cly ↦
+                                  match chi {
+                                    MkPoint chx chy ↦
+                                      λab.
+                                        λbc.
+                                          (proof intro for bool_and)
+                                            (axis_within alx ahx clx chx)
+                                            (axis_within aly ahy cly chy)
+                                            (axis_within_trans
+                                              alx
+                                              ahx
+                                              blx
+                                              bhx
+                                              clx
+                                              chx
+                                              ((proof left for bool_and)
+                                                (axis_within alx ahx blx bhx)
+                                                (axis_within aly ahy bly bhy)
+                                                ab)
+                                              ((proof left for bool_and)
+                                                (axis_within blx bhx clx chx)
+                                                (axis_within bly bhy cly chy)
+                                                bc))
+                                            (axis_within_trans
+                                              aly
+                                              ahy
+                                              bly
+                                              bhy
+                                              cly
+                                              chy
+                                              ((proof right for bool_and)
+                                                (axis_within alx ahx blx bhx)
+                                                (axis_within aly ahy bly bhy)
+                                                ab)
+                                              ((proof right for bool_and)
+                                                (axis_within blx bhx clx chx)
+                                                (axis_within bly bhy cly chy)
+                                                bc))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem intersect_greatest
+      (a : Box) (b : Box) (c : Box)
+    : IsTrue (inside a b) → IsTrue (inside a c) → IsTrue (inside a (intersect b c)) =
+  match a {
+    MkBox alo ahi ↦
+      match b {
+        MkBox blo bhi ↦
+          match c {
+            MkBox clo chi ↦
+              match alo {
+                MkPoint alx aly ↦
+                  match ahi {
+                    MkPoint ahx ahy ↦
+                      match blo {
+                        MkPoint blx bly ↦
+                          match bhi {
+                            MkPoint bhx bhy ↦
+                              match clo {
+                                MkPoint clx cly ↦
+                                  match chi {
+                                    MkPoint chx chy ↦
+                                      λab.
+                                        λac.
+                                          (proof intro for bool_and)
+                                            (axis_within alx ahx (max blx clx) (min bhx chx))
+                                            (axis_within aly ahy (max bly cly) (min bhy chy))
+                                            (axis_within_meet
+                                              alx
+                                              ahx
+                                              blx
+                                              bhx
+                                              clx
+                                              chx
+                                              ((proof left for bool_and)
+                                                (axis_within alx ahx blx bhx)
+                                                (axis_within aly ahy bly bhy)
+                                                ab)
+                                              ((proof left for bool_and)
+                                                (axis_within alx ahx clx chx)
+                                                (axis_within aly ahy cly chy)
+                                                ac))
+                                            (axis_within_meet
+                                              aly
+                                              ahy
+                                              bly
+                                              bhy
+                                              cly
+                                              chy
+                                              ((proof right for bool_and)
+                                                (axis_within alx ahx blx bhx)
+                                                (axis_within aly ahy bly bhy)
+                                                ab)
+                                              ((proof right for bool_and)
+                                                (axis_within alx ahx clx chx)
+                                                (axis_within aly ahy cly chy)
+                                                ac))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
+pub theorem hull_least
+      (b : Box) (c : Box) (d : Box)
+    : IsTrue (inside b d) → IsTrue (inside c d) → IsTrue (inside (hull b c) d) =
+  match b {
+    MkBox blo bhi ↦
+      match c {
+        MkBox clo chi ↦
+          match d {
+            MkBox dlo dhi ↦
+              match blo {
+                MkPoint blx bly ↦
+                  match bhi {
+                    MkPoint bhx bhy ↦
+                      match clo {
+                        MkPoint clx cly ↦
+                          match chi {
+                            MkPoint chx chy ↦
+                              match dlo {
+                                MkPoint dlx dly ↦
+                                  match dhi {
+                                    MkPoint dhx dhy ↦
+                                      λbd.
+                                        λcd.
+                                          (proof intro for bool_and)
+                                            (axis_within (min blx clx) (max bhx chx) dlx dhx)
+                                            (axis_within (min bly cly) (max bhy chy) dly dhy)
+                                            (axis_within_join
+                                              blx
+                                              bhx
+                                              clx
+                                              chx
+                                              dlx
+                                              dhx
+                                              ((proof left for bool_and)
+                                                (axis_within blx bhx dlx dhx)
+                                                (axis_within bly bhy dly dhy)
+                                                bd)
+                                              ((proof left for bool_and)
+                                                (axis_within clx chx dlx dhx)
+                                                (axis_within cly chy dly dhy)
+                                                cd))
+                                            (axis_within_join
+                                              bly
+                                              bhy
+                                              cly
+                                              chy
+                                              dly
+                                              dhy
+                                              ((proof right for bool_and)
+                                                (axis_within blx bhx dlx dhx)
+                                                (axis_within bly bhy dly dhy)
+                                                bd)
+                                              ((proof right for bool_and)
+                                                (axis_within clx chx dlx dhx)
+                                                (axis_within cly chy dly dhy)
+                                                cd))
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  }
+
 pub fn area (b : Box) : Nat =
   match b {
     MkBox lo hi ↦
@@ -1264,6 +1462,75 @@ theorem axis_within_refl (l : Nat) (h : Nat) : IsTrue (axis_within l h l h) =
     (leq_nat h h)
     ((proof refl for leq_nat) l)
     ((proof refl for leq_nat) h)
+
+theorem axis_within_trans
+      (l1 : Nat) (h1 : Nat) (l2 : Nat) (h2 : Nat) (l3 : Nat) (h3 : Nat)
+    : IsTrue (axis_within l1 h1 l2 h2)
+      → IsTrue (axis_within l2 h2 l3 h3)
+      → IsTrue (axis_within l1 h1 l3 h3) =
+  λw12.
+    λw23.
+      (proof intro for bool_and)
+        (leq_nat l3 l1)
+        (leq_nat h1 h3)
+        ((proof trans for leq_nat)
+          l3
+          l2
+          l1
+          ((proof left for bool_and) (leq_nat l3 l2) (leq_nat h2 h3) w23)
+          ((proof left for bool_and) (leq_nat l2 l1) (leq_nat h1 h2) w12))
+        ((proof trans for leq_nat)
+          h1
+          h2
+          h3
+          ((proof right for bool_and) (leq_nat l2 l1) (leq_nat h1 h2) w12)
+          ((proof right for bool_and) (leq_nat l3 l2) (leq_nat h2 h3) w23))
+
+theorem axis_within_meet
+      (l : Nat) (h : Nat) (l2 : Nat) (h2 : Nat) (l3 : Nat) (h3 : Nat)
+    : IsTrue (axis_within l h l2 h2)
+      → IsTrue (axis_within l h l3 h3)
+      → IsTrue (axis_within l h (max l2 l3) (min h2 h3)) =
+  λw2.
+    λw3.
+      (proof intro for bool_and)
+        (leq_nat (max l2 l3) l)
+        (leq_nat h (min h2 h3))
+        ((proof least for max)
+          l
+          l2
+          l3
+          ((proof left for bool_and) (leq_nat l2 l) (leq_nat h h2) w2)
+          ((proof left for bool_and) (leq_nat l3 l) (leq_nat h h3) w3))
+        ((proof greatest for min)
+          h
+          h2
+          h3
+          ((proof right for bool_and) (leq_nat l2 l) (leq_nat h h2) w2)
+          ((proof right for bool_and) (leq_nat l3 l) (leq_nat h h3) w3))
+
+theorem axis_within_join
+      (l2 : Nat) (h2 : Nat) (l3 : Nat) (h3 : Nat) (l : Nat) (h : Nat)
+    : IsTrue (axis_within l2 h2 l h)
+      → IsTrue (axis_within l3 h3 l h)
+      → IsTrue (axis_within (min l2 l3) (max h2 h3) l h) =
+  λw2.
+    λw3.
+      (proof intro for bool_and)
+        (leq_nat l (min l2 l3))
+        (leq_nat (max h2 h3) h)
+        ((proof greatest for min)
+          l
+          l2
+          l3
+          ((proof left for bool_and) (leq_nat l l2) (leq_nat h2 h) w2)
+          ((proof left for bool_and) (leq_nat l l3) (leq_nat h3 h) w3))
+        ((proof least for max)
+          h
+          h2
+          h3
+          ((proof right for bool_and) (leq_nat l l2) (leq_nat h2 h) w2)
+          ((proof right for bool_and) (leq_nat l l3) (leq_nat h3 h) w3))
 
 theorem axis_corner_low
       (l : Nat) (h : Nat) (x : Nat)
@@ -1493,6 +1760,12 @@ checks both axis cases and a nested pair with areas four and nine. The
 three public laws establish the corresponding general properties, not just
 these closed values.
 
+The [inclusion-order seed](../../../../conformance/stdlib/geometry/seed-box-inside-order.md)
+checks transitivity from an inverted box, a box inside an intersection, and a
+hull contained in another box despite an inverted operand. Its three reversed
+claims are refused on the same closed inputs. The generic order laws apply to
+all boxes, not only those fixtures.
+
 ## 4. Laws & proofs
 
 `intersect_sound` projects both coordinate witnesses from an intersection,
@@ -1511,7 +1784,7 @@ addition to match the distance definition. `manhattan_zero_equal` splits
 a zero sum into zero per-axis distances, derives equality of both
 coordinates by induction, and lifts them into point equality with `cong`.
 The private `axis_meet_*` and `axis_join_*` lemmas keep the coordinate
-arguments of the box laws explicit. All fifteen pre-area public laws are
+arguments of the box laws explicit. All eighteen pre-area public laws are
 generic in their boxes or points, and none identifies boxes by their
 sets of members.
 
@@ -1522,6 +1795,13 @@ bounds, while the hull laws use the opposite extrema. `inside_complete`
 requires a point in the inner box before deriving its two corner witnesses;
 pointwise inclusion alone would be vacuous for an inverted inner box. The
 private `axis_within` and per-axis lemmas keep these distinctions explicit.
+
+`inside_trans` composes lower and upper comparisons along each axis, including
+for inverted boxes. `intersect_greatest` combines the lower bounds with the
+checked `max` least law and the upper bounds with the checked `min` greatest
+law. `hull_least` combines them in the opposite direction. Private per-axis
+proofs and `bool_and` introduction assemble these generic corner-order laws
+without changing intersection or hull.
 
 `area_inside` bounds each inner inclusive span by its outer span using
 monotonicity and antitonicity of saturating subtraction, then combines the
@@ -1544,8 +1824,10 @@ distance is exact and unsigned; its triangle inequality and zero-distance
 identity are proved. Corner-wise `inside` is directional and sufficient for
 point-set inclusion, but an empty inner box can be outside a second box by
 its corners despite having no points. Its converse law therefore requires
-a member of the inner box. Different inverted boxes can have the same zero
-area without being structurally equal. Signed orientation remains outside
+a member of the inner box. The corner order is transitive; intersection is a
+greatest lower bound and hull a least upper bound for that order, without an
+`Equal Box` claim. Different inverted boxes can have the same zero area
+without being structurally equal. Signed orientation remains outside
 this interface.
 
 ## 6. References
@@ -1559,22 +1841,23 @@ this interface.
 
 ## 7. Trust & derivation
 
-1. **Contract.** [Exact geometry, §§1–4](../../../../spec/50-stdlib/67-geometry.md)
-   specifies the seven operations and eighteen public proof types.
+1. **Contract.** [Exact geometry, §§1–5](../../../../spec/50-stdlib/67-geometry.md)
+   specifies the seven operations and twenty-one public proof types.
 2. **Public API.** `Point`, `MkPoint`, `Box`, `MkBox`, `axis_contains`,
    `contains`, `intersect`, `hull`, `manhattan`, `intersect_sound`,
    `intersect_complete`, `hull_contains_left`, `hull_contains_right`,
    `manhattan_symm`, `manhattan_self`, `manhattan_triangle`,
    `manhattan_zero_equal`, `inside`, `inside_sound`, `inside_refl`,
    `intersect_inside_left`, `intersect_inside_right`, `inside_hull_left`,
-   `inside_hull_right`, `inside_complete`, `area`, `area_inside`,
+   `inside_hull_right`, `inside_complete`, `inside_trans`,
+   `intersect_greatest`, `hull_least`, `area`, `area_inside`,
    `area_inverted_x`, and `area_inverted_y`. `axis_within`, `axis_span`,
    generic subtraction and multiplication bounds, per-axis lemmas and
    proof transport helpers remain private.
 3. **Source map.** Definition contains the constructors and operations,
    followed by the checked laws and private scaffolding. Using it points to
-   closed examples and generic metric, containment and area use; Laws &
-   proofs maps each theorem to its proof strategy.
+   closed examples and generic metric, containment, inclusion order and area
+   use; Laws & proofs maps each theorem to its proof strategy.
 4. **Derivation.** `Nat`, `Bool` and the ambient conjunction come from the
    compiler floor and checked classes. Arithmetic reuses the canonical
    `Data.Numeric.Nat.Arithmetic` addition and multiplication, and checked
@@ -1595,5 +1878,11 @@ this interface.
    false inward claim separately refused. The
    [area seed](../../../../conformance/stdlib/geometry/seed-box-area.md)
    checks inclusive and inverted values and a nested pair, with a strictly
-   larger inner-area claim separately refused. All four supplement rather
-   than replace the checked law bodies.
+   larger inner-area claim separately refused. The
+   [order seed](../../../../conformance/stdlib/geometry/seed-box-inside-order.md)
+   checks an inverted transitive chain, an overlapping meet and a hull with an
+   inverted operand, followed by three isolated false reverse inclusions.
+   Its package test root-loads the catalog and checks the accepted client and
+   each refusal. This does not claim official conformance-runner execution,
+   CI, publication or landing. All five seeds supplement rather than replace
+   the checked law bodies.

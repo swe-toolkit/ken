@@ -9,10 +9,11 @@
 > Section 4's package-owned roots-loader test executes its positive
 > and refused seed fences and measures unchanged trusted identities
 > (114 → 114); no official conformance-runner run is established.
-> Section 5 specifies three more generic checked-law obligations.
-> Its catalog exports are absent at this base; an authored §5 seed
-> and D0 scratch checks do not establish shipped-seed execution, CI,
-> publication, landing or a landed trust measurement for §5.
+> Section 5 adds three generic checked-law obligations. This candidate
+> supplies the §5 catalog exports and a package test checking the authored
+> seed's accepted client and three isolated refusals against root-loaded
+> exports. The test does not establish official conformance-runner execution,
+> CI, publication, landing or a landed trusted-base measurement.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -129,9 +130,9 @@ one input; they do not themselves prove a least-hull statement.
 Section 5 states least-hull containment for every box, including
 inverted boxes, without asserting structural idempotence or equality
 between hull and union. The distance laws establish symmetry and
-zero at identical points, not triangle inequality. Architect D0 checked all six laws generically with
-private per-axis lemmas and existing checked `Nat`/Boolean laws; no
-closed seed replaces these proofs.
+zero at identical points, not triangle inequality. Architect D0 checked
+all six laws generically with private per-axis lemmas and existing
+checked `Nat`/Boolean laws; no closed seed replaces these proofs.
 
 ### 1.4 Visibility dependency, trust and deferrals
 
@@ -501,10 +502,11 @@ supplies a runtime-cost guarantee.
 
 > **Section 5 status: DRAFT v0 (SPEC-GEOMETRY-BOX-INSIDE-ORDER).**
 > Architect checked three generic transparent laws in an isolated D0
-> on `4f337ec26`. This candidate specifies those laws and authors a
-> closed seed; it does not deliver the §5 `NatBox` exports. A scratch
-> check on an overlay is not shipped-seed execution, CI, publication,
-> landing or a landed trusted-base measurement.
+> on `4f337ec26`. This candidate delivers those §5 `NatBox` exports
+> and a package test checking the authored seed's accepted client and
+> each isolated refusal through root-loaded exports. Neither D0 nor
+> package tests establish official conformance-runner execution, CI,
+> publication, landing or a landed trusted-base measurement.
 
 ### 5.1 Three checked-law obligations
 
@@ -557,8 +559,9 @@ public antisymmetry law.
 `axis_within` stays private. The D0's per-axis transitivity, meet and
 join proofs (`axis_within_trans`, `axis_within_meet`, and
 `axis_within_join`) are likewise **private**, not public Nat-order
-laws or exported geometry interfaces. Their per-axis comparisons use the already-public §1.4 bounds
-`greatest for min` and `least for max`, plus `leq_nat` transitivity.
+laws or exported geometry interfaces. Their per-axis comparisons use the
+already-public §1.4 bounds `greatest for min` and `least for max`, plus
+`leq_nat` transitivity.
 After destructuring the boxes, `bool_and` introductions combine the
 two axes. This is a checked
 proof route, not a new evaluation rule for `inside`, `intersect` or
@@ -583,8 +586,10 @@ identical `trusted_base()` GlobalId sets, 114 → 114. The three
 public laws were Transparent and owned by `NatBox`; a generic client
 applied all three. Selective imports of `axis_within` and the three
 new per-axis helpers were refused. The closed controls and isolated
-reverse-inclusion claims were checked in that scratch development,
-not in this candidate's shipped seed. Any separate author overlay
-check is reported in the seed with its own base and result; neither
-D0 nor author checks establish §5 catalog publication, official
-conformance execution, CI, landing or landed trust.
+reverse-inclusion claims were checked in that scratch development. The
+package test now root-loads this candidate's exports and checks the seed's
+accepted declarations and three isolated refused claims, including
+same-operand positive controls.
+The scratch results alone do not establish this catalog delivery; neither
+the package test nor those results establish official conformance-runner
+execution, CI, publication, landing or landed trust.
