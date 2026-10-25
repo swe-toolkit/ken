@@ -181,29 +181,41 @@ The differential discipline chapter
 through the interpreter and native backend, compared at closure-free ground
 observations — has a test for that closure-free case. The
 [native parity test](../../../crates/ken-cli/tests/rt_parity_native.rs)
-contains six `assert_narrowed_alike` cases that run the same fixture through
-both executors and assert on the exact result variant, not merely `is_err`.
-All six are currently ignored. The five rows formerly waiting on
-the byte-span repair did not re-arm: byte-span observation now succeeds, but
-each path seat is also read as `SiteOperand(0)`, which still requires a
-compile-time `Lowered` template. The sixth remains quarantined because a
-runtime-local closure has no durable boundary lane. The file also has a live
-source-scope rejection check that calls `elaborates()` without running either
-executor, and one live differential over the checked `UInt64` wrapper. That
-differential runs identical source through both executors and requires each to
-admit `UInt64::MAX` while rejecting `UInt64::MAX + 1` and `-1`. It is
-closure-free ground evidence, but it does not exercise any of the six
-narrowing paths.
+contains six enabled narrowing comparisons, each declared `#[test]` and none
+`#[ignore]`: one `BufferAllocate` case and five `FsReadAt`/`FsWriteAt` cases.
+Each uses `assert_narrowed_alike` to run the same fixture through both
+executors and check the exact result variant, not merely `is_err`. In `full`
+mode, CI inventories every `rt_parity_native` test with `cargo nextest list`,
+partitions the discovered names across ten shards, and runs each shard's
+selected tests. A successful full-mode parity job therefore provides test
+evidence for those six narrowing comparisons. This is test evidence, not a
+proof of backend equivalence.
 
-The binary remains excluded from the **sharded** test run, and a separate
-`native-rt-parity` job still runs it. The required `build + test` job depends
-on that job and checks its result. Read the resulting green precisely: it
-shows that the dedicated job ran, that the live source-scope check passed, and
-that the interpreter and native backend agreed on the bounded-integer case. It
-carries no current evidence that they agree on the six narrowing cases. That
-narrowing differential is therefore **unavailable** while all six remain
-ignored. Re-arming one cause would make it partial, and only re-arming every row
-makes it live.
+The file also has a live source-scope rejection check that calls
+`elaborates()` without running either executor, and one live differential over
+the checked `UInt64` wrapper. That differential runs identical source through
+both executors and requires each to admit `UInt64::MAX` while rejecting
+`UInt64::MAX + 1` and `-1`. It is closure-free ground evidence for the
+bounded-integer case.
+
+CI classifies runs as `full`, `doc-only`, or `pr-verified`
+([workflow](../../../.github/workflows/ci.yml)). The native parity test is
+excluded from the sharded test run and runs in its separate `native-rt-parity`
+job. That job and the other heavy test jobs run only in `full` mode. In
+`doc-only` and `pr-verified` modes they are skipped, and the `build + test`
+aggregate accepts those skips.
+
+A green `build + test` result on a `pr-verified` push does not mean those jobs
+ran on that push. The workflow selects that mode only after verifying that the
+pushed tree matches the tree of a successful full-mode pull-request run. The
+`CI_PR_VERIFIED` log line and step-summary line identify that earlier run by
+workflow run ID. For a `full` run, the aggregate checks the heavy jobs' results,
+including `native-rt-parity`. A successful parity job provides test evidence
+for the six enabled narrowing comparisons, the source-scope check, and the
+bounded-integer differential described above. It does not prove backend
+equivalence. In `doc-only` mode those tests do not run. A `pr-verified` push
+relies on the named full-mode PR run for identical-tree evidence rather than
+executing them again.
 
 Chapter [04](04-effects-capabilities-and-authority.md) now shows a checked
 filesystem authority exemplar: an explicit `Cap a` parameter beside `[FS]`,
@@ -225,9 +237,10 @@ You can now separate elaboration from execution, identify the marked places
 where partial behavior may enter, and treat the interpreter as the semantic
 oracle for native differential tests. The backend implementation and its
 required CI job are present even though the target decision remains open in
-the specification. The job carries one live bounded-integer differential but
-none of the six narrowing cases. The curriculum records both divergences
-instead of reconciling them.
+the specification. A successful full-mode parity job exercises the six
+narrowing comparisons and the bounded-integer differential, but it remains test
+evidence rather than proof. The curriculum records the specification and
+implementation divergence instead of reconciling them.
 
 ---
 
