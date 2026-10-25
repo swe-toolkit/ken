@@ -3,15 +3,15 @@
 > **Status: DRAFT v1 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 > SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 > SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY §3;
-> SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY §4).** Sections 1–3
-> and their ten public checked laws are landed in the catalog. The
-> existing seed includes three closed §3 cases, and the catalog has a
-> source acceptance target for them. Section 4 specifies row-wise
-> matrix addition and four new public distributivity laws. The §4 D0
-> proofs now accompany five §4 catalog exports; a package-owned test
-> checks the sum seed and measures unchanged trusted identities (109 → 109).
-> This is not official conformance-runner execution, CI, publication or
-> landing.
+> SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY §4;
+> SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC §5).** Sections 1–4 and their
+> fourteen public checked laws are present in the catalog. The §4
+> package-owned test checks its sum seed and measures unchanged
+> trusted identities (109 → 109), not official conformance-runner
+> execution. Section 5 specifies four further generic sum laws; its
+> catalog exports are absent at this base. Architect D0 and an authored
+> §5 seed do not establish shipped-seed execution, CI, publication,
+> landing or a landed §5 trust measurement.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -158,10 +158,13 @@ and product associativity and §3's two compatibility laws and
 The checked catalog module introduces no `Axiom`. The historical §3
 D0 measured `trusted_base()` as 109 before and after its scratch
 package; that measurement does not establish a landed §3 trust delta.
-The new §4 D0 is separately measured in §4.3. No statement in this
-chapter adds a kernel form, syntax, primitive, or `Float` support.
-An authored seed or scratch check alone is not execution of a shipped
-seed harness.
+The historical §4 D0 is separately measured in §4.3. Section 5's
+four sum laws have checked generic bodies only in Architect's isolated
+D0, with unchanged `trusted_base()` identities (114 → 114). Its
+catalog exports are not yet present; that scratch measurement is not
+landed trust. No statement in this chapter adds a kernel form,
+syntax, primitive, or `Float` support. An authored seed or scratch
+check alone is not execution of a shipped seed harness.
 
 Signed scalars, a relation-parametric semiring abstraction and a
 Rational-valued matrix tier, determinants, inverses, solving and
@@ -298,8 +301,8 @@ catalog places the two compatibility laws after
 > bodies; a package-owned roots-loader test checks all five seed source
 > fences, including the isolated refusal, and measures unchanged
 > trusted identities (109 → 109); the unchanged NatMatrix census row
-> passes in the targeted strict-resolution suite (5/5). No official
-> conformance-runner run, CI, publication or landing is claimed.
+> passes in the targeted strict-resolution suite (5/5). This test is
+> not an official conformance-runner result or a fresh CI run.
 
 ### 4.1 Exact sum on the existing indexed carrier
 
@@ -419,3 +422,92 @@ test now runs the exact seed fences, but official conformance-runner
 execution, CI and landing remain unmeasured. Signed,
 Rational-valued, semiring-general and approximate matrices, and
 subtraction, are not implied by these natural-number laws.
+
+## 5. Commutativity and associativity of indexed sums
+
+> **Section 5 status: DRAFT v1
+> (SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC).** Architect checked four
+> generic indexed proofs in an isolated D0 on `4e7cf78a6`, with no
+> new `Axiom` and identical `trusted_base()` sets (114 → 114). This
+> section and its closed seed do not deliver §5 catalog exports,
+> shipped-seed execution, CI, publication, landing or landed trust.
+
+### 5.1 Four public checked-law obligations
+
+`Algorithm.LinearAlgebra.NatMatrix` must export the following four
+checked theorems for every natural length and matrix dimension. Their
+`Equal` claims are structural equalities of indexed `Vec` values;
+there is no pointwise equivalence relation, nonempty premise, or new
+matrix carrier. Each law includes the zero-index case.
+
+```ken
+pub theorem vector_add_comm
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    : Equal (Vec Nat n) (vector_add n xs ys) (vector_add n ys xs)
+
+pub theorem vector_add_assoc
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) (zs : Vec Nat n)
+    : Equal
+        (Vec Nat n)
+        (vector_add n (vector_add n xs ys) zs)
+        (vector_add n xs (vector_add n ys zs))
+
+pub theorem matrix_add_comm
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_add m n b a)
+
+pub theorem matrix_add_assoc
+      (m : Nat)
+      (n : Nat)
+      (a : Vec (Vec Nat n) m)
+      (b : Vec (Vec Nat n) m)
+      (c : Vec (Vec Nat n) m)
+    : Equal
+        (Vec (Vec Nat n) m)
+        (matrix_add m n (matrix_add m n a b) c)
+        (matrix_add m n a (matrix_add m n b c))
+```
+
+In both associativity statements the left endpoint groups the first
+two operands; the right groups the last two. The existing Nat class
+law `(proof assoc for add) x y z` points from `x + (y + z)` to
+`(x + y) + z`, so the vector proof uses `sym` for this displayed
+direction. `matrix_add_comm` and `matrix_add_assoc` follow row by row
+from the corresponding vector laws; neither relies on matrix-product
+commutativity. An empty vector, zero-row matrix and positive-row
+zero-column matrix remain in the quantified domain. A sum is not
+thereby equal to either operand when the other is nonzero, and
+regrouping cannot change a component or row.
+
+### 5.2 Proof and trust boundary
+
+The four new per-step helpers `vector_add_cons`,
+`vector_add_assoc_cons`, `matrix_add_cons` and
+`matrix_add_assoc_cons` remain **private**. `vector_add_cons` is local
+because the underlying `zip_with_vcons` is not public in
+`Data.Vector.Vector`; the local theorem is not a second public
+vector API. Matrix proofs lift the vector equalities through the
+ordered rows, with no operation change to `vector_add` or
+`matrix_add` and no new Nat lemma. Neither a zero vector nor a
+commutative-monoid instance is introduced.
+
+The proof must not treat both nested additions as definitionally
+convertible to a `VCons` result. In Architect's D0, the left-nested
+successor form reduced, but right-nested `vector_add` did **not**:
+`zip_with` matches on its second operand and remains stuck on an
+inner `zip_with` result. Both vector and matrix associativity
+therefore pass through one-level cons equations, `cong` and `trans`;
+the head step uses the checked Nat law in the required direction.
+This records a proof route, not a new computation rule.
+
+Architect's isolated D0 inserted only `NatMatrix` proof bodies and
+migrated an allowed-inventory test from seventeen to twenty-one
+public names. Its generic client applied all four laws; checked
+closed controls included an empty vector, zero rows, zero columns
+and changed-component refusals. `ken check` and `ken fmt --check`
+returned rc 0; before and after loading the four named providers,
+`trusted_base()` contained the same 114 GlobalIds. Those
+measurements belong to the D0 scratch package, not this spec-only
+candidate. The authored §5 seed separately states its own checking
+boundary. Neither record alone establishes a shipped seed harness,
+CI, publication, landing or a landed trust delta.
