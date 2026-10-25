@@ -131,11 +131,13 @@ thread_local! {
 }
 
 /// Compile-preserving controls for the two consumption seats of the
-/// handler-owned Deferred-response decomposition.
+/// handler-owned Deferred-response decomposition, and for the in-place bracket
+/// settlement that now consumes a marked S's K at its handler.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HandlerOwnedDeferredResponseMutation {
     SuppressUnitlessDrive,
     SuppressLocalContinuationDrive,
+    SuppressBracketInPlaceContinuation,
 }
 
 #[cfg(feature = "px8-ds-test-support")]
@@ -7134,6 +7136,9 @@ impl<'a> Lowering<'a> {
         )?;
         if let Some(region) = self.bracket_view.settlement_at(static_origin)?.cloned() {
             match region.mode() {
+                BracketSettlementMode::InPlace if handler_owned_deferred_response_mutation_applies(
+                    HandlerOwnedDeferredResponseMutation::SuppressBracketInPlaceContinuation,
+                ) => {}
                 BracketSettlementMode::InPlace => {
                     let lowered_args = args.iter().enumerate()
                         .map(|(position, arg)| {
@@ -16636,6 +16641,9 @@ impl<'a> Lowering<'a> {
             ))));
         }
         match region.mode() {
+            BracketSettlementMode::InPlace if handler_owned_deferred_response_mutation_applies(
+                HandlerOwnedDeferredResponseMutation::SuppressBracketInPlaceContinuation,
+            ) => ConstructBracketEntry::Unmarked,
             BracketSettlementMode::InPlace => ConstructBracketEntry::Done(Box::new((|| {
                 let lowered_args = args.iter().enumerate()
                     .map(|(position, arg)| {

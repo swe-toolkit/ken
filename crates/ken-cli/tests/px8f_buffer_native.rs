@@ -525,7 +525,7 @@ fn assert_handler_owned_deferred_response_mutation_child() {
         .expect("handler-owned Deferred-response mutation child mode");
     let mutation = match mode.as_str() {
         "suppress-unitless-drive" => Mutation::SuppressUnitlessDrive,
-        "suppress-local-continuation" => Mutation::SuppressLocalContinuationDrive,
+        "suppress-bracket-in-place-continuation" => Mutation::SuppressBracketInPlaceContinuation,
         other => panic!("unknown handler-owned Deferred-response mutation: {other}"),
     };
     let dir = tempfile::Builder::new()
@@ -592,7 +592,7 @@ fn assert_handler_owned_deferred_response_mutation_child() {
                 "suppressing P1 execution still wrote the output"
             );
         }
-        "suppress-local-continuation" => {
+        "suppress-bracket-in-place-continuation" => {
             let error = compiled
                 .expect_err("suppressing the handler-local continuation drive crossed its closure");
             assert!(
@@ -785,7 +785,7 @@ fn retained_result_closure_proof_controls_are_exact_and_positional() {
 /// zero with the exact three writes; these negative children prove causality.
 #[test]
 fn handler_owned_deferred_response_controls_are_load_bearing() {
-    for mode in ["suppress-unitless-drive", "suppress-local-continuation"] {
+    for mode in ["suppress-unitless-drive", "suppress-bracket-in-place-continuation"] {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",

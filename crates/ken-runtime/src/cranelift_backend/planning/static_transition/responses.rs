@@ -4605,13 +4605,14 @@ impl StaticTransitionPlan<'_> {
     }
 
     /// Claim one exact member of the frame being defined by a handler-owned
-    /// response. Ambiguous or absent membership never falls back to a root ABI
-    /// position: the consumer will independently re-check this same frame.
+    /// response. Ambiguous membership refuses; absent membership is `None`,
+    /// since that frame cannot supply the coordinate. Neither falls back to a
+    /// root ABI position: the consumer will independently re-check this frame.
     pub(in crate::cranelift_backend) fn entry_frame_claim_in(
         &self,
         handler: ContinuationEmissionOwner,
         coordinate: ContinuationSourceCoordinate,
-    ) -> Result<ContinuationEnvironmentClaim, CraneliftBackendError> {
+    ) -> Result<Option<ContinuationEnvironmentClaim>, CraneliftBackendError> {
         let mut found = None;
         let mut offer = |member: ContinuationSourceCoordinate, slot: u32| {
             if member == coordinate {
@@ -4674,10 +4675,9 @@ impl StaticTransitionPlan<'_> {
                 "a handler drive cannot claim an ordinary frame for an installed fusion",
             )),
         };
-        let declared_slot = found.ok_or_else(|| planner_error(
-            "a handler drive frame declares no member for the continuation coordinate",
-        ))?;
-        Ok(ContinuationEnvironmentClaim::EntryFrame { frame, declared_slot })
+        Ok(found.map(|declared_slot| {
+            ContinuationEnvironmentClaim::EntryFrame { frame, declared_slot }
+        }))
     }
 
     /// The planned context transfer for one handler-owned Deferred response.
@@ -4727,7 +4727,13 @@ impl StaticTransitionPlan<'_> {
         self.continuation_context_parameter_members(context)?;
         let mut capture_claims = Vec::new();
         for capture in view.captures()? {
-            capture_claims.push(self.entry_frame_claim_in(handler, capture.coordinate)?);
+            // K closes over a coordinate the handler's frame does not hold, so
+            // no transfer leaves this handler. No route is planned; a drive
+            // that still reaches `drive_response_at_source` refuses there.
+            let Some(claim) = self.entry_frame_claim_in(handler, capture.coordinate)? else {
+                return Ok(None);
+            };
+            capture_claims.push(claim);
         }
         Ok(Some(HandlerDriveContextRoute {
             vis_origin: row.vis_origin(), handler, context,
