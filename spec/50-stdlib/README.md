@@ -293,11 +293,12 @@ different carrier spellings. The carrier's catalog package is
 landed; its contract does **not** itself supply the §63 §3 adapters.
 
 The **dimension-safe exact linear-algebra contract** is pinned in
-**`65-linear-algebra.md`** §§1–4
+**`65-linear-algebra.md`** §§1–5
 (SPEC-LINEAR-ALGEBRA-DIMENSION-SAFE-CONTRACT;
 SPEC-LINEAR-ALGEBRA-PRODUCT-LAWS;
 SPEC-LINEAR-ALGEBRA-PRODUCT-COMPATIBILITY;
-SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY).
+SPEC-LINEAR-ALGEBRA-MATRIX-SUM-DISTRIBUTIVITY;
+SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC).
 `Algorithm.LinearAlgebra.NatMatrix` reuses `Data.Vector.Vector.Vec`
 with row-major `Vec (Vec Nat n) m` matrices. Its seven initial natural
 operations and all ten §1–3 checked laws are landed; neither §2 law
@@ -305,12 +306,17 @@ awaits `LANG-NESTED-INDEX-MATCH-PROPOSITION-GOAL`. The existing seed
 includes closed §3 compatibility cases, with a catalog acceptance
 source target. Section 4 specifies row-wise public `matrix_add`,
 left and right matrix-product distribution, matrix-vector distribution
-in the matrix argument, and transposition of a sum. Its four generic
-laws were checked in Architect scratch D0 (rc 0, no new `Axiom`,
-trust identities 109 → 109), not delivered as §4 catalog exports or
-seed. The D0 census did not run to a verdict. No §4 shipped-seed
-execution, CI, publication, landing or landed trust measurement is
-claimed. No rational or `Float` tier is claimed.
+in the matrix argument, and transposition of a sum. Its four generic laws and
+operation are catalog exports with checked bodies and a package-owned
+seed test; Architect's historical scratch D0 had no census verdict
+and did not establish shipped execution. Section 5 specifies public
+commutativity and associativity of both sums for every dimension.
+Architect D0 checked four generic proofs, lifting the matrix laws
+row-wise from vector laws, with no new `Axiom` and unchanged scratch
+trust identities (114 → 114). The §5 catalog exports remain absent;
+this candidate authors a closed seed, not shipped-seed execution,
+CI, publication, landing or landed trust for §5. No rational or
+`Float` tier is claimed.
 
 The **natural-coefficient symbolic-algebra contract** is pinned in
 **`66-symbolic-algebra.md`** §§1–5 (SPEC-SYMBOLIC-ALGEBRA-CONTRACT;
