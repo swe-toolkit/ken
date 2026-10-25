@@ -101,7 +101,9 @@ fn assert_transparent_globals(
             catalog_or::provider_owned_id(env, owned, module, name)
                 .unwrap_or_else(|error| panic!("{module}.{name}: {error}"))
         } else {
-            *env.globals.get(*name).unwrap_or_else(|| panic!("missing local `{name}`"))
+            *env.globals
+                .get(*name)
+                .unwrap_or_else(|| panic!("missing local `{name}`"))
         };
         assert!(
             env.env.transparent_body(id).is_some(),
@@ -270,14 +272,13 @@ fn ordered_dependency_closure_elaborates_all_cc4_clients() {
         "DiagnosticCode",
         "Diagnostic",
     ] {
-        let id = catalog_or::provider_owned_id(
-            &env,
-            &diagnostics,
-            "Capability.Diagnostics.Core",
-            name,
-        )
-        .unwrap_or_else(|error| panic!("Diagnostics must own {name}: {error}"));
-        assert!(env.env.inductive(id).is_some(), "{name} must be checked data");
+        let id =
+            catalog_or::provider_owned_id(&env, &diagnostics, "Capability.Diagnostics.Core", name)
+                .unwrap_or_else(|error| panic!("Diagnostics must own {name}: {error}"));
+        assert!(
+            env.env.inductive(id).is_some(),
+            "{name} must be checked data"
+        );
     }
     assert!(
         !env.globals.contains_key("NumericError"),

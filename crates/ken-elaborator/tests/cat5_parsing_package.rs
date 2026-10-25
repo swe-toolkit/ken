@@ -35,7 +35,10 @@ fn dependency_env_with_provider_owned() -> (ElabEnv, Cat5ProviderOwned) {
         .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    assert!(!env.globals.contains_key("leq_nat"), "LC must not provide a flat test alias");
+    assert!(
+        !env.globals.contains_key("leq_nat"),
+        "LC must not provide a flat test alias"
+    );
     let diagnostics_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
@@ -1472,7 +1475,10 @@ fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
         .execute_loaded_entry_checked_fences_reporting_rejections("Capability.Parsing.Parsing")
         .expect("the owner-scoped Parsing fences must execute");
     assert_eq!(
-        rejections.iter().map(|(range, _)| range.clone()).collect::<Vec<_>>(),
+        rejections
+            .iter()
+            .map(|(range, _)| range.clone())
+            .collect::<Vec<_>>(),
         extracted.reject_ranges,
         "every reject fence must be reported in document order"
     );

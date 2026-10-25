@@ -237,7 +237,10 @@ fn ctor_args<'a>(
     value: &'a EvalVal,
     name: &str,
 ) -> &'a [EvalVal] {
-    let expected = constructors.get(name).copied().unwrap_or_else(|| env.globals[name]);
+    let expected = constructors
+        .get(name)
+        .copied()
+        .unwrap_or_else(|| env.globals[name]);
     match value {
         EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
         other => panic!("expected `{name}`, got {other:?}"),
@@ -779,12 +782,21 @@ fn full_env() -> (ElabEnv, BTreeMap<&'static str, GlobalId>) {
         ),
     ] {
         let family_id = env.globals[&format!("{module}.{family}")];
-        assert!(owned.contains(&family_id), "{family} must belong to {module}");
-        let family_decl = env.env.inductive(family_id).expect("checked constructor parent");
+        assert!(
+            owned.contains(&family_id),
+            "{family} must belong to {module}"
+        );
+        let family_decl = env
+            .env
+            .inductive(family_id)
+            .expect("checked constructor parent");
         for &name in names {
             let id = env.globals[&format!("{module}.{name}")];
             assert!(
-                family_decl.constructors.iter().any(|constructor| constructor.id == id),
+                family_decl
+                    .constructors
+                    .iter()
+                    .any(|constructor| constructor.id == id),
                 "{module}.{name} must belong to its checked {family}"
             );
             assert!(constructors.insert(name, id).is_none());

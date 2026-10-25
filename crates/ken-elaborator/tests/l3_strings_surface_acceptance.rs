@@ -624,13 +624,9 @@ fn list_eq_is_codepoint_wise_not_nfc_folding() {
 #[test]
 fn list_append_and_bytes_concat_are_distinct_pure_operations() {
     let (env, derived_owned) = mk_env_with_derived_owned();
-    let list_append_id = catalog_or::provider_owned_id(
-        &env,
-        &derived_owned,
-        DERIVED,
-        "list_append",
-    )
-    .expect("Derived must own the checked list append");
+    let list_append_id =
+        catalog_or::provider_owned_id(&env, &derived_owned, DERIVED, "list_append")
+            .expect("Derived must own the checked list append");
     let bytes_concat_id = env.globals["bytes_concat"];
     assert_ne!(
         list_append_id, bytes_concat_id,

@@ -4,8 +4,8 @@
 mod catalog_or;
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
 use std::ops::{Deref, DerefMut};
+use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
@@ -171,7 +171,13 @@ fn make_store(env: &ElabEnv) -> EvalStore {
 }
 
 fn eval_global(env: &ProcessFixture, store: &mut EvalStore, name: &str) -> EvalVal {
-    let id = if ["process_arguments", "replace_process_arguments", "process_argument_at"].contains(&name) {
+    let id = if [
+        "process_arguments",
+        "replace_process_arguments",
+        "process_argument_at",
+    ]
+    .contains(&name)
+    {
         env.checked_arguments_id(name)
     } else {
         env.globals[name] // A client declaration checked in this fixture.
