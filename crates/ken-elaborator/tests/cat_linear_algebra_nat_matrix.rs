@@ -154,7 +154,7 @@ fn matrix_env() -> ElabEnv {
 /// `matrix_vector_product`, `transpose_product`, and `dot_scale` exercise §3.
 /// PROMISE CLASS: durable invariant.
 /// MEASURED: exact owned, transparent law identities, selective imports of
-/// all seventeen names and generic clients for ten specified propositions.
+/// all twenty-six names and generic clients for ten specified propositions.
 /// CLAIMED: the public module exports checked, reusable dimension-safe laws.
 /// THE GAP: independent closed seed oracles separately catch wrong values.
 #[test]
@@ -202,6 +202,10 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         "matrix_product_distrib_right",
         "matrix_vector_distrib",
         "transpose_add",
+        "vector_add_comm",
+        "vector_add_assoc",
+        "matrix_add_comm",
+        "matrix_add_assoc",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -218,7 +222,7 @@ fn public_operations_and_generic_laws_preserve_provider_trust_set() {
         .collect::<BTreeSet<_>>();
     assert!(
         expected.is_subset(&owned_names),
-        "all seventeen public names are owned"
+        "all twenty-six public names are owned"
     );
     for name in &expected {
         let id = env.globals[&format!("{MATRIX}.{name}")];
