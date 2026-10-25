@@ -1,7 +1,7 @@
 ---
 id: SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC
 title: "Spec 62 section 3 joins walks with walk_append but states no law of it: its right unit holds only by computation, and a client cannot remove a leading WalkHere or regroup three joined walks. Rule the left-unit and associativity laws of walk_append from a checked D0 at zero trust, and state them as a section 4 with a conformance seed"
-status: ready
+status: merged
 owner: spec
 size: S
 tier: T1
