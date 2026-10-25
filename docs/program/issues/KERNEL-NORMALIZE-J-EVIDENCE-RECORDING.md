@@ -1,7 +1,7 @@
 ---
 id: KERNEL-NORMALIZE-J-EVIDENCE-RECORDING
 title: "Kernel normalization strips the Eq recording on J's equality argument, which j_endpoints treats as authoritative, so a normalized executable J over a reducing carrier cannot be re-inferred. Keep the recording through normalization and normalize only its components"
-status: active
+status: merged
 owner: kernel
 size: S
 tier: T1
