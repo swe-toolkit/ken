@@ -10,10 +10,11 @@
 > and seed are also present on main. Section 2's catalog module and
 > seed are present on main. Section 3's greatest-cost selector and
 > seven laws are landed; §3.4 specifies the Option-returning extension
-> and its four laws from Architect-checked D0. The §3.4 catalog exports
-> are not yet landed, and this candidate's seed is authored rather
-> than run against shipped exports. Scratch checks do not establish
-> shipped-seed execution, CI or a landed `trusted_base()` measurement.
+> and its four laws from Architect-checked D0. This candidate supplies the
+> §3.4 catalog exports and a package test checking the authored seed's
+> accepted and refused assertions against roots-loaded exports. This is not
+> official conformance-runner execution, CI, publication, landing or a
+> landed `trusted_base()` measurement.
 
 ## 1. Least-cost candidate
 
@@ -375,10 +376,11 @@ remain outside this bounded contract.
 > **Section 3 status: DRAFT v0 (SPEC-OPTIMIZATION-ARGMAX;
 > SPEC-OPTIMIZATION-ARGMAX-OPTION §3.4).** The §3.1–§3.2 operation
 > and seven laws, plus their seed, are present on main. Architect
-> checked §3.4 on an isolated D0 from `914cfbda0`; the §3.4 catalog
-> exports are not delivered by this spec-and-seed candidate. Its
-> authored seed and any scratch checks do not establish shipped-seed
-> execution, CI, publication, landing or landed trust.
+> checked §3.4 on an isolated D0 from `914cfbda0`; this candidate
+> supplies the §3.4 exports and a package test checking the authored
+> seed's assertions against roots-loaded exports. It does not establish
+> official conformance-runner execution, CI, publication, landing or
+> landed trust.
 
 ### 3.1 Carrier, operation and tie rule
 
@@ -472,8 +474,8 @@ declarations. A generic client restating all eight `argmax` statements
 checked. The closed earliest-tie control selected `3` and its
 later-tie refusal `4` reached the kernel's `TypeMismatch`; a local
 non-strict selector reversed those two observations. These are
-Architect-reported D0 measurements for §3.1–§3.2, not evidence that
-this candidate ran its new §3.4 seed.
+Architect-reported D0 measurements for §3.1–§3.2; only the §3.4
+package test executes this candidate's new seed.
 
 The checked D0 shares a private selection fold and membership proof
 between `argmin` and `argmax`, with a private greatest-cost proof and
@@ -549,9 +551,12 @@ Architect's checked §3.4 D0 from `914cfbda0` reported `ken check` and
 providers. The four new generic laws were consumed by a scratch
 client; the `Nil`, singleton and tied-maximum controls and five
 false-claim probes were checked separately in scratch. Those are
-Architect-reported measurements, not execution of this candidate's
-seed against shipped §3.4 exports. No ambient name beyond the
-package's current census row or change to the existing selectors is
+Architect-reported measurements. This candidate's package test instead
+loads the §3.4 exports from the catalog and checks the seed's accepted
+client and each isolated refused theorem. It checks the exact
+trusted-base identities relative to the provider closure, without
+claiming a landed trust measurement. No ambient name beyond the
+package's current census row or change to existing selectors is
 required. Option minimization remains §1.4; `argmax_option` adds no
-`argmax` law, generic Option search, top-k selection, or runtime-cost
+`argmax` law, generic Option search, top-k selection or runtime-cost
 promise.
