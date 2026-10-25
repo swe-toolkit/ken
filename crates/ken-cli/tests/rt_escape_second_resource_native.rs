@@ -943,12 +943,15 @@ fn r2_process_carrier_domain_keeps_persistent_match_child_owners() {
 }
 
 /// Promise class: transition sentinel for the selected-call fixture shape.
-/// MEASURED: the pre-schema transport source and response selection both name
-/// the r2 S5→S6 call selected by the installed owner-4 plan.
+/// MEASURED: the pre-schema transport source names the r2 S5→S6 call, and
+/// exactly one plane owns it: the checked bracket settlement row at its
+/// ResourceRelease Vis 537 (main owned it as installed owner 4, context 4).
+/// Every pre-schema transport source has exactly one owner, an installed
+/// owner or a bracket row, and preselection matches installed owners.
 /// CLAIMED: the representation-independent source stratum retains the exact
 /// call whose loss the subsequent residual-issuance increment must repair.
 /// THE GAP: this does not show the call is emitted; the existing r2 execution
-/// test is the separate emission gate, still expected to refuse until I-2.
+/// test is the separate emission gate.
 #[test]
 fn r2_pre_schema_response_selection_retains_selected_transport() {
     in_large_stack_thread("rt-escape-r2-pre-schema", || {
@@ -968,25 +971,35 @@ fn r2_pre_schema_response_selection_retains_selected_transport() {
         }
         assert_eq!(diagnostics.len(), 1, "one planner must publish one stratum");
         let plan = &diagnostics[0];
-        let owner = plan.static_response_owners.iter()
-            .find(|owner| owner.owner == 4 && owner.k_context == 4)
-            .expect("the installed plan retains r2's selected response owner");
-        let selected = &owner.selected_caller;
-        for component in [
+        let selected_call = |identity: &str| [
             "emission_owner: Specialization(ContinuationSpecializationId(5))",
             "producer_construct_origin: StaticOriginId(537)",
             "producer_alternative: 1",
             "target: ContinuationSpecializationId(6)",
             "recursive_position: 1",
-        ] {
-            assert!(selected.contains(component), "the selected caller changed: {component}");
-        }
+        ].iter().all(|component| identity.contains(component));
+        assert!(!plan.static_response_owners.iter()
+                .any(|owner| selected_call(&owner.selected_caller)),
+            "the settled release must not also be an ordinary installed owner");
+        let settled = plan.bracket_response_rows.iter()
+            .filter(|row| selected_call(&row.k_identity)).collect::<Vec<_>>();
+        let [row] = settled.as_slice() else {
+            panic!("exactly one bracket row must own r2's selected call: {settled:#?}");
+        };
+        assert_eq!((row.vis_origin, row.k_context, row.operation.as_str()),
+            (537, 4, "ResourceRelease"), "the selected call's settlement row moved");
+        let selected = &row.k_identity;
         assert!(plan.pre_schema_transport_sources.contains(selected),
             "the pre-schema transport-source set lost the selected edge");
-        assert!(plan.preselected_response_callers.contains(selected),
-            "response preselection lost the selected transport call");
         let installed = plan.static_response_owners.iter().map(|owner| &owner.selected_caller)
             .collect::<std::collections::BTreeSet<_>>();
+        let rows = plan.bracket_response_rows.iter().map(|row| &row.k_identity)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert!(installed.is_disjoint(&rows), "one call has an installed owner and a bracket row");
+        for source in &plan.pre_schema_transport_sources {
+            assert!(installed.contains(source) || rows.contains(source),
+                "pre-schema transport source has no owner: {source}");
+        }
         let preselected = plan.preselected_response_callers.iter()
             .collect::<std::collections::BTreeSet<_>>();
         assert_eq!(preselected, installed, "preselection must match installed owners by identity");
