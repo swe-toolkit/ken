@@ -1,7 +1,7 @@
 ---
 id: CAT-OPTIMIZATION-ARGMAX-OPTION
 title: "Algorithm.Optimization.Argmin exports spec 72 section 3.4: the selector argmax_option over a possibly empty List, its Nil and Cons equations, and the membership and greatest-cost corollaries, proved at zero trust, with a package test that runs the section 3.4 seed"
-status: ready
+status: active
 owner: foundation
 size: S
 tier: T2
