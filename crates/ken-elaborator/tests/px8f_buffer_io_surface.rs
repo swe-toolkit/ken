@@ -263,6 +263,7 @@ proc px8f_readsome_public_consumers
 #[test]
 fn write_all_checked_step_preserves_the_exact_first_error() {
     let mut env = ElabEnv::empty().expect("checked prelude");
+    let trusted_before_clients = env.env.trusted_base();
     let law = env.globals["write_all_first_error_step"];
     let Some(Decl::Transparent { ty, .. }) = env.env.lookup(law) else {
         panic!("first-error law must have a checked body");
@@ -296,8 +297,8 @@ fn write_all_checked_step_preserves_the_exact_first_error() {
     };
     assert!(env.env.transparent_body(*private_step).is_some());
     assert!(!env.globals.values().any(|id| id == private_step));
-    // Reintroduce the already-checked private identity in this one disposable
-    // test environment only. No production name map is changed.
+    assert!(!env.globals.contains_key("private_write_all_step"));
+    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
     env.globals
         .insert("private_write_all_step".to_string(), *private_step);
 
@@ -337,6 +338,11 @@ theorem first_error_is_no_progress
             }
         ),
         "wrong error must reach the kernel equality, got {rejection:?}"
+    );
+    assert_eq!(
+        env.env.trusted_base(),
+        trusted_before_clients,
+        "first-error clients must not add trust"
     );
 }
 

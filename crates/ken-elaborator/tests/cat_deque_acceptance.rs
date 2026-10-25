@@ -25,19 +25,6 @@ fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
-fn expose_module(env: &mut ElabEnv, module: &str) {
-    let prefix = format!("{module}.");
-    let aliases = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(&prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect::<Vec<_>>();
-    env.globals.extend(aliases);
-}
-
 fn loaded_env_with_owned() -> (ElabEnv, Vec<GlobalId>, Vec<GlobalId>) {
     let mut env = base_env();
     let derived_owned = env.elaborate_module_from_roots(&[catalog_root()], DERIVED)

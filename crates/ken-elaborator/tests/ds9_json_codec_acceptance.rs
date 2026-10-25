@@ -9,7 +9,7 @@
 #[path = "support/catalog_or.rs"]
 mod catalog_or;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ken_elaborator::{ElabEnv, ElabError, NumericLitVal};
 use ken_interp::eval::{eval, EvalStore, EvalVal, ListCharIds};
@@ -659,8 +659,9 @@ fn json_size_consumes_array_and_pair_nested_object_results() {
 /// apply the real proof, with raw checked types equal to the provider types.
 /// CLAIMED: the package specifies the size fold on every Json constructor and
 /// right-successor addition without a new assumption or public name. THE GAP:
-/// this pins the checked propositions rather than their particular proof
-/// structure. Separate production-operand mutations exercise the computation.
+/// the contract is now spelled in the provider's example fence, separately
+/// elaborated from the law; raw type equality catches binder/endpoint changes.
+/// Separate production-operand mutations exercise the computation.
 #[test]
 fn json_size_constructor_equations_are_private_checked_propositions() {
     let (mut env, trust_before) = json_env();
@@ -676,113 +677,79 @@ fn json_size_constructor_equations_are_private_checked_propositions() {
         .expect("the existing Json public API must still be importable");
 
     let laws = [
-        (
-            "json_nat_add_right_suc",
-            "theorem contract_json_nat_add_right_suc (m : Nat) (n : Nat)
-               : Equal Nat (json_nat_add m (Suc n)) (Suc (json_nat_add m n)) =
-               json_nat_add_right_suc m n",
-        ),
-        (
-            "json_size_null",
-            "theorem contract_json_size_null
-               : Equal Nat (json_size JsonNull) (Suc Zero) = json_size_null",
-        ),
-        (
-            "json_size_bool",
-            "theorem contract_json_size_bool (flag : Bool)
-               : Equal Nat (json_size (JsonBool flag)) (Suc Zero) = json_size_bool flag",
-        ),
-        (
-            "json_size_number",
-            "theorem contract_json_size_number (number : Int)
-               : Equal Nat (json_size (JsonNumber number)) (Suc Zero) =
-               json_size_number number",
-        ),
-        (
-            "json_size_string",
-            "theorem contract_json_size_string (text : String)
-               : Equal Nat (json_size (JsonString text)) (Suc Zero) =
-               json_size_string text",
-        ),
-        (
-            "json_size_array_nil",
-            "theorem contract_json_size_array_nil
-               : Equal Nat (json_size (JsonArray (Nil Json))) (Suc Zero) =
-               json_size_array_nil",
-        ),
-        (
-            "json_size_array_cons",
-            "theorem contract_json_size_array_cons (child : Json) (rest : List Json)
-               : Equal Nat
-                   (json_size (JsonArray (Cons Json child rest)))
-                   (json_nat_add (json_size child) (json_size (JsonArray rest))) =
-               json_size_array_cons child rest",
-        ),
-        (
-            "json_size_object_nil",
-            "theorem contract_json_size_object_nil
-               : Equal Nat (json_size (JsonObject (Nil (Pair String Json))))
-                   (Suc Zero) = json_size_object_nil",
-        ),
-        (
-            "json_size_object_cons",
-            "theorem contract_json_size_object_cons
-                 (key : String) (value : Json) (rest : List (Pair String Json))
-               : Equal Nat
-                   (json_size
-                     (JsonObject
-                       (Cons (Pair String Json)
-                         (mk_pair String Json key value) rest)))
-                   (json_nat_add (json_size value) (json_size (JsonObject rest))) =
-               json_size_object_cons key value rest",
-        ),
+        "json_nat_add_right_suc",
+        "json_size_null",
+        "json_size_bool",
+        "json_size_number",
+        "json_size_string",
+        "json_size_array_nil",
+        "json_size_array_cons",
+        "json_size_object_nil",
+        "json_size_object_cons",
     ];
-
     let prefix = format!("{JSON_MODULE}.");
-    let private_aliases = env
+    let qualified_before: BTreeMap<_, _> = env
         .globals
         .iter()
-        .filter_map(|(qualified, id)| {
-            qualified
-                .strip_prefix(&prefix)
-                .map(|local| (local.to_owned(), *id))
-        })
-        .collect::<Vec<_>>();
-    for (name, client) in laws {
+        .filter(|(name, _)| name.starts_with(&prefix))
+        .map(|(name, id)| (name.clone(), *id))
+        .collect();
+    let mut law_types = BTreeMap::new();
+    for name in laws {
+        let example = format!("json_example_contract_{name}");
+        assert!(
+            !env.globals.contains_key(&example),
+            "{example} must come from the fence"
+        );
+        assert!(!qualified_before.contains_key(&format!("{JSON_MODULE}.{example}")));
         let id = catalog_or::provider_owned_id(&env, &owned, JSON_MODULE, name)
             .unwrap_or_else(|error| panic!("{name} must belong to Json: {error}"));
         let Decl::Transparent { ty, .. } = env.env.lookup(id).expect("owned law must exist") else {
             panic!("{name} must be a registered kernel-checked theorem, not an assumption");
         };
-        let actual = ty.clone();
+        law_types.insert(name, ty.clone());
         match env.elaborate_file(&format!("import {JSON_MODULE} ({name})")) {
             Err(ElabError::UnboundName { name: rejected, .. }) => {
                 assert_eq!(rejected, format!("{JSON_MODULE}.{name}"));
             }
             other => panic!("{name} must remain private, got {other:?}"),
         }
-        env.globals.extend(private_aliases.iter().cloned());
-        env.elaborate_file(client)
-            .unwrap_or_else(|error| panic!("{name} full contract must elaborate: {error:?}"));
-        let client_name = format!("contract_{name}");
-        let client_id = env.globals[&client_name];
-        let Decl::Transparent { ty: expected, .. } = env
-            .env
-            .lookup(client_id)
-            .expect("client theorem must register")
-        else {
-            panic!("{client_name} must be a checked, transparent theorem");
-        };
-        assert_eq!(
-            &actual, expected,
-            "{name} must have the client's exact generic checked proposition"
-        );
     }
+    env.execute_loaded_entry_checked_fences(JSON_MODULE)
+        .expect("Json's owner-local size contracts must elaborate");
+    let qualified_after: BTreeMap<_, _> = env
+        .globals
+        .iter()
+        .filter(|(name, _)| name.starts_with(&prefix))
+        .map(|(name, id)| (name.clone(), *id))
+        .collect();
+    assert_eq!(
+        qualified_after, qualified_before,
+        "fence cannot change Json-owned ids"
+    );
     assert_eq!(
         env.env.trusted_base().into_iter().collect::<BTreeSet<_>>(),
         trust_before,
         "the independently checked clients must not extend the trusted base"
     );
+    for (name, actual) in law_types {
+        let example = format!("json_example_contract_{name}");
+        let example_id = *env
+            .globals
+            .get(&example)
+            .unwrap_or_else(|| panic!("missing {example}"));
+        assert!(
+            !owned.contains(&example_id),
+            "{example} must not be owned by Json"
+        );
+        let Some(Decl::Transparent { ty: expected, .. }) = env.env.lookup(example_id) else {
+            panic!("{example} must have a checked transparent body");
+        };
+        assert_eq!(
+            actual, *expected,
+            "{name} must retain its exact checked proposition"
+        );
+    }
 }
 
 #[test]

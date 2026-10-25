@@ -58,9 +58,14 @@ fn expose_private_source_for_client(env: &mut ElabEnv, private: &str, owner: &st
     let id = head_id(left);
     assert!(env.env.transparent_body(id).is_some());
     assert!(
+        !env.globals.contains_key(private),
+        "{private} must be fresh"
+    );
+    assert!(
         !env.globals.values().any(|visible| *visible == id),
         "the implementation helper `{private}` must remain hidden"
     );
+    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
     env.globals.insert(private.to_owned(), id);
 }
 
@@ -72,7 +77,9 @@ fn expose_release_continuation_for_client(env: &mut ElabEnv) {
     };
     let id = head_id(continuation);
     assert!(env.env.transparent_body(id).is_some());
+    assert!(!env.globals.contains_key("private_resource_release_result"));
     assert!(!env.globals.values().any(|visible| *visible == id));
+    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
     env.globals
         .insert("private_resource_release_result".to_owned(), id);
 }
@@ -167,6 +174,8 @@ fn resource_laws_have_exact_independent_checked_clients() {
     ] {
         assert!(!env.globals.contains_key(name));
         assert!(env.env.constructor(id).is_some());
+        assert!(!env.globals.values().any(|visible| *visible == id));
+        // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
         env.globals.insert(name.to_owned(), id);
     }
     let mapping_handle_id = env.globals["MappingHandle"];
@@ -177,7 +186,9 @@ fn resource_laws_have_exact_independent_checked_clients() {
         .constructors;
     assert_eq!(constructors.len(), 1);
     let private_mapping_handle = constructors[0].id;
+    assert!(!env.globals.contains_key("PrivateMappingHandle"));
     assert!(!env.globals.values().any(|id| *id == private_mapping_handle));
+    // Private-TCB fixture alias (LANG-SESSION-SCOPE item 8): no provider to import; fresh key, id from a checked authority.
     env.globals
         .insert("PrivateMappingHandle".to_owned(), private_mapping_handle);
 

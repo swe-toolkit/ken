@@ -4,6 +4,7 @@
 mod catalog_or;
 
 use std::collections::BTreeSet;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
@@ -28,10 +29,8 @@ fn dependency_env() -> ElabEnv {
         .expect("canonical Nat relation provider must elaborate third");
     env.elaborate_module_from_roots(&[catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load third");
-    expose_module_aliases(&mut env, "Capability.Diagnostics.Core");
     env.elaborate_module_from_roots(&[catalog_root()], "Capability.Parsing.Cursor")
         .expect("Capability.Parsing.Cursor must roots-load fourth");
-    expose_module_aliases(&mut env, "Capability.Parsing.Cursor");
     env
 }
 
@@ -46,39 +45,81 @@ fn catalog_root() -> PathBuf {
         .join("catalog/packages")
 }
 
-fn expose_module_aliases(env: &mut ElabEnv, module: &str) {
-    let prefix = format!("{module}.");
-    let aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(&prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(aliases);
-}
-
-fn load_arguments_module(env: &mut ElabEnv) {
+fn load_arguments_module(env: &mut ElabEnv) -> Vec<GlobalId> {
     env.elaborate_module_from_roots(&[catalog_root()], "Capability.Process.Arguments")
-        .expect("Capability.Process.Arguments must load after Capability.Parsing.Cursor");
-    expose_module_aliases(env, "Capability.Process.Arguments");
+        .expect("Capability.Process.Arguments must load after Capability.Parsing.Cursor")
 }
 
-fn full_env() -> ElabEnv {
+struct ProcessFixture {
+    inner: ElabEnv,
+    arguments_owned: Vec<GlobalId>,
+    arg_location_constructor: GlobalId,
+}
+
+impl Deref for ProcessFixture {
+    type Target = ElabEnv;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for ProcessFixture {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl ProcessFixture {
+    fn checked_arguments_id(&self, name: &str) -> GlobalId {
+        catalog_or::provider_owned_id(
+            &self.inner,
+            &self.arguments_owned,
+            "Capability.Process.Arguments",
+            name,
+        )
+        .unwrap_or_else(|error| panic!("Arguments owner {name}: {error}"))
+    }
+}
+
+fn full_env() -> ProcessFixture {
     let mut env = dependency_env();
-    load_arguments_module(&mut env);
+    let arguments_owned = load_arguments_module(&mut env);
     env.elaborate_ken_md_file(EXIT_KEN_MD)
         .expect("Capability.Process.Exit must elaborate after Capability.Process.Arguments");
-    env
+    let cursor_owned = env
+        .elaborate_module_from_roots(&[catalog_root()], "Capability.Parsing.Cursor")
+        .expect("Cursor must retain its real checked owner");
+    let arg_location = catalog_or::provider_owned_id(
+        &env,
+        &cursor_owned,
+        "Capability.Parsing.Cursor",
+        "ArgLocation",
+    )
+    .expect("Cursor must own ArgLocation");
+    let arg_location_constructor = env
+        .env
+        .inductive(arg_location)
+        .expect("ArgLocation must be checked data")
+        .constructors
+        .iter()
+        .find(|ctor| ctor.id == env.globals["Capability.Parsing.Cursor.MkArgLocation"])
+        .expect("MkArgLocation must belong to Cursor's ArgLocation")
+        .id;
+    ProcessFixture {
+        inner: env,
+        arguments_owned,
+        arg_location_constructor,
+    }
 }
 
-fn assert_transparent_globals(env: &ElabEnv, names: &[&str]) {
+fn assert_transparent_globals(env: &ProcessFixture, names: &[&str]) {
     for name in names {
-        let id = *env
-            .globals
-            .get(*name)
-            .unwrap_or_else(|| panic!("expected checked global `{name}`"));
+        let id = if name.starts_with("exit_") {
+            env.globals[*name] // Exit is compiled as this fixture's own checked unit.
+        } else {
+            env.checked_arguments_id(name)
+        };
         assert!(
             env.env.transparent_body(id).is_some(),
             "`{name}` must be a real transparent, kernel-checked term"
@@ -129,8 +170,18 @@ fn make_store(env: &ElabEnv) -> EvalStore {
     store
 }
 
-fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
-    let id = env.globals[name];
+fn eval_global(env: &ProcessFixture, store: &mut EvalStore, name: &str) -> EvalVal {
+    let id = if [
+        "process_arguments",
+        "replace_process_arguments",
+        "process_argument_at",
+    ]
+    .contains(&name)
+    {
+        env.checked_arguments_id(name)
+    } else {
+        env.globals[name] // A client declaration checked in this fixture.
+    };
     match env.env.lookup(id) {
         Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
         other => panic!("`{name}` must be transparent, got {other:?}"),
@@ -159,7 +210,7 @@ fn apply_values(
 }
 
 fn call_global(
-    env: &ElabEnv,
+    env: &ProcessFixture,
     store: &mut EvalStore,
     name: &str,
     arguments: impl IntoIterator<Item = EvalVal>,
@@ -215,8 +266,12 @@ fn nat_count(env: &ElabEnv, value: &EvalVal) -> u64 {
     }
 }
 
-fn ctor_args<'a>(env: &ElabEnv, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
-    let expected = env.globals[name];
+fn ctor_args<'a>(env: &ProcessFixture, value: &'a EvalVal, name: &str) -> &'a [EvalVal] {
+    let expected = if name == "MkArgLocation" {
+        env.arg_location_constructor
+    } else {
+        env.globals[name]
+    };
     match value {
         EvalVal::Ctor { id, args, .. } if *id == expected => args.as_ref().as_slice(),
         other => panic!("expected `{name}`, got {other:?}"),
@@ -333,6 +388,8 @@ fn structural_slice_location_keeps_nonzero_argument_and_range() {
     let mut env = full_env();
     env.elaborate_file(
         r#"
+        import Capability.Parsing.Cursor (ArgLocation)
+        import Capability.Process.Arguments (argument_slice_location)
         const cc6_arg_zero_bytes : Bytes = bytes_encode "a"
         const cc6_arg_one_bytes : Bytes = bytes_encode "bb"
         const cc6_arg_two_bytes : Bytes = bytes_encode "abcdef"

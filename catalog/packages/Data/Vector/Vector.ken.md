@@ -611,6 +611,289 @@ theorem vec_example_to_list_length
       (a : Type) (n : Nat) (xs : Vec a n)
     : Equal Nat (length a (to_list a n xs)) n =
   to_list_length a n xs
+
+theorem vec_example_lookup_zip_with_contract
+      (a : Type)
+      (b : Type)
+      (c : Type)
+      (n : Nat)
+      (f : a → b → c)
+      (xs : Vec a n)
+      (ys : Vec b n)
+      (i : Fin n)
+    : Equal c
+        (lookup c n (zip_with a b c n f xs ys) i)
+        (f (lookup a n xs i) (lookup b n ys i)) =
+  lookup_zip_with a b c n f xs ys i
+
+theorem vec_example_zip_with_map_contract
+      (a : Type)
+      (a2 : Type)
+      (b : Type)
+      (b2 : Type)
+      (c : Type)
+      (n : Nat)
+      (g : a → b)
+      (h : a2 → b2)
+      (f : b → b2 → c)
+      (k : a → a2 → c)
+      (hk : (u : a) → (v : a2) → Equal c (k u v) (f (g u) (h v)))
+      (xs : Vec a n)
+      (ys : Vec a2 n)
+    : Equal
+        (Vec c n)
+        (zip_with b b2 c n f (map a b n g xs) (map a2 b2 n h ys))
+        (zip_with a a2 c n k xs ys) =
+  zip_with_map a a2 b b2 c n g h f k hk xs ys
+
+fn vec_example_pointwise_g (x : Bool) : Bool = x
+
+fn vec_example_pointwise_h (x : Bool) : Bool =
+  match x {
+    True ↦ False;
+    False ↦ True
+  }
+
+fn vec_example_pointwise_f (x : Bool) (y : Bool) : Bool = y
+
+fn vec_example_pointwise_k (x : Bool) (y : Bool) : Bool =
+  vec_example_pointwise_f (vec_example_pointwise_g x) (vec_example_pointwise_h y)
+
+theorem vec_example_pointwise_hk
+      (u : Bool) (v : Bool)
+    : Equal Bool
+        (vec_example_pointwise_k u v)
+        (vec_example_pointwise_f (vec_example_pointwise_g u) (vec_example_pointwise_h v)) =
+  Refl
+
+theorem vec_example_unswapped_concrete
+    : Equal
+        (Vec Bool (Suc Zero))
+        (zip_with
+          Bool
+          Bool
+          Bool
+          (Suc Zero)
+          vec_example_pointwise_f
+          (map Bool Bool (Suc Zero) vec_example_pointwise_g (VCons Bool Zero True (VNil Bool)))
+          (map Bool Bool (Suc Zero) vec_example_pointwise_h (VCons Bool Zero True (VNil Bool))))
+        (zip_with
+          Bool
+          Bool
+          Bool
+          (Suc Zero)
+          vec_example_pointwise_k
+          (VCons Bool Zero True (VNil Bool))
+          (VCons Bool Zero True (VNil Bool))) =
+  zip_with_map
+    Bool
+    Bool
+    Bool
+    Bool
+    Bool
+    (Suc Zero)
+    vec_example_pointwise_g
+    vec_example_pointwise_h
+    vec_example_pointwise_f
+    vec_example_pointwise_k
+    vec_example_pointwise_hk
+    (VCons Bool Zero True (VNil Bool))
+    (VCons Bool Zero True (VNil Bool))
+
+const vec_example_swapped_head : Bool =
+  lookup
+    Bool
+    (Suc Zero)
+    (zip_with
+      Bool
+      Bool
+      Bool
+      (Suc Zero)
+      vec_example_pointwise_f
+      (map Bool Bool (Suc Zero) vec_example_pointwise_h (VCons Bool Zero True (VNil Bool)))
+      (map Bool Bool (Suc Zero) vec_example_pointwise_g (VCons Bool Zero True (VNil Bool))))
+    (FZero Zero)
+
+const vec_example_pointwise_head : Bool =
+  lookup
+    Bool
+    (Suc Zero)
+    (zip_with
+      Bool
+      Bool
+      Bool
+      (Suc Zero)
+      vec_example_pointwise_k
+      (VCons Bool Zero True (VNil Bool))
+      (VCons Bool Zero True (VNil Bool)))
+    (FZero Zero)
+
+theorem vec_example_swapped_head_true : Equal Bool vec_example_swapped_head True = Proved
+
+theorem vec_example_pointwise_head_false : Equal Bool vec_example_pointwise_head False = Proved
+
+fn vec_example_head (a : Type) (n : Nat) (xs : Vec a (Suc n)) : a = head a n xs
+
+fn vec_example_tail (a : Type) (n : Nat) (xs : Vec a (Suc n)) : Vec a n = tail a n xs
+
+fn vec_example_map (a : Type) (b : Type) (n : Nat) (f : a → b) (xs : Vec a n) : Vec b n =
+  map a b n f xs
+
+fn vec_example_zip_with
+      (a : Type) (b : Type) (c : Type) (n : Nat) (f : a → b → c) (xs : Vec a n) (ys : Vec b n)
+    : Vec c n =
+  zip_with a b c n f xs ys
+
+fn vec_example_lookup (a : Type) (n : Nat) (xs : Vec a n) (i : Fin n) : a = lookup a n xs i
+
+fn vec_example_bridge_as_list (a : Type) (n : Nat) (xs : Vec a n) : List a = to_list a n xs
+
+fn vec_example_bridge_zip
+      (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+    : Vec (Pair a b) n =
+  zip a b n xs ys
+
+fn vec_example_bridge_unzip
+      (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+    : Pair (Vec a n) (Vec b n) =
+  unzip a b n ps
+
+theorem vec_example_bridge_unzip_zip
+      (a : Type) (b : Type) (n : Nat) (xs : Vec a n) (ys : Vec b n)
+    : Equal
+        (Pair (Vec a n) (Vec b n))
+        (unzip a b n (zip a b n xs ys))
+        (mk_pair (Vec a n) (Vec b n) xs ys) =
+  unzip_zip a b n xs ys
+
+theorem vec_example_bridge_zip_unzip
+      (a : Type) (b : Type) (n : Nat) (ps : Vec (Pair a b) n)
+    : Equal
+        (Vec (Pair a b) n)
+        (zip
+          a
+          b
+          n
+          (pair_fst (Vec a n) (Vec b n) (unzip a b n ps))
+          (pair_snd (Vec a n) (Vec b n) (unzip a b n ps)))
+        ps =
+  zip_unzip a b n ps
+
+theorem vec_example_bridge_empty_list
+    : Equal (List Bool) (to_list Bool Zero (VNil Bool)) (Nil Bool) =
+  Proved
+
+theorem vec_example_bridge_two_list
+    : Equal
+        (List Bool)
+        (to_list
+          Bool
+          (Suc (Suc Zero))
+          (VCons Bool (Suc Zero) True (VCons Bool Zero False (VNil Bool))))
+        (Cons Bool True (Cons Bool False (Nil Bool))) =
+  Refl
+
+theorem vec_example_bridge_paired_head
+    : Equal
+        (List (Pair Bool Bool))
+        (to_list
+          (Pair Bool Bool)
+          (Suc Zero)
+          (zip
+            Bool
+            Bool
+            (Suc Zero)
+            (VCons Bool Zero True (VNil Bool))
+            (VCons Bool Zero False (VNil Bool))))
+        (Cons (Pair Bool Bool) (mk_pair Bool Bool True False) (Nil (Pair Bool Bool))) =
+  Refl
+
+theorem vec_example_bridge_unzipped_left
+    : Equal
+        (Vec Bool (Suc Zero))
+        (pair_fst
+          (Vec Bool (Suc Zero))
+          (Vec Bool (Suc Zero))
+          (unzip
+            Bool
+            Bool
+            (Suc Zero)
+            (VCons
+              (Pair Bool Bool)
+              Zero
+              (mk_pair Bool Bool True False)
+              (VNil (Pair Bool Bool)))))
+        (VCons Bool Zero True (VNil Bool)) =
+  Refl
+
+theorem vec_example_bridge_unzipped_right
+    : Equal
+        (Vec Bool (Suc Zero))
+        (pair_snd
+          (Vec Bool (Suc Zero))
+          (Vec Bool (Suc Zero))
+          (unzip
+            Bool
+            Bool
+            (Suc Zero)
+            (VCons
+              (Pair Bool Bool)
+              Zero
+              (mk_pair Bool Bool True False)
+              (VNil (Pair Bool Bool)))))
+        (VCons Bool Zero False (VNil Bool)) =
+  Refl
+
+const vec_example_bridge_left : Vec Bool (Suc Zero) = VCons Bool Zero True (VNil Bool)
+
+const vec_example_bridge_right : Vec Bool (Suc Zero) = VCons Bool Zero False (VNil Bool)
+
+theorem vec_example_bridge_unswapped
+    : Equal
+        (Pair (Vec Bool (Suc Zero)) (Vec Bool (Suc Zero)))
+        (unzip
+          Bool
+          Bool
+          (Suc Zero)
+          (zip Bool Bool (Suc Zero) vec_example_bridge_left vec_example_bridge_right))
+        (mk_pair
+          (Vec Bool (Suc Zero))
+          (Vec Bool (Suc Zero))
+          vec_example_bridge_left
+          vec_example_bridge_right) =
+  unzip_zip Bool Bool (Suc Zero) vec_example_bridge_left vec_example_bridge_right
+
+const vec_example_unzip_left_head : Bool =
+  lookup
+    Bool
+    (Suc Zero)
+    (pair_fst
+      (Vec Bool (Suc Zero))
+      (Vec Bool (Suc Zero))
+      (unzip
+        Bool
+        Bool
+        (Suc Zero)
+        (zip Bool Bool (Suc Zero) vec_example_bridge_left vec_example_bridge_right)))
+    (FZero Zero)
+
+const vec_example_unzip_right_head : Bool =
+  lookup
+    Bool
+    (Suc Zero)
+    (pair_snd
+      (Vec Bool (Suc Zero))
+      (Vec Bool (Suc Zero))
+      (unzip
+        Bool
+        Bool
+        (Suc Zero)
+        (zip Bool Bool (Suc Zero) vec_example_bridge_left vec_example_bridge_right)))
+    (FZero Zero)
+
+theorem vec_example_unzip_left_true : Equal Bool vec_example_unzip_left_head True = Proved
+
+theorem vec_example_unzip_right_false : Equal Bool vec_example_unzip_right_head False = Proved
 ```
 
 ## Design notes

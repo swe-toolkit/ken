@@ -28737,6 +28737,8 @@ mod nested_lift_association_tests {
         )
         .expect("shadow_sibling");
         let sibling = env.globals["shadow_sibling"];
+        assert!(!env.globals.contains_key("ShadowSibling"));
+        // Synthetic checked fixture alias (LANG-SESSION-SCOPE item 8): no catalog provider; fresh key.
         env.globals.insert("ShadowSibling".into(), sibling);
 
         let parsed = parse_expr(
@@ -29037,6 +29039,8 @@ mod nested_lift_association_tests {
             owner_ty,
         )
         .unwrap();
+        assert!(!env.globals.contains_key("recursiveOwner"));
+        // Synthetic checked fixture alias (LANG-SESSION-SCOPE item 8): no catalog provider; fresh key.
         env.globals.insert("recursiveOwner".into(), owner_id);
 
         let equality = Term::Eq(

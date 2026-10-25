@@ -27,7 +27,7 @@ fn base_env() -> ElabEnv {
     catalog_or::load_function_combinators(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
-    catalog_or::restore_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
+    catalog_or::assert_lc_bool_and_absent_after_import(&env, &lawful_owned);
     env.elaborate_ken_md_file(SUMS_KEN_MD)
         .expect("Data/Sums/Combinators.ken.md must elaborate");
     env
@@ -91,7 +91,7 @@ fn trusted_base_delta_is_empty_across_the_file() {
     catalog_or::load_function_combinators(&mut env);
     env.elaborate_ken_md_file(LAWFUL_FUNCTORS_KEN_MD)
         .expect("Core/Classes/LawfulFunctors.ken.md must elaborate");
-    catalog_or::restore_lc_bool_and_flat_aliases(&mut env, &lawful_owned);
+    catalog_or::assert_lc_bool_and_absent_after_import(&env, &lawful_owned);
     let before: std::collections::BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     env.elaborate_ken_md_file(SUMS_KEN_MD)
         .expect("Data/Sums/Combinators.ken.md must elaborate");

@@ -40,8 +40,13 @@ fn with_derived_combinators() -> ElabEnv {
             !env.env.trusted_base().contains(&id),
             "{name} adds no trust"
         );
-        env.globals.insert(name.to_owned(), id);
+        assert!(
+            !env.globals.contains_key(name),
+            "{name} must not gain a flat fixture alias"
+        );
     }
+    env.elaborate_file("import Data.Collections.Derived (map, filter, length)")
+        .expect("public Derived operations must import into the client session");
     env
 }
 
@@ -73,8 +78,8 @@ fn prelude_registers_zip_without_a_list_fold() {
 /// and the one declaration composes all four with checked identities and
 /// evaluates to one for its singleton input. CLAIMED: clients can compose
 /// these structural List combinators after loading Derived. THE GAP: this
-/// fixture exposes exact qualified identities as flat aliases; real catalog
-/// client selective imports have separate gates.
+/// fixture uses a checked selective import for the public names; the provider
+/// identity checks and concrete evaluation guard the imported operations.
 #[test]
 fn list_combinators_compose_with_checked_derived_providers() {
     let mut env = with_derived_combinators();
@@ -176,7 +181,7 @@ fn ac2_filter_computes_and_rejects_at_least_one_element() {
     let (term, _ty) = env
         .elaborate_expr(
             "ac2_filter_computes_and_rejects_at_least_one_element",
-            "filter Nat (\\n. match n { Zero |-> True ; Suc m |-> False }) \
+            "Data.Collections.Derived.filter Nat (\\n. match n { Zero |-> True ; Suc m |-> False }) \
              (Cons Nat Zero (Cons Nat (Suc Zero) (Cons Nat (Suc (Suc Zero)) (Nil Nat))))",
         )
         .expect("filter application over a concrete Nat list elaborates");

@@ -246,9 +246,11 @@ fn mk_map_dependency_env_with_provider_owned() -> (ElabEnv, MapDependenciesOwned
         "bool_and::left_identity",
         "bool_and::right_identity",
     ] {
+        catalog_or::provider_owned_id(&env, &lawful, "Core.Classes.LawfulClasses", imported)
+            .unwrap_or_else(|error| panic!("LC must own {imported}: {error}"));
         assert!(
-            env.globals.remove(imported).is_some(),
-            "Map's LC fixture must withhold selectively imported `{imported}`"
+            !env.globals.contains_key(imported),
+            "Map's LC fixture must not prebind `{imported}` before selective import"
         );
     }
     let sums = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Combinators")
@@ -390,10 +392,9 @@ fn cat_map_retires_leq_nat_family_and_totality_name() {
         env.env.lookup(provider),
         Some(Decl::Transparent { .. })
     ));
-    assert_eq!(
-        env.globals.remove("leq_nat"),
-        Some(provider),
-        "withhold the flat canonical alias so Map cannot rely on it without an import"
+    assert!(
+        !env.globals.contains_key("leq_nat"),
+        "Map must not have a flat LC.leq_nat alias before checking its own source"
     );
     let before: BTreeSet<_> = env.env.trusted_base().into_iter().collect();
     let map_ids: BTreeSet<_> = env

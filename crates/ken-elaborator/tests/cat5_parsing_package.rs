@@ -35,26 +35,17 @@ fn dependency_env_with_provider_owned() -> (ElabEnv, Cat5ProviderOwned) {
         .expect("Data.Numeric.Nat.Order must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    let lawful_prefix = "Core.Classes.LawfulClasses.";
-    let lawful_aliases: Vec<_> = env
-        .globals
-        .iter()
-        .filter_map(|(name, id)| {
-            name.strip_prefix(lawful_prefix)
-                .map(|suffix| (suffix.to_owned(), *id))
-        })
-        .collect();
-    env.globals.extend(lawful_aliases);
+    assert!(
+        !env.globals.contains_key("leq_nat"),
+        "LC must not provide a flat test alias"
+    );
     let diagnostics_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load fourth");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
         .expect("Capability.Parsing.Cursor must roots-load fifth");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Cursor");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
         .expect("Capability.Parsing.Decoder must roots-load sixth");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
     (env, Cat5ProviderOwned { diagnostics: diagnostics_owned, derived, lawful, nat_order })
 }
 
@@ -73,7 +64,6 @@ fn load_parsing_module(env: &mut ElabEnv) -> Vec<GlobalId> {
         "Capability.Parsing.Parsing",
     )
     .expect("Capability.Parsing.Parsing must roots-load");
-    catalog_or::expose_module(env, "Capability.Parsing.Parsing");
     owned
 }
 
@@ -1142,6 +1132,7 @@ fn cat5_d1_concrete_nonempty_source_constructs_and_projects() {
     let mut env = mk_env();
     env.elaborate_cat5_client(
         r#"
+        import Data.Collections.Derived (bytes_nat_length)
         data ConcreteByteSource = MkConcreteByteSource
 
         const sample_abc_bytes : Bytes = bytes_encode "abc"
@@ -1463,15 +1454,35 @@ fn cat5_parser_laws_are_publicly_instantiable_without_new_trust() {
 fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
     let extracted = ken_elaborator::literate::extract_ken_md(PARSING_KEN_MD)
         .expect("Parsing checked fences must extract");
-    let mut env = mk_env();
-    catalog_or::expose_module(&mut env, "Data.Numeric.Nat.Order");
-    let leq = env.globals["LessEqNat"];
-    let source_length = env.globals["source_length"];
+    let (mut env, _) = dependency_env_with_provider_owned();
+    let parsing_owned = load_parsing_module(&mut env);
+    let leq = catalog_or::provider_owned_id(
+        &env,
+        &parsing_owned,
+        "Capability.Parsing.Parsing",
+        "LessEqNat",
+    )
+    .expect("checked Parsing must own LessEqNat");
+    let source_length = catalog_or::provider_owned_id(
+        &env,
+        &parsing_owned,
+        "Capability.Parsing.Parsing",
+        "source_length",
+    )
+    .expect("checked Parsing must own source_length");
     let suc = env.prelude_env.suc_id;
-    let over_end = extracted.reject_ranges.iter().any(|range| {
-        let err = env
-            .elaborate_file(&PARSING_KEN_MD[range.clone()])
-            .expect_err("a reject fence must not elaborate");
+    let rejections = env
+        .execute_loaded_entry_checked_fences_reporting_rejections("Capability.Parsing.Parsing")
+        .expect("the owner-scoped Parsing fences must execute");
+    assert_eq!(
+        rejections
+            .iter()
+            .map(|(range, _)| range.clone())
+            .collect::<Vec<_>>(),
+        extracted.reject_ranges,
+        "every reject fence must be reported in document order"
+    );
+    let over_end = rejections.iter().any(|(_, err)| {
         let ElabError::KernelRejected {
             error: KernelError::TypeMismatch { expected, found },
             ..
@@ -1509,8 +1520,8 @@ fn cat5_unbounded_parser_fence_rejects_at_exact_end_bound() {
             length,
         );
         *found_right.as_ref() == *found_left.as_ref()
-            && *found == true_endpoint
-            && *expected == false_endpoint
+            && found.as_ref() == &true_endpoint
+            && expected.as_ref() == &false_endpoint
     });
     assert!(
         over_end,

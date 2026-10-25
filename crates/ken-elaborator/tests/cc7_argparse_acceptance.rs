@@ -55,7 +55,6 @@ fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
         .expect("Data.Numeric.Nat.Arithmetic must load as a qualified module");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("Core.Classes.LawfulClasses must load as a qualified module");
-    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
     for (source, label) in [
         (STRING_BIJECTION_KEN_MD, "Data.Text.StringBijection"),
         (STRING_KEYS_KEN_MD, "Data.Text.StringKeys"),
@@ -71,30 +70,25 @@ fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
         "Core.Classes.EffectfulClasses",
     )
     .expect("Core.Classes.EffectfulClasses must roots-load in dependency order");
-    catalog_or::expose_module(&mut env, "Core.Classes.EffectfulClasses");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Collections.NonEmpty")
         .expect("Data.Collections.NonEmpty must roots-load before its clients");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Sums.Validation")
         .expect("Data.Sums.Validation must roots-load through its declared dependencies");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Diagnostics.Core")
         .expect("Capability.Diagnostics.Core must roots-load in dependency order");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Core");
     env.elaborate_ken_md_file(CODEC_KEN_MD)
         .expect("Data.Text.Codec must elaborate in dependency order");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Data.Numeric.Nat.Order")
         .expect("Data.Numeric.Nat.Order must load before its Cursor consumer");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Cursor")
         .expect("Capability.Parsing.Cursor must roots-load in dependency order");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Cursor");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Parsing.Decoder")
         .expect("Capability.Parsing.Decoder must roots-load in dependency order");
-    catalog_or::expose_module(&mut env, "Capability.Parsing.Decoder");
     env.elaborate_module_from_roots(
         &[catalog_or::catalog_root()],
         "Capability.Process.Arguments",
     )
     .expect("Capability.Process.Arguments must roots-load in dependency order");
-    catalog_or::expose_module(&mut env, "Capability.Process.Arguments");
     for (source, label) in [
         (NUMERIC_KEN_MD, "Capability.Parsing.Numeric"),
         (EXIT_KEN_MD, "Capability.Process.Exit"),
@@ -104,7 +98,6 @@ fn dependency_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
     }
     let doc_owned = env.elaborate_module_from_roots(&[catalog_or::catalog_root()], "Capability.Formatting.Doc")
         .expect("Capability.Formatting.Doc must roots-load in dependency order");
-    catalog_or::expose_module(&mut env, "Capability.Formatting.Doc");
     (env, doc_owned)
 }
 
@@ -123,7 +116,6 @@ fn full_env_with_doc_owned() -> (ElabEnv, Vec<GlobalId>) {
         "Capability.Diagnostics.Render",
     )
     .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], ARGPARSE_MODULE)
         .expect("ArgParse must roots-load through its declared providers");
     let before_forge = env.module_state.clone();
@@ -568,7 +560,6 @@ fn cc7_is_a_zero_trust_specialization_with_no_second_universe() {
         "Capability.Diagnostics.Render",
     )
     .expect("Capability.Diagnostics.Render must roots-load through Core and Doc");
-    catalog_or::expose_module(&mut env, "Capability.Diagnostics.Render");
     env.elaborate_module_from_roots(&[catalog_or::catalog_root()], ARGPARSE_MODULE)
         .expect("ArgParse must roots-load through its declared providers");
     let before_forge = env.module_state.clone();

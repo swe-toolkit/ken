@@ -4,6 +4,7 @@
 mod catalog_or;
 
 use std::collections::BTreeSet;
+use std::ops::{Deref, DerefMut};
 
 use ken_elaborator::{ElabEnv, NumericLitVal};
 use ken_interp::eval::{apply, eval, EvalStore, EvalVal, ListCharIds};
@@ -27,24 +28,68 @@ const PATH_POSIX_PUBLIC: [&str; 15] = [
     "path_valid",
 ];
 
-fn full_env() -> ElabEnv {
+struct PosixFixture {
+    inner: ElabEnv,
+    owned: Vec<GlobalId>,
+    path_constructor: GlobalId,
+}
+
+impl Deref for PosixFixture {
+    type Target = ElabEnv;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for PosixFixture {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl PosixFixture {
+    fn checked_id(&self, name: &str) -> GlobalId {
+        if name == "MkPath" {
+            return self.path_constructor;
+        }
+        catalog_or::provider_owned_id(&self.inner, &self.owned, PATH_POSIX_MODULE, name)
+            .unwrap_or_else(|error| panic!("Posix owner {name}: {error}"))
+    }
+}
+
+fn full_env() -> PosixFixture {
     let mut env = ElabEnv::new().expect("prelude bootstrap");
-    env.elaborate_module_from_roots(&[catalog_or::catalog_root()], PATH_POSIX_MODULE)
+    let owned = env
+        .elaborate_module_from_roots(&[catalog_or::catalog_root()], PATH_POSIX_MODULE)
         .expect("Capability.Filesystem.Path.Posix must roots-load its declared dependencies");
     env.elaborate_file(&format!(
         "import {PATH_POSIX_MODULE} ({})",
         PATH_POSIX_PUBLIC.join(", ")
     ))
     .expect("the curated Posix surface must import together");
+    let path = catalog_or::provider_owned_id(&env, &owned, PATH_POSIX_MODULE, "Path")
+        .expect("Posix owns checked Path");
+    let path_constructor = env
+        .env
+        .inductive(path)
+        .expect("Path must be checked inductive")
+        .constructors
+        .iter()
+        .find(|ctor| ctor.id == env.globals[&format!("{PATH_POSIX_MODULE}.MkPath")])
+        .expect("MkPath must belong to Path")
+        .id;
     for surface in PATH_POSIX_PUBLIC {
-        let canonical = env.globals[&format!("{PATH_POSIX_MODULE}.{surface}")];
-        assert_eq!(
-            env.globals.insert(surface.to_owned(), canonical),
-            None,
-            "Posix public aliases must not collide"
+        assert!(
+            !env.globals.contains_key(surface),
+            "Posix `{surface}` must not enter the flat test fixture"
         );
     }
-    env
+    PosixFixture {
+        inner: env,
+        owned,
+        path_constructor,
+    }
 }
 
 fn literal_value(value: &NumericLitVal, mkdecimalpair_id: GlobalId) -> EvalVal {
@@ -83,8 +128,13 @@ fn resync_literals(env: &ElabEnv, store: &mut EvalStore) {
     }
 }
 
-fn eval_global(env: &ElabEnv, store: &mut EvalStore, name: &str) -> EvalVal {
-    match env.env.lookup(env.globals[name]) {
+fn eval_global(env: &PosixFixture, store: &mut EvalStore, name: &str) -> EvalVal {
+    let id = if PATH_POSIX_PUBLIC.contains(&name) {
+        env.checked_id(name)
+    } else {
+        env.globals[name]
+    };
+    match env.env.lookup(id) {
         Some(Decl::Transparent { body, .. }) => eval(&[], body, &env.env, store),
         other => panic!("`{name}` must be transparent, got {other:?}"),
     }
@@ -100,7 +150,7 @@ fn bool_value(env: &ElabEnv, value: &EvalVal) -> bool {
 }
 
 fn call_global(
-    env: &ElabEnv,
+    env: &PosixFixture,
     store: &mut EvalStore,
     name: &str,
     arguments: impl IntoIterator<Item = EvalVal>,
@@ -112,9 +162,9 @@ fn call_global(
     value
 }
 
-fn path_parts<'a>(env: &ElabEnv, value: &'a EvalVal) -> (bool, &'a EvalVal) {
+fn path_parts<'a>(env: &PosixFixture, value: &'a EvalVal) -> (bool, &'a EvalVal) {
     match value {
-        EvalVal::Ctor { id, args, .. } if *id == env.globals["MkPath"] => {
+        EvalVal::Ctor { id, args, .. } if *id == env.path_constructor => {
             let absolute = match &args[0] {
                 EvalVal::Ctor { id, .. } if *id == env.globals["True"] => true,
                 EvalVal::Ctor { id, .. } if *id == env.globals["False"] => false,
@@ -163,7 +213,11 @@ fn list_segments(env: &ElabEnv, value: &EvalVal) -> Vec<Vec<u8>> {
 fn ordered_dependency_closure_elaborates_path_package() {
     let env = full_env();
     for name in PATH_POSIX_PUBLIC {
-        assert!(env.globals.contains_key(name), "missing `{name}`");
+        let id = env.checked_id(name);
+        assert!(
+            env.env.lookup(id).is_some() || env.env.constructor(id).is_some(),
+            "missing checked `{name}`"
+        );
     }
 }
 

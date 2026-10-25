@@ -194,9 +194,6 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
         .instance_search("Ord", "Bool")
         .expect("Ord Bool must remain registered");
     assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be owner-checked");
-    catalog_or::expose_module(&mut env, "Core.Classes.LawfulClasses");
-    catalog_or::expose_module(&mut env, MODULE);
-    catalog_or::expose_module(&mut env, "Core.Logic.EmptyDec");
     env.elaborate_file(
         "import Core.Classes.LawfulClasses (Ord, ord_leq_at)\n\
          import Algorithm.Searching.OrderedSearch (elem, sorted_for_search, search)\n\
