@@ -1,7 +1,7 @@
 ---
 id: LANG-REFINED-RECURSION-LET-VALUE-INDEXED-MATCH
 title: "Dependent-result structural recursion on a refined parameter is still refused with K0014 when an un-ascribed let binds a match on an indexed-family value whose arms all return the recursive call. The match lowers through the index-equation convoy to an applied eliminator whose methods take an extra equation binder, and the returned-call walk has no arm for it"
-status: active
+status: merged
 owner: language
 size: S
 tier: T1
