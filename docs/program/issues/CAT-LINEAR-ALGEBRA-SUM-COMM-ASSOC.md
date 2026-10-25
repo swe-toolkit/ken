@@ -1,7 +1,7 @@
 ---
 id: CAT-LINEAR-ALGEBRA-SUM-COMM-ASSOC
 title: "Algorithm.LinearAlgebra.NatMatrix exports spec 65 section 5: vector_add_comm, vector_add_assoc, matrix_add_comm and matrix_add_assoc, proved at zero trust from the Architect's D0, with the section 5 seed run by a package test"
-status: active
+status: merged
 owner: foundation
 size: S
 tier: T2
@@ -37,7 +37,7 @@ exactly spec 65 §5's public types, each a checked proof.
   the step lemmas rewrite through one-level `*_cons` equations with
   explicit `trans` and `cong`. Do not replace them with a direct `Refl`.
 - **The one consumer.** `cat_linear_algebra_nat_matrix.rs` pins the
-  public inventory at 17 names. It becomes 21, and its
+  public inventory at 22 names. It becomes 26, and its
   `visible == expected` assertion keeps the helpers private.
 - **Module prose.** The counts in `NatMatrix.ken.md` (lede fourteen
   laws, §2 four laws, §7 twenty-two names and fourteen theorems) become
@@ -86,7 +86,7 @@ them, with no conformance-runner, CI or landing claim.
   public Nat lemma, a new import, or a census row change.
 
 Checks: 4 fired: the four types, helper set, placement and one consumer
-are read from `evt_4t7088x37v0yv` on `4e7cf78a6`; the 17-name pin and
+are read from `evt_4t7088x37v0yv` on `4e7cf78a6`; the 22-name pin and
 the fourteen and twenty-two prose counts are on `0812a8d3d`. 11 fired:
 the right-nested sum does not convert (measured by the D0), so the
 frame keeps the one-level rewrites. 8 fired: each AC-3 mutant breaks
