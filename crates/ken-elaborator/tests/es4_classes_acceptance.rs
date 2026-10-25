@@ -178,7 +178,7 @@ fn es4_owner_comparator_obligations() -> (ElabEnv, GlobalId, GlobalId, GlobalId,
             "{name} must reference Derived-owned Perm"
         );
         assert!(
-            refs.contains(&env.globals["is_sorted"]),
+            refs.contains(&env.globals["Data.Collections.Derived.is_sorted"]),
             "{name} must use is_sorted"
         );
         ids.push(id);
@@ -724,7 +724,7 @@ fn char_ord_laws_reject_missing_law_field() {
 // ─────────────────────────────────────────────────────────────────────────
 
 /// Promise class: durable checked relation. Both obligation forms pass the
-/// same comparator to the exact owned `Perm` and the prelude `is_sorted`.
+/// same comparator to the exact owned `Perm` and Derived's `is_sorted`.
 #[test]
 fn where_ord_supplies_same_comparator_as_explicit_form() {
     // Both original obligations check in the private Perm owner scope. The
@@ -760,7 +760,7 @@ fn where_ord_supplies_same_comparator_as_explicit_form() {
 
     fn comparator<'a>(env: &ElabEnv, perm_id: GlobalId, t: &'a Term) -> &'a Term {
         let (and_head, conjuncts) = applied(t);
-        assert_eq!(*and_head, Term::const_(env.globals["And"], vec![]));
+        assert_eq!(*and_head, Term::const_(env.globals["Core.Logic.Conjunction.and"], vec![]));
         assert_eq!(
             conjuncts.len(),
             2,
@@ -768,7 +768,7 @@ fn where_ord_supplies_same_comparator_as_explicit_form() {
         );
         let (sorted_head, sorted_args) = applied(conjuncts[0]);
         let (perm_head, perm_args) = applied(conjuncts[1]);
-        assert_eq!(*sorted_head, Term::const_(env.globals["is_sorted"], vec![]));
+        assert_eq!(*sorted_head, Term::const_(env.globals["Data.Collections.Derived.is_sorted"], vec![]));
         assert_eq!(*perm_head, Term::const_(perm_id, vec![]));
         assert_eq!(
             sorted_args.len(),

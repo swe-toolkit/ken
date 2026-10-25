@@ -28,6 +28,8 @@ pairs, and repeated keys are kept in order. The token codec preserves them
 (spec 71 §1.2); duplicate-key rejection is deferred (§1.4).
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro)
+
 import Data.Collections.Derived (length)
 
 import Data.Numeric.Nat.Order (lt_nat)

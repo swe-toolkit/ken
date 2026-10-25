@@ -47,8 +47,36 @@ fn base_env() -> ElabEnv {
 fn elaborate_insertion_sort(env: &mut ElabEnv) {
     let extracted = ken_elaborator::literate::extract_ken_md(INSERTION_SORT_KEN_MD)
         .expect("InsertionSort literate source must extract");
-    env.elaborate_file(&extracted.source)
+    // This legacy sequential harness has no package scope: the compiler's
+    // prelude is_sorted and Derived's new is_sorted would be ambiguous.
+    // Alpha-rename the imported binding and its references in the extracted
+    // checked source; keep the production definitions otherwise unchanged.
+    let loose = extracted
+        .source
+        .replace("is_sorted", "catalog_is_sorted")
+        .replace(
+            "import Data.Collections.Derived (eq_from_ord, catalog_is_sorted)",
+            "import Data.Collections.Derived (eq_from_ord, is_sorted as catalog_is_sorted)",
+        );
+    env.elaborate_file(&loose)
         .expect("Algorithm/Sorting/InsertionSort.ken.md must elaborate");
+    let canonical = env.globals["Data.Collections.Derived.is_sorted"];
+    for law in ["sort::sorted", "insert::sorted"] {
+        let id = env.globals[law];
+        let ty = match env.env.lookup(id) {
+            Some(Decl::Transparent { ty, .. }) => ty,
+            other => panic!("{law} must be transparent: {other:?}"),
+        };
+        let mut terms = vec![ty];
+        let mut mentions_canonical = false;
+        while let Some(term) = terms.pop() {
+            if matches!(term, Term::Const { id, .. } if *id == canonical) {
+                mentions_canonical = true;
+            }
+            terms.extend(term.children());
+        }
+        assert!(mentions_canonical, "{law} must state Derived's is_sorted");
+    }
 }
 
 fn loaded_env_with_lawful_owned() -> (ElabEnv, Vec<GlobalId>) {
@@ -271,9 +299,9 @@ fn boolean_vectors_compute_and_both_generic_laws_instantiate() {
     let (mut env, lawful_owned) = loaded_env_with_lawful_owned();
     env.elaborate_file(
         "import Core.Classes.LawfulClasses (Ord, ord_leq_at)\n\
-         import Data.Collections.Derived (count, eq_from_ord)\n\
+         import Data.Collections.Derived (count, eq_from_ord, is_sorted as catalog_is_sorted)\n\
          theorem cat_sort_bool_sorted_proof (d : Ord Bool) (xs : List Bool) : \
-           is_sorted Bool (ord_leq_at Bool d) (sort Bool d xs) = \
+           catalog_is_sorted Bool (ord_leq_at Bool d) (sort Bool d xs) = \
            sort::sorted Bool d xs\n\
          theorem cat_sort_bool_perm_proof (d : Ord Bool) (xs : List Bool) : \
            permutation Bool d xs (sort Bool d xs) = \
@@ -293,15 +321,23 @@ fn boolean_vectors_compute_and_both_generic_laws_instantiate() {
         .expect("Ord must remain a checked class")
         .projection
         .type_id;
-    assert!(lawful_owned.contains(&ord_class), "LawfulClasses must own Ord");
+    assert!(
+        lawful_owned.contains(&ord_class),
+        "LawfulClasses must own Ord"
+    );
     let bool_instance = env
         .class_env
         .instance_search("Ord", "Bool")
         .expect("the canonical Ord Bool dictionary must be registered");
-    assert!(lawful_owned.contains(&bool_instance), "Ord Bool must be LawfulClasses-owned");
+    assert!(
+        lawful_owned.contains(&bool_instance),
+        "Ord Bool must be LawfulClasses-owned"
+    );
     let wrapper_id = env.globals["cat_sort_bool_via_ord"];
     let wrapper_references = catalog_or::declaration_references(
-        env.env.lookup(wrapper_id).expect("the checked wrapper must exist"),
+        env.env
+            .lookup(wrapper_id)
+            .expect("the checked wrapper must exist"),
     );
     assert!(
         wrapper_references.contains(&bool_instance),
@@ -340,6 +376,9 @@ fn boolean_vectors_compute_and_both_generic_laws_instantiate() {
         .expect("canonical count and order-derived equality must compute together");
     assert_eq!(evaluate_boolean_list(&env, empty_id), Vec::<bool>::new());
     assert_eq!(evaluate_boolean_list(&env, sorted_id), [false, true]);
-    assert_eq!(evaluate_boolean_list(&env, duplicate_id), [false, true, true]);
+    assert_eq!(
+        evaluate_boolean_list(&env, duplicate_id),
+        [false, true, true]
+    );
     assert_eq!(evaluate_nat(&env, true_count_id), 2);
 }

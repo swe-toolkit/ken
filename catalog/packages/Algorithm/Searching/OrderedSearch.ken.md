@@ -22,6 +22,8 @@ the recursively sorted tail. This is the exact invariant used by the pruning
 branch.
 
 ```ken
+import Core.Logic.Conjunction (And, and_fst, and_snd)
+
 import Core.Classes.LawfulClasses (Ord, ord_leq_at)
 
 import Core.Classes.Membership (Membership)

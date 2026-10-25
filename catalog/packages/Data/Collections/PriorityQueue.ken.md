@@ -35,6 +35,8 @@ chooses the lesser root, descends through one right child, and rebuilds through
 that balancing helper.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
+
 import Core.Classes.LawfulClasses
   (Ord, IsTrue, bool_and, bool_or, bool_cases, ord_leq_at, leq_nat)
 

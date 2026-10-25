@@ -41,6 +41,8 @@ inverted axis. Every proof body below is the checked general construction,
 not a finite seed in place of a proof.
 
 ```ken
+import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)
+
 import Core.Classes.LawfulClasses (IsTrue, leq_nat, bool_and)
 
 import Data.Numeric.Nat.Arithmetic (add, mul)
