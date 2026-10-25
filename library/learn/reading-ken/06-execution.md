@@ -195,15 +195,24 @@ admit `UInt64::MAX` while rejecting `UInt64::MAX + 1` and `-1`. It is
 closure-free ground evidence, but it does not exercise any of the six
 narrowing paths.
 
-The binary remains excluded from the **sharded** test run, and a separate
-`native-rt-parity` job still runs it. The required `build + test` job depends
-on that job and checks its result. Read the resulting green precisely: it
-shows that the dedicated job ran, that the live source-scope check passed, and
-that the interpreter and native backend agreed on the bounded-integer case. It
-carries no current evidence that they agree on the six narrowing cases. That
-narrowing differential is therefore **unavailable** while all six remain
-ignored. Re-arming one cause would make it partial, and only re-arming every row
-makes it live.
+CI classifies runs as `full`, `doc-only`, or `pr-verified`
+([workflow](../../../.github/workflows/ci.yml)). The native parity test is
+excluded from the sharded test run and runs in its separate `native-rt-parity`
+job. That job and the other heavy test jobs run only in `full` mode. In
+`doc-only` and `pr-verified` modes they are skipped, and the `build + test`
+aggregate accepts those skips.
+
+A green `build + test` result on a `pr-verified` push does not mean those jobs
+ran on that push. The workflow selects that mode only after verifying that the
+pushed tree matches the tree of a successful full-mode pull-request run. The
+`CI_PR_VERIFIED` log line and step-summary line identify that earlier run by
+number. For a `full` run, the aggregate checks the heavy jobs' results,
+including `native-rt-parity`. Even then, the parity result covers only the live
+source-scope check and the bounded-integer differential described above. It
+carries no current evidence that the backends agree on the six narrowing cases.
+That differential is therefore **unavailable** while all six remain ignored.
+Re-arming one cause would make it partial, and only re-arming every row makes
+it live.
 
 Chapter [04](04-effects-capabilities-and-authority.md) now shows a checked
 filesystem authority exemplar: an explicit `Cap a` parameter beside `[FS]`,
@@ -225,8 +234,9 @@ You can now separate elaboration from execution, identify the marked places
 where partial behavior may enter, and treat the interpreter as the semantic
 oracle for native differential tests. The backend implementation and its
 required CI job are present even though the target decision remains open in
-the specification. The job carries one live bounded-integer differential but
-none of the six narrowing cases. The curriculum records both divergences
+the specification. A full-mode run carries one live bounded-integer
+differential but none of the six narrowing cases. The curriculum records both
+divergences
 instead of reconciling them.
 
 ---
