@@ -26,6 +26,13 @@ jobs:
   # push run re-derives that commit's tree from git and fails closed to
   # `full` on any lookup failure or mismatch (scripts/ci-pr-verified.py).
   # The read-only token scopes below exist for that lookup only.
+  #
+  # `z3_relevant` gates the z3-process-adapter job within `full` mode. It is
+  # `false` only when scripts/ci-z3-relevant.py finds that no changed path is
+  # an input of that job (ken-elaborator's build closure from `cargo metadata`,
+  # the repository files its tests read, Cargo and CI inputs); any failure here
+  # leaves it `true`. This runs inside classify-paths so the first wave gains
+  # no job.
   classify-paths:
     name: classify changed paths
     runs-on: ubuntu-latest
@@ -35,6 +42,7 @@ jobs:
       pull-requests: read
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
+      z3_relevant: ${{ steps.classify.outputs.z3_relevant }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,8 +56,16 @@ jobs:
           base='${{ github.event.pull_request.base.sha || github.event.before }}'
           if ! git diff --name-only --no-renames "$base" HEAD | python3 -c 'import json,sys; print(json.dumps([x.rstrip("\\n") for x in sys.stdin if x.rstrip("\\n")]))' > paths.json; then
             echo 'mode=full' >> "$GITHUB_OUTPUT"
+            echo 'z3_relevant=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          z3_relevant=true
+          if cargo metadata --format-version 1 --no-deps --offline > cargo-metadata.json \
+            && z3_verdict=$(python3 scripts/ci-z3-relevant.py paths.json cargo-metadata.json) \
+            && [ "$z3_verdict" = false ]; then
+            z3_relevant=false
+          fi
+          echo "z3_relevant=$z3_relevant" >> "$GITHUB_OUTPUT"
           mode=full
           if classified=$(python3 scripts/ci-doc-only.py paths.json) && [ "$classified" = doc-only ]; then
             mode=doc-only
@@ -545,9 +561,14 @@ jobs:
           echo '--- free -m ---'
           free -m
 
+  # Runs in `full` mode unless classify-paths reported `z3_relevant=false`:
+  # no changed path is an input of this job (scripts/ci-z3-relevant.py). The
+  # test is `!= 'false'`, so a missing or garbled output still runs it. The
+  # `--lib` step is the only feature-on run of the whole elaborator lib suite
+  # (prover.rs routes Route-D fallthrough to z3); keep it whole.
   z3-process-adapter:
     needs: classify-paths
-    if: needs.classify-paths.outputs.mode == 'full'
+    if: needs.classify-paths.outputs.mode == 'full' && needs.classify-paths.outputs.z3_relevant != 'false'
     name: optional z3 process adapter
     runs-on: ubuntu-latest
     container: ghcr.io/swe-toolkit/ken/ci-z3@sha256:4043afa445489c19fa9b6628258134225953354e2bf1766d996558cdf73e38da
@@ -625,11 +646,19 @@ jobs:
           issue_tracker='${{ needs.issue-tracker.result }}'
           shard_union='${{ needs.verify-realized-shard-union.result }}'
           mode='${{ needs.classify-paths.outputs.mode }}'
+          z3_relevant='${{ needs.classify-paths.outputs.z3_relevant }}'
           # doc-only and pr-verified skip the heavy jobs by design; only in
           # those two modes is a skipped job accepted as passing.
           skip_ok=0
           case "$mode" in doc-only|pr-verified) skip_ok=1 ;; esac
+          # In full mode the z3 job alone may also skip, and only when
+          # classify-paths reported that no changed path is its input.
+          z3_skip_ok=$skip_ok
+          if [ "$mode" = full ] && [ "$z3_relevant" = false ]; then
+            z3_skip_ok=1
+          fi
           echo "classified mode:        $mode"
+          echo "z3 inputs changed:      $z3_relevant"
           echo "path classification:    $classify"
           echo "test-shard matrix:      $shards"
           echo "native auxiliary tests: $write"
@@ -652,7 +681,9 @@ jobs:
                       "issue tracker and ignored-row sweep:$issue_tracker" \
                       "realized-shard-union:$shard_union"; do
             name="${pair%:*}"; result="${pair##*:}"
-            if [ "$result" != "success" ] && ! { [ "$skip_ok" = 1 ] && [ "$result" = skipped ]; }; then
+            ok=$skip_ok
+            if [ "$name" = "z3 checks" ]; then ok=$z3_skip_ok; fi
+            if [ "$result" != "success" ] && ! { [ "$ok" = 1 ] && [ "$result" = skipped ]; }; then
               echo "::error::$name did not pass ($result)." >&2
               failed=1
             fi
