@@ -1,7 +1,7 @@
 ---
 id: SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC
 title: "Spec 65 states vector_add and matrix_add and distributes products over them, but states no law of the sums themselves: a client cannot reorder or regroup two vector or matrix sums. Rule commutativity and associativity of vector_add and matrix_add from a checked D0 at zero trust, and state them as a section 5 with a conformance seed"
-status: active
+status: merged
 owner: spec
 size: S
 tier: T1
