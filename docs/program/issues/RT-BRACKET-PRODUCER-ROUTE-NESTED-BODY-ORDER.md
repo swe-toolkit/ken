@@ -169,9 +169,11 @@ next advancing stop is the node's 9th, a Research trigger.
 
 ## Hard-stop inventory (§1b)
 
-§1a: 9, child 3 aggregate 10 (Architect `evt_61nznjb9jvcer`: the
-df26d3135 CI red advances; node stop 9 is the Research trigger, ruling
-held for the advisory). Before it: 8, aggregate 9 (`evt_62kr796gv7yjf`;
+§1a: 10, child 3 aggregate 11 (Architect `evt_2rp8t2pz1rz4f`: the
+respin's attribution baseline failed on a mis-specified criterion;
+advancing, next Research trigger at 12). Before it: 9, aggregate 10
+(`evt_61nznjb9jvcer`: the df26d3135 CI red; Research `evt_yxd12w9d32sx`,
+same-WP respin on `76fc5d236`). Before that: 8, aggregate 9 (`evt_62kr796gv7yjf`;
 Research `evt_4a2ee3es6nvdw`, ruling `evt_2j4fxp3ekyr03`). The 7th stop is the unforced binary after the β′
 closure (runtime-leader `evt_3k3pjar47z8zj`). It advances with no hold.
 Only the non-advancing
@@ -251,6 +253,12 @@ L1′ `evt_3ztrhbzpvyb0`). The F2/F3 WIP `9ecf2948d` is superseded.
    at (K body, Vis); unit-less P1 rows lost their established in-place
    drive. Keyed on: specialization-table lookup by source position.
    Shares entry 8's predicate (Architect `evt_61nznjb9jvcer`).
+10. The respin's footprint pins attributed each member by immediate
+   adjacency in a unified recorder log; the branched Route1 row follows
+   a ResidualArrival, not the Consumed event. Keyed on: emission
+   position in the log. Shares the entry 8 and 9 family (Architect
+   `evt_2rp8t2pz1rz4f`); segment attribution with a counterfactual run
+   replaces it (`evt_4mm2j7qj6tkb4`).
 
 **Shared predicate, entries 4, 8 and 8 (correction)** (Architect
 `evt_2j4fxp3ekyr03`): the drive's composition, both its frames and its
