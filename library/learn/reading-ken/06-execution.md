@@ -203,7 +203,12 @@ CI classifies runs as `full`, `doc-only`, or `pr-verified`
 excluded from the sharded test run and runs in its separate `native-rt-parity`
 job. That job and the other heavy test jobs run only in `full` mode. In
 `doc-only` and `pr-verified` modes they are skipped, and the `build + test`
-aggregate accepts those skips.
+aggregate accepts those skips. One heavy job, `z3-process-adapter`, which
+runs the elaborator's tests with the `z3-process` feature against a real Z3,
+can also skip in `full` mode. The classifier reports `z3_relevant=false`
+when no changed path is an input of that job: a crate in `ken-elaborator`'s
+build closure, a repository file its tests read, a Cargo or toolchain file, or
+the CI workflow and scripts. Only then does the aggregate accept that skip.
 
 A green `build + test` result on a `pr-verified` push does not mean those jobs
 ran on that push. The workflow selects that mode only after verifying that the
