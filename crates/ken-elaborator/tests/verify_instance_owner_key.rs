@@ -167,15 +167,15 @@ fn derive_and_explicit_instance_results_use_their_dictionary_identities() {
 }
 
 /// Promise class: transition sentinel until module scoping admits these
-/// unqualified declaration kinds across different modules. MEASURED: their
-/// same-spelling pairs hit typed `DuplicateDefinition` before `with_owner`.
-/// CLAIMED: today these five kinds cannot produce an admitted shared owner.
+/// unqualified declaration kinds across different modules. MEASURED: these
+/// remaining same-spelling pairs hit `DuplicateDefinition` before `with_owner`.
+/// CLAIMED: these four kinds cannot produce an admitted shared owner; classes
+/// now qualify their owner and are tested by class-identity acceptance.
 /// THE GAP: when module scoping starts admitting such a pair, retire this
 /// refusal and give each admitted declaration its own qualified owner.
 #[test]
 fn other_unqualified_kinds_refuse_same_spelling_in_two_modules() {
     for (name, declaration) in [
-        ("D", "class D a { }"),
         ("L", "law L (v) { witness : Top }"),
         ("f", "foreign f : Int -> Int = \"f\" \"fixture\" pure"),
         ("t", "temporal t { always True }"),

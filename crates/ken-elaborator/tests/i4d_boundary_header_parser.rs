@@ -250,7 +250,7 @@ fn every_boundary_surface_failure_has_its_named_diagnostic() {
 fn write_provider(root: &FixtureRoot) {
     root.write(
         "P.ken",
-        "class Mark a { tag : Bool }\n\
+        "pub class Mark a { tag : Bool }\n\
          instance Mark Int { tag = True }\n",
     );
 }
@@ -263,7 +263,7 @@ fn write_entry(root: &FixtureRoot, admits: bool) {
             "program\n\
              {admits_clause}\
              capabilities FS AFull\n\
-             import P\n\
+             import P (Mark)\n\
              fn useP (x : Int) : Int where Mark Int = x\n"
         ),
     );

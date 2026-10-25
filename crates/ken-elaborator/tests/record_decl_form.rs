@@ -10,16 +10,6 @@ fn assert_unresolved_owner(error: ElabError, expected: &str) {
     }
 }
 
-fn assert_no_instance(error: ElabError, expected_class: &str, expected_type: &str) {
-    match error {
-        ElabError::NoInstance { class, ty, .. } => {
-            assert_eq!(class, expected_class);
-            assert_eq!(ty, expected_type);
-        }
-        other => panic!("expected NoInstance for {expected_class} {expected_type}, got {other:?}"),
-    }
-}
-
 /// Durable invariant: a record's stored type identity reaches the same borrowed
 /// projection view used by `RProj`, while remaining outside class-only storage.
 #[test]
@@ -154,7 +144,7 @@ fn records_are_unavailable_to_instance_constraint_and_derive_paths() {
     let constraint_error = env
         .elaborate_decl("fn constrained (x : Int) : Int where Point Int = x")
         .expect_err("record must not be accepted as a class constraint");
-    assert_no_instance(constraint_error, "Point", "Int");
+    assert_unresolved_owner(constraint_error, "Point");
 
     let derive_error = env
         .elaborate_decl("derive Point for Flag")

@@ -577,7 +577,7 @@ fn admitted_reexport_carries_only_the_named_instance_surface() {
             .last()
             .expect("implicit dispatch records provenance");
         assert_eq!(resolution.defining_package, "Q");
-        assert_eq!(resolution.class_name, "Render");
+        assert_eq!(resolution.class_name, "Q.Render");
         assert_eq!(resolution.head_type, "Q.Widget");
     }
 
@@ -599,7 +599,7 @@ fn admitted_reexport_carries_only_the_named_instance_surface() {
             ..
         }) => {
             assert_eq!(defining_package, "Q");
-            assert_eq!(class, "HiddenMark");
+            assert_eq!(class, "Q.HiddenMark");
             assert_eq!(head_type, "Q.Hidden");
         }
         other => panic!("non-reexported transitive instance must reject, got {other:?}"),

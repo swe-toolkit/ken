@@ -464,7 +464,7 @@ fn cat5_d1_source_span_package_elaborates_zero_delta() {
         let id = if name == "Source" {
             let matches = parsing_owned.iter().copied().filter(|id| {
                 env.class_env.class_by_id(*id).is_some_and(|class| {
-                    class.projection.owner_name == name && class.projection.type_id == *id
+                    class.projection.owner_name == format!("Capability.Parsing.Parsing.{name}") && class.projection.type_id == *id
                 })
             }).collect::<Vec<_>>();
             let [id] = matches.as_slice() else {
@@ -953,7 +953,7 @@ fn cat5_d1_source_span_surface_is_byte_artifact_and_source_explicit() {
     let source_classes = parsing_owned
         .iter()
         .filter_map(|id| env.class_env.class_by_id(*id))
-        .filter(|class| class.projection.owner_name == "Source")
+        .filter(|class| class.projection.owner_name == "Capability.Parsing.Parsing.Source")
         .collect::<Vec<_>>();
     let [source_class] = source_classes.as_slice() else {
         panic!(
