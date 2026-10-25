@@ -7,10 +7,11 @@ Frame: `docs/program/issues/SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC.md`.
 This seed applies all four public laws to closed indexed values and
 independently checks componentwise results. It includes the empty
 vector, a `0 × 2` matrix, and a `2 × 0` matrix. These instances do
-not prove the generic laws. The §5 catalog exports are absent from
-this candidate's base; isolated D0-overlay checks are not execution
-against shipped exports or an official conformance run. Each case
-promises a **durable invariant**.
+not prove the generic laws. The §5 catalog exports were absent from
+this candidate's base. The package test now checks the accepted client
+and all four isolated refusals against root-loaded §5 exports; this is
+not official conformance-runner execution, CI, publication or landing.
+Each case promises a **durable invariant**.
 
 ## Accepted shared client
 
@@ -287,5 +288,8 @@ build lock**; it has no build verdict and the preexisting binary is
 not an exact-base toolchain measurement. Architect's separate D0
 measured generic proofs and trust identities on `4e7cf78a6`; it
 did not execute these authored fences. These are source-shaped
-**D0-overlay** checks, not shipped §5 exports, official conformance,
-CI, publication, landing or a landed trust measurement.
+**D0-overlay** checks, not a shipped §5 export or official conformance
+result. The candidate's package test now checks the same seed's complete
+accepted client and each isolated refusal after a fresh accepted prefix
+against root-loaded §5 exports. That is not an official conformance-runner
+result, CI, publication, landing or a landed trust measurement.

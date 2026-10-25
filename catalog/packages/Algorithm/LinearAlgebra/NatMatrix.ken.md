@@ -1,7 +1,7 @@
 # Dimension-safe natural matrices
 
 Natural vectors and row-major matrices carry dimensions in their `Vec` types;
-all arithmetic is exact, and fourteen algebraic laws have checked proofs.
+all arithmetic is exact, and eighteen algebraic laws have checked proofs.
 
 ## Contents
 
@@ -24,10 +24,10 @@ zero-row and zero-column matrices use the same operations as nonempty ones.
 
 The canonical operations follow their contract: componentwise addition,
 scaling and dot product, followed by matrix-vector multiplication, transpose,
-matrix product and diagonal identity. Row-wise matrix addition and its four
-public laws follow those operations and laws. The named private stages build
-columns and row products; no second matrix carrier or numeric primitive is
-needed.
+matrix product and diagonal identity. Row-wise matrix addition and its six
+public laws follow those operations and laws, alongside two vector sum laws.
+The named private stages build columns and row products; no second matrix
+carrier or numeric primitive is needed.
 
 ```ken
 import Data.Vector.Vector (Vec, VNil, VCons, map, zip_with, vec_zero_vnil)
@@ -646,6 +646,367 @@ pub theorem transpose_add
               (zip_prepend_add k n arow brow at_rest bt_rest)
       }
   }
+
+pub theorem matrix_add_comm
+      (m : Nat) (n : Nat) (a : Vec (Vec Nat n) m) (b : Vec (Vec Nat n) m)
+    : Equal (Vec (Vec Nat n) m) (matrix_add m n a b) (matrix_add m n b a) =
+  match a {
+    VNil ↦
+      J
+        (λb2 _.
+          Equal
+            (Vec (Vec Nat n) Zero)
+            (matrix_add Zero n (VNil (Vec Nat n)) b2)
+            (matrix_add Zero n b2 (VNil (Vec Nat n))))
+        Proved
+        (vec_zero_vnil (Vec Nat n) b);
+    VCons k arow arest ↦
+      match b {
+        VCons _ brow brest ↦
+          trans
+            (Vec (Vec Nat n) (Suc k))
+            (VCons (Vec Nat n) k (vector_add n arow brow) (matrix_add k n arest brest))
+            (VCons (Vec Nat n) k (vector_add n brow arow) (matrix_add k n arest brest))
+            (VCons (Vec Nat n) k (vector_add n brow arow) (matrix_add k n brest arest))
+            (cong
+              (Vec Nat n)
+              (Vec (Vec Nat n) (Suc k))
+              (vector_add n arow brow)
+              (vector_add n brow arow)
+              (λrow. VCons (Vec Nat n) k row (matrix_add k n arest brest))
+              (vector_add_comm n arow brow))
+            (cong
+              (Vec (Vec Nat n) k)
+              (Vec (Vec Nat n) (Suc k))
+              (matrix_add k n arest brest)
+              (matrix_add k n brest arest)
+              (λrest. VCons (Vec Nat n) k (vector_add n brow arow) rest)
+              (matrix_add_comm k n arest brest))
+      }
+  }
+
+pub theorem matrix_add_assoc
+      (m : Nat)
+      (n : Nat)
+      (a : Vec (Vec Nat n) m)
+      (b : Vec (Vec Nat n) m)
+      (c : Vec (Vec Nat n) m)
+    : Equal
+        (Vec (Vec Nat n) m)
+        (matrix_add m n (matrix_add m n a b) c)
+        (matrix_add m n a (matrix_add m n b c)) =
+  match a {
+    VNil ↦ Proved;
+    VCons k arow arest ↦
+      match b {
+        VCons _ brow brest ↦
+          match c {
+            VCons _ crow crest ↦
+              matrix_add_assoc_cons
+                k
+                n
+                arow
+                brow
+                crow
+                arest
+                brest
+                crest
+                (matrix_add_assoc k n arest brest crest)
+          }
+      }
+  }
+
+pub theorem vector_add_comm
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n)
+    : Equal (Vec Nat n) (vector_add n xs ys) (vector_add n ys xs) =
+  match xs {
+    VNil ↦
+      J
+        (λys2 _.
+          Equal
+            (Vec Nat Zero)
+            (vector_add Zero (VNil Nat) ys2)
+            (vector_add Zero ys2 (VNil Nat)))
+        Proved
+        (vec_zero_vnil Nat ys);
+    VCons k x tail_xs ↦
+      match ys {
+        VCons _ y tail_ys ↦
+          trans
+            (Vec Nat (Suc k))
+            (VCons Nat k (add x y) (vector_add k tail_xs tail_ys))
+            (VCons Nat k (add y x) (vector_add k tail_xs tail_ys))
+            (VCons Nat k (add y x) (vector_add k tail_ys tail_xs))
+            (cong
+              Nat
+              (Vec Nat (Suc k))
+              (add x y)
+              (add y x)
+              (λv. VCons Nat k v (vector_add k tail_xs tail_ys))
+              ((proof comm for add) x y))
+            (cong
+              (Vec Nat k)
+              (Vec Nat (Suc k))
+              (vector_add k tail_xs tail_ys)
+              (vector_add k tail_ys tail_xs)
+              (λtail. VCons Nat k (add y x) tail)
+              (vector_add_comm k tail_xs tail_ys))
+      }
+  }
+
+pub theorem vector_add_assoc
+      (n : Nat) (xs : Vec Nat n) (ys : Vec Nat n) (zs : Vec Nat n)
+    : Equal
+        (Vec Nat n)
+        (vector_add n (vector_add n xs ys) zs)
+        (vector_add n xs (vector_add n ys zs)) =
+  match xs {
+    VNil ↦ Proved;
+    VCons k x tail_xs ↦
+      match ys {
+        VCons _ y tail_ys ↦
+          match zs {
+            VCons _ z tail_zs ↦
+              vector_add_assoc_cons
+                k
+                x
+                y
+                z
+                tail_xs
+                tail_ys
+                tail_zs
+                (vector_add_assoc k tail_xs tail_ys tail_zs)
+          }
+      }
+  }
+
+theorem matrix_add_assoc_cons
+      (k : Nat)
+      (n : Nat)
+      (arow : Vec Nat n)
+      (brow : Vec Nat n)
+      (crow : Vec Nat n)
+      (arest : Vec (Vec Nat n) k)
+      (brest : Vec (Vec Nat n) k)
+      (crest : Vec (Vec Nat n) k)
+      (rest_eq : Equal
+        (Vec (Vec Nat n) k)
+        (matrix_add k n (matrix_add k n arest brest) crest)
+        (matrix_add k n arest (matrix_add k n brest crest)))
+    : Equal
+        (Vec (Vec Nat n) (Suc k))
+        (matrix_add
+          (Suc k)
+          n
+          (matrix_add
+            (Suc k)
+            n
+            (VCons (Vec Nat n) k arow arest)
+            (VCons (Vec Nat n) k brow brest))
+          (VCons (Vec Nat n) k crow crest))
+        (matrix_add
+          (Suc k)
+          n
+          (VCons (Vec Nat n) k arow arest)
+          (matrix_add
+            (Suc k)
+            n
+            (VCons (Vec Nat n) k brow brest)
+            (VCons (Vec Nat n) k crow crest))) =
+  let
+    a = VCons (Vec Nat n) k arow arest;
+    b = VCons (Vec Nat n) k brow brest;
+    c = VCons (Vec Nat n) k crow crest;
+    left_rest = matrix_add k n (matrix_add k n arest brest) crest;
+    right_rest = matrix_add k n arest (matrix_add k n brest crest);
+    left_row = vector_add n (vector_add n arow brow) crow;
+    right_row = vector_add n arow (vector_add n brow crow);
+    left_inner = VCons (Vec Nat n) k (vector_add n arow brow) (matrix_add k n arest brest);
+    right_inner = VCons (Vec Nat n) k (vector_add n brow crow) (matrix_add k n brest crest);
+    left_value = VCons (Vec Nat n) k left_row left_rest;
+    middle_value = VCons (Vec Nat n) k right_row left_rest;
+    right_value = VCons (Vec Nat n) k right_row right_rest
+  in
+    trans
+      (Vec (Vec Nat n) (Suc k))
+      (matrix_add (Suc k) n (matrix_add (Suc k) n a b) c)
+      (matrix_add (Suc k) n left_inner c)
+      (matrix_add (Suc k) n a (matrix_add (Suc k) n b c))
+      (cong
+        (Vec (Vec Nat n) (Suc k))
+        (Vec (Vec Nat n) (Suc k))
+        (matrix_add (Suc k) n a b)
+        left_inner
+        (λv. matrix_add (Suc k) n v c)
+        (matrix_add_cons k n arow brow arest brest))
+      (trans
+        (Vec (Vec Nat n) (Suc k))
+        (matrix_add (Suc k) n left_inner c)
+        left_value
+        (matrix_add (Suc k) n a (matrix_add (Suc k) n b c))
+        (matrix_add_cons k n (vector_add n arow brow) crow (matrix_add k n arest brest) crest)
+        (trans
+          (Vec (Vec Nat n) (Suc k))
+          left_value
+          middle_value
+          (matrix_add (Suc k) n a (matrix_add (Suc k) n b c))
+          (cong
+            (Vec Nat n)
+            (Vec (Vec Nat n) (Suc k))
+            left_row
+            right_row
+            (λrow. VCons (Vec Nat n) k row left_rest)
+            (vector_add_assoc n arow brow crow))
+          (trans
+            (Vec (Vec Nat n) (Suc k))
+            middle_value
+            right_value
+            (matrix_add (Suc k) n a (matrix_add (Suc k) n b c))
+            (cong
+              (Vec (Vec Nat n) k)
+              (Vec (Vec Nat n) (Suc k))
+              left_rest
+              right_rest
+              (λrest. VCons (Vec Nat n) k right_row rest)
+              rest_eq)
+            (sym
+              (Vec (Vec Nat n) (Suc k))
+              (matrix_add (Suc k) n a (matrix_add (Suc k) n b c))
+              right_value
+              (trans
+                (Vec (Vec Nat n) (Suc k))
+                (matrix_add (Suc k) n a (matrix_add (Suc k) n b c))
+                (matrix_add (Suc k) n a right_inner)
+                right_value
+                (cong
+                  (Vec (Vec Nat n) (Suc k))
+                  (Vec (Vec Nat n) (Suc k))
+                  (matrix_add (Suc k) n b c)
+                  right_inner
+                  (λv. matrix_add (Suc k) n a v)
+                  (matrix_add_cons k n brow crow brest crest))
+                (matrix_add_cons
+                  k
+                  n
+                  arow
+                  (vector_add n brow crow)
+                  arest
+                  (matrix_add k n brest crest)))))))
+
+theorem matrix_add_cons
+      (k : Nat)
+      (n : Nat)
+      (arow : Vec Nat n)
+      (brow : Vec Nat n)
+      (arest : Vec (Vec Nat n) k)
+      (brest : Vec (Vec Nat n) k)
+    : Equal
+        (Vec (Vec Nat n) (Suc k))
+        (matrix_add (Suc k) n (VCons (Vec Nat n) k arow arest) (VCons (Vec Nat n) k brow brest))
+        (VCons (Vec Nat n) k (vector_add n arow brow) (matrix_add k n arest brest)) =
+  Refl
+
+theorem vector_add_assoc_cons
+      (k : Nat)
+      (x : Nat)
+      (y : Nat)
+      (z : Nat)
+      (tail_xs : Vec Nat k)
+      (tail_ys : Vec Nat k)
+      (tail_zs : Vec Nat k)
+      (tail_eq : Equal
+        (Vec Nat k)
+        (vector_add k (vector_add k tail_xs tail_ys) tail_zs)
+        (vector_add k tail_xs (vector_add k tail_ys tail_zs)))
+    : Equal
+        (Vec Nat (Suc k))
+        (vector_add
+          (Suc k)
+          (vector_add (Suc k) (VCons Nat k x tail_xs) (VCons Nat k y tail_ys))
+          (VCons Nat k z tail_zs))
+        (vector_add
+          (Suc k)
+          (VCons Nat k x tail_xs)
+          (vector_add (Suc k) (VCons Nat k y tail_ys) (VCons Nat k z tail_zs))) =
+  let
+    xs = VCons Nat k x tail_xs;
+    ys = VCons Nat k y tail_ys;
+    zs = VCons Nat k z tail_zs;
+    left_tail = vector_add k (vector_add k tail_xs tail_ys) tail_zs;
+    right_tail = vector_add k tail_xs (vector_add k tail_ys tail_zs);
+    left_inner = VCons Nat k (add x y) (vector_add k tail_xs tail_ys);
+    right_inner = VCons Nat k (add y z) (vector_add k tail_ys tail_zs);
+    left_value = VCons Nat k (add (add x y) z) left_tail;
+    middle_value = VCons Nat k (add x (add y z)) left_tail;
+    right_value = VCons Nat k (add x (add y z)) right_tail
+  in
+    trans
+      (Vec Nat (Suc k))
+      (vector_add (Suc k) (vector_add (Suc k) xs ys) zs)
+      (vector_add (Suc k) left_inner zs)
+      (vector_add (Suc k) xs (vector_add (Suc k) ys zs))
+      (cong
+        (Vec Nat (Suc k))
+        (Vec Nat (Suc k))
+        (vector_add (Suc k) xs ys)
+        left_inner
+        (λv. vector_add (Suc k) v zs)
+        (vector_add_cons k x y tail_xs tail_ys))
+      (trans
+        (Vec Nat (Suc k))
+        (vector_add (Suc k) left_inner zs)
+        left_value
+        (vector_add (Suc k) xs (vector_add (Suc k) ys zs))
+        (vector_add_cons k (add x y) z (vector_add k tail_xs tail_ys) tail_zs)
+        (trans
+          (Vec Nat (Suc k))
+          left_value
+          middle_value
+          (vector_add (Suc k) xs (vector_add (Suc k) ys zs))
+          (cong
+            Nat
+            (Vec Nat (Suc k))
+            (add (add x y) z)
+            (add x (add y z))
+            (λv. VCons Nat k v left_tail)
+            (sym Nat (add x (add y z)) (add (add x y) z) ((proof assoc for add) x y z)))
+          (trans
+            (Vec Nat (Suc k))
+            middle_value
+            right_value
+            (vector_add (Suc k) xs (vector_add (Suc k) ys zs))
+            (cong
+              (Vec Nat k)
+              (Vec Nat (Suc k))
+              left_tail
+              right_tail
+              (λtail. VCons Nat k (add x (add y z)) tail)
+              tail_eq)
+            (sym
+              (Vec Nat (Suc k))
+              (vector_add (Suc k) xs (vector_add (Suc k) ys zs))
+              right_value
+              (trans
+                (Vec Nat (Suc k))
+                (vector_add (Suc k) xs (vector_add (Suc k) ys zs))
+                (vector_add (Suc k) xs right_inner)
+                right_value
+                (cong
+                  (Vec Nat (Suc k))
+                  (Vec Nat (Suc k))
+                  (vector_add (Suc k) ys zs)
+                  right_inner
+                  (λv. vector_add (Suc k) xs v)
+                  (vector_add_cons k y z tail_ys tail_zs))
+                (vector_add_cons k x (add y z) tail_xs (vector_add k tail_ys tail_zs)))))))
+
+theorem vector_add_cons
+      (k : Nat) (x : Nat) (y : Nat) (tail_xs : Vec Nat k) (tail_ys : Vec Nat k)
+    : Equal
+        (Vec Nat (Suc k))
+        (vector_add (Suc k) (VCons Nat k x tail_xs) (VCons Nat k y tail_ys))
+        (VCons Nat k (add x y) (vector_add k tail_xs tail_ys)) =
+  Refl
 
 fn prepend (n : Nat) (x : Nat) (column : Vec Nat n) : Vec Nat (Suc n) = VCons Nat n x column
 
@@ -2016,6 +2377,15 @@ empty-width transport handling zero rows. Right-argument dot distribution,
 column addition, row-product addition and the prepend bridge stay private.
 These four proofs cover arbitrary indexed matrices, including zero dimensions.
 
+`vector_add_comm` commutes each natural sum and recurses on aligned tails;
+`matrix_add_comm` lifts this equality across rows. The associativity proofs
+rewrite both nested additions through explicit one-level cons equations before
+using `cong` and `trans`: a right-nested `zip_with` stays stuck on its inner
+result rather than converting to a `VCons` by itself. `vector_add_assoc` reverses
+the checked natural associativity proof with `sym` to match the displayed
+left-grouped-to-right-grouped direction; `matrix_add_assoc` lifts the vector
+step and recursive row equality. These proofs include zero indices.
+
 ## 5. Design notes
 
 A matrix is `Vec (Vec Nat n) m`, not a list plus an unchecked width. `transpose`
@@ -2025,7 +2395,8 @@ distinct generic proofs from right identity. Matrix-vector compatibility and
 transposed-product reversal connect the same operations without adding a new
 matrix carrier; the row, empty-width and prepend proof stages stay private.
 `matrix_add` adds rows with `vector_add`; it neither truncates nor broadcasts,
-and the four sum laws hold for arbitrary well-typed dimensions. The named
+and its six matrix sum laws hold for arbitrary well-typed dimensions. Two
+vector sum laws supply commutativity and associativity for each row. The named
 `dot_with` helper passes the row's dot product to `map` without a
 lambda-headed application in a proof goal. A rational-valued
 or approximate matrix would require a different statement of equality and is
@@ -2040,14 +2411,18 @@ not implied by natural-number arithmetic.
 
 ## 7. Trust & derivation
 
-The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–4 owns
-twenty-two public names across eight operations and fourteen laws. The
-[original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md)
-and [sum seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md)
+The [contract](../../../../spec/50-stdlib/65-linear-algebra.md) §§1–5 owns
+twenty-six public names across eight operations and eighteen laws. The
+[original seed](../../../../conformance/stdlib/linear-algebra/seed-nat-matrix.md),
+[distributivity seed](../../../../conformance/stdlib/linear-algebra/seed-matrix-sum-distributivity.md)
+and [sum-law seed](../../../../conformance/stdlib/linear-algebra/seed-vector-matrix-sum-comm-assoc.md)
 provide finite behavioral clients. The module reuses the published
-`Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column prepending, row products and proof bridges remain
-private. All fourteen public theorems have checked bodies. This package adds
-no Axiom, postulate, primitive, `Float` or trusted-base entry; dependencies
-retain their own trust posture. Root-loaded acceptance tests check generic
-imports, closed values and indexed relations, the two deliberately refused
-claims, and the exact trusted-identity set.
+`Data.Vector.Vector` carrier and natural arithmetic. `repeat`, column
+prepending, row products and proof bridges remain private. All eighteen
+public theorems have checked bodies. This package adds no Axiom, postulate,
+primitive, `Float` or trusted-base entry; dependencies retain their own trust
+posture. Root-loaded acceptance tests check generic
+imports, closed values and indexed relations, isolated refused claims, and
+the exact trusted-identity set. The indexed-sum package test checks the authored
+positive client and four isolated refusals against root-loaded exports; this
+is not an official conformance-runner result, CI, publication or landing.

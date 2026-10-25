@@ -8,10 +8,10 @@
 > fourteen public checked laws are present in the catalog. The §4
 > package-owned test checks its sum seed and measures unchanged
 > trusted identities (109 → 109), not official conformance-runner
-> execution. Section 5 specifies four further generic sum laws; its
-> catalog exports are absent at this base. Architect D0 and an authored
-> §5 seed do not establish shipped-seed execution, CI, publication,
-> landing or a landed §5 trust measurement.
+> execution. This candidate adds §5's four generic checked laws and a
+> package test that checks the authored seed against root-loaded exports.
+> These tests do not establish official conformance-runner execution,
+> CI, publication, landing or a landed §5 trust measurement.
 
 ## 1. Vectors and matrices over natural scalars
 
@@ -159,12 +159,12 @@ The checked catalog module introduces no `Axiom`. The historical §3
 D0 measured `trusted_base()` as 109 before and after its scratch
 package; that measurement does not establish a landed §3 trust delta.
 The historical §4 D0 is separately measured in §4.3. Section 5's
-four sum laws have checked generic bodies only in Architect's isolated
-D0, with unchanged `trusted_base()` identities (114 → 114). Its
-catalog exports are not yet present; that scratch measurement is not
-landed trust. No statement in this chapter adds a kernel form,
-syntax, primitive, or `Float` support. An authored seed or scratch
-check alone is not execution of a shipped seed harness.
+four sum laws have checked generic bodies in this candidate's catalog,
+and the package test checks its authored seed. Architect's isolated D0
+measured unchanged `trusted_base()` identities (114 → 114); that scratch
+measurement is not landed trust. No statement in this chapter adds a
+kernel form, syntax, primitive, or `Float` support. A package test is
+not official conformance-runner execution.
 
 Signed scalars, a relation-parametric semiring abstraction and a
 Rational-valued matrix tier, determinants, inverses, solving and
@@ -429,8 +429,10 @@ subtraction, are not implied by these natural-number laws.
 > (SPEC-LINEAR-ALGEBRA-SUM-COMM-ASSOC).** Architect checked four
 > generic indexed proofs in an isolated D0 on `4e7cf78a6`, with no
 > new `Axiom` and identical `trusted_base()` sets (114 → 114). This
-> section and its closed seed do not deliver §5 catalog exports,
-> shipped-seed execution, CI, publication, landing or landed trust.
+> candidate adds the four §5 catalog exports and a roots-loaded package
+> test of the authored seed's positive client and isolated refusals.
+> That does not establish official conformance-runner execution, CI,
+> publication, landing or landed trust.
 
 ### 5.1 Four public checked-law obligations
 
@@ -501,13 +503,16 @@ the head step uses the checked Nat law in the required direction.
 This records a proof route, not a new computation rule.
 
 Architect's isolated D0 inserted only `NatMatrix` proof bodies and
-migrated an allowed-inventory test from seventeen to twenty-one
-public names. Its generic client applied all four laws; checked
+added four names to the base's twenty-two-name allowed-inventory test.
+The actual scratch set had twenty-six names; its assertion message's
+"twenty-one" numeral was stale. Its generic client applied all four
+laws; checked
 closed controls included an empty vector, zero rows, zero columns
 and changed-component refusals. `ken check` and `ken fmt --check`
-returned rc 0; before and after loading the four named providers,
-`trusted_base()` contained the same 114 GlobalIds. Those
-measurements belong to the D0 scratch package, not this spec-only
-candidate. The authored §5 seed separately states its own checking
-boundary. Neither record alone establishes a shipped seed harness,
-CI, publication, landing or a landed trust delta.
+returned rc 0; after loading its four providers and again after
+loading NatMatrix, `trusted_base()` contained the same 114 GlobalIds.
+Those measurements belong to the D0 scratch package, not this candidate.
+The package test now checks the authored §5 seed against root-loaded
+exports and separately measures its trusted-identity set. Neither
+record establishes official conformance-runner execution, CI,
+publication, landing or a landed trust delta.
