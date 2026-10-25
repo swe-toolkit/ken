@@ -2,15 +2,20 @@
 
 > **Status: DRAFT v0 (SPEC-GRAPHS-DEPENDENCY-CONTRACT §1;
 > SPEC-GRAPHS-CYCLE-REFUTES-ORDER §2;
-> SPEC-GRAPHS-WALK-COMPOSITION-ORDER §3).** Section 1 binds finite graphs,
+> SPEC-GRAPHS-WALK-COMPOSITION-ORDER §3;
+> SPEC-GRAPHS-WALK-APPEND-UNIT-ASSOC §4).** Section 1 binds finite graphs,
 > checked reachability, and a topological-order-or-real-cycle result in
 > `Algorithm.Graphs.Dependency`; its catalog package is present on the
 > base. Section 2 adds three checked generic laws and has an authored
 > §2 conformance seed. Section 3's walk-composition operation and
 > first-edge order law now have checked catalog exports; the four §3 seed
-> fences are exercised in a package-owned test. Package-test execution is
-> not official conformance-runner execution or CI. No kernel, trust, or
-> surface-syntax change or revision to §61 §2 is required.
+> fences are exercised in a package-owned test. Section 4 specifies two
+> further generic checked-law obligations, left unit and associativity of
+> `walk_append`; their catalog exports are not delivered by this candidate.
+> The closed §4 seed is authored here, not executed against shipped §4
+> exports. Historical §3 package tests are not official conformance-runner
+> execution or CI. No kernel, trust, or surface-syntax change or revision
+> to §61 §2 is required.
 
 ## 1. Graphs, walks, and dependency order
 
@@ -391,9 +396,10 @@ Right `WalkHere` identity holds by computation, even for an open
 `first : Walk q g s t`:
 `walk_append q g s t t first (WalkHere q g t)` reduces to `first`.
 Left `WalkHere` identity does **not** hold by computation on an open
-second walk. Neither a left-unit law nor an associativity law is part
-of this section's public contract, and no public right-unit theorem
-is added for an equality already supplied by reduction.
+second walk. Section 4 states a checked left-unit law and an
+associativity law; neither is supplied by reduction on open walks.
+No public right-unit theorem is added for an equality already supplied
+by reduction.
 
 A topological order places the start of every walk with a **first
 edge** before its end. The nonempty shape is explicit rather than a
@@ -438,3 +444,71 @@ These are package-test measurements, not official conformance-runner
 execution, CI, publication, landing, or a landed trust measurement.
 Section 1's reachability and finite certificates, §2's three laws,
 and the deferred scope in §1.4 are unchanged.
+
+
+## 4. Left unit and associativity of walk composition
+
+The same `Algorithm.Graphs.Dependency` package proves that a zero-edge
+walk at the start is a **left unit** of `walk_append` for every walk:
+
+```ken
+pub theorem walk_append_here_left
+      (q : Type) (g : Graph q) (s : q) (u : q) (walk : Walk q g s u)
+    : Equal (Walk q g s u) (walk_append q g s s u (WalkHere q g s) walk) walk
+```
+
+The equality is between walks, not only their endpoints. The law is
+unconditional: it has no `Finite q`, `DecEq q`, or order premise. It
+requires induction on `walk`, since `walk_append` recurses on its
+second argument. In the `WalkHere` case, reduction closes the goal (`Proved` in the
+checked D0); in a `WalkStep` case, the induction hypothesis is carried
+through the same checked edge and prefix by congruence. A generic law body checks
+this open-walk property; a closed example alone would not establish it.
+
+The operation also **associates** without changing edge order. The
+left side groups `first` and `second` before appending `third`; the
+right side groups `second` and `third` before appending to `first`:
+
+```ken
+pub theorem walk_append_assoc
+      (q : Type)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (u : q)
+      (v : q)
+      (first : Walk q g s t)
+      (second : Walk q g t u)
+      (third : Walk q g u v)
+    : Equal
+        (Walk q g s v)
+        (walk_append q g s u v (walk_append q g s t u first second) third)
+        (walk_append q g s t v first (walk_append q g t u v second third))
+```
+
+Induction on `third` establishes this equality at every start and
+intermediate endpoint. A `WalkHere` third operand leaves a reflexive
+equality of stuck walk terms (`Refl` in the checked D0); in a
+`WalkStep` case, congruence through the final `WalkStep` transports
+the induction hypothesis without deleting or permuting an edge. No new public helper or private proof helper is
+required. Neither theorem changes the definition of `Walk`,
+`walk_append`, or the existing §1–3 laws. In particular, right
+`WalkHere` remains an **unexported reduction**, not a third public
+unit law. These statements use level-zero `Walk` data in `Type` and
+its checked `Equal` proposition at `Omega_0`; they do not introduce
+an equality primitive or a new source of trust.
+
+The Architect's isolated AC-0 development on landed base `d4f2b202c`
+checked the two generic bodies and a separate generic client with rc 0,
+no `Axiom`, Transparent package-owned theorems and unchanged exact
+`trusted_base()` identities (114 → 114). On open inputs, `Refl` was
+refused for both laws: the claims are not mere definitional equality.
+The corresponding closed §4 seed uses a four-vertex diamond, exercises
+`WalkHere` in each of the three associativity positions, and contrasts
+two genuinely different routes with a same-input accepted route. That
+D0 measurement is not shipped §4 catalog delivery or execution of
+the authored seed against delivered exports. Official conformance
+execution, CI, publication, landing and landed trust for §4 are not
+established here. The separate CAT half must update the package's
+public-law count from eleven to thirteen and add both exports to its
+package-owned loop; this spec candidate does neither.
