@@ -1,7 +1,7 @@
 ---
 id: LANG-CLASS-IDENTITY-BY-CHECKED-ID
 title: "Resolve every class reference by its checked identity, so two modules that each declare a same-spelled class cannot collide through the bare-spelling class index or globals entry"
-status: ready
+status: active
 owner: language
 size: M
 gate: architect
