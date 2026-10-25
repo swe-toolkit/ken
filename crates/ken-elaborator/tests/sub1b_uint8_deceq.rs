@@ -35,9 +35,7 @@ fn lawful_id(env: &ElabEnv, lawful_owned: &[GlobalId], name: &str) -> GlobalId {
 }
 
 fn assert_transparent_globals(env: &ElabEnv, lawful_owned: &[GlobalId], names: &[&str]) {
-    let dec_eq_class = env
-        .class_env
-        .class("DecEq")
+    let dec_eq_class = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;

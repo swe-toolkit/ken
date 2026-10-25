@@ -273,7 +273,7 @@ fn selective_consumer_preserves_local_and_reexported_provider_identities() {
     let mut env = load_order();
     let order_sub = env.globals[&format!("{ORDER}.sub")];
     let lawful_leq = env.globals[&format!("{LAWFUL}.leq_nat")];
-    let ord = env.globals["Ord"];
+    let ord = env.globals[&format!("{LAWFUL}.Ord")];
     let nat = env.globals["Nat"];
     let mut dictionaries = env
         .class_env

@@ -62,7 +62,7 @@ fn expect_unbound(result: Result<Vec<GlobalId>, ElabError>, expected: &str) {
 }
 
 fn canonical_ord_nat_id(env: &ElabEnv) -> GlobalId {
-    let ord = env.globals["Ord"];
+    let ord = env.globals[&format!("{LAWFUL}.Ord")];
     let nat = env.globals["Nat"];
     let mut matches = env
         .class_env

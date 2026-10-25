@@ -92,10 +92,9 @@ fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
     match surface {
         "Functor" | "Foldable" | "Monoid" | "Semigroup" => {
             env.class_env
-                .class(surface)
+                .class_by_id(env.globals[&format!("{LAWFUL_FUNCTORS}.{surface}")])
                 .unwrap_or_else(|| panic!("published class {surface} must be registered"))
-                .projection
-                .type_id
+                .projection.type_id
         }
         "idf" | "comp" => env.globals[&format!("Core.Function.Combinators.{surface}")],
         _ => {
@@ -515,9 +514,7 @@ fn lawful_functors_selective_consumer_retains_provider_identity_and_trust() {
 
     let mut env = load_lawful_functors();
     let semigroup_provider = provider_identity(&env, "Semigroup");
-    let semigroup = env
-        .class_env
-        .class("Semigroup")
+    let semigroup = env.globals.get("Core.Classes.LawfulFunctors.Semigroup").and_then(|id| env.class_env.class_by_id(*id))
         .expect("Semigroup must remain the registered class owner");
     assert_eq!(
         semigroup.projection.field_names,

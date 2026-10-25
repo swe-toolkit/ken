@@ -210,7 +210,6 @@ pub(crate) struct InstanceConstraintInfo {
 pub struct ClassEnv {
     /// Every admitted class and record survives subsequent name occupancy.
     named_field_owners: HashMap<GlobalId, NamedFieldInfo>,
-    current_names: HashMap<String, GlobalId>,
     /// Current spelling view retained for legacy callers and diagnostics.
     /// It is not the selection or overlap index: a later same-spelling owner
     /// can replace this view without removing either admitted checked entry.
@@ -247,7 +246,6 @@ impl ClassEnv {
         self.named_field_owners.retain(|id, info| {
             !removed.contains(id) && !removed.contains(&info.projection.type_id)
         });
-        self.current_names.retain(|_, id| !removed.contains(id));
         self.instances.retain(|_, info| {
             !removed.contains(&info.instance_id) && !removed.contains(&info.class_id)
         });
@@ -274,10 +272,6 @@ impl ClassEnv {
             })
     }
 
-    pub fn class(&self, name: &str) -> Option<ClassView<'_>> {
-        self.class_by_id(*self.current_names.get(name)?)
-    }
-
     pub fn class_by_id(&self, id: GlobalId) -> Option<ClassView<'_>> {
         let info = self.named_field_owners.get(&id)?;
         match &info.kind {
@@ -297,7 +291,6 @@ impl ClassEnv {
         let id = info.type_id;
         self.named_field_owners
             .insert(id, info.into_named_field(name.clone()));
-        self.current_names.insert(name, id);
     }
 
     pub(crate) fn register_record(
@@ -307,7 +300,6 @@ impl ClassEnv {
         field_names: Vec<String>,
         field_types: Vec<Term>,
     ) {
-        self.current_names.insert(name.clone(), type_id);
         self.named_field_owners.insert(
             type_id,
             NamedFieldInfo {
@@ -325,7 +317,6 @@ impl ClassEnv {
     pub fn initialized(record_nil_id: GlobalId, record_nil_val_id: GlobalId) -> Self {
         Self {
             named_field_owners: HashMap::new(),
-            current_names: HashMap::new(),
             instances: HashMap::new(),
             instances_by_id: HashMap::new(),
             record_nil_id,
@@ -347,7 +338,6 @@ impl ClassEnv {
     pub fn sentinel() -> Self {
         ClassEnv {
             named_field_owners: HashMap::new(),
-            current_names: HashMap::new(),
             instances: HashMap::new(),
             instances_by_id: HashMap::new(),
             record_nil_id: GlobalId(0),

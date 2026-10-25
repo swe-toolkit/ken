@@ -321,9 +321,7 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
     let mut env = load_module(LAWFUL);
     env.elaborate_module_from_roots(&[catalog_root()], SUMS)
         .expect("Sums provider must roots-load beside LawfulClasses");
-    let dec_eq = env
-        .class_env
-        .class("DecEq")
+    let dec_eq = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq class must be registered")
         .projection
         .type_id;
@@ -351,8 +349,7 @@ fn boolean_provider_selective_imports_retain_provider_identities() {
         );
     }
     assert_eq!(
-        env.class_env
-            .class("DecEq")
+        env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
             .expect("DecEq class must be registered")
             .projection
             .type_id,

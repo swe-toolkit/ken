@@ -182,9 +182,7 @@ fn generic_decision_and_yes_no_evidence_instantiate() {
     let lawful_owned = env
         .elaborate_module_from_roots(&[catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the class owner must roots-load in the same environment");
-    let ord_class = env
-        .class_env
-        .class("Ord")
+    let ord_class = env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
         .expect("Ord must remain a checked class")
         .projection
         .type_id;

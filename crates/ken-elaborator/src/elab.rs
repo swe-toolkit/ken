@@ -16396,12 +16396,9 @@ fn resolve_instance_dictionary(
     span: &Span,
     owner_label: &str,
 ) -> Result<(Term, Term), ElabError> {
-    let class_id = checked_class_id(class_env, class_name, selected_class_id, span)
-        .map_err(|_| ElabError::NoInstance {
-            class: class_name.to_string(),
-            ty: rtype_head_name(requested),
-            span: span.clone(),
-        })?;
+    // An unselected class is an unresolved name, not a missing dictionary
+    // for a selected class. Keep that distinction in the legacy/direct paths.
+    let class_id = checked_class_id(class_env, globals, class_name, selected_class_id, span)?;
     let mut cx = ElabCtx::new(env, globals, num_values, numeric_env, refinement_facts, owner_label)
         .with_preconditions(preconditions, PremiseHoles::Refused);
     for ty in &ctx.types {
@@ -17097,7 +17094,9 @@ struct ProjectionPurityCtx<'a> {
     globals: &'a HashMap<String, GlobalId>,
     class_env: &'a ClassEnv,
     local_constraints: &'a [RInstanceConstraint],
-    bound_dict_classes: &'a [(String, GlobalId)],
+    // None means an unresolved RCon in a dictionary domain: projecting it
+    // must be treated as unknown, never as an empty effect row.
+    bound_dict_classes: &'a [(String, Option<GlobalId>)],
 }
 
 fn instance_class_for_global(
@@ -17126,9 +17125,8 @@ fn constraint_instance_id(
     constraint: &RInstanceConstraint,
     ctx: &ProjectionPurityCtx<'_>,
 ) -> Option<GlobalId> {
-    let class_id = constraint.class_id.or_else(|| {
-        ctx.class_env.class(&constraint.class_name).map(|info| info.projection.type_id)
-    })?;
+    // A constraint's class is pinned by its scope selection, not its spelling.
+    let class_id = constraint.class_id?;
     let head_key = match &constraint.head_type {
         RType::RVarTy(_, name, _) => InstanceHeadKey::Parameter(name.clone()),
         RType::RCheckedGlobal { id, .. } => InstanceHeadKey::Global(
@@ -17180,7 +17178,10 @@ fn projected_field_row_type(
     };
     if let RExpr::RVar(_, name, _) = base {
         if let Some((_, class_id)) = ctx.bound_dict_classes.iter().find(|(n, _)| n == name) {
-            return projected_class_field_row_type(ctx.class_env, *class_id, field);
+            return class_id.map_or_else(
+                || crate::effects::RowType::singleton("unknown checked class owner"),
+                |id| projected_class_field_row_type(ctx.class_env, id, field),
+            );
         }
     }
     let Some(instance_id) = projected_instance_id(base, ctx) else {
@@ -17245,28 +17246,38 @@ fn projected_class_field_row_type(
     }
 }
 
-fn class_id_for_dictionary_type(class_env: &ClassEnv, ty: &RType) -> Option<GlobalId> {
+fn class_id_for_dictionary_type(
+    class_env: &ClassEnv,
+    globals: &HashMap<String, GlobalId>,
+    ty: &RType,
+) -> Option<Option<GlobalId>> {
     let head = match ty { RType::RApp(f, _, _) => f.as_ref(), _ => ty };
     match head {
         RType::RCheckedGlobal { id, .. } => {
             // A known record is not a class. An unknown selected owner must
             // not disappear from a purity check as an empty effect row.
             (class_env.class_by_id(*id).is_some()
-                || class_env.projection_by_type_id(*id).is_none()).then_some(*id)
+                || class_env.projection_by_type_id(*id).is_none()).then_some(Some(*id))
         }
-        RType::RCon(name, _) => class_env.class(name).map(|info| info.projection.type_id),
+        RType::RCon(name, _) => match globals.get(name).copied() {
+            Some(id) if class_env.class_by_id(id).is_some()
+                || class_env.projection_by_type_id(id).is_none() => Some(Some(id)),
+            Some(_) => None, // a checked record is not a class
+            None => Some(None), // unknown owner must not become an empty row
+        },
         _ => None,
     }
 }
 
 fn collect_bound_dictionary_params(
     ty: Option<&RType>,
+    globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
-) -> Vec<(String, GlobalId)> {
+) -> Vec<(String, Option<GlobalId>)> {
     let mut dicts = Vec::new();
     let mut cur = ty;
     while let Some(RType::RPi(name, domain, codomain, _)) = cur {
-        if let Some(class_id) = class_id_for_dictionary_type(class_env, domain) {
+        if let Some(class_id) = class_id_for_dictionary_type(class_env, globals, domain) {
             dicts.push((name.clone(), class_id));
         }
         cur = Some(codomain);
@@ -17435,7 +17446,7 @@ pub(crate) fn check_surface_purity(
     };
 
     let declared = surface_declared_row_type(rdecl)?.unwrap_or_else(crate::effects::RowType::empty);
-    let bound_dict_classes = collect_bound_dictionary_params(rdecl.ty.as_ref(), class_env);
+    let bound_dict_classes = collect_bound_dictionary_params(rdecl.ty.as_ref(), globals, class_env);
     let projection_ctx = ProjectionPurityCtx {
         env,
         globals,
@@ -19683,10 +19694,10 @@ fn compute_ordered_field_values(
             ci.projection.head_param.is_some(),
         )
     };
-    let mut bound_dict_classes: Vec<(String, GlobalId)> = constraints.iter().map(|constraint| {
-        let id = checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+    let mut bound_dict_classes: Vec<(String, Option<GlobalId>)> = constraints.iter().map(|constraint| {
+        let id = checked_class_id(class_env, cx.globals, &constraint.class_name, constraint.class_id, span)
             .expect("prerequisite checked before instance fields");
-        (constraint.binder.clone(), id)
+        (constraint.binder.clone(), Some(id))
     }).collect();
     if constraints.len() == 1 && constraints[0].binder != "d" {
         bound_dict_classes.push(("d".to_string(), bound_dict_classes[0].1));
@@ -19750,7 +19761,7 @@ fn check_instance_field_purity(
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
     constraints: &[RInstanceConstraint],
-    bound_dict_classes: &[(String, GlobalId)],
+    bound_dict_classes: &[(String, Option<GlobalId>)],
     span: &Span,
 ) -> Result<(), ElabError> {
     let projection_ctx = ProjectionPurityCtx {
@@ -19812,16 +19823,17 @@ fn close_type0_lams(mut body: Term, count: usize) -> Term {
     body
 }
 
-/// Class references selected by imports are never resolved through the
-/// mutable current-name index. A local/legacy reference without a selected ID
-/// uses that index only after its declaration has been checked.
+/// An imported class carries its checked ID. A local class not yet selected
+/// resolves through the same canonical globals key as type elaboration;
+/// class membership is then checked by ID, never a spelling-only index.
 fn checked_class_id(
     class_env: &ClassEnv,
+    globals: &HashMap<String, GlobalId>,
     name: &str,
     selected: Option<GlobalId>,
     span: &Span,
 ) -> Result<GlobalId, ElabError> {
-    let id = selected.or_else(|| class_env.class(name).map(|view| view.projection.type_id));
+    let id = selected.or_else(|| globals.get(name).copied());
     id.filter(|id| class_env.class_by_id(*id).is_some())
         .ok_or_else(|| ElabError::UnresolvedCon {
             name: name.to_string(),
@@ -19934,7 +19946,7 @@ fn elab_instance_decl(
     fields: &[(String, RExpr)],
 ) -> Result<ElabResult, ElabError> {
     let span = &rdecl.span;
-    let class_type_id = checked_class_id(class_env, class_name, selected_class_id, span)?;
+    let class_type_id = checked_class_id(class_env, globals, class_name, selected_class_id, span)?;
     let (class_module, class_kind) = {
         let ci = class_env.class_by_id(class_type_id).expect("selected class was checked");
         (ci.module_id, ci.kind.clone())
@@ -20016,7 +20028,7 @@ fn elab_instance_decl(
         constraints
             .iter()
             .map(|constraint| {
-                let id = checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)?;
+                let id = checked_class_id(class_env, globals, &constraint.class_name, constraint.class_id, span)?;
                 let class = class_env.class_by_id(id).expect("selected constraint was checked");
                 let head = elab_type(&mut cx, &constraint.head_type)?;
                 let core_type = if class.projection.head_param.is_some() {
@@ -20052,7 +20064,7 @@ fn elab_instance_decl(
     // There is NO search-side backstop (no resolution-depth bound or occurs-check);
     // faithful reification is the sole net for mutual-cycle termination.
     let has_self_ref = constraints.iter().any(|constraint| {
-        checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+        checked_class_id(class_env, globals, &constraint.class_name, constraint.class_id, span)
             .is_ok_and(|id| id == class_type_id)
             && rtypes_match(&constraint.head_type, head_type, globals)
     });
@@ -20208,7 +20220,7 @@ fn elab_instance_decl(
             .zip(constraint_core_types.iter().zip(&constraint_head_cores))
             .map(|(constraint, (core_type, head_core))| InstanceConstraintInfo {
                 class_name: constraint.class_name.clone(),
-                class_id: checked_class_id(class_env, &constraint.class_name, constraint.class_id, span)
+                class_id: checked_class_id(class_env, globals, &constraint.class_name, constraint.class_id, span)
                     .expect("constraint checked before instance admission"),
                 head_type: freeze_instance_pattern(&constraint.head_type, globals),
                 core_type: core_type.clone(),
@@ -20260,7 +20272,7 @@ fn elab_derive(
 ) -> Result<ElabResult, ElabError> {
     let span = &rdecl.span;
 
-    let class_type_id = checked_class_id(class_env, class_name, selected_class_id, span)?;
+    let class_type_id = checked_class_id(class_env, globals, class_name, selected_class_id, span)?;
     let has_param = class_env.class_by_id(class_type_id)
         .expect("selected class was checked").projection.head_param.is_some();
 

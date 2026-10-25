@@ -280,9 +280,7 @@ fn real_empty_dec_imports_bind_canonical_class_and_transport_identities() {
     env.elaborate_module_from_roots(&[catalog_root()], EMPTY_DEC)
         .expect("the real EmptyDec entry must isolated-roots-load");
 
-    let dec_eq = env
-        .class_env
-        .class("DecEq")
+    let dec_eq = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
         .expect("LawfulClasses must register DecEq")
         .projection
         .type_id;
@@ -397,9 +395,7 @@ fn landed_lawful_classes_package_still_elaborates_with_dependencies() {
         matches!(result, Term::IndFormer { id, .. } if *id == or_id),
         "LawfulClasses' checked private witness must return canonical Or"
     );
-    let dec_eq_class = env
-        .class_env
-        .class("DecEq")
+    let dec_eq_class = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a registered class")
         .projection
         .type_id;

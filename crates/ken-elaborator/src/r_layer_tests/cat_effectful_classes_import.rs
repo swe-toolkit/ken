@@ -155,11 +155,15 @@ fn local_global(env: &ElabEnv, name: &str) -> GlobalId {
 }
 
 fn class_id(env: &ElabEnv, name: &str) -> GlobalId {
-    env.class_env
-        .class(name)
-        .unwrap_or_else(|| panic!("missing class `{name}`"))
-        .projection
-        .type_id
+    let provider = match name {
+        "Functor" | "Foldable" => "Core.Classes.LawfulFunctors",
+        "Applicative" | "Traversable" => EFFECTFUL_CLASSES,
+        other => panic!("unexpected class `{other}`"),
+    };
+    let id = global(env, &format!("{provider}.{name}"));
+    env.class_env.class_by_id(id)
+        .unwrap_or_else(|| panic!("missing checked class `{provider}.{name}`"))
+        .projection.type_id
 }
 
 fn instance_id(env: &ElabEnv, class: &str, head: &str) -> GlobalId {

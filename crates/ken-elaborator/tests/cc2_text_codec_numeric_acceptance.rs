@@ -177,19 +177,17 @@ fn ordered_dependency_closure_elaborates_codec_then_numeric() {
         );
     }
     for class in ["DecEq", "Ord"] {
-        let class_id = env
-            .class_env
-            .class(class)
-            .unwrap_or_else(|| panic!("{class} must remain a checked class"))
-            .projection
-            .type_id;
+        let canonical = format!("Core.Classes.LawfulClasses.{class}");
+        let class_id = env.globals[&canonical];
+        assert!(env.class_env.class_by_id(class_id).is_some(),
+            "{canonical} must remain a checked class");
         assert!(
             lawful_owned.contains(&class_id),
             "{class} must be the class checked by LawfulClasses"
         );
         let instance = env
             .class_env
-            .instance_search(class, "String")
+            .instance_search(&canonical, "String")
             .unwrap_or_else(|| panic!("{class} String must be a registered dictionary"));
         assert!(
             lawful_owned.contains(&instance),

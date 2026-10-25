@@ -131,10 +131,9 @@ fn earlier_inline_class_import_replay_binds_the_exact_instance_dictionary() {
     let trust_before = env.env.trusted_base();
     env.elaborate_module_from_roots_strict(&[root.0.clone()], "Entry")
         .expect("earlier inline owner and replayed import must bind its dictionary alias");
-    // The inline owner is Entry.Classes; classes themselves currently retain
-    // their unqualified compiler identity C (as in the file-backed controls).
-    let class = env.globals["C"];
-    let canonical = env.globals["C_instance_Nat"];
+    // Both the checked class and its dictionary keep the inline owner path.
+    let class = env.globals["Entry.Classes.C"];
+    let canonical = env.globals["Entry.Classes.C_instance_Nat"];
     let (_, dictionary_type) = env
         .env
         .const_type(canonical)

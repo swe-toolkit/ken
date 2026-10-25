@@ -42,7 +42,7 @@ fn point_named_projections_are_typed_through_the_shared_owner_registry() {
     assert_eq!(projection.head_param, None);
     assert_eq!(projection.field_names, ["x", "y"]);
     assert!(
-        env.class_env.class("Point").is_none(),
+        env.globals.get("Point").and_then(|id| env.class_env.class_by_id(*id)).is_none(),
         "records must not enter class-only instance metadata"
     );
 }
@@ -73,8 +73,8 @@ fn class_instance_projection_is_unchanged_in_a_record_program() {
     )
     .expect("record and existing class/instance projection coexist");
 
-    assert!(env.class_env.class("Pick").is_some());
-    assert!(env.class_env.class("Point").is_none());
+    assert!(env.globals.get("Pick").and_then(|id| env.class_env.class_by_id(*id)).is_some());
+    assert!(env.globals.get("Point").and_then(|id| env.class_env.class_by_id(*id)).is_none());
 }
 
 /// Durable invariant: a class and a record may use the same field label while
@@ -101,9 +101,7 @@ fn shared_field_labels_keep_class_and_record_owners_distinct() {
         .class_env
         .projection_by_type_id(record_id)
         .expect("record projection owner");
-    let class_projection = env
-        .class_env
-        .class("Selected")
+    let class_projection = env.globals.get("Selected").and_then(|id| env.class_env.class_by_id(*id))
         .expect("class owner")
         .projection;
 

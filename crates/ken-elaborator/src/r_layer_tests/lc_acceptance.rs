@@ -158,7 +158,7 @@ fn ac3_overlap_check_first_ok_second_errors() {
     // second declaration path.
     // Insert a fake instance for (Eq2, Int).
     use ken_kernel::GlobalId;
-    let eq2_id = env4.class_env.class("Eq2").unwrap().projection.type_id;
+    let eq2_id = env4.globals.get("Eq2").and_then(|id| env4.class_env.class_by_id(*id)).unwrap().projection.type_id;
     let int_id = env4.globals["Int"];
     let prior = ken_elaborator::classes::InstanceInfo {
             instance_id: GlobalId(999),
@@ -222,7 +222,7 @@ fn ac4_property_vs_structure_sort_discriminant() {
     let mut env_str = mk_env();
     elab(&mut env_str, "class Count2 A { n : Nat }").unwrap();
     // Verify kind was classified as Structure.
-    let kind = env_str.class_env.class("Count2").unwrap().kind;
+    let kind = env_str.globals.get("Count2").and_then(|id| env_str.class_env.class_by_id(*id)).unwrap().kind;
     assert_eq!(
         *kind,
         ken_elaborator::ClassKind::Structure,
@@ -231,7 +231,7 @@ fn ac4_property_vs_structure_sort_discriminant() {
     // Two instances on the same head → OverlappingInstances.
     // Manually register a first one:
     use ken_kernel::GlobalId;
-    let count_id = env_str.class_env.class("Count2").unwrap().projection.type_id;
+    let count_id = env_str.globals.get("Count2").and_then(|id| env_str.class_env.class_by_id(*id)).unwrap().projection.type_id;
     let int_id = env_str.globals["Int"];
     let prior = ken_elaborator::classes::InstanceInfo {
             instance_id: GlobalId(888),
@@ -255,7 +255,7 @@ fn ac4_property_vs_structure_sort_discriminant() {
     );
 
     // Also verify that the property class kind is Property.
-    let kind_prop = env_prop.class_env.class("Trivial").unwrap().kind;
+    let kind_prop = env_prop.globals.get("Trivial").and_then(|id| env_prop.class_env.class_by_id(*id)).unwrap().kind;
     assert_eq!(
         *kind_prop,
         ken_elaborator::ClassKind::Property,

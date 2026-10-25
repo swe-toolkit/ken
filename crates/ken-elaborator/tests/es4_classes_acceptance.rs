@@ -102,8 +102,7 @@ fn es4_owner_comparator_obligations() -> (ElabEnv, GlobalId, GlobalId, GlobalId,
     let ord_id = lawful_class_id(&env, &lawful_owned, "Ord");
     let ord_int_id = lawful_instance_id(&env, &lawful_owned, "Ord", "Int");
     assert_eq!(
-        env.class_env
-            .class("Ord")
+        env.globals.get("Core.Classes.LawfulClasses.Ord").and_then(|id| env.class_env.class_by_id(*id))
             .expect("Ord must be a checked class")
             .projection
             .type_id,
@@ -136,9 +135,9 @@ fn es4_owner_comparator_obligations() -> (ElabEnv, GlobalId, GlobalId, GlobalId,
         "owner-local examples must not add trust"
     );
     assert_eq!(
-        env.globals.get("Ord").copied(),
+        env.globals.get("Core.Classes.LawfulClasses.Ord").copied(),
         Some(ord_id),
-        "the checked owner example must import the canonical public Ord identity"
+        "the checked owner example must retain the qualified public Ord identity"
     );
     assert_eq!(
         env.globals.get("Perm").copied(),
@@ -191,13 +190,12 @@ fn lawful_class_id(
     owned: &[ken_kernel::GlobalId],
     class: &str,
 ) -> ken_kernel::GlobalId {
-    let view = env
-        .class_env
-        .class(class)
-        .unwrap_or_else(|| panic!("{class} must be a checked class"));
-    let id = view.projection.type_id;
+    let canonical = format!("Core.Classes.LawfulClasses.{class}");
+    let id = env.globals[&canonical];
+    let view = env.class_env.class_by_id(id)
+        .unwrap_or_else(|| panic!("{canonical} must be a checked class"));
     assert!(owned.contains(&id), "LawfulClasses must own {class}");
-    assert_eq!(view.projection.owner_name, class);
+    assert_eq!(view.projection.owner_name, canonical);
     id
 }
 

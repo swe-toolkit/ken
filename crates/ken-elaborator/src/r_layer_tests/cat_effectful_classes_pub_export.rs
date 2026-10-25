@@ -58,10 +58,9 @@ fn term_mentions(term: &Term, target: GlobalId) -> bool {
 fn provider_identity(env: &ElabEnv, surface: &str) -> GlobalId {
     if surface == "Applicative" {
         env.class_env
-            .class(surface)
-            .expect("Applicative must remain a registered class")
-            .projection
-            .type_id
+            .class_by_id(env.globals[&format!("{EFFECTFUL_CLASSES}.{surface}")])
+            .expect("Applicative must remain a registered checked class")
+            .projection.type_id
     } else {
         env.globals[&format!("{EFFECTFUL_CLASSES}.{surface}")]
     }

@@ -39,9 +39,7 @@ fn deceq_char_transports_from_deceq_int_not_a_fresh_postulate() {
     let lawful_owned = env
         .elaborate_module_from_roots(&[catalog_or::catalog_root()], "Core.Classes.LawfulClasses")
         .expect("the LawfulClasses owner must roots-load in this environment");
-    let class_id = env
-        .class_env
-        .class("DecEq")
+    let class_id = env.globals.get("Core.Classes.LawfulClasses.DecEq").and_then(|id| env.class_env.class_by_id(*id))
         .expect("DecEq must remain a checked class")
         .projection
         .type_id;
