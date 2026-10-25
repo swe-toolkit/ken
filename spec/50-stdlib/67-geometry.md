@@ -3,14 +3,16 @@
 > **Status: DRAFT v0 (SPEC-GEOMETRY-EXACT-CONTRACT §1;
 > SPEC-GEOMETRY-MANHATTAN-METRIC §2;
 > SPEC-GEOMETRY-BOX-CONTAINMENT §3;
-> SPEC-GEOMETRY-BOX-AREA §4).** Sections 1–3, their catalog operations
-> and checked laws, and their seeds are present on main. Section 4
-> specifies natural-valued area, containment monotonicity, and both
-> generic inverted-axis zero laws. The §4 catalog exports are delivered
-> with checked proofs; a package-owned roots-loader test executes the
-> §4 seed's positive and refused fences and measures unchanged trusted
-> identities (114 → 114). This does not establish an official
-> conformance-runner run, CI, publication or landing.
+> SPEC-GEOMETRY-BOX-AREA §4;
+> SPEC-GEOMETRY-BOX-INSIDE-ORDER §5).** Sections 1–4, their catalog
+> operations and checked laws, and their seeds are present on main.
+> Section 4's package-owned roots-loader test executes its positive
+> and refused seed fences and measures unchanged trusted identities
+> (114 → 114); no official conformance-runner run is established.
+> Section 5 specifies three more generic checked-law obligations.
+> Its catalog exports are absent at this base; an authored §5 seed
+> and D0 scratch checks do not establish shipped-seed execution, CI,
+> publication, landing or a landed trust measurement for §5.
 
 ## 1. Points and closed boxes over natural coordinates
 
@@ -122,11 +124,12 @@ pub theorem manhattan_self (p : Point) :
 Together the first two prove **exactly** that a point lies in the
 intersection iff it lies in both boxes, including when either box is
 empty. They do not assert an `Eq Box` equation for two representations
-of an intersection. The hull laws each preserve membership from one
-input; neither asserts structural idempotence, a least hull for empty
-inputs, or an equality between hull and union. The distance laws
-establish symmetry and zero at identical points, not triangle
-inequality. Architect D0 checked all six laws generically with
+of an intersection. The §1 hull laws each preserve membership from
+one input; they do not themselves prove a least-hull statement.
+Section 5 states least-hull containment for every box, including
+inverted boxes, without asserting structural idempotence or equality
+between hull and union. The distance laws establish symmetry and
+zero at identical points, not triangle inequality. Architect D0 checked all six laws generically with
 private per-axis lemmas and existing checked `Nat`/Boolean laws; no
 closed seed replaces these proofs.
 
@@ -368,21 +371,24 @@ inverted pairs and an instance of `inside_complete`; a separate
 client's claim of containment in a strictly smaller box was refused
 with `TypeMismatch`. The ambient-passthrough census on that scratch
 package passed 1/1 with no residuals. These are **D0 scratch
-measurements**, not §3 catalog publication, an authored or executed
-§3 seed, CI, or a measured landed trust delta.
+measurements**, not themselves §3 catalog publication, execution of
+its authored seed, CI, or a measured landed trust delta.
 
-The approved contract adds no signed coordinates, dimensions beyond
-two, new primitive or surface feature. It does not collapse distinct
-empty boxes or change §1's `contains`, `intersect` or `hull`.
+Section 5 strengthens §3's one-sided intersection and hull bounds
+with order laws; it does not alter `inside`, its seven laws, or the
+witnessed premise of `inside_complete`. The approved §3 contract
+adds no signed coordinates, dimensions beyond two, new primitive or
+surface feature. It does not collapse distinct empty boxes or change
+§1's `contains`, `intersect` or `hull`.
 
 ## 4. Natural area of a closed box
 
 > **Section 4 status: DRAFT v0 (SPEC-GEOMETRY-BOX-AREA).** Architect
 > checked the generic area laws on the landed §1–3 base in scratch.
-> The four §4 exports and seed are present; the package-owned test runs
-> the exact positive and refused seed fences and measures unchanged
-> trusted `GlobalId` identities (114 → 114). No official
-> conformance-runner execution, CI, publication or landing is claimed.
+> The four §4 exports and seed are present on main; the package-owned
+> test runs the exact positive and refused seed fences and measures
+> unchanged trusted `GlobalId` identities (114 → 114). No official
+> conformance-runner execution is established by that package test.
 
 ### 4.1 Inclusive spans and inverted axes
 
@@ -455,7 +461,9 @@ names: `IsTrue (leq_nat (area (intersect b c)) (area b))` follows by
 `area_inside (intersect b c) b (intersect_inside_left b c)`; the
 right-hand bound is
 `area_inside (intersect b c) c (intersect_inside_right b c)`.
-Section 3.2 already exports both corner-inclusion premises. No structural
+Section 3.2 already exports both corner-inclusion premises. These
+are area corollaries, not additional area-intersection exports; §5's
+separate greatest-intersection law is about `inside`. No structural
 intersection equality or area-based equivalence of boxes follows.
 
 ### 4.3 Proof boundary and remaining scope
@@ -488,3 +496,95 @@ Signed coordinates and orientations, continuous or approximate area,
 higher-dimensional volume, canonical empty boxes and point-set
 equality remain outside this extension. Neither area nor containment
 supplies a runtime-cost guarantee.
+
+## 5. The corner-wise inclusion order
+
+> **Section 5 status: DRAFT v0 (SPEC-GEOMETRY-BOX-INSIDE-ORDER).**
+> Architect checked three generic transparent laws in an isolated D0
+> on `4f337ec26`. This candidate specifies those laws and authors a
+> closed seed; it does not deliver the §5 `NatBox` exports. A scratch
+> check on an overlay is not shipped-seed execution, CI, publication,
+> landing or a landed trusted-base measurement.
+
+### 5.1 Three checked-law obligations
+
+The module extends §3's corner-wise `inside` relation with exactly
+three public theorem types. Every law holds for all `Box` values,
+including inverted bounds and disjoint intersections. Each premise
+and conclusion is an `IsTrue` proposition over `inside`; none is a
+point-set inclusion or a structural `Equal Box` equation.
+
+```ken
+pub theorem inside_trans
+      (a : Box) (b : Box) (c : Box)
+    : IsTrue (inside a b) → IsTrue (inside b c) → IsTrue (inside a c)
+
+pub theorem intersect_greatest
+      (a : Box) (b : Box) (c : Box)
+    : IsTrue (inside a b) → IsTrue (inside a c)
+      → IsTrue (inside a (intersect b c))
+
+pub theorem hull_least
+      (b : Box) (c : Box) (d : Box)
+    : IsTrue (inside b d) → IsTrue (inside c d)
+      → IsTrue (inside (hull b c) d)
+```
+
+`inside_trans` composes comparisons of stored lower and upper
+coordinates. `intersect_greatest` says any box inside both operands
+is inside their coordinatewise intersection; together with §3.2's
+`intersect_inside_left` and `intersect_inside_right`, this makes
+`intersect b c` a greatest lower bound for **corner-wise** inclusion.
+`hull_least` says a box containing both operands also contains their
+coordinatewise hull; together with §3.2's `inside_hull_left` and
+`inside_hull_right`, the hull is a least upper bound for that same
+relation. These conclusions need **both** premises each; they do not
+claim that a hull is inside either operand or that either operand is
+inside its intersection.
+
+No premise requires a box to contain a point. An inverted box still
+has observable corners, so a chain may start with an inverted box and
+`hull_least` may take an inverted operand. For example, the inverted
+`(3,1)–(1,2)` fits in `(0,0)–(3,3)`, then in `(0,0)–(4,4)`.
+The point-set interpretation would lose information about its corners
+and cannot substitute for `inside`. The two existing §3.2 one-sided
+laws and the three laws above describe bounds in this relation, not
+an `Equal Box` identity, a canonical empty box, or an additional
+public antisymmetry law.
+
+### 5.2 Proof boundary and observed counterexamples
+
+`axis_within` stays private. The D0's per-axis transitivity, meet and
+join proofs (`axis_within_trans`, `axis_within_meet`, and
+`axis_within_join`) are likewise **private**, not public Nat-order
+laws or exported geometry interfaces. Their per-axis comparisons use the already-public §1.4 bounds
+`greatest for min` and `least for max`, plus `leq_nat` transitivity.
+After destructuring the boxes, `bool_and` introductions combine the
+two axes. This is a checked
+proof route, not a new evaluation rule for `inside`, `intersect` or
+`hull`. Neither those operations, §3's seven laws, nor §4's area
+operation and laws change here. No validity premise, primitive,
+axiom, surface feature or additional public helper is introduced.
+
+The direction of each bound is observable on closed boxes. Let
+`small=(1,1)–(2,2)` and `mid=(0,0)–(3,3)`. The hull of `small` and
+`mid` fits in `mid` but **not** in `small`, because `mid` is not
+inside `small`. Their intersection fits in `small`, but `mid` does
+**not** fit in `intersect mid small`, since `mid` is not inside
+`small`. The reverse chain `inside big inverted` also fails even
+when `inverted` fits in `big`. The seed pairs each refusal with an
+accepted observation on the same operands rather than inferring a
+refusal from a missing export.
+
+On the exact base `4f337ec26eaebf62d4951878e96809619aedc25f`,
+Architect's isolated D0 reported `ken check` and `ken fmt --check`
+rc 0 on its patched `NatBox`; four root-loaded providers retained
+identical `trusted_base()` GlobalId sets, 114 → 114. The three
+public laws were Transparent and owned by `NatBox`; a generic client
+applied all three. Selective imports of `axis_within` and the three
+new per-axis helpers were refused. The closed controls and isolated
+reverse-inclusion claims were checked in that scratch development,
+not in this candidate's shipped seed. Any separate author overlay
+check is reported in the seed with its own base and result; neither
+D0 nor author checks establish §5 catalog publication, official
+conformance execution, CI, landing or landed trust.
