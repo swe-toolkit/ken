@@ -5,12 +5,16 @@ Spec: `spec/50-stdlib/67-geometry.md` §5.
 Frame: `docs/program/issues/SPEC-GEOMETRY-BOX-INSIDE-ORDER.md`.
 
 This authored seed instantiates the three public §5 laws on closed
-natural-coordinate boxes. The §5 catalog exports are absent at its base
+natural-coordinate boxes. The §5 catalog exports were absent at its base
 `4f337ec26eaebf62d4951878e96809619aedc25f`. Author `ken check`
-results below use an isolated overlay of Architect's ruled D0 patch, not
-the shipped package or official conformance runner. A closed instance
-is not a substitute for a generic proof. Every case promises a
-**durable invariant**, including both reverse-inclusion refusals.
+results below used an isolated overlay of Architect's ruled D0 patch, not
+the shipped package or official conformance runner. The package test now
+root-loads the candidate exports and checks the accepted client and all
+three isolated refused claims. It omits only the redundant `IsTrue` import
+already bound by the compiler base from its executable client; these seed
+Ken fences and fixtures remain unchanged. This is not official conformance-
+runner execution, CI, publication or landing. A closed instance is not a
+substitute for a generic proof. Every case promises a **durable invariant**.
 
 ## Shared fixtures and accepted client
 
@@ -124,9 +128,10 @@ For each refusal, first `ken check` the full accepted client above.
 Start from a **fresh copy** of that accepted source and append **only
 one** of the following fences, keeping the fixtures and all accepted
 controls. Expect rejection at the appended theorem, not an import,
-missing §5 export, malformed fixture or earlier declaration. The
-three refused directions are not consequences of the three public
-laws; a law silently stated without its premise would admit one.
+missing §5 export, malformed fixture or earlier declaration. The three
+refused directions do not follow from the three public laws. Their rejection
+by reduction and the same-operand controls pin the closed bound directions;
+neither establishes that a public law retains its premises.
 
 ### stdlib/geometry/reject-hull-inside-left-operand
 
@@ -187,6 +192,7 @@ appended theorem (each starts at 1884), not a missing import, fixture
 or earlier proof. Logs are `/tmp/spec-author-box-inside-order-Positive.log`
 and `/tmp/spec-author-box-inside-order-Refusal{1..3}.log`. The three
 refusals distinguish reversed order bounds but do not prove the
-general laws. This is **scratch-overlay** checking, not execution
-against shipped §5 exports or the official conformance runner, CI,
+general laws. That was **scratch-overlay** checking. The package test now
+checks the same positive assertions and each refusal against root-loaded
+§5 exports, without claiming official conformance-runner execution, CI,
 publication, landing or a landed trusted-base measurement.
