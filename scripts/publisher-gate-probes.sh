@@ -113,6 +113,12 @@ publisher_state_dir|EXCLUDED: pure accessor, driven by the containment guard
 freeze_marker_path|EXCLUDED: pure accessor, driven by every freeze assertion
 release_gate_worktree|EXCLUDED: cleanup helper, no observable of its own
 cleanup_gate|EXCLUDED: EXIT trap, not reachable as a unit under test
+release_merge_lock|probe 8b (a released lock is acquirable from another worktree)
+list_ci_runs_for_head|probe 13 (run selection, through a stubbed gh)
+classify_tested_run|probe 13 (current, stale, pending, and each fail-closed refusal)
+retrigger_ci_by_reopen|probe 13 (returns on a newer run; dies if reopen fails)
+wait_for_green_checks|EXCLUDED: thin poll over gh pr checks, moved verbatim from the unprobed top-level flow
+sync_primary_checkout|EXCLUDED: writes to the real primary checkout at /workspaces/ken, unsafe to drive here
 "
 declared_cov="$(printf '%s' "$COVERAGE" | sed '/^$/d' | cut -d'|' -f1 | sort -u)"
 if [ "$declared_cov" = "$expected_fns" ]; then
@@ -300,6 +306,23 @@ wait "$holder_pid" 2>/dev/null
 # And it must be RELEASED, not permanently stuck.
 out="$( cd "$LOCK_WT" && bash "$SANDBOX/lock.sh" 2>&1 )"
 if grep -q 'LOCK=ACQUIRED' <<<"$out"; then ok "lock RELEASED after the holder exits"; else bad "lock never released -- the gate would deadlock the fleet"; fi
+
+head_ "Probe 8b -- release_merge_lock releases while the holder still runs"
+# The tested-base gate leaves the critical section to wait for a re-triggered
+# CI run. The holder process stays alive, so only an explicit release frees it.
+lock_snippet='acquire_merge_lock && release_merge_lock && echo LOCK=RELEASED-EARLY'
+mk_runner "$SANDBOX/lock-release.sh"
+lock_snippet='acquire_merge_lock && echo LOCK=ACQUIRED || echo LOCK=REFUSED'
+( cd "$SANDBOX/clone" && HOLD=6 bash "$SANDBOX/lock-release.sh" >"$SANDBOX/holder2.out" 2>&1 ) &
+holder_pid=$!
+for _ in 1 2 3 4 5 6 7 8 9 10; do grep -q 'LOCK=' "$SANDBOX/holder2.out" 2>/dev/null && break; sleep 0.3; done
+out="$( cd "$LOCK_WT" && bash "$SANDBOX/lock.sh" 2>&1 )"
+if grep -q 'LOCK=RELEASED-EARLY' "$SANDBOX/holder2.out" 2>/dev/null && grep -q 'LOCK=ACQUIRED' <<<"$out"; then
+  ok "worktree B ACQUIRES while A is alive but has released"
+else
+  bad "worktree B could not acquire after A released -- a re-trigger wait would block every other publish"
+fi
+wait "$holder_pid" 2>/dev/null
 git -C "$SANDBOX/clone" worktree remove --force "$LOCK_WT" >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
@@ -497,6 +520,102 @@ if grep -q 'NOT.*frozen\|will proceed unblocked' <<<"$out"; then ok "and it says
 # And prove it: the next publish really does proceed.
 out2="$(run_gate 'refuse_if_frozen && echo NEXT_PUBLISH_PROCEEDED=1')"
 if grep -q 'NEXT_PUBLISH_PROCEEDED=1' <<<"$out2"; then ok "proved: the next publish proceeds (so the FROZEN claim would have been false)"; else bad "next publish blocked -- then a marker exists and this probe is not testing what it claims"; fi
+
+# ---------------------------------------------------------------------------
+# PROBE 13 -- the tested-base gate (operator, 2026-10-26: no post-merge run on
+# main). The real classify_tested_run runs against a real fresh_result_gate in
+# the sandbox; only `gh` is stubbed, and each knob below manufactures one
+# state. The record is built from the sandbox's real merge base and tree, so
+# the accepting case is not supplied by the stub.
+# ---------------------------------------------------------------------------
+head_ "Probe 13 -- merge only on a green run that tested the current base"
+build_sandbox
+TESTED_STUB='
+  fresh_result_gate >/dev/null 2>&1 || { echo FRESH_FAILED; exit 1; }
+  tmpdir="$(mktemp -d)"
+  head_branch=candidate
+  T_BASE="${T_BASE:-$checked_base}"
+  T_TREE="${T_TREE:-$checked_tree_oid}"
+  T_MHEAD="${T_MHEAD:-$head_sha}"
+  T_PRHEAD="${T_PRHEAD:-$head_sha}"
+  T_MERGE=dddddddddddddddddddddddddddddddddddddddd
+  gh() {
+    case "$1 $2" in
+      "pr view") printf "%s\n" "$T_PRHEAD" ;;
+      "pr close") return 0 ;;
+      "pr reopen") [ -z "${T_NOREOPEN:-}" ] ;;
+      "run download")
+        [ -z "${T_NOART:-}" ] || return 1
+        mkdir -p "$7"
+        jq -n --argjson schema "${T_SCHEMA:-2}" --argjson run "${T_RUN:-500}" \
+          --arg head "$head_sha" --arg mhead "$T_MHEAD" --arg sha "$T_MERGE" \
+          --arg base "$T_BASE" --arg tree "$T_TREE" \
+          "{schema: \$schema, event: \"pull_request\", run_id: \$run, pr_number: 9001,
+            mode: \"full\", head_sha: \$head, sha: \$sha, base_sha: \$base,
+            merge_head_sha: \$mhead, tree: \$tree}" > "$7/record.json" ;;
+      *)
+        case "$2" in
+          *"/actions/workflows/ci.yml/runs?"*)
+            jq -n --arg sha "$head_sha" --arg st "${T_STATUS:-completed}" \
+              --arg concl "${T_CONCLUSION:-success}" --argjson ids "${T_IDS:-[500]}" \
+              "{workflow_runs: [\$ids[] | {id: ., event: \"pull_request\", head_sha: \$sha,
+                head_branch: \"candidate\", path: \".github/workflows/ci.yml\",
+                status: \$st, conclusion: \$concl,
+                head_repository: {full_name: \"o/r\"}, repository: {full_name: \"o/r\"},
+                pull_requests: [{number: 9001}]}]}" ;;
+          *"/commits/"*)
+            if [ -n "${T_APIBAD:-}" ]; then printf "%s\n" "$T_TREE $T_BASE $T_BASE"
+            else printf "%s\n" "$T_TREE $T_BASE $T_MHEAD"; fi ;;
+          *) echo "unexpected gh call: $*" >&2; return 9 ;;
+        esac ;;
+    esac
+  }
+'
+tested_case() {
+  run_gate "$TESTED_STUB"'
+  classify_tested_run "$checked_base" "$checked_tree_oid"
+  echo "STATE=$tested_state RUN=$tested_run_id"'
+}
+other=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+out="$(tested_case)"
+if grep -q 'STATE=current RUN=500' <<<"$out"; then ok "control: a green run that tested (origin/main, routed head) is current"; else bad "accepting case did not accept: $out"; fi
+out="$(T_BASE=$other tested_case)"
+if grep -q 'STATE=stale' <<<"$out"; then ok "a green run on an older base is stale (re-trigger, not merge)"; else bad "moved base not reported stale: $out"; fi
+out="$(T_STATUS=in_progress tested_case)"
+if grep -q 'STATE=pending' <<<"$out"; then ok "an incomplete latest run is pending"; else bad "incomplete run not pending: $out"; fi
+out="$(T_IDS='[400,500]' T_RUN=400 tested_case)"
+if grep -q 'STATE=' <<<"$out"; then bad "accepted the record of a run that is not the latest: $out"; else ok "the latest run's record must name that run"; fi
+
+refuses() {
+  local label="$1"; shift
+  out="$( export "$@"; tested_case 2>&1 )" || true
+  if grep -q 'STATE=' <<<"$out" || ! grep -q 'Not merging' <<<"$out"; then
+    bad "FAILS OPEN on $label: $out"
+  else
+    ok "refuses on $label"
+  fi
+}
+refuses "a red latest run"              T_CONCLUSION=failure
+refuses "a cancelled latest run"        T_CONCLUSION=cancelled
+refuses "a run with no artifact"        T_NOART=1
+refuses "a schema-1 record (no parents)" T_SCHEMA=1
+refuses "a record whose second parent is not the routed head" T_MHEAD=$other
+refuses "a record GitHub's merge commit contradicts" T_APIBAD=1
+refuses "a PR head that is not the routed SHA" T_PRHEAD=$other
+refuses "a tested tree that is not the merge result built here" T_TREE=$other
+
+out="$(run_gate "$TESTED_STUB"'
+  T_IDS="[500,501]"
+  retrigger_ci_by_reopen 500 && echo RETRIGGERED=1')"
+if grep -q 'RETRIGGERED=1' <<<"$out"; then ok "retrigger returns once a newer run exists"; else bad "retrigger did not see the newer run: $out"; fi
+out="$(T_NOREOPEN=1 run_gate "$TESTED_STUB"'
+  retrigger_ci_by_reopen 500 && echo RETRIGGERED=1')"
+if grep -q 'could NOT be reopened' <<<"$out" && ! grep -q 'RETRIGGERED=1' <<<"$out"; then
+  ok "a failed reopen stops with the hand-reopen instruction"
+else
+  bad "a failed reopen was not reported: $out"
+fi
 
 printf '\n=== %s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

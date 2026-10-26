@@ -5,12 +5,17 @@ name: CI
 # branch can't merge until they're green (docs/ops/github-setup.md, WP F1). This
 # is the compute offload: the heavy jobs run on GitHub runners, not the laptop.
 # No merge_group — one publisher serialises merges, so there's no queue.
+#
+# No push trigger: there is no post-merge run on main (operator, 2026-10-26).
+# The publisher merges only a PR whose latest green run tested a merge commit
+# whose first parent is the current main tip and whose second parent is the
+# routed head, so a push run would repeat that run's work on the same tree.
+# The `ci-tested-tree` artifact below is how the publisher learns that base.
 
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
+    types: [opened, synchronize, reopened]
 
 # Cancel superseded runs on the same PR/ref so rapid pushes don't pile up CI
 # (matters even though public-repo Actions minutes are free — it shortens queues).
@@ -19,13 +24,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # A push to main whose tree is byte-identical to a PR merge commit that
-  # already passed a full-mode pull_request run of this workflow is
-  # `pr-verified`: the heavy jobs skip, exactly as for doc-only. PR runs
-  # record their tested merge commit in the `ci-tested-tree` artifact; the
-  # push run re-derives that commit's tree from git and fails closed to
-  # `full` on any lookup failure or mismatch (scripts/ci-pr-verified.py).
-  # The read-only token scopes below exist for that lookup only.
+  # Every run records the merge commit it tested, with both parents, in the
+  # `ci-tested-tree` artifact (scripts/ci-tested-merge.py). The publisher reads
+  # it before merging and refuses unless the first parent is the current main
+  # tip and the second is the routed head (scripts/scripted-pr-automerge.sh).
   #
   # `z3_relevant` gates the z3-process-adapter job within `full` mode. It is
   # `false` only when scripts/ci-z3-relevant.py finds that no changed path is
@@ -38,8 +40,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: read
-      pull-requests: read
     outputs:
       mode: ${{ steps.classify.outputs.mode }}
       z3_relevant: ${{ steps.classify.outputs.z3_relevant }}
@@ -49,11 +49,9 @@ jobs:
           fetch-depth: 0
       - id: classify
         shell: bash
-        env:
-          CI_PR_VERIFIED_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          base='${{ github.event.pull_request.base.sha || github.event.before }}'
+          base='${{ github.event.pull_request.base.sha }}'
           if ! git diff --name-only --no-renames "$base" HEAD | python3 -c 'import json,sys; print(json.dumps([x.rstrip("\\n") for x in sys.stdin if x.rstrip("\\n")]))' > paths.json; then
             echo 'mode=full' >> "$GITHUB_OUTPUT"
             echo 'z3_relevant=true' >> "$GITHUB_OUTPUT"
@@ -70,24 +68,16 @@ jobs:
           if classified=$(python3 scripts/ci-doc-only.py paths.json) && [ "$classified" = doc-only ]; then
             mode=doc-only
           fi
-          if [ "$mode" = full ] && [ "$GITHUB_EVENT_NAME" = push ]; then
-            if verified=$(python3 scripts/ci-pr-verified.py check) && [ "$verified" = pr-verified ]; then
-              mode=pr-verified
-            fi
-          fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
-      # Best effort: a PR run without this record only means its later push
-      # run stays full, so a recording failure must not fail the PR.
+      # Required, not best effort: the publisher will not merge on a run that
+      # has no record of its tested base, so a recording failure fails the run.
       - name: Record tested merge tree
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
         env:
           CI_MODE: ${{ steps.classify.outputs.mode }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: python3 scripts/ci-pr-verified.py record "$CI_MODE" ci-tested-tree/record.json
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python3 scripts/ci-tested-merge.py record "$CI_MODE" ci-tested-tree/record.json
       - name: Upload tested merge tree
-        if: github.event_name == 'pull_request'
-        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ci-tested-tree
@@ -647,10 +637,10 @@ jobs:
           shard_union='${{ needs.verify-realized-shard-union.result }}'
           mode='${{ needs.classify-paths.outputs.mode }}'
           z3_relevant='${{ needs.classify-paths.outputs.z3_relevant }}'
-          # doc-only and pr-verified skip the heavy jobs by design; only in
-          # those two modes is a skipped job accepted as passing.
+          # doc-only skips the heavy jobs by design; only in that mode is a
+          # skipped job accepted as passing.
           skip_ok=0
-          case "$mode" in doc-only|pr-verified) skip_ok=1 ;; esac
+          case "$mode" in doc-only) skip_ok=1 ;; esac
           # In full mode the z3 job alone may also skip, and only when
           # classify-paths reported that no changed path is its input.
           z3_skip_ok=$skip_ok

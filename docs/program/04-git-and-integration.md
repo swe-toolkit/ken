@@ -142,10 +142,17 @@ Inputs are deliberately minimal:
 The script creates or finds the PR and performs the publisher merge gate. For
 docs-only changes it runs the squash merge immediately. For non-doc changes it
 reads the most recent completed `CI` workflow duration, waits that duration plus
-10%, then starts polling the PR checks. Once all checks pass, it runs the squash
-merge and returns. Remote head-branch deletion is handled by the repository
-setting, not by the script, because `gh pr merge --delete-branch` can fail after
-a successful remote merge in the shared-worktree layout. The merge command uses
+10%, then starts polling the PR checks. Once all checks pass, it merges only if
+the PR's latest run tested a merge commit whose first parent is the current
+`origin/main` tip and whose second parent is the routed SHA; each run records
+that commit in its `ci-tested-tree` artifact. If `main` moved after the run,
+it closes and reopens the PR to re-trigger CI and waits again. If it cannot
+determine the tested base, it refuses. CI does not run on `main` after the
+merge (operator, 2026-10-26), so this pre-merge run is the landed tree's only
+CI. It then runs the squash merge and returns. Remote head-branch deletion is
+handled by the repository setting, not by the script, because
+`gh pr merge --delete-branch` can fail after a successful remote merge in the
+shared-worktree layout. The merge command uses
 the publisher's admin merge authority, guarded by the exact PR head SHA, because
 the `main` ruleset may otherwise block the branch update even after required
 checks pass. If GitHub still blocks the merge command, the script fails with
@@ -291,7 +298,9 @@ it is not a separate reviewer. **Teams do not merge.**
    (branch protection: required checks + merge restricted to the publisher),
    one commit with the WP ID in the subject, then fetches so origin/main updates
    for all.
-5. Publisher caller verifies main green, resolves the merge Decision, posts the
+5. Publisher caller verifies the landing by blob identity (no CI runs on
+   `main` after a merge; the gating PR run tested this exact merge onto the
+   current tip), resolves the merge Decision, posts the
    ship Event in ken-integration mentioning the Steward only, and sweeps the
    merged wp/<ID> branch. Steward digests the log; the operator hears only
    gate-level news.

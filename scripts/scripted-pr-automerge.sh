@@ -16,8 +16,13 @@ gate.
 Behavior:
   * doc-only: merge immediately.
   * non-doc: wait for the latest CI workflow duration + 10%, then poll PR
-    checks until they complete; merge after all checks pass.
+    checks until they complete. Merge only when the PR's latest CI run is
+    green AND tested a merge commit whose first parent is the current
+    origin/main tip and whose second parent is the routed head. If main has
+    moved since that run, close and reopen the PR to re-trigger CI and wait
+    again (at most PUBLISHER_MAX_CI_RETRIGGERS times, default 3).
 
+There is no post-merge CI run on main; this pre-merge check replaces it.
 The script returns after the merge command succeeds.
 USAGE
 }
@@ -399,6 +404,13 @@ time; that mutual exclusion is the ONLY reason the checked tree is the landed
 tree. Wait for the other publish to finish and re-run. Do not bypass."
 }
 
+# Closing the descriptor releases the flock. Used only when the tested-base
+# check sends the publish back to wait for CI, so that a re-triggered run's
+# wait does not hold the critical section other publishes need.
+release_merge_lock() {
+  exec 8>&- 2>/dev/null || true
+}
+
 freeze_marker_path() {
   printf '%s/ken-publisher-FROZEN\n' "$(publisher_state_dir)"
 }
@@ -600,6 +612,189 @@ Investigate before retrying."
     printf 'Publisher gate: origin/main advanced during evaluation; reconstructing (attempt %s).\n' \
       "$attempt"
     release_gate_worktree
+  done
+}
+
+# ---------------------------------------------------------------------------
+# TESTED-BASE GATE (operator, 2026-10-26). CI no longer runs on main after a
+# merge, so the pre-merge run is the only CI the landed tree gets. A green run
+# is therefore authorization only if it tested THIS merge: a merge commit whose
+# first parent is the origin/main tip we are about to merge onto and whose
+# second parent is the routed head.
+#
+# Each run records that commit in its `ci-tested-tree` artifact
+# (scripts/ci-tested-merge.py, recorded from the checked-out HEAD). This reads
+# the PR's latest run of the CI workflow for the routed head and sets:
+#
+#   tested_state   current | stale | pending
+#   tested_run_id  the run it read
+#   tested_base    the first parent that run tested (current and stale only)
+#
+# FAILS CLOSED: every lookup that cannot produce an answer dies, which never
+# merges. A red, cancelled or record-less latest run, a record that does not
+# name this run, PR and head, a record GitHub's own view of the merge commit
+# contradicts, a tested tree that is not the merge result we built, or a PR
+# head that is not the routed SHA all stop the publish. Only `current` merges.
+#
+# Must run after fresh_result_gate, inside the lock: $1 is $checked_base and
+# $2 is $checked_tree_oid.
+# ---------------------------------------------------------------------------
+tested_state=""
+tested_run_id=""
+tested_base=""
+
+list_ci_runs_for_head() {
+  gh api "repos/{owner}/{repo}/actions/workflows/ci.yml/runs?event=pull_request&head_sha=$head_sha&per_page=50" |
+    jq -c --arg sha "$head_sha" --arg branch "$head_branch" --argjson pr "$pr_number" '
+      [.workflow_runs[]?
+       | select(.event == "pull_request"
+                and .head_sha == $sha
+                and .head_branch == $branch
+                and .path == ".github/workflows/ci.yml"
+                and .head_repository.full_name == .repository.full_name
+                and ((.pull_requests | length) == 0
+                     or any(.pull_requests[]; .number == $pr)))]
+      | sort_by(.id)'
+}
+
+classify_tested_run() {
+  local want_base="$1" want_tree="$2"
+  local runs latest status conclusion pr_head dir rec mode api_view rec_view
+  tested_state=""
+  tested_run_id=""
+  tested_base=""
+
+  pr_head="$(gh pr view "$pr_number" --json headRefOid,state \
+    --jq 'select(.state == "OPEN") | .headRefOid')" ||
+    die "publisher gate: CANNOT DETERMINE the tested base -- could not read PR #$pr_number. Not merging."
+  [ "$pr_head" = "$head_sha" ] ||
+    die "publisher gate: PR #$pr_number head is '${pr_head:-<not open>}', not the routed $head_sha. Not merging."
+
+  runs="$(list_ci_runs_for_head)" ||
+    die "publisher gate: CANNOT DETERMINE the tested base -- could not list CI runs for $head_sha. Not merging."
+  latest="$(printf '%s\n' "$runs" | jq -c 'last // empty')" ||
+    die "publisher gate: CANNOT DETERMINE the tested base -- unreadable CI run list. Not merging."
+  [ -n "$latest" ] ||
+    die "publisher gate: no CI run of PR #$pr_number exists for $head_sha. Not merging."
+
+  tested_run_id="$(printf '%s\n' "$latest" | jq -r '.id')"
+  status="$(printf '%s\n' "$latest" | jq -r '.status')"
+  conclusion="$(printf '%s\n' "$latest" | jq -r '.conclusion')"
+  case "$tested_run_id" in ''|*[!0-9]*)
+    die "publisher gate: CANNOT DETERMINE the tested base -- malformed run id. Not merging." ;;
+  esac
+
+  if [ "$status" != completed ]; then
+    tested_state=pending
+    return 0
+  fi
+  [ "$conclusion" = success ] ||
+    die "publisher gate: the latest CI run $tested_run_id of PR #$pr_number concluded '$conclusion', not success. Not merging."
+
+  dir="$tmpdir/tested-$tested_run_id"
+  rm -rf "$dir"
+  gh run download "$tested_run_id" -n ci-tested-tree -D "$dir" >/dev/null 2>&1 ||
+    die "publisher gate: CANNOT DETERMINE the tested base -- run $tested_run_id has no readable ci-tested-tree artifact. Not merging.
+
+A run that predates scripts/ci-tested-merge.py, or whose record step failed,
+cannot authorize a merge. Close and reopen the PR to get a run that records it."
+  rec="$dir/record.json"
+  [ -f "$rec" ] ||
+    die "publisher gate: CANNOT DETERMINE the tested base -- run $tested_run_id's artifact holds no record.json. Not merging."
+
+  jq -e --argjson run "$tested_run_id" --argjson pr "$pr_number" --arg head "$head_sha" '
+      .schema == 2
+      and .event == "pull_request"
+      and .run_id == $run
+      and .pr_number == $pr
+      and .head_sha == $head
+      and .merge_head_sha == $head
+      and (.sha | test("^[0-9a-f]{40}$"))
+      and (.base_sha | test("^[0-9a-f]{40}$"))
+      and (.tree | test("^[0-9a-f]{40}$"))' "$rec" >/dev/null 2>&1 ||
+    die "publisher gate: CANNOT DETERMINE the tested base -- run $tested_run_id's record does not name this run, PR #$pr_number and head $head_sha as a two-parent merge. Not merging."
+
+  # Cross-check the record against GitHub's own view of the merge commit, so
+  # the gate does not rest on one artifact alone.
+  rec_view="$(jq -r '[.tree, .base_sha, .merge_head_sha] | join(" ")' "$rec")"
+  api_view="$(gh api "repos/{owner}/{repo}/commits/$(jq -r '.sha' "$rec")" \
+    --jq '[.commit.tree.sha, (.parents | map(.sha) | join(" "))] | join(" ")')" ||
+    die "publisher gate: CANNOT DETERMINE the tested base -- could not read the tested merge commit from GitHub. Not merging."
+  [ "$api_view" = "$rec_view" ] ||
+    die "publisher gate: run $tested_run_id's record ($rec_view) disagrees with GitHub's merge commit ($api_view). Not merging."
+
+  tested_base="$(jq -r '.base_sha' "$rec")"
+  mode="$(jq -r '.mode' "$rec")"
+  if [ "$tested_base" != "$want_base" ]; then
+    tested_state=stale
+    return 0
+  fi
+  [ "$(jq -r '.tree' "$rec")" = "$want_tree" ] ||
+    die "publisher gate: run $tested_run_id tested base $want_base and head $head_sha, but its tree $(jq -r '.tree' "$rec") is not the merge result built here ($want_tree). Not merging."
+  printf 'Publisher gate: CI run %s (mode %s) tested merge of %s onto current origin/main %s.\n' \
+    "$tested_run_id" "$mode" "$head_sha" "$want_base"
+  tested_state=current
+}
+
+# Re-trigger CI on a moved base. `gh run rerun` is refused (COORDINATION
+# §12a) and would retest the stale merge ref anyway; a close and reopen makes
+# GitHub compute a fresh merge ref against the current main. Returns once a run
+# newer than $1 exists for the routed head.
+retrigger_ci_by_reopen() {
+  local stale_run="$1" waited=0 newest
+  gh pr close "$pr_number" >/dev/null ||
+    die "publisher gate: could not close PR #$pr_number to re-trigger CI."
+  gh pr reopen "$pr_number" >/dev/null ||
+    die "publisher gate: PR #$pr_number was CLOSED to re-trigger CI and could NOT be reopened.
+Reopen it by hand: gh pr reopen $pr_number"
+  while :; do
+    newest="$(list_ci_runs_for_head | jq -r 'map(.id) | max // 0')" || newest=0
+    case "$newest" in ''|*[!0-9]*) newest=0 ;; esac
+    if [ "$newest" -gt "$stale_run" ]; then
+      printf 'Publisher gate: re-triggered CI run %s for PR #%s.\n' "$newest" "$pr_number"
+      return 0
+    fi
+    [ "$waited" -lt 300 ] ||
+      die "publisher gate: no new CI run appeared within 300s of reopening PR #$pr_number."
+    sleep 15
+    waited=$((waited + 15))
+  done
+}
+
+# Poll the PR's checks until none is pending. Dies on any failing or cancelled
+# check, after printing the failing jobs' logs.
+wait_for_green_checks() {
+  local checks_json checks_status pending_count failing failing_count
+  while :; do
+    refresh_gh_token
+    set +e
+    checks_json="$(gh pr checks "$pr_number" --json name,bucket,state,link)"
+    checks_status=$?
+    set -e
+    if [ "$checks_status" -ne 0 ] && [ "$checks_status" -ne 8 ]; then
+      die "could not read checks for PR #$pr_number"
+    fi
+
+    pending_count="$(printf '%s\n' "$checks_json" |
+      jq '[.[] | select(.bucket == "pending")] | length')"
+    failing="$(printf '%s\n' "$checks_json" |
+      jq '[.[] | select(.bucket == "fail" or .bucket == "cancel")]')"
+    failing_count="$(printf '%s\n' "$failing" | jq 'length')"
+
+    if [ "$failing_count" -gt 0 ]; then
+      printf '%s\n' "$failing" | jq -r '.[] | "- \(.name): \(.bucket) \(.link)"' >&2
+      # Two job URLs and no cause stalls the diagnosis on a human with credentials.
+      # Non-fatal by construction: we still die on the original condition below.
+      report_failing_job_logs "$failing" || true
+      die "PR #$pr_number has failing checks"
+    fi
+
+    if [ "$pending_count" -eq 0 ]; then
+      return 0
+    fi
+
+    printf 'PR #%s checks still pending (%s); polling again in 15s.\n' "$pr_number" "$pending_count"
+    sleep 15
   done
 }
 
@@ -842,58 +1037,44 @@ if [ -n "$latest_run_json" ]; then
   fi
 fi
 
-printf 'Waiting %ss before polling PR #%s checks.\n' "$wait_seconds" "$pr_number"
-sleep "$wait_seconds"
+max_retriggers="${PUBLISHER_MAX_CI_RETRIGGERS:-3}"
+retriggers=0
+poll_wait="$wait_seconds"
 
 while :; do
+  printf 'Waiting %ss before polling PR #%s checks.\n' "$poll_wait" "$pr_number"
+  sleep "$poll_wait"
+  wait_for_green_checks
+
+  # ⛔ GREEN CI IS NOT AUTHORIZATION. This is the whole point of SRC-ATTEST
+  #   Part 2, and the normal path needs it MORE than `--doc-only` does, not
+  #   less: this path just spent minutes polling, and `main` can advance many
+  #   times inside that window. The checks that passed attest to a merge
+  #   result computed when the run STARTED.
+  #
+  #   #885, measured: a PR's green check formed against a base with zero
+  #   citations; `main` then gained those citations; the PR merged on the old
+  #   green and left `main` red. Nothing in the PR changed — the base did.
+  #
+  #   So re-derive the merge result on a freshly fetched origin/main and run
+  #   origin/main's checker on it, under the lock, immediately before merging.
+  #   Then require that the green run tested exactly that base and head
+  #   (classify_tested_run): with no post-merge run on main, this is the only
+  #   CI the landed tree gets.
+  acquire_merge_lock
+  # ⛔ RE-CHECK THE FREEZE HERE, not only at startup -- @librarian QA.
+  #    The startup `refuse_if_frozen` runs BEFORE the lock and, on the normal
+  #    path, before a minutes-long wait for CI. Another publisher's alarm can
+  #    freeze publication inside that window: this invocation passed the startup
+  #    check, waits, acquires the now-released lock, and merges into a state
+  #    someone else has already declared unsafe. Proved to the merge boundary.
+  #    The freeze is only meaningful if it is read INSIDE the lock, immediately
+  #    before evaluating and merging.
+  refuse_if_frozen
   refresh_gh_token
-  set +e
-  checks_json="$(gh pr checks "$pr_number" --json name,bucket,state,link)"
-  checks_status=$?
-  set -e
-  if [ "$checks_status" -ne 0 ] && [ "$checks_status" -ne 8 ]; then
-    die "could not read checks for PR #$pr_number"
-  fi
-
-  pending_count="$(printf '%s\n' "$checks_json" |
-    jq '[.[] | select(.bucket == "pending")] | length')"
-  failing="$(printf '%s\n' "$checks_json" |
-    jq '[.[] | select(.bucket == "fail" or .bucket == "cancel")]')"
-  failing_count="$(printf '%s\n' "$failing" | jq 'length')"
-
-  if [ "$failing_count" -gt 0 ]; then
-    printf '%s\n' "$failing" | jq -r '.[] | "- \(.name): \(.bucket) \(.link)"' >&2
-    # Two job URLs and no cause stalls the diagnosis on a human with credentials.
-    # ⛔ Non-fatal by construction: we still die on the original condition below.
-    report_failing_job_logs "$failing" || true
-    die "PR #$pr_number has failing checks"
-  fi
-
-  if [ "$pending_count" -eq 0 ]; then
-    # ⛔ GREEN CI IS NOT AUTHORIZATION. This is the whole point of SRC-ATTEST
-    #   Part 2, and the normal path needs it MORE than `--doc-only` does, not
-    #   less: this path just spent minutes polling, and `main` can advance many
-    #   times inside that window. The checks that passed attest to a merge
-    #   result computed when the run STARTED.
-    #
-    #   #885, measured: a PR's green check formed against a base with zero
-    #   citations; `main` then gained those citations; the PR merged on the old
-    #   green and left `main` red. Nothing in the PR changed — the base did.
-    #
-    #   So re-derive the merge result on a freshly fetched origin/main and run
-    #   origin/main's checker on it, under the lock, immediately before merging.
-    acquire_merge_lock
-    # ⛔ RE-CHECK THE FREEZE HERE, not only at startup -- @librarian QA.
-    #    The startup `refuse_if_frozen` runs BEFORE the lock and, on the normal
-    #    path, before a minutes-long wait for CI. Another publisher's alarm can
-    #    freeze publication inside that window: this invocation passed the startup
-    #    check, waits, acquires the now-released lock, and merges into a state
-    #    someone else has already declared unsafe. Proved to the merge boundary.
-    #    The freeze is only meaningful if it is read INSIDE the lock, immediately
-    #    before evaluating and merging.
-    refuse_if_frozen
-    refresh_gh_token
-    fresh_result_gate
+  fresh_result_gate
+  classify_tested_run "$checked_base" "$checked_tree_oid"
+  if [ "$tested_state" = current ]; then
     merge_pr
     printf 'PR #%s checks passed and merge command succeeded.\n' "$pr_number"
     verify_landed_tree
@@ -901,6 +1082,29 @@ while :; do
     exit 0
   fi
 
-  printf 'PR #%s checks still pending (%s); polling again in 15s.\n' "$pr_number" "$pending_count"
-  sleep 15
+  # Not mergeable yet: leave the critical section before any further wait.
+  release_gate_worktree
+  release_merge_lock
+
+  if [ "$tested_state" = pending ]; then
+    printf 'Publisher gate: CI run %s of PR #%s has not completed; waiting.\n' \
+      "$tested_run_id" "$pr_number"
+    poll_wait=15
+    continue
+  fi
+
+  # stale: the green run tested a base that is no longer origin/main.
+  retriggers=$((retriggers + 1))
+  if [ "$retriggers" -gt "$max_retriggers" ]; then
+    die "publisher gate: origin/main moved past PR #$pr_number's tested base $max_retriggers times.
+
+Latest green run $tested_run_id tested base $tested_base; origin/main is now
+$checked_base. Not merging. Something is landing on main faster than CI can
+retest this PR; hold other merges and re-run the publisher on the same SHA."
+  fi
+  printf 'Publisher gate: CI run %s tested base %s but origin/main is %s; re-triggering CI (%s of %s).\n' \
+    "$tested_run_id" "$tested_base" "$checked_base" "$retriggers" "$max_retriggers"
+  refresh_gh_token
+  retrigger_ci_by_reopen "$tested_run_id"
+  poll_wait="$wait_seconds"
 done

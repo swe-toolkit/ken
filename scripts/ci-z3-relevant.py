@@ -63,7 +63,7 @@ RELEVANT_FILES = frozenset({
     ".github/workflows/ci.yml",
     "scripts/ci-z3-relevant.py",
     "scripts/ci-doc-only.py",
-    "scripts/ci-pr-verified.py",
+    "scripts/ci-tested-merge.py",
     "scripts/ci-resource-monitor.py",
 })
 IRRELEVANT_PREFIXES = (

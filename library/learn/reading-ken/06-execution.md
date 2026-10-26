@@ -198,12 +198,13 @@ both executors and requires each to admit `UInt64::MAX` while rejecting
 `UInt64::MAX + 1` and `-1`. It is closure-free ground evidence for the
 bounded-integer case.
 
-CI classifies runs as `full`, `doc-only`, or `pr-verified`
+CI runs on pull requests only, not after a merge to `main`, and classifies
+each run as `full` or `doc-only`
 ([workflow](../../../.github/workflows/ci.yml)). The native parity test is
 excluded from the sharded test run and runs in its separate `native-rt-parity`
 job. That job and the other heavy test jobs run only in `full` mode. In
-`doc-only` and `pr-verified` modes they are skipped, and the `build + test`
-aggregate accepts those skips. One heavy job, `z3-process-adapter`, which
+`doc-only` mode they are skipped, and the `build + test` aggregate accepts
+those skips. One heavy job, `z3-process-adapter`, which
 runs the elaborator's tests with the `z3-process` feature against a real Z3,
 can also skip in `full` mode. The classifier reports `z3_relevant=false`
 only when every changed path is recognized as a non-input of that job. Its
@@ -213,17 +214,18 @@ workflow and scripts. An empty or unrecognized path list and any
 classification failure leave it `true`. Only on `false` does the aggregate
 accept that skip.
 
-A green `build + test` result on a `pr-verified` push does not mean those jobs
-ran on that push. The workflow selects that mode only after verifying that the
-pushed tree matches the tree of a successful full-mode pull-request run. The
-`CI_PR_VERIFIED` log line and step-summary line identify that earlier run by
-workflow run ID. For a `full` run, the aggregate checks the heavy jobs' results,
-including `native-rt-parity`. A successful parity job provides test evidence
-for the six enabled narrowing comparisons, the source-scope check, and the
-bounded-integer differential described above. It does not prove backend
-equivalence. In `doc-only` mode those tests do not run. A `pr-verified` push
-relies on the named full-mode PR run for identical-tree evidence rather than
-executing them again.
+Each run records the merge commit it tested and that commit's two parents.
+The `CI_TESTED_MERGE` log line and step-summary line name them. A docs-only
+publish merges without waiting for CI. Otherwise the publisher merges only
+when the PR's latest green run tested the current `main` tip merged with the
+routed head
+([publisher](../../../scripts/scripted-pr-automerge.sh)), so the tree that
+lands on `main` is the tree that run tested. For a `full` run, the aggregate
+checks the heavy jobs' results, including `native-rt-parity`. A successful
+parity job provides test evidence for the six enabled narrowing comparisons,
+the source-scope check, and the bounded-integer differential described above.
+It does not prove backend equivalence. In `doc-only` mode those tests do not
+run.
 
 Chapter [04](04-effects-capabilities-and-authority.md) now shows a checked
 filesystem authority exemplar: an explicit `Cap a` parameter beside `[FS]`,
