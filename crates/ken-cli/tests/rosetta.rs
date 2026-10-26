@@ -264,16 +264,21 @@ fn collections_prelude() -> String {
     // providers this runner flattened above, plus Derived's facade-only export.
     // Fail closed if an edge changes shape or cardinality.
     for import in [
+        // Flat `ken run` has the convertible Ω conjunction in its prelude.
+        "import Core.Logic.Conjunction (And, and_intro)",
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult (OrdResult, Lt, Eq, Gt, ord_eq, ord_lt, ord_gt)",
         "import Core.Logic.Transport (sym)",
     ] {
         remove_flattened_directive(&mut compare, "Compare", import);
     }
+    // The legacy flat unit uses its convertible prelude Ω conjunction; it
+    // cannot also import the package's same-spelled declarations by module.
     for import in [
         "import Core.Function.Combinators (comp, idf)",
         "import Core.Classes.LawfulClasses (IsTrue, bool_and, bool_or, bool_leq, leq_nat)",
         "import Core.Logic.Compare (list_compare, list_eq)",
+        "import Core.Logic.Conjunction (And, and_intro, and_fst, and_snd)",
         "import Core.Logic.Or (Or, Inl, Inr)",
         "import Core.Logic.OrdResult\n  (OrdResult,\n    Lt,\n    Eq,\n    Gt,\n    ord_eq,\n    ord_lt,\n    ord_gt,\n    ord_result_leq,\n    ord_result_dispatch2,\n    ord_result_elim,\n    ord_result_elim2)",
         "import Core.Logic.And (And as Conj)",

@@ -1,8 +1,8 @@
 //! CAT-ORD-NAT-CANONICAL-OWNER acceptance controls.
 //!
 //! Promise classes: the identity, ownership, trust, and behavior controls are
-//! durable invariants. Pair floor realization advances the former Pair boundary
-//! to its freshly measured next Strict frontier while ownership controls remain
+//! durable invariants. Pair floor realization and the checked Conjunction
+//! import close Compare's former Strict frontier; ownership controls remain
 //! on the compatibility loader. These controls use parsed module identities,
 //! loader-produced `GlobalId`s, and the class registry. They do not treat
 //! repository prose or frozen numeric ids as an oracle.
@@ -12,8 +12,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use ken_elaborator::modules::PRELUDE_FLOOR_NAMES;
-use ken_elaborator::{literate, parser, Decl, ElabEnv, ElabError, ExportForm};
-use ken_kernel::{GlobalId, Term};
+use ken_elaborator::{literate, parser, Decl, ElabEnv, ExportForm};
+use ken_kernel::{Decl as KernelDecl, GlobalId, Term};
 
 #[path = "../../tests/support/catalog_or.rs"]
 mod catalog_or;
@@ -207,12 +207,13 @@ fn canonical_ord_nat(env: &ElabEnv) -> (GlobalId, GlobalId, GlobalId) {
 
 /// MEASURED: parsed module identities give LawfulClasses -> Compare directly;
 /// Order reaches the unique LawfulClasses Ord provider, the catalog publishes no
-/// competing Pair identity, and Strict Compare advances past Pair to the next
-/// typed unavailable name. CLAIMED: Pair floor realization removes only the
-/// Pair boundary without projecting catalog closure. THE GAP: the diagnostic
-/// corroborates the next frontier; membership comes from the closed inventory.
+/// competing Pair identity, and Strict Compare loads through its checked
+/// Conjunction provider without requiring an ambient And. CLAIMED: Pair's
+/// floor realization and the explicit Conjunction edge close Compare's former
+/// ambient boundary. THE GAP: this one package does not close other consumers;
+/// the whole-catalog strict census checks their independent import closures.
 #[test]
-fn pair_floor_advances_the_structural_compare_boundary() {
+fn pair_floor_and_conjunction_close_strict_compare_boundary() {
     let root = catalog_root();
     let units = discover_units(&root);
     let ord_providers: BTreeSet<_> = units
@@ -235,6 +236,7 @@ fn pair_floor_advances_the_structural_compare_boundary() {
         "Order must reach its unique LawfulClasses Ord provider explicitly or through its parsed instance subject"
     );
     assert!(units[LAWFUL].imports.contains(COMPARE));
+    assert!(units[COMPARE].imports.contains("Core.Logic.Conjunction"));
 
     let pair_providers: BTreeSet<_> = units
         .values()
@@ -253,14 +255,24 @@ fn pair_floor_advances_the_structural_compare_boundary() {
 
     let mut strict = ElabEnv::new().expect("base environment");
     let canonical_pair = strict.globals["Pair"];
-    let error = strict
+    let owned = strict
         .elaborate_module_from_roots_strict(&[root], COMPARE)
-        .expect_err("Compare retains later non-floor dependencies");
+        .expect("Compare must close through checked Conjunction after Pair's floor realization");
     assert_eq!(strict.globals["Pair"], canonical_pair);
     assert!(
-        matches!(error, ElabError::UnboundName { ref name, .. } if name == "And"),
-        "the fifteen-member floor must reach the later And boundary, got {error:?}"
+        owned.contains(&strict.globals["Core.Logic.Compare.pair_compare"]),
+        "Compare must own its structural comparison"
     );
+    for name in ["and", "and_intro"] {
+        let provider = strict.globals[&format!("Core.Logic.Conjunction.{name}")];
+        assert!(
+            matches!(
+                strict.env.lookup(provider),
+                Some(KernelDecl::Transparent { .. })
+            ),
+            "{name} must come from the checked Conjunction provider"
+        );
+    }
 }
 
 /// MEASURED: ordinary roots elaborate both real units. CLAIMED: Pair floor
