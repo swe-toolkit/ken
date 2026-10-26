@@ -5527,8 +5527,8 @@ fn expand_scope(
             other => {
                 let is_pub = other.is_pub();
                 let inner = other.unwrap_pub();
-                // Class declarations are qualifiable but remain ordered
-                // registry barriers; all other qualifiable kinds are nodes.
+                // Class and record declarations are qualifiable but remain
+                // ordered registry barriers; all other qualifiable kinds are nodes.
                 if is_qualifiable(inner)
                     && !matches!(inner, Decl::ClassDecl { .. } | Decl::RecordDecl { .. })
                 {
