@@ -140,6 +140,7 @@ pub(in crate::cranelift_backend) struct StaticResponseContextDemand {
     response_origin: StaticOriginId,
     effect_origin: StaticOriginId,
     operation_root_origin: StaticOriginId,
+    selected_operation_origin: StaticOriginId,
     effect_source_owner: super::units::PredeclaredFunctionId,
     operation_source_owner: super::units::PredeclaredFunctionId,
     effect_environment: Vec<StaticResponseEffectInput>,
@@ -788,6 +789,9 @@ pub(in crate::cranelift_backend) struct DeferredResponseRow {
     /// closed diagnostic relation and suppression control.
     producer_call_origin: StaticOriginId,
     operation_root_origin: StaticOriginId,
+    /// The operation leaf the planner's route selection chose inside the
+    /// operation root. A driver descends to it and never past it.
+    selected_operation_origin: StaticOriginId,
     effect_origin: StaticOriginId,
     operation: HostOpV1,
     sub_case: DeferredResponseSubCase,
@@ -817,6 +821,10 @@ impl DeferredResponseRow {
 
     pub(in crate::cranelift_backend) fn operation_root_origin(&self) -> StaticOriginId {
         self.operation_root_origin
+    }
+
+    pub(in crate::cranelift_backend) fn selected_operation_origin(&self) -> StaticOriginId {
+        self.selected_operation_origin
     }
 
     pub(in crate::cranelift_backend) fn effect_origin(&self) -> StaticOriginId {
@@ -2501,6 +2509,74 @@ pub(super) struct DeferredResponseContinuationShape {
     pub(super) other_exits: usize,
 }
 
+/// Every uniquely resolved declaration tail call in `k_body`'s tail positions
+/// targets a body whose own tail exits construct no `ITree` node.
+fn deferred_response_tail_callees_answer_directly(
+    plan: &StaticTransitionPlan<'_>,
+    k_body: StaticOriginId,
+) -> Result<bool, CraneliftBackendError> {
+    let mut visited = BTreeSet::new();
+    tail_answers_directly(plan, k_body, &mut visited, false)
+}
+
+fn tail_answers_directly(
+    plan: &StaticTransitionPlan<'_>,
+    origin: StaticOriginId,
+    visited: &mut BTreeSet<StaticOriginId>,
+    inside_callee: bool,
+) -> Result<bool, CraneliftBackendError> {
+    let mut each = |positions: &[usize], visited: &mut BTreeSet<StaticOriginId>| {
+        for &position in positions {
+            let child = plan.semantic.child_origin(origin, position)?;
+            if !tail_answers_directly(plan, child, visited, inside_callee)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    };
+    match plan.planned_occurrence_expr(origin)? {
+        RuntimeExpr::CheckedBracketFinalizer { .. }
+        | RuntimeExpr::CheckedJoinSite { .. }
+        | RuntimeExpr::CheckedSubcontinuationFrame { .. }
+        | RuntimeExpr::CheckedRecursiveInvocation { .. }
+        | RuntimeExpr::CheckedComputationalIHSlots { .. }
+        | RuntimeExpr::CheckedComputationalIHInvocation { .. } => each(&[0], visited),
+        RuntimeExpr::Let { .. } => each(&[1], visited),
+        RuntimeExpr::If { .. } => each(&[1, 2], visited),
+        RuntimeExpr::Match { cases, .. } => each(&(1..=cases.len()).collect::<Vec<_>>(), visited),
+        RuntimeExpr::ComputationalMatch { cases, .. } => {
+            each(&(1..=cases.len()).collect::<Vec<_>>(), visited)
+        }
+        RuntimeExpr::Construct { constructor, .. } => Ok(!inside_callee
+            || !(constructor.as_str().ends_with("::ITree::Ret")
+                || constructor.as_str().ends_with("::ITree::Vis"))),
+        RuntimeExpr::Call { .. } => {
+            let callee = plan.semantic.child_origin(origin, 0)?;
+            let declared = matches!(
+                plan.planned_occurrence_expr(callee)?,
+                RuntimeExpr::DeclarationRef { .. }
+            ) && plan.declaration_call_target_class(callee).is_some();
+            let targets = plan
+                .emittable_call_edges()?
+                .into_iter()
+                .filter(|edge| {
+                    edge.kind() == super::units::EmittableCallKind::Declaration
+                        && edge.call_site_origin() == callee
+                })
+                .map(|edge| edge.callee_origin())
+                .collect::<Vec<_>>();
+            let ([body], true) = (targets.as_slice(), declared) else {
+                return Ok(false);
+            };
+            if !visited.insert(*body) {
+                return Ok(true);
+            }
+            tail_answers_directly(plan, *body, visited, true)
+        }
+        _ => Ok(true),
+    }
+}
+
 /// Count uses of lexical parameter zero along the most demanding execution
 /// path. Sequential children add; mutually exclusive branches take their max;
 /// nested closure bodies have their own coordinate space, so only capture
@@ -2848,15 +2924,30 @@ impl StaticTransitionPlan<'_> {
             Err(reason) => return Ok(Err(infeasible(reason))),
         };
         Ok(Ok(StaticResponseContextDemand {
-            id, base_owner, producer_call_origin: route.producer_call_origin,
-            response_origin: route.response_origin, effect_origin: route.effect_origin,
-            operation_root_origin, effect_source_owner, operation_source_owner,
-            effect_environment, vis_origin, operation: route.operation, k_identity,
-            k_specialization: unit.id(), k_closure_origin: unit.worker_closure_origin(),
-            k_body_origin: unit.worker_body_origin(), k_ret_identity, raw_owner,
-            worker: unit.key.worker.clone(), captures,
-            continuation_inputs: continuation_inputs.iter().map(|input|
-                (input.ordinal, input.coordinate, input.ordinary_abi_position)).collect(),
+            id,
+            base_owner,
+            producer_call_origin: route.producer_call_origin,
+            response_origin: route.response_origin,
+            effect_origin: route.effect_origin,
+            operation_root_origin,
+            selected_operation_origin,
+            effect_source_owner,
+            operation_source_owner,
+            effect_environment,
+            vis_origin,
+            operation: route.operation,
+            k_identity,
+            k_specialization: unit.id(),
+            k_closure_origin: unit.worker_closure_origin(),
+            k_body_origin: unit.worker_body_origin(),
+            k_ret_identity,
+            raw_owner,
+            worker: unit.key.worker.clone(),
+            captures,
+            continuation_inputs: continuation_inputs
+                .iter()
+                .map(|input| (input.ordinal, input.coordinate, input.ordinary_abi_position))
+                .collect(),
             context_inputs: unit.key.continuation_inputs.clone(),
         }))
     }
@@ -2984,6 +3075,7 @@ impl StaticTransitionPlan<'_> {
                     vis_origin,
                     producer_call_origin: route.producer_call_origin,
                     operation_root_origin,
+                    selected_operation_origin,
                     effect_origin: route.effect_origin,
                     operation: route.operation,
                     sub_case: DeferredResponseSubCase::NoContinuationUnit,
@@ -3839,6 +3931,7 @@ impl StaticTransitionPlan<'_> {
                     vis_origin: demand.vis_origin,
                     producer_call_origin: demand.producer_call_origin,
                     operation_root_origin: demand.operation_root_origin,
+                    selected_operation_origin: demand.selected_operation_origin,
                     effect_origin: demand.effect_origin,
                     operation: demand.operation,
                     sub_case: DeferredResponseSubCase::ContinuationBodyTail,
@@ -3884,6 +3977,7 @@ impl StaticTransitionPlan<'_> {
                     vis_origin: demand.vis_origin,
                     producer_call_origin: demand.producer_call_origin,
                     operation_root_origin: demand.operation_root_origin,
+                    selected_operation_origin: demand.selected_operation_origin,
                     effect_origin: demand.effect_origin,
                     operation: demand.operation,
                     sub_case: DeferredResponseSubCase::UnconsumedTransportCaller,
@@ -4552,7 +4646,16 @@ impl StaticTransitionPlan<'_> {
         let Some(shape) = self.deferred_response_continuation_shape(row)? else {
             return Ok(None);
         };
-        if shape.response_uses != 1 || shape.ret_exits == 0 || shape.other_exits != 0 {
+        // A static tail call completes like a Ret exit when its callee answers
+        // directly: its effects run in place and its result reaches the drive
+        // as the CHECKED answer, never as an ITree word.
+        let completing_exits = shape.ret_exits.saturating_add(shape.static_tail_calls);
+        if shape.response_uses != 1 || completing_exits == 0 || shape.other_exits != 0 {
+            return Ok(None);
+        }
+        if shape.static_tail_calls != 0
+            && !deferred_response_tail_callees_answer_directly(self, shape.k_body_origin)?
+        {
             return Ok(None);
         }
         let mut candidates = Vec::new();
@@ -5504,8 +5607,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        CheckedComputationalIHBinderMorphism, RuntimeComputationalMatchCase, RuntimeMatchCase,
-        RuntimeTrap, RuntimeTrapCode, RuntimeValue,
+        CheckedComputationalIHBinderMorphism, RuntimeComputationalMatchCase, RuntimeDeclaration,
+        RuntimeDeclarationKind, RuntimeMatchCase, RuntimeSymbolMetadata, RuntimeTrap,
+        RuntimeTrapCode, RuntimeValue,
     };
 
     fn trap() -> RuntimeTrap {
@@ -5860,6 +5964,87 @@ mod tests {
         );
         assert_eq!(infeasible.k_closure_origin(), None);
         assert_eq!(infeasible.k_body_origin(), None);
+    }
+
+    /// Promise class: durable invariant. MEASURED: a K whose only tail exits
+    /// call a uniquely resolved countdown declaration is direct-answering;
+    /// invoking the same walk *inside* a declaration whose tail builds an
+    /// ITree::Ret is not. CLAIMED: P1 admits only direct-answering static
+    /// tail callees. THE GAP: this RuntimeExpr-level fixture models the two
+    /// px8ds tail forms; the linked px8ds row pins real checked-source reach.
+    #[test]
+    fn rt_p1_tail_walk_direct_countdown_and_itree_copy_discriminate() {
+        let call_countdown = || RuntimeExpr::Call {
+            callee: Box::new(RuntimeExpr::DeclarationRef {
+                symbol: "decl:fixture::countdown".to_string(),
+            }),
+            args: vec![RuntimeExpr::Var(0)],
+        };
+        let k_body = RuntimeExpr::If {
+            scrutinee: Box::new(RuntimeExpr::Var(0)),
+            then_expr: Box::new(call_countdown()),
+            else_expr: Box::new(call_countdown()),
+        };
+        let countdown = RuntimeDeclaration {
+            symbol: "decl:fixture::countdown".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["fuel".to_string()],
+                    body: Box::new(RuntimeExpr::If {
+                        scrutinee: Box::new(RuntimeExpr::Var(0)),
+                        then_expr: Box::new(RuntimeExpr::Construct {
+                            constructor: "ctor:fixture::Result::Ok".to_string(),
+                            args: vec![RuntimeExpr::Value(RuntimeValue::Bool(true))],
+                        }),
+                        else_expr: Box::new(call_countdown()),
+                    }),
+                },
+            },
+            metadata: RuntimeSymbolMetadata::empty(),
+        };
+        let itree_copy = RuntimeDeclaration {
+            symbol: "decl:fixture::itree_copy".to_string(),
+            kind: RuntimeDeclarationKind::Transparent {
+                body: RuntimeExpr::LexicalClosure {
+                    captures: Vec::new(),
+                    params: vec!["answer".to_string()],
+                    body: Box::new(RuntimeExpr::Construct {
+                        constructor: "ctor:fixture::ITree::Ret".to_string(),
+                        args: vec![RuntimeExpr::Var(0)],
+                    }),
+                },
+            },
+            metadata: RuntimeSymbolMetadata::empty(),
+        };
+        let declarations = BTreeMap::from([
+            (countdown.symbol.as_str(), &countdown),
+            (itree_copy.symbol.as_str(), &itree_copy),
+        ]);
+        let plan = super::super::plan_static_transition_graph(&k_body, &declarations)
+            .expect("the direct-countdown and ITree-form copy fixtures plan");
+        let k_origin = plan
+            .source_occurrences
+            .iter()
+            .flatten()
+            .find(|entry| matches!(entry.expr, RuntimeExpr::If { .. }))
+            .expect("K has a checked branch occurrence")
+            .static_origin;
+        let copy_decl = plan
+            .declaration_occurrence_origin(&itree_copy.symbol)
+            .expect("ITree-form declaration has an origin");
+        let copy_body = plan
+            .semantic
+            .child_origin(copy_decl, 0)
+            .expect("ITree-form closure has a body");
+        assert!(
+            deferred_response_tail_callees_answer_directly(&plan, k_origin)
+                .expect("the K's static call targets resolve")
+        );
+        assert!(
+            !tail_answers_directly(&plan, copy_body, &mut BTreeSet::new(), true)
+                .expect("the ITree-form copy's tail is classified")
+        );
     }
 }
 

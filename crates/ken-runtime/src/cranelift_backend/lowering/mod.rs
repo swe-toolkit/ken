@@ -3016,6 +3016,16 @@ struct ActiveCarriedComputationalRetSink {
     return_body: Block,
 }
 
+/// Who may install a carried frame's strict Ret sink.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum CarriedRetSinkAuthority {
+    /// Only a Ready planner assessment installs it (every ordinary frame).
+    Assessed,
+    /// The frame receives a unit-less response drive's CHECKED answer, so a
+    /// PendingCheckedControl assessment also installs it.
+    DriveFedCheckedAnswer,
+}
+
 /// One active carried computational elimination and its optional strict `Ret`
 /// sink. The sink is installed exactly once after the shared block is created.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

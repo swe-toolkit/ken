@@ -3127,7 +3127,7 @@ pub(super) fn lower_continuation_selected_case_body(
 /// ClockWallNow answers an Instant constructor and stays refused here until a
 /// fixture measures its owner path. Every other operation answers a
 /// specialized HostResult.
-fn static_response_shape_matches(
+pub(super) fn static_response_shape_matches(
     operation: ken_host::HostOpV1,
     response: &LoweringOperand,
 ) -> bool {

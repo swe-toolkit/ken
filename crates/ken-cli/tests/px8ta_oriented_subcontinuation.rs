@@ -456,6 +456,169 @@ fn run_px8ds_real_same_depth_path() {
 }
 
 #[cfg(target_os = "linux")]
+fn px8ds_swapped_arm_source() -> String {
+    let original = PX8DS_SIBLING_RECURSION_PROGRAM;
+    let false_then_true = "    False |-> after_countdown (Ok Int Bool False);\n    True |-> bind";
+    let true_then_false = "    True |-> after_countdown (Ok Int Bool False);\n    False |-> bind";
+    assert_eq!(
+        original.matches(false_then_true).count(),
+        1,
+        "swap one fixed fixture arm"
+    );
+    original.replacen(false_then_true, true_then_false, 1)
+}
+
+#[cfg(target_os = "linux")]
+fn observe_px8ds_p1_parity(
+    source: &str,
+    case: &str,
+) -> (
+    ken_runtime::EffectObservation,
+    Vec<ken_runtime::StaticResponseFeasibilityDiagnostic>,
+) {
+    let dir = output_dir(case);
+    let (compiled, plans) = ken_runtime::with_static_response_feasibility_diagnostics(|| {
+        ken_cli::build_native_program(
+            source,
+            ken_cli::SourceFormat::Ken,
+            case,
+            dir.path(),
+            ken_runtime::boundary_resource_profile::starter_smoke_profile(),
+        )
+    });
+    let compiled = compiled.unwrap_or_else(|error| panic!("{case}: native build: {error:?}"));
+    let native = ken_runtime::run_bound_process_effect_observation(
+        &compiled.artifact,
+        &ken_runtime::NativeEffectRunOptionsV1 {
+            arguments: Vec::new(),
+            environment: Vec::new(),
+            cwd: dir.path().to_owned(),
+            plan_hash: compiled.plan_transport_hash,
+        },
+    )
+    .unwrap_or_else(|error| panic!("{case}: linked execution: {error:?}"));
+    let mut host = ken_interp::PosixHost::new_at(dir.path());
+    let interpreted = ken_cli::run_program_effect_observation(
+        source,
+        ken_cli::SourceFormat::Ken,
+        &[],
+        &[],
+        dir.path().as_os_str().as_encoded_bytes(),
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("{case}: interpreter execution: {error:?}"));
+    assert_eq!(
+        native.exit_status, interpreted.exit_status,
+        "{case}: exit parity"
+    );
+    assert_eq!(
+        native.terminal_error, interpreted.terminal_error,
+        "{case}: terminal parity"
+    );
+    assert_eq!(
+        native.terminal_exit, interpreted.terminal_exit,
+        "{case}: exit class parity"
+    );
+    assert_eq!(native.stdout, interpreted.stdout, "{case}: stdout parity");
+    assert_eq!(
+        native.effect_trace, interpreted.effect_trace,
+        "{case}: trace parity"
+    );
+    (native, plans)
+}
+
+#[cfg(target_os = "linux")]
+fn assert_px8ds_p1_effect_trace(
+    observation: &ken_runtime::EffectObservation,
+    console_count: usize,
+) {
+    assert_eq!(observation.exit_status, 0, "{observation:?}");
+    assert_eq!(observation.terminal_error, None, "{observation:?}");
+    let mut expected = vec![ken_runtime::HostOpV1::BufferAllocate];
+    expected.extend(std::iter::repeat_n(
+        ken_runtime::HostOpV1::ConsoleIsTerminal,
+        console_count,
+    ));
+    expected.push(ken_runtime::HostOpV1::ResourceRelease);
+    let observed = observation
+        .effect_trace
+        .iter()
+        .map(|event| event.operation)
+        .collect::<Vec<_>>();
+    assert_eq!(observed, expected, "{observation:?}");
+}
+
+/// Promise class: normative compatibility vector for this fixed checked
+/// swapped-arm program. MEASURED: the selected false arm executes the full
+/// countdown suffix under the linked native process and the interpreter with
+/// the same canonical effects and successful exit. CLAIMED: a P1 K whose
+/// only completions are direct static tail calls reaches its handler and
+/// returns the checked answer. THE GAP: this vector covers the one checked
+/// nested Console operation, not every response operation or depth.
+#[cfg(target_os = "linux")]
+#[test]
+fn px8ds_p1_swapped_tail_call_exits_match_reference() {
+    std::thread::Builder::new()
+        .name("px8ds-p1-swapped".to_string())
+        .stack_size(PX8DS_THREAD_STACK_BYTES)
+        .spawn(|| {
+            let (native, _) =
+                observe_px8ds_p1_parity(&px8ds_swapped_arm_source(), "px8ds-p1-swapped");
+            assert_px8ds_p1_effect_trace(&native, 4);
+        })
+        .expect("spawn with existing stated px8ds stack provision")
+        .join()
+        .expect("swapped P1 linked observation thread");
+}
+
+/// Promise class: normative compatibility vector for the unchanged original
+/// checked program. MEASURED: native and interpreter observe one Console
+/// effect on the false arm, and the planner projects both P1 rows onto the
+/// same specialization owner. CLAIMED: new tail-call admission does not
+/// perturb the original path or RELAY classification. THE GAP: the public
+/// projection does not expose all RELAY row details; existing roster controls
+/// retain that independent job.
+#[cfg(target_os = "linux")]
+#[test]
+fn px8ds_p1_original_false_arm_and_handler_owner_remain_stable() {
+    std::thread::Builder::new()
+        .name("px8ds-p1-original".to_string())
+        .stack_size(PX8DS_THREAD_STACK_BYTES)
+        .spawn(|| {
+            let (native, plans) =
+                observe_px8ds_p1_parity(PX8DS_SIBLING_RECURSION_PROGRAM, "px8ds-p1-original");
+            assert_px8ds_p1_effect_trace(&native, 1);
+            let with_p1 = plans
+                .iter()
+                .filter_map(|plan| {
+                    let rows = plan
+                        .static_response_deferred
+                        .iter()
+                        .filter(|row| {
+                            row.sub_case == "NoContinuationUnit"
+                                && row.operation == "ConsoleIsTerminal"
+                        })
+                        .collect::<Vec<_>>();
+                    (rows.len() == 2).then_some(rows)
+                })
+                .collect::<Vec<_>>();
+            let [rows] = with_p1.as_slice() else {
+                panic!("one response plan carries the original two Console P1 rows: {plans:?}");
+            };
+            for row in rows {
+                assert_eq!(
+                    row.handler_owner.as_deref(),
+                    Some("Specialization(ContinuationSpecializationId(0))"),
+                    "P1 row: {row:?}"
+                );
+            }
+        })
+        .expect("spawn with existing stated px8ds stack provision")
+        .join()
+        .expect("original P1 linked observation thread");
+}
+
+#[cfg(target_os = "linux")]
 fn assert_depth_finishes_and_releases_lifo(depth: usize) {
     let (observation, planned_frames) = run_depth(depth);
     assert_eq!(observation.exit_status, 0, "depth {depth}: {observation:?}");
