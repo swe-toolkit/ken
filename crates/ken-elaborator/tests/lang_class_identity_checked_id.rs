@@ -330,8 +330,7 @@ fn local_class_is_prebound_for_collision_and_type_use() {
     }
 }
 
-const FILE_CLASS: &str =
-    "pub class View a { get : a -> a }\ninstance View Nat { get = \\x. x }";
+const FILE_CLASS: &str = "pub class View a { get : a -> a }\ninstance View Nat { get = \\x. x }";
 
 fn class_session(warm: bool) -> (tempfile::TempDir, ElabEnv) {
     let root = tempfile::tempdir().expect("class fixture root");
@@ -395,7 +394,8 @@ fn forward_local_class_refuses_stale_warm_identity() {
 /// by the existing selection and alias tests above rather than here.
 #[test]
 fn after_class_barrier_and_data_forward_keep_checked_identity() {
-    let after = "module A { pub class View a { other : Nat }\nfn late (d : View Nat) : View Nat = d }";
+    let after =
+        "module A { pub class View a { other : Nat }\nfn late (d : View Nat) : View Nat = d }";
     let data = "module A { fn early (t : T) : T = t\npub data T = MkT }";
     for warm in [false, true] {
         let (_root, mut env) = class_session(warm);

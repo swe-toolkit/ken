@@ -922,7 +922,10 @@ fn resolve_checked_ref(
     let imported_qualified = name.rsplit_once('.')
         .is_some_and(|(prefix, _)| scope.prefixes.contains_key(prefix));
     if selected.is_none() && scope.pending_local_classes.contains(&canonical) {
-        return Err(ElabError::UnresolvedCon { name: canonical, span: span.clone() });
+        return Err(ElabError::UnresolvedCon {
+            name: canonical,
+            span: span.clone(),
+        });
     }
     if selected.is_some_and(|id| scope.private_ids.contains(&id))
         || (selected.is_none() && (imported_bare || imported_qualified))
@@ -5598,7 +5601,9 @@ fn expand_scope(
                         );
                     }
                     if matches!(inner, Decl::ClassDecl { .. }) {
-                        scope.pending_local_classes.remove(&qualify(prefix, inner.name()));
+                        scope
+                            .pending_local_classes
+                            .remove(&qualify(prefix, inner.name()));
                         record_checked_local(scope, inner.name(), &result.name, result.def_id);
                         // Class-bearing references lack RCon. Once this local
                         // declaration is checked, pin later constraints and
