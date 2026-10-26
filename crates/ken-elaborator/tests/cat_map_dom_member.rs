@@ -72,7 +72,11 @@ fn map_dom_member_public_surface_transition_sentinel() {
     .into_iter()
     .map(str::to_owned)
     .collect::<BTreeSet<_>>();
-    let visible = catalog_publication::published_module_surfaces(MAP_KEN_MD, MAP, "map_dom_member");
+    let visible = catalog_publication::published_module_surfaces(
+        &catalog_or::map_source_for_loose_environment(MAP_KEN_MD),
+        MAP,
+        "map_dom_member",
+    );
     eprintln!("Map loader-visible exports: {visible:?}");
     assert_eq!(
         visible, expected,
