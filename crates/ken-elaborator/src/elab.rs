@@ -30140,7 +30140,8 @@ mod class_identity_resolution_tests {
             Box::new(RType::RCon("Nat".to_owned(), span.clone())),
             span.clone(),
         );
-        let dictionaries = collect_bound_dictionary_params(Some(&ty), &elab.env, &elab.globals, &elab.class_env);
+        let dictionaries =
+            collect_bound_dictionary_params(Some(&ty), &elab.env, &elab.globals, &elab.class_env);
         assert_eq!(dictionaries, vec![("d".to_owned(), None)]);
         let ctx = ProjectionPurityCtx {
             env: &elab.env,
