@@ -1346,6 +1346,100 @@ fn cast_reduce(a_ty: EvalVal, b_ty: EvalVal, eq: EvalVal, val: EvalVal) -> EvalV
     EvalVal::Unknown
 }
 
+/// `cast A B e a` with C6's parameters-only push (`16 §3.2`, inductive
+/// case): when `A` and `B` are the same family at agreeing indices and `a` is
+/// constructor-headed, the reduct is the constructor re-applied at `B`'s
+/// parameters with its fields unchanged, provided every field's type agrees
+/// under both parameter lists (else Unknown, as the kernel is stuck). This is
+/// `ken-kernel` `cast_at_inductive`'s no-index-change branch. Parameters are
+/// read from `B`, never compared, so a closure parameter is not inspected.
+fn cast_reduce_in(
+    a_ty: EvalVal,
+    b_ty: EvalVal,
+    eq: EvalVal,
+    val: EvalVal,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> EvalVal {
+    if [&a_ty, &b_ty, &eq, &val]
+        .iter()
+        .any(|v| matches!(v, EvalVal::Unknown))
+        || eq_type_eq(&a_ty, &b_ty)
+    {
+        return cast_reduce(a_ty, b_ty, eq, val);
+    }
+    cast_push_params(&a_ty, &b_ty, &val, globals, store).unwrap_or(EvalVal::Unknown)
+}
+
+fn cast_push_params(
+    a_ty: &EvalVal,
+    b_ty: &EvalVal,
+    val: &EvalVal,
+    globals: &GlobalEnv,
+    store: &mut EvalStore,
+) -> Option<EvalVal> {
+    let (
+        EvalVal::IndTypeApp {
+            id: family,
+            args: source,
+        },
+        EvalVal::IndTypeApp {
+            id: target_family,
+            args: target,
+        },
+    ) = (a_ty, b_ty)
+    else {
+        return None;
+    };
+    let ind = globals.inductive(*family)?;
+    let m = ind.params.len();
+    if family != target_family || source.len() != target.len() || source.len() < m {
+        return None;
+    }
+    if !source[m..]
+        .iter()
+        .zip(target[m..].iter())
+        .all(|(i, j)| eq_type_eq(i, j))
+    {
+        return None;
+    }
+    if !source[..m]
+        .iter()
+        .zip(target[..m].iter())
+        .all(|(p, q)| values_agree(p, q, true))
+    {
+        return None;
+    }
+    let EvalVal::Ctor { id: ctor, args, .. } = val else {
+        return None;
+    };
+    let (owner, k) = globals.constructor(*ctor)?;
+    if owner.id != *family || args.len() != m + owner.constructors[k].args.len() {
+        return None;
+    }
+    let decl = &owner.constructors[k];
+    let fields = &args[m..];
+    let mut source_env: Env = source[..m].to_vec();
+    let mut target_env: Env = target[..m].to_vec();
+    for (field_ty, field) in decl.args.iter().zip(fields.iter()) {
+        let from = eval(&source_env, field_ty, globals, store);
+        let to = eval(&target_env, field_ty, globals, store);
+        if !eq_type_eq(&from, &to) {
+            return None;
+        }
+        source_env.push(field.clone());
+        target_env.push(field.clone());
+    }
+    for (index, expected) in decl.target_indices.iter().zip(target[m..].iter()) {
+        if !eq_type_eq(&eval(&target_env, index, globals, store), expected) {
+            return None;
+        }
+    }
+    let mut rebuilt = target[..m].to_vec();
+    rebuilt.extend(fields.iter().cloned());
+    Some(make_ctor(*ctor, rebuilt, store))
+}
+
 /// `eqReduce A a b` — Eq-by-type (`16 §2.2`, C2–C4).
 ///
 /// For same-head inductive constructors → conjunction of field equalities
@@ -1434,6 +1528,13 @@ fn eq_reduce(
 /// C5 type endpoints and for J-beta's checked, erased equation endpoints
 /// (`15 §4`). Pair components compare structurally; closures fail closed.
 fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
+    values_agree(a, b, false)
+}
+
+/// Structural agreement in which a closure pair is not refuted: the value
+/// layer can neither confirm nor deny it (`42 §1`), so a checked cast's typing
+/// is the only evidence. Every closure-free position must still agree.
+fn values_agree(a: &EvalVal, b: &EvalVal, up_to_closures: bool) -> bool {
     match (a, b) {
         (EvalVal::TypeUniverse(la), EvalVal::TypeUniverse(lb)) => la.equiv(lb),
         (EvalVal::OmegaUniverse(la), EvalVal::OmegaUniverse(lb)) => la.equiv(lb),
@@ -1447,14 +1548,17 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
                 carrier: b,
                 relation: s,
             },
-        ) => eq_type_eq(a, b) && r == s,
+        ) => values_agree(a, b, up_to_closures) && r == s,
         (
             EvalVal::OpaquePrimType { id: ia, args: aa },
             EvalVal::OpaquePrimType { id: ib, args: ba },
         ) => {
             ia == ib
                 && aa.len() == ba.len()
-                && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
+                && aa
+                    .iter()
+                    .zip(ba.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
         (EvalVal::Int(x), EvalVal::Int(y)) => x == y,
         (EvalVal::BigInt(x), EvalVal::BigInt(y)) => x == y,
@@ -1470,7 +1574,10 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
         (EvalVal::IndTypeApp { id: ia, args: aa }, EvalVal::IndTypeApp { id: ib, args: ba }) => {
             ia == ib
                 && aa.len() == ba.len()
-                && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
+                && aa
+                    .iter()
+                    .zip(ba.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
         (
             EvalVal::Pair {
@@ -1479,7 +1586,7 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
             EvalVal::Pair {
                 fst: bf, snd: bsnd, ..
             },
-        ) => eq_type_eq(af, bf) && eq_type_eq(asnd, bsnd),
+        ) => values_agree(af, bf, up_to_closures) && values_agree(asnd, bsnd, up_to_closures),
         (
             EvalVal::SigmaTy {
                 dom: ad,
@@ -1492,10 +1599,13 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
                 env: be,
             },
         ) => {
-            eq_type_eq(ad, bd)
+            values_agree(ad, bd, up_to_closures)
                 && ac == bc
                 && ae.len() == be.len()
-                && ae.iter().zip(be.iter()).all(|(x, y)| eq_type_eq(x, y))
+                && ae
+                    .iter()
+                    .zip(be.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
         (
             EvalVal::Ctor {
@@ -1507,8 +1617,14 @@ fn eq_type_eq(a: &EvalVal, b: &EvalVal) -> bool {
         ) => {
             a == b
                 && aa.len() == ba.len()
-                && aa.iter().zip(ba.iter()).all(|(x, y)| eq_type_eq(x, y))
+                && aa
+                    .iter()
+                    .zip(ba.iter())
+                    .all(|(x, y)| values_agree(x, y, up_to_closures))
         }
+        // A closure pair is never compared (`42 §1`). Only the parameters-
+        // only push asks whether the value layer can refute agreement.
+        (EvalVal::Closure { .. }, EvalVal::Closure { .. }) => up_to_closures,
         _ => false,
     }
 }
@@ -1592,7 +1708,7 @@ fn eval_j_by_endpoints(
     );
     let target = apply(apply(family, b, globals, store), tt.clone(), globals, store);
     let payload = eval(env, base, globals, store);
-    cast_reduce(source, target, tt, payload)
+    cast_reduce_in(source, target, tt, payload, globals, store)
 }
 
 #[cfg(test)]
@@ -2922,7 +3038,7 @@ fn eval_in_erasure_scope(
             {
                 return tv;
             }
-            cast_reduce(av, bv, ev, tv)
+            cast_reduce_in(av, bv, ev, tv, globals, store)
         }
 
         // --- Checked quotient carrier (`16 §5`) ---
