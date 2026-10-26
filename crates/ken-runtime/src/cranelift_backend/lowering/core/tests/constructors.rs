@@ -381,6 +381,7 @@ fn run_dynamic_constructor_dispatch_fixture(
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
+            ownerless_boundary_arena: false,
             native_int_arena: None,
             boundary_arena: None,
             native_int_binop: None,
@@ -2338,6 +2339,7 @@ pub(in crate::cranelift_backend::lowering) fn bare_carrier_test_lowering<'src>(
             selected_call_consume: None,
             host_dispatch_context: None,
             services_pointer: None,
+            ownerless_boundary_arena: false,
             native_int_arena: None,
             boundary_arena: None,
             native_int_binop: None,
@@ -2769,7 +2771,7 @@ fn ac_c7_try_compile_edge_with_operands<'src>(
         // `ARENA_NATIVE_INT` binding. ⛔ Setting both from one value would
         // reinstate the equality the Architect's ruling deletes; the native
         // field is left for the fixtures that bind one.
-        compiler.function_local.boundary_arena = Some(parameters[0]);
+        compiler.function_local.bind_ownerless_boundary_arena_for_tests(parameters[0]);
         let emitted_operands = if operands == 0 {
             compiler.function_local.trap_exit = None;
             compiler
@@ -2906,7 +2908,7 @@ pub(super) fn c2_compile_edge_with_arg<'src>(
         let parameters = builder.block_params(entry).to_vec();
         // This rig receives the published boundary arena directly.  Its
         // carrier producer/consumer paths do not use native-Int services.
-        compiler.function_local.boundary_arena = Some(parameters[0]);
+        compiler.function_local.bind_ownerless_boundary_arena_for_tests(parameters[0]);
         bind_bare_test_trap_lane(&mut compiler, &mut builder);
         let result = emit(&mut compiler, &mut builder, parameters[1])
             .expect("the C2 carrier edge emits");

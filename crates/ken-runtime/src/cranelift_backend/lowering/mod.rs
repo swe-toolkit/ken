@@ -1135,6 +1135,8 @@ impl ArtifactHelpers<'_> {
             // each function derives its own from its entry block.
             host_dispatch_context: None,
             services_pointer: None,
+            #[cfg(test)]
+            ownerless_boundary_arena: false,
             native_int_arena: None,
             // ⛔ Sourced by the activation-services record, which the `S6`/`D6`
             // reland introduces. Fail closed until then.
@@ -1329,6 +1331,11 @@ struct FunctionLocalRefs {
     selected_call_consume: Option<FuncRef>,
     host_dispatch_context: Option<cranelift_codegen::ir::Value>,
     services_pointer: Option<cranelift_codegen::ir::Value>,
+    /// Test rigs only: the boundary arena was bound from a raw parameter with
+    /// no activation owner behind it, so a capacity status has no issuer to
+    /// record into and keeps the pre-route -1 trap.
+    #[cfg(test)]
+    ownerless_boundary_arena: bool,
     native_int_arena: Option<cranelift_codegen::ir::Value>,
     /// ⭐ **The BOUNDARY arena, and it is a different pointer from
     /// [`Self::native_int_arena`]** — Architect ruling via `evt_e300y2kjeb6k`.
@@ -1574,6 +1581,17 @@ struct FunctionLocalRefs {
     emission_reachable_match_cases: BTreeMap<StaticOriginId, BTreeSet<usize>>,
 }
 
+#[cfg(test)]
+impl FunctionLocalRefs {
+    /// The one way a rig binds an arena with no services behind it.
+    pub(super) fn bind_ownerless_boundary_arena_for_tests(
+        &mut self,
+        arena: cranelift_codegen::ir::Value,
+    ) {
+        self.boundary_arena = Some(arena);
+        self.ownerless_boundary_arena = true;
+    }
+}
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -14290,6 +14308,19 @@ impl<'a> Lowering<'a> {
         let failed = builder.create_block();
         builder.ins().brif(ok, valid, &[], failed, &[]);
         builder.switch_to_block(failed);
+        #[cfg(test)]
+        if self.function_local.services_pointer.is_none()
+            && self.function_local.ownerless_boundary_arena
+        {
+            // No activation owner exists to record into: every non-OK
+            // status, capacity included, keeps the pre-route -1. Never -7.
+            let trap = builder.ins().iconst(types::I64, -1);
+            builder.ins().return_(&[trap]);
+            builder.seal_block(failed);
+            builder.switch_to_block(valid);
+            builder.seal_block(valid);
+            return Ok(());
+        }
         let capacity = builder.ins().icmp_imm(
             cranelift_codegen::ir::condcodes::IntCC::Equal,
             status,
