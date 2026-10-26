@@ -6,8 +6,10 @@ Spec: `spec/50-stdlib/68-numerical.md` §5.
 These are closed, source-shaped behavioral oracles. Each case has promise
 class **durable invariant**. A closed instance does not prove any generic
 quantifier. `MkRational n k` denotes `n/(Suc k)`; `half` is `1/2`.
-The §5 exports are absent from the candidate base `d6c05223e`.
-No check against shipped §5 exports or official conformance run is claimed.
+The §5 exports were absent from the Architect's D0 base `d6c05223e`.
+A targeted package test now checks the accepted client and both isolated
+refusals against the roots-loaded §5 exports. No official conformance run,
+CI, publication or landing is claimed.
 
 The non-degenerate chain is `inner=[1,2]` inside
 `middle=[1/2,3]` inside `outer=[0,4]`. Its six endpoints are
@@ -314,6 +316,11 @@ accepted-prefix-plus-one-refusal clients returned rc 1/K0004
 byte 6186 and errors within its appended theorem at 6186–6269;
 the wrong-premise refusal starts at byte 6195 and errors within its
 appended theorem at 6195–6339. No import, fixture or earlier theorem
-failed. These D0-overlay checks do not establish shipped §5 exports,
-official conformance-runner execution, CI, publication, landing or
-landed trust.
+failed. These historical D0-overlay checks did not establish shipped §5 exports.
+A targeted package test now loads all five owned Transparent §5 laws,
+checks the complete accepted Ken client, and appends each refusal to a
+fresh accepted prefix. Both refusals TypeMismatch-reject within their
+appended theorem after their same-input controls check; the exact
+package-local trusted-base identity set remains 114 → 114. These
+package-test measurements are not official conformance-runner execution,
+CI, publication, landing or a landed trust measurement.

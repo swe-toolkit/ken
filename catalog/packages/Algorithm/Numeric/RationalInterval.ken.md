@@ -35,7 +35,9 @@ establish containment without assuming either input has ordered endpoints.
 The endpoint-inclusion operation and its nine checked laws follow the §1–2
 proofs; neither the operation nor its laws assumes sorted endpoints. Four
 further checked laws establish distributivity and factoring by endpoint-value
-inclusion on both sides of multiplication.
+inclusion on both sides of multiplication. Five more checked laws establish
+transitivity of inclusion and operand-swap inclusion for addition,
+multiplication, hull and intersection.
 
 ```ken
 import Core.Classes.LawfulClasses (IsTrue, bool_and)
@@ -377,6 +379,38 @@ pub theorem interval_inside_refl (i : Interval) : IsTrue (interval_inside i i) =
         ((proof refl for rational_leq) b)
   }
 
+pub theorem interval_inside_trans
+      (i : Interval) (j : Interval) (k : Interval)
+    : IsTrue (interval_inside i j)
+      → IsTrue (interval_inside j k)
+      → IsTrue (interval_inside i k) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          match k {
+            MkInterval e f ↦
+              λij.
+                λjk.
+                  (proof intro for bool_and)
+                    (rational_leq e a)
+                    (rational_leq b f)
+                    ((proof trans for rational_leq)
+                      e
+                      c
+                      a
+                      ((proof left for bool_and) (rational_leq e c) (rational_leq d f) jk)
+                      ((proof left for bool_and) (rational_leq c a) (rational_leq b d) ij))
+                    ((proof trans for rational_leq)
+                      b
+                      d
+                      f
+                      ((proof right for bool_and) (rational_leq c a) (rational_leq b d) ij)
+                      ((proof right for bool_and) (rational_leq e c) (rational_leq d f) jk))
+          }
+      }
+  }
+
 pub theorem interval_add_inside
       (i : Interval) (i2 : Interval) (j : Interval) (j2 : Interval)
     : IsTrue (interval_inside i i2)
@@ -708,6 +742,98 @@ pub theorem interval_factor_r_inside
       }
   }
 
+pub theorem interval_add_comm_inside
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_add i j) (interval_add j i)) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          (proof intro for bool_and)
+            (rational_leq (rational_add c a) (rational_add a c))
+            (rational_leq (rational_add b d) (rational_add d b))
+            (equiv_leq
+              (rational_add c a)
+              (rational_add a c)
+              ((proof comm for rational_add) c a))
+            (equiv_leq
+              (rational_add b d)
+              (rational_add d b)
+              ((proof comm for rational_add) b d))
+      }
+  }
+
+pub theorem interval_mul_comm_inside
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_mul i j) (interval_mul j i)) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          (proof intro for bool_and)
+            (rational_leq (rational_mul c a) (rational_mul a c))
+            (rational_leq (rational_mul b d) (rational_mul d b))
+            (equiv_leq
+              (rational_mul c a)
+              (rational_mul a c)
+              ((proof comm for rational_mul) c a))
+            (equiv_leq
+              (rational_mul b d)
+              (rational_mul d b)
+              ((proof comm for rational_mul) b d))
+      }
+  }
+
+pub theorem interval_hull_comm_inside
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_hull i j) (interval_hull j i)) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          (proof intro for bool_and)
+            (rational_leq (rational_min c a) (rational_min a c))
+            (rational_leq (rational_max b d) (rational_max d b))
+            ((proof greatest for rational_min)
+              a
+              c
+              (rational_min c a)
+              ((proof leq_right for rational_min) c a)
+              ((proof leq_left for rational_min) c a))
+            ((proof least for rational_max)
+              b
+              d
+              (rational_max d b)
+              ((proof right_leq for rational_max) d b)
+              ((proof left_leq for rational_max) d b))
+      }
+  }
+
+pub theorem interval_intersect_comm_inside
+      (i : Interval) (j : Interval)
+    : IsTrue (interval_inside (interval_intersect i j) (interval_intersect j i)) =
+  match i {
+    MkInterval a b ↦
+      match j {
+        MkInterval c d ↦
+          (proof intro for bool_and)
+            (rational_leq (rational_max c a) (rational_max a c))
+            (rational_leq (rational_min b d) (rational_min d b))
+            ((proof least for rational_max)
+              c
+              a
+              (rational_max a c)
+              ((proof right_leq for rational_max) a c)
+              ((proof left_leq for rational_max) a c))
+            ((proof greatest for rational_min)
+              d
+              b
+              (rational_min b d)
+              ((proof leq_right for rational_min) b d)
+              ((proof leq_left for rational_min) b d))
+      }
+  }
+
 theorem equiv_leq
       (x : Rational) (y : Rational)
     : rational_equiv x y → IsTrue (rational_leq x y) =
@@ -813,6 +939,13 @@ commutativity and left distributivity; `equiv_leq` turns each Rational value
 equivalence into the corresponding checked order comparison. Neither stage
 exports a new Rational law or assumes an interval commutativity law.
 
+Inclusion transitivity composes the two checked endpoint comparisons through
+Rational order transitivity. The addition and multiplication swap laws turn
+Rational value commutativity into endpoint comparisons using the existing
+private `equiv_leq` proof. Hull and intersection swaps use the checked Rational
+min/max bounds. Applying a swap law in each argument order gives mutual
+endpoint-value inclusion, not structural equality of stored intervals.
+
 A point interval contains its defining value by rational order reflexivity.
 Conversely, membership in a point interval forces order in both directions,
 so rational antisymmetry proves value equivalence. Endpoint-wise arithmetic
@@ -853,7 +986,7 @@ API.
 
 1. **Public API.** `Interval`, `MkInterval`, `interval_contains`,
    `interval_add`, `interval_mul`, `interval_point`, `interval_hull`,
-   `interval_intersect`, `interval_inside` and twenty-three checked interval
+   `interval_intersect`, `interval_inside` and twenty-eight checked interval
    laws form the public contract.
 2. **Source map.** [Definition](#2-definition) has every exported law and
    operation, [Using it](#3-using-it) checks construction and membership,
@@ -868,16 +1001,20 @@ API.
    Inclusion soundness reuses transitivity; its isotonicity reuses Rational
    monotonicity, and its four bound laws reuse those min/max proofs. The
    four distributive inclusions reuse Rational's checked `distrib_l` and
-   `comm` laws through two private proof stages.
-4. **Trusted-base delta.** Zero: all twenty-three laws have checked proof bodies,
+   `comm` laws through two private proof stages. Inclusion transitivity reuses
+   Rational order transitivity; the four swap inclusions reuse Rational
+   commutativity or public min/max bounds without a new helper.
+4. **Trusted-base delta.** Zero: all twenty-eight laws have checked proof bodies,
    and the package declares no `Axiom` or new primitive. Imported rational,
    natural-number and logical providers retain their inherited trust.
 5. **Validation.** The
    [arithmetic seed](../../../../conformance/stdlib/numerical/seed-rational-interval.md)
    [hull/intersection seed](../../../../conformance/stdlib/numerical/seed-interval-hull-intersection.md)
    [inclusion seed](../../../../conformance/stdlib/numerical/seed-interval-inclusion.md)
-   and [distributivity seed](../../../../conformance/stdlib/numerical/seed-interval-distributivity.md)
+   [distributivity seed](../../../../conformance/stdlib/numerical/seed-interval-distributivity.md)
+   and [inclusion-order seed](../../../../conformance/stdlib/numerical/seed-interval-inside-order.md)
    supply separately constructed positive values and false controls;
    those finite cases do not replace the generic checked proof bodies. The
-   distributivity seed's accepting client and dropped-product refusal run in
-   a package test, not in an official conformance-runner or CI claim.
+   distributivity seed's accepting client and dropped-product refusal, and the
+   inclusion-order seed's accepted client and two chain refusals, run in package
+   tests, not in an official conformance-runner or CI claim.
