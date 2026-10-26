@@ -30227,4 +30227,44 @@ mod class_identity_resolution_tests {
             vec![("b".to_owned(), Some(unchecked_id))]
         );
     }
+
+    /// Promise class: durable invariant (spec 36 §1.6).
+    /// MEASURED: an actual Applicative class is recognized while a checked
+    /// non-class with that same spelling is not. CLAIMED: the row-polymorphic
+    /// field contract requires checked class identity, not a name suffix.
+    /// THE GAP: the field-marker integration test exercises the caller path.
+    #[test]
+    fn dictionary_applicative_marker_requires_checked_class() {
+        let mut class_env = crate::ElabEnv::new().expect("prelude");
+        class_env
+            .elaborate_file("class Applicative a {}")
+            .expect("checked Applicative class");
+        let span = Span::zero();
+        let head = RType::RCon("Applicative".to_owned(), span.clone());
+        assert!(names_applicative_class(
+            &head,
+            &class_env.globals,
+            &class_env.class_env,
+        ));
+
+        let mut data_env = crate::ElabEnv::new().expect("prelude");
+        data_env
+            .elaborate_file("data Applicative = MkApplicative")
+            .expect("ordinary data named Applicative");
+        assert!(!names_applicative_class(
+            &head,
+            &data_env.globals,
+            &data_env.class_env,
+        ));
+        let same_spelling_wrong_id = RType::RCheckedGlobal {
+            name: "Applicative".to_owned(),
+            id: data_env.globals["Applicative"],
+            span,
+        };
+        assert!(!names_applicative_class(
+            &same_spelling_wrong_id,
+            &class_env.globals,
+            &class_env.class_env,
+        ));
+    }
 }
