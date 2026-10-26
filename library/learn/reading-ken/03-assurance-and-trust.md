@@ -56,8 +56,7 @@ Each is `proved`: the kernel re-checked the `Proved` certificate against
 its stated `Equal Bool …` claim, and this file's whole-file elaboration —
 Definition, Using it, and this Laws & proofs section together — is exactly
 what `ac4_bridge_demonstrated_over_deceq_bool_not_only_deceq_int`
-in the [acceptance producer](../../../crates/ken-elaborator/tests/ds1_empty_dec_acceptance.rs)
-exercises when
+in the [acceptance producer][empty-dec-producer] exercises when
 it loads the entry standalone
 ([§5.3](../../../spec/20-verification/21-spec-syntax.md#53-how-the-verdict-and-the-status-relate-the-projection)).
 For these two `EmptyDec` claims, the `proved` certificates add no new trust
@@ -207,10 +206,13 @@ constructs remain unavailable in these fragments.
 
 ---
 
+[empty-dec-producer]:
+  ../../../crates/ken-elaborator/src/r_layer_tests/ds1_empty_dec_acceptance.rs
+
 **Sources:**
 [verification status §§5.1–5.5](../../../spec/20-verification/21-spec-syntax.md#51-the-verdict-per-obligation-operational), and
 [trust model §§1–1.2, 4](../../../spec/60-security/64-trust-model.md#1-the-trusted-computing-base-tcb-precisely), and
 [Transport acceptance](../../../crates/ken-elaborator/tests/surface_transport_acceptance.rs), and
-[EmptyDec acceptance](../../../crates/ken-elaborator/tests/ds1_empty_dec_acceptance.rs).
+[EmptyDec acceptance][empty-dec-producer].
 This explanatory chapter interprets those sources and the registered
 [fragments](fragments.md), and it adds no language rule.

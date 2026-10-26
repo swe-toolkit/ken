@@ -131,57 +131,20 @@ re-elaborating it
 `cross_file_import_resolves_lazily_through_plural_root_api_and_caches`).
 Cross-file import is not an unimplemented language feature.
 
-What is true, and worth stating precisely rather than either overclaiming
-or underclaiming it: **no fragment in `catalog/packages/` uses `import`,
-`module`, `export`, `admits`, `capabilities`, or `program` as live code**,
-and the
-command this curriculum's fragments are checked with — `ken check`, which
-every "still checks" claim in [`fragments.md`](fragments.md) rests on —
-elaborates a single file at a time, and it does not call the roots-based
-loader this section just cited. So a catalog fragment run through `ken
-check` alone does not follow a cross-file `import` even though
-the underlying mechanism is supported and tested. That is a
-**corpus-and-tooling gap** — no fragment is written to exercise the
-mechanism, and the one CLI command used to check fragments doesn't invoke
-it — not a capability the language lacks. A whole-catalog search for these
-six forms as live code finds only prose hits. The only hits are prose:
-`README.md`'s own description of the path/import rule, and
-`Data/Sums/Combinators.ken.md`'s references section naming Haskell's
-`Data.Either` *module* as an external citation. Label the
-absence **unavailable** in checked-fragment form — the same labelling
-chapter [03](03-assurance-and-trust.md) used for `tested` and chapter
-[04](04-effects-capabilities-and-authority.md) used for capability
-tokens — but label it as a gap in what the corpus and
-its tooling exercise, not a gap in what the language can do.
+Catalog package code has live `import` and `export` declarations.
+`Core/Logic/EmptyDec.ken.md` imports and uses `sym` and `trans` from
+`Core/Logic/Transport.ken` in `dec_eq_decides`. It also imports class helpers
+and exports its declarations.
 
-`Core/Logic/EmptyDec.ken.md` does not use `import` — it re-declares two
-small lemmas it needs, and names exactly what it is doing right where it
-does it: "`sym`/`trans` are inlined from
-`catalog/packages/Core/Logic/Transport.ken` (self-containment, the same
-idiom `library/guide/proof-techniques.ken.md` uses for `cong`)." That
-sentence is Markdown prose, not checked code. The two small `ken`-fenced lemma
-re-declarations beneath it are the checked code, in the same `ken
-check`-passing file in which chapter
-[03](03-assurance-and-trust.md) grounded `proved`. Read the prose precisely,
-against the import discussion: the fragment's own word is
-"self-containment," a style choice, not a claim that cross-file `import`
-failed or could not deliver
-`Transport`'s lemmas — nothing in this entry says that, and the discussion
-already showed that claim would be false. What this fragment shows is the
-corpus gap from the inside: a checked entry
-that needed another package's declarations and, in a corpus where no
-fragment's own checking path exercises cross-file `import`, chose to
-restate them locally rather than reach for a mechanism nothing else in the
-catalog uses yet. Reading the fragment's own reason correctly — a
-convention, not a limitation — matters more than what conclusion its
-neighbor sections happen to support.
+For catalog-addressed paths, `ken check` finds the module root with
+`catalog_module_from_path`, loads its import closure through
+`elaborate_module_from_roots_v1`, and checks the entry's own fences
+(`crates/ken-cli/src/main.rs`). Catalog `ken check` therefore follows
+cross-file imports. It is not the isolated-file route used for other paths.
 
 You can now derive a package's import name from its path, separate inherited
 definitions from new trust, and check informal tier labels against the
-taxonomy. Cross-file resolution is supported and tested, but remains
-unavailable through the catalog fragments and the single-file command used
-to check them. A fragment may therefore choose self-containment without
-implying that imports are unsupported.
+taxonomy.
 
 ---
 
@@ -192,8 +155,7 @@ implying that imports are unsupported.
 [module declarations §§3.1–3.3](../../../spec/30-surface/33-declarations.md#31-declaring-modules), and
 [module acceptance](../../../crates/ken-elaborator/tests/es3_modules_acceptance.rs), and
 [loader acceptance](../../../crates/ken-elaborator/tests/n2_in_repo_loader.rs), and
-[single-file check path](../../../crates/ken-cli/src/main.rs), and
+[catalog check path](../../../crates/ken-cli/src/main.rs), and
 [registered fragments](fragments.md).
-The path sources establish addressing, while the producer tests establish
-cross-file resolution. The absence claim is limited to the catalog corpus
-and the single-file checking path.
+The path rule establishes module naming; the CLI path and loader acceptance
+establish how catalog `ken check` follows imports.
