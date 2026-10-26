@@ -103,6 +103,47 @@ pub fn walk_append
       WalkStep q g s prev end e (walk_append q g s t prev first prefix)
   }
 
+pub theorem walk_append_here_left
+      (q : Type) (g : Graph q) (s : q) (u : q) (walk : Walk q g s u)
+    : Equal (Walk q g s u) (walk_append q g s s u (WalkHere q g s) walk) walk =
+  match walk {
+    WalkHere ↦ Proved;
+    WalkStep prev end e prefix ↦
+      cong
+        (Walk q g s prev)
+        (Walk q g s end)
+        (walk_append q g s s prev (WalkHere q g s) prefix)
+        prefix
+        (λw. WalkStep q g s prev end e w)
+        (walk_append_here_left q g s prev prefix)
+  }
+
+pub theorem walk_append_assoc
+      (q : Type)
+      (g : Graph q)
+      (s : q)
+      (t : q)
+      (u : q)
+      (v : q)
+      (first : Walk q g s t)
+      (second : Walk q g t u)
+      (third : Walk q g u v)
+    : Equal
+        (Walk q g s v)
+        (walk_append q g s u v (walk_append q g s t u first second) third)
+        (walk_append q g s t v first (walk_append q g t u v second third)) =
+  match third {
+    WalkHere ↦ Refl;
+    WalkStep prev end e prefix ↦
+      cong
+        (Walk q g s prev)
+        (Walk q g s end)
+        (walk_append q g s u prev (walk_append q g s t u first second) prefix)
+        (walk_append q g s t prev first (walk_append q g t u prev second prefix))
+        (λw. WalkStep q g s prev end e w)
+        (walk_append_assoc q g s t u prev first second prefix)
+  }
+
 pub fn graph_reachable
       (q : Type) (fq : Finite q) (g : Graph q) (s : q) (target : q → Bool)
     : Bool =
@@ -418,7 +459,11 @@ uniqueness or coverage premise. The first edge of a `Cycle` and its
 return `Walk` would force an order to place its start before itself;
 only the `all_edges_forward` field is needed to derive the contradiction.
 `walk_append` recurses on the second walk, preserving the first walk and
-appending the second walk's final checked edge. An order's forward-edge
+appending the second walk's final checked edge. Induction on that walk proves
+left `WalkHere` identity: the base reduces, and congruence carries the prefix
+hypothesis through the final `WalkStep`. Induction on the third walk likewise
+proves associativity, preserving every edge; right `WalkHere` identity remains
+a reduction, with no additional public theorem. An order's forward-edge
 field places a walk's first edge ahead; the existing `walk_before` lemma
 transports that ordering through the rest of the walk. The Boolean step
 proofs reuse the private `before_step` scan helper.
@@ -2171,16 +2216,19 @@ checked first edge gives a strict ordering claim.
 
 ## 7. Trust & derivation
 
-The behavioral contract is [graphs §§1–3](../../../../spec/50-stdlib/62-graphs.md).
+The behavioral contract is [graphs §§1–4](../../../../spec/50-stdlib/62-graphs.md).
 The [§1 seed](../../../../conformance/stdlib/graphs/seed-dependency.md)
 covers the original graph and order behavior; the §2 seed covers the
-cycle/order exclusion; the
+cycle/order exclusion. The
 [§3 seed](../../../../conformance/stdlib/graphs/seed-walk-composition-order.md)
 checks two-edge walk composition, forward ordering, and the paired
-reversed-order refusal in a package-owned test. The public API is the
-graph, path and certificate types, their constructors, the walk-append
-operation, the predicate-reachability decision and witness, the
-dependency-order operation, five list/order predicates, and eleven
+reversed-order refusal. The
+[§4 seed](../../../../conformance/stdlib/graphs/seed-walk-append-unit-assoc.md)
+checks left unit, three positions of `WalkHere` in associativity, the
+same-route control, and the other-route refusal in a package-owned test.
+The public API is the graph, path and certificate types, their constructors,
+the walk-append operation, the predicate-reachability decision and witness,
+the dependency-order operation, five list/order predicates, and thirteen
 kernel-checked laws. Every other helper is private to this package.
 
 | Reader task | Section |
@@ -2197,7 +2245,9 @@ binding, postulate or `trusted_base()` entry; this does not erase inherited
 assumptions of imported providers. The existing graph seed and targeted
 acceptance suite exercise the §1 behavior cases, generic law clients,
 exact public ownership and the package-local trust delta. The separate
-§3 package test root-loads the two added exports, exercises the §3 seed,
-and checks that their private proof dependency stays unimportable; this
-is not official conformance-runner execution or CI. Neither suite
-establishes execution of the §2 seed.
+§3 package test root-loads walk composition and forward order, exercises the
+§3 seed, and checks that their private proof dependency stays unimportable.
+The §4 package test root-loads both walk laws, checks their generic public
+types and zero local trust delta, and exercises the §4 seed's accepted and
+refused clients. These are package tests, not official conformance-runner
+execution or CI. Neither suite establishes execution of the §2 seed.

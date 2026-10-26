@@ -107,7 +107,12 @@ fn generic_walk_exports_are_checked_private_and_trust_free() {
     );
     assert_eq!(after, before, "§3 adds no trusted GlobalId identities");
 
-    for name in ["walk_append", "ordered_walk_forward"] {
+    for name in [
+        "walk_append",
+        "walk_append_here_left",
+        "walk_append_assoc",
+        "ordered_walk_forward",
+    ] {
         let id = env.globals[&format!("{GRAPH}.{name}")];
         assert!(owned.contains(&id), "{name} belongs to graph package");
         assert!(
