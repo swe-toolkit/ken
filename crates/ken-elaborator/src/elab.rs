@@ -17270,37 +17270,45 @@ fn projected_class_field_row_type(
 }
 
 fn class_id_for_dictionary_type(
+    env: &GlobalEnv,
     class_env: &ClassEnv,
     globals: &HashMap<String, GlobalId>,
     ty: &RType,
 ) -> Option<Option<GlobalId>> {
-    let head = match ty { RType::RApp(f, _, _) => f.as_ref(), _ => ty };
-    match head {
-        RType::RCheckedGlobal { id, .. } => {
-            // A known record is not a class. An unknown selected owner must
-            // not disappear from a purity check as an empty effect row.
-            (class_env.class_by_id(*id).is_some()
-                || class_env.projection_by_type_id(*id).is_none()).then_some(Some(*id))
-        }
+    let mut head = ty;
+    while let RType::RApp(f, _, _) = head {
+        head = f.as_ref();
+    }
+    let id = match head {
+        RType::RCheckedGlobal { id, .. } => *id,
         RType::RCon(name, _) => match globals.get(name).copied() {
-            Some(id) if class_env.class_by_id(id).is_some()
-                || class_env.projection_by_type_id(id).is_none() => Some(Some(id)),
-            Some(_) => None, // a checked record is not a class
-            None => Some(None), // unknown owner must not become an empty row
+            Some(id) => id,
+            None => return Some(None), // unknown owner must not become an empty row
         },
-        _ => None,
+        _ => return None,
+    };
+    if class_env.class_by_id(id).is_some() {
+        Some(Some(id))
+    } else if env.lookup(id).is_some() {
+        // A checked non-class declaration (record, data, alias) binds no
+        // dictionary; projecting it takes the ordinary record path.
+        None
+    } else {
+        // An id with no checked declaration stays an unknown owner.
+        Some(Some(id))
     }
 }
 
 fn collect_bound_dictionary_params(
     ty: Option<&RType>,
+    env: &GlobalEnv,
     globals: &HashMap<String, GlobalId>,
     class_env: &ClassEnv,
 ) -> Vec<(String, Option<GlobalId>)> {
     let mut dicts = Vec::new();
     let mut cur = ty;
     while let Some(RType::RPi(name, domain, codomain, _)) = cur {
-        if let Some(class_id) = class_id_for_dictionary_type(class_env, globals, domain) {
+        if let Some(class_id) = class_id_for_dictionary_type(env, class_env, globals, domain) {
             dicts.push((name.clone(), class_id));
         }
         cur = Some(codomain);
@@ -17469,7 +17477,8 @@ pub(crate) fn check_surface_purity(
     };
 
     let declared = surface_declared_row_type(rdecl)?.unwrap_or_else(crate::effects::RowType::empty);
-    let bound_dict_classes = collect_bound_dictionary_params(rdecl.ty.as_ref(), globals, class_env);
+    let bound_dict_classes =
+        collect_bound_dictionary_params(rdecl.ty.as_ref(), env, globals, class_env);
     let projection_ctx = ProjectionPurityCtx {
         env,
         globals,
@@ -30131,7 +30140,7 @@ mod class_identity_resolution_tests {
             Box::new(RType::RCon("Nat".to_owned(), span.clone())),
             span.clone(),
         );
-        let dictionaries = collect_bound_dictionary_params(Some(&ty), &elab.globals, &elab.class_env);
+        let dictionaries = collect_bound_dictionary_params(Some(&ty), &elab.env, &elab.globals, &elab.class_env);
         assert_eq!(dictionaries, vec![("d".to_owned(), None)]);
         let ctx = ProjectionPurityCtx {
             env: &elab.env,
@@ -30144,5 +30153,77 @@ mod class_identity_resolution_tests {
             &RExpr::RVar(0, "d".to_owned(), span), "step", Some(&ctx),
         );
         assert_eq!(projected, crate::effects::RowType::singleton("unknown checked class owner"));
+    }
+
+    /// Promise class: durable invariant (spec 36 §1.6).
+    /// MEASURED: a checked non-class binds no dictionary in either reference
+    /// form, while a two-argument class head and an unchecked id stay bound.
+    /// CLAIMED: purity classification uses checked identity, not a negative
+    /// record test or the depth of the application spine. THE GAP: the unit
+    /// test checks the classifier; the refinement fixture checks its caller.
+    #[test]
+    fn checked_non_class_domain_binds_no_dictionary() {
+        let mut elab = crate::ElabEnv::new().expect("prelude");
+        elab.elaborate_file("class C a {}")
+            .expect("checked class fixture");
+        let span = Span::zero();
+        let pi = |domain: RType| {
+            RType::RPi(
+                "b".to_owned(),
+                Box::new(domain),
+                Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+                span.clone(),
+            )
+        };
+        let dictionaries = |domain| {
+            collect_bound_dictionary_params(
+                Some(&pi(domain)),
+                &elab.env,
+                &elab.globals,
+                &elab.class_env,
+            )
+        };
+        assert!(dictionaries(RType::RCon("Nat".to_owned(), span.clone())).is_empty());
+        let nat_id = elab.globals["Nat"];
+        assert!(dictionaries(RType::RCheckedGlobal {
+            name: "Nat".to_owned(),
+            id: nat_id,
+            span: span.clone(),
+        })
+        .is_empty());
+
+        let class_id = elab.globals["C"];
+        assert!(elab.class_env.class_by_id(class_id).is_some());
+        let class_head = RType::RApp(
+            Box::new(RType::RApp(
+                Box::new(RType::RCon("C".to_owned(), span.clone())),
+                Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+                span.clone(),
+            )),
+            Box::new(RType::RCon("Nat".to_owned(), span.clone())),
+            span.clone(),
+        );
+        assert_eq!(
+            dictionaries(class_head),
+            vec![("b".to_owned(), Some(class_id))]
+        );
+        assert_eq!(
+            dictionaries(RType::RCheckedGlobal {
+                name: "selected class".to_owned(),
+                id: class_id,
+                span: span.clone(),
+            }),
+            vec![("b".to_owned(), Some(class_id))]
+        );
+        let unchecked_id = GlobalId(u32::MAX);
+        assert!(elab.env.lookup(unchecked_id).is_none());
+        assert_eq!(
+            dictionaries(RType::RCheckedGlobal {
+                name: "unknown selected owner".to_owned(),
+                id: unchecked_id,
+                span,
+            }),
+            vec![("b".to_owned(), Some(unchecked_id))]
+        );
     }
 }
